@@ -1,5 +1,7 @@
 node_modules
 dist
 server/bin/
+main-merge-check/
+fish-stand-check/
 .DS_Store
 *.log
