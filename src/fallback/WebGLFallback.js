@@ -1101,11 +1101,12 @@ export class WebGLFallback {
 			console.warn( 'WebGL fallback village model unavailable:', error );
 		}
 		await this._loadVegetation();
-		this.spawn = { position: [ 53.6, this.terrain.heightAt( 53.6, -77 ) + 1.7, -77 ], yaw: Math.PI, pitch: - 0.05 };
+		const start = WORLD.start || WORLD.spawn;
+		this.spawn = { position: [ start.position.x, this.terrain.heightAt( start.position.x, start.position.z ) + 1.7, start.position.z ], yaw: start.yaw, pitch: - 0.05 };
 		this.groundHeight = ( x, z ) => this.terrain.heightAt( x, z );
-		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( 53.6, 0, -77 ) } );
+		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position.x, 0, start.position.z ) } );
 		this.scene.add( this.grass );
-		this.grassCenter = new T.Vector2( 53.6, -77 );
+		this.grassCenter = new T.Vector2( start.position.x, start.position.z );
 		this.worldName.textContent = 'WebGL mode · island rendering simplified';
 		progress( 0.9, 'Starting the WebGL island…' );
 
@@ -1117,7 +1118,8 @@ export class WebGLFallback {
 			const response = await fetch( vegetationUrl );
 			if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 			const records = decodeVegetationPlacements( new Uint8Array( await response.arrayBuffer() ), 7 );
-			const T = this.THREE, center = [ 53.6, -77 ], group = new T.Group();
+			const start = WORLD.start || WORLD.spawn;
+			const T = this.THREE, center = [ start.position.x, start.position.z ], group = new T.Group();
 			const material = webglPlantMaterial( T ), anchoredMaterial = webglPlantMaterial( T, true );
 			const distance = record => Math.hypot( record.x - center[ 0 ], record.z - center[ 1 ] );
 			const add = ( kind, build, maxDistance, heightScale, castShadow = false, anchored = false ) => {
