@@ -861,3 +861,35 @@ library. The Android binary is an AArch64 PIE using `/system/bin/linker64`;
 its SHA-256 is `27de51fd0e509991ddbc3d59f5de344cca8ffac7eed6c19e07d0769a8ccf55b4`.
 No Android device is currently connected through ADB, so installation, normal
 peer ECHO cadence, and post-fix threat scoring remain unverified on the Flip7.
+
+### Ten-per-second ECHO threshold rebuilt and checked (2026-10-11)
+
+The current ZeroTierOne `exp3` source is commit
+`9cf0e785ee8c918eb2a1c3fd601f3ff019eec15d`. It sets
+`ZT_PEER_ECHO_RATE_LIMIT` to ten replies per second; `Path::rateGateEchoRequest`
+therefore permits a reply after at least 100 ms. The designed maximum normal
+heartbeat cadence is six replies per second. `SecurityMonitor` classifies a
+suppressed `SEC_EXCESSIVE_ECHO` as a rate-limit hit rather than a protocol
+violation.
+
+The current Linux `libzt.so` was rebuilt from that checkout and bundled beside
+`thruholdd`; both copies have SHA-256
+`26f663cb601b0882649a2a4f824ef53a858f83c177139988f87f436f70304454`. Two
+disposable Linux daemons using this build joined the dedicated network and
+held a libp2p/DHT peer connection for 75 seconds. Both health responses
+reported one libp2p peer and one DHT routing peer, and neither daemon emitted
+an `EXCESSIVE_ECHO` event during that interval. This checks normal connected
+operation, not a deliberate over-limit burst or the resulting rate-limit
+score.
+
+The Android arm64 library was also rebuilt against the same ZeroTierOne
+checkout with NDK r29/API 26. Its SHA-256 is
+`b366353d832c8a8d3b0df8d7860c3ebf9687aea72ce55bfa1d55e3732438126d`. A new
+Android `thruholdd` was built from ElseMesh revision
+`041ecb8cae3972179dfb427c808a02822fbe36a2`; the bundled library hash matches
+the CMake output. `file` and `llvm-readelf` confirm an Android AArch64/API 26
+binary, `/system/bin/linker64`, `$ORIGIN` runpath, and the bundled `libzt.so`
+dependency. This cross-build supersedes the older Android package hashes in
+the preceding section, but it has not been installed or run on a phone.
+Current ADB lists no device, and SSH to the Flip7's configured LAN address
+returns `No route to host`.
