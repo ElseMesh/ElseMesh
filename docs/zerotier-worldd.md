@@ -942,3 +942,20 @@ Both starts joined as ZeroTier node `a5a50a281d` and received IPv4
 starts; the temporary world and ZeroTier data were removed after verification.
 This verifies persistence across a daemon restart with the current Linux build,
 not across a software upgrade, a device reboot, or on Android.
+
+The actual upgrade path was also exercised using an external build of the
+pre-migration parent revision `2cb4840` followed by the current `thruholdd`
+build. The older daemon created its libzt state at
+`$XDG_CONFIG_HOME/tidewater/worldd/zerotier`; the current daemon migrated it to
+`$XDG_CONFIG_HOME/elsemesh/zerotier` without an explicit network-ID argument.
+The node remained `c68d92f7a8`, its 6PLANE address remained
+`fc60:bbbd:e2c6:8d92:f7a8::1`, and the exact `identity.secret` contents were
+preserved with mode `0600`. The current daemon also received IPv4
+`172.22.160.101`. Both daemons were stopped between runs and the isolated test
+configuration was removed. This validates the tested legacy-to-current Linux
+migration; Android upgrade behavior still needs a device test.
+
+The full ZeroTier-tagged daemon suite passed on 2026-10-11 from the external
+`.make/server` tree with explicit libzt include and library paths. It was run
+in a network-enabled shell because the restricted shell cannot enumerate local
+network interfaces or launch the headless Chromium integration test.
