@@ -72,3 +72,30 @@ enough to call it a controlled match or sign off on visual parity. The retained
 captures show the [current playable scene](images/flip7-virtual-current-2026-10-10.png)
 and the [original playable scene](images/flip7-virtual-baseline-playable-2026-10-10.png).
 Neither physical Flip7 display was targeted.
+
+## Direct unlisted gateway on Flip7, 2026-10-11
+
+The current hosted client was opened with a direct Example Island invite through
+an unlisted Cloudflare Quick Tunnel to the local `thruholdd` gateway. The public
+`/healthz` endpoint returned HTTP 200. No gateway was published to the Worker
+directory or DHT; the random Quick Tunnel URL was shared directly for this
+test and was not added to project documentation or discovery. The tunnel is
+temporary, has no uptime guarantee, and anyone who obtains its URL can reach
+the gateway and served content.
+
+Chrome ran only on scrcpy virtual display 30 (720×1600; SurfaceFlinger ID
+`11529215048683042661`). The initial invite reached the hosted loading page,
+then the playable pier view. The on-screen stamp `8340dfcd` matched the
+`main` HEAD at capture time, and the HUD reported about 54 FPS. The pier wood,
+beach, and water rendered without the earlier white-texture failure. The
+captured view is available at
+[the Flip7 direct-gateway screenshot](images/flip7-unlisted-direct-gateway-2026-10-11.png).
+
+This verifies one public HTTPS/WSS gateway path and the start area on one
+device. It does not establish an independent-network/NAT test, relay or WebRTC
+fallback, portal traversal, matched visual parity against the original, or
+persistent gateway availability. A desktop Chrome attempt remains unable to
+create either a WebGPU adapter or WebGL context, so it could not render the
+scene. During the first phone launch attempt, shell handling split the invite
+URL at its `&` separators; quoting the complete remote `am start` command fixed
+the test invocation. No source change was needed for that issue.
