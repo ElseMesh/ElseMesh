@@ -3,6 +3,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { TerrainData } from '../world/TerrainData.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
+import { keyboardLookDelta } from '../core/Input.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
@@ -11,6 +12,41 @@ import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/island/lod-source/vegetation-placements.bin?url';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
+
+function webglGrassMesh( T, terrain, camera, previous ) {
+
+	const radius = 42, spacing = 0.62, positions = [], colors = [], indices = [];
+	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
+	const hash = ( x, z ) => { let n = Math.imul( x, 0x1f123bb5 ) ^ Math.imul( z, 0x5f356495 ); n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b ); return ( n ^ n >>> 16 ) >>> 0; };
+	const addBlade = ( x, z, y, angle, height, width, color ) => {
+		const dx = Math.cos( angle ), dz = Math.sin( angle ), bend = 0.12 + height * 0.16, sx = - dz * width, sz = dx * width, base = positions.length / 3;
+		positions.push( x - sx, y, z - sz, x + sx, y, z + sz, x + dx * bend - sx * 0.3, y + height * 0.72, z + dz * bend + sz * 0.3, x + dx * bend + sx * 0.3, y + height * 0.72, z + dz * bend - sz * 0.3, x + dx * bend * 1.8, y + height, z + dz * bend * 1.8 );
+		for ( let v = 0; v < 5; v ++ ) { const f = v === 4 ? 1.18 : v < 2 ? 0.76 : 1.08; colors.push( color[ 0 ] * f, color[ 1 ] * f, color[ 2 ] * f ); }
+		indices.push( base, base + 1, base + 2, base + 1, base + 3, base + 2, base + 2, base + 3, base + 4 );
+	};
+	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
+		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
+		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
+		if ( d > radius || rand( 3 ) > 0.58 ) continue;
+		const terrainIndex = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) ) * terrain.res + Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
+		const h = terrain.heightAt( x, z );
+		if ( h < 2.6 || h > 76 || terrain.rock[ terrainIndex ] > 0.42 || terrain.sand[ terrainIndex ] > 86 || terrain.path[ terrainIndex ] > 72 ) continue;
+		const density = Math.min( 1, Math.max( 0.18, ( 1 - ( d / radius ) ** 3 ) * 1.25 ));
+		if ( rand( 4 ) > density ) continue;
+		const baseAngle = rand( 5 ) * Math.PI * 2, height = 0.38 + rand( 6 ) * 0.48, tone = rand( 7 );
+		const color = [ 0.12 + tone * 0.07, 0.25 + tone * 0.1, 0.075 + tone * 0.035 ];
+		for ( let blade = 0; blade < 3; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI / 3 + rand( blade + 8 ) * 0.18, height * ( 0.82 + rand( blade + 11 ) * 0.32 ), 0.018 + rand( blade + 14 ) * 0.009, color );
+	}
+	const geometry = new T.BufferGeometry();
+	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
+	geometry.setAttribute( 'color', new T.Float32BufferAttribute( colors, 3 ) );
+	geometry.setIndex( indices ); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
+	const mesh = new T.Mesh( geometry, new T.MeshStandardMaterial( { vertexColors: true, side: T.DoubleSide, roughness: 1 } ) );
+	mesh.name = 'WebGL camera-following grass'; mesh.frustumCulled = false; mesh.renderOrder = 1;
+	if ( previous ) { previous.geometry.dispose(); previous.material.dispose(); }
+	return mesh;
+
+}
 
 function webglPlantGeometry( T, source ) {
 
@@ -303,6 +339,9 @@ export class WebGLFallback {
 		await this._loadVegetation();
 		this.spawn = { position: [ 53.6, this.terrain.heightAt( 53.6, -77 ) + 1.7, -77 ], yaw: Math.PI, pitch: - 0.05 };
 		this.groundHeight = ( x, z ) => this.terrain.heightAt( x, z );
+		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( 53.6, 0, -77 ) } );
+		this.scene.add( this.grass );
+		this.grassCenter = new T.Vector2( 53.6, -77 );
 		this.worldName.textContent = 'WebGL mode · island rendering simplified';
 		progress( 0.9, 'Starting the WebGL island…' );
 
@@ -450,7 +489,7 @@ export class WebGLFallback {
 			if ( ! object.isMesh ) return;
 			const bounds = new T.Box3().setFromObject( object );
 			const size = bounds.getSize( new T.Vector3() );
-			if ( ! bounds.isEmpty() && size.x > 0.5 && size.z > 0.5 && size.x < 90 && size.z < 90 && size.y > 0.5 ) this.blockers.push( { bounds, yaw: 0, centerX: ( bounds.min.x + bounds.max.x ) / 2, centerZ: ( bounds.min.z + bounds.max.z ) / 2, halfX: size.x / 2, halfZ: size.z / 2 } );
+			if ( ! bounds.isEmpty() && size.x > 0.5 && size.z > 0.5 && size.x < 22 && size.z < 22 && size.y > 1 && size.y < 24 ) this.blockers.push( { bounds, yaw: 0, centerX: ( bounds.min.x + bounds.max.x ) / 2, centerZ: ( bounds.min.z + bounds.max.z ) / 2, halfX: size.x / 2, halfZ: size.z / 2, minY: bounds.min.y, maxY: bounds.max.y } );
 		} );
 
 	}
@@ -539,6 +578,7 @@ export class WebGLFallback {
 	_bindInput() {
 
 		this._keyDown = event => {
+			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
 			this.keys.add( event.code );
 			if ( event.code === 'KeyE' ) this._useNearestPortal();
 			if ( event.code === 'Space' ) { event.preventDefault(); if ( this.onGround ) this.velocityY = 5; }
@@ -606,12 +646,16 @@ export class WebGLFallback {
 		const forward = new T.Vector3( - Math.sin( this.yaw ), 0, - Math.cos( this.yaw ) );
 		const right = new T.Vector3( Math.cos( this.yaw ), 0, - Math.sin( this.yaw ) );
 		const move = new T.Vector3();
-		if ( this.keys.has( 'KeyW' ) || this.keys.has( 'ArrowUp' ) ) move.add( forward );
-		if ( this.keys.has( 'KeyS' ) || this.keys.has( 'ArrowDown' ) ) move.sub( forward );
-		if ( this.keys.has( 'KeyD' ) || this.keys.has( 'ArrowRight' ) ) move.add( right );
-		if ( this.keys.has( 'KeyA' ) || this.keys.has( 'ArrowLeft' ) ) move.sub( right );
+		if ( this.keys.has( 'KeyW' ) ) move.add( forward );
+		if ( this.keys.has( 'KeyS' ) ) move.sub( forward );
+		if ( this.keys.has( 'KeyD' ) ) move.add( right );
+		if ( this.keys.has( 'KeyA' ) ) move.sub( right );
 		move.addScaledVector( forward, - this.moveStick.y );
 		move.addScaledVector( right, this.moveStick.x );
+		const look = keyboardLookDelta( this.keys, dt );
+		this.yaw -= look.x * 0.0022;
+		this.pitch = Math.max( - 1.45, Math.min( 1.45, this.pitch - look.y * 0.0022 ) );
+		this._look();
 		if ( move.lengthSq() ) {
 			move.normalize().multiplyScalar( speed * dt );
 			const old = this.camera.position.clone();
@@ -624,6 +668,13 @@ export class WebGLFallback {
 		this.velocityY -= 14 * dt;
 		this.camera.position.y += this.velocityY * dt;
 		if ( this.camera.position.y <= floor ) { this.camera.position.y = floor; this.velocityY = 0; this.onGround = true; } else this.onGround = false;
+		const grassDx = this.camera.position.x - this.grassCenter.x, grassDz = this.camera.position.z - this.grassCenter.y;
+		if ( this.grass && grassDx * grassDx + grassDz * grassDz > 64 ) {
+			this.scene.remove( this.grass );
+			this.grass = webglGrassMesh( T, this.terrain, this.camera, this.grass );
+			this.scene.add( this.grass );
+			this.grassCenter.set( this.camera.position.x, this.camera.position.z );
+		}
 		this.renderer.render( this.scene, this.camera );
 
 	}
