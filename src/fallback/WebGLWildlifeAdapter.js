@@ -2,6 +2,8 @@ import { Birds } from '../world/wildlife/Birds.js';
 import { Shorebirds } from '../world/wildlife/Shorebirds.js';
 import { SPECIES } from '../world/wildlife/BirdSpecies.js';
 import { buildBird } from '../world/wildlife/BirdShapes.js';
+import { sunDirectionFromTime } from '../sky/Sky.js';
+import { smooth } from '../world/wildlife/WildlifeMath.js';
 
 const BODY_COLORS = [ 0xe8e4d9, 0xf1eadc, 0x80634d, 0x30291f, 0xbca77e ];
 const WING_COLORS = [ 0x777d7a, 0x757d7b, 0x55483f, 0x211d19, 0x8c795e ];
@@ -100,8 +102,8 @@ export class WebGLWildlifeAdapter {
 		v.speed = Math.hypot( p.x - v.px, p.z - v.pz ) / Math.max( dt, 1e-3 );
 		v.x = p.x; v.y = p.y - 1.6; v.z = p.z;
 		v.px = p.x; v.pz = p.z;
-		this.environment.night = Math.max( 0, 1 - Math.abs( timeOfDay - 12 ) / 8 );
-		this.environment.sunY = Math.max( 0.05, Math.sin( ( timeOfDay - 6 ) / 12 * Math.PI ) );
+		this.environment.sunY = sunDirectionFromTime( timeOfDay ).y;
+		this.environment.night = smooth( 0.02, 0.18, - this.environment.sunY );
 		this.birds.step( dt, v, this.environment );
 		this.shorebirds.step( dt, v, p, this.environment );
 		this._writePopulation( this.birds.agents.map( ( agent ) => agent.f.P ), this.speciesMeshes );

@@ -12,6 +12,7 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
+import { WebGLCrabAdapter } from './WebGLCrabAdapter.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
@@ -627,6 +628,12 @@ export class WebGLFallback {
 		this.camera.position.set( ...this.spawn.position );
 		if ( ! this.worldLink ) {
 			this.boat = new WebGLBoatAdapter( T, this.scene );
+			const vegetation = this.vegetationRecords ? { records: this.vegetationRecords } : null;
+			this.crabs = new WebGLCrabAdapter( T, this.scene, {
+				terrain: this.terrain,
+				colliders: this.app.worldState.colliders,
+				vegetation,
+			} );
 			this.wildlife = new WebGLWildlifeAdapter( T, this.scene, {
 				terrain: this.terrain,
 				colliders: this.app.worldState.colliders,
@@ -1130,6 +1137,7 @@ export class WebGLFallback {
 			const response = await fetch( vegetationUrl );
 			if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 			const records = decodeVegetationPlacements( new Uint8Array( await response.arrayBuffer() ), 7 );
+			this.vegetationRecords = records;
 			const start = WORLD.start || WORLD.spawn;
 			const T = this.THREE, center = [ start.position[ 0 ], start.position[ 2 ] ], group = new T.Group();
 			const material = webglPlantMaterial( T ), anchoredMaterial = webglPlantMaterial( T, true );
@@ -1478,6 +1486,7 @@ export class WebGLFallback {
 			}
 		}
 		this.wildlife?.update( dt, this.camera, this.app.settings.timeOfDay );
+		this.crabs?.update( dt, this.camera, this.app.settings.timeOfDay );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
 		if ( this.waterScene.children.length && ! this.debugNoWater ) {

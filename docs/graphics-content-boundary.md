@@ -47,8 +47,12 @@ uses the same `BoatController` state. It currently has no WebGL water-query
 adapter, so the boat remains at its shared mooring state. `WebGLWildlifeAdapter`
 constructs the same `Birds` and `Shorebirds` simulations as WebGPU and presents
 their states with Three.js instanced meshes and simplified materials/poses.
-Crabs and the shore probe are not yet connected. These adapters do not remove
-the early return or the separately loaded WebGL island scene.
+`WebGLCrabAdapter` now consumes the same `Crabs` simulation, `CrabPresentation`
+records, and `CritterShapes` body geometry; it presents burrows, crab bodies,
+and gait-driven limb segments through instanced Three.js meshes. The crab
+material and burrow surface remain simplified, and the shore probe is not yet
+connected. These adapters do not remove the early return or the separately
+loaded WebGL island scene.
 
 ## Migration order
 
