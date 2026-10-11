@@ -879,8 +879,11 @@ disposable Linux daemons using this build joined the dedicated network and
 held a libp2p/DHT peer connection for 75 seconds. Both health responses
 reported one libp2p peer and one DHT routing peer, and neither daemon emitted
 an `EXCESSIVE_ECHO` event during that interval. This checks normal connected
-operation, not a deliberate over-limit burst or the resulting rate-limit
-score.
+operation. A temporary direct `Path` harness also verified that six replies
+spaced 166 ms apart are accepted, intervals shorter than 100 ms are rejected,
+and a 1 ms burst permits ten replies across its 1,000 ms sample. It did not
+inject an over-limit packet burst through a live ZeroTier peer or inspect the
+resulting production threat score.
 
 The Android arm64 library was also rebuilt against the same ZeroTierOne
 checkout with NDK r29/API 26. Its SHA-256 is
