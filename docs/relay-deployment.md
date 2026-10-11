@@ -209,6 +209,26 @@ browser-origin behavior, DHT discovery, WebRTC, relay fallback, portal
 traversal, or a persistent deployment. Do not use the ephemeral URL as an
 invite or production endpoint.
 
+### Unlisted route recheck (2026-10-11)
+
+After the user authorized direct, unadvertised exposure for testing, a fresh
+`worldd` was built from `main` (`b0ff24e`, SHA-256
+`4b910bdef103a8f0fbf9dadef539e9c694cdeffa356f71d3a137a21d34e22293`). A
+temporary profile served the checked-in Example Island on loopback through a
+Cloudflare Quick Tunnel. The profile had `discoverable: false`, used DHT client
+mode, and published no Worker or DHT advertisement. The signed manifest
+contained 38 components and 59 assets.
+
+Through the temporary public URL, `/healthz` and the signed manifest returned
+HTTP 200, the hosted client returned HTTP 200, and `/gateway` accepted a WSS
+upgrade (HTTP 101) for the configured `https://elsemesh.org` origin. The
+WebSocket remained open until the smoke-test timeout; this checked the upgrade,
+not the browser application protocol or asset transfer. The request round trip
+used the development host's outbound connection, so it is not an independent
+network/NAT test or a rendered-browser verification. The daemon, tunnel, and
+temporary world identity/profile were stopped and removed immediately after the
+check. The URL is intentionally omitted and was not added to discovery.
+
 The host ZeroTier One service reported active, but `/usr/sbin/zerotier-cli`
 could not read its authentication token in the current execution environment.
 Do not infer that the dedicated ElseMesh network is joined from the interface
