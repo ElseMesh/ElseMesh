@@ -851,3 +851,17 @@ Android libzt build. This verifies cross-compilation and packaging only. The
 Flip7 currently has no ADB transport, and SSH to its configured LAN address
 returns `No route to host`, so this binary has not been installed or exercised
 on the phone.
+
+### ECHO accounting fix packaged for Linux and Android (2026-10-11)
+
+ZeroTierOne `bf5dfff60` changes only threat accounting for ECHOs rejected by
+the existing six-per-second per-path reply gate. The Linux CMake build and
+Android NDK r29/API 26 CMake build both recompiled
+`node/SecurityMonitor.cpp`; both resulting `thruholdd` packages include the
+matching `libzt.so`. Linux library SHA-256: `f40aad27b0e056365a55b1695b4d724592b733ba6170559ebcdbd2a1e0da6a7a`;
+Android library SHA-256: `e594d8c8c5c433e9d585fa58ee57d5a2b202751ef5c6443be3d6874dee8794dd`.
+The Linux `thruholdd --help` smoke check passed and `ldd` resolved its bundled
+library. The Android binary is an AArch64 PIE using `/system/bin/linker64`;
+its SHA-256 is `27de51fd0e509991ddbc3d59f5de344cca8ffac7eed6c19e07d0769a8ccf55b4`.
+No Android device is currently connected through ADB, so installation, normal
+peer ECHO cadence, and post-fix threat scoring remain unverified on the Flip7.
