@@ -578,12 +578,14 @@ export class WebGLFallback {
 	_bindInput() {
 
 		this._keyDown = event => {
+			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
 			this.keys.add( event.code );
 			if ( event.code === 'KeyE' ) this._useNearestPortal();
 			if ( event.code === 'Space' ) { event.preventDefault(); if ( this.onGround ) this.velocityY = 5; }
 		};
 		this._keyUp = event => this.keys.delete( event.code );
+		this._clearKeys = () => this.keys.clear();
 		this._mouse = event => {
 			if ( document.pointerLockElement !== this.engine.canvas ) return;
 			this.yaw -= event.movementX * 0.002;
@@ -623,8 +625,10 @@ export class WebGLFallback {
 			this.camera.updateProjectionMatrix();
 			this.renderer.setSize( w, h );
 		};
-		window.addEventListener( 'keydown', this._keyDown );
-		window.addEventListener( 'keyup', this._keyUp );
+		// Capture key events before UI descendants can stop them from reaching the fallback.
+		window.addEventListener( 'keydown', this._keyDown, true );
+		window.addEventListener( 'keyup', this._keyUp, true );
+		window.addEventListener( 'blur', this._clearKeys );
 		window.addEventListener( 'mousemove', this._mouse );
 		document.addEventListener( 'pointerlockchange', this._lockChange );
 		this.requestLock = () => this.engine.canvas.requestPointerLock?.();
