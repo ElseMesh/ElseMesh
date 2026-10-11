@@ -864,13 +864,18 @@ func securityHeaders(next http.Handler) http.Handler {
 
 func (d *daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	libp2pPeers := len(d.host.Network().Peers())
+	dhtRoutingPeers := 0
+	if d.dht != nil && d.dht.RoutingTable() != nil {
+		dhtRoutingPeers = d.dht.RoutingTable().Size()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":      "ok",
-		"nodeId":      d.host.ID().String(),
-		"worldId":     d.world.WorldID,
-		"protocol":    manifestProtocol,
-		"libp2pPeers": libp2pPeers,
-		"dhtPeers":    libp2pPeers, // Deprecated compatibility alias; this is not ZeroTier status.
+		"status":          "ok",
+		"nodeId":          d.host.ID().String(),
+		"worldId":         d.world.WorldID,
+		"protocol":        manifestProtocol,
+		"libp2pPeers":     libp2pPeers,
+		"dhtRoutingPeers": dhtRoutingPeers,
+		"dhtPeers":        libp2pPeers, // Deprecated compatibility alias; this is not DHT or ZeroTier status.
 	})
 }
 

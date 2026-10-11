@@ -27,6 +27,7 @@ try {
 	assert.equal( detailImage.data.length, 512 * 512 * 4, 'CPU detail image retains the exact shared RGBA data layout' );
 	const checkedInDir = path.resolve( 'worlds/island' );
 	const checkedInSourceBytes = await readFile( path.join( checkedInDir, 'world-source.json' ) );
+	const checkedInTerrainReportBytes = await readFile( path.join( checkedInDir, 'terrain-validation.json' ) );
 	const checkedInSource = validateWorldSource( JSON.parse( checkedInSourceBytes ) );
 	const referencedIDs = ( source ) => new Set( [ ...source.objects.flatMap( ( object ) => [ object.assetId, ...( object.lods || [] ).map( ( lod ) => lod.assetId ) ] ), ...source.components.flatMap( ( component ) => [ component.placementAssetId, component.dataAssetId, ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ] ).filter( Boolean ) ] );
 	const checkedInIDs = referencedIDs( checkedInSource );
@@ -55,6 +56,9 @@ try {
 	const sourcePath = path.join( output, 'world-source.json' );
 	const firstExportOutput = execFileSync( process.execPath, [ 'tools/export-island.mjs', '--out', output ], { encoding: 'utf8' } );
 	const sourceFirst = await readFile( sourcePath );
+	const terrainReportPath = path.join( output, 'terrain-validation.json' );
+	const terrainReportFirst = await readFile( terrainReportPath );
+	const terrainReport = JSON.parse( terrainReportFirst );
 	const firstDocument = JSON.parse( sourceFirst );
 	const assetPath = path.join( output, 'assets', firstDocument.objects[ 0 ].assetId.slice( 'sha256:'.length ) );
 	const assetFirst = await readFile( assetPath );
@@ -62,10 +66,27 @@ try {
 	for ( const id of new Set( [ ...firstDocument.objects.flatMap( ( object ) => [ object.assetId, ...( object.lods || [] ).map( ( lod ) => lod.assetId ) ] ), ...firstDocument.components.flatMap( ( component ) => [ component.placementAssetId, component.dataAssetId, ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ] ).filter( Boolean ) ] ) ) firstAssets.set( id, await readFile( path.join( output, 'assets', id.slice( 'sha256:'.length ) ) ) );
 	const secondExportOutput = execFileSync( process.execPath, [ 'tools/export-island.mjs', '--out', output ], { encoding: 'utf8' } );
 	const sourceBytes = await readFile( sourcePath );
+	const terrainReportSecond = await readFile( terrainReportPath );
 	const source = validateWorldSource( JSON.parse( sourceBytes ) );
 	const assetBytes = await readFile( path.join( output, 'assets', source.objects[ 0 ].assetId.slice( 'sha256:'.length ) ) );
 	assert.deepEqual( sourceBytes, sourceFirst, 'repeated source generation must be byte-identical' );
 	assert.deepEqual( sourceBytes, checkedInSourceBytes, 'checked-in world source must match the clean deterministic export' );
+	assert.deepEqual( terrainReportSecond, checkedInTerrainReportBytes, 'checked-in terrain validation report must match the clean deterministic export' );
+	assert.deepEqual( terrainReportSecond, terrainReportFirst, 'repeated terrain validation report must be byte-identical' );
+	assert.equal( terrainReport.format, 'elsemesh.terrain-validation/1', 'terrain report declares its schema version' );
+	assert.equal( terrainReport.worldId, source.worldId, 'terrain report identifies the exported ThruHold' );
+	assert.deepEqual( terrainReport.assets.map( asset => asset.role ), [ 'visual-surface', 'full-terrain-collision-and-visual-fallback', 'portal-preview' ], 'terrain report lists each exported terrain representation' );
+	for ( const asset of terrainReport.assets ) {
+		const bytes = firstAssets.get( asset.id );
+		assert.ok( bytes, `terrain report asset ${asset.id} is referenced by the package` );
+		assert.equal( asset.sha256, asset.id.slice( 'sha256:'.length ), 'terrain report hash agrees with the content address' );
+		assert.equal( asset.bytes, bytes.byteLength, 'terrain report byte length matches the served file' );
+		assert.equal( asset.sha256, createHash( 'sha256' ).update( bytes ).digest( 'hex' ), 'terrain report hash matches the exact asset bytes' );
+		assert.ok( Object.keys( asset.dimensions ).length > 0, 'terrain report records asset dimensions' );
+		assert.ok( asset.encoding && asset.rendererContract, 'terrain report records encoding and renderer contract' );
+	}
+	assert.deepEqual( terrainReport.assets[ 0 ].dimensions.heightfield, [ 2049, 2049 ], 'visual terrain report records the complete high-resolution heightfield dimensions' );
+	assert.deepEqual( terrainReport.assets[ 0 ].dimensions.detailTexture, [ 512, 512 ], 'visual terrain report records the packaged detail texture dimensions' );
 	assert.deepEqual( assetBytes, assetFirst, 'repeated GLB generation must be byte-identical' );
 	const vegetationComponent = source.components.find( component => component.type === 'tidewater.static-vegetation/1' );
 	const placementID = vegetationComponent.placementAssetId;

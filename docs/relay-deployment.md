@@ -153,8 +153,13 @@ After installing the service, run `systemctl daemon-reload` and
 and reload it. Confirm `https://world.example.org/healthz`, then test an
 actual browser invite through `wss://world.example.org/gateway` and an owner
 tab through `/browser-host` from a network outside the host. A green health
-check proves only the HTTP process is reachable; it does not prove DHT
-discovery, remote asset retrieval, or relay traversal.
+check proves only the HTTP process is reachable. `/healthz` reports ordinary
+libp2p connections as `libp2pPeers`, the actual Kademlia routing-table size as
+`dhtRoutingPeers`, and keeps `dhtPeers` as a deprecated alias for
+`libp2pPeers`. A nonzero routing-table size is useful discovery evidence but
+does not prove a particular world is available; verify that `/api/lookup` for
+the invited world returns its expected owner/provider, then test remote asset
+retrieval and portal traversal.
 
 ## Configure world nodes
 

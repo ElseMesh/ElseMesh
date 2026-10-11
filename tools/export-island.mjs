@@ -41,6 +41,7 @@ for ( let i = 0; i < args.length; i ++ ) {
 }
 
 const sourcePath = path.join( output, 'world-source.json' );
+const terrainValidationPath = path.join( output, 'terrain-validation.json' );
 let updatedAt = '2026-10-01T00:00:00Z';
 try {
 	const previous = JSON.parse( await readFile( sourcePath, 'utf8' ) );
@@ -289,7 +290,46 @@ const source = {
 	updatedAt,
 };
 await writeFile( sourcePath, `${JSON.stringify( source, null, 2 )}\n` );
+const terrainValidation = {
+	format: 'elsemesh.terrain-validation/1',
+	worldId: source.worldId,
+	assets: [
+		{
+			role: 'visual-surface',
+			id: terrainSurfaceAssetId,
+			sha256: terrainSurfaceAssetId.slice( 'sha256:'.length ),
+			bytes: terrainSurface.byteLength,
+			dimensions: { heightfield: [ terrain.res + 1, terrain.res + 1 ], normalRockAO: [ terrain.res, terrain.res ], terrainMasks: [ terrain.res, terrain.res ], detailTexture: [ terrainDetail.width, terrainDetail.height ] },
+			encoding: 'EMTERR1/DEFLATE; ETRNSF1; f32le heights; rgba8unorm normal/rock/AO and masks; rgba8unorm detail texture',
+			rendererContract: 'original-tidewater-terrain-v1',
+		},
+		{
+			role: 'full-terrain-collision-and-visual-fallback',
+			id: assetId,
+			sha256: assetId.slice( 'sha256:'.length ),
+			bytes: glb.byteLength,
+			dimensions: { gridCells: [ 512, 512 ], vertices: [ 513, 513 ] },
+			encoding: 'glTF 2.0 binary (GLB); indexed TRIANGLES; COLOR_0 fallback colors',
+			rendererContract: 'collision heightfield plus low-fidelity vertex-color fallback; use visual-surface for original material fidelity',
+		},
+		{
+			role: 'portal-preview',
+			id: terrainPreviewAssetId,
+			sha256: terrainPreviewAssetId.slice( 'sha256:'.length ),
+			bytes: terrainPreviewGLB.byteLength,
+			dimensions: { gridCells: [ 128, 128 ], vertices: [ 129, 129 ] },
+			encoding: 'glTF 2.0 binary (GLB); indexed TRIANGLES; COLOR_0 preview colors',
+			rendererContract: 'low-cost portal preview; replaced by full terrain and visual-surface assets when available',
+		},
+	],
+};
+for ( const asset of terrainValidation.assets ) {
+	const bytes = staticAssets.get( asset.id );
+	if ( ! bytes || createHash( 'sha256' ).update( bytes ).digest( 'hex' ) !== asset.sha256 || bytes.byteLength !== asset.bytes ) throw new Error( `Terrain validation metadata does not match asset ${asset.id}` );
+}
+await writeFile( terrainValidationPath, `${JSON.stringify( terrainValidation, null, 2 )}\n` );
 console.log( `Wrote ${sourcePath}` );
+console.log( `Wrote ${terrainValidationPath}` );
 const boatTriangles = generated.boatBatches.reduce( ( count, { batch } ) => count + batch.idx.length / 3, 0 );
 console.log( `Wrote ${staticAssets.size} content-addressed assets (${generated.villageTriangles} village triangles, ${boatTriangles} boat triangles, ${debris.length} scanned debris instances)` );
 console.log( `Reef export: ${reefRecords.length} records, ${reefTiles.length} tiles, ${reefAssetBytes} encoded bytes` );

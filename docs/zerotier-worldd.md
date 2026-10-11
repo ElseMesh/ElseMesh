@@ -242,9 +242,10 @@ The endpoint returns the currently observed physical `IP/UDP-port` paths, an
 empty list when the peer is known but has no queryable direct path, or 404 when
 libzt does not know that peer. The endpoint is disabled by default; startup
 rejects it if the HTTP listener is not bound to a loopback IP. `/healthz`
-separately reports application connections as
-`libp2pPeers`; `dhtPeers` remains as a deprecated compatibility alias. Neither
-field reports ZeroTier peer/path status. Requests also must arrive from
+reports ordinary application connections as `libp2pPeers`, the Kademlia
+routing-table size as `dhtRoutingPeers`, and retains `dhtPeers` as a deprecated
+alias for `libp2pPeers`. None of these fields reports ZeroTier peer/path status.
+Requests also must arrive from
 loopback without proxy-forwarding headers and use a loopback Host value. Do not add this diagnostic path to a
 public reverse-proxy allowlist: physical endpoint addresses are sensitive and
 ephemeral. This query observes ZeroTier's path only; it does not switch traffic
