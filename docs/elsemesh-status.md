@@ -6,6 +6,17 @@ This document tracks the agreed ElseMesh direction against the current code. It 
 
 Graphics comparisons can use the named and captured camera URL parameters documented in [graphics-review.md](graphics-review.md), so a view and time of day can be reproduced after a normal page load without changing the phone or browser environment.
 
+## Client suite and production build (2026-10-11)
+
+The checked-in `package.json` test command had duplicate and concatenated paths,
+introduced when `heightfield-terrain-data.mjs` was added in commit `61977c5`.
+The command has been reconstructed from its last valid predecessor with that
+test added once. After syncing the current source to the external `.make` tree,
+`npm test` passed with exit code 0 across 44 commands, and `npm run build`
+passed with Vite 8.3.0 (253 modules transformed). The optional sandboxed Blender
+worker remained skipped because its explicit opt-in was not set. These checks
+do not replace the outstanding matched-view and Flip7 graphics verification.
+
 ## Latest verification note (later 2026-10-10)
 
 The Flip7 is reachable over SSH and ADB again. To avoid disturbing either
