@@ -239,28 +239,37 @@ function webglTerrainWaterTexture( T, terrain ) {
 function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
 	const field = computeShoreField( terrain, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ], seaLevel } );
-	const data = new Uint8Array( field.res * field.res * 4 );
-	let minTime = Infinity, maxTime = - Infinity;
+	const data = new Uint8Array( field.res * field.res * 4 ), swashData = new Uint8Array( field.res * field.res * 4 );
+	let minTime = Infinity, maxTime = - Infinity, minSwashTime = Infinity, maxSwashTime = - Infinity;
 	for ( let i = 0; i < field.res * field.res; i ++ ) {
-		const source = i * 4, arrival = field.data[ source ];
+		const source = i * 4, arrival = field.data[ source ], swashArrival = field.data[ source + 3 ];
 		if ( field.depth[ i ] > 0 && arrival < 10000 ) { minTime = Math.min( minTime, arrival ); maxTime = Math.max( maxTime, arrival ); }
+		if ( swashArrival < 10000 ) { minSwashTime = Math.min( minSwashTime, swashArrival ); maxSwashTime = Math.max( maxSwashTime, swashArrival ); }
 	}
-	if ( ! Number.isFinite( minTime ) || ! Number.isFinite( maxTime ) ) return null;
-	const timeRange = Math.max( maxTime - minTime, 1e-6 );
+	if ( ! Number.isFinite( minTime ) || ! Number.isFinite( maxTime ) || ! Number.isFinite( minSwashTime ) || ! Number.isFinite( maxSwashTime ) ) return null;
+	const timeRange = Math.max( maxTime - minTime, 1e-6 ), swashTimeRange = Math.max( maxSwashTime - minSwashTime, 1e-6 );
 	for ( let i = 0; i < field.res * field.res; i ++ ) {
 		const source = i * 4, directionLength = Math.hypot( field.data[ source + 1 ], field.data[ source + 2 ] );
 		const exposure = Math.min( 1, directionLength ), arrival = Math.max( minTime, Math.min( maxTime, field.data[ source ] ) );
+		const swashArrival = Math.max( minSwashTime, Math.min( maxSwashTime, field.data[ source + 3 ] ) ), out = source;
 		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : WORLD.swellDir.x ) * 0.5 + 0.5 ) * 255 );
 		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : WORLD.swellDir.y ) * 0.5 + 0.5 ) * 255 );
 		data[ source + 2 ] = Math.round( exposure * 255 );
 		data[ source + 3 ] = Math.round( ( arrival - minTime ) / timeRange * 255 );
+		swashData[ out ] = Math.round( ( swashArrival - minSwashTime ) / swashTimeRange * 255 );
+		swashData[ out + 3 ] = 255;
 	}
 	const texture = new T.DataTexture( data, field.res, field.res, T.RGBAFormat, T.UnsignedByteType );
 	texture.wrapS = texture.wrapT = T.ClampToEdgeWrapping;
 	texture.magFilter = texture.minFilter = T.LinearFilter;
 	texture.generateMipmaps = false;
 	texture.needsUpdate = true;
-	return { texture, timeRange: new T.Vector2( minTime, maxTime ), origin: field.origin, size: field.size };
+	const swashTexture = new T.DataTexture( swashData, field.res, field.res, T.RGBAFormat, T.UnsignedByteType );
+	swashTexture.wrapS = swashTexture.wrapT = T.ClampToEdgeWrapping;
+	swashTexture.magFilter = swashTexture.minFilter = T.LinearFilter;
+	swashTexture.generateMipmaps = false;
+	swashTexture.needsUpdate = true;
+	return { texture, swashTexture, timeRange: new T.Vector2( minTime, maxTime ), swashTimeRange: new T.Vector2( minSwashTime, maxSwashTime ), origin: field.origin, size: field.size };
 
 }
 
@@ -285,6 +294,8 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 		uniforms: {
 			uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() },
 			uShoreField: { value: terrainWater.shore.texture }, uShoreFieldOrigin: { value: terrainWater.shore.origin }, uShoreFieldSize: { value: terrainWater.shore.size }, uShoreTimeRange: { value: terrainWater.shore.timeRange }, uSeaLevel: { value: seaLevel },
+			uTerrainHeight: { value: terrainWater.texture }, uTerrainOrigin: { value: terrainWater.origin }, uTerrainSize: { value: terrainWater.size },
+			uHeightRange: { value: new T.Vector2( terrainWater.minHeight, terrainWater.maxHeight ) },
 		},
 		vertexShader: /* glsl */`
 			uniform float uTime;
@@ -294,6 +305,10 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 			uniform float uShoreFieldSize;
 			uniform vec2 uShoreTimeRange;
 			uniform float uSeaLevel;
+			uniform sampler2D uTerrainHeight;
+			uniform float uTerrainOrigin;
+			uniform float uTerrainSize;
+			uniform vec2 uHeightRange;
 			attribute float aSeed;
 			attribute float aDepth;
 			varying float vOpacity;
@@ -319,8 +334,15 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 					float randomWave = fract( sin( index * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
 					float waveSet = abs( sin( index * 0.448799 ) ) * 0.6 + 0.55;
 					float amp = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + variation * 0.385 ) * bar, 0.02 );
+					float lam = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0;
+					vec2 crestPosition = p.xz + dir * ( u * lam );
+					vec2 crestTerrainUv = ( crestPosition - vec2( uTerrainOrigin ) ) / uTerrainSize;
+					vec4 crestTerrain = texture2D( uTerrainHeight, crestTerrainUv );
+					float crestEncodedHeight = ( crestTerrain.r * 255.0 * 256.0 + crestTerrain.g * 255.0 ) / 65535.0;
+					float depthAtCrest = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, crestEncodedHeight );
+					depthAtCrest = mix( depthAtCrest, depth, smoothstep( 0.3, 0.5, abs( u ) ) );
 					float breakDepth = pow( amp * 3.556 / 0.78, 0.8 );
-					float breaking = ( breakDepth - depth ) / max( breakDepth * 0.13, 0.05 );
+					float breaking = ( breakDepth - depthAtCrest ) / max( breakDepth * 0.13, 0.05 );
 					float impact = smoothstep( 0.86, 0.99, breaking ) * ( 1.0 - smoothstep( 1.4, 1.9, breaking ) ) * exp( -abs( u - 0.08 ) * 22.0 );
 					float roller = smoothstep( 0.85, 1.35, breaking ) * exp( -abs( u + 0.08 ) * 16.0 );
 					float burst = max( impact, roller * 0.12 );
@@ -612,7 +634,7 @@ export class WebGLFallback {
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
 				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
-				uShoreTimeRange: { value: terrainWater?.shore?.timeRange || new T.Vector2() },
+				uShoreTimeRange: { value: terrainWater?.shore?.timeRange || new T.Vector2() }, uSwashField: { value: terrainWater?.shore?.swashTexture || null }, uSwashTimeRange: { value: terrainWater?.shore?.swashTimeRange || new T.Vector2() },
 				uBeachPatchMode: { value: beachPatchMode }, uBeachPatchBounds: { value: new T.Vector4( WORLD.beach.xMin - 50, - 120, WORLD.beach.xMax + 50, 40 ) },
 			},
 			vertexShader: /* glsl */`
@@ -624,8 +646,11 @@ export class WebGLFallback {
 				uniform float uShoreFieldOrigin;
 				uniform float uShoreFieldSize;
 				uniform vec2 uShoreTimeRange;
+				uniform sampler2D uSwashField;
+				uniform vec2 uSwashTimeRange;
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
+				uniform int uBeachPatchMode;
 				varying vec3 vWorldPosition;
 				varying vec2 vRestPosition;
 				varying float vWaveHeight;
@@ -634,10 +659,16 @@ export class WebGLFallback {
 				varying float vShoreEnv;
 				varying float vShoreAlongVariation;
 				varying float vShoreSlope;
+				varying float vSwashFront;
+				varying float vSwashFoam;
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
 					vec2 p = world.xz;
 					vRestPosition = p;
+					vSwashFront = -1.0;
+					vSwashFoam = 0.0;
+					float vertexGroundHeight = uHeightRange.x;
+					float vertexSandCoverage = 0.0;
 					float a = dot( p, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
 					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
 					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.7;
@@ -654,7 +685,9 @@ export class WebGLFallback {
 						if ( all( greaterThanEqual( terrainUv, vec2( 0.0 ) ) ) && all( lessThanEqual( terrainUv, vec2( 1.0 ) ) ) ) {
 							vec4 terrain = texture2D( uTerrainHeight, terrainUv );
 							float encodedHeight = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
-							float depth = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, encodedHeight );
+							vertexGroundHeight = mix( uHeightRange.x, uHeightRange.y, encodedHeight );
+							vertexSandCoverage = terrain.b;
+							float depth = uSeaLevel - vertexGroundHeight;
 							if ( depth > -0.25 && depth < 26.0 && uShoreFieldSize > 0.0 ) {
 								vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 								vec4 shore = texture2D( uShoreField, shoreUv );
@@ -707,6 +740,35 @@ export class WebGLFallback {
 							}
 						}
 					}
+					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vertexSandCoverage > 0.05 ) {
+						vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
+						vec4 shore = texture2D( uShoreField, shoreUv );
+						vec2 dir = normalize( shore.rg * 2.0 - 1.0 );
+						float exposure = shore.b;
+						float along = dot( p, vec2( -dir.y, dir.x ) );
+						float swashArrival = mix( uSwashTimeRange.x, uSwashTimeRange.y, texture2D( uSwashField, shoreUv ).r );
+						float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
+						float phase = ( uTime - swashArrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+						float waveIndex = floor( phase );
+						float tau = fract( phase );
+						float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
+						float variation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
+						variation += ( sin( along * 0.29 + waveIndex * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + waveIndex * 5.9 + 0.8 ) * 0.4 ) * 0.28;
+						float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
+						float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
+						float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
+						float amp = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + variation * 0.385 ) * bar, 0.02 );
+						float runupMax = amp * 2.1 * clamp( exposure * 1.4, 0.0, 1.0 ) / 0.08;
+						float su = clamp( tau / 0.4, 0.0, 1.0 ), sb = clamp( ( tau - 0.4 ) / 0.55, 0.0, 1.0 );
+						float runup = ( tau < 0.4 ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
+						float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
+						float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 ) - max( vertexGroundHeight - uSeaLevel, 0.0 ) / 0.08;
+						vSwashFront = runupFront;
+						if ( runupFront > 0.0 ) {
+							float uprush = 1.0 - smoothstep( 0.32, 0.46, tau );
+							vSwashFoam = ( 1.0 - smoothstep( 0.0, 0.8, runupFront ) ) * smoothstep( -0.05, 0.05, runupFront ) * uprush * 0.9;
+						}
+					}
 					world.y += vWaveHeight;
 					vWorldPosition = world.xyz;
 					gl_Position = projectionMatrix * viewMatrix * world;
@@ -736,6 +798,8 @@ export class WebGLFallback {
 				varying float vShoreEnv;
 				varying float vShoreAlongVariation;
 				varying float vShoreSlope;
+				varying float vSwashFront;
+				varying float vSwashFoam;
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
 				}
@@ -767,6 +831,9 @@ export class WebGLFallback {
 							depth = max( 0.0, uSeaLevel + vWaveHeight - groundHeight );
 							sandCoverage = terrain.b;
 						}
+					}
+					if ( uBeachPatchMode == 2 && groundHeight > uSeaLevel && sandCoverage > 0.05 ) {
+						if ( vSwashFront <= 0.0 ) discard;
 					}
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
@@ -824,7 +891,7 @@ export class WebGLFallback {
 					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU + 0.08 ) * 24.0 );
 					float breakerFoam = max( impact, roller ) * vShoreEnv * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) * smoothstep( 0.24, 0.68, shoreDetail );
 					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.55 );
-					float foam = max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 );
+					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 ), vSwashFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
