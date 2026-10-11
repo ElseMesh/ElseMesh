@@ -378,12 +378,13 @@ export class WebGLFallback {
 				}
 				void main() {
 					vec2 p = vWorldPosition.xz;
-					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 );
+					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 ), kE = vec2( 0.72, -0.48 );
 					float a = dot( p, kA ) + uTime * 0.3;
 					float b = dot( p, kB ) - uTime * 0.55;
 					float c = dot( p, kC ) + uTime * 0.7;
 					float d = dot( p, kD ) + uTime * 1.3;
-					vec2 slope = kA * cos( a ) * 0.36 + kB * cos( b ) * 0.14 + kC * cos( c ) * 0.025 + kD * cos( d ) * 0.01;
+					float e = dot( p, kE ) + uTime * 1.6;
+					vec2 slope = kA * cos( a ) * 0.36 + kB * cos( b ) * 0.14 + kC * cos( c ) * 0.025 + kD * cos( d ) * 0.01 + kE * cos( e ) * 0.004;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
 					if ( uTerrainSize > 0.0 ) {
@@ -419,8 +420,10 @@ export class WebGLFallback {
 					float foamNoise = 0.5 + 0.25 * sin( dot( p, vec2( 0.48, 0.31 ) ) + uTime * 0.42 )
 						+ 0.18 * sin( dot( p, vec2( -0.29, 0.57 ) ) - uTime * 0.28 )
 						+ 0.07 * sin( dot( p, vec2( 0.91, -0.22 ) ) + uTime * 0.63 );
-					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.15, 1.25, depth ) );
-					float shoreFoam = shoreBand * smoothstep( 0.3, 0.7, foamNoise );
+					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
+					float shoreWave = 0.5 + 0.5 * sin( depth * 1.3 - uTime * 1.2 + ( shoreDetail - 0.5 ) * 4.8 );
+					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.15, 2.7, depth ) );
+					float shoreFoam = shoreBand * smoothstep( 0.69, 0.91, shoreWave ) * smoothstep( 0.28, 0.76, shoreDetail );
 					float foam = max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.12 + 0.24 * ripple + 0.06 * micro ), shoreFoam * 0.82 );
 					reflected = mix( reflected, vec3( 0.78, 0.9, 0.88 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
