@@ -237,6 +237,20 @@ to the service token before using this host in a live `thruholdd` test. No
 service, firewall, route, or ZeroTier membership was changed during the
 preflight.
 
+### User-authorized unlisted route attempt (2026-10-12)
+
+A fresh no-ZeroTier `thruholdd` built from current `main` served the signed
+Example Island on `127.0.0.1:18789`; `/healthz` returned HTTP 200 and the
+temporary profile used `discoverable: false`. A Cloudflare Quick Tunnel
+registered successfully, but the host's client request could not resolve its
+random `trycloudflare.com` hostname before timeout. The web fetch tool also
+could not access that ephemeral hostname, so this attempt did not verify the
+public WSS application protocol or content transfer. The daemon, tunnel, and
+temporary identity were stopped, and the hostname is intentionally omitted.
+Retry from an independent client network/device with working DNS; do not treat
+the tunnel registration or loopback health response as proof of public client
+connectivity.
+
 ## Configure world nodes
 
 Pass multiple bootstrap and relay addresses so a single unavailable operator
