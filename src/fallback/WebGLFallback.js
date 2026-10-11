@@ -815,8 +815,10 @@ export class WebGLFallback {
 					float e = dot( p, kE ) + uTime * 1.6;
 					vec2 waterUv = p * 0.024 + vec2( uTime * 0.0013, -uTime * 0.0008 );
 					vec4 waterNoise = texture2D( uCloudNoise, waterUv );
+					vec2 fineUv = p * 0.19 + vec2( -uTime * 0.0021, uTime * 0.0015 );
+					vec4 fineNoise = texture2D( uCloudNoise, fineUv );
 					vec2 slope = kA * cos( a ) * 0.95 + kB * cos( b ) * 0.55 + kC * cos( c ) * 0.08 + kD * cos( d ) * 0.03 + kE * cos( e ) * 0.01;
-					slope += ( waterNoise.rg - 0.5 ) * 0.11;
+					slope += ( waterNoise.rg - 0.5 ) * 0.11 + ( fineNoise.rg - 0.5 ) * 0.24;
 					slope.y += vShoreSlope;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
@@ -867,7 +869,7 @@ export class WebGLFallback {
 					vec3 screenReflection = screenColorToLinear( texture2D( uSceneColor, reflectedUv ).rgb );
 					sky = mix( sky, screenReflection, reflectedOnScreen * 0.72 );
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
-					float micro = waterNoise.r * 0.55 + waterNoise.g * 0.45;
+					float micro = fineNoise.r * 0.65 + fineNoise.g * 0.35;
 					float shallow = smoothstep( 0.0, 18.0, depth );
 					vec3 water = mix( vec3( 0.012, 0.16, 0.24 ), vec3( 0.002, 0.016, 0.065 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					float bottomVisibility = ( uTerrainSize > 0.0 ) ? 1.0 - smoothstep( 4.0, 36.0, depth ) : 0.0;
@@ -875,8 +877,8 @@ export class WebGLFallback {
 					vec3 waterBody = mix( water, transmitted, bottomVisibility * 0.18 * ( 1.0 - waterFresnel ) );
 					vec3 reflected = mix( waterBody, sky, waterFresnel * 0.82 );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
-					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 128.0 );
-					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.005 + 0.015 * ripple );
+					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 96.0 );
+					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.025 + 0.055 * ripple );
 					float foamNoise = texture2D( uCloudNoise, p * 0.09 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
 					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
 					float shoreDepth = depth + sin( p.x * 0.13 - uTime * 0.42 ) * 0.3 + ( shoreDetail - 0.5 ) * 0.45;
