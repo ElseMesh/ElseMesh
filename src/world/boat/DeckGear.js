@@ -2,6 +2,8 @@ import { BufferGeometry, ConeGeometry, CylinderGeometry, Float32BufferAttribute,
 import { box, roundedBox, cylinder, rod, sphere, torus, lathe, tube, mat4, alignY, auxVertices } from './GeoKit.js';
 import { foredeckY, PALETTE } from './HullBuilder.js';
 import { lerp } from './HullLines.js';
+import { HAULER, TRAP, TRAPS } from './BoatSpecs.js';
+export { HAULER, TRAP, TRAPS } from './BoatSpecs.js';
 
 const V = ( x, y, z ) => new Vector3( x, y, z );
 
@@ -51,16 +53,6 @@ function trapFace( a, b, c, d, w, h, pattern = 0 ) {
 	return { g, opts: { rough: w, metal: h, pattern } };
 
 }
-
-export const TRAP = { L: 0.95, W: 0.55, H: 0.37 };
-
-// Traps on deck: [x, y (bottom), z, yaw, colour]
-export const TRAPS = [
-	[ 0.66, 0, - 3.25, 0.02, 0xd8b21c ],
-	[ 0.66, 1, - 3.23, - 0.03, 0x2f7a3c ],
-	[ 0.64, 0, - 2.2, - 0.04, 0xd8b21c ],
-	[ - 0.68, 0, - 3.25, 0.03, 0x1f2326 ],
-];
 
 function buildTraps( kit, L ) {
 
@@ -135,8 +127,6 @@ function buildTraps( kit, L ) {
 }
 
 // ------------------------------------------------------------------ hauler and davit (starboard)
-
-export const HAULER = { x: - 1.0, z: - 0.62, y: 1.34 };
 
 function buildHauler( kit, L ) {
 

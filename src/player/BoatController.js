@@ -49,14 +49,14 @@ const _dq = new THREE.Quaternion();
 // mooring lines as before.
 export class BoatController {
 
-	constructor( { model, query, terrain, colliders, initialPosition = WORLD.boatDock.position, initialHeading = WORLD.boatDock.heading } ) {
+	constructor( { model, design = model.design || model, query, terrain, colliders, initialPosition = WORLD.boatDock.position, initialHeading = WORLD.boatDock.heading } ) {
 
-		this.model = model;
+		this.design = design;
 		this.query = query;
 		this.terrain = terrain;
 		this.colliders = colliders;
 
-		const hydro = model.hydro || {};
+		const hydro = this.design.hydro || {};
 		this.mass = hydro.suggestedMass || 3200;
 		this.com = hydro.centerOfMass ? new THREE.Vector3().copy( hydro.centerOfMass ) : new THREE.Vector3( 0, 0.3, - 0.74 );
 		// principal inertia in the boat frame (+Z forward, +X port): x = pitch, y = yaw, z = roll. Gear
@@ -71,7 +71,7 @@ export class BoatController {
 		// effective waterplane: lateral / longitudinal lever arms of the buoyancy samples
 		const cbz = hydro.centerOfBuoyancy ? hydro.centerOfBuoyancy.z : this.com.z;
 		const sx = 0.79, sz = 0.9;
-		this.samples = model.hullSamples.map( ( s ) => ( {
+		this.samples = this.design.hullSamples.map( ( s ) => ( {
 			p: new THREE.Vector3( s.position.x * sx, s.position.y, cbz + ( s.position.z - cbz ) * sz ),
 			area: s.area, bottom: s.bottomY ?? s.position.y,
 		} ) );
@@ -250,9 +250,6 @@ export class BoatController {
 
 		if ( ! this.isFinite() ) this.reset();
 
-		this.model.setThrottle( this.throttle );
-		this.model.setSteering( this.steer );
-		this.model.setPropellerRPM( this.rpm * 2400 * Math.sign( this.throttle || 1 ) );
 		this.apply();
 
 	}
@@ -349,7 +346,7 @@ export class BoatController {
 
 		// ---- propeller: thrust from the engine rpm, falling off towards the pitch speed; prop walk
 		// astern (stern to port)
-		const propW = this.toWorld( this.model.propeller, _p );
+		const propW = this.toWorld( this.design.propeller, _p );
 		const propSub = this.sampleWaterAt( propW ) - propW.y;
 		const propWet = clamp( propSub / 0.3 + 0.5, 0, 1 );
 		const dir = this.driven ? Math.sign( this.throttle ) : 0;
@@ -366,11 +363,11 @@ export class BoatController {
 		// flow angle at the stern (drift + yaw) reduces its angle of attack
 		// the rudder's side force is partly carried by the aft hull (flap effect), so it acts higher
 		// than the blade's centre: less heel kick when the wheel goes over
-		const rudW = this.toWorld( _rud.set( 0, - 0.15, this.model.rudder.z ), _rud );
+		const rudW = this.toWorld( _rud.set( 0, - 0.15, this.design.rudder.z ), _rud );
 		const race = Math.max( thrust, 0 ) * 2 / ( RHO * 0.14 ); // slipstream dynamic pressure term (m^2/s^2)
 		const Ur2 = u * Math.abs( u ) + 0.9 * race;
 		const Ur = Math.sqrt( Math.abs( Ur2 ) ) * Math.sign( Ur2 );
-		const vRud = vs + aLoc.y * ( this.model.rudder.z - this.com.z );
+		const vRud = vs + aLoc.y * ( this.design.rudder.z - this.com.z );
 		const delta = this.steer * 0.6 + ( Math.abs( Ur ) > 0.3 ? Math.atan2( vRud, Math.abs( Ur ) ) * Math.sign( Ur ) : 0 );
 		const d = clamp( delta, - 0.7, 0.7 );
 		const lift = 0.5 * RHO * 0.12 * Math.abs( Ur2 ) * this.rudderLift * Math.sin( d ) * Math.cos( d ) * propWet * Math.sign( Ur2 || 1 );
@@ -566,10 +563,6 @@ export class BoatController {
 
 	apply() {
 
-		const g = this.model.group;
-		g.position.copy( this.position );
-		g.quaternion.copy( this.quaternion );
-		g.updateMatrixWorld( true );
 		this.toWorld( _v.set( 0, 0, 3.9 ), this.bowWorld );
 		this.toWorld( _v.set( 0, 0, - 3.8 ), this.sternWorld );
 

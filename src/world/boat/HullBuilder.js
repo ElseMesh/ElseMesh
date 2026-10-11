@@ -1,6 +1,8 @@
 import { BufferGeometry, Float32BufferAttribute, Vector3 } from '../../engine/index.js';
 import { gridSurface, loft, fanCap, orientTowards, slab, box, rod, tube, auxVertices } from './GeoKit.js';
 import { sstep, lerp } from './HullLines.js';
+import { KEEL, keelBottomAt, houseHalfWidth } from './BoatSpecs.js';
+export { KEEL, keelBottomAt, keelVolume, houseHalfWidth } from './BoatSpecs.js';
 
 // Colors (sRGB hex; GeoKit converts to linear)
 export const PALETTE = {
@@ -121,26 +123,6 @@ export function buildHullVolume( L ) {
 
 // ------------------------------------------------------------------ keel, shoe, shaft log
 
-// Keel bottom profile (z, y): shallow at the forefoot, deepest at the prop aperture.
-const KEEL_PROFILE = [ [ 3.74, - 0.093 ], [ 3.3, - 0.2 ], [ 3.0, - 0.265 ], [ 1.5, - 0.5 ], [ 0, - 0.62 ], [ - 1.5, - 0.7 ], [ - 3.05, - 0.77 ] ];
-
-export function keelBottomAt( z ) {
-
-	const P = KEEL_PROFILE;
-	if ( z >= P[ 0 ][ 0 ] ) return P[ 0 ][ 1 ];
-	if ( z <= P[ P.length - 1 ][ 0 ] ) return P[ P.length - 1 ][ 1 ];
-	let i = 0;
-	while ( i < P.length - 2 && z < P[ i + 1 ][ 0 ] ) i ++;
-	const p0 = P[ Math.max( 0, i - 1 ) ], p1 = P[ i ], p2 = P[ i + 1 ], p3 = P[ Math.min( P.length - 1, i + 2 ) ];
-	const f = ( p1[ 0 ] - z ) / ( p1[ 0 ] - p2[ 0 ] );
-	// uniform Catmull-Rom on y
-	const f2 = f * f, f3 = f2 * f;
-	return 0.5 * ( 2 * p1[ 1 ] + ( - p0[ 1 ] + p2[ 1 ] ) * f + ( 2 * p0[ 1 ] - 5 * p1[ 1 ] + 4 * p2[ 1 ] - p3[ 1 ] ) * f2 + ( - p0[ 1 ] + 3 * p1[ 1 ] - 3 * p2[ 1 ] + p3[ 1 ] ) * f3 );
-
-}
-
-export const KEEL = { zFront: 3.74, zAft: - 3.05, shoeAft: - 3.68, bottom: - 0.77, shoeTop: - 0.74 };
-
 function buildKeel( kit, L ) {
 
 	const N = 32;
@@ -184,25 +166,6 @@ function buildKeel( kit, L ) {
 	kit.add( 'fittings', rod( V( 0, - 0.53, KEEL.zAft + 0.02 ), V( 0, - 0.53, - 3.27 ), 0.024, 10 ), { color: 0xc9ccd0, rough: 0.25, metal: 1 } );
 	// stern tube boss where the shaft leaves the keel
 	kit.add( 'hull', rod( V( 0, - 0.53, KEEL.zAft + 0.06 ), V( 0, - 0.53, KEEL.zAft - 0.03 ), 0.05, 12, 0.04 ) );
-
-}
-
-// Volume of the keel appendage and shoe below the canoe body (m^3).
-export function keelVolume( L ) {
-
-	const N = 240;
-	const dz = ( KEEL.zFront - KEEL.zAft ) / N;
-	let v = 0;
-	for ( let i = 0; i < N; i ++ ) {
-
-		const z = KEEL.zAft + ( i + 0.5 ) * dz;
-		const h = Math.max( 0, - L.draftAt( z ) - keelBottomAt( z ) );
-		const fwd = sstep( 2.6, KEEL.zFront, z );
-		v += ( lerp( 0.065, 0.012, fwd ) + lerp( 0.042, 0.008, fwd ) ) * h * dz;
-
-	}
-
-	return v + 0.075 * ( KEEL.shoeTop - KEEL.bottom ) * ( KEEL.zAft - KEEL.shoeAft );
 
 }
 
@@ -424,12 +387,6 @@ function buildDecks( kit, L ) {
 
 	// flush hatch lifting ring
 	kit.add( 'fittings', rod( V( - 0.05, L.deckY + 0.004, - 1.45 ), V( 0.05, L.deckY + 0.004, - 1.45 ), 0.006, 6 ), { color: PALETTE.stainless, rough: 0.3, metal: 1 } );
-
-}
-
-export function houseHalfWidth( L, z ) {
-
-	return L.sheerX( L.tAtSheerZ( z ) ) - 0.2;
 
 }
 

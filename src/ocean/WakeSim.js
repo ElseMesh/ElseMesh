@@ -71,7 +71,7 @@ export class WakeSim {
 		this.renderer = renderer;
 		this.terrain = terrainGPU;
 		this.boat = boat;
-		this.lines = boat.model.lines;
+		this.lines = boat.design.lines;
 
 		const K = this.kernelParams = new UniformBlock( 'WakeKernel', {
 			origin: [ 'vec2f', new Vector2() ], // min corner, cells

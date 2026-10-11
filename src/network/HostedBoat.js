@@ -32,6 +32,7 @@ export class HostedBoat {
 
 		if ( ! this.controller ) this.controller = new BoatController( {
 			model: this.model,
+			design: this.model.design,
 			query,
 			terrain: null,
 			colliders,
@@ -60,6 +61,7 @@ export class HostedBoat {
 
 	update( dt ) {
 
+		if ( this.controller ) this.model.sync( this.controller );
 		this.model.update( dt );
 
 	}

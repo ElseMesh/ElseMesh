@@ -3,26 +3,13 @@ import {
 	slab, loft, fanCap, box, roundedBox, cylinder, rod, sphere, torus, lathe, tube, prepare, mat4, alignY,
 	auxVertices, paintVertices, mergePrepared,
 } from './GeoKit.js';
-import { houseHalfWidth, foredeckY, PALETTE } from './HullBuilder.js';
+import { foredeckY, PALETTE } from './HullBuilder.js';
 import { lerp } from './HullLines.js';
 import { buoyGeometry } from './DeckGear.js';
+import { HOUSE, houseHalfWidth, roofTopY } from './BoatSpecs.js';
+export { HOUSE, roofTopY } from './BoatSpecs.js';
 
 const V = ( x, y, z ) => new Vector3( x, y, z );
-
-// Wheelhouse dimensions (boat frame)
-export const HOUSE = {
-	wallT: 0.045,
-	wsBottomY: 1.48, // windshield base
-	wsTopY: 2.24,
-	roofUnderY: 2.31,
-	roofZ0: - 0.95,
-	roofZ1: 1.34,
-	winBottom: 1.56,
-	winTop: 2.12,
-	dash: { zFace: 0.98, yKnee: 1.08, zTop: 1.16, yTop: 1.4, zBack: 1.41, halfW: 1.1 },
-	helmX: - 0.55,
-	seatZ: 0.22,
-};
 
 const STAINLESS = { color: PALETTE.stainless, rough: 0.22, metal: 1 };
 const BLACK_PLASTIC = { color: 0x1a1b1d, rough: 0.55, metal: 0 };
@@ -39,12 +26,6 @@ export function wsZ( L, y ) {
 export function wallX( L, z, y ) {
 
 	return houseHalfWidth( L, z ) - Math.max( 0, y - 1.15 ) * 0.04;
-
-}
-
-export function roofTopY( x ) {
-
-	return 2.375 + 0.035 * ( 1 - ( x / 1.35 ) ** 2 );
 
 }
 

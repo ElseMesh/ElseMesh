@@ -1,12 +1,13 @@
 import { Matrix4, Vector3 } from '../../engine/index.js';
 import { lathe, fanCap, gridSurface, orientTowards, prepare, mergePrepared, cylinder } from './GeoKit.js';
 import { PALETTE } from './HullBuilder.js';
+import { PROP_SPEC, RUDDER_SPEC } from './BoatSpecs.js';
 
 const V = ( x, y, z ) => new Vector3( x, y, z );
 
 // Propeller hub centre (boat frame) and rudder stock pivot.
-export const PROP = { position: V( 0, - 0.53, - 3.3 ), radius: 0.21, blades: 4, pitch: 0.42 };
-export const RUDDER = { pivot: V( 0, - 0.52, - 3.58 ), top: - 0.33, bottom: - 0.72, lead: 0.08, trail: - 0.27, maxAngle: 0.61 };
+export const PROP = { ...PROP_SPEC, position: new Vector3( ...PROP_SPEC.position ) };
+export const RUDDER = { ...RUDDER_SPEC, pivot: new Vector3( ...RUDDER_SPEC.pivot ) };
 
 const BRONZE = { color: 0xc8905a, rough: 0.3, metal: 1 };
 
