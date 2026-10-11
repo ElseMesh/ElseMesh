@@ -361,7 +361,7 @@ export class Player {
 		_boatRelativeVelocity.copy( this.velocity ).sub( b.velocity ).applyQuaternion( _boatInvQ );
 		if ( _boatRelativeVelocity.y >= 0 ) return false;
 
-		for ( const c of b.model.colliders ) {
+		for ( const c of b.design.colliders ) {
 
 			if ( ! c.walkable ) continue;
 			const top = c.center.y + c.half.y;
@@ -545,8 +545,8 @@ export class Player {
 		b.driven = false;
 		b.throttle = 0;
 		this.mode = 'deck';
-		const helm = b.model.helmPosition || new THREE.Vector3( HOUSE_HELM.x, b.model.lines.deckY, HOUSE_HELM.z );
-		this.deckPos.set( helm.x + 0.45, b.model.lines.deckY, helm.z - 0.1 );
+		const helm = b.design.helmPosition || new THREE.Vector3( HOUSE_HELM.x, b.design.lines.deckY, HOUSE_HELM.z );
+		this.deckPos.set( helm.x + 0.45, b.design.lines.deckY, helm.z - 0.1 );
 		this.deckVel.set( 0, 0, 0 );
 		this.deckYaw = this.helmYaw;
 		this.pitch = this.helmPitch;
@@ -664,9 +664,9 @@ export class Player {
 	// highest walkable box top under the point (boat frame), not above maxY; the sole otherwise
 	deckGroundAt( x, z, maxY ) {
 
-		const L = this.boat.model.lines;
+		const L = this.boat.design.lines;
 		let g = L.deckY;
-		for ( const c of this.boat.model.colliders ) {
+		for ( const c of this.boat.design.colliders ) {
 
 			if ( ! c.walkable ) continue;
 			if ( Math.abs( x - c.center.x ) > c.half.x || Math.abs( z - c.center.z ) > c.half.z ) continue;
@@ -684,7 +684,7 @@ export class Player {
 		const inp = this.input;
 		const axes = inp.moveAxes();
 		const b = this.boat;
-		const L = b.model.lines;
+		const L = b.design.lines;
 		const look = inp.consumeLook( dt );
 		this.deckYaw -= look.x * 0.0022;
 		this.pitch = THREE.MathUtils.clamp( this.pitch - look.y * 0.0022, - 1.5, 1.5 );
@@ -716,7 +716,7 @@ export class Player {
 		p.addScaledVector( v, dt );
 
 		// walls: push out of the solid boxes you can't step onto (boat frame, axis aligned)
-		for ( let iter = 0; iter < 2; iter ++ ) for ( const c of b.model.colliders ) {
+		for ( let iter = 0; iter < 2; iter ++ ) for ( const c of b.design.colliders ) {
 
 			if ( ! c.solid ) continue;
 			const top = c.center.y + c.half.y, bot = c.center.y - c.half.y;
@@ -762,7 +762,7 @@ export class Player {
 		this.deckToWorld();
 
 		// prompts: take the helm, or step ashore
-		const helm = b.model.helmPosition || HOUSE_HELM;
+		const helm = b.design.helmPosition || HOUSE_HELM;
 		const hx = helm.x, hz = helm.z;
 		const nearHelm = Math.hypot( p.x - hx, p.z - hz ) < HELM_REACH && ! this.busy;
 		this._ashoreT -= dt;
