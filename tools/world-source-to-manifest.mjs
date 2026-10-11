@@ -56,6 +56,7 @@ async function main() {
 		const references = [
 			...( component.placementAssetId ? [ { id: component.placementAssetId, kind: component.type === 'tidewater.static-reef/1' ? 'reef-placement/1' : component.type === 'tidewater.static-fish-props/1' ? 'fish-props-placement/1' : 'vegetation-placement/1', limit: 16 * 1024 * 1024 } ] : [] ),
 			...( component.dataAssetId ? [ { id: component.dataAssetId, kind: component.type === 'tidewater.village-materials/2' ? 'village-materials/1' : 'terrain-surface/1', limit: component.type === 'tidewater.village-materials/2' ? 64 * 1024 * 1024 : 128 * 1024 * 1024 } ] : [] ),
+			...( component.type === 'tidewater.humpback-whale/1' ? [ { id: component.modelAssetId, kind: 'whale-model/1', limit: 1 * 1024 * 1024 }, { id: component.geometryAssetId, kind: 'whale-geometry/1', limit: 32 * 1024 * 1024 }, { id: component.albedoAssetId, kind: 'whale-albedo/1', limit: 16 * 1024 * 1024 }, { id: component.heightAssetId, kind: 'whale-height/1', limit: 32 * 1024 * 1024 } ] : [] ),
 			...( component.beds || [] ).map( ( bed ) => ( { id: bed.assetId, kind: 'audio/ogg', limit: 16 * 1024 * 1024 } ) ),
 		];
 		for ( const { id, kind, limit } of references ) {

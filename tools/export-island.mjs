@@ -32,6 +32,7 @@ import { GPU } from '../src/engine/gpu/GPU.js';
 import { readTexture } from '../src/engine/gpu/Readback.js';
 import { VillageTextures } from '../src/world/village/TextureBaker.js';
 import { encodeVillageMaterialAsset, wrapCompressedVillageMaterialAsset } from '../src/network/VillageMaterialAsset.js';
+import { EXAMPLE_ISLAND_WHALE_PROFILE } from '../src/world/marine/WhaleBrain.js';
 
 const REPO = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const args = process.argv.slice( 2 );
@@ -85,6 +86,9 @@ const villageMaterialsAssetId = `sha256:${createHash( 'sha256' ).update( village
 staticAssets.set( villageMaterialsAssetId, villageMaterials );
 villageTextures.dispose();
 GPU.device.destroy();
+const whaleFiles = await Promise.all( [ 'humpback.json', 'humpback.bin', 'humpback_albedo.png', 'humpback_height.png' ].map( name => readFile( path.join( REPO, 'public', 'models', 'whale', name ) ) ) );
+const whaleAssetIDs = whaleFiles.map( bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}` );
+for ( let i = 0; i < whaleFiles.length; i ++ ) staticAssets.set( whaleAssetIDs[ i ], whaleFiles[ i ] );
 const villageGLB = exportBatchGLB( generated.villageBatches, 'Procedural village', true );
 const villageAssetId = `sha256:${createHash( 'sha256' ).update( villageGLB ).digest( 'hex' )}`;
 const villageBounds = boundsForGLB( villageGLB );
@@ -145,7 +149,7 @@ for ( const tile of reefTiles ) {
 		streamingBounds: tile.bounds,
 	} );
 }
-if ( reefComponents.length + 7 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding reef tiles and six fixed components' );
+if ( reefComponents.length + 8 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding reef tiles and seven fixed components' );
 const debrisAssetIDs = new Map();
 const debrisLODAssetIDs = new Map();
 const debrisAssetBounds = new Map();
@@ -190,7 +194,7 @@ for ( const spec of ambientBedSpecs ) {
 		...( spec.position ? { position: spec.position, refDistance: spec.refDistance, rolloff: spec.rolloff } : {} ),
 	} );
 }
-if ( reefComponents.length + 7 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding fish props and other fixed components' );
+if ( reefComponents.length + 8 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding whale, fish props, and other fixed components' );
 const assetsPath = path.join( output, 'assets' );
 await mkdir( assetsPath, { recursive: true } );
 for ( const entry of await readdir( assetsPath, { withFileTypes: true } ) ) {
@@ -212,7 +216,7 @@ const source = {
 		avatarComplexity: 20000,
 		physicsProfile: 'tidewater-default',
 		vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 100000 },
-			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
+			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
 		maxPackageBytes: 128 * 1024 * 1024,
 	},
 	hosts: [],
@@ -280,6 +284,7 @@ const source = {
 		{ id: 'tw-component:island-vegetation', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId },
 		...( generated.fishProps.length ? [ { id: 'tw-component:island-fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: fishPropsAssetId, streamingBounds: fishPropsBounds } ] : [] ),
 		{ id: 'tw-component:island-terrain', type: 'tidewater.terrain-surface/1', profile: 'example-island-v1', objectId: 'tw-object:island-terrain', dataAssetId: terrainSurfaceAssetId, priority: 'visible' },
+		{ id: 'tw-component:island-humpback', type: 'tidewater.humpback-whale/1', profile: 'example-island-humpback-v1', priority: 'visible', streamingBounds: { center: [ 0, - 4, 200 ], radius: 250 }, modelAssetId: whaleAssetIDs[ 0 ], geometryAssetId: whaleAssetIDs[ 1 ], albedoAssetId: whaleAssetIDs[ 2 ], heightAssetId: whaleAssetIDs[ 3 ], seed: EXAMPLE_ISLAND_WHALE_PROFILE.seed, route: EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed },
 		...reefComponents,
 		{ id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' },
 		{ id: 'tw-component:island-lobster-boat', type: 'tidewater.downeast-boat/1', objectId: 'tw-object:moored-lobster-boat', priority: 'portal-preview' },

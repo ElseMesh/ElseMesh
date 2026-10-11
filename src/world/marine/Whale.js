@@ -3,8 +3,8 @@ import { Material } from '../../engine/render/Material.js';
 import { ShaderModule } from '../../engine/gpu/Shader.js';
 import { LAYERS } from '../../core/SceneRenderer.js';
 import { SPRAY } from '../../fx/Spray.js';
-import { WhaleBrain } from './WhaleBrain.js';
-import { loadTexture } from './WhaleTextures.js';
+import { WhaleBrain, EXAMPLE_ISLAND_WHALE_PROFILE } from './WhaleBrain.js';
+import { loadTexture, loadTextureBytes } from './WhaleTextures.js';
 
 // Humpback whale (Megaptera novaeangliae), ~14.5 m.
 //
@@ -37,17 +37,18 @@ const _t = new THREE.Vector3();
 
 export class Whale {
 
-	constructor( { scene, terrain, query = null, spray = null, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/' } ) {
+	constructor( { scene, terrain, query = null, spray = null, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile = EXAMPLE_ISLAND_WHALE_PROFILE, seaLevel = 0 } ) {
 
 		this.scene = scene;
 		this.terrain = terrain;
 		this.query = query;
 		this.spray = spray;
 		this.url = url;
+		this.profile = profile;
 		this.ready = false;
 		this.group = new THREE.Group();
 		this.group.name = 'Whale';
-		this.brain = new WhaleBrain( { terrain, query } );
+		this.brain = new WhaleBrain( { terrain, query, ...profile, seaLevel } );
 		this.frames = null;
 		this.meshes = [];
 		this.lod = - 1;
@@ -62,52 +63,65 @@ export class Whale {
 		if ( this._loading ) return this._loading;
 		this._loading = ( async () => {
 
-			const [ manifest, bin ] = await Promise.all( [
+			const [ manifest, bin, albedo, height ] = await Promise.all( [
 				fetch( this.url + 'humpback.json' ).then( ( r ) => r.json() ),
 				fetch( this.url + 'humpback.bin' ).then( ( r ) => r.arrayBuffer() ),
+				fetch( this.url + 'humpback_albedo.png' ).then( ( r ) => r.arrayBuffer() ),
+				fetch( this.url + 'humpback_height.png' ).then( ( r ) => r.arrayBuffer() ),
 			] );
-			this.manifest = manifest;
-			if ( manifest.textures ) {
-
-				[ this.albedoTex, this.heightTex ] = await Promise.all( [
-					loadTexture( this.url + manifest.textures.albedo, true ),
-					loadTexture( this.url + manifest.textures.height, false ),
-				] );
-
-			}
-
-			this._setupRig( manifest );
-			this.material = this._createMaterial( manifest );
-			for ( const lv of manifest.levels ) {
-
-				const geo = new THREE.BufferGeometry();
-				geo.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( bin, lv.position, lv.vertices * 3 ), 3 ) );
-				geo.setAttribute( 'normal', new THREE.BufferAttribute( new Int16Array( bin, lv.normal, lv.vertices * 3 ), 3, true ) );
-				geo.setAttribute( 'uv', new THREE.BufferAttribute( new Float32Array( bin, lv.uv, lv.vertices * 2 ), 2 ) );
-				geo.setAttribute( 'uv1', new THREE.BufferAttribute( new Float32Array( bin, lv.uv1, lv.vertices * 2 ), 2 ) );
-				geo.setAttribute( 'rig', new THREE.BufferAttribute( new Float32Array( bin, lv.rig, lv.vertices * 4 ), 4 ) );
-				geo.setIndex( new THREE.BufferAttribute( new Uint32Array( bin, lv.index, lv.indices ), 1 ) );
-				// posed in world space by the vertex shader: the bounds follow the whale (see update)
-				geo.boundingSphere = new THREE.Sphere( new THREE.Vector3(), 11 );
-				geo.boundingBox = new THREE.Box3( new THREE.Vector3( - 11, - 11, - 11 ), new THREE.Vector3( 11, 11, 11 ) );
-				const mesh = new THREE.Mesh( geo, this.material );
-				mesh.name = 'Whale_' + lv.name;
-				mesh.castShadow = true;
-				mesh.receiveShadow = true;
-				mesh.layers.set( LAYERS.OPAQUE );
-				mesh.visible = false;
-				mesh.matrixAutoUpdate = false;
-				this.meshes.push( mesh );
-				this.group.add( mesh );
-
-			}
-
-			this.scene.add( this.group );
-			this.ready = true;
-			this.update( 0, null );
+			await this._loadAssets( manifest, bin, albedo, height );
 
 		} )();
 		return this._loading;
+
+	}
+
+	async loadPackage( assets ) {
+
+		if ( this._loading ) return this._loading;
+		this._loading = this._loadAssets( JSON.parse( new TextDecoder().decode( assets.manifest ) ), assets.geometry, assets.albedo, assets.height );
+		return this._loading;
+
+	}
+
+	async _loadAssets( manifest, bin, albedo, height ) {
+
+		this.manifest = manifest;
+		this.albedoTex = await loadTextureBytes( albedo, 'humpback_albedo.png', true );
+		this.heightTex = await loadTextureBytes( height, 'humpback_height.png', false );
+		const geometry = exactArrayBuffer( bin );
+
+		this._setupRig( manifest );
+		this.material = this._createMaterial( manifest );
+		for ( const lv of manifest.levels ) {
+
+			const geo = new THREE.BufferGeometry();
+			geo.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( geometry, lv.position, lv.vertices * 3 ), 3 ) );
+			geo.setAttribute( 'normal', new THREE.BufferAttribute( new Int16Array( geometry, lv.normal, lv.vertices * 3 ), 3, true ) );
+			geo.setAttribute( 'uv', new THREE.BufferAttribute( new Float32Array( geometry, lv.uv, lv.vertices * 2 ), 2 ) );
+			geo.setAttribute( 'uv1', new THREE.BufferAttribute( new Float32Array( geometry, lv.uv1, lv.vertices * 2 ), 2 ) );
+			geo.setAttribute( 'rig', new THREE.BufferAttribute( new Float32Array( geometry, lv.rig, lv.vertices * 4 ), 4 ) );
+			geo.setIndex( new THREE.BufferAttribute( new Uint32Array( geometry, lv.index, lv.indices ), 1 ) );
+			// posed in world space by the vertex shader: the bounds follow the whale (see update)
+			geo.boundingSphere = new THREE.Sphere( new THREE.Vector3(), 11 );
+			geo.boundingBox = new THREE.Box3( new THREE.Vector3( - 11, - 11, - 11 ), new THREE.Vector3( 11, 11, 11 ) );
+			const mesh = new THREE.Mesh( geo, this.material );
+			mesh.name = 'Whale_' + lv.name;
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
+			mesh.layers.set( LAYERS.OPAQUE );
+			mesh.visible = false;
+			mesh.matrixAutoUpdate = false;
+			this.meshes.push( mesh );
+			this.group.add( mesh );
+
+		}
+
+		this.scene.add( this.group );
+		this.ready = true;
+		this.update( 0, null );
+
+		return this;
 
 	}
 
@@ -328,6 +342,18 @@ export class Whale {
 
 	}
 
+	dispose() {
+
+		this.scene.remove( this.group );
+		for ( const mesh of this.meshes ) mesh.geometry.dispose();
+		this.material?.dispose();
+		this.albedoTex?.destroy();
+		this.heightTex?.destroy();
+		this.meshes = [];
+		this.ready = false;
+
+	}
+
 	// blow spout and water streaming off the flukes (Spray particles)
 	_effects( dt ) {
 
@@ -539,4 +565,10 @@ fn whalePose( p: vec3f, n: vec3f, rig: vec4f, o: i32 ) -> WhalePosed {
 
 	}
 
+}
+
+function exactArrayBuffer( value ) {
+	if ( value instanceof ArrayBuffer ) return value;
+	if ( ArrayBuffer.isView( value ) ) return value.buffer.slice( value.byteOffset, value.byteOffset + value.byteLength );
+	throw new TypeError( 'Whale geometry asset must be binary data' );
 }

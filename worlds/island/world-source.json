@@ -60,6 +60,7 @@
       "tidewater.static-vegetation/1",
       "tidewater.static-reef/1",
       "tidewater.static-fish-props/1",
+      "tidewater.humpback-whale/1",
       "tidewater.island-ocean/1",
       "tidewater.downeast-boat/1",
       "tidewater.ambient-audio/1",
@@ -12376,6 +12377,66 @@
       "objectId": "tw-object:island-terrain",
       "dataAssetId": "sha256:6aa0547b983d023f64c329f767e7711a56c40be4b1240b62f7d5d410b915f438",
       "priority": "visible"
+    },
+    {
+      "id": "tw-component:island-humpback",
+      "type": "tidewater.humpback-whale/1",
+      "profile": "example-island-humpback-v1",
+      "priority": "visible",
+      "streamingBounds": {
+        "center": [
+          0,
+          -4,
+          200
+        ],
+        "radius": 250
+      },
+      "modelAssetId": "sha256:c47390c365da1c8c6fa73bea4996bf51073a973770c1942e8993f545e283a354",
+      "geometryAssetId": "sha256:b3a31801a393489331bc3dd4fd5be64cbad32ac4e159f5180e0eb028d489a92d",
+      "albedoAssetId": "sha256:5daaa6727f5304aaa3b6f6ef86cedcebc7cf922376a5c0e7caad66c4f4a5efe1",
+      "heightAssetId": "sha256:5e18fbff0aa0034519d149c245d515f75011e7dd4f626dbd1a5e97eea79b66b5",
+      "seed": 1,
+      "route": [
+        [
+          70,
+          300
+        ],
+        [
+          60,
+          200
+        ],
+        [
+          35,
+          120
+        ],
+        [
+          5,
+          88
+        ],
+        [
+          -25,
+          100
+        ],
+        [
+          -52,
+          128
+        ],
+        [
+          -75,
+          178
+        ],
+        [
+          -52,
+          262
+        ],
+        [
+          -10,
+          330
+        ]
+      ],
+      "surfaceAt": 0.25,
+      "cruiseSpeed": 2.6,
+      "surfaceSpeed": 1.5
     },
     {
       "id": "tw-component:reef-tile--3--1",

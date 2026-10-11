@@ -671,6 +671,7 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 	let audioComponentCount = 0;
 	let boatCount = 0;
 	let fishPropsCount = 0;
+	let whaleCount = 0;
 	let boatObject = null;
 	const waterBodies = [];
 	for ( const component of components ) {
@@ -679,6 +680,7 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 		const staticVegetation = component.type === 'tidewater.static-vegetation/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
 		const staticReef = component.type === 'tidewater.static-reef/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
 		const staticFishProps = component.type === 'tidewater.static-fish-props/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
+		const humpbackWhale = component.type === 'tidewater.humpback-whale/1' && validHumpbackWhaleComponent( component ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'streamingBounds', 'modelAssetId', 'geometryAssetId', 'albedoAssetId', 'heightAssetId', 'route', 'seed', 'surfaceAt', 'cruiseSpeed', 'surfaceSpeed' ].includes( key ) );
 		const islandOcean = component.type === 'tidewater.island-ocean/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'streamingBounds' ].includes( key ) );
 		const waterBody = component.type === 'tidewater.water-body/1' && ( component.profile === undefined || [ 'deep-ocean', 'calm-lagoon', 'storm' ].includes( component.profile ) ) && Array.isArray( component.center ) && component.center.length === 2 && Number.isFinite( component.extent ) && component.extent >= 8 && component.extent <= 100000 && component.center.every( ( n ) => Number.isFinite( n ) && Math.abs( n ) + component.extent <= 1e6 ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'center', 'extent', 'profile', 'streamingBounds' ].includes( key ) );
 		const ambientAudio = component.type === 'tidewater.ambient-audio/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'streamingBounds', 'beds' ].includes( key ) ) && Array.isArray( component.beds ) && component.beds.length > 0 && component.beds.length <= 16 && component.beds.every( ( bed ) => validAudioBed( bed, assetRefs, component.priority || 'portal-preview' ) );
@@ -686,12 +688,13 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 		const proceduralTerrain = component.type === 'tidewater.procedural-island-terrain/1' && component.profile === 'example-island-v1' && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'streamingBounds' ].includes( key ) );
 		const terrainSurface = component.type === 'tidewater.terrain-surface/1' && component.profile === 'example-island-v1' && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ].includes( key ) );
 		const villageMaterials = component.type === 'tidewater.village-materials/2' && component.profile === 'original-tidewater-village-v1' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ].includes( key ) );
-		invariant( ( vegetation || staticVegetation || staticReef || staticFishProps || islandOcean || proceduralTerrain || terrainSurface || villageMaterials || waterBody || ambientAudio || boat ) && ( component.priority === undefined || [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( component.priority ) ), `Unsupported or invalid world component ${component.id}` );
+		invariant( ( vegetation || staticVegetation || staticReef || staticFishProps || humpbackWhale || islandOcean || proceduralTerrain || terrainSurface || villageMaterials || waterBody || ambientAudio || boat ) && ( component.priority === undefined || [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( component.priority ) ), `Unsupported or invalid world component ${component.id}` );
 		if ( islandOcean ) invariant( ++ islandOceanCount === 1, 'World manifest may declare only one island ocean component' );
 		if ( waterBody ) invariant( ++ waterBodyCount <= 4 && rules.seaLevel !== undefined && islandOceanCount === 0, 'Portable water requires seaLevel, allows at most four bodies, and cannot be combined with island-ocean' );
 		if ( islandOcean ) invariant( waterBodyCount === 0, 'A world cannot combine portable water and island-ocean components' );
 		if ( ambientAudio ) invariant( ++ audioComponentCount <= 16, 'World manifest may declare at most 16 ambient audio components' );
 		if ( staticFishProps ) invariant( ++ fishPropsCount <= 1, 'World manifest may declare at most one static fish-props component' );
+		if ( humpbackWhale ) invariant( ++ whaleCount <= 1, 'World manifest may declare at most one humpback whale component' );
 		if ( boat ) {
 			boatCount ++;
 			boatObject = objectRefs.get( component.objectId );
@@ -714,6 +717,12 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 			const limit = terrainSurface ? 128 * 1024 * 1024 : 64 * 1024 * 1024;
 			invariant( asset?.kind === kind && asset.priority === ( component.priority || 'portal-preview' ) && asset.bytes > 0 && asset.bytes <= limit, `World component ${component.id} has an invalid ${kind} asset` );
 		}
+		if ( humpbackWhale ) {
+			for ( const [ field, kind, limit ] of [ [ 'modelAssetId', 'whale-model/1', 1 * 1024 * 1024 ], [ 'geometryAssetId', 'whale-geometry/1', 32 * 1024 * 1024 ], [ 'albedoAssetId', 'whale-albedo/1', 16 * 1024 * 1024 ], [ 'heightAssetId', 'whale-height/1', 32 * 1024 * 1024 ] ] ) {
+				const asset = assetRefs.get( component[ field ] );
+				invariant( asset?.kind === kind && asset.priority === ( component.priority || 'portal-preview' ) && asset.bytes > 0 && asset.bytes <= limit, `Whale component ${component.id} has an invalid ${kind} asset` );
+			}
+		}
 		if ( component.type === 'tidewater.static-vegetation/1' ) invariant( typeof component.placementAssetId === 'string', `Static vegetation component ${component.id} requires placement data` );
 		if ( staticReef ) invariant( typeof component.placementAssetId === 'string', `Static reef component ${component.id} requires placement data` );
 		if ( staticFishProps ) invariant( typeof component.placementAssetId === 'string' && assetRefs.get( component.placementAssetId )?.bytes > 0 && assetRefs.get( component.placementAssetId )?.bytes <= 16 * 1024 * 1024, `Static fish-props component ${component.id} requires a bounded placement asset` );
@@ -730,6 +739,10 @@ function validAudioBed( bed, assetRefs, priority ) {
 	if ( ! bed || typeof bed !== 'object' || Array.isArray( bed ) || Object.keys( bed ).some( ( key ) => ! [ 'assetId', 'gain', 'condition', 'position', 'refDistance', 'rolloff' ].includes( key ) ) ) return false;
 	const asset = assetRefs.get( bed.assetId );
 	return typeof bed.assetId === 'string' && /^sha256:[0-9a-f]{64}$/.test( bed.assetId ) && asset?.kind === 'audio/ogg' && asset.bytes > 0 && asset.bytes <= 16 * 1024 * 1024 && asset.priority === priority && Number.isFinite( bed.gain ) && bed.gain >= 0 && bed.gain <= 1 && ( bed.condition === undefined || [ 'always', 'day', 'night', 'dawn', 'underwater' ].includes( bed.condition ) ) && ( bed.position === undefined || validVector( bed.position ) && bed.position.every( ( value ) => Math.abs( value ) <= 100000 ) ) && ( bed.refDistance === undefined || Number.isFinite( bed.refDistance ) && bed.refDistance >= 0.5 && bed.refDistance <= 1000 ) && ( bed.rolloff === undefined || Number.isFinite( bed.rolloff ) && bed.rolloff >= 0 && bed.rolloff <= 10 );
+}
+
+function validHumpbackWhaleComponent( component ) {
+	return component.profile === 'example-island-humpback-v1' && [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ].every( id => /^sha256:[0-9a-f]{64}$/.test( id || '' ) ) && Number.isInteger( component.seed ) && component.seed >= 0 && component.seed <= 0xffffffff && Array.isArray( component.route ) && component.route.length >= 4 && component.route.length <= 32 && component.route.every( point => Array.isArray( point ) && point.length === 2 && point.every( value => Number.isFinite( value ) && Math.abs( value ) <= 10000 ) ) && Number.isFinite( component.surfaceAt ) && component.surfaceAt >= 0 && component.surfaceAt <= 1 && Number.isFinite( component.cruiseSpeed ) && component.cruiseSpeed >= 0 && component.cruiseSpeed <= 10 && Number.isFinite( component.surfaceSpeed ) && component.surfaceSpeed >= 0 && component.surfaceSpeed <= 10 && validComponentStreamingBounds( component.streamingBounds );
 }
 
 function validComponentStreamingBounds( bounds ) {

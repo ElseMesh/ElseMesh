@@ -55,7 +55,7 @@ export function selectWorldComponentsForView( manifest, camera, { nearbyDistance
 		if ( distance <= maxDistance && ( distance <= nearbyDistance || _frustum.intersectsSphere( _sphere ) ) ) selected.push( component );
 	}
 	const assets = new Map( ( manifest.assets || [] ).map( ( asset ) => [ asset.id, asset.priority ] ) );
-	return selected.sort( ( a, b ) => ( VIEW_RANK[ a.priority || assets.get( a.placementAssetId ) || assets.get( a.beds?.[ 0 ]?.assetId ) ] ?? 1 ) - ( VIEW_RANK[ b.priority || assets.get( b.placementAssetId ) || assets.get( b.beds?.[ 0 ]?.assetId ) ] ?? 1 ) );
+	return selected.sort( ( a, b ) => ( VIEW_RANK[ a.priority || assets.get( a.placementAssetId ) || assets.get( a.modelAssetId ) || assets.get( a.beds?.[ 0 ]?.assetId ) ] ?? 1 ) - ( VIEW_RANK[ b.priority || assets.get( b.placementAssetId ) || assets.get( b.modelAssetId ) || assets.get( b.beds?.[ 0 ]?.assetId ) ] ?? 1 ) );
 }
 
 export function transformBoundsCenter( object, center, target ) {

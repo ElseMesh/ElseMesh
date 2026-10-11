@@ -473,6 +473,87 @@ func TestWorldManifestValidatesStaticFishPropsComponent(t *testing.T) {
 	}
 }
 
+func TestWorldManifestValidatesHumpbackWhaleAssets(t *testing.T) {
+	owner := testKey(t)
+	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	newManifest := func() worldManifest {
+		ids := []string{
+			"sha256:" + strings.Repeat("a", 64),
+			"sha256:" + strings.Repeat("b", 64),
+			"sha256:" + strings.Repeat("c", 64),
+			"sha256:" + strings.Repeat("d", 64),
+		}
+		manifest := newStarterManifest("Whale assets", ownerID.String())
+		manifest.WorldID = "tw-world:whale-assets"
+		manifest.Rules.RequiredFeatures = []string{"tidewater.humpback-whale/1"}
+		manifest.Assets = []assetRef{
+			{ID: ids[0], Bytes: 4096, Kind: "whale-model/1", Priority: "visible"},
+			{ID: ids[1], Bytes: 3 << 20, Kind: "whale-geometry/1", Priority: "visible"},
+			{ID: ids[2], Bytes: 4 << 20, Kind: "whale-albedo/1", Priority: "visible"},
+			{ID: ids[3], Bytes: 12 << 20, Kind: "whale-height/1", Priority: "visible"},
+		}
+		seed := uint32(1)
+		surfaceAt, cruiseSpeed, surfaceSpeed := 0.25, 2.6, 1.5
+		manifest.Components = []worldComponent{{
+			ID: "tw-component:humpback", Type: "tidewater.humpback-whale/1", Profile: "example-island-humpback-v1", Priority: "visible",
+			StreamingBounds: &streamingBounds{Center: vector3{0, -4, 180}, Radius: 1800},
+			ModelAssetID:    ids[0], GeometryAssetID: ids[1], AlbedoAssetID: ids[2], HeightAssetID: ids[3],
+			Seed: seed, Route: [][]float64{{70, 300}, {60, 200}, {35, 120}, {5, 88}}, SurfaceAt: &surfaceAt, CruiseSpeed: &cruiseSpeed, SurfaceSpeed: &surfaceSpeed,
+		}}
+		return manifest
+	}
+
+	manifest := newManifest()
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid humpback component rejected: %v", err)
+	}
+	document, err := signDocument(manifestProtocol, manifest, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("signed humpback component failed daemon JSON decode: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*worldManifest)
+	}{
+		{"missing model reference", func(m *worldManifest) { m.Components[0].ModelAssetID = "" }},
+		{"malformed geometry id", func(m *worldManifest) { m.Components[0].GeometryAssetID = "sha256:bad" }},
+		{"unlisted albedo asset", func(m *worldManifest) { m.Components[0].AlbedoAssetID = "sha256:" + strings.Repeat("e", 64) }},
+		{"wrong asset kind", func(m *worldManifest) { m.Assets[2].Kind = "image/png" }},
+		{"priority mismatch", func(m *worldManifest) { m.Assets[3].Priority = "background" }},
+		{"empty height texture", func(m *worldManifest) { m.Assets[3].Bytes = 0 }},
+		{"oversized geometry", func(m *worldManifest) { m.Assets[1].Bytes = 32<<20 + 1 }},
+		{"unknown profile", func(m *worldManifest) { m.Components[0].Profile = "custom-route" }},
+		{"missing streaming bounds", func(m *worldManifest) { m.Components[0].StreamingBounds = nil }},
+		{"missing seed", func(m *worldManifest) { m.Components[0].Seed = 0 }},
+		{"short route", func(m *worldManifest) { m.Components[0].Route = m.Components[0].Route[:3] }},
+		{"out of bounds route", func(m *worldManifest) { m.Components[0].Route[0][0] = 10001 }},
+		{"invalid surface fraction", func(m *worldManifest) { value := 1.1; m.Components[0].SurfaceAt = &value }},
+		{"invalid cruise speed", func(m *worldManifest) { value := 10.1; m.Components[0].CruiseSpeed = &value }},
+		{"duplicate whale component", func(m *worldManifest) { m.Components = append(m.Components, m.Components[0]) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			bad := newManifest()
+			test.mutate(&bad)
+			if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+				t.Fatal("invalid humpback component accepted")
+			}
+		})
+	}
+
+	var unknownField []worldComponent
+	if err := json.Unmarshal([]byte(`[{"id":"tw-component:humpback","type":"tidewater.humpback-whale/1","profile":"example-island-humpback-v1","modelAssetId":"sha256:`+strings.Repeat("a", 64)+`","geometryAssetId":"sha256:`+strings.Repeat("b", 64)+`","albedoAssetId":"sha256:`+strings.Repeat("c", 64)+`","heightAssetId":"sha256:`+strings.Repeat("d", 64)+`","route":[],"path":[]}]`), &unknownField); err == nil {
+		t.Fatal("unknown humpback component field accepted")
+	}
+}
+
 func TestWorldManifestValidatesDeterministicMovementRules(t *testing.T) {
 	key, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

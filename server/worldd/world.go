@@ -209,6 +209,14 @@ type worldComponent struct {
 	Priority         string           `json:"priority,omitempty"`
 	PlacementAssetID string           `json:"placementAssetId,omitempty"`
 	DataAssetID      string           `json:"dataAssetId,omitempty"`
+	ModelAssetID     string           `json:"modelAssetId,omitempty"`
+	GeometryAssetID  string           `json:"geometryAssetId,omitempty"`
+	AlbedoAssetID    string           `json:"albedoAssetId,omitempty"`
+	HeightAssetID    string           `json:"heightAssetId,omitempty"`
+	Route            [][]float64      `json:"route,omitempty"`
+	SurfaceAt        *float64         `json:"surfaceAt,omitempty"`
+	CruiseSpeed      *float64         `json:"cruiseSpeed,omitempty"`
+	SurfaceSpeed     *float64         `json:"surfaceSpeed,omitempty"`
 	StreamingBounds  *streamingBounds `json:"streamingBounds,omitempty"`
 	Center           []float64        `json:"center,omitempty"`
 	Extent           float64          `json:"extent,omitempty"`
@@ -272,6 +280,11 @@ func (component *worldComponent) UnmarshalJSON(data []byte) error {
 		allowed["placementAssetId"] = true
 	case "tidewater.static-fish-props/1":
 		allowed["placementAssetId"] = true
+	case "tidewater.humpback-whale/1":
+		allowed["profile"], allowed["seed"], allowed["route"] = true, true, true
+		allowed["surfaceAt"], allowed["cruiseSpeed"], allowed["surfaceSpeed"] = true, true, true
+		allowed["modelAssetId"], allowed["geometryAssetId"] = true, true
+		allowed["albedoAssetId"], allowed["heightAssetId"] = true, true
 	case "tidewater.island-ocean/1":
 	case "tidewater.procedural-island-terrain/1":
 		allowed["objectId"], allowed["profile"] = true, true
@@ -740,6 +753,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	ambientAudioCount := 0
 	boatCount := 0
 	fishPropsCount := 0
+	whaleCount := 0
 	var boatObject worldObject
 	waterBodies := make([]worldComponent, 0, 4)
 	assetRefs := make(map[string]assetRef, len(manifest.Assets))
@@ -751,6 +765,21 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		staticVegetation := component.Type == "tidewater.static-vegetation/1" && component.Seed == 0 && component.PlacementAssetID != ""
 		staticReef := component.Type == "tidewater.static-reef/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
 		staticFishProps := component.Type == "tidewater.static-fish-props/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
+		humpbackWhale := component.Type == "tidewater.humpback-whale/1" && component.Seed > 0 && component.PlacementAssetID == "" && component.Profile == "example-island-humpback-v1" && component.ModelAssetID != "" && component.GeometryAssetID != "" && component.AlbedoAssetID != "" && component.HeightAssetID != "" && component.StreamingBounds != nil && len(component.Route) >= 4 && len(component.Route) <= 32 && component.SurfaceAt != nil && *component.SurfaceAt >= 0 && *component.SurfaceAt <= 1 && component.CruiseSpeed != nil && *component.CruiseSpeed >= 0 && *component.CruiseSpeed <= 10 && component.SurfaceSpeed != nil && *component.SurfaceSpeed >= 0 && *component.SurfaceSpeed <= 10
+		if humpbackWhale {
+			for _, point := range component.Route {
+				if len(point) != 2 {
+					humpbackWhale = false
+					break
+				}
+				for _, coordinate := range point {
+					if math.IsNaN(coordinate) || math.IsInf(coordinate, 0) || math.Abs(coordinate) > 10000 {
+						humpbackWhale = false
+						break
+					}
+				}
+			}
+		}
 		ambientAudio := component.Type == "tidewater.ambient-audio/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Beds) > 0 && len(component.Beds) <= 16
 		boat := component.Type == "tidewater.downeast-boat/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.ObjectID != ""
 		islandOcean := component.Type == "tidewater.island-ocean/1" && component.Seed == 0 && component.PlacementAssetID == ""
@@ -778,6 +807,9 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		if staticFishProps {
 			fishPropsCount++
 		}
+		if humpbackWhale {
+			whaleCount++
+		}
 		if boat {
 			boatCount++
 			preview, exists := objectByID[component.ObjectID]
@@ -787,7 +819,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			}
 			boatObject = preview
 		}
-		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !staticFishProps && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || fishPropsCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
+		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !staticFishProps && !humpbackWhale && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || fishPropsCount > 1 || whaleCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
 			return fmt.Errorf("invalid or unsupported world component %q", component.ID)
 		}
 		if waterBody && (manifest.Rules.SeaLevel == nil || islandOceanCount > 0) || islandOcean && waterBodyCount > 0 {
@@ -835,6 +867,28 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			}
 			if !assetIDPattern.MatchString(component.DataAssetID) || !exists || asset.Kind != "village-materials/1" || asset.Priority != priority || asset.Bytes == 0 || asset.Bytes > 64<<20 {
 				return fmt.Errorf("invalid village materials asset reference on world component %q", component.ID)
+			}
+		}
+		if humpbackWhale {
+			priority := component.Priority
+			if priority == "" {
+				priority = "portal-preview"
+			}
+			whaleAssets := []struct {
+				id       string
+				kind     string
+				maxBytes int64
+			}{
+				{component.ModelAssetID, "whale-model/1", 1 << 20},
+				{component.GeometryAssetID, "whale-geometry/1", 32 << 20},
+				{component.AlbedoAssetID, "whale-albedo/1", 16 << 20},
+				{component.HeightAssetID, "whale-height/1", 32 << 20},
+			}
+			for _, reference := range whaleAssets {
+				asset, exists := assetRefs[reference.id]
+				if !assetIDPattern.MatchString(reference.id) || !exists || asset.Kind != reference.kind || asset.Priority != priority || asset.Bytes == 0 || asset.Bytes > reference.maxBytes {
+					return fmt.Errorf("invalid %s asset reference on world component %q", reference.kind, component.ID)
+				}
 			}
 		}
 		if ambientAudio {

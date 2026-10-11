@@ -467,6 +467,36 @@
           "additionalProperties": false
         },
         {
+          "required": ["id", "type", "profile", "modelAssetId", "geometryAssetId", "albedoAssetId", "heightAssetId", "route", "seed", "surfaceAt", "cruiseSpeed", "surfaceSpeed", "streamingBounds"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
+            "type": { "const": "tidewater.humpback-whale/1" },
+            "profile": { "const": "example-island-humpback-v1" },
+            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
+            "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
+            "modelAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "geometryAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "albedoAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "heightAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "route": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 32,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": { "type": "number", "minimum": -10000, "maximum": 10000 }
+              }
+            },
+            "seed": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+            "surfaceAt": { "type": "number", "minimum": 0, "maximum": 1 },
+            "cruiseSpeed": { "type": "number", "minimum": 0, "maximum": 10 },
+            "surfaceSpeed": { "type": "number", "minimum": 0, "maximum": 10 }
+          },
+          "additionalProperties": false
+        },
+        {
           "required": ["id", "type", "beds"],
           "properties": {
             "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },

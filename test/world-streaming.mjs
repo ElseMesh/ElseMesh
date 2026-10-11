@@ -82,9 +82,10 @@ const components = [
 	{ id: 'tw-component:near', type: 'tidewater.static-vegetation/1', placementAssetId: 'near', priority: 'nearby', streamingBounds: { center: [ 0, 0, 3 ], radius: 0.5 } },
 	{ id: 'tw-component:legacy', type: 'tidewater.island-ocean/1', priority: 'portal-preview' },
 	{ id: 'tw-component:ambience', type: 'tidewater.ambient-audio/1', beds: [ { assetId: 'ambient-loop' } ] },
+	{ id: 'tw-component:whale', type: 'tidewater.humpback-whale/1', modelAssetId: 'whale-model', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
 ];
-const componentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' } ], components }, camera, { nearbyDistance: 5 } ).map( ( component ) => component.id );
-assert.deepEqual( componentIDs, [ 'tw-component:legacy', 'tw-component:ambience', 'tw-component:front', 'tw-component:near' ], 'component selection uses world-space bounds, priority ordering, and eager compatibility for unbounded components' );
+const componentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5 } ).map( ( component ) => component.id );
+assert.deepEqual( componentIDs, [ 'tw-component:legacy', 'tw-component:ambience', 'tw-component:front', 'tw-component:near', 'tw-component:whale' ], 'component selection uses world-space bounds and uses the whale manifest asset priority when the component has none' );
 
 const originalWebTransport = globalThis.WebTransport;
 const originalWebSocket = globalThis.WebSocket;

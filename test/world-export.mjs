@@ -21,6 +21,8 @@ import { Vector3 } from '../src/engine/math/Vector3.js';
 
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const output = await mkdtemp( path.join( temporaryRoot, 'elsemesh-island-export-' ) );
+const whaleAssetRefs = ( component ) => [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ].filter( Boolean );
+const componentAssetRefs = ( component ) => [ component.placementAssetId, component.dataAssetId, ...whaleAssetRefs( component ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ].filter( Boolean );
 
 try {
 	const detailImage = getDetailImage();
@@ -30,7 +32,7 @@ try {
 	const checkedInSourceBytes = await readFile( path.join( checkedInDir, 'world-source.json' ) );
 	const checkedInTerrainReportBytes = await readFile( path.join( checkedInDir, 'terrain-validation.json' ) );
 	const checkedInSource = validateWorldSource( JSON.parse( checkedInSourceBytes ) );
-	const referencedIDs = ( source ) => new Set( [ ...source.objects.flatMap( ( object ) => [ object.assetId, ...( object.lods || [] ).map( ( lod ) => lod.assetId ) ] ), ...source.components.flatMap( ( component ) => [ component.placementAssetId, component.dataAssetId, ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ] ).filter( Boolean ) ] );
+	const referencedIDs = ( source ) => new Set( [ ...source.objects.flatMap( ( object ) => [ object.assetId, ...( object.lods || [] ).map( ( lod ) => lod.assetId ) ] ), ...source.components.flatMap( componentAssetRefs ) ] );
 	const checkedInIDs = referencedIDs( checkedInSource );
 	const checkedInFiles = ( await readdir( path.join( checkedInDir, 'assets' ) ) ).sort();
 	assert.deepEqual( checkedInFiles, [ ...checkedInIDs ].map( ( id ) => id.slice( 'sha256:'.length ) ).sort(), 'checked-in island package stores exactly its referenced assets' );
@@ -42,6 +44,14 @@ try {
 	}
 	assert.ok( checkedInBytes <= checkedInSource.rules.maxPackageBytes, 'checked-in assets fit the world package budget' );
 	assert.ok( checkedInSource.objects.some( ( object ) => object.id === 'tw-object:island-village' ), 'checked-in island source contains the static village GLB instance' );
+	const checkedInWhale = checkedInSource.components.find( component => component.type === 'tidewater.humpback-whale/1' );
+	assert.ok( checkedInWhale, 'checked-in Example Island declares its humpback simulation' );
+	assert.deepEqual( checkedInWhale.route, [ [ 70, 300 ], [ 60, 200 ], [ 35, 120 ], [ 5, 88 ], [ -25, 100 ], [ -52, 128 ], [ -75, 178 ], [ -52, 262 ], [ -10, 330 ] ], 'whale route is explicit world data, not a hidden client default' );
+	assert.equal( checkedInWhale.seed, 1, 'whale simulation seed is explicit and stable' );
+	for ( const id of whaleAssetRefs( checkedInWhale ) ) {
+		const bytes = await readFile( path.join( checkedInDir, 'assets', id.slice( 'sha256:'.length ) ) );
+		assert.equal( `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`, id, `whale model input ${id} is content addressed` );
+	}
 	const checkedInBoat = checkedInSource.objects.find( ( object ) => object.id === 'tw-object:moored-lobster-boat' );
 	assert.ok( checkedInBoat, 'checked-in island package includes its moored boat as a static visual asset' );
 	assert.equal( checkedInBoat.priority, 'portal-preview', 'the moored boat is included in open portal previews' );
@@ -64,7 +74,7 @@ try {
 	const assetPath = path.join( output, 'assets', firstDocument.objects[ 0 ].assetId.slice( 'sha256:'.length ) );
 	const assetFirst = await readFile( assetPath );
 	const firstAssets = new Map();
-	for ( const id of new Set( [ ...firstDocument.objects.flatMap( ( object ) => [ object.assetId, ...( object.lods || [] ).map( ( lod ) => lod.assetId ) ] ), ...firstDocument.components.flatMap( ( component ) => [ component.placementAssetId, component.dataAssetId, ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ] ).filter( Boolean ) ] ) ) firstAssets.set( id, await readFile( path.join( output, 'assets', id.slice( 'sha256:'.length ) ) ) );
+	for ( const id of new Set( [ ...firstDocument.objects.flatMap( ( object ) => [ object.assetId, ...( object.lods || [] ).map( ( lod ) => lod.assetId ) ] ), ...firstDocument.components.flatMap( componentAssetRefs ) ] ) ) firstAssets.set( id, await readFile( path.join( output, 'assets', id.slice( 'sha256:'.length ) ) ) );
 	const secondExportOutput = execFileSync( process.execPath, [ 'tools/export-island.mjs', '--out', output ], { encoding: 'utf8' } );
 	const sourceBytes = await readFile( sourcePath );
 	const terrainReportSecond = await readFile( terrainReportPath );
@@ -119,9 +129,9 @@ try {
 	assert.ok( boatObject, 'export includes the static moored boat preview' );
 	assert.equal( boatObject.lods?.length, 1, 'moored boat preview has a distant geometry variant' );
 	assert.ok( firstAssets.has( boatObject.lods[ 0 ].assetId ), 'moored boat LOD is part of the portable package' );
-	assert.deepEqual( source.rules.requiredFeatures, [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ], 'portable terrain surfaces, packaged village maps, vegetation, reef, fish props, ocean, boat, audio, and portals declare runtime capabilities' );
+	assert.deepEqual( source.rules.requiredFeatures, [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ], 'portable terrain, village, wildlife, props, reef, ocean, boat, audio, and portal renderer capabilities are declared' );
 	assert.equal( source.portals[ 0 ].destinationWorldId, 'tw-world:loz-underneath', 'the example island links to the portable LOZ-derived cave' );
-	assert.equal( source.components.length, 7 + source.components.filter( ( component ) => component.type === 'tidewater.static-reef/1' ).length, 'portable island declares village materials, vegetation, reef tiles, fish props, terrain renderer, ocean, boat, and ambient components' );
+	assert.equal( source.components.length, 8 + source.components.filter( ( component ) => component.type === 'tidewater.static-reef/1' ).length, 'portable island declares village materials, vegetation, reef tiles, fish props, terrain renderer, humpback, ocean, boat, and ambient components' );
 	assert.equal( vegetationComponent.type, 'tidewater.static-vegetation/1', 'portable island uses terrain-independent, authored world-space vegetation placements' );
 	assert.match( vegetationComponent.placementAssetId, /^sha256:[0-9a-f]{64}$/, 'vegetation placement data is content addressed' );
 	assert.equal( vegetationComponent.priority, 'portal-preview', 'vegetation records are available for open portal previews' );

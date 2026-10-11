@@ -6,6 +6,7 @@ import { generateMipmaps } from '../../engine/gpu/Mipmaps.js';
 // as plain data textures (no image element / ImageBitmap orientation or colour-space surprises).
 export async function decodePNG( buffer ) {
 
+	if ( ArrayBuffer.isView( buffer ) ) buffer = buffer.buffer.slice( buffer.byteOffset, buffer.byteOffset + buffer.byteLength );
 	const u8 = new Uint8Array( buffer );
 	const dv = new DataView( buffer );
 	let p = 8;
@@ -71,10 +72,16 @@ export async function decodePNG( buffer ) {
 export async function loadTexture( url, srgb ) {
 
 	const buf = await fetch( url ).then( ( r ) => r.arrayBuffer() );
-	const img = await decodePNG( buf );
+	return loadTextureBytes( buf, url.split( '/' ).pop(), srgb );
+
+}
+
+export async function loadTextureBytes( buffer, label, srgb ) {
+
+	const img = await decodePNG( buffer );
 	// sampled with the shared anisotropic clamp sampler (was ClampToEdge, trilinear, anisotropy 8)
 	const tex = new Texture( {
-		label: url.split( '/' ).pop(),
+		label,
 		width: img.width, height: img.height,
 		format: srgb ? 'rgba8unorm-srgb' : 'rgba8unorm',
 		mips: true,

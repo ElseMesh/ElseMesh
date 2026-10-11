@@ -10,10 +10,13 @@ import * as THREE from '../../engine/index.js';
 
 // route (x, z) through the bay, checked against TerrainData
 // passes ~130 m off the beach and ~65 m from the pier head; >= 8.8 m of water everywhere
-const ROUTE = [ [ 70, 300 ], [ 60, 200 ], [ 35, 120 ], [ 5, 88 ], [ - 25, 100 ], [ - 52, 128 ], [ - 75, 178 ], [ - 52, 262 ], [ - 10, 330 ] ];
-const SURFACE_AT = 0.25; // route fraction where the surfacing sequence starts (heading in toward the beach)
-const CRUISE_SPEED = 2.6; // m/s underwater
-const SURFACE_SPEED = 1.5;
+export const EXAMPLE_ISLAND_WHALE_PROFILE = Object.freeze( {
+	seed: 1,
+	route: [ [ 70, 300 ], [ 60, 200 ], [ 35, 120 ], [ 5, 88 ], [ - 25, 100 ], [ - 52, 128 ], [ - 75, 178 ], [ - 52, 262 ], [ - 10, 330 ] ],
+	surfaceAt: 0.25,
+	cruiseSpeed: 2.6,
+	surfaceSpeed: 1.5,
+} );
 const TAU = Math.PI * 2;
 
 const _e = new THREE.Euler();
@@ -22,17 +25,20 @@ const _p = new THREE.Vector3();
 
 export class WhaleBrain {
 
-	constructor( { terrain, query = null, seed = 1 } ) {
+	constructor( { terrain, query = null, seed = 1, route = EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed, seaLevel = 0 } ) {
 
 		this.terrain = terrain;
 		this.query = query;
+		this.surfaceAt = surfaceAt;
+		this.cruiseSpeed = cruiseSpeed;
+		this.surfaceSpeed = surfaceSpeed;
 		this.rand = mulberry( seed );
-		this._buildRoute();
-		this.u = this.length * ( SURFACE_AT - 0.06 ); // start just before the surfacing zone
+		this._buildRoute( route );
+		this.u = this.length * ( this.surfaceAt - 0.06 ); // start just before the surfacing zone
 		this.position = new THREE.Vector3();
 		this.quaternion = new THREE.Quaternion();
 		this.velocity = new THREE.Vector3();
-		this.speed = CRUISE_SPEED;
+		this.speed = this.cruiseSpeed;
 		this.yaw = 0;
 		this.pitch = 0;
 		this.roll = 0;
@@ -43,7 +49,7 @@ export class WhaleBrain {
 		this.bob = 0;
 		this.y = - 9;
 		this.vy = 0;
-		this.water = 0;
+		this.water = seaLevel;
 		this.wetAge = 100; // s since the back last broke the surface
 		this.strokePhase = 0;
 		this.strokeAmp = 0.13;
@@ -81,9 +87,9 @@ export class WhaleBrain {
 
 	}
 
-	_buildRoute() {
+	_buildRoute( route ) {
 
-		const pts = ROUTE.map( ( p ) => new THREE.Vector3( p[ 0 ], 0, p[ 1 ] ) );
+		const pts = route.map( ( p ) => new THREE.Vector3( p[ 0 ], 0, p[ 1 ] ) );
 		const curve = new THREE.CatmullRomCurve3( pts, true, 'centripetal', 0.5 );
 		curve.arcLengthDivisions = 4000;
 		this.length = curve.getLength();
@@ -312,16 +318,16 @@ export class WhaleBrain {
 
 		const n = 3 + Math.floor( this.rand() * 4 ); // 3-6 breaths
 		const k = [];
-		k.push( { t: 9, depth: 1.3, pitch: 0.08, arch: 0, follow: 0.85, speed: SURFACE_SPEED, stroke: 0.07 } ); // rise
+		k.push( { t: 9, depth: 1.3, pitch: 0.08, arch: 0, follow: 0.85, speed: this.surfaceSpeed, stroke: 0.07 } ); // rise
 		for ( let i = 0; i < n; i ++ ) {
 
-			k.push( { t: 3.5, depth: 1.12, pitch: 0.1, arch: 0.02, follow: 0.85, speed: SURFACE_SPEED, stroke: 0.03, blow: true } );
+			k.push( { t: 3.5, depth: 1.12, pitch: 0.1, arch: 0.02, follow: 0.85, speed: this.surfaceSpeed, stroke: 0.03, blow: true } );
 			if ( i < n - 1 ) {
 
 				// roll back under: the head goes down, the back and dorsal fin roll through
-				k.push( { t: 4, depth: 2.2, pitch: - 0.14, arch: - 0.05, follow: 0.92, speed: SURFACE_SPEED, stroke: 0.04 } );
-				k.push( { t: 7 + this.rand() * 6, depth: 3.4, pitch: 0, arch: 0, follow: 0.85, speed: SURFACE_SPEED, stroke: 0.06 } );
-				k.push( { t: 5, depth: 1.3, pitch: 0.08, arch: 0, follow: 0.85, speed: SURFACE_SPEED, stroke: 0.06 } );
+				k.push( { t: 4, depth: 2.2, pitch: - 0.14, arch: - 0.05, follow: 0.92, speed: this.surfaceSpeed, stroke: 0.04 } );
+				k.push( { t: 7 + this.rand() * 6, depth: 3.4, pitch: 0, arch: 0, follow: 0.85, speed: this.surfaceSpeed, stroke: 0.06 } );
+				k.push( { t: 5, depth: 1.3, pitch: 0.08, arch: 0, follow: 0.85, speed: this.surfaceSpeed, stroke: 0.06 } );
 
 			}
 
@@ -334,7 +340,7 @@ export class WhaleBrain {
 			k.push( { t: 7, depth: 9, pitch: - 0.2, arch: 0, follow: 0.6, speed: 2.4, stroke: 0.1 } );
 			k.push( { t: 6, depth: 9, pitch: 0.45, arch: 0, follow: 0.3, speed: 3.5, stroke: 0.14, breach: 'launch' } );
 			k.push( { t: 6, depth: 2, pitch: 0, arch: 0, follow: 0.3, speed: 2.5, stroke: 0.05, breach: 'air' } );
-			k.push( { t: 6, depth: 2.4, pitch: 0.05, arch: 0, follow: 0.85, speed: SURFACE_SPEED, stroke: 0.05 } );
+			k.push( { t: 6, depth: 2.4, pitch: 0.05, arch: 0, follow: 0.85, speed: this.surfaceSpeed, stroke: 0.05 } );
 
 		}
 
@@ -342,7 +348,7 @@ export class WhaleBrain {
 		k.push( { t: 3, depth: 1.25, pitch: - 0.12, arch: - 0.14, follow: 0.85, speed: 1.8, stroke: 0.02 } );
 		k.push( { t: 4.5, depth: 5.5, pitch: - 0.95, arch: - 0.12, follow: 0.12, speed: 1.9, stroke: 0.0, fluke: true } );
 		k.push( { t: 6, depth: 11, pitch: - 0.45, arch: 0, follow: 0.6, speed: 2.2, stroke: 0.08 } );
-		k.push( { t: 8, depth: 10, pitch: 0, arch: 0, follow: 0.85, speed: CRUISE_SPEED, stroke: 0.1 } );
+		k.push( { t: 8, depth: 10, pitch: 0, arch: 0, follow: 0.85, speed: this.cruiseSpeed, stroke: 0.1 } );
 		this.seq = { keys: k, i: 0, t: 0, blown: false };
 		this.state = 'surface';
 
@@ -383,15 +389,15 @@ export class WhaleBrain {
 
 		// ---- sequencer
 		const frac = ( ( this.u / this.length ) % 1 + 1 ) % 1;
-		if ( this.state === 'cruise' && frac > SURFACE_AT && frac < SURFACE_AT + 0.05 && ! this.lastWrap ) {
+		if ( this.state === 'cruise' && frac > this.surfaceAt && frac < this.surfaceAt + 0.05 && ! this.lastWrap ) {
 
 			this._startSequence();
 			this.lastWrap = true;
 
 		}
 
-		if ( frac < SURFACE_AT - 0.1 || frac > SURFACE_AT + 0.3 ) this.lastWrap = false;
-		let target = { depth: 9.5, pitch: 0, arch: 0, follow: 0.85, speed: CRUISE_SPEED, stroke: 0.13 };
+		if ( frac < this.surfaceAt - 0.1 || frac > this.surfaceAt + 0.3 ) this.lastWrap = false;
+		let target = { depth: 9.5, pitch: 0, arch: 0, follow: 0.85, speed: this.cruiseSpeed, stroke: 0.13 };
 		this.blow = 0;
 		this.flukeUp = 0;
 		if ( this.seq ) {

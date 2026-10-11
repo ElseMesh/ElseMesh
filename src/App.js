@@ -843,7 +843,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
 		for ( const component of connector.manifest.components || [] ) {
-			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'tidewater.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
+			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'tidewater.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'tidewater.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
 			const count = installed.length;
 			if ( component.type === 'tidewater.procedural-island-vegetation/1' || component.type === 'tidewater.static-vegetation/1' ) {
 				if ( ! this.vegetationEnabled ) continue;
@@ -861,6 +861,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				replacedObjects.add( component.objectId );
 				const maps = await decodeTerrainSurfaceAsset( connector.assets.get( component.dataAssetId ) );
 				const terrainData = new HeightfieldTerrainData( maps );
+				root.userData.terrainData = terrainData;
 				const surfaceMaps = { normal: maps.normal, splat: maps.splat, detailWidth: maps.detailWidth, detailHeight: maps.detailHeight, detail: maps.detail };
 				const terrainGPU = new TerrainGPU( terrainData, null, surfaceMaps );
 				const terrain = new Terrain( { scene: root, terrainData, terrainGPU } );
@@ -909,6 +910,25 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					fishProps: true,
 					dispose: () => { root.remove( mesh ); fishProps.dispose(); },
 				} );
+			} else if ( component.type === 'tidewater.humpback-whale/1' ) {
+				const whale = new Whale( {
+					scene: root,
+					terrain: root.userData.terrainData || null,
+					seaLevel: connector.manifest.rules.seaLevel ?? 0,
+					profile: { seed: component.seed, route: component.route, surfaceAt: component.surfaceAt, cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed },
+				} );
+				try {
+					await whale.loadPackage( {
+						manifest: connector.assets.get( component.modelAssetId ),
+						geometry: connector.assets.get( component.geometryAssetId ),
+						albedo: connector.assets.get( component.albedoAssetId ),
+						height: connector.assets.get( component.heightAssetId ),
+					} );
+				} catch ( error ) {
+					whale.dispose();
+					throw error;
+				}
+				installed.push( { whale: true, update: ( dt, camera ) => whale.update( dt, camera ), dispose: () => whale.dispose() } );
 			} else if ( component.type === 'tidewater.island-ocean/1' ) {
 				const lod = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
 				const mesh = new Mesh( lod.geometry, this.waterMaterial );
@@ -1038,7 +1058,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const assetPriorities = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset.priority ] ) );
 		const rank = { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 };
 		const wantedRank = objects.reduce( ( best, object ) => Math.min( best, rank[ object.priority || assetPriorities.get( object.assetId ) ] ?? 1 ), Infinity );
-		const componentRank = components.reduce( ( best, component ) => Math.min( best, rank[ component.priority || assetPriorities.get( component.placementAssetId ) || assetPriorities.get( component.beds?.[ 0 ]?.assetId ) ] ?? 1 ), Infinity );
+		const componentRank = components.reduce( ( best, component ) => Math.min( best, rank[ component.priority || assetPriorities.get( component.placementAssetId ) || assetPriorities.get( component.modelAssetId ) || assetPriorities.get( component.beds?.[ 0 ]?.assetId ) ] ?? 1 ), Infinity );
 		const loadRank = Math.min( wantedRank, componentRank );
 		if ( state.loading ) {
 			const allStillNeeded = [ ...state.loadingObjectIDs ].every( ( objectID ) => wantedObjectIDs.has( objectID ) ) && [ ...state.loadingComponentIDs ].every( ( componentID ) => wantedComponentIDs.has( componentID ) );
@@ -1426,7 +1446,10 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.reef.update( dt, this.camera.position );
 		this.village.update( dt );
 		if ( this.vegetation && ! this.remoteWorldActive ) this.vegetation.update( dt, this.camera );
-		if ( this.whale ) this.whale.update( dt, this.camera );
+		if ( this.whale ) {
+			this.whale.group.visible = ! this.remoteWorldActive;
+			if ( ! this.remoteWorldActive ) this.whale.update( dt, this.camera );
+		}
 		this.boat.update( dt );
 		this.wildlife.update( dt, this.camera, this.freeCam ? null : this.player );
 		this.localLights.update( this.camera, dt );
@@ -1547,7 +1570,7 @@ function readVegetationPlacements( connector, component ) {
 }
 
 function componentAssetIDs( component ) {
-	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
+	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.type === 'tidewater.humpback-whale/1' ? [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
 }
 
 function readReefPlacements( connector, component ) {
