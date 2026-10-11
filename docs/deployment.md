@@ -16,6 +16,11 @@ archive. Check Actions for success and compare the client bottom-right eight-dig
 stamp with the source HEAD. GitHub repository URL redirects do not guarantee
 redirects for old `rebroad.github.io/tidewater/` links; use the new address.
 
+The root client's Vite build stamp comes from `main` HEAD. The workflow stamps
+the archived page after building it, using the checked-out
+`archive/loz/main` HEAD, so `/` and `/loz/` identify their own source revisions.
+The LOZ stamp sits above its bottom-right Credits link.
+
 On 2026-10-10, Pages run `38080038023` successfully built and deployed main at
 `ac86602eaf860a8f0615db6333dd6fbfdb9ea756` and the preserved
 `archive/loz/main` ref at `f691cd9`. The archive includes the imported `loz/main`

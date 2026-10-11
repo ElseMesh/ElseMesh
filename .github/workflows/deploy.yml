@@ -28,6 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node --test test/build-commit-stamp.mjs
       - run: npm run build
         env:
           ELSEMESH_COMMIT_SHA: ${{ github.sha }}
@@ -35,6 +36,8 @@ jobs:
       - run: node test/input-look-keys.mjs
         working-directory: loz-source
       - run: npm run build --prefix loz-source
+      - name: Stamp archived LOZ commit
+        run: node tools/stamp-build-commit.mjs loz-source/dist/index.html "$(git -C loz-source rev-parse HEAD)"
       - run: mkdir -p dist/loz && cp -a loz-source/dist/. dist/loz/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
