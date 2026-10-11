@@ -58,6 +58,11 @@ stamp matched `archive/loz/main`. `https://elsemesh.github.io/` redirected to
 `https://elsemesh.org/`, and the authenticated Pages API reported
 `cname: elsemesh.org` with HTTPS enforcement enabled.
 
+The later Pages run `38176009348` deployed main commit `58365976` on
+2026-10-11. The custom-domain root returned HTTP 200 with stamp `58365976`,
+matching `main`; `/loz/` returned HTTP 200 with stamp `f691cd9e`, matching
+`archive/loz/main`.
+
 ## Selected ThruHolds
 
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
