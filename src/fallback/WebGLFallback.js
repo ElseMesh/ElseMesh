@@ -64,6 +64,66 @@ function webglCloudNoiseTexture( T, size = 512 ) {
 
 }
 
+function webglCloudVolumeTexture( T, size = 64 ) {
+
+	const data = new Uint8Array( size * size * size * 4 ), channels = [ [ 4, 73 ], [ 5, 131 ], [ 6, 197 ], [ 8, 251 ] ];
+	const fade = t => t * t * t * ( t * ( t * 6 - 15 ) + 10 );
+	for ( let c = 0; c < 4; c ++ ) {
+
+		const [ frequency, seed ] = channels[ c ], rand = mulberry32( seed ), octaves = [];
+		for ( let o = 0; o < 2; o ++ ) {
+			const n = frequency << o, gradients = new Float32Array( n * n * n * 3 );
+			for ( let i = 0; i < n * n * n; i ++ ) {
+				const z = rand() * 2 - 1, angle = rand() * Math.PI * 2, radius = Math.sqrt( 1 - z * z );
+				gradients[ i * 3 ] = Math.cos( angle ) * radius;
+				gradients[ i * 3 + 1 ] = Math.sin( angle ) * radius;
+				gradients[ i * 3 + 2 ] = z;
+			}
+			octaves.push( { n, gradients } );
+		}
+
+		const values = new Float32Array( size * size * size );
+		let min = Infinity, max = - Infinity;
+		for ( let z = 0; z < size; z ++ ) for ( let y = 0; y < size; y ++ ) for ( let x = 0; x < size; x ++ ) {
+			let value = 0, amplitude = 1, weight = 0;
+			for ( const { n, gradients } of octaves ) {
+				const px = x / size * n, py = y / size * n, pz = z / size * n;
+				const ix = Math.floor( px ), iy = Math.floor( py ), iz = Math.floor( pz );
+				const fx = px - ix, fy = py - iy, fz = pz - iz, u = fade( fx ), v = fade( fy ), w = fade( fz );
+				const at = ( gx, gy, gz, dx, dy, dz ) => {
+					const index = ( ( ( ( gz % n ) + n ) % n ) * n * n + ( ( ( gy % n ) + n ) % n ) * n + ( ( ( gx % n ) + n ) % n ) ) * 3;
+					return gradients[ index ] * dx + gradients[ index + 1 ] * dy + gradients[ index + 2 ] * dz;
+				};
+				const x00 = at( ix, iy, iz, fx, fy, fz ) * ( 1 - u ) + at( ix + 1, iy, iz, fx - 1, fy, fz ) * u;
+				const x10 = at( ix, iy + 1, iz, fx, fy - 1, fz ) * ( 1 - u ) + at( ix + 1, iy + 1, iz, fx - 1, fy - 1, fz ) * u;
+				const x01 = at( ix, iy, iz + 1, fx, fy, fz - 1 ) * ( 1 - u ) + at( ix + 1, iy, iz + 1, fx - 1, fy, fz - 1 ) * u;
+				const x11 = at( ix, iy + 1, iz + 1, fx, fy - 1, fz - 1 ) * ( 1 - u ) + at( ix + 1, iy + 1, iz + 1, fx - 1, fy - 1, fz - 1 ) * u;
+				const y0 = x00 * ( 1 - v ) + x10 * v, y1 = x01 * ( 1 - v ) + x11 * v;
+				value += ( y0 * ( 1 - w ) + y1 * w ) * amplitude;
+				weight += amplitude; amplitude *= 0.5;
+			}
+			value /= weight;
+			const index = ( z * size * size + y * size + x );
+			values[ index ] = value;
+			min = Math.min( min, value ); max = Math.max( max, value );
+		}
+		for ( let i = 0; i < values.length; i ++ ) data[ i * 4 + c ] = Math.round( ( values[ i ] - min ) / ( max - min ) * 255 );
+
+	}
+
+	const texture = new T.Data3DTexture( data, size, size, size );
+	texture.format = T.RGBAFormat;
+	texture.type = T.UnsignedByteType;
+	texture.wrapS = texture.wrapT = texture.wrapR = T.RepeatWrapping;
+	texture.magFilter = T.LinearFilter;
+	texture.minFilter = T.LinearMipmapLinearFilter;
+	texture.unpackAlignment = 1;
+	texture.generateMipmaps = true;
+	texture.needsUpdate = true;
+	return texture;
+
+}
+
 function webglTerrainMaterial( T, terrain ) {
 
 	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
@@ -386,6 +446,7 @@ export class WebGLFallback {
 		const material = new T.ShaderMaterial( {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
 			},
@@ -408,6 +469,7 @@ export class WebGLFallback {
 				uniform float uTime;
 				uniform vec3 uCameraPosition;
 				uniform vec3 uSunDirection;
+				uniform sampler2D uCloudNoise;
 				uniform sampler2D uTerrainHeight;
 				uniform float uTerrainOrigin;
 				uniform float uTerrainSize;
@@ -415,17 +477,6 @@ export class WebGLFallback {
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
 				varying float vWaveHeight;
-				float hashWater( vec2 p ) {
-					p = fract( p * vec2( 123.34, 456.21 ) );
-					p += dot( p, p + 45.32 );
-					return fract( p.x * p.y );
-				}
-				float noiseWater( vec2 p ) {
-					vec2 i = floor( p ), f = fract( p );
-					f = f * f * ( 3.0 - 2.0 * f );
-					return mix( mix( hashWater( i ), hashWater( i + vec2( 1.0, 0.0 ) ), f.x ),
-						mix( hashWater( i + vec2( 0.0, 1.0 ) ), hashWater( i + vec2( 1.0, 1.0 ) ), f.x ), f.y );
-				}
 				void main() {
 					vec2 p = vWorldPosition.xz;
 					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 ), kE = vec2( 0.72, -0.48 );
@@ -451,25 +502,31 @@ export class WebGLFallback {
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
 					float fresnel = 0.025 + 0.86 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
 					vec3 sky = mix( vec3( 0.035, 0.12, 0.26 ), vec3( 0.22, 0.43, 0.68 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) );
-					vec2 skyP = reflectionDirection.xz / max( reflectionDirection.y + 0.14, 0.14 ) * 4.2 + vec2( uTime * 0.018, -uTime * 0.005 );
-					float reflectedCloudNoise = noiseWater( skyP * 0.72 ) * 0.68 + noiseWater( skyP * 1.8 + vec2( 7.3, -4.1 ) ) * 0.32;
+					vec2 skyUv = vec2( atan( reflectionDirection.x, reflectionDirection.z ) / 6.2831853 + 0.5, asin( clamp( reflectionDirection.y, -1.0, 1.0 ) ) / 3.1415927 + 0.5 );
+					skyUv += vec2( uTime * 0.0005, -uTime * 0.00014 );
+					vec4 cloudField = texture2D( uCloudNoise, skyUv * 0.38 );
+					vec2 cloudWarp = ( cloudField.rg - 0.5 ) * 0.024;
+					float cloudBroad = texture2D( uCloudNoise, skyUv * 0.72 + cloudWarp ).r;
+					float cloudDetail = texture2D( uCloudNoise, skyUv * 1.8 + vec2( 0.17, -0.11 ) ).g;
+					float cloudFine = texture2D( uCloudNoise, skyUv * 4.0 + vec2( 0.31, -0.19 ) ).b;
+					float reflectedCloudNoise = cloudBroad - max( 0.0, 0.52 - cloudDetail ) * 0.32 + ( cloudFine - 0.5 ) * 0.045;
 					float reflectedCloudBand = smoothstep( 0.055, 0.16, reflectionDirection.y ) * ( 1.0 - smoothstep( 0.72, 0.96, reflectionDirection.y ) );
-					float reflectedCloud = smoothstep( 0.51, 0.65, reflectedCloudNoise ) * reflectedCloudBand * 0.72;
+					float reflectedCloud = smoothstep( 0.58, 0.72, reflectedCloudNoise ) * reflectedCloudBand * 0.9;
 					float reflectedSun = pow( max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ), 96.0 );
 					vec3 cloudColor = mix( vec3( 0.42, 0.5, 0.62 ), vec3( 1.25, 1.16, 1.0 ), max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ) * 0.6 + 0.2 );
 					sky = mix( sky, cloudColor, reflectedCloud );
 					sky += vec3( 1.0, 0.72, 0.43 ) * reflectedSun * 0.14;
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
-					float micro = 0.5 + 0.5 * sin( dot( p, vec2( 0.62, 0.47 ) ) + uTime * 0.68 + sin( dot( p, vec2( -0.41, 0.73 ) ) * 1.6 - uTime * 0.43 ) );
+					vec2 waterUv = p * 0.0032 + vec2( uTime * 0.0002, -uTime * 0.00011 );
+					vec4 waterNoise = texture2D( uCloudNoise, waterUv );
+					float micro = waterNoise.r * 0.55 + waterNoise.g * 0.45;
 					float shallow = smoothstep( 0.0, 18.0, depth );
 					vec3 water = mix( vec3( 0.018, 0.31, 0.27 ), vec3( 0.004, 0.035, 0.10 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					vec3 reflected = mix( water, sky, fresnel );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
 					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 128.0 );
 					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.005 + 0.015 * ripple );
-					float foamNoise = 0.5 + 0.25 * sin( dot( p, vec2( 0.48, 0.31 ) ) + uTime * 0.42 )
-						+ 0.18 * sin( dot( p, vec2( -0.29, 0.57 ) ) - uTime * 0.28 )
-						+ 0.07 * sin( dot( p, vec2( 0.91, -0.22 ) ) + uTime * 0.63 );
+					float foamNoise = texture2D( uCloudNoise, p * 0.011 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
 					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
 					float shoreWave = 0.5 + 0.5 * sin( depth * 1.3 - uTime * 1.2 + ( shoreDetail - 0.5 ) * 4.8 );
 					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.15, 2.7, depth ) );
@@ -495,9 +552,12 @@ export class WebGLFallback {
 
 	_makeCloudLayer( sunDirection ) {
 
-		const T = this.THREE, cloudNoise = webglCloudNoiseTexture( T );
+		const T = this.THREE, cloudNoise = webglCloudNoiseTexture( T ), cloudVolume = webglCloudVolumeTexture( T );
 		const material = new T.ShaderMaterial( {
-			uniforms: { uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() }, uCloudNoise: { value: cloudNoise } },
+			uniforms: {
+				uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() }, uCameraPosition: { value: new T.Vector3() },
+				uCloudNoise: { value: cloudNoise }, uCloudVolume: { value: cloudVolume },
+			},
 			vertexShader: /* glsl */`
 				varying vec3 vDirection;
 				void main() {
@@ -509,7 +569,9 @@ export class WebGLFallback {
 			fragmentShader: /* glsl */`
 				uniform float uTime;
 				uniform vec3 uSunDirection;
+				uniform vec3 uCameraPosition;
 				uniform sampler2D uCloudNoise;
+				uniform sampler3D uCloudVolume;
 				varying vec3 vDirection;
 				void main() {
 					vec3 dir = normalize( vDirection );
@@ -530,17 +592,34 @@ export class WebGLFallback {
 					float fine = texture2D( uCloudNoise, uv * 4.0 + vec2( 0.31, -0.19 ) ).b;
 					float n = broad - max( 0.0, 0.52 - detail ) * 0.32 + ( fine - 0.5 ) * 0.045;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
-					float alpha = smoothstep( 0.58, 0.72, n ) * band * 0.9;
-					float sun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
-					float fullness = smoothstep( 0.51, 0.72, broad );
-					float densityLeft = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.003, 0.0 ) ).r;
-					float densityUp = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.0, 0.003 ) ).r;
-					vec2 gradient = vec2( broad - densityLeft, broad - densityUp );
-					vec2 sunPlane = normalize( uSunDirection.xz + vec2( 0.0001 ) );
-					float lobeLight = clamp( 0.5 + dot( normalize( gradient + vec2( 0.0001 ) ), sunPlane ) * 0.5, 0.0, 1.0 );
-					float cloudLight = 0.12 + 0.3 * fullness + 0.25 * sun + 0.25 * smoothstep( 0.1, 0.62, dir.y ) + lobeLight * 0.16 + ( fine - 0.5 ) * 0.12;
-					vec3 cloud = mix( vec3( 0.34, 0.42, 0.54 ), vec3( 1.4, 1.31, 1.15 ), clamp( cloudLight, 0.0, 1.0 ) );
-					gl_FragColor = vec4( mix( sky, cloud, alpha ), 1.0 );
+					float coverage = smoothstep( 0.58, 0.72, n ) * band * 0.9;
+					float transmittance = 1.0;
+					vec3 cloudRadiance = vec3( 0.0 );
+					float cloudSun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
+					float cloudStart = max( 0.0, ( 850.0 - uCameraPosition.y ) / max( dir.y, 0.055 ) );
+					float cloudEnd = max( cloudStart, ( 1650.0 - uCameraPosition.y ) / max( dir.y, 0.055 ) );
+					float stepLength = min( ( cloudEnd - cloudStart ) / 8.0, 12000.0 );
+					if ( coverage > 0.002 && stepLength > 0.0 && dir.y > 0.055 ) {
+						for ( int i = 0; i < 8; i ++ ) {
+							float t = cloudStart + ( float( i ) + 0.5 ) * stepLength;
+							vec3 worldPoint = uCameraPosition + dir * t;
+							vec3 noisePoint = worldPoint * 0.0027 + vec3( uTime * 0.0000068, 0.0, -uTime * 0.0000044 );
+							vec4 volume = texture( uCloudVolume, noisePoint );
+							float height = clamp( ( worldPoint.y - 850.0 ) / 800.0, 0.0, 1.0 );
+							float profile = smoothstep( 0.0, 0.15, height ) * ( 1.0 - smoothstep( 0.76, 1.0, height ) );
+							float shape = 0.5 + ( volume.r - 0.5 ) * 0.24 + ( volume.g - 0.5 ) * 0.08 + ( broad - 0.5 ) * 0.45;
+							float density = smoothstep( 0.39, 0.67, shape - max( 0.0, 0.52 - volume.b ) * 0.06 ) * profile * coverage;
+							float sunDensity = texture( uCloudVolume, noisePoint + normalize( uSunDirection ) * 0.2 ).r;
+							float lightFacing = clamp( 0.58 + ( sunDensity - volume.r ) * 1.1 + cloudSun * 0.16, 0.25, 1.0 );
+							float lightHeight = 0.22 + height * 0.38 + smoothstep( 0.52, 0.76, volume.g ) * 0.24 + lightFacing * 0.24;
+							vec3 light = mix( vec3( 0.28, 0.36, 0.49 ), vec3( 1.38, 1.28, 1.12 ), clamp( lightHeight, 0.0, 1.0 ) );
+							light += vec3( 1.0, 0.66, 0.38 ) * pow( cloudSun, 12.0 ) * 0.18;
+							float stepAlpha = 1.0 - exp( - density * stepLength * 0.00045 );
+							cloudRadiance += transmittance * stepAlpha * light;
+							transmittance *= 1.0 - stepAlpha;
+						}
+					}
+					gl_FragColor = vec4( sky * transmittance + cloudRadiance, 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>
 				}
@@ -553,6 +632,7 @@ export class WebGLFallback {
 		} );
 		const clouds = new T.Mesh( new T.SphereGeometry( 1, 64, 32 ), material );
 		clouds.userData.cloudNoise = cloudNoise;
+		clouds.userData.cloudVolume = cloudVolume;
 		clouds.renderOrder = - 999;
 		clouds.frustumCulled = false;
 		return clouds;
@@ -928,6 +1008,7 @@ export class WebGLFallback {
 		const T = this.THREE, speed = this.keys.has( 'ShiftLeft' ) || this.keys.has( 'ShiftRight' ) ? 10 : 5;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = now * 0.001;
+		this.cloudLayer.material.uniforms.uCameraPosition.value.copy( this.camera.position );
 		for ( const object of this.scene.children ) if ( object.isWater ) object.material.uniforms.uTime.value = now * 0.001;
 		const forward = new T.Vector3( - Math.sin( this.yaw ), 0, - Math.cos( this.yaw ) );
 		const right = new T.Vector3( Math.cos( this.yaw ), 0, - Math.sin( this.yaw ) );
