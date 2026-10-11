@@ -1,5 +1,5 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { WORLD } from '../world/WorldLayout.js';
+import { ISLAND_DEFINITION as WORLD } from '../world/IslandDefinition.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
@@ -10,6 +10,7 @@ import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
+import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
@@ -253,7 +254,8 @@ function webglTerrainWaterTexture( T, terrain ) {
 
 function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
-	const field = computeShoreField( terrain, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ], seaLevel } );
+	const swellLength = Math.hypot( ...WORLD.swellDir ), swell = WORLD.swellDir.map( value => value / swellLength );
+	const field = computeShoreField( terrain, { res: 512, swellDir: swell, seaLevel } );
 	const data = new Uint8Array( field.res * field.res * 4 ), swashData = new Uint8Array( field.res * field.res * 4 );
 	let minTime = Infinity, maxTime = - Infinity, minSwashTime = Infinity, maxSwashTime = - Infinity;
 	for ( let i = 0; i < field.res * field.res; i ++ ) {
@@ -267,8 +269,8 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 		const source = i * 4, directionLength = Math.hypot( field.data[ source + 1 ], field.data[ source + 2 ] );
 		const exposure = Math.min( 1, directionLength ), arrival = Math.max( minTime, Math.min( maxTime, field.data[ source ] ) );
 		const swashArrival = Math.max( minSwashTime, Math.min( maxSwashTime, field.data[ source + 3 ] ) ), out = source;
-		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : WORLD.swellDir.x ) * 0.5 + 0.5 ) * 255 );
-		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : WORLD.swellDir.y ) * 0.5 + 0.5 ) * 255 );
+		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : swell[ 0 ] ) * 0.5 + 0.5 ) * 255 );
+		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : swell[ 1 ] ) * 0.5 + 0.5 ) * 255 );
 		data[ source + 2 ] = Math.round( exposure * 255 );
 		data[ source + 3 ] = Math.round( ( arrival - minTime ) / timeRange * 255 );
 		swashData[ out ] = Math.round( ( swashArrival - minSwashTime ) / swashTimeRange * 255 );
@@ -622,6 +624,7 @@ export class WebGLFallback {
 		else await this._loadIsland( onProgress );
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
+		if ( ! this.worldLink ) this.boat = new WebGLBoatAdapter( T, this.scene );
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -1101,11 +1104,12 @@ export class WebGLFallback {
 			console.warn( 'WebGL fallback village model unavailable:', error );
 		}
 		await this._loadVegetation();
-		this.spawn = { position: [ 53.6, this.terrain.heightAt( 53.6, -77 ) + 1.7, -77 ], yaw: Math.PI, pitch: - 0.05 };
+		const start = WORLD.start || WORLD.spawn;
+		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
 		this.groundHeight = ( x, z ) => this.terrain.heightAt( x, z );
-		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( 53.6, 0, -77 ) } );
+		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
 		this.scene.add( this.grass );
-		this.grassCenter = new T.Vector2( 53.6, -77 );
+		this.grassCenter = new T.Vector2( start.position[ 0 ], start.position[ 2 ] );
 		this.worldName.textContent = 'WebGL mode · island rendering simplified';
 		progress( 0.9, 'Starting the WebGL island…' );
 
@@ -1117,7 +1121,8 @@ export class WebGLFallback {
 			const response = await fetch( vegetationUrl );
 			if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 			const records = decodeVegetationPlacements( new Uint8Array( await response.arrayBuffer() ), 7 );
-			const T = this.THREE, center = [ 53.6, -77 ], group = new T.Group();
+			const start = WORLD.start || WORLD.spawn;
+			const T = this.THREE, center = [ start.position[ 0 ], start.position[ 2 ] ], group = new T.Group();
 			const material = webglPlantMaterial( T ), anchoredMaterial = webglPlantMaterial( T, true );
 			const distance = record => Math.hypot( record.x - center[ 0 ], record.z - center[ 1 ] );
 			const add = ( kind, build, maxDistance, heightScale, castShadow = false, anchored = false ) => {
@@ -1412,6 +1417,7 @@ export class WebGLFallback {
 		const now = performance.now(), dt = Math.min( 0.05, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
+		this.boat?.update( dt );
 		const T = this.THREE, speed = this.keys.has( 'ShiftLeft' ) || this.keys.has( 'ShiftRight' ) ? 10 : 5;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;

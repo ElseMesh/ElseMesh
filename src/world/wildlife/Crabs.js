@@ -1,8 +1,7 @@
-import { G } from '../../core/Globals.js';
-import { WORLD } from '../WorldLayout.js';
+import { ISLAND_DEFINITION as WORLD } from '../IslandDefinition.js';
 import { mulberry32 } from '../../util/Noise.js';
-import { CRITTER } from './CritterShapes.js';
-import { TAU, clamp, smooth, angleDiff, approach, qGround } from './Kit.js';
+import { CRITTER } from './CritterSpecies.js';
+import { TAU, clamp, smooth, angleDiff, approach } from './WildlifeMath.js';
 
 // Ghost crabs and hermit crabs.
 //
@@ -17,7 +16,6 @@ import { TAU, clamp, smooth, angleDiff, approach, qGround } from './Kit.js';
 // shells when approached, coming out again slowly.
 
 const ACTIVE = 36; // m: burrows / homes simulated within this distance of the viewer
-const DRAW = 34; // m: crabs shrink away before this distance
 const MAX_GHOST = 32, MAX_HERMIT = 14;
 const CELL = 12;
 
@@ -38,11 +36,6 @@ export class Crabs {
 		this.time = 0;
 		this.scan = 0;
 		this.nearBurrows = [];
-		this._rec = {
-			x: 0, y: 0, z: 0, scale: 1, q: [ 0, 0, 0, 1 ], species: 0, phase: 0, stride: 0, lift: 0, out: 1, eyes: 1, claws: 0, seed: 0,
-			px: 0, py: 0, pz: 0, pPhase: 0, pq: [ 0, 0, 0, 1 ],
-		};
-
 	}
 
 	cell( x, z ) {
@@ -149,13 +142,12 @@ export class Crabs {
 
 	// ------------------------------------------------------------------ update
 
-	update( dt, viewer, batch, camera, blobs = null ) {
+	step( dt, viewer, focus, environment ) {
 
 		this.time += dt;
-		const cp = camera.position;
-		const night = G.night.value;
+		const night = environment.night;
 		// dusk / night: ghost crabs come out
-		const sunY = G.sunDir.value.y;
+		const sunY = environment.sunY;
 		this.activity = clamp( 0.45 + 0.5 * Math.max( night, smooth( 0.35, 0.05, sunY ) ), 0, 0.95 );
 
 		// (re)assign the pool to the burrows near the viewer, a few times a second
@@ -163,42 +155,12 @@ export class Crabs {
 		if ( this.scan <= 0 ) {
 
 			this.scan = 0.25;
-			this.assign( cp );
+			this.assign( focus );
 
 		}
 
 		for ( const c of this.ghosts ) this.updateGhost( c, dt, viewer );
 		for ( const c of this.hermits ) this.updateHermit( c, dt, viewer );
-
-		// draw burrows (near), ghost crabs, hermit crabs
-		const rec = this._rec;
-		for ( const b of this.nearBurrows ) {
-
-			const d = Math.hypot( b.x - cp.x, b.z - cp.z );
-			if ( d > DRAW ) continue;
-			this.burrowRecord( b, rec, smooth( DRAW, DRAW * 0.75, d ) );
-			batch.write( rec );
-
-		}
-
-		for ( const c of this.ghosts ) if ( c.visible ) {
-
-			this.crabRecord( c, rec, cp );
-			if ( rec.scale <= 0 ) continue;
-			batch.write( rec );
-			if ( blobs ) blobs.add( c.x, c.y, c.z, rec.scale * 0.75, rec.scale * ( c.lift + 0.12 ), smooth( 0.35, 0.8, c.out ), c.sx, c.sz );
-
-		}
-
-		for ( const c of this.hermits ) {
-
-			this.crabRecord( c, rec, cp );
-			if ( rec.scale <= 0 ) continue;
-			batch.write( rec );
-			if ( blobs ) blobs.add( c.x, c.y, c.z, rec.scale * 0.8, rec.scale * 0.45, 0.9, c.sx, c.sz );
-
-		}
-
 	}
 
 	assign( cp ) {
@@ -704,80 +666,6 @@ export class Crabs {
 
 		c.state = 'withdrawn';
 		c.t = 8 + this.rng() * 10;
-
-	}
-
-	// ------------------------------------------------------------------ records
-
-	crabRecord( c, r, cp ) {
-
-		const T = this.terrain;
-		const d = Math.hypot( c.x - cp.x, c.z - cp.z );
-		const fadeIn = c.fade = Math.min( 1, c.fade + 0.05 );
-		r.scale = c.size * smooth( DRAW, DRAW * 0.72, d ) * fadeIn;
-		if ( r.scale <= 0 ) return;
-		const y = T.heightAt( c.x, c.z );
-		c.y = y;
-		// orientation: ground normal, body yaw
-		const e = 0.15;
-		const nx = T.heightAt( c.x - e, c.z ) - T.heightAt( c.x + e, c.z ), nz = T.heightAt( c.x, c.z - e ) - T.heightAt( c.x, c.z + e );
-		const nl = Math.hypot( nx, 2 * e, nz );
-		c.sx = - nx / ( 2 * e );
-		c.sz = - nz / ( 2 * e );
-		for ( let i = 0; i < 4; i ++ ) c.pq[ i ] = c.q[ i ];
-		qGround( c.q, c.bodyYaw, nx / nl, 2 * e / nl, nz / nl );
-		if ( c.fresh ) {
-
-			c.px = c.x; c.py = y; c.pz = c.z;
-			for ( let i = 0; i < 4; i ++ ) c.pq[ i ] = c.q[ i ];
-			c.pPhase = c.phase;
-			c.fresh = false;
-
-		}
-
-		r.x = c.x; r.y = y; r.z = c.z;
-		for ( let i = 0; i < 4; i ++ ) {
-
-			r.q[ i ] = c.q[ i ];
-			r.pq[ i ] = c.pq[ i ];
-
-		}
-
-		r.species = c.species;
-		r.phase = c.phase;
-		r.pPhase = c.pPhase;
-		r.stride = c.stride;
-		r.lift = c.lift;
-		r.out = c.out;
-		r.eyes = c.eyes;
-		r.claws = c.claws;
-		r.seed = c.seed;
-		r.px = c.px; r.py = c.py; r.pz = c.pz;
-		c.px = c.x; c.py = y; c.pz = c.z;
-
-	}
-
-	burrowRecord( b, r, k ) {
-
-		const T = this.terrain;
-		r.x = b.x; r.y = b.y; r.z = b.z;
-		r.scale = 0.05 * b.size * k;
-		if ( ! b.q ) {
-
-			b.q = [ 0, 0, 0, 1 ];
-			const e = 0.3;
-			const nx = T.heightAt( b.x - e, b.z ) - T.heightAt( b.x + e, b.z ), nz = T.heightAt( b.x, b.z - e ) - T.heightAt( b.x, b.z + e );
-			const nl = Math.hypot( nx, 2 * e, nz );
-			qGround( b.q, b.yaw, nx / nl, 2 * e / nl, nz / nl );
-
-		}
-
-		for ( let i = 0; i < 4; i ++ ) r.q[ i ] = r.pq[ i ] = b.q[ i ];
-		r.species = CRITTER.BURROW;
-		r.phase = r.pPhase = 0;
-		r.stride = 0; r.lift = 0; r.out = 1; r.eyes = 0; r.claws = 0;
-		r.seed = b.seed;
-		r.px = b.x; r.py = b.y; r.pz = b.z;
 
 	}
 

@@ -1,4 +1,6 @@
 import * as THREE from '../../engine/index.js';
+import { CRITTER } from './CritterSpecies.js';
+export { CRITTER } from './CritterSpecies.js';
 
 // Beach critters sharing one template: ghost crab, hermit crab (in a turban shell) and the crab
 // burrow (a dark hole in a fan of dug-out sand).
@@ -12,8 +14,6 @@ import * as THREE from '../../engine/index.js';
 //   limbs parametric (vertex attributes, same for every species), placed in the shader from the
 //         species' limb table and the gait: 8 walking legs, 2 claws, 2 eyestalks
 //         aLimb = ( limb index, segment, t along, radius scale ), aRing = ( cos, sin ) around
-
-export const CRITTER = { GHOST: 0, HERMIT: 1, BURROW: 2 };
 
 export const NU = 12, NV = 9;
 export const BODY_VERTS = NU * NV + 2;

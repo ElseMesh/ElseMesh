@@ -1,32 +1,9 @@
 import * as THREE from '../../engine/index.js';
 import { StorageBuffer } from '../../engine/gpu/Texture.js';
 import { ShaderModule } from '../../engine/gpu/Shader.js';
+export { TAU, clamp, lerp, smooth, angleDiff, approach, qAxis, qMul, qYawPitchRoll, qRotate, qGround } from './WildlifeMath.js';
 
 // Shared pieces of the wildlife renderers and simulations.
-
-export const TAU = Math.PI * 2;
-
-export const clamp = ( x, a, b ) => x < a ? a : x > b ? b : x;
-export const lerp = ( a, b, t ) => a + ( b - a ) * t;
-export const smooth = ( a, b, x ) => {
-
-	const t = clamp( ( x - a ) / ( b - a ), 0, 1 );
-	return t * t * ( 3 - 2 * t );
-
-};
-
-// shortest signed angle a - b
-export const angleDiff = ( a, b ) => {
-
-	let d = ( a - b ) % TAU;
-	if ( d > Math.PI ) d -= TAU;
-	else if ( d < - Math.PI ) d += TAU;
-	return d;
-
-};
-
-// exponential approach factor for a rate (1/s)
-export const approach = ( rate, dt ) => 1 - Math.exp( - rate * dt );
 
 // WGSL: rotate v by the unit quaternion q ( fn rotateQ( q: vec4f, v: vec3f ) -> vec3f )
 export const kitModule = new ShaderModule( {
@@ -42,70 +19,6 @@ fn rotateQ( q: vec4f, v: vec3f ) -> vec3f { return v + cross( q.xyz, cross( q.xy
 // position with the previous camera, which is the same to first order. Vertex snippets set the
 // world position directly and hand the previous one:
 //   v.useWorld = true; v.worldPos = world; v.worldNormal = n; v.prevWorldPos = world - delta;
-
-// ---------------------------------------------------------------- CPU quaternions (plain arrays)
-
-// q = [ x, y, z, w ]
-export function qAxis( out, ax, ay, az, angle ) {
-
-	const s = Math.sin( angle / 2 );
-	out[ 0 ] = ax * s; out[ 1 ] = ay * s; out[ 2 ] = az * s; out[ 3 ] = Math.cos( angle / 2 );
-	return out;
-
-}
-
-// out = a * b
-export function qMul( out, a, b ) {
-
-	const ax = a[ 0 ], ay = a[ 1 ], az = a[ 2 ], aw = a[ 3 ];
-	const bx = b[ 0 ], by = b[ 1 ], bz = b[ 2 ], bw = b[ 3 ];
-	out[ 0 ] = ax * bw + aw * bx + ay * bz - az * by;
-	out[ 1 ] = ay * bw + aw * by + az * bx - ax * bz;
-	out[ 2 ] = az * bw + aw * bz + ax * by - ay * bx;
-	out[ 3 ] = aw * bw - ax * bx - ay * by - az * bz;
-	return out;
-
-}
-
-// rotation from yaw (about y), pitch (about the rotated x: nose up > 0) and roll (about the
-// rotated z: right wing down > 0), for a body whose forward axis is +z
-const _qa = [ 0, 0, 0, 1 ], _qb = [ 0, 0, 0, 1 ];
-export function qYawPitchRoll( out, yaw, pitch, roll ) {
-
-	qAxis( out, 0, 1, 0, yaw );
-	qMul( out, out, qAxis( _qa, 1, 0, 0, - pitch ) );
-	return qMul( out, out, qAxis( _qb, 0, 0, 1, roll ) );
-
-}
-
-// rotate the vector (x, y, z) by q into out ([ x, y, z ])
-export function qRotate( out, q, x, y, z ) {
-
-	const qx = q[ 0 ], qy = q[ 1 ], qz = q[ 2 ], qw = q[ 3 ];
-	const tx = 2 * ( qy * z - qz * y ), ty = 2 * ( qz * x - qx * z ), tz = 2 * ( qx * y - qy * x );
-	out[ 0 ] = x + qw * tx + qy * tz - qz * ty;
-	out[ 1 ] = y + qw * ty + qz * tx - qx * tz;
-	out[ 2 ] = z + qw * tz + qx * ty - qy * tx;
-	return out;
-
-}
-
-// quaternion that turns the +y axis onto the unit vector n and faces +z along the heading yaw
-// (ground-aligned bodies)
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion();
-const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3();
-export function qGround( out, yaw, nx, ny, nz ) {
-
-	_y.set( nx, ny, nz );
-	_z.set( Math.sin( yaw ), 0, Math.cos( yaw ) );
-	_x.crossVectors( _y, _z ).normalize();
-	_z.crossVectors( _x, _y );
-	_m.makeBasis( _x, _y, _z );
-	_q.setFromRotationMatrix( _m );
-	out[ 0 ] = _q.x; out[ 1 ] = _q.y; out[ 2 ] = _q.z; out[ 3 ] = _q.w;
-	return out;
-
-}
 
 // ---------------------------------------------------------------- instance records
 

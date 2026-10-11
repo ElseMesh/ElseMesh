@@ -1,5 +1,4 @@
-import { STAND } from './FishStand.js';
-import { CHANDLERY } from './Chandlery.js';
+import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 
 // First-play guide:
 //  - an intro (3 cards) the first time the game starts, after the start overlay: the goal, the fishing
@@ -314,7 +313,7 @@ export class Guide {
 
 				this._whereT = 0.25;
 				const x = p.position.x, z = p.position.z;
-				for ( const [ id, t ] of [ [ 'joe', STAND ], [ 'marta', CHANDLERY ] ] ) {
+				for ( const [ id, t ] of [ [ 'joe', ISLAND_DEFINITION.fishStand ], [ 'marta', ISLAND_DEFINITION.chandlery ] ] ) {
 
 					const el = this.body.querySelector( `[data-where="${ id }"]` );
 					if ( el ) el.textContent = `${ Math.round( Math.hypot( t.x - x, t.z - z ) ) } m ${ compassWord( x, z, t.x, t.z ) }`;

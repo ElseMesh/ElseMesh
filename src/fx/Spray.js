@@ -4,6 +4,7 @@ import {
 } from '../engine/webgpu.js';
 import { GRAVITY } from '../core/Globals.js';
 import { LAYERS } from '../core/SceneRenderer.js';
+import { SPRAY } from './SprayTypes.js';
 
 // GPU spray particles: drops, ligaments, dense spray and mist.
 //
@@ -43,7 +44,7 @@ import { LAYERS } from '../core/SceneRenderer.js';
 // optional), breakersSprayShadow( p, tag ) (the `waveShadow` module, optional). The optional hooks
 // are resolved when the kernel / material are first built (first update() / first draw).
 
-export const SPRAY = { DROPLET: 0, MIST: 1, LIGAMENT: 2, SPRAY: 3, SHEET: 4 };
+export { SPRAY } from './SprayTypes.js';
 
 // per-kind constants: droplet (a drop of a few mm, ballistic), mist (fine drops that follow the air),
 // ligament (an elongated blob of water, ~1-2 cm, torn off a sheet or jet), spray (a cloud of drops:

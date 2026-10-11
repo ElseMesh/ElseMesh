@@ -1,7 +1,8 @@
 import * as THREE from '../../engine/index.js';
 import { Material } from '../../engine/render/Material.js';
 import { StorageBuffer } from '../../engine/gpu/Texture.js';
-import { SPECIES, buildBird } from './BirdShapes.js';
+import { SPECIES } from './BirdSpecies.js';
+import { buildBird } from './BirdShapes.js';
 import { InstanceRecords, instancedMesh, kitModule } from './Kit.js';
 
 // One instanced draw for every bird (gulls, terns, pelicans, frigatebirds, sanderlings), plus

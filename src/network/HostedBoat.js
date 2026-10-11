@@ -31,7 +31,6 @@ export class HostedBoat {
 	activate( { query, colliders } ) {
 
 		if ( ! this.controller ) this.controller = new BoatController( {
-			model: this.model,
 			design: this.model.design,
 			query,
 			terrain: null,

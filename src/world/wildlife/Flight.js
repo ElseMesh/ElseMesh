@@ -1,6 +1,6 @@
-import { BIRD, SPECIES } from './BirdShapes.js';
+import { BIRD, SPECIES } from './BirdSpecies.js';
 import { createPose, flapWings, tuckLegs, setHead, storePrevious, resetPrevious } from './BirdPose.js';
-import { TAU, clamp, lerp, angleDiff, approach, qYawPitchRoll } from './Kit.js';
+import { TAU, clamp, lerp, angleDiff, approach, qYawPitchRoll } from './WildlifeMath.js';
 
 // Flight model shared by every flying bird: a point mass flying coordinated turns (bank from the
 // turn rate), climbing / sinking toward a target height, flapping when it needs power (climbing,

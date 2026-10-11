@@ -45,8 +45,9 @@ descriptors plus current simulation state.
    contracts. Move orchestration out of the backend-specific early-return path
    without making WebGPU-only systems run against WebGL accidentally.
 2. Split mixed domain/presentation classes at their ownership boundary. The
-   first split is complete for the lobster boat; continue with wildlife
-   behavior, then static village, fish stand, chandlery, and vendor content.
+   first split is complete for the lobster boat; wildlife has a partial
+   extraction; continue with its remaining renderer orchestration, then static
+   village, fish stand, chandlery, and vendor content.
    Preserve existing geometry, assets, placements, interactions, and collision
    behavior as the shared source of truth.
 3. Give each renderer an adapter for those shared entities and state. Keep
@@ -81,6 +82,24 @@ builds a separate reduced world, and wildlife, village props, vendors, and
 backend-specific rendering effects still need shared content/runtime adapters.
 Matched Flip7 views of the refactored boat and comparisons under both graphics
 backends remain open.
+
+## Wildlife extraction milestone (partial)
+
+The island constants now live in plain data in `IslandDefinition`; renderer
+math and wildlife-specific math/species data have separate modules. Bird and
+shorebird behavior consume explicit environment samples, while crab behavior
+is separated from `CrabPresentation`, which creates renderer-facing records.
+The active `Wildlife` orchestrator still writes directly to the existing bird,
+critter, and shadow batches, and some bird pose/interpolation state remains
+presentation-specific. This is an ownership split in progress, not a shared
+WebGPU/WebGL wildlife adapter yet.
+
+The full `npm test` suite, production build, focused hermit-crab update test,
+and WebGL boat-adapter test pass. A headless rendered wildlife smoke produced
+bird, ghost-crab, and hermit-crab frames. The Flip7 is not currently connected
+to ADB, so this wildlife change has not received a new on-device visual check.
+Do not claim cross-backend or Flip7 parity until the remaining adapters and
+matched device views are verified.
 
 ## Acceptance criteria
 
