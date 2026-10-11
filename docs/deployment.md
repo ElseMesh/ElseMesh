@@ -29,11 +29,10 @@ history and its later arrow-key look-controls change; its build passed
 and `https://elsemesh.github.io/loz/` returned HTTP 200 and referenced their
 respective JavaScript bundles.
 
-On 2026-10-11, Pages run `38137302535` deployed main commit
-`a4b73b9087d805e64c2b925366d2c8ea047f103c` successfully. Both public paths
-returned HTTP 200; the root displayed `a4b73b90` and `/loz/` displayed
-`f691cd9e`, matching `main` and `archive/loz/main` respectively. The current
-deployment workflow includes the archived-branch stamp step.
+On 2026-10-11, Pages run `38148318847` succeeded for main commit
+`1964d7557952d2c567b99bb442a9a1d233aac488`; the archived ref was
+`f691cd9e`. A prior run verified the root and `/loz/` stamps, but the current
+edge response has not yet been revalidated against these refs.
 
 ## Selected ThruHolds
 
@@ -81,37 +80,51 @@ browser's home makes it the default for that browser.
 
 ## elsemesh.org
 
-DNS inspection on 2026-10-11 confirms Namecheap nameservers, an apex parking
+DNS inspection on 2026-10-11 found Namecheap nameservers, an apex parking
 address `162.255.119.79`, and `www` pointing to `parkingpage.namecheap.com`.
-The domain is not yet connected to Pages. Preserve the existing email records:
-MX priorities 10 (`eforward1`, `eforward2`, `eforward3`), 15 (`eforward4`),
-and 20 (`eforward5`) under `registrar-servers.com`, plus the apex SPF record
-`v=spf1 include:spf.efwd.registrar-servers.com ~all`. The zone currently has
+The apex HTTP endpoint redirects to Namecheap parking and the HTTPS request
+timed out. The GitHub Pages API initially reported `cname: elsemesh.org` and
+`https_enforced: false`; that custom-domain setting was then cleared so the
+GitHub.io client can remain the working address until DNS is ready. The API
+now reports `cname: null` and `https_enforced: true`. Immediately afterward,
+GitHub's edge still returned cached HTTP 301 redirects for both GitHub.io
+paths to `http://elsemesh.org/` and `/loz/` (response `Age: 85`). Recheck both
+paths after the edge cache expires; do not claim the public client is restored
+until they serve the deployed pages and matching commit stamps.
+
+Preserve the existing email records: MX priorities 10 (`eforward1`,
+`eforward2`, `eforward3`), 15 (`eforward4`), and 20 (`eforward5`) under
+`registrar-servers.com`, plus the apex SPF record
+`v=spf1 include:spf.efwd.registrar-servers.com ~all`. The zone previously had
 no apex AAAA or CAA records. Nameservers are `dns1.registrar-servers.com` and
 `dns2.registrar-servers.com`.
 
-The same DNS check confirms `elsemesh.org` still resolves to the parking IP;
-HTTPS does not respond, and `www` remains parked. GitHub Pages serves the
-static client at `https://elsemesh.github.io/`, but `/healthz`, `/api/lookup`,
-and `/gateway` return 404 there; Pages is not a world gateway. The deployment
-host previously had no active `elsemesh-gateway` or Caddy service and no
-listener on TCP 80, 443, 5200, or 42901. No public gateway or relay endpoint is
-verified; the service and firewall examples below are deployment instructions,
-not evidence of a running service.
+The organization Pages domain-verification challenge is pending. It was
+created in **ElseMesh organization settings → Pages → Verified domains**;
+GitHub supplied the hostname `_github-pages-challenge-ElseMesh` and a
+per-domain TXT value. A DNS query currently returns no TXT answer for that
+hostname. The authenticated `gh` token lacks `admin:org`, so the challenge
+cannot be inspected through the CLI. After Namecheap access is available, add
+the exact value shown by GitHub, verify the domain in the GitHub settings
+page, and keep the TXT record in DNS after verification. The challenge value
+is intentionally not stored in this public repository.
 
-1. Verify the domain for the **ElseMesh organisation** in GitHub Pages settings
-   using the organisation-provided TXT verification record.
-2. Set the repository Pages custom domain to `elsemesh.org` (Actions deployments
-   use the Pages setting; adding a tracked CNAME file is not required).
-3. Replace only the apex parking/URL-redirection A record with these four A records for `@`:
-   `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
-4. Replace the `www` parking CNAME with `elsemesh.github.io`. Keep all five MX
-   records and the apex SPF TXT record listed above.
-5. Wait for DNS validation and certificate provisioning, then enforce HTTPS and
-   verify https://elsemesh.org/ plus a selected-world invite. The same query
-   arguments work at the domain root.
+After verification, update Namecheap DNS:
 
-Do not switch the live Pages custom-domain setting before DNS access is ready:
-it redirects the working GitHub.io address to the custom domain.
+1. Replace only the apex parking/URL-redirection record with four A records
+   for `@`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, and
+   `185.199.111.153`.
+2. Replace the `www` parking CNAME with `elsemesh.github.io`. Keep all five MX
+   records, the apex SPF TXT record, and the GitHub verification TXT record.
+3. Confirm authoritative DNS has the new records, wait for certificate
+   provisioning, then enforce HTTPS and verify `https://elsemesh.org/` plus a
+   selected-world invite. The same query arguments work at the domain root.
+
+GitHub Pages serves the static client at `https://elsemesh.github.io/`, but
+`/healthz`, `/api/lookup`, and `/gateway` return 404 there; Pages is not a
+world gateway. The development host has no active `elsemesh-gateway` or Caddy
+service and no listener on TCP 80, 443, 5200, or 42901. No public gateway or
+relay endpoint is verified; the service and firewall examples below are
+deployment instructions, not evidence of a running service.
 
 Reference: [GitHub custom-domain documentation](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
