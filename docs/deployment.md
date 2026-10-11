@@ -29,17 +29,11 @@ history and its later arrow-key look-controls change; its build passed
 and `https://elsemesh.github.io/loz/` returned HTTP 200 and referenced their
 respective JavaScript bundles.
 
-On 2026-10-11, Pages run `38127106456` deployed main commit
-`f89f47a42d3e15102252bf6afaed0182432d9651` successfully. Both public paths
-returned HTTP 200; the root displayed `f89f47a4` and `/loz/` displayed
+On 2026-10-11, Pages run `38137302535` deployed main commit
+`a4b73b9087d805e64c2b925366d2c8ea047f103c` successfully. Both public paths
+returned HTTP 200; the root displayed `a4b73b90` and `/loz/` displayed
 `f691cd9e`, matching `main` and `archive/loz/main` respectively. The current
 deployment workflow includes the archived-branch stamp step.
-
-Immediately before this documentation update, both public paths returned HTTP
-200; the root HTML displayed `2c0a1fd6`, matching `main` HEAD, and `/loz/`
-displayed `f691cd9e`, matching `archive/loz/main`. This documentation push
-triggers a new deployment, so verify the root stamp again against its new
-`main` HEAD after the workflow completes.
 
 ## Selected ThruHolds
 
