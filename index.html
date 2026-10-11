@@ -4,7 +4,7 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>ElseMesh</title>
-	<link rel="preload" as="image" href="ui/elsemesh-splash.png" />
+	<link rel="preload" as="image" href="ui/elsemesh-splash.webp" type="image/webp" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat+Brush&family=Kalam:wght@400;700&display=swap" rel="stylesheet" />
@@ -27,7 +27,10 @@
 	<div id="build-commit" aria-label="Build commit %ELSEMESH_COMMIT%" title="Build commit %ELSEMESH_COMMIT%">%ELSEMESH_COMMIT%</div>
 	<div id="loader" role="status" aria-live="polite" aria-label="Loading ThruHold">
 		<div class="loader-inner">
-			<img class="loader-art" src="ui/elsemesh-splash.png" width="1672" height="941" alt="ElseMesh — connected ThruHolds" decoding="async" fetchpriority="high" />
+			<picture class="loader-picture">
+				<source srcset="ui/elsemesh-splash.webp" type="image/webp" />
+				<img class="loader-art" src="ui/elsemesh-splash.png" width="1672" height="941" alt="ElseMesh — connected ThruHolds" decoding="async" fetchpriority="high" />
+			</picture>
 			<div class="loader-world">
 				<p class="loader-kicker">ThruHold</p>
 				<h1 class="loader-title">Loading world experience…</h1>

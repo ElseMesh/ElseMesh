@@ -98,9 +98,15 @@ body {
 	pointer-events: none;
 }
 
-.loader-art {
+.loader-picture {
 	display: block;
 	flex: none;
+	width: 100%;
+	max-height: min(62svh, 680px);
+}
+
+.loader-art {
+	display: block;
 	width: 100%;
 	height: auto;
 	max-height: min(62svh, 680px);

@@ -7,15 +7,102 @@ import { keyboardLookDelta } from '../core/Input.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
+import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/island/lod-source/vegetation-placements.bin?url';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
 
+function webglTerrainMaterial( T, terrain ) {
+
+	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
+	const smooth = ( a, b, x ) => { const t = T.MathUtils.clamp( ( x - a ) / ( b - a ), 0, 1 ); return t * t * ( 3 - 2 * t ); };
+	const linear = c => c <= 0.04045 ? c / 12.92 : Math.pow( ( c + 0.055 ) / 1.055, 2.4 );
+	const mix = ( a, b, t ) => a.map( ( c, i ) => c + ( b[ i ] - c ) * t );
+	const palette = Object.fromEntries( Object.entries( {
+		lush: [ 0.13, 0.2, 0.05 ], green: [ 0.25, 0.32, 0.1 ], olive: [ 0.36, 0.37, 0.14 ],
+		yellow: [ 0.5, 0.46, 0.2 ], straw: [ 0.62, 0.54, 0.33 ], soil: [ 0.17, 0.13, 0.08 ],
+		sand: [ 0.76, 0.68, 0.48 ], seabed: [ 0.72, 0.7, 0.58 ], rock: [ 0.3, 0.285, 0.265 ],
+	} ).map( ( [ name, color ] ) => [ name, color.map( linear ) ] ) );
+	const { noise, noise2 } = terrain;
+	for ( let j = 0; j < resolution; j ++ ) {
+		const sourceJ = Math.min( terrain.res - 1, Math.floor( ( j + 0.5 ) * step ) );
+		for ( let i = 0; i < resolution; i ++ ) {
+			const sourceI = Math.min( terrain.res - 1, Math.floor( ( i + 0.5 ) * step ) ), source = sourceJ * terrain.res + sourceI, out = ( j * resolution + i ) * 4;
+			const h = terrain.heights[ source ], x = terrain.origin + ( sourceI + 0.5 ) * terrain.texel, z = terrain.origin + ( sourceJ + 0.5 ) * terrain.texel;
+			const row = sourceJ * terrain.res, west = Math.max( 0, sourceI - 1 ), east = Math.min( terrain.res - 1, sourceI + 1 );
+			const north = Math.max( 0, sourceJ - 1 ) * terrain.res + sourceI, south = Math.min( terrain.res - 1, sourceJ + 1 ) * terrain.res + sourceI;
+			const hx = ( terrain.heights[ row + east ] - terrain.heights[ row + west ] ) / ( Math.max( 1, east - west ) * terrain.texel );
+			const hz = ( terrain.heights[ south ] - terrain.heights[ north ] ) / ( Math.max( 1, Math.min( terrain.res - 1, sourceJ + 1 ) - Math.max( 0, sourceJ - 1 ) ) * terrain.texel );
+			const normalLength = 1 / Math.sqrt( hx * hx + 1 + hz * hz ), slope = 1 - normalLength, southFacing = - hz * normalLength;
+			const macroA = 0.5 + noise.noise( ( x * 0.765 + z * 0.644 ) / 173, ( - x * 0.644 + z * 0.765 ) / 173 ) * 0.1;
+			const macroB = 0.5 + noise2.noise( ( x * - 0.505 + z * 0.863 ) / 47, ( - x * 0.863 - z * 0.505 ) / 47 ) * 0.1;
+			const detail = T.MathUtils.clamp( 0.5 + noise.noise( x / 6.7, z / 6.7 ) * 0.1 + noise2.noise( x / 1.9, z / 1.9 ) * 0.06, 0, 1 );
+			const dry = macroA * 0.55 + macroB * 0.45 + slope * 0.25 + southFacing * 0.04 + ( detail - 0.5 ) * 0.28;
+			const olive = smooth( 0.52, 0.6, dry ), yellow = smooth( 0.6, 0.67, dry );
+			const straw = smooth( 0.66, 0.73, dry + ( macroB - 0.5 ) * 0.2 );
+			const lush = smooth( 0.46, 0.37, macroB * 0.7 + macroA * 0.3 + slope * 0.2 + ( detail - 0.5 ) * 0.2 );
+			let color = mix( palette.green, palette.olive, olive );
+			color = mix( color, palette.yellow, yellow * 0.8 );
+			color = mix( color, palette.straw, straw * 0.55 );
+			color = mix( color, palette.lush, lush * 0.75 );
+			const clump = detail * 0.6 + macroB * 0.4;
+			color = color.map( channel => channel * ( ( clump - 0.5 ) * 0.68 + 1 ) * ( ( detail - 0.4 ) * 0.22 + 1 ) );
+			const path = terrain.path[ source ] / 255, gully = terrain.gully[ source ] / 255;
+			const sand = terrain.sand[ source ] / 255, seabed = 1 - smooth( - 22, - 3, h );
+			const rock = Math.max( terrain.rock[ source ], smooth( 0.34, 0.62, slope ) * smooth( 2, 30, h ) );
+			color = mix( color, palette.soil, Math.max( path * 0.92, gully * ( 1 - rock ) * 0.5 ) );
+			color = mix( color, palette.rock, rock );
+			color = mix( color, palette.sand, sand * ( 1 - seabed ) );
+			color = mix( color, palette.seabed, seabed * ( 1 - terrain.sand[ source ] / 255 * 0.3 ) );
+			color = mix( color, palette.green, terrain.seagrass[ source ] / 255 * seabed );
+			color = mix( color, palette.rock, terrain.rubble[ source ] / 255 * seabed );
+			color = mix( color, palette.rock, terrain.scarp[ source ] / 255 * 0.92 );
+			pixels[ out ] = Math.round( T.MathUtils.clamp( color[ 0 ], 0, 1 ) * 255 );
+			pixels[ out + 1 ] = Math.round( T.MathUtils.clamp( color[ 1 ], 0, 1 ) * 255 );
+			pixels[ out + 2 ] = Math.round( T.MathUtils.clamp( color[ 2 ], 0, 1 ) * 255 );
+			pixels[ out + 3 ] = 255;
+		}
+	}
+	const texture = new T.DataTexture( pixels, resolution, resolution, T.RGBAFormat, T.UnsignedByteType );
+	texture.magFilter = T.LinearFilter; texture.minFilter = T.LinearMipmapLinearFilter; texture.generateMipmaps = true; texture.needsUpdate = true;
+	const detailImage = getDetailImage();
+	const detailTexture = new T.DataTexture( detailImage.data, detailImage.width, detailImage.height, T.RGBAFormat, T.UnsignedByteType );
+	detailTexture.wrapS = detailTexture.wrapT = T.RepeatWrapping;
+	detailTexture.magFilter = T.LinearFilter; detailTexture.minFilter = T.LinearMipmapLinearFilter; detailTexture.generateMipmaps = true; detailTexture.needsUpdate = true;
+	const material = new T.MeshStandardMaterial( { roughness: 0.94, side: T.DoubleSide } );
+	material.onBeforeCompile = shader => {
+		shader.uniforms.uTerrainColor = { value: texture };
+		shader.uniforms.uTerrainDetail = { value: detailTexture };
+		shader.vertexShader = shader.vertexShader.replace( '#include <common>', '#include <common>\nvarying vec3 vTerrainWorldPosition;' );
+		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', '#include <begin_vertex>\nvTerrainWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>
+uniform sampler2D uTerrainColor;
+uniform sampler2D uTerrainDetail;
+varying vec3 vTerrainWorldPosition;
+` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>
+			vec2 terrainUv = ( vTerrainWorldPosition.xz - vec2( ${ terrain.origin.toFixed( 1 ) } ) ) / ${ terrain.size.toFixed( 1 ) };
+			vec3 terrainBase = texture2D( uTerrainColor, terrainUv ).rgb;
+			vec2 terrainXZ = vTerrainWorldPosition.xz;
+			vec4 terrainNear = texture2D( uTerrainDetail, terrainXZ / 1.9 );
+			vec4 terrainMid = texture2D( uTerrainDetail, mat2( 0.2675, 0.9636, -0.9636, 0.2675 ) * terrainXZ / 6.7 + 0.21 );
+			vec4 terrainFine = texture2D( uTerrainDetail, mat2( -0.7374, 0.6755, -0.6755, -0.7374 ) * terrainXZ / 0.63 + 0.53 );
+			float terrainClump = terrainMid.a * 0.6 + terrainNear.g * 0.4;
+			float terrainDistance = length( cameraPosition - vTerrainWorldPosition );
+			float terrainClumpContrast = mix( 0.34, 0.95, smoothstep( 40.0, 140.0, terrainDistance ) );
+			diffuseColor.rgb = terrainBase * ( ( terrainClump - 0.5 ) * terrainClumpContrast + 1.0 ) * ( ( terrainFine.g - 0.4 ) * 0.22 + 1.0 );` );
+	};
+	material.customProgramCacheKey = () => 'elsemesh-webgl-baked-terrain-detail-v2';
+	material.userData.terrainTextures = [ texture, detailTexture ];
+	return material;
+
+}
+
 function webglGrassMesh( T, terrain, camera, previous ) {
 
-	const radius = 42, spacing = 0.62, positions = [], colors = [], indices = [];
+	const radius = 42, spacing = 0.46, positions = [], colors = [], indices = [];
 	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
 	const hash = ( x, z ) => { let n = Math.imul( x, 0x1f123bb5 ) ^ Math.imul( z, 0x5f356495 ); n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b ); return ( n ^ n >>> 16 ) >>> 0; };
 	const addBlade = ( x, z, y, angle, height, width, color ) => {
@@ -27,21 +114,25 @@ function webglGrassMesh( T, terrain, camera, previous ) {
 	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
 		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
 		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
-		if ( d > radius || rand( 3 ) > 0.58 ) continue;
+		const near = 1 - T.MathUtils.smoothstep( d, 14, 24 );
+		if ( d > radius || rand( 3 ) > 0.32 + near * 0.68 ) continue;
 		const terrainIndex = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) ) * terrain.res + Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
 		const h = terrain.heightAt( x, z );
-		if ( h < 2.6 || h > 76 || terrain.rock[ terrainIndex ] > 0.42 || terrain.sand[ terrainIndex ] > 86 || terrain.path[ terrainIndex ] > 72 ) continue;
-		const density = Math.min( 1, Math.max( 0.18, ( 1 - ( d / radius ) ** 3 ) * 1.25 ));
+		const sand = terrain.sand[ terrainIndex ], dune = sand > 86 && h > 2.15 && h < 6.5 && x > - 180 && x < 200 && z > - 260 && z < 0;
+		if ( h < ( dune ? 2.15 : 2.6 ) || h > ( dune ? 6.5 : 76 ) || terrain.rock[ terrainIndex ] > 0.42 || terrain.path[ terrainIndex ] > 72 || ( sand > 86 && ! dune ) ) continue;
+		const patch = dune ? terrain.noise2.noise( x / 4.2 + 5.5, z / 4.2 - 3.3 ) * 0.6 + terrain.noise.noise( x / 11 - 7.1, z / 11 + 1.9 ) * 0.4 : 1;
+		const clump = dune ? T.MathUtils.smoothstep( patch, - 0.45, 0.25 ) : 1;
+		const density = Math.min( 1, Math.max( 0.08, ( 1 - ( d / radius ) ** 3 ) * ( dune ? 0.95 * clump : 1.25 ) ));
 		if ( rand( 4 ) > density ) continue;
-		const baseAngle = rand( 5 ) * Math.PI * 2, height = 0.38 + rand( 6 ) * 0.48, tone = rand( 7 );
+		const baseAngle = rand( 5 ) * Math.PI * 2, height = dune ? 0.24 + rand( 6 ) * 0.38 : 0.38 + rand( 6 ) * 0.48, tone = rand( 7 ), blades = Math.round( 3 + near * 2 );
 		const color = [ 0.12 + tone * 0.07, 0.25 + tone * 0.1, 0.075 + tone * 0.035 ];
-		for ( let blade = 0; blade < 3; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI / 3 + rand( blade + 8 ) * 0.18, height * ( 0.82 + rand( blade + 11 ) * 0.32 ), 0.018 + rand( blade + 14 ) * 0.009, color );
+		for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + 8 ) * 0.18, height * ( 0.82 + rand( blade + 11 ) * 0.32 ), 0.018 + rand( blade + 14 ) * 0.009, color );
 	}
 	const geometry = new T.BufferGeometry();
 	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
 	geometry.setAttribute( 'color', new T.Float32BufferAttribute( colors, 3 ) );
 	geometry.setIndex( indices ); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
-	const mesh = new T.Mesh( geometry, new T.MeshStandardMaterial( { vertexColors: true, side: T.DoubleSide, roughness: 1 } ) );
+	const mesh = new T.Mesh( geometry, new T.MeshLambertMaterial( { vertexColors: true, side: T.DoubleSide } ) );
 	mesh.name = 'WebGL camera-following grass'; mesh.frustumCulled = false; mesh.renderOrder = 1;
 	if ( previous ) { previous.geometry.dispose(); previous.material.dispose(); }
 	return mesh;
@@ -164,7 +255,6 @@ export class WebGLFallback {
 		window.addEventListener( 'resize', this._resize );
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
-
 	}
 
 	_makeWater( geometry, seaLevel ) {
@@ -302,7 +392,12 @@ export class WebGLFallback {
 		const T = this.THREE;
 		try {
 			const model = await this.loader.loadAsync( terrainUrl );
-			model.scene.traverse( object => { if ( object.isMesh ) object.receiveShadow = true; } );
+			const terrainMaterial = webglTerrainMaterial( T, this.terrain );
+			model.scene.traverse( object => {
+				if ( ! object.isMesh ) return;
+				object.receiveShadow = true;
+				object.material = terrainMaterial;
+			} );
 			this.scene.add( model.scene );
 		} catch ( error ) {
 			console.warn( 'WebGL fallback packaged terrain unavailable:', error );
@@ -330,6 +425,9 @@ export class WebGLFallback {
 				if ( ! object.isMesh ) return;
 				object.castShadow = true;
 				object.receiveShadow = true;
+				for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
+					if ( /(?:^| )(?:wood|sign-wood|lantern-wood)$/i.test( material.name ) ) material.color.set( 0x80532f );
+				}
 			} );
 			this.scene.add( model.scene );
 			this._collectBlockers( model.scene );
