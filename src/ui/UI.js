@@ -2202,7 +2202,7 @@ export class UI {
 					<p class="tw-world-empty" hidden>No hosted worlds saved yet. Open an invite to add one here.</p>
 					<form class="tw-world-invite-form">
 						<label for="tw-world-invite-url">Open an invite</label>
-						<div class="tw-world-invite-row"><input id="tw-world-invite-url" name="invite" type="url" inputmode="url" autocomplete="url" placeholder="Paste a ThruHold invite URL" required /><button type="submit">Open</button></div>
+						<div class="tw-world-invite-row"><input id="tw-world-invite-url" name="invite" type="text" inputmode="url" autocomplete="url" placeholder="Invite URL, ThruHold ID, or ZeroTier ID" required /><button type="submit">Open</button></div>
 						<p class="tw-world-invite-error" role="status" aria-live="polite"></p>
 					</form>
 					<button type="button" class="tw-world-picker-close">Done</button>

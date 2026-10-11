@@ -11,6 +11,14 @@ function appPageURL( value ) {
 	return url;
 }
 
+function configuredWorldResolver() {
+	const value = globalThis.ELSEMESH_CONFIG?.worldResolver || '';
+	if ( ! value ) return '';
+	const resolver = new URL( value );
+	if ( resolver.protocol !== 'https:' || resolver.username || resolver.password || ! [ '', '/' ].includes( resolver.pathname ) || resolver.search || resolver.hash ) throw new Error( 'Configured world resolver must be an HTTPS origin' );
+	return resolver.origin;
+}
+
 function isLoopback( hostname ) {
 	return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
 }
@@ -26,9 +34,10 @@ function validGateway( value, page ) {
 	}
 }
 
-function normalizedWorldURL( { pageURL, worldId, nodeId = '', gateway = '', providers = [], directory = '' } ) {
+function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', nodeId = '', gateway = '', providers = [], directory = '' } ) {
 	const page = appPageURL( pageURL );
-	if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) ) throw new Error( 'Invite does not contain a valid world ID' );
+	if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) && ! ( ! worldId && /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) ) throw new Error( 'Invite does not contain a valid ThruHold ID or ZeroTier node ID' );
+	if ( zeroTierNodeId && ! /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) throw new Error( 'Invite contains an invalid ZeroTier node ID' );
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	if ( candidates.length > 8 ) throw new Error( 'Invite contains too many gateway candidates' );
 	for ( const candidate of candidates ) {
@@ -41,7 +50,11 @@ function normalizedWorldURL( { pageURL, worldId, nodeId = '', gateway = '', prov
 		const directoryURL = new URL( directory );
 		if ( directoryURL.protocol !== 'https:' || directoryURL.username || directoryURL.password || ! [ '', '/' ].includes( directoryURL.pathname ) || directoryURL.search || directoryURL.hash ) throw new Error( 'Invite contains an invalid directory URL' );
 	}
-	page.searchParams.set( 'worldId', worldId );
+	if ( zeroTierNodeId && ! directory ) throw new Error( 'A ZeroTier node ID requires an HTTPS world resolver' );
+	if ( worldId ) page.searchParams.set( 'worldId', worldId );
+	else page.searchParams.delete( 'worldId' );
+	page.searchParams.delete( 'ztNodeId' );
+	if ( zeroTierNodeId ) page.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
 	page.searchParams.delete( 'nodeId' );
 	page.searchParams.delete( 'gateway' );
 	for ( const candidate of candidates ) {
@@ -61,6 +74,15 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 	const page = appPageURL( pageURL );
 	const input = String( value ).trim();
 	if ( input.length > MAX_INVITE_URL_CHARS ) throw new Error( 'Invite URL is too long' );
+	const resolver = configuredWorldResolver();
+	if ( /^tw-world:[\w.-]{1,128}$/.test( input ) ) {
+		if ( ! resolver ) throw new Error( 'No ThruHold resolver is configured; paste a full invite URL or configure worldResolver in elsemesh-config.js' );
+		return normalizedWorldURL( { pageURL: page.href, worldId: input, directory: resolver } ).href;
+	}
+	if ( /^[0-9a-f]{10}$/i.test( input ) ) {
+		if ( ! resolver ) throw new Error( 'No ZeroTier resolver is configured; configure worldResolver in elsemesh-config.js first' );
+		return normalizedWorldURL( { pageURL: page.href, zeroTierNodeId: input, directory: resolver } ).href;
+	}
 	let invite;
 	try {
 		invite = new URL( input, page );
@@ -75,9 +97,10 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 	return normalizedWorldURL( {
 		pageURL: page.href,
 		worldId: params.get( 'worldId' ),
+		zeroTierNodeId: params.get( 'ztNodeId' ) || '',
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
 		gateway: nodeIds.length ? '' : gateways[ 0 ] || '',
-		directory: params.get( 'directory' ) || '',
+		directory: params.get( 'directory' ) || resolver,
 	} ).href;
 }
 
@@ -151,12 +174,12 @@ export function clearHomeWorld( { storage } = {} ) {
 
 export function defaultHomeWorldURL( { pageURL = globalThis.location?.href, storage } = {} ) {
 	const current = new URL( pageURL );
-	if ( current.searchParams.has( 'worldId' ) || current.searchParams.get( 'example' ) === '1' ) return null;
+	if ( current.searchParams.has( 'worldId' ) || current.searchParams.has( 'ztNodeId' ) || current.searchParams.get( 'example' ) === '1' ) return null;
 	const home = getHomeWorld( { pageURL, storage } );
 	if ( ! home ) return null;
 	const url = new URL( home.url );
 	for ( const [ key, value ] of current.searchParams ) {
-		if ( ! [ 'worldId', 'nodeId', 'gateway', 'directory', 'example' ].includes( key ) ) url.searchParams.append( key, value );
+		if ( ! [ 'worldId', 'ztNodeId', 'nodeId', 'gateway', 'directory', 'example' ].includes( key ) ) url.searchParams.append( key, value );
 	}
 	return url.href;
 }

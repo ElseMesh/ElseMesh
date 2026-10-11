@@ -543,9 +543,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			this.prepareHostedWorld( connector );
-			this.linkedWorldRoot.name = `hosted-world:${worldLink.worldId}`;
+			this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
 			scene.add( this.linkedWorldRoot );
-			this.remoteWorlds.set( worldLink.worldId, { connector, root: this.linkedWorldRoot } );
+			this.remoteWorlds.set( connector.worldId, { connector, root: this.linkedWorldRoot } );
 			this.player.setHostedWorldPose( this.camera.position, this.player.yaw, this.player.pitch );
 			this.streamWorldRemainder( connector, this.linkedWorldRoot );
 			this.proceduralWorldRoot.visible = false;
@@ -1349,7 +1349,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		url.searchParams.set( 'worldId', destinationConnector.worldId );
 		url.searchParams.delete( 'nodeId' );
 		url.searchParams.delete( 'gateway' );
-		const providers = destinationConnector.providers.length ? destinationConnector.providers : [ { nodeId: destinationConnector.nodeId, gateway: destinationConnector.gateway } ];
+		const providers = destinationConnector.providers?.length ? destinationConnector.providers : [ { nodeId: destinationConnector.nodeId, gateway: destinationConnector.gateway } ];
 		for ( const provider of providers ) {
 			url.searchParams.append( 'nodeId', provider.nodeId );
 			url.searchParams.append( 'gateway', provider.gateway );

@@ -29,6 +29,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	manifest := testSignedDocument(t, manifestProtocol, manifestPayload, owner)
 	nodeRecord := testSignedDocument(t, nodeProtocol, map[string]any{
 		"protocol": nodeProtocol, "nodeId": nodeID, "gateway": "https://node.example",
+		"zeroTierNodeId": "3af4fd5d50", "zeroTierNetworkId": "e3918db4832a3056",
 		"worldIds": []string{"tw-world:coast"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
 	}, node)
 	store := &directory{path: filepath.Join(t.TempDir(), "providers.json"), entries: make(map[string]provider)}
@@ -68,12 +69,34 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	if lookup.Code != http.StatusOK || result.WorldID != "tw-world:coast" || len(result.Providers) != 1 || result.Providers[0].Signer != nodeID {
 		t.Fatalf("lookup did not return the verified provider: status=%d result=%+v", lookup.Code, result)
 	}
+	zeroTierLookup := httptest.NewRecorder()
+	loaded.handleZeroTier(zeroTierLookup, httptest.NewRequest(http.MethodGet, "/v1/zerotier/e3918db4832a3056/3af4fd5d50", nil))
+	var overlayResult struct {
+		NetworkID string           `json:"networkId"`
+		NodeID    string           `json:"nodeId"`
+		WorldIDs  []string         `json:"worldIds"`
+		Providers []signedDocument `json:"providers"`
+	}
+	if err := json.Unmarshal(zeroTierLookup.Body.Bytes(), &overlayResult); err != nil {
+		t.Fatal(err)
+	}
+	if zeroTierLookup.Code != http.StatusOK || overlayResult.NetworkID != "e3918db4832a3056" || overlayResult.NodeID != "3af4fd5d50" || len(overlayResult.Providers) != 1 || overlayResult.Providers[0].Signer != nodeID || len(overlayResult.WorldIDs) != 1 || overlayResult.WorldIDs[0] != "tw-world:coast" {
+		t.Fatalf("ZeroTier lookup did not return the current signed provider/world: status=%d result=%+v", zeroTierLookup.Code, overlayResult)
+	}
 
 	bad := nodeRecord
 	bad.Signature = base64.RawStdEncoding.EncodeToString([]byte("forged"))
 	entry, _, err := validateAnnouncement(announcement{Node: bad, Manifest: manifest}, now)
 	if err == nil || entry.Node.Signer != "" {
 		t.Fatal("forged node announcement accepted")
+	}
+	malformedOverlay := testSignedDocument(t, nodeProtocol, map[string]any{
+		"protocol": nodeProtocol, "nodeId": nodeID, "gateway": "https://node.example",
+		"zeroTierNodeId": "3af4fd5d5z", "zeroTierNetworkId": "e3918db4832a3056",
+		"worldIds": []string{"tw-world:coast"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
+	}, node)
+	if _, _, err := validateAnnouncement(announcement{Node: malformedOverlay, Manifest: manifest}, now); err == nil {
+		t.Fatal("invalid ZeroTier identity locator was accepted")
 	}
 }
 

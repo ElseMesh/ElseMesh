@@ -61,6 +61,8 @@ type daemon struct {
 	webRoot               string
 	publicGateway         string
 	directoryURL          string
+	zeroTierNodeID        string
+	zeroTierNetworkID     string
 	allowedBrowserOrigins map[string]struct{}
 	assetCheckMu          sync.Mutex
 	verifiedAssets        map[string]assetFileStamp
@@ -521,7 +523,10 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), webRoot: *webRoot, publicGateway: *publicGateway, directoryURL: *directoryURL, allowedBrowserOrigins: allowedBrowserOrigins, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), webRoot: *webRoot, publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	if zeroTier != nil {
+		d.zeroTierNodeID = zeroTier.NodeID()
+	}
 	if err := d.loadRoleRevocations(); err != nil {
 		return fmt.Errorf("load persisted role revocations: %w", err)
 	}
@@ -966,13 +971,21 @@ func (d *daemon) currentAuthorityLease() *signedDocument {
 
 func (d *daemon) handleNodeRecord(w http.ResponseWriter, _ *http.Request) {
 	now := time.Now()
-	record := map[string]any{"protocol": "tidewater.node/1", "nodeId": d.host.ID().String(), "addresses": d.peerAddresses(), "worldIds": []string{d.world.WorldID}, "gateway": d.publicGateway, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix()}
-	doc, err := signDocument("tidewater.node/1", record, d.key)
+	doc, err := signDocument("tidewater.node/1", d.nodeRecordPayload(now), d.key)
 	if err != nil {
 		http.Error(w, "could not sign node record", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, doc)
+}
+
+func (d *daemon) nodeRecordPayload(now time.Time) map[string]any {
+	record := map[string]any{"protocol": "tidewater.node/1", "nodeId": d.host.ID().String(), "addresses": d.peerAddresses(), "worldIds": []string{d.world.WorldID}, "gateway": d.publicGateway, "issuedAt": now.Unix(), "expiresAt": now.Add(15 * time.Minute).Unix()}
+	if d.zeroTierNodeID != "" && d.zeroTierNetworkID != "" {
+		record["zeroTierNodeId"] = d.zeroTierNodeID
+		record["zeroTierNetworkId"] = d.zeroTierNetworkID
+	}
+	return record
 }
 
 func (d *daemon) publishDirectory() {
@@ -999,10 +1012,8 @@ func (d *daemon) publishDirectory() {
 				continue
 			}
 		}
-		published := false
 		now := time.Now()
-		nodeRecord := map[string]any{"protocol": "tidewater.node/1", "nodeId": d.host.ID().String(), "addresses": d.peerAddresses(), "worldIds": []string{d.world.WorldID}, "gateway": d.publicGateway, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix()}
-		nodeDocument, err := signDocument("tidewater.node/1", nodeRecord, d.key)
+		nodeDocument, err := signDocument("tidewater.node/1", d.nodeRecordPayload(now), d.key)
 		if err == nil {
 			body, marshalErr := json.Marshal(map[string]any{"node": nodeDocument, "manifest": d.manifest, "authorityLease": d.currentAuthorityLease()})
 			if marshalErr == nil {
@@ -1015,9 +1026,7 @@ func (d *daemon) publishDirectory() {
 						log.Printf("directory publish failed: %v", postErr)
 					} else {
 						response.Body.Close()
-						if response.StatusCode == http.StatusAccepted {
-							published = true
-						} else {
+						if response.StatusCode != http.StatusAccepted {
 							log.Printf("directory publish rejected: HTTP %d", response.StatusCode)
 						}
 					}
@@ -1031,11 +1040,7 @@ func (d *daemon) publishDirectory() {
 		} else {
 			log.Printf("directory node record signing failed: %v", err)
 		}
-		interval := 5 * time.Minute
-		if published {
-			interval = 12 * time.Hour
-		}
-		timer := time.NewTimer(interval)
+		timer := time.NewTimer(5 * time.Minute)
 		select {
 		case <-d.ctx.Done():
 			timer.Stop()

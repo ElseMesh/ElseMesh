@@ -3,10 +3,14 @@ import { validateObjectLODs, validateWorldSpawn } from './WorldSource.js';
 import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
+import { verifySignedDocument } from './SignedDocument.js';
+
+export { verifySignedDocument } from './SignedDocument.js';
 
 const ASSET_CHUNK_BYTES = 128 * 1024;
 const MAX_ASSET_BYTES = 2 * 1024 * 1024 * 1024;
 const PRIORITY_ORDER = Object.freeze( [ 'portal-preview', 'visible', 'nearby', 'background' ] );
+export const DEFAULT_ZEROTIER_NETWORK_ID = 'e3918db4832a3056';
 
 function invariant( value, message ) { if ( ! value ) throw new Error( message ); }
 
@@ -32,16 +36,19 @@ export function assetConcurrencyForConnection( connection = globalThis.navigator
 export function worldLinkFromLocation( location = globalThis.location ) {
 	const params = new URLSearchParams( location.search );
 	const worldId = params.get( 'worldId' );
-	if ( ! worldId ) return null;
+	const zeroTierNodeId = params.get( 'ztNodeId' ) || '';
+	if ( ! worldId && ! zeroTierNodeId ) return null;
 	const nodeIds = params.getAll( 'nodeId' );
 	const gateways = params.getAll( 'gateway' );
 	invariant( nodeIds.length === gateways.length || ( nodeIds.length === 0 && gateways.length === 1 ), 'Invite provider IDs and gateways must be paired' );
 	return {
-		worldId,
+		worldId: worldId || '',
+		zeroTierNodeId,
+		zeroTierNetworkId: DEFAULT_ZEROTIER_NETWORK_ID,
 		nodeId: nodeIds[ 0 ] || '',
 		gateway: gateways[ 0 ] || location.origin,
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
-		directory: params.get( 'directory' ),
+		directory: params.get( 'directory' ) || globalThis.ELSEMESH_CONFIG?.worldResolver || '',
 	};
 }
 
@@ -73,11 +80,14 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 }
 
 export class WorldConnector {
-	constructor( { worldId, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES } = {} ) {
-		invariant( /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ), 'A valid worldId is required' );
+	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES } = {} ) {
+		invariant( /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
+		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && directory, 'ZeroTier lookup requires a valid node ID, network ID, and HTTPS resolver' );
 		this.worldId = worldId;
+		this.zeroTierNodeId = zeroTierNodeId;
+		this.zeroTierNetworkId = zeroTierNetworkId;
 		this.nodeId = nodeId || '';
 		this.gateway = gateway;
 		this.providers = providers.length ? providers.map( ( provider ) => ( { ...provider } ) ) : this.nodeId ? [ { nodeId: this.nodeId, gateway } ] : [];
@@ -104,6 +114,18 @@ export class WorldConnector {
 
 	async getManifest( { signal, excludeProviders = this.unavailableProviders } = {} ) {
 		throwIfAborted( signal );
+		if ( this.zeroTierNodeId ) {
+			const discovered = await this.#discoverZeroTierProviders( signal );
+			if ( ! this.worldId ) {
+				const worldIDs = [ ...new Set( discovered.flatMap( ( provider ) => provider.worldIds ) ) ];
+				invariant( worldIDs.length === 1, worldIDs.length ? 'ZeroTier node advertises multiple ThruHolds; choose one by ThruHold ID' : 'ZeroTier node does not currently advertise a ThruHold' );
+				this.worldId = worldIDs[ 0 ];
+			}
+			const candidates = discovered.filter( ( provider ) => provider.worldIds.includes( this.worldId ) );
+			invariant( candidates.length > 0, 'ZeroTier node does not advertise the requested ThruHold' );
+			this.providers = candidates.map( ( provider ) => ( { nodeId: provider.nodeId, gateway: provider.gateway } ) );
+		}
+		invariant( /^tw-world:[\w.-]{1,128}$/.test( this.worldId || '' ), 'A valid worldId is required' );
 		let lastError = null;
 		const attempted = new Set( excludeProviders );
 		for ( const provider of this.providers ) {
@@ -215,6 +237,26 @@ export class WorldConnector {
 			providers.push( { nodeId: node.nodeId, gateway: node.gateway } );
 		}
 		if ( providers.length === 0 ) throw new Error( 'Directory returned no valid signed provider for this world' );
+		return providers;
+	}
+
+	async #discoverZeroTierProviders( signal ) {
+		const url = new URL( `/v1/zerotier/${this.zeroTierNetworkId}/${this.zeroTierNodeId}`, this.directory );
+		const response = await fetch( url, { credentials: 'omit', cache: 'no-store', signal } );
+		if ( ! response.ok ) throw new Error( `ZeroTier resolver lookup failed (${response.status})` );
+		const result = await response.json();
+		throwIfAborted( signal );
+		invariant( result.networkId === this.zeroTierNetworkId && result.nodeId === this.zeroTierNodeId && Array.isArray( result.providers ), 'ZeroTier resolver returned an invalid node lookup' );
+		const providers = [];
+		for ( const document of result.providers ) {
+			throwIfAborted( signal );
+			try { await verifySignedDocument( document, 'tidewater.node/1' ); }
+			catch { continue; }
+			const node = document.payload;
+			const now = Date.now() / 1000;
+			if ( node.protocol !== 'tidewater.node/1' || node.nodeId !== document.signer || node.zeroTierNodeId !== this.zeroTierNodeId || node.zeroTierNetworkId !== this.zeroTierNetworkId || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! /^tw-world:[\w.-]{1,128}$/.test( node.worldIds[ 0 ] ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
+			providers.push( { nodeId: node.nodeId, gateway: node.gateway, worldIds: node.worldIds } );
+		}
 		return providers;
 	}
 
@@ -977,17 +1019,6 @@ function waitWithAbort( promise, signal ) {
 	} );
 }
 
-export async function verifySignedDocument( document, protocol ) {
-	invariant( document?.protocol === protocol && typeof document.signer === 'string' && typeof document.publicKey === 'string' && typeof document.signature === 'string' && document.payload, 'Invalid signed world document' );
-	const protobufKey = decodeBase64( document.publicKey );
-	invariant( protobufKey.length === 36 && protobufKey[ 0 ] === 8 && protobufKey[ 1 ] === 1 && protobufKey[ 2 ] === 18 && protobufKey[ 3 ] === 32, 'Unsupported world signing key' );
-	invariant( peerIdFromEd25519( protobufKey ) === document.signer, 'World signer does not match its public key' );
-	const unsigned = { protocol: document.protocol, signer: document.signer, publicKey: document.publicKey, payload: document.payload };
-	const key = await crypto.subtle.importKey( 'raw', protobufKey.subarray( 4 ), { name: 'Ed25519' }, false, [ 'verify' ] );
-	const valid = await crypto.subtle.verify( 'Ed25519', key, decodeBase64( document.signature ), new TextEncoder().encode( canonicalJSON( unsigned ) ) );
-	invariant( valid, 'World signature verification failed' );
-}
-
 export async function verifySignedWorldManifest( document ) {
 	await verifySignedDocument( document, 'tidewater.world/1' );
 	const manifest = document.payload;
@@ -1001,33 +1032,6 @@ export async function verifySignedWorldManifest( document ) {
 	validateWorldHosts( manifest.hosts );
 	invariant( Number.isSafeInteger( manifest.authorityEpoch ) && manifest.authorityEpoch > 0, 'Manifest authority epoch is outside the supported range' );
 	return manifest;
-}
-
-function canonicalJSON( value ) {
-	if ( Array.isArray( value ) ) return `[${value.map( canonicalJSON ).join( ',' )}]`;
-	if ( value && typeof value === 'object' ) return `{${Object.keys( value ).sort().map( ( key ) => `${canonicalString( key )}:${canonicalJSON( value[ key ] )}` ).join( ',' )}}`;
-	return typeof value === 'string' ? canonicalString( value ) : JSON.stringify( value );
-}
-
-// encoding/json escapes HTML-sensitive characters and U+2028/U+2029 even in canonical payloads.
-function canonicalString( value ) { return JSON.stringify( value ).replace( /[<>&\u2028\u2029]/g, ( char ) => `\\u${char.charCodeAt( 0 ).toString( 16 ).padStart( 4, '0' )}` ); }
-
-function peerIdFromEd25519( protobufKey ) {
-	const multihash = new Uint8Array( 2 + protobufKey.length );
-	multihash[ 0 ] = 0; // identity multihash
-	multihash[ 1 ] = protobufKey.length;
-	multihash.set( protobufKey, 2 );
-	return base58( multihash );
-}
-
-function base58( bytes ) {
-	const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-	let value = 0n;
-	for ( const byte of bytes ) value = value * 256n + BigInt( byte );
-	let encoded = '';
-	while ( value > 0n ) { const remainder = Number( value % 58n ); encoded = alphabet[ remainder ] + encoded; value /= 58n; }
-	for ( const byte of bytes ) { if ( byte !== 0 ) break; encoded = `1${encoded}`; }
-	return encoded;
 }
 
 function decodeBase64( value ) {

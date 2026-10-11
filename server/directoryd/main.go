@@ -36,6 +36,8 @@ const (
 )
 
 var worldIDPattern = regexp.MustCompile(`^tw-world:[a-zA-Z0-9._-]{1,128}$`)
+var zeroTierNodeIDPattern = regexp.MustCompile(`^[0-9a-f]{10}$`)
+var zeroTierNetworkIDPattern = regexp.MustCompile(`^[0-9a-f]{16}$`)
 
 var buildRevision = "development"
 
@@ -55,12 +57,14 @@ type unsignedDocument struct {
 }
 
 type nodePayload struct {
-	Protocol  string   `json:"protocol"`
-	NodeID    string   `json:"nodeId"`
-	Gateway   string   `json:"gateway"`
-	WorldIDs  []string `json:"worldIds"`
-	IssuedAt  int64    `json:"issuedAt"`
-	ExpiresAt int64    `json:"expiresAt"`
+	Protocol          string   `json:"protocol"`
+	NodeID            string   `json:"nodeId"`
+	Gateway           string   `json:"gateway"`
+	WorldIDs          []string `json:"worldIds"`
+	ZeroTierNodeID    string   `json:"zeroTierNodeId,omitempty"`
+	ZeroTierNetworkID string   `json:"zeroTierNetworkId,omitempty"`
+	IssuedAt          int64    `json:"issuedAt"`
+	ExpiresAt         int64    `json:"expiresAt"`
 }
 
 type hostGrant struct {
@@ -141,6 +145,7 @@ func run() error {
 	mux.HandleFunc("/healthz", d.handleHealth)
 	mux.HandleFunc("/v1/announce", d.handleAnnounce)
 	mux.HandleFunc("/v1/worlds/", d.handleWorld)
+	mux.HandleFunc("/v1/zerotier/", d.handleZeroTier)
 	mux.HandleFunc("/v1/nodes", d.handleNodes)
 	server := &http.Server{Addr: *listen, Handler: cors(mux), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	errCh := make(chan error, 1)
@@ -229,6 +234,9 @@ func validateAnnouncement(record announcement, now time.Time) (provider, string,
 	}
 	if node.Protocol != nodeProtocol || node.NodeID != record.Node.Signer || len(node.WorldIDs) != 1 || node.IssuedAt > now.Add(5*time.Minute).Unix() || node.IssuedAt < now.Add(-24*time.Hour).Unix() || node.ExpiresAt <= now.Unix() || node.ExpiresAt > now.Add(48*time.Hour).Unix() || node.ExpiresAt > node.IssuedAt+48*60*60 || !validGateway(node.Gateway) {
 		return provider{}, "", errors.New("invalid or expired node record")
+	}
+	if (node.ZeroTierNodeID == "") != (node.ZeroTierNetworkID == "") || node.ZeroTierNodeID != "" && (!zeroTierNodeIDPattern.MatchString(node.ZeroTierNodeID) || !zeroTierNetworkIDPattern.MatchString(node.ZeroTierNetworkID)) {
+		return provider{}, "", errors.New("invalid ZeroTier identity locator")
 	}
 	if _, err := peer.Decode(node.NodeID); err != nil {
 		return provider{}, "", errors.New("invalid node PeerID")
@@ -446,6 +454,58 @@ func (d *directory) handleWorld(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"worldId": worldID, "providers": providers})
+}
+
+func (d *directory) handleZeroTier(w http.ResponseWriter, r *http.Request) {
+	setPublicReadCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/zerotier/"), "/")
+	if len(parts) != 2 || !zeroTierNetworkIDPattern.MatchString(parts[0]) || !zeroTierNodeIDPattern.MatchString(parts[1]) {
+		http.Error(w, "invalid ZeroTier network or node ID", http.StatusBadRequest)
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	now := time.Now()
+	pruned := d.pruneLocked(now)
+	providers := make([]provider, 0)
+	for _, entry := range d.entries {
+		var node nodePayload
+		if json.Unmarshal(entry.Node.Payload, &node) == nil && node.ZeroTierNodeID == parts[1] && node.ZeroTierNetworkID == parts[0] {
+			providers = append(providers, entry)
+		}
+	}
+	sort.Slice(providers, func(i, j int) bool {
+		leftTier := directoryProviderTier(providers[i], now)
+		rightTier := directoryProviderTier(providers[j], now)
+		if leftTier != rightTier {
+			return leftTier < rightTier
+		}
+		return providers[i].Node.Signer < providers[j].Node.Signer
+	})
+	nodes := make([]signedDocument, 0, len(providers))
+	worldIDs := make([]string, 0, len(providers))
+	seenWorlds := make(map[string]struct{})
+	for _, entry := range providers {
+		nodes = append(nodes, entry.Node)
+		if _, exists := seenWorlds[entry.WorldID]; !exists {
+			worldIDs = append(worldIDs, entry.WorldID)
+			seenWorlds[entry.WorldID] = struct{}{}
+		}
+	}
+	if pruned {
+		if err := d.saveLocked(); err != nil {
+			log.Printf("could not persist expired-provider cleanup: %v", err)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"networkId": parts[0], "nodeId": parts[1], "worldIds": worldIDs, "providers": nodes})
 }
 
 func setPublicReadCORS(w http.ResponseWriter) {

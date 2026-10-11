@@ -55,6 +55,11 @@ for ( const [ id, gateway ] of [ [ first, 'https://offline.example' ], [ second,
 		worldIds: [ 'tw-world:directory-test' ], issuedAt: now, expiresAt: now + 3600,
 	}, id ) );
 }
+const zeroTierProvider = await signedDocument( 'tidewater.node/1', {
+	protocol: 'tidewater.node/1', nodeId: second.peerId, gateway: 'https://online.example',
+	worldIds: [ 'tw-world:directory-test' ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+	issuedAt: now, expiresAt: now + 3600,
+}, second );
 const assetBytes = new Map( [ [ 'mesh', new Uint8Array( [ 17, 29, 43, 61 ] ) ], [ 'texture', new Uint8Array( [ 5, 11, 23, 47, 89 ] ) ] ] );
 const assetIDs = new Map();
 for ( const [ name, bytes ] of assetBytes ) assetIDs.set( name, `sha256:${Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' )}` );
@@ -79,7 +84,11 @@ const OldWebSocket = globalThis.WebSocket;
 let staleSecondAssets = new Set();
 let failoverProviderReachable = false;
 let directoryProviders = providers;
-globalThis.fetch = async () => ( { ok: true, json: async () => ( { worldId: 'tw-world:directory-test', providers: directoryProviders } ) } );
+globalThis.fetch = async ( input ) => {
+	const url = new URL( input );
+	if ( url.pathname === '/v1/zerotier/e3918db4832a3056/3af4fd5d50' ) return { ok: true, json: async () => ( { networkId: 'e3918db4832a3056', nodeId: '3af4fd5d50', worldIds: [ 'tw-world:directory-test' ], providers: [ zeroTierProvider ] } ) };
+	return { ok: true, json: async () => ( { worldId: 'tw-world:directory-test', providers: directoryProviders } ) };
+};
 globalThis.WebSocket = class extends EventTarget {
 	static OPEN = 1;
 	static CONNECTING = 0;
@@ -144,6 +153,11 @@ try {
 	assert.equal( invitedReplicas.nodeId, second.peerId, 'a shareable invite falls through from an offline desktop node to its independent replica gateway' );
 	assert.equal( invitedReplicas.gateway, 'https://online.example' );
 	invitedReplicas.close();
+	const zeroTierConnector = new WorldConnector( { zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org' } );
+	const zeroTierManifest = await zeroTierConnector.getManifest();
+	assert.equal( zeroTierManifest.worldId, 'tw-world:directory-test', 'a ZeroTier node locator resolves through its signed provider record to the canonical ThruHold ID' );
+	assert.equal( zeroTierConnector.nodeId, second.peerId, 'ZeroTier lookup selects the signed provider gateway and verifies the world manifest' );
+	zeroTierConnector.close();
 	failoverProviderReachable = false;
 	authorityLease = await signedDocument( 'tidewater.authority/2', {
 		worldId: 'tw-world:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch: grantEpoch - 1,

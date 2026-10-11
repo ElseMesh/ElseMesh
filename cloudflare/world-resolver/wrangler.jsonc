@@ -1,0 +1,17 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "elsemesh-world-resolver",
+	"main": "src/index.js",
+	"compatibility_date": "2026-10-11",
+	"workers_dev": true,
+	"kv_namespaces": [
+		{ "binding": "PROVIDERS" }
+	],
+	"ratelimits": [
+		{
+			"name": "ANNOUNCEMENT_LIMIT",
+			"namespace_id": "841726035",
+			"simple": { "limit": 20, "period": 60 }
+		}
+	]
+}
