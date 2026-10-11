@@ -897,6 +897,20 @@ the preceding section, but it has not been installed or run on a phone.
 Current ADB lists no device, and SSH to the Flip7's configured LAN address
 returns `No route to host`.
 
+### Rolling ECHO threat-score window (2026-10-11)
+
+ZeroTierOne `exp3` commit `6bcec45a6` keeps lifetime violation counters for
+reporting while computing threat levels from bounded five-minute buckets. A
+suppressed `SEC_EXCESSIVE_ECHO` increments the rate-limit count and does not
+increment protocol violations. This prevents old rate-limit events from
+permanently elevating a later event's score; the 13-bucket window spans at
+most 65 minutes. The focused `zerotier-selftest` passed: 50 suppressed ECHO
+events raised the score, lifetime accounting remained intact, and after 65
+minutes one new ECHO event scored LOW. The Linux selftest was built with
+`ZT_SSO_SUPPORTED=0` to avoid the unrelated `zeroidc` Cargo/Android-linker
+failure in the default host build. This is unit-level evidence only: a live
+over-limit packet burst and its production event score remain unverified.
+
 ### Default Android `thruholdd` cgo build (2026-10-11)
 
 A fresh build from ElseMesh `8d23b2964cece02ed3fc7d24810afd3a6ac87f72` now
