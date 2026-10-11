@@ -931,3 +931,14 @@ runtime dependency on that library; do not add that flag unless the matching
 NDK runtime is packaged beside the binary. This cross-build still does not
 prove that the daemon starts or joins the overlay on Android. ADB currently
 lists no device and SSH to the Flip7 reports `Network is unreachable`.
+
+### Linux libzt identity survives daemon restart (2026-10-11)
+
+The current Linux `thruholdd` build (`6c31bc89`) started twice with the default
+network `e3918db4832a3056` and the same isolated `--zerotier-data` directory.
+Both starts joined as ZeroTier node `a5a50a281d` and received IPv4
+`172.22.23.66` plus 6PLANE `fc60:bbbd:e2a5:a50a:281d::1`. The private
+`identity.secret` stayed mode `0600`. The daemon was stopped cleanly between
+starts; the temporary world and ZeroTier data were removed after verification.
+This verifies persistence across a daemon restart with the current Linux build,
+not across a software upgrade, a device reboot, or on Android.
