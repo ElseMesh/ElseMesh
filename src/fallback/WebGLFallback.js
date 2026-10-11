@@ -787,7 +787,7 @@ export class WebGLFallback {
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = waterNoise.r * 0.55 + waterNoise.g * 0.45;
 					float shallow = smoothstep( 0.0, 18.0, depth );
-					vec3 water = mix( vec3( 0.018, 0.31, 0.27 ), vec3( 0.004, 0.035, 0.10 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
+					vec3 water = mix( vec3( 0.018, 0.26, 0.30 ), vec3( 0.004, 0.032, 0.105 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					float bottomVisibility = ( uTerrainSize > 0.0 ) ? 1.0 - smoothstep( 4.0, 36.0, depth ) : 0.0;
 					float waterFresnel = fresnel * mix( 1.0, 0.38, bottomVisibility );
 					vec3 waterBody = mix( water, transmitted, bottomVisibility * 0.38 * ( 1.0 - waterFresnel ) );
