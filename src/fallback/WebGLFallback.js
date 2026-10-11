@@ -891,8 +891,11 @@ export class WebGLFallback {
 					float breakerFace = faceBand * faceProgress * vShoreEnv;
 					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.08 ) * 38.0 );
 					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU + 0.08 ) * 24.0 );
-					float breakerFoam = max( impact, roller ) * vShoreEnv * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) * smoothstep( 0.24, 0.68, shoreDetail );
-					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.55 );
+					float foamLaceNoise = texture2D( uCloudNoise, p * 0.27 + vec2( -uTime * 0.0008, uTime * 0.00057 ) ).b;
+					float foamLace = smoothstep( 0.3, 0.68, foamLaceNoise * 0.65 + shoreDetail * 0.35 );
+					float crestFoam = smoothstep( 0.68, 0.94, vShoreBreaking ) * ( 1.0 - smoothstep( 1.45, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.06 ) * 16.0 ) * mix( 0.2, 1.0, foamLace );
+					float breakerFoam = max( max( impact, roller ), crestFoam * 0.85 ) * vShoreEnv * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) * smoothstep( 0.14, 0.58, shoreDetail );
+					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.34 );
 					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 ), vSwashFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
