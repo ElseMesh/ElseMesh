@@ -18,13 +18,12 @@ import { Clouds } from './sky/Clouds.js';
 import { SkyProClouds } from './sky/SkyProClouds.js';
 import { Environment } from './sky/Environment.js';
 
-import { TerrainData } from './world/TerrainData.js';
+import { IslandWorldState } from './world/IslandWorldState.js';
 import { HeightfieldTerrainData } from './world/HeightfieldTerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
-import { Colliders } from './world/Colliders.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
 import { FishProps } from './world/fish/FishProps.js';
@@ -212,7 +211,12 @@ export class App {
 			if ( typeof requestAnimationFrame === 'function' ) await new Promise( ( r ) => requestAnimationFrame( () => setTimeout( r, 0 ) ) );
 
 		};
-		await progress( 0.02, 'Starting WebGPU…', undefined, 'gpu' );
+		await progress( 0.02, 'Preparing the shared island state…', undefined, 'terrain' );
+		this.worldState = new IslandWorldState();
+		this.terrainData = this.worldState.terrain;
+		this.colliders = this.worldState.colliders;
+		this.hostedColliders = this.worldState.hostedColliders;
+		await progress( 0.03, 'Starting the graphics backend…', undefined, 'gpu' );
 		const engine = this.engine = new Engine( document.getElementById( 'app' ) );
 		await engine.init();
 		this.backend = engine.backend;
@@ -267,9 +271,6 @@ export class App {
 
 		// ---------------------------------------------------------------- island
 		await progress( 0.06, 'Shaping the island…', undefined, 'terrain' );
-		this.terrainData = new TerrainData();
-		this.colliders = new Colliders();
-		this.hostedColliders = new Colliders();
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
 		await progress( 0.12, 'Building the village…', undefined, 'village' );

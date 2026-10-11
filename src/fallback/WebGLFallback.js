@@ -1,5 +1,4 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { TerrainData } from '../world/TerrainData.js';
 import { WORLD } from '../world/WorldLayout.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
@@ -835,7 +834,10 @@ export class WebGLFallback {
 					vec2 fineUv = p * 0.19 + vec2( -uTime * 0.0021, uTime * 0.0015 );
 					vec4 fineNoise = texture2D( uCloudNoise, fineUv );
 					vec2 slope = kA * cos( a ) * 0.95 + kB * cos( b ) * 0.55 + kC * cos( c ) * 0.08 + kD * cos( d ) * 0.03 + kE * cos( e ) * 0.01;
-					slope += ( waterNoise.rg - 0.5 ) * 0.11 + ( fineNoise.rg - 0.5 ) * 0.24;
+					vec2 fineStep = vec2( 0.0012, 0.0 );
+					float fineSlopeX = texture2D( uCloudNoise, fineUv + fineStep ).r - texture2D( uCloudNoise, fineUv - fineStep ).r;
+					float fineSlopeY = texture2D( uCloudNoise, fineUv + fineStep.yx ).r - texture2D( uCloudNoise, fineUv - fineStep.yx ).r;
+					slope += ( waterNoise.rg - 0.5 ) * 0.11 + vec2( fineSlopeX, fineSlopeY ) * 0.52;
 					slope.y += vShoreSlope;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
@@ -1043,7 +1045,7 @@ export class WebGLFallback {
 	async _loadIsland( progress ) {
 
 		progress( 0.15, 'Building a WebGL terrain…' );
-		this.terrain = new TerrainData();
+		this.terrain = this.app.worldState.terrain;
 		const T = this.THREE;
 		try {
 			const model = await this.loader.loadAsync( terrainUrl );
