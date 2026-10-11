@@ -276,7 +276,7 @@ export class Birds {
 
 	// ------------------------------------------------------------------ update
 
-	update( dt, viewer, batch, camera, environment ) {
+	step( dt, viewer, environment ) {
 
 		this.time += dt;
 		this.lastViewer = viewer;
@@ -293,22 +293,6 @@ export class Birds {
 				case 'frigate': this.updateFrigate( a, dt ); break;
 
 			}
-
-		}
-
-		// draw: everything within its draw distance, shrinking away the last stretch
-		const cp = camera.position;
-		for ( const a of this.agents ) {
-
-			if ( ! a.visible ) continue;
-			const P = a.f.P;
-			const d = Math.hypot( P.pos[ 0 ] - cp.x, P.pos[ 1 ] - cp.y, P.pos[ 2 ] - cp.z );
-			const far = a.kind === 'frigate' ? 1400 : a.kind === 'pelican' ? 800 : 550;
-			if ( d > far ) continue;
-			const k = a.f.scale0 || ( a.f.scale0 = P.scale );
-			P.scale = k * smooth( far, far * 0.8, d );
-			batch.write( P );
-			P.scale = k;
 
 		}
 

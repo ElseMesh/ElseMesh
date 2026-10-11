@@ -6,6 +6,7 @@ import { ShadowBlobs } from './ShadowBlobs.js';
 import { SwashProbe } from './SwashProbe.js';
 import { Shorebirds } from './Shorebirds.js';
 import { G } from '../../core/Globals.js';
+import { smooth } from './WildlifeMath.js';
 
 // Water heights for birds on / just above the sea (pelicans skimming, floating, diving): a few
 // WaterQuery slots handed out to whoever asks, read back 1-3 frames later. Falls back to sea level.
@@ -165,9 +166,10 @@ export class Wildlife {
 		if ( this.test ) this.test( this.birdBatch, dt, this.critterBatch, this.blobs );
 		else {
 
-			this.birds.update( dt, viewer, this.birdBatch, camera, environment );
+			this.birds.step( dt, viewer, environment );
 			this.shorebirds.update( dt, viewer, this.birdBatch, camera, this.blobs, environment );
 			this.crabs.update( dt, viewer, this.critterBatch, camera, this.blobs, environment );
+			this.writeBirds( camera );
 
 		}
 
@@ -176,6 +178,25 @@ export class Wildlife {
 		this.blobs.commit();
 		this.water.endFrame();
 		this.cpuMs += ( performance.now() - t0 - this.cpuMs ) * 0.05;
+
+	}
+
+	writeBirds( camera ) {
+
+		const cp = camera.position;
+		for ( const a of this.birds.agents ) {
+
+			if ( ! a.visible ) continue;
+			const P = a.f.P;
+			const d = Math.hypot( P.pos[ 0 ] - cp.x, P.pos[ 1 ] - cp.y, P.pos[ 2 ] - cp.z );
+			const far = a.kind === 'frigate' ? 1400 : a.kind === 'pelican' ? 800 : 550;
+			if ( d > far ) continue;
+			const k = a.f.scale0 || ( a.f.scale0 = P.scale );
+			P.scale = k * smooth( far, far * 0.8, d );
+			this.birdBatch.write( P );
+			P.scale = k;
+
+		}
 
 	}
 
