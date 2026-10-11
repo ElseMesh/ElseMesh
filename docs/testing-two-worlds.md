@@ -95,6 +95,16 @@ peer each. The production `WorldConnector` verified both signed manifests and
 resolved each portal destination through the corresponding gateway. This is
 connectivity evidence; it does not prove complete visual fidelity or traversal.
 
+## Revalidation (2026-10-11)
+
+Two fresh profiles were prepared from the checked-in Example Island and
+LOZ-derived cave packages using the current `worldd` build. Each local daemon
+served its owner-signed manifest, and each gateway's `/api/lookup` returned the
+other world's owner PeerID through a shared loopback bootstrap. The temporary
+profiles and daemons were removed after the check. Both nodes ran on the same
+development host; this does not establish independent-network or NAT traversal,
+browser play, portal crossing, or visual parity.
+
 ## Visiting from another device
 
 `127.0.0.1` means the device opening the link. These links therefore work on the
