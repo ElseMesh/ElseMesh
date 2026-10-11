@@ -715,3 +715,32 @@ logged `spod` drops.
 The test establishes a live peer between separate devices, but not separate
 NATs: both may have shared the same network egress. It also does not yet verify
 portal handoff, content transfer, sustained peer stability, or relay fallback.
+
+### Current Linux host route and firewall snapshot (2026-10-11)
+
+A later read-only check on the Linux host queried the previously observed
+Flip7 address `172.22.216.247`. The current route is via the normal Wi-Fi
+gateway (`192.168.20.1`, interface `wlo1`, source `192.168.22.247`), not a
+ZeroTier interface. The host currently exposes ZeroTier interfaces for
+`10.205.192.0/24`, `192.168.192.0/24`, and `192.168.193.0/24`; no route for the
+dedicated network's `172.22.0.0/16` was present. No `thruholdd` process was
+running during this snapshot, so it was not an active libzt peer test. This
+means the earlier Flip7 address is stale for the current host state and cannot
+be used as evidence of present reachability.
+
+The firewall log's latest relevant entries were `nPOd` UDP translation records
+on `lo` involving `10.205.192.*` and inbound UDP drops to host port `14237`;
+there were no matching current UDP/9993 or daemon TCP/42901 drops in the
+inspected window. The records do not identify a libzt process or establish a
+causal relationship. The `zerotier-cli` binary is installed at `/usr/sbin`, but
+the unprivileged execution environment cannot read `/var/lib/zerotier-one`'s
+auth token. Attempts to use `sudo` from this execution environment are blocked
+by its `no_new_privs` setting, despite the host-side report that sudo now
+works. No firewall, route, ZeroTier membership, or daemon state was changed.
+
+Before the next live peer attempt, join the Linux libzt test daemon and Flip7
+to the same dedicated network and re-check the assigned addresses and route
+from a shell with the host's required privileges. Capture `/var/log/fw.log`
+over that exact test interval and correlate it with the daemon's selected
+interface and libzt path-query output. Do not infer process ownership from the
+firewall rule label alone.
