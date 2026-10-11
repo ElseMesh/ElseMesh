@@ -180,6 +180,27 @@ down. This is not evidence that the router cannot forward public traffic, but
 the gateway/relay is not currently deployed or externally reachable from this
 host. A public route or a separately hosted community node is still required.
 
+## Temporary public route smoke test (2026-10-11)
+
+The current source successfully prepared and served the packaged Example
+Island after rebuilding `server/bin/worldd-linux-amd64` in the external build
+tree. The previously present daemon binary was dated October 1 and rejected
+the source's `tidewater.village-materials/2` component; the current source
+already supports that component, so this was a stale-build failure rather than
+a missing source contract. The rebuilt binary's SHA-256 was
+`36910065b44cc460114e6ccf8eb809faf359bcb86b93ab5f7be34ff798a0c33e`.
+
+A short-lived Cloudflare Quick Tunnel then forwarded to a loopback-only test
+profile. From the public `trycloudflare.com` URL, `/healthz` returned HTTP 200,
+`/api/world/manifest?worldId=tw-world%3Aexample-island` returned the signed
+manifest with HTTP 200, and a WSS client received `type: connected` from
+`/gateway`. The temporary tunnel and daemon were shut down immediately after
+the checks. This proves that the gateway routes can pass through a public HTTPS
+and WSS tunnel; it does not prove access from a second independent network,
+browser-origin behavior, DHT discovery, WebRTC, relay fallback, portal
+traversal, or a persistent deployment. Do not use the ephemeral URL as an
+invite or production endpoint.
+
 The host ZeroTier One service reported active, but `/usr/sbin/zerotier-cli`
 could not read its authentication token in the current execution environment.
 Do not infer that the dedicated ElseMesh network is joined from the interface
