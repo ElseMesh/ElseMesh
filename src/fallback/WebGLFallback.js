@@ -10,12 +10,28 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
+import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/island/lod-source/vegetation-placements.bin?url';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
+let sharedFoamLaceTexture;
+
+function webglFoamLaceTexture( T, size = 512 ) {
+
+	if ( sharedFoamLaceTexture ) return sharedFoamLaceTexture;
+	const texture = new T.DataTexture( makeFoamLaceData( size ), size, size, T.RGBAFormat, T.UnsignedByteType );
+	texture.wrapS = texture.wrapT = T.RepeatWrapping;
+	texture.magFilter = T.LinearFilter;
+	texture.minFilter = T.LinearMipmapLinearFilter;
+	texture.generateMipmaps = true;
+	texture.needsUpdate = true;
+	sharedFoamLaceTexture = texture;
+	return texture;
+
+}
 
 function webglCloudNoiseTexture( T, size = 512 ) {
 
@@ -629,7 +645,7 @@ export class WebGLFallback {
 		const material = new T.ShaderMaterial( {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -779,6 +795,7 @@ export class WebGLFallback {
 				uniform vec3 uCameraPosition;
 				uniform vec3 uSunDirection;
 				uniform sampler2D uCloudNoise;
+				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
 				uniform mat4 uViewProjection;
 				uniform vec2 uViewport;
@@ -891,10 +908,15 @@ export class WebGLFallback {
 					float breakerFace = faceBand * faceProgress * vShoreEnv;
 					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.08 ) * 38.0 );
 					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU + 0.08 ) * 24.0 );
-					float foamLaceNoise = texture2D( uCloudNoise, p * 0.27 + vec2( -uTime * 0.0008, uTime * 0.00057 ) ).b;
-					float foamLace = smoothstep( 0.3, 0.68, foamLaceNoise * 0.65 + shoreDetail * 0.35 );
+					vec4 foamLaceData = texture2D( uFoamLace, p / 3.5 + vec2( -uTime * 0.0008, uTime * 0.00057 ) );
+					float foamLace = 1.0 - smoothstep( 0.42, 0.72, foamLaceData.r );
 					float crestFoam = smoothstep( 0.68, 0.94, vShoreBreaking ) * ( 1.0 - smoothstep( 1.45, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.06 ) * 16.0 ) * mix( 0.2, 1.0, foamLace );
 					float breakerFoam = max( max( impact, roller ), crestFoam * 0.85 ) * vShoreEnv * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) * smoothstep( 0.14, 0.58, shoreDetail );
+					float laceWidth = clamp( pow( breakerFoam, 1.4 ) * ( 0.7 + foamLaceData.b * 0.2 ), 0.0, 0.78 );
+					float laceMat = 1.0 - smoothstep( laceWidth - 0.035, laceWidth + 0.035, foamLaceData.r );
+					float laceBubbles = foamLaceData.g * smoothstep( laceWidth + 0.22, laceWidth, foamLaceData.r );
+					breakerFoam *= mix( laceMat, 1.0, smoothstep( 0.55, 0.92, breakerFoam ) );
+					breakerFoam = max( breakerFoam, laceBubbles * smoothstep( 0.12, 0.5, breakerFoam ) * 0.48 );
 					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.34 );
 					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 ), vSwashFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
