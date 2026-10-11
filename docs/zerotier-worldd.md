@@ -755,8 +755,35 @@ mode `0600`. Focused `go test -count=1 ./worldd -run 'TestZeroTierIdentity|TestM
 
 These checks confirm the local libp2p key persists across fresh CLI
 invocations and the ZeroTier marker logic behaves as intended. They do not
-prove that a real libzt node retains its host ID through a live daemon restart
-or software upgrade. That still needs a live libzt restart using a preserved
-test identity on the dedicated network; the current host cannot read its
-ZeroTier service token in this execution environment, and the Flip7 is not
-currently reachable over ADB or SSH.
+by themselves prove that a real libzt node retains its host ID through a live
+daemon restart or software upgrade. A disposable live libzt restart on this
+Linux host is verified below. It does not prove survival of the user's
+pre-existing identity through a software upgrade or peer connectivity across
+separate NATs. The host ZeroTier CLI still cannot read its service token in
+this execution environment, and the Flip7 is not currently reachable over ADB
+or SSH.
+
+### Disposable Linux libzt join and restart (2026-10-11)
+
+The latest Linux `thruholdd` build was run with fresh world and libzt state
+under `/var/tmp/elsemesh-libzt-smoke.xL23KM`, loopback HTTP `127.0.0.1:55200`,
+and P2P port `42911`. Without an interface blacklist, it joined the default
+network `e3918db4832a3056` as ZeroTier node `bc49b737b2`, receiving
+`172.22.20.219/16` and `fc60:bbbd:e2bc:49b7:37b2::1`. `/healthz` returned
+`status: ok`; `dhtPeers` and `dhtRoutingPeers` were both zero. After SIGTERM,
+the same binary restarted with the same state directory and reported the same
+ZeroTier node ID and both addresses. Its libp2p PeerID and world ID also
+remained the same. The secret key and ID-marker files were mode `0600`. The
+test daemon exited cleanly and the disposable state was removed. No user's
+persistent identity, route, or firewall rule was changed.
+
+The firewall log during this interval contained outgoing `SDROP` records on
+`spod` from `137.205.192.1` to ZeroTier root IPs, including UDP destination
+ports 9993 and 21045. Kernel route lookups for the same destinations selected
+the Wi-Fi gateway `192.168.20.1` on `wlo1`. These records do not identify the
+originating process, and the route lookup does not reveal which interface an
+individual libzt socket used. Since the daemon joined successfully, the drops
+did not prevent this join; the successful physical path is still unproven. No
+firewall rule was changed. The next path test must correlate process-owned
+socket endpoints and libzt path-query data with the firewall log before
+considering any `spod` rule change.
