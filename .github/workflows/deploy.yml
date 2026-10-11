@@ -32,6 +32,7 @@ jobs:
       - run: npm run build
         env:
           ELSEMESH_COMMIT_SHA: ${{ github.sha }}
+          ELSEMESH_ALLOW_SOURCE_BUILD: '1'
       - run: npm ci --prefix loz-source
       - run: node test/input-look-keys.mjs
         working-directory: loz-source

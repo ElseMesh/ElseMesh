@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5189",
+    "prebuild": "node tools/require-external-build-tree.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test:world-gateway": "node test/world-gateway-e2e.mjs",
