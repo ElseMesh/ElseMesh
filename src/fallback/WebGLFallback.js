@@ -264,6 +264,126 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
 }
 
+function webglBreakerSpray( T, terrainWater, seaLevel ) {
+
+	const positions = [], seeds = [];
+	for ( let x = WORLD.beach.xMin - 25; x <= WORLD.beach.xMax + 25; x += 1.5 ) for ( let z = - 64; z <= 28; z += 1.5 ) {
+		positions.push( x, 0, z );
+		seeds.push( ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1 );
+	}
+	const geometry = new T.BufferGeometry();
+	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
+	geometry.setAttribute( 'aSeed', new T.Float32BufferAttribute( seeds, 1 ) );
+	const material = new T.ShaderMaterial( {
+		uniforms: {
+			uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uTerrainHeight: { value: terrainWater.texture },
+			uTerrainOrigin: { value: terrainWater.origin }, uTerrainSize: { value: terrainWater.size }, uHeightRange: { value: new T.Vector2( terrainWater.minHeight, terrainWater.maxHeight ) },
+			uShoreField: { value: terrainWater.shore.texture }, uShoreFieldOrigin: { value: terrainWater.shore.origin }, uShoreFieldSize: { value: terrainWater.shore.size }, uShoreTimeRange: { value: terrainWater.shore.timeRange }, uSeaLevel: { value: seaLevel },
+		},
+		vertexShader: /* glsl */`
+			uniform float uTime;
+			uniform vec3 uCameraPosition;
+			uniform sampler2D uTerrainHeight;
+			uniform float uTerrainOrigin;
+			uniform float uTerrainSize;
+			uniform vec2 uHeightRange;
+			uniform sampler2D uShoreField;
+			uniform float uShoreFieldOrigin;
+			uniform float uShoreFieldSize;
+			uniform vec2 uShoreTimeRange;
+			uniform float uSeaLevel;
+			attribute float aSeed;
+			varying float vOpacity;
+			void main() {
+				vec3 p = position;
+				vOpacity = 0.0;
+				float depth = -1.0;
+				vec2 terrainUv = ( p.xz - vec2( uTerrainOrigin ) ) / uTerrainSize;
+				if ( all( greaterThanEqual( terrainUv, vec2( 0.0 ) ) ) && all( lessThanEqual( terrainUv, vec2( 1.0 ) ) ) ) {
+					vec4 terrain = texture2D( uTerrainHeight, terrainUv );
+					float encoded = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
+					depth = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, encoded );
+				}
+				if ( depth > 0.15 && depth < 5.5 ) {
+					vec2 shoreUv = ( p.xz - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
+					vec4 shore = texture2D( uShoreField, shoreUv );
+					vec2 dir = normalize( shore.rg * 2.0 - 1.0 );
+					float exposure = shore.b;
+					float along = dot( p.xz, vec2( -dir.y, dir.x ) );
+					float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
+					float warp = sin( along * 0.016 ) * 1.6;
+					float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
+					float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
+					float phase = ( uTime - arrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+					float index = floor( phase + 0.5 );
+					float u = phase - index;
+					float variation = sin( along * 0.062 + index * 1.7 + warp ) * 0.6 + sin( along * 0.13 + index * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
+					variation += ( sin( along * 0.29 + index * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + index * 5.9 + 0.8 ) * 0.4 ) * 0.28;
+					float randomWave = fract( sin( index * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
+					float waveSet = abs( sin( index * 0.448799 ) ) * 0.6 + 0.55;
+					float amp = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + variation * 0.385 ) * bar, 0.02 );
+					float breakDepth = pow( amp * 3.556 / 0.78, 0.8 );
+					float breaking = ( breakDepth - depth ) / max( breakDepth * 0.13, 0.05 );
+					float impact = smoothstep( 0.86, 0.99, breaking ) * ( 1.0 - smoothstep( 1.4, 1.9, breaking ) ) * exp( -abs( u - 0.08 ) * 22.0 );
+					float roller = smoothstep( 0.85, 1.35, breaking ) * exp( -abs( u + 0.08 ) * 16.0 );
+					float burst = max( impact, roller * 0.12 );
+					float age = fract( uTime * 0.85 + aSeed );
+					float lift = 1.2 + sin( age * 3.14159265 ) * ( 1.4 + aSeed * 2.4 );
+					float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * smoothstep( 0.02, 0.3, exposure );
+					vOpacity = burst * env * smoothstep( 0.35, 0.95, variation ) * ( 1.0 - age * 0.45 );
+					p.xz += dir * age * 1.4 + vec2( -dir.y, dir.x ) * ( aSeed - 0.5 ) * age * 2.4;
+					float shoaledAmp = amp * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
+					float sharpness = mix( 1.0, 3.0, smoothstep( -2.5, 0.0, breaking ) );
+					float meanProfile = inversesqrt( ( sharpness + 0.25 ) * 3.14159265 );
+					float skew = smoothstep( -3.0, 0.0, breaking ) * 0.55;
+					float phaseSkew = u - skew * ( 1.0 - cos( u * 6.2831853 ) ) / 6.2831853;
+					float skewCrest = max( ( cos( phaseSkew * 6.2831853 ) + 1.0 ) * 0.5, 0.0 );
+					float curl = smoothstep( -3.0, 0.0, breaking );
+					float preHeight = shoaledAmp * 2.0 * ( pow( skewCrest, sharpness ) - meanProfile ) * ( 1.0 + smoothstep( -1.0, 0.3, breaking ) * 0.22 );
+					float bore = smoothstep( 0.85, 1.35, breaking );
+					float waveHeight = shoaledAmp * 2.0 * ( 1.0 - meanProfile );
+					float lipHeight = min( waveHeight * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
+					float lip = smoothstep( -0.17, -0.12, u ) * ( 1.0 - smoothstep( -0.025, 0.015, u ) );
+					float crestHeight = preHeight + lipHeight * bore * curl * lip;
+					p.xz += dir * sin( u * 6.2831853 ) * shoaledAmp * 0.12 * env;
+					float a = dot( p.xz, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
+					float b = dot( p.xz, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
+					float c = dot( p.xz, vec2( 0.21, -0.16 ) ) + uTime * 0.7;
+					float d = dot( p.xz, vec2( 0.42, 0.09 ) ) + uTime * 1.3;
+					float e = dot( p.xz, vec2( 0.72, -0.48 ) ) + uTime * 1.6;
+					float baseWave = 0.95 * sin( a ) + 0.55 * sin( b ) + 0.08 * sin( c ) + 0.03 * sin( d ) + 0.01 * sin( e );
+					p.y = uSeaLevel + baseWave + crestHeight * env + lift;
+					gl_PointSize = clamp( ( 18.0 + aSeed * 24.0 ) * 120.0 / max( distance( uCameraPosition, p ), 28.0 ), 6.0, 32.0 );
+				} else {
+					gl_PointSize = 0.0;
+				}
+				gl_Position = projectionMatrix * viewMatrix * vec4( p, 1.0 );
+			}
+		`,
+		fragmentShader: /* glsl */`
+			varying float vOpacity;
+			void main() {
+				float d = length( gl_PointCoord - 0.5 );
+				float alpha = min( vOpacity * 3.0, 1.0 ) * ( 1.0 - smoothstep( 0.16, 0.5, d ) );
+				if ( alpha < 0.015 ) discard;
+				gl_FragColor = vec4( vec3( 0.92, 0.98, 1.0 ), alpha );
+				#include <tonemapping_fragment>
+				#include <colorspace_fragment>
+			}
+		`,
+		transparent: true,
+		depthWrite: false,
+		depthTest: true,
+		blending: T.NormalBlending,
+		toneMapped: false,
+	} );
+	const spray = new T.Points( geometry, material );
+	spray.renderOrder = 1;
+	spray.frustumCulled = false;
+	return spray;
+
+}
+
 function webglGrassMesh( T, terrain, camera, previous ) {
 
 	const radius = 42, spacing = 0.46, positions = [], colors = [], indices = [];
@@ -833,6 +953,7 @@ export class WebGLFallback {
 		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
 		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, - 0.15 );
 		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 1024, 1024 ), - 0.15, waterTerrain ) );
+		this.waterScene.add( webglBreakerSpray( T, waterTerrain, - 0.15 ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( villageUrl );
@@ -1141,7 +1262,7 @@ export class WebGLFallback {
 			this.sceneColorTexture.image.width = size.x;
 			this.sceneColorTexture.image.height = size.y;
 			this.sceneColorTexture.needsUpdate = true;
-			for ( const water of this.waterScene.children ) water.material.uniforms.uViewport.value.copy( size );
+			for ( const water of this.waterScene.children ) water.material.uniforms.uViewport?.value.copy( size );
 		};
 		// Capture key events before UI descendants can stop them from reaching the fallback.
 		window.addEventListener( 'keydown', this._keyDown, true );
@@ -1165,7 +1286,10 @@ export class WebGLFallback {
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;
 		this.cloudLayer.material.uniforms.uCameraPosition.value.copy( this.camera.position );
-		for ( const object of this.waterScene.children ) object.material.uniforms.uTime.value = simulationTime;
+		for ( const object of this.waterScene.children ) {
+			object.material.uniforms.uTime.value = simulationTime;
+			object.material.uniforms.uCameraPosition?.value.copy( this.camera.position );
+		}
 		const forward = new T.Vector3( - Math.sin( this.yaw ), 0, - Math.cos( this.yaw ) );
 		const right = new T.Vector3( Math.cos( this.yaw ), 0, - Math.sin( this.yaw ) );
 		const move = new T.Vector3();
