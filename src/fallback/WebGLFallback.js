@@ -11,6 +11,7 @@ import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern,
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
+import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
@@ -624,7 +625,15 @@ export class WebGLFallback {
 		else await this._loadIsland( onProgress );
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
-		if ( ! this.worldLink ) this.boat = new WebGLBoatAdapter( T, this.scene );
+		if ( ! this.worldLink ) {
+			this.boat = new WebGLBoatAdapter( T, this.scene );
+			this.wildlife = new WebGLWildlifeAdapter( T, this.scene, {
+				terrain: this.terrain,
+				colliders: this.app.worldState.colliders,
+				boat: this.boat.controller,
+				boatModel: this.boat.model,
+			} );
+		}
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -1468,6 +1477,7 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
+		this.wildlife?.update( dt, this.camera, this.app.settings.timeOfDay );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
 		if ( this.waterScene.children.length && ! this.debugNoWater ) {

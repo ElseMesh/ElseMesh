@@ -11,12 +11,13 @@ second copy of game content or gameplay rules.
 ## Current failure
 
 `App.init()` returns to `WebGLFallback` immediately after backend selection.
-That fallback constructs a separate Three.js scene and independently loads a
-reduced terrain, village, vegetation, and water presentation. The ordinary App
-path constructs the boat, game, vendors, wildlife, whale, and the richer ocean
-systems after that return. Some of those classes also mix simulation with
-render-object construction, so removing the return alone would not establish
-backend independence.
+That fallback still constructs a separate Three.js scene and independently
+loads a reduced terrain, village, vegetation, and water presentation. It now
+adapts the canonical boat model and bird simulations, but the fish game,
+vendors, crabs, whale, and richer ocean systems remain on the ordinary App
+path. Some of those classes also mix simulation with render-object
+construction, so removing the return alone would not establish backend
+independence.
 
 ## Target ownership
 
@@ -38,6 +39,16 @@ backend independence.
 Content descriptors should be ordinary data and stable across backend changes.
 Presentation objects should be disposable and rebuildable from those
 descriptors plus current simulation state.
+
+## Current progress, 2026-10-11
+
+`WebGLBoatAdapter` copies the canonical `BoatModel` meshes into Three.js and
+uses the same `BoatController` state. It currently has no WebGL water-query
+adapter, so the boat remains at its shared mooring state. `WebGLWildlifeAdapter`
+constructs the same `Birds` and `Shorebirds` simulations as WebGPU and presents
+their states with Three.js instanced meshes and simplified materials/poses.
+Crabs and the shore probe are not yet connected. These adapters do not remove
+the early return or the separately loaded WebGL island scene.
 
 ## Migration order
 
