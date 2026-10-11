@@ -321,11 +321,17 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 					float impact = smoothstep( 0.86, 0.99, breaking ) * ( 1.0 - smoothstep( 1.4, 1.9, breaking ) ) * exp( -abs( u - 0.08 ) * 22.0 );
 					float roller = smoothstep( 0.85, 1.35, breaking ) * exp( -abs( u + 0.08 ) * 16.0 );
 					float burst = max( impact, roller * 0.12 );
-					float age = fract( uTime * 0.85 + aSeed );
-					float lift = 1.2 + sin( age * 3.14159265 ) * ( 1.4 + aSeed * 2.4 );
+					float ageJitter = aSeed * 0.12;
+					float impactAge = fract( phase - 0.08 + ageJitter + 1.0 ) * 9.0;
+					float rollerAge = fract( phase + 0.08 + ageJitter + 1.0 ) * 9.0;
+					float age = mix( impactAge, rollerAge, step( impact, roller ) );
+					float life = 1.0 + aSeed * 1.5;
+					float alive = smoothstep( 0.02, 0.12, age ) * ( 1.0 - smoothstep( life * 0.65, life, age ) );
 					float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * smoothstep( 0.02, 0.3, exposure );
-					vOpacity = burst * env * smoothstep( 0.35, 0.95, variation ) * ( 1.0 - age * 0.45 );
-					p.xz += dir * age * 1.4 + vec2( -dir.y, dir.x ) * ( aSeed - 0.5 ) * age * 2.4;
+					vOpacity = burst * env * smoothstep( 0.35, 0.95, variation ) * alive * ( 1.0 - age / life * 0.25 );
+					float upSpeed = 4.0 + aSeed * 5.0;
+					p.xz += dir * age * ( 1.0 + aSeed * 3.0 ) + vec2( -dir.y, dir.x ) * ( aSeed - 0.5 ) * age * 2.5;
+					float lift = 0.08 + upSpeed * age - 4.905 * age * age;
 					float shoaledAmp = amp * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
 					float sharpness = mix( 1.0, 3.0, smoothstep( -2.5, 0.0, breaking ) );
 					float meanProfile = inversesqrt( ( sharpness + 0.25 ) * 3.14159265 );
@@ -347,7 +353,7 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 					float e = dot( p.xz, vec2( 0.72, -0.48 ) ) + uTime * 1.6;
 					float baseWave = 0.95 * sin( a ) + 0.55 * sin( b ) + 0.08 * sin( c ) + 0.03 * sin( d ) + 0.01 * sin( e );
 					p.y = uSeaLevel + baseWave + crestHeight * env + lift;
-					gl_PointSize = clamp( ( 18.0 + aSeed * 24.0 ) * 120.0 / max( distance( uCameraPosition, p ), 28.0 ), 6.0, 32.0 );
+					gl_PointSize = clamp( ( 6.0 + aSeed * 12.0 ) * 120.0 / max( distance( uCameraPosition, p ), 28.0 ), 1.5, 10.0 );
 				} else {
 					gl_PointSize = 0.0;
 				}
@@ -685,7 +691,7 @@ export class WebGLFallback {
 								float lipHeight = min( waveHeight * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
 								float lip = smoothstep( -0.17, -0.12, u ) * ( 1.0 - smoothstep( -0.025, 0.015, u ) );
 								float crestHeight = preHeight + lipHeight * bore * curl * lip;
-								world.xz += shoreDirection * sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 * env;
+								world.xz += shoreDirection * ( sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 + lipHeight * 0.55 * bore * curl * lip ) * env;
 								vWaveHeight += ( crestHeight - preHeight ) * env;
 							}
 						}
