@@ -833,12 +833,10 @@ healthy. The gate does not suppress ordinary world traffic, and the observed
 events do not justify changing its six-per-second reply threshold. The source
 now counts suppressed ECHOs as rate-limit hits, which avoids inflating the
 protocol-violation score. This fix was committed to ZeroTierOne `exp3` as
-`bf5dfff60`, then rebuilt into Linux libzt and `thruholdd`. Their libzt SHA-256
-is `f40aad27b0e056365a55b1695b4d724592b733ba6170559ebcdbd2a1e0da6a7a`;
-`thruholdd --help` exits successfully and resolves the bundled library. Runtime
-threat-score behavior is not yet verified, and Android still needs a matching
-rebuild. Both test daemons were stopped and their temporary state removed;
-persistent identities and Central policy were untouched.
+`bf5dfff60` and packaged for Linux and Android; build details and remaining
+runtime checks are recorded below. Both test daemons were stopped and their
+temporary state removed; persistent identities and Central policy were
+untouched.
 
 ### Android arm64 rebuild with automatic interface selection (2026-10-11)
 
