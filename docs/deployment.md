@@ -86,8 +86,9 @@ network. A world invite needs a stable `worldId` and a reachable HTTPS/WSS
 `gateway`. The gateway or owner daemon can use its embedded libzt connection
 to reach the persistent ZeroTier node and serve that world. GitHub Pages only
 serves the client files, so this requires a separately running gateway/daemon
-and a public route to its HTTPS/WSS endpoint. The current deployment host has
-no such service; see [the gateway preflight](relay-deployment.md#current-host-deployment-preflight-2026-10-11).
+and a public route to its HTTPS/WSS endpoint. The host has no persistent
+gateway; a temporary unlisted direct-test gateway was active during the
+2026-10-11 check. See [the gateway preflight](relay-deployment.md#current-host-deployment-preflight-2026-10-11).
 
 An invite may contain multiple repeated `nodeId`/`gateway` pairs, in matching
 order, so the browser can try the desktop, phone, and a trusted replica
@@ -104,21 +105,28 @@ browser's home makes it the default for that browser.
 
 ## elsemesh.org
 
-DNS inspection on 2026-10-11 found Namecheap nameservers, an apex parking
-address `162.255.119.79`, and `www` pointing to `parkingpage.namecheap.com`.
-The apex HTTP endpoint redirects to Namecheap parking and the HTTPS request
-timed out. The GitHub Pages API initially reported `cname: elsemesh.org` and
-`https_enforced: false`; that setting was cleared so GitHub.io remained usable.
-Reattaching `elsemesh.org` briefly for a live check immediately changed
-`https://elsemesh.github.io/` to an HTTP 301 redirect to `http://elsemesh.org/`,
-which still leads to Namecheap parking. The setting was cleared again. The
-current Pages API reports `cname: null` and `https_enforced: true`, and the
-GitHub.io root returned HTTP 200 after clearing it. Keep using GitHub.io until
-the DNS records and verification challenge are ready; then attach the custom
-domain and update DNS together so the working URL does not redirect to parking.
-The custom domain is still not ready: `elsemesh.org` resolves to
-`162.255.119.79`, `www` still uses `parkingpage.namecheap.com`, and the
-`_github-pages-challenge-ElseMesh` TXT query returned no answer.
+An earlier 2026-10-11 check found Namecheap parking records and an incomplete
+GitHub Pages setup. That observation is superseded by the live recheck below.
+
+At 22:00 BST on 2026-10-11, `https://elsemesh.org/` and
+`https://elsemesh.org/loz/` both returned HTTP 200. The root page showed stamp
+`c5fc3fd5`, matching `main`; `/loz/` showed `f691cd9e`, matching
+`archive/loz/main`. `https://elsemesh.github.io/` now redirects to the custom
+domain. The authenticated GitHub Pages API reports `cname: elsemesh.org` and
+`https_enforced: true`. The custom-domain `elsemesh-config.js` serves the
+resolver configuration. The static client is live; this does not make Pages a
+world gateway.
+
+`http://elsemesh.com/` currently redirects to `https://elsemesh.org/`, but a
+direct HTTPS request to `https://elsemesh.com/` timed out in this check. The
+`.com` redirect is therefore only partially verified; provide HTTPS redirect
+service for that hostname and verify it from an independent connection.
+
+The resolver is live, but its read-only lookup for
+`tw-world:example-island` returned an empty provider list. Do not infer that a
+world is discoverable merely because the client and resolver are deployed.
+The private direct gateway invite used for the current test is intentionally
+not written here or published through the resolver.
 
 Preserve the existing email records: MX priorities 10 (`eforward1`,
 `eforward2`, `eforward3`), 15 (`eforward4`), and 20 (`eforward5`) under
@@ -127,32 +135,15 @@ Preserve the existing email records: MX priorities 10 (`eforward1`,
 no apex AAAA or CAA records. Nameservers are `dns1.registrar-servers.com` and
 `dns2.registrar-servers.com`.
 
-The organization Pages domain-verification challenge is pending. It was
-created in **ElseMesh organization settings → Pages → Verified domains**;
-GitHub supplied the hostname `_github-pages-challenge-ElseMesh` and a
-per-domain TXT value. A DNS query currently returns no TXT answer for that
-hostname. The authenticated `gh` token lacks `admin:org`, so the challenge
-cannot be inspected through the CLI. After Namecheap access is available, add
-the exact value shown by GitHub, verify the domain in the GitHub settings
-page, and keep the TXT record in DNS after verification. The challenge value
-is intentionally not stored in this public repository.
+The earlier verification challenge and Namecheap record observations above
+were made before the custom-domain setup completed. Recheck the organization
+verification TXT record and current Namecheap records in their dashboards
+before changing the zone; preserve the email records listed above. The
+challenge value must remain out of this public repository.
 
-After verification, update Namecheap DNS:
-
-1. Replace only the apex parking/URL-redirection record with four A records
-   for `@`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, and
-   `185.199.111.153`.
-2. Replace the `www` parking CNAME with `elsemesh.github.io`. Keep all five MX
-   records, the apex SPF TXT record, and the GitHub verification TXT record.
-3. Confirm authoritative DNS has the new records, wait for certificate
-   provisioning, then enforce HTTPS and verify `https://elsemesh.org/` plus a
-   selected-world invite. The same query arguments work at the domain root.
-
-GitHub Pages serves the static client at `https://elsemesh.github.io/`, but
-`/healthz`, `/api/lookup`, and `/gateway` return 404 there; Pages is not a
-world gateway. The development host has no active `elsemesh-gateway` or Caddy
-service and no listener on TCP 80, 443, 5200, or 42901. No public gateway or
-relay endpoint is verified; the service and firewall examples below are
-deployment instructions, not evidence of a running service.
+GitHub Pages serves the static client only. It does not serve `/api/lookup` or
+`/gateway`; world access requires a separate gateway/daemon. See the live
+gateway evidence and limitations in [gateway resilience](gateway-resilience.md)
+and the deployment procedures below.
 
 Reference: [GitHub custom-domain documentation](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
