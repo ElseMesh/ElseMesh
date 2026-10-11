@@ -2,15 +2,40 @@
 // contains no island generator, noise seed, or authoring-only state.
 export class HeightfieldTerrainData {
 
-	constructor( { size, origin, resolution, heights } ) {
+	constructor( { size, origin, resolution, heights, splat = null } ) {
 
-		if ( ! Number.isFinite( size ) || size <= 0 || ! Number.isFinite( origin ) || ! Number.isInteger( resolution ) || resolution < 2 || heights?.length !== resolution * resolution ) throw new Error( 'Invalid packaged terrain heightfield' );
+		if ( ! Number.isFinite( size ) || size <= 0 || ! Number.isFinite( origin ) || ! Number.isInteger( resolution ) || resolution < 2 || heights?.length !== resolution * resolution || splat && splat.length !== resolution * resolution * 4 ) throw new Error( 'Invalid packaged terrain heightfield' );
 		this.size = size;
 		this.origin = origin;
 		this.res = resolution;
 		this.texel = size / resolution;
 		this.heights = heights;
+		this.splat = splat;
 		this.buildMinMax();
+
+	}
+
+	// Bilinear height query using the same half-texel convention as the procedural terrain.
+	heightAt( x, z ) {
+
+		const { res, texel, origin, heights } = this;
+		const fx = ( x - origin ) / texel - 0.5, fz = ( z - origin ) / texel - 0.5;
+		if ( fx < 0 || fz < 0 || fx >= res - 1 || fz >= res - 1 ) return - 90;
+		const i = Math.floor( fx ), j = Math.floor( fz );
+		const tx = fx - i, tz = fz - j, k = j * res + i;
+		const a = heights[ k ], b = heights[ k + 1 ], c = heights[ k + res ], d = heights[ k + res + 1 ];
+		return ( a * ( 1 - tx ) + b * tx ) * ( 1 - tz ) + ( c * ( 1 - tx ) + d * tx ) * tz;
+
+	}
+
+	// Red channel of the exported RGBA splat map stores the loose-sand mask.
+	sandAt( x, z ) {
+
+		if ( ! this.splat ) return 0;
+		const { res, texel, origin, splat } = this;
+		const i = Math.floor( ( x - origin ) / texel ), j = Math.floor( ( z - origin ) / texel );
+		if ( i < 0 || j < 0 || i >= res || j >= res ) return 0;
+		return splat[ ( j * res + i ) * 4 ] / 255;
 
 	}
 
