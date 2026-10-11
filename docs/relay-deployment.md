@@ -161,6 +161,24 @@ does not prove a particular world is available; verify that `/api/lookup` for
 the invited world returns its expected owner/provider, then test remote asset
 retrieval and portal traversal.
 
+## Current host deployment preflight (2026-10-11)
+
+A read-only check of the development host (`HP-ENVY-x360`) found no running
+`thruholdd`/`worldd` process, no active `elsemesh-gateway` or Caddy service,
+and no listener on TCP 80, 443, 42901, or 5200. The Wi-Fi interface had private
+address `192.168.22.247/22` via `192.168.20.1`; the host's `spod` interface was
+down. This is not evidence that the router cannot forward public traffic, but
+the gateway/relay is not currently deployed or externally reachable from this
+host. A public route or a separately hosted community node is still required.
+
+The host ZeroTier One service reported active, but `/usr/sbin/zerotier-cli`
+could not read its authentication token in the current execution environment.
+Do not infer that the dedicated ElseMesh network is joined from the interface
+list alone. Refresh membership and assigned addresses from a shell with access
+to the service token before using this host in a live `thruholdd` test. No
+service, firewall, route, or ZeroTier membership was changed during the
+preflight.
+
 ## Configure world nodes
 
 Pass multiple bootstrap and relay addresses so a single unavailable operator
