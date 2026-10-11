@@ -37,11 +37,19 @@ revalidated against these refs; the later verification is recorded below.
 Rechecked after Pages run `38151990451` deployed main commit
 `0e49a73fbb8ccfeff15e13382ced0cbd33ee3524`: both
 `https://elsemesh.github.io/` and `https://elsemesh.github.io/loz/` returned
-HTTP 200. The root HTML contained stamp `0e49a73f`, matching `main`, and the
-archived page contained `f691cd9e`, matching `archive/loz/main`. The Pages API
+HTTP 200. The root HTML contained stamp `0e49a73f`, matching `main` at that
+observation. The archived page contained `f691cd9e`, matching
+`archive/loz/main`. The Pages API
 reported `cname: null` and HTTPS enforcement enabled. These checks verify the
 static clients and their revision stamps; they do not verify gateway or world
 server reachability.
+
+The follow-up documentation commit `8626e94982f7c7e26e1a7dfbdc841c54b55ac9cb`
+also deployed successfully in Pages run `38152524653`. After deployment, the
+root returned HTTP 200 with stamp `8626e949` and `/loz/` returned HTTP 200 with
+stamp `f691cd9e`, matching their refs at that time. Each later push triggers a
+new build and root stamp; check the latest run and live page before reporting
+the current revision.
 
 ## Selected ThruHolds
 
