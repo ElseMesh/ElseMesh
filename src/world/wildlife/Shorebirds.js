@@ -1,11 +1,10 @@
-import * as THREE from '../../engine/index.js';
-import { G } from '../../core/Globals.js';
-import { WORLD } from '../WorldLayout.js';
+import * as M from '../../engine/math/index.js';
+import { ISLAND_DEFINITION as WORLD } from '../IslandDefinition.js';
 import { mulberry32 } from '../../util/Noise.js';
 import { BIRD } from './BirdShapes.js';
 import { Flyer } from './Flight.js';
 import { groundPose, setHead, setWings, standHeight, storePrevious, resetPrevious } from './BirdPose.js';
-import { TAU, clamp, lerp, smooth, angleDiff, approach } from './Kit.js';
+import { TAU, clamp, lerp, smooth, angleDiff, approach } from './WildlifeMath.js';
 
 // Sanderlings working the swash: small flocks that chase the backwash down the wet sand, probing
 // as they go, and scurry up the beach ahead of every uprush (the edge of the water comes from
@@ -18,7 +17,7 @@ const DRAW = 190;
 const WARY = 15, FLUSH = 8; // m
 
 const _r = { runup: 0, inland: 0, speed: 0, tau: 0, x: 0, z: 0, age: 0 };
-const _p = new THREE.Vector3(), _t = new THREE.Vector3();
+const _p = new M.Vector3(), _t = new M.Vector3();
 
 export class Shorebirds {
 
@@ -89,11 +88,11 @@ export class Shorebirds {
 
 	}
 
-	update( dt, viewer, batch, camera, blobs = null ) {
+	update( dt, viewer, batch, camera, blobs = null, environment ) {
 
 		this.time += dt;
 		const cp = camera.position;
-		const night = G.night.value;
+		const night = environment.night;
 		for ( const F of this.flocks ) {
 
 			// nothing to do while nobody is anywhere near
@@ -102,7 +101,7 @@ export class Shorebirds {
 			cx /= F.birds.length;
 			F.cx = cx;
 			if ( Math.hypot( cx - cp.x, - 40 - cp.z ) > DRAW + 120 ) continue;
-			this.updateFlock( F, dt, viewer, night );
+			this.updateFlock( F, dt, viewer, night, environment );
 
 		}
 
@@ -128,7 +127,7 @@ export class Shorebirds {
 
 	}
 
-	updateFlock( F, dt, viewer, night ) {
+	updateFlock( F, dt, viewer, night, environment ) {
 
 		// the viewer: wary birds run off along the beach, pressed ones flush
 		let threat = 1e9, running = false;
@@ -163,7 +162,7 @@ export class Shorebirds {
 		for ( const b of F.birds ) {
 
 			if ( b.state === 'fly' ) this.flyBird( b, dt );
-			else this.groundBird( b, dt, viewer, night );
+			else this.groundBird( b, dt, viewer, night, environment );
 
 		}
 
@@ -179,7 +178,7 @@ export class Shorebirds {
 
 	// ------------------------------------------------------------------ on the ground
 
-	groundBird( b, dt, viewer, night ) {
+	groundBird( b, dt, viewer, night, environment ) {
 
 		const F = b.F, T = this.terrain;
 		const s = this.slopeAt( b.x, b.z, _t );
@@ -193,7 +192,7 @@ export class Shorebirds {
 		if ( r && r.age < 1.5 ) {
 
 			const Rt = r.runup;
-			const inland = Math.max( h - G.seaLevel.value, 0 ) / SLOPE;
+			const inland = Math.max( h - environment.seaLevel, 0 ) / SLOPE;
 			dm = ( inland - Rt ) * SLOPE / g;
 			vf = r.speed * SLOPE / g;
 			up = r.speed > 0.05;
@@ -327,7 +326,7 @@ export class Shorebirds {
 			[ cx, 0.6, z0 ], [ cx + dir * 10, 2.2, z0 + 7 ], [ mid - dir * 12, 3 + rng() * 2, z0 + 14 + rng() * 8 ],
 			[ mid + dir * 14, 2.5 + rng() * 2, z1 + 12 + rng() * 8 ], [ dest - dir * 12, 1.4, z1 + 4 ], [ dest, 0.4, z1 - 1.5 ],
 		];
-		F.path = new THREE.CatmullRomCurve3( pts.map( ( p ) => new THREE.Vector3( p[ 0 ], p[ 1 ], p[ 2 ] ) ), false, 'centripetal' );
+		F.path = new M.CatmullRomCurve3( pts.map( ( p ) => new M.Vector3( p[ 0 ], p[ 1 ], p[ 2 ] ) ), false, 'centripetal' );
 		F.len = F.path.getLength();
 		F.s = 0;
 		F.dest = dest;

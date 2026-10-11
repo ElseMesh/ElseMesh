@@ -5,6 +5,7 @@ import { Crabs } from './Crabs.js';
 import { ShadowBlobs } from './ShadowBlobs.js';
 import { SwashProbe } from './SwashProbe.js';
 import { Shorebirds } from './Shorebirds.js';
+import { G } from '../../core/Globals.js';
 
 // Water heights for birds on / just above the sea (pelicans skimming, floating, diving): a few
 // WaterQuery slots handed out to whoever asks, read back 1-3 frames later. Falls back to sea level.
@@ -107,6 +108,7 @@ export class Wildlife {
 		this.water = new WaterHeights( query );
 		this.birds = new Birds( { terrain, village, colliders, boat, boatModel, roofPerches, water: this.water, spray, seed: seed + 6 } );
 		this.viewer = { x: 0, y: 0, z: 0, speed: 0, mode: 'walk', px: 0, pz: 0, init: false };
+		this.environment = { windX: 0, windZ: 0, windSpeed: 0, night: 0, sunY: 1, seaLevel: 0 };
 		this.test = null;
 		this.cpuMs = 0;
 
@@ -150,15 +152,22 @@ export class Wildlife {
 
 		const t0 = performance.now();
 		const viewer = this.updateViewer( dt, camera, player );
+		const environment = this.environment;
+		environment.windX = G.windDir.value.x;
+		environment.windZ = G.windDir.value.y;
+		environment.windSpeed = G.windSpeed.value;
+		environment.night = G.night.value;
+		environment.sunY = G.sunDir.value.y;
+		environment.seaLevel = G.seaLevel.value;
 		this.birdBatch.begin();
 		this.critterBatch.begin();
 		this.blobs.begin();
 		if ( this.test ) this.test( this.birdBatch, dt, this.critterBatch, this.blobs );
 		else {
 
-			this.birds.update( dt, viewer, this.birdBatch, camera );
-			this.shorebirds.update( dt, viewer, this.birdBatch, camera, this.blobs );
-			this.crabs.update( dt, viewer, this.critterBatch, camera, this.blobs );
+			this.birds.update( dt, viewer, this.birdBatch, camera, environment );
+			this.shorebirds.update( dt, viewer, this.birdBatch, camera, this.blobs, environment );
+			this.crabs.update( dt, viewer, this.critterBatch, camera, this.blobs, environment );
 
 		}
 

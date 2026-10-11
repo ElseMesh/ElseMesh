@@ -1,12 +1,11 @@
-import * as THREE from '../../engine/index.js';
-import { G } from '../../core/Globals.js';
-import { WORLD } from '../WorldLayout.js';
-import { SPRAY } from '../../fx/Spray.js';
+import * as M from '../../engine/math/index.js';
+import { ISLAND_DEFINITION as WORLD } from '../IslandDefinition.js';
+import { SPRAY } from '../../fx/SprayTypes.js';
 import { mulberry32 } from '../../util/Noise.js';
 import { BIRD } from './BirdShapes.js';
 import { Flyer } from './Flight.js';
 import { setHead, groundPose, standHeight, storePrevious, resetPrevious, setWings, tuckLegs } from './BirdPose.js';
-import { TAU, clamp, lerp, smooth, angleDiff, approach, qYawPitchRoll } from './Kit.js';
+import { TAU, clamp, lerp, smooth, angleDiff, approach, qYawPitchRoll } from './WildlifeMath.js';
 
 // Gulls, terns, pelicans and frigatebirds.
 //
@@ -23,7 +22,7 @@ import { TAU, clamp, lerp, smooth, angleDiff, approach, qYawPitchRoll } from './
 
 const DECK = WORLD.pier.deckHeight;
 const RAIL_TOP = DECK + 0.95 + 0.0445;
-const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+const _v = new M.Vector3(), _w = new M.Vector3();
 
 // flight initiation distances (m) by species when walking up to them
 const FLUSH = { [ BIRD.GULL ]: 7, [ BIRD.PELICAN ]: 5.5, [ BIRD.TERN ]: 9 };
@@ -41,7 +40,7 @@ export class Birds {
 		this.time = 0;
 		this.agents = [];
 		this.perches = this.buildPerches( village, colliders, roofPerches );
-		this.wind = new THREE.Vector2();
+		this.wind = new M.Vector2();
 
 		const rng = this.rng;
 		const add = ( kind, species, init ) => {
@@ -151,7 +150,7 @@ export class Birds {
 		// the moored boat's wheelhouse roof (follows the boat)
 		if ( this.boat && this.boatModel && this.boatModel.dimensions ) {
 
-			const local = new THREE.Vector3( - 0.5, this.boatModel.dimensions.houseRoofHeight, 0.15 );
+			const local = new M.Vector3( - 0.5, this.boatModel.dimensions.houseRoofHeight, 0.15 );
 			add( 0, 0, 0, 'boat', [ 'gull' ], { local } );
 
 		}
@@ -177,7 +176,7 @@ export class Birds {
 		this.boat = boat;
 		this.boatModel = boatModel;
 		if ( ! boat || ! boatModel?.dimensions || this.perches.some( perch => perch.kind === 'boat' ) ) return;
-		const local = new THREE.Vector3( - 0.5, boatModel.dimensions.houseRoofHeight, 0.15 );
+		const local = new M.Vector3( - 0.5, boatModel.dimensions.houseRoofHeight, 0.15 );
 		this.perches.push( { x: 0, y: 0, z: 0, kind: 'boat', kinds: [ 'gull' ], bird: null, yawJitter: ( this.rng() - 0.5 ) * 0.8, local } );
 
 	}
@@ -277,12 +276,12 @@ export class Birds {
 
 	// ------------------------------------------------------------------ update
 
-	update( dt, viewer, batch, camera ) {
+	update( dt, viewer, batch, camera, environment ) {
 
 		this.time += dt;
 		this.lastViewer = viewer;
-		this.wind.set( G.windDir.value.x, G.windDir.value.y ).multiplyScalar( G.windSpeed.value );
-		const day = 1 - G.night.value;
+		this.wind.set( environment.windX, environment.windZ ).multiplyScalar( environment.windSpeed );
+		const day = 1 - environment.night;
 		this.updateSquad( dt );
 		for ( const a of this.agents ) {
 
@@ -833,9 +832,9 @@ export class Birds {
 
 		}
 
-		const curve = new THREE.CatmullRomCurve3( pts.map( ( p ) => new THREE.Vector3( p[ 0 ], p[ 2 ], p[ 1 ] ) ), true, 'centripetal' );
+		const curve = new M.CatmullRomCurve3( pts.map( ( p ) => new M.Vector3( p[ 0 ], p[ 2 ], p[ 1 ] ) ), true, 'centripetal' );
 		const length = curve.getLength();
-		return { curve, length, pt: new THREE.Vector3(), tan: new THREE.Vector3() };
+		return { curve, length, pt: new M.Vector3(), tan: new M.Vector3() };
 
 	}
 

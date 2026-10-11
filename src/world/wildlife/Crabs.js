@@ -1,8 +1,7 @@
-import { G } from '../../core/Globals.js';
-import { WORLD } from '../WorldLayout.js';
+import { ISLAND_DEFINITION as WORLD } from '../IslandDefinition.js';
 import { mulberry32 } from '../../util/Noise.js';
 import { CRITTER } from './CritterShapes.js';
-import { TAU, clamp, smooth, angleDiff, approach, qGround } from './Kit.js';
+import { TAU, clamp, smooth, angleDiff, approach, qGround } from './WildlifeMath.js';
 
 // Ghost crabs and hermit crabs.
 //
@@ -149,13 +148,13 @@ export class Crabs {
 
 	// ------------------------------------------------------------------ update
 
-	update( dt, viewer, batch, camera, blobs = null ) {
+	update( dt, viewer, batch, camera, blobs = null, environment ) {
 
 		this.time += dt;
 		const cp = camera.position;
-		const night = G.night.value;
+		const night = environment.night;
 		// dusk / night: ghost crabs come out
-		const sunY = G.sunDir.value.y;
+		const sunY = environment.sunY;
 		this.activity = clamp( 0.45 + 0.5 * Math.max( night, smooth( 0.35, 0.05, sunY ) ), 0, 0.95 );
 
 		// (re)assign the pool to the burrows near the viewer, a few times a second
