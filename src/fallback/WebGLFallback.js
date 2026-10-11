@@ -1,5 +1,5 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { WORLD } from '../world/WorldLayout.js';
+import { ISLAND_DEFINITION as WORLD } from '../world/IslandDefinition.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
@@ -253,7 +253,8 @@ function webglTerrainWaterTexture( T, terrain ) {
 
 function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
-	const field = computeShoreField( terrain, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ], seaLevel } );
+	const swellLength = Math.hypot( ...WORLD.swellDir ), swell = WORLD.swellDir.map( value => value / swellLength );
+	const field = computeShoreField( terrain, { res: 512, swellDir: swell, seaLevel } );
 	const data = new Uint8Array( field.res * field.res * 4 ), swashData = new Uint8Array( field.res * field.res * 4 );
 	let minTime = Infinity, maxTime = - Infinity, minSwashTime = Infinity, maxSwashTime = - Infinity;
 	for ( let i = 0; i < field.res * field.res; i ++ ) {
@@ -267,8 +268,8 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 		const source = i * 4, directionLength = Math.hypot( field.data[ source + 1 ], field.data[ source + 2 ] );
 		const exposure = Math.min( 1, directionLength ), arrival = Math.max( minTime, Math.min( maxTime, field.data[ source ] ) );
 		const swashArrival = Math.max( minSwashTime, Math.min( maxSwashTime, field.data[ source + 3 ] ) ), out = source;
-		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : WORLD.swellDir.x ) * 0.5 + 0.5 ) * 255 );
-		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : WORLD.swellDir.y ) * 0.5 + 0.5 ) * 255 );
+		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : swell[ 0 ] ) * 0.5 + 0.5 ) * 255 );
+		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : swell[ 1 ] ) * 0.5 + 0.5 ) * 255 );
 		data[ source + 2 ] = Math.round( exposure * 255 );
 		data[ source + 3 ] = Math.round( ( arrival - minTime ) / timeRange * 255 );
 		swashData[ out ] = Math.round( ( swashArrival - minSwashTime ) / swashTimeRange * 255 );
@@ -1102,11 +1103,11 @@ export class WebGLFallback {
 		}
 		await this._loadVegetation();
 		const start = WORLD.start || WORLD.spawn;
-		this.spawn = { position: [ start.position.x, this.terrain.heightAt( start.position.x, start.position.z ) + 1.7, start.position.z ], yaw: start.yaw, pitch: - 0.05 };
+		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
 		this.groundHeight = ( x, z ) => this.terrain.heightAt( x, z );
-		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position.x, 0, start.position.z ) } );
+		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
 		this.scene.add( this.grass );
-		this.grassCenter = new T.Vector2( start.position.x, start.position.z );
+		this.grassCenter = new T.Vector2( start.position[ 0 ], start.position[ 2 ] );
 		this.worldName.textContent = 'WebGL mode · island rendering simplified';
 		progress( 0.9, 'Starting the WebGL island…' );
 
@@ -1119,7 +1120,7 @@ export class WebGLFallback {
 			if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 			const records = decodeVegetationPlacements( new Uint8Array( await response.arrayBuffer() ), 7 );
 			const start = WORLD.start || WORLD.spawn;
-			const T = this.THREE, center = [ start.position.x, start.position.z ], group = new T.Group();
+			const T = this.THREE, center = [ start.position[ 0 ], start.position[ 2 ] ], group = new T.Group();
 			const material = webglPlantMaterial( T ), anchoredMaterial = webglPlantMaterial( T, true );
 			const distance = record => Math.hypot( record.x - center[ 0 ], record.z - center[ 1 ] );
 			const add = ( kind, build, maxDistance, heightScale, castShadow = false, anchored = false ) => {

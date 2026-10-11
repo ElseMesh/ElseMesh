@@ -70,9 +70,10 @@ assert.notEqual( swimPlayer.camera.quaternion.y, 0, 'hosted swimming rotates the
 assert.ok( swimPlayer.velocity.z < 0, 'hosted swimmer can move and change view simultaneously' );
 
 const boatDeck = { center: new Vector3( 0, 1, 0 ), half: new Vector3( 2, 0.1, 4 ), walkable: true, solid: true };
+const hostedBoatDesign = { colliders: [ boatDeck ], boardPoint: new Vector3(), lines: { deckY: 1.1 }, helmPosition: new Vector3() };
 const hostedBoat = {
 	position: new Vector3(), velocity: new Vector3(), quaternion: new Quaternion(), driven: false, moored: true,
-	model: { colliders: [ boatDeck ], boardPoint: new Vector3(), lines: { deckY: 1.1 }, helmPosition: new Vector3() },
+	model: hostedBoatDesign, design: hostedBoatDesign,
 	getYaw: () => 0,
 	toWorld( local, out ) { return out.copy( local ).applyQuaternion( this.quaternion ).add( this.position ); },
 };
