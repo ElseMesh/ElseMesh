@@ -51,6 +51,13 @@ stamp `f691cd9e`, matching their refs at that time. Each later push triggers a
 new build and root stamp; check the latest run and live page before reporting
 the current revision.
 
+After Pages run `38175268904` deployed commit `6543171c` on 2026-10-11, the
+custom-domain root returned HTTP 200 with stamp `6543171c` and `/loz/` returned
+HTTP 200 with stamp `f691cd9e`. The root stamp matched `main`; the archive
+stamp matched `archive/loz/main`. `https://elsemesh.github.io/` redirected to
+`https://elsemesh.org/`, and the authenticated Pages API reported
+`cname: elsemesh.org` with HTTPS enforcement enabled.
+
 ## Selected ThruHolds
 
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
@@ -121,6 +128,19 @@ world gateway.
 direct HTTPS request to `https://elsemesh.com/` timed out in this check. The
 `.com` redirect is therefore only partially verified; provide HTTPS redirect
 service for that hostname and verify it from an independent connection.
+
+A public DNS recheck on 2026-10-11 found the `.com` nameservers still at
+Namecheap (`dns1.registrar-servers.com` and `dns2.registrar-servers.com`), with
+apex A `192.64.119.161` and `www` A `192.64.119.254`. The five Namecheap email
+forwarding MX records and apex SPF record are present. The ElseMesh GitHub
+Pages verification TXT record also now returns a value; its value is omitted
+from this repository. Namecheap's URL-redirect guidance says an HTTPS source
+domain needs an SSL certificate to perform a secure redirect to another
+domain. Choose a TLS-capable redirect endpoint before changing DNS; a Cloudflare
+redirect would require that domain's DNS to be served through Cloudflare, while
+retaining the current Namecheap forwarding keeps the existing HTTP-only
+behavior. Preserve the MX and SPF records in either configuration. See
+[Namecheap URL redirect guidance](https://www.namecheap.com/support/knowledgebase/article.aspx/385/2237/how-to-set-up-a-url-redirect-for-a-domain/).
 
 The resolver is live, but its read-only lookup for
 `tw-world:example-island` returned an empty provider list. Do not infer that a
