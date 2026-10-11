@@ -833,3 +833,15 @@ healthy. The gate does not suppress ordinary world traffic, and this test does
 not justify changing its threshold. Both daemons were stopped and their
 temporary state removed; persistent identities and Central policy were
 untouched.
+
+### Android arm64 rebuild with automatic interface selection (2026-10-11)
+
+After adding automatic Linux/Android interface selection,
+`tools/build-thruholdd.sh` rebuilt the Android target from commit
+`a59453c0a3b934aa60789e4c33aad169a70b9318` using NDK r29 (14206865) and
+Android API 26. `file` and `readelf` confirmed an AArch64 Android PIE with
+`/system/bin/linker64`; the bundled `libzt.so` SHA-256 matched the external
+Android libzt build. This verifies cross-compilation and packaging only. The
+Flip7 currently has no ADB transport, and SSH to its configured LAN address
+returns `No route to host`, so this binary has not been installed or exercised
+on the phone.
