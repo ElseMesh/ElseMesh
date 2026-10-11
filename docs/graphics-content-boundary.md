@@ -101,6 +101,18 @@ to ADB, so this wildlife change has not received a new on-device visual check.
 Do not claim cross-backend or Flip7 parity until the remaining adapters and
 matched device views are verified.
 
+## Fish stand extraction milestone (partial)
+
+The fish stand's identity, placement, vendor interaction descriptor, collision
+volumes, material pattern IDs, and procedural fallback geometry now live in
+backend-neutral content modules. `WebGLFishStandAdapter` consumes the same
+placement, collision descriptors, and generated geometry as the WebGPU-side
+stand fallback, and loads Joe's shared character asset. The adapter check
+passes. The WebGL path does not yet use the photo-scanned StallKit surface
+textures, render the static fish display, or connect the buyer to the shared
+fishing/selling HUD and game runtime. The backend-specific early return and
+separate island scene remain in place.
+
 ## Acceptance criteria
 
 - Backend selection does not skip creation of the boat, fish stand, vendors,

@@ -2,6 +2,7 @@ import { standard } from '../materials/Materials.js';
 import { Vector3 } from '../engine/index.js';
 import { ShaderModule } from '../engine/gpu/Shader.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
+export { PAT } from './PropPatterns.js';
 
 // Materials for the game's props (rod, bobber, fish stand, vendor). Geometry is built with the
 // boat's GeoKit layout: color = linear albedo, aux = ( roughness, metalness, pattern, spare ).
@@ -9,11 +10,6 @@ import { commonModule } from '../engine/render/wgsl/common.js';
 //   cloth, 3 skin, 4 cork, 5 painted metal with rust; fishing tackle (local +Y = the rod or reel
 //   axis): 8 carbon blank under clear coat, 9 epoxy-coated thread wraps, 10 EVA foam grip,
 //   11 braided line on the spool, 12 machined / anodised metal, 13 knurled metal, 14 rubber
-export const PAT = {
-	plain: 0, wood: 1, cloth: 2, skin: 3, cork: 4, rusty: 5, woodX: 6, woodZ: 7,
-	carbon: 8, thread: 9, eva: 10, braid: 11, machined: 12, knurl: 13, rubber: 14,
-};
-
 const gameModule = new ShaderModule( {
 	name: 'gameProps',
 	deps: [ commonModule ],

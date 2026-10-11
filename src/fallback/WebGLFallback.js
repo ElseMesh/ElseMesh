@@ -11,6 +11,8 @@ import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern,
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
+import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
+import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
@@ -624,7 +626,19 @@ export class WebGLFallback {
 		else await this._loadIsland( onProgress );
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
-		if ( ! this.worldLink ) this.boat = new WebGLBoatAdapter( T, this.scene );
+		if ( ! this.worldLink ) {
+			this.boat = new WebGLBoatAdapter( T, this.scene );
+			this.fishStand = new WebGLFishStandAdapter( T, this.scene, {
+				terrain: this.terrain,
+				colliders: this.app.worldState.colliders,
+				loader: this.loader,
+			} );
+			const y = this.terrain.heightAt( STAND.x, STAND.z );
+			for ( const box of fishStandColliderVolumes( y ) ) this.blockers.push( {
+				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
+				minY: box.center[ 1 ] - box.half[ 1 ], maxY: box.center[ 1 ] + box.half[ 1 ],
+			} );
+		}
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -1468,6 +1482,7 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
+		this.fishStand?.update( dt, this.camera.position );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
 		if ( this.waterScene.children.length && ! this.debugNoWater ) {
