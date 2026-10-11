@@ -6,6 +6,8 @@ export const ISLAND_DEFINITION = Object.freeze( {
 	beach: Object.freeze( { xMin: - 150, xMax: 170 } ),
 	pier: Object.freeze( { x: 55, zStart: - 64, zEnd: 40, deckHeight: 2.3, width: 2.6, headWidth: 14, headDepth: 7 } ),
 	boatDock: Object.freeze( { position: Object.freeze( [ 64.5, 0, 36.5 ] ), heading: 0 } ),
+	fishStand: Object.freeze( { x: 49.9, z: - 74.6, yaw: 1.45 } ),
+	chandlery: Object.freeze( { x: 85.5, z: - 60.5, yaw: - 1.9 } ),
 	village: Object.freeze( { center: Object.freeze( [ 40, 0, - 118 ] ), radius: 95 } ),
 	reef: Object.freeze( { center: Object.freeze( [ - 78, 0, 58 ] ), radius: 58 } ),
 	spawn: Object.freeze( { position: Object.freeze( [ 18, 0, - 60 ] ), yaw: Math.PI } ),

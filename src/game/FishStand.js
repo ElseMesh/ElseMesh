@@ -6,13 +6,14 @@ import { Vendor } from './Vendor.js';
 import { loadStallAssets, KitBuilder, LAYER, ATLAS, place, Shapes } from './StallKit.js';
 import { FishProps } from '../world/fish/FishProps.js';
 import { FISH } from './FishTable.js';
+import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 
 // The fish buyer's stall on the beach by the pier: a weathered plank shack with a rusty tin roof,
 // a wooden fish box of crushed ice on the counter, a hanging spring scale, floats, crates, a
 // chalkboard of prices and a hand-painted sign, and the buyer behind it. Built from photoscanned
 // surfaces and props (StallKit, Poly Haven CC0); the old procedural stall is the fallback if they
 // fail to load.
-export const STAND = { x: 49.9, z: - 74.6, yaw: 1.45 }; // beside the boardwalk up from the pier foot, facing it
+export const STAND = ISLAND_DEFINITION.fishStand; // beside the boardwalk up from the pier foot, facing it
 
 const STALL_FLOOR = 0.06; // top of the stall's plank floor (local y)
 const ICE_TOP = 1.27; // top of the ice in the chest on the counter (local y)

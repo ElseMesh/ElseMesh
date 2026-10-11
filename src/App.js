@@ -24,6 +24,7 @@ import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
+import { ISLAND_DEFINITION } from './world/IslandDefinition.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
 import { FishProps } from './world/fish/FishProps.js';
@@ -59,8 +60,6 @@ import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
 import { Game } from './game/Game.js';
-import { STAND } from './game/FishStand.js';
-import { CHANDLERY } from './game/Chandlery.js';
 import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
@@ -489,7 +488,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.game = new Game( this );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
 		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
-		for ( const [ s, lx, ly, lz ] of [ [ STAND, - 0.9, 1.85, 0.1 ], [ CHANDLERY, - 0.75, 1.58, - 1.45 ] ] ) {
+		for ( const [ s, lx, ly, lz ] of [ [ ISLAND_DEFINITION.fishStand, - 0.9, 1.85, 0.1 ], [ ISLAND_DEFINITION.chandlery, - 0.75, 1.58, - 1.45 ] ] ) {
 
 			const c = Math.cos( s.yaw ), sn = Math.sin( s.yaw );
 			const x = s.x + lx * c + lz * sn, z = s.z - lx * sn + lz * c;

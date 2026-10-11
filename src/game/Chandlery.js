@@ -3,12 +3,13 @@ import { prepare, mergePrepared, box, cylinder, sphere, rod, torus, mat4 } from 
 import { createPropMaterial, PAT } from './GameMaterials.js';
 import { Vendor } from './Vendor.js';
 import { loadStallAssets, KitBuilder, LAYER, ATLAS, place, Shapes } from './StallKit.js';
+import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 
 // The upgrade trader by the boathouse: a scanned work table with a tackle box, spools of line and
 // reels, display shelves of rope and floats behind her, a rack of rods, jerrycans of diesel, fenders,
 // a coil of mooring line and a hand-painted sign on posts (StallKit, Poly Haven CC0; the old
 // procedural table is the fallback). Sells the gear levels in Gear.js and fuel.
-export const CHANDLERY = { x: 85.5, z: - 60.5, yaw: - 1.9 }; // faces the beach and the pier
+export const CHANDLERY = ISLAND_DEFINITION.chandlery; // faces the beach and the pier
 
 export class Chandlery {
 

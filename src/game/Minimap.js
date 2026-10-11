@@ -1,6 +1,5 @@
 import { WORLD } from '../world/WorldLayout.js';
-import { STAND } from './FishStand.js';
-import { CHANDLERY } from './Chandlery.js';
+import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 
 // Minimap, lower right: the island baked once from the terrain data into a 2D canvas (depth-tinted
 // sea, reef and seagrass, sand, grass and forest by height, rock, paths, village pads, the pier,
@@ -123,8 +122,8 @@ export class Minimap {
 		};
 
 		this.markers = [
-			{ id: 'joe', ...mk( 'joe', ICON.fish ), pos: () => ( { x: STAND.x, z: STAND.z } ) },
-			{ id: 'marta', ...mk( 'marta', ICON.anchor ), pos: () => ( { x: CHANDLERY.x, z: CHANDLERY.z } ) },
+			{ id: 'joe', ...mk( 'joe', ICON.fish ), pos: () => ( { x: ISLAND_DEFINITION.fishStand.x, z: ISLAND_DEFINITION.fishStand.z } ) },
+			{ id: 'marta', ...mk( 'marta', ICON.anchor ), pos: () => ( { x: ISLAND_DEFINITION.chandlery.x, z: ISLAND_DEFINITION.chandlery.z } ) },
 			{ id: 'boat', ...mk( 'boat', ICON.boat ), pos: () => {
 
 				const b = game.app.boatCtl;
