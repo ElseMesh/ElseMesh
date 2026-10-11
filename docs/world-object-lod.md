@@ -178,3 +178,12 @@ run `ELSEMESH_WORLD_OBJECT_LOD_RENDER=1 node test/world-object-lod.mjs` from the
 external build tree after copying source into it. This checks masked material
 pipelines for both visible levels in color and shadow passes; it does not replace
 matched-view or Flip7 visual checks.
+
+On 2026-10-11, this headless Dawn WebGPU mode completed from the external build
+tree: the masked transition compiled four pipelines, the packaged moored boat
+rendered 72 draws through 48 pipelines, and the cave distance mesh rendered
+145 draws through 35 pipelines. The selector, hysteresis, async race rejection,
+near/far and mapped-camera transitions, collision retention, load-bias recovery,
+and `test/render-load-lod.mjs` stability checks also passed. The Node WebGPU
+adapter did not expose a vendor or device name, so this confirms pipeline and
+draw correctness only; it is not a hardware frame-rate or matched-image result.
