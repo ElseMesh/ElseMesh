@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elsemesh.github.io/schemas/ai-edit-decision.schema.json",
+  "title": "ElseMesh AI Edit Review Decision",
+  "description": "Unsigned local owner review record bound to one AI candidate and exact base source. Acceptance never authorizes signing or publication.",
+  "type": "object",
+  "required": [
+    "protocol",
+    "decision",
+    "worldId",
+    "taskId",
+    "baseSourceHash",
+    "candidateSourceHash",
+    "reviewedAt",
+    "reviewerNote",
+    "inspectionConfirmed",
+    "publication"
+  ],
+  "properties": {
+    "protocol": { "const": "elsemesh.ai-edit-decision/1" },
+    "decision": { "enum": ["accepted", "rejected"] },
+    "worldId": { "type": "string", "pattern": "^tw-world:[\\w.-]{1,128}$" },
+    "taskId": { "type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$" },
+    "baseSourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "candidateSourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "reviewedAt": { "type": "string", "format": "date-time" },
+    "reviewerNote": { "type": "string", "maxLength": 2000 },
+    "inspectionConfirmed": { "type": "boolean" },
+    "publication": { "const": "not-performed" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "decision": { "const": "accepted" } } },
+      "then": { "properties": { "inspectionConfirmed": { "const": true } } },
+      "else": { "properties": { "inspectionConfirmed": { "const": false } } }
+    }
+  ],
+  "additionalProperties": false
+}
