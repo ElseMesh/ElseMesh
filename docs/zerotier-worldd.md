@@ -744,3 +744,19 @@ from a shell with the host's required privileges. Capture `/var/log/fw.log`
 over that exact test interval and correlate it with the daemon's selected
 interface and libzt path-query output. Do not infer process ownership from the
 firewall rule label alone.
+
+### Local persistent identity checks (2026-10-11)
+
+The current Linux `thruholdd` was rebuilt from this checkout into the external
+ElseMesh build tree. With a fresh isolated Linux data directory, two separate
+`thruholdd --print-node-id` invocations returned the same libp2p PeerID
+(`12D3KooWM9EHdYFRp1u3smaC2SmJZ8UhiMxv9AgYGteZ8JEmvM7j`); its `node.key` was
+mode `0600`. Focused `go test -count=1 ./worldd -run 'TestZeroTierIdentity|TestMigrateLegacyZeroTierStorage'` also passed, covering the persistent ZeroTier node-ID marker, replacement/loss rejection, and legacy state migration.
+
+These checks confirm the local libp2p key persists across fresh CLI
+invocations and the ZeroTier marker logic behaves as intended. They do not
+prove that a real libzt node retains its host ID through a live daemon restart
+or software upgrade. That still needs a live libzt restart using a preserved
+test identity on the dedicated network; the current host cannot read its
+ZeroTier service token in this execution environment, and the Flip7 is not
+currently reachable over ADB or SSH.
