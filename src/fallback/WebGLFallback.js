@@ -335,6 +335,8 @@ export class WebGLFallback {
 					scale.set( anchored ? 1 : record.s, anchored ? 1 : h * ( record.sy ?? 1 ), anchored ? 1 : record.s );
 					matrix.compose( position, rotation, scale ); mesh.setMatrixAt( i, matrix );
 				}
+				mesh.instanceMatrix.needsUpdate = true;
+				mesh.computeBoundingSphere();
 				mesh.castShadow = castShadow;
 				if ( anchored ) mesh.frustumCulled = false;
 				mesh.name = `WebGL ${kind}`;
@@ -365,6 +367,8 @@ export class WebGLFallback {
 					scale.set( h * 0.035, h * 0.38, h * 0.035 );
 					matrix.compose( position, rotation, scale ); trunkMesh.setMatrixAt( i, matrix );
 				}
+				trunkMesh.instanceMatrix.needsUpdate = true;
+				trunkMesh.computeBoundingSphere();
 				trunkMesh.name = 'WebGL distant trunks'; group.add( trunkMesh );
 				const crownColors = [ 0x416b35, 0x527b3b, 0x365f31, 0x47723a, 0x3b6332, 0x527b3b, 0x416b35, 0x365f31 ];
 				for ( let l = 0; l < TREE_LOBES.length; l ++ ) {
@@ -377,6 +381,8 @@ export class WebGLFallback {
 						scale.set( radius * s, radius * s * sy, radius * s );
 						matrix.compose( position, rotation, scale ); mesh.setMatrixAt( i, matrix );
 					}
+					mesh.instanceMatrix.needsUpdate = true;
+					mesh.computeBoundingSphere();
 					mesh.name = 'WebGL distant canopy lobe'; group.add( mesh );
 				}
 			}
