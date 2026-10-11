@@ -127,7 +127,11 @@ Island's `village-materials/2` component.
 community deployment path: loopback-only daemon, exact browser-origin allow
 list, TLS termination, and a narrow HTTP route allowlist. The WSS gateway and
 native relay still need an operator to deploy this on a publicly reachable
-host; no public endpoint or external-browser test is claimed.
+host. A temporary Cloudflare Quick Tunnel smoke test reached the Example
+Island's HTTPS health and signed-manifest routes and completed a public WSS
+gateway handshake on 2026-10-11; it was shut down afterward and does not prove
+external-browser or independent-network behavior. See
+[relay deployment](relay-deployment.md#temporary-public-route-smoke-test-2026-10-11).
 
 Still open: a real browser owner session against a deployed public WSS gateway,
 a second browser fetching from that host, gateway deployment and external
