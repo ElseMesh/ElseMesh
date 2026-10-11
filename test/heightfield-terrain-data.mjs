@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { HeightfieldTerrainData } from '../src/world/HeightfieldTerrainData.js';
 import { decodeTerrainSurfaceAsset } from '../src/network/TerrainSurfaceAsset.js';
+import { Crabs } from '../src/world/wildlife/Crabs.js';
 
 const terrain = new HeightfieldTerrainData( {
 	size: 4,
@@ -30,5 +31,6 @@ const x = maps.origin + ( i + 0.5 ) * ( maps.size / maps.resolution );
 const z = maps.origin + ( j + 0.5 ) * ( maps.size / maps.resolution );
 assert.equal( packaged.heightAt( x, z ), maps.heights[ index ], 'the checked-in terrain package height is directly queryable' );
 assert.equal( packaged.sandAt( x, z ), maps.splat[ index * 4 ] / 255, 'the checked-in terrain package preserves its sand mask for simulation' );
+assert.equal( Crabs.prototype.sandAt.call( { terrain: packaged }, x, z ), packaged.sandAt( x, z ), 'the existing crab habitat query consumes the packaged sand mask' );
 
 console.log( 'ok packaged terrain height and sand queries' );

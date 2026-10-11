@@ -74,6 +74,7 @@ export class Crabs {
 	sandAt( x, z ) {
 
 		const T = this.terrain;
+		if ( typeof T.sandAt === 'function' ) return T.sandAt( x, z );
 		const i = Math.floor( ( x - T.origin ) / T.texel ), j = Math.floor( ( z - T.origin ) / T.texel );
 		if ( i < 0 || j < 0 || i >= T.res || j >= T.res ) return 0;
 		return T.sand[ j * T.res + i ] / 255;
