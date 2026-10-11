@@ -264,10 +264,12 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
 }
 
-function webglBreakerSpray( T, terrainWater, seaLevel ) {
+function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 
 	const positions = [], seeds = [];
 	for ( let x = WORLD.beach.xMin - 25; x <= WORLD.beach.xMax + 25; x += 1.5 ) for ( let z = - 64; z <= 28; z += 1.5 ) {
+		const depth = seaLevel - terrain.heightAt( x, z );
+		if ( depth <= 0.15 || depth >= 5.5 ) continue;
 		positions.push( x, 0, z );
 		seeds.push( ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1 );
 	}
@@ -597,7 +599,7 @@ export class WebGLFallback {
 		this._startPresence();
 	}
 
-	_makeWater( geometry, seaLevel, terrainWater ) {
+	_makeWater( geometry, seaLevel, terrainWater, beachPatchMode = 0 ) {
 
 		const T = this.THREE;
 		const material = new T.ShaderMaterial( {
@@ -609,6 +611,7 @@ export class WebGLFallback {
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
 				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
 				uShoreTimeRange: { value: terrainWater?.shore?.timeRange || new T.Vector2() },
+				uBeachPatchMode: { value: beachPatchMode }, uBeachPatchBounds: { value: new T.Vector4( WORLD.beach.xMin - 50, - 120, WORLD.beach.xMax + 50, 40 ) },
 			},
 			vertexShader: /* glsl */`
 				uniform float uTime;
@@ -622,6 +625,7 @@ export class WebGLFallback {
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
+				varying vec2 vRestPosition;
 				varying float vWaveHeight;
 				varying float vShoreU;
 				varying float vShoreBreaking;
@@ -631,6 +635,7 @@ export class WebGLFallback {
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
 					vec2 p = world.xz;
+					vRestPosition = p;
 					float a = dot( p, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
 					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
 					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.7;
@@ -711,7 +716,10 @@ export class WebGLFallback {
 				uniform float uTerrainSize;
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
+				uniform int uBeachPatchMode;
+				uniform vec4 uBeachPatchBounds;
 				varying vec3 vWorldPosition;
+				varying vec2 vRestPosition;
 				varying float vWaveHeight;
 				varying float vShoreU;
 				varying float vShoreBreaking;
@@ -723,6 +731,8 @@ export class WebGLFallback {
 				}
 				void main() {
 					vec2 p = vWorldPosition.xz;
+					bool inBeachPatch = vRestPosition.x >= uBeachPatchBounds.x && vRestPosition.x <= uBeachPatchBounds.z && vRestPosition.y >= uBeachPatchBounds.y && vRestPosition.y <= uBeachPatchBounds.w;
+					if ( ( uBeachPatchMode == 1 && inBeachPatch ) || ( uBeachPatchMode == 2 && ! inBeachPatch ) ) discard;
 					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 ), kE = vec2( 0.72, -0.48 );
 					float a = dot( p, kA ) + uTime * 0.3;
 					float b = dot( p, kB ) - uTime * 0.55;
@@ -952,8 +962,12 @@ export class WebGLFallback {
 		progress( 0.52, 'Mapping the coastal swell…' );
 		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
 		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, - 0.15 );
-		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 1024, 1024 ), - 0.15, waterTerrain ) );
-		this.waterScene.add( webglBreakerSpray( T, waterTerrain, - 0.15 ) );
+		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), - 0.15, waterTerrain, 1 ) );
+		const beachPatch = this._makeWater( new T.PlaneGeometry( WORLD.beach.xMax - WORLD.beach.xMin + 100, 160, 672, 256 ), - 0.15, waterTerrain, 2 );
+		beachPatch.position.x = ( WORLD.beach.xMin + WORLD.beach.xMax ) * 0.5;
+		beachPatch.position.z = - 40;
+		this.waterScene.add( beachPatch );
+		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, - 0.15 ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( villageUrl );
