@@ -267,11 +267,14 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 
 	const positions = [], seeds = [], depths = [];
-	for ( let x = WORLD.beach.xMin - 25; x <= WORLD.beach.xMax + 25; x += 1.5 ) for ( let z = - 64; z <= 28; z += 1.5 ) {
-		const depth = seaLevel - terrain.heightAt( x, z );
+	for ( let x = WORLD.beach.xMin - 25; x <= WORLD.beach.xMax + 25; x += 0.75 ) for ( let z = - 64; z <= 28; z += 0.75 ) {
+		const seed = ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1;
+		const jitter = salt => ( ( Math.sin( x * 39.346 + z * 11.135 + salt ) * 24634.6345 ) % 1 + 1 ) % 1;
+		const px = x + ( jitter( 1.7 ) - 0.5 ) * 0.7, pz = z + ( jitter( 8.3 ) - 0.5 ) * 0.7;
+		const depth = seaLevel - terrain.heightAt( px, pz );
 		if ( depth <= 0.15 || depth >= 5.5 ) continue;
-		positions.push( x, 0, z );
-		seeds.push( ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1 );
+		positions.push( px, 0, pz );
+		seeds.push( seed );
 		depths.push( depth );
 	}
 	const geometry = new T.BufferGeometry();
@@ -325,11 +328,12 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 					float impactAge = fract( phase - 0.08 + ageJitter + 1.0 ) * 9.0;
 					float rollerAge = fract( phase + 0.08 + ageJitter + 1.0 ) * 9.0;
 					float age = mix( impactAge, rollerAge, step( impact, roller ) );
-					float life = 1.0 + aSeed * 1.5;
+					float life = 0.7 + aSeed * 1.2;
 					float alive = smoothstep( 0.02, 0.12, age ) * ( 1.0 - smoothstep( life * 0.65, life, age ) );
 					float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * smoothstep( 0.02, 0.3, exposure );
-					vOpacity = burst * env * smoothstep( 0.35, 0.95, variation ) * alive * ( 1.0 - age / life * 0.25 );
-					float upSpeed = 4.0 + aSeed * 5.0;
+					float alongDensity = mix( 0.35, 1.0, smoothstep( -0.45, 0.45, variation ) );
+					vOpacity = burst * env * alongDensity * alive * ( 1.0 - age / life * 0.25 );
+					float upSpeed = 2.4 + aSeed * 3.0;
 					p.xz += dir * age * ( 1.0 + aSeed * 3.0 ) + vec2( -dir.y, dir.x ) * ( aSeed - 0.5 ) * age * 2.5;
 					float lift = 0.08 + upSpeed * age - 4.905 * age * age;
 					float shoaledAmp = amp * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
@@ -364,7 +368,7 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 			varying float vOpacity;
 			void main() {
 				float d = length( gl_PointCoord - 0.5 );
-				float alpha = min( vOpacity * 3.0, 1.0 ) * ( 1.0 - smoothstep( 0.16, 0.5, d ) );
+				float alpha = min( vOpacity * 2.4, 0.72 ) * exp( - d * d * 10.0 );
 				if ( alpha < 0.015 ) discard;
 				gl_FragColor = vec4( vec3( 0.92, 0.98, 1.0 ), alpha );
 				#include <tonemapping_fragment>
