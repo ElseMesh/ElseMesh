@@ -124,6 +124,15 @@ build tree, then install the service example as
 `/etc/systemd/system/elsemesh-gateway.service`. Install
 `deploy/systemd/elsemesh-gateway.env.example` as the root-owned
 `/etc/elsemesh/gateway.env` with mode `0640`, changing the host in both files.
+For direct browser WebRTC, configure one or more STUN endpoints in that file
+with `ELSEMESH_WEBRTC_STUN_ARGS`, for example
+`ELSEMESH_WEBRTC_STUN_ARGS="--webrtc-stun-server stun:<host>:<port>"`.
+The unit expands this variable into separate command-line arguments; repeat
+the `--webrtc-stun-server` option for additional endpoints. Configure the same
+STUN URLs on each target `worldd`. If no STUN endpoint is configured, the WSS
+gateway path remains available, while direct WebRTC may fail for peers behind
+NAT. STUN discovers candidate addresses; it is not a relay or a guarantee of
+direct connectivity.
 Add each client
 origin that should be allowed by repeating `--allow-browser-origin` in
 `ExecStart`; the example allows `https://elsemesh.github.io`. The origin is an
