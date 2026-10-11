@@ -1,4 +1,4 @@
-import { BIRD, SPECIES } from './BirdShapes.js';
+import { BIRD, SPECIES } from './BirdSpecies.js';
 import { createPose, flapWings, tuckLegs, setHead, storePrevious, resetPrevious } from './BirdPose.js';
 import { TAU, clamp, lerp, angleDiff, approach, qYawPitchRoll } from './WildlifeMath.js';
 

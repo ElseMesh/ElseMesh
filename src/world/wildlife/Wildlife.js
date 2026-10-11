@@ -2,10 +2,12 @@ import { BirdBatch } from './BirdBatch.js';
 import { Birds } from './Birds.js';
 import { CritterBatch } from './CritterBatch.js';
 import { Crabs } from './Crabs.js';
+import { CrabPresentation } from './CrabPresentation.js';
 import { ShadowBlobs } from './ShadowBlobs.js';
 import { SwashProbe } from './SwashProbe.js';
 import { Shorebirds } from './Shorebirds.js';
 import { G } from '../../core/Globals.js';
+import { Vector3 } from '../../engine/math/index.js';
 import { smooth } from './WildlifeMath.js';
 
 // Water heights for birds on / just above the sea (pelicans skimming, floating, diving): a few
@@ -88,6 +90,7 @@ export class Wildlife {
 		this.critterBatch = new CritterBatch();
 		scene.add( this.critterBatch.mesh );
 		this.crabs = new Crabs( { terrain, village, footprints, colliders, vegetation, seed } );
+		this.crabPresentation = new CrabPresentation( terrain );
 		this.blobs = new ShadowBlobs();
 		scene.add( this.blobs.mesh );
 		let probe = null;
@@ -110,6 +113,7 @@ export class Wildlife {
 		this.birds = new Birds( { terrain, village, colliders, boat, boatModel, roofPerches, water: this.water, spray, seed: seed + 6 } );
 		this.viewer = { x: 0, y: 0, z: 0, speed: 0, mode: 'walk', px: 0, pz: 0, init: false };
 		this.environment = { windX: 0, windZ: 0, windSpeed: 0, night: 0, sunY: 1, seaLevel: 0 };
+		this.shoreSlope = new Vector3();
 		this.test = null;
 		this.cpuMs = 0;
 
@@ -167,9 +171,12 @@ export class Wildlife {
 		else {
 
 			this.birds.step( dt, viewer, environment );
-			this.shorebirds.update( dt, viewer, this.birdBatch, camera, this.blobs, environment );
-			this.crabs.update( dt, viewer, this.critterBatch, camera, this.blobs, environment );
+			this.shorebirds.step( dt, viewer, camera.position, environment );
+			this.crabs.step( dt, viewer, camera.position, environment );
 			this.writeBirds( camera );
+			this.writeShorebirds( camera );
+			this.crabPresentation.write( this.crabs, camera.position, this.critterBatch, this.blobs );
+			this.shorebirds.probe?.update();
 
 		}
 
@@ -195,6 +202,30 @@ export class Wildlife {
 			P.scale = k * smooth( far, far * 0.8, d );
 			this.birdBatch.write( P );
 			P.scale = k;
+
+		}
+
+	}
+
+	writeShorebirds( camera ) {
+
+		const cp = camera.position;
+		const drawDistance = this.shorebirds.drawDistance;
+		for ( const bird of this.shorebirds.birds ) {
+
+			const P = bird.f.P;
+			const d = Math.hypot( P.pos[ 0 ] - cp.x, P.pos[ 1 ] - cp.y, P.pos[ 2 ] - cp.z );
+			if ( d > drawDistance ) continue;
+			const k = bird.scale0 || ( bird.scale0 = P.scale );
+			P.scale = k * smooth( drawDistance, drawDistance * 0.8, d );
+			this.birdBatch.write( P );
+			P.scale = k;
+			if ( bird.state !== 'fly' ) {
+
+				const slope = this.shorebirds.slopeAt( bird.x, bird.z, this.shoreSlope );
+				this.blobs.add( bird.x, bird.y, bird.z, 0.06 * k, 0.06 * k, 0.85, slope.x * slope.y, slope.z * slope.y );
+
+			}
 
 		}
 

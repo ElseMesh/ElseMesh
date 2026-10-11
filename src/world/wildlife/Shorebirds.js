@@ -1,7 +1,7 @@
 import * as M from '../../engine/math/index.js';
 import { ISLAND_DEFINITION as WORLD } from '../IslandDefinition.js';
 import { mulberry32 } from '../../util/Noise.js';
-import { BIRD } from './BirdShapes.js';
+import { BIRD } from './BirdSpecies.js';
 import { Flyer } from './Flight.js';
 import { groundPose, setHead, setWings, standHeight, storePrevious, resetPrevious } from './BirdPose.js';
 import { TAU, clamp, lerp, smooth, angleDiff, approach } from './WildlifeMath.js';
@@ -25,6 +25,7 @@ export class Shorebirds {
 
 		this.terrain = terrain;
 		this.probe = probe;
+		this.drawDistance = DRAW;
 		this.rng = mulberry32( seed );
 		this.time = 0;
 		this.birds = [];
@@ -88,10 +89,9 @@ export class Shorebirds {
 
 	}
 
-	update( dt, viewer, batch, camera, blobs = null, environment ) {
+	step( dt, viewer, focus, environment ) {
 
 		this.time += dt;
-		const cp = camera.position;
 		const night = environment.night;
 		for ( const F of this.flocks ) {
 
@@ -100,30 +100,10 @@ export class Shorebirds {
 			for ( const b of F.birds ) cx += b.x;
 			cx /= F.birds.length;
 			F.cx = cx;
-			if ( Math.hypot( cx - cp.x, - 40 - cp.z ) > DRAW + 120 ) continue;
+			if ( Math.hypot( cx - focus.x, - 40 - focus.z ) > DRAW + 120 ) continue;
 			this.updateFlock( F, dt, viewer, night, environment );
 
 		}
-
-		for ( const b of this.birds ) {
-
-			const P = b.f.P;
-			const d = Math.hypot( P.pos[ 0 ] - cp.x, P.pos[ 1 ] - cp.y, P.pos[ 2 ] - cp.z );
-			if ( d > DRAW ) continue;
-			const k = b.scale0 || ( b.scale0 = P.scale );
-			P.scale = k * smooth( DRAW, DRAW * 0.8, d );
-			batch.write( P );
-			P.scale = k;
-			if ( blobs && b.state !== 'fly' ) {
-
-				const s = this.slopeAt( b.x, b.z, _t );
-				blobs.add( b.x, b.y, b.z, 0.06 * k, 0.06 * k, 0.85, s.x * s.y, s.z * s.y );
-
-			}
-
-		}
-
-		if ( this.probe ) this.probe.update();
 
 	}
 

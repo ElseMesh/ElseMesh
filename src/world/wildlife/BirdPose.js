@@ -1,4 +1,4 @@
-import { SPECIES } from './BirdShapes.js';
+import { SPECIES } from './BirdSpecies.js';
 import { qAxis, qMul, clamp } from './WildlifeMath.js';
 
 // Pose of one bird as the renderer wants it (see BirdBatch), plus helpers that turn wing / leg /

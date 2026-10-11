@@ -2,7 +2,7 @@ import * as M from '../../engine/math/index.js';
 import { ISLAND_DEFINITION as WORLD } from '../IslandDefinition.js';
 import { SPRAY } from '../../fx/SprayTypes.js';
 import { mulberry32 } from '../../util/Noise.js';
-import { BIRD } from './BirdShapes.js';
+import { BIRD } from './BirdSpecies.js';
 import { Flyer } from './Flight.js';
 import { setHead, groundPose, standHeight, storePrevious, resetPrevious, setWings, tuckLegs } from './BirdPose.js';
 import { TAU, clamp, lerp, smooth, angleDiff, approach, qYawPitchRoll } from './WildlifeMath.js';

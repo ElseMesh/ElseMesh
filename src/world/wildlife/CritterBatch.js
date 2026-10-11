@@ -2,7 +2,8 @@ import * as THREE from '../../engine/index.js';
 import { Material } from '../../engine/render/Material.js';
 import { StorageBuffer } from '../../engine/gpu/Texture.js';
 import { ShaderModule } from '../../engine/gpu/Shader.js';
-import { buildCritters, BODY_VERTS, LIMBS, CRITTER } from './CritterShapes.js';
+import { buildCritters, BODY_VERTS, LIMBS } from './CritterShapes.js';
+import { CRITTER } from './CritterSpecies.js';
 import { InstanceRecords, instancedMesh, kitModule } from './Kit.js';
 
 // One instanced draw for the beach critters: ghost crabs, hermit crabs and burrows.
