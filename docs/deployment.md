@@ -29,6 +29,12 @@ history and its later arrow-key look-controls change; its build passed
 and `https://elsemesh.github.io/loz/` returned HTTP 200 and referenced their
 respective JavaScript bundles.
 
+On 2026-10-11, Pages run `38127106456` deployed main commit
+`f89f47a42d3e15102252bf6afaed0182432d9651` successfully. Both public paths
+returned HTTP 200; the root displayed `f89f47a4` and `/loz/` displayed
+`f691cd9e`, matching `main` and `archive/loz/main` respectively. The current
+deployment workflow includes the archived-branch stamp step.
+
 ## Selected ThruHolds
 
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
