@@ -67,7 +67,6 @@ exec "$chromium" \
   --disable-sync \
   --disable-extensions \
   --enable-unsafe-webgpu \
-  --enable-features=Vulkan \
-  --enable-tab-audio-muting \
+  --enable-features=Vulkan,EnableTabMuting \
   --use-vulkan \
   --new-window "$url"
