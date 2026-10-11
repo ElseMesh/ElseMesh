@@ -10,6 +10,7 @@ import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
+import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
@@ -623,6 +624,7 @@ export class WebGLFallback {
 		else await this._loadIsland( onProgress );
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
+		if ( ! this.worldLink ) this.boat = new WebGLBoatAdapter( T, this.scene );
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -1415,6 +1417,7 @@ export class WebGLFallback {
 		const now = performance.now(), dt = Math.min( 0.05, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
+		this.boat?.update( dt );
 		const T = this.THREE, speed = this.keys.has( 'ShiftLeft' ) || this.keys.has( 'ShiftRight' ) ? 10 : 5;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;
