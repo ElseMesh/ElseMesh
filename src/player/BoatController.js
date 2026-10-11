@@ -1,4 +1,4 @@
-import * as THREE from '../engine/index.js';
+import * as THREE from '../engine/math/index.js';
 import { WORLD } from '../world/WorldLayout.js';
 
 const RHO = 1025; // sea water density

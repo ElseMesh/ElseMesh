@@ -1,6 +1,6 @@
-import * as THREE from '../engine/index.js';
+import * as THREE from '../engine/math/index.js';
 import { WORLD } from '../world/WorldLayout.js';
-import { HOUSE } from '../world/boat/Wheelhouse.js';
+import { HOUSE } from '../world/boat/BoatSpecs.js';
 import { gravityAcceleration, movementParameters } from '../network/WorldRules.js';
 
 const HOUSE_HELM = { x: HOUSE.helmX, z: HOUSE.seatZ };

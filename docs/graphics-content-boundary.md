@@ -44,11 +44,11 @@ descriptors plus current simulation state.
 1. Introduce a backend-neutral world runtime and explicit content/state
    contracts. Move orchestration out of the backend-specific early-return path
    without making WebGPU-only systems run against WebGL accidentally.
-2. Split mixed domain/presentation classes at their ownership boundary. Start
-   with boat hydrostatics/controller state and wildlife behavior, then static
-   village, fish stand, chandlery, and vendor content. Preserve existing
-   geometry, assets, placements, interactions, and collision behavior as the
-   shared source of truth.
+2. Split mixed domain/presentation classes at their ownership boundary. The
+   first split is complete for the lobster boat; continue with wildlife
+   behavior, then static village, fish stand, chandlery, and vendor content.
+   Preserve existing geometry, assets, placements, interactions, and collision
+   behavior as the shared source of truth.
 3. Give each renderer an adapter for those shared entities and state. Keep
    GPU-only ocean simulations and post effects behind effect adapters, with
    shared parameters and a defined WebGL implementation or documented visual
@@ -59,6 +59,28 @@ descriptors plus current simulation state.
 5. Verify shared content and behavior under both backends, then compare matched
    camera, viewport, time, render scale, and graphics settings for visual
    quality and frame rate.
+
+## First completed split: lobster boat
+
+`BoatDesign` and `BoatSpecs` now own the renderer-neutral hull dimensions,
+hydrostatic values, interaction points, collision shapes, and equipment
+placements. `BoatController` consumes that design and owns the live physical
+state. `BoatModel` builds the existing Three.js presentation and copies the
+controller state through `sync()`; the hosted-boat adapter does the same. The
+player and controller import the CPU math package directly, and the boat berth
+layout no longer imports the full engine entry point.
+
+The procedural boat geometry, materials, equipment, and existing game
+behavior remain the presentation reference. The simulation can now be
+constructed from a `BoatDesign` without constructing a `BoatModel` or a GPU
+backend. `test/boat-design.mjs` exercises that path; the full suite and
+production build remain required after later changes.
+
+This completes only the boat's first ownership split. The WebGL fallback still
+builds a separate reduced world, and wildlife, village props, vendors, and
+backend-specific rendering effects still need shared content/runtime adapters.
+Matched Flip7 views of the refactored boat and comparisons under both graphics
+backends remain open.
 
 ## Acceptance criteria
 
