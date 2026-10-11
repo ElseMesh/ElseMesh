@@ -54,6 +54,31 @@ Use **Share world invite** in the World panel to construct a hosted invite.
 Browser home/visit preferences are origin-local and do not transfer from the old
 Pages origin to the new one or to the custom domain.
 
+### Personal home world and ZeroTier identity
+
+A bare visit to `https://elsemesh.github.io/` starts the built-in Example
+Island. A user can open a hosted invite, then choose **Set as home** in the
+World picker; the client stores that invite in this browser's local storage and
+redirects later bare visits to it. An explicit `?worldId=...` invite or
+`?example=1` takes precedence over the saved home. This preference is local to
+the current browser and Pages origin, not a server-side account setting.
+
+The `nodeId` query argument is a **libp2p PeerID**, not a ZeroTier node ID.
+ZeroTier's stable 10-hex node ID identifies the daemon's overlay identity; it
+is not a browser-routable address and the browser does not join the ZeroTier
+network. A world invite needs a stable `worldId` and a reachable HTTPS/WSS
+`gateway`. The gateway or owner daemon can use its embedded libzt connection
+to reach the persistent ZeroTier node and serve that world. GitHub Pages only
+serves the client files, so this requires a separately running gateway/daemon
+and a public route to its HTTPS/WSS endpoint. The current deployment host has
+no such service; see [the gateway preflight](relay-deployment.md#current-host-deployment-preflight-2026-10-11).
+
+For a browser-hosted personal world, the owner must start **Host a world from
+this browser** and keep that session connected to the gateway. It is not a
+persistent substitute for the owner's `thruholdd`; visitors lose access when
+the host tab disconnects. Once a reachable invite exists, setting it as the
+browser's home makes it the default for that browser.
+
 ## elsemesh.org
 
 DNS inspection on 2026-10-11 confirms Namecheap nameservers, an apex parking
