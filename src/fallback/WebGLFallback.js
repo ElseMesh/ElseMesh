@@ -8,11 +8,46 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
+import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/island/lod-source/vegetation-placements.bin?url';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
+
+function webglCloudNoiseTexture( T, size = 128 ) {
+
+	const data = new Uint8Array( size * size * 4 ), rand = mulberry32( 27183 );
+	const lattices = [ 4, 8, 16, 32 ].map( n => {
+		const values = new Float32Array( n * n );
+		for ( let i = 0; i < values.length; i ++ ) values[ i ] = rand();
+		return { n, values };
+	} );
+	const smooth = t => t * t * ( 3 - 2 * t );
+	const sample = ( lattice, u, v ) => {
+		const { n, values } = lattice, x = u * n, y = v * n;
+		const ix = Math.floor( x ), iy = Math.floor( y ), fx = smooth( x - ix ), fy = smooth( y - iy );
+		const at = ( a, b ) => values[ ( ( ( b % n ) + n ) % n ) * n + ( ( ( a % n ) + n ) % n ) ];
+		return ( at( ix, iy ) * ( 1 - fx ) + at( ix + 1, iy ) * fx ) * ( 1 - fy )
+			+ ( at( ix, iy + 1 ) * ( 1 - fx ) + at( ix + 1, iy + 1 ) * fx ) * fy;
+	};
+	for ( let y = 0; y < size; y ++ ) for ( let x = 0; x < size; x ++ ) {
+		const u = ( x + 0.5 ) / size, v = ( y + 0.5 ) / size, i = ( y * size + x ) * 4;
+		for ( let c = 0; c < 4; c ++ ) {
+			const a = sample( lattices[ c ], u, v );
+			const b = sample( lattices[ Math.min( c + 1, 3 ) ], u, v );
+			data[ i + c ] = Math.round( ( a * 0.72 + b * 0.28 ) * 255 );
+		}
+	}
+	const texture = new T.DataTexture( data, size, size, T.RGBAFormat, T.UnsignedByteType );
+	texture.wrapS = texture.wrapT = T.RepeatWrapping;
+	texture.magFilter = T.LinearFilter;
+	texture.minFilter = T.LinearMipmapLinearFilter;
+	texture.generateMipmaps = true;
+	texture.needsUpdate = true;
+	return texture;
+
+}
 
 function webglTerrainMaterial( T, terrain ) {
 
@@ -445,9 +480,9 @@ export class WebGLFallback {
 
 	_makeCloudLayer( sunDirection ) {
 
-		const T = this.THREE;
+		const T = this.THREE, cloudNoise = webglCloudNoiseTexture( T );
 		const material = new T.ShaderMaterial( {
-			uniforms: { uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() } },
+			uniforms: { uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() }, uCloudNoise: { value: cloudNoise } },
 			vertexShader: /* glsl */`
 				varying vec3 vDirection;
 				void main() {
@@ -459,27 +494,8 @@ export class WebGLFallback {
 			fragmentShader: /* glsl */`
 				uniform float uTime;
 				uniform vec3 uSunDirection;
+				uniform sampler2D uCloudNoise;
 				varying vec3 vDirection;
-				float hashCloud( vec2 p ) {
-					p = fract( p * vec2( 123.34, 456.21 ) );
-					p += dot( p, p + 45.32 );
-					return fract( p.x * p.y );
-				}
-				float noiseCloud( vec2 p ) {
-					vec2 i = floor( p ), f = fract( p );
-					f = f * f * ( 3.0 - 2.0 * f );
-					return mix( mix( hashCloud( i ), hashCloud( i + vec2( 1.0, 0.0 ) ), f.x ),
-						mix( hashCloud( i + vec2( 0.0, 1.0 ) ), hashCloud( i + vec2( 1.0, 1.0 ) ), f.x ), f.y );
-				}
-				float cloudFbm( vec2 p ) {
-					float n = 0.0, a = 0.55;
-					for ( int i = 0; i < 4; i ++ ) {
-						n += a * noiseCloud( p );
-						p = mat2( 1.6, -1.2, 1.2, 1.6 ) * p;
-						a *= 0.5;
-					}
-					return n;
-				}
 				void main() {
 					vec3 dir = normalize( vDirection );
 					float elevation = max( dir.y, 0.0 );
@@ -492,16 +508,23 @@ export class WebGLFallback {
 					sky += vec3( 0.16, 0.095, 0.035 ) * sunGlow;
 					vec2 p = dir.xz / max( dir.y + 0.14, 0.14 );
 					p = p * 4.2 + vec2( uTime * 0.018, -uTime * 0.005 );
-					vec2 warp = vec2( noiseCloud( p * 0.38 + vec2( 3.4, 1.8 ) ), noiseCloud( p * 0.38 + vec2( - 2.2, 5.1 ) ) ) - 0.5;
-					float broad = cloudFbm( p * 0.72 + warp * 0.85 );
-					float detail = cloudFbm( p * 1.8 + vec2( 7.3, -4.1 ) );
-					float fine = noiseCloud( p * 8.0 + vec2( 13.1, - 6.7 ) );
+					vec2 uv = p * 0.035;
+					vec4 field = texture2D( uCloudNoise, uv );
+					vec2 warp = ( field.rg - 0.5 ) * 0.22;
+					float broad = texture2D( uCloudNoise, uv * 0.72 + warp ).b * 0.58 + field.r * 0.42;
+					float detail = texture2D( uCloudNoise, uv * 1.8 + vec2( 0.17, -0.11 ) ).g;
+					float fine = texture2D( uCloudNoise, uv * 4.0 + vec2( 0.31, -0.19 ) ).a;
 					float n = broad - max( 0.0, 0.52 - detail ) * 0.32 + ( fine - 0.5 ) * 0.045;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
 					float alpha = smoothstep( 0.51, 0.65, n ) * band * 0.92;
 					float sun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
 					float fullness = smoothstep( 0.51, 0.72, broad );
-					float cloudLight = 0.18 + 0.3 * fullness + 0.25 * sun + 0.25 * smoothstep( 0.1, 0.62, dir.y ) + ( fine - 0.5 ) * 0.12;
+					float densityLeft = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.012, 0.0 ) ).b;
+					float densityUp = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.0, 0.012 ) ).b;
+					vec2 gradient = vec2( broad - densityLeft, broad - densityUp );
+					vec2 sunPlane = normalize( uSunDirection.xz + vec2( 0.0001 ) );
+					float lobeLight = clamp( 0.5 + dot( normalize( gradient + vec2( 0.0001 ) ), sunPlane ) * 0.5, 0.0, 1.0 );
+					float cloudLight = 0.12 + 0.3 * fullness + 0.25 * sun + 0.25 * smoothstep( 0.1, 0.62, dir.y ) + lobeLight * 0.16 + ( fine - 0.5 ) * 0.12;
 					vec3 cloud = mix( vec3( 0.34, 0.42, 0.54 ), vec3( 1.4, 1.31, 1.15 ), clamp( cloudLight, 0.0, 1.0 ) );
 					gl_FragColor = vec4( mix( sky, cloud, alpha ), 1.0 );
 					#include <tonemapping_fragment>
@@ -515,6 +538,7 @@ export class WebGLFallback {
 			toneMapped: true,
 		} );
 		const clouds = new T.Mesh( new T.SphereGeometry( 1, 64, 32 ), material );
+		clouds.userData.cloudNoise = cloudNoise;
 		clouds.renderOrder = - 999;
 		clouds.frustumCulled = false;
 		return clouds;
