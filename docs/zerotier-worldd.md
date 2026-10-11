@@ -826,13 +826,19 @@ cross-device or cross-NAT connectivity.
 `ZT_SECURITY: EXCESSIVE_ECHO` events from the connected peer still appeared on
 the selected Wi-Fi address. The per-path inbound ECHO gate suppresses replies
 more frequent than `ZT_PEER_GENERAL_RATE_LIMIT / 6` (about 167 ms); the
-underlying gate has been in ZeroTier since 2022 and the fork adds low-threat
-security-event reporting. Events later showed `Threat:MEDIUM`, from the
-monitor's accumulated classification, while both peer connections remained
-healthy. The gate does not suppress ordinary world traffic, and this test does
-not justify changing its threshold. Both daemons were stopped and their
-temporary state removed; persistent identities and Central policy were
-untouched.
+underlying gate has been in ZeroTier since 2022; the fork adds event logging.
+The earlier records showed `Threat:MEDIUM` because each suppressed ECHO was
+counted as a protocol violation, although both peer connections remained
+healthy. The gate does not suppress ordinary world traffic, and the observed
+events do not justify changing its six-per-second reply threshold. The source
+now counts suppressed ECHOs as rate-limit hits, which avoids inflating the
+protocol-violation score. This fix was committed to ZeroTierOne `exp3` as
+`bf5dfff60`, then rebuilt into Linux libzt and `thruholdd`. Their libzt SHA-256
+is `f40aad27b0e056365a55b1695b4d724592b733ba6170559ebcdbd2a1e0da6a7a`;
+`thruholdd --help` exits successfully and resolves the bundled library. Runtime
+threat-score behavior is not yet verified, and Android still needs a matching
+rebuild. Both test daemons were stopped and their temporary state removed;
+persistent identities and Central policy were untouched.
 
 ### Android arm64 rebuild with automatic interface selection (2026-10-11)
 
