@@ -180,6 +180,14 @@ down. This is not evidence that the router cannot forward public traffic, but
 the gateway/relay is not currently deployed or externally reachable from this
 host. A public route or a separately hosted community node is still required.
 
+A follow-up on 2026-10-11 found the `cloudflared` executable but no Cloudflare
+configuration, origin certificate, or system service in the standard locations.
+`cloudflared tunnel list` therefore cannot authenticate and list any named
+tunnels. The Quick Tunnel smoke test above was temporary; no persistent tunnel
+configuration or public hostname was found in the standard locations. Do not store tunnel credentials
+in the repository. A named tunnel or a separately hosted community gateway is
+still needed for persistent public access.
+
 ## Temporary public route smoke test (2026-10-11)
 
 The current source successfully prepared and served the packaged Example
