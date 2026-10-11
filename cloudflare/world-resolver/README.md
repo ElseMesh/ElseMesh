@@ -17,7 +17,7 @@ npx wrangler whoami
 npx wrangler deploy
 ```
 
-The Worker initially receives its own `workers.dev` hostname. Test `/healthz` and the local `/v1/announce` and lookup contract before attaching a custom hostname. Use a dedicated hostname such as `worlds.elsemesh.org` only after the domain is active in Cloudflare. Configure the browser's `worldResolver` value in `public/elsemesh-config.js` to that HTTPS origin, then publish the Pages client.
+The production Worker is deployed at `https://elsemesh-world-resolver.rebroad.workers.dev`. Its persistent `PROVIDERS` KV namespace is `acdad0a24fff4ef083ca3aeb304f1fdb`; keep this binding ID in `wrangler.jsonc` for future deployments. `/healthz` is the live health check. The hosted client at `https://elsemesh.org` uses this origin through `public/elsemesh-config.js`. A dedicated hostname such as `worlds.elsemesh.org` can be attached after the domain is active in Cloudflare.
 
 The configured limit is a best-effort 20 announcements per provider per minute, enforced within each Cloudflare location. Cloudflare documents this limiter as eventually consistent and local to each location, so it is an abuse-cost control rather than an authorization boundary. Signed documents and owner grants remain the authorization boundary.
 

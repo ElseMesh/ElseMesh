@@ -5,7 +5,7 @@
 	"compatibility_date": "2026-10-11",
 	"workers_dev": true,
 	"kv_namespaces": [
-		{ "binding": "PROVIDERS" }
+		{ "binding": "PROVIDERS", "id": "acdad0a24fff4ef083ca3aeb304f1fdb" }
 	],
 	"ratelimits": [
 		{
