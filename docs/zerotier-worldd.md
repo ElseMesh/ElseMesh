@@ -824,19 +824,17 @@ used the allowed port. Since both daemons ran on one host, this does not prove
 cross-device or cross-NAT connectivity.
 
 `ZT_SECURITY: EXCESSIVE_ECHO` events from the connected peer still appeared on
-the selected Wi-Fi address. The per-path inbound ECHO gate suppresses replies
-more frequent than `ZT_PEER_GENERAL_RATE_LIMIT / 6` (about 167 ms); the
-underlying gate has been in ZeroTier since 2022; the fork adds event logging.
-The earlier records showed `Threat:MEDIUM` because each suppressed ECHO was
-counted as a protocol violation, although both peer connections remained
-healthy. The gate does not suppress ordinary world traffic, and the observed
-events do not justify changing its six-per-second reply threshold. The source
-now counts suppressed ECHOs as rate-limit hits, which avoids inflating the
-protocol-violation score. This fix was committed to ZeroTierOne `exp3` as
-`bf5dfff60` and packaged for Linux and Android; build details and remaining
-runtime checks are recorded below. Both test daemons were stopped and their
-temporary state removed; persistent identities and Central policy were
-untouched.
+the selected Wi-Fi address. The per-path inbound ECHO gate originally allowed
+six replies per second. That matched the maximum heartbeat cadence at the
+minimum bond failover interval (500 ms / 3), leaving no tolerance for
+millisecond rounding or scheduling jitter. The gate now allows up to ten
+replies per second, above the designed heartbeat rate while still bounding
+responses to an authenticated peer. Suppressed replies are classified as
+rate-limit hits, not protocol violations, so routine timing overlap does not
+inflate the protocol-violation score. The earlier `bf5dfff60` change made that
+classification correction; the threshold margin is a subsequent ZeroTierOne
+source change. Both test daemons were stopped and their temporary state
+removed; persistent identities and Central policy were untouched.
 
 ### Android arm64 rebuild with automatic interface selection (2026-10-11)
 
