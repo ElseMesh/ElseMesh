@@ -287,13 +287,14 @@ export class WebGLFallback {
 			vertexShader: /* glsl */`
 				uniform float uTime;
 				varying vec3 vWorldPosition;
+				varying float vWaveHeight;
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
 					vec2 p = world.xz;
-					float a = dot( p, vec2( 0.12, 0.08 ) ) + uTime * 0.52;
-					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.37;
-					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.24;
-					world.y += 0.18 * sin( a ) + 0.08 * sin( b ) + 0.035 * sin( c );
+					float a = dot( p, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
+					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
+					vWaveHeight = 0.36 * sin( a ) + 0.14 * sin( b );
+					world.y += vWaveHeight;
 					vWorldPosition = world.xyz;
 					gl_Position = projectionMatrix * viewMatrix * world;
 				}
@@ -308,21 +309,24 @@ export class WebGLFallback {
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
+				varying float vWaveHeight;
 				void main() {
 					vec2 p = vWorldPosition.xz;
-					float a = dot( p, vec2( 0.12, 0.08 ) ) + uTime * 0.52;
-					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.37;
-					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.24;
-					vec2 slope = vec2( 0.12, 0.08 ) * cos( a ) * 0.18 + vec2( -0.07, 0.15 ) * cos( b ) * 0.08 + vec2( 0.21, -0.16 ) * cos( c ) * 0.035;
+					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 );
+					float a = dot( p, kA ) + uTime * 0.3;
+					float b = dot( p, kB ) - uTime * 0.55;
+					float c = dot( p, kC ) + uTime * 0.7;
+					float d = dot( p, kD ) + uTime * 1.3;
+					vec2 slope = kA * cos( a ) * 0.36 + kB * cos( b ) * 0.14 + kC * cos( c ) * 0.025 + kD * cos( d ) * 0.01;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
-					float depth = 100.0, sandCoverage = 0.0;
+					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
 					if ( uTerrainSize > 0.0 ) {
 						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
 						if ( all( greaterThanEqual( terrainUv, vec2( 0.0 ) ) ) && all( lessThanEqual( terrainUv, vec2( 1.0 ) ) ) ) {
 							vec4 terrain = texture2D( uTerrainHeight, terrainUv );
 							float encodedHeight = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
-							float groundHeight = mix( uHeightRange.x, uHeightRange.y, encodedHeight );
-							depth = max( 0.0, uSeaLevel - groundHeight );
+							groundHeight = mix( uHeightRange.x, uHeightRange.y, encodedHeight );
+							depth = max( 0.0, uSeaLevel + vWaveHeight - groundHeight );
 							sandCoverage = terrain.b;
 						}
 					}
@@ -333,12 +337,17 @@ export class WebGLFallback {
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = 0.5 + 0.5 * sin( dot( p, vec2( 0.62, 0.47 ) ) + uTime * 0.68 + sin( dot( p, vec2( -0.41, 0.73 ) ) * 1.6 - uTime * 0.43 ) );
 					float shallow = smoothstep( 0.0, 18.0, depth );
-					vec3 water = mix( vec3( 0.07, 0.23, 0.36 ), vec3( 0.004, 0.035, 0.10 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
+					vec3 water = mix( vec3( 0.018, 0.31, 0.27 ), vec3( 0.004, 0.035, 0.10 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					vec3 reflected = mix( water, sky, fresnel );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
 					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 128.0 );
 					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.005 + 0.015 * ripple );
-					float foam = sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.12 + 0.24 * ripple + 0.06 * micro );
+					float foamNoise = 0.5 + 0.25 * sin( dot( p, vec2( 0.48, 0.31 ) ) + uTime * 0.42 )
+						+ 0.18 * sin( dot( p, vec2( -0.29, 0.57 ) ) - uTime * 0.28 )
+						+ 0.07 * sin( dot( p, vec2( 0.91, -0.22 ) ) + uTime * 0.63 );
+					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.15, 1.25, depth ) );
+					float shoreFoam = shoreBand * smoothstep( 0.3, 0.7, foamNoise );
+					float foam = max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.12 + 0.24 * ripple + 0.06 * micro ), shoreFoam * 0.82 );
 					reflected = mix( reflected, vec3( 0.78, 0.9, 0.88 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
@@ -409,12 +418,14 @@ export class WebGLFallback {
 					vec2 warp = vec2( noiseCloud( p * 0.38 + vec2( 3.4, 1.8 ) ), noiseCloud( p * 0.38 + vec2( - 2.2, 5.1 ) ) ) - 0.5;
 					float broad = cloudFbm( p * 0.72 + warp * 0.85 );
 					float detail = cloudFbm( p * 1.8 + vec2( 7.3, -4.1 ) );
-					float n = broad - max( 0.0, 0.52 - detail ) * 0.32;
+					float fine = noiseCloud( p * 8.0 + vec2( 13.1, - 6.7 ) );
+					float n = broad - max( 0.0, 0.52 - detail ) * 0.32 + ( fine - 0.5 ) * 0.045;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
 					float alpha = smoothstep( 0.51, 0.65, n ) * band * 0.92;
 					float sun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
 					float fullness = smoothstep( 0.51, 0.72, broad );
-					vec3 cloud = mix( vec3( 0.36, 0.44, 0.55 ), vec3( 1.4, 1.31, 1.15 ), 0.2 + 0.48 * fullness + 0.32 * sun );
+					float cloudLight = 0.18 + 0.3 * fullness + 0.25 * sun + 0.25 * smoothstep( 0.1, 0.62, dir.y ) + ( fine - 0.5 ) * 0.12;
+					vec3 cloud = mix( vec3( 0.34, 0.42, 0.54 ), vec3( 1.4, 1.31, 1.15 ), clamp( cloudLight, 0.0, 1.0 ) );
 					gl_FragColor = vec4( mix( sky, cloud, alpha ), 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>
