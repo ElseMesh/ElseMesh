@@ -35,6 +35,12 @@ returned HTTP 200; the root displayed `f89f47a4` and `/loz/` displayed
 `f691cd9e`, matching `main` and `archive/loz/main` respectively. The current
 deployment workflow includes the archived-branch stamp step.
 
+Immediately before this documentation update, both public paths returned HTTP
+200; the root HTML displayed `2c0a1fd6`, matching `main` HEAD, and `/loz/`
+displayed `f691cd9e`, matching `archive/loz/main`. This documentation push
+triggers a new deployment, so verify the root stamp again against its new
+`main` HEAD after the workflow completes.
+
 ## Selected ThruHolds
 
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
