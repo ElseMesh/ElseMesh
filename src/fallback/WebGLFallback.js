@@ -1,9 +1,9 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { TerrainData } from '../world/TerrainData.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
 import { keyboardLookDelta } from '../core/Input.js';
+import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
@@ -23,7 +23,7 @@ function webglTerrainMaterial( T, terrain ) {
 	const palette = Object.fromEntries( Object.entries( {
 		lush: [ 0.13, 0.2, 0.05 ], green: [ 0.25, 0.32, 0.1 ], olive: [ 0.36, 0.37, 0.14 ],
 		yellow: [ 0.5, 0.46, 0.2 ], straw: [ 0.62, 0.54, 0.33 ], soil: [ 0.17, 0.13, 0.08 ],
-		sand: [ 0.76, 0.68, 0.48 ], seabed: [ 0.72, 0.7, 0.58 ], rock: [ 0.3, 0.285, 0.265 ],
+		sand: [ 0.84, 0.77, 0.64 ], seabed: [ 0.72, 0.7, 0.58 ], rock: [ 0.3, 0.285, 0.265 ],
 	} ).map( ( [ name, color ] ) => [ name, color.map( linear ) ] ) );
 	const { noise, noise2 } = terrain;
 	for ( let j = 0; j < resolution; j ++ ) {
@@ -62,7 +62,7 @@ function webglTerrainMaterial( T, terrain ) {
 			pixels[ out ] = Math.round( T.MathUtils.clamp( color[ 0 ], 0, 1 ) * 255 );
 			pixels[ out + 1 ] = Math.round( T.MathUtils.clamp( color[ 1 ], 0, 1 ) * 255 );
 			pixels[ out + 2 ] = Math.round( T.MathUtils.clamp( color[ 2 ], 0, 1 ) * 255 );
-			pixels[ out + 3 ] = 255;
+			pixels[ out + 3 ] = terrain.sand[ source ];
 		}
 	}
 	const texture = new T.DataTexture( pixels, resolution, resolution, T.RGBAFormat, T.UnsignedByteType );
@@ -84,19 +84,43 @@ varying vec3 vTerrainWorldPosition;
 ` );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>
 			vec2 terrainUv = ( vTerrainWorldPosition.xz - vec2( ${ terrain.origin.toFixed( 1 ) } ) ) / ${ terrain.size.toFixed( 1 ) };
-			vec3 terrainBase = texture2D( uTerrainColor, terrainUv ).rgb;
+			vec4 terrainSample = texture2D( uTerrainColor, terrainUv );
+			vec3 terrainBase = terrainSample.rgb;
 			vec2 terrainXZ = vTerrainWorldPosition.xz;
 			vec4 terrainNear = texture2D( uTerrainDetail, terrainXZ / 1.9 );
 			vec4 terrainMid = texture2D( uTerrainDetail, mat2( 0.2675, 0.9636, -0.9636, 0.2675 ) * terrainXZ / 6.7 + 0.21 );
 			vec4 terrainFine = texture2D( uTerrainDetail, mat2( -0.7374, 0.6755, -0.6755, -0.7374 ) * terrainXZ / 0.63 + 0.53 );
 			float terrainClump = terrainMid.a * 0.6 + terrainNear.g * 0.4;
+			float sandCoverage = smoothstep( 0.25, 0.8, terrainSample.a );
+			float terrainDetail = mix( terrainClump, terrainNear.b * 0.55 + terrainMid.b * 0.45, sandCoverage );
+			float terrainFineDetail = mix( terrainFine.g, terrainFine.b, sandCoverage );
 			float terrainDistance = length( cameraPosition - vTerrainWorldPosition );
 			float terrainClumpContrast = mix( 0.34, 0.95, smoothstep( 40.0, 140.0, terrainDistance ) );
-			diffuseColor.rgb = terrainBase * ( ( terrainClump - 0.5 ) * terrainClumpContrast + 1.0 ) * ( ( terrainFine.g - 0.4 ) * 0.22 + 1.0 );` );
+			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage );
+			float wetSand = sandCoverage * ( 1.0 - smoothstep( -0.1, 0.35, vTerrainWorldPosition.y ) );
+			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 + 1.0 ) * ( 1.0 - wetSand * 0.2 );` );
 	};
 	material.customProgramCacheKey = () => 'elsemesh-webgl-baked-terrain-detail-v2';
 	material.userData.terrainTextures = [ texture, detailTexture ];
 	return material;
+
+}
+
+function webglTerrainWaterTexture( T, terrain ) {
+
+	const resolution = 1024, minHeight = - 512, maxHeight = 1536, data = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
+	for ( let j = 0; j < resolution; j ++ ) for ( let i = 0; i < resolution; i ++ ) {
+		const sourceJ = Math.min( terrain.res - 1, Math.floor( ( j + 0.5 ) * step ) ), sourceI = Math.min( terrain.res - 1, Math.floor( ( i + 0.5 ) * step ) ), source = sourceJ * terrain.res + sourceI, out = ( j * resolution + i ) * 4;
+		const normalized = T.MathUtils.clamp( ( terrain.heights[ source ] - minHeight ) / ( maxHeight - minHeight ), 0, 1 ), height = Math.round( normalized * 65535 );
+		data[ out ] = height >>> 8;
+		data[ out + 1 ] = height & 255;
+		data[ out + 2 ] = terrain.sand[ source ];
+		data[ out + 3 ] = 255;
+	}
+	const texture = new T.DataTexture( data, resolution, resolution, T.RGBAFormat, T.UnsignedByteType );
+	texture.wrapS = texture.wrapT = T.ClampToEdgeWrapping;
+	texture.magFilter = T.LinearFilter; texture.minFilter = T.LinearMipmapLinearFilter; texture.generateMipmaps = true; texture.needsUpdate = true;
+	return { texture, minHeight, maxHeight, origin: terrain.origin, size: terrain.size };
 
 }
 
@@ -196,8 +220,8 @@ export class WebGLFallback {
 		this.THREE = engine.THREE;
 		this.renderer = engine.renderer;
 		this.scene = new this.THREE.Scene();
-		this.scene.background = new this.THREE.Color( 0xa6c9d3 );
-		this.camera = new this.THREE.PerspectiveCamera( 65, 1, 0.1, 5000 );
+		this.scene.background = new this.THREE.Color( 0x172b42 );
+		this.camera = new this.THREE.PerspectiveCamera( 62, 1, 0.1, 5000 );
 		this.camera.rotation.order = 'YXZ';
 		this.keys = new Set();
 		this.velocityY = 0;
@@ -214,20 +238,13 @@ export class WebGLFallback {
 	async init( onProgress = () => {} ) {
 
 		const T = this.THREE;
+		this.reviewPose = cameraPoseFromSearch( location.search );
+		if ( this.reviewPose?.time !== undefined ) this.app.settings.timeOfDay = this.reviewPose.time;
 		this.renderer.toneMapping = T.ACESFilmicToneMapping;
 		this.renderer.toneMappingExposure = 0.9;
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = T.PCFSoftShadowMap;
-		this.sky = new Sky();
-		this.sky.scale.setScalar( 450000 );
-		this.sky.material.uniforms.turbidity.value = 7;
-		this.sky.material.uniforms.rayleigh.value = 1.8;
-		this.sky.material.uniforms.mieCoefficient.value = 0.005;
-		this.sky.material.uniforms.mieDirectionalG.value = 0.82;
-		this.sky.renderOrder = - 1000;
 		const sunDirection = this._sunDirection( this.app.settings.timeOfDay );
-		this.sky.material.uniforms.sunPosition.value.copy( sunDirection );
-		this.scene.add( this.sky );
 		this.cloudLayer = this._makeCloudLayer( sunDirection );
 		this.scene.add( this.cloudLayer );
 		this.scene.add( new T.HemisphereLight( 0xd9f1ff, 0x42513f, 1.5 ) );
@@ -246,6 +263,7 @@ export class WebGLFallback {
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
+		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
 		this.yaw = this.spawn.yaw || 0;
 		this.pitch = this.spawn.pitch || 0;
@@ -257,15 +275,25 @@ export class WebGLFallback {
 		this._startPresence();
 	}
 
-	_makeWater( geometry, seaLevel ) {
+	_makeWater( geometry, seaLevel, terrainWater ) {
 
 		const T = this.THREE;
 		const material = new T.ShaderMaterial( {
-			uniforms: { uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() } },
+			uniforms: {
+				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
+				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
+				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
+			},
 			vertexShader: /* glsl */`
+				uniform float uTime;
 				varying vec3 vWorldPosition;
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
+					vec2 p = world.xz;
+					float a = dot( p, vec2( 0.12, 0.08 ) ) + uTime * 0.52;
+					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.37;
+					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.24;
+					world.y += 0.18 * sin( a ) + 0.08 * sin( b ) + 0.035 * sin( c );
 					vWorldPosition = world.xyz;
 					gl_Position = projectionMatrix * viewMatrix * world;
 				}
@@ -274,24 +302,44 @@ export class WebGLFallback {
 				uniform float uTime;
 				uniform vec3 uCameraPosition;
 				uniform vec3 uSunDirection;
+				uniform sampler2D uTerrainHeight;
+				uniform float uTerrainOrigin;
+				uniform float uTerrainSize;
+				uniform vec2 uHeightRange;
+				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
 				void main() {
 					vec2 p = vWorldPosition.xz;
 					float a = dot( p, vec2( 0.12, 0.08 ) ) + uTime * 0.52;
 					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.37;
 					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.24;
-					vec2 slope = vec2( 0.12, 0.08 ) * cos( a ) * 0.48 + vec2( -0.07, 0.15 ) * cos( b ) * 0.26 + vec2( 0.21, -0.16 ) * cos( c ) * 0.10;
+					vec2 slope = vec2( 0.12, 0.08 ) * cos( a ) * 0.18 + vec2( -0.07, 0.15 ) * cos( b ) * 0.08 + vec2( 0.21, -0.16 ) * cos( c ) * 0.035;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
+					float depth = 100.0, sandCoverage = 0.0;
+					if ( uTerrainSize > 0.0 ) {
+						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
+						if ( all( greaterThanEqual( terrainUv, vec2( 0.0 ) ) ) && all( lessThanEqual( terrainUv, vec2( 1.0 ) ) ) ) {
+							vec4 terrain = texture2D( uTerrainHeight, terrainUv );
+							float encodedHeight = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
+							float groundHeight = mix( uHeightRange.x, uHeightRange.y, encodedHeight );
+							depth = max( 0.0, uSeaLevel - groundHeight );
+							sandCoverage = terrain.b;
+						}
+					}
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
 					float fresnel = 0.055 + 0.65 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
 					vec3 sky = mix( vec3( 0.12, 0.34, 0.43 ), vec3( 0.34, 0.59, 0.70 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) );
-					vec3 water = mix( vec3( 0.012, 0.10, 0.15 ), vec3( 0.025, 0.23, 0.28 ), 0.5 + 0.5 * sin( a * 0.35 + b * 0.2 ) );
+					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
+					float micro = 0.5 + 0.5 * sin( dot( p, vec2( 0.62, 0.47 ) ) + uTime * 0.68 + sin( dot( p, vec2( -0.41, 0.73 ) ) * 1.6 - uTime * 0.43 ) );
+					float shallow = smoothstep( 0.0, 18.0, depth );
+					vec3 water = mix( vec3( 0.055, 0.27, 0.36 ), vec3( 0.008, 0.065, 0.14 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					vec3 reflected = mix( water, sky, fresnel );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
-					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 96.0 );
-					float ripple = 0.5 + 0.5 * sin( a * 2.0 + sin( b ) );
-					reflected += vec3( 1.0, 0.83, 0.60 ) * glint * ( 0.12 + 0.45 * ripple );
+					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 128.0 );
+					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.005 + 0.015 * ripple );
+					float foam = smoothstep( 0.8, 0.98, ripple ) * sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * 0.25;
+					reflected = mix( reflected, vec3( 0.78, 0.9, 0.88 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>
@@ -348,22 +396,32 @@ export class WebGLFallback {
 				}
 				void main() {
 					vec3 dir = normalize( vDirection );
-					if ( dir.y < 0.055 ) discard;
+					float elevation = max( dir.y, 0.0 );
+					float day = smoothstep( -0.12, 0.08, uSunDirection.y );
+					float skyHeight = pow( smoothstep( 0.0, 0.9, elevation ), 0.72 );
+					vec3 daySky = mix( vec3( 0.18, 0.31, 0.42 ), vec3( 0.075, 0.19, 0.42 ), skyHeight );
+					vec3 nightSky = mix( vec3( 0.025, 0.045, 0.075 ), vec3( 0.008, 0.018, 0.045 ), skyHeight );
+					vec3 sky = mix( nightSky, daySky, day );
+					float sunGlow = pow( max( dot( dir, normalize( uSunDirection ) ), 0.0 ), 10.0 ) * day;
+					sky += vec3( 0.16, 0.095, 0.035 ) * sunGlow;
 					vec2 p = dir.xz / max( dir.y + 0.14, 0.14 );
-					p = p * 3.1 + vec2( uTime * 0.022, -uTime * 0.006 );
-					float n = cloudFbm( p );
+					p = p * 4.2 + vec2( uTime * 0.018, -uTime * 0.005 );
+					vec2 warp = vec2( noiseCloud( p * 0.38 + vec2( 3.4, 1.8 ) ), noiseCloud( p * 0.38 + vec2( - 2.2, 5.1 ) ) ) - 0.5;
+					float broad = cloudFbm( p * 0.72 + warp * 0.85 );
+					float detail = cloudFbm( p * 1.8 + vec2( 7.3, -4.1 ) );
+					float n = broad * 0.76 + detail * 0.24;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
-					float alpha = smoothstep( 0.48, 0.64, n ) * band * 0.82;
-					if ( alpha < 0.008 ) discard;
+					float alpha = smoothstep( 0.53, 0.64, n ) * band * 0.95;
 					float sun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
-					vec3 cloud = mix( vec3( 0.42, 0.48, 0.58 ), vec3( 1.45, 1.35, 1.12 ), 0.58 + 0.42 * sun );
-					gl_FragColor = vec4( cloud, alpha );
+					float fullness = smoothstep( 0.48, 0.74, broad );
+					vec3 cloud = mix( vec3( 0.36, 0.44, 0.55 ), vec3( 1.4, 1.31, 1.15 ), 0.2 + 0.48 * fullness + 0.32 * sun );
+					gl_FragColor = vec4( mix( sky, cloud, alpha ), 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>
 				}
 			`,
 			side: T.BackSide,
-			transparent: true,
+			transparent: false,
 			depthWrite: false,
 			depthTest: true,
 			toneMapped: true,
@@ -417,7 +475,8 @@ export class WebGLFallback {
 			const terrain = new T.Mesh( geometry, new T.MeshStandardMaterial( { vertexColors: true, roughness: 0.94, side: T.DoubleSide } ) );
 			terrain.receiveShadow = true; this.scene.add( terrain );
 		}
-		this.scene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000 ), - 0.15 ) );
+		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
+		this.scene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 512, 512 ), - 0.15, waterTerrain ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( villageUrl );
@@ -741,7 +800,6 @@ export class WebGLFallback {
 		const now = performance.now(), dt = Math.min( 0.05, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		this.lastFrame = now;
 		const T = this.THREE, speed = this.keys.has( 'ShiftLeft' ) || this.keys.has( 'ShiftRight' ) ? 10 : 5;
-		this.sky.position.copy( this.camera.position );
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = now * 0.001;
 		for ( const object of this.scene.children ) if ( object.isWater ) object.material.uniforms.uTime.value = now * 0.001;
@@ -767,9 +825,12 @@ export class WebGLFallback {
 		}
 		this.useButton.style.display = this._nearestPortalRoute() ? '' : 'none';
 		const floor = Math.max( this.groundHeight( this.camera.position.x, this.camera.position.z ) + 1.7, 1.7 );
-		this.velocityY -= 14 * dt;
-		this.camera.position.y += this.velocityY * dt;
-		if ( this.camera.position.y <= floor ) { this.camera.position.y = floor; this.velocityY = 0; this.onGround = true; } else this.onGround = false;
+		if ( this.reviewPose ) { this.camera.position.y = this.spawn.position[ 1 ]; this.velocityY = 0; this.onGround = false; }
+		else {
+			this.velocityY -= 14 * dt;
+			this.camera.position.y += this.velocityY * dt;
+			if ( this.camera.position.y <= floor ) { this.camera.position.y = floor; this.velocityY = 0; this.onGround = true; } else this.onGround = false;
+		}
 		const grassDx = this.camera.position.x - this.grassCenter.x, grassDz = this.camera.position.z - this.grassCenter.y;
 		if ( this.grass && grassDx * grassDx + grassDz * grassDz > 64 ) {
 			this.scene.remove( this.grass );
