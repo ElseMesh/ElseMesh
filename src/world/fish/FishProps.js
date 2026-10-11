@@ -541,4 +541,14 @@ export class FishProps {
 
 	}
 
+	dispose() {
+
+		this.batch?.dispose();
+		this.material?.dispose();
+		this.fadeMaterial?.dispose();
+		this.batch = this.material = this.fadeMaterial = this.mesh = null;
+		this.kind0 = this.pos = this.items = null;
+
+	}
+
 }

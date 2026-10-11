@@ -59,6 +59,7 @@
       "tidewater.terrain-surface/1",
       "tidewater.static-vegetation/1",
       "tidewater.static-reef/1",
+      "tidewater.static-fish-props/1",
       "tidewater.island-ocean/1",
       "tidewater.downeast-boat/1",
       "tidewater.ambient-audio/1",
@@ -12353,6 +12354,20 @@
       "type": "tidewater.static-vegetation/1",
       "priority": "portal-preview",
       "placementAssetId": "sha256:e9ead2780768e0dabea07317da0c020497137472e6adc1cb3f166611fb0fbae6"
+    },
+    {
+      "id": "tw-component:island-fish-props",
+      "type": "tidewater.static-fish-props/1",
+      "priority": "visible",
+      "placementAssetId": "sha256:6b9db587b80d1eae35fa062fd0308416bbe6bbba2842477971410403c16dd78c",
+      "streamingBounds": {
+        "center": [
+          66.64174159012683,
+          3.8970913254688266,
+          -40.00388889533359
+        ],
+        "radius": 79.93684890306201
+      }
     },
     {
       "id": "tw-component:island-terrain",

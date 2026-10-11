@@ -21,6 +21,7 @@ import { createVegetationPlacement } from '../src/world/vegetation/Scatter.js';
 import { encodeVegetationPlacements } from '../src/network/VegetationPlacements.js';
 import { Reef } from '../src/world/Reef.js';
 import { encodeReefPlacements } from '../src/network/ReefPlacements.js';
+import { encodeFishPropPlacements, MAX_FISH_PROP_PLACEMENT_BYTES } from '../src/network/FishPropPlacements.js';
 import { BANK } from '../src/audio/soundBank.js';
 import { MIX } from '../src/audio/SoundScape.js';
 import { bakeTerrainMaps } from '../src/world/terrain/TerrainBake.js';
@@ -114,6 +115,11 @@ const debris = generated.debris;
 const vegetationDocument = Buffer.from( encodeVegetationPlacements( generated.vegetation, 7 ) );
 const vegetationAssetId = `sha256:${createHash( 'sha256' ).update( vegetationDocument ).digest( 'hex' )}`;
 staticAssets.set( vegetationAssetId, vegetationDocument );
+const fishPropsDocument = Buffer.from( encodeFishPropPlacements( generated.fishProps ) );
+if ( fishPropsDocument.length > MAX_FISH_PROP_PLACEMENT_BYTES ) throw new Error( 'Fish-prop placements exceed the 16 MiB asset limit' );
+const fishPropsAssetId = `sha256:${createHash( 'sha256' ).update( fishPropsDocument ).digest( 'hex' )}`;
+staticAssets.set( fishPropsAssetId, fishPropsDocument );
+const fishPropsBounds = boundsForFishProps( generated.fishProps );
 const reefLayout = new Reef( { terrain, layoutOnly: true } );
 const reefRecords = reefLayout.placements();
 const reefModelRadius = Math.max( ...[ ...reefLayout.kinds.hard, ...reefLayout.kinds.soft ].filter( ( kind ) => kind.lod === 0 ).map( ( kind ) => {
@@ -139,7 +145,7 @@ for ( const tile of reefTiles ) {
 		streamingBounds: tile.bounds,
 	} );
 }
-if ( reefComponents.length + 4 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding reef tiles, the boat, and ambient audio' );
+if ( reefComponents.length + 7 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding reef tiles and six fixed components' );
 const debrisAssetIDs = new Map();
 const debrisLODAssetIDs = new Map();
 const debrisAssetBounds = new Map();
@@ -184,7 +190,7 @@ for ( const spec of ambientBedSpecs ) {
 		...( spec.position ? { position: spec.position, refDistance: spec.refDistance, rolloff: spec.rolloff } : {} ),
 	} );
 }
-if ( reefComponents.length + 3 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding ambient audio' );
+if ( reefComponents.length + 7 > 128 ) throw new Error( 'Island world exceeds the 128 component limit after adding fish props and other fixed components' );
 const assetsPath = path.join( output, 'assets' );
 await mkdir( assetsPath, { recursive: true } );
 for ( const entry of await readdir( assetsPath, { withFileTypes: true } ) ) {
@@ -206,7 +212,7 @@ const source = {
 		avatarComplexity: 20000,
 		physicsProfile: 'tidewater-default',
 		vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 100000 },
-			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
+			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
 		maxPackageBytes: 128 * 1024 * 1024,
 	},
 	hosts: [],
@@ -272,6 +278,7 @@ const source = {
 	components: [
 		{ id: 'tw-component:island-village-materials', type: 'tidewater.village-materials/2', profile: 'original-tidewater-village-v1', dataAssetId: villageMaterialsAssetId, objectId: 'tw-object:island-village', priority: 'visible', streamingBounds: villageBounds },
 		{ id: 'tw-component:island-vegetation', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId },
+		...( generated.fishProps.length ? [ { id: 'tw-component:island-fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: fishPropsAssetId, streamingBounds: fishPropsBounds } ] : [] ),
 		{ id: 'tw-component:island-terrain', type: 'tidewater.terrain-surface/1', profile: 'example-island-v1', objectId: 'tw-object:island-terrain', dataAssetId: terrainSurfaceAssetId, priority: 'visible' },
 		...reefComponents,
 		{ id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' },
@@ -406,10 +413,26 @@ function buildIslandProceduralContent( terrainData ) {
 		villageBatches: batches,
 		villageTriangles: batches.reduce( ( total, { batch } ) => total + batch.triangles, 0 ),
 		villageColliders,
+		fishProps: village.B.fishProps?.items || [],
 		boatBatches: buildBoatBatches(),
 		debris: placer.scanned,
 		vegetation: vegetation.records,
 	};
+}
+
+function boundsForFishProps( records ) {
+	if ( records.length === 0 ) throw new Error( 'Example Island produced no fish props' );
+	const min = [ Infinity, Infinity, Infinity ], max = [ - Infinity, - Infinity, - Infinity ];
+	for ( const record of records ) {
+		const extent = Math.max( 0.25, record.L * 0.8 );
+		for ( const [ axis, value ] of [ record.x, record.y, record.z ].entries() ) {
+			min[ axis ] = Math.min( min[ axis ], value - extent );
+			max[ axis ] = Math.max( max[ axis ], value + extent );
+		}
+	}
+	const center = min.map( ( value, axis ) => ( value + max[ axis ] ) * 0.5 );
+	const radius = Math.max( 0.01, ...records.map( record => Math.hypot( record.x - center[ 0 ], record.y - center[ 1 ], record.z - center[ 2 ] ) + Math.max( 0.25, record.L * 0.8 ) ) );
+	return { center, radius };
 }
 
 // Preserve the exact material packing used by Village._assemble().

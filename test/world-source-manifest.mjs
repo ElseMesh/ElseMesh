@@ -6,6 +6,7 @@ import path from 'node:path';
 import { gravityAcceleration, movementParameters, validateWorldRequirements, worldSeaLevel } from '../src/network/WorldRules.js';
 import { validateWorldSource, validateWorldSpawn, worldSpawnPose } from '../src/network/WorldSource.js';
 import { encodeVegetationPlacements, VEGETATION_PLACEMENT_KINDS } from '../src/network/VegetationPlacements.js';
+import { encodeFishPropPlacements } from '../src/network/FishPropPlacements.js';
 
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const root = await mkdtemp( path.join( temporaryRoot, 'elsemesh-manifest-test-' ) );
@@ -27,6 +28,9 @@ try {
 	const reefPlacementBytes = Buffer.from( 'reef placements test payload' );
 	const reefPlacementAssetID = `sha256:${createHashForTest( reefPlacementBytes )}`;
 	await writeFile( path.join( assetsPath, reefPlacementAssetID.slice( 'sha256:'.length ) ), reefPlacementBytes );
+	const fishPropBytes = Buffer.from( encodeFishPropPlacements( [ { kind: 'whole', species: 'mullet', L: 0.4, x: 1, y: 0.5, z: -2, q: [ 0, 0, 0, 1 ], pattern: 14, seed: 0.5, curl: 0, sag: 0.1, jaw: 0.2, flags: [ 0.4, 1, 0, 0 ] } ] ) );
+	const fishPropAssetID = `sha256:${createHashForTest( fishPropBytes )}`;
+	await writeFile( path.join( assetsPath, fishPropAssetID.slice( 'sha256:'.length ) ), fishPropBytes );
 	const ambientBytes = Buffer.from( 'fake OGG bytes for manifest conversion' );
 	const ambientAssetID = `sha256:${createHashForTest( ambientBytes )}`;
 	await writeFile( path.join( assetsPath, ambientAssetID.slice( 'sha256:'.length ) ), ambientBytes );
@@ -37,10 +41,10 @@ try {
 		spawn: { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 },
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
-		rules: { gravity: 1, seaLevel: -4.5, atmosphereLevel: 18000, avatarComplexity: 20000, physicsProfile: 'default', movement: { walkSpeed: 2.5, sprintSpeed: 7, jumpSpeed: 4.2 }, vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000 }, maxPackageBytes: 1024, requiredFeatures: [ 'tidewater.portal-handoff/1', 'tidewater.procedural-island-vegetation/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.static-glb-emissive-strength/1' ] },
+		rules: { gravity: 1, seaLevel: -4.5, atmosphereLevel: 18000, avatarComplexity: 20000, physicsProfile: 'default', movement: { walkSpeed: 2.5, sprintSpeed: 7, jumpSpeed: 4.2 }, vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000 }, maxPackageBytes: 1024, requiredFeatures: [ 'tidewater.portal-handoff/1', 'tidewater.procedural-island-vegetation/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.static-glb-emissive-strength/1' ] },
 		hosts: [ { peerId: '12D3KooWAbcdefghijk1234567890123456', scopes: [ 'content-cache', 'failover-authority' ], expiresAt: 1900000000, epoch: 3, failoverAfter: 1800000000, failoverSeconds: 300 } ],
 		objects: [ { id: 'tw-object:bounded', kind: 'asset-instance', label: 'Bounded', assetId: boundedAssetID, priority: 'nearby', streamingBounds: { center: [ 1, 2, 3 ], radius: 4 }, transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } }, { id: 'tw-object:boat-preview', kind: 'asset-instance', label: 'Boat berth preview', assetId: boatPreviewAssetID, priority: 'portal-preview', transform: { position: [ 0, -4.5, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } ],
-		components: [ { id: 'tw-component:test-vegetation', type: 'tidewater.procedural-island-vegetation/1', seed: 7, priority: 'portal-preview', placementAssetId: placementAssetID }, { id: 'tw-component:static-plants', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: placementAssetID }, { id: 'tw-component:reef-tile', type: 'tidewater.static-reef/1', priority: 'visible', placementAssetId: reefPlacementAssetID, streamingBounds: { center: [ 0, -4, 0 ], radius: 32 } }, { id: 'tw-component:test-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' }, { id: 'tw-component:hosted-boat', type: 'tidewater.downeast-boat/1', objectId: 'tw-object:boat-preview', priority: 'portal-preview' }, { id: 'tw-component:test-ambience', type: 'tidewater.ambient-audio/1', priority: 'portal-preview', beds: [ { assetId: ambientAssetID, gain: 0.3, condition: 'underwater', position: [ 1, 2, 3 ] } ] } ],
+		components: [ { id: 'tw-component:test-vegetation', type: 'tidewater.procedural-island-vegetation/1', seed: 7, priority: 'portal-preview', placementAssetId: placementAssetID }, { id: 'tw-component:static-plants', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: placementAssetID }, { id: 'tw-component:reef-tile', type: 'tidewater.static-reef/1', priority: 'visible', placementAssetId: reefPlacementAssetID, streamingBounds: { center: [ 0, -4, 0 ], radius: 32 } }, { id: 'tw-component:fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: fishPropAssetID, streamingBounds: { center: [ 0, 0, 0 ], radius: 4 } }, { id: 'tw-component:test-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' }, { id: 'tw-component:hosted-boat', type: 'tidewater.downeast-boat/1', objectId: 'tw-object:boat-preview', priority: 'portal-preview' }, { id: 'tw-component:test-ambience', type: 'tidewater.ambient-audio/1', priority: 'portal-preview', beds: [ { assetId: ambientAssetID, gain: 0.3, condition: 'underwater', position: [ 1, 2, 3 ] } ] } ],
 		portals: [],
 		updatedAt: '2026-09-30T12:34:56Z',
 	} ) );
@@ -68,7 +72,7 @@ try {
 	assert.equal( manifest.updatedAt, 1790771696, 'runtime timestamp must come from the source snapshot' );
 	assert.equal( manifest.discoverable, false, 'world publication is private by default' );
 	assert.deepEqual( manifest.hosts, [ { peerId: '12D3KooWAbcdefghijk1234567890123456', scopes: [ 'content-cache', 'failover-authority' ], expiresAt: 1900000000, epoch: 3, failoverAfter: 1800000000, failoverSeconds: 300 } ], 'owner-granted cache and failover authority survive conversion' );
-	assert.deepEqual( manifest.rules.requiredFeatures, [ 'tidewater.portal-handoff/1', 'tidewater.procedural-island-vegetation/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.static-glb-emissive-strength/1' ], 'runtime feature requirements survive deterministic conversion' );
+	assert.deepEqual( manifest.rules.requiredFeatures, [ 'tidewater.portal-handoff/1', 'tidewater.procedural-island-vegetation/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.static-glb-emissive-strength/1' ], 'runtime feature requirements survive deterministic conversion' );
 	assert.deepEqual( manifest.components.at( -1 ), { id: 'tw-component:test-ambience', type: 'tidewater.ambient-audio/1', priority: 'portal-preview', beds: [ { assetId: ambientAssetID, gain: 0.3, condition: 'underwater', position: [ 1, 2, 3 ] } ] }, 'ambient bed contract survives deterministic conversion' );
 	assert.deepEqual( manifest.components.find( ( component ) => component.type === 'tidewater.downeast-boat/1' ), { id: 'tw-component:hosted-boat', type: 'tidewater.downeast-boat/1', objectId: 'tw-object:boat-preview', priority: 'portal-preview' }, 'boat runtime binds through stable world object ID' );
 	assert.ok( manifest.assets.some( ( asset ) => asset.id === ambientAssetID && asset.kind === 'audio/ogg' && asset.priority === 'portal-preview' ), 'audio bytes are included in the signed manifest at the component streaming priority' );
@@ -77,6 +81,7 @@ try {
 	assert.throws( () => validateWorldSource( invalidAmbientSource ), /world component/, 'source validation rejects unimplemented ambient audio conditions' );
 	assert.ok( manifest.assets.some( ( asset ) => asset.id === placementAssetID && asset.kind === 'vegetation-placement/1' && asset.priority === 'portal-preview' ), 'component placement data is included as a hash-verified early-stream asset' );
 	assert.ok( manifest.assets.some( ( asset ) => asset.id === reefPlacementAssetID && asset.kind === 'reef-placement/1' && asset.priority === 'visible' ), 'reef placement data is content-addressed and keeps its view streaming priority' );
+	assert.ok( manifest.assets.some( ( asset ) => asset.id === fishPropAssetID && asset.kind === 'fish-props-placement/1' && asset.priority === 'visible' ), 'fish-prop placements use their own content-addressed renderer asset kind' );
 	assert.deepEqual( manifest.rules.movement, { walkSpeed: 2.5, sprintSpeed: 7, jumpSpeed: 4.2 }, 'world movement rules survive deterministic conversion' );
 	assert.deepEqual( manifest.rules.vehiclePolicy, { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000 }, 'destination vehicle acceptance and limits survive deterministic conversion' );
 	assert.equal( manifest.rules.maxPackageBytes, 1024, 'aggregate content budget survives deterministic conversion' );

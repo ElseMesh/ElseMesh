@@ -444,6 +444,35 @@ func TestWorldManifestValidatesStaticReefComponent(t *testing.T) {
 	}
 }
 
+func TestWorldManifestValidatesStaticFishPropsComponent(t *testing.T) {
+	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := newStarterManifest("Portable fish props", ownerID.String())
+	manifest.WorldID = "tw-world:portable-fish-props"
+	manifest.Rules.RequiredFeatures = []string{"tidewater.static-fish-props/1"}
+	placementID := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	manifest.Assets = []assetRef{{ID: placementID, Bytes: 64, Kind: "fish-props-placement/1", Priority: "visible"}}
+	manifest.Components = []worldComponent{{ID: "tw-component:fish-props", Type: "tidewater.static-fish-props/1", Priority: "visible", PlacementAssetID: placementID, StreamingBounds: &streamingBounds{Center: vector3{0, 2, 0}, Radius: 8}}}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid bounded fish-props component rejected: %v", err)
+	}
+	manifest.Assets[0].Kind = "reef-placement/1"
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("fish-props component accepted a reef placement asset")
+	}
+	manifest.Assets[0].Kind = "fish-props-placement/1"
+	manifest.Assets[0].Bytes = 16<<20 + 1
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("fish-props component accepted an oversized placement asset")
+	}
+}
+
 func TestWorldManifestValidatesDeterministicMovementRules(t *testing.T) {
 	key, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

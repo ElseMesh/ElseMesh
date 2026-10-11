@@ -54,7 +54,7 @@ async function main() {
 	for ( const component of source.components || [] ) {
 		const priority = component.priority || 'portal-preview';
 		const references = [
-			...( component.placementAssetId ? [ { id: component.placementAssetId, kind: component.type === 'tidewater.static-reef/1' ? 'reef-placement/1' : 'vegetation-placement/1', limit: 16 * 1024 * 1024 } ] : [] ),
+			...( component.placementAssetId ? [ { id: component.placementAssetId, kind: component.type === 'tidewater.static-reef/1' ? 'reef-placement/1' : component.type === 'tidewater.static-fish-props/1' ? 'fish-props-placement/1' : 'vegetation-placement/1', limit: 16 * 1024 * 1024 } ] : [] ),
 			...( component.dataAssetId ? [ { id: component.dataAssetId, kind: component.type === 'tidewater.village-materials/2' ? 'village-materials/1' : 'terrain-surface/1', limit: component.type === 'tidewater.village-materials/2' ? 64 * 1024 * 1024 : 128 * 1024 * 1024 } ] : [] ),
 			...( component.beds || [] ).map( ( bed ) => ( { id: bed.assetId, kind: 'audio/ogg', limit: 16 * 1024 * 1024 } ) ),
 		];

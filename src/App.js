@@ -27,6 +27,7 @@ import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
+import { FishProps } from './world/fish/FishProps.js';
 import { BoatModel } from './world/BoatModel.js';
 import { Rocks } from './world/Rocks.js';
 import { Debris } from './world/Debris.js';
@@ -68,6 +69,7 @@ import { Vegetation } from './world/Vegetation.js';
 import { decodeVegetationPlacements } from './network/VegetationPlacements.js';
 import { decodeTerrainSurfaceAsset } from './network/TerrainSurfaceAsset.js';
 import { decodeReefPlacements, MAX_REEF_PLACEMENTS, REEF_PLACEMENT_HEADER_BYTES, REEF_PLACEMENT_RECORD_BYTES } from './network/ReefPlacements.js';
+import { decodeFishPropPlacements } from './network/FishPropPlacements.js';
 import { SoundScape } from './audio/SoundScape.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
 import { Group } from './engine/scene/Group.js';
@@ -898,6 +900,15 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					} );
 				}
 				installedIDs.add( component.id );
+			} else if ( component.type === 'tidewater.static-fish-props/1' ) {
+				const fishProps = new FishProps();
+				fishProps.items = readFishPropPlacements( connector, component );
+				const mesh = fishProps.build();
+				root.add( mesh );
+				installed.push( {
+					fishProps: true,
+					dispose: () => { root.remove( mesh ); fishProps.dispose(); },
+				} );
 			} else if ( component.type === 'tidewater.island-ocean/1' ) {
 				const lod = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
 				const mesh = new Mesh( lod.geometry, this.waterMaterial );
@@ -1543,6 +1554,12 @@ function readReefPlacements( connector, component ) {
 	const bytes = connector.assets.get( component.placementAssetId );
 	if ( ! bytes ) throw new Error( `Reef component ${component.id} is missing its placement asset` );
 	return decodeReefPlacements( bytes );
+}
+
+function readFishPropPlacements( connector, component ) {
+	const bytes = connector.assets.get( component.placementAssetId );
+	if ( ! bytes ) throw new Error( `Fish-prop component ${component.id} is missing its placement asset` );
+	return decodeFishPropPlacements( bytes );
 }
 
 function reefPlacementCapacity( connector ) {

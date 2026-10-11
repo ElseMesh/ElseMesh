@@ -270,6 +270,8 @@ func (component *worldComponent) UnmarshalJSON(data []byte) error {
 		allowed["placementAssetId"] = true
 	case "tidewater.static-reef/1":
 		allowed["placementAssetId"] = true
+	case "tidewater.static-fish-props/1":
+		allowed["placementAssetId"] = true
 	case "tidewater.island-ocean/1":
 	case "tidewater.procedural-island-terrain/1":
 		allowed["objectId"], allowed["profile"] = true, true
@@ -737,6 +739,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	waterBodyCount := 0
 	ambientAudioCount := 0
 	boatCount := 0
+	fishPropsCount := 0
 	var boatObject worldObject
 	waterBodies := make([]worldComponent, 0, 4)
 	assetRefs := make(map[string]assetRef, len(manifest.Assets))
@@ -747,6 +750,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		vegetation := component.Type == "tidewater.procedural-island-vegetation/1" && component.Seed == 7
 		staticVegetation := component.Type == "tidewater.static-vegetation/1" && component.Seed == 0 && component.PlacementAssetID != ""
 		staticReef := component.Type == "tidewater.static-reef/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
+		staticFishProps := component.Type == "tidewater.static-fish-props/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
 		ambientAudio := component.Type == "tidewater.ambient-audio/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Beds) > 0 && len(component.Beds) <= 16
 		boat := component.Type == "tidewater.downeast-boat/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.ObjectID != ""
 		islandOcean := component.Type == "tidewater.island-ocean/1" && component.Seed == 0 && component.PlacementAssetID == ""
@@ -771,6 +775,9 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		if ambientAudio {
 			ambientAudioCount++
 		}
+		if staticFishProps {
+			fishPropsCount++
+		}
 		if boat {
 			boatCount++
 			preview, exists := objectByID[component.ObjectID]
@@ -780,7 +787,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			}
 			boatObject = preview
 		}
-		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
+		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !staticFishProps && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || fishPropsCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
 			return fmt.Errorf("invalid or unsupported world component %q", component.ID)
 		}
 		if waterBody && (manifest.Rules.SeaLevel == nil || islandOceanCount > 0) || islandOcean && waterBodyCount > 0 {
@@ -803,8 +810,10 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			kind := "vegetation-placement/1"
 			if staticReef {
 				kind = "reef-placement/1"
+			} else if staticFishProps {
+				kind = "fish-props-placement/1"
 			}
-			if !assetIDPattern.MatchString(component.PlacementAssetID) || !exists || asset.Kind != kind || asset.Priority != priority {
+			if !assetIDPattern.MatchString(component.PlacementAssetID) || !exists || asset.Kind != kind || asset.Priority != priority || staticFishProps && (asset.Bytes == 0 || asset.Bytes > 16<<20) {
 				return fmt.Errorf("invalid placement asset reference on world component %q", component.ID)
 			}
 		}

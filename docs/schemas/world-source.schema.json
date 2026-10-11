@@ -456,6 +456,17 @@
           "additionalProperties": false
         },
         {
+          "required": ["id", "type", "placementAssetId", "streamingBounds"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
+            "type": { "const": "tidewater.static-fish-props/1" },
+            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
+            "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
+          },
+          "additionalProperties": false
+        },
+        {
           "required": ["id", "type", "beds"],
           "properties": {
             "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
