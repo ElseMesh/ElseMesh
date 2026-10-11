@@ -31,8 +31,17 @@ respective JavaScript bundles.
 
 On 2026-10-11, Pages run `38148318847` succeeded for main commit
 `1964d7557952d2c567b99bb442a9a1d233aac488`; the archived ref was
-`f691cd9e`. A prior run verified the root and `/loz/` stamps, but the current
-edge response has not yet been revalidated against these refs.
+`f691cd9e`. At that point the current edge response had not yet been
+revalidated against these refs; the later verification is recorded below.
+
+Rechecked after Pages run `38151990451` deployed main commit
+`0e49a73fbb8ccfeff15e13382ced0cbd33ee3524`: both
+`https://elsemesh.github.io/` and `https://elsemesh.github.io/loz/` returned
+HTTP 200. The root HTML contained stamp `0e49a73f`, matching `main`, and the
+archived page contained `f691cd9e`, matching `archive/loz/main`. The Pages API
+reported `cname: null` and HTTPS enforcement enabled. These checks verify the
+static clients and their revision stamps; they do not verify gateway or world
+server reachability.
 
 ## Selected ThruHolds
 
@@ -86,11 +95,15 @@ The apex HTTP endpoint redirects to Namecheap parking and the HTTPS request
 timed out. The GitHub Pages API initially reported `cname: elsemesh.org` and
 `https_enforced: false`; that custom-domain setting was then cleared so the
 GitHub.io client can remain the working address until DNS is ready. The API
-now reports `cname: null` and `https_enforced: true`. Immediately afterward,
-GitHub's edge still returned cached HTTP 301 redirects for both GitHub.io
-paths to `http://elsemesh.org/` and `/loz/` (response `Age: 85`). Recheck both
-paths after the edge cache expires; do not claim the public client is restored
-until they serve the deployed pages and matching commit stamps.
+now reports `cname: null` and `https_enforced: true`. GitHub's edge briefly
+returned cached HTTP 301 redirects to the parked custom domain after the
+setting was cleared. The latest check on 2026-10-11 confirms both GitHub.io
+paths now return HTTP 200 with the current main and archived commit stamps.
+The custom domain itself is still not ready: `elsemesh.org` resolves to
+`162.255.119.79`, `www` still uses `parkingpage.namecheap.com`, and the
+`_github-pages-challenge-ElseMesh` TXT query returned no answer. Keep using the
+GitHub.io URLs until DNS records and organization domain verification are
+complete.
 
 Preserve the existing email records: MX priorities 10 (`eforward1`,
 `eforward2`, `eforward3`), 15 (`eforward4`), and 20 (`eforward5`) under
