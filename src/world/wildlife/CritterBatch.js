@@ -75,6 +75,16 @@ export class CritterBatch {
 
 	}
 
+	dispose() {
+
+		this.mesh.removeFromParent();
+		this.template.geometry.dispose();
+		this.material.dispose();
+		this.records.dispose();
+		this.bodyBuffer.destroy();
+
+	}
+
 	createMaterial() {
 
 		const R = this.records;

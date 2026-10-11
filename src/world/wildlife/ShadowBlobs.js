@@ -99,4 +99,13 @@ export class ShadowBlobs {
 
 	}
 
+	dispose() {
+
+		this.mesh.removeFromParent();
+		this.mesh.geometry.dispose();
+		this.material.dispose();
+		this.records.dispose();
+
+	}
+
 }

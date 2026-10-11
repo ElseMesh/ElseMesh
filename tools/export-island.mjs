@@ -216,7 +216,7 @@ const source = {
 		avatarComplexity: 20000,
 		physicsProfile: 'tidewater-default',
 		vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 100000 },
-			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
+			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
 		maxPackageBytes: 128 * 1024 * 1024,
 	},
 	hosts: [],
@@ -284,6 +284,7 @@ const source = {
 		{ id: 'tw-component:island-vegetation', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId },
 		...( generated.fishProps.length ? [ { id: 'tw-component:island-fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: fishPropsAssetId, streamingBounds: fishPropsBounds } ] : [] ),
 		{ id: 'tw-component:island-terrain', type: 'tidewater.terrain-surface/1', profile: 'example-island-v1', objectId: 'tw-object:island-terrain', dataAssetId: terrainSurfaceAssetId, priority: 'visible' },
+		{ id: 'tw-component:island-wildlife', type: 'tidewater.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'visible', streamingBounds: { center: [ 0, 0, - 40 ], radius: 300 }, roofPerches: generated.roofPerches, footprints: generated.villageFootprints },
 		{ id: 'tw-component:island-humpback', type: 'tidewater.humpback-whale/1', profile: 'example-island-humpback-v1', priority: 'visible', streamingBounds: { center: [ 0, - 4, 200 ], radius: 250 }, modelAssetId: whaleAssetIDs[ 0 ], geometryAssetId: whaleAssetIDs[ 1 ], albedoAssetId: whaleAssetIDs[ 2 ], heightAssetId: whaleAssetIDs[ 3 ], seed: EXAMPLE_ISLAND_WHALE_PROFILE.seed, route: EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed },
 		...reefComponents,
 		{ id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' },
@@ -392,6 +393,7 @@ function buildIslandProceduralContent( terrainData ) {
 		yaw: box.rotY,
 		walkable: box.walkable,
 		solid: box.solid,
+		tag: box.tag === 'pierRail' ? 'pierRail' : undefined,
 	} ) );
 	const B = new Builder();
 	const placer = new DebrisPlacer( { B, inst: new InstancedProps( B ), terrain: terrainData, village, vegetation, rocks, colliders } ).run();
@@ -418,6 +420,8 @@ function buildIslandProceduralContent( terrainData ) {
 		villageBatches: batches,
 		villageTriangles: batches.reduce( ( total, { batch } ) => total + batch.triangles, 0 ),
 		villageColliders,
+		roofPerches: village.buildings.filter( building => building.stilts && building.roofTop ).map( building => [ building.x, building.roofTop - 0.13, building.z ] ),
+		villageFootprints: village.getFootprints().map( ( { x, z, r } ) => ( { x, z, r } ) ),
 		fishProps: village.B.fishProps?.items || [],
 		boatBatches: buildBoatBatches(),
 		debris: placer.scanned,

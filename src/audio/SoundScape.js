@@ -1315,7 +1315,7 @@ export class SoundScape {
 	// the wildlife's flying / perched sea birds (window.__app.wildlife.birds.agents), if any
 	_flock() {
 
-		const app = globalThis.__app, w = app && app.wildlife, b = w && w.birds;
+		const app = globalThis.__app, w = app && ( app.activeHostedWildlife || app.wildlife ), b = w && w.birds;
 		return b && Array.isArray( b.agents ) && b.agents.length ? b.agents : null;
 
 	}
@@ -1491,7 +1491,7 @@ export class SoundScape {
 	_whale( now, dt ) {
 
 		const e = this.env, s = this._wh, app = globalThis.__app;
-		const w = app && app.whale, b = w && w.ready && w.brain;
+		const w = app && ( app.activeHostedWhale || app.whale ), b = w && w.ready && w.brain;
 		if ( ! b || ! b.position ) {
 
 			if ( this._beds.has( 'whale_song' ) ) this._bed( 'whale_song', 0, now, 1 );

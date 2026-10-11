@@ -314,6 +314,62 @@ func TestWorldManifestValidatesPortableTerrainSurface(t *testing.T) {
 	}
 }
 
+func TestWorldManifestValidatesExampleIslandWildlifeDependency(t *testing.T) {
+	owner := testKey(t)
+	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := newStarterManifest("Portable wildlife", ownerID.String())
+	manifest.WorldID = "tw-world:portable-wildlife"
+	manifest.Rules.RequiredFeatures = []string{"tidewater.terrain-surface/1", "tidewater.example-island-wildlife/1"}
+	glbID := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	terrainID := "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	manifest.Assets = []assetRef{
+		{ID: glbID, Bytes: 1, Kind: "glb", Priority: "visible"},
+		{ID: terrainID, Bytes: 16, Kind: "terrain-surface/1", Priority: "visible"},
+	}
+	var fallback worldObject
+	if err := json.Unmarshal([]byte(`{"id":"tw-object:terrain-fallback","kind":"asset-instance","label":"Terrain fallback","assetId":"`+glbID+`","priority":"visible","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"none","enabled":false}}`), &fallback); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Objects = []worldObject{fallback}
+	wildlife := worldComponent{
+		ID: "tw-component:island-wildlife", Type: "tidewater.example-island-wildlife/1",
+		Profile: "example-island-wildlife-v1", Seed: 5, Priority: "visible",
+		StreamingBounds: &streamingBounds{Center: vector3{0, -4, 0}, Radius: 300},
+		RoofPerches:     [][]float64{{1, 2, 3}}, Footprints: []wildlifeFootprint{{X: 1, Z: 2, R: 3}},
+	}
+	terrain := worldComponent{
+		ID: "tw-component:terrain-surface", Type: "tidewater.terrain-surface/1",
+		Profile: "example-island-v1", ObjectID: fallback.ID, DataAssetID: terrainID, Priority: "visible",
+	}
+	manifest.Components = []worldComponent{wildlife, terrain}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid wildlife with a later-listed terrain dependency rejected: %v", err)
+	}
+	manifest.Components = []worldComponent{wildlife}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("wildlife without packaged terrain accepted")
+	}
+	manifest.Components = []worldComponent{wildlife, terrain}
+	manifest.Components[1].Priority = "background"
+	manifest.Assets[1].Priority = "background"
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("wildlife that streams before terrain accepted")
+	}
+	manifest.Components[1].Priority = "visible"
+	manifest.Assets[1].Priority = "visible"
+	manifest.Components = append(manifest.Components, terrain)
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("duplicate terrain surfaces accepted")
+	}
+	var unknownFields []worldComponent
+	if err := json.Unmarshal([]byte(`[{"id":"tw-component:wildlife","type":"tidewater.example-island-wildlife/1","profile":"example-island-wildlife-v1","seed":5,"streamingBounds":{"center":[0,0,0],"radius":1},"roofPerches":[],"footprints":[],"extra":true}]`), &unknownFields); err == nil {
+		t.Fatal("unknown wildlife controls accepted")
+	}
+}
+
 func TestWorldManifestValidatesHostedBoatBerthAsset(t *testing.T) {
 	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {
@@ -877,10 +933,15 @@ func TestWorldManifestValidatesEnabledObjectCollisionBounds(t *testing.T) {
 		t.Fatal("oversized heightfield collision accepted")
 	}
 	manifest.Objects[0].Collision.Shape = "compound"
-	manifest.Objects[0].Collision.Boxes = []collisionBox{{Center: vector3{1, 2, 3}, HalfExtents: vector3{1, 0.5, 2}, Yaw: 0.4, Walkable: true, Solid: true}}
+	manifest.Objects[0].Collision.Boxes = []collisionBox{{Center: vector3{1, 2, 3}, HalfExtents: vector3{1, 0.5, 2}, Yaw: 0.4, Walkable: true, Solid: true, Tag: "pierRail"}}
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
 		t.Fatalf("valid compound collision rejected: %v", err)
 	}
+	manifest.Objects[0].Collision.Boxes[0].Tag = "arbitrary"
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("unsupported compound collision tag accepted")
+	}
+	manifest.Objects[0].Collision.Boxes[0].Tag = "pierRail"
 	manifest.Objects[0].Collision.Boxes[0].Yaw = 361
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("out-of-range compound collider yaw accepted")

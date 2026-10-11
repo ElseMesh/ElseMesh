@@ -30,7 +30,7 @@ const FLUSH = { [ BIRD.GULL ]: 7, [ BIRD.PELICAN ]: 5.5, [ BIRD.TERN ]: 9 };
 
 export class Birds {
 
-	constructor( { terrain, village, colliders, boat, boatModel, water, spray, seed = 11 } ) {
+	constructor( { terrain, village, colliders, boat, boatModel, roofPerches = [], water, spray, seed = 11 } ) {
 
 		this.terrain = terrain;
 		this.boat = boat;
@@ -40,7 +40,7 @@ export class Birds {
 		this.rng = mulberry32( seed );
 		this.time = 0;
 		this.agents = [];
-		this.perches = this.buildPerches( village, colliders );
+		this.perches = this.buildPerches( village, colliders, roofPerches );
 		this.wind = new THREE.Vector2();
 
 		const rng = this.rng;
@@ -105,7 +105,7 @@ export class Birds {
 
 	// ------------------------------------------------------------------ perches
 
-	buildPerches( village, colliders ) {
+	buildPerches( village, colliders, roofPerches = [] ) {
 
 		const P = [];
 		const rng = this.rng;
@@ -146,6 +146,7 @@ export class Birds {
 			}
 
 		}
+		for ( const [ x, y, z ] of roofPerches ) add( x, y, z, 'roof', [ 'gull' ] );
 
 		// the moored boat's wheelhouse roof (follows the boat)
 		if ( this.boat && this.boatModel && this.boatModel.dimensions ) {
@@ -168,6 +169,16 @@ export class Birds {
 		}
 
 		return P;
+
+	}
+
+	setBoat( boat, boatModel ) {
+
+		this.boat = boat;
+		this.boatModel = boatModel;
+		if ( ! boat || ! boatModel?.dimensions || this.perches.some( perch => perch.kind === 'boat' ) ) return;
+		const local = new THREE.Vector3( - 0.5, boatModel.dimensions.houseRoofHeight, 0.15 );
+		this.perches.push( { x: 0, y: 0, z: 0, kind: 'boat', kinds: [ 'gull' ], bird: null, yawJitter: ( this.rng() - 0.5 ) * 0.8, local } );
 
 	}
 

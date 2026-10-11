@@ -102,6 +102,7 @@ type collisionBox struct {
 	Yaw         float64 `json:"yaw"`
 	Walkable    bool    `json:"walkable"`
 	Solid       bool    `json:"solid"`
+	Tag         string  `json:"tag,omitempty"`
 }
 
 type portalBack struct {
@@ -202,26 +203,34 @@ func (object *worldObject) UnmarshalJSON(data []byte) error {
 }
 
 type worldComponent struct {
-	ID               string           `json:"id"`
-	Type             string           `json:"type"`
-	ObjectID         string           `json:"objectId,omitempty"`
-	Seed             uint32           `json:"seed,omitempty"`
-	Priority         string           `json:"priority,omitempty"`
-	PlacementAssetID string           `json:"placementAssetId,omitempty"`
-	DataAssetID      string           `json:"dataAssetId,omitempty"`
-	ModelAssetID     string           `json:"modelAssetId,omitempty"`
-	GeometryAssetID  string           `json:"geometryAssetId,omitempty"`
-	AlbedoAssetID    string           `json:"albedoAssetId,omitempty"`
-	HeightAssetID    string           `json:"heightAssetId,omitempty"`
-	Route            [][]float64      `json:"route,omitempty"`
-	SurfaceAt        *float64         `json:"surfaceAt,omitempty"`
-	CruiseSpeed      *float64         `json:"cruiseSpeed,omitempty"`
-	SurfaceSpeed     *float64         `json:"surfaceSpeed,omitempty"`
-	StreamingBounds  *streamingBounds `json:"streamingBounds,omitempty"`
-	Center           []float64        `json:"center,omitempty"`
-	Extent           float64          `json:"extent,omitempty"`
-	Profile          string           `json:"profile,omitempty"`
-	Beds             []audioBed       `json:"beds,omitempty"`
+	ID               string              `json:"id"`
+	Type             string              `json:"type"`
+	ObjectID         string              `json:"objectId,omitempty"`
+	Seed             uint32              `json:"seed,omitempty"`
+	Priority         string              `json:"priority,omitempty"`
+	PlacementAssetID string              `json:"placementAssetId,omitempty"`
+	DataAssetID      string              `json:"dataAssetId,omitempty"`
+	ModelAssetID     string              `json:"modelAssetId,omitempty"`
+	GeometryAssetID  string              `json:"geometryAssetId,omitempty"`
+	AlbedoAssetID    string              `json:"albedoAssetId,omitempty"`
+	HeightAssetID    string              `json:"heightAssetId,omitempty"`
+	Route            [][]float64         `json:"route,omitempty"`
+	SurfaceAt        *float64            `json:"surfaceAt,omitempty"`
+	CruiseSpeed      *float64            `json:"cruiseSpeed,omitempty"`
+	SurfaceSpeed     *float64            `json:"surfaceSpeed,omitempty"`
+	StreamingBounds  *streamingBounds    `json:"streamingBounds,omitempty"`
+	Center           []float64           `json:"center,omitempty"`
+	Extent           float64             `json:"extent,omitempty"`
+	Profile          string              `json:"profile,omitempty"`
+	RoofPerches      [][]float64         `json:"roofPerches,omitempty"`
+	Footprints       []wildlifeFootprint `json:"footprints,omitempty"`
+	Beds             []audioBed          `json:"beds,omitempty"`
+}
+
+type wildlifeFootprint struct {
+	X float64 `json:"x"`
+	Z float64 `json:"z"`
+	R float64 `json:"r"`
 }
 
 type audioBed struct {
@@ -280,6 +289,9 @@ func (component *worldComponent) UnmarshalJSON(data []byte) error {
 		allowed["placementAssetId"] = true
 	case "tidewater.static-fish-props/1":
 		allowed["placementAssetId"] = true
+	case "tidewater.example-island-wildlife/1":
+		allowed["profile"], allowed["seed"] = true, true
+		allowed["roofPerches"], allowed["footprints"] = true, true
 	case "tidewater.humpback-whale/1":
 		allowed["profile"], allowed["seed"], allowed["route"] = true, true, true
 		allowed["surfaceAt"], allowed["cruiseSpeed"], allowed["surfaceSpeed"] = true, true, true
@@ -661,6 +673,9 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 					return errors.New("invalid compound collision box count")
 				}
 				for _, box := range object.Collision.Boxes {
+					if box.Tag != "" && box.Tag != "pierRail" {
+						return errors.New("unsupported compound collision tag")
+					}
 					for _, extent := range box.HalfExtents {
 						if math.IsNaN(extent) || math.IsInf(extent, 0) || extent <= 0 || extent > 1000 {
 							return errors.New("compound collision half extents out of bounds")
@@ -754,6 +769,10 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	boatCount := 0
 	fishPropsCount := 0
 	whaleCount := 0
+	wildlifeCount := 0
+	terrainSurfaceCount := 0
+	wildlifePriority := ""
+	terrainSurfacePriority := ""
 	var boatObject worldObject
 	waterBodies := make([]worldComponent, 0, 4)
 	assetRefs := make(map[string]assetRef, len(manifest.Assets))
@@ -765,6 +784,21 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		staticVegetation := component.Type == "tidewater.static-vegetation/1" && component.Seed == 0 && component.PlacementAssetID != ""
 		staticReef := component.Type == "tidewater.static-reef/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
 		staticFishProps := component.Type == "tidewater.static-fish-props/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
+		islandWildlife := component.Type == "tidewater.example-island-wildlife/1" && component.Seed > 0 && component.Profile == "example-island-wildlife-v1" && component.PlacementAssetID == "" && component.StreamingBounds != nil && component.RoofPerches != nil && len(component.RoofPerches) <= 64 && component.Footprints != nil && len(component.Footprints) <= 256
+		if islandWildlife {
+			for _, perch := range component.RoofPerches {
+				if len(perch) != 3 || vector3OutOfBounds(vector3{perch[0], perch[1], perch[2]}, 10000) {
+					islandWildlife = false
+					break
+				}
+			}
+			for _, footprint := range component.Footprints {
+				if math.IsNaN(footprint.X) || math.IsInf(footprint.X, 0) || math.Abs(footprint.X) > 10000 || math.IsNaN(footprint.Z) || math.IsInf(footprint.Z, 0) || math.Abs(footprint.Z) > 10000 || math.IsNaN(footprint.R) || math.IsInf(footprint.R, 0) || footprint.R <= 0 || footprint.R > 1000 {
+					islandWildlife = false
+					break
+				}
+			}
+		}
 		humpbackWhale := component.Type == "tidewater.humpback-whale/1" && component.Seed > 0 && component.PlacementAssetID == "" && component.Profile == "example-island-humpback-v1" && component.ModelAssetID != "" && component.GeometryAssetID != "" && component.AlbedoAssetID != "" && component.HeightAssetID != "" && component.StreamingBounds != nil && len(component.Route) >= 4 && len(component.Route) <= 32 && component.SurfaceAt != nil && *component.SurfaceAt >= 0 && *component.SurfaceAt <= 1 && component.CruiseSpeed != nil && *component.CruiseSpeed >= 0 && *component.CruiseSpeed <= 10 && component.SurfaceSpeed != nil && *component.SurfaceSpeed >= 0 && *component.SurfaceSpeed <= 10
 		if humpbackWhale {
 			for _, point := range component.Route {
@@ -807,6 +841,17 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		if staticFishProps {
 			fishPropsCount++
 		}
+		if islandWildlife {
+			wildlifeCount++
+			wildlifePriority = component.Priority
+		}
+		if terrainSurface {
+			terrainSurfaceCount++
+			if terrainSurfaceCount > 1 {
+				return errors.New("world may declare at most one packaged terrain surface")
+			}
+			terrainSurfacePriority = component.Priority
+		}
 		if humpbackWhale {
 			whaleCount++
 		}
@@ -819,7 +864,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			}
 			boatObject = preview
 		}
-		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !staticFishProps && !humpbackWhale && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || fishPropsCount > 1 || whaleCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
+		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !staticFishProps && !islandWildlife && !humpbackWhale && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || fishPropsCount > 1 || whaleCount > 1 || wildlifeCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
 			return fmt.Errorf("invalid or unsupported world component %q", component.ID)
 		}
 		if waterBody && (manifest.Rules.SeaLevel == nil || islandOceanCount > 0) || islandOcean && waterBodyCount > 0 {
@@ -917,6 +962,25 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			}
 		}
 		seenComponents[component.ID] = true
+	}
+	if wildlifeCount > 0 && terrainSurfaceCount == 0 {
+		return errors.New("Example Island wildlife requires a packaged terrain surface")
+	}
+	if wildlifeCount > 0 {
+		rank := func(priority string) int {
+			for index, candidate := range []string{"portal-preview", "visible", "nearby", "background"} {
+				if priority == candidate {
+					return index
+				}
+			}
+			if priority == "" {
+				return 1
+			}
+			return -1
+		}
+		if rank(terrainSurfacePriority) > rank(wildlifePriority) {
+			return errors.New("Example Island wildlife cannot stream before its terrain surface")
+		}
 	}
 	if boatCount > 0 {
 		if manifest.Rules.SeaLevel == nil || islandOceanCount != 1 && waterBodyCount == 0 {

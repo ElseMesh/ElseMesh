@@ -23,9 +23,10 @@ const CELL = 12;
 
 export class Crabs {
 
-	constructor( { terrain, village = null, colliders = null, vegetation = null, seed = 5 } ) {
+	constructor( { terrain, village = null, footprints = [], colliders = null, vegetation = null, seed = 5 } ) {
 
 		this.terrain = terrain;
+		this.footprints = footprints;
 		this.rng = mulberry32( seed );
 		this.burrows = this.placeBurrows( village, colliders );
 		this.homes = this.placeHomes( vegetation, colliders );
@@ -64,6 +65,7 @@ export class Crabs {
 			for ( const f of village.getFootprints() ) if ( Math.hypot( f.x - x, f.z - z ) < f.r ) return false;
 
 		}
+		if ( this.footprints.some( f => Math.hypot( f.x - x, f.z - z ) < f.r ) ) return false;
 
 		const e = 0.8;
 		const gx = T.heightAt( x + e, z ) - T.heightAt( x - e, z ), gz = T.heightAt( x, z + e ) - T.heightAt( x, z - e );

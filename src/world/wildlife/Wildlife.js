@@ -76,8 +76,8 @@ class WaterHeights {
 export class Wildlife {
 
 	constructor( {
-		scene, renderer, terrain, terrainGPU = null, shore = null, village = null, colliders = null, vegetation = null,
-		boat = null, boatModel = null, query = null, spray = null, csm = null,
+		scene, renderer, terrain, terrainGPU = null, shore = null, village = null, footprints = [], roofPerches = [], colliders = null, vegetation = null,
+		boat = null, boatModel = null, query = null, spray = null, csm = null, seed = 5,
 	} ) {
 
 		this.terrain = terrain;
@@ -85,7 +85,7 @@ export class Wildlife {
 		scene.add( this.birdBatch.mesh );
 		this.critterBatch = new CritterBatch();
 		scene.add( this.critterBatch.mesh );
-		this.crabs = new Crabs( { terrain, village, colliders, vegetation } );
+		this.crabs = new Crabs( { terrain, village, footprints, colliders, vegetation, seed } );
 		this.blobs = new ShadowBlobs();
 		scene.add( this.blobs.mesh );
 		let probe = null;
@@ -103,9 +103,9 @@ export class Wildlife {
 
 		}
 
-		this.shorebirds = new Shorebirds( { terrain, probe } );
+		this.shorebirds = new Shorebirds( { terrain, probe, seed: seed + 12 } );
 		this.water = new WaterHeights( query );
-		this.birds = new Birds( { terrain, village, colliders, boat, boatModel, water: this.water, spray } );
+		this.birds = new Birds( { terrain, village, colliders, boat, boatModel, roofPerches, water: this.water, spray, seed: seed + 6 } );
 		this.viewer = { x: 0, y: 0, z: 0, speed: 0, mode: 'walk', px: 0, pz: 0, init: false };
 		this.test = null;
 		this.cpuMs = 0;
@@ -167,6 +167,15 @@ export class Wildlife {
 		this.blobs.commit();
 		this.water.endFrame();
 		this.cpuMs += ( performance.now() - t0 - this.cpuMs ) * 0.05;
+
+	}
+
+	dispose() {
+
+		this.birdBatch.dispose();
+		this.critterBatch.dispose();
+		this.blobs.dispose();
+		this.shorebirds.probe?.dispose();
 
 	}
 

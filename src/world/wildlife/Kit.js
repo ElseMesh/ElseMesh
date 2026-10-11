@@ -152,6 +152,12 @@ export class InstanceRecords {
 
 	}
 
+	dispose() {
+
+		this.buffer.destroy();
+
+	}
+
 }
 
 // Instanced mesh drawing `records.count` instances; with a csm (SunShadows), shadows are cast into

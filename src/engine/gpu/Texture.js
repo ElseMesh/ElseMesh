@@ -311,8 +311,9 @@ export class StorageBuffer {
 
 	destroy() {
 
-		if ( this.gpu ) this.gpu.destroy();
+		this.gpu?.destroy();
 		this.gpu = null;
+		this.pendingData = null;
 
 	}
 

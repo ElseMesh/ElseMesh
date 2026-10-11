@@ -538,7 +538,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
 			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs } );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
-			this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
+			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
+			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			this.prepareHostedWorld( connector );
 			this.linkedWorldRoot.name = `hosted-world:${worldLink.worldId}`;
@@ -842,7 +843,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
-		for ( const component of connector.manifest.components || [] ) {
+		const installRank = { 'tidewater.static-vegetation/1': 0, 'tidewater.terrain-surface/1': 0, 'tidewater.downeast-boat/1': 1, 'tidewater.example-island-wildlife/1': 2 };
+		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( installRank[ a.type ] ?? 1 ) - ( installRank[ b.type ] ?? 1 ) );
+		for ( const component of components ) {
 			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'tidewater.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'tidewater.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
 			const count = installed.length;
 			if ( component.type === 'tidewater.procedural-island-vegetation/1' || component.type === 'tidewater.static-vegetation/1' ) {
@@ -870,6 +873,19 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					islandTerrain: true,
 					update: ( _dt, camera ) => terrain.update( camera, true ),
 					dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); terrainGPU.dispose(); if ( fallback ) fallback.visible = true; },
+				} );
+			} else if ( component.type === 'tidewater.example-island-wildlife/1' ) {
+				const terrain = root.userData.terrainData;
+				if ( ! terrain ) throw new Error( `Wildlife component ${component.id} requires the packaged terrain surface to install first` );
+				const vegetation = [ ...( root.userData.worldComponents || [] ), ...installed ].find( runtime => runtime.records?.palms ) || null;
+				const wildlife = new Wildlife( {
+					scene: root, renderer: this.renderer, terrain, footprints: component.footprints, roofPerches: component.roofPerches,
+					colliders: this.hostedColliders, vegetation, query: this.hostedQuery, spray: this.spray, csm: this.csm, seed: component.seed,
+				} );
+				installed.push( {
+					wildlife: true, wildlifeRuntime: wildlife,
+					update: ( dt, camera, player ) => wildlife.update( dt, camera, player ),
+					dispose: () => wildlife.dispose(),
 				} );
 			} else if ( component.type === 'tidewater.procedural-island-terrain/1' ) {
 				const fallback = root.children.find( ( child ) => child.userData.worldObjectId === component.objectId );
@@ -928,7 +944,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					whale.dispose();
 					throw error;
 				}
-				installed.push( { whale: true, update: ( dt, camera ) => whale.update( dt, camera ), dispose: () => whale.dispose() } );
+				installed.push( { whale: true, whaleInstance: whale, update: ( dt, camera ) => whale.update( dt, camera ), dispose: () => whale.dispose() } );
 			} else if ( component.type === 'tidewater.island-ocean/1' ) {
 				const lod = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
 				const mesh = new Mesh( lod.geometry, this.waterMaterial );
@@ -988,6 +1004,12 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const runtime = ( root.userData.worldComponents || [] ).find( ( component ) => component.hostedBoat );
 		this.activeHostedBoat = runtime || null;
 		this.player.boat = runtime ? runtime.activate( { query: this.hostedQuery, colliders: this.hostedColliders } ) : null;
+		const wildlife = ( root.userData.worldComponents || [] ).find( ( component ) => component.wildlife )?.wildlifeRuntime;
+		this.activeHostedWildlife = wildlife || null;
+		if ( wildlife ) {
+			wildlife.birds.setBoat( this.player.boat, runtime?.boat.model || null );
+		}
+		this.activeHostedWhale = ( root.userData.worldComponents || [] ).find( ( component ) => component.whale )?.whaleInstance || null;
 		if ( runtime ) {
 			const policy = vehiclePolicy( connector.manifest.rules );
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
@@ -1018,6 +1040,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.worldPresence?.dispose();
 		this.worldPresence = null;
 
+		this.activeHostedWildlife = null;
+		this.activeHostedWhale = null;
 		const runtime = this.activeHostedBoat;
 		if ( ! runtime ) return;
 		const controller = runtime.boat.controller;
@@ -1040,7 +1064,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const previewRoot = this.portalPreviewId ? this.portalPreparations.get( this.portalPreviewId )?.root : null;
 		const previewWater = ( previewRoot?.userData?.worldComponents || [] ).some( ( component ) => component.islandOcean || component.waterBody || component.reef );
 		if ( dt > 0 && ( activeWater || previewWater ) ) this.fft.update( dt );
-		for ( const component of components ) component.update( dt, camera );
+		for ( const component of components ) component.update( dt, camera, this.player );
 	}
 
 	updateWorldStreaming() {

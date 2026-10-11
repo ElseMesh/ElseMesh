@@ -117,8 +117,8 @@
             "maxCombinedComplexity": { "type": "integer", "minimum": 1, "maximum": 1000000 }
           },
           "allOf": [
-            { "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] }, "then": { "required": ["maxSpeed", "maxCombinedComplexity"] } },
-            { "if": { "properties": { "enabled": { "const": false } }, "required": ["enabled"] }, "then": { "not": { "anyOf": [{ "required": ["maxSpeed"] }, { "required": ["maxCombinedComplexity"] }] } } }
+            {"if":{"properties":{"enabled":{"const":true}},"required":["enabled"]},"then":{"required":["maxSpeed","maxCombinedComplexity"]}},
+            {"if":{"properties":{"enabled":{"const":false}},"required":["enabled"]},"then":{"not":{"anyOf":[{"required":["maxSpeed"]},{"required":["maxCombinedComplexity"]}]}}}
           ],
           "additionalProperties": false,
           "description": "Optional destination acceptance for the built-in Downeast boat. Accepted transfers apply maxSpeed and require configured avatar complexity plus the bundled boat's triangle count to fit maxCombinedComplexity. Omission or enabled=false denies vehicle transfer and suppresses open-portal previews while the player is aboard or at the helm."
@@ -171,7 +171,11 @@
       "format": "date-time"
     }
   },
-  "allOf": [{"if": {"properties": {"portals": {"contains": {"required": ["back"]}}}, "required": ["portals"]}, "then": {"properties": {"rules": {"required": ["requiredFeatures"], "properties": {"requiredFeatures": {"contains": {"const": "tidewater.portal-two-sided/1"}}}}}}}],
+  "allOf": [
+    {"if":{"properties":{"portals":{"contains":{"required":["back"]}}},"required":["portals"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"tidewater.portal-two-sided/1"}}}}}}},
+    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.example-island-wildlife/1"}},"required":["type"]},"maxContains":1}}}},
+    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.terrain-surface/1"}},"required":["type"]},"maxContains":1}}}}
+  ],
   "$defs": {
     "vector3": {
       "type": "array",
@@ -323,7 +327,8 @@
                   },
                   "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
                   "walkable": { "type": "boolean" },
-                  "solid": { "type": "boolean" }
+                  "solid": { "type": "boolean" },
+                  "tag": { "const": "pierRail", "description": "Optional semantic tag retained for bird perching on the Example Island pier rails." }
                 },
                 "additionalProperties": false
               }
@@ -463,6 +468,20 @@
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["id", "type", "profile", "seed", "streamingBounds", "roofPerches", "footprints"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
+            "type": { "const": "tidewater.example-island-wildlife/1" },
+            "profile": { "const": "example-island-wildlife-v1" },
+            "seed": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
+            "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
+            "roofPerches": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/vector3" }, "description": "Explicit world-space roof perches used by the Example Island bird simulation." },
+            "footprints": { "type": "array", "maxItems": 256, "items": { "type": "object", "required": ["x", "z", "r"], "properties": { "x": { "type": "number", "minimum": -10000, "maximum": 10000 }, "z": { "type": "number", "minimum": -10000, "maximum": 10000 }, "r": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 } }, "additionalProperties": false }, "description": "Portable building and prop exclusion circles used when placing shore wildlife." }
           },
           "additionalProperties": false
         },

@@ -11,6 +11,7 @@ export const SUPPORTED_WORLD_FEATURES = new Set( [
 	'tidewater.static-vegetation/1',
 	'tidewater.static-reef/1',
 	'tidewater.static-fish-props/1',
+	'tidewater.example-island-wildlife/1',
 	'tidewater.humpback-whale/1',
 	'tidewater.island-ocean/1',
 	'tidewater.water-body/1',

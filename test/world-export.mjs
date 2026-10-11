@@ -129,9 +129,9 @@ try {
 	assert.ok( boatObject, 'export includes the static moored boat preview' );
 	assert.equal( boatObject.lods?.length, 1, 'moored boat preview has a distant geometry variant' );
 	assert.ok( firstAssets.has( boatObject.lods[ 0 ].assetId ), 'moored boat LOD is part of the portable package' );
-	assert.deepEqual( source.rules.requiredFeatures, [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ], 'portable terrain, village, wildlife, props, reef, ocean, boat, audio, and portal renderer capabilities are declared' );
+	assert.deepEqual( source.rules.requiredFeatures, [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ], 'portable terrain, village, wildlife, props, reef, ocean, boat, audio, and portal renderer capabilities are declared' );
 	assert.equal( source.portals[ 0 ].destinationWorldId, 'tw-world:loz-underneath', 'the example island links to the portable LOZ-derived cave' );
-	assert.equal( source.components.length, 8 + source.components.filter( ( component ) => component.type === 'tidewater.static-reef/1' ).length, 'portable island declares village materials, vegetation, reef tiles, fish props, terrain renderer, humpback, ocean, boat, and ambient components' );
+	assert.equal( source.components.length, 9 + source.components.filter( ( component ) => component.type === 'tidewater.static-reef/1' ).length, 'portable island declares village materials, vegetation, reef tiles, fish props, terrain renderer, wildlife, humpback, ocean, boat, and ambient components' );
 	assert.equal( vegetationComponent.type, 'tidewater.static-vegetation/1', 'portable island uses terrain-independent, authored world-space vegetation placements' );
 	assert.match( vegetationComponent.placementAssetId, /^sha256:[0-9a-f]{64}$/, 'vegetation placement data is content addressed' );
 	assert.equal( vegetationComponent.priority, 'portal-preview', 'vegetation records are available for open portal previews' );
@@ -159,6 +159,11 @@ try {
 	assert.equal( terrainAsset.heights.length, terrainAsset.resolution ** 2, 'portable terrain surface contains its full-resolution heightfield' );
 	assert.equal( terrainAsset.metadata.rendererProfile, 'original-tidewater-terrain-v1', 'terrain asset pins its versioned material renderer contract' );
 	assert.ok( terrainAsset.metadata.material.paletteLinear.rockDark.length === 3, 'terrain package includes linear material palette parameters' );
+	const wildlife = source.components.find( ( component ) => component.type === 'tidewater.example-island-wildlife/1' );
+	assert.equal( wildlife?.profile, 'example-island-wildlife-v1', 'hosted island declares the versioned trusted wildlife runtime' );
+	assert.equal( wildlife?.priority, 'visible', 'wildlife waits for its terrain runtime instead of being constructed during portal preview' );
+	assert.ok( wildlife?.roofPerches.length > 0 && wildlife.roofPerches.length <= 64, 'portable wildlife carries bounded authored roof perches' );
+	assert.ok( wildlife?.footprints.length > 0 && wildlife.footprints.length <= 256, 'portable wildlife carries bounded building exclusion footprints' );
 	assert.deepEqual( source.components.find( ( component ) => component.type === 'tidewater.island-ocean/1' ), { id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' }, 'portable island declares its versioned ocean renderer for early portal previews' );
 	const boat = source.components.find( ( component ) => component.type === 'tidewater.downeast-boat/1' );
 	assert.deepEqual( boat, { id: 'tw-component:island-lobster-boat', type: 'tidewater.downeast-boat/1', objectId: 'tw-object:moored-lobster-boat', priority: 'portal-preview' }, 'portable island binds the trusted boat runtime to its signed world-local berth' );

@@ -60,6 +60,7 @@
       "tidewater.static-vegetation/1",
       "tidewater.static-reef/1",
       "tidewater.static-fish-props/1",
+      "tidewater.example-island-wildlife/1",
       "tidewater.humpback-whale/1",
       "tidewater.island-ocean/1",
       "tidewater.downeast-boat/1",
@@ -685,7 +686,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -700,7 +702,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -715,7 +718,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -730,7 +734,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -745,7 +750,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -760,7 +766,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -775,7 +782,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -790,7 +798,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -805,7 +814,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -820,7 +830,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -835,7 +846,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -850,7 +862,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -865,7 +878,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -880,7 +894,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -895,7 +910,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -910,7 +926,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -925,7 +942,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -940,7 +958,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -955,7 +974,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -970,7 +990,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -985,7 +1006,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1000,7 +1022,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1015,7 +1038,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1030,7 +1054,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1045,7 +1070,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1060,7 +1086,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1075,7 +1102,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1090,7 +1118,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1105,7 +1134,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1120,7 +1150,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1135,7 +1166,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1150,7 +1182,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1165,7 +1198,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1180,7 +1214,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1195,7 +1230,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1210,7 +1246,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1225,7 +1262,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1240,7 +1278,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1255,7 +1294,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1270,7 +1310,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1285,7 +1326,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1300,7 +1342,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1315,7 +1358,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1330,7 +1374,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1345,7 +1390,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1360,7 +1406,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1375,7 +1422,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1390,7 +1438,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1405,7 +1454,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1420,7 +1470,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1435,7 +1486,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1450,7 +1502,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1465,7 +1518,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1480,7 +1534,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1495,7 +1550,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1510,7 +1566,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1645,7 +1702,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1660,7 +1718,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1675,7 +1734,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1690,7 +1750,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1705,7 +1766,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1720,7 +1782,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1735,7 +1798,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1750,7 +1814,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1765,7 +1830,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -1780,7 +1846,8 @@
             ],
             "yaw": 0,
             "walkable": false,
-            "solid": true
+            "solid": true,
+            "tag": "pierRail"
           },
           {
             "center": [
@@ -12377,6 +12444,200 @@
       "objectId": "tw-object:island-terrain",
       "dataAssetId": "sha256:6aa0547b983d023f64c329f767e7711a56c40be4b1240b62f7d5d410b915f438",
       "priority": "visible"
+    },
+    {
+      "id": "tw-component:island-wildlife",
+      "type": "tidewater.example-island-wildlife/1",
+      "profile": "example-island-wildlife-v1",
+      "seed": 5,
+      "priority": "visible",
+      "streamingBounds": {
+        "center": [
+          0,
+          0,
+          -40
+        ],
+        "radius": 300
+      },
+      "roofPerches": [
+        [
+          67.8,
+          7.081561054555244,
+          -64.6
+        ],
+        [
+          79.8,
+          7.9690550253136445,
+          -70.4
+        ],
+        [
+          37.2,
+          7.90732275028513,
+          -72.4
+        ]
+      ],
+      "footprints": [
+        {
+          "x": 41.5,
+          "z": -111,
+          "r": 6
+        },
+        {
+          "x": 13.5,
+          "z": -106.5,
+          "r": 6.347071299343465
+        },
+        {
+          "x": 26.5,
+          "z": -112,
+          "r": 5.782218381404011
+        },
+        {
+          "x": 62.5,
+          "z": -106,
+          "r": 6.985466837676846
+        },
+        {
+          "x": 79,
+          "z": -110.5,
+          "r": 6.125410782277739
+        },
+        {
+          "x": 96,
+          "z": -115.5,
+          "r": 5.877400909914442
+        },
+        {
+          "x": -3,
+          "z": -125,
+          "r": 6.015361924162118
+        },
+        {
+          "x": 16.5,
+          "z": -130,
+          "r": 6.790826320300063
+        },
+        {
+          "x": 57.5,
+          "z": -128.5,
+          "r": 6.460388679233962
+        },
+        {
+          "x": 75.5,
+          "z": -132.5,
+          "r": 4.34682957019364
+        },
+        {
+          "x": 96.5,
+          "z": -135,
+          "r": 6.2644304369257
+        },
+        {
+          "x": 3.5,
+          "z": -151,
+          "r": 6.291812087098392
+        },
+        {
+          "x": 30.5,
+          "z": -149,
+          "r": 7.100793600809346
+        },
+        {
+          "x": 55,
+          "z": -152.5,
+          "r": 5.739635614091387
+        },
+        {
+          "x": 78.5,
+          "z": -156,
+          "r": 6.125410782277739
+        },
+        {
+          "x": 67.8,
+          "z": -64.6,
+          "r": 5.005948168962618
+        },
+        {
+          "x": 79.8,
+          "z": -70.4,
+          "r": 5.019004621945797
+        },
+        {
+          "x": 37.2,
+          "z": -72.4,
+          "r": 4.918252056394801
+        },
+        {
+          "x": 21.5,
+          "z": -119.5,
+          "r": 1.8747548783981962
+        },
+        {
+          "x": 68,
+          "z": -124,
+          "r": 1.8747548783981962
+        },
+        {
+          "x": 89,
+          "z": -146,
+          "r": 1.8747548783981962
+        },
+        {
+          "x": 43.5,
+          "z": -155.5,
+          "r": 1.8747548783981962
+        },
+        {
+          "x": 92.5,
+          "z": -57.5,
+          "r": 5.5
+        },
+        {
+          "x": 40.2,
+          "z": -113.2,
+          "r": 3.2808652046684816
+        },
+        {
+          "x": 20.799999999999997,
+          "z": -57.2,
+          "r": 2.4
+        },
+        {
+          "x": 17.9,
+          "z": -59.8,
+          "r": 2.4
+        },
+        {
+          "x": 63.5,
+          "z": -55.6,
+          "r": 2.4
+        },
+        {
+          "x": 84.6,
+          "z": -53.2,
+          "r": 2.4
+        },
+        {
+          "x": 102.5,
+          "z": -49.8,
+          "r": 4
+        },
+        {
+          "x": 41.8,
+          "z": -64.2,
+          "r": 2.2
+        },
+        {
+          "x": 74.6,
+          "z": -58.6,
+          "r": 2.2
+        },
+        {
+          "x": 86.4,
+          "z": -64,
+          "r": 2.2
+        }
+      ]
     },
     {
       "id": "tw-component:island-humpback",
