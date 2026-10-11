@@ -36,6 +36,20 @@ The Example Island package now includes the GPU-baked village PBR maps in its ow
 
 The hosted page initially reported `WebGL fallback failed (Cannot read properties of undefined (reading 'WebGLRenderer'))` after WebGPU adapter creation failed. `three@0.180` exposes `WebGLRenderer` as a named ESM export, not a default export. Commit `58f253c` changed the lazy import to use the module namespace and added a regression check. The Pages workflow succeeded, and the live page showed build stamp `58f253c8`; its fallback error changed to `WebGL fallback failed (Error creating WebGL context.)`. That confirms the module import defect is fixed and the renderer constructor was reached. This Chrome session has neither a usable WebGPU adapter nor a usable WebGL context, so it still cannot verify scene rendering. No game click or pointer-lock request was used. The separate `npm run test:webgl-backend` check and production build pass.
 
+## WebGL fallback scene and asset path, 2026-10-11
+
+Commit `40554cf` expanded the fallback scene with terrain colors derived from
+the packaged terrain masks and height data, multi-scale terrain detail,
+camera-following grass, and packaged vegetation placements. The full client
+test suite and Vite production build pass from the external build tree, and
+`npm run test:webgl-backend` passes. These checks establish that the fallback
+code bundles and backend selection works; they do not show how the scene looks
+or performs on an actual WebGL context. Matched-view browser verification is
+still outstanding, and the earlier browser session had no usable WebGL
+context. The optional Blender worker runtime test was also attempted but
+could not enter its Bubblewrap namespace in this container; it remains
+unverified here.
+
 ## Flip7 virtual-display smoke check, 2026-10-10
 
 The deployed `https://elsemesh.github.io/` page was opened in Chrome on the
