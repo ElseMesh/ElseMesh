@@ -365,6 +365,17 @@ export class WebGLFallback {
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
 				varying float vWaveHeight;
+				float hashWater( vec2 p ) {
+					p = fract( p * vec2( 123.34, 456.21 ) );
+					p += dot( p, p + 45.32 );
+					return fract( p.x * p.y );
+				}
+				float noiseWater( vec2 p ) {
+					vec2 i = floor( p ), f = fract( p );
+					f = f * f * ( 3.0 - 2.0 * f );
+					return mix( mix( hashWater( i ), hashWater( i + vec2( 1.0, 0.0 ) ), f.x ),
+						mix( hashWater( i + vec2( 0.0, 1.0 ) ), hashWater( i + vec2( 1.0, 1.0 ) ), f.x ), f.y );
+				}
 				void main() {
 					vec2 p = vWorldPosition.xz;
 					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 );
@@ -387,8 +398,16 @@ export class WebGLFallback {
 					}
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
-					float fresnel = 0.025 + 0.32 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
+					float fresnel = 0.025 + 0.86 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
 					vec3 sky = mix( vec3( 0.035, 0.12, 0.26 ), vec3( 0.22, 0.43, 0.68 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) );
+					vec2 skyP = reflectionDirection.xz / max( reflectionDirection.y + 0.14, 0.14 ) * 4.2 + vec2( uTime * 0.018, -uTime * 0.005 );
+					float reflectedCloudNoise = noiseWater( skyP * 0.72 ) * 0.68 + noiseWater( skyP * 1.8 + vec2( 7.3, -4.1 ) ) * 0.32;
+					float reflectedCloudBand = smoothstep( 0.055, 0.16, reflectionDirection.y ) * ( 1.0 - smoothstep( 0.72, 0.96, reflectionDirection.y ) );
+					float reflectedCloud = smoothstep( 0.51, 0.65, reflectedCloudNoise ) * reflectedCloudBand * 0.72;
+					float reflectedSun = pow( max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ), 96.0 );
+					vec3 cloudColor = mix( vec3( 0.42, 0.5, 0.62 ), vec3( 1.25, 1.16, 1.0 ), max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ) * 0.6 + 0.2 );
+					sky = mix( sky, cloudColor, reflectedCloud );
+					sky += vec3( 1.0, 0.72, 0.43 ) * reflectedSun * 0.14;
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = 0.5 + 0.5 * sin( dot( p, vec2( 0.62, 0.47 ) ) + uTime * 0.68 + sin( dot( p, vec2( -0.41, 0.73 ) ) * 1.6 - uTime * 0.43 ) );
 					float shallow = smoothstep( 0.0, 18.0, depth );
