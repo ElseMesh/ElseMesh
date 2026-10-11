@@ -15,29 +15,44 @@ import vegetationUrl from '../../worlds/island/lod-source/vegetation-placements.
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
 
-function webglCloudNoiseTexture( T, size = 128 ) {
+function webglCloudNoiseTexture( T, size = 512 ) {
 
-	const data = new Uint8Array( size * size * 4 ), rand = mulberry32( 27183 );
-	const lattices = [ 4, 8, 16, 32 ].map( n => {
-		const values = new Float32Array( n * n );
-		for ( let i = 0; i < values.length; i ++ ) values[ i ] = rand();
-		return { n, values };
-	} );
-	const smooth = t => t * t * ( 3 - 2 * t );
-	const sample = ( lattice, u, v ) => {
-		const { n, values } = lattice, x = u * n, y = v * n;
-		const ix = Math.floor( x ), iy = Math.floor( y ), fx = smooth( x - ix ), fy = smooth( y - iy );
-		const at = ( a, b ) => values[ ( ( ( b % n ) + n ) % n ) * n + ( ( ( a % n ) + n ) % n ) ];
-		return ( at( ix, iy ) * ( 1 - fx ) + at( ix + 1, iy ) * fx ) * ( 1 - fy )
-			+ ( at( ix, iy + 1 ) * ( 1 - fx ) + at( ix + 1, iy + 1 ) * fx ) * fy;
-	};
-	for ( let y = 0; y < size; y ++ ) for ( let x = 0; x < size; x ++ ) {
-		const u = ( x + 0.5 ) / size, v = ( y + 0.5 ) / size, i = ( y * size + x ) * 4;
-		for ( let c = 0; c < 4; c ++ ) {
-			const a = sample( lattices[ c ], u, v );
-			const b = sample( lattices[ Math.min( c + 1, 3 ) ], u, v );
-			data[ i + c ] = Math.round( ( a * 0.72 + b * 0.28 ) * 255 );
+	const data = new Uint8Array( size * size * 4 ), channels = [ [ 32, 17 ], [ 40, 29 ], [ 48, 43 ], [ 64, 61 ] ];
+	const fade = t => t * t * t * ( t * ( t * 6 - 15 ) + 10 );
+	for ( let c = 0; c < 4; c ++ ) {
+
+		const [ frequency, seed ] = channels[ c ], rand = mulberry32( seed ), octaves = [];
+		for ( let o = 0; o < 3; o ++ ) {
+			const n = frequency << o, gradients = new Float32Array( n * n * 2 );
+			for ( let i = 0; i < n * n; i ++ ) {
+				const angle = rand() * Math.PI * 2;
+				gradients[ i * 2 ] = Math.cos( angle ); gradients[ i * 2 + 1 ] = Math.sin( angle );
+			}
+			octaves.push( { n, gradients } );
 		}
+
+		const values = new Float32Array( size * size );
+		let min = Infinity, max = - Infinity;
+		for ( let y = 0; y < size; y ++ ) for ( let x = 0; x < size; x ++ ) {
+			let value = 0, amplitude = 1, weight = 0;
+			for ( const { n, gradients } of octaves ) {
+				const px = x / size * n, py = y / size * n, ix = Math.floor( px ), iy = Math.floor( py ), fx = px - ix, fy = py - iy;
+				const at = ( gx, gy, dx, dy ) => {
+					const index = ( ( ( gy % n ) + n ) % n ) * n + ( ( ( gx % n ) + n ) % n );
+					return gradients[ index * 2 ] * dx + gradients[ index * 2 + 1 ] * dy;
+				};
+				const u = fade( fx ), v = fade( fy );
+				const a = at( ix, iy, fx, fy ) * ( 1 - u ) + at( ix + 1, iy, fx - 1, fy ) * u;
+				const b = at( ix, iy + 1, fx, fy - 1 ) * ( 1 - u ) + at( ix + 1, iy + 1, fx - 1, fy - 1 ) * u;
+				value += ( a * ( 1 - v ) + b * v ) * amplitude;
+				weight += amplitude; amplitude *= 0.5;
+			}
+			value /= weight;
+			values[ y * size + x ] = value;
+			min = Math.min( min, value ); max = Math.max( max, value );
+		}
+		for ( let i = 0; i < values.length; i ++ ) data[ i * 4 + c ] = Math.round( ( values[ i ] - min ) / ( max - min ) * 255 );
+
 	}
 	const texture = new T.DataTexture( data, size, size, T.RGBAFormat, T.UnsignedByteType );
 	texture.wrapS = texture.wrapT = T.RepeatWrapping;
@@ -506,21 +521,20 @@ export class WebGLFallback {
 					vec3 sky = mix( nightSky, daySky, day );
 					float sunGlow = pow( max( dot( dir, normalize( uSunDirection ) ), 0.0 ), 10.0 ) * day;
 					sky += vec3( 0.16, 0.095, 0.035 ) * sunGlow;
-					vec2 p = dir.xz / max( dir.y + 0.14, 0.14 );
-					p = p * 4.2 + vec2( uTime * 0.018, -uTime * 0.005 );
-					vec2 uv = p * 0.035;
-					vec4 field = texture2D( uCloudNoise, uv );
-					vec2 warp = ( field.rg - 0.5 ) * 0.22;
-					float broad = texture2D( uCloudNoise, uv * 0.72 + warp ).b * 0.58 + field.r * 0.42;
+					vec2 uv = vec2( atan( dir.x, dir.z ) / 6.2831853 + 0.5, asin( clamp( dir.y, -1.0, 1.0 ) ) / 3.1415927 + 0.5 );
+					uv += vec2( uTime * 0.0005, -uTime * 0.00014 );
+					vec4 field = texture2D( uCloudNoise, uv * 0.38 );
+					vec2 warp = ( field.rg - 0.5 ) * 0.024;
+					float broad = texture2D( uCloudNoise, uv * 0.72 + warp ).r;
 					float detail = texture2D( uCloudNoise, uv * 1.8 + vec2( 0.17, -0.11 ) ).g;
-					float fine = texture2D( uCloudNoise, uv * 4.0 + vec2( 0.31, -0.19 ) ).a;
+					float fine = texture2D( uCloudNoise, uv * 4.0 + vec2( 0.31, -0.19 ) ).b;
 					float n = broad - max( 0.0, 0.52 - detail ) * 0.32 + ( fine - 0.5 ) * 0.045;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
-					float alpha = smoothstep( 0.51, 0.65, n ) * band * 0.92;
+					float alpha = smoothstep( 0.58, 0.72, n ) * band * 0.9;
 					float sun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
 					float fullness = smoothstep( 0.51, 0.72, broad );
-					float densityLeft = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.012, 0.0 ) ).b;
-					float densityUp = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.0, 0.012 ) ).b;
+					float densityLeft = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.003, 0.0 ) ).r;
+					float densityUp = texture2D( uCloudNoise, uv * 0.72 + warp - vec2( 0.0, 0.003 ) ).r;
 					vec2 gradient = vec2( broad - densityLeft, broad - densityUp );
 					vec2 sunPlane = normalize( uSunDirection.xz + vec2( 0.0001 ) );
 					float lobeLight = clamp( 0.5 + dot( normalize( gradient + vec2( 0.0001 ) ), sunPlane ) * 0.5, 0.0, 1.0 );
