@@ -3,11 +3,12 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: tools/elsemesh-chromium-webgpu.sh [URL]
+Usage: tools/elsemesh-chromium-webgpu.sh [--enable-tab-audio-muting] [URL]
 
 Open an ElseMesh URL in a dedicated Chromium window with WebGPU enabled and
 full-resolution graphics. The normal tab strip stays visible so you can mute
-the game's tab by clicking its speaker icon. The default URL is
+the game's tab by clicking its speaker icon. Tab audio muting is enabled by
+default; the option is accepted for clarity. The default URL is
 https://elsemesh.org/?quality=1.
 
 Set CHROMIUM to choose the Chromium executable and
@@ -15,12 +16,32 @@ ELSEMESH_CHROMIUM_PROFILE to choose its isolated profile directory.
 EOF
 }
 
-if [[ ${1:-} == -h || ${1:-} == --help ]]; then
-  usage
-  exit 0
-fi
-
-url=${1:-https://elsemesh.org/?quality=1}
+url=https://elsemesh.org/?quality=1
+url_supplied=false
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --enable-tab-audio-muting)
+      ;;
+    -* )
+      echo "Unknown option: $arg" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [[ $url_supplied == true ]]; then
+        echo "Only one URL may be specified." >&2
+        usage >&2
+        exit 2
+      fi
+      url=$arg
+      url_supplied=true
+      ;;
+  esac
+done
 chromium=${CHROMIUM:-}
 if [[ -z $chromium ]]; then
   for candidate in chromium chromium-browser google-chrome; do
