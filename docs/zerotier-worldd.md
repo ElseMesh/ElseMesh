@@ -811,19 +811,25 @@ interfaces.
 Two disposable Linux daemons with separate ZeroTier state directories joined
 `e3918db4832a3056` using the automatic interface policy. Both selected only
 `wlo1`; the policy excluded `spod`, Docker, `br-winproxy`, and existing
-ZeroTier interfaces. Both daemons received managed IPv4 and 6PLANE addresses,
-but the second daemon's libp2p bootstrap dial to the first timed out. Because
-both nodes ran on one host, this is not an independent-NAT connectivity test.
+ZeroTier interfaces. An initial test using custom ports `43041` and `43042`
+timed out. That result was invalid: the configured flow rules allow TCP peer
+traffic on `42901`, not those custom ports.
 
-During simultaneous startup/path probes, libzt emitted a small set of
-`ZT_SECURITY: EXCESSIVE_ECHO` messages for ECHO requests from the other
-temporary node, arriving on the selected Wi-Fi address. This event is emitted
-when the existing per-path inbound ECHO gate declines to answer more than one
-request per `ZT_PEER_GENERAL_RATE_LIMIT / 6` (about 167 ms). The underlying
-gate is present in the ZeroTier source since 2022; the fork added the
-low-threat security-event reporting. These observations show bursts during
-path discovery, but do not establish that the gate caused the unrelated
-libp2p bootstrap timeout or that the gate is misconfigured. No ZeroTierOne
-threshold change was made. Stop or remove these temporary daemons and state
-directories after the check; they do not affect the persistent device
-identity.
+The corrected test ran the first daemon on TCP `42901` at managed IPv4
+`172.22.13.62` and the second daemon on local TCP `42902` at `172.22.207.68`.
+The second bootstrapped to the first at `/ip4/172.22.13.62/tcp/42901`. Both
+`/healthz` endpoints reported `libp2pPeers: 1` and `dhtRoutingPeers: 1`. This
+proves the two libzt-backed daemons exchanged peer traffic when the dial target
+used the allowed port. Since both daemons ran on one host, this does not prove
+cross-device or cross-NAT connectivity.
+
+`ZT_SECURITY: EXCESSIVE_ECHO` events from the connected peer still appeared on
+the selected Wi-Fi address. The per-path inbound ECHO gate suppresses replies
+more frequent than `ZT_PEER_GENERAL_RATE_LIMIT / 6` (about 167 ms); the
+underlying gate has been in ZeroTier since 2022 and the fork adds low-threat
+security-event reporting. Events later showed `Threat:MEDIUM`, from the
+monitor's accumulated classification, while both peer connections remained
+healthy. The gate does not suppress ordinary world traffic, and this test does
+not justify changing its threshold. Both daemons were stopped and their
+temporary state removed; persistent identities and Central policy were
+untouched.
