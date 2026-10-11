@@ -896,3 +896,38 @@ dependency. This cross-build supersedes the older Android package hashes in
 the preceding section, but it has not been installed or run on a phone.
 Current ADB lists no device, and SSH to the Flip7's configured LAN address
 returns `No route to host`.
+
+### Default Android `thruholdd` cgo build (2026-10-11)
+
+A fresh build from ElseMesh `8d23b2964cece02ed3fc7d24810afd3a6ac87f72` now
+passes with NDK r29/API 26 when the Android compiler is selected explicitly
+and no extra C++ runtime library is injected:
+
+```sh
+BUILD=/mnt/kingston/builds/rebroad/src/elsemesh.build/android-sso-check
+NDK=/home/rebroad/Android/Sdk/ndk/29.0.14206865
+THRUHOLDD_BUILD_SERVER="$BUILD/server" \
+THRUHOLDD_OUT="$BUILD/out-default" \
+GOOS=android GOARCH=arm64 \
+CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" \
+tools/build-thruholdd.sh
+```
+
+The build input was synced into the isolated external build directory with
+`cpto`; the existing server build outputs were not overwritten. `file` and
+`readelf` identify an AArch64 Android PIE with `/system/bin/linker64`, API 26,
+and `$ORIGIN` runpath. Its dynamic dependencies are `libzt.so` plus Android
+platform libraries; neither the daemon nor bundled libzt needs
+`libc++_shared.so` in this default configuration. The bundled libzt SHA-256
+matches the external Android libzt build:
+`65d054a19651c576b415b90f4717c1e64c7c4c4918ba852083ce35e204512de1`.
+The daemon binary SHA-256 is
+`b8d1351f1e2982111a7237bb1c4c1fec0e567f141b5ae00a2a92438a73c4ce9d`, and its
+embedded build revision matches the source HEAD.
+
+This resolves the earlier cross-linker uncertainty for the default build
+configuration only. A build that explicitly adds `-lc++_shared` does acquire a
+runtime dependency on that library; do not add that flag unless the matching
+NDK runtime is packaged beside the binary. This cross-build still does not
+prove that the daemon starts or joins the overlay on Android. ADB currently
+lists no device and SSH to the Flip7 reports `Network is unreachable`.
