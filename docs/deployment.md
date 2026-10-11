@@ -56,27 +56,32 @@ Pages origin to the new one or to the custom domain.
 
 ## elsemesh.org
 
-DNS inspection on 2026-10-02 found Namecheap nameservers, an apex parking address
-`162.255.119.79` and `www` pointing to `parkingpage.namecheap.com`. The domain is
-not yet connected to Pages. Preserve unrelated DNS records, including email.
+DNS inspection on 2026-10-11 confirms Namecheap nameservers, an apex parking
+address `162.255.119.79`, and `www` pointing to `parkingpage.namecheap.com`.
+The domain is not yet connected to Pages. Preserve the existing email records:
+MX priorities 10 (`eforward1`, `eforward2`, `eforward3`), 15 (`eforward4`),
+and 20 (`eforward5`) under `registrar-servers.com`, plus the apex SPF record
+`v=spf1 include:spf.efwd.registrar-servers.com ~all`. The zone currently has
+no apex AAAA or CAA records. Nameservers are `dns1.registrar-servers.com` and
+`dns2.registrar-servers.com`.
 
-Rechecked on 2026-10-11: `elsemesh.org` still resolves to `162.255.119.79` and
-HTTPS does not respond. `www.elsemesh.org` does not resolve in the local
-resolver. GitHub Pages serves the static client at `https://elsemesh.github.io/`,
-but `/healthz`, `/api/lookup`, and `/gateway` return 404 there; Pages is not a
-world gateway. No local `elsemesh-gateway` or Caddy service is active, and this
-host has no listener on TCP 80, 443, 5200, or 42901. Thus no public gateway or
-relay endpoint is currently deployed or available to test. The service and
-firewall examples below remain deployment instructions, not evidence of a
-running service.
+The same DNS check confirms `elsemesh.org` still resolves to the parking IP;
+HTTPS does not respond, and `www` remains parked. GitHub Pages serves the
+static client at `https://elsemesh.github.io/`, but `/healthz`, `/api/lookup`,
+and `/gateway` return 404 there; Pages is not a world gateway. The deployment
+host previously had no active `elsemesh-gateway` or Caddy service and no
+listener on TCP 80, 443, 5200, or 42901. No public gateway or relay endpoint is
+verified; the service and firewall examples below are deployment instructions,
+not evidence of a running service.
 
 1. Verify the domain for the **ElseMesh organisation** in GitHub Pages settings
    using the organisation-provided TXT verification record.
 2. Set the repository Pages custom domain to `elsemesh.org` (Actions deployments
    use the Pages setting; adding a tracked CNAME file is not required).
-3. Replace apex parking/URL-redirection records with these four A records for `@`:
+3. Replace only the apex parking/URL-redirection A record with these four A records for `@`:
    `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`.
-4. Replace the `www` parking CNAME with `elsemesh.github.io`.
+4. Replace the `www` parking CNAME with `elsemesh.github.io`. Keep all five MX
+   records and the apex SPF TXT record listed above.
 5. Wait for DNS validation and certificate provisioning, then enforce HTTPS and
    verify https://elsemesh.org/ plus a selected-world invite. The same query
    arguments work at the domain root.
