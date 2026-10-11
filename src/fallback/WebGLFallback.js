@@ -1,5 +1,7 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { TerrainData } from '../world/TerrainData.js';
+import { WORLD } from '../world/WorldLayout.js';
+import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
 import { keyboardLookDelta } from '../core/Input.js';
@@ -234,6 +236,34 @@ function webglTerrainWaterTexture( T, terrain ) {
 
 }
 
+function webglShoreFieldTexture( T, terrain, seaLevel ) {
+
+	const field = computeShoreField( terrain, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ], seaLevel } );
+	const data = new Uint8Array( field.res * field.res * 4 );
+	let minTime = Infinity, maxTime = - Infinity;
+	for ( let i = 0; i < field.res * field.res; i ++ ) {
+		const source = i * 4, arrival = field.data[ source ];
+		if ( field.depth[ i ] > 0 && arrival < 10000 ) { minTime = Math.min( minTime, arrival ); maxTime = Math.max( maxTime, arrival ); }
+	}
+	if ( ! Number.isFinite( minTime ) || ! Number.isFinite( maxTime ) ) return null;
+	const timeRange = Math.max( maxTime - minTime, 1e-6 );
+	for ( let i = 0; i < field.res * field.res; i ++ ) {
+		const source = i * 4, directionLength = Math.hypot( field.data[ source + 1 ], field.data[ source + 2 ] );
+		const exposure = Math.min( 1, directionLength ), arrival = Math.max( minTime, Math.min( maxTime, field.data[ source ] ) );
+		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : WORLD.swellDir.x ) * 0.5 + 0.5 ) * 255 );
+		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : WORLD.swellDir.y ) * 0.5 + 0.5 ) * 255 );
+		data[ source + 2 ] = Math.round( exposure * 255 );
+		data[ source + 3 ] = Math.round( ( arrival - minTime ) / timeRange * 255 );
+	}
+	const texture = new T.DataTexture( data, field.res, field.res, T.RGBAFormat, T.UnsignedByteType );
+	texture.wrapS = texture.wrapT = T.ClampToEdgeWrapping;
+	texture.magFilter = texture.minFilter = T.LinearFilter;
+	texture.generateMipmaps = false;
+	texture.needsUpdate = true;
+	return { texture, timeRange: new T.Vector2( minTime, maxTime ), origin: field.origin, size: field.size };
+
+}
+
 function webglGrassMesh( T, terrain, camera, previous ) {
 
 	const radius = 42, spacing = 0.46, positions = [], colors = [], indices = [];
@@ -457,12 +487,18 @@ export class WebGLFallback {
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
+				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
+				uShoreTimeRange: { value: terrainWater?.shore?.timeRange || new T.Vector2() },
 			},
 			vertexShader: /* glsl */`
 				uniform float uTime;
 				uniform sampler2D uTerrainHeight;
+				uniform sampler2D uShoreField;
 				uniform float uTerrainOrigin;
 				uniform float uTerrainSize;
+				uniform float uShoreFieldOrigin;
+				uniform float uShoreFieldSize;
+				uniform vec2 uShoreTimeRange;
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
@@ -488,18 +524,24 @@ export class WebGLFallback {
 							vec4 terrain = texture2D( uTerrainHeight, terrainUv );
 							float encodedHeight = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
 							float depth = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, encodedHeight );
-							if ( depth > -0.25 && depth < 26.0 ) {
-								float along = p.x;
+							if ( depth > -0.25 && depth < 26.0 && uShoreFieldSize > 0.0 ) {
+								vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
+								vec4 shore = texture2D( uShoreField, shoreUv );
+								vec2 shoreDirection = normalize( shore.rg * 2.0 - 1.0 );
+								float exposure = shore.b;
+								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
+								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
 								float warp = sin( along * 0.016 ) * 1.6;
-								float alongVariation = sin( along * 0.062 + warp ) * 0.6 + sin( along * 0.13 + 1.3 - warp * 0.7 ) * 0.4;
-								alongVariation += ( sin( along * 0.29 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + 0.8 ) * 0.4 ) * 0.28;
-								float phase = uTime / 9.0 - p.y / ( sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0 );
-								phase += sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035;
+								float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
+								float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
+								float phase = ( uTime - arrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 								float waveIndex = floor( phase + 0.5 );
+								float alongVariation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
+								alongVariation += ( sin( along * 0.29 + waveIndex * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + waveIndex * 5.9 + 0.8 ) * 0.4 ) * 0.28;
 								float u = phase - waveIndex;
 								float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
 								float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
-								float amplitude = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + alongVariation * 0.385 ), 0.02 );
+								float amplitude = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + alongVariation * 0.385 ) * bar, 0.02 );
 								float breakDepth = pow( amplitude * 3.556 / 0.78, 0.8 );
 								float breaking = ( breakDepth - depth ) / max( breakDepth * 0.13, 0.05 );
 								float shoaledAmplitude = amplitude * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
@@ -509,7 +551,7 @@ export class WebGLFallback {
 								float phaseSkew = u - skew * ( 1.0 - cos( u * 6.2831853 ) ) / 6.2831853;
 								float skewCrest = max( ( cos( phaseSkew * 6.2831853 ) + 1.0 ) * 0.5, 0.0 );
 								float curl = smoothstep( -3.0, 0.0, breaking );
-								float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth );
+								float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * smoothstep( 0.02, 0.3, exposure );
 								float preHeight = shoaledAmplitude * 2.0 * ( pow( skewCrest, sharpness ) - meanProfile ) * ( 1.0 + smoothstep( -1.0, 0.3, breaking ) * 0.22 );
 								vShoreSlope = 2.0 * shoaledAmplitude * sharpness * 3.14159265 * pow( skewCrest, max( sharpness - 1.0, 0.0 ) ) * sin( phaseSkew * 6.2831853 ) * ( 1.0 - skew * sin( u * 6.2831853 ) ) / ( sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0 ) * env;
 								vWaveHeight += preHeight * env;
@@ -524,7 +566,7 @@ export class WebGLFallback {
 								float impact = smoothstep( 0.86, 0.99, breaking ) * ( 1.0 - smoothstep( 1.4, 1.9, breaking ) ) * exp( -abs( u - 0.08 ) * 38.0 );
 								float roller = bore * exp( -abs( u + 0.08 ) * 24.0 );
 								vShoreFoam = max( impact, roller ) * env * smoothstep( 0.15, 0.55, alongVariation + 0.6 );
-								world.z += sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 * env;
+								world.xz += shoreDirection * sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 * env;
 								vWaveHeight += ( crestHeight - preHeight ) * env;
 							}
 						}
@@ -585,7 +627,7 @@ export class WebGLFallback {
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
 					vec3 sceneColor = screenColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
-					vec3 absorption = exp( -vec3( 0.08, 0.027, 0.012 ) * min( depth, 60.0 ) );
+					vec3 absorption = exp( -vec3( 0.42, 0.075, 0.035 ) * min( depth, 60.0 ) );
 					vec3 refractedBed = mix( seabedColor, sceneColor, 0.1 ) * vec3( 0.58, 0.86, 0.96 );
 					vec3 transmitted = refractedBed * absorption + vec3( 0.008, 0.13, 0.17 ) * ( 1.0 - absorption );
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
@@ -779,8 +821,10 @@ export class WebGLFallback {
 			const terrain = new T.Mesh( geometry, new T.MeshStandardMaterial( { vertexColors: true, roughness: 0.94, side: T.DoubleSide } ) );
 			terrain.receiveShadow = true; this.scene.add( terrain );
 		}
+		progress( 0.52, 'Mapping the coastal swell…' );
 		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
-		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 512, 512 ), - 0.15, waterTerrain ) );
+		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, - 0.15 );
+		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 1024, 1024 ), - 0.15, waterTerrain ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( villageUrl );
