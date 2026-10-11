@@ -779,11 +779,22 @@ persistent identity, route, or firewall rule was changed.
 
 The firewall log during this interval contained outgoing `SDROP` records on
 `spod` from `137.205.192.1` to ZeroTier root IPs, including UDP destination
-ports 9993 and 21045. Kernel route lookups for the same destinations selected
-the Wi-Fi gateway `192.168.20.1` on `wlo1`. These records do not identify the
-originating process, and the route lookup does not reveal which interface an
-individual libzt socket used. Since the daemon joined successfully, the drops
-did not prevent this join; the successful physical path is still unproven. No
-firewall rule was changed. The next path test must correlate process-owned
-socket endpoints and libzt path-query data with the firewall log before
-considering any `spod` rule change.
+ports 9993 and 21045. A process-level check then matched the logged source
+ports to UDP sockets owned by this exact `thruholdd` PID. `ss` showed libzt had
+opened same-port sockets bound to `wlo1`, `spod`, `docker0`, and
+`br-winproxy`; so the `spod` packets were libzt's own multi-interface
+ZeroTier discovery/path traffic, not traffic routed through ElseMesh's
+managed ZeroTier interface and not the standalone `zerotier-one` service.
+The host's `spod` interface is a separate bridge for other host networking.
+
+The daemon was restarted with the existing
+`--zerotier-blacklist-interface spod` option. It joined the same network and
+reported healthy, while its libzt UDP sockets remained on `wlo1`, `docker0`,
+and `br-winproxy` and none were bound to `spod`. No new `SDROP` records for
+that daemon appeared during the inspected post-restart window. This confirms
+that the interface was involved because libzt's default physical-interface
+selection included it; it was not a requirement of ElseMesh or the ZeroTier
+overlay. The host firewall remains unchanged. Keep the option for this host's
+test invocation; whether to blacklist interfaces by default is a separate
+deployment choice because other hosts may legitimately use multiple
+interfaces.
