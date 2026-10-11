@@ -26,19 +26,29 @@ function validGateway( value, page ) {
 	}
 }
 
-function normalizedWorldURL( { pageURL, worldId, nodeId = '', gateway = '', directory = '' } ) {
+function normalizedWorldURL( { pageURL, worldId, nodeId = '', gateway = '', providers = [], directory = '' } ) {
 	const page = appPageURL( pageURL );
 	if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) ) throw new Error( 'Invite does not contain a valid world ID' );
-	if ( nodeId && ! /^[A-Za-z0-9]{20,256}$/.test( nodeId ) ) throw new Error( 'Invite contains an invalid provider ID' );
-	if ( gateway && ! validGateway( gateway, page ) ) throw new Error( 'Invite contains an invalid or insecure gateway' );
+	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
+	if ( candidates.length > 8 ) throw new Error( 'Invite contains too many gateway candidates' );
+	for ( const candidate of candidates ) {
+		if ( ! /^[A-Za-z0-9]{20,256}$/.test( candidate.nodeId || '' ) ) throw new Error( 'Invite contains an invalid provider ID' );
+		if ( ! validGateway( candidate.gateway, page ) ) throw new Error( 'Invite contains an invalid or insecure gateway' );
+	}
+	if ( ! candidates.length && nodeId ) throw new Error( 'Invite provider ID and gateway must be supplied together' );
+	if ( ! candidates.length && gateway && ! validGateway( gateway, page ) ) throw new Error( 'Invite contains an invalid or insecure gateway' );
 	if ( directory ) {
 		const directoryURL = new URL( directory );
 		if ( directoryURL.protocol !== 'https:' || directoryURL.username || directoryURL.password || ! [ '', '/' ].includes( directoryURL.pathname ) || directoryURL.search || directoryURL.hash ) throw new Error( 'Invite contains an invalid directory URL' );
 	}
-	if ( page.protocol === 'https:' && gateway && ! [ 'https:', 'wss:' ].includes( new URL( gateway ).protocol ) ) throw new Error( 'Secure pages require a secure world gateway' );
 	page.searchParams.set( 'worldId', worldId );
-	if ( nodeId ) page.searchParams.set( 'nodeId', nodeId );
-	if ( gateway ) page.searchParams.set( 'gateway', gateway );
+	page.searchParams.delete( 'nodeId' );
+	page.searchParams.delete( 'gateway' );
+	for ( const candidate of candidates ) {
+		page.searchParams.append( 'nodeId', candidate.nodeId );
+		page.searchParams.append( 'gateway', candidate.gateway );
+	}
+	if ( ! candidates.length && gateway ) page.searchParams.set( 'gateway', gateway );
 	if ( directory ) page.searchParams.set( 'directory', directory );
 	return page;
 }
@@ -59,11 +69,14 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 	}
 	if ( ! [ 'http:', 'https:' ].includes( invite.protocol ) || invite.username || invite.password ) throw new Error( 'Enter a valid ElseMesh world invite URL' );
 	const params = invite.searchParams;
+	const nodeIds = params.getAll( 'nodeId' );
+	const gateways = params.getAll( 'gateway' );
+	if ( nodeIds.length !== gateways.length && ! ( nodeIds.length === 0 && gateways.length === 1 ) ) throw new Error( 'Invite provider IDs and gateways must be paired' );
 	return normalizedWorldURL( {
 		pageURL: page.href,
 		worldId: params.get( 'worldId' ),
-		nodeId: params.get( 'nodeId' ) || '',
-		gateway: params.get( 'gateway' ) || '',
+		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
+		gateway: nodeIds.length ? '' : gateways[ 0 ] || '',
 		directory: params.get( 'directory' ) || '',
 	} ).href;
 }
@@ -116,10 +129,10 @@ export function getHomeWorld( { pageURL = globalThis.location?.href, storage } =
 	}
 }
 
-export function setHomeWorld( { pageURL = globalThis.location?.href, worldId, nodeId = '', gateway = '', directory = '', title = '', url: worldURL = '', storage } = {} ) {
+export function setHomeWorld( { pageURL = globalThis.location?.href, worldId, nodeId = '', gateway = '', providers = [], directory = '', title = '', url: worldURL = '', storage } = {} ) {
 	const targetStorage = getStorage( storage );
 	if ( ! targetStorage ) return false;
-	const url = worldURL ? parseWorldInviteURL( worldURL, pageURL ) : normalizedWorldURL( { pageURL, worldId, nodeId, gateway, directory } ).href;
+	const url = worldURL ? parseWorldInviteURL( worldURL, pageURL ) : normalizedWorldURL( { pageURL, worldId, nodeId, gateway, providers, directory } ).href;
 	const actualWorldId = new URL( url ).searchParams.get( 'worldId' );
 	if ( worldId && worldId !== actualWorldId ) throw new Error( 'Home world ID does not match its invite URL' );
 	try {
@@ -148,8 +161,8 @@ export function defaultHomeWorldURL( { pageURL = globalThis.location?.href, stor
 	return url.href;
 }
 
-export function rememberWorldVisit( { pageURL = globalThis.location?.href, worldId, nodeId = '', gateway = '', directory = '', title = '', storage, now = Date.now() } = {} ) {
-	const url = normalizedWorldURL( { pageURL, worldId, nodeId, gateway, directory } ).href;
+export function rememberWorldVisit( { pageURL = globalThis.location?.href, worldId, nodeId = '', gateway = '', providers = [], directory = '', title = '', storage, now = Date.now() } = {} ) {
+	const url = normalizedWorldURL( { pageURL, worldId, nodeId, gateway, providers, directory } ).href;
 	const targetStorage = getStorage( storage );
 	if ( ! targetStorage ) return false;
 	const visited = readVisitedWorlds( pageURL, targetStorage ).filter( item => item.worldId !== worldId );

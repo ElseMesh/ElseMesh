@@ -245,6 +245,9 @@ assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ ambientAudio.type ] }, components: [ { ...ambientAudio, beds: [ { ...ambientAudio.beds[ 0 ], condition: 'storm' } ] } ] } ), /Invalid or duplicate world component/, 'authoring rejects conditions without runtime semantics' );
 const directoryLink = worldLinkFromLocation( { search: '?worldId=tw-world:coast&directory=https%3A%2F%2Fthruhold.org', origin: 'https://rebroad.github.io' } );
 assert.equal( directoryLink.directory, 'https://thruhold.org', 'browser link can opt into the community directory' );
+const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';
+const pairedLink = worldLinkFromLocation( { search: `?worldId=tw-world:coast&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fdesktop.example&nodeId=${backupPeerId}&gateway=wss%3A%2F%2Fflip.example`, origin: 'https://rebroad.github.io' } );
+assert.deepEqual( pairedLink.providers, [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ], 'browser links preserve each peer identity with its own secure gateway' );
 assert.throws( () => new WorldConnector( { worldId: 'tw-world:coast', directory: 'http://thruhold.org' } ), 'directory endpoints must use HTTPS' );
 const invite = createWorldInviteURL( {
 	pageURL: 'https://rebroad.github.io/tidewater/?noVeg=1',
@@ -260,5 +263,7 @@ assert.equal( inviteURL.searchParams.get( 'nodeId' ), '12D3KooWAbcdefghijk123456
 assert.equal( inviteURL.searchParams.get( 'gateway' ), 'https://coast.example', 'world invitations carry the provider gateway' );
 assert.equal( inviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'world invitations retain optional decentralized discovery' );
 assert.equal( inviteURL.searchParams.get( 'noVeg' ), '1', 'world invitations preserve unrelated client options' );
+const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://rebroad.github.io/', worldId: 'tw-world:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
+assert.deepEqual( redundantInvite.searchParams.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
 assert.throws( () => createWorldInviteURL( { pageURL: 'https://rebroad.github.io/tidewater/', worldId: 'tw-world:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );
 console.log( 'ok   portal crossing geometry and orientation handoff' );

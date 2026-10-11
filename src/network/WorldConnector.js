@@ -33,27 +33,38 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	const params = new URLSearchParams( location.search );
 	const worldId = params.get( 'worldId' );
 	if ( ! worldId ) return null;
+	const nodeIds = params.getAll( 'nodeId' );
+	const gateways = params.getAll( 'gateway' );
+	invariant( nodeIds.length === gateways.length || ( nodeIds.length === 0 && gateways.length === 1 ), 'Invite provider IDs and gateways must be paired' );
 	return {
 		worldId,
-		nodeId: params.get( 'nodeId' ),
-		gateway: params.get( 'gateway' ) || location.origin,
+		nodeId: nodeIds[ 0 ] || '',
+		gateway: gateways[ 0 ] || location.origin,
+		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
 		directory: params.get( 'directory' ),
 	};
 }
 
-export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, nodeId, gateway, directory = '' } = {} ) {
+export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, nodeId, gateway, providers = [], directory = '' } = {} ) {
 	invariant( /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ), 'A valid worldId is required for an invite' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
 	url.searchParams.set( 'worldId', worldId );
-	if ( nodeId ) {
-		invariant( /^[A-Za-z0-9]{20,256}$/.test( nodeId ), 'Invalid invite node PeerID' );
-		url.searchParams.set( 'nodeId', nodeId );
-	} else url.searchParams.delete( 'nodeId' );
-	if ( gateway ) {
+	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
+	invariant( candidates.length <= 8, 'Invite contains too many gateway candidates' );
+	url.searchParams.delete( 'nodeId' );
+	url.searchParams.delete( 'gateway' );
+	for ( const provider of candidates ) {
+		invariant( /^[A-Za-z0-9]{20,256}$/.test( provider.nodeId || '' ), 'Invalid invite node PeerID' );
+		invariant( validSecureGateway( provider.gateway ), 'Invite gateway must be a secure HTTPS/WSS origin' );
+		url.searchParams.append( 'nodeId', provider.nodeId );
+		url.searchParams.append( 'gateway', provider.gateway );
+	}
+	invariant( candidates.length || ! nodeId, 'Invite provider ID and gateway must be supplied together' );
+	if ( ! candidates.length && gateway ) {
 		invariant( validSecureGateway( gateway ), 'Invite gateway must be a secure HTTPS/WSS origin' );
 		url.searchParams.set( 'gateway', gateway );
-	} else url.searchParams.delete( 'gateway' );
+	}
 	if ( directory ) {
 		invariant( validSecureOrigin( directory ), 'Invite directory must be an HTTPS origin' );
 		url.searchParams.set( 'directory', directory );
@@ -62,13 +73,15 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 }
 
 export class WorldConnector {
-	constructor( { worldId, nodeId, gateway = globalThis.location?.origin, directory = '', chunkBytes = ASSET_CHUNK_BYTES } = {} ) {
+	constructor( { worldId, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES } = {} ) {
 		invariant( /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ), 'A valid worldId is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
 		this.worldId = worldId;
 		this.nodeId = nodeId || '';
 		this.gateway = gateway;
+		this.providers = providers.length ? providers.map( ( provider ) => ( { ...provider } ) ) : this.nodeId ? [ { nodeId: this.nodeId, gateway } ] : [];
+		invariant( this.providers.length <= 8 && this.providers.every( ( provider ) => /^[A-Za-z0-9]{20,256}$/.test( provider.nodeId || '' ) && validGatewayForCurrentPage( provider.gateway ) ), 'Invalid world gateway candidates' );
 		this.directory = directory;
 		this.chunkBytes = chunkBytes;
 		this.manifest = null;
@@ -93,10 +106,12 @@ export class WorldConnector {
 		throwIfAborted( signal );
 		let lastError = null;
 		const attempted = new Set( excludeProviders );
-		if ( this.nodeId ) {
-			const key = `${this.nodeId}\n${this.gateway}`;
+		for ( const provider of this.providers ) {
+			const key = `${provider.nodeId}\n${provider.gateway}`;
 			if ( ! attempted.has( key ) ) {
 				attempted.add( key );
+				this.nodeId = provider.nodeId;
+				this.gateway = provider.gateway;
 				try {
 					return await this.#fetchManifest( signal );
 				} catch ( error ) {
@@ -106,8 +121,8 @@ export class WorldConnector {
 					this.nodeId = '';
 				}
 			}
-			this.nodeId = '';
 		}
+		this.nodeId = '';
 		let providers;
 		try {
 			providers = this.directory ? await this.#discoverDirectoryProviders( signal ) : await this.#discoverGatewayProviders( signal );
@@ -805,6 +820,18 @@ function validSecureGateway( value ) {
 	try {
 		const url = new URL( value );
 		return [ 'https:', 'wss:' ].includes( url.protocol ) && ! url.username && ! url.password && ( url.pathname === '' || url.pathname === '/' ) && ! url.search && ! url.hash;
+	} catch {
+		return false;
+	}
+}
+
+function validGatewayForCurrentPage( value ) {
+	if ( validSecureGateway( value ) ) return true;
+	try {
+		const gateway = new URL( value );
+		const page = globalThis.location && new URL( globalThis.location.href );
+		const loopback = ( hostname ) => [ 'localhost', '127.0.0.1', '::1', '[::1]' ].includes( hostname );
+		return [ 'http:', 'ws:' ].includes( gateway.protocol ) && loopback( gateway.hostname ) && ( ! page || page.protocol === 'http:' && loopback( page.hostname ) );
 	} catch {
 		return false;
 	}

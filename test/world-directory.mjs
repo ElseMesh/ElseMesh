@@ -139,6 +139,12 @@ try {
 	assert.equal( failoverConnector.nodeId, second.peerId, 'asset fallback selects the owner after the failover node denies content access' );
 	failoverConnector.close();
 	failoverProviderReachable = false;
+	const invitedReplicas = new WorldConnector( { worldId: 'tw-world:directory-test', providers: [ { nodeId: first.peerId, gateway: 'https://offline.example' }, { nodeId: second.peerId, gateway: 'https://online.example' } ] } );
+	await invitedReplicas.getManifest();
+	assert.equal( invitedReplicas.nodeId, second.peerId, 'a shareable invite falls through from an offline desktop node to its independent replica gateway' );
+	assert.equal( invitedReplicas.gateway, 'https://online.example' );
+	invitedReplicas.close();
+	failoverProviderReachable = false;
 	authorityLease = await signedDocument( 'tidewater.authority/2', {
 		worldId: 'tw-world:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch: grantEpoch - 1,
 		notBefore: failoverAfter, expiresAt: Math.min( expiresAt, failoverAfter + failoverSeconds ),

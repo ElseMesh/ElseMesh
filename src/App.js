@@ -558,6 +558,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				worldId: connector.worldId,
 				nodeId: connector.nodeId,
 				gateway: connector.gateway,
+				providers: connector.providers,
 				directory: connector.directory,
 				title: connector.manifest.title,
 			} );
@@ -1346,14 +1347,20 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		const url = new URL( location.href );
 		url.searchParams.set( 'worldId', destinationConnector.worldId );
-		url.searchParams.set( 'nodeId', destinationConnector.nodeId );
-		url.searchParams.set( 'gateway', destinationConnector.gateway );
+		url.searchParams.delete( 'nodeId' );
+		url.searchParams.delete( 'gateway' );
+		const providers = destinationConnector.providers.length ? destinationConnector.providers : [ { nodeId: destinationConnector.nodeId, gateway: destinationConnector.gateway } ];
+		for ( const provider of providers ) {
+			url.searchParams.append( 'nodeId', provider.nodeId );
+			url.searchParams.append( 'gateway', provider.gateway );
+		}
 		history.replaceState( null, '', url );
 		rememberWorldVisit( {
 			pageURL: location.href,
 			worldId: destinationConnector.worldId,
 			nodeId: destinationConnector.nodeId,
 			gateway: destinationConnector.gateway,
+			providers: destinationConnector.providers,
 			directory: destinationConnector.directory,
 			title: destinationConnector.manifest.title,
 		} );

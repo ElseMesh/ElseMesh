@@ -4,7 +4,7 @@ import { assetConcurrencyForConnection, WorldConnector } from '../src/network/Wo
 import { selectWorldComponentsForView, selectWorldObjectsForView } from '../src/network/WorldStreaming.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 
-const connector = new WorldConnector( { worldId: 'tw-world:stream-test', nodeId: 'peer', gateway: 'https://example.test' } );
+const connector = new WorldConnector( { worldId: 'tw-world:stream-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 const alreadyAborted = new AbortController();
 alreadyAborted.abort( new DOMException( 'Portal is no longer in view', 'AbortError' ) );
 await assert.rejects( connector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:destination' }, { signal: alreadyAborted.signal } ), { name: 'AbortError' }, 'a world-ID portal honors cancellation before provider discovery starts' );
@@ -142,7 +142,7 @@ class FakeWebSocket {
 try {
 	globalThis.WebTransport = FakeWebTransport;
 	globalThis.WebSocket = FakeWebSocket;
-	const retryConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: 'peer', gateway: 'https://example.test', chunkBytes: 3 } );
+	const retryConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
 	retryConnector.manifest = { assets: [ { id: assetId, bytes: bytes.length } ] };
 	const downloaded = await retryConnector.getAsset( assetId );
 	assert.deepEqual( downloaded, bytes, 'interrupted WebTransport asset chunks recover over WebSocket' );
@@ -153,7 +153,7 @@ try {
 	transportStream = 0;
 	webTransportRequests.length = 0;
 	transportMode = 'shared-download';
-	const sharedConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: 'peer', gateway: 'https://example.test', chunkBytes: 3 } );
+	const sharedConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
 	sharedConnector.manifest = { assets: [ { id: assetId, bytes: bytes.length } ] };
 	const firstCallerAbort = new AbortController();
 	const firstCaller = sharedConnector.getAsset( assetId, { signal: firstCallerAbort.signal } );
@@ -170,14 +170,14 @@ try {
 	transportStream = 0;
 	transportMode = 'gateway-error';
 	const requestCount = webSocketRequests.length;
-	const errorConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: 'peer', gateway: 'https://example.test', chunkBytes: 3 } );
+	const errorConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
 	errorConnector.manifest = { assets: [ { id: assetId, bytes: bytes.length } ] };
 	await assert.rejects( errorConnector.getAsset( assetId ), /asset is not available/, 'a gateway error response remains an application error' );
 	assert.equal( webSocketRequests.length, requestCount, 'gateway errors do not trigger transport fallback' );
 	errorConnector.close();
 	transportStream = 0;
 	transportMode = 'blocked-manifest';
-	const portalConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: 'peer', gateway: 'https://example.test' } );
+	const portalConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 	const portalAbort = new AbortController();
 	const portalPreparation = portalConnector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:pending', destinationPeerId: '12D3KooW12345678901234567890' }, { signal: portalAbort.signal } );
 	await new Promise( ( resolve ) => setTimeout( resolve, 10 ) );
@@ -189,7 +189,7 @@ try {
 	portalConnector.close();
 	transportStream = 0;
 	transportMode = 'blocked-ready';
-	const readyConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: 'peer', gateway: 'https://example.test' } );
+	const readyConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 	const readyAbort = new AbortController();
 	const readyPreparation = readyConnector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:waiting', destinationPeerId: '12D3KooW12345678901234567890' }, { signal: readyAbort.signal } );
 	await new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
@@ -200,7 +200,7 @@ try {
 	readyConnector.close();
 	delete globalThis.WebTransport;
 	transportMode = 'blocked-socket-connect';
-	const socketConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: 'peer', gateway: 'https://example.test' } );
+	const socketConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 	const socketAbort = new AbortController();
 	const socketPreparation = socketConnector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:socket-wait', destinationPeerId: '12D3KooW1234567890123456' }, { signal: socketAbort.signal } );
 	await new Promise( ( resolve ) => setTimeout( resolve, 0 ) );

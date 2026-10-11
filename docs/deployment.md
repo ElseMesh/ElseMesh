@@ -89,6 +89,13 @@ serves the client files, so this requires a separately running gateway/daemon
 and a public route to its HTTPS/WSS endpoint. The current deployment host has
 no such service; see [the gateway preflight](relay-deployment.md#current-host-deployment-preflight-2026-10-11).
 
+An invite may contain multiple repeated `nodeId`/`gateway` pairs, in matching
+order, so the browser can try the desktop, phone, and a trusted replica
+independently. Every pair must refer to a provider authorized by the same
+signed ThruHold manifest. The client supports up to eight candidates and
+validates the signed manifest after connecting. Example format and current
+implementation limits are in [gateway resilience](gateway-resilience.md).
+
 For a browser-hosted personal world, the owner must start **Host a world from
 this browser** and keep that session connected to the gateway. It is not a
 persistent substitute for the owner's `thruholdd`; visitors lose access when

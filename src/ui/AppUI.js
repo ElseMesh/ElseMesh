@@ -153,6 +153,7 @@ export class AppUI {
 				worldId: hostedDocument?.payload.worldId || connector.worldId,
 				nodeId: hostedDocument?.signer || connector.nodeId,
 				gateway: hostedDocument ? browserHostState.gateway : connector.gateway,
+				providers: hostedDocument ? [] : connector.providers,
 				directory: hostedDocument ? '' : connector.directory,
 			} );
 			try {

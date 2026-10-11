@@ -15,6 +15,11 @@ const invite = `https://rebroad.github.io/tidewater/?worldId=tw-world%3Acave&nod
 assert.equal( builtInWorldURL( pageURL ), 'https://rebroad.github.io/tidewater/' );
 assert.equal( parseWorldInviteURL( invite, pageURL ), invite );
 assert.equal( parseWorldInviteURL( 'https://elsemesh.example/another-app/?worldId=tw-world:cave&gateway=https%3A%2F%2Fworld.example', pageURL ), 'https://rebroad.github.io/tidewater/?worldId=tw-world%3Acave&gateway=https%3A%2F%2Fworld.example' );
+const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';
+const multiGateway = new URL( pageURL );
+multiGateway.search = new URLSearchParams( [ [ 'worldId', 'tw-world:cave' ], [ 'nodeId', peerId ], [ 'gateway', 'https://desktop.example' ], [ 'nodeId', backupPeerId ], [ 'gateway', 'wss://flip.example' ] ] ).toString();
+assert.equal( parseWorldInviteURL( multiGateway.href, pageURL ), multiGateway.href, 'validated invites retain ordered, paired owner and replica gateway candidates' );
+assert.throws( () => parseWorldInviteURL( `${pageURL}&nodeId=${peerId}`, pageURL ), /must be paired/ );
 assert.throws( () => parseWorldInviteURL( 'https://rebroad.github.io/tidewater/?worldId=bad', pageURL ), /valid world ID/ );
 assert.throws( () => parseWorldInviteURL( 'https://rebroad.github.io/tidewater/?worldId=tw-world:cave&gateway=http%3A%2F%2Fworld.example', pageURL ), /invalid or insecure gateway/ );
 assert.throws( () => parseWorldInviteURL( `https://rebroad.github.io/tidewater/?worldId=tw-world:cave&padding=${'x'.repeat(4096)}`, pageURL ), /too long/ );
