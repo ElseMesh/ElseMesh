@@ -163,6 +163,56 @@ function webglGrassMesh( T, terrain, camera, previous ) {
 
 }
 
+function webglBeachDebris( T, terrain, camera, previous ) {
+
+	const radius = 25, spacing = 0.62, firstX = Math.floor( ( camera.position.x - radius ) / spacing ), firstZ = Math.floor( ( camera.position.z - radius ) / spacing );
+	const hash = ( x, z, salt ) => {
+		let n = Math.imul( x + salt * 31, 0x1f123bb5 ) ^ Math.imul( z - salt * 17, 0x5f356495 );
+		n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b );
+		return ( n ^ n >>> 16 ) >>> 0;
+	};
+	const samples = [];
+	for ( let gz = firstZ; gz <= Math.ceil( ( camera.position.z + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( camera.position.x + radius ) / spacing ); gx ++ ) {
+		const random = salt => hash( gx, gz, salt ) / 0xffffffff;
+		const x = ( gx + 0.18 + random( 1 ) * 0.64 ) * spacing, z = ( gz + 0.18 + random( 2 ) * 0.64 ) * spacing;
+		const d = Math.hypot( x - camera.position.x, z - camera.position.z );
+		if ( d > radius || random( 3 ) > 0.36 + ( 1 - T.MathUtils.smoothstep( d, 12, 23 ) ) * 0.5 ) continue;
+		const ix = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
+		const iz = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) );
+		const index = iz * terrain.res + ix, height = terrain.heightAt( x, z ), sand = terrain.sand[ index ] / 255;
+		if ( height < 0.35 || height > 4.6 || sand < 0.36 || terrain.rock[ index ] > 0.24 || terrain.path[ index ] > 90 ) continue;
+		const slope = Math.hypot( terrain.heightAt( x + 1, z ) - terrain.heightAt( x - 1, z ), terrain.heightAt( x, z + 1 ) - terrain.heightAt( x, z - 1 ) );
+		if ( slope > 0.72 ) continue;
+		const shore = 1 - T.MathUtils.smoothstep( Math.abs( height - 1.25 ), 0.18, 1.55 );
+		const patch = T.MathUtils.smoothstep( terrain.noise2.noise( x / 4.2 + 5.5, z / 4.2 - 3.3 ), - 0.45, 0.25 );
+		const density = ( 0.06 + shore * 0.34 ) * ( 0.5 + patch * 0.9 ) * ( 0.55 + ( 1 - T.MathUtils.smoothstep( d, 12, 23 ) ) * 0.45 );
+		if ( random( 4 ) > density ) continue;
+		samples.push( { x, z, height, random: [ random( 5 ), random( 6 ), random( 7 ) ] } );
+	}
+	const mesh = previous || new T.InstancedMesh(
+		new T.IcosahedronGeometry( 1, 0 ),
+		new T.MeshStandardMaterial( { color: 0xffffff, roughness: 0.94, metalness: 0, flatShading: true } ),
+		8192,
+	);
+	const matrix = new T.Matrix4(), position = new T.Vector3(), rotation = new T.Quaternion(), scale = new T.Vector3(), euler = new T.Euler(), color = new T.Color();
+	const palette = [ 0xc5b99d, 0x9e927a, 0xd4cbb5, 0x8b7561, 0xb5a88f ];
+	for ( let i = 0; i < samples.length; i ++ ) {
+		const sample = samples[ i ], [ size, tone, yaw ] = sample.random;
+		const r = 0.035 + size * size * 0.105;
+		position.set( sample.x, sample.height + r * 0.12, sample.z );
+		euler.set( ( tone - 0.5 ) * 0.35, yaw * Math.PI * 2, ( size - 0.5 ) * 0.3 ); rotation.setFromEuler( euler );
+		scale.set( r * ( 1.1 + tone * 0.65 ), r * ( 0.28 + size * 0.14 ), r * ( 0.8 + ( 1 - tone ) * 0.45 ) );
+		mesh.setMatrixAt( i, matrix.compose( position, rotation, scale ) );
+		color.setHex( palette[ Math.floor( tone * palette.length ) ] ); mesh.setColorAt( i, color );
+	}
+	mesh.count = samples.length;
+	mesh.instanceMatrix.setUsage( T.DynamicDrawUsage ); mesh.instanceMatrix.needsUpdate = true;
+	if ( mesh.instanceColor ) mesh.instanceColor.needsUpdate = true;
+	mesh.name = 'WebGL camera-following beach debris'; mesh.frustumCulled = false; mesh.renderOrder = 2;
+	return mesh;
+
+}
+
 function webglPlantGeometry( T, source ) {
 
 	const geometry = new T.BufferGeometry(), position = source.attributes.position, normal = source.attributes.normal, uv = source.attributes.uv, veg = source.attributes.aVeg, parts = source.attributes.aMat;
@@ -265,6 +315,11 @@ export class WebGLFallback {
 		else await this._loadIsland( onProgress );
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
+		if ( this.terrain ) {
+			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
+			this.scene.add( this.beachDebris );
+			this.debrisCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
+		}
 		this.yaw = this.spawn.yaw || 0;
 		this.pitch = this.spawn.pitch || 0;
 		this._look();
@@ -848,6 +903,13 @@ export class WebGLFallback {
 			this.grass = webglGrassMesh( T, this.terrain, this.camera, this.grass );
 			this.scene.add( this.grass );
 			this.grassCenter.set( this.camera.position.x, this.camera.position.z );
+		}
+		if ( this.beachDebris ) {
+			const dx = this.camera.position.x - this.debrisCenter.x, dz = this.camera.position.z - this.debrisCenter.y;
+			if ( dx * dx + dz * dz > 36 ) {
+				webglBeachDebris( T, this.terrain, this.camera, this.beachDebris );
+				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
+			}
 		}
 		this.renderer.render( this.scene, this.camera );
 
