@@ -304,18 +304,25 @@ listener. Other TCP addresses and QUIC/WebSocket/WebTransport/WebRTC keep their
 normal paths. The address is a transport locator only; signed identity and
 world authorization remain authoritative.
 
-On Linux hosts with an unusable or policy-blocked physical interface, exclude
-that interface from libzt's physical path discovery with a repeatable option:
+On Linux and Android, `thruholdd` first inspects host interfaces and selects
+active hardware-backed links (or links with a default route) that have a global
+unicast address. It asks libzt to exclude the other interface-name prefixes
+before startup. This avoids ZeroTier discovery traffic over loopback,
+container bridges, and existing ZeroTier interfaces while keeping multiple
+usable uplinks available. If inspection fails or finds no usable uplink, it
+leaves libzt's own interface discovery enabled. The startup log lists the
+selected interfaces and excluded prefixes.
+
+An explicit exclusion remains available for a known problematic interface:
 
 ```sh
-thruholdd --zerotier-blacklist-interface spod
+thruholdd --zerotier-blacklist-interface example0
 ```
 
 The argument is an interface-name prefix (maximum 15 bytes) and calls libzt's
-`zts_init_blacklist_if()` before node start. It changes only this libzt node's
-interface selection; it does not alter host routes or firewall policy. Omit it
-on hosts that do not need an exclusion. The Linux–Flip7 verification below
-used it on the Linux node to exclude `spod`.
+`zts_init_blacklist_if()` before node start. It adds to the automatic policy
+and changes only this libzt node's interface selection; it does not alter host
+routes or firewall policy.
 
 This path requires a libzt build for each target architecture and its native
 dependencies. For Android arm64, build `libzt.so` with the Android NDK for
@@ -798,3 +805,25 @@ overlay. The host firewall remains unchanged. Keep the option for this host's
 test invocation; whether to blacklist interfaces by default is a separate
 deployment choice because other hosts may legitimately use multiple
 interfaces.
+
+### Automatic interface selection and ECHO rate-gate check (2026-10-11)
+
+Two disposable Linux daemons with separate ZeroTier state directories joined
+`e3918db4832a3056` using the automatic interface policy. Both selected only
+`wlo1`; the policy excluded `spod`, Docker, `br-winproxy`, and existing
+ZeroTier interfaces. Both daemons received managed IPv4 and 6PLANE addresses,
+but the second daemon's libp2p bootstrap dial to the first timed out. Because
+both nodes ran on one host, this is not an independent-NAT connectivity test.
+
+During simultaneous startup/path probes, libzt emitted a small set of
+`ZT_SECURITY: EXCESSIVE_ECHO` messages for ECHO requests from the other
+temporary node, arriving on the selected Wi-Fi address. This event is emitted
+when the existing per-path inbound ECHO gate declines to answer more than one
+request per `ZT_PEER_GENERAL_RATE_LIMIT / 6` (about 167 ms). The underlying
+gate is present in the ZeroTier source since 2022; the fork added the
+low-threat security-event reporting. These observations show bursts during
+path discovery, but do not establish that the gate caused the unrelated
+libp2p bootstrap timeout or that the gate is misconfigured. No ZeroTierOne
+threshold change was made. Stop or remove these temporary daemons and state
+directories after the check; they do not affect the persistent device
+identity.

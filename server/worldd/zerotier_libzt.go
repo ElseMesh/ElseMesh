@@ -76,6 +76,15 @@ func startZeroTier(networkID, storagePath string, blacklistInterfaces []string) 
 	if err != nil || netID == 0 {
 		return nil, errors.New("network ID must be a nonzero 16-digit hexadecimal value")
 	}
+	selectedInterfaces, automaticBlacklist, interfaceErr := discoverZeroTierInterfacePolicy()
+	if interfaceErr != nil {
+		log.Printf("could not inspect host interfaces for libzt; retaining libzt interface discovery: %v", interfaceErr)
+	} else if len(selectedInterfaces) == 0 {
+		log.Printf("no usable host uplinks identified for libzt; retaining libzt interface discovery")
+	} else {
+		log.Printf("libzt physical uplinks selected: %s; excluded interface prefixes: %s", strings.Join(selectedInterfaces, ","), strings.Join(automaticBlacklist, ","))
+		blacklistInterfaces = append(automaticBlacklist, blacklistInterfaces...)
+	}
 	for _, prefix := range blacklistInterfaces {
 		if len(prefix) == 0 || len(prefix) > 15 || strings.IndexByte(prefix, 0) >= 0 {
 			return nil, fmt.Errorf("ZeroTier interface blacklist prefix must be 1-15 bytes without NUL: %q", prefix)
