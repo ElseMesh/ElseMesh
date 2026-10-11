@@ -388,6 +388,19 @@ function buildIslandProceduralContent( terrainData ) {
 		.filter( ( [ , batch ] ) => batch.vcount > 0 )
 		.map( ( [ name, batch ] ) => ( { name, batch } ) );
 	for ( const [ name, batch ] of Object.entries( village.signB?.batches || {} ) ) if ( batch.vcount > 0 ) batches.push( { name: `sign-${name}`, batch } );
+	const lanternBatches = new Builder();
+	for ( const { B } of village.pierInfo.hung || [] ) {
+		const glass = B.batches.glass;
+		if ( glass?.vcount > 0 ) lanternBatches.batch( 'wood' ).append( glass, ( d ) => [ d[ 0 ], d[ 1 ], 9, d[ 2 ] ] );
+		for ( const name of [ 'wood', 'hard' ] ) {
+			const batch = B.batches[ name ];
+			if ( batch?.vcount > 0 ) lanternBatches.batch( name ).append( batch );
+		}
+	}
+	for ( const name of [ 'wood', 'hard' ] ) {
+		const batch = lanternBatches.batches[ name ];
+		if ( batch?.vcount > 0 ) batches.push( { name: `lantern-${name}`, batch } );
+	}
 	return {
 		spawn: { position: [ WORLD.start.position.x, Math.max( terrainData.heightAt( WORLD.start.position.x, WORLD.start.position.z ), colliders.groundHeightAt( WORLD.start.position.x, WORLD.start.position.z, 50 ) ) + 1.62, WORLD.start.position.z ], yaw: WORLD.start.yaw, pitch: - 0.05 },
 		villageBatches: batches,
@@ -461,7 +474,7 @@ function exportBatchGLB( batches, sceneName, villageMaterials = false ) {
 	const primitives = [], materials = [];
 	for ( const { name, batch } of batches ) {
 		const material = materials.length;
-		const role = name.startsWith( 'sign-' ) ? name.slice( 5 ) : name;
+		const role = name.startsWith( 'sign-' ) || name.startsWith( 'lantern-' ) ? name.slice( name.indexOf( '-' ) + 1 ) : name;
 		if ( villageMaterials && ! VILLAGE_MATERIAL_ROLES.includes( role ) ) throw new Error( `Unknown village material role: ${role}` );
 		materials.push( {
 			...( villageMaterials ? { extras: { tidewaterMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } : {} ),

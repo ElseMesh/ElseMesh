@@ -190,6 +190,11 @@ try {
 	assert.ok( villageGLB.meshes[ 0 ].length >= 8, 'village export preserves its separate authored material batches' );
 	assert.ok( villageGLB.meshes[ 0 ].reduce( ( count, primitive ) => count + primitive.indices.length, 0 ) > 300000, 'village export includes the complete deterministic structural geometry' );
 	assert.ok( villageGLB.meshes[ 0 ].every( ( primitive ) => primitive.attributes.COLOR_0 ), 'village export carries authored per-vertex tint' );
+	const lanternMaterialIndexes = new Set( villageGLB.materials.flatMap( ( material, index ) => material.name.includes( 'lantern-' ) ? [ index ] : [] ) );
+	assert.deepEqual( [ ...lanternMaterialIndexes ].map( index => villageGLB.materials[ index ].extras?.tidewaterMaterial?.role ).sort(), [ 'hard', 'wood' ], 'export includes static hanging lanterns with the trusted hard and wood materials' );
+	const lanternPrimitives = villageGLB.meshes[ 0 ].filter( primitive => lanternMaterialIndexes.has( primitive.material ) );
+	assert.equal( lanternPrimitives.length, 2, 'export includes separate lantern wood and hard geometry batches' );
+	assert.ok( lanternPrimitives.every( primitive => primitive.indices?.length > 0 && primitive.attributes._TW_VDATA?.itemSize === 4 ), 'exported lantern geometry retains indexed meshes and renderer material data' );
 	assert.equal( villageObject.collision.shape, 'compound', 'village source includes the runtime builder collision layout' );
 	assert.equal( villageObject.collision.boxes.length, 394, 'village collision layout matches its deterministic walkable and solid boxes' );
 	assert.equal( villageObject.lods.length, 1, 'village has a separate distance LOD while retaining its full-detail base asset' );
