@@ -1,25 +1,19 @@
 import assert from 'node:assert/strict';
-import { Group, Vector3 } from '../src/engine/index.js';
+import { Vector3 } from '../src/engine/math/index.js';
 import { BoatController } from '../src/player/BoatController.js';
-import { WORLD } from '../src/world/WorldLayout.js';
-
-function modelStub() {
-	return {
-		group: new Group(),
-		hullSamples: [ { position: new Vector3(), area: 1, bottomY: - 1 } ],
-		hydro: {},
-	};
-}
+import { BoatDesign } from '../src/world/boat/BoatDesign.js';
+import { ISLAND_DEFINITION } from '../src/world/IslandDefinition.js';
 
 const query = { allocate: () => 1 };
-const defaultBoat = new BoatController( { model: modelStub(), query } );
-assert.deepEqual( defaultBoat.position.toArray(), WORLD.boatDock.position.toArray() );
-assert.deepEqual( defaultBoat.mooring.anchor.toArray(), WORLD.boatDock.position.toArray() );
-assert.equal( defaultBoat.homeHeading, WORLD.boatDock.heading );
+const design = new BoatDesign();
+const defaultBoat = new BoatController( { design, query } );
+assert.deepEqual( defaultBoat.position.toArray(), ISLAND_DEFINITION.boatDock.position );
+assert.deepEqual( defaultBoat.mooring.anchor.toArray(), ISLAND_DEFINITION.boatDock.position );
+assert.equal( defaultBoat.homeHeading, ISLAND_DEFINITION.boatDock.heading );
 
 const berth = new Vector3( 120, 2.5, - 48 );
 const heading = 1.17;
-const hostedBoat = new BoatController( { model: modelStub(), query, terrain: null, initialPosition: berth, initialHeading: heading } );
+const hostedBoat = new BoatController( { design, query, terrain: null, initialPosition: berth, initialHeading: heading } );
 assert.deepEqual( hostedBoat.position.toArray(), berth.toArray() );
 assert.deepEqual( hostedBoat.mooring.anchor.toArray(), berth.toArray() );
 assert.equal( hostedBoat.mooring.heading, heading );

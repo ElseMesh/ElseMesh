@@ -103,7 +103,7 @@ class InputStub {
 
 const input = new InputStub();
 const camera = new E.PerspectiveCamera( 60, 2, 0.1, 5000 );
-const boat = new BoatController( { model, query, terrain, colliders } );
+const boat = new BoatController( { design: model, query, terrain, colliders } );
 const player = new Player( { camera, input, terrain, colliders, query, boat } );
 
 const dt = 1 / 60;

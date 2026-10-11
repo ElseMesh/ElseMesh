@@ -1,37 +1,37 @@
-import * as THREE from '../engine/index.js';
-import { WORLD } from '../world/WorldLayout.js';
+import { MathUtils, Quaternion, Vector3 } from '../engine/math/index.js';
+import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 
 const RHO = 1025; // sea water density
 const GRAV = 9.81;
 const DEG = Math.PI / 180;
 
-const sstep = THREE.MathUtils.smoothstep;
-const clamp = THREE.MathUtils.clamp;
+const sstep = MathUtils.smoothstep;
+const clamp = MathUtils.clamp;
 
 // scratch (the integrator runs at 120 Hz: no allocations in the loop)
-const _F = new THREE.Vector3();
-const _T = new THREE.Vector3();
-const _com = new THREE.Vector3();
-const _p = new THREE.Vector3();
-const _r = new THREE.Vector3();
-const _f = new THREE.Vector3();
-const _vp = new THREE.Vector3();
-const _vl = new THREE.Vector3();
-const _a = new THREE.Vector3();
-const _fwd = new THREE.Vector3();
-const _side = new THREE.Vector3();
-const _up = new THREE.Vector3();
-const _v = new THREE.Vector3();
-const _rud = new THREE.Vector3();
-const _g = new THREE.Vector3();
-const _t = new THREE.Vector3();
-const _c1 = new THREE.Vector3();
-const _c2 = new THREE.Vector3();
-const _c3 = new THREE.Vector3();
-const _c4 = new THREE.Vector3();
-const _c5 = new THREE.Vector3();
-const _invQ = new THREE.Quaternion();
-const _dq = new THREE.Quaternion();
+const _F = new Vector3();
+const _T = new Vector3();
+const _com = new Vector3();
+const _p = new Vector3();
+const _r = new Vector3();
+const _f = new Vector3();
+const _vp = new Vector3();
+const _vl = new Vector3();
+const _a = new Vector3();
+const _fwd = new Vector3();
+const _side = new Vector3();
+const _up = new Vector3();
+const _v = new Vector3();
+const _rud = new Vector3();
+const _g = new Vector3();
+const _t = new Vector3();
+const _c1 = new Vector3();
+const _c2 = new Vector3();
+const _c3 = new Vector3();
+const _c4 = new Vector3();
+const _c5 = new Vector3();
+const _invQ = new Quaternion();
+const _dq = new Quaternion();
 
 // Rigid-body model of an 8.2 m, 3.2 t Downeast lobster boat (semi-displacement hull, full keel; 46,845 triangles in v1).
 //
@@ -49,7 +49,7 @@ const _dq = new THREE.Quaternion();
 // mooring lines as before.
 export class BoatController {
 
-	constructor( { model, design = model.design || model, query, terrain, colliders, initialPosition = WORLD.boatDock.position, initialHeading = WORLD.boatDock.heading } ) {
+	constructor( { design, query, terrain, colliders, initialPosition = new Vector3( ...ISLAND_DEFINITION.boatDock.position ), initialHeading = ISLAND_DEFINITION.boatDock.heading } ) {
 
 		this.design = design;
 		this.query = query;
@@ -58,21 +58,21 @@ export class BoatController {
 
 		const hydro = this.design.hydro || {};
 		this.mass = hydro.suggestedMass || 3200;
-		this.com = hydro.centerOfMass ? new THREE.Vector3().copy( hydro.centerOfMass ) : new THREE.Vector3( 0, 0.3, - 0.74 );
+		this.com = hydro.centerOfMass ? new Vector3().copy( hydro.centerOfMass ) : new Vector3( 0, 0.3, - 0.74 );
 		// principal inertia in the boat frame (+Z forward, +X port): x = pitch, y = yaw, z = roll. Gear
 		// high on deck (traps, hauler, wheelhouse) gives a larger roll radius than the bare hull.
-		this.inertia = hydro.inertia ? hydro.inertia.clone() : new THREE.Vector3( 14600, 15700, 3500 );
+		this.inertia = hydro.inertia ? hydro.inertia.clone() : new Vector3( 14600, 15700, 3500 );
 		this.inertia.z *= 1.24;
 		// added mass / inertia when fully wet (fraction of the rigid-body value): surge, sway, heave;
 		// pitch, yaw, roll
-		this.addedMass = new THREE.Vector3( 0.6, 0.7, 0.05 ); // x (sway), y (heave), z (surge)
-		this.addedInertia = new THREE.Vector3( 1.0, 0.4, 0.2 ); // x (pitch), y (yaw), z (roll)
+		this.addedMass = new Vector3( 0.6, 0.7, 0.05 ); // x (sway), y (heave), z (surge)
+		this.addedInertia = new Vector3( 1.0, 0.4, 0.2 ); // x (pitch), y (yaw), z (roll)
 
 		// effective waterplane: lateral / longitudinal lever arms of the buoyancy samples
 		const cbz = hydro.centerOfBuoyancy ? hydro.centerOfBuoyancy.z : this.com.z;
 		const sx = 0.79, sz = 0.9;
 		this.samples = this.design.hullSamples.map( ( s ) => ( {
-			p: new THREE.Vector3( s.position.x * sx, s.position.y, cbz + ( s.position.z - cbz ) * sz ),
+			p: new Vector3( s.position.x * sx, s.position.y, cbz + ( s.position.z - cbz ) * sz ),
 			area: s.area, bottom: s.bottomY ?? s.position.y,
 		} ) );
 		let pitchK = 0;
@@ -88,14 +88,14 @@ export class BoatController {
 		this.rudderLift = 2.8; // rudder lift slope (x area 0.12 m^2), includes the hull's flap effect
 
 		// Each world supplies its own berth. Defaults preserve the built-in island placement.
-		this.homePosition = new THREE.Vector3().copy( initialPosition );
+		this.homePosition = new Vector3().copy( initialPosition );
 		this.homeHeading = initialHeading;
 
 		// state (position = model origin at the design waterline)
 		this.position = this.homePosition.clone();
-		this.quaternion = new THREE.Quaternion().setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), this.homeHeading );
-		this.velocity = new THREE.Vector3();
-		this.angular = new THREE.Vector3();
+		this.quaternion = new Quaternion().setFromAxisAngle( new Vector3( 0, 1, 0 ), this.homeHeading );
+		this.velocity = new Vector3();
+		this.angular = new Vector3();
 
 		this.throttle = 0; // lever -1..1 (moves with some inertia)
 		this.steer = 0; // wheel -1..1
@@ -127,8 +127,8 @@ export class BoatController {
 		this._acc = 0;
 		this._age = 0; // s since the latest read-back was issued
 
-		this.bowWorld = new THREE.Vector3();
-		this.sternWorld = new THREE.Vector3();
+		this.bowWorld = new Vector3();
+		this.sternWorld = new Vector3();
 
 		this.apply();
 
@@ -442,7 +442,7 @@ export class BoatController {
 	reset() {
 
 		this.position.copy( this.homePosition );
-		this.quaternion.setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), this.homeHeading );
+		this.quaternion.setFromAxisAngle( new Vector3( 0, 1, 0 ), this.homeHeading );
 		this.velocity.set( 0, 0, 0 );
 		this.angular.set( 0, 0, 0 );
 		this.throttle = 0;
@@ -511,9 +511,9 @@ export class BoatController {
 	contacts( F, T, comW ) {
 
 		const pts = this.contactPoints || ( this.contactPoints = [
-			new THREE.Vector3( 0, - 0.7, 3.2 ), new THREE.Vector3( 0, - 0.75, 0 ), new THREE.Vector3( 0, - 0.72, - 3.4 ),
-			new THREE.Vector3( 1.1, - 0.4, 1.5 ), new THREE.Vector3( - 1.1, - 0.4, 1.5 ), new THREE.Vector3( 1.2, - 0.35, - 2.5 ), new THREE.Vector3( - 1.2, - 0.35, - 2.5 ),
-			new THREE.Vector3( 0, 0.2, 4.2 ),
+			new Vector3( 0, - 0.7, 3.2 ), new Vector3( 0, - 0.75, 0 ), new Vector3( 0, - 0.72, - 3.4 ),
+			new Vector3( 1.1, - 0.4, 1.5 ), new Vector3( - 1.1, - 0.4, 1.5 ), new Vector3( 1.2, - 0.35, - 2.5 ), new Vector3( - 1.2, - 0.35, - 2.5 ),
+			new Vector3( 0, 0.2, 4.2 ),
 		] );
 		const pw = _c1, vp = _c2, f = _c3, r = _c4;
 		for ( const lp of pts ) {
@@ -537,8 +537,8 @@ export class BoatController {
 		if ( this.colliders ) {
 
 			const outline = this.outline || ( this.outline = [
-				new THREE.Vector3( 0, 0.3, 4.1 ), new THREE.Vector3( 1.2, 0.3, 2.0 ), new THREE.Vector3( - 1.2, 0.3, 2.0 ),
-				new THREE.Vector3( 1.4, 0.3, - 1.0 ), new THREE.Vector3( - 1.4, 0.3, - 1.0 ), new THREE.Vector3( 1.2, 0.3, - 3.8 ), new THREE.Vector3( - 1.2, 0.3, - 3.8 ),
+				new Vector3( 0, 0.3, 4.1 ), new Vector3( 1.2, 0.3, 2.0 ), new Vector3( - 1.2, 0.3, 2.0 ),
+				new Vector3( 1.4, 0.3, - 1.0 ), new Vector3( - 1.4, 0.3, - 1.0 ), new Vector3( 1.2, 0.3, - 3.8 ), new Vector3( - 1.2, 0.3, - 3.8 ),
 			] );
 			const tmp = _c5;
 			for ( const lp of outline ) {
