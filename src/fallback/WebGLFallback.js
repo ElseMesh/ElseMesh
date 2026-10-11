@@ -328,17 +328,17 @@ export class WebGLFallback {
 					}
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
-					float fresnel = 0.055 + 0.65 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
-					vec3 sky = mix( vec3( 0.12, 0.34, 0.43 ), vec3( 0.34, 0.59, 0.70 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) );
+					float fresnel = 0.025 + 0.32 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
+					vec3 sky = mix( vec3( 0.035, 0.12, 0.26 ), vec3( 0.22, 0.43, 0.68 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) );
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = 0.5 + 0.5 * sin( dot( p, vec2( 0.62, 0.47 ) ) + uTime * 0.68 + sin( dot( p, vec2( -0.41, 0.73 ) ) * 1.6 - uTime * 0.43 ) );
 					float shallow = smoothstep( 0.0, 18.0, depth );
-					vec3 water = mix( vec3( 0.055, 0.27, 0.36 ), vec3( 0.008, 0.065, 0.14 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
+					vec3 water = mix( vec3( 0.07, 0.23, 0.36 ), vec3( 0.004, 0.035, 0.10 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					vec3 reflected = mix( water, sky, fresnel );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
 					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 128.0 );
 					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.005 + 0.015 * ripple );
-					float foam = smoothstep( 0.8, 0.98, ripple ) * sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * 0.25;
+					float foam = sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.12 + 0.24 * ripple + 0.06 * micro );
 					reflected = mix( reflected, vec3( 0.78, 0.9, 0.88 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
@@ -409,11 +409,11 @@ export class WebGLFallback {
 					vec2 warp = vec2( noiseCloud( p * 0.38 + vec2( 3.4, 1.8 ) ), noiseCloud( p * 0.38 + vec2( - 2.2, 5.1 ) ) ) - 0.5;
 					float broad = cloudFbm( p * 0.72 + warp * 0.85 );
 					float detail = cloudFbm( p * 1.8 + vec2( 7.3, -4.1 ) );
-					float n = broad * 0.76 + detail * 0.24;
+					float n = broad - max( 0.0, 0.52 - detail ) * 0.32;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
-					float alpha = smoothstep( 0.53, 0.64, n ) * band * 0.95;
+					float alpha = smoothstep( 0.51, 0.65, n ) * band * 0.92;
 					float sun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
-					float fullness = smoothstep( 0.48, 0.74, broad );
+					float fullness = smoothstep( 0.51, 0.72, broad );
 					vec3 cloud = mix( vec3( 0.36, 0.44, 0.55 ), vec3( 1.4, 1.31, 1.15 ), 0.2 + 0.48 * fullness + 0.32 * sun );
 					gl_FragColor = vec4( mix( sky, cloud, alpha ), 1.0 );
 					#include <tonemapping_fragment>
