@@ -503,8 +503,10 @@ export class WebGLFallback {
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
 				varying float vWaveHeight;
-				varying float vShoreFace;
-				varying float vShoreFoam;
+				varying float vShoreU;
+				varying float vShoreBreaking;
+				varying float vShoreEnv;
+				varying float vShoreAlongVariation;
 				varying float vShoreSlope;
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
@@ -515,8 +517,10 @@ export class WebGLFallback {
 					float d = dot( p, vec2( 0.42, 0.09 ) ) + uTime * 1.3;
 					float e = dot( p, vec2( 0.72, -0.48 ) ) + uTime * 1.6;
 					vWaveHeight = 0.95 * sin( a ) + 0.55 * sin( b ) + 0.08 * sin( c ) + 0.03 * sin( d ) + 0.01 * sin( e );
-					vShoreFace = 0.0;
-					vShoreFoam = 0.0;
+					vShoreU = 0.0;
+					vShoreBreaking = -10.0;
+					vShoreEnv = 0.0;
+					vShoreAlongVariation = 0.0;
 					vShoreSlope = 0.0;
 					if ( uTerrainSize > 0.0 ) {
 						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
@@ -544,6 +548,9 @@ export class WebGLFallback {
 								float amplitude = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + alongVariation * 0.385 ) * bar, 0.02 );
 								float breakDepth = pow( amplitude * 3.556 / 0.78, 0.8 );
 								float breaking = ( breakDepth - depth ) / max( breakDepth * 0.13, 0.05 );
+								vShoreU = u;
+								vShoreBreaking = breaking;
+								vShoreAlongVariation = alongVariation;
 								float shoaledAmplitude = amplitude * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
 								float sharpness = mix( 1.0, 3.0, smoothstep( -2.5, 0.0, breaking ) );
 								float meanProfile = inversesqrt( ( sharpness + 0.25 ) * 3.14159265 );
@@ -552,6 +559,7 @@ export class WebGLFallback {
 								float skewCrest = max( ( cos( phaseSkew * 6.2831853 ) + 1.0 ) * 0.5, 0.0 );
 								float curl = smoothstep( -3.0, 0.0, breaking );
 								float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * smoothstep( 0.02, 0.3, exposure );
+								vShoreEnv = env;
 								float preHeight = shoaledAmplitude * 2.0 * ( pow( skewCrest, sharpness ) - meanProfile ) * ( 1.0 + smoothstep( -1.0, 0.3, breaking ) * 0.22 );
 								vShoreSlope = 2.0 * shoaledAmplitude * sharpness * 3.14159265 * pow( skewCrest, max( sharpness - 1.0, 0.0 ) ) * sin( phaseSkew * 6.2831853 ) * ( 1.0 - skew * sin( u * 6.2831853 ) ) / ( sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0 ) * env;
 								vWaveHeight += preHeight * env;
@@ -560,12 +568,6 @@ export class WebGLFallback {
 								float lipHeight = min( waveHeight * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
 								float lip = smoothstep( -0.17, -0.12, u ) * ( 1.0 - smoothstep( -0.025, 0.015, u ) );
 								float crestHeight = preHeight + lipHeight * bore * curl * lip;
-								float inFace = u > -0.15 && u < 0.0 ? 1.0 : 0.0;
-								float faceProgress = smoothstep( -0.4, 0.0, breaking ) * ( 1.0 - smoothstep( 0.9, 1.08, breaking ) );
-								vShoreFace = inFace * faceProgress * env;
-								float impact = smoothstep( 0.86, 0.99, breaking ) * ( 1.0 - smoothstep( 1.4, 1.9, breaking ) ) * exp( -abs( u - 0.08 ) * 38.0 );
-								float roller = bore * exp( -abs( u + 0.08 ) * 24.0 );
-								vShoreFoam = max( impact, roller ) * env * smoothstep( 0.15, 0.55, alongVariation + 0.6 );
 								world.xz += shoreDirection * sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 * env;
 								vWaveHeight += ( crestHeight - preHeight ) * env;
 							}
@@ -591,8 +593,10 @@ export class WebGLFallback {
 				uniform float uSeaLevel;
 				varying vec3 vWorldPosition;
 				varying float vWaveHeight;
-				varying float vShoreFace;
-				varying float vShoreFoam;
+				varying float vShoreU;
+				varying float vShoreBreaking;
+				varying float vShoreEnv;
+				varying float vShoreAlongVariation;
 				varying float vShoreSlope;
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
@@ -666,8 +670,12 @@ export class WebGLFallback {
 					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.08, 0.42, shoreDepth ) );
 					float shoreCrest = smoothstep( 0.62, 0.86, shoreWave ) * smoothstep( 0.22, 0.66, shoreDetail );
 					float shoreFoam = shoreBand * shoreCrest;
-					float breakerFace = vShoreFace;
-					float breakerFoam = vShoreFoam * smoothstep( 0.24, 0.68, shoreDetail );
+					float faceBand = smoothstep( -0.19, -0.13, vShoreU ) * ( 1.0 - smoothstep( -0.015, 0.01, vShoreU ) );
+					float faceProgress = smoothstep( -0.4, 0.0, vShoreBreaking ) * ( 1.0 - smoothstep( 0.9, 1.08, vShoreBreaking ) );
+					float breakerFace = faceBand * faceProgress * vShoreEnv;
+					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.08 ) * 38.0 );
+					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU + 0.08 ) * 24.0 );
+					float breakerFoam = max( impact, roller ) * vShoreEnv * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) * smoothstep( 0.24, 0.68, shoreDetail );
 					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.55 );
 					float foam = max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
