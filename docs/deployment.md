@@ -101,17 +101,17 @@ DNS inspection on 2026-10-11 found Namecheap nameservers, an apex parking
 address `162.255.119.79`, and `www` pointing to `parkingpage.namecheap.com`.
 The apex HTTP endpoint redirects to Namecheap parking and the HTTPS request
 timed out. The GitHub Pages API initially reported `cname: elsemesh.org` and
-`https_enforced: false`; that custom-domain setting was then cleared so the
-GitHub.io client can remain the working address until DNS is ready. The API
-now reports `cname: null` and `https_enforced: true`. GitHub's edge briefly
-returned cached HTTP 301 redirects to the parked custom domain after the
-setting was cleared. The latest check on 2026-10-11 confirms both GitHub.io
-paths now return HTTP 200 with the current main and archived commit stamps.
-The custom domain itself is still not ready: `elsemesh.org` resolves to
+`https_enforced: false`; that setting was cleared so GitHub.io remained usable.
+Reattaching `elsemesh.org` briefly for a live check immediately changed
+`https://elsemesh.github.io/` to an HTTP 301 redirect to `http://elsemesh.org/`,
+which still leads to Namecheap parking. The setting was cleared again. The
+current Pages API reports `cname: null` and `https_enforced: true`, and the
+GitHub.io root returned HTTP 200 after clearing it. Keep using GitHub.io until
+the DNS records and verification challenge are ready; then attach the custom
+domain and update DNS together so the working URL does not redirect to parking.
+The custom domain is still not ready: `elsemesh.org` resolves to
 `162.255.119.79`, `www` still uses `parkingpage.namecheap.com`, and the
-`_github-pages-challenge-ElseMesh` TXT query returned no answer. Keep using the
-GitHub.io URLs until DNS records and organization domain verification are
-complete.
+`_github-pages-challenge-ElseMesh` TXT query returned no answer.
 
 Preserve the existing email records: MX priorities 10 (`eforward1`,
 `eforward2`, `eforward3`), 15 (`eforward4`), and 20 (`eforward5`) under
