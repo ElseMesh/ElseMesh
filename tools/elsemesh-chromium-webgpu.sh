@@ -5,8 +5,10 @@ usage() {
   cat <<'EOF'
 Usage: tools/elsemesh-chromium-webgpu.sh [URL]
 
-Open ElseMesh in a dedicated Chromium app window with WebGPU enabled and
-full-resolution graphics. The default URL is https://elsemesh.org/?quality=1.
+Open an ElseMesh URL in a dedicated Chromium window with WebGPU enabled and
+full-resolution graphics. The normal tab strip stays visible so you can mute
+the game's tab from its speaker icon or tab context menu. The default URL is
+https://elsemesh.org/?quality=1.
 
 Set CHROMIUM to choose the Chromium executable and
 ELSEMESH_CHROMIUM_PROFILE to choose its isolated profile directory.
@@ -46,4 +48,4 @@ exec "$chromium" \
   --enable-unsafe-webgpu \
   --enable-features=Vulkan \
   --use-vulkan \
-  --app="$url"
+  --new-window "$url"
