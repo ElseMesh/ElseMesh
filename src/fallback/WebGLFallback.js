@@ -524,7 +524,7 @@ export class WebGLFallback {
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
 					vec3 sceneColor = screenColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
 					vec3 absorption = exp( -vec3( 0.08, 0.027, 0.012 ) * min( depth, 60.0 ) );
-					vec3 refractedBed = mix( seabedColor, sceneColor, 0.1 ) * vec3( 1.0, 0.68, 0.4 );
+					vec3 refractedBed = mix( seabedColor, sceneColor, 0.1 ) * vec3( 0.58, 0.86, 0.96 );
 					vec3 transmitted = refractedBed * absorption + vec3( 0.008, 0.13, 0.17 ) * ( 1.0 - absorption );
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
@@ -557,11 +557,12 @@ export class WebGLFallback {
 					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.005 + 0.015 * ripple );
 					float foamNoise = texture2D( uCloudNoise, p * 0.011 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
 					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
-					float shoreWave = 0.5 + 0.5 * sin( depth * 1.3 - uTime * 1.2 + ( shoreDetail - 0.5 ) * 4.8 );
-					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.15, 2.7, depth ) );
-					float shoreFoam = shoreBand * smoothstep( 0.69, 0.91, shoreWave ) * smoothstep( 0.28, 0.76, shoreDetail );
-					float foam = max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.12 + 0.24 * ripple + 0.06 * micro ), shoreFoam * 0.82 );
-					reflected = mix( reflected, vec3( 0.78, 0.9, 0.88 ), foam );
+					float shoreWave = 0.5 + 0.5 * sin( depth * 1.15 + dot( p, vec2( 0.038, 0.061 ) ) - uTime * 0.9 + ( shoreDetail - 0.5 ) * 4.8 );
+					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.2, 4.2, depth ) );
+					float shoreCrest = smoothstep( 0.68, 0.9, shoreWave ) * smoothstep( 0.22, 0.66, shoreDetail );
+					float shoreFoam = shoreBand * shoreCrest;
+					float foam = max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.12 + 0.24 * ripple + 0.06 * micro ), shoreFoam * 0.88 );
+					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>
