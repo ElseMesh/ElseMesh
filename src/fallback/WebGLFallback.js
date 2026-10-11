@@ -266,46 +266,38 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
 function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 
-	const positions = [], seeds = [];
+	const positions = [], seeds = [], depths = [];
 	for ( let x = WORLD.beach.xMin - 25; x <= WORLD.beach.xMax + 25; x += 1.5 ) for ( let z = - 64; z <= 28; z += 1.5 ) {
 		const depth = seaLevel - terrain.heightAt( x, z );
 		if ( depth <= 0.15 || depth >= 5.5 ) continue;
 		positions.push( x, 0, z );
 		seeds.push( ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1 );
+		depths.push( depth );
 	}
 	const geometry = new T.BufferGeometry();
 	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
 	geometry.setAttribute( 'aSeed', new T.Float32BufferAttribute( seeds, 1 ) );
+	geometry.setAttribute( 'aDepth', new T.Float32BufferAttribute( depths, 1 ) );
 	const material = new T.ShaderMaterial( {
 		uniforms: {
-			uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uTerrainHeight: { value: terrainWater.texture },
-			uTerrainOrigin: { value: terrainWater.origin }, uTerrainSize: { value: terrainWater.size }, uHeightRange: { value: new T.Vector2( terrainWater.minHeight, terrainWater.maxHeight ) },
+			uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() },
 			uShoreField: { value: terrainWater.shore.texture }, uShoreFieldOrigin: { value: terrainWater.shore.origin }, uShoreFieldSize: { value: terrainWater.shore.size }, uShoreTimeRange: { value: terrainWater.shore.timeRange }, uSeaLevel: { value: seaLevel },
 		},
 		vertexShader: /* glsl */`
 			uniform float uTime;
 			uniform vec3 uCameraPosition;
-			uniform sampler2D uTerrainHeight;
-			uniform float uTerrainOrigin;
-			uniform float uTerrainSize;
-			uniform vec2 uHeightRange;
 			uniform sampler2D uShoreField;
 			uniform float uShoreFieldOrigin;
 			uniform float uShoreFieldSize;
 			uniform vec2 uShoreTimeRange;
 			uniform float uSeaLevel;
 			attribute float aSeed;
+			attribute float aDepth;
 			varying float vOpacity;
 			void main() {
 				vec3 p = position;
 				vOpacity = 0.0;
-				float depth = -1.0;
-				vec2 terrainUv = ( p.xz - vec2( uTerrainOrigin ) ) / uTerrainSize;
-				if ( all( greaterThanEqual( terrainUv, vec2( 0.0 ) ) ) && all( lessThanEqual( terrainUv, vec2( 1.0 ) ) ) ) {
-					vec4 terrain = texture2D( uTerrainHeight, terrainUv );
-					float encoded = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
-					depth = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, encoded );
-				}
+				float depth = aDepth;
 				if ( depth > 0.15 && depth < 5.5 ) {
 					vec2 shoreUv = ( p.xz - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 					vec4 shore = texture2D( uShoreField, shoreUv );
