@@ -1483,6 +1483,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			this.whale.group.visible = ! this.remoteWorldActive;
 			if ( ! this.remoteWorldActive ) this.whale.update( dt, this.camera );
 		}
+		this.boat.sync( this.boatCtl );
 		this.boat.update( dt );
 		this.wildlife.update( dt, this.camera, this.freeCam ? null : this.player );
 		this.localLights.update( this.camera, dt );

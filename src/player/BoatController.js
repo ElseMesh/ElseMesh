@@ -51,7 +51,6 @@ export class BoatController {
 
 	constructor( { model, design = model.design || model, query, terrain, colliders, initialPosition = WORLD.boatDock.position, initialHeading = WORLD.boatDock.heading } ) {
 
-		this.model = model;
 		this.design = design;
 		this.query = query;
 		this.terrain = terrain;
@@ -251,9 +250,6 @@ export class BoatController {
 
 		if ( ! this.isFinite() ) this.reset();
 
-		this.model.setThrottle( this.throttle );
-		this.model.setSteering( this.steer );
-		this.model.setPropellerRPM( this.rpm * 2400 * Math.sign( this.throttle || 1 ) );
 		this.apply();
 
 	}
@@ -567,10 +563,6 @@ export class BoatController {
 
 	apply() {
 
-		const g = this.model.group;
-		g.position.copy( this.position );
-		g.quaternion.copy( this.quaternion );
-		g.updateMatrixWorld( true );
 		this.toWorld( _v.set( 0, 0, 3.9 ), this.bowWorld );
 		this.toWorld( _v.set( 0, 0, - 3.8 ), this.sternWorld );
 

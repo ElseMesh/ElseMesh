@@ -167,6 +167,18 @@ export class BoatModel {
 
 	}
 
+	// Copy backend-neutral simulation state into this renderer's presentation model.
+	sync( state ) {
+
+		this.group.position.copy( state.position );
+		this.group.quaternion.copy( state.quaternion );
+		this.group.updateMatrixWorld( true );
+		this.setThrottle( state.throttle );
+		this.setSteering( state.steer );
+		this.setPropellerRPM( state.rpm * 2400 * Math.sign( state.throttle || 1 ) );
+
+	}
+
 	setNavLights( on ) {
 
 		this.materials.setNavLights( on );

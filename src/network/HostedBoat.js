@@ -61,6 +61,7 @@ export class HostedBoat {
 
 	update( dt ) {
 
+		if ( this.controller ) this.model.sync( this.controller );
 		this.model.update( dt );
 
 	}
