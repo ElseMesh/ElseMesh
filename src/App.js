@@ -221,6 +221,7 @@ export class App {
 			const { WebGLFallback } = await import( './fallback/WebGLFallback.js' );
 			this.webglFallback = new WebGLFallback( this, engine );
 			await this.webglFallback.init( onProgress );
+			window.__app = this;
 			return this;
 
 		}

@@ -308,11 +308,11 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 					float exposure = shore.b;
 					float along = dot( p.xz, vec2( -dir.y, dir.x ) );
 					float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
-					float warp = sin( along * 0.016 ) * 1.6;
 					float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 					float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
 					float phase = ( uTime - arrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 					float index = floor( phase + 0.5 );
+					float warp = sin( along * 0.016 + index * 0.9 ) * 1.6;
 					float u = phase - index;
 					float variation = sin( along * 0.062 + index * 1.7 + warp ) * 0.6 + sin( along * 0.13 + index * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
 					variation += ( sin( along * 0.29 + index * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + index * 5.9 + 0.8 ) * 0.4 ) * 0.28;
@@ -607,7 +607,7 @@ export class WebGLFallback {
 		const material = new T.ShaderMaterial( {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSceneColor: { value: this.sceneColorTexture }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -662,19 +662,26 @@ export class WebGLFallback {
 								float exposure = shore.b;
 								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
 								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
-								float warp = sin( along * 0.016 ) * 1.6;
 								float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 								float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
 								float phase = ( uTime - arrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 								float waveIndex = floor( phase + 0.5 );
+								float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
 								float alongVariation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
 								alongVariation += ( sin( along * 0.29 + waveIndex * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + waveIndex * 5.9 + 0.8 ) * 0.4 ) * 0.28;
 								float u = phase - waveIndex;
 								float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
 								float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
 								float amplitude = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + alongVariation * 0.385 ) * bar, 0.02 );
+								float lam = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0;
+								vec2 crestPosition = p + shoreDirection * ( u * lam );
+								vec2 crestTerrainUv = ( crestPosition - vec2( uTerrainOrigin ) ) / uTerrainSize;
+								vec4 crestTerrain = texture2D( uTerrainHeight, crestTerrainUv );
+								float crestEncodedHeight = ( crestTerrain.r * 255.0 * 256.0 + crestTerrain.g * 255.0 ) / 65535.0;
+								float depthAtCrest = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, crestEncodedHeight );
+								depthAtCrest = mix( depthAtCrest, depth, smoothstep( 0.3, 0.5, abs( u ) ) );
 								float breakDepth = pow( amplitude * 3.556 / 0.78, 0.8 );
-								float breaking = ( breakDepth - depth ) / max( breakDepth * 0.13, 0.05 );
+								float breaking = ( breakDepth - depthAtCrest ) / max( breakDepth * 0.13, 0.05 );
 								vShoreU = u;
 								vShoreBreaking = breaking;
 								vShoreAlongVariation = alongVariation;
@@ -711,6 +718,7 @@ export class WebGLFallback {
 				uniform vec3 uSunDirection;
 				uniform sampler2D uCloudNoise;
 				uniform sampler2D uSceneColor;
+				uniform mat4 uViewProjection;
 				uniform vec2 uViewport;
 				uniform sampler2D uTerrainColor;
 				uniform sampler2D uTerrainHeight;
@@ -784,13 +792,20 @@ export class WebGLFallback {
 					vec3 cloudColor = mix( vec3( 0.42, 0.5, 0.62 ), vec3( 1.25, 1.16, 1.0 ), max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ) * 0.6 + 0.2 );
 					sky = mix( sky, cloudColor, reflectedCloud );
 					sky += vec3( 1.0, 0.72, 0.43 ) * reflectedSun * 0.14;
+					vec4 reflectedClip = uViewProjection * vec4( vWorldPosition + reflectionDirection * 1200.0, 1.0 );
+					vec2 reflectedUv = reflectedClip.xy / max( reflectedClip.w, 0.0001 ) * 0.5 + 0.5;
+					float reflectedOnScreen = step( 0.015, reflectionDirection.y ) * step( 0.001, reflectedClip.w )
+						* step( 0.001, reflectedUv.x ) * step( reflectedUv.x, 0.999 )
+						* step( 0.001, reflectedUv.y ) * step( reflectedUv.y, 0.999 );
+					vec3 screenReflection = screenColorToLinear( texture2D( uSceneColor, reflectedUv ).rgb );
+					sky = mix( sky, screenReflection, reflectedOnScreen * 0.72 );
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = waterNoise.r * 0.55 + waterNoise.g * 0.45;
 					float shallow = smoothstep( 0.0, 18.0, depth );
-					vec3 water = mix( vec3( 0.018, 0.26, 0.30 ), vec3( 0.004, 0.032, 0.105 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
+					vec3 water = mix( vec3( 0.012, 0.16, 0.24 ), vec3( 0.002, 0.016, 0.065 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
 					float bottomVisibility = ( uTerrainSize > 0.0 ) ? 1.0 - smoothstep( 4.0, 36.0, depth ) : 0.0;
 					float waterFresnel = fresnel * mix( 1.0, 0.38, bottomVisibility );
-					vec3 waterBody = mix( water, transmitted, bottomVisibility * 0.38 * ( 1.0 - waterFresnel ) );
+					vec3 waterBody = mix( water, transmitted, bottomVisibility * 0.18 * ( 1.0 - waterFresnel ) );
 					vec3 reflected = mix( waterBody, sky, waterFresnel * 0.82 );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
 					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 128.0 );
@@ -823,7 +838,10 @@ export class WebGLFallback {
 		water.rotation.x = - Math.PI / 2;
 		water.position.y = seaLevel;
 		water.isWater = true;
-		water.onBeforeRender = ( renderer, scene, camera ) => material.uniforms.uCameraPosition.value.setFromMatrixPosition( camera.matrixWorld );
+		water.onBeforeRender = ( renderer, scene, camera ) => {
+			material.uniforms.uCameraPosition.value.setFromMatrixPosition( camera.matrixWorld );
+			material.uniforms.uViewProjection.value.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
+		};
 		return water;
 
 	}
