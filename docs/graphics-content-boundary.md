@@ -107,11 +107,14 @@ The fish stand's identity, placement, vendor interaction descriptor, collision
 volumes, material pattern IDs, and procedural fallback geometry now live in
 backend-neutral content modules. `WebGLFishStandAdapter` consumes the same
 placement, collision descriptors, and generated geometry as the WebGPU-side
-stand fallback, and loads Joe's shared character asset. The adapter check
-passes. The WebGL path does not yet use the photo-scanned StallKit surface
-textures, render the static fish display, or connect the buyer to the shared
-fishing/selling HUD and game runtime. The backend-specific early return and
-separate island scene remain in place.
+stand fallback, and loads Joe's shared character asset. `WebGLGameAdapter`
+connects the fallback buyer to the existing `GameState` and `GameHUD`, restores
+the same browser-saved inventory, and routes selling through the shared game
+rules. The headless fish-stand and game-adapter checks pass. The WebGL path
+does not yet implement the rod/casting/bite/fight simulation, render the static
+fish display, or use the photo-scanned StallKit surface textures. This buyer
+integration is partial gameplay parity, not a complete game runtime. The
+backend-specific early return and separate island scene remain in place.
 
 ## Acceptance criteria
 

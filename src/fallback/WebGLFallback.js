@@ -12,6 +12,7 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
+import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
@@ -633,6 +634,7 @@ export class WebGLFallback {
 				colliders: this.app.worldState.colliders,
 				loader: this.loader,
 			} );
+			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor );
 			const y = this.terrain.heightAt( STAND.x, STAND.z );
 			for ( const box of fishStandColliderVolumes( y ) ) this.blockers.push( {
 				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
@@ -1363,6 +1365,7 @@ export class WebGLFallback {
 		this._keyDown = event => {
 			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
+			if ( this.gameAdapter?.handleKey( event.code ) ) { event.preventDefault(); return; }
 			this.keys.add( event.code );
 			if ( event.code === 'KeyE' ) this._useNearestPortal();
 			if ( event.code === 'Space' ) { event.preventDefault(); if ( this.onGround ) this.velocityY = 5; }
@@ -1449,11 +1452,12 @@ export class WebGLFallback {
 		if ( this.keys.has( 'KeyA' ) ) move.sub( right );
 		move.addScaledVector( forward, - this.moveStick.y );
 		move.addScaledVector( right, this.moveStick.x );
-		const look = keyboardLookDelta( this.keys, dt );
+		const gamePanelOpen = !! ( this.gameAdapter?.hud.standOpen || this.gameAdapter?.hud.invOpen );
+		const look = gamePanelOpen ? { x: 0, y: 0 } : keyboardLookDelta( this.keys, dt );
 		this.yaw -= look.x * 0.0022;
 		this.pitch = Math.max( - 1.45, Math.min( 1.45, this.pitch - look.y * 0.0022 ) );
 		this._look();
-		if ( move.lengthSq() ) {
+		if ( ! gamePanelOpen && move.lengthSq() ) {
 			move.normalize().multiplyScalar( speed * dt );
 			const old = this.camera.position.clone();
 			this.camera.position.x += move.x;
@@ -1483,6 +1487,7 @@ export class WebGLFallback {
 			}
 		}
 		this.fishStand?.update( dt, this.camera.position );
+		this.gameAdapter?.update( dt, this.camera.position );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
 		if ( this.waterScene.children.length && ! this.debugNoWater ) {
