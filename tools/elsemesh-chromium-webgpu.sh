@@ -7,7 +7,7 @@ Usage: tools/elsemesh-chromium-webgpu.sh [URL]
 
 Open an ElseMesh URL in a dedicated Chromium window with WebGPU enabled and
 full-resolution graphics. The normal tab strip stays visible so you can mute
-the game's tab from its speaker icon or tab context menu. The default URL is
+the game's tab by clicking its speaker icon. The default URL is
 https://elsemesh.org/?quality=1.
 
 Set CHROMIUM to choose the Chromium executable and
@@ -47,5 +47,6 @@ exec "$chromium" \
   --disable-extensions \
   --enable-unsafe-webgpu \
   --enable-features=Vulkan \
+  --enable-tab-audio-muting \
   --use-vulkan \
   --new-window "$url"
