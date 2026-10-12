@@ -14,7 +14,7 @@ function temporaryRoot() {
 
 export function parseArguments( argv ) {
 	const options = {};
-	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin', '--web-root' ] );
+	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
 		if ( ! valueOptions.has( key ) || ! argv[ i + 1 ] || argv[ i + 1 ].startsWith( '--' ) ) throw new Error( `Invalid or incomplete option: ${key}` );
@@ -90,7 +90,6 @@ async function serve( options ) {
 	if ( options[ '--dht-mode' ] ) args.push( '--dht-mode', options[ '--dht-mode' ] );
 	if ( options[ '--public-gateway' ] ) args.push( '--public-gateway', options[ '--public-gateway' ] );
 	if ( options[ '--directory-url' ] ) args.push( '--directory-url', options[ '--directory-url' ] );
-	if ( options[ '--web-root' ] ) args.push( '--web-root', path.resolve( options[ '--web-root' ] ) );
 	for ( const key of [ 'bootstrap', 'relay', 'announce-address', 'allow-browser-origin' ] ) for ( const value of options[ key ] || [] ) args.push( `--${key}`, value );
 	const child = spawn( path.resolve( options[ '--worldd' ] ), args, { stdio: 'inherit' } );
 	const forwardSignal = signal => child.kill( signal );

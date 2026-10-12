@@ -58,7 +58,6 @@ type daemon struct {
 	world                 worldManifest
 	key                   crypto.PrivKey
 	assetsDir             string
-	webRoot               string
 	publicGateway         string
 	directoryURL          string
 	zeroTierNodeID        string
@@ -129,7 +128,6 @@ func run() error {
 	webTransportAddress := flag.String("webtransport", "", "optional WebTransport HTTP/3 UDP listen address, for example :5201")
 	webTransportCert := flag.String("webtransport-tls-cert", "", "TLS certificate for the optional WebTransport listener")
 	webTransportKey := flag.String("webtransport-tls-key", "", "TLS private key for the optional WebTransport listener")
-	webRoot := flag.String("web-root", "", "optional built ElseMesh web client directory")
 	publicGateway := flag.String("public-gateway", "", "public HTTPS/WSS gateway origin included in signed node records")
 	directoryURL := flag.String("directory-url", "", "optional HTTPS ElseMesh directory service URL for publishing this discoverable node")
 	var allowedBrowserOriginsFlags stringFlags
@@ -523,7 +521,7 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), webRoot: *webRoot, publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
 	if zeroTier != nil {
 		d.zeroTierNodeID = zeroTier.NodeID()
 	}
@@ -594,9 +592,6 @@ func run() error {
 		mux.HandleFunc("/gateway-webtransport", func(w http.ResponseWriter, r *http.Request) {
 			d.handleBrowserWebTransport(w, r, wtServer)
 		})
-	}
-	if d.webRoot != "" {
-		mux.Handle("/", http.FileServer(http.Dir(d.webRoot)))
 	}
 	server := &http.Server{Addr: *httpAddress, Handler: securityHeaders(mux), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 90 * time.Second}
 	serverErr := make(chan error, 1)

@@ -1,15 +1,28 @@
 # Visit the two development worlds
 
+## Run the browser client separately
+
+Start the Vite client from the external build tree in its own terminal:
+
+```sh
+cd /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
+npm run dev
+```
+
+Open the client at `http://127.0.0.1:5189/`. `thruholdd` does not serve the
+static ElseMesh client; it serves world and gateway APIs only.
+
 ## Links on the server computer
 
-- [Hosted example island](http://127.0.0.1:5200/?worldId=tw-world%3Aexample-island)
-- [UNDERNEATH / LOZ-derived basalt cavern](http://127.0.0.1:5200/?worldId=tw-world%3Aloz-underneath)
+- [Hosted example island](http://127.0.0.1:5189/?worldId=tw-world%3Aexample-island&gateway=http%3A%2F%2F127.0.0.1%3A5200)
+- [UNDERNEATH / LOZ-derived basalt cavern](http://127.0.0.1:5189/?worldId=tw-world%3Aloz-underneath&gateway=http%3A%2F%2F127.0.0.1%3A5200)
 
 Both links use the island gateway on port 5200. It discovers the cave owner
 and forwards content over libp2p. The cave backend on port 5202 must remain
 running, but visitors do not need to use that port. Independent world servers
-retain their own ownership and storage. No separate Vite process is needed. The query selects the world; the same-origin gateway discovers its owner
-and the client verifies the signed manifest. Click **Tap or click to explore**
+retain their own ownership and storage. The query selects the world; the
+selected gateway discovers its owner and the client verifies the signed manifest.
+Click **Tap or click to explore**
 after loading. WASD moves; arrows change the view; click the scene for mouse look.
 The bottom-right eight-digit hash identifies the client build.
 
@@ -51,7 +64,8 @@ node tools/serve-world-profile.mjs \
   --profile island-example \
   --source worlds/island/world-source.json --assets worlds/island/assets \
   --http 127.0.0.1:5200 --p2p-port 42901 \
-  --discoverable true --dht-mode server --web-root dist
+  --discoverable true --dht-mode server \
+  --allow-browser-origin http://127.0.0.1:5189
 ```
 
 ## Start or restart the cave
@@ -71,7 +85,8 @@ node tools/serve-world-profile.mjs \
   --source worlds/loz-underneath/world-source.json --assets worlds/loz-underneath/assets \
   --http 127.0.0.1:5202 --p2p-port 42903 \
   --discoverable true --dht-mode server \
-  --bootstrap "/ip4/127.0.0.1/tcp/42901/p2p/$island_peer" --web-root dist
+  --bootstrap "/ip4/127.0.0.1/tcp/42901/p2p/$island_peer" \
+  --allow-browser-origin http://127.0.0.1:5189
 ```
 
 Ctrl+C stops each server. Existing profile manifests are retained; restarting does
@@ -108,9 +123,9 @@ browser play, portal crossing, or visual parity.
 ## Visiting from another device
 
 `127.0.0.1` means the device opening the link. These links therefore work on the
-Linux server computer, not directly on the Flip7/iPad. A remote device needs a
-reachable HTTPS/WSS gateway serving the client, or a suitably configured local
-tunnel. Plain HTTP over a LAN address does not provide the secure context WebGPU
+Linux server computer, not directly on the Flip7/iPad. A remote device needs the
+separately hosted HTTPS ElseMesh client and a reachable HTTPS/WSS world gateway.
+Plain HTTP over a LAN address does not provide the secure context WebGPU
 requires. Public gateway and exact browser-origin configuration are documented
 in [ThruHold hosting](thruholds.md#hosting-a-checked-in-world-profile).
 
