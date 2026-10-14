@@ -19,7 +19,7 @@ class ScreenConsole {
 
 export class C64Computer {
   constructor(app) {
-    this.app=app; this.lines=[]; this.active=false; this.loggedIn=false; this.username=''; this.commandQueue=Promise.resolve();
+    this.app=app; this.lines=[]; this.active=false; this.loggedIn=false; this.username=''; this.commandQueue=Promise.resolve(); this.commandGeneration=0;
     this.console=new ScreenConsole((text,newline)=>this.write(text,newline));
     this.interpreter=new Interpreter(this.console);
     const execute=this.interpreter.executeStatement.bind(this.interpreter);
@@ -52,7 +52,7 @@ export class C64Computer {
     </style><div class="elsemesh-c64-shell"><section class="elsemesh-c64-monitor"><div class="elsemesh-c64-screen"><div class="elsemesh-c64-text" role="log" aria-live="polite"></div><div class="elsemesh-c64-preview"><canvas width="320" height="200" aria-label="VIC-II sprite 0 preview"></canvas><span>SPRITE 0 PREVIEW · DEFAULT VIC BANK</span></div></div><form class="elsemesh-c64-form"><input class="elsemesh-c64-input" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="C64 command"><button>RETURN</button><button type="button" class="elsemesh-c64-exit">LEAVE</button></form><div class="elsemesh-c64-meta"><span>COMMODORE 64 · MICROSOFT 6502 BASIC 1.1</span><span>ENTER PROGRAM LINES · RUN · LIST · SAVE "NAME" · ESC LEAVES</span></div></section></div>`;
     document.body.append(this.dialog);
     this.screen=this.dialog.querySelector('.elsemesh-c64-text'); this.preview=this.dialog.querySelector('canvas'); this.input=this.dialog.querySelector('.elsemesh-c64-input');
-    this.dialog.querySelector('form').addEventListener('submit',event=>{event.preventDefault();const command=this.input.value;this.input.value='';this.commandQueue=this.commandQueue.then(()=>this.submit(command));});
+    this.dialog.querySelector('form').addEventListener('submit',event=>{event.preventDefault();const command=this.input.value,generation=this.commandGeneration;this.input.value='';this.commandQueue=this.commandQueue.then(()=>generation===this.commandGeneration&&this.active?this.submit(command):undefined);});
     this.dialog.querySelector('.elsemesh-c64-exit').onclick=()=>this.close();
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
     this.write('ELSEMESH WAREHOUSE NETWORK',true); this.write('COMMODORE 64 TERMINAL 01',true); this.write('',true); this.write('LOGIN:',true);
@@ -72,5 +72,5 @@ export class C64Computer {
     catch(error) { this.write(error?.toString?.()||'?ERROR',true); this.write('READY.',true); }
   }
   open(){if(this.active)return;this.active=true;this.lastYield=performance.now();drawSprite0(this.preview,this.interpreter.memoryMap);this.app.input.suspend();document.exitPointerLock?.();this.dialog.showModal();this.input.focus();}
-  close(){if(!this.active)return;this.interpreter.state.interrupted=true;this.interpreter.state.running=false;this.active=false;this.dialog.close();this.app.input.resume();this.app.input.requestLock();}
+  close(){if(!this.active)return;this.commandGeneration++;this.interpreter.state.interrupted=true;this.interpreter.state.running=false;this.active=false;this.dialog.close();this.app.input.resume();this.app.input.requestLock();}
 }

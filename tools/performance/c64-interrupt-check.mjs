@@ -15,8 +15,10 @@ try{
 	await evaluate("(()=>{const c=window.__app.thirdIsland.portalInterior.c64;c.input.value='RUN';c.dialog.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));return true})()");
 	await new Promise(ok=>setTimeout(ok,150));
 	const before=await evaluate('({active:window.__app.thirdIsland.portalInterior.c64.active,running:window.__app.thirdIsland.portalInterior.c64.interpreter.state.running})');
+	await evaluate("(()=>{const c=window.__app.thirdIsland.portalInterior.c64;c.input.value='RUN';c.dialog.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));return true})()");
 	await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
 	await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+	await evaluate('window.__app.thirdIsland.portalInterior.c64.commandQueue');
 	await new Promise(ok=>setTimeout(ok,150));
 	const after=await evaluate('({active:window.__app.thirdIsland.portalInterior.c64.active,running:window.__app.thirdIsland.portalInterior.c64.interpreter.state.running})');
 	await evaluate('window.__app.thirdIsland.portalInterior.c64.open();true');
