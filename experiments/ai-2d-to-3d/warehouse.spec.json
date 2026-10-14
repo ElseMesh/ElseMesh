@@ -1,0 +1,21 @@
+{
+  "schema": "elsemesh.image-guided-building/v1",
+  "id": "warehouse-image-guided-codex-v1",
+  "backend": "parametric-warehouse-v1",
+  "referenceImages": [
+    "references/island-portal-exterior.png",
+    "references/warehouse-interior.png"
+  ],
+  "dimensionsMetres": { "width": 32, "depth": 30, "wallHeight": 12 },
+  "materials": {
+    "brick": { "color": [0.39, 0.25, 0.22], "roughness": 0.94, "metalness": 0 },
+    "steel": { "color": [0.12, 0.16, 0.18], "roughness": 0.51, "metalness": 0.66 },
+    "concrete": { "color": [0.53, 0.53, 0.52], "roughness": 0.82, "metalness": 0.02 },
+    "glass": { "color": [0.72, 0.82, 0.88], "roughness": 0.12, "metalness": 0, "opacity": 0.15 },
+    "wood": { "color": [0.40, 0.28, 0.19], "roughness": 0.76, "metalness": 0 }
+  },
+  "observed": ["tall brick walls", "large gridded factory windows", "steel roof structure", "raised loft and rail", "concrete ground floor"],
+  "calibration": "32 x 30 x 12 metres taken from the existing PortalInteriorRecipe source, not measured from a single image",
+  "inferred": ["exterior wall surfaces", "flat weatherproof roof", "north door and its size", "hidden wall layout", "window depths and glass thickness", "loft structural dimensions"],
+  "license": "ElseMesh runtime reference capture; local experiment only"
+}

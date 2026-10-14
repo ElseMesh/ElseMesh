@@ -1,0 +1,1826 @@
+{
+  "schema": "elsemesh.image-guided-asset/v1",
+  "id": "warehouse-image-guided-codex-v1",
+  "backend": "parametric-warehouse-v1",
+  "dimensionsMetres": {
+    "width": 32,
+    "depth": 30,
+    "wallHeight": 12
+  },
+  "references": [
+    {
+      "path": "references/island-portal-exterior.png",
+      "sha256": "a5e521abac3a5e9f8828347cdd221d30f56da48380674c64fa52ad025913a16f",
+      "bytes": 1057088
+    },
+    {
+      "path": "references/warehouse-interior.png",
+      "sha256": "94d7f3f11236d875967a087c4033085128fa525118c8b41a70bcb1e31bd121b4",
+      "bytes": 1132804
+    }
+  ],
+  "observed": [
+    "tall brick walls",
+    "large gridded factory windows",
+    "steel roof structure",
+    "raised loft and rail",
+    "concrete ground floor"
+  ],
+  "calibration": "32 x 30 x 12 metres taken from the existing PortalInteriorRecipe source, not measured from a single image",
+  "inferred": [
+    "exterior wall surfaces",
+    "flat weatherproof roof",
+    "north door and its size",
+    "hidden wall layout",
+    "window depths and glass thickness",
+    "loft structural dimensions"
+  ],
+  "parts": [
+    {
+      "name": "concrete ground floor",
+      "material": "concrete",
+      "center": [
+        0,
+        -0.15,
+        0
+      ],
+      "size": [
+        32,
+        0.3,
+        30
+      ],
+      "solid": true,
+      "walkable": true,
+      "source": "calibrated"
+    },
+    {
+      "name": "entry apron",
+      "material": "concrete",
+      "center": [
+        0,
+        -0.15,
+        -17.2
+      ],
+      "size": [
+        8,
+        0.3,
+        4.4
+      ],
+      "solid": true,
+      "walkable": true,
+      "source": "inferred"
+    },
+    {
+      "name": "roof slab",
+      "material": "steel",
+      "center": [
+        0,
+        12.16,
+        0
+      ],
+      "size": [
+        32,
+        0.32,
+        30
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "inferred"
+    },
+    {
+      "name": "front left brick",
+      "material": "brick",
+      "center": [
+        -8.8,
+        6,
+        -15
+      ],
+      "size": [
+        14.4,
+        12,
+        0.4
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "inferred"
+    },
+    {
+      "name": "front right brick",
+      "material": "brick",
+      "center": [
+        8.8,
+        6,
+        -15
+      ],
+      "size": [
+        14.4,
+        12,
+        0.4
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "inferred"
+    },
+    {
+      "name": "front door lintel",
+      "material": "steel",
+      "center": [
+        0,
+        7.75,
+        -15
+      ],
+      "size": [
+        3.2,
+        8.5,
+        0.42
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "inferred"
+    },
+    {
+      "name": "front door left jamb",
+      "material": "steel",
+      "center": [
+        -1.62,
+        1.75,
+        -14.98
+      ],
+      "size": [
+        0.12,
+        3.5,
+        0.44
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "front door right jamb",
+      "material": "steel",
+      "center": [
+        1.62,
+        1.75,
+        -14.98
+      ],
+      "size": [
+        0.12,
+        3.5,
+        0.44
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "rear brick wall",
+      "material": "brick",
+      "center": [
+        0,
+        6,
+        15
+      ],
+      "size": [
+        32,
+        12,
+        0.4
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "inferred"
+    },
+    {
+      "name": "west lower sill",
+      "material": "brick",
+      "center": [
+        -16,
+        0.58,
+        0
+      ],
+      "size": [
+        0.4,
+        1.16,
+        30
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west high header",
+      "material": "brick",
+      "center": [
+        -16,
+        11.2,
+        0
+      ],
+      "size": [
+        0.4,
+        1.6,
+        30
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 0",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        -15
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 1",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        -10
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 2",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        -5
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 3",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        0
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 4",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        5
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 5",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        10
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west pier 6",
+      "material": "brick",
+      "center": [
+        -16,
+        6,
+        15
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west glazing 0",
+      "material": "glass",
+      "center": [
+        -15.97,
+        6,
+        -12.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 0-1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        3.4799999999999995,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 0-2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        5.8,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 0-3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        8.12,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west central mullion 0",
+      "material": "steel",
+      "center": [
+        -15.89,
+        6,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west glazing 1",
+      "material": "glass",
+      "center": [
+        -15.97,
+        6,
+        -7.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 1-1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        3.4799999999999995,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 1-2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        5.8,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 1-3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        8.12,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west central mullion 1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        6,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west glazing 2",
+      "material": "glass",
+      "center": [
+        -15.97,
+        6,
+        -2.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 2-1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        3.4799999999999995,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 2-2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        5.8,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 2-3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        8.12,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west central mullion 2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        6,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west glazing 3",
+      "material": "glass",
+      "center": [
+        -15.97,
+        6,
+        2.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 3-1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        3.4799999999999995,
+        2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 3-2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        5.8,
+        2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 3-3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        8.12,
+        2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west central mullion 3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        6,
+        2.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west glazing 4",
+      "material": "glass",
+      "center": [
+        -15.97,
+        6,
+        7.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 4-1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        3.4799999999999995,
+        7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 4-2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        5.8,
+        7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 4-3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        8.12,
+        7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west central mullion 4",
+      "material": "steel",
+      "center": [
+        -15.89,
+        6,
+        7.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west glazing 5",
+      "material": "glass",
+      "center": [
+        -15.97,
+        6,
+        12.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 5-1",
+      "material": "steel",
+      "center": [
+        -15.89,
+        3.4799999999999995,
+        12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 5-2",
+      "material": "steel",
+      "center": [
+        -15.89,
+        5.8,
+        12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west transom 5-3",
+      "material": "steel",
+      "center": [
+        -15.89,
+        8.12,
+        12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "west central mullion 5",
+      "material": "steel",
+      "center": [
+        -15.89,
+        6,
+        12.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east lower sill",
+      "material": "brick",
+      "center": [
+        16,
+        0.58,
+        0
+      ],
+      "size": [
+        0.4,
+        1.16,
+        30
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east high header",
+      "material": "brick",
+      "center": [
+        16,
+        11.2,
+        0
+      ],
+      "size": [
+        0.4,
+        1.6,
+        30
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 0",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        -15
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 1",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        -10
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 2",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        -5
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 3",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        0
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 4",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        5
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 5",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        10
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east pier 6",
+      "material": "brick",
+      "center": [
+        16,
+        6,
+        15
+      ],
+      "size": [
+        0.44,
+        9.28,
+        0.72
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east glazing 0",
+      "material": "glass",
+      "center": [
+        15.97,
+        6,
+        -12.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 0-1",
+      "material": "steel",
+      "center": [
+        15.89,
+        3.4799999999999995,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 0-2",
+      "material": "steel",
+      "center": [
+        15.89,
+        5.8,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 0-3",
+      "material": "steel",
+      "center": [
+        15.89,
+        8.12,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east central mullion 0",
+      "material": "steel",
+      "center": [
+        15.89,
+        6,
+        -12.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east glazing 1",
+      "material": "glass",
+      "center": [
+        15.97,
+        6,
+        -7.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 1-1",
+      "material": "steel",
+      "center": [
+        15.89,
+        3.4799999999999995,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 1-2",
+      "material": "steel",
+      "center": [
+        15.89,
+        5.8,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 1-3",
+      "material": "steel",
+      "center": [
+        15.89,
+        8.12,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east central mullion 1",
+      "material": "steel",
+      "center": [
+        15.89,
+        6,
+        -7.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east glazing 2",
+      "material": "glass",
+      "center": [
+        15.97,
+        6,
+        -2.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 2-1",
+      "material": "steel",
+      "center": [
+        15.89,
+        3.4799999999999995,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 2-2",
+      "material": "steel",
+      "center": [
+        15.89,
+        5.8,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 2-3",
+      "material": "steel",
+      "center": [
+        15.89,
+        8.12,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east central mullion 2",
+      "material": "steel",
+      "center": [
+        15.89,
+        6,
+        -2.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east glazing 3",
+      "material": "glass",
+      "center": [
+        15.97,
+        6,
+        2.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 3-1",
+      "material": "steel",
+      "center": [
+        15.89,
+        3.4799999999999995,
+        2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 3-2",
+      "material": "steel",
+      "center": [
+        15.89,
+        5.8,
+        2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 3-3",
+      "material": "steel",
+      "center": [
+        15.89,
+        8.12,
+        2.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east central mullion 3",
+      "material": "steel",
+      "center": [
+        15.89,
+        6,
+        2.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east glazing 4",
+      "material": "glass",
+      "center": [
+        15.97,
+        6,
+        7.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 4-1",
+      "material": "steel",
+      "center": [
+        15.89,
+        3.4799999999999995,
+        7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 4-2",
+      "material": "steel",
+      "center": [
+        15.89,
+        5.8,
+        7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 4-3",
+      "material": "steel",
+      "center": [
+        15.89,
+        8.12,
+        7.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east central mullion 4",
+      "material": "steel",
+      "center": [
+        15.89,
+        6,
+        7.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east glazing 5",
+      "material": "glass",
+      "center": [
+        15.97,
+        6,
+        12.5
+      ],
+      "size": [
+        0.065,
+        9.28,
+        4.28
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 5-1",
+      "material": "steel",
+      "center": [
+        15.89,
+        3.4799999999999995,
+        12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 5-2",
+      "material": "steel",
+      "center": [
+        15.89,
+        5.8,
+        12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east transom 5-3",
+      "material": "steel",
+      "center": [
+        15.89,
+        8.12,
+        12.5
+      ],
+      "size": [
+        0.13,
+        0.065,
+        4.28
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "east central mullion 5",
+      "material": "steel",
+      "center": [
+        15.89,
+        6,
+        12.5
+      ],
+      "size": [
+        0.13,
+        9.3,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "steel column -15 -14",
+      "material": "steel",
+      "center": [
+        -15,
+        6,
+        -14
+      ],
+      "size": [
+        0.3,
+        12,
+        0.3
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "steel column -15 14",
+      "material": "steel",
+      "center": [
+        -15,
+        6,
+        14
+      ],
+      "size": [
+        0.3,
+        12,
+        0.3
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "steel column 15 -14",
+      "material": "steel",
+      "center": [
+        15,
+        6,
+        -14
+      ],
+      "size": [
+        0.3,
+        12,
+        0.3
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "steel column 15 14",
+      "material": "steel",
+      "center": [
+        15,
+        6,
+        14
+      ],
+      "size": [
+        0.3,
+        12,
+        0.3
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "roof cross beam -10",
+      "material": "steel",
+      "center": [
+        0,
+        11.3,
+        -10
+      ],
+      "size": [
+        31.2,
+        0.3,
+        0.35
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "roof cross beam 0",
+      "material": "steel",
+      "center": [
+        0,
+        11.3,
+        0
+      ],
+      "size": [
+        31.2,
+        0.3,
+        0.35
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "roof cross beam 10",
+      "material": "steel",
+      "center": [
+        0,
+        11.3,
+        10
+      ],
+      "size": [
+        31.2,
+        0.3,
+        0.35
+      ],
+      "solid": true,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "raised mezzanine",
+      "material": "wood",
+      "center": [
+        -8,
+        3.5,
+        4
+      ],
+      "size": [
+        15.5,
+        0.28,
+        15
+      ],
+      "solid": true,
+      "walkable": true,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 0",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        -3
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 1",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        -1.25
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 2",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        0.5
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 3",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        2.25
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 4",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        4
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 5",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        5.75
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 6",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        7.5
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 7",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        9.25
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail post 8",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.23,
+        11
+      ],
+      "size": [
+        0.09,
+        1.25,
+        0.09
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    },
+    {
+      "name": "loft rail",
+      "material": "steel",
+      "center": [
+        -0.48,
+        4.87,
+        4
+      ],
+      "size": [
+        0.09,
+        0.1,
+        15
+      ],
+      "solid": false,
+      "walkable": false,
+      "source": "observed"
+    }
+  ],
+  "sha256": "9a0f331974cf46c6a5d337a6a7f3f879f036064942ad6a7e496382df9c5da286"
+}

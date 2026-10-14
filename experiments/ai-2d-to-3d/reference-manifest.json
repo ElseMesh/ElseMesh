@@ -1,0 +1,11 @@
+{
+  "schema": "elsemesh.reference-capture/v1",
+  "sourceRevision": "4be987e55a1de665210cf71b6770dbf05a472dbf",
+  "capture": "Local headless Chrome, 1280x720, 2026-10-14, procedural and balanced quality at render scale 0.75",
+  "cameraPath": "Scripted browser camera positions in tools/performance/c64-sprite-video.mjs; exterior frame-002 and interior frame-013",
+  "images": [
+    { "path": "references/island-portal-exterior.png", "role": "Island portal appearance; this sign and ring are not the warehouse shell" },
+    { "path": "references/warehouse-interior.png", "role": "Interior architectural evidence: brick, arched factory windows, loft, steel and concrete" }
+  ],
+  "limitation": "The exterior shell and hidden sides are not visible in these references. The candidate's continuous exterior and doorway are inferred."
+}

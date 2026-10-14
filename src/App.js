@@ -27,6 +27,7 @@ import { PROCEDURAL_SEED } from './world/ProceduralHeight.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
+import { ImageGuidedWarehouse } from './world/ImageGuidedWarehouse.js';
 import { CaveSystem } from './world/CaveSystem.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
@@ -351,6 +352,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.avatar = new PlayerAvatar( scene, this.boatCtl );
 		this.avatarChooser = new AvatarChooser({ app: this });
 		this.thirdIsland = new ThirdIslandSystem( this );
+		this.aiWarehouse = qs.has( 'aiWarehouse' ) ? new ImageGuidedWarehouse( this ) : null;
 		this.fourthIsland = new FourthIslandSystem( this );
 		this.fifthIsland = new IslandFiveSystem( this );
 		this.portIsland = new PortIslandSystem( this );
@@ -737,6 +739,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		else if ( this.monorail.state !== 'riding' && !this.thirdIsland.active && !this.portIsland.driving ) this.player.update( dt );
 		if ( ! this.freeCam && !this.thirdIsland.active ) this.monorail.update( dt, this.player, this.input, this.camera, ( message ) => this.ui?.ui.toast( message ) );
 		this.thirdIsland.update( dt );
+		this.aiWarehouse?.update();
 		this.fourthIsland.update( dt );
 		this.fifthIsland.update( dt );
 		this.portIsland.update( dt );

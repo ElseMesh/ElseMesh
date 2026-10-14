@@ -1,0 +1,1055 @@
+{
+  "schema": "elsemesh.ai-2d-to-3d-screencast/v1",
+  "source": "Continuous CDP Page.screencastFrame from running browser",
+  "timestampSource": "node-frame-receipt",
+  "metadataTimestampValid": false,
+  "url": "http://127.0.0.1:5189/?procedural&aiWarehouse&quality=balanced&scale=0.75&noAudio",
+  "viewport": [
+    1280,
+    720
+  ],
+  "frameCount": 184,
+  "wallDurationSec": 41.50375629999999,
+  "events": [
+    {
+      "name": "Original island and source references",
+      "sec": -0.16373600000000443
+    },
+    {
+      "name": "Construction record: offline specification and GLB",
+      "sec": 3.1702930999999954
+    },
+    {
+      "name": "Original warehouse interior",
+      "sec": 5.981155899999998
+    },
+    {
+      "name": "Imported 3D candidate",
+      "sec": 8.296363700000002
+    },
+    {
+      "name": "Candidate exterior front",
+      "sec": 9.707505999999993
+    },
+    {
+      "name": "Candidate exterior west",
+      "sec": 11.644398100000005
+    },
+    {
+      "name": "Candidate exterior east",
+      "sec": 13.361441300000006
+    },
+    {
+      "name": "Return to candidate doorway",
+      "sec": 15.065040000000009
+    },
+    {
+      "name": "Walk through candidate doorway",
+      "sec": 15.971960900000006
+    },
+    {
+      "name": "Explore candidate interior",
+      "sec": 30.305058799999998
+    },
+    {
+      "name": "Inspect candidate loft",
+      "sec": 33.286930500000004
+    },
+    {
+      "name": "Return to original warehouse",
+      "sec": 36.342804300000005
+    },
+    {
+      "name": "Original C64 interaction",
+      "sec": 38.3183772
+    },
+    {
+      "name": "C64 BASIC remains functional",
+      "sec": 39.59285189999999
+    }
+  ],
+  "beforeWalk": {
+    "freeCam": false,
+    "position": [
+      360,
+      18.08,
+      281
+    ]
+  },
+  "afterWalk": {
+    "freeCam": false,
+    "position": [
+      360,
+      18,
+      288.4898867886917
+    ]
+  },
+  "walkSamples": [
+    {
+      "sec": 1.9059643999999971,
+      "z": 281.0663597650786
+    },
+    {
+      "sec": 3.0561342000000002,
+      "z": 282.48995652301977
+    },
+    {
+      "sec": 4.180915500000003,
+      "z": 283.3898878343982
+    },
+    {
+      "sec": 5.320847099999999,
+      "z": 284.2898868043727
+    },
+    {
+      "sec": 6.438709300000002,
+      "z": 284.8898867896453
+    },
+    {
+      "sec": 7.427390100000004,
+      "z": 285.4898867887497
+    },
+    {
+      "sec": 8.181318499999994,
+      "z": 285.789886788706
+    },
+    {
+      "sec": 9.734441699999996,
+      "z": 286.38988678869254
+    },
+    {
+      "sec": 11.891077900000004,
+      "z": 287.5898867886917
+    },
+    {
+      "sec": 13.521518800000006,
+      "z": 288.4898867886917
+    }
+  ],
+  "c64Output": "EHOUSE NETWORK\nCOMMODORE 64 TERMINAL 01\n\nLOGIN:\nLOGIN: EXPLORER\n\nWELCOME EXPLORER\nMICROSOFT BASIC 1.1\nFOR THE 6502 MICROPROCESSOR\n\nREADY.\n]PRINT 2+2 4 \n\n\nREADY.",
+  "errors": [],
+  "scriptedNavigation": true,
+  "model": "Codex image-guided programmatic reconstruction; no Argon run",
+  "frames": [
+    {
+      "name": "capture-00000.jpg",
+      "sec": 0,
+      "metadataTimestamp": 1791985988.441152
+    },
+    {
+      "name": "capture-00001.jpg",
+      "sec": 0.024862999999996305,
+      "metadataTimestamp": 1791985988.457887
+    },
+    {
+      "name": "capture-00002.jpg",
+      "sec": 0.10316299999999501,
+      "metadataTimestamp": 1791985988.548081
+    },
+    {
+      "name": "capture-00003.jpg",
+      "sec": 0.17050569999999254,
+      "metadataTimestamp": 1791985988.610715
+    },
+    {
+      "name": "capture-00004.jpg",
+      "sec": 0.2398561999999913,
+      "metadataTimestamp": 1791985988.680098
+    },
+    {
+      "name": "capture-00005.jpg",
+      "sec": 0.351618000000002,
+      "metadataTimestamp": 1791985988.787202
+    },
+    {
+      "name": "capture-00006.jpg",
+      "sec": 0.4352678999999995,
+      "metadataTimestamp": 1791985988.87991
+    },
+    {
+      "name": "capture-00007.jpg",
+      "sec": 0.5521362999999866,
+      "metadataTimestamp": 1791985988.989824
+    },
+    {
+      "name": "capture-00008.jpg",
+      "sec": 0.6314208000000008,
+      "metadataTimestamp": 1791985989.073747
+    },
+    {
+      "name": "capture-00009.jpg",
+      "sec": 0.7477580999999986,
+      "metadataTimestamp": 1791985989.189228
+    },
+    {
+      "name": "capture-00010.jpg",
+      "sec": 0.8471203999999943,
+      "metadataTimestamp": 1791985989.278721
+    },
+    {
+      "name": "capture-00011.jpg",
+      "sec": 0.9543759999999963,
+      "metadataTimestamp": 1791985989.392325
+    },
+    {
+      "name": "capture-00012.jpg",
+      "sec": 1.0650713999999937,
+      "metadataTimestamp": 1791985989.508163
+    },
+    {
+      "name": "capture-00013.jpg",
+      "sec": 1.1545776999999902,
+      "metadataTimestamp": 1791985989.588568
+    },
+    {
+      "name": "capture-00014.jpg",
+      "sec": 1.251864100000006,
+      "metadataTimestamp": 1791985989.689606
+    },
+    {
+      "name": "capture-00015.jpg",
+      "sec": 1.3463165000000004,
+      "metadataTimestamp": 1791985989.789818
+    },
+    {
+      "name": "capture-00016.jpg",
+      "sec": 1.4374691999999953,
+      "metadataTimestamp": 1791985989.881128
+    },
+    {
+      "name": "capture-00017.jpg",
+      "sec": 1.5492474999999928,
+      "metadataTimestamp": 1791985989.991904
+    },
+    {
+      "name": "capture-00018.jpg",
+      "sec": 1.6280672999999837,
+      "metadataTimestamp": 1791985990.07342
+    },
+    {
+      "name": "capture-00019.jpg",
+      "sec": 1.7335925000000003,
+      "metadataTimestamp": 1791985990.168173
+    },
+    {
+      "name": "capture-00020.jpg",
+      "sec": 1.8399901999999884,
+      "metadataTimestamp": 1791985990.274911
+    },
+    {
+      "name": "capture-00021.jpg",
+      "sec": 1.9507232999999928,
+      "metadataTimestamp": 1791985990.391514
+    },
+    {
+      "name": "capture-00022.jpg",
+      "sec": 2.056540300000009,
+      "metadataTimestamp": 1791985990.493925
+    },
+    {
+      "name": "capture-00023.jpg",
+      "sec": 2.149509199999997,
+      "metadataTimestamp": 1791985990.590169
+    },
+    {
+      "name": "capture-00024.jpg",
+      "sec": 2.234702900000002,
+      "metadataTimestamp": 1791985990.672812
+    },
+    {
+      "name": "capture-00025.jpg",
+      "sec": 2.3514073000000053,
+      "metadataTimestamp": 1791985990.792902
+    },
+    {
+      "name": "capture-00026.jpg",
+      "sec": 2.4250861999999955,
+      "metadataTimestamp": 1791985990.866504
+    },
+    {
+      "name": "capture-00027.jpg",
+      "sec": 2.5285341000000017,
+      "metadataTimestamp": 1791985990.972832
+    },
+    {
+      "name": "capture-00028.jpg",
+      "sec": 2.635257999999993,
+      "metadataTimestamp": 1791985991.074302
+    },
+    {
+      "name": "capture-00029.jpg",
+      "sec": 2.7357021999999915,
+      "metadataTimestamp": 1791985991.170042
+    },
+    {
+      "name": "capture-00030.jpg",
+      "sec": 2.8309440000000023,
+      "metadataTimestamp": 1791985991.27572
+    },
+    {
+      "name": "capture-00031.jpg",
+      "sec": 2.941792300000003,
+      "metadataTimestamp": 1791985991.373862
+    },
+    {
+      "name": "capture-00032.jpg",
+      "sec": 3.0429131999999868,
+      "metadataTimestamp": 1791985991.477153
+    },
+    {
+      "name": "capture-00033.jpg",
+      "sec": 3.153311400000007,
+      "metadataTimestamp": 1791985991.593922
+    },
+    {
+      "name": "capture-00034.jpg",
+      "sec": 3.2880705999999975,
+      "metadataTimestamp": 1791985991.714791
+    },
+    {
+      "name": "capture-00035.jpg",
+      "sec": 3.430443199999985,
+      "metadataTimestamp": 1791985991.861089
+    },
+    {
+      "name": "capture-00036.jpg",
+      "sec": 3.5362592999999976,
+      "metadataTimestamp": 1791985991.964397
+    },
+    {
+      "name": "capture-00037.jpg",
+      "sec": 3.6725291999999996,
+      "metadataTimestamp": 1791985992.09339
+    },
+    {
+      "name": "capture-00038.jpg",
+      "sec": 3.7831680000000034,
+      "metadataTimestamp": 1791985992.209213
+    },
+    {
+      "name": "capture-00039.jpg",
+      "sec": 3.9110819999999933,
+      "metadataTimestamp": 1791985992.340743
+    },
+    {
+      "name": "capture-00040.jpg",
+      "sec": 4.114197700000005,
+      "metadataTimestamp": 1791985992.547199
+    },
+    {
+      "name": "capture-00041.jpg",
+      "sec": 4.243943299999998,
+      "metadataTimestamp": 1791985992.674583
+    },
+    {
+      "name": "capture-00042.jpg",
+      "sec": 4.3671942,
+      "metadataTimestamp": 1791985992.793456
+    },
+    {
+      "name": "capture-00043.jpg",
+      "sec": 4.470681200000001,
+      "metadataTimestamp": 1791985992.904546
+    },
+    {
+      "name": "capture-00044.jpg",
+      "sec": 4.589204899999999,
+      "metadataTimestamp": 1791985993.025694
+    },
+    {
+      "name": "capture-00045.jpg",
+      "sec": 4.700266299999996,
+      "metadataTimestamp": 1791985993.125943
+    },
+    {
+      "name": "capture-00046.jpg",
+      "sec": 4.809206000000003,
+      "metadataTimestamp": 1791985993.233305
+    },
+    {
+      "name": "capture-00047.jpg",
+      "sec": 4.935540500000002,
+      "metadataTimestamp": 1791985993.358804
+    },
+    {
+      "name": "capture-00048.jpg",
+      "sec": 5.0947709,
+      "metadataTimestamp": 1791985993.530781
+    },
+    {
+      "name": "capture-00049.jpg",
+      "sec": 5.259912499999999,
+      "metadataTimestamp": 1791985993.683628
+    },
+    {
+      "name": "capture-00050.jpg",
+      "sec": 5.360083599999996,
+      "metadataTimestamp": 1791985993.791369
+    },
+    {
+      "name": "capture-00051.jpg",
+      "sec": 5.462511599999999,
+      "metadataTimestamp": 1791985993.896547
+    },
+    {
+      "name": "capture-00052.jpg",
+      "sec": 5.574017399999988,
+      "metadataTimestamp": 1791985994.001244
+    },
+    {
+      "name": "capture-00053.jpg",
+      "sec": 5.691231999999999,
+      "metadataTimestamp": 1791985994.127073
+    },
+    {
+      "name": "capture-00054.jpg",
+      "sec": 5.808808499999998,
+      "metadataTimestamp": 1791985994.231366
+    },
+    {
+      "name": "capture-00055.jpg",
+      "sec": 5.919774499999988,
+      "metadataTimestamp": 1791985994.355948
+    },
+    {
+      "name": "capture-00056.jpg",
+      "sec": 6.014948599999997,
+      "metadataTimestamp": 1791985994.44437
+    },
+    {
+      "name": "capture-00057.jpg",
+      "sec": 6.151579599999991,
+      "metadataTimestamp": 1791985994.590168
+    },
+    {
+      "name": "capture-00058.jpg",
+      "sec": 6.286995099999999,
+      "metadataTimestamp": 1791985994.714915
+    },
+    {
+      "name": "capture-00059.jpg",
+      "sec": 6.3820987,
+      "metadataTimestamp": 1791985994.821629
+    },
+    {
+      "name": "capture-00060.jpg",
+      "sec": 6.453449699999993,
+      "metadataTimestamp": 1791985994.888769
+    },
+    {
+      "name": "capture-00061.jpg",
+      "sec": 6.540893400000002,
+      "metadataTimestamp": 1791985994.977604
+    },
+    {
+      "name": "capture-00062.jpg",
+      "sec": 6.641458899999989,
+      "metadataTimestamp": 1791985995.070929
+    },
+    {
+      "name": "capture-00063.jpg",
+      "sec": 6.744189299999988,
+      "metadataTimestamp": 1791985995.183709
+    },
+    {
+      "name": "capture-00064.jpg",
+      "sec": 6.8421266,
+      "metadataTimestamp": 1791985995.274688
+    },
+    {
+      "name": "capture-00065.jpg",
+      "sec": 6.939632500000002,
+      "metadataTimestamp": 1791985995.36286
+    },
+    {
+      "name": "capture-00066.jpg",
+      "sec": 7.0285133,
+      "metadataTimestamp": 1791985995.463309
+    },
+    {
+      "name": "capture-00067.jpg",
+      "sec": 7.136355899999984,
+      "metadataTimestamp": 1791985995.572026
+    },
+    {
+      "name": "capture-00068.jpg",
+      "sec": 7.228489699999997,
+      "metadataTimestamp": 1791985995.664127
+    },
+    {
+      "name": "capture-00069.jpg",
+      "sec": 7.318994900000007,
+      "metadataTimestamp": 1791985995.75614
+    },
+    {
+      "name": "capture-00070.jpg",
+      "sec": 7.400744799999998,
+      "metadataTimestamp": 1791985995.837478
+    },
+    {
+      "name": "capture-00071.jpg",
+      "sec": 7.497490699999986,
+      "metadataTimestamp": 1791985995.932702
+    },
+    {
+      "name": "capture-00072.jpg",
+      "sec": 7.613401999999994,
+      "metadataTimestamp": 1791985996.041271
+    },
+    {
+      "name": "capture-00073.jpg",
+      "sec": 7.7032612,
+      "metadataTimestamp": 1791985996.142143
+    },
+    {
+      "name": "capture-00074.jpg",
+      "sec": 7.803102899999999,
+      "metadataTimestamp": 1791985996.24077
+    },
+    {
+      "name": "capture-00075.jpg",
+      "sec": 7.8997474999999895,
+      "metadataTimestamp": 1791985996.331083
+    },
+    {
+      "name": "capture-00076.jpg",
+      "sec": 8.008063399999998,
+      "metadataTimestamp": 1791985996.436444
+    },
+    {
+      "name": "capture-00077.jpg",
+      "sec": 8.1084697,
+      "metadataTimestamp": 1791985996.545571
+    },
+    {
+      "name": "capture-00078.jpg",
+      "sec": 8.189785099999995,
+      "metadataTimestamp": 1791985996.633248
+    },
+    {
+      "name": "capture-00079.jpg",
+      "sec": 8.295483199999993,
+      "metadataTimestamp": 1791985996.737832
+    },
+    {
+      "name": "capture-00080.jpg",
+      "sec": 8.44028089999999,
+      "metadataTimestamp": 1791985996.864678
+    },
+    {
+      "name": "capture-00081.jpg",
+      "sec": 8.51442879999999,
+      "metadataTimestamp": 1791985996.962923
+    },
+    {
+      "name": "capture-00082.jpg",
+      "sec": 8.61679319999999,
+      "metadataTimestamp": 1791985997.06202
+    },
+    {
+      "name": "capture-00083.jpg",
+      "sec": 8.693402700000007,
+      "metadataTimestamp": 1791985997.137255
+    },
+    {
+      "name": "capture-00084.jpg",
+      "sec": 8.808193899999992,
+      "metadataTimestamp": 1791985997.257017
+    },
+    {
+      "name": "capture-00085.jpg",
+      "sec": 8.904820399999991,
+      "metadataTimestamp": 1791985997.34934
+    },
+    {
+      "name": "capture-00086.jpg",
+      "sec": 8.992362200000002,
+      "metadataTimestamp": 1791985997.43048
+    },
+    {
+      "name": "capture-00087.jpg",
+      "sec": 9.076163199999996,
+      "metadataTimestamp": 1791985997.527221
+    },
+    {
+      "name": "capture-00088.jpg",
+      "sec": 9.167605100000003,
+      "metadataTimestamp": 1791985997.615197
+    },
+    {
+      "name": "capture-00089.jpg",
+      "sec": 9.248770799999988,
+      "metadataTimestamp": 1791985997.700674
+    },
+    {
+      "name": "capture-00090.jpg",
+      "sec": 9.364559900000003,
+      "metadataTimestamp": 1791985997.812178
+    },
+    {
+      "name": "capture-00091.jpg",
+      "sec": 9.4585565,
+      "metadataTimestamp": 1791985997.905187
+    },
+    {
+      "name": "capture-00092.jpg",
+      "sec": 9.568609100000003,
+      "metadataTimestamp": 1791985998.01865
+    },
+    {
+      "name": "capture-00093.jpg",
+      "sec": 9.677245200000002,
+      "metadataTimestamp": 1791985998.123465
+    },
+    {
+      "name": "capture-00094.jpg",
+      "sec": 9.80431519999999,
+      "metadataTimestamp": 1791985998.250196
+    },
+    {
+      "name": "capture-00095.jpg",
+      "sec": 10.053091299999991,
+      "metadataTimestamp": 1791985998.476793
+    },
+    {
+      "name": "capture-00096.jpg",
+      "sec": 10.251207099999988,
+      "metadataTimestamp": 1791985998.679161
+    },
+    {
+      "name": "capture-00097.jpg",
+      "sec": 10.377585600000003,
+      "metadataTimestamp": 1791985998.807808
+    },
+    {
+      "name": "capture-00098.jpg",
+      "sec": 10.540920299999996,
+      "metadataTimestamp": 1791985998.976739
+    },
+    {
+      "name": "capture-00099.jpg",
+      "sec": 10.727500899999995,
+      "metadataTimestamp": 1791985999.154978
+    },
+    {
+      "name": "capture-00100.jpg",
+      "sec": 10.863060500000003,
+      "metadataTimestamp": 1791985999.293018
+    },
+    {
+      "name": "capture-00101.jpg",
+      "sec": 10.97324189999999,
+      "metadataTimestamp": 1791985999.405104
+    },
+    {
+      "name": "capture-00102.jpg",
+      "sec": 11.058538100000007,
+      "metadataTimestamp": 1791985999.50692
+    },
+    {
+      "name": "capture-00103.jpg",
+      "sec": 11.176922699999992,
+      "metadataTimestamp": 1791985999.622968
+    },
+    {
+      "name": "capture-00104.jpg",
+      "sec": 11.270921700000002,
+      "metadataTimestamp": 1791985999.715614
+    },
+    {
+      "name": "capture-00105.jpg",
+      "sec": 11.362815299999994,
+      "metadataTimestamp": 1791985999.806972
+    },
+    {
+      "name": "capture-00106.jpg",
+      "sec": 11.4620374,
+      "metadataTimestamp": 1791985999.905021
+    },
+    {
+      "name": "capture-00107.jpg",
+      "sec": 11.548729399999985,
+      "metadataTimestamp": 1791985999.994324
+    },
+    {
+      "name": "capture-00108.jpg",
+      "sec": 11.664607499999988,
+      "metadataTimestamp": 1791986000.10725
+    },
+    {
+      "name": "capture-00109.jpg",
+      "sec": 11.760339099999996,
+      "metadataTimestamp": 1791986000.208384
+    },
+    {
+      "name": "capture-00110.jpg",
+      "sec": 17.872822099999993,
+      "metadataTimestamp": 1791986004.772916
+    },
+    {
+      "name": "capture-00111.jpg",
+      "sec": 18.029168900000002,
+      "metadataTimestamp": 1791986005.312475
+    },
+    {
+      "name": "capture-00112.jpg",
+      "sec": 18.310431699999995,
+      "metadataTimestamp": 1791986005.644913
+    },
+    {
+      "name": "capture-00113.jpg",
+      "sec": 18.316825800000004,
+      "metadataTimestamp": 1791986006.42302
+    },
+    {
+      "name": "capture-00114.jpg",
+      "sec": 19.22269449999999,
+      "metadataTimestamp": 1791986006.854988
+    },
+    {
+      "name": "capture-00115.jpg",
+      "sec": 19.51294209999999,
+      "metadataTimestamp": 1791986007.499855
+    },
+    {
+      "name": "capture-00116.jpg",
+      "sec": 19.929769199999996,
+      "metadataTimestamp": 1791986007.824053
+    },
+    {
+      "name": "capture-00117.jpg",
+      "sec": 21.701734700000003,
+      "metadataTimestamp": 1791986009.076779
+    },
+    {
+      "name": "capture-00118.jpg",
+      "sec": 22.276809299999996,
+      "metadataTimestamp": 1791986009.908129
+    },
+    {
+      "name": "capture-00119.jpg",
+      "sec": 23.154287800000006,
+      "metadataTimestamp": 1791986010.868596
+    },
+    {
+      "name": "capture-00120.jpg",
+      "sec": 24.566176099999993,
+      "metadataTimestamp": 1791986012.25402
+    },
+    {
+      "name": "capture-00121.jpg",
+      "sec": 24.837778699999987,
+      "metadataTimestamp": 1791986012.083329
+    },
+    {
+      "name": "capture-00122.jpg",
+      "sec": 25.41616479999999,
+      "metadataTimestamp": 1791986012.263633
+    },
+    {
+      "name": "capture-00123.jpg",
+      "sec": 27.411611699999995,
+      "metadataTimestamp": 1791986014.22459
+    },
+    {
+      "name": "capture-00124.jpg",
+      "sec": 27.860463600000003,
+      "metadataTimestamp": 1791986014.972575
+    },
+    {
+      "name": "capture-00125.jpg",
+      "sec": 28.523474199999995,
+      "metadataTimestamp": 1791986015.670612
+    },
+    {
+      "name": "capture-00126.jpg",
+      "sec": 29.438270599999996,
+      "metadataTimestamp": 1791986016.644135
+    },
+    {
+      "name": "capture-00127.jpg",
+      "sec": 31.036996599999995,
+      "metadataTimestamp": 1791986018.607353
+    },
+    {
+      "name": "capture-00128.jpg",
+      "sec": 36.3404024,
+      "metadataTimestamp": 1791986024.007161
+    },
+    {
+      "name": "capture-00129.jpg",
+      "sec": 37.2362414,
+      "metadataTimestamp": 1791986025.015033
+    },
+    {
+      "name": "capture-00130.jpg",
+      "sec": 38.05910159999999,
+      "metadataTimestamp": 1791986026.095861
+    },
+    {
+      "name": "capture-00131.jpg",
+      "sec": 38.083700500000006,
+      "metadataTimestamp": 1791986025.690424
+    },
+    {
+      "name": "capture-00132.jpg",
+      "sec": 38.11134989999999,
+      "metadataTimestamp": 1791986026.085628
+    },
+    {
+      "name": "capture-00133.jpg",
+      "sec": 38.31451059999999,
+      "metadataTimestamp": 1791986026.635841
+    },
+    {
+      "name": "capture-00134.jpg",
+      "sec": 38.64657559999999,
+      "metadataTimestamp": 1791986027.050721
+    },
+    {
+      "name": "capture-00135.jpg",
+      "sec": 38.8192566,
+      "metadataTimestamp": 1791986027.254362
+    },
+    {
+      "name": "capture-00136.jpg",
+      "sec": 38.8476349,
+      "metadataTimestamp": 1791986027.291807
+    },
+    {
+      "name": "capture-00137.jpg",
+      "sec": 38.892171899999994,
+      "metadataTimestamp": 1791986027.331563
+    },
+    {
+      "name": "capture-00138.jpg",
+      "sec": 38.9088309,
+      "metadataTimestamp": 1791986027.347867
+    },
+    {
+      "name": "capture-00139.jpg",
+      "sec": 38.973087899999996,
+      "metadataTimestamp": 1791986027.410003
+    },
+    {
+      "name": "capture-00140.jpg",
+      "sec": 39.002328399999996,
+      "metadataTimestamp": 1791986027.441029
+    },
+    {
+      "name": "capture-00141.jpg",
+      "sec": 39.0455408,
+      "metadataTimestamp": 1791986027.483473
+    },
+    {
+      "name": "capture-00142.jpg",
+      "sec": 39.1018146,
+      "metadataTimestamp": 1791986027.53882
+    },
+    {
+      "name": "capture-00143.jpg",
+      "sec": 39.12072859999999,
+      "metadataTimestamp": 1791986027.558236
+    },
+    {
+      "name": "capture-00144.jpg",
+      "sec": 39.161356199999986,
+      "metadataTimestamp": 1791986027.596066
+    },
+    {
+      "name": "capture-00145.jpg",
+      "sec": 39.217737099999994,
+      "metadataTimestamp": 1791986027.657053
+    },
+    {
+      "name": "capture-00146.jpg",
+      "sec": 39.259729300000004,
+      "metadataTimestamp": 1791986027.694099
+    },
+    {
+      "name": "capture-00147.jpg",
+      "sec": 39.2759928,
+      "metadataTimestamp": 1791986027.713646
+    },
+    {
+      "name": "capture-00148.jpg",
+      "sec": 39.3210474,
+      "metadataTimestamp": 1791986027.761155
+    },
+    {
+      "name": "capture-00149.jpg",
+      "sec": 39.35056759999999,
+      "metadataTimestamp": 1791986027.790065
+    },
+    {
+      "name": "capture-00150.jpg",
+      "sec": 39.37821739999998,
+      "metadataTimestamp": 1791986027.821335
+    },
+    {
+      "name": "capture-00151.jpg",
+      "sec": 39.428741299999984,
+      "metadataTimestamp": 1791986027.873467
+    },
+    {
+      "name": "capture-00152.jpg",
+      "sec": 39.46688,
+      "metadataTimestamp": 1791986027.904765
+    },
+    {
+      "name": "capture-00153.jpg",
+      "sec": 39.488420500000004,
+      "metadataTimestamp": 1791986027.932207
+    },
+    {
+      "name": "capture-00154.jpg",
+      "sec": 39.51726289999999,
+      "metadataTimestamp": 1791986027.958542
+    },
+    {
+      "name": "capture-00155.jpg",
+      "sec": 39.566207599999984,
+      "metadataTimestamp": 1791986028.008933
+    },
+    {
+      "name": "capture-00156.jpg",
+      "sec": 39.63940889999999,
+      "metadataTimestamp": 1791986028.08629
+    },
+    {
+      "name": "capture-00157.jpg",
+      "sec": 39.78954139999999,
+      "metadataTimestamp": 1791986028.238019
+    },
+    {
+      "name": "capture-00158.jpg",
+      "sec": 39.83640700000001,
+      "metadataTimestamp": 1791986028.285935
+    },
+    {
+      "name": "capture-00159.jpg",
+      "sec": 39.886368700000006,
+      "metadataTimestamp": 1791986028.323803
+    },
+    {
+      "name": "capture-00160.jpg",
+      "sec": 39.947796100000005,
+      "metadataTimestamp": 1791986028.388611
+    },
+    {
+      "name": "capture-00161.jpg",
+      "sec": 40.050937000000005,
+      "metadataTimestamp": 1791986028.496053
+    },
+    {
+      "name": "capture-00162.jpg",
+      "sec": 40.10346279999999,
+      "metadataTimestamp": 1791986028.550017
+    },
+    {
+      "name": "capture-00163.jpg",
+      "sec": 40.1925614,
+      "metadataTimestamp": 1791986028.628077
+    },
+    {
+      "name": "capture-00164.jpg",
+      "sec": 40.250663599999996,
+      "metadataTimestamp": 1791986028.690357
+    },
+    {
+      "name": "capture-00165.jpg",
+      "sec": 40.3213444,
+      "metadataTimestamp": 1791986028.769588
+    },
+    {
+      "name": "capture-00166.jpg",
+      "sec": 40.3383367,
+      "metadataTimestamp": 1791986028.7867
+    },
+    {
+      "name": "capture-00167.jpg",
+      "sec": 40.44369169999999,
+      "metadataTimestamp": 1791986028.883674
+    },
+    {
+      "name": "capture-00168.jpg",
+      "sec": 40.4584409,
+      "metadataTimestamp": 1791986028.909106
+    },
+    {
+      "name": "capture-00169.jpg",
+      "sec": 40.542561199999994,
+      "metadataTimestamp": 1791986028.988094
+    },
+    {
+      "name": "capture-00170.jpg",
+      "sec": 40.5900635,
+      "metadataTimestamp": 1791986029.033452
+    },
+    {
+      "name": "capture-00171.jpg",
+      "sec": 40.6860197,
+      "metadataTimestamp": 1791986029.13396
+    },
+    {
+      "name": "capture-00172.jpg",
+      "sec": 40.7165519,
+      "metadataTimestamp": 1791986029.15849
+    },
+    {
+      "name": "capture-00173.jpg",
+      "sec": 40.8037126,
+      "metadataTimestamp": 1791986029.247862
+    },
+    {
+      "name": "capture-00174.jpg",
+      "sec": 40.8555224,
+      "metadataTimestamp": 1791986029.303608
+    },
+    {
+      "name": "capture-00175.jpg",
+      "sec": 40.950468099999995,
+      "metadataTimestamp": 1791986029.392514
+    },
+    {
+      "name": "capture-00176.jpg",
+      "sec": 40.960494600000004,
+      "metadataTimestamp": 1791986029.409873
+    },
+    {
+      "name": "capture-00177.jpg",
+      "sec": 41.077975699999996,
+      "metadataTimestamp": 1791986029.522551
+    },
+    {
+      "name": "capture-00178.jpg",
+      "sec": 41.170294999999996,
+      "metadataTimestamp": 1791986029.607821
+    },
+    {
+      "name": "capture-00179.jpg",
+      "sec": 41.2333828,
+      "metadataTimestamp": 1791986029.671988
+    },
+    {
+      "name": "capture-00180.jpg",
+      "sec": 41.298448199999996,
+      "metadataTimestamp": 1791986029.747689
+    },
+    {
+      "name": "capture-00181.jpg",
+      "sec": 41.403908099999995,
+      "metadataTimestamp": 1791986029.844051
+    },
+    {
+      "name": "capture-00182.jpg",
+      "sec": 41.43528189999999,
+      "metadataTimestamp": 1791986029.873024
+    },
+    {
+      "name": "capture-00183.jpg",
+      "sec": 41.50375629999999,
+      "metadataTimestamp": 1791986029.946041
+    }
+  ]
+}

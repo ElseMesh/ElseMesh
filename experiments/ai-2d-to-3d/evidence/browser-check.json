@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:5189/?procedural&aiWarehouse&quality=balanced&scale=0.75&noAudio",
+  "loadMs": 68113.2975,
+  "initial": {
+    "asset": "warehouse-image-guided-codex-v1",
+    "parts": 105,
+    "colliders": 47,
+    "enabled": false,
+    "originalObjects": 1755,
+    "c64": true,
+    "heap": 581367178
+  },
+  "vehicleGuard": true,
+  "beforeDoor": [
+    360,
+    18,
+    281
+  ],
+  "afterDoor": [
+    360,
+    18,
+    291.652088663464
+  ],
+  "afterWall": [
+    344.7024331053764,
+    18,
+    300
+  ],
+  "originalFreeCam": false,
+  "c64Open": true,
+  "c64Output": "EHOUSE NETWORK\nCOMMODORE 64 TERMINAL 01\n\nLOGIN:\nLOGIN: EXPLORER\n\nWELCOME EXPLORER\nMICROSOFT BASIC 1.1\nFOR THE 6502 MICROPROCESSOR\n\nREADY.\n]PRINT 2+2 4 \n\n\nREADY.",
+  "final": {
+    "candidateVisible": false,
+    "activeCandidateColliders": 0,
+    "originalInteriorVisible": true
+  },
+  "errors": []
+}

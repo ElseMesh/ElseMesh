@@ -1,0 +1,101 @@
+{
+  "schema": "elsemesh.ai-warehouse-benchmark/v1",
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+    "output": [
+      1280,
+      720
+    ],
+    "renderScale": 0.75,
+    "quality": "balanced",
+    "gpuTimestamps": true,
+    "assetBytes": 13064
+  },
+  "method": "Same camera, fixed 1280x720 viewport, balanced, scale 0.75, procedural streaming frozen, 1.4 s warm-up and 3.2 s capture per alternating condition. Headless Chrome rAF and App callback/CPU timings; no GPU-time claim.",
+  "runs": [
+    {
+      "mode": "off",
+      "elapsedMs": 3231.3819999999996,
+      "renderCallbacks": 154,
+      "renderCallbackRate": 47.65762760329791,
+      "medianWallMs": 49.80000000001746,
+      "p95WallMs": 50.20000000001164,
+      "medianCpuMs": 18.900000005960464,
+      "p95CpuMs": 28.600000001490116,
+      "heapBytes": 534898647,
+      "draws": 2769,
+      "triangles": 3249520,
+      "cpuSmoothedMs": 21.252311862620914
+    },
+    {
+      "mode": "on",
+      "elapsedMs": 3240.7959,
+      "renderCallbacks": 150,
+      "renderCallbackRate": 46.2849264898169,
+      "medianWallMs": 49.79999999998836,
+      "p95WallMs": 66.70000000001164,
+      "medianCpuMs": 26.600000001490116,
+      "p95CpuMs": 42,
+      "heapBytes": 537469093,
+      "draws": 1284,
+      "triangles": 2601919,
+      "cpuSmoothedMs": 29.503457995168485
+    },
+    {
+      "mode": "on",
+      "elapsedMs": 3212.9840999999997,
+      "renderCallbacks": 154,
+      "renderCallbackRate": 47.93052041558501,
+      "medianWallMs": 33.5,
+      "p95WallMs": 66.70000000001164,
+      "medianCpuMs": 21.899999998509884,
+      "p95CpuMs": 33.5,
+      "heapBytes": 537426423,
+      "draws": 1284,
+      "triangles": 2601919,
+      "cpuSmoothedMs": 23.431729706674
+    },
+    {
+      "mode": "off",
+      "elapsedMs": 3204.881900000002,
+      "renderCallbacks": 146,
+      "renderCallbackRate": 45.55550081268202,
+      "medianWallMs": 49.89999999999418,
+      "p95WallMs": 66.60000000000582,
+      "medianCpuMs": 20.299999997019768,
+      "p95CpuMs": 34,
+      "heapBytes": 536700809,
+      "draws": 2769,
+      "triangles": 3251888,
+      "cpuSmoothedMs": 23.541243217459364
+    },
+    {
+      "mode": "off",
+      "elapsedMs": 3207.9880999999987,
+      "renderCallbacks": 150,
+      "renderCallbackRate": 46.75827818687983,
+      "medianWallMs": 49.89999999999418,
+      "p95WallMs": 66.69999999998254,
+      "medianCpuMs": 18.80000000447035,
+      "p95CpuMs": 32.600000001490116,
+      "heapBytes": 535764773,
+      "draws": 1018,
+      "triangles": 2599911,
+      "cpuSmoothedMs": 23.634589465564844
+    },
+    {
+      "mode": "on",
+      "elapsedMs": 3207.9759999999987,
+      "renderCallbacks": 160,
+      "renderCallbackRate": 49.87568485549769,
+      "medianWallMs": 33.40000000002328,
+      "p95WallMs": 66.5,
+      "medianCpuMs": 22.69999999552965,
+      "p95CpuMs": 38.5,
+      "heapBytes": 539315823,
+      "draws": 1162,
+      "triangles": 2162324,
+      "cpuSmoothedMs": 25.135032107728755
+    }
+  ]
+}

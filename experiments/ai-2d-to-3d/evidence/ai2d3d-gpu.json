@@ -1,0 +1,271 @@
+{
+  "schema": "elsemesh.ai-warehouse-gpu-benchmark/v1",
+  "method": "Existing ElseMesh Bench; fixed review view, 1280x720, balanced scale 0.75, dt=0, 35 warm-up and 60 measured frames per alternating condition; procedural streaming frozen; headless Chrome GPU timestamps.",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "runs": [
+    {
+      "mode": "off",
+      "wall": 43.345,
+      "gpu": 40.113,
+      "gpuMedian": 39.387,
+      "cpu": 19.799,
+      "passes": [
+        [
+          "water + transparent",
+          7.925
+        ],
+        [
+          "opaque",
+          7.029
+        ],
+        [
+          "TAAU",
+          3.476
+        ],
+        [
+          "refraction",
+          2.756
+        ],
+        [
+          "Ocean FFT",
+          2.4
+        ],
+        [
+          "Clouds Panorama",
+          1.891
+        ],
+        [
+          "Clouds Trace",
+          1.644
+        ],
+        [
+          "causticsFine",
+          1.254
+        ],
+        [
+          "shadow cascade 0",
+          1.182
+        ],
+        [
+          "shadow cascade 2",
+          0.982
+        ],
+        [
+          "haze march",
+          0.982
+        ],
+        [
+          "final (grade + tonemap)",
+          0.922
+        ]
+      ],
+      "diagnostics": {
+        "submitted": 60,
+        "captured": 60,
+        "ringDrops": 0,
+        "mapFailures": 0,
+        "invalidFrames": 0,
+        "truncatedPasses": 0,
+        "lastMapError": null
+      }
+    },
+    {
+      "mode": "on",
+      "wall": 38.323,
+      "gpu": 34.444,
+      "gpuMedian": 34.079,
+      "cpu": 20.037,
+      "passes": [
+        [
+          "opaque",
+          7.249
+        ],
+        [
+          "TAAU",
+          3.323
+        ],
+        [
+          "refraction",
+          2.661
+        ],
+        [
+          "water + transparent",
+          2.389
+        ],
+        [
+          "Ocean FFT",
+          2.24
+        ],
+        [
+          "Clouds Panorama",
+          1.788
+        ],
+        [
+          "Clouds Trace",
+          1.524
+        ],
+        [
+          "shadow cascade 0",
+          1.386
+        ],
+        [
+          "causticsFine",
+          1.177
+        ],
+        [
+          "shadow cascade 2",
+          0.95
+        ],
+        [
+          "final (grade + tonemap)",
+          0.866
+        ],
+        [
+          "Shore Sim",
+          0.79
+        ]
+      ],
+      "diagnostics": {
+        "submitted": 120,
+        "captured": 120,
+        "ringDrops": 0,
+        "mapFailures": 0,
+        "invalidFrames": 0,
+        "truncatedPasses": 0,
+        "lastMapError": null
+      }
+    },
+    {
+      "mode": "off",
+      "wall": 41.887,
+      "gpu": 39.354,
+      "gpuMedian": 38.863,
+      "cpu": 19.554,
+      "passes": [
+        [
+          "water + transparent",
+          7.666
+        ],
+        [
+          "opaque",
+          6.92
+        ],
+        [
+          "TAAU",
+          3.37
+        ],
+        [
+          "refraction",
+          2.762
+        ],
+        [
+          "Ocean FFT",
+          2.357
+        ],
+        [
+          "Clouds Panorama",
+          1.862
+        ],
+        [
+          "Clouds Trace",
+          1.634
+        ],
+        [
+          "causticsFine",
+          1.24
+        ],
+        [
+          "shadow cascade 0",
+          1.171
+        ],
+        [
+          "shadow cascade 2",
+          0.968
+        ],
+        [
+          "haze march",
+          0.959
+        ],
+        [
+          "final (grade + tonemap)",
+          0.883
+        ]
+      ],
+      "diagnostics": {
+        "submitted": 180,
+        "captured": 180,
+        "ringDrops": 0,
+        "mapFailures": 0,
+        "invalidFrames": 0,
+        "truncatedPasses": 0,
+        "lastMapError": null
+      }
+    },
+    {
+      "mode": "on",
+      "wall": 37.832,
+      "gpu": 33.705,
+      "gpuMedian": 33.686,
+      "cpu": 21.823,
+      "passes": [
+        [
+          "opaque",
+          7.123
+        ],
+        [
+          "TAAU",
+          3.259
+        ],
+        [
+          "refraction",
+          2.726
+        ],
+        [
+          "water + transparent",
+          2.289
+        ],
+        [
+          "Ocean FFT",
+          2.204
+        ],
+        [
+          "Clouds Panorama",
+          1.7
+        ],
+        [
+          "Clouds Trace",
+          1.447
+        ],
+        [
+          "shadow cascade 0",
+          1.373
+        ],
+        [
+          "causticsFine",
+          1.15
+        ],
+        [
+          "shadow cascade 2",
+          0.891
+        ],
+        [
+          "final (grade + tonemap)",
+          0.851
+        ],
+        [
+          "Shore Sim",
+          0.762
+        ]
+      ],
+      "diagnostics": {
+        "submitted": 240,
+        "captured": 240,
+        "ringDrops": 0,
+        "mapFailures": 0,
+        "invalidFrames": 0,
+        "truncatedPasses": 0,
+        "lastMapError": null
+      }
+    }
+  ]
+}

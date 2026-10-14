@@ -263,7 +263,7 @@ export class ProceduralWorld {
 	save() {
 		if(!this.storage){this.storageWarning='Browser storage unavailable';return false;}
 		const p=this.app.player;
-		const position=p?.mode==='walk' && !this.app.thirdIsland?.portalInterior?.inside ? [p.position.x,p.position.y,p.position.z] : this.savedPosition;
+		const position=p?.mode==='walk' && !this.app.thirdIsland?.portalInterior?.inside && !this.app.aiWarehouse?.inside ? [p.position.x,p.position.y,p.position.z] : this.savedPosition;
 		try {
 			this.storage.setItem(SAVE_KEY,JSON.stringify({version:PROCEDURAL_VERSION,seed:this.seed,position,discovered:[...this.discovered],beacons:this.beacons}));
 			this.savedPosition=position;
