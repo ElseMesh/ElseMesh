@@ -6,6 +6,7 @@ import { ISLAND_FIVE, islandFiveHeight } from './IslandFiveLayout.js';
 import { PORT, portIslandHeight } from './PortRoadGraph.js';
 import { softRamp, erosionNoise, sampleGrid, upsample2, boxBlur } from './terrain/TerrainNoise.js';
 import { ridgeEnvelope, SEA_STACKS, PATHS, polylineDistance } from './terrain/IslandShape.js';
+import { proceduralHeightAt } from './ProceduralHeight.js';
 
 const smin = ( a, b, k ) => {
 
@@ -48,6 +49,7 @@ const VILLAGE = WORLD.village.center;
 export class TerrainData {
 
 	constructor( seed = 7 ) {
+		this.proceduralSeed = null;
 
 		this.size = WORLD.terrainSize;
 		this.res = RES;
@@ -979,7 +981,7 @@ export class TerrainData {
 
 		const { res, texel, origin, heights } = this;
 		const fx = ( x - origin ) / texel - 0.5, fz = ( z - origin ) / texel - 0.5;
-		if ( fx < 0 || fz < 0 || fx >= res - 1 || fz >= res - 1 ) return - 90;
+		if ( fx < 0 || fz < 0 || fx >= res - 1 || fz >= res - 1 ) return this.proceduralSeed === null ? -90 : proceduralHeightAt( x, z, this.proceduralSeed );
 		const i = Math.floor( fx ), j = Math.floor( fz );
 		const tx = fx - i, tz = fz - j;
 		const k = j * res + i;

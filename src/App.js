@@ -22,6 +22,8 @@ import { Environment } from './sky/Environment.js';
 import { TerrainData } from './world/TerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
+import { ProceduralWorld } from './world/ProceduralWorld.js';
+import { PROCEDURAL_SEED } from './world/ProceduralHeight.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
@@ -156,6 +158,8 @@ export class App {
 		// ---------------------------------------------------------------- island
 		await progress( 0.06, 'Shaping the island…' );
 		this.terrainData = new TerrainData();
+		// Experimental outer world is opt-in; the authored grid is generated unchanged.
+		if ( qs.has( 'procedural' ) ) this.terrainData.proceduralSeed = PROCEDURAL_SEED;
 		this.colliders = new Colliders();
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
@@ -351,6 +355,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.fifthIsland = new IslandFiveSystem( this );
 		this.portIsland = new PortIslandSystem( this );
 		this.monorail.restorePlayer( this.player );
+		if ( qs.has( 'procedural' ) ) {
+			this.procedural = new ProceduralWorld( this, PROCEDURAL_SEED );
+			const saved = this.procedural.savedPosition;
+			const x = saved?.[0] ?? 100, z = saved?.[2] ?? 584;
+			const y = saved?.[1] ?? this.player.groundAt( x, z, 1000 );
+			this.monorail.teleport( this.player, x, y, z, Math.PI );
+			if ( typeof window !== 'undefined' ) window.__procedural = this.procedural;
+		}
 		this.pistol = new SurvivalPistol( scene );
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
 		this.wildlife = new Wildlife( {
@@ -728,6 +740,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.fourthIsland.update( dt );
 		this.fifthIsland.update( dt );
 		this.portIsland.update( dt );
+		if ( this.procedural ) this.procedural.update( dt );
 		this.esmie.update( dt );
 		this.monorail.marine.update(dt, this.camera.position);
 		this.avatar.update( dt, this.player, this.camera, this.freeCam );

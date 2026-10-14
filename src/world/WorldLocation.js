@@ -3,6 +3,7 @@ import { ISLAND_FIVE, islandFiveContains } from './IslandFiveLayout.js';
 import { THIRD } from './ThirdIslandLayout.js';
 import { RAIL } from './MonorailRoute.js';
 import { PORT } from './PortRoadGraph.js';
+import { PROTECTED_EXTENT } from './ProceduralHeight.js';
 
 // Agent Control: one deterministic location resolver feeds the HUD in every movement mode.
 export function resolveWorldLocation(x, y, z, terrainHeight = -90) {
@@ -12,6 +13,7 @@ export function resolveWorldLocation(x, y, z, terrainHeight = -90) {
   if (Math.hypot(x - THIRD.x, z - THIRD.z) <= THIRD.radius + 22) return 'Helicopter Island · Island 3';
   if (Math.hypot(x - RAIL.island.x, z - RAIL.island.z) <= RAIL.island.radius + 8) return 'Station Island · Island 2';
   if (y < -5) return 'UNDERNEATH';
+  if (terrainHeight > -2.5 && (Math.abs(x) > PROTECTED_EXTENT || Math.abs(z) > PROTECTED_EXTENT)) return 'Outer Island · Procedural';
   if (terrainHeight > -2.5) return 'Home Island · Island 1';
   return 'Open Sea';
 }

@@ -8,6 +8,7 @@ import { G } from '../engine/render/Frame.js';
 import { bakeTerrainMaps, buildShadowHeights } from './terrain/TerrainBake.js';
 import { getDetailTexture } from './terrain/DetailTextures.js';
 import { detailBinding } from './terrain/TerrainShading.js';
+import { proceduralHeightWGSL } from './ProceduralHeight.js';
 
 // GPU-side terrain data shared by every shader that needs ground height:
 // ocean (depth attenuation / hiding under land), shore waves, terrain mesh,
@@ -110,7 +111,7 @@ export class TerrainGPU {
 				terrainShoreTex: { texture: () => this.shoreTexture, sampleType: 'unfilterable-float' },
 				terrainSunShadowTex: { texture: this.sunShadowTexture },
 			},
-			code: TERRAIN_WGSL,
+			code: terrain.proceduralSeed === null ? TERRAIN_WGSL : proceduralHeightWGSL( terrain.proceduralSeed ) + TERRAIN_WGSL.replace( 'return select( h, -90.0, outside );', 'return select( h, proceduralHeightAt( xz ), outside );' ),
 		} );
 
 		// the former TerrainLightingModel: multiplies the key light by the heightfield sun shadow.
