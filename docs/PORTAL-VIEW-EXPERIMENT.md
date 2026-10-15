@@ -58,3 +58,15 @@ Remove `portalView` to disable the entire experiment. Stop removes its monkey/co
 Final validation: npm test completed with 120 passed, 2 skipped, 0 failed, plus the preceding script-based checks and WebGPU smoke tests. npm run build passed with the existing LocalLights mixed-import warning. No matched performance benchmark or cross-device qualification was performed.
 
 Completion re-review accepted the scoped local demonstration after independently rerunning all 9 focused tests and reviewing restoration evidence, encoded contact sheets and the test/build logs. General portal release qualification remains PARTIAL.
+
+## Monkey follows the coconut — 15 October 2026
+
+The same replay now continues after the throw. At simulation time 7 s the monkey returns its throwing arm to the walking gait, climbs a temporary approach ramp, crosses the opening and walks down into the warehouse, finishing near the existing avatar at 13 s.
+
+One deterministic actor trajectory drives two persistent render representations. Each material clips against its own portal plane in color and shadow passes, so the head, body and tail cross progressively instead of teleporting the whole monkey. The destination representation belongs to the interior render set throughout. The aperture frame now matches its rendered plane exactly. Temporary ramps accommodate the unequal floor heights, and lowering starts only after tail clearance. Stop removes both representations, four walkway meshes and the coconut, restoring player/camera state. The original world geometry is unchanged.
+
+Evidence: `artifacts/portal-monkey-walk/island-view.mp4` (21.549 s) and `warehouse-view.mp4` (21.349 s) are actual 464 x 1724 browser-canvas recordings, captured independently using the two replay buttons. Both were decoded and inspected across the crossing. Events show one monkey crossing and one arrival per replay. `restore-check.json` records live browser cleanup checks before, during and after crossing (simulation times 0, 10 and 14): player position, room membership, free-camera state and scene object count were restored. Time was staged only for those cleanup checks, not for the videos.
+
+Validation: npm test 121 passed, 2 skipped, zero failed; preceding script checks and WebGPU smoke passed; build passed. The new GPU check verifies monkey material compilation and visible versus fully clipped color output. Unit coverage verifies mapped trajectory agreement and final floor height. Shadow clipping and individual foot contact on ramps are not independently pixel-qualified. This remains scripted locomotion, with existing low-resolution portal visibility and temporal trailing limitations.
+
+Architect PLAN required clipped halves, matched portal planes, aperture clearance, throw-arm recovery and delayed floor settling; implemented. COMPLETION accepted the implementation with two remaining evidence items (island crossing inspection and active Stop/replay cleanup); both were subsequently verified as above. This establishes a local demonstration, not networking or multi-machine world transfer. No production merge or deployment.

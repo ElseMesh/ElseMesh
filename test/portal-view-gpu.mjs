@@ -10,6 +10,8 @@ import { MeshRenderer } from '../src/engine/render/MeshRenderer.js';
 import { SunShadows } from '../src/engine/render/Shadows.js';
 import { BoxGeometry, CircleGeometry, Mesh, PerspectiveCamera, Scene, TorusGeometry } from '../src/engine/index.js';
 import { createPortalApertureMaterial, createPortalStormMaterial } from '../src/world/PortalView.js';
+import { PortalMonkeyActor } from '../src/world/PortalMonkeyActor.js';
+import { Vector3 } from '../src/engine/index.js';
 
 await GPU.init({ headless: true });
 const width = 128, height = 72;
@@ -57,5 +59,23 @@ const mid = ((height >> 1) * width + (width >> 1)) * 4;
 assert.ok(pixels[mid] > 100 && pixels[mid] > pixels[mid + 1] * 2,
   `portal centre should show the red destination: ${Array.from(pixels.slice(mid, mid + 4))}`);
 assert.equal(pixels[0], 0, 'outside the circular aperture should show the clear colour');
-console.log('Portal aperture and electrical material WebGPU smoke passed');
+const actorScene=new Scene(),actor=new PortalMonkeyActor(actorScene);
+actor.pose({position:new Vector3(0,0,-3),yaw:0,time:1,walk:1,throwWeight:0});
+camera.position.y=.6;camera.updateMatrixWorld();
+async function actorPixels(clipD){
+  for(const batch of actor.batches)batch.material.uniforms.clipD.value=clipD;
+  for(let i=0;i<5;i++){
+    GPU.beginFrame();setFrameCamera(camera,width,height);
+    shadows.render(actorScene,mr,shadows.update(camera,G.sunDir.value));
+    mr.render(actorScene,{kind:'color',camera,frameBlock:FrameUniforms,colorViews:[output.texture.view()],colorFormats:output.formats,
+      clearColors:[[0,0,0,1]],depthView:output.depthTexture.view(),depthFormat:'depth32float',clearDepth:0});
+    GPU.submit();await GPU.device.queue.onSubmittedWorkDone();
+  }
+  const data=new Uint8Array((await readTexture(output.texture)).data);
+  return data.reduce((n,v,i)=>n+(i%4!==3&&v>0?1:0),0);
+}
+assert.ok(await actorPixels(1)>0,'unclipped monkey must render');
+assert.equal(await actorPixels(-1),0,'clipped monkey must leave no color fragments');
+actor.dispose();
+console.log('Portal aperture, electrical material and monkey clipping WebGPU smoke passed');
 process.exit(0);

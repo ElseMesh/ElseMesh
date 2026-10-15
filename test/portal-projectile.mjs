@@ -70,3 +70,20 @@ test('only latest pending replay proceeds after avatar load',async()=>{
  await assert.rejects(second,/Selected avatar has not loaded/);
  assert.equal(demo.saved,undefined);
 });
+
+test('monkey traversal keeps rigid pose at the aperture and settles after tail clearance',async()=>{
+ const {monkeyPortalPose}=await import('../src/world/PortalThrowDemo.js');
+ const {portalFrame,mappedPortalCameraMatrix}=await import('../src/world/PortalView.js');
+ const source=portalFrame(100,8.7628,580.17),destination=portalFrame(296.02,20.05,300,Math.PI/2);
+ const mapping=mappedPortalCameraMatrix(new Matrix4(),source,destination);
+ let previousZ=Infinity;
+ for(let t=7;t<=13;t+=.025){
+  const pose=monkeyPortalPose(t,source,destination,7.4128,18.08);
+  assert.ok(pose.z<=previousZ+1e-9);previousZ=pose.z;
+  if(pose.z>=-1.6)near(pose.position.clone().applyMatrix4(mapping),pose.insidePosition);
+  assert.ok(Math.abs(pose.insideYaw-Math.PI/2)<1e-9);
+  if(Math.abs(pose.z)<1)assert.ok(Math.abs(pose.position.y-7.8128)<1e-9);
+ }
+ const end=monkeyPortalPose(14,source,destination,7.4128,18.08);
+ assert.ok(Math.abs(end.insidePosition.y-18.08)<1e-9);assert.equal(end.done,true);assert.equal(end.walk,0);assert.equal(end.throwWeight,0);
+});

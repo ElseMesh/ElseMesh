@@ -1,0 +1,124 @@
+[
+  {
+    "after": {
+      "count": 63,
+      "freeCam": false,
+      "inside": false,
+      "position": [
+        3976,
+        46.44466397422977,
+        4296
+      ]
+    },
+    "before": {
+      "count": 63,
+      "freeCam": false,
+      "inside": false,
+      "position": [
+        3976,
+        46.44466397422977,
+        4296
+      ]
+    },
+    "events": [],
+    "restored": true,
+    "time": 0
+  },
+  {
+    "after": {
+      "count": 63,
+      "freeCam": false,
+      "inside": false,
+      "position": [
+        3976,
+        46.44466397422977,
+        4296
+      ]
+    },
+    "before": {
+      "count": 63,
+      "freeCam": false,
+      "inside": false,
+      "position": [
+        3976,
+        46.44466397422977,
+        4296
+      ]
+    },
+    "events": [
+      {
+        "event": "monkey-crossing",
+        "position": [
+          296.12,
+          19.1,
+          300.15
+        ],
+        "time": 10
+      },
+      {
+        "event": "release",
+        "position": [
+          100.02,
+          7.837824749946595,
+          579.7057105710426
+        ],
+        "time": 10
+      }
+    ],
+    "restored": true,
+    "time": 10
+  },
+  {
+    "after": {
+      "count": 63,
+      "freeCam": false,
+      "inside": false,
+      "position": [
+        3976,
+        46.44466397422977,
+        4296
+      ]
+    },
+    "before": {
+      "count": 63,
+      "freeCam": false,
+      "inside": false,
+      "position": [
+        3976,
+        46.44466397422977,
+        4296
+      ]
+    },
+    "events": [
+      {
+        "event": "monkey-crossing",
+        "position": [
+          299.22,
+          18.08,
+          300.15
+        ],
+        "time": 14
+      },
+      {
+        "event": "monkey-arrived",
+        "position": [
+          299.22,
+          18.08,
+          300.15
+        ],
+        "time": 14
+      },
+      {
+        "event": "release",
+        "position": [
+          100.02,
+          7.837824749946595,
+          576.66
+        ],
+        "time": 14
+      }
+    ],
+    "restored": true,
+    "time": 14
+  }
+]

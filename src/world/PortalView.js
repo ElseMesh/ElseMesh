@@ -141,7 +141,7 @@ export class PortalView {
 
   insideFrame() {
     const o = this.portal.origin;
-    return portalFrame(o.x - 4, o.y + 2.05, o.z, Math.PI / 2);
+    return portalFrame(o.x - 3.98, o.y + 2.05, o.z, Math.PI / 2);
   }
 
   render() {

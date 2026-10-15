@@ -5,10 +5,13 @@ import {TreeWildlife} from './TreeWildlife.js';
 // The canopy monkey's sphere anatomy and shared limb builders, with one arm
 // articulated independently for the portal demonstration.
 export class PortalMonkeyActor {
-	constructor(scene) {
+	constructor(scene, clip = [0,0,0,1]) {
 		this.group=new Group();this.group.name='Portal coconut monkey';scene.add(this.group);
 		this.batches=[0x594132,0xc4a17b,0x201b17,0xead8b7].map((color,i)=>{
-			const material=standard({name:'Portal monkey '+['fur','face','eyes and hands','chest'][i],color,roughness:.88});material.localLightsCheap=true;
+			const material=standard({name:'Portal monkey '+['fur','face','eyes and hands','chest'][i],color,roughness:.88,
+				uniforms:{clipX:['f32',clip[0]],clipY:['f32',clip[1]],clipZ:['f32',clip[2]],clipD:['f32',clip[3]]},
+				surface:'if(dot(in.P,vec3f(mat.clipX,mat.clipY,mat.clipZ))+mat.clipD < 0.0){discard;}',
+				shadow:'return dot(in.P,vec3f(mat.clipX,mat.clipY,mat.clipZ))+mat.clipD >= 0.0;'});material.localLightsCheap=true;
 			const batch=new InstancedMesh(new SphereGeometry(1,12,8),material,96);
 			batch.frustumCulled=false;batch.castShadow=true;batch.count=0;
 			batch.previous=new InstancedInterleavedBuffer(new Float32Array(batch.instanceMatrix.array),16);
@@ -27,7 +30,7 @@ export class PortalMonkeyActor {
 	}
 	put(...args){return TreeWildlife.prototype.put.apply(this,args);}
 	segment(...args){return TreeWildlife.prototype.segment.apply(this,args);}
-	pose({position,yaw=0,time=0,walk=0,throwProgress=0}) {
+	pose({position,yaw=0,time=0,walk=0,throwProgress=0,throwWeight=1}) {
 		const stride=Math.max(0,Math.min(1,walk)),t=time*7.5,bob=Math.sin(t*2)*.025*stride;
 		const throwing=Math.max(0,Math.min(1,throwProgress));
 		this.body.compose(position,this.rot.setFromAxisAngle(new Vector3(0,1,0),yaw),new Vector3(1,1,1));
@@ -54,8 +57,8 @@ export class PortalMonkeyActor {
 					// Raise the hand with the coconut, draw back, then extend forwards.
 					const wind=Math.sin(Math.PI*Math.min(throwing/.6,1));
 					const release=Math.max(0,(throwing-.6)/.4);
-					this.b.set(.27,.78+bob+.24*wind,.29-.22*wind+.25*release);
-					this.c.set(.23,.87+bob+.31*wind,.56-.48*wind+.50*release);
+					this.b.lerp(new Vector3(.27,.78+bob+.24*wind,.29-.22*wind+.25*release),throwWeight);
+					this.c.lerp(new Vector3(.23,.87+bob+.31*wind,.56-.48*wind+.50*release),throwWeight);
 					this.hand.copy(this.c).applyMatrix4(frame);
 				}
 				this.segment(fur,frame,this.a,this.b,front?.063:.09);

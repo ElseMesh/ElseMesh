@@ -1,6 +1,6 @@
 // A reversible, explicitly scripted interaction for portal inspection/capture.
 // Both observer views run the same simulation and reuse the player's avatar.
-import { Mesh, SphereGeometry, Vector3, Matrix4 } from '../engine/index.js';
+import { Mesh, SphereGeometry, BoxGeometry, Vector3, Matrix4 } from '../engine/index.js';
 import { standard } from '../materials/Materials.js';
 import { portalFrame, mappedPortalCameraMatrix } from './PortalView.js';
 import { PortalMonkeyActor } from './PortalMonkeyActor.js';
@@ -8,6 +8,36 @@ import { crossPortalSegment } from './PortalProjectile.js';
 
 const GRAVITY = 9.81;
 const RADIUS = .14;
+const clamp = x => Math.max(0,Math.min(1,x));
+export function monkeyPortalPose(time, source, destination, ground, floor) {
+  const f=clamp(time/4), approach=f*f*(3-2*f), follow=clamp((time-7)/6);
+  const travel=follow*follow*(3-2*follow), z=7-4*approach-6.2*travel;
+  const sourceY=ground-source.elements[13]+.4*clamp((3-z)/1.6);
+  const position=new Vector3(.15,sourceY,z).applyMatrix4(source);
+  const mapping=mappedPortalCameraMatrix(new Matrix4(),source,destination);
+  const insidePosition=position.clone().applyMatrix4(mapping);
+  // Keep the rigid mapping until the complete tail has cleared, then descend
+  // the temporary warehouse ramp. The same pose drives both clipped halves.
+  insidePosition.y += (floor-insidePosition.y)*clamp((-z-1.6)/1.6);
+  const direction=new Vector3(0,0,-1).transformDirection(source);
+  const insideDirection=direction.clone().transformDirection(mapping);
+  return {position,insidePosition,yaw:Math.atan2(direction.x,direction.z),insideYaw:Math.atan2(insideDirection.x,insideDirection.z),
+    walk:time<4?Math.sin(Math.PI*f)**.4:time>7&&time<13?Math.sin(Math.PI*follow)**.25:0,
+    throwWeight:1-clamp((time-6)/.7),throwProgress:clamp((time-4)/1.2),z,done:time>=13};
+}
+function clipPlane(frame) {
+  const e=frame.elements;return [e[8],e[9],e[10],-(e[8]*e[12]+e[9]*e[13]+e[10]*e[14])];
+}
+function walkway(scene,frame,start,end,nearHeight,farHeight,bottom) {
+  const geometry=new BoxGeometry(1.2,1,end-start),p=geometry.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const z=p.getZ(i)+(start+end)/2,t=(z-start)/(end-start);
+    p.setXYZ(i,p.getX(i),p.getY(i)>0?nearHeight+(farHeight-nearHeight)*t:bottom,z);
+  }
+  geometry.computeVertexNormals();geometry.applyMatrix4(frame);
+  const mesh=new Mesh(geometry,standard({name:'Temporary portal walkway',color:0x65594c,roughness:.95}));
+  mesh.castShadow=true;scene.add(mesh);return mesh;
+}
 const belongsTo = (object, root) => {
   for (let node = object; node; node = node.parent) if (node === root) return true;
   return false;
@@ -52,11 +82,15 @@ export class PortalThrowDemo {
     portal.returnState = { position:new Vector3(g.x,g.y,g.z+3), yaw:0, landscape:false };
     p.position.copy(this.avatarPosition); p.velocity.set(0,0,0); p.yaw = Math.PI/2; p.pitch = 0;
     a.avatar.cinematic = { x:p.position.x,y:p.position.y,z:p.position.z,yaw:-Math.PI/2 };
-    this.actor = new PortalMonkeyActor(a.scene);
+    this.actor = new PortalMonkeyActor(a.scene,clipPlane(this.source));
+    this.insideActor = new PortalMonkeyActor(a.scene,clipPlane(this.destination));
+    const sy=this.ground-this.source.elements[13],dy=sy+.4,floor=portal.origin.y+.08-this.destination.elements[13];
+    this.walkways=[walkway(a.scene,this.source,0,1.4,sy+.4,sy+.4,sy-.08),walkway(a.scene,this.source,1.4,3,sy+.4,sy,sy-.08),
+      walkway(a.scene,this.destination,0,1.6,dy,dy,floor-.08),walkway(a.scene,this.destination,1.6,3.2,dy,floor,floor-.08)];
     this.coconut = new Mesh(new SphereGeometry(RADIUS,16,12), standard({name:'Thrown coconut husk',color:0x704326,roughness:.95,
       surface:'let grain = .7 + .3 * sin(in.uv.x * 115.0 + sin(in.uv.y * 31.0)); s.albedo *= grain;'}));
     this.coconut.name='Portal demo coconut'; this.coconut.castShadow=true; a.scene.add(this.coconut);
-    this.time=0; this.crossed=false; this.released=false; this.hit=false; this.landed=false; this.events=[];
+    this.time=0; this.crossed=false; this.released=false; this.hit=false; this.landed=false; this.monkeyCrossed=false; this.monkeyArrived=false; this.events=[];
     this.viewSide=viewSide; this.active=true;
     a.setFreeCam(true); a.fly.velocity.set(0,0,0);
     // The camera is an observer; changing it never moves the avatar or projectile.
@@ -66,18 +100,18 @@ export class PortalThrowDemo {
   }
 
   isInteriorObject(object) {
-    return belongsTo(object,this.app.avatar.group) || (this.crossed && object===this.coconut);
+    return belongsTo(object,this.app.avatar.group) || belongsTo(object,this.insideActor?.group) || this.walkways?.slice(2).includes(object) || (this.crossed && object===this.coconut);
   }
 
   update(dt) {
     if (!this.active) return;
     this.time += Math.min(dt,.1);
-    const g = new Vector3().setFromMatrixPosition(this.source);
-    const f = Math.min(1,this.time/4), eased=f*f*(3-2*f);
-    const walk=f<1 ? Math.sin(Math.PI*f)**.4 : 0;
-    const throwProgress=Math.min(1,Math.max(0,(this.time-4)/1.2));
-    const monkeyPosition=new Vector3(g.x+.15,this.ground,g.z+7-4*eased);
-    this.actor.pose({position:monkeyPosition,yaw:Math.PI,time:this.time,walk,throwProgress});
+    const pose=monkeyPortalPose(this.time,this.source,this.destination,this.ground,this.portal.origin.y+.08);
+    const {throwProgress}=pose;
+    this.actor.pose({...pose,time:this.time});
+    this.insideActor.pose({...pose,position:pose.insidePosition,yaw:pose.insideYaw,time:this.time});
+    if(pose.z<=0&&!this.monkeyCrossed){this.monkeyCrossed=true;this.events.push({event:'monkey-crossing',time:this.time,position:pose.insidePosition.toArray()});}
+    if(pose.done&&!this.monkeyArrived){this.monkeyArrived=true;this.events.push({event:'monkey-arrived',time:this.time,position:pose.insidePosition.toArray()});}
     if (!this.released) {
       this.actor.handPosition(this.position);
       if (throwProgress>=.8) {
@@ -97,7 +131,7 @@ export class PortalThrowDemo {
     }
     this.coconut.position.copy(this.position);
     if(this.released&&!this.landed){this.coconut.rotation.x+=dt*7;this.coconut.rotation.z+=dt*4;}
-    this.status.textContent = this.landed ? 'Coconut landed · choose either view to replay' : this.hit ? 'Coconut reached avatar · bouncing' : this.crossed ? 'Coconut inside warehouse' : this.released ? 'Coconut flying towards portal' : this.time<4 ? 'Monkey approaching on island' : 'Monkey winding up';
+    this.status.textContent = this.monkeyArrived ? 'Monkey inside warehouse · choose either view to replay' : this.monkeyCrossed ? 'Monkey walking into warehouse' : this.time>=7 ? 'Monkey following coconut through portal' : this.hit ? 'Coconut reached avatar · monkey preparing to follow' : this.crossed ? 'Coconut inside warehouse' : this.released ? 'Coconut flying towards portal' : this.time<4 ? 'Monkey approaching on island' : 'Monkey winding up';
   }
 
   step(dt) {
@@ -132,7 +166,9 @@ export class PortalThrowDemo {
     if(!this.active)return;
     this.active=false;
     const a=this.app,p=a.player,s=this.saved;
-    this.actor.dispose();this.coconut.removeFromParent();this.coconut.geometry.dispose();this.coconut.material.dispose();
+    this.actor.dispose();this.insideActor.dispose();
+    for(const mesh of this.walkways){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();}
+    this.coconut.removeFromParent();this.coconut.geometry.dispose();this.coconut.material.dispose();
     if(!s.inside)this.portal.exit();
     this.portal.returnState=s.returnState;
     a.avatar.cinematic=s.cinematic;
