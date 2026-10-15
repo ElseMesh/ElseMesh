@@ -346,7 +346,8 @@ export class AppUI {
 
 		const p = app.player;
 		const locationPoint = app.freeCam ? app.camera.position : p.position;
-		ui.setLocation( resolveWorldLocation( locationPoint.x, locationPoint.y, locationPoint.z, app.terrainData.heightAt( locationPoint.x, locationPoint.z ) ) );
+		const generatedInterior = app.thirdIsland?.portalInterior?.inside && app.thirdIsland.portalInterior.returnState?.landscape;
+		ui.setLocation( generatedInterior ? 'GENERATED ISLAND · WAREHOUSE' : resolveWorldLocation( locationPoint.x, locationPoint.y, locationPoint.z, app.terrainData.heightAt( locationPoint.x, locationPoint.z ) ) );
 		app.camera.getWorldDirection( this.viewDirection );
 		ui.setViewedLocation( resolveViewedIsland(
 			app.camera.position.x, app.camera.position.y, app.camera.position.z,

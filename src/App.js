@@ -374,21 +374,25 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			if ( typeof window !== 'undefined' ) window.__procedural = this.procedural;
 		}
 		if ( this.landscapeSpec?.structures.some( placement => placement.assetId === 'abandoned-warehouse' ) ) {
-			this.landscapeWarehouse = new LandscapeWarehouse( this, this.landscapeSpec );
+			try { this.landscapeWarehouse = new LandscapeWarehouse( this, this.landscapeSpec ); }
+			catch ( error ) { this.landscapeWarehouseError = error; console.warn( 'Generated warehouse could not be placed', error ); }
 		}
 		if ( qs.has( 'landscapeBuilder' ) ) {
 			this.landscapeBuilder = new LandscapeBuilder( {
 				spec: this.landscapeSpec ?? readSavedLandscapeSpec() ?? undefined,
 				onGoHome: this.landscapeSpec ? () => {
+					if ( this.thirdIsland.portalInterior.inside ) { this.thirdIsland.portalInterior.c64.close(); this.thirdIsland.portalInterior.exit(); }
 					const x = 100, z = 584;
 					this.monorail.teleport( this.player, x, this.player.groundAt( x, z, 1000 ), z, Math.PI );
 				} : undefined,
 				onGoLandscape: this.landscapeSpec ? () => {
+					if ( this.thirdIsland.portalInterior.inside ) { this.thirdIsland.portalInterior.c64.close(); this.thirdIsland.portalInterior.exit(); }
 					const spawn = landscapePathLayout( this.landscapeSpec ).spawn;
 					this.monorail.teleport( this.player, spawn.x, this.player.groundAt( spawn.x, spawn.z, 1000 ), spawn.z, - Math.PI / 2 );
 				} : undefined,
 			} );
 			if ( qs.get( 'generated' ) === '1' && ! this.landscapeSpec ) this.landscapeBuilder.notice( 'Saved landscape is missing or invalid. Review and save the specification before exploring.', true );
+			if ( this.landscapeWarehouseError ) this.landscapeBuilder.notice( 'Generated warehouse could not be placed. The original island remains available; move the structure onto dry land and save again.', true );
 		}
 		this.pistol = new SurvivalPistol( scene );
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)

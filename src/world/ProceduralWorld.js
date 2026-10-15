@@ -188,7 +188,7 @@ export class ProceduralWorld {
 		const spec=this.landscapeSpec;
 		if(!spec||spec.vegetation.grassDensity===0)return [];
 		const stems=[],x0=cx*CHUNK_SIZE,z0=cz*CHUNK_SIZE;
-		const stride=spec.qualityProfile==='low'?12:spec.qualityProfile==='high'?6:8;
+		const stride=spec.qualityProfile==='low'?6:spec.qualityProfile==='high'?12:8;
 		for(let j=0;j<stride;j++)for(let i=0;i<stride;i++){
 			const gx=cx*stride+i,gz=cz*stride+j;
 			if(hash2(gx,gz,this.seed+91)/4294967295>spec.vegetation.grassDensity)continue;

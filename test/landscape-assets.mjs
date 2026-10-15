@@ -33,11 +33,14 @@ test('current runtime files and declared SHA-256/byte sizes match the registry',
 
 test('public placement permits credited existing buildings and blocks experimental rights', () => {
   assert.deepEqual(listLandscapeAssets().map(asset => asset.id), ['abandoned-warehouse', 'forest-cabin']);
-  assert.equal(listLandscapeAssets({ publicRuntime: false }).length, 5);
-  for (const assetId of ['warehouse-image-guided', 'warehouse-argon', 'cottage-argon']) {
+  assert.equal(listLandscapeAssets({ publicRuntime: false }).length, 3);
+  for (const assetId of ['warehouse-image-guided']) {
     const result = validateLandscapeAssetReferences([{ assetId, x: 10, z: 20 }]);
     assert.equal(result.valid, false);
     assert.ok(result.errors.some(error => error.code === 'redistribution'));
+  }
+  for (const assetId of ['warehouse-argon', 'cottage-argon']) {
+    assert.equal(getLandscapeAsset(assetId), undefined, `${assetId} must not be published in this branch`);
   }
   assert.equal(validateLandscapeAssetReferences([{ assetId: 'abandoned-warehouse', x: 10, z: -12, yawRadians: Math.PI / 2, scale: 1 }]).valid, true);
   const unknown = clone('forest-cabin');

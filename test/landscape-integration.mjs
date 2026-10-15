@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Group, Vector3 } from '../src/engine/index.js';
 import { Colliders } from '../src/world/Colliders.js';
-import { DEFAULT_LANDSCAPE_SPEC, landscapeWorldId } from '../src/world/LandscapeSpec.js';
+import { DEFAULT_LANDSCAPE_SPEC, canonicalLandscapeSpec, landscapeWorldId } from '../src/world/LandscapeSpec.js';
 import { landscapeHeightAt, landscapePathLayout } from '../src/world/LandscapeHeight.js';
 import { LandscapeWarehouse, landscapeWarehouseGatePosition } from '../src/world/LandscapeWarehouse.js';
+import { PortalInterior } from '../src/world/PortalInterior.js';
 import { validateBuilderSpec, readSavedLandscapeSpec, LANDSCAPE_STORAGE_KEY } from '../src/world/LandscapeBuilder.js';
 import { ProceduralWorld, buildChunkGeometry } from '../src/world/ProceduralWorld.js';
 
@@ -23,6 +24,10 @@ test('saved definitions accept only validated public assets and remain versioned
 	assert.equal(readSavedLandscapeSpec(store), null);
 	assert.equal(validateBuilderSpec({ ...spec, structures: [{ ...spec.structures[0], assetId: 'warehouse-argon' }] }).valid, false);
 	assert.equal(validateBuilderSpec({ ...spec, structures: [{ ...spec.structures[0], assetId: 'forest-cabin' }] }).valid, false);
+	const submerged = { ...spec, structures: [{ ...spec.structures[0], x: 5036, z: 5036 }] };
+	assert.ok(validateBuilderSpec(submerged).errors.some(error => error.includes('underwater')));
+	store.setItem(LANDSCAPE_STORAGE_KEY, JSON.stringify(submerged));
+	assert.equal(readSavedLandscapeSpec(store), null, 'A saved underwater warehouse must not abort startup.');
 });
 
 test('generated warehouse doorway, floor and walls align with graded access', async () => {
@@ -51,6 +56,22 @@ test('generated warehouse doorway, floor and walls align with graded access', as
 	assert.equal(colliders.boxes.filter(record => record.solid).length, 0);
 });
 
+test('warehouse portal lands directly on the walkable interior floor', () => {
+	const player = { mode: 'walk', position: new Vector3(4070, 52, 4296), yaw: 0,
+		velocity: new Vector3(), grounded: false, groundAt: (x, z, maxY) => {
+			assert.deepEqual([x, z], [300, 300]); assert.ok(maxY >= 19); return 18;
+		} };
+	const portal = Object.create(PortalInterior.prototype);
+	portal.app = { player }; portal.origin = new Vector3(300, 18, 300);
+	portal.recipe = { zones: { arrival: [0, 1, 0] } }; portal.localLightSources = [];
+	portal.group = { visible: false }; portal.setInteriorCollidersEnabled = () => {};
+	portal.toast = () => {};
+	portal.enter();
+	assert.deepEqual(player.position.toArray(), [300, 18, 300]);
+	assert.equal(player.grounded, true);
+	assert.deepEqual(portal.returnState.position.toArray(), [4070, 52, 4296]);
+});
+
 test('adjacent landscape chunks share their world-space edge at equal LOD', () => {
 	const h = (x, z) => landscapeHeightAt(x, z, spec);
 	const left = buildChunkGeometry(15, 16, 0, h), right = buildChunkGeometry(16, 16, 0, h);
@@ -69,6 +90,15 @@ test('regenerating the same landscape restores only its own player and beacon sa
 	try {
 		const makeApp = () => ({ scene: new Group(), monorail: { mapEl: null }, player: { position: new Vector3(3976, 170, 4092), mode: 'walk' }, thirdIsland: { portalInterior: { inside: false } } });
 		const first = new ProceduralWorld(makeApp(), spec.seed, { landscapeSpec: spec });
+		const profileCounts = [];
+		for (const qualityProfile of ['low', 'balanced', 'high']) {
+			first.landscapeSpec = canonicalLandscapeSpec({ ...spec, qualityProfile });
+			const grass = first.makeGrass(16, 17);
+			profileCounts.push(grass[0]?.count ?? 0);
+			for (const mesh of grass) { first.app.scene.remove(mesh); mesh.geometry.dispose(); }
+		}
+		first.landscapeSpec = spec;
+		assert.ok(profileCounts[0] < profileCounts[1] && profileCounts[1] < profileCounts[2], `Grass budgets should rise with quality: ${profileCounts}`);
 		const vertices = first.access.geometry.attributes.position.array, indices = first.access.geometry.index.array;
 		const at = i => [vertices[indices[i] * 3], vertices[indices[i] * 3 + 2]];
 		const a = at(0), b = at(1), c = at(2);

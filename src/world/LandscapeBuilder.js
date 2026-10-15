@@ -10,6 +10,10 @@ export function validateBuilderSpec(input) {
   const assets = validateLandscapeAssetReferences(result.spec.structures);
   const errors = assets.errors.map(error => `Structure ${error.index + 1}: ${error.message}`);
   for (const placement of result.spec.structures) if (placement.assetId !== 'abandoned-warehouse') errors.push(`Structure ${placement.assetId}: this builder currently supports only the abandoned-warehouse runtime adapter.`);
+  for (const [index, placement] of result.spec.structures.entries()) {
+    if (landscapeHeightAt(placement.x, placement.z, result.spec) <= result.spec.waterLevel)
+      errors.push(`Structure ${index + 1}: placement is underwater. Move it onto dry generated terrain.`);
+  }
   for (const [index, ref] of result.spec.references.entries()) {
     const asset = getLandscapeAsset(ref.assetId);
     if (!asset || !validateLandscapeAsset(asset).valid) errors.push(`Reference ${index + 1}: choose a registered asset cleared for public redistribution; ${ref.assetId} is unavailable.`);
@@ -78,8 +82,8 @@ export class LandscapeBuilder {
     this.number('ruggedness', 'Ruggedness (0–1)', 0, 1, .05, grid);
     this.number('treeDensity', 'Tree density (0–1)', 0, 1, .05, grid);
     this.number('grassDensity', 'Grass density (0–1)', 0, 1, .05, grid);
-    this.number('originX', 'Centre X (m)', -1000000, 1000000, 1, grid);
-    this.number('originZ', 'Centre Z (m)', -1000000, 1000000, 1, grid);
+    this.number('originX', 'Centre X (m)', -90000, 90000, 1, grid);
+    this.number('originZ', 'Centre Z (m)', -90000, 90000, 1, grid);
     this.select('terrainType', 'Terrain type', [['temperate-island','Temperate island'],['temperate-hills','Temperate hills']], form);
     this.select('qualityProfile', 'Quality', [['low','Low'],['balanced','Balanced'],['high','High']], form);
     const access = make('fieldset', undefined, form); make('legend', 'Access and structures', access);

@@ -43,18 +43,6 @@ export const LANDSCAPE_ASSETS = deepFreeze([
     { id: 'LOCAL-EXPERIMENT-ONLY', redistribution: 'restricted', attribution: 'ElseMesh reference-guided parametric experiment.', evidence: 'experiments/ai-2d-to-3d/warehouse.spec.json' },
     { status: 'recorded', bytes: 13064, meshes: 5, materials: 5, images: 0, notes: 'Shared box geometry; inferred hidden geometry; no production qualification.' },
     { references: [{ path: '/models/experimental/warehouse-image-guided.json', role: 'construction manifest' }] }),
-  entry('warehouse-argon', 'Argon warehouse candidate', '/models/experimental/warehouse-argon.glb',
-    'aa664e4a70d6d53291fc703911a84878ab190129377047c72089b6683b4c5aa9', 297408,
-    { kind: 'internal-experiment', uri: 'experiments/ai-2d-to-3d/argon/build-warehouse.py', author: 'Gemini 4 Argon / ElseMesh adaptation', provenance: ['public/models/experimental/warehouse-argon.json'] },
-    { id: 'UNCONFIRMED', redistribution: 'unknown', attribution: 'Argon warehouse experiment; redistribution clearance not recorded.', evidence: 'public/models/experimental/warehouse-argon.json' },
-    { status: 'recorded', bytes: 297408, meshes: 27, materials: 7, images: 0, notes: 'Offline generated GLB; candidate collision meshes require a dedicated adapter.' },
-    { references: [{ path: '/models/experimental/warehouse-argon.json', role: 'construction manifest' }] }),
-  entry('cottage-argon', 'Private-reference cottage candidate', '/models/experimental/cottage-argon.glb',
-    '86e353fcb4b59c2eaa71321bbae114858403fbbe008363c8e248d7f8db89ab5f', 950176,
-    { kind: 'internal-experiment', uri: 'experiments/ai-2d-to-3d/cottage-argon/build-cottage.py', author: 'Argon / ElseMesh adaptation', provenance: ['experiments/ai-2d-to-3d/cottage-argon/reference-manifest.json'] },
-    { id: 'UNCONFIRMED', redistribution: 'unknown', attribution: 'Cottage experiment based on private user references; no public clearance recorded.', evidence: 'experiments/ai-2d-to-3d/cottage-argon/reference-manifest.json' },
-    { status: 'recorded', bytes: 950176, meshes: 57, materials: 23, images: 0, notes: 'Geometry only; textured gallery adaptation and private reference photographs are excluded from registry dependencies.' },
-    { references: [{ path: '/models/experimental/cottage-argon.json', role: 'construction manifest' }] }),
 ]);
 
 export function getLandscapeAsset(id, registry = LANDSCAPE_ASSETS) {

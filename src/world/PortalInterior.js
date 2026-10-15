@@ -205,7 +205,9 @@ export class PortalInterior {
   enter() {
     const p = this.app.player;
     if (this.inside || p.mode !== 'walk') return;
-    this.returnState = { position: p.position.clone(), yaw: p.yaw };
+    const entrance = this.landscapeEntrance;
+    const landscape = !!entrance && Math.hypot(p.position.x - entrance.x, p.position.z - entrance.z) < 4.2;
+    this.returnState = { position: p.position.clone(), yaw: p.yaw, landscape };
     this.setInteriorCollidersEnabled(true);
     for (const source of this.localLightSources) source.enabled = true;
     this.inside = true;
@@ -227,6 +229,7 @@ export class PortalInterior {
     this.group.visible = false;
     for (const source of this.localLightSources) source.enabled = false;
     this.setInteriorCollidersEnabled(false);
+    const landscape = !!this.returnState?.landscape;
     if (this.returnState) {
       p.position.copy(this.returnState.position);
       p.yaw = this.returnState.yaw;
@@ -237,7 +240,7 @@ export class PortalInterior {
     p.velocity.set(0, 0, 0);
     p.grounded = true;
     this.returnState = null;
-    this.toast('Returned to Island 3');
+    this.toast(landscape ? 'Returned to generated warehouse' : 'Returned to Island 3');
   }
 
   update(dt) {

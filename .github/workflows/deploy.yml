@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -38,15 +38,15 @@ jobs:
       - run: npm test && npm run test:landscape-gpu && npm run test:network && npm run test:security && npm run test:cargo && npm run test:vehicle-steering && npm run test:vehicle-material && npm run test:graphics && npm run test:renderer && npm run test:terrain-quality && npm run test:architecture && npm run test:publication
       - run: npm run build
       - uses: actions/configure-pages@v5
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read

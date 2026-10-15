@@ -62,7 +62,9 @@ export function validateLandscapeSpec(input) {
 	if (!s.origin || typeof s.origin !== 'object' || Array.isArray(s.origin)) errors.push('origin must contain x and z coordinates.');
 	else {
 		ownKeys(s.origin, ['x','z'], 'origin', errors);
-		for (const key of ['x','z']) if (!Number.isFinite(s.origin[key]) || Math.abs(s.origin[key]) > 1000000) errors.push(`origin.${key} must be finite and within 1000000 metres.`);
+		// ProceduralWorld's position and discovery save limits cover the full
+		// rectangle when its centre stays within this range.
+		for (const key of ['x','z']) if (!Number.isFinite(s.origin[key]) || Math.abs(s.origin[key]) > 90000) errors.push(`origin.${key} must be finite and within 90000 metres so exploration can be saved.`);
 		if (Math.abs(s.origin.x) - s.width / 2 <= 1536 && Math.abs(s.origin.z) - s.length / 2 <= 1536) errors.push('Landscape overlaps the protected square. Move its full bounds outside x,z = -1536..1536.');
 	}
 	const structures = input.structures === undefined ? [{assetId:'abandoned-warehouse',x:s.origin?.x,z:(s.origin?.z??0)+Math.min(204,Math.max(0,s.length/2-60)),yawRadians:Math.PI/2,scale:1}] : s.structures;

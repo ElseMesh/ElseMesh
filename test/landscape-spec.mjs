@@ -16,7 +16,7 @@ test('sample schema, canonical identity, frozen data and exact requested extent'
 	assert.equal(spec.maxElevation,250);assert.equal(spec.waterLevel,0);
 });
 test('invalid dimensions, versions, origins, features and private reference payloads rejected',()=>{
-	for(const change of [{width:0},{length:Infinity},{maxElevation:0},{seed:1.2},{seed:-1},{version:2},{origin:{x:0,z:0}},{features:['river']},{description:'a'.repeat(2001)},{image:'data:image/png;base64,private'},{references:[{assetId:'private',title:'x',license:'owned',attribution:'owner',data:'private'}]},{references:[{assetId:'x',title:'x',license:'owned',attribution:'owner',sourceUrl:'https://127.0.0.1/x'}]}]) {
+    for(const change of [{width:0},{length:Infinity},{maxElevation:0},{seed:1.2},{seed:-1},{version:2},{origin:{x:0,z:0}},{origin:{x:1000000,z:4096}},{features:['river']},{description:'a'.repeat(2001)},{image:'data:image/png;base64,private'},{references:[{assetId:'private',title:'x',license:'owned',attribution:'owner',data:'private'}]},{references:[{assetId:'x',title:'x',license:'owned',attribution:'owner',sourceUrl:'https://127.0.0.1/x'}]}]) {
 		assert.equal(validateLandscapeSpec({...sample,...change}).valid,false,JSON.stringify(change));
 	}
 	assert.equal(validateLandscapeSpec({...sample,waterLevel:12}).valid,false,'Regional sea level is not implemented by the shared ocean renderer.');
@@ -93,7 +93,7 @@ test('WGSL generator rejects injected names and supports TerrainGPU fallback nam
 test('actual WebGPU CPU/GPU parity when invoked with --gpu',async t=>{
 	if(!process.argv.includes('--gpu')){t.skip('Run node test/landscape-spec.mjs --gpu for hardware parity.');return;}
 	await import('./headless.mjs');
-	const adapter=await navigator.gpu.requestAdapter();if(!adapter){t.skip('WebGPU adapter unavailable.');return;}
+	const adapter=await navigator.gpu.requestAdapter();assert.ok(adapter,'A WebGPU adapter is required for explicit --gpu qualification.');
 	const device=await adapter.requestDevice();
 	for(const gpuSpec of [spec,canonicalLandscapeSpec({...sample,terrainType:'temperate-hills',elevation:{ruggedness:.2},roads:{enabled:true,width:12},structures:[{...sample.structures[0],yawRadians:Math.PI/3,scale:.5}]}),canonicalLandscapeSpec({...sample,paths:{enabled:false,width:5},structures:[{...sample.structures[0],x:4196,z:4196,yawRadians:Math.PI/3}]}),canonicalLandscapeSpec({...sample,structures:[]})]) {
 	const points=[[0,0],[1536,1536],[3096,4096],[5096,4096],[4096,4096],[3976,4096],[4068,4096]];
