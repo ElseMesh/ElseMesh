@@ -38,7 +38,7 @@ In the final controlled browser journey, 49 chunk slots were resident near the g
 
 A separate controlled browser route used the existing helicopter key, boarding, flight physics, landing and exit actions. It landed on the generated island at `(624, 2547)` with CPU ground height `17.34 m`, exited and reboarded, then landed at home `(114, 638)` and exited. The scripted walk ended `2.16 m` from the warehouse start point. All flight assertions passed with no recorded browser exception. The 46 captured frames form `helicopter-round-trip.mp4`. This is an automated vehicle route, not a human-control playtest; its 10 FPS screenshot HUD reflects forced manual frames and is not an actual performance measurement.
 
-Evidence is stored outside the branch under `C:\Users\Loz\Documents\Codex\2026-10-14\procedural-evidence-v4`, `procedural-flight-evidence-v2`, and the `procedural-fps-*.json` and `procedural-*.json` benchmark files in that date directory. The free-camera journey video is `procedural-browser-journey.mp4` and the existing-vehicle route is `helicopter-round-trip.mp4`. Images and videos depict this test machine, not all supported hardware.
+Evidence is stored in private local directories outside the branch, including `procedural-fps-*.json` and `procedural-*.json` benchmark files. The free-camera journey video is `procedural-browser-journey.mp4` and the existing-vehicle route is `helicopter-round-trip.mp4`. Images and videos depict this test machine, not all supported hardware.
 
 ## Known limits and rollback
 

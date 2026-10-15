@@ -8,8 +8,13 @@ import { AdaptiveResolution } from '../src/core/RenderQuality.js';
 // Supply Vite's environment values when importing the real App under Node.
 // No rendering modules or App methods are replaced by the loader.
 const sourceRoot = new URL('../src/', import.meta.url).href;
+const projectRoot = new URL('../', import.meta.url).href;
 const hook = registerHooks({
   load(url, context, nextLoad) {
+    // Vite turns image ?url imports into URL strings. Node cannot load the
+    // transitive experimental-gallery PNG when this test imports the real App.
+    if (url.startsWith(projectRoot) && /\.png\?url$/.test(url))
+      return { format:'module', shortCircuit:true, source:'export default "/test-image.png";' };
     const loaded = nextLoad(url, context);
     if (!url.startsWith(sourceRoot) || loaded.format !== 'module') return loaded;
     const source = typeof loaded.source === 'string' ? loaded.source : Buffer.from(loaded.source).toString();
