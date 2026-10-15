@@ -7,6 +7,7 @@ on:
       - 'src/network/**'
       - 'tools/networking/**'
       - 'test/*network*.mjs'
+      - 'test/federated-*.mjs'
       - 'test/federation.mjs'
       - 'test/online-*.mjs'
       - 'test/ten-player-room.mjs'
