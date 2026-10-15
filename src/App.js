@@ -31,7 +31,6 @@ import { LandscapeWarehouse } from './world/LandscapeWarehouse.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
-import { ImageGuidedWarehouse } from './world/ImageGuidedWarehouse.js';
 import { CaveSystem } from './world/CaveSystem.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
@@ -361,7 +360,13 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.avatar = new PlayerAvatar( scene, this.boatCtl );
 		this.avatarChooser = new AvatarChooser({ app: this });
 		this.thirdIsland = new ThirdIslandSystem( this );
-		this.aiWarehouse = qs.has( 'aiWarehouse' ) ? new ImageGuidedWarehouse( this ) : null;
+		// The reference-guided candidate is a local experiment. Keep its images and
+		// restricted GLB out of production bundles, including opt-in URLs.
+		this.aiWarehouse = null;
+		if ( import.meta.env.DEV && qs.has( 'aiWarehouse' ) ) {
+			const { ImageGuidedWarehouse } = await import( './world/ImageGuidedWarehouse.js' );
+			this.aiWarehouse = new ImageGuidedWarehouse( this );
+		}
 		this.fourthIsland = new FourthIslandSystem( this );
 		this.fifthIsland = new IslandFiveSystem( this );
 		this.portIsland = new PortIslandSystem( this );

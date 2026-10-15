@@ -271,7 +271,7 @@ export class PortalInterior {
       p.prompt = { key: 'E', text: 'Enter warehouse loft' };
       if (this.app.input.hit('KeyE')) { this.enter(); this.cooldown = .8; }
     } else if (nearInside) {
-      p.prompt = { key: 'E', text: 'Return to Island 3' };
+      p.prompt = { key: 'E', text: this.returnState?.landscape ? 'Return to generated warehouse' : 'Return to Island 3' };
       if (this.app.input.hit('KeyE')) { this.exit(); this.cooldown = .8; }
     }
   }

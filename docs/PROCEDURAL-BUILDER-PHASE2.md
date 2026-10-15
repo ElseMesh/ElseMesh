@@ -2,6 +2,8 @@
 
 Status: **experimental, partial, not deployed**. This extends the draft PR #4 work based on `b06b22c`. The ordinary ElseMesh URL still opens the authored island and its warehouse, computers, roads and vehicles. The new world remains opt-in through `?landscapeBuilder`.
 
+The current release gate and isolated production-build preview procedure are recorded in [PROCEDURAL-BUILDER-RELEASE-GATES.md](PROCEDURAL-BUILDER-RELEASE-GATES.md). The local-only image-guided experiment is excluded from the production artifact; `npm run verify:release-assets` checks this after build.
+
 ## Architecture and versioning
 
 The renderer is ElseMesh's WebGPU/WGSL stack. `LandscapeHeight` supplies CPU height and biome queries, and emits matching WGSL for `TerrainGPU`. `ProceduralWorld` streams 256 m chunks, selects three LODs, builds at most two chunks per frame and caps residency at 49. Eviction disposes chunk geometry and vegetation instances. `TerrainData` uses the same edited height outside the authored island. The authored square `|x|,|z| <= 1536` remains protected.
