@@ -161,7 +161,7 @@ export function createPortalHandoff(identity, { portal, playerId, sessionId, seq
   return signObject({ kind: 'portal-handoff', protocol: 'elsemesh.handoff/1', handoffId: randomUUID(), portalId: portal.portalId, portalRevision: portal.revision, sourceRegion: portal.sourceRegion, destinationRegion: portal.destinationRegion, playerId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, controlMode, sourceAuthority: identity.nodeId, timestamp: Date.now() }, identity);
 }
 
-export function acceptPortalHandoff(handoff, { portal, sourceAuthority, sourceEpoch, destinationRules, supportedCapabilities, trustedAuthorities, replay, now = Date.now() }) {
+export function acceptPortalHandoff(handoff, { portal, sourceAuthority, sourceEpoch, destinationRules, supportedCapabilities, trustedAuthorities, replay, destinationAdmission, now = Date.now() }) {
   validatePortal(portal);
   check(verifyObject(handoff, trustedAuthorities) && handoff.kind === 'portal-handoff' && handoff.protocol === 'elsemesh.handoff/1', 'Bad handoff signature');
   check(handoff.sourceAuthority === handoff.signer && handoff.signer === sourceAuthority && handoff.authorityEpoch === sourceEpoch, 'Wrong handoff authority');
@@ -170,6 +170,14 @@ export function acceptPortalHandoff(handoff, { portal, sourceAuthority, sourceEp
   check(Number.isSafeInteger(handoff.sequence) && handoff.sequence >= 0 && Number.isFinite(handoff.timestamp) && Math.abs(now - handoff.timestamp) <= 30_000, 'Expired handoff');
   const negotiation = negotiateRules(destinationRules, supportedCapabilities);
   check(negotiation.accepted, `Unsupported rules: ${negotiation.unsupported.join(',')}`);
+  check(portal.access.mode === 'PUBLIC' || portal.access.allowPlayers.includes(handoff.playerId), 'Portal player not allowed');
+  // A valid source signature does NOT authorize entry. This callback must be
+  // implemented by the destination authority using its own admission policy.
+  // Deny by default, and bind its decision to this player/session/region.
+  const admitted = typeof destinationAdmission === 'function' ? destinationAdmission({ handoff, portal, now }) : null;
+  check(admitted?.accepted === true && admitted.playerId === handoff.playerId &&
+    admitted.sessionId === handoff.sessionId && admitted.destinationRegion === portal.destinationRegion,
+  'Destination admission denied');
   check(replay.accept(handoff.handoffId), 'Replayed handoff');
   return { playerId: handoff.playerId, regionId: portal.destinationRegion, spawn: structuredClone(portal.exit), controlMode: handoff.controlMode, rules: negotiation.rules, handoffId: handoff.handoffId };
 }

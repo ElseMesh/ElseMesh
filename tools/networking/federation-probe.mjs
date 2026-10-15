@@ -19,7 +19,8 @@ const other = trust.find((entry) => entry.nodeId !== identity.nodeId).nodeId;
 const lozId = mode === 'probe' ? identity.nodeId : other;
 const edId = mode === 'serve' ? identity.nodeId : other;
 const f = sampleRegions(lozId, edId);
-const transport = new TcpUdpTransport({ identity, trustedIds: trusted, host: '0.0.0.0', port: mode === 'serve' ? Number(arg('port')) : 0 });
+const insecureLanProbe = process.argv.includes('--allow-insecure-development');
+const transport = new TcpUdpTransport({ identity, trustedIds: trusted, host: insecureLanProbe ? '0.0.0.0' : '127.0.0.1', allowInsecureDevelopment: insecureLanProbe, port: mode === 'serve' ? Number(arg('port')) : 0 });
 const emptyHash = assetId(Buffer.alloc(0));
 const replay = new ReplayGuard();
 const audit = (data) => console.log(JSON.stringify({ time: new Date().toISOString(), ...data }));
@@ -40,7 +41,7 @@ if (mode === 'serve') {
         await transport.send_reliable(message.from, 'region-descriptor', published);
       }
       if (message.type === 'portal-handoff') {
-        const admitted = acceptPortalHandoff(message.body, { portal: f.edDoor, sourceAuthority: lozId, sourceEpoch: 1, destinationRules: f.edWorld.rules, supportedCapabilities: f.capabilities, trustedAuthorities: trusted, replay });
+        const admitted = acceptPortalHandoff(message.body, { portal: f.edDoor, sourceAuthority: lozId, sourceEpoch: 1, destinationRules: f.edWorld.rules, supportedCapabilities: f.capabilities, trustedAuthorities: trusted, replay, destinationAdmission: ({handoff}) => ({ accepted: true, playerId: handoff.playerId, sessionId: handoff.sessionId, destinationRegion: handoff.destinationRegion }) });
         const receipt = signObject({ kind: 'portal-admission', handoffId: admitted.handoffId, playerId: admitted.playerId, regionId: admitted.regionId, destinationAuthority: edId, destinationEpoch: 1, rules: admitted.rules, acceptedAt: Date.now() }, identity);
         await transport.send_reliable(message.from, 'portal-admission', receipt);
         const returnHandoff = createPortalHandoff(identity, { portal: f.edReturn, playerId: admitted.playerId, sessionId: 'elsemesh-session:physical-probe', sequence: 2, authorityEpoch: 1, avatarAssetId: emptyHash, inventoryHash: emptyHash, position: [0, 1, 1], velocity: [0, 0, 0], controlMode: 'HUMAN' });
@@ -66,7 +67,7 @@ if (mode === 'serve') {
   const admission = await admissionPromise;
   if (!verifyObject(admission, trusted) || admission.signer !== other || admission.handoffId !== handoff.handoffId || admission.regionId !== region.regionId) throw new Error('Bad destination admission');
   const returning = await returnPromise;
-  const back = acceptPortalHandoff(returning, { portal: f.edReturn, sourceAuthority: other, sourceEpoch: 1, destinationRules: f.underneath.rules, supportedCapabilities: f.capabilities, trustedAuthorities: trusted, replay });
+  const back = acceptPortalHandoff(returning, { portal: f.edReturn, sourceAuthority: other, sourceEpoch: 1, destinationRules: f.underneath.rules, supportedCapabilities: f.capabilities, trustedAuthorities: trusted, replay, destinationAdmission: ({handoff}) => ({ accepted: true, playerId: handoff.playerId, sessionId: handoff.sessionId, destinationRegion: handoff.destinationRegion }) });
   audit({ event: 'federation-roundtrip', transport: 'signed-reference-tcp', sourceNodeId: identity.nodeId, destinationNodeId: other, sourceRegion: f.underneath.regionId, destinationRegion: region.regionId, returnRegion: back.regionId, portalId: f.edDoor.portalId, returnPortalId: f.edReturn.portalId, sourceAuthorityBefore: identity.nodeId, destinationAuthorityAfter: admission.destinationAuthority, handoffId: handoff.handoffId, manifestHash: published.manifestHash, rulesNegotiated: true, result: 'PASS', scope: 'protocol-only-no-rendered-avatar' });
   await transport.stop_node();
 }

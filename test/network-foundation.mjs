@@ -8,6 +8,11 @@ import { RouteTable } from '../network/routes.mjs';
 const a = newIdentity(), b = newIdentity(), unknown = newIdentity();
 const trusted = new Set([a.nodeId, b.nodeId]);
 
+test('unencrypted native reference refuses non-loopback listeners by default', () => {
+  assert.throws(() => new TcpUdpTransport({ identity: a, trustedIds: trusted, host: '0.0.0.0' }), /loopback-only/);
+  assert.ok(new TcpUdpTransport({ identity: a, trustedIds: trusted }).node_id() === a.nodeId);
+});
+
 test('identity is key-derived rather than route-derived, including overlapping private IPs', () => {
   assert.equal(nodeId(a.publicKeyPem), a.nodeId);
   assert.notEqual(a.nodeId, b.nodeId);

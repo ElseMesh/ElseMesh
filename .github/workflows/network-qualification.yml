@@ -1,0 +1,41 @@
+name: Network qualification checks
+
+on:
+  pull_request:
+    paths:
+      - 'network/**'
+      - 'src/network/**'
+      - 'tools/networking/**'
+      - 'test/*network*.mjs'
+      - 'test/federation.mjs'
+      - 'test/online-*.mjs'
+      - 'test/ten-player-room.mjs'
+      - 'package*.json'
+      - '.github/workflows/network-qualification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  network:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+          - os: windows-latest
+            node: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:network
+      - run: npm run test:security
+      - run: npm run build

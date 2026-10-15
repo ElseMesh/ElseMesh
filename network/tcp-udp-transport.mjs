@@ -35,8 +35,10 @@ function writeFrame(socket, value) {
 export class TcpUdpTransport extends NetworkTransport {
   #identity; #trusted; #server; #udp; #peers = new Map(); #events = new EventEmitter();
   #replay = new ReplayGuard(); #latestTransient = new LatestTransient(); #sequence = 0; #session = randomUUID(); #port; #host; #started = false;
-  constructor({ identity, trustedIds, host = '0.0.0.0', port = 0 }) {
-    super(); this.#identity = identity; this.#trusted = trustedIds; this.#host = host; this.#port = port;
+  constructor({ identity, trustedIds, host = '127.0.0.1', port = 0, allowInsecureDevelopment = false }) {
+    super();
+    if (host !== '127.0.0.1' && !allowInsecureDevelopment) throw new Error('Unencrypted reference transport is loopback-only without explicit unsafe-development opt-in');
+    this.#identity = identity; this.#trusted = trustedIds; this.#host = host; this.#port = port;
   }
   on(type, fn) { this.#events.on(type, fn); return this; }
   off(type, fn) { this.#events.off(type, fn); return this; }

@@ -75,7 +75,7 @@ export async function createOnlineServer({ root = resolve('dist'), host = '127.0
 				client.alive = true;
 				client.on('pong', () => { client.alive = true; });
 				let peers = rooms.get(room);
-				if (!peers) { if (rooms.size >= 500) { client.close(1013, 'Server full'); return; } peers = new Map(); peers.speechIds = new Set(); peers.lastSpeech = new Map(); peers.speechQueue = Promise.resolve(); rooms.set(room, peers); }
+				if (!peers) { if (rooms.size >= 500) { client.close(1013, 'Server full'); return; } peers = new Map(); peers.speechIds = new Set(); peers.lastSpeech = new Map(); peers.latestStates = new Map(); peers.speechQueue = Promise.resolve(); rooms.set(room, peers); }
 				if (requestedRole === 'loz' && peers.hostKey && peers.hostKey !== hostKey) { client.close(1008, 'Host key rejected'); return; }
 				const role = requestedRole === 'guest' ? ONLINE_ROLES.slice(1).find((slot) => !peers.has(slot)) : requestedRole;
 				if (!role || peers.has(role) || peers.size >= MAX_ROOM_PLAYERS) { client.close(1008, 'Room full or role taken'); return; }
@@ -91,6 +91,11 @@ export async function createOnlineServer({ root = resolve('dist'), host = '127.0
 					for (const peer of peers.values()) sendBounded(peer, data);
 				};
 				client.send(JSON.stringify({ type: 'welcome', role, playerId: PLAYER_IDS[role], capacity: MAX_ROOM_PLAYERS }));
+					// Initial snapshot for late joiners and reconnects. Expire old poses.
+					for (const [peerRole, snapshot] of peers.latestStates) {
+						if (peerRole !== role && Date.now() - snapshot.acceptedAt <= 8000)
+							sendBounded(client, JSON.stringify({ type: 'state', state: snapshot.state }));
+					}
 				client.send(JSON.stringify(peers.helicopter.packet()));
 				broadcast(peers.economy.packet());
 				const notify = () => {
@@ -124,6 +129,7 @@ export async function createOnlineServer({ root = resolve('dist'), host = '127.0
 							if (state.sequence <= lastSequence) return;
 							lastSequence = state.sequence;
 							lastPlayer = state;
+							peers.latestStates.set(role, { state, acceptedAt: now });
 							peers.economy.position(role, state, now);
 							if (role === 'loz' && state.boat) peers.economy.boat(state.boat, now);
 							if (now - (peers.lastEconomyTick || 0) >= 200) {
@@ -165,6 +171,7 @@ export async function createOnlineServer({ root = resolve('dist'), host = '127.0
 				client.on('close', () => {
 					if (peers.get(role) !== client) return;
 					peers.delete(role);
+					peers.latestStates.delete(role);
 					peers.economy.disconnect(role);broadcast(peers.economy.packet());
 					peers.helicopter.disconnect(role); broadcast(peers.helicopter.packet());
 					if (peers.size) { broadcast({ type: 'peer-left', role, playerId: PLAYER_IDS[role] }); notify(); }
