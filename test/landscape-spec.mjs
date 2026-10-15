@@ -74,6 +74,21 @@ test('finite bounded deterministic continuous domain and expected biomes',()=>{
 	}
 	for(const p of [[0,0],[1536,1536],[3096,4096],[5096,4096],[Infinity,0],[NaN,0]])assert.equal(sampler(...p),-90);
 });
+test('version 2 extends the starter island with repeatable outer islands and continuous seams',()=>{
+	const expanded=canonicalLandscapeSpec({...sample,version:2,expansion:true});
+	assert.equal(landscapeWorldId(spec).startsWith('landscape-v1-'),true);
+	assert.equal(landscapeWorldId(expanded).startsWith('landscape-v2-'),true);
+	assert.equal(landscapeHeightAt(5584,3456,spec),-90);
+	assert.ok(landscapeHeightAt(5584,3456,expanded)>5);
+	assert.equal(landscapeHeightAt(5584,3456,expanded),landscapeHeightAt(5584,3456,canonicalLandscapeSpec({...sample,version:2,expansion:true})));
+	for(const x of [3096,5096])for(let z=3096;z<=5096;z+=64){
+		assert.ok(Math.abs(landscapeHeightAt(x-.001,z,expanded)-landscapeHeightAt(x+.001,z,expanded))<.1);
+	}
+	for(const z of [3096,5096])for(let x=3096;x<=5096;x+=64){
+		assert.ok(Math.abs(landscapeHeightAt(x,z-.001,expanded)-landscapeHeightAt(x,z+.001,expanded))<.1);
+	}
+	for(const x of [-1024,0,1024])assert.equal(landscapeHeightAt(x,0,expanded),-90);
+});
 test('warehouse pad and footpath centre are flat and connected to dry spawn',()=>{
 	const layout=landscapePathLayout(spec),h=layout.pad.height;
 	assert.ok(h>0&&h<=250);assert.equal(layout.pad.radius,35);
@@ -95,16 +110,17 @@ test('actual WebGPU CPU/GPU parity when invoked with --gpu',async t=>{
 	await import('./headless.mjs');
 	const adapter=await navigator.gpu.requestAdapter();assert.ok(adapter,'A WebGPU adapter is required for explicit --gpu qualification.');
 	const device=await adapter.requestDevice();
-	for(const gpuSpec of [spec,canonicalLandscapeSpec({...sample,terrainType:'temperate-hills',elevation:{ruggedness:.2},roads:{enabled:true,width:12},structures:[{...sample.structures[0],yawRadians:Math.PI/3,scale:.5}]}),canonicalLandscapeSpec({...sample,paths:{enabled:false,width:5},structures:[{...sample.structures[0],x:4196,z:4196,yawRadians:Math.PI/3}]}),canonicalLandscapeSpec({...sample,structures:[]})]) {
-	const points=[[0,0],[1536,1536],[3096,4096],[5096,4096],[4096,4096],[3976,4096],[4068,4096]];
-	const route=landscapePathLayout(gpuSpec);
+	for(const gpuSpec of [spec,canonicalLandscapeSpec({...sample,terrainType:'temperate-hills',elevation:{ruggedness:.2},roads:{enabled:true,width:12},structures:[{...sample.structures[0],yawRadians:Math.PI/3,scale:.5}]}),canonicalLandscapeSpec({...sample,paths:{enabled:false,width:5},structures:[{...sample.structures[0],x:4196,z:4196,yawRadians:Math.PI/3}]}),canonicalLandscapeSpec({...sample,structures:[]}),canonicalLandscapeSpec({...sample,version:2,expansion:true}),canonicalLandscapeSpec({...sample,version:2,expansion:true,maxElevation:5,structures:[]}),canonicalLandscapeSpec({...sample,version:2,expansion:true,seed:4294967295,structures:[]}),canonicalLandscapeSpec({...sample,version:2,expansion:true,structures:[{...sample.structures[0],x:5584,z:3456}]})]) {
+	const edits=gpuSpec.expansion?[{id:'test-rise',x:5600,z:3510,radius:55,delta:9}]:[];
+	const points=[[0,0],[1536,1536],[3096,4096],[5096,4096],[4096,4096],[3976,4096],[4068,4096],[5584,3456],[5600,3510],[5620,3520],[5200,3456],[6000,3456],[-3500,-3500]];
+		const route=landscapePathLayout(gpuSpec,edits);
 	for(let i=0;i<=20;i++){
 		const x=route.spawn.x+(route.gate.x-route.spawn.x)*i/20,z=route.spawn.z+(route.gate.z-route.spawn.z)*i/20;
 		points.push([x,z],[x+5,z+5],[x+15,z+15]);
 	}
 	for(let z=3100;z<=5100;z+=79)for(let x=3100;x<=5100;x+=83)points.push([x,z]);
 	const input=new Float32Array(points.flat()),count=points.length;
-	const module=device.createShaderModule({code:landscapeHeightWGSL(gpuSpec)+`
+	const module=device.createShaderModule({code:landscapeHeightWGSL(gpuSpec,{edits})+`
 @group(0) @binding(0) var<storage,read> points:array<vec2f>;
 @group(0) @binding(1) var<storage,read_write> heights:array<f32>;
 @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x<${count}u){heights[id.x]=landscapeHeightAt(points[id.x]);}}`});
@@ -118,7 +134,7 @@ test('actual WebGPU CPU/GPU parity when invoked with --gpu',async t=>{
 		const group=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:a}},{binding:1,resource:{buffer:b}}]});
 		const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.dispatchWorkgroups(Math.ceil(count/64));pass.end();encoder.copyBufferToBuffer(b,0,c,0,count*4);device.queue.submit([encoder.finish()]);
 		await c.mapAsync(GPUMapMode.READ);const output=new Float32Array(c.getMappedRange().slice(0));c.unmap();let maxError=0;
-		for(let i=0;i<count;i++){const error=Math.abs(landscapeHeightAt(input[i*2],input[i*2+1],gpuSpec)-output[i]);maxError=Math.max(maxError,error);assert.ok(error<.03,`CPU/GPU mismatch ${points[i]}: ${error}m`);}
+		for(let i=0;i<count;i++){const error=Math.abs(landscapeHeightAt(input[i*2],input[i*2+1],gpuSpec,edits)-output[i]);maxError=Math.max(maxError,error);assert.ok(error<.03,`CPU/GPU mismatch ${points[i]}: ${error}m`);}
 		console.log(`Landscape height parity: ${count} points; maximum error ${maxError} m`);
 	}finally{a.destroy();b.destroy();c.destroy();}
 	}

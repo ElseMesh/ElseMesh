@@ -1,4 +1,5 @@
-import { canonicalLandscapeSpec, DEFAULT_LANDSCAPE_SPEC } from './LandscapeSpec.js';
+import { canonicalLandscapeSpec, DEFAULT_LANDSCAPE_SPEC, landscapeBounds } from './LandscapeSpec.js';
+import { PROCEDURAL_CELL, islandForCell, proceduralHeightAt, proceduralHeightWGSL } from './ProceduralHeight.js';
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 const smooth = (a,b,v) => {const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
 const mix = (a,b,t) => a+(b-a)*t;
@@ -12,11 +13,21 @@ function noise(x,z,seed) {
 	const ix=Math.floor(x),iz=Math.floor(z),tx=smooth(0,1,x-ix),tz=smooth(0,1,z-iz);
 	return mix(mix(hash(ix,iz,seed),hash(ix+1,iz,seed),tx),mix(hash(ix,iz+1,seed),hash(ix+1,iz+1,seed),tx),tz);
 }
+export function landscapeOuterHeightAt(x,z,s) {
+	if (!s.expansion || !Number.isFinite(x) || !Number.isFinite(z)) return s.waterLevel - 90;
+	const island=islandForCell(Math.floor(x/PROCEDURAL_CELL),Math.floor(z/PROCEDURAL_CELL),s.seed);
+	if (!island) return s.waterLevel - 90;
+	const b=landscapeBounds(s),nearestX=clamp(island.x,b.minX,b.maxX),nearestZ=clamp(island.z,b.minZ,b.maxZ);
+	// Suppress the whole neighbouring island, not just the part under the starter
+	// rectangle. Both sides of that boundary then meet at the same seabed.
+	if (Math.hypot(island.x-nearestX,island.z-nearestZ)<island.radius*1.38+128) return s.waterLevel - 90;
+	return proceduralHeightAt(x,z,s.seed);
+}
 function baseHeightAt(x,z,s) {
 	const bottom=s.waterLevel-90;
 	if (!Number.isFinite(x)||!Number.isFinite(z)) return bottom;
 	const u=(x-s.origin.x)/(s.width/2),v=(z-s.origin.z)/(s.length/2);
-	if (Math.abs(u)>=1||Math.abs(v)>=1) return bottom;
+	if (Math.abs(u)>=1||Math.abs(v)>=1) return landscapeOuterHeightAt(x,z,s);
 	// Keep the entire warped shelf inside the exact finite rectangle, with a
 	// zero derivative at its seabed boundary so neighbouring chunks join cleanly.
 	const n=noise(u*3+19,v*3+23,s.seed),r=Math.max(Math.hypot(u,v)+(n-.5)*.055,Math.max(Math.abs(u),Math.abs(v))*.99);
@@ -35,7 +46,7 @@ function access(s) {
 	// relative to source centre, so rotate that source-frame offset by the
 	// placement's turn from PI/2, preserving the gate's lateral alignment.
 	const scale=placement?.scale??1,turn=yawRadians-Math.PI/2;
-	const start=Math.min(120,s.width/2-Math.abs(x-s.origin.x)-34,s.length/2-Math.abs(z-s.origin.z)-34);
+	const start=s.expansion?120:Math.min(120,s.width/2-Math.abs(x-s.origin.x)-34,s.length/2-Math.abs(z-s.origin.z)-34);
 	return {x,z,start,end:24.3*scale,lateral:-4*scale,cos:Math.cos(turn),sin:Math.sin(turn),padEnabled:!!placement,
 		enabled:!!placement&&(s.paths.enabled||s.roads.enabled),width:Math.max(s.paths.enabled?s.paths.width:0,s.roads.enabled?s.roads.width:0)};
 }
@@ -46,9 +57,17 @@ export function landscapePathDistance(x,z,input = DEFAULT_LANDSCAPE_SPEC) {
 	const dx=x-a.x,dz=z-a.z,u=dx*a.cos-dz*a.sin,v=dx*a.sin+dz*a.cos;
 	return Math.hypot(u-clamp(u,-a.start,-a.end),v-a.lateral);
 }
-export function landscapePathLayout(input = DEFAULT_LANDSCAPE_SPEC) {
+function editedBaseAt(x,z,s,edits) {
+	let height=baseHeightAt(x,z,s);
+	for (const edit of edits) {
+		const distance=Math.hypot(x-edit.x,z-edit.z);
+		if (distance<edit.radius) height=clamp(height+edit.delta*(1-smooth(0,1,distance/edit.radius)),s.waterLevel-90,s.maxElevation);
+	}
+	return clamp(height,s.waterLevel-90,s.maxElevation);
+}
+export function landscapePathLayout(input = DEFAULT_LANDSCAPE_SPEC, edits = []) {
 	const s=canonicalLandscapeSpec(input),a=access(s),{x,z}=a;
-	const height=baseHeightAt(x,z,s);
+	const height=editedBaseAt(x,z,s,edits);
 	const spawn={x:x-a.start*a.cos+a.lateral*a.sin,y:height,z:z+a.start*a.sin+a.lateral*a.cos};
 	const gate={x:x-a.end*a.cos+a.lateral*a.sin,y:height,z:z+a.end*a.sin+a.lateral*a.cos};
 	return {enabled:a.enabled,spawn,gate,points:a.enabled?[{x:spawn.x,z:spawn.z},{x:gate.x,z:gate.z}]:[],width:a.width,
@@ -61,24 +80,25 @@ export function landscapeSurfaceAt(x,z,input = DEFAULT_LANDSCAPE_SPEC) {
 	if(a.padEnabled&&Math.hypot(x-a.x,z-a.z)<=35)return 'building-pad';
 	return null;
 }
-export function landscapeHeightAt(x,z,input = DEFAULT_LANDSCAPE_SPEC) {
+export function landscapeHeightAt(x,z,input = DEFAULT_LANDSCAPE_SPEC, edits = []) {
 	const s=canonicalLandscapeSpec(input),h=baseHeightAt(x,z,s);
 	if (!Number.isFinite(x)||!Number.isFinite(z)) return h;
+	const edited=editedBaseAt(x,z,s,edits);
 	const a=access(s),pad=a.padEnabled?1-smooth(35,55,Math.hypot(x-a.x,z-a.z)):0;
 	const path=a.enabled?1-smooth(a.width/2,30,landscapePathDistance(x,z,s)):0;
-	return mix(h,baseHeightAt(a.x,a.z,s),Math.max(pad,path));
+	return mix(edited,editedBaseAt(a.x,a.z,s,edits),Math.max(pad,path));
 }
-export function createLandscapeHeight(input = DEFAULT_LANDSCAPE_SPEC) {
+export function createLandscapeHeight(input = DEFAULT_LANDSCAPE_SPEC, edits = []) {
 	const s=canonicalLandscapeSpec(input);
-	return (x,z) => landscapeHeightAt(x,z,s);
+	return (x,z) => landscapeHeightAt(x,z,s,edits);
 }
 // Pure classification hook for later vegetation and path builders. Forest here
 // describes a biome mask; it does not claim that tree geometry has been placed.
-export function landscapeSampleAt(x,z,input = DEFAULT_LANDSCAPE_SPEC) {
-	const s=canonicalLandscapeSpec(input),height=landscapeHeightAt(x,z,s);
-	const inside=Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x-s.origin.x)<=s.width/2&&Math.abs(z-s.origin.z)<=s.length/2;
-	const dx=(landscapeHeightAt(x+1,z,s)-landscapeHeightAt(x-1,z,s))/2;
-	const dz=(landscapeHeightAt(x,z+1,s)-landscapeHeightAt(x,z-1,s))/2;
+export function landscapeSampleAt(x,z,input = DEFAULT_LANDSCAPE_SPEC, edits = []) {
+	const s=canonicalLandscapeSpec(input),height=landscapeHeightAt(x,z,s,edits);
+	const inside=Number.isFinite(x)&&Number.isFinite(z)&&(s.expansion||Math.abs(x-s.origin.x)<=s.width/2&&Math.abs(z-s.origin.z)<=s.length/2);
+	const dx=(landscapeHeightAt(x+1,z,s,edits)-landscapeHeightAt(x-1,z,s,edits))/2;
+	const dz=(landscapeHeightAt(x,z+1,s,edits)-landscapeHeightAt(x,z-1,s,edits))/2;
 	const slope=Math.hypot(dx,dz);
 	const relative=(height-s.waterLevel)/(s.maxElevation-s.waterLevel);
 	const biome=height<=s.waterLevel?'sea':height<s.waterLevel+5?'beach':relative>.6?'mountain-ridge':s.features.includes('forest')&&relative>.08&&slope<.7?'forest':'hills';
@@ -86,12 +106,21 @@ export function landscapeSampleAt(x,z,input = DEFAULT_LANDSCAPE_SPEC) {
 }
 // Identical formula and integer noise in WGSL. CPU doubles versus GPU f32
 // introduce small rounding differences; callers should compare with tolerance.
-export function landscapeHeightWGSL(input = DEFAULT_LANDSCAPE_SPEC, {functionName='landscapeHeightAt'} = {}) {
+export function landscapeHeightWGSL(input = DEFAULT_LANDSCAPE_SPEC, {functionName='landscapeHeightAt', edits=[]} = {}) {
 	const s=canonicalLandscapeSpec(input);
 	const a=access(s);
+	const outer=s.expansion ? proceduralHeightWGSL(s.seed,{functionName:'landscapeOuterHeightAt',excludedBounds:landscapeBounds(s)}) : '';
 	if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(functionName)) throw new TypeError('Invalid WGSL function name.');
+	if(!Array.isArray(edits)||edits.length>64||edits.some(e=>!Number.isFinite(e.x)||!Number.isFinite(e.z)||!Number.isFinite(e.radius)||!Number.isFinite(e.delta)))throw new TypeError('Invalid terrain edits for WGSL.');
 	const f=n => Number.isInteger(n)?`${n}.0`:`${n}`;
-	return `
+	const brush=edits.map((e,i)=>`let d${i}=distance(p,vec2f(${f(e.x)},${f(e.z)})); if(d${i}<${f(e.radius)}){h=clamp(h+${f(e.delta)}*(1.0-landscapeSmooth(0.0,1.0,d${i}/${f(e.radius)})),${f(s.waterLevel-90)},${f(s.maxElevation)});}`).join('\n ');
+	const grading=`let delta=p-vec2f(${f(a.x)},${f(a.z)});
+ let local=vec2f(delta.x*${f(a.cos)}-delta.y*${f(a.sin)},delta.x*${f(a.sin)}+delta.y*${f(a.cos)});
+ let pad=${a.padEnabled?'1.0-landscapeSmooth(35.0,55.0,length(delta))':'0.0'};
+ let path=${a.enabled?`1.0-landscapeSmooth(${f(a.width/2)},30.0,length(vec2f(local.x-clamp(local.x,${f(-a.start)},${f(-a.end)}),local.y-(${f(a.lateral)}))))`:'0.0'};
+	 h=clamp(h,${f(s.waterLevel-90)},${f(s.maxElevation)});
+	 return mix(h,${f(editedBaseAt(a.x,a.z,s,edits))},max(pad,path));`;
+	return `${outer}
 fn landscapeHash(x:i32,z:i32,seed:u32)->f32 {
  var h=(u32(x)*0x1f123bb5u)^(u32(z)*0x5f356495u)^seed;
  h=(h^(h>>16u))*0x7feb352du;
@@ -105,19 +134,16 @@ fn landscapeNoise(p:vec2f,seed:u32)->f32 {
 }
 fn ${functionName}(p:vec2f)->f32 {
  let q=(p-vec2f(${f(s.origin.x)},${f(s.origin.z)}))/vec2f(${f(s.width/2)},${f(s.length/2)});
- if(abs(q.x)>=1.0||abs(q.y)>=1.0){return ${f(s.waterLevel-90)};}
+ if(abs(q.x)>=1.0||abs(q.y)>=1.0){var h=${s.expansion?'landscapeOuterHeightAt(p)':f(s.waterLevel-90)}; ${brush} ${grading}}
  let n=landscapeNoise(q*3.0+vec2f(19.0,23.0),${s.seed}u);
  let r=max(length(q)+(n-0.5)*0.055,max(abs(q.x),abs(q.y))*0.99);
  let land=landscapeSmooth(0.86,0.68,r);let shelf=landscapeSmooth(0.99,0.87,r);
  let hills=${s.features.includes('hills')?`landscapeNoise(q*5.0+vec2f(31.0,37.0),${(s.seed^0x1567)>>>0}u)*0.19`:'0.04'};
  let ridge=${s.features.includes('mountain-ridge')?'(1.0-landscapeSmooth(0.02,0.4,abs(q.y+0.16+q.x*0.28)))*(1.0-landscapeSmooth(0.15,0.7,abs(q.x-0.08)))*0.75':'0.0'};
  let relief=${f(s.maxElevation-s.waterLevel)}*clamp(0.035+(hills+ridge)*${f(.4+s.elevation.ruggedness)}*${s.terrainType==='temperate-hills'?'0.55':'1.0'},0.0,1.0)*landscapeSmooth(0.77,0.48,r);
- let h=min(${f(s.maxElevation)},${f(s.waterLevel-90)}+88.0*shelf+land*${s.features.includes('beach')?'4.0':'7.0'}+relief);
- let delta=p-vec2f(${f(a.x)},${f(a.z)});
- let local=vec2f(delta.x*${f(a.cos)}-delta.y*${f(a.sin)},delta.x*${f(a.sin)}+delta.y*${f(a.cos)});
- let pad=${a.padEnabled?'1.0-landscapeSmooth(35.0,55.0,length(delta))':'0.0'};
- let path=${a.enabled?`1.0-landscapeSmooth(${f(a.width/2)},30.0,length(vec2f(local.x-clamp(local.x,${f(-a.start)},${f(-a.end)}),local.y-(${f(a.lateral)}))))`:'0.0'};
- return mix(h,${f(baseHeightAt(a.x,a.z,s))},max(pad,path));
+ var h=min(${f(s.maxElevation)},${f(s.waterLevel-90)}+88.0*shelf+land*${s.features.includes('beach')?'4.0':'7.0'}+relief);
+ ${brush}
+ ${grading}
 }
 `;
 }

@@ -50,10 +50,15 @@ export function proceduralHeightAt(x, z, seed = PROCEDURAL_SEED) {
 
 // The same integer hash and height expression run in WGSL for water depth and
 // GPU queries. The CPU is authoritative for mesh and collision generation.
-export function proceduralHeightWGSL(seed = PROCEDURAL_SEED) {
+export function proceduralHeightWGSL(seed = PROCEDURAL_SEED, { functionName = 'proceduralHeightAt', excludedBounds = null } = {}) {
+	if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(functionName)) throw new TypeError('Invalid WGSL function name.');
+	const f = value => Number.isInteger(value) ? `${value}.0` : `${value}`;
+	const exclusion = excludedBounds ? `
+  let nearest = clamp(vec2f(x,z),vec2f(${f(excludedBounds.minX)},${f(excludedBounds.minZ)}),vec2f(${f(excludedBounds.maxX)},${f(excludedBounds.maxZ)}));
+  if (distance(vec2f(x,z),nearest) < radius*1.38+128.0) { return -90.0; }` : '';
 	return /* wgsl */`
-fn proceduralHash(ix: i32, iz: i32, salt: i32) -> u32 {
-  var h = (u32(ix) * 0x1f123bb5u) ^ (u32(iz) * 0x5f356495u) ^ (u32(salt) * 0x2c1b3c6du);
+fn proceduralHash(ix: i32, iz: i32, salt: u32) -> u32 {
+  var h = (u32(ix) * 0x1f123bb5u) ^ (u32(iz) * 0x5f356495u) ^ (salt * 0x2c1b3c6du);
   h = h ^ (h >> 16u);
   h = h * 0x7feb352du;
   h = h ^ (h >> 15u);
@@ -64,15 +69,16 @@ fn proceduralSmooth(a: f32, b: f32, v: f32) -> f32 {
   let t = clamp((v-a)/(b-a), 0.0, 1.0);
   return t*t*(3.0-2.0*t);
 }
-fn proceduralHeightAt(p: vec2f) -> f32 {
+fn ${functionName}(p: vec2f) -> f32 {
   if (abs(p.x)<=1536.0 && abs(p.y)<=1536.0) { return -90.0; }
   let ix = i32(floor(p.x / 1024.0));
   let iz = i32(floor(p.y / 1024.0));
-  let x = (f32(ix)+0.5)*1024.0 + (f32(proceduralHash(ix,iz,${seed + 1})) / 4294967295.0-0.5)*256.0;
-  let z = (f32(iz)+0.5)*1024.0 + (f32(proceduralHash(ix,iz,${seed + 2})) / 4294967295.0-0.5)*256.0;
+  let x = (f32(ix)+0.5)*1024.0 + (f32(proceduralHash(ix,iz,${(seed + 1) >>> 0}u)) / 4294967295.0-0.5)*256.0;
+  let z = (f32(iz)+0.5)*1024.0 + (f32(proceduralHash(ix,iz,${(seed + 2) >>> 0}u)) / 4294967295.0-0.5)*256.0;
   if (abs(x)<=2048.0 && abs(z)<=2048.0) { return -90.0; }
-  if (!(ix==0 && iz==2) && f32(proceduralHash(ix,iz,${seed + 3}))/4294967295.0>=0.68) { return -90.0; }
-  let radius = 220.0 + 50.0*f32(proceduralHash(ix,iz,${seed + 4}))/4294967295.0;
+  if (!(ix==0 && iz==2) && f32(proceduralHash(ix,iz,${(seed + 3) >>> 0}u))/4294967295.0>=0.68) { return -90.0; }
+  let radius = 220.0 + 50.0*f32(proceduralHash(ix,iz,${(seed + 4) >>> 0}u))/4294967295.0;
+  ${exclusion}
   let r = length(p-vec2f(x,z))/radius;
   if (r>=1.38) { return -90.0; }
   let shelf = -90.0+72.0*(1.0-proceduralSmooth(1.0,1.38,r));

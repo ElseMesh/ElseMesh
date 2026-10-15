@@ -79,14 +79,15 @@ export function buildChunkGeometry(cx, cz, level, heightAt, tintAt = (_, __, h) 
 }
 
 export class ProceduralWorld {
-	constructor(app, seed = PROCEDURAL_SEED, { landscapeSpec = null } = {}) {
+	constructor(app, seed = PROCEDURAL_SEED, { landscapeSpec = null, landscapeEdits = [], worldId = null } = {}) {
 		this.app = app;
 		this.seed = seed;
 		this.landscapeSpec = landscapeSpec;
+		this.landscapeEdits = landscapeEdits;
 		this.landscapeBounds = landscapeSpec ? landscapeBounds(landscapeSpec) : null;
-		this.worldId = landscapeSpec ? landscapeWorldId(landscapeSpec) : null;
+		this.worldId = landscapeSpec ? worldId ?? landscapeWorldId(landscapeSpec) : null;
 		this.saveKey = this.worldId ? `elsemesh.landscape.world.v1.${this.worldId}` : SAVE_KEY;
-		this.heightAt = landscapeSpec ? createLandscapeHeight(landscapeSpec) : (x,z) => proceduralHeightAt(x,z,seed);
+		this.heightAt = landscapeSpec ? createLandscapeHeight(landscapeSpec,landscapeEdits) : (x,z) => proceduralHeightAt(x,z,seed);
 		this.chunks = new Map();
 		this.discovered = new Set();
 		this.beacons = [];
@@ -163,7 +164,7 @@ export class ProceduralWorld {
 			const z=z0+(j+.25+.5*(hash2(tx,tz,this.seed+82)/4294967295))*32;
 			const y=this.heightAt(x,z);
 			if (this.landscapeSpec) {
-				const sample = landscapeSampleAt(x,z,this.landscapeSpec);
+				const sample = landscapeSampleAt(x,z,this.landscapeSpec,this.landscapeEdits);
 				if (sample.biome !== 'forest' || sample.surface || hash2(tx,tz,this.seed+84)/4294967295 > this.landscapeSpec.vegetation.treeDensity) continue;
 			} else if(y<4 || y>27)continue;
 			const height=5+4*(hash2(tx,tz,this.seed+83)/4294967295);
@@ -194,7 +195,7 @@ export class ProceduralWorld {
 			if(hash2(gx,gz,this.seed+91)/4294967295>spec.vegetation.grassDensity)continue;
 			const x=x0+(i+.2+.6*hash2(gx,gz,this.seed+92)/4294967295)*CHUNK_SIZE/stride;
 			const z=z0+(j+.2+.6*hash2(gx,gz,this.seed+93)/4294967295)*CHUNK_SIZE/stride;
-			const sample=landscapeSampleAt(x,z,spec);
+			const sample=landscapeSampleAt(x,z,spec,this.landscapeEdits);
 			if(!sample.inside||sample.height<spec.waterLevel+5||sample.grade>30||sample.surface)continue;
 			stems.push({x,y:sample.height,z,height:.45+.45*hash2(gx,gz,this.seed+94)/4294967295});
 		}
@@ -209,7 +210,7 @@ export class ProceduralWorld {
 	}
 
 	buildAccessRibbon() {
-		const spec=this.landscapeSpec,route=landscapePathLayout(spec);
+		const spec=this.landscapeSpec,route=landscapePathLayout(spec,this.landscapeEdits);
 		if(!route.enabled)return null;
 		const width=route.width*.92,steps=32,positions=[],normals=[],indices=[];
 		const dx=route.gate.x-route.spawn.x,dz=route.gate.z-route.spawn.z,dist=Math.hypot(dx,dz),nx=-dz/dist,nz=dx/dist;
@@ -263,10 +264,11 @@ export class ProceduralWorld {
 		const desired=[];
 		for(let dz=-3;dz<=3;dz++)for(let dx=-3;dx<=3;dx++) {
 			const x=cx+dx,z=cz+dz;
-			if(this.landscapeBounds) {
+			if(this.landscapeBounds && !this.landscapeSpec.expansion) {
 				const b=this.landscapeBounds;
 				if((x+1)*CHUNK_SIZE<=b.minX||x*CHUNK_SIZE>=b.maxX||(z+1)*CHUNK_SIZE<=b.minZ||z*CHUNK_SIZE>=b.maxZ)continue;
 			} else if(Math.abs((x+.5)*CHUNK_SIZE)<PROTECTED_EXTENT && Math.abs((z+.5)*CHUNK_SIZE)<PROTECTED_EXTENT)continue;
+			if(this.landscapeSpec?.expansion && (Math.abs(x*CHUNK_SIZE)>90000 || Math.abs(z*CHUNK_SIZE)>90000))continue;
 			const dist=Math.max(Math.abs(dx),Math.abs(dz));
 			if(dist>3)continue;
 			desired.push({x,z,level:dist<=1?0:dist<=2?1:2,dist});

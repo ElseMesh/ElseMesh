@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "expansion": true,
+  "seed": 2049,
+  "width": 2000,
+  "length": 2000,
+  "maxElevation": 250,
+  "waterLevel": 0,
+  "origin": { "x": 4096, "z": 4096 },
+  "description": "Temperate coast with beaches, rolling hills, forested interior and a mountain ridge.",
+  "features": ["coast", "beach", "hills", "forest", "mountain-ridge"],
+  "references": [],
+  "terrainType": "temperate-island",
+  "elevation": { "ruggedness": 0.6 },
+  "vegetation": { "treeDensity": 0.65, "grassDensity": 0.8 },
+  "paths": { "enabled": true, "width": 5 },
+  "roads": { "enabled": false, "width": 8 },
+  "structures": [{ "assetId": "abandoned-warehouse", "x": 4096, "z": 4300, "yawRadians": 1.5707963267948966, "scale": 1 }],
+  "qualityProfile": "balanced"
+}

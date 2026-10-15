@@ -113,7 +113,7 @@ export class TerrainGPU {
 				terrainSunShadowTex: { texture: this.sunShadowTexture },
 			},
 			code: terrain.landscapeSpec
-				? landscapeHeightWGSL( terrain.landscapeSpec, { functionName: 'proceduralHeightAt' } ) + TERRAIN_WGSL.replace( 'return select( h, -90.0, outside );', 'return select( h, proceduralHeightAt( xz ), outside );' )
+				? landscapeHeightWGSL( terrain.landscapeSpec, { functionName: 'proceduralHeightAt', edits: terrain.landscapeEdits ?? [] } ) + TERRAIN_WGSL.replace( 'return select( h, -90.0, outside );', 'return select( h, proceduralHeightAt( xz ), outside );' )
 				: terrain.proceduralSeed === null ? TERRAIN_WGSL : proceduralHeightWGSL( terrain.proceduralSeed ) + TERRAIN_WGSL.replace( 'return select( h, -90.0, outside );', 'return select( h, proceduralHeightAt( xz ), outside );' ),
 		} );
 

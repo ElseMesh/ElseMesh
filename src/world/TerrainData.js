@@ -983,7 +983,7 @@ export class TerrainData {
 
 		const { res, texel, origin, heights } = this;
 		const fx = ( x - origin ) / texel - 0.5, fz = ( z - origin ) / texel - 0.5;
-		if ( fx < 0 || fz < 0 || fx >= res - 1 || fz >= res - 1 ) return this.landscapeSpec ? landscapeHeightAt( x, z, this.landscapeSpec ) : this.proceduralSeed === null ? -90 : proceduralHeightAt( x, z, this.proceduralSeed );
+		if ( fx < 0 || fz < 0 || fx >= res - 1 || fz >= res - 1 ) return this.landscapeSpec ? landscapeHeightAt( x, z, this.landscapeSpec, this.landscapeEdits ?? [] ) : this.proceduralSeed === null ? -90 : proceduralHeightAt( x, z, this.proceduralSeed );
 		const i = Math.floor( fx ), j = Math.floor( fz );
 		const tx = fx - i, tz = fz - j;
 		const k = j * res + i;

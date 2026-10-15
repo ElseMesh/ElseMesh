@@ -1,6 +1,7 @@
 import { DEFAULT_LANDSCAPE_SPEC, TERRAIN_FEATURES, validateLandscapeSpec, parseLandscapeDescription, landscapeWorldId, landscapeBounds } from './LandscapeSpec.js';
 import { landscapeHeightAt, landscapePathLayout } from './LandscapeHeight.js';
 import { getLandscapeAsset, validateLandscapeAsset, validateLandscapeAssetReferences } from './LandscapeAssets.js';
+import { LANDSCAPE_WORLD_KEY, archiveSavedLandscapeWorldDocument, createLandscapeWorldDocument, effectiveLandscapeSpec, readSavedLandscapeWorldDocument, saveLandscapeWorldDocument, validateLandscapeWorldDocument } from './LandscapeWorldDocument.js';
 
 export const LANDSCAPE_STORAGE_KEY = 'elsemesh.landscape-spec.v1';
 
@@ -38,8 +39,10 @@ const make = (tag, text, parent) => {
 };
 
 export class LandscapeBuilder {
-  constructor({ spec = DEFAULT_LANDSCAPE_SPEC, parent = document.body, onGoHome, onGoLandscape } = {}) {
+  constructor({ spec = DEFAULT_LANDSCAPE_SPEC, parent = document.body, onGoHome, onGoLandscape, worldDocument = null, onGetPosition } = {}) {
     this.spec = validateBuilderSpec(spec).spec ?? DEFAULT_LANDSCAPE_SPEC;
+    this.worldDocument = worldDocument ?? readSavedLandscapeWorldDocument();
+    this.onGetPosition = onGetPosition;
     this.timer = null;
     this.fields = {};
     const panel = this.element = make('section', undefined, parent);
@@ -86,6 +89,7 @@ export class LandscapeBuilder {
     this.number('originZ', 'Centre Z (m)', -90000, 90000, 1, grid);
     this.select('terrainType', 'Terrain type', [['temperate-island','Temperate island'],['temperate-hills','Temperate hills']], form);
     this.select('qualityProfile', 'Quality', [['low','Low'],['balanced','Balanced'],['high','High']], form);
+    this.checkbox('expansion', 'Version 2: stream seeded islands beyond the starter rectangle (supported coordinates ±90 km)', form);
     const access = make('fieldset', undefined, form); make('legend', 'Access and structures', access);
     this.checkbox('pathsEnabled', 'Access path', access);
     this.number('pathWidth', 'Path width (2–12 m)', 2, 12, .5, access);
@@ -109,6 +113,39 @@ export class LandscapeBuilder {
       this.populate(saved); this.preview(); this.notice('Loaded saved landscape.');
     }, actions);
     this.button('Export JSON', () => this.exportJSON(), actions);
+    const world = make('fieldset', undefined, form); make('legend', 'Expanded world edits (version 2)', world);
+    make('p', 'Edits are bounded and saved in a portable world document. Applying an edit reloads the renderer so collision, terrain meshes and GPU height queries reconstruct together.', world);
+    const editGrid = make('div', undefined, world); editGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px';
+    this.number('editX', 'Edit X (m)', -89900, 89900, 1, editGrid);
+    this.number('editZ', 'Edit Z (m)', -89900, 89900, 1, editGrid);
+    this.number('editRadius', 'Brush radius (2–100 m)', 2, 100, 1, editGrid);
+    this.number('editDelta', 'Height change (−30 to 30 m)', -30, 30, 1, editGrid);
+    this.fields.editX.value = this.spec.origin.x + 1488;
+    this.fields.editZ.value = this.spec.origin.z - 640;
+    this.fields.editRadius.value = 30;
+    this.fields.editDelta.value = 8;
+    this.button('Use player position', () => {
+      const p=this.onGetPosition?.(); if(!p){this.notice('Player position is unavailable in this view.',true);return;}
+      this.fields.editX.value=Math.round(p.x);this.fields.editZ.value=Math.round(p.z);
+    }, world);
+    this.button('Apply terrain brush', () => this.applyWorldChange(doc => ({...doc,terrain:[...doc.terrain,{id:`brush-${Date.now()}`,x:Number(this.fields.editX.value),z:Number(this.fields.editZ.value),radius:Number(this.fields.editRadius.value),delta:Number(this.fields.editDelta.value)}]})), world);
+    this.button('Undo last terrain brush', () => this.applyWorldChange(doc => ({...doc,terrain:doc.terrain.slice(0,-1)})), world);
+    this.button('Place warehouse here (replaces current)', () => this.applyWorldChange(doc => ({...doc,
+      objects:[...doc.objects,{id:`warehouse-${Date.now()}`,assetId:'abandoned-warehouse',x:Number(this.fields.editX.value),z:Number(this.fields.editZ.value),yawRadians:Math.PI/2,scale:1}],
+      removed:[...new Set([...doc.removed,'base-warehouse',...doc.objects.map(o=>o.id)])]})), world);
+    this.button('Remove placed warehouse', () => this.applyWorldChange(doc => ({...doc,removed:[...new Set([...doc.removed,...doc.objects.map(o=>o.id)])]})), world);
+    this.button('Export portable world JSON', () => this.exportWorldJSON(), world);
+    const worldImportLabel=make('label','Import portable world JSON',world);worldImportLabel.htmlFor='landscape-world-import';
+    const worldInput=make('input',undefined,world);worldInput.id='landscape-world-import';worldInput.type='file';worldInput.accept='.json,application/json';worldInput.style.display='block';
+    worldInput.addEventListener('change',async()=>{
+      const file=worldInput.files?.[0];if(!file)return;
+      try { if(file.size>128*1024)throw Error('World document exceeds 128 KiB.');
+        const result=validateLandscapeWorldDocument(JSON.parse(await file.text()));
+        if(!result.valid)throw Error(result.errors.join(' '));
+        const saved=saveLandscapeWorldDocument(result.document);if(!saved.saved)throw Error(saved.errors.join(' '));
+        this.worldDocument=result.document;this.populate(result.document.spec);this.notice('Imported world, including terrain and object edits. Reloading to reconstruct it.');this.reloadGenerated();
+      }catch(error){this.notice(`World import failed: ${error.message}`,true);}finally{worldInput.value='';}
+    });
     const importLabel = make('label', 'Import landscape JSON', form); importLabel.htmlFor = 'landscape-json-import';
     const input = make('input', undefined, form); input.id = 'landscape-json-import'; input.type = 'file'; input.accept = '.json,application/json'; input.style.display = 'block';
     input.addEventListener('change', async () => {
@@ -145,6 +182,7 @@ export class LandscapeBuilder {
     const values = { ruggedness: spec.elevation.ruggedness, treeDensity: spec.vegetation.treeDensity, grassDensity: spec.vegetation.grassDensity, originX: spec.origin.x, originZ: spec.origin.z, pathWidth: spec.paths.width, roadWidth: spec.roads.width };
     for (const [key, value] of Object.entries(values)) this.fields[key].value = value;
     this.fields.pathsEnabled.checked = spec.paths.enabled; this.fields.roadsEnabled.checked = spec.roads.enabled; this.fields.warehouse.checked = spec.structures.some(p => p.assetId === 'abandoned-warehouse');
+    this.fields.expansion.checked = !!spec.expansion;
     this.referenceNote.textContent = spec.references.length ? `Retained approved metadata: ${spec.references.map(ref => ref.title).join('; ')}.` : 'No reference metadata attached. Warehouse provenance and licence are retained in the asset registry.';
   }
 
@@ -152,7 +190,8 @@ export class LandscapeBuilder {
     const f = this.fields, n = key => f[key].value.trim() === '' ? NaN : Number(f[key].value);
     const origin = { x: n('originX'), z: n('originZ') };
     const prior = this.spec.structures.find(p => p.assetId === 'abandoned-warehouse');
-    return { ...this.spec, description: f.description.value, width:n('width'), length:n('length'), maxElevation:n('maxElevation'), waterLevel:n('waterLevel'), seed:n('seed'), origin,
+    const { expansion: _oldExpansion, ...base } = this.spec;
+    return { ...base, version:f.expansion.checked?2:1, ...(f.expansion.checked?{expansion:true}:{}), description: f.description.value, width:n('width'), length:n('length'), maxElevation:n('maxElevation'), waterLevel:n('waterLevel'), seed:n('seed'), origin,
       features: TERRAIN_FEATURES.filter(feature => f[`feature:${feature}`].checked), terrainType:f.terrainType.value, qualityProfile:f.qualityProfile.value,
       elevation:{ruggedness:n('ruggedness')}, vegetation:{treeDensity:n('treeDensity'),grassDensity:n('grassDensity')}, paths:{enabled:f.pathsEnabled.checked,width:n('pathWidth')}, roads:{enabled:f.roadsEnabled.checked,width:n('roadWidth')},
       structures: f.warehouse.checked ? [{assetId:'abandoned-warehouse',x:origin.x+(prior?prior.x-this.spec.origin.x:0),z:origin.z+(prior?prior.z-this.spec.origin.z:0),yawRadians:prior?.yawRadians??0,scale:prior?.scale??1}] : [],
@@ -171,11 +210,12 @@ export class LandscapeBuilder {
   preview() {
     const result = validateBuilderSpec(this.readForm()); this.report(result);
     if (!result.valid) { this.caption.textContent = 'Preview is paused until the fields are valid. The previous map remains visible.'; return null; }
-    const s = result.spec, bounds = landscapeBounds(s), canvas = this.canvas, context = canvas.getContext('2d');
+    const activeDoc=this.worldDocument?.worldId===landscapeWorldId(result.spec)?this.worldDocument:null;
+    const s = activeDoc?effectiveLandscapeSpec(activeDoc):result.spec, bounds = landscapeBounds(s), canvas = this.canvas, context = canvas.getContext('2d');
     if (!context) { this.notice('2D canvas is unavailable in this browser. Save/export remains available.', true); return s; }
     const image = context.createImageData(canvas.width, canvas.height);
     for (let row=0; row<canvas.height; row++) for (let col=0; col<canvas.width; col++) {
-      const x=bounds.minX+(col+.5)/canvas.width*s.width,z=bounds.minZ+(row+.5)/canvas.height*s.length,h=landscapeHeightAt(x,z,s);
+      const x=bounds.minX+(col+.5)/canvas.width*s.width,z=bounds.minZ+(row+.5)/canvas.height*s.length,h=landscapeHeightAt(x,z,s,activeDoc?.terrain??[]);
       const t=Math.max(0,Math.min(1,(h-s.waterLevel)/(s.maxElevation-s.waterLevel)));
       const color=h<=s.waterLevel?[25,72,100]:h<s.waterLevel+5?[205,187,133]:[Math.round(45+175*t),Math.round(110+105*t),Math.round(66+150*t)];
       const i=(row*canvas.width+col)*4; image.data.set([...color,255],i);
@@ -186,14 +226,45 @@ export class LandscapeBuilder {
     if (route.enabled) { context.strokeStyle='#ffdf77'; context.lineWidth=Math.max(1,route.width/s.width*canvas.width); context.beginPath(); context.moveTo(...point(route.spawn)); context.lineTo(...point(route.gate)); context.stroke(); }
     for (const building of s.structures) { const [x,z]=point(building); context.fillStyle='#ffffff'; context.fillRect(x-2,z-2,4,4); }
     this.caption.textContent = `${s.width} × ${s.length} m · ceiling ${s.maxElevation} m · seed ${s.seed} · north at top · ${landscapeWorldId(s)}`;
-    return s;
+    return result.spec;
   }
 
   save(explore) {
     const spec = this.preview(); if (!spec) return;
-    try { globalThis.localStorage.setItem(LANDSCAPE_STORAGE_KEY,JSON.stringify(spec)); this.spec = spec; this.notice('Saved in this browser. Export JSON for a portable copy.'); }
-    catch (error) { this.notice(`Could not save: ${error.message}. Enable browser storage or export JSON.`,true); return; }
-    if (explore) { const url=new URL(globalThis.location.href); url.searchParams.set('landscapeBuilder',''); url.searchParams.set('generated','1'); globalThis.location.assign(url.href); }
+    if(spec.version===2){
+      const replaced=this.worldDocument&&this.worldDocument.worldId!==landscapeWorldId(spec);
+      const doc=replaced||!this.worldDocument?createLandscapeWorldDocument(spec):this.worldDocument;
+      const result=saveLandscapeWorldDocument(doc);
+      if(!result.saved){this.notice(result.errors.join(' '),true);return;}
+      this.worldDocument=doc;
+      this.notice('Saved the expanded world. Export portable world JSON for a backup.');
+    }else{
+      try { const archived=archiveSavedLandscapeWorldDocument();if(!archived.saved)throw Error(archived.errors.join(' '));globalThis.localStorage.setItem(LANDSCAPE_STORAGE_KEY,JSON.stringify(spec));globalThis.localStorage.removeItem(LANDSCAPE_WORLD_KEY);this.worldDocument=null;this.notice('Saved finite version 1 landscape. The previous expanded world is archived in this browser; export JSON for a portable copy.'); }
+      catch (error) { this.notice(`Could not save: ${error.message}. Enable browser storage or export JSON.`,true); return; }
+    }
+    this.spec=spec;
+    if (explore) this.reloadGenerated();
+  }
+
+  reloadGenerated(){const url=new URL(globalThis.location.href);url.searchParams.set('landscapeBuilder','');url.searchParams.set('generated','1');globalThis.location.assign(url.href);}
+
+  applyWorldChange(change){
+    const spec=this.preview();if(!spec)return;
+    if(spec.version!==2){this.notice('Enable version 2 expansion and save the world before editing.',true);return;}
+    const doc=this.worldDocument?.worldId===landscapeWorldId(spec)?this.worldDocument:createLandscapeWorldDocument(spec);
+    const result=validateLandscapeWorldDocument(change(doc));
+    if(!result.valid){this.notice(result.errors.join(' '),true);return;}
+    const saved=saveLandscapeWorldDocument(result.document);
+    if(!saved.saved){this.notice(saved.errors.join(' '),true);return;}
+    this.worldDocument=result.document;this.notice('World edit saved. Reloading terrain, collisions and GPU queries.');this.reloadGenerated();
+  }
+
+  exportWorldJSON(){
+    const spec=this.preview();if(!spec||spec.version!==2){this.notice('A version 2 world is required for portable world export.',true);return;}
+    const doc=this.worldDocument?.worldId===landscapeWorldId(spec)?this.worldDocument:createLandscapeWorldDocument(spec);
+    const url=URL.createObjectURL(new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'}));
+    const link=make('a',undefined,this.element);link.href=url;link.download=`${doc.worldId}-world.json`;link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    this.notice('Exported canonical specification and world edits. Browser player progress is stored separately.');
   }
 
   exportJSON() {

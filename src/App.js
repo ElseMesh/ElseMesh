@@ -26,6 +26,7 @@ import { ProceduralWorld } from './world/ProceduralWorld.js';
 import { PROCEDURAL_SEED } from './world/ProceduralHeight.js';
 import { LandscapeBuilder, readSavedLandscapeSpec } from './world/LandscapeBuilder.js';
 import { landscapePathLayout } from './world/LandscapeHeight.js';
+import { effectiveLandscapeSpec, readSavedLandscapeWorldDocument } from './world/LandscapeWorldDocument.js';
 import { LandscapeWarehouse } from './world/LandscapeWarehouse.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
@@ -164,8 +165,9 @@ export class App {
 		this.terrainData = new TerrainData();
 		// Resolve the saved, validated definition before any terrain WGSL is built.
 		// The authored islands remain untouched; the new domain lies outside them.
-		this.landscapeSpec = qs.has( 'landscapeBuilder' ) && qs.get( 'generated' ) === '1' ? readSavedLandscapeSpec() : null;
-		if ( this.landscapeSpec ) this.terrainData.landscapeSpec = this.landscapeSpec;
+		this.landscapeDocument = qs.has( 'landscapeBuilder' ) && qs.get( 'generated' ) === '1' ? readSavedLandscapeWorldDocument() : null;
+		this.landscapeSpec = this.landscapeDocument ? effectiveLandscapeSpec( this.landscapeDocument ) : qs.has( 'landscapeBuilder' ) && qs.get( 'generated' ) === '1' ? readSavedLandscapeSpec() : null;
+		if ( this.landscapeSpec ) { this.terrainData.landscapeSpec = this.landscapeSpec; this.terrainData.landscapeEdits = this.landscapeDocument?.terrain ?? []; }
 		// Experimental outer world is opt-in; the authored grid is generated unchanged.
 		if ( ! this.landscapeSpec && qs.has( 'procedural' ) ) this.terrainData.proceduralSeed = PROCEDURAL_SEED;
 		this.colliders = new Colliders();
@@ -365,9 +367,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.portIsland = new PortIslandSystem( this );
 		this.monorail.restorePlayer( this.player );
 		if ( this.landscapeSpec || qs.has( 'procedural' ) ) {
-			this.procedural = new ProceduralWorld( this, this.landscapeSpec?.seed ?? PROCEDURAL_SEED, { landscapeSpec: this.landscapeSpec } );
+			this.procedural = new ProceduralWorld( this, this.landscapeSpec?.seed ?? PROCEDURAL_SEED, { landscapeSpec: this.landscapeSpec, landscapeEdits: this.landscapeDocument?.terrain ?? [], worldId: this.landscapeDocument?.worldId } );
 			const saved = this.procedural.savedPosition;
-			const spawn = this.landscapeSpec ? landscapePathLayout( this.landscapeSpec ).spawn : null;
+			const spawn = this.landscapeSpec ? landscapePathLayout( this.landscapeSpec, this.landscapeDocument?.terrain ?? [] ).spawn : null;
 			const x = saved?.[0] ?? spawn?.x ?? 100, z = saved?.[2] ?? spawn?.z ?? 584;
 			const y = saved?.[1] ?? this.player.groundAt( x, z, 1000 );
 			this.monorail.teleport( this.player, x, y, z, this.landscapeSpec ? - Math.PI / 2 : Math.PI );
@@ -379,7 +381,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		if ( qs.has( 'landscapeBuilder' ) ) {
 			this.landscapeBuilder = new LandscapeBuilder( {
-				spec: this.landscapeSpec ?? readSavedLandscapeSpec() ?? undefined,
+				spec: this.landscapeDocument?.spec ?? this.landscapeSpec ?? readSavedLandscapeSpec() ?? undefined,
+				worldDocument: this.landscapeDocument,
+				onGetPosition: () => ( { x: this.player.position.x, z: this.player.position.z } ),
 				onGoHome: this.landscapeSpec ? () => {
 					if ( this.thirdIsland.portalInterior.inside ) { this.thirdIsland.portalInterior.c64.close(); this.thirdIsland.portalInterior.exit(); }
 					const x = 100, z = 584;
@@ -387,7 +391,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				} : undefined,
 				onGoLandscape: this.landscapeSpec ? () => {
 					if ( this.thirdIsland.portalInterior.inside ) { this.thirdIsland.portalInterior.c64.close(); this.thirdIsland.portalInterior.exit(); }
-					const spawn = landscapePathLayout( this.landscapeSpec ).spawn;
+					const spawn = landscapePathLayout( this.landscapeSpec, this.landscapeDocument?.terrain ?? [] ).spawn;
 					this.monorail.teleport( this.player, spawn.x, this.player.groundAt( spawn.x, spawn.z, 1000 ), spawn.z, - Math.PI / 2 );
 				} : undefined,
 			} );

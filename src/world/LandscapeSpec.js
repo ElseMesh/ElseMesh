@@ -1,6 +1,7 @@
 // This schema is deliberately bounded: description text selects supported
 // features; it cannot execute instructions or silently change numeric limits.
 export const LANDSCAPE_VERSION = 1;
+export const LANDSCAPE_EXPANDED_VERSION = 2;
 export const TERRAIN_FEATURES = Object.freeze(['coast', 'beach', 'hills', 'forest', 'mountain-ridge']);
 export const DEFAULT_LANDSCAPE_SPEC = Object.freeze({
 	version: 1, seed: 2049, width: 2000, length: 2000, maxElevation: 250,
@@ -39,9 +40,11 @@ const ownKeys = (value, keys, name, errors) => {
 export function validateLandscapeSpec(input) {
 	const errors = [], warnings = [];
 	if (!input || typeof input !== 'object' || Array.isArray(input)) return {valid: false, errors: ['Spec must be an object.'], warnings, spec: null};
-	ownKeys(input, ['version','seed','width','length','maxElevation','waterLevel','origin','description','features','references','terrainType','elevation','vegetation','paths','roads','structures','qualityProfile'], 'spec', errors);
+	ownKeys(input, ['version','seed','width','length','maxElevation','waterLevel','origin','description','features','references','terrainType','elevation','vegetation','paths','roads','structures','qualityProfile','expansion'], 'spec', errors);
 	const s = {...DEFAULT_LANDSCAPE_SPEC, ...input};
-	if (s.version !== LANDSCAPE_VERSION) errors.push(`Unsupported version; use ${LANDSCAPE_VERSION}.`);
+	if (![LANDSCAPE_VERSION,LANDSCAPE_EXPANDED_VERSION].includes(s.version)) errors.push(`Unsupported version; use ${LANDSCAPE_VERSION} or ${LANDSCAPE_EXPANDED_VERSION}.`);
+	if (s.version === LANDSCAPE_VERSION && s.expansion !== undefined) errors.push('Version 1 has a finite island; remove expansion or select version 2.');
+	if (s.version === LANDSCAPE_EXPANDED_VERSION && s.expansion !== true) errors.push('Version 2 requires expansion: true.');
 	if (!Number.isInteger(s.seed) || s.seed < 0 || s.seed > 4294967295) errors.push('seed must be an unsigned 32 bit integer.');
 	for (const key of ['width','length']) if (!Number.isFinite(s[key]) || s[key] < 256 || s[key] > 8192) errors.push(`${key} must be between 256 and 8192 metres.`);
 	if (!Number.isFinite(s.waterLevel) || s.waterLevel < -50 || s.waterLevel > 50) errors.push('waterLevel must be between -50 and 50 metres.');
@@ -73,7 +76,8 @@ export function validateLandscapeSpec(input) {
 		if(!placement||typeof placement!=='object'||Array.isArray(placement)){errors.push(`structures[${i}] must be placement metadata.`);continue;}
 		ownKeys(placement,['assetId','x','z','yawRadians','scale'],`structures[${i}]`,errors);
 		if(typeof placement.assetId!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(placement.assetId))errors.push(`structures[${i}].assetId must be an asset identifier.`);
-		for(const axis of ['x','z'])if(!Number.isFinite(placement[axis])||Math.abs(placement[axis]-s.origin?.[axis])>(axis==='x'?s.width:s.length)/2-60)errors.push(`structures[${i}].${axis} must be at least 60 metres inside landscape bounds.`);
+		for(const axis of ['x','z'])if(!Number.isFinite(placement[axis])||(s.version===LANDSCAPE_EXPANDED_VERSION?Math.abs(placement[axis])>89900:Math.abs(placement[axis]-s.origin?.[axis])>(axis==='x'?s.width:s.length)/2-60))errors.push(`structures[${i}].${axis} must be ${s.version===LANDSCAPE_EXPANDED_VERSION?'within the supported ±89900 m domain':'at least 60 metres inside landscape bounds'}.`);
+		if(s.version===LANDSCAPE_EXPANDED_VERSION&&Number.isFinite(placement.x)&&Number.isFinite(placement.z)&&Math.abs(placement.x)<1596&&Math.abs(placement.z)<1596)errors.push(`structures[${i}] overlaps the protected authored island.`);
 		if(!Number.isFinite(placement.yawRadians)||Math.abs(placement.yawRadians)>Math.PI*2)errors.push(`structures[${i}].yawRadians must be within +/- 2 pi.`);
 		if(!Number.isFinite(placement.scale)||placement.scale<.25||placement.scale>1)errors.push(`structures[${i}].scale must be between 0.25 and 1.`);
 	}
@@ -101,6 +105,7 @@ export function validateLandscapeSpec(input) {
 		vegetation:Object.freeze({treeDensity:s.vegetation.treeDensity,grassDensity:s.vegetation.grassDensity}),
 		paths:Object.freeze({enabled:s.paths.enabled,width:s.paths.width}),roads:Object.freeze({enabled:s.roads.enabled,width:s.roads.width}),
 		structures:Object.freeze(structures.map(p=>Object.freeze({assetId:p.assetId,x:p.x,z:p.z,yawRadians:p.yawRadians,scale:p.scale}))),qualityProfile:s.qualityProfile,
+		...(s.version === LANDSCAPE_EXPANDED_VERSION ? {expansion:true} : {}),
 		references:Object.freeze(refs.map(ref => Object.freeze(Object.fromEntries(Object.entries(ref).sort(([a],[b]) => a.localeCompare(b))))))});
 	approved.add(spec);
 	return {valid:true, errors, warnings, spec};
@@ -117,7 +122,7 @@ export function landscapeWorldId(input = DEFAULT_LANDSCAPE_SPEC) {
 	const text = JSON.stringify(canonicalLandscapeSpec(input));
 	let hash = 2166136261;
 	for (let i=0; i<text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619) >>> 0;
-	return `landscape-v${LANDSCAPE_VERSION}-${hash.toString(16).padStart(8,'0')}`;
+	return `landscape-v${canonicalLandscapeSpec(input).version}-${hash.toString(16).padStart(8,'0')}`;
 }
 export function landscapeBounds(input = DEFAULT_LANDSCAPE_SPEC) {
 	const s = canonicalLandscapeSpec(input);
