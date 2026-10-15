@@ -68,6 +68,7 @@ export class LandscapeWarehouse {
 
   dispose() {
     this.app.scene.remove(this.group);
+    this.app.thirdIsland.portalInterior.portalView?.removeLandscapeStorm(this.entrance);
     this.app.scene.remove(this.entrance);
     if (this.app.thirdIsland.portalInterior.landscapeEntrance?.group === this.entrance) {
       this.app.thirdIsland.portalInterior.landscapeEntrance = null;

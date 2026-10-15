@@ -871,6 +871,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.engine.meshRenderer.withSceneTransforms( this.scene, () => {
 
 			this.shadows.render( this.scene, this.engine.meshRenderer, this.shadows.update( this.camera, G.sunDir.value ) );
+			this.thirdIsland.portalInterior.portalView?.render();
 			this.sceneRenderer.render();
 
 		} );

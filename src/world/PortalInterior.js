@@ -6,6 +6,7 @@ import { decodeImage } from '../engine/loaders/GLTF.js';
 import { buildRecipe } from './PortalInteriorRecipe.js';
 import { makeKeyboardLegendMaterial, makeRetroNameplateMaterial, makeRetroScreenMaterial } from './PortalRetroScreens.js';
 import { C64Computer } from './C64Computer.js';
+import { PortalView } from './PortalView.js';
 
 const shapeGeometry = (shape, size) => {
   if (shape === 'cylinder') return new CylinderGeometry(size[0] * .5, size[0] * .5, size[1], 16);
@@ -48,6 +49,7 @@ const portalSurface = (name, lights, origin) => {
 export class PortalInterior {
   constructor(app) {
     this.app = app;
+    this.portalPreviewEnabled = new URLSearchParams(globalThis.location?.search || '').has('portalView');
     this.recipe = buildRecipe();
     this.origin = new Vector3(300, 18, 300);
     this.group = new Group();
@@ -91,6 +93,7 @@ export class PortalInterior {
     this.cooldown = 0;
     this.returnState = null;
     this.c64 = new C64Computer(app);
+    this.portalView = this.portalPreviewEnabled ? new PortalView(app, this) : null;
   }
 
   async loadSurfaceTextures(){
@@ -116,7 +119,7 @@ export class PortalInterior {
     for (const object of this.recipe.objects) {
       const geometry = shapeGeometry(object.shape, object.size);
       position.set(...object.position);
-      rotation.set(...object.rotation);
+      rotation.set(...(this.portalPreviewEnabled && object.name === 'return portal ring' ? [0, Math.PI / 2, 0] : object.rotation));
       quaternion.setFromEuler(rotation);
       scale.set(1, 1, 1);
       if (object.shape === 'sphere') scale.set(...object.size);
@@ -176,11 +179,13 @@ export class PortalInterior {
     const texture = new Texture({ label: 'Warehouse Loft sign', width: 1024, height: 256, data: ctx.getImageData(0, 0, 1024, 256).data });
     const signMaterial = standard({ name: 'Warehouse Loft lettering', color: 0xffffff, roughness: .4, metalness: .1, textures: { warehouseSign: texture }, surface: 'let ink = textureSample(warehouseSign, smpAnisoClamp, vec2f(in.uv.x, 1.0-in.uv.y)).rgb; s.albedo=ink; s.emissive=ink*0.3;' });
     const sign = new Mesh(new BoxGeometry(4.8, 2.1, .18), signMaterial);
-    sign.position.y = 2.4; g.add(sign);
+    sign.position.y = this.portalPreviewEnabled ? 3.65 : 2.4; g.add(sign);
     const frame = new Mesh(new TorusGeometry(1.35, .16, 10, 24), this.materials.amber);
     frame.position.set(0, 1.35, .2); g.add(frame);
-    const post = new Mesh(new BoxGeometry(.18, 4, .18), this.materials.steel);
-    post.position.y = 1.1; g.add(post);
+    if (!this.portalPreviewEnabled) {
+      const post = new Mesh(new BoxGeometry(.18, 4, .18), this.materials.steel);
+      post.position.y = 1.1; g.add(post);
+    }
     this.exterior = g;
   }
 
@@ -190,12 +195,14 @@ export class PortalInterior {
   addLandscapeEntrance(x, y, z) {
     if (![x, y, z].every(Number.isFinite)) throw Error('Landscape entrance needs finite coordinates');
     if (this.landscapeEntrance) {
+      this.portalView?.removeLandscapeStorm(this.landscapeEntrance.group);
       this.app.scene.remove(this.landscapeEntrance.group);
     }
     const group = this.exterior.clone(true);
     group.name = 'Generated landscape warehouse entrance';
     group.position.set(x, y, z);
     this.app.scene.add(group);
+    this.portalView?.addLandscapeStorm(group);
     this.landscapeEntrance = { x, y, z, group };
     return group;
   }
@@ -245,6 +252,7 @@ export class PortalInterior {
 
   update(dt) {
     this.cooldown = Math.max(0, this.cooldown - dt);
+    this.portalView?.update(dt);
     const p = this.app.player;
     if (!p) return;
     if (this.c64.active) return;
