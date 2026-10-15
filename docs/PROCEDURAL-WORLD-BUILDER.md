@@ -1,6 +1,6 @@
 # Procedural world builder consolidation
 
-Status: **experimental branch; qualification pending**. The default ElseMesh URL retains the authored island, warehouse, computers, roads and vehicles. The builder is opt-in at `?landscapeBuilder`; the existing `?procedural` test mode remains available. No production renderer was replaced.
+Status: **experimental branch; partial local qualification; not deployed**. The default ElseMesh URL retains the authored island, warehouse, computers, roads and vehicles. The builder is opt-in at `?landscapeBuilder`; the existing `?procedural` test mode remains available. No production renderer was replaced.
 
 ## Architecture and audit
 
@@ -26,6 +26,8 @@ The previous procedural world and image-guided warehouse systems were reused ins
 
 The saved sample is [`public/landscapes/temperate-2049.json`](../public/landscapes/temperate-2049.json). Required identity fields are `version`, `seed`, `width`, `length`, `maxElevation`, `waterLevel`, `origin`, `description`, `features`, `terrainType`, `elevation.ruggedness`, `vegetation.treeDensity`, `vegetation.grassDensity`, `paths`, `roads`, `structures`, `references` and `qualityProfile`. Dimensions are metres. Width and length are 256–8192 m; seed is an unsigned 32-bit integer; elevation ceiling must exceed the water level and is at most 2000 m. The finite rectangle is exactly `origin ± width/2, length/2`; outside it the seabed is −90 m. The current global ElseMesh ocean is fixed at 0 m, so a nonzero `waterLevel` is rejected with an actionable message until regional water support exists.
 
+The centre is limited to ±90,000 m on each axis. This keeps the entire generated rectangle inside the existing player, beacon and discovery save envelopes. Warehouse placement must be dry at its selected coordinates; a submerged placement is rejected before save or reload. An optional warehouse adapter failure is also contained during startup so the builder can show a recovery message.
+
 The default sample is a 2000 × 2000 m temperate island with a 250 m elevation ceiling, coast, beach, hills, forest, mountain ridge, path, a licensed warehouse, seed 2049 and balanced quality. Its ID is derived from the canonical validated JSON and changes with every saved field. The ID isolates discovery, beacons and player position from the earlier procedural save. Ordinary game state continues to use ElseMesh's existing storage, so this is not a fully isolated world save.
 
 Natural-language text is a bounded feature selector for **coast, beach, hills, forest and mountain ridge**. Unsupported requests such as caves or rivers produce warnings; prose does not secretly set dimensions, roads, structures or assets. Users can explicitly choose the supported features. References are approved asset metadata, not uploaded photos or geometry. The only placeable public adapter in this version is `abandoned-warehouse`; other GLBs require collision and entrance integration. See [landscape asset registry and rights](LANDSCAPE-ASSETS.md).
@@ -47,11 +49,13 @@ The new tests cover schema validation, deterministic reconstruction, exact bound
 
 | Measure | Baseline | Builder mode | Status |
 | --- | --- | --- | --- |
-| Authored scene FPS | Pending matched run | Pending matched run | Do not infer a gain from different camera views |
-| Test island FPS and 1% low | No baseline: new scene | Pending | Compare repeated runs of the same saved spec |
+| Authored warehouse view FPS | 42.76 median snapshot FPS, builder off | 42.70 median snapshot FPS, generated mode on and 0 nearby chunks | One 10 s single-tab run each at the same camera, balanced, scale 0.75. Difference is within run uncertainty; no gain claimed. |
+| Generated start view FPS | No baseline: new scene | 50.19 median snapshot FPS after shader warm-up | Different camera and scene; this is not a before/after gain. The same short run included three initial stalls. 1% low remains unmeasured. |
 | GPU frame/pass cost | Pending | Pending | Only if timestamp queries are reliable |
 | GPU memory | Unavailable | Unavailable | Terrain buffer bytes are an estimate, not total VRAM |
-| Generated chunk count | N/A | Up to 49 resident | Configured cap, not a measured FPS result |
+| Generated chunk count | N/A | 49/49 at generated start, 0/49 at authored warehouse | Browser telemetry; 49 is also the configured cap. |
+
+The raw 20-snapshot traces, method and browser screenshots are in [the evidence folder](evidence/README.md). The in-app browser exposed a WebGPU timestamp feature, but the pass profiler was disabled; no GPU-time figure or total GPU-memory figure was collected. The short snapshots cannot establish 1% low, a performance improvement, device qualification or regression bounds. A second renderer tab initially halved FPS; those confounded local traces were excluded from the comparison. The actual GPU identity was not exposed by this browser.
 
 ## Known issues and release gate
 
@@ -71,4 +75,4 @@ The existing `.github/workflows/deploy.yml` deploys GitHub Pages after a success
 
 **Plan gate:** Triggered by renderer, terrain, asset, persistence and deployment integration. The architect challenged origin safety, immutable validation, CPU/WGSL parity, actual entrance/road alignment, explicit rights, save namespace and matched benchmarks. The primary chose an opt-in finite domain outside the protected authored square, a shared terrain definition, existing chunk streamer and shared warehouse geometry. The architect warned that the initial 2 km prototype is not an effectively endless world or release-ready integration.
 
-**Completion gate:** Pending independent review of browser results, regression suite, documentation, resource cleanup, security and unmet acceptance criteria.
+**Completion gate:** Triggered by the cross-component implementation and browser evidence. The architect identified six material issues: PR builds could cancel a main deployment, submerged warehouse placement was accepted, teleport shortcuts could leave a portal interior active, very large origins exceeded the save envelope, explicit GPU tests could silently skip, and grass density increased in the low-quality profile. The primary fixed all six and added targeted tests. The browser also confirmed generated warehouse re-entry after using the home and landscape shortcuts. The branch remains experimental: there is no general photo-to-mesh pipeline, arbitrary structure placement, endless domain, qualified GPU-memory measurement, 1% low, multi-device result or deployed test. A draft PR is appropriate for review; merge and deployment are not qualified.
