@@ -7,6 +7,7 @@ import { buildRecipe } from './PortalInteriorRecipe.js';
 import { makeKeyboardLegendMaterial, makeRetroNameplateMaterial, makeRetroScreenMaterial } from './PortalRetroScreens.js';
 import { C64Computer } from './C64Computer.js';
 import { PortalView } from './PortalView.js';
+import { PortalThrowDemo } from './PortalThrowDemo.js';
 
 const shapeGeometry = (shape, size) => {
   if (shape === 'cylinder') return new CylinderGeometry(size[0] * .5, size[0] * .5, size[1], 16);
@@ -51,6 +52,9 @@ export class PortalInterior {
     this.app = app;
     this.portalPreviewEnabled = new URLSearchParams(globalThis.location?.search || '').has('portalView');
     this.recipe = buildRecipe();
+    if (this.portalPreviewEnabled) {
+      this.recipe.objects.find(object => object.name === 'return portal ring').material = 'black';
+    }
     this.origin = new Vector3(300, 18, 300);
     this.group = new Group();
     this.group.name = 'Island 3 warehouse portal interior';
@@ -94,6 +98,7 @@ export class PortalInterior {
     this.returnState = null;
     this.c64 = new C64Computer(app);
     this.portalView = this.portalPreviewEnabled ? new PortalView(app, this) : null;
+    this.demo = this.portalPreviewEnabled ? new PortalThrowDemo(app, this) : null;
   }
 
   async loadSurfaceTextures(){
@@ -180,7 +185,7 @@ export class PortalInterior {
     const signMaterial = standard({ name: 'Warehouse Loft lettering', color: 0xffffff, roughness: .4, metalness: .1, textures: { warehouseSign: texture }, surface: 'let ink = textureSample(warehouseSign, smpAnisoClamp, vec2f(in.uv.x, 1.0-in.uv.y)).rgb; s.albedo=ink; s.emissive=ink*0.3;' });
     const sign = new Mesh(new BoxGeometry(4.8, 2.1, .18), signMaterial);
     sign.position.y = this.portalPreviewEnabled ? 3.65 : 2.4; g.add(sign);
-    const frame = new Mesh(new TorusGeometry(1.35, .16, 10, 24), this.materials.amber);
+    const frame = new Mesh(new TorusGeometry(1.35, .16, 10, 24), this.portalPreviewEnabled ? this.materials.black : this.materials.amber);
     frame.position.set(0, 1.35, .2); g.add(frame);
     if (!this.portalPreviewEnabled) {
       const post = new Mesh(new BoxGeometry(.18, 4, .18), this.materials.steel);
@@ -253,6 +258,7 @@ export class PortalInterior {
   update(dt) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.portalView?.update(dt);
+    this.demo?.update(dt);
     const p = this.app.player;
     if (!p) return;
     if (this.c64.active) return;

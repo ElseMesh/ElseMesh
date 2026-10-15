@@ -1,0 +1,23 @@
+{
+  "after": {
+    "children": 164,
+    "freeCam": false,
+    "inside": false,
+    "position": [
+      3976,
+      46.44466397422977,
+      4296
+    ]
+  },
+  "before": {
+    "children": 164,
+    "freeCam": false,
+    "inside": false,
+    "position": [
+      3976,
+      46.44466397422977,
+      4296
+    ]
+  },
+  "restored": true
+}

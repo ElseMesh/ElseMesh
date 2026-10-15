@@ -5,6 +5,7 @@ import { RenderTarget } from '../engine/gpu/Texture.js';
 import { createViewUniforms, setFrameCamera } from '../engine/render/Frame.js';
 import { LAYERS } from '../engine/render/SceneRenderer.js';
 import { Material } from '../engine/render/Material.js';
+import { Terrain } from './Terrain.js';
 
 const UP = new Vector3(0, 1, 0);
 const UNIT = new Vector3(1, 1, 1);
@@ -49,11 +50,16 @@ export function createPortalApertureMaterial(texture) {
 
 export function createPortalStormMaterial() {
   return new Material({
-    name: 'Portal electrical storm', lit: false, side: 'double', depthWrite: false,
+    name: 'Portal electrical storm', lit: false, side: 'double', transparent: true, depthWrite: false,
+    vertex: `let tick = floor(frame.time * 12.0);
+      let noise = fract(sin(v.uv.x * 173.3 + tick * 7.13) * 43758.5453);
+      let radial = normalize(v.position.xy);
+      v.position.x += radial.x * (noise - 0.5) * 0.14;
+      v.position.y += radial.y * (noise - 0.5) * 0.14;`,
     surface: `let pulse = pow(max(0.0, sin(frame.time * 17.0 + in.uv.x * 27.0)), 8.0);
       let flicker = 0.55 + 0.45 * sin(frame.time * 4.7 + in.uv.x * 8.0);
       s.albedo = vec3f(0.08, 0.34, 0.62) * flicker + vec3f(0.5, 0.9, 1.0) * pulse;
-      s.emissive = s.albedo * 1.8;`,
+      s.emissive = s.albedo * 4.0;`,
   });
 }
 
@@ -102,9 +108,9 @@ export class PortalView {
     parent.add(aperture);
     this.apertures.push(aperture);
     const arcs = [];
-    for (let i = 0; i < 4; i++) {
-      const arc = stormArc(this.stormMaterial, i * Math.PI * .5, .55 + .2 * (i % 2));
-      arc.position.set(x, y, z + (yaw ? 0 : .1));
+    for (let i = 0; i < 8; i++) {
+      const arc = stormArc(this.stormMaterial, i * Math.PI * .25, .68 + .15 * (i % 2));
+      arc.position.set(x + Math.sin(yaw) * .23, y, z + Math.cos(yaw) * .23);
       arc.rotation.y = yaw;
       parent.add(arc);
       arcs.push(arc);
@@ -125,6 +131,7 @@ export class PortalView {
   }
 
   outsideFrame() {
+    if (this.portal.demo?.active) return this.portal.demo.source.clone();
     const entrance = this.portal.landscapeEntrance;
     const useLandscape = this.portal.inside ? this.portal.returnState?.landscape :
       !!entrance && this.app.camera.position.distanceTo(entrance.group.position) < 25;
@@ -139,7 +146,7 @@ export class PortalView {
 
   render() {
     const { app, portal } = this;
-    const inside = portal.inside;
+    const inside = portal.demo?.active ? portal.demo.viewSide === 'warehouse' : portal.inside;
     const source = inside ? this.insideFrame() : this.outsideFrame();
     this.position.setFromMatrixPosition(source);
     const distance = this.position.distanceTo(app.camera.position);
@@ -173,6 +180,17 @@ export class PortalView {
     const oldVisible = portal.group.visible;
     try {
       if (inside) {
+        // Main-camera CDLOD nodes exclude terrain visible only through the
+        // portal. Own the selection buffers; sharing them would overwrite
+        // shadow/main draws queued in the same GPU submission.
+        if (!this.previewTerrain) {
+          this.previewTerrain = new Terrain({ scene: this.seaScene, terrainData: app.terrainData,
+            terrainGPU: app.terrainGPU, gridSize: 24, rangeFactor: 2, sunShadow: false });
+        }
+        this.previewTerrain.uViewPos.value.copy(this.camera.position);
+        this.previewTerrain.gustOffset.copy(app.terrain.gustOffset);
+        this.previewTerrain.simpleShading = app.terrain.simpleShading;
+        this.previewTerrain.lod.update(this.camera);
         const outside = new Vector3().setFromMatrixPosition(this.outsideFrame());
         this.sea.position.x = outside.x;
         this.sea.position.z = outside.z;
@@ -181,13 +199,13 @@ export class PortalView {
         });
         app.engine.meshRenderer.render(app.scene, {
           ...pass, label: 'portal preview island', layerMask: 1 << LAYERS.OPAQUE,
-          filter: object => !this.interiorMeshes.has(object) && object.material !== this.apertureMaterial && object.material !== this.stormMaterial,
+          filter: object => object !== app.terrain.mesh && !this.isInteriorObject(object) && object.material !== this.apertureMaterial && object.material !== this.stormMaterial,
         });
       } else {
         portal.group.visible = true;
         app.engine.meshRenderer.render(app.scene, {
           ...pass, label: 'portal preview warehouse', clearColors: [[.014, .018, .025, 1]], clearDepth: 0,
-          filter: object => this.interiorMeshes.has(object) && object.material !== this.apertureMaterial,
+          filter: object => this.isInteriorObject(object) && object.material !== this.apertureMaterial,
         });
       }
       this.apertureMaterial.uniforms.previewActive.value = 1;
@@ -207,6 +225,11 @@ export class PortalView {
     for (const arcs of this.storms) for (let i = 0; i < arcs.length; i++) arcs[i].rotation.z += dt * (i % 2 ? -.21 : .17);
   }
 
+  isInteriorObject(object) {
+    if (this.interiorMeshes.has(object)) return true;
+    return this.portal.demo?.active && this.portal.demo.isInteriorObject(object);
+  }
+
   dispose() {
     for (const aperture of this.apertures) {
       aperture.removeFromParent();
@@ -216,6 +239,7 @@ export class PortalView {
     this.target.texture.destroy();
     this.target.depthTexture.destroy();
     this.frameBlock.buffer?.destroy();
+    this.previewTerrain?.lod.params.buffer?.destroy();
     this.apertureMaterial.dispose();
     this.stormMaterial.dispose();
     for (const geometry of new Set(this.storms.flat().map(arc => arc.geometry))) geometry.dispose();
