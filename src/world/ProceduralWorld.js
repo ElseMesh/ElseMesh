@@ -1,6 +1,8 @@
 import { BoxGeometry, BufferGeometry, ConeGeometry, CylinderGeometry, Float32BufferAttribute, InstancedMesh, Matrix4, Mesh, Quaternion, Vector3 } from '../engine/index.js';
 import { standard } from '../materials/Materials.js';
 import { CHUNK_SIZE, PROCEDURAL_CELL, PROCEDURAL_SEED, PROCEDURAL_VERSION, PROTECTED_EXTENT, hash2, islandForCell, proceduralHeightAt } from './ProceduralHeight.js';
+import { landscapeBounds, landscapeWorldId } from './LandscapeSpec.js';
+import { createLandscapeHeight, landscapeSampleAt, landscapePathLayout, landscapeSurfaceAt } from './LandscapeHeight.js';
 
 const SAVE_KEY = 'elsemesh.procedural.v1';
 const MAX_CHUNKS = 49;
@@ -13,11 +15,14 @@ const validDiscovery = value => {
 	return Number.isSafeInteger(x) && Number.isSafeInteger(z) && Math.abs(x) <= 196 && Math.abs(z) <= 196;
 };
 const colour = h => h < -2 ? [0.38, 0.40, 0.35] : h < 2 ? [0.77, 0.67, 0.43] : h < 10 ? [0.25, 0.45, 0.19] : [0.20, 0.35, 0.17];
+const landscapeColour = (h, spec) => h < spec.waterLevel - 2 ? [0.29, 0.36, 0.40] :
+	h < spec.waterLevel + 5 ? [0.79, 0.70, 0.48] :
+	h > spec.maxElevation * .62 ? [0.46, 0.45, 0.42] : [0.25, 0.42, 0.21];
 
-export function loadProceduralSave(storage, seed = PROCEDURAL_SEED) {
+export function loadProceduralSave(storage, seed = PROCEDURAL_SEED, saveKey = SAVE_KEY, worldId = null) {
 	try {
-		const value = JSON.parse(storage?.getItem(SAVE_KEY) || 'null');
-		if (!value || value.version !== PROCEDURAL_VERSION || value.seed !== seed) return null;
+		const value = JSON.parse(storage?.getItem(saveKey) || 'null');
+		if (!value || value.version !== PROCEDURAL_VERSION || value.seed !== seed || (worldId && value.worldId !== worldId)) return null;
 		return {
 			position: validPosition(value.position) ? value.position : null,
 			discovered: Array.isArray(value.discovered) ? value.discovered.filter(validDiscovery).slice(0, 10000) : [],
@@ -27,7 +32,7 @@ export function loadProceduralSave(storage, seed = PROCEDURAL_SEED) {
 }
 
 // World-space samples give neighbouring chunks identical edges at every LOD.
-export function buildChunkGeometry(cx, cz, level, heightAt) {
+export function buildChunkGeometry(cx, cz, level, heightAt, tintAt = (_, __, h) => colour(h)) {
 	const n = 32 >> level, step = CHUNK_SIZE / n;
 	const positions = [], normals = [], colors = [], indices = [];
 	let highest = -90;
@@ -45,7 +50,7 @@ export function buildChunkGeometry(cx, cz, level, heightAt) {
 		const dx = heightAt(x + 2, z) - heightAt(x - 2, z);
 		const dz = heightAt(x, z + 2) - heightAt(x, z - 2);
 		const length = Math.hypot(dx, 4, dz);
-		vertex(x, y, z, [-dx / length, 4 / length, -dz / length], colour(y));
+		vertex(x, y, z, [-dx / length, 4 / length, -dz / length], tintAt(x, z, y));
 	}
 	if (highest <= -89.99) return null;
 	for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -74,10 +79,14 @@ export function buildChunkGeometry(cx, cz, level, heightAt) {
 }
 
 export class ProceduralWorld {
-	constructor(app, seed = PROCEDURAL_SEED) {
+	constructor(app, seed = PROCEDURAL_SEED, { landscapeSpec = null } = {}) {
 		this.app = app;
 		this.seed = seed;
-		this.heightAt = (x,z) => proceduralHeightAt(x,z,seed);
+		this.landscapeSpec = landscapeSpec;
+		this.landscapeBounds = landscapeSpec ? landscapeBounds(landscapeSpec) : null;
+		this.worldId = landscapeSpec ? landscapeWorldId(landscapeSpec) : null;
+		this.saveKey = this.worldId ? `elsemesh.landscape.world.v1.${this.worldId}` : SAVE_KEY;
+		this.heightAt = landscapeSpec ? createLandscapeHeight(landscapeSpec) : (x,z) => proceduralHeightAt(x,z,seed);
 		this.chunks = new Map();
 		this.discovered = new Set();
 		this.beacons = [];
@@ -94,10 +103,13 @@ export class ProceduralWorld {
 		this.trunkGeometry = new CylinderGeometry(.42,.55,1,6);
 		this.leafGeometry = new ConeGeometry(1,1,7);
 		this.beaconGeometry = new BoxGeometry(.55,3,.55);
+		this.grassGeometry = landscapeSpec ? new ConeGeometry(.12,.7,3) : null;
+		this.grassMaterial = landscapeSpec ? standard({name:'Landscape grass',color:0x6b8e49,roughness:1,side:'double'}) : null;
+		this.access = landscapeSpec ? this.buildAccessRibbon() : null;
 		let storage = null;
 		try { storage = globalThis.localStorage; } catch { this.storageWarning = 'Browser storage unavailable'; }
 		this.storage = storage;
-		const saved = loadProceduralSave(storage,seed);
+		const saved = loadProceduralSave(storage,seed,this.saveKey,this.worldId);
 		if (saved) {
 			this.savedPosition = saved.position;
 			this.discovered = new Set(saved.discovered);
@@ -114,7 +126,7 @@ export class ProceduralWorld {
 		map.style.inset = '5% 8%';
 		map.style.padding = '16px';
 		map.style.overflow = 'hidden';
-		map.innerHTML = '<h2 style="margin:0 0 8px">ARCHIPELAGO · WORLD MAP</h2><p style="margin:0 0 10px">Warehouse marker · explored terrain · coordinates in metres · N to close</p><canvas width="960" height="510" style="display:block;width:100%;height:calc(100% - 135px);background:#0c3445"></canvas><p style="margin:8px 0 0;font-size:14px">Y: place a persistent exploration beacon on generated land. Use the existing boat or helicopter to explore.</p>';
+		map.innerHTML = `<h2 style="margin:0 0 8px">${this.landscapeSpec ? 'LANDSCAPE · WORLD MAP' : 'ARCHIPELAGO · WORLD MAP'}</h2><p style="margin:0 0 10px">Warehouse marker · explored terrain · coordinates in metres · N to close</p><canvas width="960" height="510" style="display:block;width:100%;height:calc(100% - 135px);background:#0c3445"></canvas><p style="margin:8px 0 0;font-size:14px">Y: place a persistent exploration beacon on generated land. Use the existing boat or helicopter to explore.</p>`;
 		this.mapCanvas = map.querySelector('canvas');
 	}
 
@@ -150,7 +162,10 @@ export class ProceduralWorld {
 			const x=x0+(i+.25+.5*(hash2(tx,tz,this.seed+81)/4294967295))*32;
 			const z=z0+(j+.25+.5*(hash2(tx,tz,this.seed+82)/4294967295))*32;
 			const y=this.heightAt(x,z);
-			if(y<4 || y>27)continue;
+			if (this.landscapeSpec) {
+				const sample = landscapeSampleAt(x,z,this.landscapeSpec);
+				if (sample.biome !== 'forest' || sample.surface || hash2(tx,tz,this.seed+84)/4294967295 > this.landscapeSpec.vegetation.treeDensity) continue;
+			} else if(y<4 || y>27)continue;
 			const height=5+4*(hash2(tx,tz,this.seed+83)/4294967295);
 			trees.push({x,y,z,height});
 		}
@@ -169,15 +184,64 @@ export class ProceduralWorld {
 		return [trunk,crown];
 	}
 
+	makeGrass(cx,cz) {
+		const spec=this.landscapeSpec;
+		if(!spec||spec.vegetation.grassDensity===0)return [];
+		const stems=[],x0=cx*CHUNK_SIZE,z0=cz*CHUNK_SIZE;
+		const stride=spec.qualityProfile==='low'?12:spec.qualityProfile==='high'?6:8;
+		for(let j=0;j<stride;j++)for(let i=0;i<stride;i++){
+			const gx=cx*stride+i,gz=cz*stride+j;
+			if(hash2(gx,gz,this.seed+91)/4294967295>spec.vegetation.grassDensity)continue;
+			const x=x0+(i+.2+.6*hash2(gx,gz,this.seed+92)/4294967295)*CHUNK_SIZE/stride;
+			const z=z0+(j+.2+.6*hash2(gx,gz,this.seed+93)/4294967295)*CHUNK_SIZE/stride;
+			const sample=landscapeSampleAt(x,z,spec);
+			if(!sample.inside||sample.height<spec.waterLevel+5||sample.grade>30||sample.surface)continue;
+			stems.push({x,y:sample.height,z,height:.45+.45*hash2(gx,gz,this.seed+94)/4294967295});
+		}
+		if(!stems.length)return [];
+		const mesh=new InstancedMesh(this.grassGeometry.clone(),this.grassMaterial,stems.length);
+		const matrix=new Matrix4(),position=new Vector3(),rotation=new Quaternion(),scale=new Vector3();
+		for(let i=0;i<stems.length;i++){
+			const stem=stems[i];matrix.compose(position.set(stem.x,stem.y+stem.height*.5,stem.z),rotation,scale.set(1,stem.height/.7,1));mesh.setMatrixAt(i,matrix);
+		}
+		mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();this.app.scene.add(mesh);
+		return [mesh];
+	}
+
+	buildAccessRibbon() {
+		const spec=this.landscapeSpec,route=landscapePathLayout(spec);
+		if(!route.enabled)return null;
+		const width=route.width*.92,steps=32,positions=[],normals=[],indices=[];
+		const dx=route.gate.x-route.spawn.x,dz=route.gate.z-route.spawn.z,dist=Math.hypot(dx,dz),nx=-dz/dist,nz=dx/dist;
+		for(let i=0;i<=steps;i++){
+			const t=i/steps,x=route.spawn.x+dx*t,z=route.spawn.z+dz*t;
+			for(const side of [-1,1]){
+				const px=x+nx*side*width/2,pz=z+nz*side*width/2;
+				positions.push(px,this.heightAt(px,pz)+.07,pz);normals.push(0,1,0);
+			}
+			if(i<steps){const k=i*2;indices.push(k,k+1,k+2,k+1,k+3,k+2);}
+		}
+		const geometry=new BufferGeometry();geometry.setAttribute('position',new Float32BufferAttribute(positions,3));geometry.setAttribute('normal',new Float32BufferAttribute(normals,3));geometry.setIndex(indices);geometry.computeBoundingSphere();
+		const material=standard({name:'Landscape access',color:spec.roads.enabled?0x72706a:0x9b855b,roughness:1,side:'double',emissive:spec.roads.enabled?0x25231f:0x302719,emissiveIntensity:.18});
+		material.underwaterLighting='none';material.localLightsCheap=true;
+		const mesh=new Mesh(geometry,material);mesh.name=spec.roads.enabled?'Generated access road':'Generated footpath';mesh.staticVelocity=true;this.app.scene.add(mesh);
+		return mesh;
+	}
+
 	createChunk(cx,cz,level) {
 		const t0=performance.now();
-		const result=buildChunkGeometry(cx,cz,level,this.heightAt);
+		const tintAt=this.landscapeSpec ? (x, z, h) => {
+			const surface=landscapeSurfaceAt(x,z,this.landscapeSpec);
+			return surface==='building-pad'?[.41,.44,.34]:surface==='road'?[.43,.42,.40]:surface==='path'?[.61,.52,.36]:landscapeColour(h,this.landscapeSpec);
+		} : undefined;
+		const result=buildChunkGeometry(cx,cz,level,this.heightAt,tintAt);
 		if(!result)return {cx,cz,level,mesh:null,trees:[],bytes:0};
 		const mesh=new Mesh(result.geometry,this.material);
 		mesh.name=`Procedural terrain ${cx},${cz} L${level}`;
 		mesh.castShadow=true;mesh.receiveShadow=true;mesh.staticVelocity=true;
 		this.app.scene.add(mesh);
 		const trees=level<2?this.makeTrees(cx,cz):[];
+		if(level===0)trees.push(...this.makeGrass(cx,cz));
 		this.generationMs.push(performance.now()-t0);
 		if(this.generationMs.length>256)this.generationMs.shift();
 		return {cx,cz,level,mesh,trees,bytes:result.bytes};
@@ -199,7 +263,10 @@ export class ProceduralWorld {
 		const desired=[];
 		for(let dz=-3;dz<=3;dz++)for(let dx=-3;dx<=3;dx++) {
 			const x=cx+dx,z=cz+dz;
-			if(Math.abs((x+.5)*CHUNK_SIZE)<PROTECTED_EXTENT && Math.abs((z+.5)*CHUNK_SIZE)<PROTECTED_EXTENT)continue;
+			if(this.landscapeBounds) {
+				const b=this.landscapeBounds;
+				if((x+1)*CHUNK_SIZE<=b.minX||x*CHUNK_SIZE>=b.maxX||(z+1)*CHUNK_SIZE<=b.minZ||z*CHUNK_SIZE>=b.maxZ)continue;
+			} else if(Math.abs((x+.5)*CHUNK_SIZE)<PROTECTED_EXTENT && Math.abs((z+.5)*CHUNK_SIZE)<PROTECTED_EXTENT)continue;
 			const dist=Math.max(Math.abs(dx),Math.abs(dz));
 			if(dist>3)continue;
 			desired.push({x,z,level:dist<=1?0:dist<=2?1:2,dist});
@@ -229,7 +296,7 @@ export class ProceduralWorld {
 			const times=[...this.generationMs].sort((a,b)=>a-b);
 			const p95=times.length?times[Math.floor((times.length-1)*.95)].toFixed(1):'—';
 			const bytes=[...this.chunks.values()].reduce((sum,c)=>sum+c.bytes,0);
-			this.statusEl.textContent=`Outer world seed ${this.seed} · chunks ${this.chunks.size}/${MAX_CHUNKS} · terrain ~${(bytes/1048576).toFixed(1)} MiB · gen p95 ${p95} ms${this.storageWarning?' · SAVE WARNING':''}`;
+			this.statusEl.textContent=`${this.landscapeSpec ? 'Landscape' : 'Outer world'} seed ${this.seed} · chunks ${this.chunks.size}/${MAX_CHUNKS} · terrain ~${(bytes/1048576).toFixed(1)} MiB · gen p95 ${p95} ms${this.storageWarning?' · SAVE WARNING':''}`;
 		}
 	}
 
@@ -265,7 +332,7 @@ export class ProceduralWorld {
 		const p=this.app.player;
 		const position=p?.mode==='walk' && !this.app.thirdIsland?.portalInterior?.inside && !this.app.aiWarehouse?.inside ? [p.position.x,p.position.y,p.position.z] : this.savedPosition;
 		try {
-			this.storage.setItem(SAVE_KEY,JSON.stringify({version:PROCEDURAL_VERSION,seed:this.seed,position,discovered:[...this.discovered],beacons:this.beacons}));
+			this.storage.setItem(this.saveKey ?? SAVE_KEY,JSON.stringify({version:PROCEDURAL_VERSION,seed:this.seed,...(this.worldId?{worldId:this.worldId}:{}),position,discovered:[...this.discovered],beacons:this.beacons}));
 			this.savedPosition=position;
 			this.storageWarning=null;
 			return true;
@@ -279,6 +346,8 @@ export class ProceduralWorld {
 		for(const mesh of this.beaconMeshes)this.app.scene.remove(mesh);
 		for(const geometry of [this.trunkGeometry,this.leafGeometry,this.beaconGeometry])geometry.dispose();
 		for(const material of [this.material,this.trunkMaterial,this.leafMaterial,this.beaconMaterial])material.dispose();
+		if(this.access){this.app.scene.remove(this.access);this.access.geometry.dispose();this.access.material.dispose();}
+		this.grassGeometry?.dispose();this.grassMaterial?.dispose();
 		this.statusEl?.remove();
 	}
 }

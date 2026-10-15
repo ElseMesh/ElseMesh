@@ -86,6 +86,7 @@ export class PortalInterior {
     this.textureReady=this.loadSurfaceTextures();
     this.setInteriorCollidersEnabled(false);
     this.buildExteriorPortal();
+    this.landscapeEntrance = null;
     this.inside = false;
     this.cooldown = 0;
     this.returnState = null;
@@ -183,6 +184,22 @@ export class PortalInterior {
     this.exterior = g;
   }
 
+  // A generated warehouse may share the authored, interactive computer room.
+  // The extra entrance reuses the existing sign geometry and materials; the
+  // original island entrance and its interaction coordinates remain intact.
+  addLandscapeEntrance(x, y, z) {
+    if (![x, y, z].every(Number.isFinite)) throw Error('Landscape entrance needs finite coordinates');
+    if (this.landscapeEntrance) {
+      this.app.scene.remove(this.landscapeEntrance.group);
+    }
+    const group = this.exterior.clone(true);
+    group.name = 'Generated landscape warehouse entrance';
+    group.position.set(x, y, z);
+    this.app.scene.add(group);
+    this.landscapeEntrance = { x, y, z, group };
+    return group;
+  }
+
   toast(text) { this.app.ui?.ui.toast(text); }
 
   enter() {
@@ -193,8 +210,14 @@ export class PortalInterior {
     for (const source of this.localLightSources) source.enabled = true;
     this.inside = true;
     this.group.visible = true;
-    p.position.set(this.origin.x + this.recipe.zones.arrival[0], this.origin.y + this.recipe.zones.arrival[1], this.origin.z + this.recipe.zones.arrival[2]);
+    const arrival = this.recipe.zones.arrival;
+    const x = this.origin.x + arrival[0], z = this.origin.z + arrival[2];
+    // Spawn on the collider floor. A one-metre drop here can tunnel through
+    // the floor during a long first-frame shader compile after teleporting.
+    const floor = p.groundAt(x, z, this.origin.y + arrival[1] + 1);
+    p.position.set(x, Number.isFinite(floor) ? floor : this.origin.y + arrival[1], z);
     p.velocity.set(0, 0, 0);
+    p.grounded = true;
     this.toast('Warehouse loft entered · E to return');
   }
 
@@ -232,7 +255,10 @@ export class PortalInterior {
     }
     if (this.cooldown > 0 || this.app.freeCam || p.mode !== 'walk') return;
     const exteriorY = p.groundAt(100, 580, 30);
-    const nearOutside = !this.inside && Math.hypot(p.position.x - 100, p.position.z - 580) < 4.2 && (!Number.isFinite(exteriorY) || Math.abs(p.position.y - exteriorY) < 3);
+    const nearOriginal = Math.hypot(p.position.x - 100, p.position.z - 580) < 4.2 && (!Number.isFinite(exteriorY) || Math.abs(p.position.y - exteriorY) < 3);
+    const entrance = this.landscapeEntrance;
+    const nearLandscape = entrance && Math.hypot(p.position.x - entrance.x, p.position.z - entrance.z) < 4.2 && Math.abs(p.position.y - entrance.y) < 3;
+    const nearOutside = !this.inside && (nearOriginal || nearLandscape);
     const nearInside = this.inside && Math.hypot(p.position.x - (this.origin.x - 4), p.position.z - this.origin.z) < 3.5;
     const nearC64 = this.inside && Math.hypot(p.position.x - (this.origin.x - 11.5), p.position.z - (this.origin.z + 8.0)) < 1.9 && Math.abs(p.position.y - (this.origin.y + 4)) < 2;
     if (nearC64) {

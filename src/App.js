@@ -24,6 +24,9 @@ import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
 import { ProceduralWorld } from './world/ProceduralWorld.js';
 import { PROCEDURAL_SEED } from './world/ProceduralHeight.js';
+import { LandscapeBuilder, readSavedLandscapeSpec } from './world/LandscapeBuilder.js';
+import { landscapePathLayout } from './world/LandscapeHeight.js';
+import { LandscapeWarehouse } from './world/LandscapeWarehouse.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
@@ -159,8 +162,12 @@ export class App {
 		// ---------------------------------------------------------------- island
 		await progress( 0.06, 'Shaping the island…' );
 		this.terrainData = new TerrainData();
+		// Resolve the saved, validated definition before any terrain WGSL is built.
+		// The authored islands remain untouched; the new domain lies outside them.
+		this.landscapeSpec = qs.has( 'landscapeBuilder' ) && qs.get( 'generated' ) === '1' ? readSavedLandscapeSpec() : null;
+		if ( this.landscapeSpec ) this.terrainData.landscapeSpec = this.landscapeSpec;
 		// Experimental outer world is opt-in; the authored grid is generated unchanged.
-		if ( qs.has( 'procedural' ) ) this.terrainData.proceduralSeed = PROCEDURAL_SEED;
+		if ( ! this.landscapeSpec && qs.has( 'procedural' ) ) this.terrainData.proceduralSeed = PROCEDURAL_SEED;
 		this.colliders = new Colliders();
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
@@ -357,13 +364,31 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.fifthIsland = new IslandFiveSystem( this );
 		this.portIsland = new PortIslandSystem( this );
 		this.monorail.restorePlayer( this.player );
-		if ( qs.has( 'procedural' ) ) {
-			this.procedural = new ProceduralWorld( this, PROCEDURAL_SEED );
+		if ( this.landscapeSpec || qs.has( 'procedural' ) ) {
+			this.procedural = new ProceduralWorld( this, this.landscapeSpec?.seed ?? PROCEDURAL_SEED, { landscapeSpec: this.landscapeSpec } );
 			const saved = this.procedural.savedPosition;
-			const x = saved?.[0] ?? 100, z = saved?.[2] ?? 584;
+			const spawn = this.landscapeSpec ? landscapePathLayout( this.landscapeSpec ).spawn : null;
+			const x = saved?.[0] ?? spawn?.x ?? 100, z = saved?.[2] ?? spawn?.z ?? 584;
 			const y = saved?.[1] ?? this.player.groundAt( x, z, 1000 );
-			this.monorail.teleport( this.player, x, y, z, Math.PI );
+			this.monorail.teleport( this.player, x, y, z, this.landscapeSpec ? - Math.PI / 2 : Math.PI );
 			if ( typeof window !== 'undefined' ) window.__procedural = this.procedural;
+		}
+		if ( this.landscapeSpec?.structures.some( placement => placement.assetId === 'abandoned-warehouse' ) ) {
+			this.landscapeWarehouse = new LandscapeWarehouse( this, this.landscapeSpec );
+		}
+		if ( qs.has( 'landscapeBuilder' ) ) {
+			this.landscapeBuilder = new LandscapeBuilder( {
+				spec: this.landscapeSpec ?? readSavedLandscapeSpec() ?? undefined,
+				onGoHome: this.landscapeSpec ? () => {
+					const x = 100, z = 584;
+					this.monorail.teleport( this.player, x, this.player.groundAt( x, z, 1000 ), z, Math.PI );
+				} : undefined,
+				onGoLandscape: this.landscapeSpec ? () => {
+					const spawn = landscapePathLayout( this.landscapeSpec ).spawn;
+					this.monorail.teleport( this.player, spawn.x, this.player.groundAt( spawn.x, spawn.z, 1000 ), spawn.z, - Math.PI / 2 );
+				} : undefined,
+			} );
+			if ( qs.get( 'generated' ) === '1' && ! this.landscapeSpec ) this.landscapeBuilder.notice( 'Saved landscape is missing or invalid. Review and save the specification before exploring.', true );
 		}
 		this.pistol = new SurvivalPistol( scene );
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
