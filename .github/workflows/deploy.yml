@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, loz/main ]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: main-revision
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -27,7 +31,7 @@ jobs:
       - run: node --test test/build-commit-stamp.mjs
       - run: npm run build
         env:
-          ELSEMESH_COMMIT_SHA: ${{ github.sha }}
+          ELSEMESH_COMMIT_SHA: ${{ steps.main-revision.outputs.sha }}
           ELSEMESH_ALLOW_SOURCE_BUILD: '1'
       - id: loz-ref
         name: Check for mirrored LOZ main branch
