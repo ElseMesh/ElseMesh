@@ -1,0 +1,59 @@
+name: Publish experimental ElseMesh preview
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: elsemesh-experimental-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pinned ElseMesh source
+        uses: actions/checkout@v4
+        with:
+          repository: lozknowles/ElseMesh
+          ref: f2afd7f2858c5cd8080e0f3514a3934e29d0daa8
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+      - name: Install dependencies
+        working-directory: source
+        run: npm ci
+      - name: Verify static preview and publishable source
+        working-directory: source
+        run: npm run test:preview && npm run test:publication && npm run test:network && npm test
+      - name: Build and stage isolated preview
+        working-directory: source
+        run: npm run build && npm run stage:static-preview
+      - name: Check exact build identity
+        working-directory: source
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const m=JSON.parse(fs.readFileSync('artifacts/preview-site/preview-build.json')); if(m.sourceCommit !== 'f2afd7f2858c5cd8080e0f3514a3934e29d0daa8' || m.sourceTreeDirty || m.liveFederation) process.exit(1)"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: source/artifacts/preview-site
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
