@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out pinned ElseMesh source
         uses: actions/checkout@v4
@@ -33,6 +33,17 @@ jobs:
       - name: Install dependencies
         working-directory: source
         run: npm ci
+      - name: Install software Vulkan for headless WebGPU tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libvulkan1 mesa-vulkan-drivers vulkan-tools
+          VK_DRIVER_FILES="$(find /usr/share/vulkan/icd.d -maxdepth 1 -name 'lvp_icd*.json' -print -quit)"
+          test -n "$VK_DRIVER_FILES"
+          XDG_RUNTIME_DIR="$RUNNER_TEMP/elsemesh-xdg"
+          install -d -m 700 "$XDG_RUNTIME_DIR"
+          echo "VK_DRIVER_FILES=$VK_DRIVER_FILES" >> "$GITHUB_ENV"
+          echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
+          vulkaninfo --summary
       - name: Verify static preview and publishable source
         working-directory: source
         run: npm run test:preview && npm run test:publication && npm run test:network && npm test
