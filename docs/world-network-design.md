@@ -22,11 +22,11 @@ are part of the same boundary.
 
 World moderation and a visitor's personal viewing choice are separate policy
 layers. The owner can select which shared avatars and objects are normally
-visible to visitors. An individual visitor may opt into a less restricted view,
-including content other people deliberately share directly with them. That
-choice affects only that visitor's presentation: it does not authorize writes,
-increase server capacity, bypass the owner's admission and transport limits, or
-make hidden content available to everyone. A private world or access-controlled
+visible to visitors. Unapproved content is shared directly by the person who
+created or controls it, and only visitors who opt in receive it. That choice
+affects only the visitor's presentation: it does not authorize writes, increase
+server capacity, bypass the owner's admission and transport limits, or make
+hidden content available to everyone. A private world or access-controlled
 asset still requires authorization. Clients should clearly identify when they
 are viewing content outside the owner's default presentation policy.
 
@@ -42,18 +42,30 @@ A world owner should be able to nominate neighboring world operators as
 redundant providers for this world, with an explicit preference order. A
 neighbor participates only after the owner grants its daemon the relevant
 hosting scopes and it has the required signed package data. If the owner is
-unavailable, clients should try eligible providers in owner-defined order,
-verify the unchanged owner-signed manifest and asset hashes, and return to the
-owner when it recovers. A preference list expresses failover order; it does not
-transfer ownership or permit a neighbor to rewrite the source world.
+unavailable, the system should select the first eligible provider in
+owner-defined order, verify the unchanged owner-signed manifest and asset
+hashes, and return authority to the owner when it recovers. Each configured
+standby receives every committed simulation update; an update is committed
+only after all configured standbys acknowledge it. A shared, heartbeat-driven,
+expiring authority lease with fencing prevents two servers from simulating the
+world at once. When the owner returns, it synchronizes the latest committed
+state and reclaims authority promptly with a higher fencing epoch. A preference
+list expresses failover order; it does not transfer world ownership or permit
+a neighbor to rewrite the owner's signed source.
 
 Serving static content and becoming the live world authority are separate
 permissions. The current delegated failover lease can temporarily make an
 authorized delegate discoverable and allow it to serve the owner's manifest;
-`content-cache` is separately required to serve assets. Delegation does not
-currently transfer presence, simulation, or shared state. So this redundancy
-keeps a world package reachable, but does not yet provide seamless multiplayer
-continuity through owner failure.
+`content-cache` is separately required to serve assets. Current delegation does
+not replicate live presence, simulation, or shared state. The ranked, fully
+replicated standby and fenced authority model above is a design requirement,
+not a current capability.
+
+If no authorized provider has the latest acknowledged state, the world becomes
+read-only. Visitors may still move locally and traverse signed portals whose
+destinations are available. They do not publish presence or commit gameplay
+changes in that read-only world. A destination with an active authority may
+accept normal play; otherwise the visitor continues in read-only mode.
 
 ## World and portal lifecycle
 
@@ -152,6 +164,13 @@ the current presence protocol does not contain one.
 7. **Direct browser networking is not universally reachable.** WebRTC has a
    tested local path and gateway fallback; cross-NAT public connectivity and
    TURN are outstanding. Browser-hosted owners still require the gateway path.
+8. **Read-only failover traversal is not implemented.** The client has no
+   read-only world mode that permits local movement and signed-portal traversal
+   while suppressing presence and gameplay writes.
+9. **Synchronous simulation standby is not implemented.** Current failover
+   grants preserve bounded manifest authority and content delivery only. There
+   is no replication of committed simulation state, all-standby acknowledgement,
+   shared heartbeat lease, fencing epoch transition, or owner recovery sync.
 
 These gaps mean current caps reduce accidental overload and bound several
 protocol paths, but do not yet constitute comprehensive DoS resistance or the

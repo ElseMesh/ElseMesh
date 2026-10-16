@@ -63,22 +63,46 @@ providers with neighboring world IDs or ensure that they are geographically or
 topologically near.
 
 The requested design is for an owner to designate neighboring worlds as
-eligible replicas and publish an ordered preference list. At the protocol
-level, this needs a versioned signed redundancy policy that binds each rank to
-the neighbor world ID and its authorized hosting PeerID(s), required scopes,
-content revision/hash, and bounded failover conditions. Clients and directory
-selection should honor that order after the owner is unavailable, while still
-verifying the original owner's manifest and grants. Neighbor ranking should
-not itself grant hosting rights; explicit owner authorization and the existing
-scopes remain necessary. Recovery should prefer the owner again and retire the
-temporary authority according to the signed epoch/lease rules.
+eligible replicas and publish an ordered preference list. A versioned signed
+redundancy policy should bind each rank to the neighbor world ID and its
+authorized hosting PeerID(s), required scopes, content revision/hash, and
+bounded failover conditions. Neighbor ranking should not itself grant hosting
+rights; explicit owner authorization and the existing scopes remain necessary.
+Clients and directory selection should honor that order after owner failure,
+while still verifying the original owner's manifest and grants.
+
+For full simulation continuity, every configured standby synchronously
+replicates the authoritative mutable state needed to resume play: presence,
+vehicle and object state, inventories, and other world simulation/event state.
+An action becomes committed only when every configured standby acknowledges
+it. This intentionally trades write availability for consistency: if a
+standby cannot acknowledge, the update is not committed. If no eligible
+provider can prove it has the latest committed state, visitors enter read-only
+mode rather than continuing a divergent simulation.
+
+One shared, heartbeat-driven, expiring authority lease selects the active
+simulation server. Fencing epochs prevent a former owner or delegate from
+continuing to accept writes after authority changes. When the owner returns,
+it first synchronizes the latest committed state from the active authority,
+then reclaims authority promptly with a higher fencing epoch; the transition
+must not allow owner and delegate to simulate concurrently. Owner-defined
+neighbor ranking selects which eligible, state-current standby takes over.
+
+In read-only mode, visitors may move locally and traverse any signed portal
+whose destination can be resolved and prepared. Their presence and gameplay
+actions are not published or committed in the read-only world. On arrival, the
+destination's own authority state determines whether normal play or read-only
+traversal applies. This allows visitors to reach exits toward neighboring
+worlds even while their current world lacks a safe writable authority.
 
 This is not a blanket claim that the current system implements neighbor-ranked
 redundancy. Current grants authorize provider nodes and current discovery
 orders by role tier, with PeerID ties. The owner-configurable neighbor ranking
 is missing. Also missing is failover of live presence, simulation state, or
 write authority; the current leases only preserve bounded manifest authority,
-and cached content can preserve package delivery.
+and cached content can preserve package delivery. The ranked neighbor policy,
+all-standby synchronous state replication, shared heartbeat lease, fencing,
+owner resynchronization, and read-only portal traversal are future behavior.
 
 ## Current presence limits and checks
 
@@ -144,6 +168,14 @@ The sequence is currently coordinated in the browser. It is not an atomic
 server transaction. Account identity, inventory, arbitrary carried objects,
 and authoritative simulation continuity are outside the current handover.
 
+The desired read-only failover path uses the last verified, fully acknowledged
+world state as a static baseline. The visitor's avatar may move locally and
+cross a signed portal after its destination is resolved and prepared, but the
+read-only world does not publish that avatar's presence or accept gameplay
+mutations. Each destination independently determines whether the visitor can
+join writable simulation or remains in read-only traversal mode. This fallback
+does not claim that presence or gameplay state has transferred.
+
 ## Desired policy extension: moderation and personal view
 
 The desired model needs explicit separation between **admission**, **sharing**,
@@ -155,20 +187,28 @@ and **presentation**:
    request/connection budgets. The owner must reject new sessions or updates
    before allocating unbounded state. A user override cannot change this layer.
 2. **Sharing/moderation policy (owner default):** a signed allowlist/catalog of
-   approved avatar and object definitions, plus rules for whether visitor
-   content is visible to others by default. References must be content hashes
-   and versioned data contracts, never executable scripts or arbitrary URLs.
+   approved avatar and object definitions, plus rules for the normal visibility
+   of approved content. Unapproved content is not broadcast by default;
+   only the content creator/controller can share it directly, and only to
+   visitors who opt in. References must be content hashes and versioned data
+   contracts, never executable scripts or arbitrary URLs.
 3. **Personal presentation preference (visitor local):** each visitor may
-   choose to render compatible content shared by another participant even if
-   it is outside the owner's default moderation list. The preference is local
-   and per-world. It does not publish a policy change, increase admission
-   limits, permit content download the visitor is not authorized to access, or
-   alter what other visitors see.
-4. **Direct sharing:** if visitors exchange content directly, use a negotiated,
-   bounded data channel with explicit recipient consent, size/rate limits,
-   content type allowlists, hash verification, and short-lived routing. Do not
-   use direct sharing to relay writes to the world or evade owner-side session
-   and network quotas. A visitor should be able to disable direct sharing.
+   choose to render compatible content that its creator/controller shares
+   directly with them, even if it is outside the owner's default moderation
+   list. Only opted-in viewers receive the unapproved content. The preference
+   is local and per-world. It does not publish a policy change, increase
+   admission limits, permit unauthorized downloads, or alter what other
+   visitors see.
+4. **Direct sharing:** share content directly from the person who created or
+   controls it, after recipient opt-in. Use bounded data channels, size/rate
+   limits, content type allowlists, hash verification, and short-lived routing.
+   Do not use direct sharing to relay world writes or evade owner-side session
+   and network quotas. A visitor can disable direct sharing.
+
+Gameplay-affecting carried objects require world-server authority. A visitor's
+direct presentation sharing does not grant an object write, ownership, or
+simulation right; object state that changes the shared world must be validated
+and committed by its authoritative world server.
 
 Protocol extension should version these settings in the signed manifest and
 define whether moderation applies to the sender, receiver, or public world
