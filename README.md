@@ -6,18 +6,40 @@ An experimental WebGPU island exploration game. Walk, sail and fly between
 islands, explore the underwater cave and monorail, and collect a sedan delivered
 to Bracken Quay by cargo ship. Fishing, trading and hunger are optional.
 
-**[Play the current public build](https://lozknowles.github.io/ElseMesh/)** · **[Try the experimental preview](https://lozknowles.github.io/ElseMesh-preview/)**
+**[Play the current public build](https://lozknowles.github.io/ElseMesh/)** · **[Track draft cross-world work](https://github.com/lozknowles/ElseMesh/pull/5)**
 
-The experimental preview is a separately published, clearly labelled static
-build from [draft PR #5](https://github.com/lozknowles/ElseMesh/pull/5).
-It lets a collaborator try the island and inspect the in-progress source without
-changing the existing public build. It does **not** provide live internet
-multiplayer or cross-world portal travel: those require separately hosted,
-qualified HTTPS/WebSocket world services. The preview keeps its browser saves
-and demo identity separate from the existing site's data. See
-[CHANGELOG.md](CHANGELOG.md) for changes and [the preview publisher](https://github.com/lozknowles/ElseMesh-preview)
-for the pinned build and deployment status. Friends can fork PR #5's branch and
-send a pull request; direct pushes require collaborator access.
+The requested friend preview requires live travel between independently hosted
+worlds. That build is **not available yet**. Draft PR #5 contains the in-progress
+federation source and tests, but its current browser integration only shows
+signed remote scene proxies in a local development preview. A separate
+[preview publisher](https://github.com/lozknowles/ElseMesh-preview) exists,
+but its deployment is disabled; its Pages URL is not an available multiplayer
+link. See [CHANGELOG.md](CHANGELOG.md) and
+[the qualification record](docs/FEDERATION-PHASE2-QUALIFICATION.md) for the
+remaining work. Friends can fork PR #5's branch and send a pull request;
+direct pushes require collaborator access.
+
+## Ed's focus: prove live cross-world travel
+
+The portal shown in the game video connects places within the existing island
+world. It is not evidence that a player has crossed between independently
+hosted worlds. Ed's priority is to make that complete journey work in the
+actual browser game, using the signed federation work in draft PR #5:
+
+1. Enter a portal from world A and obtain a one-time, owner-signed handoff.
+2. Join independently hosted world B under its own owner and session authority,
+   then render and control the player's avatar there with other players visible.
+3. Return through a portal to world A, including safe recovery if either world
+   disconnects or rejects the handoff. Prevent replay or duplicate avatar
+   control, and define what happens to carried items.
+4. Capture a reproducible browser demonstration and logs showing the two
+   separate world services, successful entry and return, and failed/replayed
+   handoff handling. Record the exact commit, endpoints, machines and limits.
+
+This is the acceptance target for a friend-ready cross-world preview. The
+existing shared room and local remote-scene proxy are useful development steps,
+but neither proves that journey. Keep the current public island and draft PR #4
+unchanged while this work is tested on PR #5.
 
 This is a public experimental source release, not a finished or fully qualified
 game. WebGPU and a capable desktop GPU are required. Frame rate and memory use

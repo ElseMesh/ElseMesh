@@ -1,15 +1,16 @@
-# Experimental static preview for collaborators
+# Experimental preview plan for collaborators
 
-The public preview lives at `https://lozknowles.github.io/ElseMesh-preview/`.
-Its publisher is the separate `lozknowles/ElseMesh-preview` repository, which
-pins an exact draft PR #5 source commit. The publisher's Actions run and
-`preview-build.json` identify the build actually served. The existing
+No friend-ready cross-world preview is deployed. The separate
+`lozknowles/ElseMesh-preview` repository pins a draft PR #5 source commit,
+but its Pages deployment was canceled and its workflow disabled once live
+cross-world travel became the requirement. Its URL must not be shared as a
+working multiplayer link. The existing
 `lozknowles.github.io/ElseMesh/` site remains on main (`95719848d5ffa4428b57c75c272483e1c2113a72`
 when this plan was prepared).
 
-## What the preview demonstrates
+## What the staged static build demonstrates locally
 
-- Static WebGPU island gameplay and assets for a friend to try in a browser.
+- Static WebGPU island gameplay and assets when run locally in a browser.
 - A direct path to inspect or fork draft PR #5 source.
 - A visible experimental label. The preview is **not** a production multiplayer
   release, GitHub Release or protocol assurance claim.
