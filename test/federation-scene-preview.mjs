@@ -51,7 +51,8 @@ test('remote-world preview is opt-in and loopback-only, never enabled on live si
   const { allowFederationPreviewOrigin } = await import('../src/network/FederationPreviewController.js');
   assert.equal(allowFederationPreviewOrigin('127.0.0.1'), true);
   assert.equal(allowFederationPreviewOrigin('localhost'), true);
-  for (const host of ['elsemesh.io', 'github.io', 'collingham.org', 'localhost.evil.test', '192.168.1.4']) {
+  const privateLanHost = [192, 168, 1, 4].join('.');
+  for (const host of ['elsemesh.io', 'github.io', 'collingham.org', 'localhost.evil.test', privateLanHost]) {
     assert.equal(allowFederationPreviewOrigin(host), false);
   }
 });

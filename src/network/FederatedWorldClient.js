@@ -34,7 +34,7 @@ export async function signedWorldJoin(identity, challenge, playerId, subtle = cr
   const hash = new Uint8Array(await subtle.digest('SHA-256', spki));
   const signer = 'elsemesh-node:' + Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
   if (signer !== identity.nodeId) throw new Error('Browser identity mismatch');
-  const payload = { kind: 'elsemesh-world-join/1', protocol: 'elsemesh.world-wss/1',
+  const payload = { kind: 'elsemesh-world-join/1', protocol: 'elsemesh.world-wss/2',
     worldId: challenge.worldId, regionId: challenge.regionId,
     authorityEpoch: challenge.authorityEpoch, serverNonce: challenge.nonce,
     clientNonce: crypto.randomUUID(), issuedAt: Date.now(), playerId, signer, publicKey };
@@ -79,6 +79,7 @@ export class FederatedWorldClient {
         const m = JSON.parse(event.data.toString());
         if (m.type === 'challenge') {
           if (m.challenge?.kind !== 'elsemesh-world-challenge/1' ||
+              m.challenge.protocol !== 'elsemesh.world-wss/2' ||
               m.challenge.worldId !== this.world || m.challenge.regionId !== this.region ||
               m.manifest?.descriptor?.regionId !== this.region || m.manifest?.descriptor?.worldId !== this.world ||
               m.challenge.manifestHash !== m.manifest?.manifestHash ||
@@ -95,6 +96,7 @@ export class FederatedWorldClient {
           const challenge = m.challenge;
           if (!this.renewing || !this.grant || !challenge ||
               challenge.kind !== 'elsemesh-world-renew-challenge/1' ||
+              challenge.protocol !== 'elsemesh.world-wss/2' ||
               challenge.worldId !== this.world || challenge.regionId !== this.region ||
               challenge.sessionId !== this.grant.sessionId ||
               challenge.playerId !== this.playerId || challenge.playerNodeId !== this.identity.nodeId ||
@@ -111,6 +113,7 @@ export class FederatedWorldClient {
         if (m.type === 'admitted' || m.type === 'renewed') {
           const g = m.grant;
           if (!g || g.kind !== 'elsemesh-world-admission/1' ||
+              g.protocol !== 'elsemesh.world-wss/2' ||
               g.worldId !== this.world || g.regionId !== this.region ||
               g.playerId !== this.playerId || g.playerNodeId !== this.identity.nodeId ||
               typeof g.sessionId !== 'string' ||
@@ -135,7 +138,8 @@ export class FederatedWorldClient {
             this.resolveReady(g);
           }
         } else if (m.type === 'travel-admitted') {
-          if (m.arrival?.worldId !== this.world ||
+          if (m.arrival?.protocol !== 'elsemesh.world-wss/2' ||
+              m.arrival?.worldId !== this.world ||
               m.arrival?.regionId !== this.region ||
               m.arrival?.playerId !== this.playerId ||
               m.arrival?.playerNodeId !== this.identity.nodeId ||
@@ -151,13 +155,15 @@ export class FederatedWorldClient {
           // not treated as an owner-authentication failure.
           if (Number.isSafeInteger(m.revision) && m.revision < this.snapshotRevision) return;
           if (Number.isFinite(m.capturedAt) && Math.abs(Date.now() - m.capturedAt) > 60000) return;
-          if (!this.grant?.permissions.includes('view') || m.protocol !== 'elsemesh.world-wss/1' ||
+          if (!this.grant?.permissions.includes('view') || m.protocol !== 'elsemesh.world-wss/2' ||
               m.worldId !== this.world || m.regionId !== this.region ||
               m.sessionId !== this.grant.sessionId || m.authorityEpoch !== this.grant.authorityEpoch ||
               !await verifyWorldSignature(m, this.owner, this.subtle) ||
               !Number.isSafeInteger(m.revision) || m.revision < this.snapshotRevision ||
               !Number.isFinite(m.capturedAt) || Math.abs(Date.now() - m.capturedAt) > 60000 ||
               !Array.isArray(m.entities) || m.entities.length > 64 ||
+              !Number.isSafeInteger(m.visibleCount) || m.visibleCount < m.entities.length ||
+              m.truncated !== (m.visibleCount > m.entities.length) ||
               !m.entities.every(e => e && Object.keys(e).every(k => ['entityId', 'kind', 'position', 'yaw', 'revision'].includes(k)) &&
                 typeof e.entityId === 'string' && /^[a-z0-9._:-]{1,128}$/.test(e.entityId) &&
                 ['player','npc','prop'].includes(e.kind) && Array.isArray(e.position) && e.position.length === 3 &&
@@ -229,7 +235,7 @@ export async function signedWorldRenew(identity, challenge, playerId, subtle = c
   const hash = new Uint8Array(await subtle.digest('SHA-256', spki));
   const signer = 'elsemesh-node:' + Array.from(hash, n => n.toString(16).padStart(2, '0')).join('');
   if (signer !== identity.nodeId) throw new Error('Browser renewal signer mismatch');
-  const payload = { kind: 'elsemesh-world-renew-proof/1', protocol: 'elsemesh.world-wss/1',
+  const payload = { kind: 'elsemesh-world-renew-proof/1', protocol: 'elsemesh.world-wss/2',
     worldId: challenge.worldId, regionId: challenge.regionId,
     authorityEpoch: challenge.authorityEpoch, previousSessionId: challenge.sessionId,
     serverNonce: challenge.nonce, issuedAt: Date.now(), playerId, signer, publicKey };

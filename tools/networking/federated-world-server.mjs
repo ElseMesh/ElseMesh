@@ -5,7 +5,7 @@ import { nodeId, signObject, verifyObject } from '../../network/identity.mjs';
 import { validateRegion, validatePortal, publishRegion, acceptPortalHandoff } from '../../network/federation.mjs';
 import { DurableHandoffReplay } from '../../network/DurableHandoffReplay.mjs';
 
-export const FEDERATION_WIRE = 'elsemesh.world-wss/1';
+export const FEDERATION_WIRE = 'elsemesh.world-wss/2';
 const MAX_CLIENT_FRAME = 8192;
 const MAX_PEERS = 64;
 const MAX_PENDING_AUTH = 8;
@@ -39,15 +39,16 @@ export function validatePublicEntity(entity) {
   return { entityId: entity.entityId, kind: entity.kind, position: [...entity.position],
     yaw: entity.yaw, revision: entity.revision };
 }
-export function relevantEntities(entities, interest) {
+function entitiesInInterest(entities, interest) {
   const squared = interest.radius * interest.radius;
   return entities.filter(e => e.position.reduce((sum, n, i) =>
     sum + (n - interest.center[i]) ** 2, 0) <= squared)
     .sort((a, b) => {
       const dist = e => e.position.reduce((sum, n, i) => sum + (n - interest.center[i]) ** 2, 0);
       return dist(a) - dist(b) || a.entityId.localeCompare(b.entityId);
-    }).slice(0, 64);
+    });
 }
+export function relevantEntities(entities, interest) { return entitiesInInterest(entities, interest).slice(0, 64); }
 
 /**
  * Standalone, single-owner authoritative WSS world. Networking only:
@@ -134,11 +135,15 @@ export async function createFederatedWorldServer({
   function snapshot(socket) {
     const st = socket.worldState;
     if (!st?.authenticated || !st.interest) return;
-    const selected = relevantEntities([...entities.values()], st.interest);
+    const visible = entitiesInInterest([...entities.values()], st.interest);
+    const selected = visible.slice(0, 64);
     const packet = { type: 'snapshot', protocol: FEDERATION_WIRE, worldId: region.worldId,
       regionId: region.regionId, authorityEpoch: region.authority.epoch,
-      sessionId: st.grant.sessionId, revision, entities: selected, capturedAt: Date.now() };
+      sessionId: st.grant.sessionId, revision, entities: selected,
+      visibleCount: visible.length, truncated: visible.length > selected.length,
+      capturedAt: Date.now() };
     while (packet.entities.length && Buffer.byteLength(JSON.stringify(packet)) > MAX_CLIENT_FRAME - 700) packet.entities.pop();
+    packet.truncated = visible.length > packet.entities.length;
     sendBounded(socket, signObject(packet, identity), stats);
   }
   wss.on('connection', socket => {

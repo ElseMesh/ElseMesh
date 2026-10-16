@@ -38,7 +38,8 @@ export async function installLocalFederationPreview(app, params, host = location
         try {
           preview.applyVerifiedSnapshot(event.packet);
           status.textContent = 'Remote world proxies: ' + event.packet.entities.length +
-            ' entities (not full terrain)';
+            '/' + event.packet.visibleCount + ' visible entities' +
+            (event.packet.truncated ? ' (limited view)' : '') + ' (not full terrain)';
         } catch {
           preview.disconnect();
           status.textContent = 'Remote proxy state rejected';

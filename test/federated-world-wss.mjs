@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash, webcrypto } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { newIdentity, assetId } from '../network/identity.mjs';
+import { newIdentity, assetId, signObject } from '../network/identity.mjs';
 import { DurableHandoffReplay } from '../network/DurableHandoffReplay.mjs';
 import { sampleRegions } from '../network/federation-fixtures.mjs';
 import { createPortalHandoff } from '../network/federation.mjs';
@@ -96,6 +96,22 @@ test('two independently owned WSS worlds support identity challenge, scoped view
   assert.equal(received.sessionId, clientB.grant.sessionId, 'snapshot bound to authenticated viewer session');
   assert.deepEqual(received.entities.map(e => e.entityId).sort(), ['prop:b1', 'prop:b2']);
   assert.equal(received.entities.some(e => e.entityId === 'prop:secret'), false);
+  assert.equal(received.visibleCount, 2);
+  assert.equal(received.truncated, false);
+  const crowded = wait(clientB, 'snapshot');
+  hostB.setEntities(Array.from({ length: 100 }, (_, i) => entity('prop:crowd-' + i, 2)));
+  const crowdedPacket = await crowded;
+  assert.equal(crowdedPacket.visibleCount, 100);
+  assert.equal(crowdedPacket.entities.length, 64);
+  assert.equal(crowdedPacket.truncated, true, 'entity clipping must be visible to the renderer');
+  const byteLimited = wait(clientB, 'snapshot');
+  hostB.setEntities(Array.from({ length: 64 }, (_, i) =>
+    entity('prop:' + 'x'.repeat(110) + i, 2)));
+  const limitedPacket = await byteLimited;
+  assert.equal(limitedPacket.visibleCount, 64);
+  assert.ok(limitedPacket.entities.length < 64, 'byte budget should clip long IDs');
+  assert.equal(limitedPacket.truncated, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(limitedPacket)) <= 8192);
   const bad = connect(hostB, await visitorIdentity(), f.edWorld, b.nodeId);
   t.after(() => bad.close());
   await assert.rejects(bad.ready, /World disconnected|connection failed/i, 'Unknown player signer denied');
@@ -136,6 +152,30 @@ test('two independently owned WSS worlds support identity challenge, scoped view
   assert.equal(hostB.metrics().replayEntries, 1);
   assert.equal(hostA.metrics().replayEntries, 1);
   assert.notEqual(unknown.nodeId, b.nodeId);
+});
+test('signed inconsistent snapshot metadata and unsigned tampering are rejected', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'elsemesh-snapshot-meta-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const a = newIdentity(), owner = newIdentity(), visitor = await visitorIdentity();
+  const region = sampleRegions(a.nodeId, owner.nodeId).edWorld;
+  const server = await createFederatedWorldServer({ identity: owner, region,
+    browserOrigin: ORIGIN, replayFile: join(dir, 'ledger'),
+    authorize: () => ({ allowed: true, permissions: ['view'] }),
+    initialEntities: [entity('prop:one', 1)] });
+  t.after(() => server.close());
+  const client = connect(server, visitor, region, owner.nodeId);
+  t.after(() => client.close());
+  await client.ready;
+  const first = wait(client, 'snapshot');
+  await client.subscribe([0, 0, 0], 30);
+  const packet = await first;
+  assert.equal(await verifyWorldSignature({ ...packet, visibleCount: 2 }, owner.nodeId), false);
+  const { signature, ...payload } = packet;
+  const invalid = signObject({ ...payload, truncated: true }, owner);
+  assert.equal(await verifyWorldSignature(invalid, owner.nodeId), true);
+  const error = wait(client, 'protocol-error');
+  await client.socket.onmessage({ data: JSON.stringify(invalid) });
+  assert.match((await error).error, /Invalid remote world snapshot/);
 });
 test('unknown world owner pin rejected before sending browser authentication', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'elsemesh-pin-'));
