@@ -87,3 +87,33 @@ latency/loss tests; WebRTC comparative transport profile if useful; real
 browser FPS and 1% lows with GPU telemetry; adversarial fuzzing, rollback
 and repeat Argon final SHA signoff. The prior Argon remediation follow-up
 has not produced a verifiable completed response and is not treated as approval.
+
+## Exploratory rendered-frame browser probe (not a release gate PASS)
+
+An additional isolated Chrome 155 headless run on MSI used the actual ElseMesh
+WebGPU scene graph and an adapter reported as `intel / xe-lpg`, at 1280x720,
+balanced render scale 0.75, authored warehouse camera. It ran an A/B/A
+sequence: unchanged scene; 64 visible remote entity *proxy* meshes; unchanged
+scene again. Each stage collected about 10 seconds of complete rAF frame
+intervals. The methodology and raw samples are committed in
+`tools/performance/federation-preview-browser.mjs` and
+`docs/evidence/federation-64proxy-browser-2026-10-16.json`.
+
+| Stage | Complete frames | Mean FPS | Median frame ms | p95 frame ms | Correct slowest-1%-mean low FPS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before | 151 | 15.07 | 50.1 | 100.1 | 1.56 |
+| 64 proxies | 142 | 14.37 | 66.6 | 100.3 | 2.26 |
+| After | 162 | 16.12 | 66.6 | 100.0 | 8.57 |
+
+The 1% low comes from dividing 1000 by the mean duration of the **slowest
+ceil(0.01 × frame count) complete frame intervals**, not a single percentile
+frame. Results are highly unstable because of very long frames, a heavy
+headless WebGPU workload and possible compilation/scheduler interference.
+The probe uses **Vite development output**, not the release artifact, and does
+not test a remotely networked view or terrain/asset transfer. **No FPS gain,
+60-FPS compliance, or demonstrated proxy-only frame-rate regression is
+claimed** from this one A/B/A run. Physical visible-display, frame pacing,
+same-hardware repeated/alternating build tests, 1%-low confidence, GPU pass
+timings, 10/25/50 *remote* entities and actual cross-world scenes remain
+blocked. Do not use the reported GPU adapter string as proof of render-device
+isolation or GPU utilization telemetry.

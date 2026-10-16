@@ -79,7 +79,13 @@ export class FederationView {
     const current = this.client;
     let cancelWait = () => {};
     const outcome = new Promise((resolve, reject) => {
-      const timer = this.setTimer(() => { off(); reject(new Error('Portal destination timed out')); }, timeoutMs);
+      const timer = this.setTimer(() => {
+        off();
+        // A timed-out handoff may have succeeded remotely. Never reuse this
+        // session or silently replay it: close and reauthenticate before travel.
+        current.close();
+        reject(new Error('Portal destination timed out; session closed for resynchronisation'));
+      }, timeoutMs);
       const off = current.onMessage(message => {
         if (!['travel-admitted', 'disconnected', 'protocol-error'].includes(message.type)) return;
         this.clearTimer(timer);

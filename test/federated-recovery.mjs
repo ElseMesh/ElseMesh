@@ -78,3 +78,20 @@ test('federated view rejects denied player without an endless reconnection loop'
   assert.equal(view.running, false);
   assert.equal(view.timer, null);
 });
+
+test('timed-out portal handoff closes ambiguous destination session rather than reusing it', async () => {
+  const view = new FederationView({ endpoint: 'ws://127.0.0.1:1/world' });
+  const listeners = new Set();
+  let closed = false, sent = 0;
+  view.connected = true;
+  view.client = {
+    closed: false,
+    close() { closed = true; this.closed = true; },
+    onMessage(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    async travel() { sent++; },
+  };
+  await assert.rejects(view.visit({ handoffId: 'unsafe' }, 10), /session closed for resynchronisation/);
+  assert.equal(sent, 1, 'ambiguous travel is not automatically replayed');
+  assert.equal(closed, true);
+  assert.equal(listeners.size, 0);
+});
