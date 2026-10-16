@@ -58,6 +58,7 @@ export function relevantEntities(entities, interest) {
  */
 export async function createFederatedWorldServer({
   identity, region, port = 0, host = '127.0.0.1', browserOrigin,
+  sessionTtlMs = 10 * 60_000,
   expectedHost = null, authorize, inboundPortals = [], replayFile,
   initialEntities = [],
 } = {}) {
@@ -71,6 +72,8 @@ export async function createFederatedWorldServer({
     throw new Error('Explicit exact browser origin required');
   if (typeof authorize !== 'function') throw new Error('Explicit destination policy required');
   if (!replayFile) throw new Error('Durable replay ledger required');
+  if (!Number.isSafeInteger(sessionTtlMs) || sessionTtlMs < 1000 || sessionTtlMs > 24 * 60 * 60_000)
+    throw new Error('Invalid destination grant lifetime');
   if (!Array.isArray(inboundPortals) || inboundPortals.length > 64) throw new Error('Invalid inbound portal list');
   const published = publishRegion(region, identity);
   const replay = new DurableHandoffReplay(replayFile);
@@ -169,7 +172,7 @@ export async function createFederatedWorldServer({
         if (now - state.windowStart >= 1000) { state.windowStart = now; state.count = 0; }
         if (++state.count > 30) return socket.close(1008, 'Rate limit');
         const msg = JSON.parse(bytes.toString());
-        if (!shape(msg, ['type', 'join', 'center', 'radius', 'handoff']) || typeof msg.type !== 'string')
+        if (!shape(msg, ['type', 'join', 'center', 'radius', 'handoff', 'proof']) || typeof msg.type !== 'string')
           return socket.close(1008, 'Invalid message');
         if (!state.authenticated) {
           if (msg.type !== 'authenticate' || !shape(msg.join, ['kind', 'protocol', 'worldId', 'regionId',
@@ -215,9 +218,53 @@ export async function createFederatedWorldServer({
             worldId: region.worldId, regionId: region.regionId, playerId: j.playerId,
             playerNodeId: j.signer, sessionId: randomUUID(),
             authorityEpoch: region.authority.epoch, permissions: state.permissions,
-            issuedAt: now, expiresAt: now + 10 * 60_000 }, identity);
+            issuedAt: now, expiresAt: now + sessionTtlMs }, identity);
           state.grant = grant;
           sendBounded(socket, { type: 'admitted', grant }, stats);
+          return;
+        }
+        if (msg.type === 'renew-request') {
+          if (now - (state.lastRenewAt || 0) < 250) return socket.close(1008, 'Renewal rate limit');
+          state.lastRenewAt = now;
+          state.renewChallenge = signObject({ kind: 'elsemesh-world-renew-challenge/1', protocol: FEDERATION_WIRE,
+            worldId: region.worldId, regionId: region.regionId,
+            authorityEpoch: region.authority.epoch, sessionId: state.grant.sessionId,
+            playerId: state.playerId, playerNodeId: state.playerNodeId,
+            nonce: randomUUID(), issuedAt: now, expiresAt: now + 5000 }, identity);
+          sendBounded(socket, { type: 'renew-challenge', challenge: state.renewChallenge }, stats);
+          return;
+        }
+        if (msg.type === 'renew-proof') {
+          const proof = msg.proof, challenge = state.renewChallenge;
+          state.renewChallenge = null; // one-time challenge, even on failure
+          if (!challenge || !proof || !shape(proof, ['kind','protocol','worldId','regionId',
+              'authorityEpoch','previousSessionId','serverNonce','issuedAt','playerId',
+              'signer','publicKey','signature']) ||
+              proof.kind !== 'elsemesh-world-renew-proof/1' || proof.protocol !== FEDERATION_WIRE ||
+              proof.worldId !== region.worldId || proof.regionId !== region.regionId ||
+              proof.authorityEpoch !== region.authority.epoch ||
+              proof.previousSessionId !== state.grant.sessionId || proof.serverNonce !== challenge.nonce ||
+              proof.playerId !== state.playerId || proof.signer !== state.playerNodeId ||
+              !Number.isSafeInteger(proof.issuedAt) || Math.abs(now - proof.issuedAt) > 5000 ||
+              now > challenge.expiresAt || !verifyObject(proof, new Set([state.playerNodeId])))
+            return socket.close(1008, 'Invalid renewal proof');
+          // Re-run destination policy on each renewal so revocation is effective.
+          const renewedPolicy = authorize({ playerId: state.playerId, playerNodeId: state.playerNodeId,
+            worldId: region.worldId, regionId: region.regionId });
+          if (!renewedPolicy || renewedPolicy.allowed !== true ||
+              !Array.isArray(renewedPolicy.permissions) || !renewedPolicy.permissions.length ||
+              !renewedPolicy.permissions.every(p => ['view','visit'].includes(p)))
+            return socket.close(1008, 'Admission revoked');
+          const refreshed = signObject({ kind: 'elsemesh-world-admission/1', protocol: FEDERATION_WIRE,
+            worldId: region.worldId, regionId: region.regionId,
+            playerId: state.playerId, playerNodeId: state.playerNodeId,
+            sessionId: state.grant.sessionId, authorityEpoch: region.authority.epoch,
+            permissions: [...new Set(renewedPolicy.permissions)], issuedAt: now,
+            expiresAt: now + sessionTtlMs }, identity);
+          state.grant = refreshed;
+          state.permissions = refreshed.permissions;
+          if (!state.permissions.includes('view')) state.interest = null;
+          sendBounded(socket, { type: 'renewed', grant: refreshed }, stats);
           return;
         }
         if (msg.type === 'subscribe') {

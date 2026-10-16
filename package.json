@@ -12,7 +12,7 @@
     "test:cargo": "node --test test/port-cargo.mjs",
     "test:demo": "node --test test/network-demo.mjs",
     "test:vehicle-steering": "node --test test/port-wheel-rig.mjs test/port-traffic.mjs",
-    "test:network": "node --test test/network-foundation.mjs test/network-player.mjs test/federation.mjs test/online-room.mjs test/online-reconnect.mjs test/ten-player-room.mjs test/network-speech.mjs test/avatar-appearance.mjs test/network-demo.mjs test/federated-world-wss.mjs test/federated-recovery.mjs test/durable-replay-expiry.mjs",
+    "test:network": "node --test test/network-foundation.mjs test/network-player.mjs test/federation.mjs test/online-room.mjs test/online-reconnect.mjs test/ten-player-room.mjs test/network-speech.mjs test/avatar-appearance.mjs test/network-demo.mjs test/federated-world-wss.mjs test/federated-recovery.mjs test/durable-replay-expiry.mjs test/federation-scene-preview.mjs",
     "verify:portal-detail": "node tools/portal_interior/verify-reference-detail.mjs",
     "world:export": "node tools/blender/export-terrain.mjs artifacts/world",
     "test:federation": "node --test test/federated-world-wss.mjs test/federated-recovery.mjs",

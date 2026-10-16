@@ -65,6 +65,9 @@ export class FederatedWorldClient {
     this.closed = false;
     this.snapshotRevision = -1;
     this.pendingHandoffId = null;
+    this.renewalTimer = null;
+    this.renewalTimeout = null;
+    this.renewing = false;
     this.ready = new Promise((resolve, reject) => { this.resolveReady = resolve; this.rejectReady = reject; });
     this.readyTimeout = setTimeout(() => {
       this.rejectReady(new Error('Timed out authenticating destination'));
@@ -88,7 +91,24 @@ export class FederatedWorldClient {
             join: await signedWorldJoin(this.identity, m.challenge, this.playerId, this.subtle) }));
           return;
         }
-        if (m.type === 'admitted') {
+        if (m.type === 'renew-challenge') {
+          const challenge = m.challenge;
+          if (!this.renewing || !this.grant || !challenge ||
+              challenge.kind !== 'elsemesh-world-renew-challenge/1' ||
+              challenge.worldId !== this.world || challenge.regionId !== this.region ||
+              challenge.sessionId !== this.grant.sessionId ||
+              challenge.playerId !== this.playerId || challenge.playerNodeId !== this.identity.nodeId ||
+              challenge.authorityEpoch !== this.grant.authorityEpoch ||
+              !Number.isSafeInteger(challenge.issuedAt) ||
+              Math.abs(Date.now() - challenge.issuedAt) > 5000 ||
+              Date.now() > challenge.expiresAt ||
+              !await verifyWorldSignature(challenge, this.owner, this.subtle))
+            throw new Error('Untrusted renewal challenge');
+          this.socket.send(JSON.stringify({ type: 'renew-proof',
+            proof: await signedWorldRenew(this.identity, challenge, this.playerId, this.subtle) }));
+          return;
+        }
+        if (m.type === 'admitted' || m.type === 'renewed') {
           const g = m.grant;
           if (!g || g.kind !== 'elsemesh-world-admission/1' ||
               g.worldId !== this.world || g.regionId !== this.region ||
@@ -99,9 +119,21 @@ export class FederatedWorldClient {
               !Number.isFinite(g.expiresAt) || Date.now() > g.expiresAt ||
               !await verifyWorldSignature(g, this.owner, this.subtle))
             throw new Error('Untrusted destination admission');
+          if (m.type === 'renewed') {
+            if (!this.renewing || !this.grant || g.sessionId !== this.grant.sessionId ||
+                g.authorityEpoch !== this.grant.authorityEpoch ||
+                g.expiresAt <= this.grant.expiresAt)
+              throw new Error('Invalid renewal continuity');
+          } else if (this.grant) throw new Error('Duplicate initial admission');
           this.grant = g;
-          clearTimeout(this.readyTimeout);
-          this.resolveReady(g);
+          clearTimeout(this.renewalTimeout);
+          this.renewalTimeout = null;
+          this.renewing = false;
+          this.scheduleRenewal();
+          if (m.type === 'admitted') {
+            clearTimeout(this.readyTimeout);
+            this.resolveReady(g);
+          }
         } else if (m.type === 'travel-admitted') {
           if (m.arrival?.worldId !== this.world ||
               m.arrival?.regionId !== this.region ||
@@ -144,12 +176,30 @@ export class FederatedWorldClient {
     };
     this.socket.onclose = event => {
       clearTimeout(this.readyTimeout);
+      clearTimeout(this.renewalTimer);
+      clearTimeout(this.renewalTimeout);
       this.pendingHandoffId = null;
       this.closed = true;
       this.rejectReady(new Error('World disconnected: ' + event.code));
       for (const listener of this.listeners) listener({ type: 'disconnected', code: event.code });
     };
     this.socket.onerror = () => this.rejectReady(new Error('World connection failed'));
+  }
+  scheduleRenewal() {
+    clearTimeout(this.renewalTimer);
+    if (!this.grant || this.closed) return;
+    const remaining = this.grant.expiresAt - Date.now();
+    const lead = Math.min(60000, Math.max(500, Math.floor(remaining * 0.6)));
+    this.renewalTimer = setTimeout(() => {
+      if (this.closed || this.renewing || this.socket.readyState !== 1) return;
+      this.renewing = true;
+      this.socket.send(JSON.stringify({ type: 'renew-request' }));
+      this.renewalTimeout = setTimeout(() => {
+        if (!this.closed && this.renewing) this.socket.close(1012, 'Renewal not acknowledged');
+      }, 5000);
+      this.renewalTimeout.unref?.();
+    }, Math.max(100, remaining - lead));
+    this.renewalTimer.unref?.();
   }
   onMessage(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   async subscribe(center, radius = 150) {
@@ -165,5 +215,24 @@ export class FederatedWorldClient {
     this.pendingHandoffId = handoff.handoffId;
     this.socket.send(JSON.stringify({ type: 'travel', handoff }));
   }
-  close() { clearTimeout(this.readyTimeout); this.socket.close(); }
+  close() {
+    clearTimeout(this.readyTimeout);
+    clearTimeout(this.renewalTimer);
+    clearTimeout(this.renewalTimeout);
+    this.socket.close();
+  }
+}
+
+export async function signedWorldRenew(identity, challenge, playerId, subtle = crypto.subtle) {
+  const spki = new Uint8Array(await subtle.exportKey('spki', identity.publicKey));
+  const publicKey = spkiToPEM(spki);
+  const hash = new Uint8Array(await subtle.digest('SHA-256', spki));
+  const signer = 'elsemesh-node:' + Array.from(hash, n => n.toString(16).padStart(2, '0')).join('');
+  if (signer !== identity.nodeId) throw new Error('Browser renewal signer mismatch');
+  const payload = { kind: 'elsemesh-world-renew-proof/1', protocol: 'elsemesh.world-wss/1',
+    worldId: challenge.worldId, regionId: challenge.regionId,
+    authorityEpoch: challenge.authorityEpoch, previousSessionId: challenge.sessionId,
+    serverNonce: challenge.nonce, issuedAt: Date.now(), playerId, signer, publicKey };
+  const signature = bytesToB64(await subtle.sign({ name: 'Ed25519' }, identity.privateKey, encoder.encode(canonical(payload))));
+  return { ...payload, signature };
 }

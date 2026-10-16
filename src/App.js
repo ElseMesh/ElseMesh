@@ -437,6 +437,19 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		}
 		if ( this.qs.has( 'view' ) ) window.__view?.( this.qs.get( 'view' ) );
+		// Local isolated renderer qualification only; no remote connection from
+		// ordinary live URLs and no remote-world objects on the default island.
+		if ( this.qs.has( 'federationPreview' ) &&
+			( location.hostname === '127.0.0.1' || location.hostname === 'localhost' ) ) {
+			try {
+				const { installLocalFederationPreview } = await import( './network/FederationPreviewController.js' );
+				this.federationPreview = await installLocalFederationPreview(
+					this, new URLSearchParams( location.hash.slice( 1 ) ) );
+			} catch ( error ) {
+				this.federationPreviewError = String( error );
+				console.warn( 'Experimental local federation preview unavailable', error );
+			}
+		}
 
 	}
 
@@ -733,6 +746,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.avatar.update( dt, this.player, this.camera, this.freeCam );
 		if ( this.portIsland.driving ) this.avatar.group.visible = false;
 		if ( this.networkDemo ) this.networkDemo.update( dt );
+		this.federationPreview?.update();
 		this.pistol.update( dt, this.camera, this.input, ! this.freeCam && this.monorail.state !== 'riding' && this.player.mode === 'walk', ( message ) => this.ui?.ui.toast( message ) );
 		this.game.update( dt );
 		this.needs.update( dt, this.input, ( message ) => this.ui?.ui.toast( message ) );

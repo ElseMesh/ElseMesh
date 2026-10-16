@@ -206,3 +206,50 @@ test('unauthenticated slots are bounded independently of authenticated world cap
   t.after(() => allowed.terminate());
   await new Promise((resolve, reject) => { allowed.once('open', resolve); allowed.once('error', reject); });
 });
+
+test('signed in-place renewal preserves session and view without reconnect', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'elsemesh-renew-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const a = newIdentity(), b = newIdentity(), visitor = await visitorIdentity();
+  const region = sampleRegions(a.nodeId, b.nodeId).edWorld;
+  const server = await createFederatedWorldServer({ identity: b, region,
+    browserOrigin: ORIGIN, replayFile: join(dir, 'renew-ledger'),
+    sessionTtlMs: 6000,
+    authorize: ({ playerNodeId }) => playerNodeId === visitor.nodeId
+      ? { allowed: true, permissions: ['view', 'visit'] } : { allowed: false },
+    initialEntities: [entity('prop:renews', 1)] });
+  t.after(() => server.close());
+  const client = connect(server, visitor, region, b.nodeId);
+  t.after(() => client.close());
+  const first = await client.ready;
+  const renewed = wait(client, 'renewed', 12000);
+  const updated = (await renewed).grant;
+  assert.equal(updated.sessionId, first.sessionId, 'renewal must not change visit session');
+  assert.ok(updated.expiresAt > first.expiresAt);
+  assert.equal(await verifyWorldSignature(updated, b.nodeId), true);
+  assert.equal(server.metrics().authenticated, 1);
+  const snapshot = wait(client, 'snapshot');
+  await client.subscribe([0, 0, 0], 40);
+  const result = await snapshot;
+  assert.equal(result.sessionId, updated.sessionId);
+  assert.equal(client.closed, false);
+});
+test('destination policy revocation ends renewal without escalating permissions', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'elsemesh-revoke-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const a = newIdentity(), b = newIdentity(), visitor = await visitorIdentity();
+  const region = sampleRegions(a.nodeId, b.nodeId).edWorld;
+  let allowed = true;
+  const server = await createFederatedWorldServer({ identity: b, region,
+    browserOrigin: ORIGIN, replayFile: join(dir, 'renew-ledger'), sessionTtlMs: 6000,
+    authorize: ({ playerNodeId }) => ({ allowed: allowed && playerNodeId === visitor.nodeId,
+      permissions: ['view'] }) });
+  t.after(() => server.close());
+  const client = connect(server, visitor, region, b.nodeId);
+  t.after(() => client.close());
+  await client.ready;
+  allowed = false;
+  const disconnected = wait(client, 'disconnected', 12000);
+  assert.equal((await disconnected).code, 1008, 'owner revocation closes connection on renewal');
+  assert.equal(client.closed, true);
+});
