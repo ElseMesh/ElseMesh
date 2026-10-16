@@ -31,12 +31,14 @@ push access to `origin` and uses an atomic push so a failed publication leaves
 the published refs unchanged.
 
 The first sync preserves the existing `archive/loz/main` copy under
-`archive/loz-preserved/main/<commit>`. If Loz rewrites a branch, the previous
-published tip is preserved under the same namespace before its new source tree
-is published. A bridge commit keeps the update fast-forward while its tree
-matches Loz's current branch. If Loz deletes a branch, its last mirror is
-preserved and the active `loz/<branch>` ref is removed. If Loz deletes `main`,
-the root Pages deployment continues and the `/loz/` build is skipped.
+`archive/loz-preserved/main/<commit>`. Each active `loz/<branch>` ref points to
+the exact source commit. Linear updates use normal fast-forward pushes. If Loz
+rewrites history, the script preserves the old mirror ref, removes the active
+ref, then creates it at Loz's exact new tip with a normal push; there is briefly
+no active ref between those two pushes. If the script stops in that interval,
+rerun it to finish publishing. If Loz deletes a branch, its last mirror is
+preserved and the active ref is removed. If Loz deletes `main`, the root Pages
+deployment continues and the `/loz/` build is skipped.
 
 On 2026-10-10, Pages run `38080038023` successfully built and deployed main at
 `ac86602eaf860a8f0615db6333dd6fbfdb9ea756` and the preserved
