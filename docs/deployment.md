@@ -11,15 +11,32 @@ were retained by the transfer.
 Client: https://elsemesh.github.io/
 Archived LOZ client: https://elsemesh.github.io/loz/
 
-`.github/workflows/deploy.yml` deploys every push to `main`, including the LOZ
-archive. Check Actions for success and compare the client bottom-right eight-digit
-stamp with the source HEAD. GitHub repository URL redirects do not guarantee
+`.github/workflows/deploy.yml` deploys every push to `main`. It builds the
+archived LOZ client from `loz/main` when that mirror branch exists. Check Actions
+for success and compare the client bottom-right eight-digit stamp with the
+source HEAD. GitHub repository URL redirects do not guarantee
 redirects for old `rebroad.github.io/tidewater/` links; use the new address.
 
 The root client's Vite build stamp comes from `main` HEAD. The workflow stamps
-the archived page after building it, using the checked-out
-`archive/loz/main` HEAD, so `/` and `/loz/` identify their own source revisions.
+the archived page after building it, using the checked-out `loz/main` HEAD, so
+`/` and `/loz/` identify their own source revisions.
 The LOZ stamp sits above its bottom-right Credits link.
+
+## Mirroring Loz branches
+
+Run `tools/mirror-loz.sh` from this checkout daily. It fetches every branch from
+the configured `loz` remote and publishes its source tree under `loz/<branch>`
+on `origin`; `loz/main` supplies the `/loz/` Pages build. The script needs Git
+push access to `origin` and uses an atomic push so a failed publication leaves
+the published refs unchanged.
+
+The first sync preserves the existing `archive/loz/main` copy under
+`archive/loz-preserved/main/<commit>`. If Loz rewrites a branch, the previous
+published tip is preserved under the same namespace before its new source tree
+is published. A bridge commit keeps the update fast-forward while its tree
+matches Loz's current branch. If Loz deletes a branch, its last mirror is
+preserved and the active `loz/<branch>` ref is removed. If Loz deletes `main`,
+the root Pages deployment continues and the `/loz/` build is skipped.
 
 On 2026-10-10, Pages run `38080038023` successfully built and deployed main at
 `ac86602eaf860a8f0615db6333dd6fbfdb9ea756` and the preserved

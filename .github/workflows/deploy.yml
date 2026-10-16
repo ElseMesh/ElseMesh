@@ -19,10 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          ref: archive/loz/main
-          path: loz-source
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,13 +29,36 @@ jobs:
         env:
           ELSEMESH_COMMIT_SHA: ${{ github.sha }}
           ELSEMESH_ALLOW_SOURCE_BUILD: '1'
+      - id: loz-ref
+        name: Check for mirrored LOZ main branch
+        run: |
+          set -euo pipefail
+          if refs=$(git ls-remote origin refs/heads/loz/main); then
+            if [[ -n "$refs" ]]; then
+              echo 'exists=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'exists=false' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            exit $?
+          fi
+      - uses: actions/checkout@v4
+        if: steps.loz-ref.outputs.exists == 'true'
+        with:
+          ref: loz/main
+          path: loz-source
       - run: npm ci --prefix loz-source
+        if: steps.loz-ref.outputs.exists == 'true'
       - run: node test/input-look-keys.mjs
+        if: steps.loz-ref.outputs.exists == 'true'
         working-directory: loz-source
       - run: npm run build --prefix loz-source
+        if: steps.loz-ref.outputs.exists == 'true'
       - name: Stamp archived LOZ commit
+        if: steps.loz-ref.outputs.exists == 'true'
         run: node tools/stamp-build-commit.mjs loz-source/dist/index.html "$(git -C loz-source rev-parse HEAD)"
       - run: mkdir -p dist/loz && cp -a loz-source/dist/. dist/loz/
+        if: steps.loz-ref.outputs.exists == 'true'
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
