@@ -12,6 +12,10 @@ high-level model is in [world-network-design.md](world-network-design.md).
   are routing hints. Browser routes use HTTPS/WSS.
 - Content is addressed by SHA-256; clients verify signed declarations and
   downloaded bytes. A cache provider is not thereby a world owner.
+- The signed manifest may contain up to 256 host grants. Each grant names a
+  PeerID, scopes (`content-cache` and/or `failover-authority`), expiry and
+  epoch. Failover grants also define a bounded activation window. Windows for
+  different delegates may not overlap.
 - Gateway and WebTransport sessions assign a fresh random 128-bit presence
   session. The server derives the player key from its own identity plus that
   session. Browser-supplied player/session identity is overwritten.
@@ -36,6 +40,45 @@ Presence updates must reach the owner. The owner validates and stores the
 latest pose for each active connection, then returns a sorted snapshot. A cache
 or failover provider returns `presence_owner_required` rather than becoming a
 second simulation authority.
+
+## Neighbor redundancy: current protocol and requested preference model
+
+The current host-grant protocol already provides part of the redundancy
+foundation. The owner signs grants for provider PeerIDs. `content-cache` lets a
+provider preload and serve the complete hash-verified package. A separate
+`failover-authority` grant allows that daemon, during its bounded owner-signed
+window, to obtain a temporary authority lease and serve the unchanged
+owner-signed manifest. A failover-only grant does not include package bytes;
+that delegate also needs `content-cache` to serve assets. Owner recovery takes
+priority over an active delegate. The delegate cannot sign a replacement world
+manifest, accept edits, or take over presence/simulation authority.
+
+Provider discovery currently orders an available owner first, active failover
+delegates second, and cache providers third. PeerID is the stable tie-break
+within each tier. The client can also accept up to eight explicit
+`nodeId`/`gateway` pairs in invite order, then continue signed discovery and
+recovery. This supports operator-curated URL order but does not encode an
+owner-authored ranking in the signed manifest. It also does not associate
+providers with neighboring world IDs or ensure that they are geographically or
+topologically near.
+
+The requested design is for an owner to designate neighboring worlds as
+eligible replicas and publish an ordered preference list. At the protocol
+level, this needs a versioned signed redundancy policy that binds each rank to
+the neighbor world ID and its authorized hosting PeerID(s), required scopes,
+content revision/hash, and bounded failover conditions. Clients and directory
+selection should honor that order after the owner is unavailable, while still
+verifying the original owner's manifest and grants. Neighbor ranking should
+not itself grant hosting rights; explicit owner authorization and the existing
+scopes remain necessary. Recovery should prefer the owner again and retire the
+temporary authority according to the signed epoch/lease rules.
+
+This is not a blanket claim that the current system implements neighbor-ranked
+redundancy. Current grants authorize provider nodes and current discovery
+orders by role tier, with PeerID ties. The owner-configurable neighbor ranking
+is missing. Also missing is failover of live presence, simulation state, or
+write authority; the current leases only preserve bounded manifest authority,
+and cached content can preserve package delivery.
 
 ## Current presence limits and checks
 

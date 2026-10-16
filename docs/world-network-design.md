@@ -36,6 +36,25 @@ signaling and compatibility fallback. Direct connections are optimizations,
 not authority. Every path must preserve the same world identity, owner
 authorization, bounded request handling, and signed content checks.
 
+### Neighboring-world redundancy
+
+A world owner should be able to nominate neighboring world operators as
+redundant providers for this world, with an explicit preference order. A
+neighbor participates only after the owner grants its daemon the relevant
+hosting scopes and it has the required signed package data. If the owner is
+unavailable, clients should try eligible providers in owner-defined order,
+verify the unchanged owner-signed manifest and asset hashes, and return to the
+owner when it recovers. A preference list expresses failover order; it does not
+transfer ownership or permit a neighbor to rewrite the source world.
+
+Serving static content and becoming the live world authority are separate
+permissions. The current delegated failover lease can temporarily make an
+authorized delegate discoverable and allow it to serve the owner's manifest;
+`content-cache` is separately required to serve assets. Delegation does not
+currently transfer presence, simulation, or shared state. So this redundancy
+keeps a world package reachable, but does not yet provide seamless multiplayer
+continuity through owner failure.
+
 ## World and portal lifecycle
 
 World content is authored as editable source, converted to a deterministic
@@ -95,6 +114,11 @@ the current presence protocol does not contain one.
 - WebSocket/WebTransport gateway requests, optional direct WebRTC requests,
   and optional daemon ZeroTier/libp2p transport. Owner presence remains the
   authority; cache replicas reject presence writes.
+- Owner-signed hosting grants can authorize `content-cache` and/or bounded
+  `failover-authority` for up to 256 provider nodes. Delegated authority windows
+  cannot overlap. Directory lookup ranks a recovered owner first, active
+  delegates second, and cache providers third; within a tier it uses PeerID as
+  a stable tie-breaker.
 
 ## Current gaps and mismatches
 
@@ -119,7 +143,13 @@ the current presence protocol does not contain one.
    identity, inventory, authoritative simulation continuity, and an atomic
    source-leave/destination-join protocol do not transfer. A disconnect during
    the transition can leave only TTL cleanup at the source.
-6. **Direct browser networking is not universally reachable.** WebRTC has a
+6. **Neighbor preference order is not owner-configurable yet.** The code has
+   ordered provider pairs in invite URLs and tiered directory selection, but
+   the signed hosting grants do not record an owner-selected ranking among
+   neighboring worlds. Current order within the delegate tier is a PeerID
+   tie-break, not the owner's preference. A topology-aware, ranked neighbor
+   failover list is therefore a design requirement, not an implemented policy.
+7. **Direct browser networking is not universally reachable.** WebRTC has a
    tested local path and gateway fallback; cross-NAT public connectivity and
    TURN are outstanding. Browser-hosted owners still require the gateway path.
 
