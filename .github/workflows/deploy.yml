@@ -53,9 +53,8 @@ jobs:
           path: loz-source
       - run: npm ci --prefix loz-source
         if: steps.loz-ref.outputs.exists == 'true'
-      - run: node test/input-look-keys.mjs
+      - run: npm run test:input --prefix loz-source
         if: steps.loz-ref.outputs.exists == 'true'
-        working-directory: loz-source
       - run: npm run build --prefix loz-source
         if: steps.loz-ref.outputs.exists == 'true'
       - name: Stamp archived LOZ commit
