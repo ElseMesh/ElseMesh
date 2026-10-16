@@ -115,8 +115,14 @@ export class FederatedWorldClient {
             throw new Error('Untrusted portal arrival');
           this.pendingHandoffId = null;
         } else if (m.type === 'snapshot') {
+          // Delayed out-of-order updates and old tab/wake frames are discarded,
+          // not treated as an owner-authentication failure.
+          if (Number.isSafeInteger(m.revision) && m.revision < this.snapshotRevision) return;
+          if (Number.isFinite(m.capturedAt) && Math.abs(Date.now() - m.capturedAt) > 60000) return;
           if (!this.grant?.permissions.includes('view') || m.protocol !== 'elsemesh.world-wss/1' ||
               m.worldId !== this.world || m.regionId !== this.region ||
+              m.sessionId !== this.grant.sessionId || m.authorityEpoch !== this.grant.authorityEpoch ||
+              !await verifyWorldSignature(m, this.owner, this.subtle) ||
               !Number.isSafeInteger(m.revision) || m.revision < this.snapshotRevision ||
               !Number.isFinite(m.capturedAt) || Math.abs(Date.now() - m.capturedAt) > 60000 ||
               !Array.isArray(m.entities) || m.entities.length > 64 ||
@@ -130,12 +136,15 @@ export class FederatedWorldClient {
         }
         for (const listener of this.listeners) listener(m);
       } catch (error) {
+        this.pendingHandoffId = null;
+        for (const listener of this.listeners) listener({ type: 'protocol-error', error: error.message });
         this.rejectReady(error);
         this.socket.close(1008, 'Untrusted destination');
       }
     };
     this.socket.onclose = event => {
       clearTimeout(this.readyTimeout);
+      this.pendingHandoffId = null;
       this.closed = true;
       this.rejectReady(new Error('World disconnected: ' + event.code));
       for (const listener of this.listeners) listener({ type: 'disconnected', code: event.code });

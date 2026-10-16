@@ -91,6 +91,9 @@ test('two independently owned WSS worlds support identity challenge, scoped view
   const snapshot = wait(clientB, 'snapshot');
   await clientB.subscribe([0, 0, 0], 30);
   const received = await snapshot;
+  assert.equal(await verifyWorldSignature(received, b.nodeId), true, 'snapshot must be signed by the pinned owner');
+  assert.equal(await verifyWorldSignature({ ...received, revision: Number.MAX_SAFE_INTEGER }, b.nodeId), false, 'snapshot tampering must fail');
+  assert.equal(received.sessionId, clientB.grant.sessionId, 'snapshot bound to authenticated viewer session');
   assert.deepEqual(received.entities.map(e => e.entityId).sort(), ['prop:b1', 'prop:b2']);
   assert.equal(received.entities.some(e => e.entityId === 'prop:secret'), false);
   const bad = connect(hostB, await visitorIdentity(), f.edWorld, b.nodeId);
@@ -99,6 +102,7 @@ test('two independently owned WSS worlds support identity challenge, scoped view
   // Owner A signs source transfer; owner B explicitly accepts this player into B.
   const hash = assetId(Buffer.alloc(0));
   const handoff = createPortalHandoff(a, { portal: f.edDoor, playerId: 'player:visitor',
+    playerNodeId: visitor.nodeId, destinationAuthority: b.nodeId, destinationSessionId: clientB.grant.sessionId,
     sessionId: 'elsemesh-session:visit-test', sequence: 1,
     authorityEpoch: f.underneath.authority.epoch, avatarAssetId: hash, inventoryHash: hash,
     position: [-216, 1.2, -29], velocity: [0, 0, 0], controlMode: 'HUMAN' });
@@ -108,7 +112,8 @@ test('two independently owned WSS worlds support identity challenge, scoped view
   assert.equal(arrival.regionId, f.edWorld.regionId);
   assert.equal(arrival.playerNodeId, visitor.nodeId);
   const returningHandoff = createPortalHandoff(b, { portal: f.edReturn,
-    playerId: 'player:visitor', sessionId: 'elsemesh-session:visit-test', sequence: 2,
+    playerId: 'player:visitor', playerNodeId: visitor.nodeId, destinationAuthority: a.nodeId,
+    destinationSessionId: clientA.grant.sessionId, sessionId: 'elsemesh-session:visit-test', sequence: 2,
     authorityEpoch: f.edWorld.authority.epoch, avatarAssetId: hash, inventoryHash: hash,
     position: [0, 1, 1], velocity: [0, 0, 0], controlMode: 'HUMAN' });
   const returning = wait(clientA, 'travel-admitted');
@@ -161,6 +166,43 @@ test('signed reconnect supersedes the previous socket instead of cloning player 
   const second = connect(server, visitor, region, b.nodeId);
   t.after(() => second.close());
   await second.ready;
-  assert.equal((await replacementNotice).code, 1012);
+  assert.equal((await replacementNotice).code, 4009, 'superseded identity must be fenced, not endlessly reconnected');
   assert.equal(second.closed, false);
+});
+
+test('unauthenticated slots are bounded independently of authenticated world capacity', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'elsemesh-pending-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const a = newIdentity(), b = newIdentity();
+  const region = sampleRegions(a.nodeId, b.nodeId).edWorld;
+  const server = await createFederatedWorldServer({
+    identity: b, region, browserOrigin: ORIGIN, replayFile: join(dir, 'pending.log'),
+    authorize: () => ({ allowed: false }),
+  });
+  t.after(() => server.close());
+  const url = 'ws://127.0.0.1:' + server.address.port + '/world';
+  const pending = [];
+  for (let i = 0; i < 8; i++) {
+    const socket = new WebSocket(url, { origin: ORIGIN });
+    pending.push(socket);
+    await new Promise((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
+  }
+  t.after(() => pending.forEach(socket => socket.terminate()));
+  assert.equal(server.metrics().pendingAuth, 8);
+  const extra = new WebSocket(url, { origin: ORIGIN });
+  extra.on('error', () => {});
+  t.after(() => extra.terminate());
+  const error = await new Promise(resolve => extra.once('error', resolve));
+  assert.match(error.message, /403/);
+  pending[0].close();
+  await new Promise(resolve => pending[0].once('close', resolve));
+  const settleBy = Date.now() + 1000;
+  while (server.metrics().pendingAuth !== 7) {
+    if (Date.now() > settleBy) throw new Error('Closed unauthenticated slot was not released');
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  const allowed = new WebSocket(url, { origin: ORIGIN });
+  allowed.on('error', () => {});
+  t.after(() => allowed.terminate());
+  await new Promise((resolve, reject) => { allowed.once('open', resolve); allowed.once('error', reject); });
 });

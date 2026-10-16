@@ -4,7 +4,7 @@ import { ReplayGuard } from './protocol.mjs';
 
 export const FEDERATION_CAPABILITIES = Object.freeze([
   'elsemesh.identity/1', 'elsemesh.region/1', 'elsemesh.portal/1', 'elsemesh.rules/1',
-  'elsemesh.handoff/1', 'elsemesh.asset/1', 'elsemesh.authority/1', 'elsemesh.avatar-control/1',
+  'elsemesh.handoff/2', 'elsemesh.asset/1', 'elsemesh.authority/1', 'elsemesh.avatar-control/1',
 ]);
 export const CONTROL_MODES = Object.freeze(['HUMAN', 'AI_ASSISTED', 'AI_AUTONOMOUS']);
 export const AVAILABILITY = Object.freeze(['ONLINE', 'REPLICA_AVAILABLE', 'OFFLINE', 'DEGRADED', 'UNREACHABLE']);
@@ -154,19 +154,19 @@ export function verifyPortalInvitation(invitation, acceptance, { sourceRegion, d
   return invitation.portal;
 }
 
-export function createPortalHandoff(identity, { portal, playerId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, controlMode }) {
+export function createPortalHandoff(identity, { portal, playerId, playerNodeId, destinationAuthority, destinationSessionId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, controlMode }) {
   validatePortal(portal);
-  check(id('player', playerId) && id('elsemesh-session', sessionId) && hash(avatarAssetId) && hash(inventoryHash) && vector(position) && vector(velocity) && CONTROL_MODES.includes(controlMode), 'Invalid handoff data');
+  check(id('player', playerId) && node(playerNodeId) && node(destinationAuthority) && typeof destinationSessionId === 'string' && /^[a-zA-Z0-9:_-]{1,128}$/.test(destinationSessionId) && id('elsemesh-session', sessionId) && hash(avatarAssetId) && hash(inventoryHash) && vector(position) && vector(velocity) && CONTROL_MODES.includes(controlMode), 'Invalid handoff data');
   check(Number.isSafeInteger(sequence) && sequence >= 0 && Number.isSafeInteger(authorityEpoch) && authorityEpoch >= 0, 'Invalid handoff sequence/epoch');
-  return signObject({ kind: 'portal-handoff', protocol: 'elsemesh.handoff/1', handoffId: randomUUID(), portalId: portal.portalId, portalRevision: portal.revision, sourceRegion: portal.sourceRegion, destinationRegion: portal.destinationRegion, playerId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, controlMode, sourceAuthority: identity.nodeId, timestamp: Date.now() }, identity);
+  return signObject({ kind: 'portal-handoff', protocol: 'elsemesh.handoff/2', handoffId: randomUUID(), portalId: portal.portalId, portalRevision: portal.revision, sourceRegion: portal.sourceRegion, destinationRegion: portal.destinationRegion, playerId, playerNodeId, destinationAuthority, destinationSessionId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, controlMode, sourceAuthority: identity.nodeId, timestamp: Date.now() }, identity);
 }
 
-export function acceptPortalHandoff(handoff, { portal, sourceAuthority, sourceEpoch, destinationRules, supportedCapabilities, trustedAuthorities, replay, destinationAdmission, now = Date.now() }) {
+export function acceptPortalHandoff(handoff, { portal, sourceAuthority, sourceEpoch, destinationAuthority, destinationSessionId, playerNodeId, destinationRules, supportedCapabilities, trustedAuthorities, replay, destinationAdmission, now = Date.now() }) {
   validatePortal(portal);
-  check(verifyObject(handoff, trustedAuthorities) && handoff.kind === 'portal-handoff' && handoff.protocol === 'elsemesh.handoff/1', 'Bad handoff signature');
+  check(verifyObject(handoff, trustedAuthorities) && handoff.kind === 'portal-handoff' && handoff.protocol === 'elsemesh.handoff/2', 'Bad handoff signature');
   check(handoff.sourceAuthority === handoff.signer && handoff.signer === sourceAuthority && handoff.authorityEpoch === sourceEpoch, 'Wrong handoff authority');
   check(handoff.portalId === portal.portalId && handoff.portalRevision === portal.revision && handoff.sourceRegion === portal.sourceRegion && handoff.destinationRegion === portal.destinationRegion && portal.enabled, 'Wrong portal');
-  check(id('player', handoff.playerId) && id('elsemesh-session', handoff.sessionId) && hash(handoff.avatarAssetId) && hash(handoff.inventoryHash) && vector(handoff.position) && vector(handoff.velocity) && CONTROL_MODES.includes(handoff.controlMode), 'Invalid handoff content');
+  check(id('player', handoff.playerId) && node(handoff.playerNodeId) && handoff.playerNodeId === playerNodeId && node(destinationAuthority) && handoff.destinationAuthority === destinationAuthority && typeof destinationSessionId === 'string' && handoff.destinationSessionId === destinationSessionId && id('elsemesh-session', handoff.sessionId) && hash(handoff.avatarAssetId) && hash(handoff.inventoryHash) && vector(handoff.position) && vector(handoff.velocity) && CONTROL_MODES.includes(handoff.controlMode), 'Invalid handoff content');
   check(Number.isSafeInteger(handoff.sequence) && handoff.sequence >= 0 && Number.isFinite(handoff.timestamp) && Math.abs(now - handoff.timestamp) <= 30_000, 'Expired handoff');
   const negotiation = negotiateRules(destinationRules, supportedCapabilities);
   check(negotiation.accepted, `Unsupported rules: ${negotiation.unsupported.join(',')}`);
@@ -175,7 +175,7 @@ export function acceptPortalHandoff(handoff, { portal, sourceAuthority, sourceEp
   // implemented by the destination authority using its own admission policy.
   // Deny by default, and bind its decision to this player/session/region.
   const admitted = typeof destinationAdmission === 'function' ? destinationAdmission({ handoff, portal, now }) : null;
-  check(admitted?.accepted === true && admitted.playerId === handoff.playerId &&
+  check(admitted?.accepted === true && admitted.playerId === handoff.playerId && admitted.playerNodeId === handoff.playerNodeId && admitted.destinationSessionId === handoff.destinationSessionId &&
     admitted.sessionId === handoff.sessionId && admitted.destinationRegion === portal.destinationRegion,
   'Destination admission denied');
   check(replay.accept(handoff.handoffId), 'Replayed handoff');

@@ -1,7 +1,7 @@
 import { FEDERATION_CAPABILITIES } from './federation.mjs';
 
 const transform = (position) => ({ position, yaw: 0 });
-const rules = (changes = {}) => ({ gravity: 1, avatarScale: 1, environmentScale: 1, timeOfDay: 'LOCAL', weapons: 'ALLOW', movement: ['WALK', 'RUN', 'JUMP', 'SWIM'], requiredCapabilities: ['elsemesh.rules/1', 'elsemesh.handoff/1'], ...changes });
+const rules = (changes = {}) => ({ gravity: 1, avatarScale: 1, environmentScale: 1, timeOfDay: 'LOCAL', weapons: 'ALLOW', movement: ['WALK', 'RUN', 'JUMP', 'SWIM'], requiredCapabilities: ['elsemesh.rules/1', 'elsemesh.handoff/2'], ...changes });
 
 export function sampleRegions(lozNodeId, edNodeId) {
   const make = (regionId, ownerPlayerId, ownerNodeId, authorityNodeId, ruleChanges = {}) => ({
@@ -20,7 +20,7 @@ export function sampleRegions(lozNodeId, edNodeId) {
   edWorld.portals = ['elsemesh-portal:ed-return'];
   const makePortal = (portalId, sourceRegion, destinationRegion, visual, entry, exit) => ({
     protocol: 'elsemesh.portal/1', portalId, sourceRegion, destinationRegion, visual,
-    entry: transform(entry), exit: transform(exit), enabled: true, requiredCapabilities: ['elsemesh.portal/1', 'elsemesh.handoff/1'],
+    entry: transform(entry), exit: transform(exit), enabled: true, requiredCapabilities: ['elsemesh.portal/1', 'elsemesh.handoff/2'],
     access: { mode: 'PUBLIC', allowPlayers: [] }, handoffPolicy: 'SIGNED', revision: 1,
   });
   // Coordinates describe protocol entry and spawn points. The live game cave remains the existing scene.

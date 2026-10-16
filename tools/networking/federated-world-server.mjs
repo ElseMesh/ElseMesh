@@ -8,6 +8,7 @@ import { DurableHandoffReplay } from '../../network/DurableHandoffReplay.mjs';
 export const FEDERATION_WIRE = 'elsemesh.world-wss/1';
 const MAX_CLIENT_FRAME = 8192;
 const MAX_PEERS = 64;
+const MAX_PENDING_AUTH = 8;
 const OUTBOUND_BUDGET = 128 * 1024;
 const PLAYER = /^player:[A-Za-z0-9._-]{1,128}$/;
 const ENTITY = /^[a-z0-9._:-]{1,128}$/;
@@ -111,6 +112,7 @@ export async function createFederatedWorldServer({
     if (wss.clients.size) broadcastSnapshots();
   };
   const sessions = new Map();
+  let pendingAuth = 0;
   const stats = { connections: 0, authenticated: 0, denied: 0, dropped: 0, bytesOut: 0 };
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_CLIENT_FRAME, perMessageDeflate: false });
   const server = createServer((_req, res) => res.writeHead(404).end());
@@ -119,7 +121,7 @@ export async function createFederatedWorldServer({
     let url;
     try { url = new URL(req.url, 'http://localhost'); } catch { socket.destroy(); return; }
     if (url.pathname !== '/world' || url.search || req.headers.origin !== browserOrigin ||
-        req.headers.host !== hostname || wss.clients.size >= MAX_PEERS) {
+        req.headers.host !== hostname || wss.clients.size >= MAX_PEERS || pendingAuth >= MAX_PENDING_AUTH) {
       socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
@@ -131,11 +133,13 @@ export async function createFederatedWorldServer({
     if (!st?.authenticated || !st.interest) return;
     const selected = relevantEntities([...entities.values()], st.interest);
     const packet = { type: 'snapshot', protocol: FEDERATION_WIRE, worldId: region.worldId,
-      regionId: region.regionId, revision, entities: selected, capturedAt: Date.now() };
-    while (packet.entities.length && Buffer.byteLength(JSON.stringify(packet)) > MAX_CLIENT_FRAME) packet.entities.pop();
-    sendBounded(socket, packet, stats);
+      regionId: region.regionId, authorityEpoch: region.authority.epoch,
+      sessionId: st.grant.sessionId, revision, entities: selected, capturedAt: Date.now() };
+    while (packet.entities.length && Buffer.byteLength(JSON.stringify(packet)) > MAX_CLIENT_FRAME - 700) packet.entities.pop();
+    sendBounded(socket, signObject(packet, identity), stats);
   }
   wss.on('connection', socket => {
+    pendingAuth++;
     stats.connections++;
     socket.alive = true;
     socket.on('pong', () => { socket.alive = true; });
@@ -151,6 +155,7 @@ export async function createFederatedWorldServer({
     socket.on('close', () => {
       clearTimeout(timer);
       const st = socket.worldState;
+      if (!st?.authenticated && !st?.revoked) pendingAuth = Math.max(0, pendingAuth - 1);
       if (st?.playerNodeId && sessions.get(st.playerNodeId) === socket) sessions.delete(st.playerNodeId);
     });
     socket.on('error', () => socket.terminate());
@@ -159,6 +164,7 @@ export async function createFederatedWorldServer({
       try {
         if (binary) return socket.close(1003, 'Text only');
         const now = Date.now();
+        if (state.revoked) return socket.close(4009, 'Superseded session');
         if (state.authenticated && now > state.grant.expiresAt) return socket.close(1012, 'Session renewal required');
         if (now - state.windowStart >= 1000) { state.windowStart = now; state.count = 0; }
         if (++state.count > 30) return socket.close(1008, 'Rate limit');
@@ -194,9 +200,13 @@ export async function createFederatedWorldServer({
           // Exactly one active world session per cryptographic player identity.
           // A new authenticated device supersedes an old session without cloning an avatar.
           const previous = sessions.get(j.signer);
-          if (previous && previous !== socket) previous.close(1012, 'New signed session');
+          if (previous && previous !== socket) {
+            previous.worldState.revoked = true;
+            previous.close(4009, 'Superseded signed session');
+          }
           sessions.set(j.signer, socket);
           state.authenticated = true;
+          pendingAuth = Math.max(0, pendingAuth - 1);
           state.playerId = j.playerId;
           state.playerNodeId = j.signer;
           state.permissions = [...new Set(policy.permissions)];
@@ -223,16 +233,19 @@ export async function createFederatedWorldServer({
           if (!state.permissions.includes('visit') || !h || typeof h !== 'object' || !inbound.has(h.portalId))
             return socket.close(1008, 'No travel permission');
           const config = inbound.get(h.portalId);
-          if (h.playerId !== state.playerId) return socket.close(1008, 'Player mismatch');
+          if (h.playerId !== state.playerId || h.playerNodeId !== state.playerNodeId || h.destinationAuthority !== identity.nodeId || h.destinationSessionId !== state.grant.sessionId) return socket.close(1008, 'Player or destination session mismatch');
           // Portal source signature, current epoch, explicit destination policy,
           // portal player allowlist, freshness and durable replay rejection.
           const admitted = acceptPortalHandoff(h, {
             portal: config.portal, sourceAuthority: config.sourceAuthority,
-            sourceEpoch: config.sourceEpoch, destinationRules: region.rules,
+            sourceEpoch: config.sourceEpoch, destinationAuthority: identity.nodeId,
+            destinationSessionId: state.grant.sessionId, playerNodeId: state.playerNodeId,
+            destinationRules: region.rules,
             supportedCapabilities: config.supportedCapabilities,
             trustedAuthorities: new Set([config.sourceAuthority]), replay,
             destinationAdmission: ({ handoff }) => ({
-              accepted: true, playerId: state.playerId, sessionId: handoff.sessionId,
+              accepted: true, playerId: state.playerId, playerNodeId: state.playerNodeId,
+              sessionId: handoff.sessionId, destinationSessionId: state.grant.sessionId,
               destinationRegion: region.regionId }),
           });
           const arrival = signObject({ kind: 'elsemesh-world-travel/1', protocol: FEDERATION_WIRE,
@@ -271,7 +284,7 @@ export async function createFederatedWorldServer({
   heartbeat.unref?.();
   return {
     address: server.address(), published, ownerNodeId: identity.nodeId, setEntities,
-    metrics: () => ({ ...stats, connected: wss.clients.size, revision, replayEntries: replay.size }),
+    metrics: () => ({ ...stats, connected: wss.clients.size, pendingAuth, revision, replayEntries: replay.size }),
     close: async () => {
       clearInterval(heartbeat);
       if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }

@@ -35,11 +35,13 @@ export class FederationView {
       if (message.type === 'snapshot') {
         this.latest = message;
         this.emit({ type: 'snapshot', packet: message });
+      } else if (message.type === 'protocol-error') {
+        this.emit(message);
       } else if (message.type === 'disconnected') {
         this.connected = false;
         this.latest = null; // never display indefinitely stale remote state
         this.emit({ type: 'disconnected', code: message.code });
-        if ([1003, 1008, 1009].includes(message.code)) {
+        if ([1003, 1008, 1009, 4009].includes(message.code)) {
           this.running = false; // No policy/identity/format downgrades
           this.emit({ type: 'denied', code: message.code });
         } else this.schedule();
@@ -79,10 +81,11 @@ export class FederationView {
     const outcome = new Promise((resolve, reject) => {
       const timer = this.setTimer(() => { off(); reject(new Error('Portal destination timed out')); }, timeoutMs);
       const off = current.onMessage(message => {
-        if (message.type !== 'travel-admitted' && message.type !== 'disconnected') return;
+        if (!['travel-admitted', 'disconnected', 'protocol-error'].includes(message.type)) return;
         this.clearTimer(timer);
         off();
         if (message.type === 'disconnected') reject(new Error('Portal transfer interrupted'));
+        else if (message.type === 'protocol-error') reject(new Error(message.error));
         else resolve(message.arrival);
       });
       cancelWait = () => { this.clearTimer(timer); off(); };

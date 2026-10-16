@@ -50,11 +50,14 @@ test('rules negotiate bounded values and reject unsupported mandatory features',
 });
 
 test('signed portal handoff changes region and rules, rejects replay and stale authority', () => {
-  const handoff = createPortalHandoff(loz, { portal: f.caveEntry, playerId: 'player:loz', sessionId: 'elsemesh-session:visit-1', sequence: 4, authorityEpoch: 1, avatarAssetId: emptyHash, inventoryHash: emptyHash, position: [-340, 0, 80], velocity: [0, 0, 0], controlMode: 'HUMAN' });
-  const options = { portal: f.caveEntry, sourceAuthority: loz.nodeId, sourceEpoch: 1, destinationRules: f.underneath.rules, supportedCapabilities: f.capabilities, trustedAuthorities: trustedLoz, replay: new ReplayGuard(), destinationAdmission: ({handoff}) => ({ accepted: true, playerId: handoff.playerId, sessionId: handoff.sessionId, destinationRegion: handoff.destinationRegion }) };
+  const handoff = createPortalHandoff(loz, { portal: f.caveEntry, playerId: 'player:loz', playerNodeId: loz.nodeId, destinationAuthority: loz.nodeId, destinationSessionId: 'elsemesh-session:destination-test', sessionId: 'elsemesh-session:visit-1', sequence: 4, authorityEpoch: 1, avatarAssetId: emptyHash, inventoryHash: emptyHash, position: [-340, 0, 80], velocity: [0, 0, 0], controlMode: 'HUMAN' });
+  const options = { portal: f.caveEntry, sourceAuthority: loz.nodeId, sourceEpoch: 1, destinationAuthority: loz.nodeId, destinationSessionId: 'elsemesh-session:destination-test', playerNodeId: loz.nodeId, destinationRules: f.underneath.rules, supportedCapabilities: f.capabilities, trustedAuthorities: trustedLoz, replay: new ReplayGuard(), destinationAdmission: ({handoff}) => ({ accepted: true, playerId: handoff.playerId, playerNodeId: handoff.playerNodeId, sessionId: handoff.sessionId, destinationSessionId: handoff.destinationSessionId, destinationRegion: handoff.destinationRegion }) };
   const admitted = acceptPortalHandoff(handoff, options);
   assert.equal(admitted.regionId, f.underneath.regionId);
   assert.equal(admitted.rules.timeOfDay, 'NIGHT');
+  assert.throws(() => acceptPortalHandoff(handoff, { ...options, playerNodeId: ed.nodeId, replay: new ReplayGuard() }), /Invalid handoff content/);
+  assert.throws(() => acceptPortalHandoff(handoff, { ...options, destinationSessionId: 'elsemesh-session:other', replay: new ReplayGuard() }), /Invalid handoff content/);
+  assert.throws(() => acceptPortalHandoff(handoff, { ...options, destinationAuthority: ed.nodeId, replay: new ReplayGuard() }), /Invalid handoff content/);
   assert.throws(() => acceptPortalHandoff(handoff, { ...options, replay: new ReplayGuard(), destinationAdmission: undefined }), /Destination admission denied/);
   assert.throws(() => acceptPortalHandoff(handoff, { ...options, replay: new ReplayGuard(), destinationAdmission: () => ({ accepted: true, playerId: 'player:attacker' }) }), /Destination admission denied/);
   const privatePortal = { ...f.caveEntry, access: { mode: 'ALLOWLIST', allowPlayers: ['player:ed'] } };
