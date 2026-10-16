@@ -51,4 +51,4 @@ Raw benchmark files: `docs/evidence/federation-loopback-2026-10-15.json` and `do
 - Performance optimization of snapshot signing and replay disk sync overhead, with regression budgets.
 - Re-review of fixed SHA by Argon or a human reviewer before treating findings as closed.
 
-**Do not merge, deploy, tag, or create a GitHub Release from this branch while any blocker remains.** The user's strict qualification requirement means green unit tests are necessary but insufficient.
+**Do not merge into main, deploy over the existing Pages site, tag, or create a GitHub Release from this branch while any blocker remains.** The user's strict qualification requirement means green unit tests are necessary but insufficient. On 16 October the user authorized a separate, labelled static development preview for a collaborator; that preview does not qualify production federation.

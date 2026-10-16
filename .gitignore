@@ -6,6 +6,7 @@ artifacts/world/
 artifacts/blender/
 artifacts/video/
 artifacts/network/
+artifacts/preview-site/
 *.pcap
 *.pcapng
 *.pem

@@ -6,7 +6,18 @@ An experimental WebGPU island exploration game. Walk, sail and fly between
 islands, explore the underwater cave and monorail, and collect a sedan delivered
 to Bracken Quay by cargo ship. Fishing, trading and hunger are optional.
 
-**[Play ElseMesh](https://lozknowles.github.io/ElseMesh/)**
+**[Play the current public build](https://lozknowles.github.io/ElseMesh/)** · **[Try the experimental preview](https://lozknowles.github.io/ElseMesh-preview/)**
+
+The experimental preview is a separately published, clearly labelled static
+build from [draft PR #5](https://github.com/lozknowles/ElseMesh/pull/5).
+It lets a collaborator try the island and inspect the in-progress source without
+changing the existing public build. It does **not** provide live internet
+multiplayer or cross-world portal travel: those require separately hosted,
+qualified HTTPS/WebSocket world services. The preview keeps its browser saves
+and demo identity separate from the existing site's data. See
+[CHANGELOG.md](CHANGELOG.md) for changes and [the preview publisher](https://github.com/lozknowles/ElseMesh-preview)
+for the pinned build and deployment status. Friends can fork PR #5's branch and
+send a pull request; direct pushes require collaborator access.
 
 This is a public experimental source release, not a finished or fully qualified
 game. WebGPU and a capable desktop GPU are required. Frame rate and memory use
@@ -29,6 +40,11 @@ configured HTTPS/WebSocket room server; Pages does not host that server.
 See [deployment examples](deploy/README.md). The public client and server use
 ElseMesh protocol identifiers and environment variables; older invitations and
 saved settings from the private prototype are not migrated.
+
+To work on the experimental branch locally, fetch
+`feature/network-federation-hardening` from this repository and run the commands
+above. This branch and PR #5 remain draft while network and renderer release
+gates are open. The procedural builder in draft PR #4 is separate.
 
 ## Controls
 
