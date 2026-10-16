@@ -10,10 +10,10 @@ import { newIdentity } from '../../network/identity.mjs';
 import { sampleRegions } from '../../network/federation-fixtures.mjs';
 import { createFederatedWorldServer } from './federated-world-server.mjs';
 import { FederatedWorldClient } from '../../src/network/FederatedWorldClient.js';
+import { nearestRank } from './quantiles.mjs';
 globalThis.crypto ||= webcrypto;
 const ORIGIN = 'http://localhost:5189';
 class TestWS extends WebSocket { constructor(url) { super(url, { origin: ORIGIN }); } }
-const quantile = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * p))];
 const sizes = [2, 4, 10, 25, 50];
 const rounds = 5;
 const identity = async () => {
@@ -81,9 +81,9 @@ for (const count of sizes) {
     times.sort((a, b) => a - b);
     records.push({ worlds: count, physicallyDistinctMachines: 1, worldSocketServices: count,
       snapshots, failures, entitiesPerSnapshot: items / Math.max(1, snapshots),
-      p50Ms: times.length ? quantile(times, .5) : null,
-      p95Ms: times.length ? quantile(times, .95) : null,
-      p99Ms: times.length ? quantile(times, .99) : null,
+      p50Ms: times.length ? nearestRank(times, .5) : null,
+      p95Ms: times.length ? nearestRank(times, .95) : null,
+      p99Ms: times.length ? nearestRank(times, .99) : null,
       totalBytes, elapsedMs: performance.now() - started,
       heapUsedBytes: process.memoryUsage().heapUsed,
       rssBytes: process.memoryUsage().rss });

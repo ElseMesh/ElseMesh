@@ -1,0 +1,86 @@
+{
+  "scope": "loopback-only",
+  "rounds": 5,
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "results": [
+    {
+      "worlds": 2,
+      "physicallyDistinctMachines": 1,
+      "worldSocketServices": 2,
+      "snapshots": 10,
+      "failures": 0,
+      "entitiesPerSnapshot": 15,
+      "p50Ms": 1.622700000000009,
+      "p95Ms": 2.2428000000000026,
+      "p99Ms": 2.2428000000000026,
+      "totalBytes": 22978,
+      "elapsedMs": 57.56070000000001,
+      "heapUsedBytes": 12220712,
+      "rssBytes": 65560576
+    },
+    {
+      "worlds": 4,
+      "physicallyDistinctMachines": 1,
+      "worldSocketServices": 4,
+      "snapshots": 20,
+      "failures": 0,
+      "entitiesPerSnapshot": 15,
+      "p50Ms": 2.4429000000000087,
+      "p95Ms": 2.8097999999999956,
+      "p99Ms": 2.8982000000000028,
+      "totalBytes": 45956,
+      "elapsedMs": 34.55789999999999,
+      "heapUsedBytes": 13769720,
+      "rssBytes": 69287936
+    },
+    {
+      "worlds": 10,
+      "physicallyDistinctMachines": 1,
+      "worldSocketServices": 10,
+      "snapshots": 50,
+      "failures": 0,
+      "entitiesPerSnapshot": 15,
+      "p50Ms": 5.150200000000012,
+      "p95Ms": 5.457300000000004,
+      "p99Ms": 5.763200000000012,
+      "totalBytes": 114890,
+      "elapsedMs": 66.74110000000002,
+      "heapUsedBytes": 11395720,
+      "rssBytes": 71540736
+    },
+    {
+      "worlds": 25,
+      "physicallyDistinctMachines": 1,
+      "worldSocketServices": 25,
+      "snapshots": 125,
+      "failures": 0,
+      "entitiesPerSnapshot": 15,
+      "p50Ms": 16.810400000000016,
+      "p95Ms": 18.277800000000013,
+      "p99Ms": 18.3125,
+      "totalBytes": 287465,
+      "elapsedMs": 168.1426,
+      "heapUsedBytes": 14395296,
+      "rssBytes": 74469376
+    },
+    {
+      "worlds": 50,
+      "physicallyDistinctMachines": 1,
+      "worldSocketServices": 50,
+      "snapshots": 250,
+      "failures": 0,
+      "entitiesPerSnapshot": 15,
+      "p50Ms": 25.217100000000073,
+      "p95Ms": 29.774900000000002,
+      "p99Ms": 29.88810000000001,
+      "totalBytes": 575090,
+      "elapsedMs": 350.17089999999996,
+      "heapUsedBytes": 12937176,
+      "rssBytes": 86564864
+    }
+  ]
+}

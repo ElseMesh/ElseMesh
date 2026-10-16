@@ -14,7 +14,9 @@ The grant-renewal and local 3D proxy changes arrived concurrently in `90f7367`. 
 - `npm run build`: passed after this follow-up.
 - `docs/evidence/federation-loopback-current-2026-10-16.json`: one single-machine loopback run. It started 2/4/10/25/50 independent **WS** world services in sequential scenarios, with five concurrent-per-round snapshot requests per world and zero recorded failures. At 50 services the observed p99 was 24.74 ms and total outbound bytes 575,090. This is not a controlled before/after test and cannot isolate signature cost. No browser FPS, WAN impairment, multiple physical machines, TLS/WSS ingress, or power-loss recovery was measured.
 
-The Google Argon follow-up response was not accessible in this session: the computer-use inventory exposed Edge but no signed-in collingham Chrome/Gemini tab. The original finding table remains in `docs/ARGON-REVIEW-ADJUDICATION.md`; no second verdict is claimed.
+Correction: that run used the earlier `floor((N - 1) × p)` helper, so its p99 label is not the nearest-rank p99 for small samples. See `FEDERATION-PHYSICAL-AND-QUANTILE-FOLLOWUP-2026-10-16.md` and the fresh corrected benchmark file. The raw earlier record is retained for provenance.
+
+The user subsequently supplied the complete original Argon review of `b1c7361`, which confirmed the benchmark quantile error. The Google Argon follow-up response on the `17bb5f3` diff was not accessible: the computer-use inventory exposed Edge but no signed-in collingham Chrome/Gemini tab. The original finding table remains in `docs/ARGON-REVIEW-ADJUDICATION.md`; no second verdict is claimed.
 
 ## Architect gates and decision
 
