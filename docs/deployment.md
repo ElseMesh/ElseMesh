@@ -24,8 +24,8 @@ The LOZ stamp sits above its bottom-right Credits link.
 
 ## Mirroring Loz branches
 
-Run `tools/mirror-loz.sh` from this checkout daily. It fetches every branch from
-the configured `loz` remote and from Loz's `ElseMesh-preview` repository, then
+GitHub Actions runs `tools/mirror-loz.sh` hourly. It fetches every branch from
+the `loz` remote and from Loz's `ElseMesh-preview` repository, then
 publishes them under `loz/<branch>` and `loz/preview/<branch>` respectively on
 `origin`. The script configures the `loz-preview` fetch remote from the
 repository URL if needed. `loz/main` supplies the `/loz/` Pages build; preview
