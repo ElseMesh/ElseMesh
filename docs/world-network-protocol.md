@@ -4,6 +4,11 @@ This low-level companion describes current wire and runtime behavior, with
 recommended extensions clearly separated from implemented protocol. The
 high-level model is in [world-network-design.md](world-network-design.md).
 
+For external design references, see
+[Second Life streaming references](secondlife-streaming-references.md). Those
+native projects inform queueing, caching, range requests, and LOD policy only;
+ElseMesh rendering remains browser-side WebGL/WebGPU.
+
 ## Identity and trust boundaries
 
 - `worldId` is the stable `tw-world:...` identifier. The owner's signed
