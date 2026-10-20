@@ -1,4 +1,4 @@
-import { Group, Mesh, Vector3, Matrix4, Quaternion } from '../engine/index.js';
+import { Group, Mesh, Vector3, Matrix4, Quaternion, mergeGeometries } from '../engine/index.js';
 import { createPropMaterial } from './GameMaterials.js';
 import { Vendor } from './Vendor.js';
 import { loadStallAssets, KitBuilder, LAYER, ATLAS, place, Shapes } from './StallKit.js';
