@@ -146,6 +146,72 @@ function webglCloudVolumeTexture( T, size = 64 ) {
 
 }
 
+// Backend-neutral gameplay needs a water query even when the presentation uses
+// WebGL. This follows the WebGL water shader's wave field and exposes the same
+// CPU query contract consumed by BoatController.
+class WebGLWaterQuery {
+
+	constructor( terrain, seaLevel = - 0.15 ) {
+
+		this.terrain = terrain;
+		this.seaLevel = seaLevel;
+		this.inputs = new Float32Array( 64 * 4 );
+		this.cpu = new Float32Array( 64 * 4 );
+		this.resultInputs = new Float32Array( 64 * 4 );
+		this.count = 1;
+		this.slots = new Map();
+		this.cpuValid = false;
+		this.version = 0;
+		this.resultTime = 0;
+		this.latency = 0.016;
+		this.time = 0;
+
+	}
+
+	allocate( name, n ) {
+
+		if ( this.slots.has( name ) ) return this.slots.get( name ).start;
+		const start = this.count;
+		this.slots.set( name, { start, n } );
+		this.count += n;
+		return start;
+
+	}
+
+	setPoint( i, x, z ) {
+
+		this.inputs[ i * 4 ] = x;
+		this.inputs[ i * 4 + 1 ] = z;
+
+	}
+
+	_height( x, z ) {
+
+		const t = this.time;
+		return this.seaLevel + 0.95 * Math.sin( x * 0.035 + z * 0.025 + t * 0.3 ) + 0.55 * Math.sin( - x * 0.07 + z * 0.15 - t * 0.55 ) + 0.08 * Math.sin( x * 0.21 - z * 0.16 + t * 0.7 ) + 0.03 * Math.sin( x * 0.42 + z * 0.09 + t * 1.3 );
+
+	}
+
+	update( dt ) {
+
+		this.time += Math.max( 0, dt );
+		this.resultInputs.set( this.inputs );
+		const e = 0.35;
+		for ( let i = 0; i < this.count; i ++ ) {
+			const x = this.inputs[ i * 4 ], z = this.inputs[ i * 4 + 1 ], h = this._height( x, z );
+			const nx = ( h - this._height( x + e, z ) ) / e, nz = ( h - this._height( x, z + e ) ) / e;
+			const n = Math.sqrt( nx * nx + nz * nz + 1 );
+			const k = i * 4;
+			this.cpu[ k ] = h; this.cpu[ k + 1 ] = nx / n; this.cpu[ k + 2 ] = nz / n; this.cpu[ k + 3 ] = this.terrain.heightAt( x, z );
+		}
+		this.cpuValid = true;
+		this.version ++;
+		this.resultTime = this.time;
+
+	}
+
+}
+
 function webglTerrainMaterial( T, terrain ) {
 
 	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
@@ -595,6 +661,7 @@ export class WebGLFallback {
 		this.moveStick = { x: 0, y: 0 };
 		this.loader = new GLTFLoader();
 		this.worldLink = worldLinkFromLocation();
+		this.waterQuery = null;
 
 	}
 
@@ -629,7 +696,8 @@ export class WebGLFallback {
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
 		if ( ! this.worldLink ) {
-			this.boat = new WebGLBoatAdapter( T, this.scene );
+			this.waterQuery = new WebGLWaterQuery( this.terrain );
+			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders } );
 			this.fishStand = new WebGLFishStandAdapter( T, this.scene, {
 				terrain: this.terrain,
 				colliders: this.app.worldState.colliders,
@@ -1442,6 +1510,10 @@ export class WebGLFallback {
 		const now = performance.now(), dt = Math.min( 0.05, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
+		if ( this.waterQuery ) {
+			this.boat.controller.queueQueries();
+			this.waterQuery.update( dt );
+		}
 		this.boat?.update( dt );
 		const T = this.THREE, speed = this.keys.has( 'ShiftLeft' ) || this.keys.has( 'ShiftRight' ) ? 10 : 5;
 		this.cloudLayer.position.copy( this.camera.position );
