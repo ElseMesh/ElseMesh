@@ -1,161 +1,106 @@
-Implement the agreed ElseMesh decentralized multi-world architecture in the main branch: Go/libp2p world daemon for Linux and Android/Termux; cryptographic node/world identity and signed manifests; optional thruhold.org bootstrap and browser links; browser connectivity with WebTransport plus secure WebSocket fallback; portal handoff and priority asset streaming; allow players to bring vehicles through portals, subject to destination ThruHold rules that may cap vehicle speed or avatar-plus-vehicle complexity, or deny entry and even portal preview when requirements are not met; owner-scoped neighbor caching and temporary failover authority; shared player presence so players in the same ThruHold can see one another, including a defined avatar appearance and live position/orientation updates; deterministic world-content rules and optional Google login; preserve procedural JS and GLB/glTF content. Inspect the archived `loz/main` work for reusable avatar or multiplayer functionality before designing or replacing it. Verify, commit, and push to the configured working remote where feasible.
-Service boundary: do not ship or serve the static ElseMesh browser client from `thruholdd`; host the client separately (for example, on ElseMesh's static website). `thruholdd` serves signed ThruHold manifests, authorized world assets, and gateway/browser transport endpoints. One daemon may run world-host, gateway, bootstrap, relay, and cache roles when configured, while keeping their responsibilities and permissions distinct. Keep no `--web-root` option or catch-all static-file handler in the daemon.
+# ElseMesh goal and acceptance index
 
-Implement distance-based levels of detail (LOD) for world objects, including avatars: reduce geometry complexity as objects become distant/small on screen, preserve silhouettes, materials and avatar animations, and restore full detail when approached. Use stable transitions to avoid visible popping or repeated switching. Support further adaptive reductions under sustained rendering load, with recovery when performance improves; preserve close-range graphics quality on the Android Flip7 when it has sufficient headroom. Verify near/far visual comparisons and rendering/resource costs, including portal views.
+Implement and verify the agreed decentralized ElseMesh multi-world system in
+the main branch. This file is the short, durable acceptance contract. Detailed
+protocols, procedures, schemas, and dated evidence live in `docs/`; update
+those documents rather than copying their full explanations here.
 
-Define “export” as deterministic conversion to a self-contained, server-servable world package, not as a screenshot or a copy of the authoring runtime. Require it to preserve appearance within explicit visual, storage, and performance budgets. The Example Island must look at least as good in color and texture detail as it did in the original game; use the original game as the visual reference and require matched-view comparisons before accepting terrain-export changes. Coarse vertex-color terrain is only a collision/compatibility representation, not a visual-quality result. The Example Island package must carry all visual inputs the renderer consumes (height, terrain masks, detail/material textures and renderer parameters), not just a seed or a coarse vertex-color mesh, so an independent compatible client can render without regenerating hidden project state. Keep its GLB for collision and fallback use. Record matched-camera comparisons against the original game and keep low-cost collision/portal previews separate from full-quality visuals where needed. Provide Linux desktop users a persistent choice between FPS priority and Visual Quality: default to FPS with the existing 24 fps target and adaptive reductions to keep the desktop responsive; Visual Quality restores full-quality desktop defaults and disables automatic reductions. Preserve the Android Flip7's existing full-quality behavior.
-Use the ElseMesh loading page for the main client and show ThruHold-specific identity, game presentation, loading copy, tips, and stage labels from the selected world's signed experience metadata; keep engine-owned fallback text neutral. Publish the current ElseMesh client at `elsemesh.github.io/` and the latest archived `loz/main` game at `/loz`, preserving its source history and arrow-key view controls. Retire the separate `/elsemesh` deployment path.
-Show an eight-character source commit stamp in the bottom-right corner of both published clients: root must match `main` HEAD, and `/loz` must match `archive/loz/main` HEAD.
-Provide an owner-authorized workflow to add, position, orient, edit and remove portals in ThruHold maps, with user-facing documentation and worked examples. A portal has two independently configurable sides: each side may lead to a different destination, or both may lead to the same destination with opposite-facing arrival orientations. Select the appropriate side for previews and crossings based on the viewer's approach, and preserve mapped viewpoint and travel direction. Provide a shareable portal-link description containing the world/portal identifiers and side-specific connection and placement/orientation information needed for a friend to create a complementary portal in their own ThruHold; document how to export/share it, import/place the complementary portal, review permissions and publish it using the receiving owner's authorization. Sharing connection information must not grant world editing rights or bypass destination entry/preview rules. Verify both approach sides, distinct destinations, same-destination opposite orientations, reciprocal travel, previews, and the documented two-owner sharing workflow.
-At some point we need to test that we can connect two thruholds(worlds), so we will need to test a 2nd world(thruhold) and ideally that 2nd world can be based on the modified content of the `loz/main` branch, so we'll need to be able to launch ElseMesh to go into either the default world or that world, so we'll need to be able to have a storage area for multiple worlds so that we can start the server connected to either (or have 2 servers running at the same time serving each world).
+## Product requirements
 
-Make ElseMesh ThruHolds and portals reachable between arbitrary internet-connected devices, including hosts behind NAT, by delivering and validating a public gateway, discovery, and relay deployment path plus the required client/server configuration. Prefer each person running their own persistent `worldd`; also support an optional browser-hosted server for people who cannot run a standalone daemon, with the explicit limitation that it is available only while that browser session remains open. Let portal relationships discover worlds organically; do not require a central world directory for portal traversal.
+- **World daemon and identity:** provide the Go/libp2p `thruholdd` for Linux
+  and Android/Termux, signed node/world manifests, content-addressed assets,
+  distinct host/gateway/bootstrap/relay/cache roles, and no static client
+  serving from the daemon, with owner-scoped neighbor caching and optional
+  `thruhold.org` bootstrap links. See [ThruHolds](docs/thruholds.md),
+  [world and network design](docs/world-network-design.md#design-goals), and
+  [implementation status](docs/elsemesh-status.md).
+- **World content and export:** export deterministic, self-contained packages
+  that carry the renderer's visual inputs and retain GLB collision/fallback
+  data. Preserve the original island's visual quality, support the Linux FPS
+  priority/Visual Quality choice, and preserve Android's full-quality path.
+  See [world authoring](docs/world-authoring.md#replaceable-world-content-and-packaging), the
+  [terrain package contract](docs/schemas/terrain-package.md),
+  [graphics priority](docs/graphics-priority.md), and
+  [graphics review](docs/graphics-review.md).
+- **Runtime presentation:** implement distance-based object and avatar LOD
+  with stable transitions and load-based recovery; preserve shared player
+  presence, avatar appearance, animations, and vehicle rules. See
+  [world-object LOD](docs/world-object-lod.md#content-and-streaming-contract),
+  [player presence](docs/player-presence.md), and
+  [implementation status](docs/elsemesh-status.md).
+- **Optional identity and editing:** keep worlds usable without an account;
+  support optional Google login, owner-signed roles/revocations, and the
+  reviewable AI/Blender editing boundary. See [account roles](docs/account-roles.md)
+  and [AI editing](docs/ai-editor-worker.md).
+- **Portals and multiple worlds:** support independently configured portal
+  sides, mapped arrival orientation/travel direction, owner-authorized sharing,
+  preview/entry rules, and at least two separately hosted worlds including a
+  LOZ-derived world. See [portal authoring](docs/portal-authoring.md#share-one-side-with-a-friend) and the
+  [two-world test runbook](docs/testing-two-worlds.md).
+- **Loading and transport:** use signed experience metadata for world-specific
+  loading stages and readiness, stream content by priority, and derive portal
+  lighting from the downloaded destination scene. Apply the same admission and
+  readiness rules over WebTransport, secure WebSocket, WebRTC, and relay paths.
+  See [world and network design](docs/world-network-design.md#readiness-and-light-continuity) and
+  [world and network protocol](docs/world-network-protocol.md#readiness-contracts-and-portal-light-bridges).
+- **Internet reachability:** provide public HTTPS/WSS gateway, discovery, and
+  relay deployment for devices behind NAT. Standalone daemons remain durable;
+  browser hosting is explicitly temporary while its tab is open. See
+  [gateway resilience](docs/gateway-resilience.md#intended-deployment),
+  [browser hosting](docs/browser-hosting.md),
+  [direct WebRTC](docs/browser-direct-webrtc.md), and
+  [relay deployment](docs/relay-deployment.md#publish-a-browser-gateway-with-tls).
+- **ZeroTier:** keep ElseMesh network `e3918db4832a3056` separate from
+  `xellent` (`632ea2908569fc9e`), use libzt identities and network-scoped
+  addresses without exposing Central credentials, and treat physical path
+  observations as transient. Verify routing, ports, peer discovery, and
+  operation without Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
+- **Publishing:** host the current ElseMesh client at `elsemesh.github.io/`
+  and archived `loz/main` at `/loz`, retire `/elsemesh`, and show an eight
+  character source stamp matching each published ref; inspect the archived
+  `loz/main` implementation for reusable avatar/multiplayer work before
+  replacing it. See
+  [deployment](docs/deployment.md#github-pages).
 
-Use ZeroTier as an optional transport/bootstrap network for `worldd`. Use the dedicated ElseMesh ZeroTier network `e3918db4832a3056`, created in Central with a user-reported `/16` IPv4 range and 6PLANE enabled. Keep the existing `/24` test LAN `632ea2908569fc9e` (`xellent`) separate and unchanged. Verify the exact assigned IPv4 range and route behavior through Central when API access is restored; avoid disrupting overlapping private networks on hosts. Integrate through `libzt` so standalone daemons, including Android/Termux deployments, use the overlay without a separately installed ZeroTier CLI. Use stable ZeroTier node IDs and network-scoped 6PLANE addresses for peer routing. Any `findip` mapping learned by a local ZeroTier process is observational and may be used only as a fallback; never treat it as a guaranteed controller lookup. The Central API token is for administration/setup only, remains in owner-only local secret storage, and must never be required by a running world or placed in source, manifests, browser configuration, logs, or this repository.
+## Personal ThruHold and provider failover
 
-Before attempting to carry ElseMesh traffic directly over ZeroTier's physical UDP paths, inspect the active peer endpoints exposed by libzt's `zts_core_query_path_count()` and `zts_core_query_path()` APIs. The current libzt API returns observed active endpoint IP/UDP-port pairs; those values are transient path observations, not stable node addresses, direct-reachability guarantees, or a way to take ownership of ZeroTier's socket/NAT mapping. `thruholdd` currently routes peer traffic inside the managed overlay and does not consume these endpoint queries. Keep that working transport as fallback; only add a separate direct transport after proving how endpoint discovery, simultaneous NAT mapping, packet demultiplexing, authentication, and path failure/recovery work. Modify libzt only if a concrete missing API or socket integration is demonstrated.
+The hosted client may open an owner's configured personal ThruHold by default.
+Invites may identify a signed ThruHold, a ZeroTier locator, and ordered
+`(libp2p PeerID, HTTPS/WSS gateway)` candidates. The browser resolves and
+authenticates candidates but never treats a ZeroTier ID as an IP or joins
+ZeroTier. Independent desktop, Flip7, and trusted-friend providers may serve
+the same owner-authorized content; owner recovery supersedes temporary
+failover authority. An optional resolver/Worker is lookup/bootstrap only and
+must not hold world data or credentials.
 
-Prepare the dedicated public ZeroTier network for ElseMesh traffic with only the additional daemon ports required by the transport; document its ID, `/16` IPv4 and 6PLANE addressing, discovery, joining steps, ports, flow rules, and troubleshooting in `docs/zerotier-worldd.md`. Leave the existing `xellent` network and its rules unchanged. Keep ElseMesh identity signatures and world/portal authorization authoritative regardless of transport. Support browser players without ZeroTier through the public HTTPS/WSS gateway and direct WebRTC where available; retain relay fallback for peers that cannot form direct paths. Do not make runtime world access depend on ZeroTier Central, a single bootstrap host, or the browser staying open when a standalone owner/replica is available.
+Acceptance requires independent-provider and unrelated-network checks,
+provider stopover and owner recovery, resolver/gateway outage behavior, and
+separate lookup/content measurements. The canonical contract and current
+boundary are [gateway resilience](docs/gateway-resilience.md#identifiers-and-routes), with operating
+details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-hosting.md).
 
-Verify Central API access without exposing the token, the dedicated public network's `/16` IPv4 pool and 6PLANE configuration, non-disruptive route behavior, and port policy; test daemon joins and peer discovery from separate NATed networks, direct and relayed portal traversal, browser gateway/WebRTC access without a ZeroTier client, and operation when Central API access is unavailable. Run relevant builds/tests and verify the renderer/world content on the Flip7. Document unresolved deployment dependencies and limits. Commit and push the implementation and documentation to the configured working remote.
+## Invitation-gated launch and staged portal loading
 
-## Personal ThruHold reachability and independent fallback nodes
+Support opt-in invitation issuance, redemption, revocation, replay protection,
+world/gateway-bound admission assertions, and enforcement on every transport.
+Signed experience metadata must declare bootstrap, minimum-visible, and
+portal-preview content; the client must hold at the threshold until crossing
+requirements are met, then continue prioritized streaming. Portal lighting is a
+provisional/refining result from the rendered destination scene, scoped to the
+portal and bounded in cost; it is not a separately published light descriptor.
 
-The hosted ElseMesh client should open the owner's personal ThruHold by default when that owner has configured one. Support a readable invite that accepts either a canonical `ThruHold ID` or a ZeroTier node ID as a locator, with an optional resolver URL and one or more secure gateway candidates. Keep the identity layers distinct: the ThruHold ID is the signed world identity; a ZeroTier node ID is a stable overlay locator; a libp2p PeerID identifies a daemon/provider; and an HTTPS/WSS gateway is the browser-reachable endpoint. A ZeroTier ID by itself is not a route from a browser and must be resolved to current, authenticated gateway candidates.
+The normative requirements, wire contracts, and test plan are maintained in
+[world and network design: invitation and readiness](docs/world-network-design.md#invitation-gated-entry),
+[world and network protocol: admission and readiness](docs/world-network-protocol.md#invitation-admission-and-launch-grants),
+and [portal authoring: preview readiness and light bridge](docs/portal-authoring.md#preview-readiness-and-light-bridge).
 
-The owner's desktop and Flip7 should be able to run independent `thruholdd` instances with separate persistent ZeroTier identities, serving or caching the same owner-authorized ThruHold. Friend Loz should be able to operate an independently administered fallback/cache node. Replicas must serve the same signed world identity and content hashes, and each candidate must prove its provider identity and owner-granted scopes. Browser invites may list several `(libp2p PeerID, HTTPS/WSS gateway)` pairs; attempt them in order and continue to signed discovery/fallback after an endpoint fails. A restored owner node takes precedence over a temporary failover authority according to the signed owner policy.
+## Verification and completion
 
-Use an optional ElseMesh Cloudflare Worker as a small resolver/bootstrap, not as a world authority or a mandatory data path. It may map a canonical ThruHold ID or a supplied ZeroTier node ID to a short-lived list of signed, currently reachable gateway advertisements. Updates must be authenticated by world/provider signatures, expire quickly, and be replaceable by the owner. Do not store world assets, portal permissions, ZeroTier secrets, or Central API tokens there. Keep static multi-gateway invite links and portal-driven discovery usable if the Worker is offline. A Worker or Cloudflare Tunnel may provide HTTPS/WSS reachability to a daemon, but must not silently proxy all world traffic unless that deployment mode is explicitly selected and measured. Do not modify or reuse the unrelated `mame-proxy` Worker.
-
-The browser remains a client: it does not join ZeroTier and does not host the owner's durable world. A browser-hosted daemon is an opt-in temporary convenience and disappears when its host tab closes. Do not require the user to keep the ElseMesh website open when an independent desktop, phone, or Loz daemon is serving the ThruHold. Document how to persist each daemon's identity, grant replica/cache scope, configure secure gateways, share candidate URLs, and recover when one or more providers are offline.
-
-Acceptance gates: connect from an unrelated Internet connection to each independent provider; stop the desktop and verify the Flip7/Loz provider takes over; stop the owner and exercise only the explicitly granted temporary authority behavior; verify owner recovery; resolve both a ThruHold ID and a ZeroTier locator without treating the latter as an IP; open an ordinary browser through HTTPS/WSS without ZeroTier installed; and repeat with the resolver and each gateway unavailable. Measure lookup and content traffic separately. Keep gateway deployment and DNS/Worker credentials out of source control.
-
-Implementation status: invite parsing and startup failover support up to eight ordered, paired provider IDs and secure gateways. `thruholdd` publishes its local ZeroTier node/network IDs inside its signed node advertisement, `directoryd` validates and indexes that optional locator, and the client can resolve a single-world ZeroTier ID then verify the provider and world signatures. The Cloudflare Worker is deployed at `https://elsemesh-world-resolver.rebroad.workers.dev` with persistent KV storage and provider rate limiting; `/healthz` is live, and the hosted client at `https://elsemesh.org` uses it. The source contract tests pass. No live daemon advertisement has been verified yet; daemon configuration, reachable public gateways, multi-device deployment, and independent-network acceptance tests remain open.
-
-## Progress ledger (updated 2026-10-12)
-
-These statuses separate code, local tests, deployment, and end-to-end acceptance. **Implemented** means the capability exists in this repository; **locally verified** means the stated local test passed; **deployed** means a hosted/device build is available; **acceptance incomplete** means at least one required end-to-end gate remains. A feature can have different statuses at each layer. The overall goal remains **in progress**.
-
-| Part of the goal | Implementation status | Verification / deployment status | What is still needed |
-| --- | --- | --- | --- |
-| Browser-client and daemon boundary | **Implemented in source**: `thruholdd` no longer serves the static ElseMesh client; the browser application is hosted separately. The daemon serves world manifests/assets and gateway APIs; world-host, gateway, bootstrap, relay, and cache roles may share a process with distinct configuration. | **Verified 2026-10-12**: removed the daemon root file handler and `--web-root` option; Go daemon build succeeds and its help omits `--web-root`. Local two-world instructions use separate Vite client hosting on port 5189 and explicit gateway origins. | Inspect externally managed user service units for stale `--web-root` arguments; systemd's user bus was unavailable in this session. |
-| `thruholdd`, persistent node identity, signed manifests, content-addressed assets | **Implemented** for Linux and Android/Termux | **Locally verified**: current Linux `thruholdd` returned the same PeerID across two fresh invocations with one isolated data directory; `node.key` remained mode `0600`; focused ZeroTier identity-marker/migration tests pass. On 2026-10-11, the default-network Linux binary joined `e3918db4832a3056` twice using one temporary libzt state directory and retained the same ZeroTier node ID, IPv4, and 6PLANE address; `identity.secret` remained mode `0600`. A pre-migration `worldd` upgraded to current `thruholdd` through the legacy storage migration with its exact ZeroTier secret, node ID, and 6PLANE address preserved. | Finish remote peer/content exchange across independent networks. See [ThruHolds](docs/thruholds.md) and [implementation status](docs/elsemesh-status.md). |
-| Multiple world profiles and the Example Island / LOZ-derived cave | **Implemented** with separate world profiles and owner identities | **Local workflow verified**: on 2026-10-11 two independent profile processes served their signed manifests and reciprocally discovered each other through a loopback DHT bootstrap. Earlier local browser tests covered portal discovery and preview asset fetch. | Verify the two worlds from an independent network, confirm gameplay parity and portal crossing in a browser, then complete visual checks on the Flip7. Same-host DHT results do not prove cross-NAT reachability. See [two-world testing](docs/testing-two-worlds.md). |
-| Portable world export and deterministic content | **Implemented foundations**: terrain height and baked material inputs, village textures, static hanging lanterns, shader-rendered fish props, packaged animated humpback with explicit route/seed/speeds, deterministic bird and shore-wildlife component inputs/runtime, GLB collision/fallback, and content-addressed assets | **Locally verified**: deterministic island export; wildlife component/manifest validation and terrain dependency checks; portal/source-manifest/audio tests; production Vite build. Packaged heightfield queries expose bilinear height and sand-mask sampling for terrain-dependent runtimes. The opt-in Blender worker test was skipped because it requires explicit enablement. | Verify the wildlife in a live rendered scene, including boat perches and building/shore habitat, on the Flip7 when available. Complete matched original-game views for mountain, trail, beach, village, headlands, and seabed. Live fish schools, fishing gameplay, dynamic wildlife sounds, sign/lantern motion and lighting, and visual parity remain. The whale has not yet had an in-game visual parity check on Flip7. File hashes and automated tests alone do not prove visual parity. See [terrain package contract](docs/schemas/terrain-package.md), [Example Island wildlife contract](docs/schemas/example-island-wildlife.md), [fish-props-placement](docs/schemas/fish-props-placement.md), [humpback component](docs/schemas/humpback-whale.md), and [graphics review](docs/graphics-review.md). |
-| Original island appearance and graphics-priority choice | **Implemented**: Linux FPS/Visual Quality preference; Android excluded from those adaptive settings. The WebGL fallback now uses packaged terrain inputs, detail textures, vegetation, camera-following grass, and camera-following beach debris. | **Basic Flip7 comparison only**: current and original were playable at default pier views on the same 720×1600 virtual display (29 vs 23 FPS); broad pier/beach/ocean similarity and no white-texture failure observed. On 2026-10-11 the repaired 44-command client suite and production build passed with the expanded fallback. A local matched beach view renders in headless Chromium with WebGL, but Chromium chose SwiftShader; this verifies shader compilation and appearance only, not hardware frame-rate parity. | Camera, time, exposure, and render settings were not exactly matched in the Flip7 comparison. Hardware frame-rate parity and a matched WebGPU comparison remain open. Complete repeatable matched-view comparison across the named locations and confirm Android quality stays unchanged. See [graphics priority](docs/graphics-priority.md) and [graphics review](docs/graphics-review.md). |
-| Object/avatar LOD and adaptive rendering | **Implemented**: projected-size LOD, portal-camera selection, hysteresis/cross-fades, load-based LOD bias, distant avatar meshes | **Headless Dawn WebGPU smoke passed on 2026-10-11**: the synthetic transition, packaged boat and cave LODs rendered through color/shadow passes (4/48/35 pipelines; 72 boat and 145 cave draws). Near/far selection, mapped portal cameras, adaptive-load recovery and stability checks passed. Adapter model was unavailable, so this is not proof of physical-GPU performance or visual parity. | Compare actual browser near/far and portal views, measure frame/resource costs, validate on Flip7, and decide whether to reduce retained texture/mesh residency. See [world object LOD](docs/world-object-lod.md). |
-| Loading experience and hosted client | **Implemented and deployed**; `/loz/` uses archived `loz/main` history and arrow-key look controls; the deployment workflow stamps both source refs | **Live verified 2026-10-11**: `elsemesh.org` root and `/loz/` return HTTP 200; GitHub Pages API reports `cname: elsemesh.org` and HTTPS enforced. The latest deployed root stamp was verified to match `main`; `/loz/` stamp `f691cd9e` matches `archive/loz/main`. `elsemesh.github.io` redirects to the custom domain. `elsemesh.com` HTTP redirects to `https://elsemesh.org/`, but direct HTTPS timed out; DNS still uses Namecheap URL-forwarding addresses and the mail records are present. | Verify `.com` HTTPS redirect from an independent connection and resolve the HTTPS timeout using a TLS-capable redirect endpoint. Pages does not provide the world gateway/service. See [deployment](docs/deployment.md). |
-| GitHub Pages default and personal ThruHold | **Implemented locally**: the user can set a visited hosted-world invite as this browser's home; explicit `worldId` invites and `?example=1` override it. | `test/world-launcher.mjs` covers saved-home routing, invite/query precedence, and the built-in example override. Current public deployment still starts Example Island until a user saves a home invite. | Deploy a reachable HTTPS/WSS gateway/owner daemon and set the desired invite as home per browser. The URL's `nodeId` means libp2p PeerID; a ZeroTier node ID does not route browser traffic. A browser-hosted world requires its tab to remain connected. See [personal home and ZeroTier identity](docs/deployment.md#personal-home-world-and-zerotier-identity). |
-| Personal-world resolver and desktop/Flip7/Loz provider redundancy | **Partially implemented**: invite URLs accept up to eight ordered `(PeerID, HTTPS/WSS gateway)` pairs; `thruholdd` publishes its ZeroTier identity in signed node records; the client resolves bare ThruHold or ZeroTier IDs. The Worker is deployed at `https://elsemesh-world-resolver.rebroad.workers.dev`; the hosted client is configured to use it. | **Verified**: Worker health endpoint, client config served from `https://elsemesh.org`, resolver contract tests, and simulated provider failover pass. A live lookup for `tw-world:example-island` returned `providers: []`. A separate unlisted direct-gateway test verified the signed manifest and loaded 11 portal-preview assets without announcing the provider. | Publish signed provider records only when configured for discovery; deploy independent desktop/Flip7/Loz daemons and gateways, then verify from separate Internet/NAT paths. A browser still cannot route directly to a ZeroTier node ID. See [gateway resilience](docs/gateway-resilience.md) and [Worker deployment](cloudflare/world-resolver/README.md). |
-| Portal authoring, two-sided destinations, sharing | **Implemented and documented**: owner-authorized edits, side-specific destinations/orientations, previews, crossing transforms, share/import descriptions | **Focused tests and local command-line round-trip verified** | Demonstrate two-owner share/import and live traversal between independently published worlds; verify preview/entry enforcement including vehicle restrictions. See [portal authoring](docs/portal-authoring.md). |
-| Content streaming and portal preparation | **Implemented**: bounded/spatial selection, priority fetch, cancellation, provider fallback, hash verification | **Automated integration coverage verified**, including cancellation and provider recovery | Complete live browser recovery through the deployed multi-node gateway and broader device/network testing. |
-| Shared world content and simulation across renderers | **Partial implementation**: the lobster boat has renderer-neutral `BoatDesign`/`BoatSpecs`, simulation state in `BoatController`, and a separate Three.js `BoatModel`; wildlife has plain island definitions, renderer-neutral math/species modules, explicit bird/shore environment inputs, and crab simulation separated from record presentation. The fish stand shares identity, placement, collision descriptors, vendor data, material pattern IDs, and procedural fallback geometry between the WebGPU-side content and WebGL adapter. The fallback now uses `WebGLGameAdapter` with the shared saved `GameState` and `GameHUD` for inventory and fish sales. The `Wildlife` orchestrator still writes directly to renderer batches, bird pose state is partly presentation-specific, and shared wildlife adapters are not implemented. | **Locally verified 2026-10-12**: fish-stand, game-adapter, and boat-adapter headless checks pass. The full suite and production build were verified on the prior milestone; rerun them for this integration. Pages deployment run `38184789608` for `7b7a7de` succeeded and its live root stamp matched at that point. The fallback still lacks rod/bite/fight gameplay, the static fish display, and scanned StallKit materials. A new Flip7 visual check is pending because no ADB device is currently connected. | Continue extracting wildlife orchestration and add shared adapters for both renderers, then static village props, chandlery, and vendors. Move fishing/catch simulation behind the shared runtime and render the same static fish display and StallKit appearance in WebGL. The WebGL fallback still builds a separate reduced world. Complete matched Flip7/backend visual checks before claiming parity. See [graphics content boundary](docs/graphics-content-boundary.md). |
-| Player presence and avatars | **Implemented foundations**: signed presence, position/orientation updates, avatar appearance and complexity limits | **Focused tests and headless asset/render checks verified** | Presence remains presentation/self-reported state rather than authoritative simulation. Verify live multiplayer, portal continuity, portal-view rendering, and Flip7. See [player presence](docs/player-presence.md). |
-| Boat and vehicle portal rules | **Implemented foundations**: hosted boat, automatic deck landing, helm control, signed destination limits, admission/preview checks, compatible boat handoff | **Focused browser/source/daemon tests verified** | Vehicle speed/state are still self-reported; authoritative physics and live portal crossing/Flip7 validation remain. |
-| AI world-editing service and Blender workflow | **Partial implementation**: local MCP adapter, scoped proposals, isolated candidate execution, rendered review package, offline hash-bound owner accept/reject record | `test/ai-edit-review-html.mjs` now verifies decision identity binding, mandatory inspection confirmation for acceptance, and that a decision does not publish. Existing Blender worker integration passed on 2026-10-02. | Hosted/multi-user service, accepted-proposal inbox handoff, integrated owner publication UI, current sandboxed worker run, and accepted-edit training corpus remain incomplete. See [implementation status](docs/elsemesh-status.md) and [AI edit workflow](docs/ai-editor-worker.md). |
-| Optional accounts and world roles | **Partial implementation**: opt-in Google account broker, signed role grants/revocations, local owner proposal review | **Local validators and owner-only proposal workflow implemented** | Remote manifest/asset writes, portal/role management UI, proposal review UI, and durable rejection/currentness checks remain. |
-| Internet discovery, gateways, WebRTC, relay, browser-hosted world | **Protocol foundations implemented**: DHT, HTTPS/WSS gateway config, optional WebTransport, browser-host reverse connection, WebRTC negotiation, repeatable STUN configuration in the gateway service template, local fallback tests | **Temporary public HTTPS/WSS client smoke tests passed previously; no persistent public service is deployed.** Earlier tests verified signed manifests, WSS, and content through unadvertised Quick Tunnels, including a rendered Flip7 hosted-client session on 2026-10-11. On 2026-10-12, a fresh current-main no-ZeroTier daemon served the signed Example Island on loopback with `discoverable:false` and returned local health HTTP 200; a temporary Quick Tunnel connected successfully. The client-side request to the random hostname then failed because DNS resolution timed out in this environment, and the web fetch tool could not access that hostname, so no new public WSS/application/asset verification was completed. The tunnel, daemon, and temporary identity were stopped afterward. Prior requests came through the development host's outbound connection; they do not prove an independent-network/browser application session, relay, WebRTC, or portal traversal. | Test a direct invite from an independent Internet connection and complete a rendered browser session; diagnose the attached desktop Chrome GPU/context failure; deploy persistent gateway/relay with reachable public routing, DNS/TLS/monitoring; verify direct and relayed connections between independent NATs. Browser-hosted service stops when its tab closes. See [relay deployment](docs/relay-deployment.md), [browser hosting](docs/browser-hosting.md), and [browser WebRTC](docs/browser-direct-webrtc.md). |
-| Dedicated ZeroTier network and embedded libzt | **Implemented**: default network `e3918db4832a3056`; stable identities, address advertisement, automatic Linux/Android uplink selection with explicit exclusions, opt-in loopback path diagnostics, and separate libp2p/DHT-routing health counts. | **Verified**: current Android arm64 `libzt.so` and `thruholdd` cross-built with NDK r29/API 26 from ZeroTierOne `9cf0e785e` and ElseMesh `041ecb8`; bundled and external library hashes match. A new isolated Linux libzt daemon joined `e3918db4832a3056`; after clean restart it retained ZeroTier ID `bc49b737b2`, IPv4 `172.22.20.219/16`, 6PLANE `fc60:bbbd:e2bc:49b7:37b2::1`, and reported healthy. A separate 2026-10-11 restart run using the default network setting again retained its libzt node ID, IPv4 `172.22.23.66`, and 6PLANE `fc60:bbbd:e2a5:a50a:281d::1`; the private `identity.secret` stayed mode `0600`. An actual pre-migration (`2cb4840`) to current-binary upgrade migrated the exact identity secret and retained ZeroTier ID `c68d92f7a8` and 6PLANE `fc60:bbbd:e2c6:8d92:f7a8::1`; the current binary received IPv4 `172.22.160.101`. The full ZeroTier-tagged server suite passed in a network-enabled shell. Automatic filtering selected only `wlo1`, excluding `spod`, Docker, and existing ZeroTier interfaces. A corrected same-host peer test reported one libp2p peer and one DHT routing peer at each node. The latest 75-second connected Linux run emitted no `EXCESSIVE_ECHO` events; a temporary `Path` harness confirmed six-per-second heartbeat spacing passes, sub-100 ms intervals are gated, and a 1 ms burst is limited to ten replies per 1,000 ms sample. This did not inject a live peer burst or inspect production threat scoring. ZeroTierOne `exp3` commit `6bcec45a6` now has a bounded recent-event scoring window; its focused selftest confirms sustained suppressed ECHO events raise the score and expire after 65 minutes while lifetime counters remain. Live production-path burst scoring remains unverified. A fresh default Android arm64 cgo build from `8d23b296` now passes with NDK r29/API 26 and the explicit NDK clang; ELF inspection shows no `libc++_shared` dependency. | Cross-host connectivity still needs a fresh test: current ADB lists no device and SSH to the Flip7 returns `Network is unreachable`. The prior timeout test used disallowed custom ports and is invalid evidence. The current Android package has not been installed or run on a phone; live production-path ECHO-burst scoring remains unverified; the ZeroTierOne rolling-window selftest passes. See [ZeroTier setup and test log](docs/zerotier-worldd.md). | Verify peer discovery and content exchange across devices on independent NATs; correlate libzt socket paths with firewall events, verify Central pool/flow rules, and test portal traversal and relay fallback. See [ZeroTier setup and test log](docs/zerotier-worldd.md). |
-| Flip7 renderer and content check | Current root and original Tidewater are both runnable | **Smoke check and basic comparison completed only on isolated virtual display** (logical display 29; SurfaceFlinger ID `11529215050196523144`); physical displays were not used | Current and original reached the pier at 720×1600; current showed HUD/touch controls, matching `e9399014` stamp, and 29 FPS; original showed 23 FPS. On 2026-10-11, the current direct-gateway invite rendered the playable pier scene on virtual display 30 (720×1600), stamped `8340dfcd` to match `main` HEAD, and reported about 54 FPS; no white-texture issue appeared. Complete matched camera/time/exposure views, mountain/trail/village/headlands/seabed, LOD, boat, controls, and broader content checks. |
-
-This ledger is deliberately qualitative: a percentage would imply a precision the evidence does not support. “Implemented” is not the same as “verified,” and local verification is not the same as a public end-to-end deployment. The linked documents contain the detailed test evidence and limitations.
-
-### Completion rule
-
-Do not treat a workstream as complete because its code or unit tests exist. Change its status only when the evidence in the linked document meets the stated scope, including public deployment, independent-network behavior, or visual comparison where required. Keep this ledger current as those gates pass or fail; do not reduce the original requirements above to fit the current implementation.
-
-## Invitation-gated world launch and staged portal loading
-
-### Summary
-
-Add an optional invitation admission layer to ElseMesh while preserving existing guest-readable worlds.
-
-A user visits an invitation URL on `elsemesh.org`. The main ElseMesh service validates the invitation and the invitee’s approved identity, then redirects to the selected world with a short-lived opaque launch grant. The destination gateway exchanges that grant for a signed, world-bound admission assertion before accepting the browser connection.
-
-World manifests will also declare the minimum content needed for first visibility and portal previews. The client will load only that content before entering the world, then continue streaming nearby and background content. Portal lighting will be derived dynamically from the currently available rendered contents of the destination world rather than published as a separate light descriptor.
-
-### Key changes
-
-#### Invitation and admission service
-
-- Add owner-authorized invitation issuance, revocation, and inspection.
-- Invitation records include an invitation ID and hashed secret/code, target `worldId`, optional provider or gateway constraints, approved identity type and value, creation/expiry/inactive-timeout fields, and redemption/use state.
-- Support reusable invitations bound to a stable identity. ZeroTier node ID is the first supported identity, and the schema allows later static identity types. Invitations without a proven static identity become single-use.
-- Use an invite URL such as `/invite/<code>`. Redeem it through the main service rather than trusting query parameters supplied directly to the world.
-- Redemption returns an opaque, short-lived launch grant. Remove the invitation code and grant from browser history after successful handoff.
-- Add a gateway exchange endpoint. The main service converts the launch grant into a signed admission assertion containing the target world, invite and redemption IDs, approved identity binding, issue/expiry times, audience or gateway binding, nonce, and replay protection.
-- Extend browser `connect` messages and all equivalent WebTransport/WebSocket/WebRTC paths to carry the admission assertion.
-- `worldd` must reject `manifest.get`, assets, presence, and gameplay requests for invitation-gated worlds unless the connection has a valid assertion. Direct world URLs cannot bypass the gate.
-- Keep existing unsigned routing fields only as discovery hints. Continue verifying the owner-signed world manifest and provider authorization independently.
-- Add replay protection, bounded clock skew, rate limits, revocation checks, and durable redemption state.
-
-#### World readiness and loading
-
-Extend signed world experience metadata with a readiness contract:
-
-- bootstrap assets/components required to create the first usable frame;
-- minimum visible asset/component set;
-- optional loading-screen stage labels and world-specific copy;
-- portal-preview asset/component set for each portal side;
-- whether the world requires collision, spawn, lighting, or simulation data before release from the loading screen.
-
-Change remote-world startup so it initializes shared engine services only, fetches and verifies the world manifest and experience metadata, loads the declared bootstrap and minimum-visible sets, places the player at the signed spawn point, shows the first valid frame once the readiness contract is satisfied, and streams nearby, visible, and background content afterward according to view, distance, bandwidth, and cancellation priority.
-
-Avoid constructing the full procedural Example Island for remote launches. Keep that setup on the built-in-world path only.
-
-Retain the existing priority order, but make the startup threshold explicit rather than implicitly preloading selected assets “through background.”
-
-#### Portal preparation and streaming
-
-- Let each portal side declare the assets/components needed to render its first view.
-- Prepare portal content in this order: destination manifest and admission validation; portal-preview content visible through the aperture; destination visible-tier content; nearby/background content after crossing.
-- Continue holding the player at the threshold until the destination’s declared crossing requirements are met.
-- Preserve current cancellation behavior when the player looks away or approaches another portal.
-- Keep portal previews read-only and do not start destination presence until crossing.
-
-#### Cross-world light bridge
-
-Portal lighting must be derived from the destination scene that the client has
-actually downloaded and rendered. As the player approaches, prioritize the
-structures, surfaces, textures, lights, and other objects nearest to the portal
-and visible through its aperture, similar to Second Life's progressive content
-arrival. Bootstrap the destination's global environment and dominant light
-sources as well, since a distant sun, sky, or emissive object can illuminate
-the doorway even when it is outside the aperture. Use the currently available
-destination scene for a provisional portal view and refine its lighting as
-higher-priority geometry and textures arrive.
-
-Apply any destination light contribution only in a portal-local volume and cap
-its cost and intensity. If the destination scene is incomplete, preserve a
-clearly provisional result or a neutral fallback rather than claiming that the
-lighting is final. Full cross-world shadow maps and global-illumination state
-transfer are not required for the first implementation.
-
-### Interfaces
-
-Add versioned contracts for invitation issuance/revocation, launch-grant redemption and gateway exchange, signed admission assertions, manifest access policy, readiness metadata, and portal streaming priorities. Do not add a separately published portal-light descriptor; lighting comes from the streamed destination scene.
-
-Update browser connector transport messages, gateway validation, manifest validation, and world-loading state so every transport applies the same admission and readiness rules.
-
-### Test plan
-
-- Issue, redeem, reuse, expire, revoke, and rotate invitations.
-- Verify reusable ZeroTier-bound invitations work only for the bound identity.
-- Verify invitations without a static identity become single-use.
-- Reject wrong-world, wrong-gateway, expired, revoked, replayed, and tampered grants.
-- Confirm direct URLs remain valid for non-gated worlds and fail for gated worlds.
-- Exercise WebSocket, WebTransport, WebRTC, and gateway fallback admission paths.
-- Confirm invitation codes and launch grants are removed from browser history and are absent from subsequent asset requests.
-- Test first-frame readiness with minimal assets, delayed assets, failed assets, and cancellation.
-- Verify world-specific loading stages and text appear before and during streaming.
-- Verify portal preview loads only its declared visible set, crossing waits for required content, and background loading continues afterward.
-- Test progressive portal rendering with delayed structures, textures, lights, and destination objects; verify nearest/visible content is prioritized, lighting refines as data arrives, incomplete scenes use a provisional result, and portal-local cost/intensity caps hold in both directions.
-- Run focused browser/source tests plus a rendered two-world portal session; do not treat unit tests alone as proof of live gateway enforcement or visual light continuity.
-
-### Assumptions
-
-- Invitation gating is opt-in through a signed world access policy; existing guest worlds remain compatible.
-- ZeroTier node identity is the first reusable identity mechanism, with a pluggable identity interface for non-ZeroTier clients.
-- The main ElseMesh service remains the admission broker, while the destination world authority remains responsible for enforcing the resulting assertion.
-- Portal lighting is a dynamic result of the streamed destination scene. The first implementation may use provisional or neutral lighting while destination data is incomplete; full cross-world GI and shadow transport are later work.
+Run the focused source/build checks plus the live browser, two-world, gateway,
+independent-network, and isolated Flip7 checks required by the linked docs.
+Record dated results and remaining gates in
+[implementation status](docs/elsemesh-status.md) and the relevant runbook.
+Do not call the goal complete because code or local tests exist: completion
+requires the documented deployment, cross-network, rendering, and content
+acceptance evidence. Keep the repository clean, commit the implementation and
+documentation, and push to the configured working remote where feasible.
