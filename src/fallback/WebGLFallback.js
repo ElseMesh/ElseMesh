@@ -14,6 +14,7 @@ import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
+import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
@@ -640,6 +641,7 @@ export class WebGLFallback {
 				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
 				minY: box.center[ 1 ] - box.half[ 1 ], maxY: box.center[ 1 ] + box.half[ 1 ],
 			} );
+			this._addIslandBlockers();
 		}
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
@@ -1122,12 +1124,18 @@ export class WebGLFallback {
 		await this._loadVegetation();
 		const start = WORLD.start || WORLD.spawn;
 		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
-		this.groundHeight = ( x, z ) => this.terrain.heightAt( x, z );
+		this.groundHeight = ( x, z ) => this._groundHeightAt( x, z );
 		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
 		this.scene.add( this.grass );
 		this.grassCenter = new T.Vector2( start.position[ 0 ], start.position[ 2 ] );
 		this.worldName.textContent = 'WebGL mode · island rendering simplified';
 		progress( 0.9, 'Starting the WebGL island…' );
+
+	}
+
+	_groundHeightAt( x, z ) {
+
+		return pierWalkableHeightAt( x, z, ( px, pz ) => this.terrain.heightAt( px, pz ) );
 
 	}
 
@@ -1488,6 +1496,7 @@ export class WebGLFallback {
 		}
 		this.fishStand?.update( dt, this.camera.position );
 		this.gameAdapter?.update( dt, this.camera.position );
+		this._updateAudio( dt );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
 		if ( this.waterScene.children.length && ! this.debugNoWater ) {
@@ -1496,6 +1505,45 @@ export class WebGLFallback {
 			this.renderer.render( this.waterScene, this.camera );
 			this.renderer.autoClear = true;
 		}
+
+	}
+
+	_addIslandBlockers() {
+
+		// The WebGL scene uses the packaged village model, while the canonical
+		// pier is procedural and therefore has no GLTF bounds to collect. Keep
+		// its side walls in the fallback collision set so walking along the pier
+		// remains possible but walking through its rails/hull is not.
+		const P = WORLD.pier, z0 = P.zStart + 3, z1 = P.zEnd + P.headDepth;
+		for ( const side of [ - 1, 1 ] ) this.blockers.push( {
+			centerX: P.x + side * ( P.width * 0.5 + 0.2 ), centerZ: ( z0 + z1 ) * 0.5,
+			halfX: 0.22, halfZ: ( z1 - z0 ) * 0.5, yaw: 0, minY: - 2, maxY: P.deckHeight + 1.4,
+		} );
+		// The T-head has solid outer edges too; leave its open end navigable.
+		const headZ = P.zEnd - P.headDepth * 0.5;
+		for ( const side of [ - 1, 1 ] ) this.blockers.push( {
+			centerX: P.x + side * ( P.headWidth * 0.5 ), centerZ: headZ,
+			halfX: 0.22, halfZ: P.headDepth * 0.5, yaw: 0, minY: - 2, maxY: P.deckHeight + 1.4,
+		} );
+
+	}
+
+	_updateAudio( dt ) {
+
+		const audio = this.app.audio;
+		if ( ! audio || ! audio.enabled ) return;
+		const p = this.camera.position, fwd = new this.THREE.Vector3();
+		this.camera.getWorldDirection( fwd );
+		const coast = this.terrain?.coastDistance?.( p.x, p.z )?.d ?? 60;
+		const boat = this.boat?.controller;
+		audio.update( dt, {
+			listener: { position: p, forward: fwd, up: new this.THREE.Vector3( 0, 1, 0 ) },
+			underwater: p.y < - 0.15 ? 1 : 0,
+			depthBelowSurface: Math.max( 0, - 0.15 - p.y ),
+			distanceToShore: Math.abs( coast ), coastDistance: coast,
+			nearPier: Math.abs( p.x - WORLD.pier.x ) < 12 && p.z > WORLD.pier.zStart - 5 && p.z < WORLD.pier.zEnd + 8,
+			boat: { active: !! boat?.driven, rpm: boat?.rpm || 0, speed: boat?.velocity?.length?.() || 0, position: this.boat?.model?.group?.position, listenerInside: false },
+		} );
 
 	}
 

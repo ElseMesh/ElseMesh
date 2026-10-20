@@ -239,9 +239,14 @@ export class App {
 		}
 		if ( engine.backend === 'webgl' ) {
 
+			// WebGL uses the fallback game loop, so it must own the same audio
+			// lifecycle as the WebGPU loop. AudioContext creation still waits for
+			// the first canvas gesture because of browser autoplay policy.
+			this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
 			const { WebGLFallback } = await import( './fallback/WebGLFallback.js' );
 			this.webglFallback = new WebGLFallback( this, engine );
 			await this.webglFallback.init( onProgress );
+			if ( this.audio ) engine.domElement.addEventListener( 'click', () => this.audio.resume(), { passive: true } );
 			window.__app = this;
 			return this;
 
