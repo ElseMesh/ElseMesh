@@ -64,3 +64,88 @@ This ledger is deliberately qualitative: a percentage would imply a precision th
 ### Completion rule
 
 Do not treat a workstream as complete because its code or unit tests exist. Change its status only when the evidence in the linked document meets the stated scope, including public deployment, independent-network behavior, or visual comparison where required. Keep this ledger current as those gates pass or fail; do not reduce the original requirements above to fit the current implementation.
+
+## Invitation-gated world launch and staged portal loading
+
+### Summary
+
+Add an optional invitation admission layer to ElseMesh while preserving existing guest-readable worlds.
+
+A user visits an invitation URL on `elsemesh.org`. The main ElseMesh service validates the invitation and the invitee’s approved identity, then redirects to the selected world with a short-lived opaque launch grant. The destination gateway exchanges that grant for a signed, world-bound admission assertion before accepting the browser connection.
+
+World manifests will also declare the minimum content needed for first visibility and portal previews. The client will load only that content before entering the world, then continue streaming nearby and background content. Portal lighting will use a bounded signed light-bridge contract rather than attempting unrestricted cross-world global illumination.
+
+### Key changes
+
+#### Invitation and admission service
+
+- Add owner-authorized invitation issuance, revocation, and inspection.
+- Invitation records include an invitation ID and hashed secret/code, target `worldId`, optional provider or gateway constraints, approved identity type and value, creation/expiry/inactive-timeout fields, and redemption/use state.
+- Support reusable invitations bound to a stable identity. ZeroTier node ID is the first supported identity, and the schema allows later static identity types. Invitations without a proven static identity become single-use.
+- Use an invite URL such as `/invite/<code>`. Redeem it through the main service rather than trusting query parameters supplied directly to the world.
+- Redemption returns an opaque, short-lived launch grant. Remove the invitation code and grant from browser history after successful handoff.
+- Add a gateway exchange endpoint. The main service converts the launch grant into a signed admission assertion containing the target world, invite and redemption IDs, approved identity binding, issue/expiry times, audience or gateway binding, nonce, and replay protection.
+- Extend browser `connect` messages and all equivalent WebTransport/WebSocket/WebRTC paths to carry the admission assertion.
+- `worldd` must reject `manifest.get`, assets, presence, and gameplay requests for invitation-gated worlds unless the connection has a valid assertion. Direct world URLs cannot bypass the gate.
+- Keep existing unsigned routing fields only as discovery hints. Continue verifying the owner-signed world manifest and provider authorization independently.
+- Add replay protection, bounded clock skew, rate limits, revocation checks, and durable redemption state.
+
+#### World readiness and loading
+
+Extend signed world experience metadata with a readiness contract:
+
+- bootstrap assets/components required to create the first usable frame;
+- minimum visible asset/component set;
+- optional loading-screen stage labels and world-specific copy;
+- portal-preview asset/component set for each portal side;
+- whether the world requires collision, spawn, lighting, or simulation data before release from the loading screen.
+
+Change remote-world startup so it initializes shared engine services only, fetches and verifies the world manifest and experience metadata, loads the declared bootstrap and minimum-visible sets, places the player at the signed spawn point, shows the first valid frame once the readiness contract is satisfied, and streams nearby, visible, and background content afterward according to view, distance, bandwidth, and cancellation priority.
+
+Avoid constructing the full procedural Example Island for remote launches. Keep that setup on the built-in-world path only.
+
+Retain the existing priority order, but make the startup threshold explicit rather than implicitly preloading selected assets “through background.”
+
+#### Portal preparation and streaming
+
+- Let each portal side declare the assets/components needed to render its first view.
+- Prepare portal content in this order: destination manifest and admission validation; portal-preview content visible through the aperture; destination visible-tier content; nearby/background content after crossing.
+- Continue holding the player at the threshold until the destination’s declared crossing requirements are met.
+- Preserve current cancellation behavior when the player looks away or approaches another portal.
+- Keep portal previews read-only and do not start destination presence until crossing.
+
+#### Cross-world light bridge
+
+Add a bounded portal-light descriptor to the signed portal/world contract. Each portal side may publish its aperture position and normal, destination-side ambient irradiance/color, dominant directional light direction/color/intensity, optional emissive contribution, validity/version, and conservative intensity limits.
+
+At runtime, the portal preview uses the destination descriptor to light the aperture view consistently. The source world receives a limited destination light contribution around the doorway, and the destination world receives the corresponding source contribution when viewed from the other side. Contributions are clipped to a portal-local volume and capped to prevent brightness or resource abuse. When the descriptor is absent or invalid, fall back to the local world’s existing lighting.
+
+This provides visible light continuity through the door without requiring cross-world shadow maps or full global-illumination state transfer.
+
+### Interfaces
+
+Add versioned contracts for invitation issuance/revocation, launch-grant redemption and gateway exchange, signed admission assertions, manifest access policy and readiness metadata, and portal light descriptors.
+
+Update browser connector transport messages, gateway validation, manifest validation, and world-loading state so every transport applies the same admission and readiness rules.
+
+### Test plan
+
+- Issue, redeem, reuse, expire, revoke, and rotate invitations.
+- Verify reusable ZeroTier-bound invitations work only for the bound identity.
+- Verify invitations without a static identity become single-use.
+- Reject wrong-world, wrong-gateway, expired, revoked, replayed, and tampered grants.
+- Confirm direct URLs remain valid for non-gated worlds and fail for gated worlds.
+- Exercise WebSocket, WebTransport, WebRTC, and gateway fallback admission paths.
+- Confirm invitation codes and launch grants are removed from browser history and are absent from subsequent asset requests.
+- Test first-frame readiness with minimal assets, delayed assets, failed assets, and cancellation.
+- Verify world-specific loading stages and text appear before and during streaming.
+- Verify portal preview loads only its declared visible set, crossing waits for required content, and background loading continues afterward.
+- Test portal light descriptors in both directions, invalid descriptor fallback, intensity caps, and absent-light behavior.
+- Run focused browser/source tests plus a rendered two-world portal session; do not treat unit tests alone as proof of live gateway enforcement or visual light continuity.
+
+### Assumptions
+
+- Invitation gating is opt-in through a signed world access policy; existing guest worlds remain compatible.
+- ZeroTier node identity is the first reusable identity mechanism, with a pluggable identity interface for non-ZeroTier clients.
+- The main ElseMesh service remains the admission broker, while the destination world authority remains responsible for enforcing the resulting assertion.
+- The first lighting implementation is bounded portal-local ambient/directional transfer; full cross-world GI and shadow transport are later work.

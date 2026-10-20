@@ -91,6 +91,34 @@ destination accepts the current bundled boat and its declared limits are met,
 boat state is mapped and transferred with a destination speed cap. Otherwise
 the visitor remains on the source side.
 
+### Carried and detached objects
+
+Objects an avatar carries are owned by that user. The world owner defines
+policies per object type: whether it can be put down or thrown, what happens
+when its user leaves, whether detached objects persist, how long an unclaimed
+object remains available, and whether users may transfer objects to each
+other. A drop can preserve the current owner's claim, release the object for
+others to claim, or remove it, according to that policy. The world server
+authoritatively assigns ownership and simulates any permitted throwing; a
+client cannot create ownership by assertion.
+
+Ownership may be session-bound or persistent, as selected by each world.
+Persistent ownership requires a stable user identity across reconnection. A
+world may release an object as claimable when its user leaves; if no one claims
+it before the owner-defined claim window expires, the world prunes it. Worlds
+may instead remove it or retain it under their configured persistence rules.
+Enabled user-to-user transfers require both users' consent and an atomic,
+server-validated item-for-item exchange.
+
+At a portal, carried objects transfer only if the destination permits them and
+has capacity. If it rejects an object, the visitor waits at the threshold and
+can drop or trade the object before trying again. The handoff must not leave a
+duplicate or lose ownership when either world disconnects during the transfer.
+
+These policies are design requirements. ElseMesh currently has static,
+owner-authored world objects, not a general runtime object inventory, loose
+object, ownership, or transfer protocol.
+
 ## Security and denial-of-service model
 
 Treat every browser and peer as untrusted. Parse bounded messages, validate
@@ -143,7 +171,9 @@ the current presence protocol does not contain one.
 3. **Vehicle support is narrow.** Only the bundled Downeast boat has a declared
    46,845-triangle contract. Carried objects, arbitrary vehicles, inventory,
    object ownership, and server-authoritative object simulation are not
-   represented by the presence protocol.
+   represented by the presence protocol. World-owner policies for dropping,
+   throwing, persistence, claims, disconnect handling, and transfers are
+   design requirements, not runtime features.
 4. **No owner moderation list or personal override exists yet.** Presence
    snapshots currently go to all participants of that world connection, and
    there is no policy for selective avatar/object visibility or direct
@@ -152,9 +182,12 @@ the current presence protocol does not contain one.
    confused with bypassing access control.
 5. **Handover is client-coordinated, not transactional.** The client prepares
    and verifies the destination before switching, but persistent account
-   identity, inventory, authoritative simulation continuity, and an atomic
-   source-leave/destination-join protocol do not transfer. A disconnect during
-   the transition can leave only TTL cleanup at the source.
+   identity, inventory, arbitrary carried objects, authoritative simulation
+   continuity, and an atomic source-leave/destination-join protocol do not
+   transfer today. The design requires destination policy and capacity checks,
+   a wait-at-threshold path for rejected objects, and duplicate-safe ownership
+   transfer. A disconnect during the current transition can leave only TTL
+   cleanup at the source.
 6. **Neighbor preference order is not owner-configurable yet.** The code has
    ordered provider pairs in invite URLs and tiered directory selection, but
    the signed hosting grants do not record an owner-selected ranking among
