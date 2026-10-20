@@ -3,7 +3,9 @@ import { ISLAND_DEFINITION as WORLD } from '../world/IslandDefinition.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
-import { keyboardLookDelta } from '../core/Input.js';
+import { Input } from '../core/Input.js';
+import { Player } from '../player/Player.js';
+import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
@@ -662,6 +664,9 @@ export class WebGLFallback {
 		this.loader = new GLTFLoader();
 		this.worldLink = worldLinkFromLocation();
 		this.waterQuery = null;
+		this.input = null;
+		this.player = null;
+		this.hostedSeaLevel = null;
 
 	}
 
@@ -695,9 +700,18 @@ export class WebGLFallback {
 		else await this._loadIsland( onProgress );
 		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
+		this.input = new Input( this.engine.canvas );
 		if ( ! this.worldLink ) {
 			this.waterQuery = new WebGLWaterQuery( this.terrain );
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders } );
+			this.boat.controller.model = this.boat.model;
+			this._addIslandGameplayColliders();
+			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio } );
+			this.player.yaw = this.spawn.yaw || 0;
+			this.player.pitch = this.spawn.pitch || 0;
+			this.player.position.set( this.spawn.position[ 0 ], this.spawn.position[ 1 ] - 1.62, this.spawn.position[ 2 ] );
+			this.player.camera.position.set( ...this.spawn.position );
+			this.player._camY = null;
 			this.fishStand = new WebGLFishStandAdapter( T, this.scene, {
 				terrain: this.terrain,
 				colliders: this.app.worldState.colliders,
@@ -709,16 +723,19 @@ export class WebGLFallback {
 				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
 				minY: box.center[ 1 ] - box.half[ 1 ], maxY: box.center[ 1 ] + box.half[ 1 ],
 			} );
-			this._addIslandBlockers();
+		} else {
+			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
+			const hostedTerrain = { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
+			this.waterQuery = new WebGLWaterQuery( hostedTerrain, this.hostedSeaLevel ?? 0 );
+			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
+			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
+			this.player.hostedSeaLevel = this.hostedSeaLevel;
 		}
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
 			this.debrisCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 		}
-		this.yaw = this.spawn.yaw || 0;
-		this.pitch = this.spawn.pitch || 0;
-		this._look();
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
@@ -1192,7 +1209,6 @@ export class WebGLFallback {
 		await this._loadVegetation();
 		const start = WORLD.start || WORLD.spawn;
 		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
-		this.groundHeight = ( x, z ) => this._groundHeightAt( x, z );
 		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
 		this.scene.add( this.grass );
 		this.grassCenter = new T.Vector2( start.position[ 0 ], start.position[ 2 ] );
@@ -1201,9 +1217,29 @@ export class WebGLFallback {
 
 	}
 
-	_groundHeightAt( x, z ) {
+	_addIslandGameplayColliders() {
 
-		return pierWalkableHeightAt( x, z, ( px, pz ) => this.terrain.heightAt( px, pz ) );
+		const C = this.app.worldState.colliders, P = WORLD.pier, y = P.deckHeight;
+		const box = ( x, cy, z, hx, hy, hz, tag, options = {} ) => C.addBox( new EngineVector3( x, cy, z ), new EngineVector3( hx, hy, hz ), 0, { tag, ...options } );
+		const stepGround = this.terrain.heightAt( P.x, P.zStart - 0.7 ), nSteps = Math.max( 2, Math.ceil( Math.max( 0, y - stepGround ) / 0.22 ) ), tread = 0.32;
+		for ( let k = 1; k < nSteps; k ++ ) {
+			const zc = P.zStart - ( k - 0.5 ) * tread, top = pierWalkableHeightAt( P.x, zc, ( px, pz ) => this.terrain.heightAt( px, pz ) ), gb = this.terrain.heightAt( P.x, zc );
+			box( P.x, ( top + gb - 0.4 ) * 0.5, zc, P.width * 0.5, ( top - gb + 0.4 ) * 0.5, tread * 0.5 + 0.005, 'pierStep', { walkable: true } );
+		}
+		// Walkable pier deck and T-head.
+		box( P.x, y - 0.04, ( P.zStart + P.zEnd ) * 0.5, P.width * 0.5, 0.04, ( P.zEnd - P.zStart ) * 0.5, 'pierDeck', { walkable: true } );
+		box( P.x, y - 0.04, P.zEnd - P.headDepth * 0.5, P.headWidth * 0.5, 0.04, P.headDepth * 0.5, 'pierDeck', { walkable: true } );
+		// The ladder is on the outer (+X) T-head edge at z = 35.1. Its rungs
+		// are walkable, non-solid stepping surfaces for the shared swimmer.
+		const ladderX = P.x + P.headWidth * 0.5 + 0.07, ladderZ = 35.1;
+		for ( let rungY = - 0.15; rungY < y; rungY += 0.3 ) if ( rungY >= - 0.4 ) box( ladderX + 0.25, rungY - 0.15, ladderZ, 0.27, 0.15, 0.3, 'ladder', { walkable: true, solid: false } );
+		// Solid rail/hull boundaries, with a deliberate opening at the ladder.
+		const side = ( x, za, zb ) => box( x, ( y - 2 ) * 0.5, ( za + zb ) * 0.5, 0.22, ( y + 2 ) * 0.5, ( zb - za ) * 0.5, 'pierRail' );
+		side( P.x - P.width * 0.5 - 0.2, P.zStart + 3, P.zEnd + P.headDepth );
+		side( P.x + P.width * 0.5 + 0.2, P.zStart + 3, P.zEnd + P.headDepth );
+		side( P.x + P.headWidth * 0.5, P.zEnd - P.headDepth, ladderZ - 1 );
+		side( P.x + P.headWidth * 0.5, ladderZ + 1, P.zEnd );
+		side( P.x - P.headWidth * 0.5, P.zEnd - P.headDepth, P.zEnd );
 
 	}
 
@@ -1337,7 +1373,8 @@ export class WebGLFallback {
 		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
 			this.spawn = { position: transfer.slice( 0, 3 ), yaw: transfer[ 3 ], pitch: transfer[ 4 ] };
 		}
-		this.groundHeight = () => Number( this.spawn.position[ 1 ] ) - 1.7;
+		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) )
+			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
 		this.worldName.textContent = `${ manifest.title || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } GPU feature(s) omitted` : '' }`;
 		progress( 0.9, 'Preparing hosted world…' );
 
@@ -1350,7 +1387,9 @@ export class WebGLFallback {
 			if ( ! object.isMesh ) return;
 			const bounds = new T.Box3().setFromObject( object );
 			const size = bounds.getSize( new T.Vector3() );
-			if ( ! bounds.isEmpty() && size.x > 0.5 && size.z > 0.5 && size.x < 22 && size.z < 22 && size.y > 1 && size.y < 24 ) this.blockers.push( { bounds, yaw: 0, centerX: ( bounds.min.x + bounds.max.x ) / 2, centerZ: ( bounds.min.z + bounds.max.z ) / 2, halfX: size.x / 2, halfZ: size.z / 2, minY: bounds.min.y, maxY: bounds.max.y } );
+			if ( ! bounds.isEmpty() && size.x > 0.5 && size.z > 0.5 && size.x < 22 && size.z < 22 && size.y > 1 && size.y < 24 ) {
+				this.app.worldState.colliders.addBox( new EngineVector3( ( bounds.min.x + bounds.max.x ) / 2, ( bounds.min.y + bounds.max.y ) / 2, ( bounds.min.z + bounds.max.z ) / 2 ), new EngineVector3( size.x / 2, size.y / 2, size.z / 2 ), 0, { tag: 'villageObject' } );
+			}
 		} );
 
 	}
@@ -1366,7 +1405,7 @@ export class WebGLFallback {
 				const yaw = ( transform.yaw || 0 ) + ( item.yaw || 0 ), cos = Math.cos( transform.yaw || 0 ), sin = Math.sin( transform.yaw || 0 );
 				const lx = item.center[ 0 ] * scale[ 0 ], lz = item.center[ 2 ] * scale[ 2 ];
 				const hx = item.halfExtents[ 0 ] * scale[ 0 ], hz = item.halfExtents[ 2 ] * scale[ 2 ];
-				this.blockers.push( { centerX: transform.position[ 0 ] + lx * cos + lz * sin, centerZ: transform.position[ 2 ] - lx * sin + lz * cos, halfX: hx, halfZ: hz, yaw, minY: transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ] - item.halfExtents[ 1 ] * scale[ 1 ], maxY: transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ] + item.halfExtents[ 1 ] * scale[ 1 ] } );
+				( this.app.worldState.hostedColliders || this.app.worldState.colliders ).addBox( new EngineVector3( transform.position[ 0 ] + lx * cos + lz * sin, transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ], transform.position[ 2 ] - lx * sin + lz * cos ), new EngineVector3( hx, item.halfExtents[ 1 ] * scale[ 1 ], hz ), yaw, { walkable: collision.walkable, solid: collision.solid, tag: `world:${object.id}` } );
 			}
 		}
 
@@ -1441,46 +1480,9 @@ export class WebGLFallback {
 		this._keyDown = event => {
 			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
-			if ( this.gameAdapter?.handleKey( event.code ) ) { event.preventDefault(); return; }
-			this.keys.add( event.code );
-			if ( event.code === 'KeyE' ) this._useNearestPortal();
-			if ( event.code === 'Space' ) { event.preventDefault(); if ( this.onGround ) this.velocityY = 5; }
+			if ( this.gameAdapter?.handleKey( event.code ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+			if ( this.worldLink && event.code === 'KeyE' ) this._useNearestPortal();
 		};
-		this._keyUp = event => this.keys.delete( event.code );
-		this._clearKeys = () => this.keys.clear();
-		this._mouse = event => {
-			if ( document.pointerLockElement !== this.engine.canvas ) return;
-			this.yaw -= event.movementX * 0.002;
-			this.pitch = Math.max( - 1.45, Math.min( 1.45, this.pitch - event.movementY * 0.002 ) );
-			this._look();
-		};
-		this._touches = new Map();
-		for ( const { pad, knob, role } of this.touchPads ) {
-			pad.addEventListener( 'pointerdown', event => {
-				event.preventDefault(); pad.setPointerCapture( event.pointerId );
-				this._touches.set( event.pointerId, { role, x: event.clientX, y: event.clientY, originX: event.clientX, originY: event.clientY, pad, knob } );
-			} );
-			pad.addEventListener( 'pointermove', event => {
-				const touch = this._touches.get( event.pointerId ); if ( ! touch ) return;
-				if ( role === 'move' ) {
-					const dx = event.clientX - touch.originX, dy = event.clientY - touch.originY, radius = 40;
-					const length = Math.max( 1, Math.hypot( dx, dy ) ), scale = Math.min( 1, radius / length );
-					this.moveStick.x = dx * scale / radius; this.moveStick.y = dy * scale / radius;
-					knob.style.transform = `translate(${ dx * scale }px, ${ dy * scale }px)`;
-				} else {
-					this.yaw -= ( event.clientX - touch.x ) * 0.006;
-					this.pitch = Math.max( - 1.45, Math.min( 1.45, this.pitch - ( event.clientY - touch.y ) * 0.006 ) );
-					touch.x = event.clientX; touch.y = event.clientY; this._look();
-				}
-			} );
-			const end = event => {
-				const touch = this._touches.get( event.pointerId ); if ( ! touch ) return;
-				this._touches.delete( event.pointerId );
-				if ( role === 'move' ) { this.moveStick.x = this.moveStick.y = 0; knob.style.transform = ''; }
-			};
-			pad.addEventListener( 'pointerup', end ); pad.addEventListener( 'pointercancel', end );
-		}
-		this._lockChange = () => { this.locked = document.pointerLockElement === this.engine.canvas; };
 		this._resize = () => {
 			const w = window.innerWidth, h = window.innerHeight;
 			this.camera.aspect = w / Math.max( 1, h );
@@ -1494,16 +1496,10 @@ export class WebGLFallback {
 		};
 		// Capture key events before UI descendants can stop them from reaching the fallback.
 		window.addEventListener( 'keydown', this._keyDown, true );
-		window.addEventListener( 'keyup', this._keyUp, true );
-		window.addEventListener( 'blur', this._clearKeys );
-		window.addEventListener( 'mousemove', this._mouse );
-		document.addEventListener( 'pointerlockchange', this._lockChange );
-		this.requestLock = () => this.engine.canvas.requestPointerLock?.();
+		this.requestLock = () => this.input?.requestLock?.() || this.engine.canvas.requestPointerLock?.();
 		this.engine.canvas.addEventListener( 'click', this.requestLock );
 
 	}
-
-	_look() { this.camera.rotation.set( this.pitch, this.yaw, 0, 'YXZ' ); }
 
 	_frame() {
 
@@ -1511,11 +1507,11 @@ export class WebGLFallback {
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		if ( this.waterQuery ) {
-			this.boat.controller.queueQueries();
+			this.boat?.controller?.queueQueries();
 			this.waterQuery.update( dt );
 		}
 		this.boat?.update( dt );
-		const T = this.THREE, speed = this.keys.has( 'ShiftLeft' ) || this.keys.has( 'ShiftRight' ) ? 10 : 5;
+		const T = this.THREE;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;
 		this.cloudLayer.material.uniforms.uCameraPosition.value.copy( this.camera.position );
@@ -1523,35 +1519,12 @@ export class WebGLFallback {
 			object.material.uniforms.uTime.value = simulationTime;
 			object.material.uniforms.uCameraPosition?.value.copy( this.camera.position );
 		}
-		const forward = new T.Vector3( - Math.sin( this.yaw ), 0, - Math.cos( this.yaw ) );
-		const right = new T.Vector3( Math.cos( this.yaw ), 0, - Math.sin( this.yaw ) );
-		const move = new T.Vector3();
-		if ( this.keys.has( 'KeyW' ) ) move.add( forward );
-		if ( this.keys.has( 'KeyS' ) ) move.sub( forward );
-		if ( this.keys.has( 'KeyD' ) ) move.add( right );
-		if ( this.keys.has( 'KeyA' ) ) move.sub( right );
-		move.addScaledVector( forward, - this.moveStick.y );
-		move.addScaledVector( right, this.moveStick.x );
 		const gamePanelOpen = !! ( this.gameAdapter?.hud.standOpen || this.gameAdapter?.hud.invOpen );
-		const look = gamePanelOpen ? { x: 0, y: 0 } : keyboardLookDelta( this.keys, dt );
-		this.yaw -= look.x * 0.0022;
-		this.pitch = Math.max( - 1.45, Math.min( 1.45, this.pitch - look.y * 0.0022 ) );
-		this._look();
-		if ( ! gamePanelOpen && move.lengthSq() ) {
-			move.normalize().multiplyScalar( speed * dt );
-			const old = this.camera.position.clone();
-			this.camera.position.x += move.x;
-			this.camera.position.z += move.z;
-			if ( this._blocked( this.camera.position.x, this.camera.position.z ) ) this.camera.position.set( old.x, this.camera.position.y, old.z );
+		if ( this.player && ! gamePanelOpen ) {
+			if ( this.worldLink ) this.player.updateHostedWorld( dt );
+			else this.player.update( dt );
 		}
 		this.useButton.style.display = this._nearestPortalRoute() ? '' : 'none';
-		const floor = Math.max( this.groundHeight( this.camera.position.x, this.camera.position.z ) + 1.7, 1.7 );
-		if ( this.reviewPose ) { this.camera.position.y = this.spawn.position[ 1 ]; this.velocityY = 0; this.onGround = false; }
-		else {
-			this.velocityY -= 14 * dt;
-			this.camera.position.y += this.velocityY * dt;
-			if ( this.camera.position.y <= floor ) { this.camera.position.y = floor; this.velocityY = 0; this.onGround = true; } else this.onGround = false;
-		}
 		const grassDx = this.camera.position.x - this.grassCenter.x, grassDz = this.camera.position.z - this.grassCenter.y;
 		if ( this.grass && grassDx * grassDx + grassDz * grassDz > 64 ) {
 			this.scene.remove( this.grass );
@@ -1567,7 +1540,7 @@ export class WebGLFallback {
 			}
 		}
 		this.fishStand?.update( dt, this.camera.position );
-		this.gameAdapter?.update( dt, this.camera.position );
+		this.gameAdapter?.update( dt, this.player?.position || this.camera.position );
 		this._updateAudio( dt );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
@@ -1577,26 +1550,6 @@ export class WebGLFallback {
 			this.renderer.render( this.waterScene, this.camera );
 			this.renderer.autoClear = true;
 		}
-
-	}
-
-	_addIslandBlockers() {
-
-		// The WebGL scene uses the packaged village model, while the canonical
-		// pier is procedural and therefore has no GLTF bounds to collect. Keep
-		// its side walls in the fallback collision set so walking along the pier
-		// remains possible but walking through its rails/hull is not.
-		const P = WORLD.pier, z0 = P.zStart + 3, z1 = P.zEnd + P.headDepth;
-		for ( const side of [ - 1, 1 ] ) this.blockers.push( {
-			centerX: P.x + side * ( P.width * 0.5 + 0.2 ), centerZ: ( z0 + z1 ) * 0.5,
-			halfX: 0.22, halfZ: ( z1 - z0 ) * 0.5, yaw: 0, minY: - 2, maxY: P.deckHeight + 1.4,
-		} );
-		// The T-head has solid outer edges too; leave its open end navigable.
-		const headZ = P.zEnd - P.headDepth * 0.5;
-		for ( const side of [ - 1, 1 ] ) this.blockers.push( {
-			centerX: P.x + side * ( P.headWidth * 0.5 ), centerZ: headZ,
-			halfX: 0.22, halfZ: P.headDepth * 0.5, yaw: 0, minY: - 2, maxY: P.deckHeight + 1.4,
-		} );
 
 	}
 
@@ -1616,17 +1569,6 @@ export class WebGLFallback {
 			nearPier: Math.abs( p.x - WORLD.pier.x ) < 12 && p.z > WORLD.pier.zStart - 5 && p.z < WORLD.pier.zEnd + 8,
 			boat: { active: !! boat?.driven, rpm: boat?.rpm || 0, speed: boat?.velocity?.length?.() || 0, position: this.boat?.model?.group?.position, listenerInside: false },
 		} );
-
-	}
-
-	_blocked( x, z ) {
-
-		for ( const box of this.blockers ) {
-			if ( box.maxY !== undefined && ( box.maxY < this.camera.position.y - 1.7 || box.minY > this.camera.position.y + 0.2 ) ) continue;
-			const dx = x - box.centerX, dz = z - box.centerZ, cos = Math.cos( box.yaw ), sin = Math.sin( box.yaw );
-			if ( Math.abs( dx * cos - dz * sin ) < box.halfX + 0.35 && Math.abs( dx * sin + dz * cos ) < box.halfZ + 0.35 ) return true;
-		}
-		return false;
 
 	}
 
@@ -1661,8 +1603,8 @@ export class WebGLFallback {
 		if ( ! this.connector || ! this.worldLink ) return;
 		const send = () => this.connector.updatePresence( {
 			protocol: PRESENCE_PROTOCOL, sequence: this.sequence ++,
-			position: [ this.camera.position.x, this.camera.position.y - 1.7, this.camera.position.z ], yaw: this.yaw, pitch: this.pitch,
-			moving: this.keys.size > 0, mode: 'walk', appearance: { ...DEFAULT_APPEARANCE },
+			position: [ this.camera.position.x, this.camera.position.y - 1.7, this.camera.position.z ], yaw: this.player?.yaw || 0, pitch: this.player?.pitch || 0,
+			moving: !! this.player?.velocity?.lengthSq?.(), mode: this.player?.mode || 'walk', appearance: { ...DEFAULT_APPEARANCE },
 		} ).then( snapshot => this._updateRemotePlayers( snapshot ) ).catch( error => { if ( ! this.presenceFailed ) console.warn( 'WebGL fallback presence unavailable:', error.message ); this.presenceFailed = true; } );
 		this.presenceTimer = setInterval( send, 1800 );
 		send();
