@@ -89,6 +89,22 @@ matching `main`; `/loz/` returned HTTP 200 with stamp `f691cd9e`, matching
 
 ## Selected ThruHolds
 
+### Invitation-gated launches
+
+An owner may publish an invitation URL at `elsemesh.org/invite/<code>` instead
+of sharing a direct world URL. The main ElseMesh service validates the code,
+approved identity, expiry/inactivity policy, revocation state, and redemption
+limits, then redirects with a short-lived opaque launch grant. The destination
+gateway exchanges that grant for a signed admission assertion before allowing a
+browser connection.
+
+ZeroTier node ID is the first reusable static identity. Invitations without a
+provable static identity are single-use. Configure the world access policy to
+require admission; otherwise existing direct guest URLs continue to work.
+Never put account session tokens, private keys, or long-lived bearer secrets in
+an invite URL. The browser removes the code and grant from its URL after
+redemption.
+
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
 arguments. For example (replace the placeholder with an actual world gateway):
 

@@ -22,6 +22,34 @@ high-level model is in [world-network-design.md](world-network-design.md).
 - Presence pose and appearance are self-reported, ephemeral presentation data;
   they are not authenticated account identity or authoritative simulation.
 
+## Invitation admission and launch grants
+
+World access may be invitation-gated independently of signed content and
+provider identity checks. An owner-authorized invitation names a world and may
+bind admission to a stable identity. ZeroTier node ID is the first supported
+reusable identity; the contract is extensible to other static identities. An
+invitation with no identity that can be proven by the client is single-use.
+
+The public entry point is an ElseMesh invitation URL such as
+`https://elsemesh.org/invite/<code>`. The main ElseMesh service validates the
+code, identity, expiry, inactivity timeout, revocation state, and redemption
+limits. It then returns a short-lived opaque launch grant. The browser removes
+the invitation code and grant from its URL/history after handoff.
+
+The destination gateway exchanges the launch grant for a signed admission
+assertion bound to the target world, redemption, identity, audience/gateway,
+expiry, and replay nonce. Browser `connect` messages carry that assertion, and
+the same gate applies to WebSocket, WebTransport, WebRTC, and gateway fallback
+paths. A world whose signed access policy requires invitations must reject
+manifest, asset, presence, and gameplay requests without a valid assertion;
+direct routing URLs cannot bypass this check. Non-gated worlds retain the
+existing guest-readable behavior.
+
+Invitation codes and launch grants are capabilities, not account role grants.
+They must not contain private keys or reusable account session tokens. Enforce
+bounded clock skew, replay protection, rate limits, durable redemption state,
+and revocation checks at the admission service and world authority.
+
 ## Current request paths
 
 1. Browser connects to the configured gateway and selects a world/target node.
@@ -163,6 +191,25 @@ details.
    collision set, connector, and signed movement rules; activate destination
    world and presence session, append lower priority content, and close the
    source connector. The URL/history is updated for the destination.
+
+## Readiness contracts and portal light bridges
+
+Signed world experience metadata may declare a readiness contract containing
+bootstrap assets/components, the minimum visible set, required collision,
+spawn, lighting, and simulation state, and per-portal preview and crossing
+requirements. The client should release the loading screen after that contract
+is satisfied, then stream nearby and background content according to view,
+distance, bandwidth, and cancellation priority. Remote launches should
+initialize shared engine services without constructing the full built-in
+Example Island first.
+
+Each portal side may also publish a bounded signed light descriptor: aperture
+frame, destination ambient color/irradiance, dominant directional light,
+optional emissive contribution, descriptor version, and conservative intensity
+limits. The client applies this contribution only in a portal-local volume and
+uses the local world lighting when the descriptor is absent or invalid. This
+provides visible light continuity through a doorway without transferring full
+cross-world shadow maps or global-illumination state.
 
 The sequence is currently coordinated in the browser. It is not an atomic
 server transaction. Account identity, inventory, arbitrary carried objects,

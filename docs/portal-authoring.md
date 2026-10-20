@@ -22,6 +22,26 @@ A minimal front route is:
 
 Append it to Alice's source `portals` array. `openView` requests a view of the destination before crossing; `enabled` controls crossing. Optional `destinationPeerId` pins a content provider and `destinationGateway` names its HTTPS/WSS gateway. Omit them to use discovery. A provider address is a routing hint, not proof of ownership or a permission grant.
 
+For invitation-gated destinations, the portal route remains only a signed
+world connection. The visitor must separately present a valid launch grant and
+admission assertion issued by the ElseMesh invitation service. A portal link,
+provider pin, or destination gateway never grants invitation access.
+
+### Preview readiness and light bridge
+
+The destination world may declare the assets/components required for its first
+portal view and for crossing. Clients load the preview set before displaying the
+aperture, hold the visitor at the threshold until crossing requirements are
+ready, and continue loading visible, nearby, and background content after
+entry.
+
+A portal side may publish a bounded light descriptor containing its aperture
+frame, destination ambient contribution, dominant directional light, optional
+emissive contribution, descriptor version, and intensity limits. The client
+applies the contribution only around the doorway. Invalid or absent data falls
+back to the local world's lighting; this contract does not transfer full global
+illumination or shadow maps.
+
 ## Two independently routed sides
 
 The legacy front fields above remain the front route. Add an optional `back` object with its own `destinationWorldId`, `exit`, `openView`, `enabled`, and optional destination provider/gateway. Its entry uses the same position with `entry.yaw + π`: it faces the other way. Add `tidewater.portal-two-sided/1` to `rules.requiredFeatures` so older clients refuse an unsupported world rather than interpreting the doorway incorrectly.

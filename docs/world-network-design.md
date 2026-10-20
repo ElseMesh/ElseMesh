@@ -91,6 +91,37 @@ destination accepts the current bundled boat and its declared limits are met,
 boat state is mapped and transferred with a destination speed cap. Otherwise
 the visitor remains on the source side.
 
+### Invitation-gated entry
+
+World owners may opt into invitation admission. A visitor opens an
+`elsemesh.org/invite/<code>` URL; the main ElseMesh service validates the
+invitation and the approved identity, then redirects with a short-lived opaque
+launch grant. The destination gateway exchanges that grant for a signed,
+world-bound admission assertion before accepting the browser connection.
+
+ZeroTier node ID is the first reusable stable identity. An invitation without a
+provable static identity is single-use. Reuse, inactivity expiry, revocation,
+and replay protection are enforced by durable admission state. Existing worlds
+remain guest-readable unless their signed access policy requires invitations.
+The invitation is separate from account roles and does not replace owner-signed
+manifest/provider validation.
+
+### Readiness and light continuity
+
+The signed world experience may specify the minimum bootstrap, visible,
+collision, spawn, lighting, and simulation content needed before the client
+shows the first frame. Portal sides may specify a smaller preview set and a
+crossing set. The client loads those sets first, holds the visitor at the
+threshold until crossing requirements are ready, and continues view- and
+distance-prioritized streaming afterward. A remote launch should not build the
+entire procedural Example Island before activating the selected world.
+
+Portal sides may publish bounded ambient and dominant-direction light data for a
+portal-local light bridge. Each world applies the other side's contribution
+around the doorway and falls back to local lighting when no valid descriptor is
+available. Full cross-world global illumination and shadow transport are not a
+requirement of this first bridge.
+
 ### Carried and detached objects
 
 Objects an avatar carries are owned by that user. The world owner defines
