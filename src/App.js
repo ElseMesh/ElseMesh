@@ -531,13 +531,13 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			this.player.yaw = spawn.yaw;
 			this.player.pitch = spawn.pitch;
 			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0 ) );
-			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera );
-			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => this.vegetationEnabled || ! isVegetationComponent( component ) );
+			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } );
+			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
 			const initialAssetIDs = new Set( initialObjects.map( ( object ) => object.assetId ) );
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
-			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs } );
+			const visibleAssets = await connector.preload( { through: 'nearby', assetIDs: initialAssetIDs } );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
@@ -568,17 +568,18 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		window.__app = this;
 		this.gpu = GPU; // console / test access
 
-		// ---- compile pipelines asynchronously (keeps the page responsive), then prime a few
-		// frames behind the loading screen so any remaining first-use stalls happen there
-		// stage weights: in the browser the pipeline compile below takes far longer than everything before it
-		await progress( 0.36, 'Compiling shaders…', 0.95, 'compile' );
-		await this.precompile();
-		await progress( 0.96, 'Warming up…', undefined, 'warmup' );
-		for ( let i = 0; i < 2; i ++ ) {
-
-			this.frame( 1 / 60 );
-			await GPU.queue.onSubmittedWorkDone();
-
+		// Remote worlds become playable once their entry set is installed. Full pipeline
+		// compilation and warmup continue after start(), so background shader variants do
+		// not keep the player behind the loading screen.
+		if ( worldLink ) this.deferWorldWarmup = true;
+		else {
+			await progress( 0.36, 'Compiling shaders…', 0.95, 'compile' );
+			await this.precompile();
+			await progress( 0.96, 'Warming up…', undefined, 'warmup' );
+			for ( let i = 0; i < 2; i ++ ) {
+				this.frame( 1 / 60 );
+				await GPU.queue.onSubmittedWorkDone();
+			}
 		}
 
 	}
@@ -756,7 +757,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		if ( this.webglFallback ) return this.webglFallback.start();
 
 		this.engine.start( ( dt, t ) => this.frame( dt, t ), this.desktopFrameRateLimit );
-
 	}
 
 	updateFPS( dt ) {
@@ -824,6 +824,21 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const t0 = performance.now();
 		this.frameWorkMeter?.begin();
 		this._frame( dt );
+		if ( this.deferWorldWarmup && ! this.worldWarmupScheduled ) {
+			this.worldWarmupScheduled = true;
+			setTimeout( async () => {
+				try {
+					await this.precompile();
+					for ( let i = 0; i < 2; i ++ ) {
+						this.frame( 1 / 60 );
+						await GPU.queue.onSubmittedWorkDone();
+					}
+				} catch ( error ) {
+					console.warn( 'Deferred world shader warmup failed', error );
+				}
+			}, 0 );
+			this.deferWorldWarmup = false;
+		}
 		const ms = performance.now() - t0;
 		this.cpuMs = this.cpuMs === undefined ? ms : this.cpuMs * 0.95 + ms * 0.05;
 		this.renderLoadWarmup += Math.min( dt, 0.1 );

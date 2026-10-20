@@ -76,6 +76,8 @@ const objects = [
 ];
 const viewIDs = selectWorldObjectsForView( { assets: [], objects }, camera, { nearbyDistance: 5 } ).map( ( object ) => object.id );
 assert.deepEqual( viewIDs, [ 'preview-only', 'front', 'full-detail', 'near', 'legacy' ], 'active worlds load standalone portal-preview content, skip replaceable preview placeholders, include in-view visible content, and preserve legacy unbounded objects' );
+const startupViewIDs = selectWorldObjectsForView( { assets: [], objects }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( object ) => object.id );
+assert.deepEqual( startupViewIDs, [ 'preview-only', 'front', 'full-detail', 'near' ], 'startup selection excludes unbounded background objects while retaining immediate visible and nearby content' );
 const components = [
 	{ id: 'tw-component:front', type: 'tidewater.static-vegetation/1', placementAssetId: 'front', priority: 'visible', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
 	{ id: 'tw-component:behind', type: 'tidewater.static-vegetation/1', placementAssetId: 'behind', priority: 'nearby', streamingBounds: { center: [ 0, 0, 10 ], radius: 1 } },
@@ -86,6 +88,8 @@ const components = [
 ];
 const componentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5 } ).map( ( component ) => component.id );
 assert.deepEqual( componentIDs, [ 'tw-component:legacy', 'tw-component:ambience', 'tw-component:front', 'tw-component:near', 'tw-component:whale' ], 'component selection uses world-space bounds and uses the whale manifest asset priority when the component has none' );
+const startupComponentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( component ) => component.id );
+assert.deepEqual( startupComponentIDs, [ 'tw-component:legacy', 'tw-component:ambience', 'tw-component:front', 'tw-component:near', 'tw-component:whale' ], 'startup component selection excludes records above the entry priority while retaining required visible and nearby systems' );
 
 const originalWebTransport = globalThis.WebTransport;
 const originalWebSocket = globalThis.WebSocket;
