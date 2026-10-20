@@ -116,11 +116,17 @@ threshold until crossing requirements are ready, and continues view- and
 distance-prioritized streaming afterward. A remote launch should not build the
 entire procedural Example Island before activating the selected world.
 
-Portal sides may publish bounded ambient and dominant-direction light data for a
-portal-local light bridge. Each world applies the other side's contribution
-around the doorway and falls back to local lighting when no valid descriptor is
-available. Full cross-world global illumination and shadow transport are not a
-requirement of this first bridge.
+Portal lighting is a dynamic result of the destination scene currently
+available to the visitor. As the visitor approaches, prioritize the structures,
+surfaces, textures, lights, and other objects nearest to and visible through
+the aperture, using progressive arrival similar to Second Life. Bootstrap the
+destination's global environment and dominant light sources too, because a
+distant sun, sky, or emissive object may illuminate the doorway without
+appearing through the aperture. The portal may show a provisional result and
+refine its lighting as destination data arrives.
+Apply the contribution only around the doorway and cap its cost and intensity.
+Incomplete destination data must not be represented as final lighting. Full
+cross-world global illumination and shadow transport are deferred.
 
 ### Carried and detached objects
 

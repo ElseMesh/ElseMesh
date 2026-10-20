@@ -73,7 +73,7 @@ Add an optional invitation admission layer to ElseMesh while preserving existing
 
 A user visits an invitation URL on `elsemesh.org`. The main ElseMesh service validates the invitation and the invitee’s approved identity, then redirects to the selected world with a short-lived opaque launch grant. The destination gateway exchanges that grant for a signed, world-bound admission assertion before accepting the browser connection.
 
-World manifests will also declare the minimum content needed for first visibility and portal previews. The client will load only that content before entering the world, then continue streaming nearby and background content. Portal lighting will use a bounded signed light-bridge contract rather than attempting unrestricted cross-world global illumination.
+World manifests will also declare the minimum content needed for first visibility and portal previews. The client will load only that content before entering the world, then continue streaming nearby and background content. Portal lighting will be derived dynamically from the currently available rendered contents of the destination world rather than published as a separate light descriptor.
 
 ### Key changes
 
@@ -116,15 +116,25 @@ Retain the existing priority order, but make the startup threshold explicit rath
 
 #### Cross-world light bridge
 
-Add a bounded portal-light descriptor to the signed portal/world contract. Each portal side may publish its aperture position and normal, destination-side ambient irradiance/color, dominant directional light direction/color/intensity, optional emissive contribution, validity/version, and conservative intensity limits.
+Portal lighting must be derived from the destination scene that the client has
+actually downloaded and rendered. As the player approaches, prioritize the
+structures, surfaces, textures, lights, and other objects nearest to the portal
+and visible through its aperture, similar to Second Life's progressive content
+arrival. Bootstrap the destination's global environment and dominant light
+sources as well, since a distant sun, sky, or emissive object can illuminate
+the doorway even when it is outside the aperture. Use the currently available
+destination scene for a provisional portal view and refine its lighting as
+higher-priority geometry and textures arrive.
 
-At runtime, the portal preview uses the destination descriptor to light the aperture view consistently. The source world receives a limited destination light contribution around the doorway, and the destination world receives the corresponding source contribution when viewed from the other side. Contributions are clipped to a portal-local volume and capped to prevent brightness or resource abuse. When the descriptor is absent or invalid, fall back to the local world’s existing lighting.
-
-This provides visible light continuity through the door without requiring cross-world shadow maps or full global-illumination state transfer.
+Apply any destination light contribution only in a portal-local volume and cap
+its cost and intensity. If the destination scene is incomplete, preserve a
+clearly provisional result or a neutral fallback rather than claiming that the
+lighting is final. Full cross-world shadow maps and global-illumination state
+transfer are not required for the first implementation.
 
 ### Interfaces
 
-Add versioned contracts for invitation issuance/revocation, launch-grant redemption and gateway exchange, signed admission assertions, manifest access policy and readiness metadata, and portal light descriptors.
+Add versioned contracts for invitation issuance/revocation, launch-grant redemption and gateway exchange, signed admission assertions, manifest access policy, readiness metadata, and portal streaming priorities. Do not add a separately published portal-light descriptor; lighting comes from the streamed destination scene.
 
 Update browser connector transport messages, gateway validation, manifest validation, and world-loading state so every transport applies the same admission and readiness rules.
 
@@ -140,7 +150,7 @@ Update browser connector transport messages, gateway validation, manifest valida
 - Test first-frame readiness with minimal assets, delayed assets, failed assets, and cancellation.
 - Verify world-specific loading stages and text appear before and during streaming.
 - Verify portal preview loads only its declared visible set, crossing waits for required content, and background loading continues afterward.
-- Test portal light descriptors in both directions, invalid descriptor fallback, intensity caps, and absent-light behavior.
+- Test progressive portal rendering with delayed structures, textures, lights, and destination objects; verify nearest/visible content is prioritized, lighting refines as data arrives, incomplete scenes use a provisional result, and portal-local cost/intensity caps hold in both directions.
 - Run focused browser/source tests plus a rendered two-world portal session; do not treat unit tests alone as proof of live gateway enforcement or visual light continuity.
 
 ### Assumptions
@@ -148,4 +158,4 @@ Update browser connector transport messages, gateway validation, manifest valida
 - Invitation gating is opt-in through a signed world access policy; existing guest worlds remain compatible.
 - ZeroTier node identity is the first reusable identity mechanism, with a pluggable identity interface for non-ZeroTier clients.
 - The main ElseMesh service remains the admission broker, while the destination world authority remains responsible for enforcing the resulting assertion.
-- The first lighting implementation is bounded portal-local ambient/directional transfer; full cross-world GI and shadow transport are later work.
+- Portal lighting is a dynamic result of the streamed destination scene. The first implementation may use provisional or neutral lighting while destination data is incomplete; full cross-world GI and shadow transport are later work.

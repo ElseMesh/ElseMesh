@@ -35,12 +35,17 @@ aperture, hold the visitor at the threshold until crossing requirements are
 ready, and continue loading visible, nearby, and background content after
 entry.
 
-A portal side may publish a bounded light descriptor containing its aperture
-frame, destination ambient contribution, dominant directional light, optional
-emissive contribution, descriptor version, and intensity limits. The client
-applies the contribution only around the doorway. Invalid or absent data falls
-back to the local world's lighting; this contract does not transfer full global
-illumination or shadow maps.
+Portal lighting is not authored or published as a portal-side descriptor. It is
+computed from the destination scene currently downloaded and rendered by the
+client. As the visitor approaches, prioritize structures, surfaces, textures,
+lights, and other objects nearest to and visible through the aperture, using
+progressive arrival similar to Second Life. The destination's global
+environment and dominant light sources must also be bootstrapped, because a
+distant sun, sky, or emissive object can illuminate the doorway. The portal view
+may begin with a provisional or neutral result and refine as destination data
+arrives. Keep the effect local to the doorway and cap its cost and intensity;
+incomplete data must not be presented as final lighting, and full global
+illumination or shadow maps are outside this first implementation.
 
 ## Two independently routed sides
 

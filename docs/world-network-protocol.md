@@ -203,13 +203,19 @@ distance, bandwidth, and cancellation priority. Remote launches should
 initialize shared engine services without constructing the full built-in
 Example Island first.
 
-Each portal side may also publish a bounded signed light descriptor: aperture
-frame, destination ambient color/irradiance, dominant directional light,
-optional emissive contribution, descriptor version, and conservative intensity
-limits. The client applies this contribution only in a portal-local volume and
-uses the local world lighting when the descriptor is absent or invalid. This
-provides visible light continuity through a doorway without transferring full
-cross-world shadow maps or global-illumination state.
+Portal lighting is not a separately published portal-side record. It is a
+dynamic result of the destination scene currently available to the client. As
+the visitor approaches, prioritize structures, surfaces, textures, lights, and
+other objects nearest to and visible through the aperture, using progressive
+arrival similar to Second Life. Bootstrap the destination's global environment
+and dominant light sources too: a distant sun, sky, or emissive object can
+illuminate the doorway without appearing through the aperture. Render a
+provisional portal view from the data available so far, then refine its lighting
+as higher-priority destination data arrives. Apply the contribution only in a
+portal-local volume and cap its cost and intensity. When the scene is
+incomplete, use provisional or neutral lighting rather than presenting it as
+final. Full cross-world shadow maps and global-illumination transfer are
+deferred.
 
 The sequence is currently coordinated in the browser. It is not an atomic
 server transaction. Account identity, inventory, arbitrary carried objects,
