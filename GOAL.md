@@ -5,6 +5,8 @@ the main branch. This file is the short, durable acceptance contract. Detailed
 protocols, procedures, schemas, and dated evidence live in `docs/`; update
 those documents rather than copying their full explanations here.
 
+See: mini-GOAL.md
+
 ## Product requirements
 
 - **World daemon and identity:** provide the Go/libp2p `thruholdd` for Linux
