@@ -1,5 +1,6 @@
 import { WORLD } from '../world/WorldLayout.js';
 import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
+import { Vector3 } from '../engine/math/index.js';
 
 // Minimap, lower right: the island baked once from the terrain data into a 2D canvas (depth-tinted
 // sea, reef and seagrass, sand, grass and forest by height, rock, paths, village pads, the pier,
@@ -16,6 +17,7 @@ const EXT = 1280; // metres covered by the bake
 const X0 = - EXT / 2, Z0 = - 180 - EXT / 2; // world at canvas (0, 0): the island sits north of the bay
 const PPM = N / EXT; // canvas px per metre
 const ROWS_PER_FRAME = 48;
+const _vehicleForward = new Vector3();
 
 const CSS = /* css */`
 .gm-map { position: absolute; right: var(--tw-edge); bottom: var(--tw-edge); width: calc(184 * var(--tw-u)); height: calc(184 * var(--tw-u));
@@ -315,9 +317,15 @@ export class Minimap {
 		if ( ! size ) return;
 		const R = size / 2;
 
-		// forward (xz) of the view
+		// On foot and while swimming, the map follows the view. A vehicle has its own
+		// heading, so looking around must not rotate the navigation reference.
 		const e = cam.matrixWorld.elements;
 		let fx = - e[ 8 ], fz = - e[ 10 ];
+		if ( ( p.mode === 'boat' || p.mode === 'deck' ) && p.boat?.forward ) {
+			const forward = p.boat.forward( _vehicleForward );
+			fx = forward.x;
+			fz = forward.z;
+		}
 		const fl = Math.hypot( fx, fz );
 		if ( fl < 1e-4 ) {
 

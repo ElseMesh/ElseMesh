@@ -153,6 +153,7 @@ export class Player {
 		this._previousPosition.copy( this.position );
 		this.position.addScaledVector( this.velocity, dt );
 		this.colliders.resolveCapsule( this.position, RADIUS, HEIGHT, 0.4 );
+		this.resolveBoatCollision( this.position, HEIGHT );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;
 		const ground = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, 0.15 );
 		if ( this.position.y <= ground ) {
@@ -302,6 +303,7 @@ export class Player {
 		const old = p.clone();
 		p.addScaledVector( this.velocity, dt );
 		this.colliders.resolveCapsule( p, RADIUS, HEIGHT, 0.4 );
+		this.resolveBoatCollision( p, HEIGHT );
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );
 		if ( p.y <= g ) {
@@ -345,6 +347,45 @@ export class Player {
 			if ( this.audio ) this.audio.splash( wadedIn ? 0.2 : 0.5, p );
 
 		}
+
+	}
+
+	// Keep on-foot and swimming movement outside the active boat. Deck and other walkable
+	// surfaces remain traversable; the hull side is a separate soft volume for swimmers.
+	resolveBoatCollision( position, bodyHeight ) {
+
+		const b = this.boat;
+		const design = b?.design;
+		if ( ! b || ! design ) return;
+		_boatInvQ.copy( b.quaternion ).invert();
+		_boatLocal.copy( position ).sub( b.position ).applyQuaternion( _boatInvQ );
+		const local = _boatLocal;
+
+		for ( const c of design.colliders || [] ) {
+
+			if ( ! c.solid ) continue;
+			const boxBottom = c.center.y - c.half.y, boxTop = c.center.y + c.half.y;
+			if ( local.y > boxTop || local.y + bodyHeight < boxBottom ) continue;
+			const ex = c.half.x + RADIUS, ez = c.half.z + RADIUS;
+			const dx = local.x - c.center.x, dz = local.z - c.center.z;
+			if ( Math.abs( dx ) >= ex || Math.abs( dz ) >= ez ) continue;
+			const px = ex - Math.abs( dx ), pz = ez - Math.abs( dz );
+			if ( px < pz ) local.x += ( Math.sign( dx ) || 1 ) * px;
+			else local.z += ( Math.sign( dz ) || 1 ) * pz;
+
+		}
+
+		const lines = design.lines;
+		if ( ! lines?.halfBeamAt ) {
+			position.copy( local ).applyQuaternion( b.quaternion ).add( b.position );
+			return;
+		}
+		if ( local.y < lines.deckY - 0.05 && local.z >= lines.zAft && local.z <= lines.wlEnd ) {
+			const beam = lines.halfBeamAt( local.z ) + RADIUS;
+			if ( Math.abs( local.x ) < beam ) local.x = ( Math.sign( local.x ) || 1 ) * beam;
+		}
+
+		position.copy( local ).applyQuaternion( b.quaternion ).add( b.position );
 
 	}
 
@@ -433,6 +474,7 @@ export class Player {
 		p.addScaledVector( this.velocity, dt );
 		p.y = Math.min( p.y, surfaceY + 0.05 );
 		this.colliders.resolveCapsule( p, RADIUS, 1.0, 0 );
+		this.resolveBoatCollision( p, 1.0 );
 		const g = this.groundAt( p.x, p.z, p.y + 0.3 );
 		if ( p.y < g + 0.25 ) p.y = g + 0.25;
 
@@ -850,6 +892,8 @@ export class Player {
 
 			this.helmYaw = THREE.MathUtils.clamp( this.helmYaw - look.x * 0.0022, - 2.2, 2.2 );
 			this.helmPitch = THREE.MathUtils.clamp( this.helmPitch - look.y * 0.0022, - 1.2, 1.0 );
+			if ( Math.abs( look.x ) < 0.01 ) this.helmYaw *= Math.exp( - dt * 0.22 );
+			if ( Math.abs( look.y ) < 0.01 ) this.helmPitch = THREE.MathUtils.lerp( this.helmPitch, - 0.05, 1 - Math.exp( - dt * 0.22 ) );
 			const eye = b.toWorld( b.model.helmEye, new THREE.Vector3() );
 			this.camera.position.copy( eye );
 			// head partially stabilises against roll and pitch (feels natural, less nausea)
@@ -870,7 +914,7 @@ export class Player {
 				const behind = b.getYaw() + Math.PI;
 				let d = behind - this.orbitYaw;
 				d = Math.atan2( Math.sin( d ), Math.cos( d ) );
-				this.orbitYaw += d * ( 1 - Math.exp( - dt * 0.8 ) );
+				this.orbitYaw += d * ( 1 - Math.exp( - dt * 0.22 ) );
 
 			}
 

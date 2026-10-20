@@ -1,5 +1,10 @@
-import { App } from '../src/App.js';
+import { App, resolveGraphicsPriority } from '../src/App.js';
 import { Engine } from '../src/engine/Engine.js';
+
+if ( resolveGraphicsPriority( { isLinuxDesktop: true, backend: 'webgpu' } ) !== 'quality' ) throw new Error( 'Linux WebGPU should default to Visual Quality' );
+if ( resolveGraphicsPriority( { isLinuxDesktop: true, backend: 'webgl' } ) !== 'fps' ) throw new Error( 'Linux WebGL fallback should default to FPS priority' );
+if ( resolveGraphicsPriority( { isLinuxDesktop: true, backend: 'webgpu', savedPriority: 'fps' } ) !== 'fps' ) throw new Error( 'Saved FPS preference should override the WebGPU default' );
+if ( resolveGraphicsPriority( { isLinuxDesktop: true, backend: 'webgl', queryQuality: true } ) !== 'quality' ) throw new Error( 'The quality query should override the WebGL fallback default' );
 
 globalThis.location = { search: '' };
 Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { platform: 'Linux x86_64', userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' } } );

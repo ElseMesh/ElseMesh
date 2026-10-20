@@ -38,6 +38,7 @@ export class HostedBoat {
 			initialPosition: this.homePosition,
 			initialHeading: this.homeHeading,
 		} );
+		this.controller.model = this.model;
 		this.controller.query = query;
 		this.controller.colliders = colliders;
 		this.active = true;

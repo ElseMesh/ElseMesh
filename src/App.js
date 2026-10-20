@@ -105,6 +105,13 @@ function saveGraphicsPriority( value ) {
 	}
 }
 
+export function resolveGraphicsPriority( { isLinuxDesktop, backend = null, queryQuality = false, savedPriority = null } = {} ) {
+	if ( ! isLinuxDesktop ) return 'fps';
+	if ( queryQuality || savedPriority === 'quality' ) return 'quality';
+	if ( savedPriority === 'fps' ) return 'fps';
+	return backend === 'webgpu' ? 'quality' : 'fps';
+}
+
 export class App {
 
 	constructor() {
@@ -113,7 +120,8 @@ export class App {
 		const platform = navigator.userAgentData?.platform || navigator.platform || '';
 		this.isLinuxDesktop = /linux/i.test( platform ) && ! /android/i.test( navigator.userAgent );
 		const savedGraphicsPriority = readGraphicsPriority();
-		this.graphicsPriority = this.isLinuxDesktop && ( this.qs.has( 'quality' ) || savedGraphicsPriority === 'quality' ) ? 'quality' : 'fps';
+		this.savedGraphicsPriority = savedGraphicsPriority;
+		this.graphicsPriority = resolveGraphicsPriority( { isLinuxDesktop: this.isLinuxDesktop, queryQuality: this.qs.has( 'quality' ), savedPriority: savedGraphicsPriority } );
 		this.desktopAdaptiveScale = this.isLinuxDesktop && this.graphicsPriority === 'fps';
 		// Keep the Linux canvas slightly below the display resolution so full-screen post passes
 		// (temporal upscale, haze, bloom and grading) do not remain full cost when the scene scale drops.
@@ -219,6 +227,16 @@ export class App {
 		const engine = this.engine = new Engine( document.getElementById( 'app' ) );
 		await engine.init();
 		this.backend = engine.backend;
+		const backendGraphicsPriority = resolveGraphicsPriority( {
+			isLinuxDesktop: this.isLinuxDesktop,
+			backend: engine.backend,
+			queryQuality: qs.has( 'quality' ),
+			savedPriority: this.savedGraphicsPriority,
+		} );
+		if ( backendGraphicsPriority !== this.graphicsPriority ) {
+			this.graphicsPriority = backendGraphicsPriority;
+			this.configureGraphicsPriority();
+		}
 		if ( engine.backend === 'webgl' ) {
 
 			const { WebGLFallback } = await import( './fallback/WebGLFallback.js' );
@@ -432,6 +450,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.airMotes = new AirMotes( { terrain: this.terrainGPU, clouds: this.clouds, csm: this.csm, reversedDepth: true } );
 		scene.add( this.airMotes.mesh );
 		this.boatCtl = new BoatController( { design: this.boat.design, query: this.query, terrain: this.terrainData, colliders: this.colliders } );
+		// Player interaction uses the controller for physics and this presentation model for
+		// boarding, helm, and exit anchors.
+		this.boatCtl.model = this.boat;
 		this.boatSpray = new BoatSpray( { boat: this.boatCtl, spray: this.spray } );
 		// humpback cruising the deep water around the island (model fetched from public/models/whale)
 		this.whale = new Whale( { scene, terrain: this.terrainData, query: this.query, spray: this.spray } );
