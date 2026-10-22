@@ -8,6 +8,7 @@ import { Matrix4 } from '../src/engine/math/Matrix4.js';
 import { Quaternion } from '../src/engine/math/Quaternion.js';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 import { validateWorldSource } from '../src/network/WorldSource.js';
+import { writeWorldAssetIndex } from './world-asset-index.mjs';
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const packageDir = process.env.BURNING_HORIZONS_DIR ? path.resolve( process.env.BURNING_HORIZONS_DIR ) : null;
@@ -301,6 +302,8 @@ async function exportPackage( outDir ) {
 	await writeFile( path.join( assetsDir, lodAssetID.slice( 'sha256:'.length ) ), lodGLB );
 	await writeFile( path.join( assetsDir, ambienceID.slice( 'sha256:'.length ) ), ambienceBytes );
 	await writeFile( worldSourcePath, `${JSON.stringify( source, null, 2 )}\n` );
+	const assetIndex = await writeWorldAssetIndex( outDir );
+	console.log( `Wrote ${assetIndex.target} (${assetIndex.entries} indexed assets)` );
 	console.log( `Exported ${source.title}: ${source.objects.length} object, ${source.objects[ 0 ].collision.boxes.length} collision boxes, ${glb.length + ambienceBytes.length} asset bytes, ${assetID}` );
 }
 

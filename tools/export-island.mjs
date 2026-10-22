@@ -33,6 +33,7 @@ import { readTexture } from '../src/engine/gpu/Readback.js';
 import { VillageTextures } from '../src/world/village/TextureBaker.js';
 import { encodeVillageMaterialAsset, wrapCompressedVillageMaterialAsset } from '../src/network/VillageMaterialAsset.js';
 import { EXAMPLE_ISLAND_WHALE_PROFILE } from '../src/world/marine/WhaleBrain.js';
+import { writeWorldAssetIndex } from './world-asset-index.mjs';
 
 const REPO = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const args = process.argv.slice( 2 );
@@ -341,8 +342,10 @@ for ( const asset of terrainValidation.assets ) {
 	if ( ! bytes || createHash( 'sha256' ).update( bytes ).digest( 'hex' ) !== asset.sha256 || bytes.byteLength !== asset.bytes ) throw new Error( `Terrain validation metadata does not match asset ${asset.id}` );
 }
 await writeFile( terrainValidationPath, `${JSON.stringify( terrainValidation, null, 2 )}\n` );
+const assetIndex = await writeWorldAssetIndex( output );
 console.log( `Wrote ${sourcePath}` );
 console.log( `Wrote ${terrainValidationPath}` );
+console.log( `Wrote ${assetIndex.target} (${assetIndex.entries} indexed assets)` );
 const boatTriangles = generated.boatBatches.reduce( ( count, { batch } ) => count + batch.idx.length / 3, 0 );
 console.log( `Wrote ${staticAssets.size} content-addressed assets (${generated.villageTriangles} village triangles, ${boatTriangles} boat triangles, ${debris.length} scanned debris instances)` );
 console.log( `Reef export: ${reefRecords.length} records, ${reefTiles.length} tiles, ${reefAssetBytes} encoded bytes` );

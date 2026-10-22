@@ -4,6 +4,7 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { renderWorldAssetIndex } from '../tools/world-asset-index.mjs';
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const modules = await readFile( path.join( root, '.gitmodules' ), 'utf8' );
@@ -29,6 +30,9 @@ async function verifyWorld( directory, expectedWorldId ) {
 		const bytes = await readFile( path.join( worldRoot, 'assets', id ) );
 		assert.equal( createHash( 'sha256' ).update( bytes ).digest( 'hex' ), id, `${directory} asset ${id} matches its content address` );
 	}
+	const index = await readFile( path.join( worldRoot, 'ASSET-INDEX.md' ), 'utf8' );
+	assert.equal( index, await renderWorldAssetIndex( worldRoot ), `${directory} asset index is current` );
+	assert.match( index, /Procedural island terrain|Island terrain/i, `${directory} asset index includes human-readable uses` );
 	return ids.size;
 }
 
