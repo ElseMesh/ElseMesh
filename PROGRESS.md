@@ -1,5 +1,9 @@
 # ElseMesh progress
 
+This is the dated implementation and verification log. Current priorities and
+open product requirements are tracked in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md);
+completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
+
 ## 2026-10-20
 
 - Remote startup selects unbounded records only through the `nearby` tier and

@@ -25,6 +25,13 @@ This records completion of the repository-boundary work. Portable gameplay
 parity, multiplayer acceptance, controlled visual comparison, and the graphical
 world editor are still active or later goals; see [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md).
 
+The split acceptance was to initialize the Tidewater submodule and build ElseMesh
+with the package available, verify imported content hashes and deployment
+checkout, and keep Burning Horizons independently cloneable as a separate
+two-world fixture. The checks above establish those repository-boundary gates.
+The remaining parity and runtime acceptance belongs to the active project
+direction. This completed record replaces the former repository split roadmap.
+
 ## Shared engine touch controls and renderer diagnostics — complete
 
 - Move and look controls are provided once by the ElseMesh engine across

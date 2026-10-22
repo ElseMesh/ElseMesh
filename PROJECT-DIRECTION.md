@@ -6,7 +6,7 @@ and the linked runbooks. They measure requirement completion, not code volume.
 Completed milestones have been moved to [GOAL-done.md](GOAL-done.md). Reassess
 these estimates when new verification evidence is recorded.
 
-## Current priority: finish the split's integration acceptance
+## Current priority: finish Tidewater package integration and parity
 
 **Repository separation: 100% — complete.** The structural split and its
 verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
@@ -24,6 +24,10 @@ identity across portals without leaking instance state.
 
 **Graphical world editor: 0%.** After package import and multiplayer acceptance
 pass, build the editor in ElseMesh so it edits the mounted Tidewater repository.
+
+The repository split itself is complete. Its boundary decisions and acceptance
+record are in [GOAL-done.md](GOAL-done.md); this file tracks the remaining
+product work.
 
 ## Remaining goals
 
@@ -156,27 +160,30 @@ Remote startup in `src/App.js` currently:
 
 1. Fetches and verifies the world manifest.
 2. Sets the signed spawn position.
-3. Selects initial objects and components near or visible from the spawn.
-4. Downloads all selected assets.
+3. Selects initial objects and components near or visible from the spawn,
+   admitting unbounded records only through the `nearby` tier.
+4. Downloads the selected initial assets, currently including the `nearby`
+   tier.
 5. Parses and installs those assets and components.
-6. Activates the hosted world and presence.
-7. Compiles all render pipelines and warms up the GPU.
-8. Returns from `App.init()`.
+6. Activates the hosted world and presence, and schedules the remaining world
+   content for view-driven streaming.
+7. Returns from `App.init()`. The loader is hidden and the render loop starts;
+   full remote-world shader precompilation and GPU warmup are deferred until
+   after the first frame.
 
-Only then does `src/main.js` hide the loading screen and start the render loop.
-The player’s spawn pose is known earlier, but the player cannot be seen or move
-until the later gates complete.
+After `App.init()` returns, `src/main.js` hides the loading screen and starts
+the render loop. The player’s spawn pose is known earlier, but the player
+cannot be seen or move until the initial selected assets and components are
+installed.
 
-The current startup does not always download every manifest asset: the initial
-asset ID filter limits the request set. However, it still has several sources of
-unnecessary delay:
+The current startup does not download every manifest asset: the initial asset
+ID filter limits the request set, and unbounded records are admitted only
+through the `nearby` tier. Remaining sources of entry delay include:
 
-- startup allows selected assets through `background` priority;
-- objects and components without `streamingBounds` are selected immediately;
+- selected initial assets must finish downloading before entry;
 - large monolithic assets, such as terrain packages, cannot be partially
   downloaded;
-- component installation can perform expensive decoding or runtime setup;
-- full shader precompilation and GPU warmup happen before rendering starts.
+- component installation can perform expensive decoding or runtime setup.
 
 ## Entry-ready phase (15%)
 
