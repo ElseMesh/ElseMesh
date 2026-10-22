@@ -20,7 +20,7 @@ assert.equal( terrain.sandAt( 1, - 1 ), 64 / 255, 'sand sampling uses the export
 assert.equal( terrain.sandAt( 10, 0 ), 0, 'sand outside the package bounds is empty' );
 assert.throws( () => new HeightfieldTerrainData( { size: 4, origin: - 2, resolution: 2, heights: new Float32Array( 4 ), splat: new Uint8Array( 4 ) } ), /Invalid packaged terrain heightfield/, 'terrain rejects a splat map with mismatched dimensions' );
 
-const island = path.resolve( 'worlds/island' );
+const island = path.resolve( 'worlds/tidewater' );
 const source = JSON.parse( await readFile( path.join( island, 'world-source.json' ), 'utf8' ) );
 const surface = source.components.find( component => component.type === 'tidewater.terrain-surface/1' );
 const packed = await readFile( path.join( island, 'assets', surface.dataAssetId.slice( 'sha256:'.length ) ) );

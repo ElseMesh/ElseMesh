@@ -30,7 +30,7 @@ The hosted island is the portable development package, with its boat, vegetation
 reef and ambience components. It is still missing parts of the complete original
 procedural game, including wildlife and fishing, and some visual details. The
 cave is a portable static slice of LOZ's UNDERNEATH, not the complete Burning
-Horizons game. See `worlds/island/README.md` and `worlds/loz-underneath/README.md`.
+Horizons game. See `worlds/tidewater/README.md` and `worlds/loz-underneath/README.md`.
 The hosted island starts at the original boardwalk pose. The picker labels the
 complete procedural scene **Original island (offline)** and network worlds
 **Hosted ThruHold** to distinguish the two experiences. For the complete
@@ -62,7 +62,7 @@ node tools/serve-world-profile.mjs \
   --worldd server/bin/worldd-linux-amd64 \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --profile island-example \
-  --source worlds/island/world-source.json --assets worlds/island/assets \
+  --source worlds/tidewater/world-source.json --assets worlds/tidewater/assets \
   --http 127.0.0.1:5200 --p2p-port 42901 \
   --discoverable true --dht-mode server \
   --allow-browser-origin http://127.0.0.1:5189

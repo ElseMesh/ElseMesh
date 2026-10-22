@@ -28,7 +28,7 @@ try {
 	const detailImage = getDetailImage();
 	assert.equal( detailImage.width, 512, 'procedural placement can access the shared detail image without initializing WebGPU' );
 	assert.equal( detailImage.data.length, 512 * 512 * 4, 'CPU detail image retains the exact shared RGBA data layout' );
-	const checkedInDir = path.resolve( 'worlds/island' );
+	const checkedInDir = path.resolve( 'worlds/tidewater' );
 	const checkedInSourceBytes = await readFile( path.join( checkedInDir, 'world-source.json' ) );
 	const checkedInTerrainReportBytes = await readFile( path.join( checkedInDir, 'terrain-validation.json' ) );
 	const checkedInSource = validateWorldSource( JSON.parse( checkedInSourceBytes ) );

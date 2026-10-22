@@ -5,7 +5,7 @@ import { setupLife } from './life-harness.mjs';
 import { Whale } from '../src/world/marine/Whale.js';
 import { WhaleBrain } from '../src/world/marine/WhaleBrain.js';
 
-const root = path.resolve( 'worlds/island' );
+const root = path.resolve( 'worlds/tidewater' );
 const source = JSON.parse( await readFile( path.join( root, 'world-source.json' ), 'utf8' ) );
 const component = source.components.find( item => item.type === 'tidewater.humpback-whale/1' );
 assert.ok( component, 'Example Island exports a packaged humpback component' );

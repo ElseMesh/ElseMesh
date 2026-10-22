@@ -1,6 +1,6 @@
 # Vendor stall assets
 
-Builds `public/models/props/` (Joe's fish stand and Marta's chandlery, see `src/game/StallKit.js`)
+Builds `worlds/tidewater/source/models/props/` (exposed through `public/models/props/`) (Joe's fish stand and Marta's chandlery, see `src/game/StallKit.js`)
 from Poly Haven CC0 downloads.
 
 ```sh

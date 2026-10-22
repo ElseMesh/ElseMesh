@@ -35,7 +35,7 @@ try {
 		id: 'tw-portal:example-island', destinationWorldId: 'tw-world:example-island',
 		entry: { position: [ 0, 4.2, 8 ], yaw: Math.PI / 2 }, exit: { position: [ - 340, 4.2, 80 ], yaw: Math.PI / 2 }, visual: 'stone', openView: true, enabled: true,
 	} ], 'the cave ships a reciprocal, provider-discoverable portal at its mapped entrance' );
-	const islandSource = validateWorldSource( JSON.parse( await readFile( path.join( root, 'worlds/island/world-source.json' ), 'utf8' ) ) );
+	const islandSource = validateWorldSource( JSON.parse( await readFile( path.join( root, 'worlds/tidewater/world-source.json' ), 'utf8' ) ) );
 	assert.deepEqual( islandSource.portals, [ {
 		id: 'tw-portal:loz-underneath', destinationWorldId: source.worldId,
 		entry: { position: [ - 340, 4.2, 80 ], yaw: Math.PI / 2 }, exit: { position: [ 0, 4.2, 8 ], yaw: Math.PI / 2 }, visual: 'timber', openView: true, enabled: true,

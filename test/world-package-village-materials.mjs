@@ -8,16 +8,16 @@ import { loadWorldPackage, disposeWorldPackage } from '../src/network/WorldPacka
 import { decodeVillageMaterialAsset } from '../src/network/VillageMaterialAsset.js';
 import { VILLAGE_MATERIAL_PROFILE, VILLAGE_MATERIAL_ROLES } from '../src/network/WorldVillageMaterial.js';
 
-const source = JSON.parse( await readFile( new URL( '../worlds/island/world-source.json', import.meta.url ) ) );
+const source = JSON.parse( await readFile( new URL( '../worlds/tidewater/world-source.json', import.meta.url ) ) );
 const village = source.objects.find( object => object.id === 'tw-object:island-village' );
 const previewObject = source.objects.find( object => object.priority === 'portal-preview' && object.id !== village.id );
-const bytes = new Uint8Array( await readFile( new URL( `../worlds/island/assets/${village.assetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
+const bytes = new Uint8Array( await readFile( new URL( `../worlds/tidewater/assets/${village.assetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
 assert.equal( `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`, village.assetId );
 const materialComponent = source.components.find( component => component.type === 'tidewater.village-materials/2' );
 assert.ok( materialComponent, 'the island package must include its portable village maps' );
-const materialBytes = new Uint8Array( await readFile( new URL( `../worlds/island/assets/${materialComponent.dataAssetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
+const materialBytes = new Uint8Array( await readFile( new URL( `../worlds/tidewater/assets/${materialComponent.dataAssetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
 assert.equal( `sha256:${createHash( 'sha256' ).update( materialBytes ).digest( 'hex' )}`, materialComponent.dataAssetId );
-const previewBytes = new Uint8Array( await readFile( new URL( `../worlds/island/assets/${previewObject.assetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
+const previewBytes = new Uint8Array( await readFile( new URL( `../worlds/tidewater/assets/${previewObject.assetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
 const materialData = await decodeVillageMaterialAsset( materialBytes );
 await GPU.init( { headless: true } );
 const materials = Object.fromEntries( VILLAGE_MATERIAL_ROLES.map( role => [ role, { name: role, userData: {}, dispose() { this.disposed = true; } } ] ) );

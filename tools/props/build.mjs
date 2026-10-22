@@ -1,4 +1,4 @@
-// Builds the vendor-stall assets in public/models/props/ from Poly Haven (CC0) downloads:
+// Builds the vendor-stall assets in worlds/tidewater/source/models/props/ from Poly Haven (CC0) downloads:
 //   node tools/props/build.mjs            (after python3 tools/props/fetch.py)
 //
 //   props.bin / props.json   every prop model merged into one vertex + index buffer:

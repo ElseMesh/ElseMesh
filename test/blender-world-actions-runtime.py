@@ -10,7 +10,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ACTION_RUNNER = ROOT / "tools/blender/world_actions.py"
-SOURCE_PATH = ROOT / "worlds/island/world-source.json"
+SOURCE_PATH = ROOT / "worlds/tidewater/world-source.json"
 OBJECT_ID = "tw-object:blender-runtime-check"
 MESH_ID = "tw-object:blender-generated-check"
 
@@ -45,7 +45,7 @@ def main():
     if len(asset_ids) < 2:
         raise SystemExit("runtime check needs two source assets to exercise asset replacement")
     asset_id, replacement_asset_id = asset_ids[:2]
-    asset_path = ROOT / "worlds/island/assets" / asset_id.removeprefix("sha256:")
+    asset_path = ROOT / "worlds/tidewater/assets" / asset_id.removeprefix("sha256:")
     plan = {
         "protocol": "elsemesh.blender-actions/1",
         "sourceHash": "sha256:" + hashlib.sha256(source_bytes).hexdigest(),
@@ -129,7 +129,7 @@ def main():
         for content_id in asset_ids:
             digest = content_id.removeprefix("sha256:")
             candidate_asset = candidate_assets / digest
-            original_asset = ROOT / "worlds/island/assets" / digest
+            original_asset = ROOT / "worlds/tidewater/assets" / digest
             target = candidate_asset if candidate_asset.is_file() else original_asset
             if not target.is_file():
                 raise RuntimeError("candidate package is missing an asset: " + content_id)

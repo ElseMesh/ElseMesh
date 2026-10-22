@@ -1,6 +1,6 @@
 # Audio build (fishing sounds)
 
-Rebuilds the fishing sounds in `public/audio/` from CC0 Freesound previews. Needs node and ffmpeg
+Rebuilds the fishing sounds in `worlds/tidewater/source/audio/` (exposed to the runtime through `public/audio/`) from CC0 Freesound previews. Needs node and ffmpeg
 (libopus). Nothing is synthesised: every sound is a real recording (sources and licences in
 `public/audio/CREDITS.md`).
 
@@ -12,7 +12,7 @@ node dl.mjs 509902:tosha73 507070:paulprit 450849:kyles 371313:Mrthenoronha 7254
   507093:paulprit 649003:ramattahatta 570208:RatBird 336585:Anthousai
                                          # -> raw/<id>.ogg + raw/<id>.json (prints each licence; check CC0)
 node build-fishing.mjs                   # -> out/*.ogg + fishing-bank.json
-cp out/*.ogg ../../public/audio/         # then copy the entries of fishing-bank.json into src/audio/soundBank.js
+cp out/*.ogg ../../worlds/tidewater/source/audio/         # then copy the entries of fishing-bank.json into src/audio/soundBank.js
 ```
 
 - Loops (`reel_wind`, `reel_drag`, `line_strain`): excerpt, equal-power crossfade at the wrap, loudness-normalised

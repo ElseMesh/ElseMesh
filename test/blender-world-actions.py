@@ -14,7 +14,7 @@ SPEC.loader.exec_module(world_actions)
 class BlenderWorldActionsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source_bytes = (ROOT / "worlds/island/world-source.json").read_bytes()
+        cls.source_bytes = (ROOT / "worlds/tidewater/world-source.json").read_bytes()
         cls.source = json.loads(cls.source_bytes)
 
     def plan(self, actions, source_bytes=None):

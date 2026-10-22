@@ -8,9 +8,12 @@ maintained repositories with separate development lineages:
 - **ElseMesh** becomes the engine repository. It should contain the reusable
   client, server, networking, rendering, world-loading, authoring, and packaging
   systems without the example island's authored world content.
-- **Tidewater** is the separate world-content repository. It holds the actual
-  island content derived from the Tidewater game lineage, has its own GitHub
-  URL, and is included in the ElseMesh checkout as a Git submodule.
+- **Tidewater** is the separate world-content repository at
+  `https://github.com/ElseMesh/tidewater`. It contains authored content and
+  package data and is included at `worlds/tidewater` as a Git submodule.
+- **LOZ Underneath** remains a distinct world-content repository at
+  `https://github.com/ElseMesh/loz-underneath`, mounted at
+  `worlds/loz-underneath` for portal integration coverage.
 
 The split is complete when the engine can develop and build with the content
 repository checked out at its submodule path, while the two repositories keep
@@ -23,8 +26,17 @@ serve the engine itself. Update build, test, deployment, and documentation
 references to match the new boundaries, and verify both repositories and their
 integration after the move.
 
-Set Tidewater's GitHub URL as part of the split. Until then, refer to it as
-the Tidewater content repository.
+Tidewater content repositories are data packages, not independently
+compilable applications. The package describes interactions using validated,
+versioned behavior data. ElseMesh owns their authoritative execution and
+multiplayer state. The first migration preserves existing Tidewater gameplay
+through currently supported behavior handlers; it does not add a general
+scripting runtime. State is isolated by world instance and can be shared,
+player-scoped, group-scoped, or persistent when a world declares it. Player
+platform identity carries across portals without carrying instance state.
+
+After package import and multiplayer acceptance pass, build the graphical world
+editor inside ElseMesh and have it edit the mounted content repository.
 
 ## Later goals
 

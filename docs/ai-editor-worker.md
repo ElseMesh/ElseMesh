@@ -14,9 +14,9 @@ The owner creates the task explicitly:
 
 ```sh
 node tools/create-ai-edit-task.mjs \
-  --source worlds/island/world-source.json \
+  --source worlds/tidewater/world-source.json \
   --blend /path/to/owner-reviewed-island.blend \
-  --assets worlds/island/assets \
+  --assets worlds/tidewater/assets \
   --instruction 'Add a small timber fish-cleaning table beside the selected work area.' \
   --include-object tw-object:example-work-area \
   --out-task /var/tmp/elsemesh-fish-table-task
@@ -74,8 +74,8 @@ After reviewing the worker's `review.html`, use the preparation command to make 
 
 ```sh
 node tools/prepare-ai-edit-publication.mjs \
-  --base-source ./worlds/island/world-source.json \
-  --base-assets ./worlds/island/assets \
+  --base-source ./worlds/tidewater/world-source.json \
+  --base-assets ./worlds/tidewater/assets \
   --candidate /var/tmp/elsemesh-fish-table-candidate \
   --out /var/tmp/elsemesh-fish-table-publication
 ```

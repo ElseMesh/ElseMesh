@@ -1,6 +1,6 @@
 # Browser audio
 
-The island ambience is the same on a hosted build and on the Vite development server. `SoundScape` resolves its clips beneath the Vite base URL (`audio/`), and the recordings are checked into `public/audio/`. Web Audio is created only after a user gesture because browsers suspend audio contexts until playback is explicitly started. The start overlay invokes `SoundScape.resume()` from its click/Enter/Space handler; clicking the view also retries it.
+The island ambience is the same on a hosted build and on the Vite development server. `SoundScape` resolves its clips beneath the Vite base URL (`audio/`), and the recordings are stored in the Tidewater submodule at `worlds/tidewater/source/audio/` and exposed through the `public/audio/` compatibility symlink. Web Audio is created only after a user gesture because browsers suspend audio contexts until playback is explicitly started. The start overlay invokes `SoundScape.resume()` from its click/Enter/Space handler; clicking the view also retries it.
 
 If a local tab is silent while the hosted tab plays:
 

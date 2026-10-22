@@ -36,7 +36,7 @@ import { EXAMPLE_ISLAND_WHALE_PROFILE } from '../src/world/marine/WhaleBrain.js'
 
 const REPO = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const args = process.argv.slice( 2 );
-let output = path.join( REPO, 'worlds', 'island' );
+let output = path.join( REPO, 'worlds', 'tidewater' );
 for ( let i = 0; i < args.length; i ++ ) {
 	if ( args[ i ] !== '--out' || ! args[ i + 1 ] ) throw new Error( `Unknown or incomplete option: ${args[ i ]}` );
 	output = path.resolve( args[ ++ i ] );
@@ -86,14 +86,14 @@ const villageMaterialsAssetId = `sha256:${createHash( 'sha256' ).update( village
 staticAssets.set( villageMaterialsAssetId, villageMaterials );
 villageTextures.dispose();
 GPU.device.destroy();
-const whaleFiles = await Promise.all( [ 'humpback.json', 'humpback.bin', 'humpback_albedo.png', 'humpback_height.png' ].map( name => readFile( path.join( REPO, 'public', 'models', 'whale', name ) ) ) );
+const whaleFiles = await Promise.all( [ 'humpback.json', 'humpback.bin', 'humpback_albedo.png', 'humpback_height.png' ].map( name => readFile( path.join( REPO, 'worlds', 'tidewater', 'source', 'models', 'whale', name ) ) ) );
 const whaleAssetIDs = whaleFiles.map( bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}` );
 for ( let i = 0; i < whaleFiles.length; i ++ ) staticAssets.set( whaleAssetIDs[ i ], whaleFiles[ i ] );
 const villageGLB = exportBatchGLB( generated.villageBatches, 'Procedural village', true );
 const villageAssetId = `sha256:${createHash( 'sha256' ).update( villageGLB ).digest( 'hex' )}`;
 const villageBounds = boundsForGLB( villageGLB );
 staticAssets.set( villageAssetId, villageGLB );
-const villageLODGLB = await readFile( path.join( REPO, 'worlds', 'island', 'lod-source', 'village-low.glb' ) );
+const villageLODGLB = await readFile( path.join( REPO, 'worlds', 'tidewater', 'lod-source', 'village-low.glb' ) );
 const villageLODAssetId = `sha256:${createHash( 'sha256' ).update( villageLODGLB ).digest( 'hex' )}`;
 const villageBaseData = parseGLB( villageGLB );
 const villageLODData = parseGLB( villageLODGLB );
@@ -107,7 +107,7 @@ const boatGLB = exportBatchGLB( generated.boatBatches, 'Moored lobster boat' );
 const boatAssetId = `sha256:${createHash( 'sha256' ).update( boatGLB ).digest( 'hex' )}`;
 const boatBounds = boundsForGLB( boatGLB );
 staticAssets.set( boatAssetId, boatGLB );
-const boatLODGLB = await readFile( path.join( REPO, 'worlds', 'island', 'lod-source', 'moored-boat-low.glb' ) );
+const boatLODGLB = await readFile( path.join( REPO, 'worlds', 'tidewater', 'lod-source', 'moored-boat-low.glb' ) );
 const boatLODAssetId = `sha256:${createHash( 'sha256' ).update( boatLODGLB ).digest( 'hex' )}`;
 const boatBaseData = parseGLB( boatGLB );
 const boatLODData = parseGLB( boatLODGLB );
@@ -206,7 +206,7 @@ const source = {
 	protocol: 'tidewater.world-source/1',
 	worldId: 'tw-world:example-island',
 	title: 'Example Island',
-	experience: JSON.parse( await readFile( path.join( REPO, 'worlds/island/presentation.json' ), 'utf8' ) ),
+	experience: JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) ),
 	spawn: generated.spawn,
 	coordinateSystem: 'right-handed-y-up-meters',
 	styleGuide: 'Procedural volcanic island terrain. Preserve the coast, central bay, volcanic ridge, beaches, seabed, and terrain color regions.',

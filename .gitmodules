@@ -1,0 +1,6 @@
+[submodule "tidewater"]
+	path = worlds/tidewater
+	url = https://github.com/ElseMesh/tidewater.git
+[submodule "loz-underneath"]
+	path = worlds/loz-underneath
+	url = https://github.com/ElseMesh/loz-underneath.git

@@ -5,7 +5,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 out = Path('/var/tmp/elsemesh-scanned-lod-review')
 out.mkdir(exist_ok=True)
-source = json.loads((root / 'worlds/island/world-source.json').read_text())
+source = json.loads((root / 'worlds/tidewater/world-source.json').read_text())
 assets = {}
 for obj in source['objects']:
     if obj.get('kind') == 'asset-instance' and obj.get('lods') and obj.get('label') in ('dead quiver trunk','dead quiver branch 02','dead quiver branch 01','lambis shell'):
@@ -49,7 +49,7 @@ for index,(label,(base_id,lod_id,rot)) in enumerate(sorted(assets.items())):
     groups={}
     for tag,asset_id in [('near',base_id),('far',lod_id)]:
         before=set(bpy.data.objects)
-        bpy.ops.import_scene.gltf(filepath=str(root/'worlds/island/assets'/asset_id))
+        bpy.ops.import_scene.gltf(filepath=str(root/'worlds/tidewater/assets'/asset_id))
         created=[o for o in bpy.data.objects if o not in before and o.type=='MESH']
         for o in created:
             o.rotation_mode='QUATERNION'; o.rotation_quaternion=q

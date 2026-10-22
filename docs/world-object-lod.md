@@ -144,13 +144,13 @@ temporary directory and use its full-detail village GLB as the Blender input:
 npm run export:island -- --out /var/tmp/elsemesh-island-full
 blender --background --python tools/blender/export-world-object-lod.py -- \
   --source /var/tmp/elsemesh-island-full/assets/<village-asset-sha256> \
-  --out worlds/island/lod-source/village-low.glb --ratio 0.35
+  --out worlds/tidewater/lod-source/village-low.glb --ratio 0.35
 npm run export:island
 ```
 
 Regenerate the boat preview variant the same way, using its content-addressed
 full-detail GLB from the temporary export and writing to
-`worlds/island/lod-source/moored-boat-low.glb` with `--ratio 0.35`.
+`worlds/tidewater/lod-source/moored-boat-low.glb` with `--ratio 0.35`.
 
 Regenerate the UNDERNEATH cave variant from a clean package export using
 `--ratio 0.70`, write the Blender result to

@@ -1,4 +1,4 @@
-import defaultIslandExperience from '../../worlds/island/presentation.json' with { type: 'json' };
+import defaultIslandExperience from '../../worlds/tidewater/presentation.json' with { type: 'json' };
 
 const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages' ];
 const LOADING_STAGES = new Set( [ 'gpu', 'atmosphere', 'terrain', 'village', 'vegetation', 'ocean', 'reef', 'simulation', 'shaders', 'world', 'compile', 'warmup' ] );

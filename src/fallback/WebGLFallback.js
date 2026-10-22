@@ -18,9 +18,9 @@ import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
-import terrainUrl from '../../worlds/island/lod-source/terrain-full.glb?url';
-import villageUrl from '../../worlds/island/lod-source/village-full.glb?url';
-import vegetationUrl from '../../worlds/island/lod-source/vegetation-placements.bin?url';
+import terrainUrl from '../../worlds/tidewater/lod-source/terrain-full.glb?url';
+import villageUrl from '../../worlds/tidewater/lod-source/village-full.glb?url';
+import vegetationUrl from '../../worlds/tidewater/lod-source/vegetation-placements.bin?url';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
 let sharedFoamLaceTexture;

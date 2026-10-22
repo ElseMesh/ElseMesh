@@ -27,8 +27,8 @@ node tools/serve-world-profile.mjs \
   --worldd /path/to/thruholdd \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --profile island-example \
-  --source worlds/island/world-source.json \
-  --assets worlds/island/assets \
+  --source worlds/tidewater/world-source.json \
+  --assets worlds/tidewater/assets \
   --http 127.0.0.1:5200 --p2p-port 42901
 ```
 

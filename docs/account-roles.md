@@ -91,10 +91,10 @@ After reviewing the candidate source and its assets, publish it to the selected 
 ```sh
 node tools/publish-world-source.mjs \
   --worldd ./worldd \
-  --data ~/.config/elsemesh/worlds/island \
+  --data ~/.config/elsemesh/worlds/tidewater \
   --base-source ./island.world-source.json \
   --source ./candidate.world-source.json \
-  --assets ./worlds/island/assets
+  --assets ./worlds/tidewater/assets
 ```
 
 The command first asks `worldd` to verify the active signed manifest and confirm that the local node key is its owner. Runtime manifests record the SHA-256 of the exact source file used to produce them. The supplied `--base-source` must match that active signed hash, so a candidate based on an older source snapshot cannot be published. Existing manifests without a source hash require an explicit reviewed base file once; that publish records the baseline hash. The candidate must name the same world, and `worldd` independently hashes both source files (each must be a regular file no larger than 16 MiB) before signing. Publication preserves the current discoverability setting and authority epoch, constructs exactly the next manifest version, verifies and imports every referenced content-addressed asset, archives the previous signed manifest under `manifest-history/`, then atomically activates the new signed `world.json`. A failed validation or package import leaves the active manifest untouched. A publication lock prevents concurrent publishers; after a process crash, remove `.publish.lock` only after confirming no publisher is running. Restart the running `worldd` process after successful publication so it loads the new manifest. The owner profile and private proposal inbox must remain outside any static web root.

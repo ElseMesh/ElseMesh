@@ -3,7 +3,7 @@
 Example (Blender 4.3.2):
   blender --background --python tools/blender/export-world-object-lod.py -- \
     --source /var/tmp/island-village.glb \
-    --out worlds/island/lod-source/village-low.glb \
+    --out worlds/tidewater/lod-source/village-low.glb \
     --ratio 0.35
 
 The input GLB is retained as the full-detail and collision source. The output is

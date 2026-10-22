@@ -98,8 +98,8 @@ try {
 	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: path.join( root, 'server/worldd' ), encoding: 'utf8', timeout: 180000 } );
 	assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
 	const worldsDir = path.join( tempRoot, 'worlds' );
-	const islandAssets = path.join( root, 'worlds/island/assets' );
-	const islandSource = JSON.parse( await readFile( path.join( root, 'worlds/island/world-source.json' ), 'utf8' ) );
+	const islandAssets = path.join( root, 'worlds/tidewater/assets' );
+	const islandSource = JSON.parse( await readFile( path.join( root, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
 	const caveSourcePath = path.join( root, 'worlds/loz-underneath/world-source.json' );
 	const caveSource = JSON.parse( await readFile( caveSourcePath, 'utf8' ) );
 	const caveAssets = path.join( root, 'worlds/loz-underneath/assets' );
@@ -111,7 +111,7 @@ try {
 	const secondHTTP = await unusedPort();
 	const firstP2P = await unusedPort();
 	const secondP2P = await unusedPort();
-	let first = startProfile( binary, worldsDir, 'first-world', path.join( root, 'worlds/island/world-source.json' ), islandAssets, firstHTTP, firstP2P, { discoverable: true, allowedBrowserOrigins: [ 'http://127.0.0.1:5189' ], dhtMode: 'server' } );
+	let first = startProfile( binary, worldsDir, 'first-world', path.join( root, 'worlds/tidewater/world-source.json' ), islandAssets, firstHTTP, firstP2P, { discoverable: true, allowedBrowserOrigins: [ 'http://127.0.0.1:5189' ], dhtMode: 'server' } );
 	const firstManifest = await waitForWorld( first, firstHTTP, islandSource.worldId );
 	const second = startProfile( binary, worldsDir, 'loz-underneath', caveSourcePath, caveAssets, secondHTTP, secondP2P, {
 		discoverable: true,

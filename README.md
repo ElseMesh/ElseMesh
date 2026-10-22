@@ -17,6 +17,8 @@ Hosting, selected-world URLs and the `elsemesh.org` DNS setup are documented in 
 
 ## Requirements
 
+Check out the content repositories before building: `git submodule update --init --recursive`. Tidewater and the LOZ cave are data-only world packages mounted under `worlds/`; the engine builds and serves them.
+
 - A browser with WebGPU: a recent Chrome, Edge or Safari.
 - A capable GPU. It targets 60 fps at 2560×1267 on an Apple M5 Pro, and dynamic resolution scales
   the render down on slower machines.
