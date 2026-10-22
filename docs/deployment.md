@@ -24,26 +24,18 @@ The LOZ stamp sits above its bottom-right Credits link.
 
 ## Mirroring Loz branches
 
-GitHub Actions runs `tools/mirror-loz.sh` hourly. It fetches every branch from
-the `loz` remote and from Loz's `ElseMesh-preview` repository, then
-publishes them under `loz/<branch>` and `loz/preview/<branch>` respectively on
-`origin`. The script configures the `loz-preview` fetch remote from the
-repository URL if needed. `loz/main` supplies the `/loz/` Pages build; preview
-branches are retained in Git but are not built into Pages. The script needs Git
-push access to `origin` and uses atomic pushes so a failed publication leaves
-each push's refs unchanged.
+The hourly refresh workflow and `tools/mirror-loz.sh` now live in the
+[Burning Horizons content repository](https://github.com/ElseMesh/burning-horizons).
+That workflow fetches branches from `lozknowles/ElseMesh` and
+`lozknowles/ElseMesh-preview`, then publishes them under `loz/<branch>` and
+`loz/preview/<branch>` refs in the Burning Horizons repository. Replaced or
+deleted refs are preserved under `archive/loz-preserved/` there.
 
-The first sync preserves the existing `archive/loz/main` copy under
-`archive/loz-preserved/main/<commit>`. Each active `loz/<branch>` ref points to
-the exact source commit. Linear updates use normal fast-forward pushes. If Loz
-rewrites history, the script preserves the old mirror ref, removes the active
-ref, then creates it at Loz's exact new tip with a normal push; there is briefly
-no active ref between those two pushes. If the script stops in that interval,
-rerun it to finish publishing. Replaced or deleted main-repository refs are
-preserved under `archive/loz-preserved/<branch>/<commit>`; preview refs use the
-`preview/` prefix there. If Loz deletes a branch, its last mirror is preserved
-and the active ref is removed. If Loz deletes `main`, the root Pages deployment
-continues and the `/loz/` build is skipped.
+This engine repository retains its existing `loz/main` ref for the archived
+`/loz/` Pages build. That ref is no longer refreshed by this repository's
+Actions workflow; the source mirror is maintained in Burning Horizons.
+
+### Historical Pages deployments
 
 On 2026-10-10, Pages run `38080038023` successfully built and deployed main at
 `ac86602eaf860a8f0615db6333dd6fbfdb9ea756` and the preserved
