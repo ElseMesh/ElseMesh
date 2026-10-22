@@ -29,8 +29,33 @@ const ui = new UI();
 const app = new App();
 window.__ui = ui;
 
+function reportConnection() {
+	if ( ! globalThis.crypto?.randomUUID || ! navigator.sendBeacon ) return;
+	const querySettings = {};
+	for ( const key of [ 'renderer', 'quality', 'scale', 'noAudio', 'noCaustics', 'oldClouds', 'bench' ] ) {
+		if ( app.qs.has( key ) ) querySettings[ key ] = key === 'scale' || key === 'renderer' ? app.qs.get( key ) : true;
+	}
+	const settings = {
+		renderer: app.backend,
+		fallbackReason: app.engine?.fallbackReason || null,
+		platform: app.isLinuxDesktop ? 'linux-desktop' : 'other',
+		graphicsPriority: app.graphicsPriority,
+		renderScale: app.settings.renderScale,
+		autoScale: app.autoScale,
+		antiAliasing: app.post?.aaMode || null,
+		shadows: app.shadows?.enabled ?? null,
+		refractionScale: app.refraction?.scale ?? null,
+		world: app.worldState?.worldId || null,
+		query: querySettings,
+		viewport: { width: innerWidth, height: innerHeight, pixelRatio: devicePixelRatio },
+	};
+	const body = JSON.stringify( { type: 'game-ready', connectionId: crypto.randomUUID(), settings } );
+	navigator.sendBeacon( '/__elsemesh/connection', new Blob( [ body ], { type: 'application/json' } ) );
+}
+
 app.init( ( p, text, until ) => ui.setLoading( p, text, until ) ).then( async () => {
 
+	reportConnection();
 	if ( app.backend !== 'webgl' ) app.ui = new AppUI( app, ui );
 	ui.setLoading( 1, 'Ready' );
 	await ui.hideLoader();

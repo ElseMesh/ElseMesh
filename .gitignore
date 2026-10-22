@@ -5,3 +5,4 @@ main-merge-check/
 fish-stand-check/
 .DS_Store
 *.log
+logs/browser-connections.jsonl

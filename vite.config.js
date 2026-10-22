@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { appendFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
@@ -10,11 +11,47 @@ const commitSha = execFileSync( 'git', [ '--git-dir', resolve( commonGitDir ), '
 if ( ! /^[\da-f]{40}$/i.test( commitSha ) ) throw new Error( 'Git HEAD must be a full 40-character commit SHA' );
 const commitShort = commitSha.slice( 0, 8 ).toLowerCase();
 
+const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
+
+function connectionLog() {
+	const middleware = ( req, res, next ) => {
+		if ( req.method !== 'POST' || req.url !== '/__elsemesh/connection' ) return next();
+		let body = '';
+		req.setEncoding( 'utf8' );
+		req.on( 'data', ( chunk ) => {
+			body += chunk;
+			if ( body.length > 16_384 ) req.destroy();
+		} );
+		req.on( 'end', async () => {
+			try {
+				const event = JSON.parse( body );
+				if ( event?.type !== 'game-ready' || typeof event.connectionId !== 'string' || event.connectionId.length > 64 || ! event.settings || typeof event.settings !== 'object' ) {
+					res.statusCode = 400;
+					res.end( 'Invalid connection event' );
+					return;
+				}
+				await mkdir( resolve( 'logs' ), { recursive: true } );
+				await appendFile( connectionLogPath, JSON.stringify( { receivedAt: new Date().toISOString(), ...event } ) + '\n' );
+				res.statusCode = 204;
+				res.end();
+			} catch {
+				res.statusCode = 400;
+				res.end( 'Invalid connection event' );
+			}
+		} );
+	};
+	return {
+		name: 'elsemesh-browser-connection-log',
+		configureServer( server ) { server.middlewares.use( middleware ); },
+		configurePreviewServer( server ) { server.middlewares.use( middleware ); },
+	};
+}
+
 export default defineConfig( {
 	// Relative asset paths let the client run at the GitHub Pages root and under /loz.
 	base: './',
 	resolve: { preserveSymlinks: true },
-	plugins: [ {
+	plugins: [ connectionLog(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html ) {
 			if ( ! html.includes( '%ELSEMESH_COMMIT%' ) ) throw new Error( 'Build commit placeholder is missing from index.html' );
