@@ -101,7 +101,7 @@ async function waitForProvider( child, otherChild, port, otherPort, worldID, pee
 try {
 	const binary = path.join( tempRoot, 'worldd' );
 	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: path.join( root, 'server/worldd' ), encoding: 'utf8', timeout: 180000 } );
-	assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
+	assert.equal( build.status, 0, `worldd build failed:\n${build.error?.message || ''}\n${build.stdout || ''}\n${build.stderr || ''}` );
 	const worldsDir = path.join( tempRoot, 'worlds' );
 	const islandAssets = path.join( root, 'worlds/tidewater/assets' );
 	const islandSource = JSON.parse( await readFile( path.join( root, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
