@@ -4,6 +4,9 @@ For doorway placement, independent front/back routes and friend-to-friend connec
 
 ## Product direction
 
+For a content-first inventory of authored behavior needs and current runtime
+coverage, see [Burning Horizons behavior inventory](burning-horizons-behavior-inventory.md).
+
 ThruHolds use the versioned `tidewater.world-source/1` content format. Tidewater's authored source and package assets live in the separate `ElseMesh/tidewater` content repository, imported at `worlds/tidewater`. Burning Horizons is maintained separately at `ElseMesh/burning-horizons`; it is not a submodule or part of the Tidewater package. These repositories contain world data and assets, not standalone applications. After Tidewater package import and authoritative multiplayer behavior pass acceptance, ElseMesh will provide the graphical world editor for Tidewater content. Blender interchange and the separate AI editor service remain supported authoring paths.
 
 For open portal views, an object may declare `replacesObjectId` pointing to a non-colliding `portal-preview` object. The preview can render while visible-tier assets stream; the runtime hides it once the higher-detail object arrives, regardless of arrival order. Preview objects are visual only and must not carry gameplay collision.
