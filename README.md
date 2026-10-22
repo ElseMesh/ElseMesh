@@ -132,7 +132,12 @@ Add these to the URL, for example `?fly&noAudio`:
 npm install
 npm run dev      # http://127.0.0.1:5189
 npm run build    # static build in dist/
+npm run build -- --run # build, then serve the result locally
 ```
+
+The preview server prints its local URL and stays running until stopped with Ctrl+C. The build guard
+expects a sibling `elsemesh.build` directory; it also allows building in the source tree when that
+sibling path is a symbolic link to the source directory (a common Termux setup).
 
 Every push to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`.
 
