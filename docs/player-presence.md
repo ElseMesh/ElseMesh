@@ -64,7 +64,8 @@ structure are checked by `test/avatar-lod-assets.mjs`.
 
 This implements remote-avatar distance LOD only. General world-object LOD,
 projected-size selection, portal-view selection, sustained-load adaptation,
-and visual transition/animation quality remain requirements in GOAL.md.
+and visual transition/animation quality remain requirements in
+PROJECT-DIRECTION.md under Later goals.
 Textures retain their full resolution at these mesh levels. The signed avatar
 complexity cap still rejects over-budget selected geometry rather than choosing
 a lower level solely to satisfy the cap.
