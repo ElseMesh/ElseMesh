@@ -15,7 +15,7 @@ static ElseMesh client; it serves world and gateway APIs only.
 ## Links on the server computer
 
 - [Hosted example island](http://127.0.0.1:5189/?worldId=tw-world%3Aexample-island&gateway=http%3A%2F%2F127.0.0.1%3A5200)
-- [UNDERNEATH / LOZ-derived basalt cavern](http://127.0.0.1:5189/?worldId=tw-world%3Aloz-underneath&gateway=http%3A%2F%2F127.0.0.1%3A5200)
+- [UNDERNEATH / LOZ-derived basalt cavern](http://127.0.0.1:5189/?worldId=tw-world%3Aloz-underneath&gateway=http%3A%2F%2F127.0.0.1%3A5200) when the separate Burning Horizons profile is running.
 
 Both links use the island gateway on port 5200. It discovers the cave owner
 and forwards content over libp2p. The cave backend on port 5202 must remain
@@ -30,7 +30,10 @@ The hosted island is the portable development package, with its boat, vegetation
 reef and ambience components. It is still missing parts of the complete original
 procedural game, including wildlife and fishing, and some visual details. The
 cave is a portable static slice of LOZ's UNDERNEATH, not the complete Burning
-Horizons game. See `worlds/tidewater/README.md` and `worlds/loz-underneath/README.md`.
+Horizons game. See `worlds/tidewater/README.md` and the separate
+`ElseMesh/burning-horizons` repository. Clone Burning Horizons independently and
+set `BURNING_HORIZONS_DIR` to that checkout before running the two-world profile
+test or provisioning its content.
 The hosted island starts at the original boardwalk pose. The picker labels the
 complete procedural scene **Original island (offline)** and network worlds
 **Hosted ThruHold** to distinguish the two experiences. For the complete
@@ -81,8 +84,8 @@ island_peer=$(server/bin/worldd-linux-amd64 \
 node tools/serve-world-profile.mjs \
   --worldd server/bin/worldd-linux-amd64 \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
-  --profile loz-underneath \
-  --source worlds/loz-underneath/world-source.json --assets worlds/loz-underneath/assets \
+  --profile burning-horizons \
+  --source "$BURNING_HORIZONS_DIR/world-source.json" --assets "$BURNING_HORIZONS_DIR/assets" \
   --http 127.0.0.1:5202 --p2p-port 42903 \
   --discoverable true --dht-mode server \
   --bootstrap "/ip4/127.0.0.1/tcp/42901/p2p/$island_peer" \

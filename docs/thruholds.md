@@ -38,13 +38,13 @@ To run another world at the same time, use a second profile and distinct ports:
 node tools/serve-world-profile.mjs \
   --worldd /path/to/thruholdd \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
-  --profile loz-underneath \
-  --source worlds/loz-underneath/world-source.json \
-  --assets worlds/loz-underneath/assets \
+  --profile burning-horizons \
+  --source "$BURNING_HORIZONS_DIR/world-source.json" \
+  --assets "$BURNING_HORIZONS_DIR/assets" \
   --http 127.0.0.1:5202 --p2p-port 42903
 ```
 
-The checked-in `worlds/loz-underneath` package is a static, LOZ-derived cave world, not a port of the full Burning Horizons simulation. To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `thruholdd` as a DHT server. `thruholdd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.
+The `ElseMesh/burning-horizons` repository contains the static LOZ-derived cave package; it is kept separate from both ElseMesh and Tidewater. It is not a port of the full Burning Horizons simulation. Set `BURNING_HORIZONS_DIR` to a separate checkout when provisioning or testing it. To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `thruholdd` as a DHT server. `thruholdd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.
 
 On Android/Termux, the helper places temporary manifest files under `$PREFIX/tmp`; on Linux it uses `/var/tmp`. The persistent identity, signed `world.json`, and installed content-addressed assets stay under `<worlds-dir>/<profile>`. For public browser invites, configure a reachable HTTPS/WSS gateway with `--public-gateway`; add `--directory-url` to publish a discoverable world. A directory URL requires a public gateway. The WebSocket gateway accepts same-origin clients by default; for the separately hosted ElseMesh client, explicitly allow its exact HTTPS origin with repeatable `--allow-browser-origin https://elsemesh.org` (for local development, loopback HTTP origins such as `http://127.0.0.1:5189` are also accepted). It does not allow arbitrary cross-origin browser connections. Android hosting may need explicit reachable addresses; pass each as `--announce-address /ip4/.../tcp/...` (or the documented QUIC form). Repeat `--bootstrap`, `--relay`, `--announce-address`, and `--allow-browser-origin` for additional values.
 

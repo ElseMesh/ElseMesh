@@ -13,7 +13,8 @@ import { Colliders } from '../src/world/Colliders.js';
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const temporaryBase = process.env.PREFIX?.startsWith( '/data/data/' ) ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const output = await mkdtemp( path.join( temporaryBase, 'elsemesh-loz-underneath-' ) );
-const packageDir = path.join( root, 'worlds/loz-underneath' );
+const packageDir = process.env.BURNING_HORIZONS_DIR ? path.resolve( process.env.BURNING_HORIZONS_DIR ) : null;
+if ( ! packageDir ) throw new Error( 'Set BURNING_HORIZONS_DIR to a separate Burning Horizons checkout to run this optional package test' );
 
 try {
 	for ( let exportCount = 0; exportCount < 2; exportCount ++ ) execFileSync( process.execPath, [ 'tools/export-loz-underneath.mjs', '--out', output ], { cwd: root, stdio: 'ignore' } );

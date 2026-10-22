@@ -11,9 +11,9 @@ maintained repositories with separate development lineages:
 - **Tidewater** is the separate world-content repository at
   `https://github.com/ElseMesh/tidewater`. It contains authored content and
   package data and is included at `worlds/tidewater` as a Git submodule.
-- **LOZ Underneath** remains a distinct world-content repository at
-  `https://github.com/ElseMesh/loz-underneath`, mounted at
-  `worlds/loz-underneath` for portal integration coverage.
+- **Burning Horizons** is a separate content repository at
+  `https://github.com/ElseMesh/burning-horizons`. Its content is developed and
+  versioned independently; it is not part of Tidewater or checked into ElseMesh.
 
 The split is complete when the engine can develop and build with the content
 repository checked out at its submodule path, while the two repositories keep

@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { WorldConnector } from '../src/network/WorldConnector.js';
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
+const burningHorizonsRoot = process.env.BURNING_HORIZONS_DIR ? path.resolve( process.env.BURNING_HORIZONS_DIR ) : null;
+if ( ! burningHorizonsRoot ) {
+	console.log( 'skip two-world portal profile test: set BURNING_HORIZONS_DIR to a separate Burning Horizons checkout' );
+	process.exit( 0 );
+}
 const tempBase = process.env.PREFIX?.startsWith( '/data/data/' ) ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const tempRoot = await mkdtemp( path.join( tempBase, 'elsemesh-profile-e2e-' ) );
 const children = [];
@@ -100,12 +105,12 @@ try {
 	const worldsDir = path.join( tempRoot, 'worlds' );
 	const islandAssets = path.join( root, 'worlds/tidewater/assets' );
 	const islandSource = JSON.parse( await readFile( path.join( root, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
-	const caveSourcePath = path.join( root, 'worlds/loz-underneath/world-source.json' );
+	const caveSourcePath = path.join( burningHorizonsRoot, 'world-source.json' );
 	const caveSource = JSON.parse( await readFile( caveSourcePath, 'utf8' ) );
-	const caveAssets = path.join( root, 'worlds/loz-underneath/assets' );
+	const caveAssets = path.join( burningHorizonsRoot, 'assets' );
 	const firstPeerID = spawnSync( binary, [ '--worlds-dir', worldsDir, '--world-profile', 'first-world', '--print-node-id' ], { encoding: 'utf8' } );
 	assert.equal( firstPeerID.status, 0, `could not initialize the island profile identity:\n${firstPeerID.stderr}` );
-	const secondPeerID = spawnSync( binary, [ '--worlds-dir', worldsDir, '--world-profile', 'loz-underneath', '--print-node-id' ], { encoding: 'utf8' } );
+	const secondPeerID = spawnSync( binary, [ '--worlds-dir', worldsDir, '--world-profile', 'burning-horizons', '--print-node-id' ], { encoding: 'utf8' } );
 	assert.equal( secondPeerID.status, 0, `could not initialize the cave profile identity:\n${secondPeerID.stderr}` );
 	const firstHTTP = await unusedPort();
 	const secondHTTP = await unusedPort();
@@ -113,7 +118,7 @@ try {
 	const secondP2P = await unusedPort();
 	let first = startProfile( binary, worldsDir, 'first-world', path.join( root, 'worlds/tidewater/world-source.json' ), islandAssets, firstHTTP, firstP2P, { discoverable: true, allowedBrowserOrigins: [ 'http://127.0.0.1:5189' ], dhtMode: 'server' } );
 	const firstManifest = await waitForWorld( first, firstHTTP, islandSource.worldId );
-	const second = startProfile( binary, worldsDir, 'loz-underneath', caveSourcePath, caveAssets, secondHTTP, secondP2P, {
+	const second = startProfile( binary, worldsDir, 'burning-horizons', caveSourcePath, caveAssets, secondHTTP, secondP2P, {
 		discoverable: true,
 		dhtMode: 'server',
 		allowedBrowserOrigins: [ 'http://127.0.0.1:5189' ],
@@ -146,7 +151,7 @@ try {
 	assert.equal( restartedManifest.ownerPeerId, firstManifest.ownerPeerId, 'restarting a profile keeps its owner identity and manifest' );
 	const profiles = spawnSync( binary, [ '--worlds-dir', worldsDir, '--list-world-profiles' ], { encoding: 'utf8' } );
 	assert.equal( profiles.status, 0, profiles.stderr );
-	assert.deepEqual( profiles.stdout.trim().split( '\n' ).sort(), [ 'first-world', 'loz-underneath' ] );
+	assert.deepEqual( profiles.stdout.trim().split( '\n' ).sort(), [ 'first-world', 'burning-horizons' ] );
 	console.log( 'example island and LOZ cave packages were served as separate worlds; the live browser connector discovered, verified and prefetched the cave through the island portal' );
 } finally {
 	await Promise.all( children.map( stop ) );

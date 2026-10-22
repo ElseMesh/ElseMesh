@@ -10,8 +10,8 @@ import { Vector3 } from '../src/engine/math/Vector3.js';
 import { validateWorldSource } from '../src/network/WorldSource.js';
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
-const packageDir = path.join( root, 'worlds/loz-underneath' );
-const sourceDir = path.join( packageDir, 'source' );
+const packageDir = process.env.BURNING_HORIZONS_DIR ? path.resolve( process.env.BURNING_HORIZONS_DIR ) : null;
+const sourceDir = packageDir ? path.join( packageDir, 'source' ) : null;
 
 function parseArgs( argv ) {
 	const options = {};
@@ -306,7 +306,9 @@ async function exportPackage( outDir ) {
 
 try {
 	const options = parseArgs( process.argv.slice( 2 ) );
-	await exportPackage( options.out || packageDir );
+	const destination = options.out || packageDir;
+	if ( ! destination ) throw new Error( 'Set BURNING_HORIZONS_DIR to a separate Burning Horizons checkout or pass --out' );
+	await exportPackage( destination );
 } catch ( error ) {
 	console.error( error.message );
 	process.exitCode = 1;

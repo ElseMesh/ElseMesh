@@ -2,6 +2,12 @@
 
 This document tracks the agreed ElseMesh direction against the current code. It is a progress ledger, not a reduced definition of the project. Protocol IDs beginning with `tidewater.` remain in use for compatibility; ElseMesh is the project and ThruHold is an independently owned world.
 
+Repository ownership as of 2026-10-22: Tidewater is imported as the sole world
+content submodule. Burning Horizons is maintained at
+`ElseMesh/burning-horizons` and is no longer checked out or tracked in ElseMesh.
+Older dated rows below record the earlier bundled-cave state as historical
+verification evidence.
+
 ## Implemented foundations
 
 Graphics comparisons can use the named and captured camera URL parameters documented in [graphics-review.md](graphics-review.md), so a view and time of day can be reproduced after a normal page load without changing the phone or browser environment.

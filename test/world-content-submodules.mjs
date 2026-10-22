@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const modules = await readFile( path.join( root, '.gitmodules' ), 'utf8' );
 assert.match( modules, /path = worlds\/tidewater\n\s*url = https:\/\/github\.com\/ElseMesh\/tidewater\.git/ );
-assert.match( modules, /path = worlds\/loz-underneath\n\s*url = https:\/\/github\.com\/ElseMesh\/loz-underneath\.git/ );
+assert.doesNotMatch( modules, /burning-horizons|loz-underneath/i, 'Burning Horizons remains outside ElseMesh submodules' );
 
 const status = execFileSync( 'git', [ 'submodule', 'status' ], { cwd: root, encoding: 'utf8' } );
 assert.doesNotMatch( status, /^[-+U]/m, 'content submodules must be checked out at their pinned revisions' );
@@ -32,10 +32,7 @@ async function verifyWorld( directory, expectedWorldId ) {
 	return ids.size;
 }
 
-const [ tidewaterAssets, caveAssets ] = await Promise.all( [
-	verifyWorld( 'worlds/tidewater', 'tw-world:example-island' ),
-	verifyWorld( 'worlds/loz-underneath', 'tw-world:loz-underneath' ),
-] );
+const tidewaterAssets = await verifyWorld( 'worlds/tidewater', 'tw-world:example-island' );
 
 for ( const link of [ 'public/audio', 'public/models/debris', 'public/models/props', 'public/models/whale' ] ) {
 	const resolved = await realpath( path.join( root, link ) );
@@ -43,4 +40,4 @@ for ( const link of [ 'public/audio', 'public/models/debris', 'public/models/pro
 	assert.ok( ( await stat( resolved ) ).isDirectory(), `${link} resolves to a directory` );
 }
 
-console.log( `ok Tidewater and LOZ content submodules (${tidewaterAssets} + ${caveAssets} verified assets)` );
+console.log( `ok Tidewater content submodule (${tidewaterAssets} verified assets); Burning Horizons is external` );

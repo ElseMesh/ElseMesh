@@ -155,8 +155,9 @@ full-detail GLB from the temporary export and writing to
 Regenerate the UNDERNEATH cave variant from a clean package export using
 `--ratio 0.70`, write the Blender result to
 `/var/tmp/underneath-cave-low.glb`, then copy that file to
-`worlds/loz-underneath/lod-source/cave-low.glb` and run
-`node tools/export-loz-underneath.mjs`. The cave exporter maps the reduced
+`$BURNING_HORIZONS_DIR/lod-source/cave-low.glb` and run
+`BURNING_HORIZONS_DIR=/path/to/burning-horizons npm run export:burning-horizons`.
+The cave exporter maps the reduced
 primitives to the original material definitions by material name; do not
 publish a Blender GLB directly as the packaged cave LOD because Blender can
 change the authored emissive strengths.
