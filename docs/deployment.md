@@ -33,7 +33,9 @@ deleted refs are preserved under `archive/loz-preserved/` there.
 
 This engine repository retains its existing `loz/main` ref for the archived
 `/loz/` Pages build. That ref is no longer refreshed by this repository's
-Actions workflow; the source mirror is maintained in Burning Horizons.
+Actions workflow; the source mirror is maintained in Burning Horizons. The
+mirror is an upstream reference archive only, not a statement of ElseMesh's
+project direction or a decision to adopt upstream engine changes.
 
 ### Historical Pages deployments
 
