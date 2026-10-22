@@ -129,13 +129,16 @@ Add these to the URL, for example `?fly&noAudio`:
 ## Running locally
 
 ```sh
-npm install
+npm start       # install dependencies if needed, build, and serve the site
+npm ci          # optional: install dependencies ahead of time
 npm run dev      # http://127.0.0.1:5189
 npm run build    # static build in dist/
 npm run build -- --run # build, then serve the result locally
 ```
 
-The preview server prints its local URL and stays running until stopped with Ctrl+C. The build guard
+`npm start` is the one-command route: it uses the lockfile to install dependencies when Vite is
+missing, builds the site, prints the preview URL, and keeps serving until stopped with Ctrl+C. The
+preview server needs the terminal session to remain open. The build guard
 expects a sibling `elsemesh.build` directory; it also allows building in the source tree when that
 sibling path is a symbolic link to the source directory (a common Termux setup).
 
