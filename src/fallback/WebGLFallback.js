@@ -660,7 +660,6 @@ export class WebGLFallback {
 		this.portals = [];
 		this.blockers = [];
 		this.remotePlayers = new Map();
-		this.moveStick = { x: 0, y: 0 };
 		this.loader = new GLTFLoader();
 		this.worldLink = worldLinkFromLocation();
 		this.waterQuery = null;
@@ -1451,28 +1450,17 @@ export class WebGLFallback {
 		Object.assign( hint.style, { position: 'fixed', left: '16px', bottom: '16px', zIndex: 30, padding: '10px 12px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '13px/1.5 system-ui', pointerEvents: 'none' } );
 		hint.textContent = 'WASD move · mouse look · Shift run · E use portal';
 		const style = document.createElement( 'style' );
-		style.textContent = '@media (hover:none), (pointer:coarse) { .elsemesh-touch-pad { display:flex !important; } .elsemesh-webgl-hint { bottom:150px !important; } }';
+		style.textContent = '@media (hover:none), (pointer:coarse) { .elsemesh-webgl-hint { bottom:150px !important; } }';
 		document.head.appendChild( style );
-		const touchPads = [];
-		for ( const role of [ 'move', 'look' ] ) {
-			const pad = document.createElement( 'div' );
-			pad.className = 'elsemesh-touch-pad';
-			Object.assign( pad.style, { display: 'none', position: 'fixed', bottom: '20px', [ role === 'move' ? 'left' : 'right' ]: '20px', width: '112px', height: '112px', borderRadius: '50%', border: '1px solid #d9eee866', background: '#14201d66', zIndex: 29, touchAction: 'none', alignItems: 'center', justifyContent: 'center' } );
-			const knob = document.createElement( 'div' );
-			Object.assign( knob.style, { width: '42px', height: '42px', borderRadius: '50%', background: '#d9eee888', pointerEvents: 'none' } );
-			pad.appendChild( knob ); document.body.appendChild( pad ); touchPads.push( { pad, knob, role } );
-		}
 		document.body.append( hint );
 		this.worldName = document.createElement( 'div' );
 		Object.assign( this.worldName.style, { position: 'fixed', left: '16px', top: '14px', zIndex: 30, padding: '8px 11px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '12px/1.4 system-ui', pointerEvents: 'none' } );
 		document.body.append( this.worldName );
-		this.hud = [ badge, hint, this.worldName, style, ...touchPads.map( item => item.pad ) ];
+		this.hud = [ badge, hint, this.worldName, style ];
 		this.useButton = document.createElement( 'button' );
 		this.useButton.textContent = 'Use portal';
 		Object.assign( this.useButton.style, { display: 'none', position: 'fixed', left: '50%', bottom: '24px', transform: 'translateX(-50%)', zIndex: 31, padding: '12px 18px', border: '0', borderRadius: '10px', color: '#f2f7f4', background: '#14201ddd', font: 'bold 15px system-ui' } );
 		this.useButton.addEventListener( 'click', () => this._useNearestPortal() ); document.body.append( this.useButton ); this.hud.push( this.useButton );
-		this.touchPads = touchPads;
-
 	}
 
 	_bindInput() {

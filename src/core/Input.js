@@ -95,6 +95,8 @@ export class Input {
 
 		const root = document.querySelector( '.tw-root' );
 		if ( ! root ) return;
+		// Input can be recreated while a renderer backend is replaced; keep one engine-owned control layer.
+		root.querySelector( '.tw-touch-controls' )?.remove();
 
 		const controls = document.createElement( 'div' );
 		controls.className = 'tw-touch-controls';
