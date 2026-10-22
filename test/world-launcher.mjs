@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { builtInWorldURL, clearHomeWorld, defaultHomeWorldURL, getHomeWorld, homeWorldStorageKey, listVisitedWorlds, parseWorldInviteURL, rememberWorldVisit, setHomeWorld, worldLauncherStorageKey } from '../src/network/WorldLauncher.js';
+import { builtInWorldURL, clearHomeWorld, defaultHomeWorldURL, discoverLocalWorldURL, getHomeWorld, homeWorldStorageKey, listVisitedWorlds, parseWorldInviteURL, rememberWorldVisit, setHomeWorld, worldLauncherStorageKey } from '../src/network/WorldLauncher.js';
 
 class MemoryStorage {
 	items = new Map();
@@ -33,6 +33,22 @@ assert.throws( () => parseWorldInviteURL( `https://rebroad.github.io/tidewater/?
 const localInvite = parseWorldInviteURL( 'http://127.0.0.1:5189/?worldId=tw-world:local&gateway=http%3A%2F%2F127.0.0.1%3A5222', 'http://127.0.0.1:5189/' );
 assert.equal( new URL( localInvite ).searchParams.get( 'gateway' ), 'http://127.0.0.1:5222' );
 assert.throws( () => parseWorldInviteURL( 'http://127.0.0.1:5189/?worldId=tw-world:local&gateway=http%3A%2F%2Fexample.com', 'http://127.0.0.1:5189/' ), /invalid or insecure gateway/ );
+
+const daemonWorldURL = await discoverLocalWorldURL( {
+	pageURL: 'http://127.0.0.1:5189/?renderer=webgl',
+	fetchImpl: async ( url, options ) => {
+		assert.equal( url.href, 'http://127.0.0.1:5189/api/world/manifest' );
+		assert.deepEqual( options, { credentials: 'omit', cache: 'no-store' } );
+		return { ok: true, json: async () => ( { document: { payload: { worldId: 'tw-world:loz-underneath', ownerPeerId: peerId } } } ) };
+	},
+} );
+assert.equal( new URL( daemonWorldURL ).searchParams.get( 'worldId' ), 'tw-world:loz-underneath', 'a bare localhost client opens the world selected by its local daemon' );
+assert.equal( new URL( daemonWorldURL ).searchParams.get( 'nodeId' ), peerId );
+assert.equal( new URL( daemonWorldURL ).searchParams.get( 'gateway' ), 'http://127.0.0.1:5189' );
+assert.equal( new URL( daemonWorldURL ).searchParams.get( 'renderer' ), 'webgl', 'local world selection preserves renderer and debug options' );
+assert.equal( await discoverLocalWorldURL( { pageURL: 'https://elsemesh.org/' } ), null, 'daemon world discovery is limited to loopback pages' );
+assert.equal( await discoverLocalWorldURL( { pageURL: 'http://127.0.0.1:5189/?worldId=tw-world:explicit' } ), null, 'an explicit world link is not replaced by local daemon discovery' );
+assert.equal( await discoverLocalWorldURL( { pageURL: 'http://127.0.0.1:5189/?example=1' } ), null, 'the explicit built-in example route bypasses local daemon discovery' );
 
 const storage = new MemoryStorage();
 assert.equal( rememberWorldVisit( { pageURL, worldId: 'tw-world:cave', nodeId: peerId, gateway: 'https://world.example', directory: 'https://thruhold.org', title: 'LOZ Cave', storage, now: 10 } ), true );

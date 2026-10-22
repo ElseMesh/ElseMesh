@@ -35,6 +35,15 @@ content is refused until the owner publishes a reviewed source update. This
 keeps ordinary startup to one path argument without silently replacing signed
 world content.
 
+For local browser development, run `npm run dev` and open
+`http://localhost:5189/`. The Vite server proxies the local daemon's manifest
+and WebSocket gateway. On a loopback URL with no explicit world route, the
+client selects the world currently served by `thruholdd`; changing the
+directory argument changes the world opened at that same URL. `?example=1`
+continues to open the built-in Example Island, and an explicit world invite
+continues to select its named world. The daemon port is an API gateway, not a
+web page; the browser client remains on port 5189.
+
 Optional networking and storage settings remain flags. Put flags before the
 directory, for example `thruholdd --http 127.0.0.1:5202 --p2p-port 42903
 /path/to/world-content`. Use `--worlds-dir` to choose the config root or

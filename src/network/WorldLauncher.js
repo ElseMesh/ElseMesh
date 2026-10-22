@@ -23,6 +23,29 @@ function isLoopback( hostname ) {
 	return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
 }
 
+export async function discoverLocalWorldURL( { pageURL = globalThis.location?.href, fetchImpl = globalThis.fetch } = {} ) {
+	const page = new URL( pageURL );
+	if ( ! [ 'http:', 'https:' ].includes( page.protocol ) ) return null;
+	if ( ! isLoopback( page.hostname ) || page.searchParams.has( 'worldId' ) || page.searchParams.has( 'ztNodeId' ) || page.searchParams.get( 'example' ) === '1' ) return null;
+	try {
+		const response = await fetchImpl( new URL( '/api/world/manifest', page ), { credentials: 'omit', cache: 'no-store' } );
+		if ( ! response.ok ) return null;
+		const document = ( await response.json() )?.document;
+		const worldId = document?.payload?.worldId;
+		const nodeId = document?.payload?.ownerPeerId;
+		if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) || ! /^[A-Za-z0-9]{20,256}$/.test( nodeId || '' ) ) return null;
+		page.searchParams.set( 'worldId', worldId );
+		page.searchParams.delete( 'ztNodeId' );
+		page.searchParams.delete( 'directory' );
+		page.searchParams.set( 'nodeId', nodeId );
+		page.searchParams.set( 'gateway', page.origin );
+		page.hash = '';
+		return page.href;
+	} catch {
+		return null;
+	}
+}
+
 function validGateway( value, page ) {
 	try {
 		const gateway = new URL( value );
