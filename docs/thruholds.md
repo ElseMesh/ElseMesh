@@ -18,6 +18,31 @@ For the two current development-world links, build commands and restart instruct
 
 ## Hosting a checked-in world profile
 
+For the normal case, pass the world repository directory directly to the
+server:
+
+```sh
+thruholdd /path/to/world-content
+```
+
+The directory must contain the exported `world-source.json` and hash-named
+`assets/` directory. On first start, `thruholdd` validates and imports the
+package, signs its manifest with a persistent local identity, and stores that
+identity and package under the standard ElseMesh config directory, keyed by
+the source's `worldId`. If a matching saved profile already exists, its owner
+identity is reused. Later starts serve that saved signed version; changed
+content is refused until the owner publishes a reviewed source update. This
+keeps ordinary startup to one path argument without silently replacing signed
+world content.
+
+Optional networking and storage settings remain flags. Put flags before the
+directory, for example `thruholdd --http 127.0.0.1:5202 --p2p-port 42903
+/path/to/world-content`. Use `--worlds-dir` to choose the config root or
+`--data` to select one explicit persistent data directory.
+
+The longer profile helper below remains available for provisioning and
+specialized setups.
+
 `tools/serve-world-profile.mjs` provisions an immutable world package into one named owner profile, signs its runtime manifest with that profile's persistent node key, verifies and installs all package assets, then starts the supplied daemon binary. Give every simultaneously running profile its own P2P and HTTP ports. The helper refuses to overwrite an existing profile manifest; once provisioned, the same command can restart it without `--source` or `--assets`.
 
 Build `thruholdd` for the host first, then run (from the repository root):

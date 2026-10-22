@@ -96,7 +96,7 @@ func run() error {
 	}
 	elsemeshConfigDir := filepath.Join(configDir, "elsemesh")
 	defaultData := filepath.Join(elsemeshConfigDir, "worldd")
-	worldsDir := flag.String("worlds-dir", filepath.Join(configDir, "elsemesh", "worlds"), "directory containing named local ThruHold profiles")
+	worldsDir := flag.String("worlds-dir", filepath.Join(configDir, "elsemesh", "worlds"), "directory containing persistent world identities and data")
 	worldProfile := flag.String("world-profile", "", "select a named local ThruHold profile (uses a separate node identity and data directory)")
 	listWorldProfiles := flag.Bool("list-world-profiles", false, "list named local ThruHold profiles, then exit")
 	listProposals := flag.Bool("list-proposals", false, "list this owner's locally queued edit proposals, then exit (requires --manifest)")
@@ -152,10 +152,26 @@ func run() error {
 	flag.Var(&zeroTierBlacklistInterfaces, "zerotier-blacklist-interface", "interface name prefix that libzt must not use for physical paths (repeatable)")
 	cacheSyncInterval := flag.Duration("cache-sync-interval", 5*time.Minute, "how often to retry missing owner-authorized cached assets")
 	roleStateSyncInterval := flag.Duration("role-state-sync-interval", time.Minute, "how often to sync owner-signed role revocations")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options] [world-directory]\n\n", os.Args[0])
+		fmt.Fprintln(flag.CommandLine.Output(), "Pass a world content directory containing world-source.json and assets/ to serve it directly.")
+		fmt.Fprintln(flag.CommandLine.Output(), "The server creates persistent signed world data under --worlds-dir, keyed by the world's ID.")
+		fmt.Fprintln(flag.CommandLine.Output(), "With no directory, the legacy --manifest/--world-profile startup mode is used.")
+		fmt.Fprintln(flag.CommandLine.Output(), "Options:")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	if *version {
 		fmt.Printf("%s %s\n", daemonName, buildRevision)
 		return nil
+	}
+	positional := flag.Args()
+	if len(positional) > 1 {
+		return errors.New("provide at most one world content directory")
+	}
+	worldDirectory := ""
+	if len(positional) == 1 {
+		worldDirectory = positional[0]
 	}
 	operationCount := 0
 	for _, requested := range []bool{*printNodeID, *exportNodeKey != "", *importNodeKey != "", *importAssetPath != "", *importPackagePath != "", *signManifestPath != "", *signRoleGrantPath != "", *signRoleRevocationsPath != "", *listWorldProfiles, *listProposals, *inspectManifest, *publishManifestPath != "", *exportProposalID != "", *removeProposalID != ""} {
@@ -169,6 +185,9 @@ func run() error {
 	}
 	if operationCount > 1 || (*publishManifestPath != "" && !publishOperation) || ((*baseSourcePath != "" || *candidateSourcePath != "") && *publishManifestPath == "") || (*inspectManifest && *manifestPath == "") || (*manifestOut != "" && *signManifestPath == "") || (*roleDocumentOut != "" && *signRoleGrantPath == "" && *signRoleRevocationsPath == "") || ((*signRoleGrantPath != "" || *signRoleRevocationsPath != "") && *roleDocumentOut == "") || (*signRoleGrantPath != "" && *signRoleRevocationsPath != "") || (*proposalOut != "" && *exportProposalID == "") || (*exportProposalID != "" && (*proposalOut == "" || *manifestPath == "")) || ((*listProposals || *removeProposalID != "") && *manifestPath == "") {
 		return errors.New("choose one one-shot operation; publish, signing, and proposal export flags require their matching inputs")
+	}
+	if worldDirectory != "" && (operationCount > 0 || *worldProfile != "" || *manifestPath != "") {
+		return errors.New("a world directory cannot be combined with one-shot operations, --world-profile, or --manifest")
 	}
 	if *zeroTierPathDiagnostics && operationCount > 0 {
 		return errors.New("zerotier-path-diagnostics cannot be combined with one-shot operations")
@@ -197,6 +216,23 @@ func run() error {
 			return errors.New("--world-profile cannot be combined with --data")
 		}
 		profileData, profileErr := worldProfileDataDir(*worldsDir, *worldProfile)
+		if profileErr != nil {
+			return profileErr
+		}
+		*dataDir = profileData
+	}
+	if worldDirectory != "" && !dataWasSet {
+		worldDirectory = filepath.Clean(worldDirectory)
+		worldID, sourceErr := readWorldSourceID(filepath.Join(worldDirectory, "world-source.json"))
+		if sourceErr != nil {
+			return fmt.Errorf("world directory: %w", sourceErr)
+		}
+		profileData, profileErr := worldSourceProfileDataDir(
+			*worldsDir,
+			worldID,
+			*dataDir,
+			filepath.Join(configDir, "tidewater", "worldd"),
+		)
 		if profileErr != nil {
 			return profileErr
 		}
@@ -245,8 +281,10 @@ func run() error {
 		if err := migrateLegacyZeroTierStorage(filepath.Join(legacyDataDir, "zerotier"), *zeroTierDataDir); err != nil {
 			return fmt.Errorf("migrate existing ZeroTier identity: %w", err)
 		}
-		if err := migrateLegacyWorldData(legacyDataDir, *dataDir); err != nil {
-			return fmt.Errorf("migrate existing world data: %w", err)
+		if worldDirectory == "" {
+			if err := migrateLegacyWorldData(legacyDataDir, *dataDir); err != nil {
+				return fmt.Errorf("migrate existing world data: %w", err)
+			}
 		}
 	}
 	if *listProposals || *removeProposalID != "" || *exportProposalID != "" || *inspectManifest || *publishManifestPath != "" {
@@ -417,6 +455,14 @@ func run() error {
 		}
 		return signWorldRoleRevocationsFile(*signRoleRevocationsPath, *roleDocumentOut, world, state.roleStateSerial, key, time.Now())
 	}
+	var preparedWorld *signedDocument
+	if worldDirectory != "" {
+		manifest, prepareErr := prepareWorldDirectory(worldDirectory, *dataDir, localID.String(), key, time.Now())
+		if prepareErr != nil {
+			return prepareErr
+		}
+		preparedWorld = &manifest
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	var p2pHost host.Host
 	defer func() {
@@ -507,13 +553,21 @@ func run() error {
 	}
 
 	localPeerID := p2pHost.ID().String()
-	manifest, err := loadWorldManifest(*manifestPath, *dataDir, *worldName, localPeerID, key)
+	var manifest signedDocument
+	if worldDirectory != "" {
+		manifest = *preparedWorld
+	} else {
+		manifest, err = loadWorldManifest(*manifestPath, *dataDir, *worldName, localPeerID, key)
+	}
 	if err != nil {
 		return err
 	}
 	world, err := decodeManifest(manifest, localPeerID, time.Now())
 	if err != nil {
 		return fmt.Errorf("world manifest: %w", err)
+	}
+	if worldDirectory != "" {
+		log.Printf("Serving %s (%s) from %s", world.Title, world.WorldID, worldDirectory)
 	}
 	if err := validateSTUNServerURLs(webrtcSTUNServers); err != nil {
 		return err
