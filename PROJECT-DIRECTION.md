@@ -8,10 +8,9 @@ maintained repositories with separate development lineages:
 - **ElseMesh** becomes the engine repository. It should contain the reusable
   client, server, networking, rendering, world-loading, authoring, and packaging
   systems without the example island's authored world content.
-- **A separate world-content repository** holds the actual world content,
-  derived from the Tidewater repository lineage. It has its own GitHub URL and
-  is included in the ElseMesh checkout as a Git submodule. Its working name is
-  undecided: **Tidewater** and **Example Island** are the current options.
+- **Tidewater** is the separate world-content repository. It holds the actual
+  island content derived from the Tidewater game lineage, has its own GitHub
+  URL, and is included in the ElseMesh checkout as a Git submodule.
 
 The split is complete when the engine can develop and build with the content
 repository checked out at its submodule path, while the two repositories keep
@@ -24,9 +23,8 @@ serve the engine itself. Update build, test, deployment, and documentation
 references to match the new boundaries, and verify both repositories and their
 integration after the move.
 
-Choose the content repository name and GitHub URL as part of the split. Until
-then, refer to it as the world-content repository rather than assuming either
-candidate.
+Set Tidewater's GitHub URL as part of the split. Until then, refer to it as
+the Tidewater content repository.
 
 ## Later goals
 
