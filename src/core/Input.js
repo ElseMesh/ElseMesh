@@ -1,5 +1,5 @@
 // Keyboard / mouse input with pointer lock support.
-const LOOK_VERTICAL_DEAD_ZONE = 0.78;
+const LOOK_VERTICAL_DEAD_ZONE = 0.04;
 const KEYBOARD_LOOK_PIXELS_PER_SECOND = 260;
 
 export function keyboardLookDelta( keys, dt, rate = KEYBOARD_LOOK_PIXELS_PER_SECOND ) {

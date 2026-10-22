@@ -227,6 +227,7 @@ export class App {
 		const engine = this.engine = new Engine( document.getElementById( 'app' ) );
 		await engine.init();
 		this.backend = engine.backend;
+		console.info( 'ElseMesh renderer selected:', engine.backend === 'webgpu' ? 'WebGPU' : 'WebGL fallback', engine.fallbackReason || '' );
 		const backendGraphicsPriority = resolveGraphicsPriority( {
 			isLinuxDesktop: this.isLinuxDesktop,
 			backend: engine.backend,
