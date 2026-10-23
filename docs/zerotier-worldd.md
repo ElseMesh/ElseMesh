@@ -171,36 +171,30 @@ used.
 
 `thruholdd` includes libzt and joins the dedicated network by default, without
 installing the separate ZeroTier One service or passing `--zerotier-network`.
-Keep the source checkout and build tree separate. On this Linux development
-machine, sync by copying the source into the independent subdirectory of the
-mirrored `.build` tree; do not use a Git-linked build worktree or symlink the
-build tree to source. Build libzt for the target platform first. With the
+Edit the source checkout. The unified build helper uses an existing independent
+build sibling when `cpto` is installed; if that sibling resolves to the source
+tree, or `cpto` is unavailable, it builds in the source tree. It does not copy
+or synchronize trees. Build libzt for the target platform first. With the
 standard sibling layout, the helper discovers `../libzt/include` and the
 matching library under the sibling `libzt.build`; set `LIBZT_SOURCE_ROOT`,
 `LIBZT_BUILD_ROOT`, or the specific include/library variables only for a
-nonstandard installation. When run from the source checkout, the helper selects
-the external `independent` build copy automatically; `THRUHOLDD_BUILD_SERVER`
-can override the server build directory explicitly.
+nonstandard installation. To use another prepared server tree explicitly, pass
+its `server` directory with `--build-server` and select the source checkout
+separately with `--source-root`.
 
 ```sh
-mkdir -p /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
-cpto --no-lngit --nogit "$HOME/src/elsemesh" /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
-BUILD_REVISION="$(git -C "$HOME/src/elsemesh" rev-parse HEAD)" \
-"$HOME/src/elsemesh/tools/build-thruholdd.sh"
+cd "$HOME/src/elsemesh"
+tools/build-server.sh --os linux --arch amd64
 ```
 
-This builds from the selected external source mirror and creates `thruholdd`
-under its `bin/` directory. The helper embeds the source checkout's current
-commit; set `BUILD_REVISION` explicitly when building from a source snapshot
-without Git metadata. It refuses server or output directories that resolve
-inside the source checkout. It places the matching `libzt.so` beside the binary
-and embeds an `$ORIGIN` runtime search path, so the binary starts without a
-separate `LD_LIBRARY_PATH` when both files remain together. The default network
-is compiled into the ZeroTier-enabled build, so neither the network ID nor a
-special transport flag is needed. Non-libzt `worldd` builds remain available
-for development and targets without a supported libzt toolchain. The helper can
-be invoked from either the source checkout or its mirrored `.build` tree; both
-paths resolve to the same external server and sibling libzt build directories.
+This creates `thruholdd` under the selected server tree's `bin/` directory.
+The script prints the artifact path after a successful build and embeds the
+source checkout's current commit; set `BUILD_REVISION` explicitly when building
+from a source snapshot without Git metadata. It places the matching `libzt.so`
+beside the binary and embeds an `$ORIGIN` runtime search path, so the binary
+starts without a separate `LD_LIBRARY_PATH` when both files remain together.
+The default network is compiled into the ZeroTier-enabled build, so neither
+the network ID nor a special transport flag is needed.
 
 ### Observed physical peer endpoints
 
@@ -384,12 +378,12 @@ only on Android system libraries. Build `thruholdd` against that library and
 the matching NDK compiler with:
 
 ```sh
-THRUHOLDD_BUILD_SERVER=/path/to/prepared/external/server-build \
-THRUHOLDD_OUT=/path/to/prepared/external/server-build/bin/android-arm64 \
-GOOS=android GOARCH=arm64 \
 CC=/path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang \
 CXX=/path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++ \
-tools/build-thruholdd.sh
+tools/build-server.sh \
+  --target thruholdd --os android --arch arm64 \
+  --build-server /path/to/prepared/external/server-build \
+  --output /path/to/prepared/external/server-build/bin/android-arm64
 ```
 
 The build helper omits the Linux `libstdc++` linker flag on Android and applies
@@ -920,15 +914,14 @@ and no extra C++ runtime library is injected:
 ```sh
 BUILD=/mnt/kingston/builds/rebroad/src/elsemesh.build/android-sso-check
 NDK=/home/rebroad/Android/Sdk/ndk/29.0.14206865
-THRUHOLDD_BUILD_SERVER="$BUILD/server" \
-THRUHOLDD_OUT="$BUILD/out-default" \
-GOOS=android GOARCH=arm64 \
 CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" \
-tools/build-thruholdd.sh
+tools/build-server.sh \
+  --target thruholdd --os android --arch arm64 \
+  --build-server "$BUILD/server" --output "$BUILD/out-default"
 ```
 
-The build input was synced into the isolated external build directory with
-`cpto`; the existing server build outputs were not overwritten. `file` and
+The build input was synced into the isolated external build directory; the
+existing server build outputs were not overwritten. `file` and
 `readelf` identify an AArch64 Android PIE with `/system/bin/linker64`, API 26,
 and `$ORIGIN` runpath. Its dynamic dependencies are `libzt.so` plus Android
 platform libraries; neither the daemon nor bundled libzt needs

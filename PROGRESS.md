@@ -50,8 +50,24 @@ after entry.
   15:30. Both rendered; the hosted view visibly lacks the beach grass in the
   built-in view. The retained frames and comparison limits are in
   [graphics-review.md](docs/graphics-review.md).
-- Portable hosted grass, desktop comparison, fishing and wildlife authority,
-  broader gameplay parity, and sustained performance acceptance remain open.
+- Rendered hosted grass parity, desktop comparison, fishing and wildlife
+  authority, broader gameplay parity, and sustained performance acceptance
+  remain open.
+
+- Added the portable `grass-density/1` asset contract and optional
+  `grassMaskAssetId` reference for static vegetation. The CPU-only Tidewater
+  updater produced a deterministic 4 MiB mask; source-to-manifest conversion
+  verified its content hash, asset kind, and required feature. The client now
+  installs it against the matching packaged terrain. The Flip7 visual
+  comparison has not yet been repeated, so rendered grass parity remains
+  unverified.
+- Consolidated daemon builds into `tools/build-server.sh`. Its default target
+  is the sole world-daemon variant, ZeroTier-enabled `thruholdd`; explicit
+  targets cover the separate directory and account daemons. The CGO-free
+  world-daemon variant and old positional matrix aliases have been removed.
+  It selects an existing real build sibling when `cpto` is available and uses
+  the source tree when the sibling resolves to source, is absent, or `cpto` is
+  unavailable. It never synchronizes the trees automatically.
 
 - Clarified the invitation-entry contract: start at the world's authored pose;
   relocate only for a player or colliding object, choose the nearest free

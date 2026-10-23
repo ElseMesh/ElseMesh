@@ -2,10 +2,10 @@
 
 ## Run the browser client separately
 
-Start the Vite client from the external build tree in its own terminal:
+Start the Vite client from the source checkout in its own terminal:
 
 ```sh
-cd /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
+cd "$HOME/src/elsemesh"
 npm run dev
 ```
 
@@ -41,18 +41,27 @@ procedural example, use the published client with `?example=1`.
 
 ## Build on this Linux development machine
 
-Source edits belong in `~/src/elsemesh`; builds belong in the independent
-external build tree. Copy source into that tree before building. Do not use a
-Git-linked build worktree or link the build tree back to source:
+Edit source in `~/src/elsemesh`. The unified build script automatically uses a
+separate build sibling when `cpto` is installed and that sibling is a distinct
+tree. If the sibling resolves to the source tree, or `cpto` is unavailable, it
+builds in the source tree. No `cpto` setup or tree synchronization is required.
+To build the ZeroTier-enabled world daemon for Linux:
 
 ```sh
-mkdir -p /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
-cpto --no-lngit --nogit "$HOME/src/elsemesh" /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
-cd /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
+cd "$HOME/src/elsemesh"
 npm ci
 npm run build
-cd server
-go build -o bin/worldd-linux-amd64 ./worldd
+tools/build-server.sh --os linux --arch amd64
+```
+
+The script prints the artifact directory after a successful build. Use that
+path for the `--worldd` argument below; the option name is retained by the
+profile helper for compatibility, while the binary itself is `thruholdd`.
+Set `THRUHOLD` to the printed path plus `/thruholdd` before starting either
+profile:
+
+```sh
+THRUHOLD=/absolute/build/output/path/thruholdd
 ```
 
 ## Start or restart the island
@@ -60,9 +69,9 @@ go build -o bin/worldd-linux-amd64 ./worldd
 Run in one terminal and leave it open:
 
 ```sh
-cd /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
+cd "$HOME/src/elsemesh"
 node tools/serve-world-profile.mjs \
-  --worldd server/bin/worldd-linux-amd64 \
+  --worldd "$THRUHOLD" \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --profile island-example \
   --source worlds/tidewater/world-source.json --assets worlds/tidewater/assets \
@@ -77,12 +86,12 @@ Run in a second terminal. The bootstrap identity is read from the island's
 persistent profile, rather than copied from an old test run:
 
 ```sh
-cd /mnt/kingston/builds/rebroad/src/elsemesh.build/independent
-island_peer=$(server/bin/worldd-linux-amd64 \
+cd "$HOME/src/elsemesh"
+island_peer=$("$THRUHOLD" \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --world-profile island-example --print-node-id)
 node tools/serve-world-profile.mjs \
-  --worldd server/bin/worldd-linux-amd64 \
+  --worldd "$THRUHOLD" \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --profile burning-horizons \
   --source "$BURNING_HORIZONS_DIR/world-source.json" --assets "$BURNING_HORIZONS_DIR/assets" \

@@ -209,6 +209,7 @@ type worldComponent struct {
 	Seed             uint32              `json:"seed,omitempty"`
 	Priority         string              `json:"priority,omitempty"`
 	PlacementAssetID string              `json:"placementAssetId,omitempty"`
+	GrassMaskAssetID string              `json:"grassMaskAssetId,omitempty"`
 	DataAssetID      string              `json:"dataAssetId,omitempty"`
 	ModelAssetID     string              `json:"modelAssetId,omitempty"`
 	GeometryAssetID  string              `json:"geometryAssetId,omitempty"`
@@ -284,7 +285,7 @@ func (component *worldComponent) UnmarshalJSON(data []byte) error {
 	case "tidewater.procedural-island-vegetation/1":
 		allowed["seed"], allowed["placementAssetId"] = true, true
 	case "tidewater.static-vegetation/1":
-		allowed["placementAssetId"] = true
+		allowed["placementAssetId"], allowed["grassMaskAssetId"] = true, true
 	case "tidewater.static-reef/1":
 		allowed["placementAssetId"] = true
 	case "tidewater.static-fish-props/1":
@@ -894,6 +895,16 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 				return fmt.Errorf("invalid placement asset reference on world component %q", component.ID)
 			}
 		}
+		if component.GrassMaskAssetID != "" {
+			asset, exists := assetRefs[component.GrassMaskAssetID]
+			priority := component.Priority
+			if priority == "" {
+				priority = "portal-preview"
+			}
+			if !staticVegetation || !seenFeatures["tidewater.static-grass/1"] || !assetIDPattern.MatchString(component.GrassMaskAssetID) || !exists || asset.Kind != "grass-density/1" || asset.Priority != priority || asset.Bytes <= 16 || asset.Bytes > 16<<20 {
+				return fmt.Errorf("invalid grass density asset reference on world component %q", component.ID)
+			}
+		}
 		if terrainSurface {
 			asset, exists := assetRefs[component.DataAssetID]
 			priority := component.Priority
@@ -965,6 +976,11 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	}
 	if wildlifeCount > 0 && terrainSurfaceCount == 0 {
 		return errors.New("Example Island wildlife requires a packaged terrain surface")
+	}
+	for _, component := range manifest.Components {
+		if component.GrassMaskAssetID != "" && terrainSurfaceCount == 0 {
+			return errors.New("portable grass requires a packaged terrain surface")
+		}
 	}
 	if wildlifeCount > 0 {
 		rank := func(priority string) int {

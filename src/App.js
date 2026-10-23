@@ -66,6 +66,7 @@ import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
 import { decodeVegetationPlacements } from './network/VegetationPlacements.js';
 import { decodeTerrainSurfaceAsset } from './network/TerrainSurfaceAsset.js';
+import { decodeGrassDensityAsset } from './network/GrassDensityAsset.js';
 import { decodeReefPlacements, MAX_REEF_PLACEMENTS, REEF_PLACEMENT_HEADER_BYTES, REEF_PLACEMENT_RECORD_BYTES } from './network/ReefPlacements.js';
 import { decodeFishPropPlacements } from './network/FishPropPlacements.js';
 import { SoundScape } from './audio/SoundScape.js';
@@ -888,20 +889,24 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
-		const installRank = { 'tidewater.static-vegetation/1': 0, 'tidewater.terrain-surface/1': 0, 'tidewater.downeast-boat/1': 1, 'tidewater.example-island-wildlife/1': 2 };
+		const installRank = { 'tidewater.terrain-surface/1': 0, 'tidewater.static-vegetation/1': 1, 'tidewater.downeast-boat/1': 1, 'tidewater.example-island-wildlife/1': 2 };
 		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( installRank[ a.type ] ?? 1 ) - ( installRank[ b.type ] ?? 1 ) );
 		for ( const component of components ) {
-			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'tidewater.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'tidewater.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
+			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.grassMaskAssetId && ! connector.assets.has( component.grassMaskAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'tidewater.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'tidewater.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
 			const count = installed.length;
 			if ( component.type === 'tidewater.procedural-island-vegetation/1' || component.type === 'tidewater.static-vegetation/1' ) {
 				if ( ! this.vegetationEnabled ) continue;
 				const placementRecords = component.placementAssetId ? readVegetationPlacements( connector, component ) : null;
 				const staticVegetation = component.type === 'tidewater.static-vegetation/1';
+				const grassMask = component.grassMaskAssetId ? decodeGrassDensityAsset( connector.assets.get( component.grassMaskAssetId ) ) : null;
+				const grassTerrain = staticVegetation ? root.userData.terrainData : this.terrainData;
+				if ( grassMask && ! grassTerrain ) continue;
+				if ( grassMask && ( grassMask.size !== grassTerrain.size || grassMask.origin !== grassTerrain.origin ) ) throw new Error( `Static vegetation component ${component.id} grass mask does not match its terrain surface` );
 				if ( ! staticVegetation && ! this.remoteWorldActive && this.vegetation && this.vegetation.group.parent !== root && ( ! placementRecords || sameVegetationPlacements( this.vegetation.records, placementRecords ) ) ) {
 					root.add( this.vegetation.group );
 					installed.push( this.vegetation );
 				} else {
-					installed.push( new Vegetation( { scene: root, terrain: staticVegetation ? null : this.terrainData, village: staticVegetation ? null : this.village, includeGrass: ! staticVegetation, placementRecords } ) );
+					installed.push( new Vegetation( { scene: root, terrain: staticVegetation ? grassTerrain : this.terrainData, village: staticVegetation ? null : this.village, includeGrass: staticVegetation ? !! grassMask : true, grassMask, placementRecords } ) );
 				}
 			} else if ( component.type === 'tidewater.terrain-surface/1' ) {
 				const fallback = root.children.find( ( child ) => child.userData.worldObjectId === component.objectId );
@@ -1662,7 +1667,7 @@ function readVegetationPlacements( connector, component ) {
 }
 
 function componentAssetIDs( component ) {
-	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.type === 'tidewater.humpback-whale/1' ? [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
+	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.grassMaskAssetId ? [ component.grassMaskAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.type === 'tidewater.humpback-whale/1' ? [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
 }
 
 function readReefPlacements( connector, component ) {

@@ -446,10 +446,26 @@ func TestWorldManifestValidatesStaticVegetationComponent(t *testing.T) {
 	}
 	manifest := newStarterManifest("Portable foliage", ownerID.String())
 	manifest.WorldID = "tw-world:portable-foliage"
-	manifest.Rules.RequiredFeatures = []string{"tidewater.static-vegetation/1"}
+	manifest.Rules.RequiredFeatures = []string{"tidewater.static-vegetation/1", "tidewater.static-grass/1", "tidewater.terrain-surface/1"}
 	placementID := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	manifest.Assets = []assetRef{{ID: placementID, Bytes: 1, Kind: "vegetation-placement/1", Priority: "visible"}}
-	manifest.Components = []worldComponent{{ID: "tw-component:portable-foliage", Type: "tidewater.static-vegetation/1", Priority: "visible", PlacementAssetID: placementID, StreamingBounds: &streamingBounds{Center: vector3{0, 2, -10}, Radius: 12}}}
+	grassMaskID := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	glbID := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+	terrainID := "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+	manifest.Assets = []assetRef{
+		{ID: placementID, Bytes: 1, Kind: "vegetation-placement/1", Priority: "visible"},
+		{ID: grassMaskID, Bytes: 32, Kind: "grass-density/1", Priority: "visible"},
+		{ID: glbID, Bytes: 1, Kind: "glb", Priority: "visible"},
+		{ID: terrainID, Bytes: 100, Kind: "terrain-surface/1", Priority: "visible"},
+	}
+	var terrainFallback worldObject
+	if err := json.Unmarshal([]byte(`{"id":"tw-object:terrain-fallback","kind":"asset-instance","label":"Terrain fallback","assetId":"`+glbID+`","priority":"visible","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"none","enabled":false}}`), &terrainFallback); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Objects = []worldObject{terrainFallback}
+	manifest.Components = []worldComponent{
+		{ID: "tw-component:portable-foliage", Type: "tidewater.static-vegetation/1", Priority: "visible", PlacementAssetID: placementID, GrassMaskAssetID: grassMaskID, StreamingBounds: &streamingBounds{Center: vector3{0, 2, -10}, Radius: 12}},
+		{ID: "tw-component:terrain-surface", Type: "tidewater.terrain-surface/1", Profile: "example-island-v1", ObjectID: terrainFallback.ID, DataAssetID: terrainID, Priority: "visible"},
+	}
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
 		t.Fatalf("valid bounded static vegetation component rejected: %v", err)
 	}
@@ -460,6 +476,11 @@ func TestWorldManifestValidatesStaticVegetationComponent(t *testing.T) {
 	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err != nil {
 		t.Fatalf("signed bounded static vegetation component failed runtime decoding: %v", err)
 	}
+	manifest.Rules.RequiredFeatures = []string{"tidewater.static-vegetation/1", "tidewater.terrain-surface/1"}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("grass density asset without its required feature accepted")
+	}
+	manifest.Rules.RequiredFeatures = []string{"tidewater.static-vegetation/1", "tidewater.static-grass/1", "tidewater.terrain-surface/1"}
 	manifest.Assets[0].Priority = "portal-preview"
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("component with mismatched asset streaming priority accepted")

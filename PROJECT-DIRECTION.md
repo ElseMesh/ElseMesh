@@ -14,9 +14,10 @@ verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
 **Tidewater package integration and parity: 75%.** ElseMesh builds with the
 Tidewater content submodule mounted, verifies its content-addressed assets, and
 loads portable worlds through versioned interfaces. Matched hosted/built-in
-start and village views render on Android; the village comparison exposes
-missing hosted beach grass. Desktop visual acceptance and complete gameplay
-parity remain open.
+start and village views render on Android. The package now includes a signed,
+content-addressed grass-density mask for the hosted renderer; the comparison
+has not yet been repeated to verify rendered parity. Desktop visual acceptance
+and complete gameplay parity remain open.
 Keep Tidewater authored content in its repository and reusable execution code
 in ElseMesh. Tidewater is content data, not a separately compiled application;
 ElseMesh validates and executes its versioned behavior data. Do not introduce a

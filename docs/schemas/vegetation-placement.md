@@ -2,7 +2,7 @@
 
 `tidewater.vegetation-placement/1` is a compact binary asset for vegetation components. Its SHA-256 covers the entire byte sequence; the owner references that hash as `placementAssetId` in the signed world manifest. The asset is advertised with kind `vegetation-placement/1` and priority `portal-preview`, so an open portal can prepare the plants before handoff. It contains placement data only. Geometry, materials, impostors, wind, and shaders remain client code.
 
-The `tidewater.procedural-island-vegetation/1` component requires seed 7 and retains the legacy example-island meaning. The `tidewater.static-vegetation/1` component instead treats each record's `x`, `y`, and `z` as absolute world-space coordinates; it does not sample the built-in terrain and does not generate grass. The binary header still carries a generator seed for reproducibility and variation. Static vegetation does not compare that value with a component seed.
+The `tidewater.procedural-island-vegetation/1` component requires seed 7 and retains the legacy example-island meaning. The `tidewater.static-vegetation/1` component instead treats each record's `x`, `y`, and `z` as absolute world-space coordinates; it does not sample the built-in terrain. Grass density is a separate optional `grass-density/1` asset described in [grass-density.md](grass-density.md). The binary header still carries a generator seed for reproducibility and variation. Static vegetation does not compare that value with a component seed.
 
 All integers and floats are little-endian. Version 1 layout:
 

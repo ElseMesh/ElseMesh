@@ -445,6 +445,7 @@
             "type": { "const": "tidewater.static-vegetation/1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "grassMaskAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "Optional grass-density/1 asset; requires tidewater.static-grass/1." },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
           },
           "additionalProperties": false

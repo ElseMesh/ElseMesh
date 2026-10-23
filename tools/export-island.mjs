@@ -17,8 +17,9 @@ import { VILLAGE_MATERIAL_PROFILE, VILLAGE_MATERIAL_ROLES } from '../src/network
 import { InstancedProps } from '../src/world/Props.js';
 import { DebrisPlacer } from '../src/world/debris/DebrisPlacement.js';
 import { SCAN_ASSETS } from '../src/world/debris/ScannedDebris.js';
-import { createVegetationPlacement } from '../src/world/vegetation/Scatter.js';
+import { createVegetationPlacement, buildGrassMask } from '../src/world/vegetation/Scatter.js';
 import { encodeVegetationPlacements } from '../src/network/VegetationPlacements.js';
+import { encodeGrassDensityAsset } from '../src/network/GrassDensityAsset.js';
 import { Reef } from '../src/world/Reef.js';
 import { encodeReefPlacements } from '../src/network/ReefPlacements.js';
 import { encodeFishPropPlacements, MAX_FISH_PROP_PLACEMENT_BYTES } from '../src/network/FishPropPlacements.js';
@@ -120,6 +121,10 @@ const debris = generated.debris;
 const vegetationDocument = Buffer.from( encodeVegetationPlacements( generated.vegetation, 7 ) );
 const vegetationAssetId = `sha256:${createHash( 'sha256' ).update( vegetationDocument ).digest( 'hex' )}`;
 staticAssets.set( vegetationAssetId, vegetationDocument );
+const grassMask = buildGrassMask( generated.vegetation.site );
+const grassDensityDocument = Buffer.from( encodeGrassDensityAsset( { ...grassMask, size: terrain.size, origin: terrain.origin } ) );
+const grassDensityAssetId = `sha256:${createHash( 'sha256' ).update( grassDensityDocument ).digest( 'hex' )}`;
+staticAssets.set( grassDensityAssetId, grassDensityDocument );
 const fishPropsDocument = Buffer.from( encodeFishPropPlacements( generated.fishProps ) );
 if ( fishPropsDocument.length > MAX_FISH_PROP_PLACEMENT_BYTES ) throw new Error( 'Fish-prop placements exceed the 16 MiB asset limit' );
 const fishPropsAssetId = `sha256:${createHash( 'sha256' ).update( fishPropsDocument ).digest( 'hex' )}`;
@@ -217,7 +222,7 @@ const source = {
 		avatarComplexity: 20000,
 		physicsProfile: 'tidewater-default',
 		vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 100000 },
-			requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
+		requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-grass/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
 		maxPackageBytes: 128 * 1024 * 1024,
 	},
 	hosts: [],
@@ -282,7 +287,7 @@ const source = {
 	} ) ],
 	components: [
 		{ id: 'tw-component:island-village-materials', type: 'tidewater.village-materials/2', profile: 'original-tidewater-village-v1', dataAssetId: villageMaterialsAssetId, objectId: 'tw-object:island-village', priority: 'visible', streamingBounds: villageBounds },
-		{ id: 'tw-component:island-vegetation', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId },
+		{ id: 'tw-component:island-vegetation', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId, grassMaskAssetId: grassDensityAssetId },
 		...( generated.fishProps.length ? [ { id: 'tw-component:island-fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: fishPropsAssetId, streamingBounds: fishPropsBounds } ] : [] ),
 		{ id: 'tw-component:island-terrain', type: 'tidewater.terrain-surface/1', profile: 'example-island-v1', objectId: 'tw-object:island-terrain', dataAssetId: terrainSurfaceAssetId, priority: 'visible' },
 		{ id: 'tw-component:island-wildlife', type: 'tidewater.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'visible', streamingBounds: { center: [ 0, 0, - 40 ], radius: 300 }, roofPerches: generated.roofPerches, footprints: generated.villageFootprints },

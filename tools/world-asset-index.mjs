@@ -20,6 +20,7 @@ const fieldNames = new Map( [
 	[ 'assetId', 'mesh' ],
 	[ 'dataAssetId', 'component data' ],
 	[ 'placementAssetId', 'placement data' ],
+	[ 'grassMaskAssetId', 'grass density mask' ],
 	[ 'modelAssetId', 'model metadata' ],
 	[ 'geometryAssetId', 'model geometry' ],
 	[ 'albedoAssetId', 'albedo texture' ],

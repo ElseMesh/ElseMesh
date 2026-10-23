@@ -72,7 +72,7 @@ const CANOPY_FAR = [ 2600, 2800 ];
 
 export class Vegetation {
 
-	constructor( { scene, terrain, village = null, includeGrass = true, placementRecords = null } ) {
+	constructor( { scene, terrain, village = null, includeGrass = true, placementRecords = null, grassMask = null } ) {
 
 		this.scene = scene;
 		this.terrain = terrain;
@@ -82,12 +82,12 @@ export class Vegetation {
 
 		const t0 = performance.now();
 		const placement = placementRecords ? null : createVegetationPlacement( terrain, village );
-		const site = placement?.site || ( includeGrass ? createVegetationSite( terrain, village ) : null );
+		const site = placement?.site || ( includeGrass && ! grassMask ? createVegetationSite( terrain, village ) : null );
 		this.site = site;
 		const recs = placementRecords || placement.records;
 		this.records = recs;
 		const t1 = performance.now();
-		const grassMask = includeGrass ? buildGrassMask( site ) : null;
+		const resolvedGrassMask = includeGrass ? grassMask || buildGrassMask( site ) : null;
 		this.timings = { scatter: t1 - t0, mask: performance.now() - t1 };
 
 		// materials (shared across meshes)
@@ -191,7 +191,7 @@ export class Vegetation {
 		// renderer handle; the atlas bakes with its own MeshRenderer)
 		this.renderer = true;
 
-		this.grass = includeGrass ? new GrassField( { terrain, mask: grassMask } ) : null;
+		this.grass = includeGrass ? new GrassField( { terrain, mask: resolvedGrassMask } ) : null;
 		if ( this.grass ) for ( const m of this.grass.meshes ) this.group.add( m );
 
 		this.geometryTriangles = {

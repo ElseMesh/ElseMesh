@@ -10,14 +10,17 @@ ownership or portal-editing authority.
 
 ## Run a public bootstrap and relay node
 
-Build `worldd` from the `server` directory and install the binary at a stable
-path such as `/usr/local/bin/worldd`:
+Build the ZeroTier-enabled world daemon with the unified script and install it
+at a stable path such as `/usr/local/bin/thruholdd`:
 
 ```sh
-cd server
-go build -o worldd ./worldd
-sudo install -o root -g root -m 0755 worldd /usr/local/bin/worldd
+tools/build-server.sh --os linux --arch amd64
+sudo install -o root -g root -m 0755 /path/to/build-output/thruholdd /usr/local/bin/thruholdd
 ```
+
+The build script prints the artifact directory on success. Replace
+`/path/to/build-output` with that directory; when an independent build sibling
+is selected, the binary is written there rather than into the source checkout.
 
 Run it under a dedicated unprivileged service account. For example, on Debian
 or Ubuntu create the account with:
@@ -42,7 +45,7 @@ them. If ZeroTier is used as an additional transport, see
 Start one node with a persistent named profile:
 
 ```sh
-worldd \
+thruholdd \
   --worlds-dir /var/lib/elsemesh/worlds \
   --world-profile community-relay \
   --p2p-port 42901 \
@@ -70,7 +73,7 @@ User=elsemesh
 Group=elsemesh
 StateDirectory=elsemesh
 StateDirectoryMode=0700
-ExecStart=/usr/local/bin/worldd --worlds-dir /var/lib/elsemesh/worlds --world-profile community-relay --p2p-port 42901 --dht-mode server --relay-service --http 127.0.0.1:5200
+ExecStart=/usr/local/bin/thruholdd --worlds-dir /var/lib/elsemesh/worlds --world-profile community-relay --p2p-port 42901 --dht-mode server --relay-service --http 127.0.0.1:5200
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
@@ -88,7 +91,7 @@ Inspect logs with `journalctl -u elsemesh-relay`.
 Read the node's PeerID without starting a second daemon:
 
 ```sh
-worldd --worlds-dir /var/lib/elsemesh/worlds \
+thruholdd --worlds-dir /var/lib/elsemesh/worlds \
   --world-profile community-relay --print-node-id
 ```
 
@@ -191,7 +194,7 @@ still needed for persistent public access.
 ## Temporary public route smoke test (2026-10-11)
 
 The current source successfully prepared and served the packaged Example
-Island after rebuilding `server/bin/worldd-linux-amd64` in the external build
+Island after rebuilding the world daemon in the external build
 tree. The previously present daemon binary was dated October 1 and rejected
 the source's `tidewater.village-materials/2` component; the current source
 already supports that component, so this was a stale-build failure rather than

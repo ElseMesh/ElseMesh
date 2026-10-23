@@ -14,6 +14,7 @@ import { decodeVegetationPlacements } from '../src/network/VegetationPlacements.
 import { decodeReefPlacements } from '../src/network/ReefPlacements.js';
 import { decodeFishPropPlacements } from '../src/network/FishPropPlacements.js';
 import { decodeTerrainSurfaceAsset } from '../src/network/TerrainSurfaceAsset.js';
+import { decodeGrassDensityAsset } from '../src/network/GrassDensityAsset.js';
 import { decodeVillageMaterialAsset, VILLAGE_MATERIAL_MAPS, VILLAGE_MATERIAL_RENDERER_PROFILE } from '../src/network/VillageMaterialAsset.js';
 import { BANK } from '../src/audio/soundBank.js';
 import { transformBoundsCenter } from '../src/network/WorldStreaming.js';
@@ -22,7 +23,7 @@ import { Vector3 } from '../src/engine/math/Vector3.js';
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const output = await mkdtemp( path.join( temporaryRoot, 'elsemesh-island-export-' ) );
 const whaleAssetRefs = ( component ) => [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ].filter( Boolean );
-const componentAssetRefs = ( component ) => [ component.placementAssetId, component.dataAssetId, ...whaleAssetRefs( component ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ].filter( Boolean );
+const componentAssetRefs = ( component ) => [ component.placementAssetId, component.grassMaskAssetId, component.dataAssetId, ...whaleAssetRefs( component ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ].filter( Boolean );
 
 try {
 	const detailImage = getDetailImage();
@@ -129,11 +130,15 @@ try {
 	assert.ok( boatObject, 'export includes the static moored boat preview' );
 	assert.equal( boatObject.lods?.length, 1, 'moored boat preview has a distant geometry variant' );
 	assert.ok( firstAssets.has( boatObject.lods[ 0 ].assetId ), 'moored boat LOD is part of the portable package' );
-	assert.deepEqual( source.rules.requiredFeatures, [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ], 'portable terrain, village, wildlife, props, reef, ocean, boat, audio, and portal renderer capabilities are declared' );
+	assert.deepEqual( source.rules.requiredFeatures, [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-grass/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ], 'portable terrain, village, vegetation, grass, wildlife, props, reef, ocean, boat, audio, and portal renderer capabilities are declared' );
 	assert.equal( source.portals[ 0 ].destinationWorldId, 'tw-world:loz-underneath', 'the example island links to the portable LOZ-derived cave' );
 	assert.equal( source.components.length, 9 + source.components.filter( ( component ) => component.type === 'tidewater.static-reef/1' ).length, 'portable island declares village materials, vegetation, reef tiles, fish props, terrain renderer, wildlife, humpback, ocean, boat, and ambient components' );
 	assert.equal( vegetationComponent.type, 'tidewater.static-vegetation/1', 'portable island uses terrain-independent, authored world-space vegetation placements' );
 	assert.match( vegetationComponent.placementAssetId, /^sha256:[0-9a-f]{64}$/, 'vegetation placement data is content addressed' );
+	assert.match( vegetationComponent.grassMaskAssetId, /^sha256:[0-9a-f]{64}$/, 'grass density data is content addressed' );
+	const grassMask = decodeGrassDensityAsset( new Uint8Array( firstAssets.get( vegetationComponent.grassMaskAssetId ) ) );
+	assert.equal( grassMask.res, 1024, 'portable grass density uses two-metre terrain-mask texels' );
+	assert.equal( grassMask.data.length, grassMask.res * grassMask.res * 4, 'portable grass density has four RGBA channels per texel' );
 	assert.equal( vegetationComponent.priority, 'portal-preview', 'vegetation records are available for open portal previews' );
 	const fishPropsComponent = source.components.find( component => component.type === 'tidewater.static-fish-props/1' );
 	assert.ok( fishPropsComponent && fishPropsComponent.streamingBounds.radius > 0, 'market fish use a bounded trusted renderer component' );

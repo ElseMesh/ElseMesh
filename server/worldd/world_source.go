@@ -314,6 +314,11 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 				return nil, err
 			}
 		}
+		if component.GrassMaskAssetID != "" {
+			if err := add(component.GrassMaskAssetID, "grass-density/1", priority, false); err != nil {
+				return nil, err
+			}
+		}
 		if component.DataAssetID != "" {
 			kind := "terrain-surface/1"
 			if component.Type == "tidewater.village-materials/2" {

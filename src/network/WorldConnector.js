@@ -737,7 +737,7 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 	for ( const component of components ) {
 		invariant( component && typeof component.id === 'string' && /^tw-component:[\w.-]{1,128}$/.test( component.id ) && ! ids.has( component.id ), 'World manifest has an invalid or duplicate component ID' );
 		const vegetation = component.type === 'tidewater.procedural-island-vegetation/1' && component.seed === 7 && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'seed', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
-		const staticVegetation = component.type === 'tidewater.static-vegetation/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
+		const staticVegetation = component.type === 'tidewater.static-vegetation/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'grassMaskAssetId', 'streamingBounds' ].includes( key ) );
 		const staticReef = component.type === 'tidewater.static-reef/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
 		const staticFishProps = component.type === 'tidewater.static-fish-props/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
 		const islandWildlife = component.type === 'tidewater.example-island-wildlife/1' && component.profile === 'example-island-wildlife-v1' && Number.isInteger( component.seed ) && component.seed >= 1 && component.seed <= 0xffffffff && Array.isArray( component.roofPerches ) && component.roofPerches.length <= 64 && component.roofPerches.every( perch => validVector( perch ) && perch.every( value => Math.abs( value ) <= 10000 ) ) && Array.isArray( component.footprints ) && component.footprints.length <= 256 && component.footprints.every( footprint => footprint && typeof footprint === 'object' && ! Array.isArray( footprint ) && Object.keys( footprint ).every( key => [ 'x', 'z', 'r' ].includes( key ) ) && Number.isFinite( footprint.x ) && Number.isFinite( footprint.z ) && Number.isFinite( footprint.r ) && footprint.r > 0 && footprint.r <= 1000 && Math.abs( footprint.x ) <= 10000 && Math.abs( footprint.z ) <= 10000 ) && Object.keys( component ).every( key => [ 'id', 'type', 'profile', 'seed', 'priority', 'streamingBounds', 'roofPerches', 'footprints' ].includes( key ) );
@@ -790,6 +790,10 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 			}
 		}
 		if ( component.type === 'tidewater.static-vegetation/1' ) invariant( typeof component.placementAssetId === 'string', `Static vegetation component ${component.id} requires placement data` );
+		if ( component.grassMaskAssetId !== undefined ) {
+			const asset = assetRefs.get( component.grassMaskAssetId );
+			invariant( component.type === 'tidewater.static-vegetation/1' && rules.requiredFeatures?.includes( 'tidewater.static-grass/1' ) && /^sha256:[0-9a-f]{64}$/.test( component.grassMaskAssetId ) && asset?.kind === 'grass-density/1' && asset.priority === ( component.priority || 'portal-preview' ) && asset.bytes > 16 && asset.bytes <= 16 * 1024 * 1024, `Static vegetation component ${component.id} has an invalid grass density asset` );
+		}
 		if ( staticReef ) invariant( typeof component.placementAssetId === 'string', `Static reef component ${component.id} requires placement data` );
 		if ( staticFishProps ) invariant( typeof component.placementAssetId === 'string' && assetRefs.get( component.placementAssetId )?.bytes > 0 && assetRefs.get( component.placementAssetId )?.bytes <= 16 * 1024 * 1024, `Static fish-props component ${component.id} requires a bounded placement asset` );
 		ids.add( component.id );
@@ -798,6 +802,7 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 		invariant( rules.seaLevel !== undefined && ( islandOceanCount === 1 || waterBodyCount > 0 ), 'A Downeast boat requires seaLevel and a declared water renderer' );
 		if ( waterBodyCount ) invariant( waterBodies.some( ( water ) => Math.abs( boatObject.transform.position[ 0 ] - water.center[ 0 ] ) <= water.extent && Math.abs( boatObject.transform.position[ 2 ] - water.center[ 1 ] ) <= water.extent ), 'A Downeast boat berth must be inside a declared water body' );
 	}
+	if ( components.some( component => component.grassMaskAssetId !== undefined ) ) invariant( terrainSurfaceComponent, 'Portable grass requires a packaged terrain surface' );
 	if ( wildlifeCount ) {
 		const wildlife = components.find( component => component.type === 'tidewater.example-island-wildlife/1' );
 		invariant( terrainSurfaceComponent, 'Example Island wildlife requires a packaged terrain surface' );
