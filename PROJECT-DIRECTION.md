@@ -13,8 +13,10 @@ verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
 
 **Tidewater package integration and parity: 75%.** ElseMesh builds with the
 Tidewater content submodule mounted, verifies its content-addressed assets, and
-loads portable worlds through versioned interfaces. The island still lacks
-complete gameplay parity and controlled desktop/Android visual acceptance.
+loads portable worlds through versioned interfaces. Matched hosted/built-in
+start and village views render on Android; the village comparison exposes
+missing hosted beach grass. Desktop visual acceptance and complete gameplay
+parity remain open.
 Keep Tidewater authored content in its repository and reusable execution code
 in ElseMesh. Tidewater is content data, not a separately compiled application;
 ElseMesh validates and executes its versioned behavior data. Do not introduce a
@@ -114,6 +116,14 @@ details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-h
 
 Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
+Invitation launches use the destination world's authored spawn as the preferred
+entry point. Move the player only when a player or colliding object occupies
+that point, choose the nearest free location within the world's configured
+maximum displacement, and reject entry if the bounded area has no free
+location. Portal handoffs retain their mapped destination pose and bypass this
+allocation. Owner-authoritative presence must prevent two simultaneous entrants
+from reserving the same spot. Specify the optional bound's default and the
+presence-outage policy before implementing the allocator.
 Signed experience metadata must declare bootstrap, minimum-visible, and
 portal-preview content; the client must hold at the threshold until crossing
 requirements are met, then continue prioritized streaming. Portal lighting is a

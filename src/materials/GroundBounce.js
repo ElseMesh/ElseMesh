@@ -189,7 +189,9 @@ fn hookBounce( P: vec3f, Nw: vec3f ) -> vec3f {
 `,
 	} );
 
-	SceneLighting.set( 'bounce', GroundBounce.module );
-	return { bake, map, raw };
+	const module = GroundBounce.module;
+	const activate = () => SceneLighting.set( 'bounce', module );
+	activate();
+	return { bake, map, raw, module, activate };
 
 }

@@ -381,9 +381,10 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			fft: this.fft, caustics: this.caustics, clouds: this.clouds, terrain: this.terrainGPU,
 			shore: this.shore, surface: this.surface, shoreSim: this.shoreSim,
 		} );
+		this.baseUnderwaterLighting = this.underwaterLighting;
 
 		// sunlight bounced off the ground (one diffuse bounce, re-baked with the terrain sun shadow)
-		installGroundBounce( { terrain: this.terrainGPU, clouds: this.clouds } );
+		this.baseGroundBounce = installGroundBounce( { terrain: this.terrainGPU, clouds: this.clouds } );
 		this.sceneRenderer = new SceneRenderer( engine.meshRenderer, scene, camera );
 		// the water's refraction source: the scene below the water only, half resolution
 		this.refraction = new RefractionPass( { meshRenderer: engine.meshRenderer, scene, camera, sceneRenderer: this.sceneRenderer, scale: this.desktopRefractionScale } );
@@ -755,7 +756,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		p.yaw = e.y;
 		p.pitch = MathUtils.clamp( e.x, - 1.5, 1.5 );
 		p.velocity.set( 0, 0, 0 );
-		const ground = Math.max( this.terrainData.heightAt( c.x, c.z ), this.colliders.groundHeightAt( c.x, c.z, c.y ) );
+		const ground = this.remoteWorldActive ? this.hostedColliders.groundHeightAt( c.x, c.z, c.y ) : Math.max( this.terrainData.heightAt( c.x, c.z ), this.colliders.groundHeightAt( c.x, c.z, c.y ) );
 		const water = this.cameraWaterHeight ?? 0;
 		if ( c.y < water ) {
 
@@ -914,7 +915,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				const terrain = new Terrain( { scene: root, terrainData, terrainGPU } );
 				if ( fallback ) fallback.visible = false;
 				installed.push( {
-					islandTerrain: true,
+					islandTerrain: true, terrainGPU,
 					update: ( _dt, camera ) => terrain.update( camera, true ),
 					dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); terrainGPU.dispose(); if ( fallback ) fallback.visible = true; },
 				} );
@@ -1045,6 +1046,18 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	activateHostedWorld( root, connector ) {
 
 		this.prepareHostedWorld( connector );
+		const terrain = ( root.userData.worldComponents || [] ).find( ( component ) => component.islandTerrain && component.terrainGPU );
+		if ( terrain ) {
+			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
+			terrain.underwaterLighting ||= installUnderwaterLighting( {
+				fft: this.fft, caustics: this.caustics, clouds: this.clouds, terrain: terrain.terrainGPU,
+				shore: terrain.shore, surface: this.surface, shoreSim: this.shoreSim,
+			} );
+			terrain.groundBounce ||= installGroundBounce( { terrain: terrain.terrainGPU, clouds: this.clouds } );
+			this.underwaterLighting = terrain.underwaterLighting;
+			this.underwaterLighting.activate();
+			terrain.groundBounce.activate();
+		}
 		const runtime = ( root.userData.worldComponents || [] ).find( ( component ) => component.hostedBoat );
 		this.activeHostedBoat = runtime || null;
 		this.player.boat = runtime ? runtime.activate( { query: this.hostedQuery, colliders: this.hostedColliders } ) : null;
@@ -1083,6 +1096,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		this.worldPresence?.dispose();
 		this.worldPresence = null;
+		this.underwaterLighting = this.baseUnderwaterLighting;
+		this.baseUnderwaterLighting.activate();
+		this.baseGroundBounce.activate();
 
 		this.activeHostedWildlife = null;
 		this.activeHostedWhale = null;
@@ -1108,7 +1124,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const previewRoot = this.portalPreviewId ? this.portalPreparations.get( this.portalPreviewId )?.root : null;
 		const previewWater = ( previewRoot?.userData?.worldComponents || [] ).some( ( component ) => component.islandOcean || component.waterBody || component.reef );
 		if ( dt > 0 && ( activeWater || previewWater ) ) this.fft.update( dt );
-		for ( const component of components ) component.update( dt, camera, this.player );
+		for ( const component of components ) component.update?.( dt, camera, this.player );
 	}
 
 	updateWorldStreaming() {
@@ -1422,7 +1438,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		if ( s.timeSpeed !== 0 ) s.timeOfDay = ( s.timeOfDay + dt * s.timeSpeed + 24 ) % 24;
 
 		// ---- player / boat (boat physics first so the cameras follow this frame's pose)
-		if ( ! this.remoteWorldActive && this.input.hit( 'KeyF' ) ) this.setFreeCam( ! this.freeCam );
+		if ( this.input.hit( 'KeyF' ) ) this.setFreeCam( ! this.freeCam );
 		if ( this.input.hit( 'KeyT' ) ) this.toggleTime();
 		if ( this.input.hit( 'KeyL' ) ) {
 
@@ -1452,7 +1468,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				this.player.waterH = this.player.waterHeight();
 				this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
 			}
-			this.player.updateHostedWorld( dt );
+			if ( this.freeCam ) this.fly.update( dt );
+			else this.player.updateHostedWorld( dt );
 			this.updateWorldPortals();
 			this.updateWorldStreaming();
 			this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );

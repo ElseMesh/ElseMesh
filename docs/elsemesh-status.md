@@ -8,6 +8,29 @@ content submodule. Burning Horizons is maintained at
 Older dated rows below record the earlier bundled-cave state as historical
 verification evidence.
 
+## Flip7 hosted-package follow-up (2026-10-22)
+
+The local hosted Example Island now renders on the Flip7 after fixing an
+unconditional update call for static hosted components and switching
+terrain-dependent underwater and ground-bounce lighting hooks to the hosted
+heightfield. A matched Android comparison at the authored pier spawn and 16:12
+is recorded in [graphics-review.md](graphics-review.md). This closes the
+previously missing hosted Android start-view smoke check, not the remaining
+desktop comparison, broader visual review, gameplay parity, or performance
+acceptance. A direct WebRTC player-presence channel still closes during the
+local check; it did not stop the hosted world from loading and rendering.
+
+## Hosted village review (2026-10-23)
+
+The hosted review-camera preset now remains active during rendering; hosted
+world frames previously reset it to the player's spawn each frame. At the
+same village pose and time on the Flip7, the hosted and built-in scenes both
+rendered. The hosted scene lacks the beach grass visible in the built-in scene,
+consistent with the current static-vegetation package carrying plant placements
+but no grass. The matched frames are in [graphics-review.md](graphics-review.md).
+This identifies a parity gap; it does not sign off on village or island visual
+acceptance.
+
 ## Implemented foundations
 
 Graphics comparisons can use the named and captured camera URL parameters documented in [graphics-review.md](graphics-review.md), so a view and time of day can be reproduced after a normal page load without changing the phone or browser environment.
@@ -175,7 +198,7 @@ they did not verify current client rendering or remote/NAT reachability.
 ### 1. Complete the island as a portable example world
 
 - Preserve the village's material fidelity in the portable GLB and represent the boat and other interactive systems as versioned data-driven components without replacing or degrading the built-in procedural game path. Static reef placements now export deterministically to hash-verified 64 m tiles with conservative model bounds and render through the existing client Reef pipeline; fish simulation, collisions, and other reef behavior are still absent from hosted worlds. Static plant placements travel as signed-manifest-referenced, hash-verified world-space records; other worlds still need a general terrain-driven vegetation/grass contract.
-- The portable `tidewater.water-body/1` deep-water component supports up to four non-overlapping bounded squares and named `deep-ocean`, `calm-lagoon`, and `storm` material profiles. Irregular shorelines, terrain interaction, and underwater effects remain. Signed `rules.seaLevel` and `rules.atmosphereLevel` are validated and transported; hosted sea level is applied, and portable water stores destination-specific level for portal previews. Atmosphere has no runtime effect yet. The island-ocean component remains tied to the built-in island terrain. Signed `tidewater.ambient-audio/1` beds are packaged, verified, streamed, and played through `SoundScape`; this contract covers continuous loops, not dynamic sound events. A versioned component now packages the island humpback's route, seed, simulation parameters, geometry and maps. Bird/shore wildlife, fish schools, fishing gameplay, dynamic effects, and weather remain to be ported; the boat has an interactive hosted component but still needs broader parity checks.
+- The portable `tidewater.water-body/1` deep-water component supports up to four non-overlapping bounded squares and named `deep-ocean`, `calm-lagoon`, and `storm` material profiles. Irregular shorelines, terrain interaction, and underwater effects remain. Signed `rules.seaLevel` and `rules.atmosphereLevel` are validated and transported; hosted sea level is applied, and portable water stores destination-specific level for portal previews. Atmosphere has no runtime effect yet. The island-ocean component remains tied to the built-in island terrain. Signed `tidewater.ambient-audio/1` beds are packaged, verified, streamed, and played through `SoundScape`; this contract covers continuous loops, not dynamic sound events. The hosted `tidewater.example-island-wildlife/1` component runs the trusted client-side bird and shore-animal presentation using signed deterministic placement inputs; remote animal authority and controlled visual acceptance remain open. A versioned component packages the island humpback's route, seed, simulation parameters, geometry and maps. Fish schools, fishing gameplay, dynamic effects, and weather remain to be ported; the boat has an interactive hosted component but still needs broader parity checks.
 - Make the exporter deterministic, verify every emitted hash, and keep all source assets and generation code in this repository.
 - Load the resulting package as a hosted ThruHold and compare its authored scene against the built-in island on desktop and Android.
 

@@ -112,7 +112,7 @@ export class TerrainGPU {
 				terrainHeightTex: { texture: this.heightTexture, sampleType: 'unfilterable-float' },
 				terrainNormalTex: { texture: this.normalTexture },
 				terrainSplatTex: { texture: this.splatTexture },
-				terrainDetailTex: detailBinding(),
+				terrainDetailTex: detailBinding( this.detailTexture ),
 				terrainShoreTex: { texture: () => this.shoreTexture, sampleType: 'unfilterable-float' },
 				terrainSunShadowTex: { texture: this.sunShadowTexture },
 			},

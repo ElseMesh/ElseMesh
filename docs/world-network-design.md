@@ -106,6 +106,24 @@ remain guest-readable unless their signed access policy requires invitations.
 The invitation is separate from account roles and does not replace owner-signed
 manifest/provider validation.
 
+For an invitation launch, the destination world owns the initial entry point.
+The client begins placement at the world's authored spawn pose. It may move the
+entrant only when that location is occupied by a player or a colliding world
+object, and then only to the nearest available location within the maximum
+spawn displacement configured by that world. If no available location is
+found within the bound, the world rejects entry rather than placing the player
+farther away. The owner-authoritative presence service must arbitrate player
+occupancy so simultaneous arrivals cannot claim the same location. An
+unavailable or stale presence snapshot must not be treated as proof that a
+location is free; the failure policy remains to be specified. Portal arrivals
+continue to use the mapped destination pose and do not run invitation spawn
+placement.
+
+This is the intended entry contract; current clients still place visitors
+directly at the signed spawn pose and do not search for a free location. The
+maximum-displacement field and its omission behavior must be specified in the
+world format before implementation.
+
 ### Readiness and light continuity
 
 The signed world experience may specify the minimum bootstrap, visible,

@@ -328,9 +328,12 @@ fn hookShadowPosition( P: vec3f, N: vec3f, pixel: vec2f ) -> vec3f {
 `,
 	} );
 
-	SceneLighting.set( 'directModulation', direct );
-	SceneLighting.set( 'shadowPosition', shadowPos );
-	SceneLighting.set( 'ambientModulation', ambient );
-	return { helpers, direct, ambient, shadowPos, params, update, levels };
+	const activate = () => {
+		SceneLighting.set( 'directModulation', direct );
+		SceneLighting.set( 'shadowPosition', shadowPos );
+		SceneLighting.set( 'ambientModulation', ambient );
+	};
+	activate();
+	return { helpers, direct, ambient, shadowPos, params, update, levels, activate };
 
 }

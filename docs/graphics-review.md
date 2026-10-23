@@ -12,6 +12,32 @@ These opt-in parameters switch to the existing free camera; they do not affect o
 
 The upstream `dgreenheck.github.io/tidewater/` deployment does not include these review-camera parameters. A URL such as `?view=beach` there is ignored, so its spawn view cannot be treated as the same pose as one of the named ElseMesh views. Before calling an image comparison like-for-like, arrange for both builds to use the same camera pose, viewport, time of day, render scale, anti-aliasing, shadows, and water-reflection settings. Otherwise report the mismatch and use screenshots only to identify candidate differences.
 
+## Flip7 hosted-package renderer fix and matched start view, 2026-10-22
+
+The local hosted Example Island initially stayed black. Runtime logs identified
+two failures: the hosted static-fish-props component had no `update()` method,
+and the terrain shader combined the hosted heightfield with lighting hooks bound
+to the built-in heightfield. The update loop now skips optional component update
+methods, and hosted terrain activates underwater and ground-bounce hooks bound
+to its own terrain GPU module. `TerrainGPU` also binds its configured detail
+texture, so packaged and built-in terrain modules agree on that resource.
+
+On the Flip7, Chrome ran only on scrcpy virtual displays at 720×1600, density
+420, CSS viewport 274×505, and render scale 1. The hosted world and built-in
+world were captured at position [53.6, 4.53, -77], yaw 3.14, pitch -0.05, and
+16:12. The hosted app became active and its render-frame counter advanced past
+1,700 without the terrain-binding error. Its HUD ranged from 25 to 34 FPS in
+the matched capture; readings varied between captures, so this is not a
+performance acceptance result. The authored pier, beach, and ocean appear
+broadly similar in the two frames. Small material, shadow, and gameplay
+differences still need review. See the [hosted frame](images/flip7-hosted-example-2026-10-22.png)
+and [built-in frame](images/flip7-built-in-example-2026-10-22.png).
+
+This verifies the hosted Android start view and a matched-pose Android visual
+review. Desktop comparison, other island views, gameplay parity, and sustained
+performance acceptance remain open. Chrome's player-presence warning about a
+closed direct WebRTC channel also remains; the world render itself continued.
+
 ## Follow-up browser check, 2026-10-01
 
 The desktop Chrome tab for `https://rebroad.github.io/tidewater/?view=beach` showed a white 3D view while its ElseMesh HUD and performance panel remained active (10 fps, 466 × 295 render size, 50% scale, shadows and water reflections off). The upstream tab completed startup and rendered the beach scene. The two captures used different viewports and the upstream ignored `?view=beach`, so they are not a like-for-like graphics comparison. This differs from the earlier same-day check, which observed both pages rendering. Root cause of the white current view is unknown; inspect fresh renderer diagnostics before attributing it to the world package or making visual changes. The Flip7 had no ADB device, and SSH to its configured `192.168.192.7:8022` endpoint returned `Network is unreachable`.
