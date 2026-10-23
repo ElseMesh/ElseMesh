@@ -62,12 +62,23 @@ after entry.
   comparison has not yet been repeated, so rendered grass parity remains
   unverified.
 - Consolidated daemon builds into `tools/build-server.sh`. Its default target
-  is the sole world-daemon variant, ZeroTier-enabled `thruholdd`; explicit
-  targets cover the separate directory and account daemons. The CGO-free
-  world-daemon variant and old positional matrix aliases have been removed.
+  is ZeroTier-enabled `thruholdd`; an optional `worldd` target builds the
+  CGO-free daemon for use with a host-managed ZeroTier service. The `all`
+  target builds only the default world daemon plus directory and account
+  daemons, avoiding duplicate world variants. Old positional matrix aliases
+  have been removed.
   It selects an existing real build sibling when `cpto` is available and uses
   the source tree when the sibling resolves to source, is absent, or `cpto` is
   unavailable. It never synchronizes the trees automatically.
+- Verified the optional Android arm64 `worldd` artifact embeds
+  `CGO_ENABLED=0` and runs its CLI. This proves the CGO-free build path only;
+  using the ZeroTier app's host-managed network still needs a live peer check.
+- Replaced proposal-inbox hard-link publication with same-directory atomic
+  rename after Termux denied hard links. The permission test now sets its mode
+  explicitly despite Termux's restrictive umask. Upgraded go-libp2p to 0.46.0
+  (quic-go 0.57.1) to fix the Go 1.26+ QUIC session-ticket panic. The full
+  worldd Go suite passes on Termux with `-checklinkname=0`; its desktop Chromium
+  integration is skipped on Android and remains a Linux check.
 
 - Clarified the invitation-entry contract: start at the world's authored pose;
   relocate only for a player or colliding object, choose the nearest free

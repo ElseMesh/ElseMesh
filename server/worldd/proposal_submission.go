@@ -454,7 +454,17 @@ func (d *daemon) storeWorldProposal(id string, data []byte) error {
 		total += info.Size()
 	}
 	name := filepath.Join(d.proposalDir, stringsTrimPrefixSHA256(id)+".json")
-	if info, err := os.Stat(name); err == nil && info.Mode().IsRegular() {
+	if info, err := os.Lstat(name); err == nil {
+		if !info.Mode().IsRegular() {
+			return errors.New("proposal inbox contains an invalid destination")
+		}
+		stored, readErr := os.ReadFile(name)
+		if readErr != nil {
+			return readErr
+		}
+		if !bytes.Equal(stored, data) {
+			return errors.New("proposal ID already exists with different contents")
+		}
 		return nil
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -483,8 +493,12 @@ func (d *daemon) storeWorldProposal(id string, data []byte) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	if err := os.Link(temporary, name); err != nil {
-		if errors.Is(err, os.ErrExist) {
+	// Rename is atomic within this directory and works on filesystems that
+	// prohibit hard links, including Android app storage. Proposal IDs hash the
+	// exact bytes, so concurrent idempotent submissions publish identical data.
+	if err := os.Rename(temporary, name); err != nil {
+		stored, readErr := os.ReadFile(name)
+		if readErr == nil && bytes.Equal(stored, data) {
 			return nil
 		}
 		return err

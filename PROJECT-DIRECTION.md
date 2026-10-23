@@ -85,10 +85,11 @@ in `docs/`.
   [direct WebRTC](docs/browser-direct-webrtc.md), and
   [relay deployment](docs/relay-deployment.md#publish-a-browser-gateway-with-tls).
 - **ZeroTier (60%):** keep ElseMesh network `e3918db4832a3056` separate from
-  `xellent` (`632ea2908569fc9e`), use libzt identities and network-scoped
-  addresses without exposing Central credentials, and treat physical path
-  observations as transient. Verify routing, ports, peer discovery, and
-  operation without Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
+  `xellent` (`632ea2908569fc9e`), use embedded libzt by default, and retain an
+  optional CGO-free daemon that uses a host-managed ZeroTier interface. Neither
+  mode may expose Central credentials; treat physical path observations as
+  transient. Verify routing, ports, peer discovery, and operation without
+  Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
 - **Publishing (90%):** host the current ElseMesh client at `elsemesh.github.io/`
   and archived `loz/main` at `/loz`, retire `/elsemesh`, and show an eight
   character source stamp matching each published ref; inspect the archived

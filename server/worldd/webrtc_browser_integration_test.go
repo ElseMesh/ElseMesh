@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,9 @@ import (
 )
 
 func TestChromiumWorldConnectorUsesDirectWebRTC(t *testing.T) {
+	if runtime.GOOS == "android" {
+		t.Skip("desktop Chromium integration is run on Linux; Android browser checks use an isolated virtual display")
+	}
 	chromium, err := exec.LookPath("chromium")
 	if err != nil {
 		chromium, err = exec.LookPath("chromium-browser")
@@ -95,7 +99,15 @@ try {
 	})
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	profileDir, err := os.MkdirTemp("/var/tmp", "elsemesh-chromium-webrtc-")
+	tempRoot := os.TempDir()
+	if runtime.GOOS == "android" {
+		if prefix := os.Getenv("PREFIX"); prefix != "" {
+			tempRoot = filepath.Join(prefix, "tmp")
+		}
+	} else if runtime.GOOS == "linux" {
+		tempRoot = "/var/tmp"
+	}
+	profileDir, err := os.MkdirTemp(tempRoot, "elsemesh-chromium-webrtc-")
 	if err != nil {
 		t.Fatal(err)
 	}

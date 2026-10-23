@@ -116,14 +116,15 @@ The `server/worldd` Go program persists a node identity, serves a signed local s
 
 `tools/build-server.sh` is the single daemon build entry point. With no options it builds the ZeroTier-enabled `thruholdd` for the current Go target and writes it to the selected server tree's `bin/thruholdd`, alongside `libzt.so`. It discovers the sibling libzt source and matching build by default. ZeroTier is compiled in for `thruholdd`, which uses the ElseMesh network `e3918db4832a3056`; libzt itself must already be built for the requested target.
 
-Choose another daemon or target explicitly:
+Choose another world-daemon mode or target explicitly:
 
 ```sh
 tools/build-server.sh --os android --arch arm64
+tools/build-server.sh --target worldd --os linux --arch amd64
 tools/build-server.sh --target all --os linux --arch amd64
 ```
 
-The available targets are `thruholdd`, `directoryd`, `accountd`, and `all`. There is one world-daemon build: `thruholdd`, with ZeroTier enabled. It needs the matching libzt headers/library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. `--output` selects the artifact directory, and `--build-server` selects a prepared server source/build directory. When cross-building for Termux, select `--os android --arch arm64` and set the NDK `CC` and `CXX`. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
+The default world-daemon target is `thruholdd`, which embeds libzt and joins the ElseMesh ZeroTier network. The optional `worldd` target is CGO-free and uses a ZeroTier interface provided by a system service already running on the host; it does not start or configure that service. The `all` target builds the default `thruholdd` plus `directoryd` and `accountd`, without producing both world-daemon variants. The embedded target needs matching libzt headers and library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. `--output` selects the artifact directory, and `--build-server` selects a prepared server source/build directory. For an Android `thruholdd` build, select `--os android --arch arm64` and set the NDK `CC` and `CXX`; the CGO-free `worldd` target does not need the NDK C compiler. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
 
 `accountd` is optional and exits without configuration. Configure the Google OAuth web client and browser origins before starting it, and put a local HTTPS reverse proxy in front of its loopback listener:
 

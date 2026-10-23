@@ -68,6 +68,9 @@ func TestNodeIdentityImportRejectsInsecureBackupPermissions(t *testing.T) {
 	if err := os.WriteFile(backup, encoded, 0644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chmod(backup, 0644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := importIdentity(backup, filepath.Join(root, "destination", "node.key")); err == nil {
 		t.Fatal("insecurely permissioned identity backup was accepted")
 	}

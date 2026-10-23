@@ -196,6 +196,31 @@ starts without a separate `LD_LIBRARY_PATH` when both files remain together.
 The default network is compiled into the ZeroTier-enabled build, so neither
 the network ID nor a special transport flag is needed.
 
+For hosts that already run ZeroTier One, the build helper also has an optional
+CGO-free `worldd` target:
+
+```sh
+tools/build-server.sh --target worldd --os linux --arch amd64
+```
+
+This binary does not embed libzt, create a ZeroTier identity, or join a network.
+The host's ZeroTier service must already have joined and been authorized on
+the ElseMesh network, and the operating system must route its managed address
+to the daemon. Pass that managed address as an explicit libp2p announcement so
+peers can dial it, using the actual address assigned by the service:
+
+```sh
+worldd-linux-amd64 \
+  --announce-address "/ip4/$ZEROTIER_IPV4/tcp/42901" \
+  --announce-address "/ip4/$ZEROTIER_IPV4/udp/42901/quic-v1"
+```
+
+The system service owns the ZeroTier identity; `worldd` continues to use its
+separate persistent libp2p node identity. Do not set `--zerotier-network` for
+this build. The Android binary can be cross-compiled, but this host-managed
+service path still needs a device-level networking check before relying on it
+on Android.
+
 ### Observed physical peer endpoints
 
 The current libzt source already exposes active physical path observations with

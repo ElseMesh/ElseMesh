@@ -41,6 +41,23 @@ Codec, source-manifest, client component-validation, asset-index, and Go
 contract checks cover the new asset path. The Flip7 village comparison has not
 yet been repeated with this package, so visual grass parity remains unverified.
 
+## Optional host-managed ZeroTier build (2026-10-23)
+
+`tools/build-server.sh` keeps embedded-libzt `thruholdd` as its default and
+offers `--target worldd` for a CGO-free binary. That mode relies on a separately
+running, authorized ZeroTier service and the host's virtual network interface;
+the daemon can advertise the managed address with `--announce-address`. The
+Android arm64 binary reports `CGO_ENABLED=0` in Go build metadata and its CLI
+runs. No live system-service peer connection has been verified yet. The `all`
+target builds the default world daemon plus the directory and account services,
+not both world-daemon variants.
+
+The full `server/worldd` Go suite passes on Termux with
+`go test -ldflags=-checklinkname=0 ./worldd -count=1`. This followed a switch
+from hard-link publication to same-directory atomic rename for proposal files,
+which Android app storage permits. The desktop Chromium WebRTC test is skipped
+on Android and remains a Linux acceptance check.
+
 ## Implemented foundations
 
 Graphics comparisons can use the named and captured camera URL parameters documented in [graphics-review.md](graphics-review.md), so a view and time of day can be reproduced after a normal page load without changing the phone or browser environment.
