@@ -50,17 +50,21 @@ after entry.
   15:30. Both rendered; the hosted view visibly lacks the beach grass in the
   built-in view. The retained frames and comparison limits are in
   [graphics-review.md](docs/graphics-review.md).
-- Rendered hosted grass parity, desktop comparison, fishing and wildlife
-  authority, broader gameplay parity, and sustained performance acceptance
-  remain open.
+- Repeated the village review after adding the portable grass-density asset.
+  At the same pose, time, viewport, and render scale, beach grass is visible in
+  both hosted and built-in renders; the signed hosted manifest contains the mask
+  component. Full density and LOD parity, desktop comparison, fishing and
+  wildlife authority, broader gameplay parity, and sustained performance
+  acceptance remain open. Captures and limits are recorded in
+  [graphics-review.md](docs/graphics-review.md).
 
 - Added the portable `grass-density/1` asset contract and optional
   `grassMaskAssetId` reference for static vegetation. The CPU-only Tidewater
   updater produced a deterministic 4 MiB mask; source-to-manifest conversion
   verified its content hash, asset kind, and required feature. The client now
-  installs it against the matching packaged terrain. The Flip7 visual
-  comparison has not yet been repeated, so rendered grass parity remains
-  unverified.
+  installs it against the matching packaged terrain. The matched Flip7 review
+  now confirms hosted beach grass renders; broader density and LOD parity
+  remain open.
 - Consolidated daemon builds into `tools/build-server.sh`. Its default target
   is ZeroTier-enabled `thruholdd`; an optional `worldd` target builds the
   CGO-free daemon for use with a host-managed ZeroTier service. The `all`

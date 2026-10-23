@@ -12,6 +12,26 @@ These opt-in parameters switch to the existing free camera; they do not affect o
 
 The upstream `dgreenheck.github.io/tidewater/` deployment does not include these review-camera parameters. A URL such as `?view=beach` there is ignored, so its spawn view cannot be treated as the same pose as one of the named ElseMesh views. Before calling an image comparison like-for-like, arrange for both builds to use the same camera pose, viewport, time of day, render scale, anti-aliasing, shadows, and water-reflection settings. Otherwise report the mismatch and use screenshots only to identify candidate differences.
 
+## Flip7 hosted grass-density review, 2026-10-23
+
+The current source was served locally from a temporary, loopback-only Example
+Island profile. Its signed manifest included the content-addressed
+`grass-density/1` mask. Chrome ran on Rebroad scrcpy commit `b59a3d82`'s
+persistent display-only virtual display at 720×1600, density 320, CSS viewport
+360×696, DPR 2, and render scale 1. Chrome's activity was verified on logical
+display 24; captures used only SurfaceFlinger display ID
+`11529215048938202412`. The app showed source stamp `a0034d9a`.
+
+Hosted and built-in renders used pose `[62, 7, -62]`, yaw `0.34`, pitch
+`-0.12`, and 15:30. Grass is visible on the beach in both frames, so the
+hosted package no longer has the complete grass omission seen in the earlier
+2026-10-23 comparison. This confirms rendered grass presence with the packaged
+mask; it does not establish matching density at every location, LOD behavior,
+other views, or sustained performance. The hosted HUD read about 20 FPS and the
+built-in HUD about 18 FPS during these captures; these are individual readings,
+not performance acceptance results. See the [hosted frame](images/flip7-hosted-grass-village-2026-10-23.png)
+and [built-in frame](images/flip7-built-in-grass-village-2026-10-23.png).
+
 ## Flip7 hosted-package renderer fix and matched start view, 2026-10-22
 
 The local hosted Example Island initially stayed black. Runtime logs identified
