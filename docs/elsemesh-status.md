@@ -38,8 +38,11 @@ referenced by `tidewater.static-vegetation/1` and guarded by the required
 `tidewater.static-grass/1` feature. The client samples it with the packaged
 terrain surface; the exporter does not regenerate the island on the client.
 Codec, source-manifest, client component-validation, asset-index, and Go
-contract checks cover the new asset path. The Flip7 village comparison has not
-yet been repeated with this package, so visual grass parity remains unverified.
+contract checks cover the new asset path. A matched Flip7 village review
+confirmed that beach grass renders in both hosted and built-in views. This
+confirms presence at the reviewed view and time only; full density and LOD
+parity remain open. See [graphics-review.md](graphics-review.md) for capture
+conditions and limits.
 
 ## Optional host-managed ZeroTier build (2026-10-23)
 
