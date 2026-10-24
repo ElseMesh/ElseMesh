@@ -49,7 +49,7 @@ export class WebGLReefAdapter {
 				if ( reefFlex < 0.0 ) {
 					vec3 w = position * 3.1 + reefSeed * 17.0;
 					vec3 off = vec3( sin( w.y * 1.7 + w.z ), sin( w.z * 1.3 + w.x * 1.1 ) * 0.6, sin( w.x * 1.9 + w.y * 0.7 ) );
-					transformed += off * ( -reefFlex * aData.x * 0.8 );
+					transformed += off * ( -reefFlex * ( aData.x * 0.8 + 0.2 ) );
 				}` );
 			shader.vertexShader = shader.vertexShader.replace( '#include <project_vertex>', `
 				vec4 mvPosition = vec4( transformed, 1.0 );
