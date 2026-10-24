@@ -4,7 +4,7 @@ import { ShaderModule } from '../../engine/gpu/Shader.js';
 import { LAYERS } from '../../core/SceneRenderer.js';
 import { SPRAY } from '../../fx/Spray.js';
 import { WhaleBrain, EXAMPLE_ISLAND_WHALE_PROFILE } from './WhaleBrain.js';
-import { loadTexture, loadTextureBytes } from './WhaleTextures.js';
+import { decodePNG, loadTextureBytes } from './WhaleTextures.js';
 
 // Humpback whale (Megaptera novaeangliae), ~14.5 m.
 //
@@ -31,14 +31,15 @@ const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
-const _m = new THREE.Matrix4();
 const _x = new THREE.Vector3( 1, 0, 0 );
 const _t = new THREE.Vector3();
 
 export class Whale {
 
-	constructor( { scene, terrain, query = null, spray = null, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile = EXAMPLE_ISLAND_WHALE_PROFILE, seaLevel = 0 } ) {
+	constructor( { scene, terrain, query = null, queryName = 'whale', spray = null, THREE: renderer = THREE, webgl = false, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile = EXAMPLE_ISLAND_WHALE_PROFILE, seaLevel = 0 } ) {
 
+		this.THREE = renderer;
+		this.webgl = webgl;
 		this.scene = scene;
 		this.terrain = terrain;
 		this.query = query;
@@ -46,9 +47,9 @@ export class Whale {
 		this.url = url;
 		this.profile = profile;
 		this.ready = false;
-		this.group = new THREE.Group();
+		this.group = new this.THREE.Group();
 		this.group.name = 'Whale';
-		this.brain = new WhaleBrain( { terrain, query, ...profile, seaLevel } );
+		this.brain = new WhaleBrain( { terrain, query, queryName, ...profile, seaLevel } );
 		this.frames = null;
 		this.meshes = [];
 		this.lod = - 1;
@@ -84,30 +85,55 @@ export class Whale {
 
 	}
 
+	async _dataTexture( bytes, srgb, label ) {
+
+		const T = this.THREE, image = await decodePNG( bytes );
+		const texture = new T.DataTexture( image.data, image.width, image.height, T.RGBAFormat, T.UnsignedByteType );
+		texture.name = label;
+		texture.colorSpace = srgb ? T.SRGBColorSpace : T.NoColorSpace;
+		// PNG rows start at the top; WebGPU samples the decoded bytes in that orientation.
+		// Three's WebGL texture coordinates start at the bottom, so flip DataTexture uploads.
+		texture.flipY = true;
+		texture.wrapS = texture.wrapT = T.ClampToEdgeWrapping;
+		texture.magFilter = T.LinearFilter;
+		texture.minFilter = T.LinearMipmapLinearFilter;
+		texture.generateMipmaps = true;
+		texture.needsUpdate = true;
+		return texture;
+
+	}
+
 	async _loadAssets( manifest, bin, albedo, height ) {
 
 		this.manifest = manifest;
-		this.albedoTex = await loadTextureBytes( albedo, 'humpback_albedo.png', true );
-		this.heightTex = await loadTextureBytes( height, 'humpback_height.png', false );
+		if ( this.webgl ) {
+			this.albedoTex = await this._dataTexture( albedo, true, 'humpback_albedo.png' );
+			this.heightTex = await this._dataTexture( height, false, 'humpback_height.png' );
+		} else {
+			this.albedoTex = await loadTextureBytes( albedo, 'humpback_albedo.png', true );
+			this.heightTex = await loadTextureBytes( height, 'humpback_height.png', false );
+		}
 		const geometry = exactArrayBuffer( bin );
 
 		this._setupRig( manifest );
 		this.material = this._createMaterial( manifest );
 		for ( const lv of manifest.levels ) {
 
-			const geo = new THREE.BufferGeometry();
-			geo.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( geometry, lv.position, lv.vertices * 3 ), 3 ) );
-			geo.setAttribute( 'normal', new THREE.BufferAttribute( new Int16Array( geometry, lv.normal, lv.vertices * 3 ), 3, true ) );
-			geo.setAttribute( 'uv', new THREE.BufferAttribute( new Float32Array( geometry, lv.uv, lv.vertices * 2 ), 2 ) );
-			geo.setAttribute( 'uv1', new THREE.BufferAttribute( new Float32Array( geometry, lv.uv1, lv.vertices * 2 ), 2 ) );
-			geo.setAttribute( 'rig', new THREE.BufferAttribute( new Float32Array( geometry, lv.rig, lv.vertices * 4 ), 4 ) );
-			geo.setIndex( new THREE.BufferAttribute( new Uint32Array( geometry, lv.index, lv.indices ), 1 ) );
+			const T = this.THREE, geo = new T.BufferGeometry();
+			geo.setAttribute( 'position', new T.BufferAttribute( new Float32Array( geometry, lv.position, lv.vertices * 3 ), 3 ) );
+			geo.setAttribute( 'normal', new T.BufferAttribute( new Int16Array( geometry, lv.normal, lv.vertices * 3 ), 3, true ) );
+			geo.setAttribute( 'uv', new T.BufferAttribute( new Float32Array( geometry, lv.uv, lv.vertices * 2 ), 2 ) );
+			geo.setAttribute( 'uv1', new T.BufferAttribute( new Float32Array( geometry, lv.uv1, lv.vertices * 2 ), 2 ) );
+			geo.setAttribute( 'rig', new T.BufferAttribute( new Float32Array( geometry, lv.rig, lv.vertices * 4 ), 4 ) );
+			geo.setIndex( new T.BufferAttribute( new Uint32Array( geometry, lv.index, lv.indices ), 1 ) );
 			// posed in world space by the vertex shader: the bounds follow the whale (see update)
-			geo.boundingSphere = new THREE.Sphere( new THREE.Vector3(), 11 );
-			geo.boundingBox = new THREE.Box3( new THREE.Vector3( - 11, - 11, - 11 ), new THREE.Vector3( 11, 11, 11 ) );
-			const mesh = new THREE.Mesh( geo, this.material );
+			geo.boundingSphere = new T.Sphere( new T.Vector3(), 11 );
+			geo.boundingBox = new T.Box3( new T.Vector3( - 11, - 11, - 11 ), new T.Vector3( 11, 11, 11 ) );
+			const mesh = new T.Mesh( geo, this.material );
 			mesh.name = 'Whale_' + lv.name;
-			mesh.castShadow = true;
+			// The WebGPU shadow pass shares the posed material; until WebGL has a matching
+			// custom depth material, a rest-pose shadow would visibly detach from the whale.
+			mesh.castShadow = ! this.webgl;
 			mesh.receiveShadow = true;
 			mesh.layers.set( LAYERS.OPAQUE );
 			mesh.visible = false;
@@ -152,21 +178,22 @@ export class Whale {
 
 		this.rootIndex = Math.round( zHead / this.dz ); // frame nearest to z = 0
 		// uniform arrays: this frame [0, K), last frame [K, 2K)
-		this.uPos = { array: new Array( 2 * K ).fill( 0 ).map( () => new THREE.Vector4() ) };
-		this.uRot = { array: new Array( 2 * K ).fill( 0 ).map( () => new THREE.Vector4( 0, 0, 0, 1 ) ) };
-		this.uFlip = { array: [ new THREE.Vector4( 1, 0, 0, 0 ), new THREE.Vector4( 1, 0, 0, 0 ), new THREE.Vector4( 1, 0, 0, 0 ), new THREE.Vector4( 1, 0, 0, 0 ) ] };
+		const T = this.THREE;
+		this.uPos = { array: new Array( 2 * K ).fill( 0 ).map( () => new T.Vector4() ) };
+		this.uRot = { array: new Array( 2 * K ).fill( 0 ).map( () => new T.Vector4( 0, 0, 0, 1 ) ) };
+		this.uFlip = { array: [ new T.Vector4( 1, 0, 0, 0 ), new T.Vector4( 1, 0, 0, 0 ), new T.Vector4( 1, 0, 0, 0 ), new T.Vector4( 1, 0, 0, 0 ) ] };
 		this.pos = [];
 		this.rot = [];
 		for ( let k = 0; k < K; k ++ ) {
 
-			this.pos.push( new THREE.Vector3() );
-			this.rot.push( new THREE.Quaternion() );
+			this.pos.push( new T.Vector3() );
+			this.rot.push( new T.Quaternion() );
 
 		}
 
-		this.pecRoot = [ m.pectoral.left.origin, m.pectoral.right.origin ].map( ( o ) => new THREE.Vector3( ...o ) );
-		this.pecBasis = [ m.pectoral.left.basis, m.pectoral.right.basis ].map( ( b ) => new THREE.Matrix3().set( b[ 0 ][ 0 ], b[ 0 ][ 1 ], b[ 0 ][ 2 ], b[ 1 ][ 0 ], b[ 1 ][ 1 ], b[ 1 ][ 2 ], b[ 2 ][ 0 ], b[ 2 ][ 1 ], b[ 2 ][ 2 ] ) );
-		this.blowLocal = new THREE.Vector3( ...m.blowhole );
+		this.pecRoot = [ m.pectoral.left.origin, m.pectoral.right.origin ].map( ( o ) => new T.Vector3( ...o ) );
+		this.pecBasis = [ m.pectoral.left.basis, m.pectoral.right.basis ].map( ( b ) => new T.Matrix3().set( b[ 0 ][ 0 ], b[ 0 ][ 1 ], b[ 0 ][ 2 ], b[ 1 ][ 0 ], b[ 1 ][ 1 ], b[ 1 ][ 2 ], b[ 2 ][ 0 ], b[ 2 ][ 1 ], b[ 2 ][ 2 ] ) );
+		this.blowLocal = new T.Vector3( ...m.blowhole );
 		this._hasPrev = false;
 
 	}
@@ -286,7 +313,7 @@ export class Whale {
 	// world position of a rest-frame point (CPU copy of the vertex shader)
 	toWorld( local, out ) {
 
-		const fi = THREE.MathUtils.clamp( ( this.zHead - local.z ) / this.dz, 0, K - 1.001 );
+		const fi = this.THREE.MathUtils.clamp( ( this.zHead - local.z ) / this.dz, 0, K - 1.001 );
 		const i = Math.floor( fi ), t = fi - i;
 		const r0 = this.rest[ i ], r1 = this.rest[ i + 1 ];
 		const yc = r0.y + ( r1.y - r0.y ) * t;
@@ -347,8 +374,13 @@ export class Whale {
 		this.scene.remove( this.group );
 		for ( const mesh of this.meshes ) mesh.geometry.dispose();
 		this.material?.dispose();
-		this.albedoTex?.destroy();
-		this.heightTex?.destroy();
+		if ( this.webgl ) {
+			this.albedoTex?.dispose();
+			this.heightTex?.dispose();
+		} else {
+			this.albedoTex?.destroy();
+			this.heightTex?.destroy();
+		}
 		this.meshes = [];
 		this.ready = false;
 
@@ -369,7 +401,7 @@ export class Whale {
 			p.y = b.water + 0.1;
 			for ( let k = 0; k < 4; k ++ ) {
 
-				const vel = new THREE.Vector3( ( Math.random() - 0.5 ) * 3, 4.5 + Math.random() * 3, ( Math.random() - 0.5 ) * 3 );
+				const vel = new this.THREE.Vector3( ( Math.random() - 0.5 ) * 3, 4.5 + Math.random() * 3, ( Math.random() - 0.5 ) * 3 );
 				spray.emit( p, vel, 18, 0.25, SPRAY.SPRAY, { spread: 2.4, jitter: 0.6, life: 2.2, sizeJitter: 0.8 } );
 				spray.emit( p, vel, 30, 0.022, SPRAY.DROPLET, { spread: 3, jitter: 0.5, life: 2 } );
 
@@ -386,7 +418,7 @@ export class Whale {
 				// the column: dense cloud of drops, a haze that drifts downwind, and heavier drops
 				const fwd = _v.set( Math.sin( b.yaw ), 0, Math.cos( b.yaw ) );
 				const vUp = 7.5 + 2.5 * b.blow;
-				const vel = new THREE.Vector3( fwd.x * 0.8, vUp, fwd.z * 0.8 );
+				const vel = new this.THREE.Vector3( fwd.x * 0.8, vUp, fwd.z * 0.8 );
 				this._blowAcc += dt * 60 * b.blow;
 				const n = Math.floor( this._blowAcc );
 				this._blowAcc -= n;
@@ -416,7 +448,7 @@ export class Whale {
 					const zte = nz - 0.1 - 0.35 * ( Math.abs( x ) / 2.2 ) ** 2;
 					const p = this.toWorld( _v.set( x, this.rest[ K - 1 ].y, zte ), _v2 );
 					if ( p.y < b.water + 0.2 ) continue;
-					spray.emit( p, new THREE.Vector3( 0, - 0.5, 0 ), 5 * n, 0.02, SPRAY.DROPLET, { spread: 0.5, jitter: 0.12, life: 1.6 } );
+					spray.emit( p, new this.THREE.Vector3( 0, - 0.5, 0 ), 5 * n, 0.02, SPRAY.DROPLET, { spread: 0.5, jitter: 0.12, life: 1.6 } );
 
 				}
 
@@ -429,6 +461,8 @@ export class Whale {
 	// ------------------------------------------------------------------ material
 
 	_createMaterial( m ) {
+
+		if ( this.webgl ) return this._createWebGLMaterial( m );
 
 		const f = ( x ) => {
 
@@ -479,6 +513,77 @@ ${ relief }
 		this.uWater = mat.uniforms.whaleWater;
 		this.uWet = mat.uniforms.whaleWet;
 		return mat;
+
+	}
+
+	_createWebGLMaterial( manifest ) {
+
+		const T = this.THREE, [ h0, h1 ] = manifest.textures.heightRange;
+		const material = new T.MeshStandardMaterial( { name: 'Whale', color: 0xffffff, roughness: 0.62, map: this.albedoTex } );
+		material.userData.whaleUniforms = {
+			positions: { value: this.uPos.array.slice( 0, K ) }, rotations: { value: this.uRot.array.slice( 0, K ) }, flips: { value: this.uFlip.array },
+			pecRoots: { value: this.pecRoot }, albedo: { value: this.albedoTex }, height: { value: this.heightTex }, heightRange: { value: new T.Vector2( h0, h1 - h0 ) },
+			water: { value: 0 }, wet: { value: 0 },
+		};
+		material.onBeforeCompile = shader => {
+
+			const uniforms = material.userData.whaleUniforms;
+			shader.uniforms.whalePos = uniforms.positions;
+			shader.uniforms.whaleRot = uniforms.rotations;
+			shader.uniforms.whaleFlip = uniforms.flips;
+			shader.uniforms.whalePecRoot = uniforms.pecRoots;
+			shader.uniforms.whaleAlbedoTex = uniforms.albedo;
+			shader.uniforms.whaleHeightTex = uniforms.height;
+			shader.uniforms.whaleHeightRange = uniforms.heightRange;
+			shader.uniforms.whaleWater = uniforms.water;
+			shader.uniforms.whaleWet = uniforms.wet;
+			const common = `attribute vec4 rig;
+uniform vec4 whalePos[${K}];
+uniform vec4 whaleRot[${K}];
+uniform vec4 whaleFlip[4];
+uniform vec3 whalePecRoot[2];
+uniform sampler2D whaleHeightTex;
+uniform vec2 whaleHeightRange;
+varying float vWhaleWorldY;
+vec3 whaleRotateQ( vec4 q, vec3 v ) { return v + 2.0 * cross( q.xyz, cross( q.xyz, v ) + q.w * v ); }
+vec3 whaleRotAxis( vec3 ax, float ang, vec3 v ) { float c = cos( ang ), s = sin( ang ); return v * c + cross( ax, v ) * s + ax * dot( ax, v ) * ( 1.0 - c ); }
+void whalePose( vec3 p, vec3 n, out vec3 world, out vec3 worldNormal ) {
+	bool isL = rig.y > 0.5 && rig.y < 1.5, isR = rig.y > 1.5 && rig.y < 2.5;
+	bool isPec = isL || isR;
+	vec4 fl = isL ? whaleFlip[0] : whaleFlip[1];
+	vec3 root = isL ? whalePecRoot[0] : whalePecRoot[1];
+	float ang = fl.w * ( rig.z * 0.35 + 0.8 ) * ( isPec ? 1.0 : 0.0 );
+	vec3 pp = root + whaleRotAxis( fl.xyz, ang, p - root );
+	float fi = clamp( ( ${this.zHead.toFixed( 7 )} - rig.x ) / ${this.dz.toFixed( 7 )}, 0.0, ${ ( K - 1.001 ).toFixed( 7 )} );
+	int i0 = int( floor( fi ) ); float t = fract( fi );
+	vec4 P0 = whalePos[i0], P1 = whalePos[i0 + 1];
+	vec4 Q0 = whaleRot[i0], Q1 = whaleRot[i0 + 1];
+	vec4 q = normalize( mix( Q0, Q1, t ) );
+	float yc = mix( P0.w, P1.w, t );
+	world = mix( P0.xyz, P1.xyz, t ) + whaleRotateQ( q, vec3( pp.x, pp.y - yc, pp.z - rig.x ) );
+	worldNormal = whaleRotateQ( q, whaleRotAxis( fl.xyz, ang, n ) );
+}`;
+			shader.vertexShader = shader.vertexShader.replace( '#include <common>', `#include <common>\n${common}` );
+			shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>
+				vec4 hTex = texture2D( whaleHeightTex, uv );
+				float h = ( hTex.r * 0.99611 + hTex.g * 0.00389 ) * whaleHeightRange.y + whaleHeightRange.x;
+				vec3 whaleWorldPosition, whaleWorldNormal;
+				whalePose( transformed + normal * h, normal, whaleWorldPosition, whaleWorldNormal );
+				transformed = whaleWorldPosition;
+				objectNormal = whaleWorldNormal;
+				vWhaleWorldY = whaleWorldPosition.y;` );
+			shader.vertexShader = shader.vertexShader.replace( '#include <project_vertex>', `vec4 mvPosition = viewMatrix * vec4( transformed, 1.0 );\n gl_Position = projectionMatrix * mvPosition;` );
+			shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>\nuniform sampler2D whaleAlbedoTex;\nuniform float whaleWater;\nuniform float whaleWet;\nvarying float vWhaleWorldY;` );
+			shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+				float whaleAbove = smoothstep( -0.1, 0.2, vWhaleWorldY - whaleWater );
+				float whaleFilm = whaleAbove * whaleWet;
+				float whaleRoughness = texture2D( whaleAlbedoTex, vMapUv ).a;
+				roughnessFactor = mix( whaleRoughness, whaleRoughness * 0.48, whaleFilm );` );
+		};
+		material.customProgramCacheKey = () => `elsemesh-whale-rig-v1-${this.zHead}-${this.dz}`;
+		this.uWater = material.userData.whaleUniforms.water;
+		this.uWet = material.userData.whaleUniforms.wet;
+		return material;
 
 	}
 

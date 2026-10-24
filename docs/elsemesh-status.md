@@ -66,9 +66,16 @@ available; the fallback reports that capability accurately. The hosted boat
 component now uses the shared boat controller and canonical boat model in
 WebGL, positioned by its signed berth object. Static reef placements now render
 in built-in and hosted WebGL through canonical geometry and distance LODs, but
-WebGL materials and transitions are simplified and flex animation, shadows,
-fish simulation, and reef collision are missing. The whale and other
-declared behaviors remain unsupported.
+WebGL now also uses the authored placement flex/seed and shared analytic swell
+for soft-organism sway and colony warping. FFT swell, deformed normals,
+procedural Reef materials, shadows, fish simulation, and reef collision remain
+missing. The packaged whale now loads its signed route, geometry, textures, and
+LOD levels into a Three.js material that uses the existing Whale simulation
+and rig pose; hosted capability is reported only after package loading
+succeeds. Standard WebGL lighting and whale spray effects remain incomplete,
+and whale shadows are disabled until a matching deformed depth material is
+available. Matched visual parity remains open. Other declared behaviors remain
+unsupported.
 Feature omission or approximation in
 fallback mode cannot count as package parity.
 Both WebGPU and WebGL need

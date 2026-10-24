@@ -24,6 +24,7 @@ import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';
+import { Whale } from '../world/marine/Whale.js';
 import { TIDEWATER_REEF_ASSET_URLS } from '../world/reef/TidewaterReefAssets.js';
 import { initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
@@ -39,6 +40,7 @@ import tidewaterWorldSource from '../../worlds/tidewater/world-source.json';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
 const ISLAND_WILDLIFE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'tidewater.example-island-wildlife/1' );
+const ISLAND_WHALE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'tidewater.humpback-whale/1' );
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -835,6 +837,12 @@ export class WebGLFallback {
 			}
 		}
 		if ( this.worldLink ) {
+			for ( const { component, assets } of this.hostedWhalePackages || [] ) {
+				if ( await this._loadWebGLWhale( component, assets, this.hostedTerrainData, this.hostedSeaLevel ?? 0 ) ) this.hostedSupportedComponents.add( component.id );
+			}
+			this._updateHostedWebGLStatus();
+		} else await this._loadIslandWhale();
+		if ( this.worldLink ) {
 			if ( this.hostedWildlifeComponent ) {
 				if ( ! this.hostedTerrainData ) throw new Error( `Wildlife component ${this.hostedWildlifeComponent.id} requires its packaged terrain surface` );
 				this._createWildlifeRuntime( this.hostedTerrainData, this.app.worldState.hostedColliders || this.app.worldState.colliders, this.hostedWildlifeComponent );
@@ -867,6 +875,46 @@ export class WebGLFallback {
 			query: this.waterQuery, seed: component?.seed ?? 5,
 		} );
 		this.wildlifeAdapter = new WebGLWildlifeAdapter( this.THREE, this.scene, terrain );
+
+	}
+
+	async _loadWebGLWhale( component, assets, terrain = null, seaLevel = 0 ) {
+
+		const whale = new Whale( {
+			THREE: this.THREE, webgl: true, scene: this.scene, terrain, query: this.waterQuery, queryName: `whale:${component.id}`,
+			seaLevel, profile: {
+				seed: component.seed, route: component.route, surfaceAt: component.surfaceAt,
+				cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed,
+			},
+		} );
+		try {
+			if ( assets ) await whale.loadPackage( assets );
+			else await whale.load();
+			this.whales ||= [];
+			this.whales.push( whale );
+			return true;
+		} catch ( error ) {
+			whale.dispose();
+			console.warn( `WebGL whale component ${component.id} unavailable:`, error );
+			return false;
+		}
+
+	}
+
+	async _loadIslandWhale() {
+
+		try {
+			await this._loadWebGLWhale( ISLAND_WHALE_COMPONENT, null, this.terrain, tidewaterWorldSource.rules.seaLevel ?? 0 );
+		} catch ( error ) {
+			console.warn( 'WebGL island whale package unavailable:', error );
+		}
+
+	}
+
+	_updateHostedWebGLStatus() {
+
+		const unsupported = unsupportedHostedWebGLComponents( this.hostedComponents, this.hostedSupportedComponents );
+		this.worldName.textContent = `${ this.hostedTitle || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
 
 	}
 
@@ -1595,7 +1643,6 @@ export class WebGLFallback {
 		for ( const ambience of components.filter( component => component.type === 'tidewater.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
 		}
-		const unsupported = unsupportedHostedWebGLComponents( components, supportedComponents );
 		const spawn = manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
 		const transfer = new URLSearchParams( location.search ).get( 'webglSpawn' )?.split( ',' ).map( Number );
@@ -1604,7 +1651,15 @@ export class WebGLFallback {
 		}
 		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) )
 			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
-		this.worldName.textContent = `${ manifest.title || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
+		this.hostedComponents = components;
+		this.hostedTitle = manifest.title || 'Hosted world';
+		this.hostedSupportedComponents = supportedComponents;
+		this.hostedWhalePackages = [];
+		for ( const component of components.filter( candidate => candidate.type === 'tidewater.humpback-whale/1' ) ) {
+			const ids = [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ];
+			if ( ids.every( id => assets.has( id ) ) ) this.hostedWhalePackages.push( { component, assets: { manifest: assets.get( ids[ 0 ] ), geometry: assets.get( ids[ 1 ] ), albedo: assets.get( ids[ 2 ] ), height: assets.get( ids[ 3 ] ) } } );
+		}
+		this._updateHostedWebGLStatus();
 		progress( 0.9, 'Preparing hosted world…' );
 
 	}
@@ -1745,6 +1800,7 @@ export class WebGLFallback {
 			this.waterQuery.update( dt );
 		}
 		this.boat?.update( dt );
+		for ( const whale of this.whales || [] ) whale.update( dt, this.camera );
 		const T = this.THREE;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;

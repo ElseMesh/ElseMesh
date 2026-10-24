@@ -185,9 +185,10 @@ after entry.
 - Static reef placements now render through WebGL in both the built-in island
   and hosted worlds. The adapter uses canonical Reef geometry and authored
   distance-LOD thresholds, with frustum/range culling and hard/soft instance
-  batches. Materials and LOD transitions are simplified; flex animation,
-  shadows, fish simulation, reef collision, and matched visual parity
-  remain open.
+  batches. It now shares placement seed/flex data and the analytic swell
+  direction and periods for soft-organism bending and massive-colony warping.
+  FFT swell contribution, deformed normals, procedural Reef materials, shadows,
+  fish simulation, reef collision, and matched visual parity remain open.
 - Hosted WebGL now decodes the verified terrain heightfield and static
   vegetation placement and grass-density assets with the shared package
   codecs. Its existing Three.js plant builders consume the packaged placements;
@@ -204,8 +205,11 @@ after entry.
   and shares the primary renderer's analytic swell direction and periods for
   soft-organism bending plus massive-colony warping. FFT swell contribution,
   deformed normals, procedural Reef materials, and shadows remain open. The
-  whale, village material profiles, and other declared behaviors remain open
-  in WebGL.
+  packaged Whale now reuses the shared simulation, CPU rig pose, signed route,
+  asset LODs, and height/albedo/roughness data in the WebGL fallback. Its
+  standard Three.js lighting, whale shadows and spray effects, and matched
+  visual parity remain open. Village material profiles and other declared
+  behaviors remain open in WebGL.
 - Hosted WebGL now routes signed ambient-audio beds through the existing shared
   `SoundScape` world-audio service, including spatial position, authored
   conditions, listener state, and the same sun-based day/night calculation as

@@ -25,7 +25,7 @@ const _p = new THREE.Vector3();
 
 export class WhaleBrain {
 
-	constructor( { terrain, query = null, seed = 1, route = EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed, seaLevel = 0 } ) {
+	constructor( { terrain, query = null, queryName = 'whale', seed = 1, route = EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed, seaLevel = 0 } ) {
 
 		this.terrain = terrain;
 		this.query = query;
@@ -80,7 +80,7 @@ export class WhaleBrain {
 		this.seq = null;
 		this.state = 'cruise';
 		this.lastWrap = false;
-		if ( query ) this.slot = query.allocate( 'whale', 1 );
+		if ( query ) this.slot = query.allocate( queryName, 1 );
 		this._place( 0 );
 		// seed the history with a straight run-in
 		for ( let i = 60; i >= 0; i -- ) this._record( - i * 0.4 );
