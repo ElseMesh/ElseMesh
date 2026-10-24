@@ -50,6 +50,23 @@ export const SURFACE = {
 
 const SWELL = new Vector2( WORLD.swellDir.x, WORLD.swellDir.y ).normalize();
 const TAU = Math.PI * 2;
+export const REEF_SWELL = Object.freeze( { x: SWELL.x, z: SWELL.y, tau: TAU } );
+const reefFloat = ( value ) => /[.e]/.test( String( value ) ) ? String( value ) : `${value}.0`;
+
+// The WebGL fallback uses the same analytic swell as the primary Reef material.
+// Keep the direction and periods sourced here so the two shader backends cannot drift.
+export function reefSwellGLSL() {
+	return /* glsl */`
+const vec2 REEF_SWELL_DIR = normalize( vec2( ${reefFloat( REEF_SWELL.x )}, ${reefFloat( REEF_SWELL.z )} ) );
+const vec2 REEF_SWELL_SIDE = vec2( -REEF_SWELL_DIR.y, REEF_SWELL_DIR.x );
+vec2 reefSwell( vec2 xz, float t ) {
+	float along = dot( xz, REEF_SWELL_DIR ); float across = dot( xz, REEF_SWELL_SIDE );
+	float a = sin( t * ${reefFloat( REEF_SWELL.tau / 8.2 )} - along * ${reefFloat( REEF_SWELL.tau / 70 )} + sin( across * 0.021 ) * 1.5 ) * 0.3;
+	float b = sin( t * ${reefFloat( REEF_SWELL.tau / 5.3 )} - along * ${reefFloat( REEF_SWELL.tau / 34 )} + across * 0.09 ) * 0.1;
+	float c = sin( t * ${reefFloat( REEF_SWELL.tau / 11.7 )} + across * ${reefFloat( REEF_SWELL.tau / 45 )} ) * 0.07;
+	return REEF_SWELL_DIR * ( a + b ) + REEF_SWELL_SIDE * c;
+}`;
+}
 const f = ( x ) => {
 
 	const s = String( x );
@@ -124,13 +141,13 @@ export function makeSurge( getOcean ) {
 		name: 'reefSurge' + ( fftCode ? '-fft' : '' ),
 		deps,
 		code: /* wgsl */`
-const REEF_SWELL_DIR = vec2f( ${ f( SWELL.x ) }, ${ f( SWELL.y ) } );
+const REEF_SWELL_DIR = vec2f( ${ f( REEF_SWELL.x ) }, ${ f( REEF_SWELL.z ) } );
 const REEF_SWELL_SIDE = vec2f( ${ f( - SWELL.y ) }, ${ f( SWELL.x ) } );
 fn reefSwell( xz: vec2f, t: f32 ) -> vec2f {
 	let along = dot( xz, REEF_SWELL_DIR ); let across = dot( xz, REEF_SWELL_SIDE );
-	let a = sin( t * ${ f( TAU / 8.2 ) } - along * ${ f( TAU / 70 ) } + sin( across * 0.021 ) * 1.5 ) * 0.3;
-	let b = sin( t * ${ f( TAU / 5.3 ) } - along * ${ f( TAU / 34 ) } + across * 0.09 ) * 0.1;
-	let c = sin( t * ${ f( TAU / 11.7 ) } + across * ${ f( TAU / 45 ) } ) * 0.07;
+	let a = sin( t * ${ f( REEF_SWELL.tau / 8.2 ) } - along * ${ f( REEF_SWELL.tau / 70 ) } + sin( across * 0.021 ) * 1.5 ) * 0.3;
+	let b = sin( t * ${ f( REEF_SWELL.tau / 5.3 ) } - along * ${ f( REEF_SWELL.tau / 34 ) } + across * 0.09 ) * 0.1;
+	let c = sin( t * ${ f( REEF_SWELL.tau / 11.7 ) } + across * ${ f( REEF_SWELL.tau / 45 ) } ) * 0.07;
 	return REEF_SWELL_DIR * ( a + b ) + REEF_SWELL_SIDE * c;
 }
 fn reefSurge( xz: vec2f, depth: f32, t: f32 ) -> vec2f {

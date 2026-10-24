@@ -1774,8 +1774,8 @@ export class WebGLFallback {
 			}
 		}
 		this.fishStand?.update( dt, this.camera.position );
-		this.reefAdapter?.update( this.camera );
-		this.hostedReefAdapter?.update( this.camera );
+		this.reefAdapter?.update( this.camera, simulationTime, tidewaterWorldSource.rules.seaLevel ?? 0 );
+		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
 		this.gameAdapter?.update( dt, this.player?.position || this.camera.position );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;

@@ -1,10 +1,11 @@
 import { Reef, REEF_CULLING, reefLODAtDistance } from '../world/Reef.js';
+import { reefSwellGLSL } from '../world/reef/ReefMaterials.js';
 
 const { cellSize: CELL_SIZE, underwaterRange: UNDERWATER_RANGE, aboveRange: ABOVE_RANGE, maxAboveRange: MAX_ABOVE_RANGE } = REEF_CULLING;
 
 // Three.js presentation of the canonical static Reef placements and model/LOD catalog.
-// The primary Reef renderer remains authoritative for materials, flex animation, shadows,
-// fish, and collision. This adapter only presents the signed static geometry in WebGL.
+// The analytic swell and placement flex/warp are shared with the primary material contract;
+// procedural reef surfaces, FFT swell, shadows, fish, and collision remain primary-only.
 export class WebGLReefAdapter {
 
 	constructor( THREE, scene, records ) {
@@ -41,12 +42,38 @@ export class WebGLReefAdapter {
 			side: soft ? T.DoubleSide : T.FrontSide,
 		} );
 		material.onBeforeCompile = shader => {
-			shader.vertexShader = shader.vertexShader.replace( '#include <common>', `#include <common>\nattribute vec4 aData;\nattribute vec3 reefColor2;\nvarying vec3 vReefColor2;\nvarying float vReefGradient;` );
-			shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\nvReefColor2 = reefColor2;\nvReefGradient = clamp( aData.x * 0.45, 0.0, 0.45 );` );
+			shader.uniforms.reefTime = material.userData.reefTime;
+			shader.uniforms.reefSeaLevel = material.userData.reefSeaLevel;
+			shader.vertexShader = shader.vertexShader.replace( '#include <common>', `#include <common>\nattribute vec4 aData;\nattribute vec3 reefColor2;\nattribute vec3 reefAnchor;\nattribute float reefSeed;\nattribute float reefFlex;\nuniform float reefTime;\nuniform float reefSeaLevel;\nvarying vec3 vReefColor2;\nvarying float vReefGradient;\n${reefSwellGLSL()}` );
+			shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\nvReefColor2 = reefColor2;\nvReefGradient = clamp( aData.x * 0.45, 0.0, 0.45 );
+				if ( reefFlex < 0.0 ) {
+					vec3 w = position * 3.1 + reefSeed * 17.0;
+					vec3 off = vec3( sin( w.y * 1.7 + w.z ), sin( w.z * 1.3 + w.x * 1.1 ) * 0.6, sin( w.x * 1.9 + w.y * 0.7 ) );
+					transformed += off * ( -reefFlex * aData.x * 0.8 );
+				}` );
+			shader.vertexShader = shader.vertexShader.replace( '#include <project_vertex>', `
+				vec4 mvPosition = vec4( transformed, 1.0 );
+				#ifdef USE_INSTANCING
+					mvPosition = instanceMatrix * mvPosition;
+				#endif
+				vec4 reefWorld = modelMatrix * mvPosition;
+				if ( reefFlex > 0.0 ) {
+					float h = max( reefWorld.y - reefAnchor.y, 0.0 );
+					float depth = max( reefSeaLevel - reefWorld.y, 0.0 );
+					vec2 sxz = reefAnchor.xz - normalize( REEF_SWELL_DIR ) * ( h * 4.0 );
+					float ph = reefTime * 1.7 + reefSeed * 40.0 + aData.w * 12.0;
+					vec2 d = ( reefSwell( sxz, reefTime ) + vec2( sin( ph ), cos( ph * 0.77 ) ) * 0.06 ) * ( reefFlex * aData.x * aData.x );
+					reefWorld.y -= dot( d, d ) / ( max( h, 0.1 ) * 2.0 );
+					reefWorld.xz += d;
+				}
+				mvPosition = viewMatrix * reefWorld;
+				gl_Position = projectionMatrix * mvPosition;` );
 			shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>\nvarying vec3 vReefColor2;\nvarying float vReefGradient;` );
 			shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>\ndiffuseColor.rgb = mix( diffuseColor.rgb, vReefColor2, vReefGradient );` );
 		};
-		material.customProgramCacheKey = () => 'webgl-reef-static-gradient-v1';
+		material.customProgramCacheKey = () => 'webgl-reef-shared-swell-flex-v2';
+		material.userData.reefTime = { value: 0 };
+		material.userData.reefSeaLevel = { value: 0 };
 		return material;
 
 	}
@@ -71,6 +98,13 @@ export class WebGLReefAdapter {
 					geometry.setIndex( new T.BufferAttribute( source.index.array, 1 ) );
 					const colors2 = new T.InstancedBufferAttribute( new Float32Array( capacity * 3 ), 3 );
 					geometry.setAttribute( 'reefColor2', colors2 );
+					const reefAnchor = new T.InstancedBufferAttribute( new Float32Array( capacity * 3 ), 3 );
+					const reefSeed = new T.InstancedBufferAttribute( new Float32Array( capacity ), 1 );
+					const reefFlex = new T.InstancedBufferAttribute( new Float32Array( capacity ), 1 );
+					for ( const attribute of [ reefAnchor, reefSeed, reefFlex ] ) attribute.setUsage( T.DynamicDrawUsage );
+					geometry.setAttribute( 'reefAnchor', reefAnchor );
+					geometry.setAttribute( 'reefSeed', reefSeed );
+					geometry.setAttribute( 'reefFlex', reefFlex );
 					geometry.computeBoundingSphere();
 					const mesh = new T.InstancedMesh( geometry, this.materials[ which ], capacity );
 					mesh.count = 0;
@@ -79,14 +113,19 @@ export class WebGLReefAdapter {
 					mesh.receiveShadow = true;
 					mesh.instanceMatrix.setUsage( T.DynamicDrawUsage );
 					this.scene.add( mesh );
-					this.meshes[ which ].push( { baseKind, lod, capacity, mesh, colors2 } );
+					this.meshes[ which ].push( { baseKind, lod, capacity, mesh, colors2, reefAnchor, reefSeed, reefFlex } );
 				}
 			}
 		}
 
 	}
 
-	update( camera ) {
+	update( camera, time = 0, seaLevel = 0 ) {
+
+		for ( const material of Object.values( this.materials ) ) {
+			material.userData.reefTime.value = time;
+			material.userData.reefSeaLevel.value = seaLevel;
+		}
 
 		const p = camera.position;
 		camera.updateMatrixWorld();
@@ -129,10 +168,16 @@ export class WebGLReefAdapter {
 				mesh.setColorAt( i, this._color1.setHex( item.c1 ) );
 				this._color2.setHex( item.c2 );
 				state.colors2.setXYZ( i, this._color2.r, this._color2.g, this._color2.b );
+				state.reefAnchor.setXYZ( i, item.x, item.y, item.z );
+				state.reefSeed.setX( i, item.seed );
+				state.reefFlex.setX( i, item.flex );
 			}
 			mesh.instanceMatrix.needsUpdate = true;
 			if ( mesh.instanceColor ) mesh.instanceColor.needsUpdate = true;
 			state.colors2.needsUpdate = true;
+			state.reefAnchor.needsUpdate = true;
+			state.reefSeed.needsUpdate = true;
+			state.reefFlex.needsUpdate = true;
 		}
 
 	}

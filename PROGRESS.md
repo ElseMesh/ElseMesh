@@ -200,8 +200,12 @@ after entry.
   and CPU mirror for jaw/curl/sag deformation with the primary renderer. WebGL
   still approximates fish shading; species markings and shader-level surface
   effects need a shared/backend-specific parity implementation and matched-
-  render review. Reef's remaining material and runtime effects, the whale,
-  village material profiles, and other declared behaviors remain open in WebGL.
+  render review. Reef WebGL now consumes the signed placement seed/flex fields
+  and shares the primary renderer's analytic swell direction and periods for
+  soft-organism bending plus massive-colony warping. FFT swell contribution,
+  deformed normals, procedural Reef materials, and shadows remain open. The
+  whale, village material profiles, and other declared behaviors remain open
+  in WebGL.
 - Hosted WebGL now routes signed ambient-audio beds through the existing shared
   `SoundScape` world-audio service, including spatial position, authored
   conditions, listener state, and the same sun-based day/night calculation as
