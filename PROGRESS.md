@@ -147,6 +147,8 @@ after entry.
   disconnected before a matched hosted/built-in review could be completed, so
   density/LOD parity and desktop visual acceptance remain open.
 - WebGL fallback is included in the parity acceptance target. Its hosted path
-  currently loads base object assets and water only; authored object LODs and
-  the other required Tidewater package components are omitted. WebGL parity is
-  therefore incomplete and must be checked alongside WebGPU parity.
+  previously loaded base object assets and water only. The hosted loader now
+  uses the shared `WorldObjectLOD` controller and queue to fetch and render
+  authored variants using the same projected-size thresholds, hysteresis, and
+  transition timing as WebGPU. The remaining declared Tidewater components are
+  still omitted by WebGL; matched rendered parity remains open.

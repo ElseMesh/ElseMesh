@@ -9,6 +9,7 @@ import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
+import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
@@ -146,6 +147,40 @@ function webglCloudVolumeTexture( T, size = 64 ) {
 	texture.needsUpdate = true;
 	return texture;
 
+}
+
+function prepareWebGLLODFade( root ) {
+
+	const clones = new Map();
+	root.traverse( object => {
+		if ( ! object.isMesh || ! object.material ) return;
+		const prepare = source => {
+			let material = clones.get( source );
+			if ( material ) return material;
+			material = source.clone();
+			material.alphaHash = true;
+			material.userData.elsemeshLODFade = { value: 1 };
+			material.onBeforeCompile = shader => {
+				shader.uniforms.elsemeshLODFade = material.userData.elsemeshLODFade;
+				shader.fragmentShader = shader.fragmentShader
+					.replace( 'void main() {', 'uniform float elsemeshLODFade;\nvoid main() {' )
+					.replace( '#include <alphahash_fragment>', 'diffuseColor.a *= elsemeshLODFade;\n#include <alphahash_fragment>' );
+			};
+			material.customProgramCacheKey = () => 'elsemesh-authored-lod-fade-v1';
+			clones.set( source, material );
+			return material;
+		};
+		object.material = Array.isArray( object.material ) ? object.material.map( prepare ) : prepare( object.material );
+	} );
+
+}
+
+function setWebGLLODFade( root, value ) {
+	root.traverse( object => {
+		for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
+			if ( material?.userData?.elsemeshLODFade ) material.userData.elsemeshLODFade.value = value;
+		}
+	} );
 }
 
 // Backend-neutral gameplay needs a water query even when the presentation uses
@@ -1339,7 +1374,8 @@ export class WebGLFallback {
 			manifest = result.manifest;
 		} else manifest = await this.connector.getManifest();
 		const assets = await this.connector.preload( { through: 'visible' } );
-		const T = this.THREE, cache = new Map();
+		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
+		this.worldLODs = new Map();
 		for ( const object of manifest.objects || [] ) {
 
 			if ( object.kind !== 'asset-instance' ) continue;
@@ -1351,13 +1387,54 @@ export class WebGLFallback {
 				model = await this.loader.parseAsync( buffer, '' );
 				cache.set( object.assetId, model );
 			}
-			const root = model.scene.clone( true );
+			const root = new T.Group();
+			const base = model.scene.clone( true );
+			prepareWebGLLODFade( base );
+			base.name = `${ object.label || object.id } · LOD 0`;
+			root.add( base );
 			const tr = object.transform || {};
 			root.position.set( ...( tr.position || [ 0, 0, 0 ] ) );
 			if ( tr.rotation ) root.quaternion.set( ...tr.rotation ); else root.rotation.y = tr.yaw || 0;
 			root.scale.set( ...( object.scale || [ 1, 1, 1 ] ) );
 			root.updateMatrixWorld( true );
 			this.scene.add( root );
+			if ( object.lods?.length ) {
+				const levels = new Map( [ [ 0, base ] ] );
+				this.worldLODs.set( object.id, new WorldObjectLOD( {
+					object,
+					loadLevel: ( level, signal ) => lodQueue.run( signal, async () => {
+						const assetId = object.lods[ level - 1 ].assetId;
+						const bytes = await this.connector.getAsset( assetId, { signal } );
+						if ( signal.aborted ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
+						let variant = cache.get( assetId );
+						if ( ! variant ) {
+							const buffer = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
+							variant = await this.loader.parseAsync( buffer, '' );
+							cache.set( assetId, variant );
+						}
+						if ( signal.aborted ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
+						const visual = variant.scene.clone( true );
+						prepareWebGLLODFade( visual );
+						visual.name = `${ object.label || object.id } · LOD ${ level }`;
+						visual.visible = false;
+						root.add( visual );
+						levels.set( level, visual );
+					} ),
+					showLevel: level => {
+						for ( const [ index, visual ] of levels ) {
+							visual.visible = index === level;
+							setWebGLLODFade( visual, 1 );
+						}
+					},
+					showTransition: ( from, to, fade ) => {
+						for ( const [ index, visual ] of levels ) {
+							visual.visible = index === from || index === to;
+							if ( index === from ) setWebGLLODFade( visual, 1 - fade );
+							else if ( index === to ) setWebGLLODFade( visual, fade );
+						}
+					},
+				} ) );
+			}
 
 
 		}
@@ -1494,6 +1571,7 @@ export class WebGLFallback {
 		const now = performance.now(), dt = Math.min( 0.05, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
+		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
 		if ( this.waterQuery ) {
 			this.boat?.controller?.queueQueries();
 			this.waterQuery.update( dt );
