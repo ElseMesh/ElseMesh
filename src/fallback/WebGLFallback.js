@@ -11,12 +11,14 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
+import { decodeFishPropPlacements } from '../network/FishPropPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
+import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
@@ -1513,6 +1515,14 @@ export class WebGLFallback {
 			}
 			await this._loadVegetation( { placementBytes, centerPosition: [ ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 0 ], ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 2 ] ] } );
 			supportedComponents.add( vegetation.id );
+		}
+		for ( const fishProps of components.filter( component => component.type === 'tidewater.static-fish-props/1' ) ) {
+			const placementBytes = assets.get( fishProps.placementAssetId );
+			if ( ! placementBytes ) continue;
+			const records = decodeFishPropPlacements( asBytes( placementBytes ) );
+			this.hostedFishProps ||= [];
+			this.hostedFishProps.push( new WebGLFishPropsAdapter( T, this.scene, records ) );
+			supportedComponents.add( fishProps.id );
 		}
 		for ( const ambience of components.filter( component => component.type === 'tidewater.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );

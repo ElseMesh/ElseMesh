@@ -368,6 +368,21 @@ const POSE = {
 
 export { iceGeometry, leafGeometry, lobsterGeometry };
 
+// Keep model selection shared by the native batch renderer and alternate backends.
+export function fishPropGeometry( kind, species, lod = 0 ) {
+	const S = species ? SPECIES[ species ] : null;
+	switch ( kind ) {
+		case 'split': return splitFishGeometry( S, { lod } );
+		case 'head': return fishGeometry( S, { lod, pose: 'dead', u1: S.opercle + 0.02, eyes: lod === 0 } );
+		case 'trunk': return fishGeometry( S, { lod, pose: 'dead', u0: S.opercle + 0.02 } );
+		case 'ice': return iceGeometry( lod );
+		case 'leaf': return leafGeometry( lod );
+		case 'lobster': return lobsterGeometry( lod );
+		case 'whole': return fishGeometry( S, { lod, pose: 'dead', eyes: lod === 0 } );
+		default: throw new Error( `Unknown fish-prop kind: ${kind}` );
+	}
+}
+
 export class FishProps {
 
 	constructor() {
@@ -440,22 +455,7 @@ export class FishProps {
 		const base = new Map();
 		for ( const [ key, k ] of keys ) {
 
-			const S = k.species ? SPECIES[ k.species ] : null;
-			const geo = ( lod ) => {
-
-				switch ( k.kind ) {
-
-					case 'split': return splitFishGeometry( S, { lod } );
-					case 'head': return fishGeometry( S, { lod, pose: 'dead', u1: S.opercle + 0.02, eyes: lod === 0 } );
-					case 'trunk': return fishGeometry( S, { lod, pose: 'dead', u0: S.opercle + 0.02 } );
-					case 'ice': return iceGeometry( lod );
-					case 'leaf': return leafGeometry( lod );
-					case 'lobster': return lobsterGeometry( lod );
-					default: return fishGeometry( S, { lod, pose: 'dead', eyes: lod === 0 } );
-
-				}
-
-			};
+			const geo = lod => fishPropGeometry( k.kind, k.species, lod );
 
 			base.set( key, kinds.length );
 			const g1 = geo( 1 );
