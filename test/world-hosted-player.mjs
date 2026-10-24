@@ -6,6 +6,7 @@ import { App } from '../src/App.js';
 import { mapPortalPlayerState, mapPortalVehicleState } from '../src/network/PortalHandoff.js';
 import { Colliders } from '../src/world/Colliders.js';
 import { keyboardLookDelta } from '../src/core/Input.js';
+import { WorldPresenceSession } from '../src/network/WorldPresenceSession.js';
 
 const positions = new Float32Array( 11 * 11 * 3 );
 for ( let row = 0; row < 11; row ++ ) for ( let column = 0; column < 11; column ++ ) {
@@ -113,15 +114,21 @@ player.camera.position.set( 2.4, 4.1, - 7.2 );
 player.velocity.set( 1, 4.6, - 3 );
 const handoffPortal = { entry: { position: [ 2, 3, - 7 ], yaw: - 0.4 }, exit: { position: [ - 10, 5, 20 ], yaw: 1.2 } };
 const expected = mapPortalPlayerState( { position: camera.position, velocity: player.velocity, yaw: player.yaw, pitch: player.pitch }, handoffPortal.entry, handoffPortal.exit );
+const admitPresence = WorldPresenceSession.prototype.admit;
+WorldPresenceSession.prototype.admit = async function ( _pose, spawnCandidates ) {
+	assert.equal( spawnCandidates, undefined, 'portal handoffs keep their mapped pose instead of requesting invitation spawn allocation' );
+	this.admitted = true;
+};
 let sourceClosed = false;
 const destination = { worldId: 'tw-world:destination', nodeId: '1234567890123456789012345', gateway: 'http://127.0.0.1:5193', manifest: { title: 'Destination', components: [], rules: { gravity: 0.5 } } };
 const app = Object.assign( Object.create( App.prototype ), {
 	player, camera, worldConnector: { worldId: 'tw-world:source', close() { sourceClosed = true; } },
 	linkedWorldRoot: { userData: {} }, hostedColliders: new Colliders(), hostedQuery: {}, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(),
+	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
 	portalPreviousPosition: new Vector3(), portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
 } );
-app.enterWorldPortal( handoffPortal, { connector: destination, root: { userData: { worldComponents: [] } } } );
+await app.enterWorldPortal( handoffPortal, { connector: destination, root: { userData: { worldComponents: [] } } }, camera.position.clone() );
 assert.ok( camera.position.distanceTo( expected.position ) < 1e-9, 'application handoff preserves the mapped camera position' );
 assert.equal( player.yaw, expected.yaw );
 assert.equal( player.pitch, expected.pitch );
@@ -175,15 +182,17 @@ const vehiclePortalApp = Object.assign( Object.create( App.prototype ), {
 	player: vehiclePlayer, camera: vehiclePlayer.camera, worldConnector: vehicleSourceConnector, activeHostedBoat: sourceBoatRuntime,
 	linkedWorldRoot: { userData: {} }, hostedColliders: colliders, hostedQuery: {}, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(), portalPreviousPosition: new Vector3(),
+	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
 	portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
 } );
 const vehicleDestinationRoot = { userData: { worldComponents: [ destinationBoatRuntime ] } };
 const expectedVehicleState = mapPortalVehicleState( sourceVehicleController.transferState(), handoffPortal.entry, handoffPortal.exit );
-vehiclePortalApp.enterWorldPortal( handoffPortal, { connector: vehicleDestination, root: vehicleDestinationRoot } );
+await vehiclePortalApp.enterWorldPortal( handoffPortal, { connector: vehicleDestination, root: vehicleDestinationRoot }, vehiclePlayer.camera.position.clone() );
 assert.equal( vehiclePlayer.mode, 'boat', 'helm mode survives destination activation' );
 assert.equal( vehiclePlayer.boat, destinationBoatController, 'player reattaches to the destination boat controller' );
 assert.ok( acceptedVehicleState.position.distanceTo( expectedVehicleState.position ) < 1e-9, 'destination boat receives the transformed origin' );
 assert.ok( acceptedVehicleState.quaternion.angleTo( expectedVehicleState.quaternion ) < 1e-9, 'destination boat receives the transformed orientation' );
 assert.ok( Math.abs( acceptedVehicleState.velocity.length() - 7 ) < 1e-9, 'handoff preserves vehicle speed before destination policy is applied' );
 assert.equal( appliedVehicleLimit, 6, 'destination speed limit reaches the transferred boat controller' );
+WorldPresenceSession.prototype.admit = admitPresence;
 console.log( 'ok   hosted first-person movement uses only active world colliders' );

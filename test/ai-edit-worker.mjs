@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile, symlink } from 'node:fs/promises';
 import path from 'node:path';
+import { testTempRoot } from './temp-root.mjs';
 import { createWorldSource } from '../src/network/WorldSource.js';
 import { createAITaskBundle } from '../tools/create-ai-edit-task.mjs';
 import { buildSandboxCommand, validateAITaskBundle, validateScopedActions } from '../tools/run-ai-edit-worker.mjs';
 
-const temporaryRoot = await mkdtemp( path.join( '/var/tmp', 'elsemesh-ai-edit-' ) );
+const temporaryRoot = await mkdtemp( path.join( testTempRoot, 'elsemesh-ai-edit-' ) );
 try {
 	const input = path.join( temporaryRoot, 'input' );
 	const assets = path.join( input, 'assets' );

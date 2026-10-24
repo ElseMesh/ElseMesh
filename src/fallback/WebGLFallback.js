@@ -21,7 +21,9 @@ import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
 import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
+import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
+import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
@@ -406,7 +408,7 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 	swashTexture.magFilter = swashTexture.minFilter = T.LinearFilter;
 	swashTexture.generateMipmaps = false;
 	swashTexture.needsUpdate = true;
-	return { texture, swashTexture, timeRange: new T.Vector2( minTime, maxTime ), swashTimeRange: new T.Vector2( minSwashTime, maxSwashTime ), origin: field.origin, size: field.size };
+	return { texture, swashTexture, timeRange: new T.Vector2( minTime, maxTime ), swashTimeRange: new T.Vector2( minSwashTime, maxSwashTime ), origin: field.origin, size: field.size, field };
 
 }
 
@@ -844,6 +846,10 @@ export class WebGLFallback {
 			footprints: component?.footprints || [], roofPerches: component?.roofPerches || [],
 			boat: component ? null : this.boat?.controller || null,
 			boatModel: component ? null : this.boat?.model || null,
+			shoreProbe: this.shoreField ? new WebGLSwashProbe( {
+				field: this.shoreField, terrain, seaLevel: this.hostedSeaLevel ?? - 0.15,
+				time: () => this.animationStartTime ? ( performance.now() - this.animationStartTime ) * 0.001 : 0,
+			} ) : null,
 			query: this.waterQuery, seed: component?.seed ?? 5,
 		} );
 		this.wildlifeAdapter = new WebGLWildlifeAdapter( this.THREE, this.scene, terrain );
@@ -924,7 +930,7 @@ export class WebGLFallback {
 								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
 								float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 								float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
-								float phase = ( uTime - arrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+								float phase = ( uTime - arrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 								float waveIndex = floor( phase + 0.5 );
 								float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
 								float alongVariation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
@@ -932,7 +938,7 @@ export class WebGLFallback {
 								float u = phase - waveIndex;
 								float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
 								float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
-								float amplitude = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + alongVariation * 0.385 ) * bar, 0.02 );
+								float amplitude = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + alongVariation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
 								float lam = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0;
 								vec2 crestPosition = p + shoreDirection * ( u * lam );
 								vec2 crestTerrainUv = ( crestPosition - vec2( uTerrainOrigin ) ) / uTerrainSize;
@@ -975,7 +981,7 @@ export class WebGLFallback {
 						float along = dot( p, vec2( -dir.y, dir.x ) );
 						float swashArrival = mix( uSwashTimeRange.x, uSwashTimeRange.y, texture2D( uSwashField, shoreUv ).r );
 						float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
-						float phase = ( uTime - swashArrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+						float phase = ( uTime - swashArrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 						float waveIndex = floor( phase );
 						float tau = fract( phase );
 						float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
@@ -984,12 +990,12 @@ export class WebGLFallback {
 						float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
 						float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
 						float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
-						float amp = max( 0.34 * waveSet * ( 1.0 + randomWave * 0.275 + variation * 0.385 ) * bar, 0.02 );
-						float runupMax = amp * 2.1 * clamp( exposure * 1.4, 0.0, 1.0 ) / 0.08;
-						float su = clamp( tau / 0.4, 0.0, 1.0 ), sb = clamp( ( tau - 0.4 ) / 0.55, 0.0, 1.0 );
-						float runup = ( tau < 0.4 ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
+						float amp = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + variation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
+						float runupMax = amp * 2.1 * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
+						float su = clamp( tau / ${SHORE_SWASH_UP}, 0.0, 1.0 ), sb = clamp( ( tau - ${SHORE_SWASH_UP} ) / ${SHORE_SWASH_DOWN}, 0.0, 1.0 );
+						float runup = ( tau < ${SHORE_SWASH_UP} ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
 						float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
-						float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 ) - max( vertexGroundHeight - uSeaLevel, 0.0 ) / 0.08;
+						float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 ) - max( vertexGroundHeight - uSeaLevel, 0.0 ) / ${SHORE_BEACH_SLOPE};
 						vSwashFront = runupFront;
 						if ( runupFront > 0.0 ) {
 							float uprush = 1.0 - smoothstep( 0.32, 0.46, tau );
@@ -1290,6 +1296,7 @@ export class WebGLFallback {
 		progress( 0.52, 'Mapping the coastal swell…' );
 		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
 		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, - 0.15 );
+		this.shoreField = waterTerrain.shore?.field || null;
 		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), - 0.15, waterTerrain, 1 ) );
 		const beachPatch = this._makeWater( new T.PlaneGeometry( WORLD.beach.xMax - WORLD.beach.xMin + 100, 160, 672, 256 ), - 0.15, waterTerrain, 2 );
 		beachPatch.position.x = ( WORLD.beach.xMin + WORLD.beach.xMax ) * 0.5;

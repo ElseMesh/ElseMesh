@@ -1,6 +1,7 @@
 import { Vector2 } from '../engine/math/index.js';
 import { Texture, UniformBlock, ShaderModule, commonModule } from '../engine/webgpu.js';
 import { G, GRAVITY } from '../engine/render/Frame.js';
+import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN } from './ShoreSwash.js';
 
 // Depth-aware shoreline waves.
 //
@@ -35,8 +36,6 @@ import { G, GRAVITY } from '../engine/render/Frame.js';
 // Consumes terrainHeightAt( xz ) and terrainShoreSample( xz ) from the terrain module.
 
 const TAU = Math.PI * 2;
-const BEACH_SLOPE = 0.066; // run-up is converted to a horizontal excursion with this slope
-const SWASH_UP = 0.4, SWASH_DOWN = 0.55; // fractions of the period: uprush, backwash
 const SWASH_OVERSHOOT = 1.2; // the mesh sheet reaches this far (m) past the leading edge (> the mesh spacing,
 // so the per-pixel front, not the triangles, always decides where the sheet ends)
 
@@ -230,9 +229,9 @@ export class ShoreWaves {
 		return /* wgsl */`
 const SHORE_GRAVITY: f32 = ${ f( GRAVITY ) };
 const SHORE_TAU: f32 = ${ f( TAU ) };
-const SHORE_BEACH_SLOPE: f32 = ${ f( BEACH_SLOPE ) };
-const SHORE_SWASH_UP: f32 = ${ f( SWASH_UP ) };
-const SHORE_SWASH_DOWN: f32 = ${ f( SWASH_DOWN ) };
+const SHORE_BEACH_SLOPE: f32 = ${ f( SHORE_BEACH_SLOPE ) };
+const SHORE_SWASH_UP: f32 = ${ f( SHORE_SWASH_UP ) };
+const SHORE_SWASH_DOWN: f32 = ${ f( SHORE_SWASH_DOWN ) };
 const SHORE_SWASH_OVERSHOOT: f32 = ${ f( SWASH_OVERSHOOT ) };
 
 struct ShoreSample {

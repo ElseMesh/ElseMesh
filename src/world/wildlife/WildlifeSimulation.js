@@ -123,6 +123,7 @@ export class WildlifeSimulation {
 		this.shorebirds.step( dt, viewer, camera.position, this.environment );
 		this.crabs.step( dt, viewer, camera.position, this.environment );
 		this.water.endFrame();
+		this.shoreProbe?.update();
 		return viewer;
 
 	}

@@ -25,6 +25,17 @@ WebRTC data channel. Both Node harnesses now apply the Android linker
 workaround automatically. `adb devices -l` currently shows no attached
 device, so the isolated Flip7 visual check remains open.
 
+## Android test suite (2026-10-24)
+
+The default Node suite skips only `reef-placement-render.mjs`,
+`world-package-village-materials.mjs`, `world-export.mjs`, and
+`whale-world-package.mjs`, and `engine-smoke.mjs` on Android because they
+require the Node Dawn binding for rendering or GPU texture baking; all
+remaining suite commands still run. These checks remain enabled on other
+platforms. Migrating them to an
+Android-compatible headless browser is a low-priority follow-up, not a
+prerequisite for Android game rendering.
+
 ## Hosted game-state isolation (2026-10-24)
 
 `App.init()` now creates the built-in fishing game only for unlinked Example

@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { testTempRoot } from './temp-root.mjs';
 import { createWorldSource } from '../src/network/WorldSource.js';
 import { createAITaskBundle } from '../tools/create-ai-edit-task.mjs';
 import { prepareAIEditPublication } from '../tools/prepare-ai-edit-publication.mjs';
@@ -19,7 +20,7 @@ const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..
 const blenderPrefix = path.resolve( process.env.BLENDER_PREFIX || '/usr' );
 const blender = path.resolve( process.env.BLENDER_EXECUTABLE || path.join( blenderPrefix, 'bin/blender' ) );
 const blenderResources = path.join( blenderPrefix, 'share/blender' );
-const temporaryRoot = await mkdtemp( '/var/tmp/elsemesh-ai-worker-runtime-' );
+const temporaryRoot = await mkdtemp( path.join( testTempRoot, 'elsemesh-ai-worker-runtime-' ) );
 
 try {
 	const sourcePath = path.join( temporaryRoot, 'world-source.json' );

@@ -134,8 +134,11 @@ after entry.
   `WildlifeFrame` visibility/fading. The adapter currently uses simplified
   species colors. Crab and burrow records now come from the shared
   `CrabPresentation` and render through WebGL instanced batches. The WebGL
-  swash probe, detailed materials, contact shadows, and visual parity remain
-  open; hosted wildlife is still reported as an incomplete package feature.
+  built-in WebGL island now evaluates shorebird swash from the same shoreline
+  field and shared swash math as WebGPU. Detailed materials, contact shadows,
+  and matched visual parity remain open; hosted wildlife is still reported as
+  an incomplete package feature. Dawn Node based checks are skipped only by
+  the Android test runner; browser-compatible test migration is low priority.
 
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the

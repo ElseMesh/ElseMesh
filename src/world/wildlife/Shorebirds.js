@@ -5,6 +5,7 @@ import { BIRD } from './BirdSpecies.js';
 import { Flyer } from './Flight.js';
 import { groundPose, setHead, setWings, standHeight, storePrevious, resetPrevious } from './BirdPose.js';
 import { TAU, clamp, lerp, smooth, angleDiff, approach } from './WildlifeMath.js';
+import { SHORE_BEACH_SLOPE } from '../../ocean/ShoreSwash.js';
 
 // Sanderlings working the swash: small flocks that chase the backwash down the wet sand, probing
 // as they go, and scurry up the beach ahead of every uprush (the edge of the water comes from
@@ -12,7 +13,6 @@ import { TAU, clamp, lerp, smooth, angleDiff, approach } from './WildlifeMath.js
 // flush when pressed: the flock bursts up and flies off low over the surf, wheels, and lands
 // further along the beach. At night they roost in a tight group above the tide line.
 
-const SLOPE = 0.066; // ShoreWaves' nominal beach slope (run-up is measured along it)
 const DRAW = 190;
 const WARY = 15, FLUSH = 8; // m
 
@@ -172,9 +172,9 @@ export class Shorebirds {
 		if ( r && r.age < 1.5 ) {
 
 			const Rt = r.runup;
-			const inland = Math.max( h - environment.seaLevel, 0 ) / SLOPE;
-			dm = ( inland - Rt ) * SLOPE / g;
-			vf = r.speed * SLOPE / g;
+			const inland = Math.max( h - environment.seaLevel, 0 ) / SHORE_BEACH_SLOPE;
+			dm = ( inland - Rt ) * SHORE_BEACH_SLOPE / g;
+			vf = r.speed * SHORE_BEACH_SLOPE / g;
 			up = r.speed > 0.05;
 
 		} else {

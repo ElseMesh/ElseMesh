@@ -2,6 +2,7 @@ import { StorageBuffer } from '../../engine/gpu/Texture.js';
 import { ComputeKernel } from '../../engine/gpu/Compute.js';
 import { Readback } from '../../engine/gpu/Readback.js';
 import { G } from '../../core/Globals.js';
+import { extrapolateSwash } from '../../ocean/ShoreSwash.js';
 
 // Where is the edge of the swash? The run-up of the waves on the sand is analytic on the GPU
 // (ShoreWaves); this evaluates it at a few points (the shorebirds) with the very same code the
@@ -106,27 +107,10 @@ fn main( @builtin( global_invocation_id ) gid: vec3u ) {
 		if ( ! this.valid || this.issued[ i * 4 + 3 ] < 0.5 ) return null;
 		const c = this.cpu, o = i * 4;
 		const age = G.time.value - this.resultTime;
-		const tau = c[ o + 3 ] + age / Math.max( this.shore.period.value, 1 );
-		out.inland = c[ o + 1 ];
-		out.x = this.issued[ o ];
-		out.z = this.issued[ o + 1 ];
-		out.age = age;
-		if ( tau < 1 ) {
-
-			out.runup = c[ o ] + c[ o + 2 ] * age;
-			out.speed = c[ o + 2 ];
-
-		} else {
-
-			// the next wave has reached the shoreline since: its edge races up the beach
-			const t = ( tau - 1 ) * this.shore.period.value;
-			out.speed = 3.2 * Math.max( 0.2, 1 - t / 3 );
-			out.runup = 0.35 + 3.2 * t * ( 1 - t / 6 );
-
-		}
-
-		out.tau = tau % 1;
-		return out;
+		return extrapolateSwash( {
+			runup: c[ o ], inland: c[ o + 1 ], speed: c[ o + 2 ], tau: c[ o + 3 ],
+			x: this.issued[ o ], z: this.issued[ o + 1 ],
+		}, age, this.shore.period.value, out );
 
 	}
 

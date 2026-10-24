@@ -4,12 +4,13 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import path from 'node:path';
+import { testTempRoot } from './temp-root.mjs';
 import { createWorldSource } from '../src/network/WorldSource.js';
 import { createAITaskBundle } from '../tools/create-ai-edit-task.mjs';
 import { readAIEditTaskContext } from '../tools/ai-editor-mcp.mjs';
 import { validateAITaskBundle } from '../tools/run-ai-edit-worker.mjs';
 
-const temporaryRoot = await mkdtemp( path.join( '/var/tmp', 'elsemesh-ai-mcp-' ) );
+const temporaryRoot = await mkdtemp( path.join( testTempRoot, 'elsemesh-ai-mcp-' ) );
 let serverProcess;
 try {
 	const input = path.join( temporaryRoot, 'input' );

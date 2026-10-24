@@ -82,7 +82,6 @@ export class Wildlife {
 		this.writeBirds( camera );
 		this.writeShorebirds( camera );
 		this.crabPresentation.write( this.crabs, camera.position, this.critterBatch, this.blobs );
-		this.shorebirds.probe?.update();
 		this.birdBatch.commit();
 		this.critterBatch.commit();
 		this.blobs.commit();
@@ -120,7 +119,7 @@ export class Wildlife {
 		this.birdBatch.dispose();
 		this.critterBatch.dispose();
 		this.blobs.dispose();
-		this.shorebirds.probe?.dispose();
+		this.runtime.shoreProbe?.dispose();
 
 	}
 
