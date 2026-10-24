@@ -5,7 +5,8 @@ The archived `loz/main` build is also published at [elsemesh.github.io/loz](http
 A mesh of independently owned ThruHolds, connected through portals, with an island fishing game as its original example. Cast from the pier, the beach or your own boat, fight the fish,
 sell your catch to Joe at the fish stand, and spend it on better gear at Marta's chandlery. Around it is a
 real-time tropical island and ocean: swim the reef, drive the boat out to deep water, and watch a humpback
-breach. It runs directly on WebGPU and WGSL with its own small rendering engine, no framework.
+breach. WebGPU/WGSL is its primary renderer, with a WebGL fallback. Worlds describe content and behavior;
+the client selects the graphics backend.
 
 **Play it:** https://elsemesh.github.io/
 
@@ -19,7 +20,8 @@ Hosting, selected-world URLs and the `elsemesh.org` DNS setup are documented in 
 
 Check out the content repositories before building: `git submodule update --init --recursive`. Tidewater and the LOZ cave are data-only world packages mounted under `worlds/`; the engine builds and serves them.
 
-- A browser with WebGPU: a recent Chrome, Edge or Safari.
+- For the primary renderer, a browser with WebGPU, such as a recent Chrome, Edge or Safari. A WebGL
+  fallback is available, though it does not yet support every world feature.
 - A capable GPU. It targets 60 fps at 2560×1267 on an Apple M5 Pro, and dynamic resolution scales
   the render down on slower machines.
 - The first load compiles several hundred shaders, which can take a minute or more. Later visits are

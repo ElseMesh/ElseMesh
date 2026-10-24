@@ -34,7 +34,9 @@ loading its world. This keeps the local save and local-only game runtime out of
 hosted world initialization; fishing gameplay is still not a portable world
 component.
 
-WebGL fallback is part of package parity acceptance. Its hosted loader now uses
+Design goal: world content is backend-neutral, with WebGPU and WebGL consuming
+the same world data and behavior through separate presentation adapters. WebGL
+fallback is part of package parity acceptance. Its hosted loader now uses
 the shared `WorldObjectLOD` controller and bounded load queue for authored
 variants, with Three.js-specific alpha-hash material fades. It still does not
 drop the Example Island package's verified terrain, vegetation placements, or
