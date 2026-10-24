@@ -89,17 +89,22 @@ The island constants now live in plain data in `IslandDefinition`; renderer
 math and wildlife-specific math/species data have separate modules. Bird and
 shorebird behavior consume explicit environment samples, while crab behavior
 is separated from `CrabPresentation`, which creates renderer-facing records.
-The active `Wildlife` orchestrator still writes directly to the existing bird,
-critter, and shadow batches, and some bird pose/interpolation state remains
-presentation-specific. This is an ownership split in progress, not a shared
-WebGPU/WebGL wildlife adapter yet.
+`WildlifeSimulation` now owns bird, shorebird, crab, viewer, and water-query
+state without constructing meshes or GPU resources. The WebGPU `Wildlife`
+adapter owns the instance batches, contact shadows, and optional GPU swash
+probe. Bird pose/interpolation data still contains presentation fields, and
+WebGL does not yet construct this shared runtime or provide its presentation
+adapter. This advances the ownership split; it does not establish cross-backend
+wildlife parity.
 
-The full `npm test` suite, production build, focused hermit-crab update test,
-and WebGL boat-adapter test pass. A headless rendered wildlife smoke produced
-bird, ghost-crab, and hermit-crab frames. The Flip7 is not currently connected
-to ADB, so this wildlife change has not received a new on-device visual check.
-Do not claim cross-backend or Flip7 parity until the remaining adapters and
-matched device views are verified.
+`test/wildlife-runtime.mjs` constructs and advances the shared simulation
+without a renderer, and `test/life-wildlife.mjs` remains the headless rendered
+smoke for bird, ghost-crab, and hermit-crab presentation. The full suite is
+currently blocked in this Termux installation by its missing Android
+`webgpu/dist/android-arm64/dawn.node` native module. The Flip7 is not connected
+to ADB, so the extraction has no new device visual review. Do not claim
+cross-backend or Flip7 parity until the WebGL adapter and matched device views
+are verified.
 
 ## Fish stand extraction milestone (partial)
 

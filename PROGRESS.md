@@ -123,6 +123,14 @@ after entry.
   `adb devices -l` lists no attached phone, so Flip7 visual
   verification remains open.
 
+- Split wildlife state progression from its WebGPU presentation wrapper. The
+  new `WildlifeSimulation` owns bird, shorebird, crab, viewer, and water-query
+  state and accepts environment samples explicitly; the WebGPU `Wildlife`
+  adapter now owns batches, shadows, and the optional GPU swash probe. A
+  renderer-free simulation test advances the same systems and checks their
+  emitted poses. WebGL does not yet construct this shared runtime, and bird
+  pose data still includes presentation-oriented fields.
+
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the
   same full source revision. This verifies the CGO-free build and CLI, not a
@@ -150,8 +158,8 @@ after entry.
   previously loaded base object assets and water only. The hosted loader now
   uses the shared `WorldObjectLOD` controller and queue to fetch and render
   authored variants using the same projected-size thresholds, hysteresis, and
-  transition timing as WebGPU. The remaining declared Tidewater components are
-  still omitted by WebGL; matched rendered parity remains open.
+  transition timing as WebGPU. Matched rendered parity remains open; the
+  implemented hosted features and outstanding component gaps are listed below.
 - Hosted WebGL now decodes the verified terrain heightfield and static
   vegetation placement and grass-density assets with the shared package
   codecs. Its existing Three.js plant builders consume the packaged placements;
