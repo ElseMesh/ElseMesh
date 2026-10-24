@@ -128,8 +128,10 @@ after entry.
   state and accepts environment samples explicitly; the WebGPU `Wildlife`
   adapter now owns batches, shadows, and the optional GPU swash probe. A
   renderer-free simulation test advances the same systems and checks their
-  emitted poses. WebGL does not yet construct this shared runtime, and bird
-  pose data still includes presentation-oriented fields.
+  emitted poses. Shared `WildlifeFrame` now applies visibility and distance
+  fading without mutating simulation poses, giving WebGL a reusable frame
+  policy. WebGL still does not construct this runtime or render its poses, so
+  wildlife parity remains open.
 
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the

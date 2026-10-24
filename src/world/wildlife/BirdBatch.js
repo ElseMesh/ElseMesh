@@ -98,7 +98,7 @@ export class BirdBatch {
 
 	// b: pose (see Flight / pose helpers): pos, scale, q, QA, QB, QC, qH, headOff, fold, kneeL, footL,
 	// kneeR, footR, tailPitch, tailSpread, species, seed, and the previous pos / scale / q / QA / QB / QC
-	write( b ) {
+	write( b, scale = b.scale ) {
 
 		const o = this.records.push();
 		if ( o < 0 ) return;
@@ -110,7 +110,7 @@ export class BirdBatch {
 
 		};
 
-		v4( 0, b.pos, b.scale );
+		v4( 0, b.pos, scale );
 		v4( 1, b.q );
 		v4( 2, b.QA );
 		v4( 3, b.QB );

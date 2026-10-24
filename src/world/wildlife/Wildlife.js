@@ -5,8 +5,8 @@ import { ShadowBlobs } from './ShadowBlobs.js';
 import { SwashProbe } from './SwashProbe.js';
 import { G } from '../../core/Globals.js';
 import { Vector3 } from '../../engine/math/index.js';
-import { smooth } from './WildlifeMath.js';
 import { WildlifeSimulation } from './WildlifeSimulation.js';
+import { forEachVisibleWildlifeBird } from './WildlifeFrame.js';
 
 // WebGPU presentation for the shared wildlife simulation. The simulation owns animal state;
 // batches, contact shadows, and the optional GPU swash probe remain presentation effects.
@@ -93,40 +93,21 @@ export class Wildlife {
 
 	writeBirds( camera ) {
 
-		const cp = camera.position;
-		for ( const agent of this.birds.agents ) {
-
-			if ( ! agent.visible ) continue;
-			const pose = agent.f.P;
-			const d = Math.hypot( pose.pos[ 0 ] - cp.x, pose.pos[ 1 ] - cp.y, pose.pos[ 2 ] - cp.z );
-			const far = agent.kind === 'frigate' ? 1400 : agent.kind === 'pelican' ? 800 : 550;
-			if ( d > far ) continue;
-			const scale = pose.scale0 || ( pose.scale0 = pose.scale );
-			pose.scale = scale * smooth( far, far * 0.8, d );
-			this.birdBatch.write( pose );
-			pose.scale = scale;
-
-		}
+		forEachVisibleWildlifeBird( this.runtime, camera, ( pose, scale ) => this.birdBatch.write( pose, scale ) );
 
 	}
 
 	writeShorebirds( camera ) {
 
 		const cp = camera.position;
-		const drawDistance = this.shorebirds.drawDistance;
 		for ( const bird of this.shorebirds.birds ) {
 
-			const pose = bird.f.P;
-			const d = Math.hypot( pose.pos[ 0 ] - cp.x, pose.pos[ 1 ] - cp.y, pose.pos[ 2 ] - cp.z );
-			if ( d > drawDistance ) continue;
-			const scale = bird.scale0 || ( bird.scale0 = pose.scale );
-			pose.scale = scale * smooth( drawDistance, drawDistance * 0.8, d );
-			this.birdBatch.write( pose );
-			pose.scale = scale;
+			const d = Math.hypot( bird.f.P.pos[ 0 ] - cp.x, bird.f.P.pos[ 1 ] - cp.y, bird.f.P.pos[ 2 ] - cp.z );
+			if ( d > this.shorebirds.drawDistance ) continue;
 			if ( bird.state !== 'fly' ) {
 
 				const slope = this.shorebirds.slopeAt( bird.x, bird.z, this.shoreSlope );
-				this.blobs.add( bird.x, bird.y, bird.z, 0.06 * scale, 0.06 * scale, 0.85, slope.x * slope.y, slope.z * slope.y );
+				this.blobs.add( bird.x, bird.y, bird.z, 0.06 * bird.f.P.scale, 0.06 * bird.f.P.scale, 0.85, slope.x * slope.y, slope.z * slope.y );
 
 			}
 
