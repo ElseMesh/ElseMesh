@@ -1,6 +1,6 @@
-import { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../world/Reef.js';
+import { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from './ReefPlacementTypes.js';
 
-// TRP1 is a fixed-width snapshot of placements for the built-in Reef renderer.
+// TRP1 is the fixed-width portable record format for signed static-reef placements.
 // Type IDs follow REEF_TYPE_NAMES: never reorder or reuse an existing ID; append
 // new names and introduce a new protocol/feature version for incompatible changes.
 export const REEF_PLACEMENT_PROTOCOL = 'tidewater.reef-placement/1';

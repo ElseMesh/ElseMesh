@@ -104,6 +104,11 @@ after entry.
   admission uses nearest-first collision-free candidates and owner-side atomic
   occupancy/capacity checks; portal arrivals keep their mapped pose and are
   checked against destination capacity.
+- Moved the stable reef-placement type/variant registry into a renderer-free
+  module. The network codec no longer imports the reef engine, GPU batches,
+  materials, or fish simulation; the Reef renderer checks its definitions
+  against that registry. Deterministic placement and standalone codec checks
+  pass. WebGL reef presentation remains open.
 - Bumped the authoring and signed runtime document protocols to `/2` because
   their required structure changed. World data itself is not versioned by the
   engine protocol. Tidewater's source submodule and the package exporters now

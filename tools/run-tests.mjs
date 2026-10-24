@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 
 const tests = [
 	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
-	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placements.mjs',
+	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs',
 	'test/grass-density-asset.mjs', 'test/grass-density-parity.mjs', 'test/reef-placement-render.mjs',
 	'test/game-logic.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
 	'test/camera-review.mjs', 'test/input-look-keys.mjs', 'test/touch-control-ownership.mjs', 'test/world-experience.mjs',

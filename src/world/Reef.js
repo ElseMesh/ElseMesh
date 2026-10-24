@@ -7,6 +7,9 @@ import { createReefMaterials, createReefView, SURFACE, packColor } from './reef/
 import { bandFade } from '../materials/LODFade.js';
 import { createNoiseVolume } from './reef/ReefNoise.js';
 import { FishSchools } from './Fish.js';
+import { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacementTypes.js';
+
+export { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacementTypes.js';
 
 // Caribbean fringing reef around WORLD.reef, 1.5 - 12 m deep.
 //
@@ -199,10 +202,12 @@ const TYPES = {
 		c1: [ 0x8a6a2a, 0x9a7a32, 0x7a5e26, 0xa08036, 0x806228 ], c2: [ 0x6a5a26 ] },
 };
 
-// Type IDs in tidewater.reef-placement/1 follow this order. Only append names;
-// changing an existing type's meaning requires a new placement protocol version.
-export const REEF_TYPE_NAMES = Object.freeze( Object.keys( TYPES ) );
-export const REEF_TYPE_VARIANT_COUNTS = Object.freeze( Object.fromEntries( REEF_TYPE_NAMES.map( ( type ) => [ type, MODELS[ TYPES[ type ].model ].variants ] ) ) );
+// Keep the runtime renderer definitions aligned with the renderer-free placement registry.
+const rendererTypeNames = Object.keys( TYPES );
+if ( rendererTypeNames.length !== REEF_TYPE_NAMES.length || rendererTypeNames.some( ( name, index ) => name !== REEF_TYPE_NAMES[ index ] ) ) throw new Error( 'Reef renderer type order does not match tidewater.reef-placement/1' );
+for ( const name of REEF_TYPE_NAMES ) {
+	if ( MODELS[ TYPES[ name ].model ].variants !== REEF_TYPE_VARIANT_COUNTS[ name ] ) throw new Error( `Reef renderer variant count does not match tidewater.reef-placement/1 for ${name}` );
+}
 
 // Relative abundance of each type per zone and layer:
 //   [ crest, fore reef (spurs and grooves), back reef (lagoon flats), patch reefs, deep slope ]

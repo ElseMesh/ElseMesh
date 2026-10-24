@@ -39,6 +39,16 @@ Content descriptors should be ordinary data and stable across backend changes.
 Presentation objects should be disposable and rebuildable from those
 descriptors plus current simulation state.
 
+## Renderer-free reef placement contract
+
+The stable type order and model-variant counts for
+`tidewater.reef-placement/1` live in `src/network/ReefPlacementTypes.js`.
+The placement codec consumes only that registry; `Reef.js` verifies its
+renderer definitions against it. This keeps reef content serialization
+independent of engine, GPU-batch, material, and fish-simulation imports. It is
+a data-boundary step only: WebGL reef presentation and matched visual parity
+remain open.
+
 ## Migration order
 
 1. Introduce a backend-neutral world runtime and explicit content/state
