@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { encodeFishPropPlacements } from '../src/network/FishPropPlacements.js';
-import { fishPropGeometry } from '../src/world/fish/FishProps.js';
+import { deformFishPropPoint, fishPropGeometry } from '../src/world/fish/FishProps.js';
+import { SPECIES } from '../src/world/fish/FishSpecies.js';
 import { WebGLFishPropsAdapter } from '../src/fallback/WebGLFishPropsAdapter.js';
 
 const records = [
@@ -21,6 +22,11 @@ assert( adapter.mesh.geometry.index.count > 0 );
 
 const whole = fishPropGeometry( 'whole', 'mullet', 0 );
 assert( adapter.mesh.geometry.attributes.position.count >= whole.getAttribute( 'position' ).count, 'WebGL uses shared procedural fish geometry' );
+const localPoint = new THREE.Vector3().fromBufferAttribute( whole.getAttribute( 'position' ), 0 );
+deformFishPropPoint( localPoint, whole.getAttribute( 'aData' ).getY( 0 ), records[ 0 ], SPECIES.mullet );
+localPoint.multiplyScalar( records[ 0 ].L ).applyQuaternion( new THREE.Quaternion().fromArray( records[ 0 ].q ) ).add( new THREE.Vector3( records[ 0 ].x, records[ 0 ].y, records[ 0 ].z ) );
+const renderedPoint = new THREE.Vector3().fromBufferAttribute( adapter.mesh.geometry.getAttribute( 'position' ), 0 );
+assert( renderedPoint.distanceTo( localPoint ) < 1e-5, 'WebGL vertex placement uses the canonical jaw, curl, and sag deformation helper' );
 whole.dispose();
 adapter.dispose();
 assert.equal( scene.children.length, 0, 'disposing removes the hosted fish props' );

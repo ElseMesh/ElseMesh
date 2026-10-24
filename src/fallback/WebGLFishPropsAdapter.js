@@ -1,5 +1,5 @@
 import { PART } from '../world/fish/FishGeometry.js';
-import { fishPropGeometry } from '../world/fish/FishProps.js';
+import { deformFishPropPoint, fishPropGeometry } from '../world/fish/FishProps.js';
 import { SKIN, SPECIES } from '../world/fish/FishSpecies.js';
 
 const clamp01 = value => Math.max( 0, Math.min( 1, value ) );
@@ -31,27 +31,6 @@ function bodyColor( T, record, attributes, index ) {
 	return color;
 }
 
-function deformFishVertex( p, partData, record, species ) {
-	if ( ! species ) return p;
-	const jawPart = partData + 0.01 - Math.floor( partData + 0.01 );
-	const jawWeight = Math.max( jawPart - 0.01, 0 ) / 0.9;
-	const angle = record.jaw * jawWeight;
-	if ( angle !== 0 ) {
-		const hingeZ = 0.5 - species.body * species.mouth.corner, dy = p.y - species.mouth.y, dz = p.z - hingeZ;
-		const ca = Math.cos( angle ), sa = Math.sin( angle );
-		p.y = species.mouth.y + dy * ca - dz * sa;
-		p.z = hingeZ + dy * sa + dz * ca;
-	}
-	const bend = ( x, y, z, k ) => {
-		const curvature = k + ( k >= 0 ? 1e-4 : - 1e-4 ), t = curvature * z, c = Math.cos( t ), s = Math.sin( t ), sh = Math.sin( t * 0.5 );
-		return [ sh * sh * 2 / curvature + x * c, y * c, s / curvature - x * s ];
-	};
-	const curled = bend( p.x, p.y, p.z, record.curl );
-	const sagged = bend( curled[ 0 ], curled[ 1 ], curled[ 2 ], record.sag );
-	p.set( ...sagged );
-	return p;
-}
-
 // Build the signed static fish-prop placements as one Three.js mesh. Placement decoding remains
 // in FishPropPlacements.js; this adapter reuses the same procedural model geometry and anatomy.
 export class WebGLFishPropsAdapter {
@@ -73,7 +52,7 @@ export class WebGLFishPropsAdapter {
 			const vertexOffset = positions.length / 3;
 			for ( let i = 0; i < sourcePosition.count; i ++ ) {
 				const p = new T.Vector3().fromBufferAttribute( sourcePosition, i );
-				deformFishVertex( p, sourceData.getY( i ), record, record.species ? SPECIES[ record.species ] : null );
+				deformFishPropPoint( p, sourceData.getY( i ), record, record.species ? SPECIES[ record.species ] : null );
 				p.multiplyScalar( record.L ).applyQuaternion( rotation ).add( position );
 				positions.push( p.x, p.y, p.z );
 				const color = bodyColor( T, record, sourceData, i );

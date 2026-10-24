@@ -45,11 +45,12 @@ review. Hosted ambient-audio beds now use the shared `SoundScape` service and
 its data-only asset cache, spatial positions, and condition mixing; assets
 beyond the initial visible preload are still deferred. Hosted fish props now
 consume the same signed placement records and procedural geometry selector as
-the primary renderer. Their current WebGL shading and CPU deformation remain
-approximations; species markings and shader-level surface effects still need
-parity work. Reef, wildlife, whale, boat component behavior, and other declared
-behaviors remain unsupported. Feature omission or approximation in fallback
-mode cannot count as package parity.
+the primary renderer. WebGL uses the shared jaw/curl/sag CPU deformation helper;
+normals and material shading remain approximations. Species markings and
+shader-level surface effects still need parity work. Reef, wildlife, whale,
+boat component behavior, and other
+declared behaviors remain unsupported. Feature omission or approximation in
+fallback mode cannot count as package parity.
 Both WebGPU and WebGL need
 matched-view acceptance against the built-in world; the LOD shader has bundled
 successfully but has not yet been compiled in a live browser or visually

@@ -336,7 +336,7 @@ function lobsterGeometry( lod ) {
 // ---------------------------------------------------------------------------
 
 // JS mirror of the vertex shader's bends (FishMaterial propVertex): where a model point ends up
-function bendPoint( x, y, z, curl, sag, out ) {
+export function bendFishPropPoint( x, y, z, curl, sag, out ) {
 
 	const k1 = curl + ( curl >= 0 ? 1e-4 : - 1e-4 );
 	const t1 = k1 * z;
@@ -348,6 +348,23 @@ function bendPoint( x, y, z, curl, sag, out ) {
 	const h2 = Math.sin( t2 * 0.5 );
 	return out.set( x1, 2 * h2 * h2 / k2 + y * Math.cos( t2 ), Math.sin( t2 ) / k2 - y * Math.sin( t2 ) );
 
+}
+
+// CPU equivalent of the static prop vertex deformation, shared with fallback renderers.
+export function deformFishPropPoint( point, partData, record, species, out = point ) {
+	let { x, y, z } = point;
+	if ( species ) {
+		const jawPart = partData + 0.01 - Math.floor( partData + 0.01 );
+		const jawWeight = Math.max( jawPart - 0.01, 0 ) / 0.9;
+		const angle = record.jaw * jawWeight;
+		if ( angle !== 0 ) {
+			const hingeZ = 0.5 - species.body * species.mouth.corner, dy = y - species.mouth.y, dz = z - hingeZ;
+			const ca = Math.cos( angle ), sa = Math.sin( angle );
+			y = species.mouth.y + dy * ca - dz * sa;
+			z = hingeZ + dy * sa + dz * ca;
+		}
+	}
+	return bendFishPropPoint( x, y, z, record.curl, record.sag, out );
 }
 
 // model frame (nose +z, back +y, left flank +x) -> placement frame, per pose
@@ -403,7 +420,7 @@ export class FishProps {
 		_m.decompose( _p, _q, _s );
 		// the anchor point of the model sits at the frame origin
 		const a = o.anchor || [ 0, 0, 0 ];
-		const b = bendPoint( a[ 0 ], a[ 1 ], a[ 2 ], curl, sag, new THREE.Vector3() ).multiplyScalar( L ).applyQuaternion( _q );
+		const b = bendFishPropPoint( a[ 0 ], a[ 1 ], a[ 2 ], curl, sag, new THREE.Vector3() ).multiplyScalar( L ).applyQuaternion( _q );
 		_p.sub( b );
 		this.items.push( {
 			kind, species, L,
