@@ -20,6 +20,8 @@ import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
 import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
+import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
+import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
@@ -27,8 +29,10 @@ import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import terrainUrl from '../../worlds/tidewater/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/tidewater/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/tidewater/lod-source/vegetation-placements.bin?url';
+import tidewaterWorldSource from '../../worlds/tidewater/world-source.json';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
+const ISLAND_WILDLIFE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'tidewater.example-island-wildlife/1' );
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -741,6 +745,10 @@ export class WebGLFallback {
 		this.input = null;
 		this.player = null;
 		this.hostedSeaLevel = null;
+		this.hostedWildlifeComponent = null;
+		this.vegetationRecords = null;
+		this.wildlifeRuntime = null;
+		this.wildlifeAdapter = null;
 
 	}
 
@@ -810,6 +818,12 @@ export class WebGLFallback {
 				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
 		}
+		if ( this.worldLink ) {
+			if ( this.hostedWildlifeComponent ) {
+				if ( ! this.hostedTerrainData ) throw new Error( `Wildlife component ${this.hostedWildlifeComponent.id} requires its packaged terrain surface` );
+				this._createWildlifeRuntime( this.hostedTerrainData, this.app.worldState.hostedColliders || this.app.worldState.colliders, this.hostedWildlifeComponent );
+			}
+		} else this._createWildlifeRuntime( this.terrain, this.app.worldState.colliders, ISLAND_WILDLIFE_COMPONENT );
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -821,6 +835,19 @@ export class WebGLFallback {
 		this.animationStartTime = performance.now();
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
+	}
+
+	_createWildlifeRuntime( terrain, colliders, component = null ) {
+
+		this.wildlifeRuntime = new WildlifeSimulation( {
+			terrain, colliders, vegetation: { records: this.vegetationRecords || {} },
+			footprints: component?.footprints || [], roofPerches: component?.roofPerches || [],
+			boat: component ? null : this.boat?.controller || null,
+			boatModel: component ? null : this.boat?.model || null,
+			query: this.waterQuery, seed: component?.seed ?? 5,
+		} );
+		this.wildlifeAdapter = new WebGLWildlifeAdapter( this.THREE, this.scene, terrain );
+
 	}
 
 	_makeWater( geometry, seaLevel, terrainWater, beachPatchMode = 0 ) {
@@ -1334,6 +1361,8 @@ export class WebGLFallback {
 				expectedSeed = 7;
 			}
 			const records = decodeVegetationPlacements( asBytes( placementBytes ), expectedSeed );
+			this.vegetationRecords ||= {};
+			for ( const [ kind, items ] of Object.entries( records ) ) this.vegetationRecords[ kind ] = [ ...( this.vegetationRecords[ kind ] || [] ), ...items ];
 			const start = WORLD.start || WORLD.spawn;
 			const center = centerPosition || [ start.position[ 0 ], start.position[ 2 ] ];
 			const T = this.THREE, group = new T.Group();
@@ -1430,6 +1459,7 @@ export class WebGLFallback {
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.worldLODs = new Map();
 		const components = manifest.components || [];
+		this.hostedWildlifeComponent = components.find( component => component.type === 'tidewater.example-island-wildlife/1' ) || null;
 		const terrainComponent = components.find( component => component.type === 'tidewater.terrain-surface/1' );
 		if ( terrainComponent && assets.has( terrainComponent.dataAssetId ) ) {
 			const terrainBytes = assets.get( terrainComponent.dataAssetId );
@@ -1692,6 +1722,16 @@ export class WebGLFallback {
 		}
 		this.fishStand?.update( dt, this.camera.position );
 		this.gameAdapter?.update( dt, this.player?.position || this.camera.position );
+		if ( this.wildlifeRuntime ) {
+			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;
+			this.wildlifeRuntime.update( dt, this.camera, this.player, {
+				windX: DEFAULT_WILDLIFE_ENVIRONMENT.windX, windZ: DEFAULT_WILDLIFE_ENVIRONMENT.windZ,
+				windSpeed: DEFAULT_WILDLIFE_ENVIRONMENT.windSpeed,
+				night: T.MathUtils.smoothstep( - sunY, 0.02, 0.18 ), sunY,
+				seaLevel: this.hostedSeaLevel ?? DEFAULT_WILDLIFE_ENVIRONMENT.seaLevel,
+			} );
+			this.wildlifeAdapter.update( this.wildlifeRuntime, this.camera );
+		}
 		this._updateAudio( dt );
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );

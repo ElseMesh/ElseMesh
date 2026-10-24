@@ -5,7 +5,7 @@ import { ShadowBlobs } from './ShadowBlobs.js';
 import { SwashProbe } from './SwashProbe.js';
 import { G } from '../../core/Globals.js';
 import { Vector3 } from '../../engine/math/index.js';
-import { WildlifeSimulation } from './WildlifeSimulation.js';
+import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from './WildlifeSimulation.js';
 import { forEachVisibleWildlifeBird } from './WildlifeFrame.js';
 
 // WebGPU presentation for the shared wildlife simulation. The simulation owns animal state;
@@ -48,7 +48,7 @@ export class Wildlife {
 		this.water = this.runtime.water;
 		this.crabPresentation = new CrabPresentation( terrain );
 		this.viewer = this.runtime.viewer;
-		this.environment = { windX: 0, windZ: 0, windSpeed: 0, night: 0, sunY: 1, seaLevel: 0 };
+		this.environment = { ...DEFAULT_WILDLIFE_ENVIRONMENT };
 		this.shoreSlope = new Vector3();
 		this.cpuMs = 0;
 

@@ -128,10 +128,14 @@ after entry.
   state and accepts environment samples explicitly; the WebGPU `Wildlife`
   adapter now owns batches, shadows, and the optional GPU swash probe. A
   renderer-free simulation test advances the same systems and checks their
-  emitted poses. Shared `WildlifeFrame` now applies visibility and distance
-  fading without mutating simulation poses, giving WebGL a reusable frame
-  policy. WebGL still does not construct this runtime or render its poses, so
-  wildlife parity remains open.
+  emitted poses. WebGL now constructs that runtime for the built-in island and
+  hosted wildlife packages, and renders the shared bird and shorebird poses
+  through a Three.js adapter using shared species rest shapes and
+  `WildlifeFrame` visibility/fading. The adapter currently uses simplified
+  species colors. Crab and burrow records now come from the shared
+  `CrabPresentation` and render through WebGL instanced batches. The WebGL
+  swash probe, detailed materials, contact shadows, and visual parity remain
+  open; hosted wildlife is still reported as an incomplete package feature.
 
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the

@@ -1,6 +1,7 @@
 import { UniformBlock } from '../gpu/Uniforms.js';
 import { setFrameUniforms } from '../gpu/Shader.js';
 import { Vector2, Vector3, Vector4, Matrix4, Color } from '../math/index.js';
+import { DEFAULT_ENVIRONMENT } from '../../core/EnvironmentDefaults.js';
 
 // Per-frame uniforms visible to every shader as `frame` (group 0, binding 0).
 //
@@ -32,11 +33,11 @@ const FRAME_FIELDS = {
 	frameIndex: [ 'u32', 0 ],
 	time: [ 'f32', 0 ], // simulation time (s)
 	dt: [ 'f32', 1 / 60 ],
-	seaLevel: [ 'f32', 0 ],
+	seaLevel: [ 'f32', DEFAULT_ENVIRONMENT.seaLevel ],
 
 	// Sun (or moon at night) direction, pointing toward the light.
-	sunDir: [ 'vec3f', new Vector3( 0.3, 0.6, - 0.7 ).normalize() ],
-	night: [ 'f32', 0 ], // 0 = day, 1 = full night
+	sunDir: [ 'vec3f', new Vector3( ...DEFAULT_ENVIRONMENT.sunDirection ) ],
+	night: [ 'f32', DEFAULT_ENVIRONMENT.night ], // 0 = day, 1 = full night
 	// Radiance-scaled irradiance of the sun at sea level after atmospheric extinction.
 	sunColor: [ 'vec3f', new Color( 1, 1, 1 ) ],
 	exposure: [ 'f32', 1 ],
@@ -48,11 +49,11 @@ const FRAME_FIELDS = {
 	cameraWaterHeight: [ 'f32', 0 ],
 	// Water optical properties (per meter).
 	waterAbsorption: [ 'vec3f', new Vector3( 0.42, 0.075, 0.035 ) ],
-	windSpeed: [ 'f32', 7 ], // m/s at 10 m height
+	windSpeed: [ 'f32', DEFAULT_ENVIRONMENT.windSpeed ], // m/s at 10 m height
 	waterScattering: [ 'vec3f', new Vector3( 0.012, 0.018, 0.024 ) ],
 	envIntensity: [ 'f32', 1 ],
 	// direction the wind blows toward
-	windDir: [ 'vec2f', new Vector2( 0.35, 0.94 ).normalize() ],
+	windDir: [ 'vec2f', new Vector2( ...DEFAULT_ENVIRONMENT.windDirection ) ],
 	// 1 when the frame renders with reversed depth (always, except shadow maps)
 	reversedDepth: [ 'f32', 1 ],
 	pad0: [ 'f32', 0 ],

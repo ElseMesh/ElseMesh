@@ -17,6 +17,10 @@ export class CrabPresentation {
 	}
 
 	write( crabs, focus, batch, blobs ) {
+		this.forEach( crabs, focus, record => batch.write( record ), blobs );
+	}
+
+	forEach( crabs, focus, visit, blobs = null ) {
 
 		const r = this.record;
 		for ( const burrow of crabs.nearBurrows ) {
@@ -24,7 +28,7 @@ export class CrabPresentation {
 			const d = Math.hypot( burrow.x - focus.x, burrow.z - focus.z );
 			if ( d > DRAW ) continue;
 			this.burrowRecord( burrow, r, smooth( DRAW, DRAW * 0.75, d ) );
-			batch.write( r );
+			visit( r, burrow );
 
 		}
 
@@ -32,7 +36,7 @@ export class CrabPresentation {
 
 			this.crabRecord( crab, r, focus );
 			if ( r.scale <= 0 ) continue;
-			batch.write( r );
+			visit( r, crab );
 			blobs?.add( crab.x, crab.y, crab.z, r.scale * 0.75, r.scale * ( crab.lift + 0.12 ), smooth( 0.35, 0.8, crab.out ), crab.sx, crab.sz );
 
 		}
@@ -41,7 +45,7 @@ export class CrabPresentation {
 
 			this.crabRecord( crab, r, focus );
 			if ( r.scale <= 0 ) continue;
-			batch.write( r );
+			visit( r, crab );
 			blobs?.add( crab.x, crab.y, crab.z, r.scale * 0.8, r.scale * 0.45, 0.9, crab.sx, crab.sz );
 
 		}

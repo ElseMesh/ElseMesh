@@ -1,8 +1,13 @@
 import { Birds } from './Birds.js';
 import { Crabs } from './Crabs.js';
 import { Shorebirds } from './Shorebirds.js';
+import { DEFAULT_ENVIRONMENT as WORLD_ENVIRONMENT_DEFAULTS } from '../../core/EnvironmentDefaults.js';
 
-const DEFAULT_ENVIRONMENT = Object.freeze( { windX: 0, windZ: 0, windSpeed: 0, night: 0, sunY: 1, seaLevel: 0 } );
+export const DEFAULT_WILDLIFE_ENVIRONMENT = Object.freeze( {
+	windX: WORLD_ENVIRONMENT_DEFAULTS.windDirection[ 0 ], windZ: WORLD_ENVIRONMENT_DEFAULTS.windDirection[ 1 ],
+	windSpeed: WORLD_ENVIRONMENT_DEFAULTS.windSpeed, night: WORLD_ENVIRONMENT_DEFAULTS.night,
+	sunY: WORLD_ENVIRONMENT_DEFAULTS.sunDirection[ 1 ], seaLevel: WORLD_ENVIRONMENT_DEFAULTS.seaLevel,
+} );
 
 // Cached CPU water-query slots used by birds that skim or float at the surface.
 class WaterHeights {
@@ -74,7 +79,7 @@ export class WildlifeSimulation {
 		this.birds = new Birds( { terrain, village, colliders, boat, boatModel, roofPerches, water: this.water, spray, seed: seed + 6 } );
 		this.crabs = new Crabs( { terrain, village, footprints, colliders, vegetation, seed } );
 		this.viewer = { x: 0, y: 0, z: 0, speed: 0, mode: 'walk', px: 0, pz: 0, init: false };
-		this.environment = { ...DEFAULT_ENVIRONMENT };
+		this.environment = { ...DEFAULT_WILDLIFE_ENVIRONMENT };
 
 	}
 
@@ -110,9 +115,9 @@ export class WildlifeSimulation {
 
 	}
 
-	update( dt, camera, player = null, environment = DEFAULT_ENVIRONMENT ) {
+	update( dt, camera, player = null, environment = DEFAULT_WILDLIFE_ENVIRONMENT ) {
 
-		Object.assign( this.environment, DEFAULT_ENVIRONMENT, environment );
+		Object.assign( this.environment, DEFAULT_WILDLIFE_ENVIRONMENT, environment );
 		const viewer = this.updateViewer( dt, camera, player );
 		this.birds.step( dt, viewer, this.environment );
 		this.shorebirds.step( dt, viewer, camera.position, this.environment );

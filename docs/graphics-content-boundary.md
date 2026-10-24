@@ -92,19 +92,23 @@ is separated from `CrabPresentation`, which creates renderer-facing records.
 `WildlifeSimulation` now owns bird, shorebird, crab, viewer, and water-query
 state without constructing meshes or GPU resources. The WebGPU `Wildlife`
 adapter owns the instance batches, contact shadows, and optional GPU swash
-probe. Bird pose/interpolation data still contains presentation fields, and
-WebGL does not yet construct this shared runtime or provide its presentation
-adapter. This advances the ownership split; it does not establish cross-backend
-wildlife parity.
+probe. WebGL now constructs the same simulation for the built-in island and
+hosted wildlife packages, and its Three.js adapter consumes the shared bird and
+shorebird poses, species rest shapes, and frame visibility policy. The fallback
+also consumes the shared `CrabPresentation` records for instanced ghost-crab,
+hermit-crab, and burrow meshes. The fallback still lacks a WebGL swash probe,
+the WebGPU species materials, and contact shadows. The hosted wildlife
+component therefore remains reported as incomplete. This is partial runtime
+and presentation reuse, not cross-backend wildlife parity.
 
 `test/wildlife-runtime.mjs` constructs and advances the shared simulation
-without a renderer, and `test/life-wildlife.mjs` remains the headless rendered
-smoke for bird, ghost-crab, and hermit-crab presentation. The full suite is
-currently blocked in this Termux installation by its missing Android
-`webgpu/dist/android-arm64/dawn.node` native module. The Flip7 is not connected
-to ADB, so the extraction has no new device visual review. Do not claim
-cross-backend or Flip7 parity until the WebGL adapter and matched device views
-are verified.
+without a renderer; `test/webgl-wildlife-adapter.mjs` checks the Three.js
+adapter's shared rest shapes and pose consumption; and `test/life-wildlife.mjs`
+remains the headless rendered smoke for WebGPU birds, ghost crabs, and hermit
+crabs. The full suite is currently blocked in this Termux installation by its
+missing Android `webgpu/dist/android-arm64/dawn.node` native module. Do not
+claim cross-backend or Flip7 parity until both wildlife adapters, matched device
+views, and the remaining effects are verified.
 
 ## Fish stand extraction milestone (partial)
 
