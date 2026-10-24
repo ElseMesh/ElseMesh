@@ -91,3 +91,19 @@ after entry.
 - The runtime still places entrants directly at the authored pose. The world
   format's displacement field/default and behavior when owner presence is
   unavailable remain design decisions before implementation.
+
+## 2026-10-24
+
+- Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
+  Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the
+  same full source revision. This verifies the CGO-free build and CLI, not a
+  live connection through a host-managed ZeroTier service.
+- The grass-density codec, source-to-manifest, and content-submodule checks
+  passed; the mounted Tidewater package contains 60 verified assets. The full
+  `test/world-export.mjs` check could not reach its assertions because this
+  Termux Node installation lacks `webgpu/dist/android-arm64/dawn.node`.
+- A multi-view Flip7 review started on Rebroad scrcpy's display-only virtual
+  display (logical display 25; SurfaceFlinger ID `11529215049311824793`).
+  Chrome was launched and captured only on that display. The ADB transport
+  disconnected before a matched hosted/built-in review could be completed, so
+  density/LOD parity and desktop visual acceptance remain open.

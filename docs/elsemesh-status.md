@@ -42,7 +42,10 @@ contract checks cover the new asset path. A matched Flip7 village review
 confirmed that beach grass renders in both hosted and built-in views. This
 confirms presence at the reviewed view and time only; full density and LOD
 parity remain open. See [graphics-review.md](graphics-review.md) for capture
-conditions and limits.
+conditions and limits. A 2026-10-24 multi-view follow-up stopped when the
+wireless ADB transport disconnected before hosted and built-in frames could be
+matched; the 2026-10-23 captures remain the latest visual evidence. The
+environment and build verification are recorded in [PROGRESS.md](../PROGRESS.md).
 
 ## Optional host-managed ZeroTier build (2026-10-23)
 
