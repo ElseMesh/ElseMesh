@@ -104,10 +104,14 @@ after entry.
   engine protocol. Tidewater's source submodule and the package exporters now
   emit the new format and explicit rules.
 - Focused spawn, presence-session, source-manifest, portal, proposal, directory,
-  and syntax checks passed. Go daemon tests and the secure gateway and browser-host end-to-end
-  tests stopped during linking: this Termux Go toolchain reports
-  `github.com/wlynxg/anet: invalid reference to net.zoneCache`, before test
-  assertions run. Server-side execution remains unverified in this environment.
+  resolver, and syntax checks passed. The complete worldd Go suite passed with
+  `go test -ldflags='-checklinkname=0' ./... -count=1`; secure WSS gateway/cache
+  and browser-host worker end-to-end tests passed. The live WSS path verifies
+  two distinct nearest-first spawn positions and rejects a third visitor at
+  the signed cap. Go-backed Node tests now add the Android linker flag
+  automatically; without it, Go 1.27.3 rejects anet's `net.zoneCache` linkname
+  before tests run. `adb devices -l` lists no attached phone, so Flip7 visual
+  verification remains open.
 
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the
