@@ -78,10 +78,12 @@ backend. `test/boat-design.mjs` exercises that path; the full suite and
 production build remain required after later changes.
 
 This completes only the boat's first ownership split. The WebGL fallback still
-builds a separate reduced world, and wildlife, village props, vendors, and
-backend-specific rendering effects still need shared content/runtime adapters.
-Matched Flip7 views of the refactored boat and comparisons under both graphics
-backends remain open.
+builds a separate reduced world, but its hosted boat adapter now converts the
+canonical model into Three.js, replaces a signed berth preview, and connects
+the shared controller to the WebGL player and water query. Wildlife, village
+props, vendors, and backend-specific effects still need shared content/runtime
+adapters. Matched Flip7 views and comparisons under both graphics backends
+remain open.
 
 ## Wildlife extraction milestone (partial)
 
@@ -96,19 +98,20 @@ probe. WebGL now constructs the same simulation for the built-in island and
 hosted wildlife packages, and its Three.js adapter consumes the shared bird and
 shorebird poses, species rest shapes, and frame visibility policy. The fallback
 also consumes the shared `CrabPresentation` records for instanced ghost-crab,
-hermit-crab, and burrow meshes. The fallback still lacks a WebGL swash probe,
-the WebGPU species materials, and contact shadows. The hosted wildlife
-component therefore remains reported as incomplete. This is partial runtime
-and presentation reuse, not cross-backend wildlife parity.
+hermit-crab, and burrow meshes. The built-in WebGL island now evaluates
+shorebird swash from the same shoreline field and shared math as WebGPU. The
+fallback still lacks the WebGPU species materials and contact shadows, and
+hosted animal authority remains unimplemented. This is partial runtime and
+presentation reuse, not cross-backend wildlife parity.
 
 `test/wildlife-runtime.mjs` constructs and advances the shared simulation
 without a renderer; `test/webgl-wildlife-adapter.mjs` checks the Three.js
 adapter's shared rest shapes and pose consumption; and `test/life-wildlife.mjs`
-remains the headless rendered smoke for WebGPU birds, ghost crabs, and hermit
-crabs. The full suite is currently blocked in this Termux installation by its
-missing Android `webgpu/dist/android-arm64/dawn.node` native module. Do not
-claim cross-backend or Flip7 parity until both wildlife adapters, matched device
-views, and the remaining effects are verified.
+is the headless rendered smoke for WebGPU birds, ghost crabs, and hermit crabs.
+The Android test runner skips only the five Node Dawn-dependent checks on
+Android; the remaining client suite passes there. Do not claim cross-backend or
+Flip7 parity until both wildlife adapters, matched device views, and the
+remaining effects are verified.
 
 ## Fish stand extraction milestone (partial)
 
