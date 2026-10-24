@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { WorldConnector } from '../src/network/WorldConnector.js';
+import { PLAYER_PRESENCE_PROTOCOL } from '../src/network/PlayerPresence.js';
 
 const [ worldID, ownerPeerID, cachePeerID, gateway, assetID, assetPath ] = process.argv.slice( 2 );
 const connector = new WorldConnector( { worldId: worldID, nodeId: ownerPeerID, gateway, chunkBytes: 64 * 1024 } );
@@ -10,15 +11,26 @@ try {
 	assert.equal( manifest.ownerPeerId, ownerPeerID, 'connector verifies the owner-signed manifest through HTTPS/WSS' );
 	assert.equal( connector.nodeId, ownerPeerID, 'initial manifest is served by the requested owner peer' );
 
-	const pose = { protocol: 'elsemesh.player-presence/1', sequence: 1, position: [ 1, 2, 3 ], yaw: 0, pitch: 0, moving: false, mode: 'walk', appearance: { style: 'male', shirt: '#7194aa', trousers: '#27313d', skin: '#c68c67', hair: '#33251c' } };
-	const own = await connector.updatePresence( pose );
+	const pose = { protocol: PLAYER_PRESENCE_PROTOCOL, sequence: 1, position: [ 0, 1.38, 8 ], yaw: 0, pitch: 0, moving: false, mode: 'walk', appearance: { style: 'male', shirt: '#7194aa', trousers: '#27313d', skin: '#c68c67', hair: '#33251c' } };
+	const spawnCandidates = [ [ 0, 1.38, 8 ], [ 0.6, 1.38, 8 ], [ -0.6, 1.38, 8 ], [ 0, 1.38, 8.6 ], [ 0, 1.38, 7.4 ] ];
+	const own = await connector.updatePresence( pose, { spawnCandidates } );
+	const ownPose = own.players.find( ( player ) => player.id === own.playerId );
+	assert.deepEqual( ownPose.position, [ 0, 1.38, 8 ], 'first WSS visitor keeps the preferred spawn position' );
 	const observer = new WorldConnector( { worldId: worldID, nodeId: ownerPeerID, gateway } );
 	try {
 		await observer.getManifest();
-		const shared = await observer.updatePresence( { ...pose, position: [ 4, 2, 3 ] } );
+		const shared = await observer.updatePresence( pose, { spawnCandidates } );
 		assert.notEqual( shared.playerId, own.playerId, 'production connectors receive distinct session-bound player IDs' );
 		assert.equal( shared.players.length, 2, 'production WSS connections share owner presence' );
-		assert.ok( shared.players.some( ( player ) => player.id === own.playerId && player.position[ 0 ] === 1 ), 'snapshot carries the other visitor position' );
+		const observerPose = shared.players.find( ( player ) => player.id === shared.playerId );
+		const sharedOwnPose = shared.players.find( ( player ) => player.id === own.playerId );
+		assert.deepEqual( observerPose.position, [ 0.6, 1.38, 8 ], 'simultaneous WSS visitor is assigned the nearest unoccupied candidate' );
+		assert.deepEqual( sharedOwnPose.position, [ 0, 1.38, 8 ], 'snapshot retains the first visitor at the preferred position' );
+		const capped = new WorldConnector( { worldId: worldID, nodeId: ownerPeerID, gateway } );
+		try {
+			await capped.getManifest();
+			await assert.rejects( () => capped.updatePresence( pose, { spawnCandidates } ), /presence_full/, 'owner gateway enforces the signed world visitor cap' );
+		} finally { capped.close(); }
 		await observer.leavePresence();
 	} finally { observer.close(); }
 	await connector.leavePresence();

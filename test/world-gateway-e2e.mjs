@@ -6,6 +6,7 @@ import https from 'node:https';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { goBuildEnvironment } from './go-build-env.mjs';
 
 const projectRoot = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const daemonDir = path.join( projectRoot, 'server', 'worldd' );
@@ -15,7 +16,7 @@ const processes = [];
 
 try {
 	const binary = path.join( tempRoot, 'worldd' );
-	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: { ...process.env, GOCACHE: process.env.GOCACHE || path.join( tempDirectory, 'elsemesh-go-build-cache' ), GOMODCACHE: process.env.GOMODCACHE || path.join( tempDirectory, 'elsemesh-go-module-cache' ) } } );
+	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: goBuildEnvironment( { GOCACHE: process.env.GOCACHE || path.join( tempDirectory, 'elsemesh-go-build-cache' ), GOMODCACHE: process.env.GOMODCACHE || path.join( tempDirectory, 'elsemesh-go-module-cache' ) } ) } );
 	assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
 
 	const ownerData = path.join( tempRoot, 'owner' );
@@ -41,7 +42,7 @@ try {
 		discoverable: true,
 		version: 1,
 		title: 'Live gateway fixture',
-		rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 20000, physicsProfile: 'tidewater-default' },
+		rules: { gravity: 1, maxVisitors: 2, spawnRadius: 8, avatarComplexity: 20000, physicsProfile: 'tidewater-default' },
 		assets: [ { id: assetID, bytes: assetBytes.byteLength, kind: 'glb', priority: 'visible' } ],
 		objects: [],
 		components: [],
@@ -94,7 +95,7 @@ try {
 		await new Promise( ( resolve, reject ) => secureGateway.server.close( ( error ) => error ? reject( error ) : resolve() ) );
 	}
 
-	console.log( 'ok   live worldd WSS gateway, signed manifest, authorized cache recovery, HTTPS provider lookup, and asset SHA-256 verification' );
+	console.log( 'ok   live WSS two-visitor spawn admission and capacity, signed manifest, authorized cache recovery, HTTPS provider lookup, and asset SHA-256 verification' );
 } finally {
 	for ( const child of processes.reverse() ) await stopDaemon( child );
 	await rm( tempRoot, { recursive: true, force: true } );
@@ -129,7 +130,7 @@ async function runConnectorClient( { worldID, ownerPeerID, cachePeerID, gateway,
 		child.once( 'exit', ( code ) => { clearTimeout( timer ); resolve( code ); } );
 		child.once( 'error', ( error ) => { clearTimeout( timer ); reject( error ); } );
 	} );
-	assert.equal( exitCode, 0, `WSS connector client exited ${exitCode}:\n${child.output}` );
+	assert.equal( exitCode, 0, `WSS connector client exited ${exitCode}:\n${child.output}\n${JSON.stringify( result )}` );
 	assert.ok( result, `WSS connector client returned no result:\n${child.output}` );
 	return result;
 }

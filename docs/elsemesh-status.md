@@ -16,10 +16,12 @@ protocols are now `tidewater.world-source/2` and `tidewater.world/2`; these
 versions describe structure, not authored world-content revisions.
 
 Focused spawn, presence-session, source-manifest, portal, proposal, and
-directory-signature tests pass. The Go daemon tests and gateway end-to-end test
-could not reach their assertions in this Termux environment: the installed Go
-linker rejects `github.com/wlynxg/anet`'s reference to `net.zoneCache`. A
-successful Go server build and live admission check remain open.
+directory-signature tests pass. The complete Go worldd suite passes with
+`go test -ldflags='-checklinkname=0' ./... -count=1`; the secure WSS gateway/cache end-to-end test passes with two live visitors
+receiving separate spawn positions and a third rejected at the signed cap. The
+browser-host worker test also passes. Both Node harnesses now apply the Android
+linker workaround automatically. `adb devices -l` currently shows no attached
+device, so the isolated Flip7 visual check remains open.
 
 Repository ownership as of 2026-10-22: Tidewater is imported as the sole world
 content submodule. Burning Horizons is maintained at

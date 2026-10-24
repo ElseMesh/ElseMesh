@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { goBuildEnvironment } from './go-build-env.mjs';
 import { browserHostSocketURL } from '../src/network/BrowserHost.js';
 import { createWorldSource } from '../src/network/WorldSource.js';
 
@@ -105,7 +106,7 @@ const stopDaemon = async child => {
 };
 
 try {
-	const built = spawnSync( 'go', [ 'build', '-o', worldd, '.' ], { cwd: path.join( root, 'server/worldd' ), encoding: 'utf8', timeout: 180000 } );
+	const built = spawnSync( 'go', [ 'build', '-o', worldd, '.' ], { cwd: path.join( root, 'server/worldd' ), encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
 	assert.equal( built.status, 0, `worldd build failed:\n${built.stdout}\n${built.stderr}` );
 	await mkdir( path.join( profileDir, 'assets' ), { recursive: true } );
 	const assetPath = path.join( profileDir, 'assets', assetID.slice( 'sha256:'.length ) );
