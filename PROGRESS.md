@@ -126,10 +126,11 @@ after entry.
   passed; the mounted Tidewater package contains 60 verified assets. The full
   `test/world-export.mjs` check could not reach its assertions because this
   Termux Node installation lacks `webgpu/dist/android-arm64/dawn.node`.
-- Added `test/grass-density-parity.mjs` to regenerate the built-in 1024×1024
-  grass mask from Tidewater's source terrain and village, then compare every
-  channel byte with the signed package asset. The focused parity check passes;
-  visual density distribution and LOD behavior still need matched-view review.
+- Added `test/grass-density-parity.mjs` to regenerate built-in vegetation from
+  Tidewater's source terrain and village. The seeded plant-placement asset
+  matches byte for byte, and all channels of the 1024×1024 grass mask match
+  exactly. Visual density distribution and LOD behavior still need matched-view
+  review.
 - A multi-view Flip7 review started on Rebroad scrcpy's display-only virtual
   display (logical display 25; SurfaceFlinger ID `11529215049311824793`).
   Chrome was launched and captured only on that display. The ADB transport

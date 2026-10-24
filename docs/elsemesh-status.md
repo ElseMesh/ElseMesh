@@ -68,11 +68,13 @@ parity remain open. See [graphics-review.md](graphics-review.md) for capture
 conditions and limits. A 2026-10-24 multi-view follow-up stopped when the
 wireless ADB transport disconnected before hosted and built-in frames could be
 matched; the 2026-10-23 captures remain the latest visual evidence. The
-new `test/grass-density-parity.mjs` regenerates the built-in 1024×1024 mask
-and confirms that all four channels match the content-addressed Tidewater mask
-byte for byte. This verifies deterministic source-to-package density data,
-not rendered distribution or LOD behavior. The environment and build
-verification are recorded in [PROGRESS.md](../PROGRESS.md).
+new `test/grass-density-parity.mjs` regenerates built-in vegetation from the
+source terrain and village. It verifies that the seeded plant-placement asset
+matches byte for byte and all four channels of the 1024×1024 grass mask match
+the content-addressed Tidewater mask. This verifies deterministic
+source-to-package vegetation data, not rendered distribution or LOD behavior.
+The environment and build verification are recorded in
+[PROGRESS.md](../PROGRESS.md).
 
 ## Optional host-managed ZeroTier build (2026-10-23)
 
