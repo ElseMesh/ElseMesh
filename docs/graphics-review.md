@@ -82,6 +82,16 @@ The Example Island package now includes the GPU-baked village PBR maps in its ow
 
 The hosted page initially reported `WebGL fallback failed (Cannot read properties of undefined (reading 'WebGLRenderer'))` after WebGPU adapter creation failed. `three@0.180` exposes `WebGLRenderer` as a named ESM export, not a default export. Commit `58f253c` changed the lazy import to use the module namespace and added a regression check. The Pages workflow succeeded, and the live page showed build stamp `58f253c8`; its fallback error changed to `WebGL fallback failed (Error creating WebGL context.)`. That confirms the module import defect is fixed and the renderer constructor was reached. This Chrome session has neither a usable WebGPU adapter nor a usable WebGL context, so it still cannot verify scene rendering. No game click or pointer-lock request was used. The separate `npm run test:webgl-backend` check and production build pass.
 
+## WebGL whale shadow follow-up, 2026-10-24
+
+The WebGL whale now has a custom depth material that applies the packaged
+height relief and the same animated rig pose used by its visible material.
+The focused package test verifies shader injection and that each LOD uses that
+depth material. A live compile could not be completed here: Termux Chromium's
+headless SwiftShader GPU process exited with code 11, reported
+`BindToCurrentSequence failed`, and returned no WebGL context. This does not
+verify the rendered shadow or establish whale visual parity.
+
 ## WebGL fallback scene and asset path, 2026-10-11
 
 Commit `40554cf` expanded the fallback scene with terrain colors derived from

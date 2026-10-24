@@ -4,6 +4,16 @@ This is the dated implementation and verification log. Current priorities and
 open product requirements are tracked in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md);
 completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
+## 2026-10-24
+
+- WebGL whale LODs now cast shadows through a custom depth material that uses
+  the same authored height relief and animated CPU rig pose as the visible
+  whale. `test/webgl-whale-package.mjs` verifies visible and depth shader
+  injection and that all LODs use the matching shadow material. The focused
+  test passes. Live shader compilation remains unverified: Termux Chromium's
+  SwiftShader GPU process exits with code 11 and cannot create a WebGL context.
+  Whale spray, standard WebGL lighting, and matched visual parity remain open.
+
 ## 2026-10-20
 
 - Remote startup selects unbounded records only through the `nearby` tier and

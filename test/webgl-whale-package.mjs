@@ -26,7 +26,7 @@ const whale = new Whale( {
 await whale.loadPackage( { manifest, geometry, albedo, height } );
 assert.equal( whale.ready, true, 'WebGL whale loads only the packaged asset bytes' );
 assert.deepEqual( whale.meshes.map( mesh => mesh.geometry.attributes.position.count ), [ 40212, 5898, 908 ], 'WebGL creates all authored whale LODs' );
-assert.ok( whale.meshes.every( mesh => ! mesh.castShadow ), 'WebGL avoids detached rest-pose shadows' );
+assert.ok( whale.meshes.every( mesh => mesh.castShadow && mesh.customDepthMaterial === whale.depthMaterial ), 'WebGL whale LODs cast shadows through the shared deformed depth material' );
 assert.deepEqual( whale.brain.curve.points.map( point => [ point.x, point.z ] ), component.route, 'WebGL uses the signed route profile' );
 assert.equal( whale.material.map, whale.albedoTex, 'WebGL uses the packaged albedo texture' );
 assert.equal( whale.albedoTex.flipY, true, 'WebGL preserves the decoded PNG orientation relative to WebGPU sampling' );
@@ -36,6 +36,11 @@ whale.material.onBeforeCompile( shader );
 assert.match( shader.vertexShader, /whalePose\(/, 'WebGL material applies the shared animated rig pose' );
 assert.match( shader.vertexShader, /whaleHeightTex/, 'WebGL material applies the authored relief texture' );
 assert.match( shader.fragmentShader, /whaleRoughness/, 'WebGL material uses authored roughness and wet-film response' );
+const depthShader = { uniforms: {}, vertexShader: THREE.ShaderLib.depth.vertexShader, fragmentShader: THREE.ShaderLib.depth.fragmentShader };
+whale.depthMaterial.onBeforeCompile( depthShader );
+assert.match( depthShader.vertexShader, /whalePose\(/, 'WebGL shadow material uses the animated whale rig pose' );
+assert.match( depthShader.vertexShader, /whaleHeightTex/, 'WebGL shadow material includes authored surface relief' );
+assert.match( depthShader.vertexShader, /transformed = whaleWorldPosition/, 'WebGL shadow material projects the posed whale into the light depth pass' );
 
 const camera = new THREE.PerspectiveCamera();
 camera.position.copy( whale.brain.position );

@@ -131,9 +131,8 @@ export class Whale {
 			geo.boundingBox = new T.Box3( new T.Vector3( - 11, - 11, - 11 ), new T.Vector3( 11, 11, 11 ) );
 			const mesh = new T.Mesh( geo, this.material );
 			mesh.name = 'Whale_' + lv.name;
-			// The WebGPU shadow pass shares the posed material; until WebGL has a matching
-			// custom depth material, a rest-pose shadow would visibly detach from the whale.
-			mesh.castShadow = ! this.webgl;
+			mesh.castShadow = true;
+			if ( this.webgl ) mesh.customDepthMaterial = this.depthMaterial;
 			mesh.receiveShadow = true;
 			mesh.layers.set( LAYERS.OPAQUE );
 			mesh.visible = false;
@@ -377,6 +376,7 @@ export class Whale {
 		if ( this.webgl ) {
 			this.albedoTex?.dispose();
 			this.heightTex?.dispose();
+			this.depthMaterial?.dispose();
 		} else {
 			this.albedoTex?.destroy();
 			this.heightTex?.destroy();
@@ -525,7 +525,7 @@ ${ relief }
 			pecRoots: { value: this.pecRoot }, albedo: { value: this.albedoTex }, height: { value: this.heightTex }, heightRange: { value: new T.Vector2( h0, h1 - h0 ) },
 			water: { value: 0 }, wet: { value: 0 },
 		};
-		material.onBeforeCompile = shader => {
+		const installPose = ( shader, surface = false ) => {
 
 			const uniforms = material.userData.whaleUniforms;
 			shader.uniforms.whalePos = uniforms.positions;
@@ -544,7 +544,6 @@ uniform vec4 whaleFlip[4];
 uniform vec3 whalePecRoot[2];
 uniform sampler2D whaleHeightTex;
 uniform vec2 whaleHeightRange;
-varying float vWhaleWorldY;
 vec3 whaleRotateQ( vec4 q, vec3 v ) { return v + 2.0 * cross( q.xyz, cross( q.xyz, v ) + q.w * v ); }
 vec3 whaleRotAxis( vec3 ax, float ang, vec3 v ) { float c = cos( ang ), s = sin( ang ); return v * c + cross( ax, v ) * s + ax * dot( ax, v ) * ( 1.0 - c ); }
 void whalePose( vec3 p, vec3 n, out vec3 world, out vec3 worldNormal ) {
@@ -562,25 +561,35 @@ void whalePose( vec3 p, vec3 n, out vec3 world, out vec3 worldNormal ) {
 	float yc = mix( P0.w, P1.w, t );
 	world = mix( P0.xyz, P1.xyz, t ) + whaleRotateQ( q, vec3( pp.x, pp.y - yc, pp.z - rig.x ) );
 	worldNormal = whaleRotateQ( q, whaleRotAxis( fl.xyz, ang, n ) );
+
 }`;
-			shader.vertexShader = shader.vertexShader.replace( '#include <common>', `#include <common>\n${common}` );
+			shader.vertexShader = shader.vertexShader.replace( '#include <common>', `#include <common>\n${surface ? 'varying float vWhaleWorldY;\n' : ''}${common}` );
 			shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>
 				vec4 hTex = texture2D( whaleHeightTex, uv );
 				float h = ( hTex.r * 0.99611 + hTex.g * 0.00389 ) * whaleHeightRange.y + whaleHeightRange.x;
 				vec3 whaleWorldPosition, whaleWorldNormal;
 				whalePose( transformed + normal * h, normal, whaleWorldPosition, whaleWorldNormal );
 				transformed = whaleWorldPosition;
-				objectNormal = whaleWorldNormal;
-				vWhaleWorldY = whaleWorldPosition.y;` );
-			shader.vertexShader = shader.vertexShader.replace( '#include <project_vertex>', `vec4 mvPosition = viewMatrix * vec4( transformed, 1.0 );\n gl_Position = projectionMatrix * mvPosition;` );
-			shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>\nuniform sampler2D whaleAlbedoTex;\nuniform float whaleWater;\nuniform float whaleWet;\nvarying float vWhaleWorldY;` );
-			shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+				${surface ? 'objectNormal = whaleWorldNormal;\n\t\t\t\tvWhaleWorldY = whaleWorldPosition.y;' : ''}` );
+			if ( surface ) {
+
+				shader.vertexShader = shader.vertexShader.replace( '#include <project_vertex>', `vec4 mvPosition = viewMatrix * vec4( transformed, 1.0 );\n gl_Position = projectionMatrix * mvPosition;` );
+				shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>\nuniform sampler2D whaleAlbedoTex;\nuniform float whaleWater;\nuniform float whaleWet;\nvarying float vWhaleWorldY;` );
+				shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 				float whaleAbove = smoothstep( -0.1, 0.2, vWhaleWorldY - whaleWater );
 				float whaleFilm = whaleAbove * whaleWet;
 				float whaleRoughness = texture2D( whaleAlbedoTex, vMapUv ).a;
 				roughnessFactor = mix( whaleRoughness, whaleRoughness * 0.48, whaleFilm );` );
+
+			}
+
 		};
-		material.customProgramCacheKey = () => `elsemesh-whale-rig-v1-${this.zHead}-${this.dz}`;
+		const cacheKey = `elsemesh-whale-rig-v2-${this.zHead}-${this.dz}`;
+		material.onBeforeCompile = shader => installPose( shader, true );
+		material.customProgramCacheKey = () => cacheKey;
+		this.depthMaterial = new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking } );
+		this.depthMaterial.onBeforeCompile = shader => installPose( shader );
+		this.depthMaterial.customProgramCacheKey = () => `${cacheKey}-depth`;
 		this.uWater = material.userData.whaleUniforms.water;
 		this.uWet = material.userData.whaleUniforms.wet;
 		return material;

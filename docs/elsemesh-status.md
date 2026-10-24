@@ -72,10 +72,12 @@ procedural Reef materials, shadows, fish simulation, and reef collision remain
 missing. The packaged whale now loads its signed route, geometry, textures, and
 LOD levels into a Three.js material that uses the existing Whale simulation
 and rig pose; hosted capability is reported only after package loading
-succeeds. Standard WebGL lighting and whale spray effects remain incomplete,
-and whale shadows are disabled until a matching deformed depth material is
-available. Matched visual parity remains open. Other declared behaviors remain
-unsupported.
+succeeds. WebGL whale LODs now cast shadows through a custom depth material
+that applies the same height relief and animated rig pose as the visible
+material; its shader setup is covered by `test/webgl-whale-package.mjs`.
+Standard WebGL lighting and whale spray effects remain incomplete. Live shader
+compilation and matched visual parity remain open. Other declared behaviors
+remain unsupported.
 Feature omission or approximation in
 fallback mode cannot count as package parity.
 Both WebGPU and WebGL need
