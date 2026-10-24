@@ -8,7 +8,7 @@ import { Player } from '../player/Player.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
-import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
+import { appendVegetationPlacements, decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeFishPropPlacements } from '../network/FishPropPlacements.js';
@@ -24,6 +24,7 @@ import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';
+import { WebGLSpray } from './WebGLSpray.js';
 import { Whale } from '../world/marine/Whale.js';
 import { TIDEWATER_REEF_ASSET_URLS } from '../world/reef/TidewaterReefAssets.js';
 import { initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
@@ -240,6 +241,17 @@ class WebGLWaterQuery {
 
 		this.inputs[ i * 4 ] = x;
 		this.inputs[ i * 4 + 1 ] = z;
+
+	}
+
+	get( i, out = {} ) {
+
+		const offset = i * 4;
+		out.height = this.cpu[ offset ];
+		out.nx = this.cpu[ offset + 1 ];
+		out.nz = this.cpu[ offset + 2 ];
+		out.floor = this.cpu[ offset + 3 ];
+		return out;
 
 	}
 
@@ -769,6 +781,7 @@ export class WebGLFallback {
 		this.renderer.toneMappingExposure = 0.9;
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+		this.spray = new WebGLSpray( T, this.scene );
 		const sunDirection = this._sunDirection( this.app.settings.timeOfDay );
 		this.cloudLayer = this._makeCloudLayer( sunDirection );
 		this.scene.add( this.cloudLayer );
@@ -881,7 +894,7 @@ export class WebGLFallback {
 	async _loadWebGLWhale( component, assets, terrain = null, seaLevel = 0 ) {
 
 		const whale = new Whale( {
-			THREE: this.THREE, webgl: true, scene: this.scene, terrain, query: this.waterQuery, queryName: `whale:${component.id}`,
+			THREE: this.THREE, webgl: true, scene: this.scene, terrain, query: this.waterQuery, spray: this.spray, queryName: `whale:${component.id}`,
 			seaLevel, profile: {
 				seed: component.seed, route: component.route, surfaceAt: component.surfaceAt,
 				cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed,
@@ -1432,7 +1445,7 @@ export class WebGLFallback {
 			}
 			const records = decodeVegetationPlacements( asBytes( placementBytes ), expectedSeed );
 			this.vegetationRecords ||= {};
-			for ( const [ kind, items ] of Object.entries( records ) ) this.vegetationRecords[ kind ] = [ ...( this.vegetationRecords[ kind ] || [] ), ...items ];
+			appendVegetationPlacements( this.vegetationRecords, records );
 			const start = WORLD.start || WORLD.spawn;
 			const center = centerPosition || [ start.position[ 0 ], start.position[ 2 ] ];
 			const T = this.THREE, group = new T.Group();
@@ -1801,6 +1814,7 @@ export class WebGLFallback {
 		}
 		this.boat?.update( dt );
 		for ( const whale of this.whales || [] ) whale.update( dt, this.camera );
+		this.spray?.update( dt );
 		const T = this.THREE;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;

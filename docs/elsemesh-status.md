@@ -22,8 +22,9 @@ receiving separate spawn positions and a third rejected at the signed cap. The
 browser-host worker test also passes. Presence admission candidate selection is
 covered across authenticated peer forwarding, WebTransport, WebSocket, and the
 WebRTC data channel. Both Node harnesses now apply the Android linker
-workaround automatically. `adb devices -l` currently shows no attached
-device, so the isolated Flip7 visual check remains open.
+workaround automatically. At the time this entry was first recorded, `adb
+devices -l` showed no attached phone; the later native Chrome WebGL check is
+recorded below.
 
 ## Android test suite (2026-10-24)
 
@@ -74,10 +75,17 @@ LOD levels into a Three.js material that uses the existing Whale simulation
 and rig pose; hosted capability is reported only after package loading
 succeeds. WebGL whale LODs now cast shadows through a custom depth material
 that applies the same height relief and animated rig pose as the visible
-material; its shader setup is covered by `test/webgl-whale-package.mjs`.
-Standard WebGL lighting and whale spray effects remain incomplete. Live shader
-compilation and matched visual parity remain open. Other declared behaviors
-remain unsupported.
+material; its shader setup is covered by `test/webgl-whale-package.mjs`. The
+Flip7 native Chrome WebGL fallback now serves Tidewater's extensionless assets
+correctly, merges only plant-placement arrays, and exposes the shared
+water-query sample API used by WhaleBrain. Whale's existing spray emissions now
+render through a lightweight CPU-backed WebGL particle batch. `npm test` and
+the production build pass. A live check on isolated virtual display 7 rendered
+the world and packaged Whale; a forced blow produced visible spray particles.
+This proves renderer initialization and those specific WebGL paths. It is not
+a matched view against WebGPU or the built-in renderer. Standard WebGL lighting,
+spray physics parity, authored grass/LOD density matching, and broader visual
+acceptance remain open. Other declared behaviors remain unsupported.
 Feature omission or approximation in
 fallback mode cannot count as package parity.
 Both WebGPU and WebGL need

@@ -49,6 +49,13 @@ export function decodeVegetationPlacements( bytes, expectedSeed ) {
 	return records;
 }
 
+export function appendVegetationPlacements( target, source ) {
+	for ( const kind of VEGETATION_PLACEMENT_KINDS ) {
+		target[ kind ] = [ ...( target[ kind ] || [] ), ...source[ kind ] ];
+	}
+	return target;
+}
+
 function validateRecords( records, seed ) {
 	if ( ! Number.isInteger( seed ) || seed < 0 || seed > 0xffffffff || ! records || typeof records !== 'object' || ! Number.isInteger( records.villagePalms ) || records.villagePalms < 0 || records.villagePalms > 10 ) throw new Error( 'Invalid vegetation placement data' );
 	if ( Object.keys( records ).some( ( key ) => key !== 'villagePalms' && ! VEGETATION_PLACEMENT_KINDS.includes( key ) ) ) throw new Error( 'Vegetation placement data contains an unknown plant kind' );

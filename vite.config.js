@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { appendFile, mkdir } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { appendFile, mkdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
@@ -47,11 +48,48 @@ function connectionLog() {
 	};
 }
 
+function worldPackageAssets() {
+	const worldsPath = resolve( 'worlds' );
+	return {
+		name: 'elsemesh-world-package-assets',
+		configureServer( server ) {
+			server.middlewares.use( async ( req, res, next ) => {
+				if ( req.method !== 'GET' && req.method !== 'HEAD' ) return next();
+				const requestUrl = new URL( req.url, 'http://localhost' );
+				// Vite uses ?url/?import for extensionless files in the JS module
+				// graph; let its asset plugin produce the URL module.
+				if ( requestUrl.searchParams.has( 'url' ) || requestUrl.searchParams.has( 'import' ) ) return next();
+				const match = /^\/worlds\/([a-z\d_-]+)\/assets\/([a-f\d]{64})$/i.exec( requestUrl.pathname );
+				if ( ! match ) return next();
+
+				const assetPath = resolve( worldsPath, match[1], 'assets', match[2].toLowerCase() );
+				let info;
+				try {
+					info = await stat( assetPath );
+				} catch ( error ) {
+					if ( error.code === 'ENOENT' ) return next();
+					return next( error );
+				}
+				if ( ! info.isFile() ) return next();
+
+				res.statusCode = 200;
+				res.setHeader( 'Content-Type', 'application/octet-stream' );
+				res.setHeader( 'Content-Length', info.size );
+				res.setHeader( 'Cache-Control', 'no-cache' );
+				if ( req.method === 'HEAD' ) return res.end();
+				createReadStream( assetPath ).on( 'error', ( error ) => res.destroy( error ) ).pipe( res );
+			} );
+		},
+	};
+}
+
 export default defineConfig( {
 	// Relative asset paths let the client run at the GitHub Pages root and under /loz.
 	base: './',
+	// World package assets use extensionless, content-addressed filenames.
+	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ connectionLog(), {
+	plugins: [ connectionLog(), worldPackageAssets(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html ) {
 			if ( ! html.includes( '%ELSEMESH_COMMIT%' ) ) throw new Error( 'Build commit placeholder is missing from index.html' );

@@ -12,6 +12,32 @@ These opt-in parameters switch to the existing free camera; they do not affect o
 
 The upstream `dgreenheck.github.io/tidewater/` deployment does not include these review-camera parameters. A URL such as `?view=beach` there is ignored, so its spawn view cannot be treated as the same pose as one of the named ElseMesh views. Before calling an image comparison like-for-like, arrange for both builds to use the same camera pose, viewport, time of day, render scale, anti-aliasing, shadows, and water-reflection settings. Otherwise report the mismatch and use screenshots only to identify candidate differences.
 
+## Flip7 native Chrome WebGL smoke check, 2026-10-24
+
+The local client ran in Android Chrome on a scrcpy virtual display at
+720×1600, density 280, logical display 7, mapped to SurfaceFlinger display ID
+`11529215046550001813`. The activity and captures were confined to that
+virtual display; neither physical panel was targeted. WebGL mode loaded the
+island scene and packaged Whale. A Chrome DevTools camera follow showed the
+Whale render underwater, and a forced call to its existing blow effect emitted
+visible particles through the new WebGL spray batch. The forced emission checks
+the presentation adapter; it does not prove the natural blow timing or particle
+physics match the WebGPU spray simulation.
+
+This run exposed and fixed three startup faults in the fallback path: Vite
+treated fetched extensionless package assets as JavaScript, the vegetation
+loader tried to append scalar `villagePalms` metadata as an array, and the
+WebGL water query lacked the `get(slot)` method used by the shared Whale brain.
+The Vite raw-byte and URL-module routes, placement append helper, and spray
+batch have focused regression tests; the full `npm test` suite and production
+build pass.
+
+This is a renderer smoke check, not a matched comparison. It used the built-in
+island rather than a hosted package, did not compare against WebGPU at the same
+pose, and did not establish lighting, shadow, spray-physics, LOD, density, or
+performance parity. The screenshot includes the review UI and is only useful
+for confirming that the Whale and emitted particles appeared.
+
 ## Flip7 hosted grass-density review, 2026-10-23
 
 The current source was served locally from a temporary, loopback-only Example

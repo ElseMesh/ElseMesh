@@ -9,10 +9,18 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 - WebGL whale LODs now cast shadows through a custom depth material that uses
   the same authored height relief and animated CPU rig pose as the visible
   whale. `test/webgl-whale-package.mjs` verifies visible and depth shader
-  injection and that all LODs use the matching shadow material. The focused
-  test passes. Live shader compilation remains unverified: Termux Chromium's
-  SwiftShader GPU process exits with code 11 and cannot create a WebGL context.
-  Whale spray, standard WebGL lighting, and matched visual parity remain open.
+  injection and that all LODs use the matching shadow material. Vite now serves
+  extensionless content-addressed world assets as raw bytes for runtime fetches
+  while retaining URL-module handling for imports. The WebGL fallback now
+  merges only iterable vegetation placement groups, exposes the shared water
+  query `get(slot)` contract, and renders shared Whale spray emissions through
+  a small CPU-backed point batch. `npm test` and `npm run build` pass. On
+  2026-10-24, native Chrome on Flip7 rendered the WebGL world and Whale on
+  isolated display 7; a forced blow emitted visible particles. This is a live
+  feature smoke check, not matched visual parity. Standard WebGL lighting,
+  accurate spray physics, and matched visual parity remain open. A separate
+  Termux Chromium SwiftShader attempt still fails to create a context and is
+  not used as the Android renderer result.
 
 ## 2026-10-20
 

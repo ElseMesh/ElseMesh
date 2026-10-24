@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 
 const tests = [
 	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
+	'test/vite-world-assets.mjs', 'test/vegetation-placement-codec.mjs',
 	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'test/tidewater-reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
 	'test/grass-density-asset.mjs', 'test/grass-density-parity.mjs', 'test/reef-placement-render.mjs',
 	'test/game-logic.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
@@ -10,7 +11,7 @@ const tests = [
 	'test/webgl-game-adapter.mjs', 'test/webgl-wildlife-adapter.mjs', 'test/webgl-swash-probe.mjs', 'test/webgl-component-support.mjs', 'test/world-vehicle-policy.mjs',
 	'test/world-portals.mjs', 'test/portal-sides.mjs', 'test/portal-back-contract.mjs', 'test/portal-link.mjs',
 	'test/world-launcher.mjs', 'test/world-directory.mjs', 'cloudflare/world-resolver/test.mjs', 'test/world-streaming.mjs',
-	'test/world-object-lod.mjs', 'test/world-object-lod-contract.mjs', 'test/tidewater-lod-package.mjs', 'test/webgl-whale-package.mjs',
+	'test/world-object-lod.mjs', 'test/world-object-lod-contract.mjs', 'test/tidewater-lod-package.mjs', 'test/webgl-whale-package.mjs', 'test/webgl-spray.mjs',
 	'test/world-source-manifest.mjs', 'test/world-package-village-materials.mjs', 'test/world-proposal.mjs',
 	'test/ai-edit-worker.mjs', 'test/ai-edit-mcp.mjs', 'test/ai-edit-review-html.mjs', 'test/prepare-ai-edit-publication.mjs',
 	'test/ai-edit-worker-runtime.mjs', 'test/world-export.mjs', 'test/whale-world-package.mjs', 'test/world-audio.mjs',
