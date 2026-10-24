@@ -33,6 +33,7 @@ func TestBrowserWebTransportGatewayServesSignedManifest(t *testing.T) {
 	defer host.Close()
 
 	world := newStarterManifest("WebTransport integration", host.ID().String())
+	world.Rules.SpawnRadius = 1
 	document, err := signDocument(manifestProtocol, world, key)
 	if err != nil {
 		t.Fatal(err)
@@ -91,9 +92,15 @@ func TestBrowserWebTransportGatewayServesSignedManifest(t *testing.T) {
 	if _, err := decodeManifest(*manifestReply.Document, host.ID().String(), time.Now()); err != nil {
 		t.Fatalf("WebTransport returned a manifest not authorized for the connected owner: %v", err)
 	}
-	joined := exchangeWebTransportRequest(t, ctx, session, gatewayMessage{Type: "presence.update", RequestID: "join", Pose: presenceTestPose()})
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 1.38, 8}
+	candidates := presenceTestSpawnCandidates()
+	joined := exchangeWebTransportRequest(t, ctx, session, gatewayMessage{Type: "presence.update", RequestID: "join", Pose: pose, SpawnCandidates: candidates})
 	if joined.Type != "presence" || len(joined.Players) != 1 || joined.PlayerID == "" {
 		t.Fatalf("WebTransport presence join: %+v", joined)
+	}
+	if got := joined.Players[0].Position; len(got) != 3 || got[0] != 0 || got[2] != 8 {
+		t.Fatalf("WebTransport did not preserve the preferred spawn candidate: %v", got)
 	}
 	wsServer := httptest.NewServer(http.HandlerFunc(d.handleBrowserGateway))
 	defer wsServer.Close()
@@ -110,7 +117,7 @@ func TestBrowserWebTransportGatewayServesSignedManifest(t *testing.T) {
 	if err := ws.ReadJSON(&welcome); err != nil || welcome["type"] != "connected" {
 		t.Fatalf("WebSocket connect: %v %v", welcome, err)
 	}
-	if err := ws.WriteJSON(gatewayMessage{Type: "presence.update", RequestID: "ws-join", Pose: presenceTestPose()}); err != nil {
+	if err := ws.WriteJSON(gatewayMessage{Type: "presence.update", RequestID: "ws-join", Pose: pose, SpawnCandidates: candidates}); err != nil {
 		t.Fatal(err)
 	}
 	var snapshot peerResponse
@@ -119,6 +126,9 @@ func TestBrowserWebTransportGatewayServesSignedManifest(t *testing.T) {
 	}
 	if snapshot.Type != "presence" || len(snapshot.Players) != 2 || snapshot.PlayerID == joined.PlayerID {
 		t.Fatalf("transports do not share distinct player state: %+v", snapshot)
+	}
+	if got := presenceForPlayer(snapshot.Players, snapshot.PlayerID).Position; len(got) != 3 || got[0] != 0.6 || got[2] != 8 {
+		t.Fatalf("WebSocket did not receive the nearest free spawn candidate: %v", got)
 	}
 	left := exchangeWebTransportRequest(t, ctx, session, gatewayMessage{Type: "presence.leave", RequestID: "leave"})
 	if left.Type != "presence" || len(left.Players) != 1 || left.Players[0].ID != snapshot.PlayerID {

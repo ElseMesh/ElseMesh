@@ -110,7 +110,9 @@ after entry.
   two distinct nearest-first spawn positions and rejects a third visitor at
   the signed cap. Go-backed Node tests now add the Android linker flag
   automatically; without it, Go 1.27.3 rejects anet's `net.zoneCache` linkname
-  before tests run. `adb devices -l` lists no attached phone, so Flip7 visual
+  before tests run. Full `worldd` regression tests now cover the same admission
+  behavior over authenticated peer forwarding, WebTransport, WebSocket, and
+  WebRTC data channels. `adb devices -l` lists no attached phone, so Flip7 visual
   verification remains open.
 
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.

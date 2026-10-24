@@ -28,6 +28,7 @@ func TestBrowserWebRTCDataChannelServesSignedManifest(t *testing.T) {
 	}
 	defer host.Close()
 	world := newStarterManifest("WebRTC integration", host.ID().String())
+	world.Rules.SpawnRadius = 1
 	document, err := signDocument(manifestProtocol, world, key)
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +114,23 @@ func TestBrowserWebRTCDataChannelServesSignedManifest(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Fatal("WebRTC manifest request timed out")
+	}
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 1.38, 8}
+	spawnRequest, _ := json.Marshal(gatewayMessage{Type: "presence.update", WorldID: world.WorldID, RequestID: "rtc-presence", Pose: pose, SpawnCandidates: presenceTestSpawnCandidates()})
+	if err := channel.Send(spawnRequest); err != nil {
+		t.Fatalf("send WebRTC spawn admission: %v", err)
+	}
+	select {
+	case response := <-responses:
+		if response.Type != "presence" || len(response.Players) != 1 || response.PlayerID == "" {
+			t.Fatalf("unexpected WebRTC presence response: %+v", response)
+		}
+		if got := response.Players[0].Position; len(got) != 3 || got[0] != 0 || got[2] != 8 {
+			t.Fatalf("WebRTC did not preserve the preferred spawn candidate: %v", got)
+		}
+	case <-ctx.Done():
+		t.Fatal("WebRTC spawn admission timed out")
 	}
 	closed := make(chan struct{}, 1)
 	channel.OnClose(func() { closed <- struct{}{} })

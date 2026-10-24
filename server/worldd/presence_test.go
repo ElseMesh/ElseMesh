@@ -28,6 +28,17 @@ func presenceTestDaemon(t *testing.T) *daemon {
 func presenceTestPose() *playerPose {
 	return &playerPose{Protocol: playerPresenceProtocol, Sequence: 1, Position: []float64{1, 2, 3}, Yaw: 0.3, Pitch: -0.2, Mode: "walk", Appearance: avatarAppearance{Style: "male", Shirt: "#7194aa", Trousers: "#27313d", Skin: "#c68c67", Hair: "#33251c"}}
 }
+func presenceTestSpawnCandidates() [][]float64 {
+	return [][]float64{{0, 1.38, 8}, {0.6, 1.38, 8}, {-0.6, 1.38, 8}, {0, 1.38, 8.6}}
+}
+func presenceForPlayer(players []playerPresence, id string) playerPresence {
+	for _, player := range players {
+		if player.ID == id {
+			return player
+		}
+	}
+	return playerPresence{}
+}
 func TestPresenceLimitsExpiryAndIdentity(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
@@ -222,6 +233,8 @@ func TestPresenceAdmissionSelectsNearestUnoccupiedSpawnCandidate(t *testing.T) {
 
 func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 	owner := presenceTestDaemon(t)
+	owner.world.Rules.MaxVisitors = 2
+	owner.world.Rules.SpawnRadius = 1
 	gateway := presenceTestDaemon(t)
 	gateway.host.Peerstore().AddAddrs(owner.host.ID(), owner.host.Addrs(), peerstore.PermanentAddrTTL)
 	owner.host.SetStreamHandler(worldProtocol, owner.handlePeerStream)
@@ -244,9 +257,11 @@ func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 		return c
 	}
 	a, b := connect(), connect()
-	update := func(c *websocket.Conn, kind string) peerResponse {
+	update := func(c *websocket.Conn, kind string, candidates [][]float64) peerResponse {
 		// Both clients attempt to supply the same session. The gateway must replace it.
-		request := gatewayMessage{Type: kind, RequestID: "pose", PresenceSession: strings.Repeat("a", 32), Pose: presenceTestPose()}
+		pose := presenceTestPose()
+		pose.Position = []float64{0, 1.38, 8}
+		request := gatewayMessage{Type: kind, RequestID: "pose", PresenceSession: strings.Repeat("a", 32), Pose: pose, SpawnCandidates: candidates}
 		if err := c.WriteJSON(request); err != nil {
 			t.Fatal(err)
 		}
@@ -256,15 +271,22 @@ func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 		}
 		return response
 	}
-	one := update(a, "presence.update")
-	two := update(b, "presence.update")
+	candidates := presenceTestSpawnCandidates()
+	one := update(a, "presence.update", candidates)
+	two := update(b, "presence.update", candidates)
 	if one.PlayerID == two.PlayerID || len(two.Players) != 2 {
 		t.Fatalf("connection identity not isolated: %+v %+v", one, two)
+	}
+	if got := presenceForPlayer(one.Players, one.PlayerID).Position; len(got) != 3 || got[0] != 0 || got[2] != 8 {
+		t.Fatalf("forwarded first visitor did not retain preferred spawn: %v", got)
+	}
+	if got := presenceForPlayer(two.Players, two.PlayerID).Position; len(got) != 3 || got[0] != 0.6 || got[2] != 8 {
+		t.Fatalf("forwarded second visitor did not receive nearest free spawn: %v", got)
 	}
 	if two.WorldID != owner.world.WorldID {
 		t.Fatal("presence escaped selected world")
 	}
-	left := update(a, "presence.leave")
+	left := update(a, "presence.leave", nil)
 	if len(left.Players) != 1 || left.Players[0].ID != two.PlayerID {
 		t.Fatal("leave removed another player")
 	}

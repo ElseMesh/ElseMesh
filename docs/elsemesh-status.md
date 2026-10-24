@@ -19,8 +19,10 @@ Focused spawn, presence-session, source-manifest, portal, proposal, and
 directory-signature tests pass. The complete Go worldd suite passes with
 `go test -ldflags='-checklinkname=0' ./... -count=1`; the secure WSS gateway/cache end-to-end test passes with two live visitors
 receiving separate spawn positions and a third rejected at the signed cap. The
-browser-host worker test also passes. Both Node harnesses now apply the Android
-linker workaround automatically. `adb devices -l` currently shows no attached
+browser-host worker test also passes. Presence admission candidate selection is
+covered across authenticated peer forwarding, WebTransport, WebSocket, and the
+WebRTC data channel. Both Node harnesses now apply the Android linker
+workaround automatically. `adb devices -l` currently shows no attached
 device, so the isolated Flip7 visual check remains open.
 
 Repository ownership as of 2026-10-22: Tidewater is imported as the sole world
