@@ -17,8 +17,11 @@ loads portable worlds through versioned interfaces. Matched hosted/built-in
 start and village views render on Android. The package now includes a signed,
 content-addressed grass-density mask for the hosted renderer. A matched Flip7
 village review on 2026-10-23 shows beach grass in both hosted and built-in
-renders at the same view and time. Full density and LOD parity, desktop visual
-acceptance, and complete gameplay parity remain open.
+renders at the same view and time. CPU checks now prove that packaged Tidewater
+plant placements and grass density match seeded source generation, and that
+all 143 non-terrain objects have geometry-reducing distance levels. Rendered
+density and LOD parity, desktop visual acceptance, and complete gameplay parity
+remain open.
 Keep Tidewater authored content in its repository and reusable execution code
 in ElseMesh. Tidewater is content data, not a separately compiled application;
 ElseMesh validates and executes its versioned behavior data. Do not introduce a

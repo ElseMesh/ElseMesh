@@ -76,6 +76,17 @@ source-to-package vegetation data, not rendered distribution or LOD behavior.
 The environment and build verification are recorded in
 [PROGRESS.md](../PROGRESS.md).
 
+## Tidewater package LOD coverage (2026-10-24)
+
+The CPU-only `test/tidewater-lod-package.mjs` confirms that all 143 non-terrain
+objects have a valid screen-size transition and reference geometry with fewer
+triangles than the base asset. Those instances resolve to six shared asset
+pairs for the village, moored boat, and four scanned debris models. Only the
+full terrain and its portal-preview terrain representation omit geometry LODs.
+This verifies package coverage and triangle reduction; rendered transitions,
+material fidelity at distance, and matched-view desktop/Flip7 parity remain
+open. The check is part of `npm test`.
+
 ## Optional host-managed ZeroTier build (2026-10-23)
 
 `tools/build-server.sh` keeps embedded-libzt `thruholdd` as its default and

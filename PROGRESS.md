@@ -131,6 +131,11 @@ after entry.
   matches byte for byte, and all channels of the 1024×1024 grass mask match
   exactly. Visual density distribution and LOD behavior still need matched-view
   review.
+- Added `test/tidewater-lod-package.mjs`: all 143 non-terrain object instances
+  have a valid, geometry-reducing distance level, covering six shared asset
+  pairs. The only objects without LODs are the full and portal-preview terrain
+  representations. This CPU package check does not establish rendered LOD
+  transitions or visual parity.
 - A multi-view Flip7 review started on Rebroad scrcpy's display-only virtual
   display (logical display 25; SurfaceFlinger ID `11529215049311824793`).
   Chrome was launched and captured only on that display. The ADB transport
