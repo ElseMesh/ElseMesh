@@ -153,6 +153,20 @@ with one update request in flight. Closing a connection sends leave when
 possible; TTL handles abrupt loss. These limits are process/world-local and do
 not create an aggregate cap across a fleet of gateways or worlds.
 
+Version-2 world rules also require `maxVisitors` and horizontal `spawnRadius`.
+The daemon applies the per-world visitor limit during the first presence update.
+Invitation entry supplies a bounded, nearest-first `spawnCandidates` list in
+that request; each feet position must be finite, within the signed radius, and
+ordered by horizontal distance from the preferred spawn. Under the owner lock,
+the daemon selects the first candidate that does not overlap another visitor,
+or rejects admission if none is available. The browser derives candidates from
+the signed world collision package and omits positions intersecting colliders.
+This validates placement against honest clients and prevents concurrent player
+overlap; presence remains client-reported and is not authoritative movement or
+anti-cheat. Portal arrivals omit spawn candidates to preserve their mapped
+pose, but still pass through the destination capacity check. Missing owner
+admission or a full spawn area fails closed.
+
 The world rule `avatarComplexity` is validated within 1–100,000 triangles and
 is passed to the browser remote-avatar loader, which selects available meshes
 under the cap and falls back to a simple avatar. It is not checked against

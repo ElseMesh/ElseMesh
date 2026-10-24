@@ -112,7 +112,10 @@ after entry.
   automatically; without it, Go 1.27.3 rejects anet's `net.zoneCache` linkname
   before tests run. Full `worldd` regression tests now cover the same admission
   behavior over authenticated peer forwarding, WebTransport, WebSocket, and
-  WebRTC data channels. `adb devices -l` lists no attached phone, so Flip7 visual
+  WebRTC data channels. The normative network design and protocol docs now
+  match the required version-2 world rules, fail-closed admission, and client
+  collision-candidate trust boundary; invitation-token service work stays open.
+  `adb devices -l` lists no attached phone, so Flip7 visual
   verification remains open.
 
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
