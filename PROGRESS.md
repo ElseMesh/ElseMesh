@@ -159,6 +159,11 @@ after entry.
   packaged terrain heights. This removes the hardcoded Example Island grass
   scatter from hosted worlds and initializes grass streaming state so hosted
   frames do not fail on an unset center. Geometry, draw distance, and visual
-  density still need matched-render review; reef, fish props, wildlife, whale,
-  boat component behavior, ambient audio, and other declared behaviors remain
-  open in WebGL.
+  density still need matched-render review. Reef, fish props, wildlife, whale,
+  boat component behavior, village material profiles, and other declared
+  behaviors remain open in WebGL.
+- Hosted WebGL now routes signed ambient-audio beds through the existing shared
+  `SoundScape` world-audio service, including spatial position, authored
+  conditions, listener state, and the same sun-based day/night calculation as
+  the primary renderer. Audio components whose verified bed assets are outside
+  the initial visible preload remain deferred/unsupported in fallback mode.

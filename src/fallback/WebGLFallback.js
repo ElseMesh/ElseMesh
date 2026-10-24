@@ -1514,6 +1514,9 @@ export class WebGLFallback {
 			await this._loadVegetation( { placementBytes, centerPosition: [ ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 0 ], ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 2 ] ] } );
 			supportedComponents.add( vegetation.id );
 		}
+		for ( const ambience of components.filter( component => component.type === 'tidewater.ambient-audio/1' ) ) {
+			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
+		}
 		const unsupported = components.filter( component => ! supportedComponents.has( component.id ) ).map( component => component.type );
 		const spawn = manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
@@ -1694,9 +1697,25 @@ export class WebGLFallback {
 	_updateAudio( dt ) {
 
 		const audio = this.app.audio;
-		if ( ! audio || ! audio.enabled ) return;
+		if ( ! audio ) return;
 		const p = this.camera.position, fwd = new this.THREE.Vector3();
 		this.camera.getWorldDirection( fwd );
+		if ( this.worldLink && this.connector?.manifest ) {
+			const components = ( this.connector.manifest.components || [] ).filter( component => component.type === 'tidewater.ambient-audio/1' );
+			audio.setWorldAmbience( this.connector.worldId, components, this.connector.assets );
+			if ( ! audio.enabled ) return;
+			const seaLevel = this.hostedSeaLevel ?? 0;
+			const sunHeight = this._sunDirection( this.app.settings.timeOfDay ).y;
+			audio.updateWorldAudio( dt, {
+				listener: { position: p, forward: fwd, up: new this.THREE.Vector3( 0, 1, 0 ).applyQuaternion( this.camera.quaternion ) },
+				underwater: p.y < seaLevel ? 1 : 0,
+				depthBelowSurface: Math.max( 0, seaLevel - p.y ),
+				daylight: 1 - this.THREE.MathUtils.smoothstep( - sunHeight, 0.02, 0.18 ),
+				timeOfDay: this.app.settings.timeOfDay,
+			} );
+			return;
+		}
+		if ( ! audio.enabled ) return;
 		const coast = this.terrain?.coastDistance?.( p.x, p.z )?.d ?? 60;
 		const boat = this.boat?.controller;
 		audio.update( dt, {

@@ -41,9 +41,12 @@ drop the Example Island package's verified terrain, vegetation placements, or
 grass mask: it decodes them through the shared codecs and uses them for hosted
 terrain queries, plant instances, and camera-following grass. The WebGL grass
 geometry and its 42 m draw radius remain an approximation and need matched-view
-review. Reef, fish props, wildlife, whale, boat component behavior, ambient
-audio, and other declared behaviors remain unsupported. Feature omission in
-fallback mode cannot count as package parity. Both WebGPU and WebGL need
+review. Hosted ambient-audio beds now use the shared `SoundScape` service and
+its data-only asset cache, spatial positions, and condition mixing; assets
+beyond the initial visible preload are still deferred. Reef, fish props,
+wildlife, whale, boat component behavior, and other declared behaviors remain
+unsupported. Feature omission in fallback mode cannot count as package parity.
+Both WebGPU and WebGL need
 matched-view acceptance against the built-in world; the LOD shader has bundled
 successfully but has not yet been compiled in a live browser or visually
 reviewed.
