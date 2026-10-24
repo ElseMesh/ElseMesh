@@ -52,11 +52,14 @@ function copyGeometry( T, source, bucket, shape ) {
 // transforms stay owned by BoatModel; this adapter only translates its mesh data and materials.
 export class WebGLBoatAdapter {
 
-	constructor( T, scene, { query = null, terrain = null, colliders = null } = {} ) {
+	constructor( T, scene, { query = null, terrain = null, colliders = null, initialPosition = null, initialHeading = undefined } = {} ) {
 
 		this.T = T;
 		this.model = new BoatModel();
-		this.controller = new BoatController( { design: this.model.design, query: query || { allocate: () => 0 }, terrain, colliders } );
+		this.controller = new BoatController( {
+			design: this.model.design, query: query || { allocate: () => 0 }, terrain, colliders,
+			...( initialPosition ? { initialPosition } : {} ), ...( initialHeading !== undefined ? { initialHeading } : {} ),
+		} );
 		this.model.sync( this.controller );
 		this.nodes = new Map();
 		this.materials = new Map();

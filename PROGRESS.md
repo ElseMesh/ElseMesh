@@ -141,6 +141,11 @@ after entry.
   are skipped only by the Android test runner; browser-compatible test
   migration is low priority.
 
+- Hosted WebGL now replaces a signed boat berth preview with the shared
+  interactive boat model and controller. The renderer uses the signed berth
+  position and heading, hosted colliders, and WebGL water-query path; rendered
+  handling and visual parity still need a live browser review.
+
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the
   same full source revision. This verifies the CGO-free build and CLI, not a
@@ -182,8 +187,8 @@ after entry.
   and CPU mirror for jaw/curl/sag deformation with the primary renderer. WebGL
   still approximates fish shading; species markings and shader-level surface
   effects need a shared/backend-specific parity implementation and matched-
-  render review. Reef, wildlife, whale, boat component behavior, village
-  material profiles, and other declared behaviors remain open in WebGL.
+  render review. Reef, whale, village material profiles, and other declared
+  behaviors remain open in WebGL.
 - Hosted WebGL now routes signed ambient-audio beds through the existing shared
   `SoundScape` world-audio service, including spatial position, authored
   conditions, listener state, and the same sun-based day/night calculation as

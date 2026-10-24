@@ -22,7 +22,7 @@ import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
-import { initialHostedWebGLSupport, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
+import { initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
@@ -815,6 +815,16 @@ export class WebGLFallback {
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
+			if ( this.hostedBoatSpec ) {
+				const { berth, preview } = this.hostedBoatSpec;
+				preview.visible = false;
+				this.boat = new WebGLBoatAdapter( T, this.scene, {
+					query: this.waterQuery, terrain: null, colliders: hostedColliders,
+					initialPosition: new EngineVector3( ...berth.transform.position ), initialHeading: berth.transform.yaw || 0,
+				} );
+				this.boat.controller.model = this.boat.model;
+				this.player.boat = this.boat.controller;
+			}
 			if ( this.hostedTerrainData && this.hostedGrassMask ) {
 				this.grass = webglGrassMesh( T, this.hostedTerrainData, this.camera, null, this.hostedGrassMask );
 				this.scene.add( this.grass );
@@ -845,8 +855,8 @@ export class WebGLFallback {
 		this.wildlifeRuntime = new WildlifeSimulation( {
 			terrain, colliders, vegetation: { records: this.vegetationRecords || {} },
 			footprints: component?.footprints || [], roofPerches: component?.roofPerches || [],
-			boat: component ? null : this.boat?.controller || null,
-			boatModel: component ? null : this.boat?.model || null,
+			boat: this.boat?.controller || null,
+			boatModel: this.boat?.model || null,
 			shoreProbe: this.shoreField ? new WebGLSwashProbe( {
 				field: this.shoreField, terrain, seaLevel: this.hostedSeaLevel ?? - 0.15,
 				time: () => this.animationStartTime ? ( performance.now() - this.animationStartTime ) * 0.001 : 0,
@@ -1496,6 +1506,8 @@ export class WebGLFallback {
 			root.scale.set( ...( object.scale || [ 1, 1, 1 ] ) );
 			root.updateMatrixWorld( true );
 			this.scene.add( root );
+			this.hostedObjectRoots ||= new Map();
+			this.hostedObjectRoots.set( object.id, root );
 			if ( object.lods?.length ) {
 				const levels = new Map( [ [ 0, base ] ] );
 				this.worldLODs.set( object.id, new WorldObjectLOD( {
@@ -1540,7 +1552,10 @@ export class WebGLFallback {
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
 		this._addHostedWater( components, manifest.rules || {} );
-		const supportedComponents = initialHostedWebGLSupport( components, { terrainReady: !! this.hostedTerrainData } );
+		this.hostedBoatSpec = resolveHostedWebGLBoatSpec( components, manifest.objects || [], this.hostedObjectRoots );
+		const supportedComponents = initialHostedWebGLSupport( components, {
+			terrainReady: !! this.hostedTerrainData, boatReady: !! this.hostedBoatSpec,
+		} );
 		for ( const vegetation of components.filter( component => component.type === 'tidewater.static-vegetation/1' ) ) {
 			const placementBytes = assets.get( vegetation.placementAssetId );
 			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
