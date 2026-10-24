@@ -7,7 +7,7 @@ const tests = [
 	'test/game-logic.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
 	'test/camera-review.mjs', 'test/input-look-keys.mjs', 'test/touch-control-ownership.mjs', 'test/world-experience.mjs',
 	'test/boat-controller-origin.mjs', 'test/boat-design.mjs', 'test/webgl-boat-adapter.mjs', 'test/webgl-fish-stand-adapter.mjs',
-	'test/webgl-game-adapter.mjs', 'test/webgl-wildlife-adapter.mjs', 'test/webgl-swash-probe.mjs', 'test/world-vehicle-policy.mjs',
+	'test/webgl-game-adapter.mjs', 'test/webgl-wildlife-adapter.mjs', 'test/webgl-swash-probe.mjs', 'test/webgl-component-support.mjs', 'test/world-vehicle-policy.mjs',
 	'test/world-portals.mjs', 'test/portal-sides.mjs', 'test/portal-back-contract.mjs', 'test/portal-link.mjs',
 	'test/world-launcher.mjs', 'test/world-directory.mjs', 'cloudflare/world-resolver/test.mjs', 'test/world-streaming.mjs',
 	'test/world-object-lod.mjs', 'test/world-object-lod-contract.mjs', 'test/tidewater-lod-package.mjs',

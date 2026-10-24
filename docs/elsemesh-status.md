@@ -60,9 +60,11 @@ beyond the initial visible preload are still deferred. Hosted fish props now
 consume the same signed placement records and procedural geometry selector as
 the primary renderer. WebGL uses the shared jaw/curl/sag CPU deformation helper;
 normals and material shading remain approximations. Species markings and
-shader-level surface effects still need parity work. Reef, wildlife, whale,
-boat component behavior, and other
-declared behaviors remain unsupported. Feature omission or approximation in
+shader-level surface effects still need parity work. Hosted wildlife uses the
+shared simulation and WebGL presentation adapter when packaged terrain is
+available; the fallback now reports that capability accurately. Reef, whale,
+boat component behavior, and other declared behaviors remain unsupported.
+Feature omission or approximation in
 fallback mode cannot count as package parity.
 Both WebGPU and WebGL need
 matched-view acceptance against the built-in world; the LOD shader has bundled

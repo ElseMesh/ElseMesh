@@ -22,6 +22,7 @@ import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
+import { initialHostedWebGLSupport, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
@@ -1539,8 +1540,7 @@ export class WebGLFallback {
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
 		this._addHostedWater( components, manifest.rules || {} );
-		const supportedComponents = new Set( components.filter( component => [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) ).map( component => component.id ) );
-		if ( this.hostedTerrainData && terrainComponent ) supportedComponents.add( terrainComponent.id );
+		const supportedComponents = initialHostedWebGLSupport( components, { terrainReady: !! this.hostedTerrainData } );
 		for ( const vegetation of components.filter( component => component.type === 'tidewater.static-vegetation/1' ) ) {
 			const placementBytes = assets.get( vegetation.placementAssetId );
 			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
@@ -1564,7 +1564,7 @@ export class WebGLFallback {
 		for ( const ambience of components.filter( component => component.type === 'tidewater.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
 		}
-		const unsupported = components.filter( component => ! supportedComponents.has( component.id ) ).map( component => component.type );
+		const unsupported = unsupportedHostedWebGLComponents( components, supportedComponents );
 		const spawn = manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
 		const transfer = new URLSearchParams( location.search ).get( 'webglSpawn' )?.split( ',' ).map( Number );
