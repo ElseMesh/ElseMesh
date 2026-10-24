@@ -37,10 +37,16 @@ component.
 WebGL fallback is part of package parity acceptance. Its hosted loader now uses
 the shared `WorldObjectLOD` controller and bounded load queue for authored
 variants, with Three.js-specific alpha-hash material fades. It still does not
-install the other declared Tidewater components. Feature omission in fallback
-mode cannot count as package parity. Both WebGPU and WebGL need matched-view
-acceptance against the built-in world; the LOD shader has bundled successfully
-but has not yet been compiled in a live browser or visually reviewed.
+drop the Example Island package's verified terrain, vegetation placements, or
+grass mask: it decodes them through the shared codecs and uses them for hosted
+terrain queries, plant instances, and camera-following grass. The WebGL grass
+geometry and its 42 m draw radius remain an approximation and need matched-view
+review. Reef, fish props, wildlife, whale, boat component behavior, ambient
+audio, and other declared behaviors remain unsupported. Feature omission in
+fallback mode cannot count as package parity. Both WebGPU and WebGL need
+matched-view acceptance against the built-in world; the LOD shader has bundled
+successfully but has not yet been compiled in a live browser or visually
+reviewed.
 
 Repository ownership as of 2026-10-22: Tidewater is imported as the sole world
 content submodule. Burning Horizons is maintained at

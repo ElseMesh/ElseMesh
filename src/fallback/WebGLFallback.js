@@ -9,6 +9,8 @@ import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
+import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
+import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
@@ -19,12 +21,17 @@ import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
+import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import terrainUrl from '../../worlds/tidewater/lod-source/terrain-full.glb?url';
 import villageUrl from '../../worlds/tidewater/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/tidewater/lod-source/vegetation-placements.bin?url';
 
 const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
 let sharedFoamLaceTexture;
+
+function asBytes( bytes ) {
+	return bytes instanceof Uint8Array ? bytes : new Uint8Array( bytes );
+}
 
 function webglFoamLaceTexture( T, size = 512 ) {
 
@@ -534,7 +541,20 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 
 }
 
-function webglGrassMesh( T, terrain, camera, previous ) {
+function sampleGrassMask( mask, x, z ) {
+	const fx = Math.max( 0, Math.min( mask.res - 1, ( x - mask.origin ) / ( mask.size / mask.res ) - 0.5 ) );
+	const fz = Math.max( 0, Math.min( mask.res - 1, ( z - mask.origin ) / ( mask.size / mask.res ) - 0.5 ) );
+	const x0 = Math.floor( fx ), z0 = Math.floor( fz ), x1 = Math.min( mask.res - 1, x0 + 1 ), z1 = Math.min( mask.res - 1, z0 + 1 );
+	const tx = fx - x0, tz = fz - z0, result = [ 0, 0, 0, 0 ];
+	for ( let channel = 0; channel < 4; channel ++ ) {
+		const a = mask.data[ ( z0 * mask.res + x0 ) * 4 + channel ], b = mask.data[ ( z0 * mask.res + x1 ) * 4 + channel ];
+		const c = mask.data[ ( z1 * mask.res + x0 ) * 4 + channel ], d = mask.data[ ( z1 * mask.res + x1 ) * 4 + channel ];
+		result[ channel ] = ( ( a * ( 1 - tx ) + b * tx ) * ( 1 - tz ) + ( c * ( 1 - tx ) + d * tx ) * tz ) / 255;
+	}
+	return result;
+}
+
+function webglGrassMesh( T, terrain, camera, previous, grassMask = null ) {
 
 	const radius = 42, spacing = 0.46, positions = [], colors = [], indices = [];
 	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
@@ -548,10 +568,28 @@ function webglGrassMesh( T, terrain, camera, previous ) {
 	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
 		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
 		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
-		const near = 1 - T.MathUtils.smoothstep( d, 14, 24 );
-		if ( d > radius || rand( 3 ) > 0.32 + near * 0.68 ) continue;
-		const terrainIndex = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) ) * terrain.res + Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
+		const near = grassMask ? 1 : 1 - T.MathUtils.smoothstep( d, 14, 24 );
+		if ( d > radius || ( ! grassMask && rand( 3 ) > 0.32 + near * 0.68 ) ) continue;
 		const h = terrain.heightAt( x, z );
+		if ( grassMask ) {
+			const mask = sampleGrassMask( grassMask, x, z );
+			const duneFraction = mask[ 0 ] / ( mask[ 0 ] + mask[ 1 ] + 1e-3 );
+			const meadowDensity = mask[ 1 ] * ( 1 - duneFraction ) + Math.min( mask[ 0 ] * 1.1, 1 ) * duneFraction;
+			const candidates = [
+				{ density: meadowDensity, salt: 4, height: 0.62 * duneFraction + ( 0.7 + rand( 6 ) * 0.6 ) * ( 1 - duneFraction ), color: [ 0.11, 0.27, 0.09 ] },
+				{ density: mask[ 2 ], salt: 20, height: 0.9 + rand( 21 ) * 0.6, color: [ 0.32, 0.34, 0.13 ] },
+				{ density: mask[ 3 ], salt: 30, height: 0.18 + rand( 31 ) * 0.22, color: [ 0.16, 0.31, 0.12 ] },
+			];
+			for ( const candidate of candidates ) {
+				if ( rand( candidate.salt ) > candidate.density ) continue;
+				const baseAngle = rand( candidate.salt + 1 ) * Math.PI * 2, tone = rand( candidate.salt + 2 );
+				const color = candidate.color.map( ( channel, index ) => channel + tone * [ 0.06, 0.08, 0.035 ][ index ] );
+				const blades = candidate.salt === 20 ? 2 : Math.round( 3 + near * 2 );
+				for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009, color );
+			}
+			continue;
+		}
+		const terrainIndex = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) ) * terrain.res + Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
 		const sand = terrain.sand[ terrainIndex ], dune = sand > 86 && h > 2.15 && h < 6.5 && x > - 180 && x < 200 && z > - 260 && z < 0;
 		if ( h < ( dune ? 2.15 : 2.6 ) || h > ( dune ? 6.5 : 76 ) || terrain.rock[ terrainIndex ] > 0.42 || terrain.path[ terrainIndex ] > 72 || ( sand > 86 && ! dune ) ) continue;
 		const patch = dune ? terrain.noise2.noise( x / 4.2 + 5.5, z / 4.2 - 3.3 ) * 0.6 + terrain.noise.noise( x / 11 - 7.1, z / 11 + 1.9 ) * 0.4 : 1;
@@ -759,11 +797,16 @@ export class WebGLFallback {
 			} );
 		} else {
 			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
-			const hostedTerrain = { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
+			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
 			this.waterQuery = new WebGLWaterQuery( hostedTerrain, this.hostedSeaLevel ?? 0 );
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
+			if ( this.hostedTerrainData && this.hostedGrassMask ) {
+				this.grass = webglGrassMesh( T, this.hostedTerrainData, this.camera, null, this.hostedGrassMask );
+				this.scene.add( this.grass );
+				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
+			}
 		}
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
@@ -1277,14 +1320,21 @@ export class WebGLFallback {
 
 	}
 
-	async _loadVegetation() {
+	async _loadVegetation( { placementBytes = null, centerPosition = null } = {} ) {
 
+		const packaged = placementBytes !== null;
 		try {
-			const response = await fetch( vegetationUrl );
-			if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
-			const records = decodeVegetationPlacements( new Uint8Array( await response.arrayBuffer() ), 7 );
+			let expectedSeed;
+			if ( ! placementBytes ) {
+				const response = await fetch( vegetationUrl );
+				if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
+				placementBytes = new Uint8Array( await response.arrayBuffer() );
+				expectedSeed = 7;
+			}
+			const records = decodeVegetationPlacements( asBytes( placementBytes ), expectedSeed );
 			const start = WORLD.start || WORLD.spawn;
-			const T = this.THREE, center = [ start.position[ 0 ], start.position[ 2 ] ], group = new T.Group();
+			const center = centerPosition || [ start.position[ 0 ], start.position[ 2 ] ];
+			const T = this.THREE, group = new T.Group();
 			const material = webglPlantMaterial( T ), anchoredMaterial = webglPlantMaterial( T, true );
 			const distance = record => Math.hypot( record.x - center[ 0 ], record.z - center[ 1 ] );
 			const add = ( kind, build, maxDistance, heightScale, castShadow = false, anchored = false ) => {
@@ -1358,6 +1408,7 @@ export class WebGLFallback {
 			}
 			this.scene.add( group );
 		} catch ( error ) {
+			if ( packaged ) throw error;
 			console.warn( 'WebGL fallback vegetation unavailable:', error );
 		}
 
@@ -1376,6 +1427,13 @@ export class WebGLFallback {
 		const assets = await this.connector.preload( { through: 'visible' } );
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.worldLODs = new Map();
+		const components = manifest.components || [];
+		const terrainComponent = components.find( component => component.type === 'tidewater.terrain-surface/1' );
+		if ( terrainComponent && assets.has( terrainComponent.dataAssetId ) ) {
+			const terrainBytes = assets.get( terrainComponent.dataAssetId );
+			const terrain = await decodeTerrainSurfaceAsset( asBytes( terrainBytes ) );
+			this.hostedTerrainData = new HeightfieldTerrainData( { size: terrain.size, origin: terrain.origin, resolution: terrain.resolution, heights: terrain.heights, splat: terrain.splat } );
+		}
 		for ( const object of manifest.objects || [] ) {
 
 			if ( object.kind !== 'asset-instance' ) continue;
@@ -1441,8 +1499,22 @@ export class WebGLFallback {
 		this.portals = ( manifest.portals || [] ).filter( portal => portal.enabled || portal.back?.enabled );
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
-		this._addHostedWater( manifest.components || [] );
-		const unsupported = ( manifest.components || [] ).filter( component => ! [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) ).map( component => component.type );
+		this._addHostedWater( components, manifest.rules || {} );
+		const supportedComponents = new Set( components.filter( component => [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) ).map( component => component.id ) );
+		if ( this.hostedTerrainData && terrainComponent ) supportedComponents.add( terrainComponent.id );
+		for ( const vegetation of components.filter( component => component.type === 'tidewater.static-vegetation/1' ) ) {
+			const placementBytes = assets.get( vegetation.placementAssetId );
+			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
+			if ( ! placementBytes || vegetation.grassMaskAssetId && ! grassMaskBytes ) continue;
+			if ( vegetation.grassMaskAssetId ) {
+				this.hostedGrassMask = decodeGrassDensityAsset( asBytes( grassMaskBytes ) );
+				if ( ! this.hostedTerrainData ) throw new Error( `Static grass component ${vegetation.id} requires its terrain surface` );
+				if ( this.hostedGrassMask.size !== this.hostedTerrainData.size || this.hostedGrassMask.origin !== this.hostedTerrainData.origin ) throw new Error( `Static grass component ${vegetation.id} does not match its terrain surface` );
+			}
+			await this._loadVegetation( { placementBytes, centerPosition: [ ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 0 ], ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 2 ] ] } );
+			supportedComponents.add( vegetation.id );
+		}
+		const unsupported = components.filter( component => ! supportedComponents.has( component.id ) ).map( component => component.type );
 		const spawn = manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
 		const transfer = new URLSearchParams( location.search ).get( 'webglSpawn' )?.split( ',' ).map( Number );
@@ -1451,7 +1523,7 @@ export class WebGLFallback {
 		}
 		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) )
 			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
-		this.worldName.textContent = `${ manifest.title || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } GPU feature(s) omitted` : '' }`;
+		this.worldName.textContent = `${ manifest.title || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
 		progress( 0.9, 'Preparing hosted world…' );
 
 	}
@@ -1487,14 +1559,14 @@ export class WebGLFallback {
 
 	}
 
-	_addHostedWater( components ) {
+	_addHostedWater( components, rules ) {
 
 		const T = this.THREE;
 		for ( const component of components ) {
 			if ( component.type === 'tidewater.island-ocean/1' ) {
-				this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000 ), this.app.worldConnector?.manifest?.rules?.seaLevel ?? - 4.5 ) );
+				this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000 ), rules.seaLevel ?? - 4.5 ) );
 			} else if ( component.type === 'tidewater.water-body/1' ) {
-				const water = this._makeWater( new T.CircleGeometry( component.extent, 64 ), this.app.worldConnector?.manifest?.rules?.seaLevel ?? 0 );
+				const water = this._makeWater( new T.CircleGeometry( component.extent, 64 ), rules.seaLevel ?? 0 );
 				water.position.x = component.center[ 0 ]; water.position.z = component.center[ 1 ]; this.waterScene.add( water );
 			}
 		}
@@ -1591,10 +1663,10 @@ export class WebGLFallback {
 			else this.player.update( dt );
 		}
 		this.useButton.style.display = this._nearestPortalRoute() ? '' : 'none';
-		const grassDx = this.camera.position.x - this.grassCenter.x, grassDz = this.camera.position.z - this.grassCenter.y;
-		if ( this.grass && grassDx * grassDx + grassDz * grassDz > 64 ) {
+		const grassDx = this.grassCenter ? this.camera.position.x - this.grassCenter.x : 0, grassDz = this.grassCenter ? this.camera.position.z - this.grassCenter.y : 0;
+		if ( this.grass && ( this.terrain || this.hostedTerrainData ) && grassDx * grassDx + grassDz * grassDz > 64 ) {
 			this.scene.remove( this.grass );
-			this.grass = webglGrassMesh( T, this.terrain, this.camera, this.grass );
+			this.grass = webglGrassMesh( T, this.terrain || this.hostedTerrainData, this.camera, this.grass, this.hostedGrassMask || null );
 			this.scene.add( this.grass );
 			this.grassCenter.set( this.camera.position.x, this.camera.position.z );
 		}

@@ -152,3 +152,13 @@ after entry.
   authored variants using the same projected-size thresholds, hysteresis, and
   transition timing as WebGPU. The remaining declared Tidewater components are
   still omitted by WebGL; matched rendered parity remains open.
+- Hosted WebGL now decodes the verified terrain heightfield and static
+  vegetation placement and grass-density assets with the shared package
+  codecs. Its existing Three.js plant builders consume the packaged placements;
+  camera-following grass samples all four authored mask channels and uses the
+  packaged terrain heights. This removes the hardcoded Example Island grass
+  scatter from hosted worlds and initializes grass streaming state so hosted
+  frames do not fail on an unset center. Geometry, draw distance, and visual
+  density still need matched-render review; reef, fish props, wildlife, whale,
+  boat component behavior, ambient audio, and other declared behaviors remain
+  open in WebGL.
