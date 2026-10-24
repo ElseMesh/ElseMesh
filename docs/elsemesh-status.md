@@ -25,6 +25,21 @@ WebRTC data channel. Both Node harnesses now apply the Android linker
 workaround automatically. `adb devices -l` currently shows no attached
 device, so the isolated Flip7 visual check remains open.
 
+## Hosted game-state isolation (2026-10-24)
+
+`App.init()` now creates the built-in fishing game only for unlinked Example
+Island launches. A hosted invite no longer reads the Example Island's local
+`GameState` or constructs hidden local vendors, rod, and catch objects before
+loading its world. This keeps the local save and local-only game runtime out of
+hosted world initialization; fishing gameplay is still not a portable world
+component.
+
+WebGL fallback is part of package parity acceptance. Its hosted loader currently
+loads base GLB objects and water, but does not load authored object LODs or
+install the other declared Tidewater components. This is a known parity gap;
+feature omission in fallback mode cannot count as package parity. Both WebGPU
+and WebGL need matched-view acceptance against the built-in world.
+
 Repository ownership as of 2026-10-22: Tidewater is imported as the sole world
 content submodule. Burning Horizons is maintained at
 `ElseMesh/burning-horizons` and is no longer checked out or tracked in ElseMesh.

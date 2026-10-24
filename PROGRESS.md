@@ -94,6 +94,11 @@ after entry.
 
 ## 2026-10-24
 
+- Hosted invites no longer construct the built-in Example Island fishing game.
+  That constructor loaded the local `GameState` and created hidden vendors and
+  fishing objects even though hosted frames never update them. The built-in
+  game remains enabled for unlinked Example Island launches; portable fishing
+  gameplay is still open.
 - Every authored world now requires an explicit visitor cap and horizontal
   invitation spawn radius. Tidewater is set to 128 visitors and 8 m. Invitation
   admission uses nearest-first collision-free candidates and owner-side atomic
@@ -141,3 +146,7 @@ after entry.
   Chrome was launched and captured only on that display. The ADB transport
   disconnected before a matched hosted/built-in review could be completed, so
   density/LOD parity and desktop visual acceptance remain open.
+- WebGL fallback is included in the parity acceptance target. Its hosted path
+  currently loads base object assets and water only; authored object LODs and
+  the other required Tidewater package components are omitted. WebGL parity is
+  therefore incomplete and must be checked alongside WebGPU parity.

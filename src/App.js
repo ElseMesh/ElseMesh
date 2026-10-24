@@ -515,7 +515,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
 		this.player.audio = this.audio;
 		// the fishing game (rod, bites, catch, cooler, fish stand)
-		this.game = new Game( this );
+		// The built-in save, vendors and fishing simulation belong only to the local
+		// Example Island. Hosted worlds install their own declared behavior components.
+		this.game = worldLink ? null : new Game( this );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
 		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
 		for ( const [ s, lx, ly, lz ] of [ [ ISLAND_DEFINITION.fishStand, - 0.9, 1.85, 0.1 ], [ ISLAND_DEFINITION.chandlery, - 0.75, 1.58, - 1.45 ] ] ) {

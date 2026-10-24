@@ -20,8 +20,12 @@ village review on 2026-10-23 shows beach grass in both hosted and built-in
 renders at the same view and time. CPU checks now prove that packaged Tidewater
 plant placements and grass density match seeded source generation, and that
 all 143 non-terrain objects have geometry-reducing distance levels. Rendered
-density and LOD parity, desktop visual acceptance, and complete gameplay parity
-remain open.
+density and LOD parity remain open. This acceptance applies to both the primary
+WebGPU renderer and the WebGL fallback: a world package must not lose declared
+visual or runtime features merely because WebGPU is unavailable. WebGL must
+load authored object LODs and implement the package's supported renderer
+components, with matched-view checks against WebGPU and the built-in world.
+Desktop visual acceptance and complete gameplay parity also remain open.
 Keep Tidewater authored content in its repository and reusable execution code
 in ElseMesh. Tidewater is content data, not a separately compiled application;
 ElseMesh validates and executes its versioned behavior data. Do not introduce a
@@ -62,7 +66,9 @@ in `docs/`.
   [graphics review](docs/graphics-review.md).
 - **Runtime presentation (75%):** implement distance-based object and avatar LOD
   with stable transitions and load-based recovery; preserve shared player
-  presence, avatar appearance, animations, and vehicle rules. See
+  presence, avatar appearance, animations, and vehicle rules. Apply the same
+  package semantics in WebGL fallback, including authored object LODs and
+  required world components. See
   [world-object LOD](docs/world-object-lod.md#content-and-streaming-contract),
   [player presence](docs/player-presence.md), and
   [implementation status](docs/elsemesh-status.md).
