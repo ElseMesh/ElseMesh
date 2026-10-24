@@ -16,7 +16,11 @@ import (
 const playerPresenceProtocol = "elsemesh.player-presence/2"
 const legacyPlayerPresenceProtocol = "elsemesh.player-presence/1"
 const maxPresencePlayers = 128
+const maxSpawnCandidates = 1024
 const presenceTTL = 10 * time.Second
+const presencePlayerRadius = 0.3
+const presencePlayerHeight = 1.75
+const playerEyeHeight = 1.62
 const downeastBoatTriangles = 46845 // tidewater.downeast-boat/1 complexity contract
 
 var presenceSessionPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -138,6 +142,19 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		if err := validatePlayerPose(request.Pose); err != nil {
 			return peerResponse{}, err
 		}
+		if len(request.SpawnCandidates) > maxSpawnCandidates {
+			return peerResponse{}, errors.New("invalid_spawn_candidates")
+		}
+		for _, position := range request.SpawnCandidates {
+			if len(position) != 3 {
+				return peerResponse{}, errors.New("invalid_spawn_candidates")
+			}
+			for _, value := range position {
+				if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > 100000 {
+					return peerResponse{}, errors.New("invalid_spawn_candidates")
+				}
+			}
+		}
 		if err := d.validateVehiclePresence(request.Pose); err != nil {
 			return peerResponse{}, err
 		}
@@ -159,8 +176,45 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		if exists && request.Pose.Sequence <= old.Sequence {
 			return peerResponse{}, errors.New("stale_presence_sequence")
 		}
-		if !exists && len(d.players) >= maxPresencePlayers {
+		if !exists && (len(d.players) >= maxPresencePlayers || len(d.players) >= int(d.world.Rules.MaxVisitors)) {
 			return peerResponse{}, errors.New("presence_full")
+		}
+		if exists && len(request.SpawnCandidates) > 0 {
+			return peerResponse{}, errors.New("unexpected_spawn_candidates")
+		}
+		if !exists && len(request.SpawnCandidates) > 0 {
+			spawn := d.world.Spawn
+			spawnPosition := []float64{0, 3, 8}
+			if spawn != nil && len(spawn.Position) == 3 {
+				spawnPosition = spawn.Position
+			}
+			start := []float64{spawnPosition[0], spawnPosition[1] - playerEyeHeight, spawnPosition[2]}
+			chosen := false
+			lastDistanceSq := -1.0
+			for _, candidate := range request.SpawnCandidates {
+				dx, dz := candidate[0]-start[0], candidate[2]-start[2]
+				distanceSq := dx*dx + dz*dz
+				if distanceSq > d.world.Rules.SpawnRadius*d.world.Rules.SpawnRadius+1e-9 || distanceSq+1e-9 < lastDistanceSq {
+					return peerResponse{}, errors.New("invalid_spawn_candidates")
+				}
+				lastDistanceSq = distanceSq
+				occupied := false
+				for _, visitor := range d.players {
+					if presenceCapsulesOverlap(candidate, visitor.Position) {
+						occupied = true
+						break
+					}
+				}
+				if occupied {
+					continue
+				}
+				request.Pose.Position = append(request.Pose.Position[:0], candidate...)
+				chosen = true
+				break
+			}
+			if !chosen {
+				return peerResponse{}, errors.New("spawn_unavailable")
+			}
 		}
 		if exists && now.Sub(old.updated) < 50*time.Millisecond {
 			return peerResponse{}, errors.New("presence_rate_limited")
@@ -173,6 +227,15 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].ID < players[j].ID })
 	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players}, nil
+}
+
+func presenceCapsulesOverlap(a, b []float64) bool {
+	if len(a) != 3 || len(b) != 3 || math.Abs(a[1]-b[1]) >= presencePlayerHeight {
+		return false
+	}
+	dx, dz := a[0]-b[0], a[2]-b[2]
+	diameter := presencePlayerRadius * 2
+	return dx*dx+dz*dz < diameter*diameter
 }
 
 // The browser cannot choose a session ID: its gateway overwrites the field.

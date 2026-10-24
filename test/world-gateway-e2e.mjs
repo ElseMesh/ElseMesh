@@ -33,7 +33,7 @@ try {
 	const manifestPath = path.join( tempRoot, 'world-signed.json' );
 	const expiresAt = Math.floor( Date.now() / 1000 ) + 3600;
 	await writeFile( manifestInput, JSON.stringify( {
-		protocol: 'tidewater.world/1',
+		protocol: 'tidewater.world/2',
 		worldId: worldID,
 		ownerPeerId: ownerPeerID,
 		authorityPeerId: ownerPeerID,
@@ -41,7 +41,7 @@ try {
 		discoverable: true,
 		version: 1,
 		title: 'Live gateway fixture',
-		rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'tidewater-default' },
+		rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 20000, physicsProfile: 'tidewater-default' },
 		assets: [ { id: assetID, bytes: assetBytes.byteLength, kind: 'glb', priority: 'visible' } ],
 		objects: [],
 		components: [],

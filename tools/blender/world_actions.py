@@ -62,8 +62,13 @@ def require_keys(record, required, allowed, name):
 
 
 def validate_source(source):
-    if not isinstance(source, dict) or source.get("protocol") != "tidewater.world-source/1":
+    if not isinstance(source, dict) or source.get("protocol") != "tidewater.world-source/2":
         raise ValueError("unsupported world source protocol")
+    rules = source.get("rules")
+    if (not isinstance(rules, dict) or not isinstance(rules.get("maxVisitors"), int)
+            or isinstance(rules.get("maxVisitors"), bool) or not 1 <= rules["maxVisitors"] <= 128
+            or not finite_number(rules.get("spawnRadius")) or not 0 <= rules["spawnRadius"] <= 100):
+        raise ValueError("source must define maxVisitors (1-128) and spawnRadius (0-100 meters)")
     if not isinstance(source.get("objects"), list) or not isinstance(source.get("portals"), list):
         raise ValueError("source objects and portals must be arrays")
     seen = set()

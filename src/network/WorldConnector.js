@@ -173,9 +173,10 @@ export class WorldConnector {
 		throw lastError || new Error( 'No available provider could serve this world' );
 	}
 
-	async updatePresence( pose, { signal } = {} ) {
+	async updatePresence( pose, { signal, spawnCandidates } = {} ) {
 		validatePresencePose( pose );
-		const reply = await this.#request( { type: 'presence.update', pose }, { signal } );
+		if ( spawnCandidates !== undefined && ( ! Array.isArray( spawnCandidates ) || spawnCandidates.length < 1 || spawnCandidates.length > 1024 || spawnCandidates.some( ( position ) => ! Array.isArray( position ) || position.length !== 3 || ! position.every( ( value ) => Number.isFinite( value ) && Math.abs( value ) <= 100000 ) ) ) ) throw new Error( 'Invalid world spawn candidates' );
+		const reply = await this.#request( { type: 'presence.update', pose, ...( spawnCandidates ? { spawnCandidates } : {} ) }, { signal } );
 		invariant( reply.type === 'presence' && reply.worldId === this.worldId && typeof reply.playerId === 'string' && Array.isArray( reply.players ), 'Invalid player presence response' );
 		return reply;
 	}
@@ -1025,9 +1026,9 @@ function waitWithAbort( promise, signal ) {
 }
 
 export async function verifySignedWorldManifest( document ) {
-	await verifySignedDocument( document, 'tidewater.world/1' );
+	await verifySignedDocument( document, 'tidewater.world/2' );
 	const manifest = document.payload;
-	invariant( manifest.protocol === 'tidewater.world/1' && /^tw-world:[\w.-]{1,128}$/.test( manifest.worldId || '' ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
+	invariant( manifest.protocol === 'tidewater.world/2' && /^tw-world:[\w.-]{1,128}$/.test( manifest.worldId || '' ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience );
 	validateWorldSpawn( manifest.spawn );

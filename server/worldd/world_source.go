@@ -45,7 +45,7 @@ func readWorldSourceID(path string) (string, error) {
 	if err := json.Unmarshal(raw, &header); err != nil {
 		return "", fmt.Errorf("read world-source.json: %w", err)
 	}
-	if header.Protocol != "tidewater.world-source/1" || !worldIDPattern.MatchString(header.WorldID) {
+	if header.Protocol != "tidewater.world-source/2" || !worldIDPattern.MatchString(header.WorldID) {
 		return "", errors.New("world-source.json has an unsupported protocol or invalid worldId")
 	}
 	return header.WorldID, nil
@@ -128,9 +128,12 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	if err := json.Unmarshal(topLevel["rules"], &sourceRules); err != nil {
 		return signedDocument{}, errors.New("world-source.json rules must be an object")
 	}
+	if sourceRules["maxVisitors"] == nil || sourceRules["spawnRadius"] == nil {
+		return signedDocument{}, errors.New("world-source.json must define maxVisitors and spawnRadius")
+	}
 	allowedRuleFields := map[string]bool{
 		"gravity": true, "seaLevel": true, "atmosphereLevel": true, "avatarComplexity": true,
-		"physicsProfile": true, "movement": true, "vehiclePolicy": true, "maxPackageBytes": true,
+		"physicsProfile": true, "maxVisitors": true, "spawnRadius": true, "movement": true, "vehiclePolicy": true, "maxPackageBytes": true,
 		"requiredFeatures": true,
 	}
 	for field := range sourceRules {
@@ -147,14 +150,14 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return signedDocument{}, errors.New("world-source.json must contain exactly one JSON document")
 	}
-	if source.Protocol != "tidewater.world-source/1" || source.CoordinateSystem != "right-handed-y-up-meters" || !worldIDPattern.MatchString(source.WorldID) {
+	if source.Protocol != "tidewater.world-source/2" || source.CoordinateSystem != "right-handed-y-up-meters" || !worldIDPattern.MatchString(source.WorldID) {
 		return signedDocument{}, errors.New("world-source.json has an unsupported protocol, coordinate system, or worldId")
 	}
 	updatedAt, err := time.Parse(time.RFC3339Nano, source.UpdatedAt)
 	if err != nil {
 		return signedDocument{}, errors.New("world-source.json updatedAt must be a valid RFC3339 date-time")
 	}
-	if source.Rules.Gravity < 0.2 || source.Rules.Gravity > 2 || source.Rules.AvatarComplexity == 0 || source.Rules.PhysicsProfile == "" {
+	if source.Rules.Gravity < 0.2 || source.Rules.Gravity > 2 || source.Rules.AvatarComplexity == 0 || source.Rules.PhysicsProfile == "" || source.Rules.MaxVisitors == 0 || source.Rules.SpawnRadius < 0 || source.Rules.SpawnRadius > 100 {
 		return signedDocument{}, errors.New("world-source.json is missing required world rules")
 	}
 	sourceHash := sha256.Sum256(raw)

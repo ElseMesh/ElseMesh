@@ -17,7 +17,7 @@
   ],
   "properties": {
     "protocol": {
-      "const": "tidewater.world-source/1"
+      "const": "tidewater.world-source/2"
     },
     "worldId": {
       "type": "string",
@@ -69,7 +69,9 @@
       "required": [
         "gravity",
         "avatarComplexity",
-        "physicsProfile"
+        "physicsProfile",
+        "maxVisitors",
+        "spawnRadius"
       ],
       "properties": {
         "gravity": {
@@ -97,6 +99,18 @@
         "physicsProfile": {
           "type": "string",
           "enum": ["default", "tidewater-default"]
+        },
+        "maxVisitors": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "description": "Maximum simultaneous visitors admitted to this world."
+        },
+        "spawnRadius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum horizontal distance in meters from the authored spawn where invitation arrivals may be moved to avoid occupied or colliding positions."
         },
         "movement": {
           "type": "object",

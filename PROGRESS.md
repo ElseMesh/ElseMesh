@@ -94,6 +94,21 @@ after entry.
 
 ## 2026-10-24
 
+- Every authored world now requires an explicit visitor cap and horizontal
+  invitation spawn radius. Tidewater is set to 128 visitors and 8 m. Invitation
+  admission uses nearest-first collision-free candidates and owner-side atomic
+  occupancy/capacity checks; portal arrivals keep their mapped pose and are
+  checked against destination capacity.
+- Bumped the authoring and signed runtime document protocols to `/2` because
+  their required structure changed. World data itself is not versioned by the
+  engine protocol. Tidewater's source submodule and the package exporters now
+  emit the new format and explicit rules.
+- Focused spawn, presence-session, source-manifest, portal, proposal, directory,
+  and syntax checks passed. Go daemon tests and the secure gateway and browser-host end-to-end
+  tests stopped during linking: this Termux Go toolchain reports
+  `github.com/wlynxg/anet: invalid reference to net.zoneCache`, before test
+  assertions run. Server-side execution remains unverified in this environment.
+
 - Rebuilt the optional Android arm64 `worldd` from source revision `5ca7b8b`.
   Go build metadata reports `CGO_ENABLED=0`, and `worldd --version` reports the
   same full source revision. This verifies the CGO-free build and CLI, not a

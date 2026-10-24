@@ -32,7 +32,7 @@ should run `thruholdd` or an authorized cache node.
 The initial gateway endpoint is WebSocket-only. A host connects to the
 gateway's `wss://<origin>/browser-host` endpoint. The gateway sends a fresh
 32-byte nonce in `host.challenge`. The host registers one world by sending its
-owner-signed `tidewater.world/1` document and a base64 signature over the UTF-8
+owner-signed `tidewater.world/2` document and a base64 signature over the UTF-8
 message `elsemesh.browser-host/1\n<worldId>\n<nonce>`. The gateway verifies the
 world document, checks that its signer owns the world, verifies the
 nonce-bound proof, and replies `host.registered`. Reusing a proof with another

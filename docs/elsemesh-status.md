@@ -1,6 +1,25 @@
 # ElseMesh implementation status
 
-This document tracks the agreed ElseMesh direction against the current code. It is a progress ledger, not a reduced definition of the project. Protocol IDs beginning with `tidewater.` remain in use for compatibility; ElseMesh is the project and ThruHold is an independently owned world.
+This document tracks the agreed ElseMesh direction against the current code. It is a progress ledger, not a reduced definition of the project. `tidewater.` remains the namespace for world contracts; protocol versions identify document structure and interpretation, while authored world content stays in its content repository. ElseMesh is the project and ThruHold is an independently owned world.
+
+## Authored entry rules (2026-10-24)
+
+Each world source and signed runtime manifest now requires `maxVisitors` and
+`spawnRadius`. Tidewater sets these to 128 visitors and an 8 m horizontal
+invitation-spawn search radius. Invitation entry loads collision data around
+the authored spawn, sends nearest-first free candidates, and is admitted
+atomically by owner presence; the daemon enforces the visitor cap and chooses
+the first unoccupied candidate. Entry fails closed if the bounded area is full
+or owner admission fails. Portal handoffs keep their mapped arrival pose and
+still require destination visitor capacity. The source and runtime document
+protocols are now `tidewater.world-source/2` and `tidewater.world/2`; these
+versions describe structure, not authored world-content revisions.
+
+Focused spawn, presence-session, source-manifest, portal, proposal, and
+directory-signature tests pass. The Go daemon tests and gateway end-to-end test
+could not reach their assertions in this Termux environment: the installed Go
+linker rejects `github.com/wlynxg/anet`'s reference to `net.zoneCache`. A
+successful Go server build and live admission check remain open.
 
 Repository ownership as of 2026-10-22: Tidewater is imported as the sole world
 content submodule. Burning Horizons is maintained at

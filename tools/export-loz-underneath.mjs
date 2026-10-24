@@ -271,13 +271,13 @@ async function exportPackage( outDir ) {
 	try { updatedAt ||= JSON.parse( await readFile( worldSourcePath, 'utf8' ) ).updatedAt; } catch { /* new export */ }
 	updatedAt ||= '2026-10-01T00:00:00.000Z';
 	const source = validateWorldSource( {
-		protocol: 'tidewater.world-source/1',
+		protocol: 'tidewater.world-source/2',
 		worldId: 'tw-world:loz-underneath',
 		title: 'UNDERNEATH: Basalt Cavern',
 		experience: JSON.parse( await readFile( path.join( packageDir, 'presentation.json' ), 'utf8' ) ),
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: 'Static ElseMesh ThruHold export of the UNDERNEATH cave scene from archived loz/main (717d054). Authored materials preserve the cave color and emissive presentation. Source coordinates follow the Burning Horizons Y-up metre layout.',
-		rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'tidewater-default', movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 }, maxPackageBytes: 4 * 1024 * 1024, requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-emissive-strength/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ] },
+		rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 20000, physicsProfile: 'tidewater-default', movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 }, maxPackageBytes: 4 * 1024 * 1024, requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-emissive-strength/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ] },
 		hosts: [],
 		objects: [ {
 			id: 'tw-object:loz-underneath-cave', kind: 'asset-instance', label: 'UNDERNEATH cave, train station and closed door', assetId: assetID, lods: [ { assetId: lodAssetID, maxScreenFraction: 0.45 } ], priority: 'portal-preview',

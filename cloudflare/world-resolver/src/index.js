@@ -1,7 +1,7 @@
 import { verifySignedDocument } from '../../../src/network/SignedDocument.js';
 
 const NODE_PROTOCOL = 'tidewater.node/1';
-const WORLD_PROTOCOL = 'tidewater.world/1';
+const WORLD_PROTOCOL = 'tidewater.world/2';
 const AUTHORITY_PROTOCOL = 'tidewater.authority/2';
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_RECORD_BYTES = 1024 * 1024;

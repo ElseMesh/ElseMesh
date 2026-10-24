@@ -1,8 +1,8 @@
 import { validatePortalBack } from './PortalSideContract.js';
-import { MAX_WORLD_PACKAGE_BYTES, movementParameters, SUPPORTED_PHYSICS_PROFILES, validateWorldLevels, vehiclePolicy } from './WorldRules.js';
+import { MAX_WORLD_PACKAGE_BYTES, movementParameters, SUPPORTED_PHYSICS_PROFILES, validateWorldLevels, vehiclePolicy, visitorRules } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
 
-export const WORLD_SOURCE_PROTOCOL = 'tidewater.world-source/1';
+export const WORLD_SOURCE_PROTOCOL = 'tidewater.world-source/2';
 
 export function createWorldSource( { worldId = `tw-world:local-${ crypto.randomUUID() }`, title = 'Untitled world' } = {} ) {
 	return {
@@ -11,7 +11,7 @@ export function createWorldSource( { worldId = `tw-world:local-${ crypto.randomU
 		title,
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
-		rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'tidewater-default', movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } },
+		rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'tidewater-default', maxVisitors: 128, spawnRadius: 8, movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } },
 		hosts: [],
 		objects: [],
 		components: [],
@@ -29,6 +29,7 @@ export function validateWorldSource( source ) {
 	if ( source.coordinateSystem !== 'right-handed-y-up-meters' ) throw new Error( 'Unsupported world coordinate system' );
 	if ( typeof source.styleGuide !== 'string' || source.styleGuide.length > 10000 || ! source.rules || ! Number.isFinite( source.rules.gravity ) || source.rules.gravity < 0.2 || source.rules.gravity > 2 || ! Number.isInteger( source.rules.avatarComplexity ) || source.rules.avatarComplexity < 1 || source.rules.avatarComplexity > 100000 || ! SUPPORTED_PHYSICS_PROFILES.has( source.rules.physicsProfile ) ) throw new Error( 'Invalid or unsupported world rules or style guide' );
 	try { validateWorldLevels( source.rules ); } catch { throw new Error( 'Invalid world sea or atmosphere level' ); }
+	try { visitorRules( source.rules ); } catch { throw new Error( 'Invalid or missing world visitor limit or spawn radius' ); }
 	try { movementParameters( source.rules ); } catch { throw new Error( 'Invalid or unsupported world movement rules' ); }
 	try { vehiclePolicy( source.rules ); } catch { throw new Error( 'Invalid or unsupported world vehicle policy' ); }
 	if ( source.rules.maxPackageBytes !== undefined && ( ! Number.isSafeInteger( source.rules.maxPackageBytes ) || source.rules.maxPackageBytes < 1 || source.rules.maxPackageBytes > MAX_WORLD_PACKAGE_BYTES ) ) throw new Error( 'Invalid world package byte budget' );

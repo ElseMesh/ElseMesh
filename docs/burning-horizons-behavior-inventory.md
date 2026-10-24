@@ -1,7 +1,7 @@
 # Burning Horizons behavior inventory
 
 This inventory compares the authored UNDERNEATH and expansion briefs retained
-in Burning Horizons with ElseMesh's current `tidewater.world-source/1` package
+in Burning Horizons with ElseMesh's current `tidewater.world-source/2` package
 contract. The briefs are evidence of possible world behavior, not a decision to
 adopt every feature or upstream implementation. The content snapshot is
 reviewed as world design and assets; its excluded JavaScript runtime is not a

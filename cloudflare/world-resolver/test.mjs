@@ -49,8 +49,8 @@ const node = await signedDocument( 'tidewater.node/1', {
 	worldIds: [ worldId ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 	issuedAt: now, expiresAt: now + 600,
 }, owner );
-const manifest = await signedDocument( 'tidewater.world/1', {
-	protocol: 'tidewater.world/1', worldId, ownerPeerId: owner.peerId, authorityEpoch: 1,
+const manifest = await signedDocument( 'tidewater.world/2', {
+	protocol: 'tidewater.world/2', worldId, ownerPeerId: owner.peerId, authorityEpoch: 1,
 	discoverable: true, hosts: [],
 }, owner );
 const announcement = { node, manifest };

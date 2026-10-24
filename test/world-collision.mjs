@@ -11,8 +11,8 @@ const object = {
 	transform: { position: [ 10, 20, 30 ], yaw: Math.PI / 2 }, scale: [ 2, 3, 4 ], collision,
 };
 const source = {
-	protocol: 'tidewater.world-source/1', worldId: 'tw-world:test', title: 'Collision', coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
-	rules: { gravity: 1, avatarComplexity: 1000, physicsProfile: 'tidewater-default' }, objects: [ object ], portals: [], updatedAt: '2026-10-01T00:00:00Z',
+	protocol: 'tidewater.world-source/2', worldId: 'tw-world:test', title: 'Collision', coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
+	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'tidewater-default' }, objects: [ object ], portals: [], updatedAt: '2026-10-01T00:00:00Z',
 };
 assert.doesNotThrow( () => validateWorldSource( source ), 'enabled box collision with bounded dimensions is valid' );
 assert.throws( () => validateWorldSource( { ...source, objects: [ { ...object, collision: { ...collision, halfExtents: [ 1, 0, 3 ] } } ] } ), /bounded box, compound, or heightfield data/, 'zero collision extents are rejected' );

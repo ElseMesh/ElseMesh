@@ -26,6 +26,8 @@ export const SUPPORTED_WORLD_FEATURES = new Set( [
 export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'tidewater-default' ] );
 export const DEFAULT_WORLD_MOVEMENT = Object.freeze( { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } );
 export const DEFAULT_VEHICLE_POLICY = Object.freeze( { enabled: false } );
+export const MAX_WORLD_VISITORS = 128;
+export const MAX_WORLD_SPAWN_RADIUS = 100;
 // Fixed complexity contract for tidewater.downeast-boat/1. Keep synchronized
 // with BoatModel.triangleCount and the worldd validator.
 export const DOWNEAST_BOAT_TRIANGLES = 46845;
@@ -38,6 +40,7 @@ export function validateWorldRequirements( manifest ) {
 	if ( ! rules || ! Number.isFinite( rules.gravity ) || rules.gravity < 0.2 || rules.gravity > 2 || ! Number.isInteger( rules.avatarComplexity ) || rules.avatarComplexity < 1 || rules.avatarComplexity > 100000 || ! SUPPORTED_PHYSICS_PROFILES.has( rules.physicsProfile ) ) {
 		throw new Error( 'World manifest contains invalid runtime rules' );
 	}
+	visitorRules( rules );
 	validateWorldLevels( rules );
 	movementParameters( rules );
 	vehiclePolicy( rules );
@@ -51,6 +54,13 @@ export function validateWorldRequirements( manifest ) {
 		seen.add( feature );
 	}
 	return manifest;
+}
+
+export function visitorRules( rules ) {
+	if ( ! rules || ! Number.isInteger( rules.maxVisitors ) || rules.maxVisitors < 1 || rules.maxVisitors > MAX_WORLD_VISITORS || ! Number.isFinite( rules.spawnRadius ) || rules.spawnRadius < 0 || rules.spawnRadius > MAX_WORLD_SPAWN_RADIUS ) {
+		throw new Error( 'World visitor limit and spawn radius are invalid' );
+	}
+	return { maxVisitors: rules.maxVisitors, spawnRadius: rules.spawnRadius };
 }
 
 export function validateWorldLevels( rules ) {

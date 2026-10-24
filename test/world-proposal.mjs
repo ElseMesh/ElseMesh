@@ -8,9 +8,9 @@ import { applyWorldProposal } from '../tools/apply-world-proposal.mjs';
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const root = await mkdtemp( path.join( temporaryRoot, 'elsemesh-proposal-test-' ) );
 const source = {
-	protocol: 'tidewater.world-source/1', worldId: 'tw-world:proposal-test', title: 'Proposal test',
+	protocol: 'tidewater.world-source/2', worldId: 'tw-world:proposal-test', title: 'Proposal test',
 	coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
-	rules: { gravity: 1, avatarComplexity: 100, physicsProfile: 'default' },
+	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 100, physicsProfile: 'default' },
 	objects: [ { id: 'tw-object:crate', kind: 'asset-instance', label: 'Crate', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } ],
 	portals: [], updatedAt: '2026-10-01T00:00:00Z',
 };

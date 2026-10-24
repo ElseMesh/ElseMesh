@@ -124,9 +124,12 @@ entry point. Move the player only when a player or colliding object occupies
 that point, choose the nearest free location within the world's configured
 maximum displacement, and reject entry if the bounded area has no free
 location. Portal handoffs retain their mapped destination pose and bypass this
-allocation. Owner-authoritative presence must prevent two simultaneous entrants
-from reserving the same spot. Specify the optional bound's default and the
-presence-outage policy before implementing the allocator.
+allocation. Every world must author both its maximum visitor count and its
+spawn displacement radius; Tidewater's selected values are 128 visitors and
+8 m. Owner-authoritative presence atomically enforces the visitor limit and
+selects a free spawn candidate, preventing simultaneous entrants from
+reserving the same spot. Invitation entry fails closed when the owner cannot
+admit the visitor, because capacity and occupancy cannot otherwise be checked.
 Signed experience metadata must declare bootstrap, minimum-visible, and
 portal-preview content; the client must hold at the threshold until crossing
 requirements are met, then continue prioritized streaming. Portal lighting is a

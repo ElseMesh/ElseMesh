@@ -95,9 +95,9 @@ const clippedShader = buildMeshShader( new Material( { lit: false } ), [ { name:
 assert.match( clippedShader.code, /frame\.portalClipPlane/, 'portal render pipelines discard fragments using the per-view exit plane' );
 
 const source = {
-	protocol: 'tidewater.world-source/1', worldId: 'tw-world:source', title: 'Source',
+	protocol: 'tidewater.world-source/2', worldId: 'tw-world:source', title: 'Source',
 	coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
-	rules: { gravity: 1, avatarComplexity: 1000, physicsProfile: 'tidewater-default' },
+	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'tidewater-default' },
 	objects: [], updatedAt: '2026-09-30T12:00:00Z',
 	portals: [ {
 		id: 'tw-portal:door', destinationWorldId: 'tw-world:destination', destinationPeerId: '12D3KooW12345678901234567890',
@@ -138,7 +138,7 @@ disposeWorldPackage( framedWorld );
 assert.throws( () => validateWorldComponents( [ { id: 'tw-component:duplicate', type: 'tidewater.procedural-island-vegetation/1', seed: 7 } ], { requiredFeatures: [ 'tidewater.procedural-island-vegetation/1' ] }, new Set( [ 'tw-component:duplicate' ] ) ), /duplicate component ID/, 'browser rejects duplicate IDs across entity kinds' );
 const islandOcean = { id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' };
 assert.doesNotThrow( () => validateWorldComponents( [ islandOcean ], { requiredFeatures: [ islandOcean.type ] } ), 'browser accepts the versioned example-island ocean component' );
-assert.doesNotThrow( () => validateWorldRequirements( { rules: { gravity: 1, avatarComplexity: 1, physicsProfile: 'default', requiredFeatures: [ islandOcean.type ] } } ), 'browser recognizes the example-ocean runtime capability' );
+assert.doesNotThrow( () => validateWorldRequirements( { rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1, physicsProfile: 'default', requiredFeatures: [ islandOcean.type ] } } ), 'browser recognizes the example-ocean runtime capability' );
 assert.throws( () => validateWorldComponents( [ { ...islandOcean, seaLevel: 3 } ], { requiredFeatures: [ islandOcean.type ] } ), /Unsupported or invalid world component/, 'browser rejects undeclared island-ocean parameters' );
 assert.throws( () => validateWorldComponents( [ islandOcean, { ...islandOcean, id: 'tw-component:island-ocean-copy' } ], { requiredFeatures: [ islandOcean.type ] } ), /only one island ocean/, 'browser rejects duplicate infinite ocean components' );
 const waterBody = { id: 'tw-component:water-body', type: 'tidewater.water-body/1', center: [ -20, 45 ], extent: 256, priority: 'visible' };

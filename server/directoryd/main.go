@@ -28,7 +28,7 @@ import (
 
 const (
 	nodeProtocol      = "tidewater.node/1"
-	manifestProtocol  = "tidewater.world/1"
+	manifestProtocol  = "tidewater.world/2"
 	authorityProtocol = "tidewater.authority/2"
 	maxRecordBytes    = 1 << 20
 	maxDirectorySize  = 1024

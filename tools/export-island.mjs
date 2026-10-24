@@ -209,7 +209,7 @@ for ( const entry of await readdir( assetsPath, { withFileTypes: true } ) ) {
 for ( const [ id, bytes ] of staticAssets ) await writeFile( path.join( assetsPath, id.slice( 'sha256:'.length ) ), bytes );
 
 const source = {
-	protocol: 'tidewater.world-source/1',
+	protocol: 'tidewater.world-source/2',
 	worldId: 'tw-world:example-island',
 	title: 'Example Island',
 	experience: JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) ),
@@ -218,6 +218,8 @@ const source = {
 	styleGuide: 'Procedural volcanic island terrain. Preserve the coast, central bay, volcanic ridge, beaches, seabed, and terrain color regions.',
 	rules: {
 		gravity: 1,
+		maxVisitors: 128,
+		spawnRadius: 8,
 		seaLevel: 0,
 		avatarComplexity: 20000,
 		physicsProfile: 'tidewater-default',

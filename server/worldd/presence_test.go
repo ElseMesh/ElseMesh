@@ -150,6 +150,76 @@ func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 	}
 }
 
+func TestPresenceEnforcesWorldVisitorLimit(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.MaxVisitors = 1
+	now := time.Now()
+	join := func(gateway string) error {
+		request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: presenceTestPose()}
+		session, err := newPresenceSession()
+		if err != nil {
+			return err
+		}
+		bindPresenceRequest(&request, gateway, session)
+		_, err = d.presenceRequest(request, now)
+		return err
+	}
+	if err := join(d.host.ID().String()); err != nil {
+		t.Fatalf("first visitor should be admitted: %v", err)
+	}
+	if err := join("second-gateway"); err == nil || err.Error() != "presence_full" {
+		t.Fatalf("world-specific visitor limit was not enforced: %v", err)
+	}
+}
+
+func TestPresenceAdmissionSelectsNearestUnoccupiedSpawnCandidate(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.MaxVisitors = 4
+	d.world.Rules.SpawnRadius = 1
+	now := time.Now()
+	join := func(gateway string) peerResponse {
+		request := gatewayMessage{
+			Type:            "presence.update",
+			Pose:            presenceTestPose(),
+			SpawnCandidates: [][]float64{{0, 1.38, 8}, {0.6, 1.38, 8}, {-0.6, 1.38, 8}, {0, 1.38, 8.6}},
+		}
+		request.Pose.Sequence = 0
+		session, err := newPresenceSession()
+		if err != nil {
+			t.Fatal(err)
+		}
+		bindPresenceRequest(&request, gateway, session)
+		reply, err := d.presenceRequest(request, now)
+		if err != nil {
+			t.Fatalf("admission for %s: %v", gateway, err)
+		}
+		return reply
+	}
+	first := join(d.host.ID().String())
+	var firstPosition []float64
+	for _, player := range first.Players {
+		if player.ID == first.PlayerID {
+			firstPosition = player.Position
+		}
+	}
+	if got := firstPosition; len(got) != 3 || got[0] != 0 || got[2] != 8 {
+		t.Fatalf("first visitor did not retain the preferred spawn: %v", got)
+	}
+	second := join("second-gateway")
+	var secondPosition []float64
+	for _, player := range second.Players {
+		if player.ID == second.PlayerID {
+			secondPosition = player.Position
+		}
+	}
+	if got := secondPosition; len(got) != 3 || got[0] == 0 && got[2] == 8 {
+		t.Fatalf("second visitor overlapped the first visitor: %v", got)
+	}
+	if got := secondPosition; math.Abs(got[0]) != 0.6 && got[2] != 8.6 {
+		t.Fatalf("second visitor was not assigned a nearest free candidate: %v", got)
+	}
+}
+
 func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 	owner := presenceTestDaemon(t)
 	gateway := presenceTestDaemon(t)

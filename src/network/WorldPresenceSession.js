@@ -19,8 +19,8 @@ export function makePresencePose(player, sequence, appearance) {
  };
 }
 
-// Only an active ThruHold creates a session. Asset loading and portal previews
-// never publish a visitor in a destination they have not entered.
+// Entry admission is the first operation that registers a visitor. Asset loading
+// and portal previews never publish a visitor into a destination.
 export class WorldPresenceSession {
  constructor({connector, parent, appearance = loadAppearance(),
   createConnector = options => new WorldConnector(options),
@@ -42,6 +42,23 @@ export class WorldPresenceSession {
   this.pending = null;
   this.disposed = false;
   this.reportedError = false;
+  this.admitted = false;
+ }
+ async admit(player, spawnCandidates, {yaw = null} = {}) {
+  if (this.disposed || this.admitted || spawnCandidates !== undefined && (!Array.isArray(spawnCandidates) || !spawnCandidates.length)) throw new Error('Invalid world presence admission');
+  const pose = makePresencePose(player, this.sequence, this.appearance);
+  if (Number.isFinite(yaw)) pose.yaw = yaw;
+  return this.admitPose(pose, spawnCandidates);
+ }
+ async admitPose(pose, spawnCandidates) {
+  if (this.disposed || this.admitted) throw new Error('Invalid world presence admission');
+  const snapshot = await this.connector.updatePresence(pose, {signal:this.controller.signal, spawnCandidates});
+  if (this.disposed) throw new DOMException('Left ThruHold', 'AbortError');
+  this.state.observe(snapshot, {requestId:snapshot.requestId, now:this.clock()});
+  const own = snapshot.players.find(value => value.id === snapshot.playerId);
+  if (!own) throw new Error('World admission did not return the admitted visitor');
+  this.admitted = true;
+  return own;
  }
  update(dt, player, now = this.clock(), loadBias = 0) {
   if (this.disposed) return;

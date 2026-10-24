@@ -11,7 +11,7 @@ import pathlib
 import sys
 import bpy
 
-PROTOCOL = "tidewater.world-source/1"
+PROTOCOL = "tidewater.world-source/2"
 TEXT_NAME = "ElseMeshThruHoldSource"
 PREVIOUS_TEXT_NAME = "ThruholdWorldSource"
 LEGACY_TEXT_NAME = "TidewaterWorldSource"
@@ -31,6 +31,12 @@ def validate(source):
         raise ValueError("missing worldId")
     if not isinstance(source.get("objects"), list) or not isinstance(source.get("portals"), list):
         raise ValueError("objects and portals must be arrays")
+    rules = source.get("rules")
+    if (not isinstance(rules, dict) or not isinstance(rules.get("maxVisitors"), int)
+            or isinstance(rules.get("maxVisitors"), bool) or not 1 <= rules["maxVisitors"] <= 128
+            or not isinstance(rules.get("spawnRadius"), (int, float)) or isinstance(rules.get("spawnRadius"), bool)
+            or not math.isfinite(rules["spawnRadius"]) or not 0 <= rules["spawnRadius"] <= 100):
+        raise ValueError("rules must define maxVisitors (1-128) and spawnRadius (0-100 meters)")
     hosts = source.get("hosts", [])
     if not isinstance(hosts, list) or len(hosts) > 256:
         raise ValueError("hosts must be an array of at most 256 grants")

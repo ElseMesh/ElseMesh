@@ -29,6 +29,15 @@ session.dispose(); assert.equal(closed,1); assert.equal(sent[2].signal.aborted,t
 pending.resolve({type:'presence',worldId:connector.worldId,requestId:'late',playerId:own,players:[pose]}); await session.pending;
 session.update(.016,player); assert.equal(created.length,1,'late source-world response cannot resurrect an avatar after handoff');
 session.dispose(); assert.equal(closed,1,'disposal is idempotent');
+let admissionOptions, admittedPose;
+const admissionSession = new WorldPresenceSession({connector,parent:{add(){}},clock:()=>700,
+ createConnector(){return {updatePresence(pose,options){admittedPose=pose;admissionOptions=options;return Promise.resolve({type:'presence',worldId:connector.worldId,requestId:'admit',playerId:own,players:[{...pose,position:options.spawnCandidates[0],id:own,updatedAt:700}]})},close(){}}},
+});
+const accepted = await admissionSession.admit(player, [[1,1,3],[1.6,1,3]]);
+assert.equal(admittedPose.sequence,0,'admission creates the session before its regular update sequence');
+assert.deepEqual(admissionOptions.spawnCandidates,[[1,1,3],[1.6,1,3]],'invitation candidates reach the owner for atomic player occupancy checks');
+assert.deepEqual(accepted.position,[1,1,3],'admission returns the owner-selected position');
+admissionSession.dispose();
 const boatPose=makePresencePose({...player,mode:'boat',boat:{getYaw:()=>1,speed:7.5},helmYaw:.2,helmPitch:.4},4,DEFAULT_APPEARANCE);
 assert.ok(Math.abs(boatPose.yaw-Math.atan2(Math.sin(1+Math.PI+.2),Math.cos(1+Math.PI+.2)))<1e-9);
 assert.equal(boatPose.pitch,.4); assert.equal(boatPose.moving,false,'helm pose is distinct from walking');

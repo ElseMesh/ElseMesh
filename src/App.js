@@ -76,6 +76,7 @@ import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { worldSeaLevel } from './network/WorldRules.js';
 import { worldSpawnPose } from './network/WorldSource.js';
+import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView } from './network/WorldStreaming.js';
@@ -563,15 +564,32 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } );
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
+			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
-			const initialAssetIDs = new Set( initialObjects.map( ( object ) => object.assetId ) );
+			const initialAssetIDs = new Set( connector.manifest.objects.filter( ( object ) => initialObjectIDs.has( object.id ) ).map( ( object ) => object.assetId ) );
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
-			const visibleAssets = await connector.preload( { through: 'nearby', assetIDs: initialAssetIDs } );
+			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs } );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			this.prepareHostedWorld( connector );
+			this.player.setHostedWorldPose( this.camera.position, this.player.yaw, this.player.pitch );
+			let admissionSession;
+			try {
+				const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders );
+				if ( ! candidates.length ) throw new Error( 'No free player position exists within this world’s spawn radius' );
+				admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot } );
+				const admitted = await admissionSession.admit( this.player, candidates );
+				this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
+				this.camera.position.copy( this.player.camera.position );
+			} catch ( error ) {
+				admissionSession?.dispose();
+				unregisterWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
+				this.disposeUncommittedWorldComponents( this.linkedWorldRoot );
+				connector.close();
+				throw new Error( `Unable to enter this world: ${error.message}` );
+			}
 			this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
 			scene.add( this.linkedWorldRoot );
 			this.remoteWorlds.set( connector.worldId, { connector, root: this.linkedWorldRoot } );
@@ -579,7 +597,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			this.streamWorldRemainder( connector, this.linkedWorldRoot );
 			this.proceduralWorldRoot.visible = false;
 			this.remoteWorldActive = true;
-			this.activateHostedWorld( this.linkedWorldRoot, connector );
+			this.activateHostedWorld( this.linkedWorldRoot, connector, admissionSession );
 			this.refraction.enabled = false;
 			this.portalPreviousPosition = this.camera.position.clone();
 			rememberWorldVisit( {
@@ -1048,7 +1066,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		root.userData.worldComponents.push( ...installed );
 	}
 
-	activateHostedWorld( root, connector ) {
+	activateHostedWorld( root, connector, presenceSession = null ) {
 
 		this.prepareHostedWorld( connector );
 		const terrain = ( root.userData.worldComponents || [] ).find( ( component ) => component.islandTerrain && component.terrainGPU );
@@ -1076,7 +1094,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const policy = vehiclePolicy( connector.manifest.rules );
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
 		}
-		this.startWorldPresence( root, connector );
+		if ( presenceSession ) this.worldPresence = presenceSession;
+		else this.startWorldPresence( root, connector );
 
 	}
 
@@ -1189,6 +1208,12 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 	updateWorldPortals() {
 
+		if ( this.portalAdmissionPending ) {
+			this.camera.position.copy( this.portalAdmissionPending.position );
+			this.portalPreviousPosition.copy( this.portalAdmissionPending.position );
+			this.holdPlayerAtPortal( this.portalAdmissionPending.position );
+			return;
+		}
 		const connector = this.worldConnector;
 		if ( ! this.remoteWorldActive || ! connector?.manifest?.portals ) {
 			this.clearPortalPreview();
@@ -1288,7 +1313,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				}
 				return;
 			}
-			this.enterWorldPortal( portal, preparation );
+			this.enterWorldPortal( portal, preparation, previous ).catch( ( error ) => {
+				this.portalAdmissionPending = null;
+				this.camera.position.copy( previous );
+				this.portalPreviousPosition.copy( previous );
+				this.holdPlayerAtPortal( previous );
+				console.error( 'Could not enter portal destination', error );
+				this.ui?.ui?.toast( 'Could not enter this ThruHold', 3500 );
+			} );
 			return;
 		}
 
@@ -1363,7 +1395,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 	}
 
-	enterWorldPortal( portal, preparation ) {
+	async enterWorldPortal( portal, preparation, previous ) {
 
 		const sourceConnector = this.worldConnector;
 		const destinationConnector = preparation.connector;
@@ -1377,6 +1409,24 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			position: this.camera.position, velocity: this.player.velocity,
 			yaw: this.player.yaw, pitch: this.player.pitch,
 		}, portal.entry, portal.exit );
+		this.portalAdmissionPending = { position: previous.clone() };
+		this.camera.position.copy( previous );
+		this.portalPreviousPosition.copy( previous );
+		this.holdPlayerAtPortal( previous );
+		const arrivalPlayer = { ...this.player, position: new Vector3( arrival.position.x, arrival.position.y - 1.62, arrival.position.z ), yaw: arrival.yaw, pitch: arrival.pitch };
+		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot } );
+		try {
+			await admissionSession.admit( arrivalPlayer, undefined, { yaw: arrival.yaw } );
+		} catch ( error ) {
+			admissionSession.dispose();
+			this.portalAdmissionPending = null;
+			this.camera.position.copy( previous );
+			this.portalPreviousPosition.copy( previous );
+			this.holdPlayerAtPortal( previous );
+			this.ui?.ui?.toast( error.message === 'presence_full' ? 'This ThruHold has reached its visitor limit' : 'Could not enter this ThruHold', 3500 );
+			return;
+		}
+		this.portalAdmissionPending = null;
 		this.deactivateHostedWorld();
 		this.worldBackgroundLoads.get( sourceConnector.worldId )?.abort();
 		this.worldBackgroundLoads.delete( sourceConnector.worldId );
@@ -1389,7 +1439,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.player.setWorldRules( destinationConnector.manifest.rules );
 		G.seaLevel.value = worldSeaLevel( destinationConnector.manifest.rules );
 		this.player.setHostedWorldPose( arrival.position, arrival.yaw, arrival.pitch );
-		this.activateHostedWorld( destinationRoot, destinationConnector );
+		this.activateHostedWorld( destinationRoot, destinationConnector, admissionSession );
 		if ( sourceVehicle ) {
 			const destinationBoat = this.activeHostedBoat?.boat.controller;
 			const policy = vehiclePolicy( destinationConnector.manifest.rules );

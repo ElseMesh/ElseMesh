@@ -15,7 +15,8 @@ assert.throws( () => browserHostSocketURL( 'http://gateway.example.test' ), /HTT
 assert.throws( () => browserHostSocketURL( 'ws://gateway.example.test' ), /HTTPS\/WSS/ );
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
-const tempRoot = await mkdtemp( path.join( '/var/tmp', 'elsemesh-browser-host-' ) );
+const tempBase = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
+const tempRoot = await mkdtemp( path.join( tempBase, 'elsemesh-browser-host-' ) );
 const worldd = path.join( tempRoot, 'thruholdd-test' );
 const worldsDir = path.join( tempRoot, 'worlds' );
 const profile = 'browser-host-test';

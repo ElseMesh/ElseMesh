@@ -81,7 +81,7 @@ async function main() {
 		if ( packageBytes > source.rules.maxPackageBytes ) throw new Error( `World package uses ${packageBytes} bytes, over its declared ${source.rules.maxPackageBytes}-byte budget` );
 	}
 	const manifest = {
-		protocol: 'tidewater.world/1',
+		protocol: 'tidewater.world/2',
 		worldId: source.worldId,
 		sourceHash: `sha256:${createHash( 'sha256' ).update( sourceBytes ).digest( 'hex' )}`,
 		ownerPeerId: args.owner,
