@@ -35,6 +35,7 @@ import { VillageTextures } from '../src/world/village/TextureBaker.js';
 import { encodeVillageMaterialAsset, wrapCompressedVillageMaterialAsset } from '../src/network/VillageMaterialAsset.js';
 import { EXAMPLE_ISLAND_WHALE_PROFILE } from '../src/world/marine/WhaleBrain.js';
 import { writeWorldAssetIndex } from './world-asset-index.mjs';
+import { generateTidewaterReefURLs } from './generate-tidewater-reef-urls.mjs';
 
 const REPO = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const args = process.argv.slice( 2 );
@@ -311,6 +312,7 @@ const source = {
 	updatedAt,
 };
 await writeFile( sourcePath, `${JSON.stringify( source, null, 2 )}\n` );
+if ( output === path.join( REPO, 'worlds', 'tidewater' ) ) await generateTidewaterReefURLs();
 const terrainValidation = {
 	format: 'elsemesh.terrain-validation/1',
 	worldId: source.worldId,

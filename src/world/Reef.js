@@ -38,13 +38,22 @@ export { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacem
 const TAU = Math.PI * 2;
 const MAX_TOP = - 0.6; // nothing rises above this (m)
 const SWELL = new THREE.Vector2( WORLD.swellDir.x, WORLD.swellDir.y ).normalize();
-const CELL = 8; // culling cell (m)
-const RANGE = 45; // underwater draw distance (m): beyond ~40 m the water leaves < 10% contrast
-const RANGE_ABOVE = 35; // from above the water: farther away the surface mostly reflects
-const RANGE_FAR = 110; // large structures (outcrops, big heads) seen from high above the water
-const SOFT_RANGE = 40; // fans and plumes (alpha tested: expensive overdraw, faint at distance)
-const SHADOW_RANGE = 22; // large structures cast shadows within this distance of the camera (m)
-const SHADOW_SIZE = 0.6; // smallest radius (m) that casts shadows
+export const REEF_CULLING = Object.freeze( {
+	cellSize: 8,
+	underwaterRange: 45,
+	aboveRange: 35,
+	maxAboveRange: 110,
+	softRange: 40,
+	shadowRange: 22,
+	shadowSize: 0.6,
+} );
+const CELL = REEF_CULLING.cellSize;
+const RANGE = REEF_CULLING.underwaterRange;
+const RANGE_ABOVE = REEF_CULLING.aboveRange;
+const RANGE_FAR = REEF_CULLING.maxAboveRange;
+const SOFT_RANGE = REEF_CULLING.softRange;
+const SHADOW_RANGE = REEF_CULLING.shadowRange; // large structures cast shadows within this distance of the camera (m)
+const SHADOW_SIZE = REEF_CULLING.shadowSize; // smallest radius (m) that casts shadows
 const HF_CELL = 0.25; // height field resolution (m)
 // the bay floor outside the reef region that gets its own scatter (placeBay)
 const BAY = { x0: - 200, x1: 135, z0: - 48, z1: 175 };
@@ -263,11 +272,16 @@ const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
 const _v = new THREE.Vector3(), _n = new THREE.Vector3(), _up = new THREE.Vector3( 0, 1, 0 );
 const _m = new THREE.Matrix4(), _frustum = new THREE.Frustum(), _box = new THREE.Box3();
 
+export function reefLODAtDistance( distance, data, index ) {
+
+	return Math.min( distance < data.d0[ index ] ? 0 : distance < data.d1[ index ] ? 1 : distance < data.d2[ index ] ? 2 : 3, data.lods[ index ] - 1 );
+
+}
+
 export class Reef {
 
 	constructor( { scene, terrain, shoreField = null, layoutOnly = false, placementRecords = null, maxInstances = null } ) {
 
-		if ( layoutOnly && placementRecords !== null ) throw new Error( 'Reef layoutOnly and placementRecords modes are mutually exclusive' );
 		if ( maxInstances !== null && ( ! Number.isInteger( maxInstances ) || maxInstances < 1 || maxInstances > 200000 ) ) throw new Error( 'Reef maxInstances must be an integer from 1 to 200000' );
 		if ( maxInstances !== null && placementRecords === null ) throw new Error( 'Reef maxInstances is only valid with placementRecords' );
 
@@ -1471,7 +1485,7 @@ export class Reef {
 			if ( D.proxy[ i ] >= 0 && d < SHADOW_RANGE + D.r[ i ] && D.r[ i ] > SHADOW_SIZE ) batch.add( D.proxy[ i ], i );
 			const dm = Math.min( D.dmax[ i ], range );
 			if ( ! visible || d > dm ) continue;
-			const lod = Math.min( d < D.d0[ i ] ? 0 : d < D.d1[ i ] ? 1 : d < D.d2[ i ] ? 2 : 3, D.lods[ i ] - 1 );
+			const lod = reefLODAtDistance( d, D, i );
 			const kind = D.kind0[ i ] + lod;
 			// faded out (dithered) over the last tenth of the draw distance
 			if ( d > dm * 0.9 ) {

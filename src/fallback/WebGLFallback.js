@@ -12,6 +12,7 @@ import { decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeFishPropPlacements } from '../network/FishPropPlacements.js';
+import { decodeReefPlacements } from '../network/ReefPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
@@ -22,6 +23,8 @@ import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
+import { WebGLReefAdapter } from './WebGLReefAdapter.js';
+import { TIDEWATER_REEF_ASSET_URLS } from '../world/reef/TidewaterReefAssets.js';
 import { initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
@@ -1330,6 +1333,7 @@ export class WebGLFallback {
 		} catch ( error ) {
 			console.warn( 'WebGL fallback village model unavailable:', error );
 		}
+		await this._loadPackagedReef();
 		await this._loadVegetation();
 		const start = WORLD.start || WORLD.spawn;
 		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
@@ -1556,6 +1560,18 @@ export class WebGLFallback {
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			terrainReady: !! this.hostedTerrainData, boatReady: !! this.hostedBoatSpec,
 		} );
+		const hostedReefRecords = [], hostedReefIds = [];
+		for ( const reef of components.filter( component => component.type === 'tidewater.static-reef/1' ) ) {
+			const placementBytes = assets.get( reef.placementAssetId );
+			if ( ! placementBytes ) continue;
+			const decoded = decodeReefPlacements( asBytes( placementBytes ) );
+			hostedReefRecords.push( ...decoded.records );
+			hostedReefIds.push( reef.id );
+		}
+		if ( hostedReefIds.length ) {
+			this.hostedReefAdapter = new WebGLReefAdapter( T, this.scene, hostedReefRecords );
+			for ( const id of hostedReefIds ) supportedComponents.add( id );
+		}
 		for ( const vegetation of components.filter( component => component.type === 'tidewater.static-vegetation/1' ) ) {
 			const placementBytes = assets.get( vegetation.placementAssetId );
 			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
@@ -1590,6 +1606,21 @@ export class WebGLFallback {
 			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
 		this.worldName.textContent = `${ manifest.title || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
 		progress( 0.9, 'Preparing hosted world…' );
+
+	}
+
+	async _loadPackagedReef() {
+
+		const components = tidewaterWorldSource.components.filter( item => item.type === 'tidewater.static-reef/1' );
+		const recordsByTile = await Promise.all( components.map( async component => {
+			const url = TIDEWATER_REEF_ASSET_URLS[ component.placementAssetId ];
+			if ( ! url ) throw new Error( `Packaged reef asset ${component.placementAssetId} is missing from the Tidewater source tree` );
+			const response = await fetch( url );
+			if ( ! response.ok ) throw new Error( `Packaged reef asset ${component.placementAssetId} returned ${response.status}` );
+			return decodeReefPlacements( new Uint8Array( await response.arrayBuffer() ) ).records;
+		} ) );
+		const records = recordsByTile.flat();
+		if ( records.length ) this.reefAdapter = new WebGLReefAdapter( this.THREE, this.scene, records );
 
 	}
 
@@ -1743,6 +1774,8 @@ export class WebGLFallback {
 			}
 		}
 		this.fishStand?.update( dt, this.camera.position );
+		this.reefAdapter?.update( this.camera );
+		this.hostedReefAdapter?.update( this.camera );
 		this.gameAdapter?.update( dt, this.player?.position || this.camera.position );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;

@@ -64,8 +64,11 @@ shader-level surface effects still need parity work. Hosted wildlife uses the
 shared simulation and WebGL presentation adapter when packaged terrain is
 available; the fallback reports that capability accurately. The hosted boat
 component now uses the shared boat controller and canonical boat model in
-WebGL, positioned by its signed berth object. Reef, whale, and other declared
-behaviors remain unsupported.
+WebGL, positioned by its signed berth object. Static reef placements now render
+in built-in and hosted WebGL through canonical geometry and distance LODs, but
+WebGL materials and transitions are simplified and flex animation, shadows,
+fish simulation, and reef collision are missing. The whale and other
+declared behaviors remain unsupported.
 Feature omission or approximation in
 fallback mode cannot count as package parity.
 Both WebGPU and WebGL need

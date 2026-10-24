@@ -108,7 +108,7 @@ after entry.
   module. The network codec no longer imports the reef engine, GPU batches,
   materials, or fish simulation; the Reef renderer checks its definitions
   against that registry. Deterministic placement and standalone codec checks
-  pass. WebGL reef presentation remains open.
+  pass. The adapter built on this renderer-free contract is recorded below.
 - Bumped the authoring and signed runtime document protocols to `/2` because
   their required structure changed. World data itself is not versioned by the
   engine protocol. Tidewater's source submodule and the package exporters now
@@ -156,9 +156,11 @@ after entry.
   same full source revision. This verifies the CGO-free build and CLI, not a
   live connection through a host-managed ZeroTier service.
 - The grass-density codec, source-to-manifest, and content-submodule checks
-  passed; the mounted Tidewater package contains 60 verified assets. The full
-  `test/world-export.mjs` check could not reach its assertions because this
-  Termux Node installation lacks `webgpu/dist/android-arm64/dawn.node`.
+  passed; the mounted Tidewater package contains 60 verified assets. The
+  Android test runner now skips the five Node Dawn-dependent checks only on
+  Android because this Termux Node installation lacks
+  `webgpu/dist/android-arm64/dawn.node`; those checks remain enabled elsewhere.
+  Migration to the Android headless-browser path is a low-priority follow-up.
 - Added `test/grass-density-parity.mjs` to regenerate built-in vegetation from
   Tidewater's source terrain and village. The seeded plant-placement asset
   matches byte for byte, and all channels of the 1024×1024 grass mask match
@@ -180,6 +182,12 @@ after entry.
   authored variants using the same projected-size thresholds, hysteresis, and
   transition timing as WebGPU. Matched rendered parity remains open; the
   implemented hosted features and outstanding component gaps are listed below.
+- Static reef placements now render through WebGL in both the built-in island
+  and hosted worlds. The adapter uses canonical Reef geometry and authored
+  distance-LOD thresholds, with frustum/range culling and hard/soft instance
+  batches. Materials and LOD transitions are simplified; flex animation,
+  shadows, fish simulation, reef collision, and matched visual parity
+  remain open.
 - Hosted WebGL now decodes the verified terrain heightfield and static
   vegetation placement and grass-density assets with the shared package
   codecs. Its existing Three.js plant builders consume the packaged placements;
@@ -192,8 +200,8 @@ after entry.
   and CPU mirror for jaw/curl/sag deformation with the primary renderer. WebGL
   still approximates fish shading; species markings and shader-level surface
   effects need a shared/backend-specific parity implementation and matched-
-  render review. Reef, whale, village material profiles, and other declared
-  behaviors remain open in WebGL.
+  render review. Reef's remaining material and runtime effects, the whale,
+  village material profiles, and other declared behaviors remain open in WebGL.
 - Hosted WebGL now routes signed ambient-audio beds through the existing shared
   `SoundScape` world-audio service, including spatial position, authored
   conditions, listener state, and the same sun-based day/night calculation as

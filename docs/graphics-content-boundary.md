@@ -45,9 +45,11 @@ The stable type order and model-variant counts for
 `tidewater.reef-placement/1` live in `src/network/ReefPlacementTypes.js`.
 The placement codec consumes only that registry; `Reef.js` verifies its
 renderer definitions against it. This keeps reef content serialization
-independent of engine, GPU-batch, material, and fish-simulation imports. It is
-a data-boundary step only: WebGL reef presentation and matched visual parity
-remain open.
+independent of engine, GPU-batch, material, and fish-simulation imports. The
+WebGL fallback now presents signed static placements in built-in and hosted
+worlds through the canonical geometry and distance-LOD catalog. Its materials
+and LOD transitions are simplified; flex animation, shadows, fish, reef
+collision, and matched visual parity remain open.
 
 ## Migration order
 

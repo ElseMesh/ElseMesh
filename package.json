@@ -13,7 +13,7 @@
     "test:browser-host-client": "node test/browser-host-client.mjs",
     "test:account-client": "node test/account-client.mjs",
     "test:webgl-backend": "node test/webgl-backend.mjs",
-    "test:webgl-content": "node test/webgl-boat-adapter.mjs && node test/webgl-fish-stand-adapter.mjs && node test/webgl-fish-props-adapter.mjs && node test/webgl-game-adapter.mjs && node test/webgl-wildlife-adapter.mjs && node test/webgl-swash-probe.mjs && node test/webgl-component-support.mjs",
+    "test:webgl-content": "node test/webgl-boat-adapter.mjs && node test/webgl-fish-stand-adapter.mjs && node test/webgl-fish-props-adapter.mjs && node test/webgl-reef-adapter.mjs && node test/webgl-game-adapter.mjs && node test/webgl-wildlife-adapter.mjs && node test/webgl-swash-probe.mjs && node test/webgl-component-support.mjs",
     "test:wildlife-runtime": "node test/wildlife-runtime.mjs && node test/wildlife-frame.mjs",
     "export:island": "node tools/export-island.mjs",
 		"export:grass-density": "node tools/export-grass-density.mjs",
