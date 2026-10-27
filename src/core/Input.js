@@ -24,14 +24,19 @@ export class Input {
 		this.mouseDown = false;
 		this.rightDown = false;
 		this.locked = false;
+		this.lockSuppressed = false;
 		this.enabled = true;
 
 		window.addEventListener( 'keydown', ( e ) => {
 
 			if ( e.target && ( e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' ) ) return;
+			if ( e.code === 'Escape' ) {
+				this.lockSuppressed = true;
+				if ( document.pointerLockElement === this.dom ) document.exitPointerLock?.();
+			}
 			// Browsers can release pointer lock after tab focus changes. A gameplay key press is
 			// another user gesture, so use it to restore mouse-look without requiring a separate click.
-			if ( ! this.locked && this.enabled && [ 'KeyW', 'KeyA', 'KeyS', 'KeyD' ].includes( e.code ) && ! window.__ui?.isPointerOverUI ) this.requestLock();
+			if ( ! this.locked && ! this.lockSuppressed && this.enabled && [ 'KeyW', 'KeyA', 'KeyS', 'KeyD' ].includes( e.code ) && ! window.__ui?.isPointerOverUI ) this.requestLock( { userGesture: false } );
 			if ( ! this.keys.has( e.code ) ) this.pressed.add( e.code );
 			this.keys.add( e.code );
 			if ( [ 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab' ].includes( e.code ) ) e.preventDefault();
@@ -84,9 +89,11 @@ export class Input {
 
 	}
 
-	requestLock() {
+	requestLock( { userGesture = true } = {} ) {
 
 		if ( window.matchMedia?.( '(pointer: coarse)' ).matches ) return;
+		if ( userGesture ) this.lockSuppressed = false;
+		if ( this.lockSuppressed ) return;
 		if ( ! this.locked ) this.dom.requestPointerLock?.()?.catch?.( () => {} );
 
 	}

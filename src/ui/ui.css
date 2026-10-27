@@ -88,7 +88,7 @@ body {
 	color: var(--tw-ink);
 	font-family: var(--tw-font);
 	-webkit-font-smoothing: antialiased;
-	background: #05090d;
+ background: var(--world-loader-background, #05090d);
 	transition: opacity 900ms var(--tw-ease), visibility 0s linear 900ms;
 }
 
@@ -103,6 +103,17 @@ body {
 	flex: none;
 	width: 100%;
 	max-height: min(62svh, 680px);
+}
+
+.loader-picture[hidden] {
+	display: none;
+}
+
+#loader.loader-world-pending .loader-picture,
+#loader.loader-world-pending .loader-world,
+#loader.loader-world-pending .loader-note,
+#loader.loader-world-pending .loader-tips {
+	display: none;
 }
 
 .loader-art {
@@ -135,21 +146,21 @@ body {
 	font-weight: 600;
 	letter-spacing: 0.16em;
 	text-transform: uppercase;
-	color: var(--tw-aqua);
+	color: var(--world-loader-accent, var(--tw-aqua));
 }
 
 .loader-title {
 	margin: 0;
 	font-size: clamp(20px, 3vw, 34px);
 	font-weight: 600;
-	color: var(--tw-ink);
+	color: var(--world-loader-text, var(--tw-ink));
 }
 
 .loader-tagline {
 	margin: 6px 0 0;
 	font-size: clamp(12px, 1vw, 14px);
 	line-height: 1.5;
-	color: var(--tw-ink-2);
+	color: var(--world-loader-muted, var(--tw-ink-2));
 }
 
 .loader-panel {
@@ -175,7 +186,7 @@ body {
 	overflow: hidden;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-	color: var(--tw-ink);
+	color: var(--world-loader-text, var(--tw-ink));
 	font-weight: 500;
 }
 
@@ -186,11 +197,11 @@ body {
 	font-family: var(--tw-mono);
 	font-size: 0.92em;
 	font-variant-numeric: tabular-nums;
-	color: var(--tw-ink-3);
+	color: var(--world-loader-muted, var(--tw-ink-3));
 }
 
 .loader-pct {
-	color: var(--tw-ink-2);
+	color: var(--world-loader-muted, var(--tw-ink-2));
 }
 
 .loader-bar {
@@ -205,8 +216,8 @@ body {
 	position: absolute;
 	inset: 0;
 	border-radius: inherit;
-	background: linear-gradient(90deg, rgba(var(--tw-sun-rgb), 0.55), var(--tw-sun) 70%, #ffe7c8);
-	box-shadow: 0 0 10px rgba(var(--tw-sun-rgb), 0.55);
+	background: var(--world-loader-accent, var(--tw-sun));
+	box-shadow: 0 0 10px var(--world-loader-accent, var(--tw-sun));
 	transform: scaleX(0.02);
 	transform-origin: 0 50%;
 	will-change: transform;

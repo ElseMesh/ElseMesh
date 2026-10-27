@@ -6,7 +6,7 @@ const tests = [
 	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'test/tidewater-reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
 	'test/grass-density-asset.mjs', 'test/grass-density-parity.mjs', 'test/reef-placement-render.mjs',
 	'test/game-logic.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
-	'test/camera-review.mjs', 'test/input-look-keys.mjs', 'test/touch-control-ownership.mjs', 'test/world-experience.mjs',
+	'test/camera-review.mjs', 'test/input-look-keys.mjs', 'test/input-pointer-lock.mjs', 'test/touch-control-ownership.mjs', 'test/world-experience.mjs',
 	'test/boat-controller-origin.mjs', 'test/boat-design.mjs', 'test/webgl-boat-adapter.mjs', 'test/webgl-fish-stand-adapter.mjs',
 	'test/webgl-game-adapter.mjs', 'test/webgl-wildlife-adapter.mjs', 'test/webgl-swash-probe.mjs', 'test/webgl-component-support.mjs', 'test/world-vehicle-policy.mjs',
 	'test/world-portals.mjs', 'test/portal-sides.mjs', 'test/portal-back-contract.mjs', 'test/portal-link.mjs',
@@ -17,7 +17,7 @@ const tests = [
 	'test/ai-edit-worker-runtime.mjs', 'test/world-export.mjs', 'test/whale-world-package.mjs', 'test/world-audio.mjs',
 	'test/world-collision.mjs', 'test/world-hosted-player.mjs', 'test/player-presence.mjs', 'test/world-presence-session.mjs',
 	'test/remote-avatar.mjs', 'test/avatar-lod-assets.mjs', 'test/account-client.mjs', 'test/serve-world-profile-options.mjs',
-	'test/serve-world-profile-e2e.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
+	'test/serve-world-profile-e2e.mjs', 'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
 ];
 const dawnTests = new Set( [
 	'test/reef-placement-render.mjs', 'test/world-package-village-materials.mjs', 'test/world-export.mjs', 'test/whale-world-package.mjs', 'test/engine-smoke.mjs',

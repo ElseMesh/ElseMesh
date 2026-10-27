@@ -24,13 +24,22 @@ export async function chooseWorldEntryPoint( manifest, { storage = globalThis.lo
 		backdrop.setAttribute( 'aria-labelledby', 'world-entry-title' );
 		Object.assign( backdrop.style, { position: 'fixed', inset: '0', zIndex: '10000', display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,.78)', color: '#f4f0e8', font: '16px system-ui,sans-serif' } );
 		const panel = documentRef.createElement( 'section' );
-		Object.assign( panel.style, { width: 'min(440px, calc(100vw - 32px))', padding: '24px', border: '1px solid #b99b65', borderRadius: '12px', background: '#17191d', boxShadow: '0 18px 70px #000a' } );
+		const theme = manifest.experience?.theme;
+		const colors = theme?.colors || {};
+		Object.assign( panel.style, { width: 'min(440px, calc(100vw - 32px))', padding: '24px', border: `1px solid ${colors.border || '#b99b65'}`, borderRadius: '12px', background: colors.surface || '#17191d', color: colors.text || '#f4f0e8', boxShadow: '0 18px 70px #000a' } );
 		const title = documentRef.createElement( 'h2' );
 		title.id = 'world-entry-title';
 		title.textContent = manifest.title || actionLabel;
+		if ( theme?.logo ) {
+			const logo = documentRef.createElement( 'img' );
+			logo.src = theme.logo.src;
+			logo.alt = theme.logo.alt;
+			Object.assign( logo.style, { display: 'block', maxWidth: '100%', maxHeight: '120px', objectFit: 'contain', margin: '0 auto 18px' } );
+			panel.append( logo );
+		}
 		panel.append( title );
 		const actions = documentRef.createElement( 'div' );
-		const styleButton = button => Object.assign( button.style, { display: 'block', width: '100%', margin: '10px 0', padding: '12px', color: 'inherit', background: '#292d34', border: '1px solid #766747', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' } );
+		const styleButton = button => Object.assign( button.style, { display: 'block', width: '100%', margin: '10px 0', padding: '12px', color: colors.buttonText || colors.text || '#f4f0e8', background: colors.button || '#292d34', border: `1px solid ${colors.border || '#766747'}`, borderRadius: '6px', cursor: 'pointer', textAlign: 'left' } );
 		const chooseEntry = entry => {
 				try { storage?.setItem( `${STORAGE_PREFIX}${manifest.worldId}`, entry.id ); } catch {}
 				backdrop.remove();

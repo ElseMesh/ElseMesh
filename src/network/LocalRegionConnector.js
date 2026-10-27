@@ -1,3 +1,5 @@
+import { validateWorldExperience } from './WorldExperience.js';
+
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
@@ -59,60 +61,79 @@ export class LocalRegionConnector {
 		requireValue( selection?.schema === 'elsemesh.hogwarts-entry-selection/1' && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length >= 1 && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Array.isArray( previewRegion.cell ) && previewRegion.cell.length === 3 && previewRegion.cell.every( Number.isSafeInteger ) && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell' );
+		const startupCells = previewRegion.startupCells || [ previewRegion.cell ];
+		requireValue( Array.isArray( startupCells ) && startupCells.length >= 1 && startupCells.length <= 64 && startupCells.every( cell => Array.isArray( cell ) && cell.length === 3 && cell.every( Number.isSafeInteger ) ), 'Local provider has invalid startup cells' );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
 			requireValue( support?.status === 'provisional' && typeof support.basis === 'string' && support.basis.length <= 500 && Array.isArray( support.position ) && support.position.length === 3 && support.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( support.halfExtents ) && support.halfExtents.length === 3 && support.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) && ( support.yaw === undefined || Number.isFinite( support.yaw ) && Math.abs( support.yaw ) <= 360 ), 'Local provider has invalid provisional preview support' );
 		}
+		const experience = selection.experience ? structuredClone( validateWorldExperience( selection.experience ) ) : null;
+		if ( experience?.theme?.logo?.src.startsWith( '/' ) ) experience.theme.logo.src = new URL( experience.theme.logo.src, `${base}/` ).href;
 		const catalog = await fetchJSON( new URL( descriptor.regions, `${base}/descriptor` ), signal );
 		requireValue( Array.isArray( catalog.regions ) && catalog.regions.length <= 10000, 'Local provider returned an invalid region catalog' );
 		const region = catalog.regions.find( item => item.id === this.localMap || item.label === this.localMap );
 		requireValue( region && typeof region.id === 'string' && typeof region.asset === 'string', `No local map matches “${this.localMap}”` );
+		const layerLabels = previewRegion.layers || [];
+		requireValue( Array.isArray( layerLabels ) && layerLabels.length <= 8 && layerLabels.every( label => typeof label === 'string' && label.trim() && label.length <= 160 ) && new Set( layerLabels ).size === layerLabels.length, 'Local provider has invalid preview layers' );
+		const regions = [ region, ...layerLabels.map( label => catalog.regions.find( item => item.id === label || item.label === label ) ) ];
+		requireValue( regions.every( item => item && typeof item.id === 'string' && typeof item.asset === 'string' ) && new Set( regions.map( item => item.id ) ).size === regions.length, 'Local provider is missing or duplicates a preview layer' );
 		const assetURL = new URL( region.asset, `${base}/` );
 		requireValue( assetURL.origin === this.localProvider && assetURL.pathname.startsWith( '/v1/regions/' ), 'Local provider returned an unsafe region URL' );
 		this.region = region;
 		this.worldId = descriptor.worldId || DEFAULT_WORLD_ID;
 		this.sourceRevision = descriptor.sourceRevision;
-		const cellIndexURL = new URL( `${assetURL.pathname}/cells`, this.localProvider );
-		cellIndexURL.searchParams.set( 'size', String( previewRegion.cellSizeMeters ) );
-		const cellIndex = await fetchJSON( cellIndexURL, signal );
-		requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === previewRegion.cellSizeMeters && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= 50000, 'Local provider returned an invalid occupied-cell index' );
-		const cells = new Map();
-		for ( const cell of cellIndex.cells ) {
-			requireValue( Number.isSafeInteger( cell?.x ) && Number.isSafeInteger( cell?.y ) && Number.isSafeInteger( cell?.z ), 'Local provider returned invalid cell coordinates' );
-			cells.set( `${cell.x},${cell.y},${cell.z}`, { x: cell.x, y: cell.y, z: cell.z } );
-		}
-		const spawnCellKey = previewRegion.cell.join( ',' );
-		cells.set( spawnCellKey, { x: previewRegion.cell[ 0 ], y: previewRegion.cell[ 1 ], z: previewRegion.cell[ 2 ] } );
+		const startupCellKeys = new Set( startupCells.map( cell => cell.join( ',' ) ) );
+		this.initialRegionCellObjectIDs = new Set();
 		const spawn = selection.previewSpawn;
 		this.manifest = {
 			protocol: 'tidewater.world/2', worldId: this.worldId, title: `Hogwarts Legacy · ${region.label}`,
-			experience: null, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
+			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
 			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } },
 			spawn,
 			entryPointActionLabel: selection.entryPointActionLabel,
 			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ) } ) ),
 			entryPointPrompt: selection.entryPointPrompt, sourceRevision: this.sourceRevision,
 		};
-		for ( const cell of cells.values() ) {
-			const cellKey = `${cell.x},${cell.y},${cell.z}`;
-			const assetId = `local-region:${region.id}:${previewRegion.cellSizeMeters}:${cellKey}`;
-			const assetURL = new URL( region.asset, `${base}/` );
-			assetURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
-			this.regionAssets.set( assetId, assetURL.href );
-			const center = [
-				( cell.x + 0.5 ) * previewRegion.cellSizeMeters,
-				( cell.y + 0.5 ) * previewRegion.cellSizeMeters,
-				( cell.z + 0.5 ) * previewRegion.cellSizeMeters,
-			];
-			const isSpawnCell = cellKey === spawnCellKey;
-			this.manifest.assets.push( { id: assetId, bytes: 0, kind: 'model/gltf-binary', priority: isSpawnCell ? 'visible' : 'nearby' } );
-			this.manifest.objects.push( {
-				id: `tw-object:hogwarts-cell:${region.id}:${previewRegion.cellSizeMeters}:${cellKey}`,
-				label: `${region.label} cell ${cellKey}`, kind: 'asset-instance', assetId,
-				transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isSpawnCell ? 'visible' : 'nearby',
-				streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2 },
-				regionCell: true,
-			} );
+		for ( const sourceRegion of regions ) {
+			const sourceURL = new URL( sourceRegion.asset, `${base}/` );
+			requireValue( sourceURL.origin === this.localProvider && sourceURL.pathname.startsWith( '/v1/regions/' ), 'Local provider returned an unsafe region URL' );
+			const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
+			cellIndexURL.searchParams.set( 'size', String( previewRegion.cellSizeMeters ) );
+			const cellIndex = await fetchJSON( cellIndexURL, signal );
+			requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === previewRegion.cellSizeMeters && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= 50000, 'Local provider returned an invalid occupied-cell index' );
+			const cells = new Map();
+			for ( const cell of cellIndex.cells ) {
+				requireValue( Number.isSafeInteger( cell?.x ) && Number.isSafeInteger( cell?.y ) && Number.isSafeInteger( cell?.z ), 'Local provider returned invalid cell coordinates' );
+				cells.set( `${cell.x},${cell.y},${cell.z}`, { x: cell.x, y: cell.y, z: cell.z } );
+			}
+			const isPrimaryRegion = sourceRegion.id === region.id;
+			for ( const startupCell of startupCells ) {
+				const cellKey = startupCell.join( ',' );
+				if ( isPrimaryRegion || cells.has( cellKey ) ) cells.set( cellKey, { x: startupCell[ 0 ], y: startupCell[ 1 ], z: startupCell[ 2 ] } );
+			}
+			for ( const cell of cells.values() ) {
+				const cellKey = `${cell.x},${cell.y},${cell.z}`;
+				const assetId = `local-region:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}`;
+				const regionAssetURL = new URL( sourceRegion.asset, `${base}/` );
+				regionAssetURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
+				this.regionAssets.set( assetId, regionAssetURL.href );
+				const center = [
+					( cell.x + 0.5 ) * previewRegion.cellSizeMeters,
+					( cell.y + 0.5 ) * previewRegion.cellSizeMeters,
+					( cell.z + 0.5 ) * previewRegion.cellSizeMeters,
+				];
+				const isStartupCell = startupCellKeys.has( cellKey );
+				const objectId = `tw-object:hogwarts-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}`;
+				if ( isStartupCell ) this.initialRegionCellObjectIDs.add( objectId );
+				this.manifest.assets.push( { id: assetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'nearby' } );
+				this.manifest.objects.push( {
+					id: objectId,
+					label: `${sourceRegion.label} cell ${cellKey}`, kind: 'asset-instance', assetId,
+					transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'nearby',
+					streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2 },
+					regionCell: true,
+				} );
+			}
 		}
 		const support = selection.previewSupport;
 		if ( support ) {

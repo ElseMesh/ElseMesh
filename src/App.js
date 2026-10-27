@@ -1,7 +1,8 @@
 import { Vector3, Euler, Color, MathUtils, Mesh } from './engine/index.js';
 import { GPU } from './engine/gpu/GPU.js';
 import { SunShadows } from './engine/render/Shadows.js';
-import { FrameUniforms } from './engine/render/Frame.js';
+import { FrameUniforms, setFrameCamera } from './engine/render/Frame.js';
+import { FullscreenPass } from './engine/render/FullscreenPass.js';
 
 import { Engine } from './core/Engine.js';
 import { Input } from './core/Input.js';
@@ -59,6 +60,7 @@ import { PostFX } from './post/PostFX.js';
 import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
+import { Colliders } from './world/Colliders.js';
 import { Game } from './game/Game.js';
 import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
@@ -201,8 +203,8 @@ export class App {
 
 		const qs = this.qs;
 		const worldLink = worldLinkFromLocation();
-		this.loadingExperience = worldLink ? GENERIC_WORLD_EXPERIENCE : DEFAULT_WORLD_EXPERIENCE;
-		this.loadingTitle = worldLink ? 'ThruHold' : 'Example Island';
+		this.loadingExperience = worldLink?.localProvider ? null : worldLink ? GENERIC_WORLD_EXPERIENCE : DEFAULT_WORLD_EXPERIENCE;
+		this.loadingTitle = worldLink?.localProvider ? 'Connecting to world' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
 		if ( worldLink ) {
 			this.worldConnector = worldLink.localProvider ? new LocalRegionConnector( worldLink ) : new WorldConnector( worldLink );
@@ -218,10 +220,22 @@ export class App {
 		// report a stage, then let the page paint it before the (synchronous) stage work starts
 		const progress = async ( p, text, until, stage ) => {
 
-			onProgress( p, stage ? this.loadingExperience?.stages?.[ stage ] || text : text, until );
+			const status = worldLink?.localProvider && ! this.loadingExperience ? 'Connecting to world…' : stage ? this.loadingExperience?.stages?.[ stage ] || text : text;
+			onProgress( p, status, until );
 			if ( typeof requestAnimationFrame === 'function' ) await new Promise( ( r ) => requestAnimationFrame( () => setTimeout( r, 0 ) ) );
 
 		};
+		if ( worldLink?.localProvider ) {
+
+			await progress( 0.03, 'Starting the graphics backend…', undefined, 'gpu' );
+			const engine = this.engine = new Engine( document.getElementById( 'app' ) );
+			await engine.init();
+			this.backend = engine.backend;
+			console.info( 'ElseMesh renderer selected:', engine.backend === 'webgpu' ? 'WebGPU' : 'WebGL fallback', engine.fallbackReason || '' );
+			if ( engine.backend !== 'webgpu' ) throw new Error( 'The local world bridge currently requires the ElseMesh WebGPU renderer' );
+			return this.initLocalStaticWorld( progress );
+
+		}
 		await progress( 0.02, 'Preparing the shared island state…', undefined, 'terrain' );
 		this.worldState = new IslandWorldState();
 		this.terrainData = this.worldState.terrain;
@@ -556,6 +570,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			for ( const child of scene.children.slice() ) if ( ! this._sharedSceneRoots.has( child ) ) this.proceduralWorldRoot.add( child );
 			scene.add( this.proceduralWorldRoot );
 			const connector = this.worldConnector;
+			if ( connector.localOnly ) this.proceduralWorldRoot.visible = false;
 			const manifestResult = await this.worldManifestPromise;
 			if ( manifestResult.error ) throw manifestResult.error;
 			const entrySelection = await chooseWorldEntryPoint( connector.manifest );
@@ -569,6 +584,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
+			for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
 			const initialAssetIDs = new Set( connector.manifest.objects.filter( ( object ) => initialObjectIDs.has( object.id ) && object.assetId ).map( ( object ) => object.assetId ) );
@@ -635,6 +651,120 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				await GPU.queue.onSubmittedWorkDone();
 			}
 		}
+
+	}
+
+	async initLocalStaticWorld( progress ) {
+
+		const engine = this.engine;
+		const { scene, camera } = engine;
+		this.backend = 'webgpu';
+		this.localStaticWorld = true;
+		this.renderer = engine;
+		this.scene = scene;
+		this.camera = camera;
+		this.input = new Input( engine.domElement );
+		this.hostedColliders = new Colliders();
+		this.hostedQuery = { allocate: () => 0 };
+		this.player = new Player( {
+			camera, input: this.input, terrain: { heightAt: () => - 1000000 },
+			colliders: this.hostedColliders, query: this.hostedQuery, boat: null,
+		} );
+		await progress( 0.08, 'Preparing the world lighting…', undefined, 'atmosphere' );
+		this.atmosphere = new Atmosphere( engine );
+		this.sky = new Sky( this.atmosphere );
+		this.environment = new Environment( engine, scene, this.sky );
+		this.updateSun();
+		this.shadows = new SunShadows( { size: 1024, splits: [ 12, 60, 240 ] } );
+		this.shadows.enabled = false;
+		this.shadows.update( camera, new Vector3( 0, 1, 0 ) );
+		this.sceneRenderer = new SceneRenderer( engine.meshRenderer, scene, camera );
+		if ( this.sky.background ) this.sceneRenderer.background = this.sky.background;
+		this.sceneRenderer.clearColor = [ 0.018, 0.022, 0.03, 1 ];
+		this.sceneRenderer.setSize( engine.width, engine.height );
+		engine.onResize.push( () => this.sceneRenderer.setSize( engine.width, engine.height ) );
+		this.localPresent = new FullscreenPass( {
+			label: 'world presentation', colorFormats: [ GPU.format ],
+			bindings: { sceneColor: { texture: () => this.sceneRenderer.sceneRT.texture } },
+			code: `fn fragment( in: FSIn ) -> vec4f {
+				let hdr = max( textureSampleLevel( sceneColor, smpLinearClamp, in.uv, 0.0 ).rgb, vec3f( 0.0 ) );
+				let exposed = hdr * frame.exposure;
+				let mapped = exposed / ( vec3f( 1.0 ) + exposed );
+				return vec4f( pow( mapped, vec3f( 1.0 / 2.2 ) ), 1.0 );
+			}`,
+		} );
+		engine.setRenderScale( this.settings.renderScale );
+
+		await progress( 0.18, 'Connecting to world…', undefined, 'world' );
+		const connector = this.worldConnector;
+		const manifestResult = await this.worldManifestPromise;
+		if ( manifestResult.error ) throw manifestResult.error;
+		const entrySelection = await chooseWorldEntryPoint( connector.manifest );
+		const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
+		this.player.setWorldRules( connector.manifest.rules );
+		this.camera.position.set( ...spawn.position );
+		this.player.yaw = spawn.yaw;
+		this.player.pitch = spawn.pitch;
+		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0 ) );
+
+		await progress( 0.34, 'Loading the starting area…', undefined, 'world' );
+		const initialObjects = this.localStaticWorld ? [] : selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 160 } );
+		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
+		for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
+		for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
+		const assets = await connector.preload( { through: 'background', assetIDs, concurrency: 2 } );
+		this.linkedWorldRoot = await loadWorldPackage( connector, { assets, objectIDs: initialObjectIDs } );
+		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
+		this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
+		scene.add( this.linkedWorldRoot );
+		this.player.setHostedWorldPose( camera.position, spawn.yaw, spawn.pitch );
+		this.worldStreamState = new Map();
+		this.worldBackgroundLoads = new Map();
+		this.worldConnector = connector;
+		this.remoteWorldActive = true;
+		this.streamWorldRemainder( connector, this.linkedWorldRoot );
+		this.portalPreviousPosition = camera.position.clone();
+		this.gpu = GPU;
+		window.__app = this;
+
+		// Build only the pipeline variants touched by the starting view before handing
+		// control to the player. Later streamed cells compile asynchronously in the
+		// background and become visible when ready.
+		await progress( 0.82, 'Preparing the rendered scene…', undefined, 'gpu' );
+		GPU.beginFrame();
+		setFrameCamera( camera, engine.width, engine.height );
+		this.atmosphere.update( 1 / 60, camera.position.y );
+		this.environment.update( 1 / 60 );
+		this.sceneRenderer.render();
+		this.localPresent.render( { colorViews: [ GPU.context.getCurrentTexture().createView() ] } );
+		GPU.submit();
+		await GPU.pipelinesReady();
+		await GPU.queue.onSubmittedWorkDone();
+		await progress( 0.96, 'Ready to explore…', undefined, 'warmup' );
+		return this;
+
+	}
+
+	localStaticFrame( dt ) {
+
+		GPU.beginFrame();
+		FrameUniforms.fields.frameIndex.value = GPU.frame;
+		FrameUniforms.fields.dt.value = dt;
+		FrameUniforms.fields.time.value += dt;
+		G.exposure.value = this.settings.exposure;
+		this.updateSun();
+		this.atmosphere.update( dt, this.camera.position.y );
+		this.applyAtmosphereReadback();
+		this.environment.update( dt );
+		this.player.updateHostedWorld( dt );
+		this.updateWorldStreaming();
+		updateWorldPackageLOD( this.linkedWorldRoot, this.camera );
+		setFrameCamera( this.camera, this.engine.width, this.engine.height );
+		this.sceneRenderer.render();
+		this.localPresent.render( { colorViews: [ GPU.context.getCurrentTexture().createView() ] } );
+		GPU.submit();
+		this.input.endFrame();
 
 	}
 
@@ -809,6 +939,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	start() {
 
 		if ( this.webglFallback ) return this.webglFallback.start();
+		if ( this.localStaticWorld ) return this.engine.start( ( dt ) => this.localStaticFrame( dt ), this.desktopFrameRateLimit );
 
 		this.engine.start( ( dt, t ) => this.frame( dt, t ), this.desktopFrameRateLimit );
 	}
@@ -1187,14 +1318,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			for ( const object of connector.manifest.objects ) {
 				if ( ! object.regionCell || ! loaded.has( object.id ) ) continue;
 				transformBoundsCenter( object, object.streamingBounds.center, center );
-				if ( this.camera.position.distanceTo( center ) > 192 ) releaseObjectIDs.add( object.id );
+				if ( this.camera.position.distanceTo( center ) > ( this.localStaticWorld ? 64 : 192 ) ) releaseObjectIDs.add( object.id );
 			}
 			if ( releaseObjectIDs.size ) unloadWorldPackageObjects( root, connector, this.hostedColliders, releaseObjectIDs );
 		}
-		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
+		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: this.localStaticWorld ? 48 : connector.localOnly ? 160 : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
 		const wantedObjectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const installedComponents = root.userData.installedWorldComponentIDs || new Set();
-		const components = selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationComponent( component ) ) && ! installedComponents.has( component.id ) );
+		const components = this.localStaticWorld ? [] : selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationComponent( component ) ) && ! installedComponents.has( component.id ) );
 		const wantedComponentIDs = new Set( components.map( ( component ) => component.id ) );
 		const assetPriorities = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset.priority ] ) );
 		const rank = { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 };

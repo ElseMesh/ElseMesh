@@ -3335,14 +3335,35 @@ export class UI {
 
 	setLoadingPresentation( title, experience ) {
 
-		if ( ! experience ) return;
 		const L = document.getElementById( 'loader' );
 		if ( ! L ) return;
+		if ( ! experience ) {
+			L.classList.add( 'loader-world-pending' );
+			return;
+		}
+		L.classList.remove( 'loader-world-pending' );
 		const setText = ( selector, value ) => { const element = L.querySelector( selector ); if ( element ) element.textContent = value; };
 		setText( '.loader-kicker', title || 'ThruHold' );
 		setText( '.loader-title', experience.genre );
 		setText( '.loader-tagline', experience.tagline );
 		setText( '.loader-note', experience.loadingNote );
+		const logo = experience.theme?.logo;
+		const picture = L.querySelector( '.loader-picture' );
+		const art = L.querySelector( '.loader-art' );
+		if ( picture && art ) {
+			picture.hidden = !! experience.theme && ! logo;
+			if ( logo ) { art.src = logo.src; art.alt = logo.alt; }
+		}
+		const colorVariables = {
+			background: '--world-loader-background', surface: '--world-loader-surface', accent: '--world-loader-accent',
+			text: '--world-loader-text', muted: '--world-loader-muted', button: '--world-loader-button',
+			buttonText: '--world-loader-button-text', border: '--world-loader-border',
+		};
+		for ( const [ key, property ] of Object.entries( colorVariables ) ) {
+			const color = experience.theme?.colors?.[ key ];
+			if ( color ) L.style.setProperty( property, color );
+			else L.style.removeProperty( property );
+		}
 		L.setAttribute( 'aria-label', `Loading ${ title || 'ThruHold' }` );
 		document.title = `${ title || 'ThruHold' } — ElseMesh`;
 		const list = L.querySelector( '.loader-tip-list' );
