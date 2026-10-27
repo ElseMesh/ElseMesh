@@ -84,7 +84,7 @@ function bodySetupGLB( extras ) {
 }
 const bodySetupMetadata = {
 	source: 'Unreal UBodySetup.AggGeom', coordinateSystem: 'elsemesh-y-up-meters/1',
-	boxes: [ { center: [ 0, 0, 0 ], halfExtents: [ 3, 0.1, 3 ], rotation: [ 0, 0, 0, 1 ] } ],
+	boxes: [ { center: [ 0, 0, 0 ], halfExtents: [ 3, 0, 3 ], rotation: [ 0, 0, 0, 1 ] } ],
 	spheres: [ { center: [ 5, 1, 0 ], radius: 0.5 } ],
 	capsules: [ { center: [ - 5, 1, 0 ], radius: 0.25, length: 1, rotation: [ 0, 0, 0, 1 ] } ],
 	taperedCapsules: [],
@@ -98,7 +98,7 @@ const bridgedColliders = new Colliders();
 registerWorldPackageCollisions( bridgedRoot, bridgedColliders );
 assert.equal( bridgedColliders.boxes.length, 2, 'bridge registers BodySetup floor boxes and convex bounds from GLB node extras' );
 assert.equal( bridgedColliders.cylinders.length, 2, 'bridge maps BodySetup spheres and capsules into the current vertical-cylinder collider' );
-assert.ok( Math.abs( bridgedColliders.groundHeightAt( 10, 30, 10 ) - 3.1 ) < 1e-6, 'bridge floor collider is transformed with the GLB node and object placement' );
+assert.ok( Math.abs( bridgedColliders.groundHeightAt( 10, 30, 10 ) - 3 ) < 1e-6, 'zero-thickness Unreal box floor collider is transformed with the GLB node and object placement' );
 assert.equal( bridgedColliders.boxes[ 0 ].walkable, true, 'horizontal BodySetup box is walkable' );
 registerWorldPackageCollisions( bridgedRoot, bridgedColliders );
 assert.equal( bridgedColliders.boxes.length, 2, 'streaming registration does not duplicate embedded BodySetup colliders' );

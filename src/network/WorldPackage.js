@@ -362,7 +362,7 @@ function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
 			return value;
 		};
 		const vector = ( value, label, positive = false ) => {
-			if ( ! Array.isArray( value ) || value.length !== 3 || ! value.every( item => Number.isFinite( item ) && Math.abs( item ) <= 1e6 ) || ( positive && value.some( item => item <= 0 || item > 1000 ) ) ) throw new Error( `World object ${objectId} has invalid embedded collision ${label}` );
+			if ( ! Array.isArray( value ) || value.length !== 3 || ! value.every( item => Number.isFinite( item ) && Math.abs( item ) <= 1e6 ) || ( positive && ( value.some( item => item < 0 || item > 1000 ) || value.every( item => item === 0 ) ) ) ) throw new Error( `World object ${objectId} has invalid embedded collision ${label}` );
 			return new Vector3( ...value );
 		};
 		const shapeRotation = value => {
