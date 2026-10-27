@@ -34,14 +34,13 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   they are not authenticated account identity or authoritative simulation.
 - Existing request paths serve signed manifests, asset bytes, and data-channel
   messages. They do not discover or dynamically decode game-backed world
-  regions. The Hogwarts target needs a signed region provider descriptor,
-  bounded region discovery/request/cancellation, content integrity, and
-  memory/cache controls. A video/audio game-session relay would be a different
-  protocol and does not meet independent multi-avatar requirements.
+  regions. A game-backed provider needs a signed region descriptor, bounded
+  region discovery/request/cancellation, content integrity, and memory/cache
+  controls. A video/audio game-session relay would be a different protocol and
+  does not meet independent multi-avatar requirements.
 - Region collision is explicit data, not inferred from render meshes. The
-  Hogwarts bridge serializes Unreal BodySetup primitives and convex points;
-  a future region loader must validate limits and register/remove those shapes
-  with the active region and its instance transforms.
+  region loader must validate provider collision limits and register/remove
+  those shapes with the active region and its instance transforms.
 - Dynamic doors require an authoritative interaction request and a
   host-committed transition carrying the stable door ID, sequence/transition
   ID, start time, target state, and collision change. The same committed event

@@ -50,7 +50,8 @@ limits, while each visitor selects their own avatar within that world's rules.
 The world must reference versioned, bounded appearance data rather than
 arbitrary downloaded behavior. This is a native ElseMesh world feature; a live
 game video bridge shows the game's own avatar and does not insert remote
-ElseMesh avatars. See the [Hogwarts bridge design](hogwarts-bridge.md).
+ElseMesh avatars. See the private
+[Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md).
 
 The normative JSON Schema is [`schemas/world-source.schema.json`](schemas/world-source.schema.json). The browser-side structural checks are in `src/network/WorldSource.js`; Blender import/export is provided by [`../tools/blender/world_source.py`](../tools/blender/world_source.py). The `tidewater.ambient-audio/1` authored shape and runtime behavior are specified in [`schemas/ambient-audio.md`](schemas/ambient-audio.md).
 

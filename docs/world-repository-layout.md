@@ -11,9 +11,8 @@ The current content repositories are [Tidewater](../worlds/tidewater/README.md),
 [Hogwarts-World bridge repository](../worlds/Hogwarts/README.md). Tidewater and
 Hogwarts-World are mounted as Git submodules. Burning Horizons is a separate
 checkout selected by `BURNING_HORIZONS_DIR` when running its exporter. The
-Hogwarts submodule stores bridge code and design metadata only; game assets,
-generated scene files, screen captures, and save data stay out of Git. See the
-[Hogwarts bridge design](hogwarts-bridge.md).
+Hogwarts submodule stores bridge code and private project documentation. Its
+own design page records the game-content boundary and implementation target.
 
 ## Shared package layout
 
@@ -82,10 +81,9 @@ README and generated asset index are the content-side entry points.
 
 `worlds/Hogwarts` is the private `rebroad/Hogwarts-World` submodule. It is an
 engineering workspace for an in-memory, region-streaming bridge to a locally
-installed game, not a license to redistribute game content. Neither source
-game files nor generated/captured content belong in the submodule. See
-[Hogwarts bridge](hogwarts-bridge.md) for the native multi-avatar target,
-HostID/discovery model, and acceptance gates.
+installed game. Its own README and bridge-design document describe the
+implementation and content boundary. Game-specific design and status stay in
+the private submodule; see its [bridge design](../worlds/Hogwarts/docs/bridge-design.md).
 
 ## Regenerating and reviewing a package
 

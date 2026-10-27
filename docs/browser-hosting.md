@@ -63,8 +63,10 @@ gateway request messages as standalone worlds. It does not introduce a second
 world format or require a ZeroTier client.
 
 This provider currently serves predeclared assets only. It cannot discover or
-decode game-backed regions on demand. The Hogwarts bridge needs a separate
-dynamic region-provider contract; see the [Hogwarts bridge design](hogwarts-bridge.md).
+decode game-backed regions on demand. A game-backed world needs a separate
+dynamic region-provider contract; see the private
+[Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md) for its
+current implementation target.
 
 1. Prepare the world as a standalone profile with `world.json`, `node.key`,
    and its `assets/` directory. For default profiles this is under

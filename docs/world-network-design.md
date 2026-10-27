@@ -23,8 +23,8 @@ The ordinary package provider serves declared, hash-verified assets. A dynamic
 region provider needs signed region discovery, bounded on-demand decoding and
 delivery, cancellation, content integrity, and memory/cache limits. It must
 not pretend that transiently converted game data is the same as an authored
-static package. See the [Hogwarts bridge design](hogwarts-bridge.md) for the
-multi-avatar requirement and in-memory boundary.
+static package. Game-specific implementation details belong with the private
+world repository.
 
 Game-backed regions also carry a collision layer derived from Unreal BodySetup
 data; renderer triangles are not a substitute. Interactive doors are shared
