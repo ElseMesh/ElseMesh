@@ -61,6 +61,34 @@ must not execute downloaded scripts.
 This is a general engine evolution; bridge-specific milestones, source data,
 and acceptance evidence remain in the corresponding private world repository.
 
+### World selection and world-authored entry choices
+
+The default ElseMesh launch remains the existing Tidewater world and its
+current signed static-package loading path. A command-line world/profile
+override may select a different world or provider for a host process; it must
+not change the default when omitted. World selection belongs to the launch or
+hosting configuration, not a Hogwarts-specific conditional in the renderer.
+The selected provider still supplies and validates the world's identity,
+revision, entry metadata, and region data through the shared provider boundary.
+
+Entry-choice metadata is authored by the world. It may define a prompt, a
+bounded list of stable choice IDs and localized/player-facing labels, and a
+mapping from each choice to an authored spawn pose and optional avatar
+appearance palette. ElseMesh validates and displays this metadata using a
+generic chooser; it does not know Hogwarts houses or any other world's choice
+labels. Store a visitor's selected choice per world and use that choice for
+invite entry, future portal entry, and appearance updates while preserving
+their independent avatar body and personal style settings. If a world provides
+no choices, keep the ordinary authored spawn behavior. Reject malformed or
+unresolvable choices rather than guessing positions.
+
+For the Hogwarts bridge, the four house choice IDs and prompt are already
+world-owned metadata, but their operational spawn poses remain blocked on a
+location survey. The bridge must translate a selected choice into a validated
+region and collision-backed spawn before the player enters. The same generic
+path must remain usable by Tidewater and future worlds without a default-path
+change.
+
 Game-backed regions also carry a collision layer derived from Unreal BodySetup
 data; renderer triangles are not a substitute. Interactive doors are shared
 world entities with host-authorized state transitions. The transition updates

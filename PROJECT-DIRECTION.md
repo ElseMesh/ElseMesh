@@ -79,6 +79,15 @@ in `docs/`.
   [world and network design](docs/world-network-design.md#world-hosts-and-dynamic-region-providers),
   [graphics priority](docs/graphics-priority.md), and
   [graphics review](docs/graphics-review.md).
+- **Bridge-backed world launch and entry selection:** allow the normal launch to
+  continue opening Tidewater unchanged while an explicit command-line world
+  override selects another provider/world. The selected world's data defines
+  its entry prompt, choices, spawn poses, and optional appearance palettes;
+  ElseMesh supplies a generic chooser and must not hardcode world names or
+  house-specific behavior. Persist a visitor's choice per world and use it for
+  arrival and avatar appearance. Keep implementation and evidence in
+  [world and network design](docs/world-network-design.md#world-selection-and-world-authored-entry-choices)
+  and [implementation status](docs/elsemesh-status.md).
 - **Runtime presentation (75%):** implement distance-based object and avatar LOD
   with stable transitions and load-based recovery; preserve shared player
   presence, avatar appearance, animations, and vehicle rules. Apply the same
@@ -189,6 +198,15 @@ transport limits. The browser and daemon should share the same provider
 contract, while a host owns one bounded RAM/disk cache shared among its
 visitors. Cache entries are keyed by world, source revision, converter version,
 and region, and must be evictable after they are no longer in use.
+
+The normal world launch remains Tidewater. Add an explicit world/provider
+override for bridge development and hosted deployment, with the chosen world
+specified by world data or profile rather than a Hogwarts-specific branch in
+ElseMesh. On entry, a world's validated metadata may present a prompt and
+bounded choices that resolve to authored entry poses and appearance palettes.
+The chooser is generic; world labels, choice IDs, spawn positions, and avatar
+palette data are authored by each world. Retain a visitor's selection per world
+and apply it consistently to invite entry and future portal entry.
 
 This evolution is additive and must not make Tidewater depend on a bridge.
 Retain its current signed manifests, content-addressed assets, startup and

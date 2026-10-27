@@ -8,6 +8,18 @@ Hogwarts-World bridge requirements, design, and implementation status are
 maintained in its private [world subrepository](../worlds/Hogwarts/README.md),
 not in this general ElseMesh status ledger.
 
+## Bridge-driven world selection and entry metadata
+
+The provider evolution is additive: Tidewater remains the default static
+package world, and a future explicit launch/profile override selects a bridge
+provider without a Hogwarts-specific branch. Entry prompts, choice labels,
+stable IDs, spawn poses, and optional avatar palettes are world-authored data
+interpreted by a generic ElseMesh chooser. Hogwarts's four house choices exist
+as private world metadata; usable house spawn positions still require a
+measured location survey. See [world and network design](world-network-design.md#world-selection-and-world-authored-entry-choices)
+for the contract. This is a design requirement, not a claim that an override
+or bridge provider is already wired into the normal browser launch.
+
 ## Authored entry rules (2026-10-24)
 
 Each world source and signed runtime manifest now requires `maxVisitors` and
