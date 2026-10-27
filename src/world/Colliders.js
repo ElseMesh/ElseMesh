@@ -43,6 +43,13 @@ export class Colliders {
 
 	}
 
+	removeCylinder( cylinder ) {
+		const index = this.cylinders.indexOf( cylinder );
+		if ( index === - 1 ) return false;
+		this.cylinders.splice( index, 1 );
+		return true;
+	}
+
 	addHeightfield( positions, columns, rows, { position, scale, yaw = 0, tag = '' } = {} ) {
 		if ( ! positions || ! Number.isInteger( columns ) || ! Number.isInteger( rows ) || columns < 2 || rows < 2 || columns * rows > 4194304 || positions.length !== columns * rows * 3 || ! position || ! scale || ! [ position.x, position.y, position.z, scale.x, scale.y, scale.z, yaw ].every( Number.isFinite ) || scale.x <= 0 || scale.y <= 0 || scale.z <= 0 ) throw new Error( 'Invalid heightfield dimensions or transform' );
 		const first = { x: positions[ 0 ], z: positions[ 2 ] };

@@ -16,6 +16,7 @@ import { SRGBColorSpace } from '../engine/constants.js';
 import { standard } from '../materials/Materials.js';
 import { Vector3 } from '../engine/math/Vector3.js';
 import { Matrix4 } from '../engine/math/Matrix4.js';
+import { Quaternion } from '../engine/math/Quaternion.js';
 import { UniformBlock } from '../engine/gpu/Uniforms.js';
 import { Vector2 } from '../engine/math/Vector2.js';
 import { lodFadeModule } from '../materials/LODFade.js';
@@ -257,11 +258,17 @@ export function registerWorldPackageCollisions( root, colliders ) {
 	const state = root.userData.worldPackage;
 	if ( ! state ) return;
 	state.activeColliders ||= new Map();
+	state.embeddedColliders ||= new Map();
 	for ( const object of state.connector?.manifest?.objects || [] ) {
-		const collision = object.collision;
-		if ( ! state.loadedObjects.has( object.id ) || ! collision?.enabled || state.activeColliders.has( object.id ) ) continue;
+		if ( ! state.loadedObjects.has( object.id ) ) continue;
 		const instance = root.children.find( ( child ) => child.userData.worldObjectId === object.id );
 		if ( ! instance ) continue;
+		const collision = object.collision;
+		if ( ! collision?.enabled && ! state.embeddedColliders.has( object.id ) && instance.traverse ) {
+			const shapes = registerEmbeddedBodySetup( root, instance, object.id, colliders );
+			if ( shapes.length ) state.embeddedColliders.set( object.id, shapes );
+		}
+		if ( ! collision?.enabled || state.activeColliders.has( object.id ) ) continue;
 		if ( collision.shape === 'heightfield' ) {
 			const meshes = [];
 			( instance.userData.collisionRoot || instance ).traverse( ( child ) => { if ( child.isMesh ) meshes.push( child ); } );
@@ -322,13 +329,117 @@ export function registerWorldPackageCollisions( root, colliders ) {
 
 export function unregisterWorldPackageCollisions( root, colliders ) {
 	const active = root?.userData?.worldPackage?.activeColliders;
-	if ( ! active || ! colliders ) return;
-	for ( const { shape, collider } of active.values() ) {
+	const embedded = root?.userData?.worldPackage?.embeddedColliders;
+	if ( ! colliders ) return;
+	for ( const { shape, collider } of active?.values() || [] ) {
 		if ( shape === 'heightfield' ) colliders.removeHeightfield( collider );
 		else if ( shape === 'compound' ) for ( const box of collider || [] ) colliders.removeBox( box );
 		else colliders.removeBox( collider );
 	}
-	active.clear();
+	active?.clear();
+	for ( const shapes of embedded?.values() || [] ) for ( const { kind, collider } of shapes ) {
+		if ( kind === 'box' ) colliders.removeBox( collider );
+		else if ( kind === 'cylinder' ) colliders.removeCylinder( collider );
+	}
+	embedded?.clear();
+}
+
+const MAX_EMBEDDED_SHAPES_PER_OBJECT = 4096;
+const COLLISION_COORDINATE_SYSTEM = 'elsemesh-y-up-meters/1';
+
+function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
+	root.updateMatrixWorld( true );
+	const registered = [];
+	let count = 0;
+	let vertices = 0, indices = 0;
+	try { instance.traverse( node => {
+		const source = node.userData?.elsemeshCollision;
+		if ( ! source ) return;
+		if ( source.coordinateSystem !== COLLISION_COORDINATE_SYSTEM || typeof source.source !== 'string' ) throw new Error( `World object ${objectId} has unsupported embedded collision data` );
+		const checkCount = value => {
+			if ( ! Array.isArray( value ) || count + value.length > MAX_EMBEDDED_SHAPES_PER_OBJECT ) throw new Error( `World object ${objectId} exceeds the embedded collision shape limit` );
+			count += value.length;
+			return value;
+		};
+		const vector = ( value, label, positive = false ) => {
+			if ( ! Array.isArray( value ) || value.length !== 3 || ! value.every( item => Number.isFinite( item ) && Math.abs( item ) <= 1e6 ) || ( positive && value.some( item => item <= 0 || item > 1000 ) ) ) throw new Error( `World object ${objectId} has invalid embedded collision ${label}` );
+			return new Vector3( ...value );
+		};
+		const shapeRotation = value => {
+			if ( ! Array.isArray( value ) || value.length !== 4 || ! value.every( Number.isFinite ) ) throw new Error( `World object ${objectId} has invalid embedded collision rotation` );
+			if ( Math.hypot( ...value ) < 1e-6 ) throw new Error( `World object ${objectId} has invalid embedded collision rotation` );
+			return new Quaternion( ...value ).normalize();
+		};
+		const bounds = ( center, half, rotation = new Quaternion() ) => {
+			const min = new Vector3( Infinity, Infinity, Infinity ), max = new Vector3( - Infinity, - Infinity, - Infinity );
+			const local = new Vector3();
+			for ( const x of [ - 1, 1 ] ) for ( const y of [ - 1, 1 ] ) for ( const z of [ - 1, 1 ] ) {
+				local.set( center.x + half.x * x, center.y + half.y * y, center.z + half.z * z ).applyQuaternion( rotation );
+				node.localToWorld( local );
+				min.min( local ); max.max( local );
+			}
+			return { center: min.clone().add( max ).multiplyScalar( 0.5 ), half: max.clone().sub( min ).multiplyScalar( 0.5 ) };
+		};
+		const addBounds = ( center, half, rotation, walkable = false ) => {
+			const box = bounds( center, half, rotation );
+			const collider = colliders.addBox( box.center, box.half, 0, { walkable, solid: true, tag: `world:${objectId}:body-setup` } );
+			registered.push( { kind: 'box', collider } );
+		};
+		for ( const box of checkCount( source.boxes || [] ) ) {
+			const center = vector( box.center, 'box center' ), half = vector( box.halfExtents, 'box half extents', true );
+			const rotation = shapeRotation( box.rotation );
+			const worldRotation = node.getWorldQuaternion( new Quaternion() ).multiply( rotation );
+			const up = new Vector3( 0, 1, 0 ).applyQuaternion( worldRotation );
+			const walkable = up.y > 0.95 && half.y <= Math.min( half.x, half.z ) * 0.2;
+			addBounds( center, half, rotation, walkable );
+		}
+		for ( const sphere of checkCount( source.spheres || [] ) ) {
+			const center = vector( sphere.center, 'sphere center' );
+			if ( ! Number.isFinite( sphere.radius ) || sphere.radius <= 0 || sphere.radius > 1000 ) throw new Error( `World object ${objectId} has invalid embedded collision sphere` );
+			const worldCenter = node.localToWorld( center );
+			const scale = node.getWorldScale( new Vector3() );
+			const radius = sphere.radius * Math.max( Math.abs( scale.x ), Math.abs( scale.y ), Math.abs( scale.z ) );
+			registered.push( { kind: 'cylinder', collider: colliders.addCylinder( worldCenter.x, worldCenter.z, radius, worldCenter.y - radius, worldCenter.y + radius, { tag: `world:${objectId}:body-setup` } ) } );
+		}
+		for ( const [ field, tapered ] of [ [ 'capsules', false ], [ 'taperedCapsules', true ] ] ) for ( const capsule of checkCount( source[ field ] || [] ) ) {
+			const center = vector( capsule.center, 'capsule center' );
+			const radii = tapered ? [ capsule.radius0, capsule.radius1 ] : [ capsule.radius ];
+			if ( ! radii.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) || ! Number.isFinite( capsule.length ) || capsule.length < 0 || capsule.length > 10000 ) throw new Error( `World object ${objectId} has invalid embedded collision capsule` );
+			const rotation = shapeRotation( capsule.rotation );
+			const worldRotation = node.getWorldQuaternion( new Quaternion() ).multiply( rotation );
+			const axis = new Vector3( 0, 1, 0 ).applyQuaternion( worldRotation );
+			const worldCenter = node.localToWorld( center );
+			const scale = node.getWorldScale( new Vector3() );
+			const maxScale = Math.max( Math.abs( scale.x ), Math.abs( scale.y ), Math.abs( scale.z ) );
+			const radius = Math.max( ...radii ) * maxScale;
+			const halfLength = capsule.length * maxScale * 0.5 + radius;
+			if ( Math.abs( axis.y ) > 0.95 ) {
+				registered.push( { kind: 'cylinder', collider: colliders.addCylinder( worldCenter.x, worldCenter.z, radius, worldCenter.y - halfLength, worldCenter.y + halfLength, { tag: `world:${objectId}:body-setup` } ) } );
+			} else addBounds( center, new Vector3( radius, halfLength, radius ), rotation );
+		}
+		for ( const convex of checkCount( source.convexes || [] ) ) {
+			if ( ! Array.isArray( convex.vertices ) || convex.vertices.length < 4 || convex.vertices.length > 65536 ) throw new Error( `World object ${objectId} has invalid embedded convex collision vertices` );
+			vertices += convex.vertices.length;
+			if ( vertices > 262144 ) throw new Error( `World object ${objectId} exceeds the embedded convex vertex limit` );
+			const points = convex.vertices.map( point => vector( point, 'convex vertex' ) );
+			if ( ! Array.isArray( convex.indices ) || convex.indices.length < 12 || convex.indices.length % 3 !== 0 || convex.indices.length > 196608 || convex.indices.some( index => ! Number.isInteger( index ) || index < 0 || index >= points.length ) ) throw new Error( `World object ${objectId} has invalid embedded convex collision indices` );
+			indices += convex.indices.length;
+			if ( indices > 786432 ) throw new Error( `World object ${objectId} exceeds the embedded convex index limit` );
+			const min = new Vector3( Infinity, Infinity, Infinity ), max = new Vector3( - Infinity, - Infinity, - Infinity );
+			for ( const point of points ) { node.localToWorld( point ); min.min( point ); max.max( point ); }
+			const half = max.clone().sub( min ).multiplyScalar( 0.5 );
+			const walkable = half.y <= Math.min( half.x, half.z ) * 0.1;
+			const collider = colliders.addBox( min.clone().add( max ).multiplyScalar( 0.5 ), half, 0, { walkable, solid: true, tag: `world:${objectId}:body-setup-convex-bounds` } );
+			registered.push( { kind: 'box', collider } );
+		}
+	} ); } catch ( error ) {
+		for ( const { kind, collider } of registered ) {
+			if ( kind === 'box' ) colliders.removeBox( collider );
+			else colliders.removeCylinder( collider );
+		}
+		throw error;
+	}
+	return registered;
 }
 
 export function disposeWorldPackage( root ) {
