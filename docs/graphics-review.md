@@ -1,5 +1,54 @@
 # Reproducible graphics review
 
+## Tidewater content split parity review, 2026-10-27
+
+Compared the pre-split ElseMesh tree at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
+with the packaged `worlds/tidewater` content pinned at
+`cbcac318a28ccc0acfc71ee5a0ffa4f95db7b02a`. LOZ worlds were excluded. The
+browser ran headlessly in an isolated Xvfb display with a Radeon Vulkan device;
+the user's desktop browser and display were not used. Both builds used a
+1280×577 viewport, render scale 1, shadows enabled, TAA, and matched beach,
+village, valley, and summit review poses with fixed time of day. Captures were
+made separately with WebGPU and explicitly selected WebGL. In each contact
+sheet, the left image is pre-split and the right image is packaged Tidewater;
+rows run beach, village, valley, summit.
+
+### WebGPU
+
+![Pre-split and packaged Tidewater WebGPU views](images/parity-2026-10-27-webgpu.png)
+
+The four views preserve the same broad composition, terrain, vegetation,
+buildings, paths, and shoreline. The village and valley are especially close
+at these poses. Differences remain in small shoreline/debris details and the
+water's surface pattern and shading, most visible at the summit. This supports
+close scene parity for the checked views, not pixel identity or parity at every
+camera position.
+
+### WebGL
+
+![Pre-split and packaged Tidewater WebGL views](images/parity-2026-10-27-webgl.png)
+
+WebGL does not preserve visual parity. The packaged fallback has substantially
+darker, flatter ocean with reduced surf and foam detail; a much paler terrain
+and vegetation appearance; altered village building colors and boardwalk
+appearance; and visibly different shoreline clutter. Valley vegetation and
+summit island composition remain recognizable, but terrain and water shading
+still diverge. The client reports that WebGL island rendering is simplified
+and one package feature is omitted. The hosted GLB path was also missing the
+existing fallback's timber tint and mesh shadow flags; the loader now applies
+those to hosted base and LOD meshes with per-instance material clones. The
+contact sheet above predates that correction and must be recaptured before
+judging its effect. Treat WebGL parity as failed pending updated matched views
+and the remaining fallback rendering work.
+
+The package integrity and deterministic exporter checks pass. The discrepancy
+was adapter selection: the sandbox exposed llvmpipe, while an escalated shell
+also exposed Radeon, and Dawn's high-performance request baked a different
+village-material asset. `test/headless.mjs` now selects llvmpipe by default;
+`ELSEMESH_TEST_GPU_ADAPTER` can override it on hosts with a different stable
+test adapter. The full suite passes from the external build tree, including
+`world-export` and the live world-gateway integration.
+
 The current ElseMesh build accepts review-camera URL parameters so a view can be opened in a local build or the fork deployment:
 
 - `?view=beach` opens the beach and pier overview.

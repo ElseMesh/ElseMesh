@@ -48,6 +48,22 @@ function asBytes( bytes ) {
 	return bytes instanceof Uint8Array ? bytes : new Uint8Array( bytes );
 }
 
+function prepareHostedWebGLModel( root ) {
+	root.traverse( object => {
+		if ( ! object.isMesh ) return;
+		object.castShadow = true;
+		object.receiveShadow = true;
+		const wasArray = Array.isArray( object.material );
+		const materials = ( wasArray ? object.material : [ object.material ] ).map( material => {
+			if ( ! material ) return material;
+			const instance = material.clone();
+			if ( /(?:^| )(?:wood|sign-wood|lantern-wood)$/i.test( instance.name ) ) instance.color.set( 0x80532f );
+			return instance;
+		} );
+		object.material = wasArray ? materials : materials[ 0 ];
+	} );
+}
+
 function webglFoamLaceTexture( T, size = 512 ) {
 
 	if ( sharedFoamLaceTexture ) return sharedFoamLaceTexture;
@@ -1562,6 +1578,7 @@ export class WebGLFallback {
 			}
 			const root = new T.Group();
 			const base = model.scene.clone( true );
+			prepareHostedWebGLModel( base );
 			prepareWebGLLODFade( base );
 			base.name = `${ object.label || object.id } · LOD 0`;
 			root.add( base );
@@ -1589,6 +1606,7 @@ export class WebGLFallback {
 						}
 						if ( signal.aborted ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 						const visual = variant.scene.clone( true );
+						prepareHostedWebGLModel( visual );
 						prepareWebGLLODFade( visual );
 						visual.name = `${ object.label || object.id } · LOD ${ level }`;
 						visual.visible = false;

@@ -3,8 +3,11 @@ import { create, globals } from 'webgpu';
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
+// Package exports must use the same software adapter on every host so GPU
+// shader precision does not change content-addressed material assets.
+const adapterName = process.env.ELSEMESH_TEST_GPU_ADAPTER || 'llvmpipe';
 Object.assign( globalThis, globals );
-Object.defineProperty( globalThis, 'navigator', { value: { gpu: create( [] ) }, configurable: true } );
+Object.defineProperty( globalThis, 'navigator', { value: { gpu: create( [ `adapter=${adapterName}` ] ) }, configurable: true } );
 globalThis.location = { search: '' };
 
 // minimal RGBA8 PNG writer

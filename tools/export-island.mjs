@@ -122,7 +122,7 @@ const debris = generated.debris;
 const vegetationDocument = Buffer.from( encodeVegetationPlacements( generated.vegetation, 7 ) );
 const vegetationAssetId = `sha256:${createHash( 'sha256' ).update( vegetationDocument ).digest( 'hex' )}`;
 staticAssets.set( vegetationAssetId, vegetationDocument );
-const grassMask = buildGrassMask( generated.vegetation.site );
+const grassMask = buildGrassMask( generated.vegetationSite );
 const grassDensityDocument = Buffer.from( encodeGrassDensityAsset( { ...grassMask, size: terrain.size, origin: terrain.origin } ) );
 const grassDensityAssetId = `sha256:${createHash( 'sha256' ).update( grassDensityDocument ).digest( 'hex' )}`;
 staticAssets.set( grassDensityAssetId, grassDensityDocument );
@@ -435,6 +435,7 @@ function buildIslandProceduralContent( terrainData ) {
 		roofPerches: village.buildings.filter( building => building.stilts && building.roofTop ).map( building => [ building.x, building.roofTop - 0.13, building.z ] ),
 		villageFootprints: village.getFootprints().map( ( { x, z, r } ) => ( { x, z, r } ) ),
 		fishProps: village.B.fishProps?.items || [],
+		vegetationSite: vegetation.site,
 		boatBatches: buildBoatBatches(),
 		debris: placer.scanned,
 		vegetation: vegetation.records,
