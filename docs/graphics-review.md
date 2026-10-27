@@ -31,16 +31,18 @@ text and the client also decodes binary `ArrayBuffer`/`Blob` frames. The live
 isolated browser then loaded the packaged manifest over WebRTC and captured all
 four views.
 
-### WebGL separate smoke review
+### WebGL separate review
 
 ![Packaged Tidewater WebGL views at the four review poses](images/webgl-2026-10-27-review.png)
 
 WebGL was reviewed separately at the same four named camera poses; it was not
 compared with the pre-split WebGL renderer as a parity baseline. The isolated
-page selected WebGL and reported one omitted package feature. The current
-fallback shows pale, flat beach ground and dark, simplified water; village
-materials and vegetation are reduced; the valley and summit views intersect
-the terrain. The omitted package feature is
+page selected WebGL and reported one omitted package feature. It used Chromium
+ANGLE/OpenGL on the Radeon Graphics adapter (Mesa 26.1.6), with Vulkan disabled,
+at a 1280×577 viewport and the same four named camera poses. The fallback shows
+pale, flat beach ground and dark water; the village view is under the pier; the
+valley has oversized vegetation; and the summit view sees the terrain
+underside. The omitted package feature is
 `tidewater.village-materials/2` (`tw-component:island-village-materials`).
 This is a current-state review, not parity acceptance. WebGL parity remains
 unaccepted pending fixes to terrain placement, water, vegetation, shoreline
