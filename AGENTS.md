@@ -1,5 +1,13 @@
 # ElseMesh repository guidance
 
+## Network and elevated commands
+
+- Always run network-related commands in an escalated shell, even when they only access localhost. This includes `curl`, HTTP clients, browser/CDP checks, SSH, and Git fetch/push. Use an escalated shell for other commands that require elevated permissions as well.
+
+## Browser process cleanup
+
+- Stop every browser process I own as soon as it is no longer needed for the task, including after a visual check. Identify owned browsers by their dedicated systemd unit, process group, or isolated profile; never kill unrelated user browsers or another agent's browser.
+
 ## Transfers to the Flip7
 
 - For large files sent to or from the Flip7, use `rsync` over SSH rather than `scp`. The SSH link can interrupt bulk transfers, while rsync can resume them. Use `--partial --append-verify` for resumable file transfers.
