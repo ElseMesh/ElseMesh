@@ -1,5 +1,6 @@
 node_modules
 dist
+.elsemesh-source-root
 server/bin/
 main-merge-check/
 fish-stand-check/

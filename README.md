@@ -140,11 +140,10 @@ npm run build    # static build in dist/
 npm run build -- --run # build, then serve the result locally
 ```
 
-`npm start` is the one-command route: it uses the lockfile to install dependencies when Vite is
-missing, builds the site, prints the preview URL, and keeps serving until stopped with Ctrl+C. The
-preview server needs the terminal session to remain open. The build guard
-expects a sibling `elsemesh.build` directory; it also allows building in the source tree when that
-sibling path is a symbolic link to the source directory (a common Termux setup).
+`npm start` is the one-command route: it uses `cpto` to sync the source into the external
+`elsemesh.build` tree, installs locked dependencies there when Vite is missing, builds the site,
+prints the preview URL, and serves until stopped with Ctrl+C. It can be started from either the
+source checkout or the build tree. Set `ELSEMESH_BUILD_ROOT` to override the external build path.
 
 Every push to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`.
 

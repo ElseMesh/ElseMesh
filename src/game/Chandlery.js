@@ -53,14 +53,17 @@ export class Chandlery {
 			look: { shirt: 0x8a3b32, trousers: 0x2f3b4a, apron: 0x3d5a4a, hat: 0x2c3a44, hair: 0x3a2c22, skin: 0x7a5236 },
 		} );
 		scene.add( this.vendor.group );
+		this.colliders = colliders;
+		this.colliderBoxes = [];
+		this.active = true;
 		if ( colliders ) {
 
-			colliders.addBox( new Vector3( CHANDLERY.x, y + 0.45, CHANDLERY.z ), new Vector3( 1.0, 0.45, 0.4 ), CHANDLERY.yaw, { tag: 'chandlery' } );
+			this.colliderBoxes.push( colliders.addBox( new Vector3( CHANDLERY.x, y + 0.45, CHANDLERY.z ), new Vector3( 1.0, 0.45, 0.4 ), CHANDLERY.yaw, { tag: 'chandlery' } ) );
 			// shelves and sign posts behind her, the jerrycans and the rod rack
 			for ( const [ lx, lz, hx, hz, hy ] of [ [ 0, - 1.4, 0.62, 0.22, 0.8 ], [ 1.25, 0.2, 0.3, 0.3, 0.26 ], [ - 1.35, - 0.9, 0.15, 0.3, 0.9 ] ] ) {
 
 				const w = new Vector3( lx, 0, lz ).applyAxisAngle( new Vector3( 0, 1, 0 ), CHANDLERY.yaw );
-				colliders.addBox( new Vector3( CHANDLERY.x + w.x, y + hy, CHANDLERY.z + w.z ), new Vector3( hx, hy, hz ), CHANDLERY.yaw, { tag: 'chandleryProps' } );
+				this.colliderBoxes.push( colliders.addBox( new Vector3( CHANDLERY.x + w.x, y + hy, CHANDLERY.z + w.z ), new Vector3( hx, hy, hz ), CHANDLERY.yaw, { tag: 'chandleryProps' } ) );
 
 			}
 
@@ -71,6 +74,38 @@ export class Chandlery {
 	update( dt, player ) {
 
 		this.vendor.update( dt, player );
+
+	}
+
+	setActive( active, terrain = null ) {
+
+		if ( this.active === active ) return;
+		this.active = active;
+		this.group.visible = active;
+		this.vendor.group.visible = active;
+		if ( ! this.colliders ) return;
+		if ( ! active ) {
+			for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders.removeBox( box );
+			return;
+		}
+		const y = terrain?.heightAt( CHANDLERY.x, CHANDLERY.z ) ?? this.group.position.y;
+		this.colliderBoxes.push( this.colliders.addBox( new Vector3( CHANDLERY.x, y + 0.45, CHANDLERY.z ), new Vector3( 1.0, 0.45, 0.4 ), CHANDLERY.yaw, { tag: 'chandlery' } ) );
+		for ( const [ lx, lz, hx, hz, hy ] of [ [ 0, - 1.4, 0.62, 0.22, 0.8 ], [ 1.25, 0.2, 0.3, 0.3, 0.26 ], [ - 1.35, - 0.9, 0.15, 0.3, 0.9 ] ] ) {
+			const w = new Vector3( lx, 0, lz ).applyAxisAngle( new Vector3( 0, 1, 0 ), CHANDLERY.yaw );
+			this.colliderBoxes.push( this.colliders.addBox( new Vector3( CHANDLERY.x + w.x, y + hy, CHANDLERY.z + w.z ), new Vector3( hx, hy, hz ), CHANDLERY.yaw, { tag: 'chandleryProps' } ) );
+		}
+
+	}
+
+	setColliders( colliders, terrain = null ) {
+
+		if ( this.colliders === colliders ) return;
+		for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders?.removeBox( box );
+		this.colliders = colliders;
+		if ( this.active ) {
+			this.active = false;
+			this.setActive( true, terrain );
+		}
 
 	}
 

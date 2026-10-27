@@ -1082,6 +1082,13 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const terrain = ( root.userData.worldComponents || [] ).find( ( component ) => component.islandTerrain && component.terrainGPU );
 		if ( terrain ) {
 			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
+			if ( connector.worldId === 'tw-world:example-island' ) {
+				// Keep the hosted boat's hydrostatics on the same terrain-shaped, shoreline-aware
+				// surface as the built-in Tidewater boat. A deep-water-only query overstates swell
+				// at the pier and can roll the moored boat over.
+				this.hostedWaterSurface.terrain = terrain.terrainGPU;
+				this.hostedWaterSurface.shore = terrain.shore;
+			}
 			terrain.underwaterLighting ||= installUnderwaterLighting( {
 				fft: this.fft, caustics: this.caustics, clouds: this.clouds, terrain: terrain.terrainGPU,
 				shore: terrain.shore, surface: this.surface, shoreSim: this.shoreSim,
@@ -1104,6 +1111,12 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const policy = vehiclePolicy( connector.manifest.rules );
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
 		}
+		if ( connector.worldId === 'tw-world:example-island' ) {
+			const worldTerrain = root.userData.terrainData || this.terrainData;
+			if ( ! this.game ) this.game = new Game( this, { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
+			this.game.setWorldContext( { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
+			this.game.setWorldActive( true );
+		} else this.game?.setWorldActive( false );
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
 
@@ -1135,6 +1148,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.underwaterLighting = this.baseUnderwaterLighting;
 		this.baseUnderwaterLighting.activate();
 		this.baseGroundBounce.activate();
+		this.game?.setWorldContext( { query: this.query, terrain: this.terrainData, colliders: this.colliders, boatController: this.boatCtl } );
+		this.game?.setWorldActive( false );
 
 		this.activeHostedWildlife = null;
 		this.activeHostedWhale = null;
@@ -1156,10 +1171,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 	updateWorldComponents( root, dt, camera ) {
 		const components = root?.userData?.worldComponents || [];
-		const activeWater = components.some( ( component ) => component.islandOcean || component.waterBody || component.reef );
-		const previewRoot = this.portalPreviewId ? this.portalPreparations.get( this.portalPreviewId )?.root : null;
-		const previewWater = ( previewRoot?.userData?.worldComponents || [] ).some( ( component ) => component.islandOcean || component.waterBody || component.reef );
-		if ( dt > 0 && ( activeWater || previewWater ) ) this.fft.update( dt );
 		for ( const component of components ) component.update?.( dt, camera, this.player );
 	}
 
@@ -1559,6 +1570,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				deckPos: this.player.deckPos.clone(), deckYaw: this.player.deckYaw,
 			} : null;
 			if ( this.player.hostedSeaLevel !== null ) {
+				this.fft.update( dt );
+				this.seaDetail.update( dt );
 				this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
 				this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
 				hostedBoat?.queueQueries();
@@ -1569,6 +1582,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			}
 			if ( this.freeCam ) this.fly.update( dt );
 			else this.player.updateHostedWorld( dt );
+			if ( this.game?.active ) this.game.update( dt );
 			this.updateWorldPortals();
 			this.updateWorldStreaming();
 			this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
@@ -1576,6 +1590,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		else {
 
+			if ( this.game && ! this.game.active ) this.game.setWorldActive( true );
 			this.boatCtl.update( dt );
 			this.boatSpray.update( dt );
 			this.wake.update( dt );

@@ -211,6 +211,14 @@ export class FishingRod {
 
 	}
 
+	setQuery( query ) {
+
+		if ( this.query === query ) return;
+		this.query = query;
+		this.slot = query.allocate( 'bobber', 1 );
+
+	}
+
 	setGear( { castM, reelSpeed } ) {
 
 		this.castM = castM;

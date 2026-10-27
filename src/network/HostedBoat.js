@@ -33,7 +33,7 @@ export class HostedBoat {
 		if ( ! this.controller ) this.controller = new BoatController( {
 			design: this.model.design,
 			query,
-			terrain: null,
+			terrain: this.root.userData.terrainData || null,
 			colliders,
 			initialPosition: this.homePosition,
 			initialHeading: this.homeHeading,

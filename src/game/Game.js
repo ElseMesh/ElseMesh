@@ -25,23 +25,26 @@ const CATCH_CARD_MS = 9000;
 //   E          at the fish stand: sell your catch
 export class Game {
 
-	constructor( app ) {
+	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl } = {} ) {
 
 		this.app = app;
+		this.terrain = terrain;
+		this.boatController = boatController;
+		this.active = true;
 		this.state = new GameState();
 		this.state.load();
-		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query: app.query, terrain: app.terrainData, audio: app.audio } );
+		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query, terrain, audio: app.audio } );
 		this.rod.onLand = ( where ) => this.onBobberLanded( where );
-		this.stand = new FishStand( { scene: app.scene, terrain: app.terrainData, colliders: app.colliders } );
+		this.stand = new FishStand( { scene: app.scene, terrain, colliders } );
 		this.display = new CatchDisplay( { scene: app.scene, stall: this.stand.iceFish() } );
 		this.landing = null; // { species, kg } while the caught fish swings in view
-		this.chandlery = new Chandlery( { scene: app.scene, terrain: app.terrainData, colliders: app.colliders, material: this.stand.material } );
+		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material } );
 		this.vendors = [ this.stand.vendor, this.chandlery.vendor ];
 		// boat upgrades: engine (thrust / top speed) and deck floodlights for night fishing
-		const b = app.boatCtl;
+		const b = boatController;
 		this._engineBase = { maxThrust: b.maxThrust, pitchSpeed: b.pitchSpeed };
 		this.floods = [];
-		if ( app.localLights ) this.addFloodlights( app.localLights, app.boat );
+		if ( app.localLights ) this.addFloodlights( app.localLights, boatController?.model || app.boat );
 		this._fuelOut = false;
 		this._sonarT = 0;
 		this._sonar = null;
@@ -58,11 +61,43 @@ export class Game {
 
 	}
 
+	setBoatController( boatController ) {
+
+		if ( ! boatController ) return;
+		this.boatController = boatController;
+		this._engineBase = { maxThrust: boatController.maxThrust, pitchSpeed: boatController.pitchSpeed };
+		this.applyGear();
+
+	}
+
+	setWorldActive( active ) {
+
+		this.active = active;
+		this.stand.setActive( active );
+		this.chandlery.setActive( active, this.terrain );
+		this.display.mesh.visible = active;
+		if ( ! active ) this.hud?.closeStand();
+
+	}
+
+	setWorldContext( { query, terrain, colliders, boatController } ) {
+
+		if ( query ) this.rod.setQuery( query );
+		if ( terrain ) {
+			this.terrain = terrain;
+			this.rod.terrain = terrain;
+		}
+		this.stand.setColliders( colliders );
+		this.chandlery.setColliders( colliders, this.terrain );
+		this.setBoatController( boatController );
+
+	}
+
 	applyGear() {
 
 		const g = this.state.stats;
 		this.rod.setGear( { castM: g.castM, reelSpeed: g.reelSpeed } );
-		const b = this.app.boatCtl;
+		const b = this.boatController;
 		if ( b && this._engineBase ) {
 
 			b.maxThrust = this._engineBase.maxThrust * g.speedMul * g.speedMul;
@@ -318,7 +353,7 @@ export class Game {
 	// fuel burn at the helm (the engine stops when the tank is dry) and the fish finder
 	updateBoat( dt ) {
 
-		const app = this.app, b = app.boatCtl, p = app.player, s = this.state;
+		const app = this.app, b = this.boatController, p = app.player, s = this.state;
 		if ( b.driven ) {
 
 			const left = s.burn( fuelBurn( b.rpm ) * dt );
@@ -340,7 +375,7 @@ export class Game {
 
 				this._sonarT = 0.5;
 				const x = b.position.x, z = b.position.z;
-				const depth = Math.max( 0, - app.terrainData.heightAt( x, z ) );
+				const depth = Math.max( 0, - this.terrain.heightAt( x, z ) );
 				const h = this.habitatAtPoint( x, z, depth );
 				let rich = 0;
 				for ( const k in h ) rich += h[ k ];

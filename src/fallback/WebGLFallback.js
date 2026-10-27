@@ -884,7 +884,7 @@ export class WebGLFallback {
 				const { berth, preview } = this.hostedBoatSpec;
 				preview.visible = false;
 				this.boat = new WebGLBoatAdapter( T, this.scene, {
-					query: this.waterQuery, terrain: null, colliders: hostedColliders,
+					query: this.waterQuery, terrain: this.hostedTerrainData || null, colliders: hostedColliders,
 					initialPosition: new EngineVector3( ...berth.transform.position ), initialHeading: berth.transform.yaw || 0,
 				} );
 				this.boat.controller.model = this.boat.model;
@@ -895,6 +895,12 @@ export class WebGLFallback {
 				this.scene.add( this.grass );
 				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
+		}
+		if ( this.worldLink && this.connector?.worldId === 'tw-world:example-island' ) {
+			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
+			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
+			this.fishStand = new WebGLFishStandAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader } );
+			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor );
 		}
 		if ( this.worldLink ) {
 			for ( const { component, assets } of this.hostedWhalePackages || [] ) {

@@ -58,7 +58,9 @@ export class FishStand {
 		scene.add( this.vendor.group );
 
 		// the stall is solid (counter front and the side walls)
-		if ( colliders ) for ( const box of fishStandColliderVolumes( y ) ) colliders.addBox( new Vector3( ...box.center ), new Vector3( ...box.half ), box.yaw, { tag: box.tag } );
+		this.colliders = colliders;
+		this.colliderBoxes = colliders ? fishStandColliderVolumes( y ).map( box => colliders.addBox( new Vector3( ...box.center ), new Vector3( ...box.half ), box.yaw, { tag: box.tag } ) ) : [];
+		this.active = true;
 
 	}
 
@@ -86,6 +88,29 @@ export class FishStand {
 	update( dt, player ) {
 
 		this.vendor.update( dt, player );
+
+	}
+
+	setActive( active ) {
+
+		if ( this.active === active ) return;
+		this.active = active;
+		this.group.visible = active;
+		this.vendor.group.visible = active;
+		if ( ! this.colliders ) return;
+		if ( active ) {
+			for ( const box of fishStandColliderVolumes( this.group.position.y ).map( item => this.colliders.addBox( new Vector3( ...item.center ), new Vector3( ...item.half ), item.yaw, { tag: item.tag } ) ) ) this.colliderBoxes.push( box );
+		} else {
+			for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders.removeBox( box );
+		}
+
+	}
+
+	setColliders( colliders ) {
+
+		for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders?.removeBox( box );
+		this.colliders = colliders;
+		if ( this.active && colliders ) for ( const item of fishStandColliderVolumes( this.group.position.y ) ) this.colliderBoxes.push( colliders.addBox( new Vector3( ...item.center ), new Vector3( ...item.half ), item.yaw, { tag: item.tag } ) );
 
 	}
 
