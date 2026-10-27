@@ -1,57 +1,55 @@
 # Reproducible graphics review
 
-## Tidewater content split parity review, 2026-10-27
+## Tidewater post-split parity review, 2026-10-27
 
 Compared the pre-split ElseMesh tree at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
 with the packaged `worlds/tidewater` content pinned at
 `cbcac318a28ccc0acfc71ee5a0ffa4f95db7b02a`. LOZ worlds were excluded. The
-browser ran headlessly in an isolated Xvfb display with a Radeon Vulkan device;
-the user's desktop browser and display were not used. Both builds used a
-1280×577 viewport, render scale 1, shadows enabled, TAA, and matched beach,
-village, valley, and summit review poses with fixed time of day. Captures were
-made separately with WebGPU and explicitly selected WebGL. In each contact
-sheet, the left image is pre-split and the right image is packaged Tidewater;
-rows run beach, village, valley, summit.
+WebGPU views use a 1280×577 viewport, render scale 1, shadows, TAA, fixed-time
+named camera poses, and an isolated headless Weston display with the Radeon
+Vulkan adapter. The user's desktop browser and display were not used. The
+contact sheet pairs pre-split on the left with packaged Tidewater on the right;
+rows run beach, village, valley, and summit.
 
-### WebGPU
+### WebGPU matched comparison
 
-![Pre-split and packaged Tidewater WebGPU views](images/parity-2026-10-27-webgpu.png)
+![Pre-split and packaged Tidewater WebGPU views](images/parity-2026-10-27-webgpu-rtcfix.png)
 
-The four views preserve the same broad composition, terrain, vegetation,
-buildings, paths, and shoreline. The village and valley are especially close
-at these poses. Differences remain in small shoreline/debris details and the
-water's surface pattern and shading, most visible at the summit. This supports
-close scene parity for the checked views, not pixel identity or parity at every
-camera position.
+All four views retain the same broad island composition, terrain, vegetation,
+village buildings, boardwalk, beach, pier, and summit inlet. Village and valley
+content are especially close. Remaining world-rendering deltas are the water
+surface and shallow-water/foam patterns, plus small shoreline and debris
+details; they are most noticeable at the beach and summit. The packaged capture
+also lacks the pre-split minimap overlay, which is an engine UI difference, not
+a Tidewater asset difference. These views support close scene parity at the
+checked poses, not pixel identity or parity at every camera position.
 
-### WebGL
+The packaged WebGPU page reported `remoteWorldActive: true` with one active
+world. The first live check exposed missing `worldId` fields in direct WebRTC
+requests; the client now includes the world ID. The response path now sends JSON
+text and the client also decodes binary `ArrayBuffer`/`Blob` frames. The live
+isolated browser then loaded the packaged manifest over WebRTC and captured all
+four views.
 
-![Pre-split and packaged Tidewater WebGL views](images/parity-2026-10-27-webgl.png)
+### WebGL separate smoke review
 
-WebGL does not preserve visual parity. The packaged fallback has substantially
-darker, flatter ocean with reduced surf and foam detail; a much paler terrain
-and vegetation appearance; altered village building colors and boardwalk
-appearance; and visibly different shoreline clutter. Valley vegetation and
-summit island composition remain recognizable, but terrain and water shading
-still diverge. The client reports that WebGL island rendering is simplified
-and one package feature is omitted. The hosted GLB path was also missing the
-existing fallback's timber tint and mesh shadow flags; the loader now applies
-those to hosted base and LOD meshes with per-instance material clones. The
-hosted terrain renderer also now shades the signed terrain GLB from the
-packaged height, normal/AO, splat, palette, and detail maps; the LODs use the
-same package-derived material. Decoding the heightfield alone no longer marks
-the terrain visual capability ready. The contact sheet above predates these
-corrections and must be recaptured before judging their effect. WebGL parity
-remains unaccepted pending updated matched views and the remaining village
-material, water, vegetation, and shoreline rendering work.
+![Packaged Tidewater WebGL views at the four review poses](images/webgl-2026-10-27-review.png)
 
-The package integrity and deterministic exporter checks pass. The discrepancy
-was adapter selection: the sandbox exposed llvmpipe, while an escalated shell
-also exposed Radeon, and Dawn's high-performance request baked a different
-village-material asset. `test/headless.mjs` now selects llvmpipe by default;
-`ELSEMESH_TEST_GPU_ADAPTER` can override it on hosts with a different stable
-test adapter. The full suite passes from the external build tree, including
-`world-export` and the live world-gateway integration.
+WebGL was reviewed separately at the same four named camera poses; it was not
+compared with the pre-split WebGL renderer as a parity baseline. The isolated
+page selected WebGL and reported one omitted package feature. The current
+fallback shows pale, flat beach ground and dark, simplified water; village
+materials and vegetation are reduced; the valley and summit views intersect
+the terrain. The omitted package feature is
+`tidewater.village-materials/2` (`tw-component:island-village-materials`).
+This is a current-state review, not parity acceptance. WebGL parity remains
+unaccepted pending fixes to terrain placement, water, vegetation, shoreline
+presentation, and village materials.
+
+The pinned submodule check verified 60 Tidewater assets. `npm run build`, the
+full `npm test` suite, and `go test ./worldd` pass from the external build tree
+with the shared Go cache configured. The suite's Burning Horizons two-world
+test remains skipped by scope; no LOZ content was involved.
 
 The current ElseMesh build accepts review-camera URL parameters so a view can be opened in a local build or the fork deployment:
 

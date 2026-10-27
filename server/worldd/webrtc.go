@@ -225,7 +225,7 @@ func (d *daemon) handleWebRTCRequest(session *worldRTCSession, channel *webrtc.D
 		session.writeMu.Lock()
 		defer session.writeMu.Unlock()
 		if channel.ReadyState() == webrtc.DataChannelStateOpen {
-			_ = channel.Send(encoded)
+			_ = channel.SendText(string(encoded))
 		}
 	}()
 }

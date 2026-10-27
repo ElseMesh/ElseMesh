@@ -12,6 +12,7 @@ export async function chooseWorldEntryPoint( manifest, { storage = globalThis.lo
 	const entries = manifest?.entryPoints || [];
 	if ( ! entries.length ) return null;
 	if ( typeof manifest.entryPointPrompt !== 'string' || ! manifest.entryPointPrompt.trim() ) throw new Error( 'World is missing its entry point prompt' );
+	const actionLabel = typeof manifest.entryPointActionLabel === 'string' && manifest.entryPointActionLabel.trim() ? manifest.entryPointActionLabel.trim() : 'Choose an entry point';
 	let saved = null;
 	try { saved = entries.find( entry => entry.id === storage?.getItem( `${STORAGE_PREFIX}${manifest.worldId}` ) ) || null; } catch {}
 	if ( saved ) return saved;
@@ -26,22 +27,36 @@ export async function chooseWorldEntryPoint( manifest, { storage = globalThis.lo
 		Object.assign( panel.style, { width: 'min(440px, calc(100vw - 32px))', padding: '24px', border: '1px solid #b99b65', borderRadius: '12px', background: '#17191d', boxShadow: '0 18px 70px #000a' } );
 		const title = documentRef.createElement( 'h2' );
 		title.id = 'world-entry-title';
-		title.textContent = manifest.entryPointPrompt;
+		title.textContent = manifest.title || actionLabel;
 		panel.append( title );
-		for ( const entry of entries ) {
-			const button = documentRef.createElement( 'button' );
-			button.type = 'button';
-			button.textContent = entry.label;
-			Object.assign( button.style, { display: 'block', width: '100%', margin: '10px 0', padding: '12px', color: 'inherit', background: '#292d34', border: '1px solid #766747', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' } );
-			button.addEventListener( 'click', () => {
+		const actions = documentRef.createElement( 'div' );
+		const styleButton = button => Object.assign( button.style, { display: 'block', width: '100%', margin: '10px 0', padding: '12px', color: 'inherit', background: '#292d34', border: '1px solid #766747', borderRadius: '6px', cursor: 'pointer', textAlign: 'left' } );
+		const chooseEntry = entry => {
 				try { storage?.setItem( `${STORAGE_PREFIX}${manifest.worldId}`, entry.id ); } catch {}
 				backdrop.remove();
 				resolve( entry );
-			} );
-			panel.append( button );
-		}
+		};
+		const action = documentRef.createElement( 'button' );
+		action.type = 'button';
+		action.textContent = actionLabel;
+		styleButton( action );
+		action.addEventListener( 'click', () => {
+			title.textContent = manifest.entryPointPrompt;
+			actions.replaceChildren();
+			for ( const entry of entries ) {
+				const button = documentRef.createElement( 'button' );
+				button.type = 'button';
+				button.textContent = entry.label;
+				styleButton( button );
+				button.addEventListener( 'click', () => chooseEntry( entry ) );
+				actions.append( button );
+			}
+			actions.querySelector( 'button' )?.focus();
+		} );
+		actions.append( action );
+		panel.append( actions );
 		backdrop.append( panel );
 		documentRef.body.append( backdrop );
-		panel.querySelector( 'button' )?.focus();
+		action.focus();
 	} );
 }

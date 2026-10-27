@@ -71,7 +71,13 @@ export function validateWorldLevels( rules ) {
 }
 
 export function worldSeaLevel( rules ) {
-	return rules?.seaLevel ?? 0;
+	return rules?.seaLevel ?? null;
+}
+
+export function worldHasWater( manifest ) {
+	return Number.isFinite( manifest?.rules?.seaLevel ) && manifest?.components?.some( component =>
+		component?.type === 'tidewater.island-ocean/1' || component?.type === 'tidewater.water-body/1'
+	) === true;
 }
 
 export function validateWorldPackageBudget( manifest ) {

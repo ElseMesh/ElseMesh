@@ -32,12 +32,15 @@ default implementation and must retain its manifest signature, per-asset hash,
 startup, and browser-cache semantics. A region provider supplies a signed world
 descriptor, source revision, stable region IDs and bounds, and requests for
 bounded render and simulation data. Requests carry cancellation and subscriber
-lifetimes; identical in-flight requests are coalesced. Responses are checked
-against a content digest and declared limits before installation. The host owns
-the shared bounded RAM and optional disk cache for all visitors, keyed by world
-ID, source revision, converter version, and region ID. Active reads stay pinned;
-unused entries are evicted by LRU policy. Clients separately release decoded
-CPU objects and GPU buffers/textures when a region leaves their active set.
+lifetimes; identical in-flight requests are coalesced. A provider may prepare
+regions ahead of time or convert them on demand; either way, conversion stays
+off the renderer frame path and the host serves one shared result to every
+visitor. Responses are checked against a content digest and declared limits
+before installation. The host owns the shared bounded RAM and optional disk
+cache for all visitors, keyed by world ID, source revision, converter version,
+and region ID. Active reads stay pinned; unused entries are evicted by LRU
+policy. Clients separately release decoded CPU objects and GPU buffers/textures
+when a region leaves their active set.
 
 Keep the provider interface independent of the renderer backend and source
 format. The current GLB loader, WebGPU renderer, and WebGL fallback remain the
@@ -71,22 +74,30 @@ hosting configuration, not a Hogwarts-specific conditional in the renderer.
 The selected provider still supplies and validates the world's identity,
 revision, entry metadata, and region data through the shared provider boundary.
 
-Entry-choice metadata is authored by the world. It may define a prompt, a
-bounded list of stable choice IDs and localized/player-facing labels, and a
-mapping from each choice to an authored spawn pose and optional avatar
-appearance palette. ElseMesh validates and displays this metadata using a
-generic chooser; it does not know Hogwarts houses or any other world's choice
-labels. Store a visitor's selected choice per world and use that choice for
-invite entry, future portal entry, and appearance updates while preserving
-their independent avatar body and personal style settings. If a world provides
-no choices, keep the ordinary authored spawn behavior. Reject malformed or
-unresolvable choices rather than guessing positions.
+Entry-choice metadata is authored by the world. It may define a world-owned
+action-button label, a prompt, a bounded list of stable choice IDs and
+player-facing labels, and a mapping from each choice to an authored spawn pose
+and optional avatar appearance palette. ElseMesh validates and displays this
+metadata using a generic chooser; it does not know Hogwarts houses or any
+other world's choice labels. Store a visitor's selected choice per world and
+use that choice for invite entry, future portal entry, and appearance updates
+while preserving their independent avatar body and personal style settings.
+If a world provides no choices, keep the ordinary authored spawn behavior.
+Reject malformed or unresolvable choices rather than guessing positions.
 
-For the Hogwarts bridge, the four house choice IDs and prompt are already
-world-owned metadata, but their operational spawn poses remain blocked on a
-location survey. The bridge must translate a selected choice into a validated
-region and collision-backed spawn before the player enters. The same generic
-path must remain usable by Tidewater and future worlds without a default-path
+Hosted worlds have no active waterline by default. A world opts into water by
+declaring a supported water component and its own finite `rules.seaLevel`;
+without both, the hosted player has no swim/waterline behavior. Tidewater's
+built-in world continues to use its existing ocean. Hosted Tidewater worlds
+may explicitly request a water renderer, and other worlds such as Hogwarts may
+provide a better-suited implementation.
+
+For the Hogwarts bridge, the four house choice IDs, button label, and prompt
+are world-owned metadata. The current Great Hall preview presents that button
+and the choices; individual house spawn poses remain blocked on a location
+survey. The bridge must translate a selected choice into a validated region
+and collision-backed spawn before the player enters. The same generic path
+must remain usable by Tidewater and future worlds without a default-path
 change.
 
 Game-backed regions also carry a collision layer derived from Unreal BodySetup

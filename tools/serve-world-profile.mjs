@@ -17,6 +17,11 @@ export function parseArguments( argv ) {
 	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
+		if ( key === '--autoport' ) {
+			if ( options[ key ] ) throw new Error( 'Option may only be specified once: --autoport' );
+			options[ key ] = true;
+			continue;
+		}
 		if ( ! valueOptions.has( key ) || ! argv[ i + 1 ] || argv[ i + 1 ].startsWith( '--' ) ) throw new Error( `Invalid or incomplete option: ${key}` );
 		if ( [ '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ].includes( key ) ) ( options[ key.slice( 2 ) ] ||= [] ).push( argv[ ++ i ] );
 		else {
@@ -26,6 +31,7 @@ export function parseArguments( argv ) {
 	}
 	for ( const key of [ '--worldd', '--profile', '--worlds-dir' ] ) if ( ! options[ key ] ) throw new Error( `Missing ${key}` );
 	if ( Boolean( options[ '--source' ] ) !== Boolean( options[ '--assets' ] ) ) throw new Error( '--source and --assets must be supplied together' );
+	if ( options[ '--autoport' ] && options[ '--http' ] ) throw new Error( '--autoport cannot be combined with --http' );
 	if ( ! /^[a-z0-9][a-z0-9_-]{0,63}$/.test( options[ '--profile' ] ) ) throw new Error( '--profile must be 1 to 64 lowercase letters, digits, hyphens, or underscores and start with a letter or digit' );
 	if ( options[ '--http' ] && ! /^(?:localhost|127\.0\.0\.1|\[[0-9a-f:]+\]|[^\s:]+):\d{1,5}$/.test( options[ '--http' ] ) ) throw new Error( '--http must be a host:port address' );
 	if ( options[ '--p2p-port' ] && ( ! /^\d+$/.test( options[ '--p2p-port' ] ) || Number( options[ '--p2p-port' ] ) < 1 || Number( options[ '--p2p-port' ] ) > 65535 ) ) throw new Error( '--p2p-port must be between 1 and 65535' );
@@ -85,7 +91,8 @@ async function serve( options ) {
 	}
 
 	const args = worlddArgs( options, [] );
-	if ( options[ '--http' ] ) args.push( '--http', options[ '--http' ] );
+	if ( options[ '--autoport' ] ) args.push( '--http', '127.0.0.1:0' );
+	else if ( options[ '--http' ] ) args.push( '--http', options[ '--http' ] );
 	if ( options[ '--p2p-port' ] ) args.push( '--p2p-port', options[ '--p2p-port' ] );
 	if ( options[ '--dht-mode' ] ) args.push( '--dht-mode', options[ '--dht-mode' ] );
 	if ( options[ '--public-gateway' ] ) args.push( '--public-gateway', options[ '--public-gateway' ] );

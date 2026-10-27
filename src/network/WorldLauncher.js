@@ -26,6 +26,7 @@ function isLoopback( hostname ) {
 export async function discoverLocalWorldURL( { pageURL = globalThis.location?.href, fetchImpl = globalThis.fetch } = {} ) {
 	const page = new URL( pageURL );
 	if ( ! [ 'http:', 'https:' ].includes( page.protocol ) ) return null;
+	if ( page.searchParams.has( 'localProvider' ) || page.searchParams.has( 'localMap' ) ) return null;
 	if ( ! isLoopback( page.hostname ) || page.searchParams.has( 'worldId' ) || page.searchParams.has( 'ztNodeId' ) || page.searchParams.get( 'example' ) === '1' ) return null;
 	try {
 		const response = await fetchImpl( new URL( '/api/world/manifest', page ), { credentials: 'omit', cache: 'no-store' } );
@@ -197,6 +198,7 @@ export function clearHomeWorld( { storage } = {} ) {
 
 export function defaultHomeWorldURL( { pageURL = globalThis.location?.href, storage } = {} ) {
 	const current = new URL( pageURL );
+	if ( current.searchParams.has( 'localProvider' ) || current.searchParams.has( 'localMap' ) ) return null;
 	if ( current.searchParams.has( 'worldId' ) || current.searchParams.has( 'ztNodeId' ) || current.searchParams.get( 'example' ) === '1' ) return null;
 	const home = getHomeWorld( { pageURL, storage } );
 	if ( ! home ) return null;

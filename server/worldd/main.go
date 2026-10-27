@@ -648,15 +648,19 @@ func run() error {
 		})
 	}
 	server := &http.Server{Addr: *httpAddress, Handler: securityHeaders(mux), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 90 * time.Second}
+	httpListener, err := net.Listen("tcp", *httpAddress)
+	if err != nil {
+		return err
+	}
 	serverErr := make(chan error, 1)
-	go func() { serverErr <- server.ListenAndServe() }()
+	go func() { serverErr <- server.Serve(httpListener) }()
 	var webTransportErr chan error
 	if wtServer != nil {
 		webTransportErr = make(chan error, 1)
 		go func() { webTransportErr <- wtServer.ListenAndServeTLS(*webTransportCert, *webTransportKey) }()
 		log.Printf("worldd WebTransport HTTP/3 UDP listen=%s", *webTransportAddress)
 	}
-	log.Printf("worldd node=%s world=%s http=%s", localID, world.WorldID, *httpAddress)
+	log.Printf("worldd node=%s world=%s http=%s", localID, world.WorldID, httpListener.Addr())
 	for _, addr := range p2pHost.Addrs() {
 		log.Printf("p2p address %s/p2p/%s", addr, p2pHost.ID())
 	}

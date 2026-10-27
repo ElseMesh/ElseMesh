@@ -57,6 +57,42 @@
       },
       "additionalProperties": false
     },
+    "entryPointActionLabel": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "Optional world-authored label for the action that begins entry-point selection."
+    },
+    "entryPointPrompt": {
+      "type": "string",
+      "maxLength": 240,
+      "description": "World-authored question shown after the visitor activates the entry-point button."
+    },
+    "entryPoints": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "position", "yaw"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "position": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 } },
+          "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
+          "pitch": { "type": "number", "minimum": -1.5, "maximum": 1.5 },
+          "uniform": {
+            "type": "object",
+            "required": ["shirt", "trousers"],
+            "properties": {
+              "shirt": { "type": "string", "pattern": "^#[0-9a-f]{6}$" },
+              "trousers": { "type": "string", "pattern": "^#[0-9a-f]{6}$" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "coordinateSystem": {
       "const": "right-handed-y-up-meters"
     },
@@ -678,5 +714,14 @@
       "additionalProperties": true
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["entryPoints"],
+        "properties": { "entryPoints": { "minItems": 1 } }
+      },
+      "then": { "required": ["entryPointActionLabel", "entryPointPrompt"] }
+    }
+  ],
   "additionalProperties": true
 }

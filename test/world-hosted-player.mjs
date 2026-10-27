@@ -124,7 +124,7 @@ const destination = { worldId: 'tw-world:destination', nodeId: '1234567890123456
 const app = Object.assign( Object.create( App.prototype ), {
 	player, camera, worldConnector: { worldId: 'tw-world:source', close() { sourceClosed = true; } },
 	linkedWorldRoot: { userData: {} }, hostedColliders: new Colliders(), hostedQuery: {}, hostedPlayerSlot: 0,
-	scene: { remove() {}, add() {} }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(),
+	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(),
 	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
 	portalPreviousPosition: new Vector3(), portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
 } );
@@ -181,7 +181,7 @@ const vehicleDestination = {
 const vehiclePortalApp = Object.assign( Object.create( App.prototype ), {
 	player: vehiclePlayer, camera: vehiclePlayer.camera, worldConnector: vehicleSourceConnector, activeHostedBoat: sourceBoatRuntime,
 	linkedWorldRoot: { userData: {} }, hostedColliders: colliders, hostedQuery: {}, hostedPlayerSlot: 0,
-	scene: { remove() {}, add() {} }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(), portalPreviousPosition: new Vector3(),
+	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(), portalPreviousPosition: new Vector3(),
 	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
 	portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
 } );

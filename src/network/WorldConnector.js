@@ -35,6 +35,19 @@ export function assetConcurrencyForConnection( connection = globalThis.navigator
 
 export function worldLinkFromLocation( location = globalThis.location ) {
 	const params = new URLSearchParams( location.search );
+	const localProvider = params.get( 'localProvider' );
+	const localMap = params.get( 'localMap' );
+	if ( localProvider || localMap ) {
+		invariant( localProvider && localMap, 'A local provider URL and map name must be supplied together' );
+		invariant( ! params.has( 'worldId' ) && ! params.has( 'ztNodeId' ) && ! params.has( 'nodeId' ) && ! params.has( 'gateway' ), 'Local preview cannot be combined with a remote world invite' );
+		const provider = new URL( localProvider );
+		const loopback = ( hostname ) => [ 'localhost', '127.0.0.1', '[::1]' ].includes( hostname );
+		invariant( [ 'http:', 'https:' ].includes( provider.protocol ) && loopback( provider.hostname ) && ! provider.username && ! provider.password && ( provider.pathname === '' || provider.pathname === '/' ) && ! provider.search && ! provider.hash, 'Local region provider must be a loopback HTTP(S) origin' );
+		const page = new URL( location.href );
+		invariant( [ 'http:', 'https:' ].includes( page.protocol ) && loopback( page.hostname ), 'Local region preview is available only from a loopback browser page' );
+		invariant( localMap.length <= 256 && /^[\w .()/-]+$/.test( localMap ), 'Invalid local map selector' );
+		return { localProvider: provider.origin, localMap };
+	}
 	const worldId = params.get( 'worldId' );
 	const zeroTierNodeId = params.get( 'ztNodeId' ) || '';
 	if ( ! worldId && ! zeroTierNodeId ) return null;
@@ -561,7 +574,7 @@ export class WorldConnector {
 			}
 		}
 		if ( connection.kind === 'webrtc' ) {
-			try { return await this.#requestRTC( connection.channel, { ...message, requestId }, signal ); }
+			try { return await this.#requestRTC( connection.channel, { ...message, worldId: this.worldId, requestId }, signal ); }
 			catch ( error ) {
 				if ( signal?.aborted || ! [ 'manifest.get', 'role-revocations.get', 'asset.get' ].includes( message.type ) || this.rtcChannel?.readyState === 'open' ) throw error;
 				connection = await this.#connection( signal );
@@ -595,9 +608,13 @@ export class WorldConnector {
 		const channel = peer.createDataChannel( 'elsemesh-world-v1', { ordered: true } );
 		this.rtcPeerConnection = peer;
 		this.rtcChannel = channel;
-		channel.addEventListener( 'message', ( event ) => {
+		channel.addEventListener( 'message', async ( event ) => {
 			let response;
-			try { response = JSON.parse( event.data ); } catch { this.#failRTCPending( new Error( 'Invalid response from world data channel' ) ); return; }
+			try {
+				const data = typeof event.data === 'string' ? event.data : event.data instanceof ArrayBuffer ? new TextDecoder().decode( event.data ) : event.data instanceof Blob ? await event.data.text() : null;
+				if ( data === null ) throw new Error( 'Unsupported world data channel message' );
+				response = JSON.parse( data );
+			} catch { this.#failRTCPending( new Error( 'Invalid response from world data channel' ) ); return; }
 			const pending = this.rtcPending.get( response.requestId );
 			if ( ! pending ) return;
 			this.rtcPending.delete( response.requestId );
@@ -1032,7 +1049,7 @@ export async function verifySignedWorldManifest( document ) {
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience );
 	validateWorldSpawn( manifest.spawn );
-	validateWorldEntryPoints( manifest.entryPoints, manifest.entryPointPrompt );
+	validateWorldEntryPoints( manifest.entryPoints, manifest.entryPointPrompt, manifest.entryPointActionLabel );
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );
 	validateWorldPortals( manifest.portals, entityIDs, manifest.rules );
 	validateWorldComponents( manifest.components, manifest.rules, entityIDs, manifest.assets, manifest.objects );

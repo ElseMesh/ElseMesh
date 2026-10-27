@@ -54,6 +54,12 @@ specialized setups.
 
 `tools/serve-world-profile.mjs` provisions an immutable world package into one named owner profile, signs its runtime manifest with that profile's persistent node key, verifies and installs all package assets, then starts the supplied daemon binary. Give every simultaneously running profile its own P2P and HTTP ports. The helper refuses to overwrite an existing profile manifest; once provisioned, the same command can restart it without `--source` or `--assets`.
 
+For temporary local hosting, replace `--http` with `--autoport`. The daemon
+binds an OS-assigned loopback port and prints the selected address in its
+`worldd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
+mutually exclusive; it only selects the HTTP gateway port, so give concurrent
+profiles distinct `--p2p-port` values as usual.
+
 Build `thruholdd` for the host first, then run (from the repository root):
 
 ```sh

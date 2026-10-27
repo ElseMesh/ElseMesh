@@ -3,6 +3,7 @@ import { Colliders } from '../src/world/Colliders.js';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 import { Group } from '../src/engine/scene/Group.js';
 import { loadWorldPackage, registerWorldPackageCollisions, unregisterWorldPackageCollisions } from '../src/network/WorldPackage.js';
+import { appendWorldPackageAssets } from '../src/network/WorldPackage.js';
 import { validateWorldSource } from '../src/network/WorldSource.js';
 import { validateWorldObjects } from '../src/network/WorldConnector.js';
 
@@ -105,6 +106,21 @@ assert.equal( bridgedColliders.boxes.length, 2, 'streaming registration does not
 unregisterWorldPackageCollisions( bridgedRoot, bridgedColliders );
 assert.equal( bridgedColliders.boxes.length, 0, 'world handoff removes embedded box and convex-bound colliders' );
 assert.equal( bridgedColliders.cylinders.length, 0, 'world handoff removes embedded sphere and capsule colliders' );
+
+const previewSupport = {
+	id: 'tw-object:preview-support', kind: 'asset-instance', label: 'Provisional preview support', assetId: null,
+	transform: { position: [ 0, 6.75, 8 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: 'visible',
+	collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 2, 0.25, 3 ], walkable: true, solid: true },
+};
+const supportConnector = { manifest: { objects: [ previewSupport ], portals: [] } };
+const supportRoot = await loadWorldPackage( supportConnector, { assets: new Map() } );
+await appendWorldPackageAssets( supportConnector, supportRoot, new Map() );
+const supportColliders = new Colliders();
+registerWorldPackageCollisions( supportRoot, supportColliders );
+assert.equal( supportColliders.groundHeightAt( 1, 9, 10 ), 7, 'collision-only package objects provide a floor without a visual asset' );
+assert.equal( supportRoot.children[ 0 ].visible, false, 'collision-only support never renders as geometry' );
+unregisterWorldPackageCollisions( supportRoot, supportColliders );
+
 const invalidCollisionRoot = new Group();
 const invalidCollisionInstance = new Group();
 invalidCollisionInstance.userData.worldObjectId = 'tw-object:invalid-body-setup';

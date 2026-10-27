@@ -77,6 +77,20 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 		if ( state.loadedObjects.has( object.id ) ) continue;
 		if ( selectedObjects && ! selectedObjects.has( object.id ) ) continue;
 		if ( object.kind !== 'asset-instance' ) throw new Error( `Unsupported world object kind: ${object.kind}` );
+		if ( object.assetId === null && object.collision?.enabled ) {
+			const collider = new Group();
+			collider.name = object.label || object.id;
+			collider.userData.worldObjectId = object.id;
+			const t = object.transform || {};
+			collider.position.set( ...( t.position || [ 0, 0, 0 ] ) );
+			if ( t.rotation ) collider.quaternion.set( ...t.rotation );
+			else collider.rotation.y = t.yaw || 0;
+			collider.scale.set( ...( object.scale || [ 1, 1, 1 ] ) );
+			collider.visible = false;
+			root.add( collider );
+			state.loadedObjects.add( object.id );
+			continue;
+		}
 		const bytes = assets.get( object.assetId );
 		if ( ! bytes ) continue;
 		let gltf = state.parsed.get( object.assetId );
@@ -342,6 +356,60 @@ export function unregisterWorldPackageCollisions( root, colliders ) {
 		else if ( kind === 'cylinder' ) colliders.removeCylinder( collider );
 	}
 	embedded?.clear();
+}
+
+export function unloadWorldPackageObjects( root, connector, colliders, objectIDs ) {
+	const state = root?.userData?.worldPackage;
+	if ( ! state || ! objectIDs?.size ) return;
+	const assetByObject = new Map( connector.manifest.objects.map( object => [ object.id, object.assetId ] ) );
+	for ( const objectID of objectIDs ) {
+		const active = state.activeColliders?.get( objectID );
+		if ( active && colliders ) {
+			if ( active.shape === 'heightfield' ) colliders.removeHeightfield( active.collider );
+			else if ( active.shape === 'compound' ) for ( const box of active.collider || [] ) colliders.removeBox( box );
+			else colliders.removeBox( active.collider );
+			state.activeColliders.delete( objectID );
+		}
+		for ( const { kind, collider } of state.embeddedColliders?.get( objectID ) || [] ) {
+			if ( ! colliders ) continue;
+			if ( kind === 'box' ) colliders.removeBox( collider );
+			else colliders.removeCylinder( collider );
+		}
+		state.embeddedColliders?.delete( objectID );
+		const instance = root.children.find( child => child.userData.worldObjectId === objectID );
+		if ( instance ) root.remove( instance );
+		state.loadedObjects.delete( objectID );
+		state.lodControllers?.get( objectID )?.dispose();
+		state.lodControllers?.delete( objectID );
+	}
+	const releaseAssetIDs = new Set( [ ...objectIDs ].map( id => assetByObject.get( id ) ).filter( Boolean ) );
+	for ( const assetID of releaseAssetIDs ) {
+		if ( connector.manifest.objects.some( object => object.assetId === assetID && state.loadedObjects.has( object.id ) ) ) continue;
+		const parsed = state.parsed?.get( assetID );
+		if ( parsed ) {
+			const geometries = new Set(), materials = new Set(), textures = new Set();
+			parsed.traverse( object => {
+				if ( object.geometry?.dispose ) geometries.add( object.geometry );
+				for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
+					if ( ! material || material.userData?.borrowedWorldMaterial ) continue;
+					materials.add( material );
+					for ( const binding of Object.values( material.bindings || {} ) ) {
+						const texture = binding?.texture || binding;
+						if ( texture?.isTexture && texture.destroy ) textures.add( texture );
+					}
+				}
+			} );
+			const release = () => {
+				for ( const geometry of geometries ) geometry.dispose();
+				for ( const material of materials ) material.dispose?.();
+				for ( const texture of textures ) texture.destroy();
+			};
+			if ( GPU.encoder ) GPU.onSubmit( null, release );
+			else release();
+			state.parsed.delete( assetID );
+		}
+		connector.releaseAsset?.( assetID );
+	}
 }
 
 const MAX_EMBEDDED_SHAPES_PER_OBJECT = 4096;

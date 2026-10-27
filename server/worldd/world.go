@@ -423,26 +423,27 @@ type worldEntryPoint struct {
 }
 
 type worldManifest struct {
-	Protocol         string            `json:"protocol"`
-	WorldID          string            `json:"worldId"`
-	SourceHash       string            `json:"sourceHash,omitempty"`
-	OwnerPeerID      string            `json:"ownerPeerId"`
-	AuthorityPeerID  string            `json:"authorityPeerId"`
-	AuthorityEpoch   uint64            `json:"authorityEpoch"`
-	Discoverable     bool              `json:"discoverable"`
-	Version          uint64            `json:"version"`
-	Title            string            `json:"title"`
-	Experience       *worldExperience  `json:"experience,omitempty"`
-	Spawn            *worldSpawn       `json:"spawn,omitempty"`
-	EntryPoints      []worldEntryPoint `json:"entryPoints,omitempty"`
-	EntryPointPrompt string            `json:"entryPointPrompt,omitempty"`
-	Rules            worldRules        `json:"rules"`
-	Assets           []assetRef        `json:"assets"`
-	Objects          []worldObject     `json:"objects"`
-	Components       []worldComponent  `json:"components,omitempty"`
-	Portals          []portal          `json:"portals"`
-	Hosts            []hostingGrant    `json:"hosts,omitempty"`
-	UpdatedAt        int64             `json:"updatedAt"`
+	Protocol              string            `json:"protocol"`
+	WorldID               string            `json:"worldId"`
+	SourceHash            string            `json:"sourceHash,omitempty"`
+	OwnerPeerID           string            `json:"ownerPeerId"`
+	AuthorityPeerID       string            `json:"authorityPeerId"`
+	AuthorityEpoch        uint64            `json:"authorityEpoch"`
+	Discoverable          bool              `json:"discoverable"`
+	Version               uint64            `json:"version"`
+	Title                 string            `json:"title"`
+	Experience            *worldExperience  `json:"experience,omitempty"`
+	Spawn                 *worldSpawn       `json:"spawn,omitempty"`
+	EntryPoints           []worldEntryPoint `json:"entryPoints,omitempty"`
+	EntryPointPrompt      string            `json:"entryPointPrompt,omitempty"`
+	EntryPointActionLabel string            `json:"entryPointActionLabel,omitempty"`
+	Rules                 worldRules        `json:"rules"`
+	Assets                []assetRef        `json:"assets"`
+	Objects               []worldObject     `json:"objects"`
+	Components            []worldComponent  `json:"components,omitempty"`
+	Portals               []portal          `json:"portals"`
+	Hosts                 []hostingGrant    `json:"hosts,omitempty"`
+	UpdatedAt             int64             `json:"updatedAt"`
 }
 
 type worldExperience struct {
@@ -489,8 +490,14 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	if len(manifest.EntryPoints) > 0 && (strings.TrimSpace(manifest.EntryPointPrompt) == "" || len(manifest.EntryPointPrompt) > 240) {
 		return errors.New("world entry point prompt is required when entry points are defined")
 	}
+	if len(manifest.EntryPoints) > 0 && (strings.TrimSpace(manifest.EntryPointActionLabel) == "" || len(manifest.EntryPointActionLabel) > 80) {
+		return errors.New("world entry point action label is required when entry points are defined")
+	}
 	if len(manifest.EntryPointPrompt) > 240 || manifest.EntryPointPrompt != "" && strings.TrimSpace(manifest.EntryPointPrompt) == "" {
 		return errors.New("invalid world entry point prompt")
+	}
+	if len(manifest.EntryPointActionLabel) > 80 || manifest.EntryPointActionLabel != "" && strings.TrimSpace(manifest.EntryPointActionLabel) != manifest.EntryPointActionLabel {
+		return errors.New("invalid world entry point action label")
 	}
 	seenEntryPoints := make(map[string]bool, len(manifest.EntryPoints))
 	for _, entry := range manifest.EntryPoints {
