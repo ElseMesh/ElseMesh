@@ -42,6 +42,12 @@ and region ID. Active reads stay pinned; unused entries are evicted by LRU
 policy. Clients separately release decoded CPU objects and GPU buffers/textures
 when a region leaves their active set.
 
+For HTTP providers, bind each active region request to a short renewable lease
+scoped to its host, world, and region. Clients renew while they still need the
+result and release on completion or abort; lease expiry handles abrupt client
+loss. Coalesced work remains active while any subscriber lease remains and is
+canceled when the final lease is released or expires.
+
 Keep the provider interface independent of the renderer backend and source
 format. The current GLB loader, WebGPU renderer, and WebGL fallback remain the
 first supported render path; add streamed region lifecycle to these interfaces

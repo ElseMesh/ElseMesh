@@ -31,8 +31,16 @@ const bytes = makeGlb();
 const hash = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' );
 const originalFetch = globalThis.fetch;
 let cellFetches = 0;
-globalThis.fetch = async input => {
+let leaseReleases = 0;
+let abortNextCellFetch = false;
+let abortableFetchStarted;
+globalThis.fetch = async ( input, options = {} ) => {
 	const url = new URL( input );
+	if ( url.pathname === '/v1/regions/great-hall/leases' && options.method === 'POST' ) return Response.json( { leaseId: 'a'.repeat( 32 ), expiresInSeconds: 30 } );
+	if ( url.pathname === `/v1/leases/${ 'a'.repeat( 32 ) }` && options.method === 'DELETE' ) {
+		leaseReleases++;
+		return new Response( null, { status: 204 } );
+	}
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
 		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'tw-world:hogwarts-legacy-local',
 		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
@@ -49,8 +57,13 @@ globalThis.fetch = async input => {
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) return Response.json( {
 		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), cells: [ { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 } ],
 	} );
-	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' ) {
+	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
 		cellFetches++;
+		if ( abortNextCellFetch ) {
+			abortNextCellFetch = false;
+			abortableFetchStarted();
+			return new Promise( ( resolve, reject ) => options.signal.addEventListener( 'abort', () => reject( options.signal.reason ), { once: true } ) );
+		}
 		return new Response( bytes, { headers: {
 			'Content-Length': String( bytes.byteLength ), ETag: `"sha256-${hash}"`,
 		} } );
@@ -97,10 +110,21 @@ try {
 	assert.equal( loaded.get( manifest.assets[ 0 ].id ).byteLength, bytes.byteLength );
 	assert.ok( loaded.get( manifest.assets[ 1 ].id ).byteLength > 20, 'empty cell responses should become a tiny empty GLB and stay loaded' );
 	assert.equal( connector.assetBytes, bytes.byteLength + loaded.get( manifest.assets[ 1 ].id ).byteLength );
+	assert.equal( leaseReleases, 2, 'each region fetch should release its temporary visitor lease' );
 	assert.equal( connector.releaseAsset( manifest.assets[ 0 ].id ), true );
 	assert.equal( connector.assetBytes, loaded.get( manifest.assets[ 1 ].id ).byteLength, 'unloaded cells should release cached browser bytes' );
 	assert.equal( await connector.getAsset( manifest.assets[ 0 ].id ).then( value => value.byteLength ), bytes.byteLength );
 	assert.equal( cellFetches, 2, 'a released cell should be fetched again on demand' );
+	assert.equal( leaseReleases, 3, 'the refetched cell should also release its lease' );
+	connector.releaseAsset( manifest.assets[ 0 ].id );
+	abortNextCellFetch = true;
+	const requestStarted = new Promise( resolve => { abortableFetchStarted = resolve; } );
+	const abortController = new AbortController();
+	const abortedRequest = connector.getAsset( manifest.assets[ 0 ].id, { signal: abortController.signal } );
+	await requestStarted;
+	abortController.abort();
+	await assert.rejects( abortedRequest, { name: 'AbortError' } );
+	assert.equal( leaseReleases, 4, 'aborting a visitor fetch should release its server lease' );
 	connector.close();
 	assert.equal( connector.assets.size, 0 );
 	console.log( 'local region connector tests passed' );

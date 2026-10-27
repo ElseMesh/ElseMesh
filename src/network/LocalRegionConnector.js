@@ -1,5 +1,6 @@
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
+const REGION_LEASE_RENEW_MS = 10000;
 const DEFAULT_WORLD_ID = 'tw-world:hogwarts-legacy-local';
 const EMPTY_GLB = createEmptyGlb();
 
@@ -134,18 +135,61 @@ export class LocalRegionConnector {
 		}
 		const assetURL = this.regionAssets.get( assetId );
 		requireValue( this.manifest && assetURL, 'Local region asset was not declared by the provider' );
-		const response = await fetch( assetURL, { credentials: 'omit', cache: 'no-store', signal } );
-		if ( response.status === 404 ) return this.#cacheAsset( assetId, EMPTY_GLB );
-		if ( ! response.ok ) throw new Error( `Local region request failed (${response.status})` );
-		const declaredLength = Number( response.headers.get( 'Content-Length' ) );
-		requireValue( Number.isSafeInteger( declaredLength ) && declaredLength > 0 && declaredLength <= MAX_LOCAL_REGION_BYTES, 'Local region exceeds the browser memory limit' );
-		const bytes = new Uint8Array( await response.arrayBuffer() );
+		return this.#withRegionLease( assetURL, signal, async ( response, leaseSignal ) => {
+			if ( response.status === 404 ) return this.#cacheAsset( assetId, EMPTY_GLB );
+			if ( ! response.ok ) throw new Error( `Local region request failed (${response.status})` );
+			const declaredLength = Number( response.headers.get( 'Content-Length' ) );
+			requireValue( Number.isSafeInteger( declaredLength ) && declaredLength > 0 && declaredLength <= MAX_LOCAL_REGION_BYTES, 'Local region exceeds the browser memory limit' );
+			const bytes = new Uint8Array( await response.arrayBuffer() );
+			abortIfNeeded( leaseSignal );
+			requireValue( bytes.byteLength === declaredLength && bytes.byteLength <= MAX_LOCAL_REGION_BYTES, 'Local region length is invalid' );
+			const digest = await crypto.subtle.digest( 'SHA-256', bytes );
+			const digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
+			requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
+			return this.#cacheAsset( assetId, bytes );
+		} );
+	}
+
+	async #withRegionLease( assetURL, signal, consumeResponse ) {
 		abortIfNeeded( signal );
-		requireValue( bytes.byteLength === declaredLength && bytes.byteLength <= MAX_LOCAL_REGION_BYTES, 'Local region length is invalid' );
-		const digest = await crypto.subtle.digest( 'SHA-256', bytes );
-		const digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
-		requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
-		return this.#cacheAsset( assetId, bytes );
+		const regionURL = new URL( assetURL, this.localProvider );
+		const leaseURL = new URL( `${regionURL.pathname}/leases`, this.localProvider );
+		leaseURL.searchParams.set( 'cell', regionURL.searchParams.get( 'cell' ) || '' );
+		const leaseResponse = await fetch( leaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal } );
+		if ( ! leaseResponse.ok ) throw new Error( `Local region lease request failed (${leaseResponse.status})` );
+		const lease = await leaseResponse.json();
+		requireValue( /^[a-f0-9]{32}$/.test( lease?.leaseId || '' ) && lease.expiresInSeconds === 30, 'Local region provider returned an invalid lease' );
+		const controller = new AbortController();
+		const abort = () => controller.abort( signal?.reason || new DOMException( 'Aborted', 'AbortError' ) );
+		if ( signal?.aborted ) abort();
+		else signal?.addEventListener( 'abort', abort, { once: true } );
+		const controlURL = new URL( `/v1/leases/${lease.leaseId}`, this.localProvider );
+		let renewalTimer;
+		let released = false;
+		const renew = async () => {
+			if ( released || controller.signal.aborted ) return;
+			try {
+				const response = await fetch( controlURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal: controller.signal } );
+				if ( ! response.ok ) throw new Error( `Local region lease renewal failed (${response.status})` );
+				if ( ! released && ! controller.signal.aborted ) renewalTimer = setTimeout( () => { renew(); }, REGION_LEASE_RENEW_MS );
+			} catch ( error ) {
+				if ( ! released && ! controller.signal.aborted ) controller.abort( error );
+			}
+		};
+		renewalTimer = setTimeout( () => { renew(); }, REGION_LEASE_RENEW_MS );
+		const leasedURL = new URL( regionURL );
+		leasedURL.searchParams.set( 'lease', lease.leaseId );
+		try {
+			const response = await fetch( leasedURL, { credentials: 'omit', cache: 'no-store', signal: controller.signal } );
+			return await consumeResponse( response, controller.signal );
+		} finally {
+			released = true;
+			clearTimeout( renewalTimer );
+			signal?.removeEventListener( 'abort', abort );
+			try {
+				await fetch( controlURL, { method: 'DELETE', credentials: 'omit', cache: 'no-store', keepalive: true } );
+			} catch { /* Lease expiry reclaims interest if the browser has gone away. */ }
+		}
 	}
 
 	#cacheAsset( assetId, bytes ) {
