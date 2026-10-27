@@ -6,7 +6,7 @@ export function initialHostedWebGLSupport( components, { terrainReady = false, b
 	const supported = new Set( components.filter( component => WATER_COMPONENTS.has( component.type ) ).map( component => component.id ) );
 	if ( terrainReady ) {
 		for ( const component of components ) {
-			if ( component.type === 'tidewater.terrain-surface/1' || component.type === 'tidewater.example-island-wildlife/1' ) supported.add( component.id );
+			if ( component.type === 'tidewater.example-island-wildlife/1' ) supported.add( component.id );
 		}
 	}
 	if ( boatReady ) {

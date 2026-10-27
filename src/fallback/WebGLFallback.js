@@ -64,6 +64,14 @@ function prepareHostedWebGLModel( root ) {
 	} );
 }
 
+function applyHostedTerrainMaterial( root, material ) {
+	root.traverse( object => {
+		if ( ! object.isMesh ) return;
+		object.receiveShadow = true;
+		object.material = Array.isArray( object.material ) ? object.material.map( () => material.clone() ) : material.clone();
+	} );
+}
+
 function webglFoamLaceTexture( T, size = 512 ) {
 
 	if ( sharedFoamLaceTexture ) return sharedFoamLaceTexture;
@@ -298,7 +306,7 @@ class WebGLWaterQuery {
 
 }
 
-function webglTerrainMaterial( T, terrain ) {
+function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 
 	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
 	const smooth = ( a, b, x ) => { const t = T.MathUtils.clamp( ( x - a ) / ( b - a ), 0, 1 ); return t * t * ( 3 - 2 * t ); };
@@ -310,6 +318,14 @@ function webglTerrainMaterial( T, terrain ) {
 		sand: [ 0.84, 0.77, 0.64 ], seabed: [ 0.72, 0.7, 0.58 ], rock: [ 0.3, 0.285, 0.265 ],
 	} ).map( ( [ name, color ] ) => [ name, color.map( linear ) ] ) );
 	const { noise, noise2 } = terrain;
+	const samplePackagedFbm = ( x, z, scale ) => {
+		const width = packagedSurface.detailWidth, height = packagedSurface.detailHeight, data = packagedSurface.detail;
+		const u = ( ( x / scale % 1 ) + 1 ) % 1, v = ( ( z / scale % 1 ) + 1 ) % 1;
+		const index = ( Math.floor( v * height ) * width + Math.floor( u * width ) ) * 4 + 3;
+		return data[ index ] / 255;
+	};
+	const meadow = packagedSurface?.metadata.material.meadowLinear;
+	if ( meadow ) for ( const key of Object.keys( meadow ) ) palette[ key ] = meadow[ key ];
 	for ( let j = 0; j < resolution; j ++ ) {
 		const sourceJ = Math.min( terrain.res - 1, Math.floor( ( j + 0.5 ) * step ) );
 		for ( let i = 0; i < resolution; i ++ ) {
@@ -319,10 +335,20 @@ function webglTerrainMaterial( T, terrain ) {
 			const north = Math.max( 0, sourceJ - 1 ) * terrain.res + sourceI, south = Math.min( terrain.res - 1, sourceJ + 1 ) * terrain.res + sourceI;
 			const hx = ( terrain.heights[ row + east ] - terrain.heights[ row + west ] ) / ( Math.max( 1, east - west ) * terrain.texel );
 			const hz = ( terrain.heights[ south ] - terrain.heights[ north ] ) / ( Math.max( 1, Math.min( terrain.res - 1, sourceJ + 1 ) - Math.max( 0, sourceJ - 1 ) ) * terrain.texel );
-			const normalLength = 1 / Math.sqrt( hx * hx + 1 + hz * hz ), slope = 1 - normalLength, southFacing = - hz * normalLength;
-			const macroA = 0.5 + noise.noise( ( x * 0.765 + z * 0.644 ) / 173, ( - x * 0.644 + z * 0.765 ) / 173 ) * 0.1;
-			const macroB = 0.5 + noise2.noise( ( x * - 0.505 + z * 0.863 ) / 47, ( - x * 0.863 - z * 0.505 ) / 47 ) * 0.1;
-			const detail = T.MathUtils.clamp( 0.5 + noise.noise( x / 6.7, z / 6.7 ) * 0.1 + noise2.noise( x / 1.9, z / 1.9 ) * 0.06, 0, 1 );
+			let slope = 1 - 1 / Math.sqrt( hx * hx + 1 + hz * hz ), southFacing = - hz / Math.sqrt( hx * hx + 1 + hz * hz );
+			let macroA, macroB, detail;
+			if ( packagedSurface ) {
+				const normalOffset = source * 4, nx = packagedSurface.normal[ normalOffset ] / 127.5 - 1, nz = packagedSurface.normal[ normalOffset + 1 ] / 127.5 - 1;
+				slope = 1 - Math.sqrt( Math.max( 0, 1 - nx * nx - nz * nz ) );
+				southFacing = nz;
+				macroA = samplePackagedFbm( x * 0.765 + z * 0.644, - x * 0.644 + z * 0.765, 173 );
+				macroB = samplePackagedFbm( x * - 0.505 + z * 0.863, - x * 0.863 - z * 0.505, 47 );
+				detail = T.MathUtils.clamp( samplePackagedFbm( x, z, 6.7 ) * 0.6 + samplePackagedFbm( x, z, 1.9 ) * 0.4, 0, 1 );
+			} else {
+				macroA = 0.5 + noise.noise( ( x * 0.765 + z * 0.644 ) / 173, ( - x * 0.644 + z * 0.765 ) / 173 ) * 0.1;
+				macroB = 0.5 + noise2.noise( ( x * - 0.505 + z * 0.863 ) / 47, ( - x * 0.863 - z * 0.505 ) / 47 ) * 0.1;
+				detail = T.MathUtils.clamp( 0.5 + noise.noise( x / 6.7, z / 6.7 ) * 0.1 + noise2.noise( x / 1.9, z / 1.9 ) * 0.06, 0, 1 );
+			}
 			const dry = macroA * 0.55 + macroB * 0.45 + slope * 0.25 + southFacing * 0.04 + ( detail - 0.5 ) * 0.28;
 			const olive = smooth( 0.52, 0.6, dry ), yellow = smooth( 0.6, 0.67, dry );
 			const straw = smooth( 0.66, 0.73, dry + ( macroB - 0.5 ) * 0.2 );
@@ -333,25 +359,30 @@ function webglTerrainMaterial( T, terrain ) {
 			color = mix( color, palette.lush, lush * 0.75 );
 			const clump = detail * 0.6 + macroB * 0.4;
 			color = color.map( channel => channel * ( ( clump - 0.5 ) * 0.68 + 1 ) * ( ( detail - 0.4 ) * 0.22 + 1 ) );
-			const path = terrain.path[ source ] / 255, gully = terrain.gully[ source ] / 255;
-			const sand = terrain.sand[ source ] / 255, seabed = 1 - smooth( - 22, - 3, h );
-			const rock = Math.max( terrain.rock[ source ], smooth( 0.34, 0.62, slope ) * smooth( 2, 30, h ) );
+			const splatOffset = source * 4;
+			const path = packagedSurface ? packagedSurface.splat[ splatOffset + 1 ] / 255 : terrain.path[ source ] / 255;
+			const gully = packagedSurface ? packagedSurface.splat[ splatOffset + 2 ] / 255 : terrain.gully[ source ] / 255;
+			const sand = packagedSurface ? packagedSurface.splat[ splatOffset ] / 255 : terrain.sand[ source ] / 255, seabed = 1 - smooth( - 22, - 3, h );
+			const rock = Math.max( packagedSurface ? packagedSurface.normal[ splatOffset + 2 ] / 255 : terrain.rock[ source ], smooth( 0.34, 0.62, slope ) * smooth( 2, 30, h ) );
 			color = mix( color, palette.soil, Math.max( path * 0.92, gully * ( 1 - rock ) * 0.5 ) );
 			color = mix( color, palette.rock, rock );
 			color = mix( color, palette.sand, sand * ( 1 - seabed ) );
-			color = mix( color, palette.seabed, seabed * ( 1 - terrain.sand[ source ] / 255 * 0.3 ) );
-			color = mix( color, palette.green, terrain.seagrass[ source ] / 255 * seabed );
-			color = mix( color, palette.rock, terrain.rubble[ source ] / 255 * seabed );
-			color = mix( color, palette.rock, terrain.scarp[ source ] / 255 * 0.92 );
+			color = mix( color, palette.seabed, seabed * ( 1 - sand * 0.3 ) );
+			const seabedDetail = packagedSurface ? packagedSurface.splat[ splatOffset + 2 ] / 255 : terrain.seagrass[ source ] / 255;
+			const seabedRock = packagedSurface ? packagedSurface.splat[ splatOffset + 3 ] / 255 : terrain.rubble[ source ] / 255;
+			color = mix( color, palette.green, seabedDetail * seabed );
+			color = mix( color, palette.rock, seabedRock * seabed );
+			color = mix( color, palette.rock, packagedSurface ? 0 : terrain.scarp[ source ] / 255 * 0.92 );
+			if ( packagedSurface ) color = color.map( channel => channel * ( 0.82 + packagedSurface.normal[ splatOffset + 3 ] / 255 * 0.18 ) );
 			pixels[ out ] = Math.round( T.MathUtils.clamp( color[ 0 ], 0, 1 ) * 255 );
 			pixels[ out + 1 ] = Math.round( T.MathUtils.clamp( color[ 1 ], 0, 1 ) * 255 );
 			pixels[ out + 2 ] = Math.round( T.MathUtils.clamp( color[ 2 ], 0, 1 ) * 255 );
-			pixels[ out + 3 ] = terrain.sand[ source ];
+			pixels[ out + 3 ] = packagedSurface ? packagedSurface.splat[ splatOffset ] : terrain.sand[ source ];
 		}
 	}
 	const texture = new T.DataTexture( pixels, resolution, resolution, T.RGBAFormat, T.UnsignedByteType );
 	texture.magFilter = T.LinearFilter; texture.minFilter = T.LinearMipmapLinearFilter; texture.generateMipmaps = true; texture.needsUpdate = true;
-	const detailImage = getDetailImage();
+	const detailImage = packagedSurface ? { data: packagedSurface.detail, width: packagedSurface.detailWidth, height: packagedSurface.detailHeight } : getDetailImage();
 	const detailTexture = new T.DataTexture( detailImage.data, detailImage.width, detailImage.height, T.RGBAFormat, T.UnsignedByteType );
 	detailTexture.wrapS = detailTexture.wrapT = T.RepeatWrapping;
 	detailTexture.magFilter = T.LinearFilter; detailTexture.minFilter = T.LinearMipmapLinearFilter; detailTexture.generateMipmaps = true; detailTexture.needsUpdate = true;
@@ -1560,10 +1591,12 @@ export class WebGLFallback {
 		const components = manifest.components || [];
 		this.hostedWildlifeComponent = components.find( component => component.type === 'tidewater.example-island-wildlife/1' ) || null;
 		const terrainComponent = components.find( component => component.type === 'tidewater.terrain-surface/1' );
+		let terrainSurface = null, hostedTerrainMaterial = null, hostedTerrainVisualReady = false;
 		if ( terrainComponent && assets.has( terrainComponent.dataAssetId ) ) {
 			const terrainBytes = assets.get( terrainComponent.dataAssetId );
-			const terrain = await decodeTerrainSurfaceAsset( asBytes( terrainBytes ) );
-			this.hostedTerrainData = new HeightfieldTerrainData( { size: terrain.size, origin: terrain.origin, resolution: terrain.resolution, heights: terrain.heights, splat: terrain.splat } );
+			terrainSurface = await decodeTerrainSurfaceAsset( asBytes( terrainBytes ) );
+			this.hostedTerrainSurface = terrainSurface;
+			this.hostedTerrainData = new HeightfieldTerrainData( { size: terrainSurface.size, origin: terrainSurface.origin, resolution: terrainSurface.resolution, heights: terrainSurface.heights, splat: terrainSurface.splat } );
 		}
 		for ( const object of manifest.objects || [] ) {
 
@@ -1579,6 +1612,12 @@ export class WebGLFallback {
 			const root = new T.Group();
 			const base = model.scene.clone( true );
 			prepareHostedWebGLModel( base );
+			if ( object.id === terrainComponent?.objectId && terrainSurface ) {
+				hostedTerrainMaterial ||= webglTerrainMaterial( T, this.hostedTerrainData, terrainSurface );
+				applyHostedTerrainMaterial( base, hostedTerrainMaterial );
+				this.terrainColorTexture = hostedTerrainMaterial.userData.terrainTextures[ 0 ];
+				hostedTerrainVisualReady = true;
+			}
 			prepareWebGLLODFade( base );
 			base.name = `${ object.label || object.id } · LOD 0`;
 			root.add( base );
@@ -1607,6 +1646,7 @@ export class WebGLFallback {
 						if ( signal.aborted ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 						const visual = variant.scene.clone( true );
 						prepareHostedWebGLModel( visual );
+						if ( object.id === terrainComponent?.objectId && hostedTerrainMaterial ) applyHostedTerrainMaterial( visual, hostedTerrainMaterial );
 						prepareWebGLLODFade( visual );
 						visual.name = `${ object.label || object.id } · LOD ${ level }`;
 						visual.visible = false;
@@ -1639,6 +1679,7 @@ export class WebGLFallback {
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			terrainReady: !! this.hostedTerrainData, boatReady: !! this.hostedBoatSpec,
 		} );
+		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
 		const hostedReefRecords = [], hostedReefIds = [];
 		for ( const reef of components.filter( component => component.type === 'tidewater.static-reef/1' ) ) {
 			const placementBytes = assets.get( reef.placementAssetId );

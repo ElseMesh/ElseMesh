@@ -37,9 +37,13 @@ still diverge. The client reports that WebGL island rendering is simplified
 and one package feature is omitted. The hosted GLB path was also missing the
 existing fallback's timber tint and mesh shadow flags; the loader now applies
 those to hosted base and LOD meshes with per-instance material clones. The
-contact sheet above predates that correction and must be recaptured before
-judging its effect. Treat WebGL parity as failed pending updated matched views
-and the remaining fallback rendering work.
+hosted terrain renderer also now shades the signed terrain GLB from the
+packaged height, normal/AO, splat, palette, and detail maps; the LODs use the
+same package-derived material. Decoding the heightfield alone no longer marks
+the terrain visual capability ready. The contact sheet above predates these
+corrections and must be recaptured before judging their effect. WebGL parity
+remains unaccepted pending updated matched views and the remaining village
+material, water, vegetation, and shoreline rendering work.
 
 The package integrity and deterministic exporter checks pass. The discrepancy
 was adapter selection: the sandbox exposed llvmpipe, while an escalated shell

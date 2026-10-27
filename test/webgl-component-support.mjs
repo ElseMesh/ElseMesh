@@ -18,12 +18,12 @@ assert.deepEqual( unsupportedHostedWebGLComponents( components, withoutTerrain )
 
 const withTerrain = initialHostedWebGLSupport( components, { terrainReady: true } );
 assert.deepEqual( unsupportedHostedWebGLComponents( components, withTerrain ), [
-	'tidewater.reef-placement/1', 'tidewater.humpback-whale/1', 'tidewater.downeast-boat/1',
-], 'shared hosted wildlife is recognized while unfinished component renderers remain explicitly omitted' );
+	'tidewater.terrain-surface/1', 'tidewater.reef-placement/1', 'tidewater.humpback-whale/1', 'tidewater.downeast-boat/1',
+], 'decoded terrain data alone does not claim visual terrain support; shared wildlife is ready' );
 
 const withBoat = initialHostedWebGLSupport( components, { terrainReady: true, boatReady: true } );
 assert.deepEqual( unsupportedHostedWebGLComponents( components, withBoat ), [
-	'tidewater.reef-placement/1', 'tidewater.humpback-whale/1',
+	'tidewater.terrain-surface/1', 'tidewater.reef-placement/1', 'tidewater.humpback-whale/1',
 ], 'hosted boat is reported ready only after its signed berth preview is available' );
 
 const boatComponent = { ...components.find( component => component.id === 'boat' ), objectId: 'berth' };
