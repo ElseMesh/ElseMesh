@@ -11,23 +11,31 @@ these estimates when new verification evidence is recorded.
 **Repository separation: 100% — complete.** The structural split and its
 verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
 
-**Tidewater package integration and parity: 75%.** ElseMesh builds with the
-Tidewater content submodule mounted, verifies its content-addressed assets, and
-loads portable worlds through versioned interfaces. Matched hosted/built-in
-start and village views render on Android. The package now includes a signed,
-content-addressed grass-density mask for the hosted renderer. A matched Flip7
-village review on 2026-10-23 shows beach grass in both hosted and built-in
-renders at the same view and time. CPU checks now prove that packaged Tidewater
-plant placements and grass density match seeded source generation, and that
-all 143 non-terrain objects have geometry-reducing distance levels. Rendered
-density and LOD parity remain open. This acceptance applies to both the primary
-WebGPU renderer and the WebGL fallback: a world package must not lose declared
-visual or runtime features merely because WebGPU is unavailable. WebGL must
-load authored object LODs and implement the package's supported renderer
-components, with matched-view checks against WebGPU and the built-in world.
-Desktop visual acceptance and complete gameplay parity also remain open.
-Keep Tidewater authored content in its repository and reusable execution code
-in ElseMesh. Tidewater is content data, not a separately compiled application;
+**Tidewater package integration and parity: 75%.** This goal covers only the
+Example Island content now stored in the pinned Tidewater submodule. Exclude the
+LOZ cave and Burning Horizons from its checks. ElseMesh builds with Tidewater
+mounted, verifies its content-addressed assets, and loads portable worlds
+through versioned interfaces. Matched hosted/built-in start and village views
+render on Android. The package includes a signed, content-addressed grass-density
+mask; CPU checks prove that packaged plant placements and grass density match
+seeded source generation, and that all 143 non-terrain objects have
+geometry-reducing distance levels. The 2026-10-22/23 captures establish selected
+hosted-versus-built-in views and grass presence, but do not yet establish visual
+parity with the retained in-engine Example Island across the world.
+
+The remaining parity task is to compare the retained in-engine Example Island
+(the pre-split reference) with the Tidewater package loaded by the same ElseMesh
+build. Use matched renderer, device, camera pose, time, viewport, render scale,
+and graphics settings for the beach, village, valley, and summit views, plus
+close views where material, vegetation, or authored LOD differences are visible.
+Review the primary WebGPU renderer and the WebGL fallback separately; for WebGL,
+also compare matched views against WebGPU and record renderer-specific
+differences. Track content omissions, terrain/material appearance, vegetation
+density, object LOD transitions, water, and lighting/shadows as separate
+findings. Treat the existing captures as partial evidence, not completion.
+Desktop visual acceptance and complete gameplay parity remain open. Keep
+Tidewater authored content in its repository and reusable execution code in
+ElseMesh. Tidewater is content data, not a separately compiled application;
 ElseMesh validates and executes its versioned behavior data. Do not introduce a
 general downloaded-script runtime. Preserve per-world state isolation and the
 declared shared, player, group, or persistent scopes. Keep player platform
