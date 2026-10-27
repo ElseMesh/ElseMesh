@@ -68,15 +68,25 @@ in `docs/`.
   that carry the renderer's visual inputs and retain GLB collision/fallback
   data. Preserve the original island's visual quality, support the Linux FPS
   priority/Visual Quality choice, and preserve Android's full-quality path.
+  Extend this with a region-provider boundary for worlds generated or decoded
+  on demand: providers describe bounded regions and revisions, serve
+  integrity-checked content, and support cancellation and shared host-side
+  caching. Keep the signed static-package provider as the default adapter, so
+  Tidewater manifests, asset hashes, startup, and package behavior remain
+  unchanged while dynamic providers are introduced.
   See [world authoring](docs/world-authoring.md#replaceable-world-content-and-packaging), the
   [terrain package contract](docs/schemas/terrain-package.md),
+  [world and network design](docs/world-network-design.md#world-hosts-and-dynamic-region-providers),
   [graphics priority](docs/graphics-priority.md), and
   [graphics review](docs/graphics-review.md).
 - **Runtime presentation (75%):** implement distance-based object and avatar LOD
   with stable transitions and load-based recovery; preserve shared player
   presence, avatar appearance, animations, and vehicle rules. Apply the same
   package semantics in WebGL fallback, including authored object LODs and
-  required world components. See
+  required world components. Dynamic regions must install and release render
+  resources and collision together, and region-owned actors must support
+  versioned, host-authoritative state changes without arbitrary downloaded
+  scripts. See
   [world-object LOD](docs/world-object-lod.md#content-and-streaming-contract),
   [player presence](docs/player-presence.md), and
   [implementation status](docs/elsemesh-status.md).
@@ -168,6 +178,26 @@ Do not call the goal complete because code or local tests exist: completion
 requires the documented deployment, cross-network, rendering, and content
 acceptance evidence. Keep the repository clean, commit the implementation and
 documentation, and push to the configured working remote where feasible.
+
+## Bridge-driven engine evolution
+
+Support source-backed worlds through a generic `WorldContentProvider` boundary
+alongside the existing signed static-package provider. A provider may translate
+an installed or otherwise authorized source into bounded, versioned regions at
+runtime; it must preserve world ownership, admission, asset integrity, and
+transport limits. The browser and daemon should share the same provider
+contract, while a host owns one bounded RAM/disk cache shared among its
+visitors. Cache entries are keyed by world, source revision, converter version,
+and region, and must be evictable after they are no longer in use.
+
+This evolution is additive and must not make Tidewater depend on a bridge.
+Retain its current signed manifests, content-addressed assets, startup and
+rendering path as the static-provider regression baseline. Avoid a renderer or
+engine replacement: keep the existing WebGPU renderer and WebGL fallback, and
+extend their data interfaces for streamed geometry, textures, collision, and
+dynamic entities. Detailed bridge milestones and source-specific constraints
+belong in the applicable private world repository; ElseMesh owns the reusable
+provider, physics, entity, identity, and compatibility contracts.
 
 
 ## Deferred focus: earlier entry into streamed worlds (35%)

@@ -26,12 +26,54 @@ not pretend that transiently converted game data is the same as an authored
 static package. Game-specific implementation details belong with the private
 world repository.
 
+Treat `WorldContentProvider` as an additive engine boundary, not a new
+world-specific code path. The existing signed-package provider remains the
+default implementation and must retain its manifest signature, per-asset hash,
+startup, and browser-cache semantics. A region provider supplies a signed world
+descriptor, source revision, stable region IDs and bounds, and requests for
+bounded render and simulation data. Requests carry cancellation and subscriber
+lifetimes; identical in-flight requests are coalesced. Responses are checked
+against a content digest and declared limits before installation. The host owns
+the shared bounded RAM and optional disk cache for all visitors, keyed by world
+ID, source revision, converter version, and region ID. Active reads stay pinned;
+unused entries are evicted by LRU policy. Clients separately release decoded
+CPU objects and GPU buffers/textures when a region leaves their active set.
+
+Keep the provider interface independent of the renderer backend and source
+format. The current GLB loader, WebGPU renderer, and WebGL fallback remain the
+first supported render path; add streamed region lifecycle to these interfaces
+instead of replacing the engine or requiring Unreal. Tidewater continues using
+the static-package adapter and its current signed manifests and content hashes.
+Regression acceptance must cover Tidewater package loading and gameplay under
+both WebGPU and WebGL while the new provider path is exercised separately.
+
+Region data declares its collision readiness separately from visual readiness.
+The physics adapter registers/unregisters region colliders with region lifetime,
+and supports bounded primitive and convex data before any complex-triangle
+fallback is considered. Renderer triangles never become collision implicitly.
+Do not admit a player into a streamed area until its required spawn/traversal
+collision is installed. Dynamic actors use stable world-scoped IDs and
+versioned, host-authoritative state transitions; moving collision changes
+atomically with actor state. Sound is a replicated event reference, not an
+arbitrary client command, and clients deduplicate it by event ID. The protocol
+must not execute downloaded scripts.
+
+This is a general engine evolution; bridge-specific milestones, source data,
+and acceptance evidence remain in the corresponding private world repository.
+
 Game-backed regions also carry a collision layer derived from Unreal BodySetup
 data; renderer triangles are not a substitute. Interactive doors are shared
 world entities with host-authorized state transitions. The transition updates
 door motion and collision as one state change and includes a sound event ID so
 clients play the sound once. Current presence messages do not replicate these
 entities; this is a required protocol extension.
+
+The provider API also serves non-game sources that are naturally regionized or
+too large to package monolithically. It is a boundary around content production
+and lifecycle; it does not change the definition of a world, provider identity,
+or player session. A standalone daemon and an open browser-host tab may
+implement the same provider contract subject to their different durability
+limits.
 
 A ThruHold is an independently owned, signed world. Its owner publishes the
 world's content, portals, and default participation policy. Clients discover a
