@@ -455,6 +455,7 @@ async function buildGLTF( gltf, packageState = null ) {
 		object.position.set( ...node.t );
 		object.quaternion.set( ...node.r );
 		object.scale.set( ...node.s );
+		if ( node.extras ) Object.assign( object.userData, node.extras );
 		if ( node.mesh !== undefined ) for ( const mesh of builtMeshes[ node.mesh ] || [] ) object.add( mesh );
 		return object;
 

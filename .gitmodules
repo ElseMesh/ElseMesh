@@ -1,3 +1,6 @@
 [submodule "tidewater"]
 	path = worlds/tidewater
 	url = https://github.com/ElseMesh/tidewater.git
+[submodule "worlds/Hogwarts"]
+	path = worlds/Hogwarts
+	url = git@github.com:rebroad/Hogwarts-World.git

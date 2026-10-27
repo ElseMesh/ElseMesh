@@ -62,6 +62,10 @@ The browser host uses the same signed manifest, asset hashes, world rules, and
 gateway request messages as standalone worlds. It does not introduce a second
 world format or require a ZeroTier client.
 
+This provider currently serves predeclared assets only. It cannot discover or
+decode game-backed regions on demand. The Hogwarts bridge needs a separate
+dynamic region-provider contract; see the [Hogwarts bridge design](hogwarts-bridge.md).
+
 1. Prepare the world as a standalone profile with `world.json`, `node.key`,
    and its `assets/` directory. For default profiles this is under
    `~/.config/elsemesh/worlds/<profile>`.

@@ -115,6 +115,18 @@ in `docs/`.
   replacing it. See
   [deployment](docs/deployment.md#github-pages).
 
+## Hogwarts game bridge (5%)
+
+Build an in-memory region provider that reads the installed Hogwarts Legacy
+packages on demand and feeds renderable regions into ElseMesh, without storing
+game assets in either repository. The required product is independent
+multi-avatar exploration across regions; a shared game screen is not a
+substitute. Start with a single in-memory rendered region, then a connected
+castle route before expanding to the full playable map. Regions must carry
+Unreal collision points/shapes, and traversable dynamic doors need shared
+open/close state, collision changes, and synchronized sound events. See
+[Hogwarts bridge](docs/hogwarts-bridge.md).
+
 ## Personal ThruHold and provider failover (70%)
 
 The hosted client may open an owner's configured personal ThruHold by default.

@@ -6,10 +6,14 @@ ElseMesh engine owns exporters, validators, package schemas, networking, and
 runtime execution. Downloaded content may select only versioned behavior
 handlers implemented by the engine; it does not execute arbitrary scripts.
 
-The current content repositories are [Tidewater](../worlds/tidewater/README.md)
-and [Burning Horizons](https://github.com/ElseMesh/burning-horizons). Tidewater
-is mounted as a Git submodule. Burning Horizons is a separate checkout selected
-by `BURNING_HORIZONS_DIR` when running its exporter.
+The current content repositories are [Tidewater](../worlds/tidewater/README.md),
+[Burning Horizons](https://github.com/ElseMesh/burning-horizons), and the private
+[Hogwarts-World bridge repository](../worlds/Hogwarts/README.md). Tidewater and
+Hogwarts-World are mounted as Git submodules. Burning Horizons is a separate
+checkout selected by `BURNING_HORIZONS_DIR` when running its exporter. The
+Hogwarts submodule stores bridge code and design metadata only; game assets,
+generated scene files, screen captures, and save data stay out of Git. See the
+[Hogwarts bridge design](hogwarts-bridge.md).
 
 ## Shared package layout
 
@@ -73,6 +77,15 @@ LOD, and ambience blobs live in `assets/` and are linked from its
 `world-source.json`. Its exporter is `tools/export-loz-underneath.mjs` in
 ElseMesh; set `BURNING_HORIZONS_DIR` to the separate checkout. The repository
 README and generated asset index are the content-side entry points.
+
+### Hogwarts-World
+
+`worlds/Hogwarts` is the private `rebroad/Hogwarts-World` submodule. It is an
+engineering workspace for an in-memory, region-streaming bridge to a locally
+installed game, not a license to redistribute game content. Neither source
+game files nor generated/captured content belong in the submodule. See
+[Hogwarts bridge](hogwarts-bridge.md) for the native multi-avatar target,
+HostID/discovery model, and acceptance gates.
 
 ## Regenerating and reviewing a package
 

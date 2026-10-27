@@ -7,6 +7,32 @@ details and limits live in [world-network-protocol.md](world-network-protocol.md
 
 ## Design goals
 
+### World hosts and dynamic region providers
+
+Use the stable ElseMesh profile PeerID derived from its persistent `node.key`
+as the world **HostID**. Bind it to `worldId` in an owner-signed provider or
+session advertisement. Keep `worldId`, HostID, ZeroTier NodeID, and ZeroTier
+network ID as distinct values. ZeroTier roots establish overlay paths; they do
+not register ElseMesh worlds or authorize network membership. ElseMesh's
+signed directory/resolver and configured gateway handle application-level
+world discovery. A browser host can advertise through the gateway with the
+same HostID and without joining ZeroTier. A ZeroTier NodeID is an optional
+route hint, not identity or membership proof.
+
+The ordinary package provider serves declared, hash-verified assets. A dynamic
+region provider needs signed region discovery, bounded on-demand decoding and
+delivery, cancellation, content integrity, and memory/cache limits. It must
+not pretend that transiently converted game data is the same as an authored
+static package. See the [Hogwarts bridge design](hogwarts-bridge.md) for the
+multi-avatar requirement and in-memory boundary.
+
+Game-backed regions also carry a collision layer derived from Unreal BodySetup
+data; renderer triangles are not a substitute. Interactive doors are shared
+world entities with host-authorized state transitions. The transition updates
+door motion and collision as one state change and includes a sound event ID so
+clients play the sound once. Current presence messages do not replicate these
+entities; this is a required protocol extension.
+
 A ThruHold is an independently owned, signed world. Its owner publishes the
 world's content, portals, and default participation policy. Clients discover a
 world by stable world ID, verify the owner's signed manifest and content hashes,

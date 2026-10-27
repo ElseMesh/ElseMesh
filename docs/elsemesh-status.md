@@ -2,6 +2,29 @@
 
 This document tracks the agreed ElseMesh direction against the current code. It is a progress ledger, not a reduced definition of the project. `tidewater.` remains the namespace for world contracts; protocol versions identify document structure and interpretation, while authored world content stays in its content repository. ElseMesh is the project and ThruHold is an independently owned world.
 
+## Hogwarts in-memory world bridge (2026-10-27)
+
+The required target is independent ElseMesh avatars moving through separate
+areas of one world. A shared screen stream does not satisfy that requirement.
+The selected design direction is an in-memory, region-streaming provider that
+reads the locally installed Unreal packages on demand, converts the required
+render data for ElseMesh, and does not persist a bulk game-asset dump. Render
+data still reaches clients during a session. Existing `worldd` and browser-host
+paths serve predeclared signed assets; neither currently implements dynamic
+world-region discovery or conversion. The private Hogwarts subrepository must
+contain bridge source and non-game metadata only.
+
+The installed copy exposes hundreds of Hogwarts map packages with streaming,
+interior/exterior/LOD, lighting, collision, technical, and seasonal variants.
+The castle root map alone is incomplete. A Great Hall GLB was generated as
+bounded in-memory bytes, loaded into ElseMesh, and rendered in a headless
+scene. Its 906 nodes carry 465 boxes, 5 spheres, 32 capsules, and 238 convex
+shapes with 4,595 vertices and 24,678 indices in collision metadata. GLTF
+extras now survive the engine loader. The physics runtime does not yet consume
+these records. Textures/materials, dynamic doors with synchronized opening
+sounds, dynamic region networking, and two-client traversal are not
+implemented or tested. See [Hogwarts bridge design](hogwarts-bridge.md).
+
 ## Authored entry rules (2026-10-24)
 
 Each world source and signed runtime manifest now requires `maxVisitors` and

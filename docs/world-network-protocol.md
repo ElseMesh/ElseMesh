@@ -13,6 +13,12 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
 
 - `worldId` is the stable `tw-world:...` identifier. The owner's signed
   manifest is the authority for world content and rules.
+- For provider discovery, the stable ElseMesh HostID is the owner's profile
+  PeerID derived from `node.key`, bound to `worldId` by a signed host/session
+  advertisement. Keep HostID distinct from ZeroTier NodeID and network ID;
+  ZeroTier roots provide overlay path discovery, not ElseMesh world
+  registration or membership authorization. Browser hosts can advertise the
+  same HostID through their gateway without a ZeroTier client.
 - `ownerPeerId` identifies the owner node. Optional portal peer/gateway fields
   are routing hints. Browser routes use HTTPS/WSS.
 - Content is addressed by SHA-256; clients verify signed declarations and
@@ -26,6 +32,22 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   session. Browser-supplied player/session identity is overwritten.
 - Presence pose and appearance are self-reported, ephemeral presentation data;
   they are not authenticated account identity or authoritative simulation.
+- Existing request paths serve signed manifests, asset bytes, and data-channel
+  messages. They do not discover or dynamically decode game-backed world
+  regions. The Hogwarts target needs a signed region provider descriptor,
+  bounded region discovery/request/cancellation, content integrity, and
+  memory/cache controls. A video/audio game-session relay would be a different
+  protocol and does not meet independent multi-avatar requirements.
+- Region collision is explicit data, not inferred from render meshes. The
+  Hogwarts bridge serializes Unreal BodySetup primitives and convex points;
+  a future region loader must validate limits and register/remove those shapes
+  with the active region and its instance transforms.
+- Dynamic doors require an authoritative interaction request and a
+  host-committed transition carrying the stable door ID, sequence/transition
+  ID, start time, target state, and collision change. The same committed event
+  carries the sound event ID/reference so clients animate and play the effect
+  once. Current presence is self-reported pose/appearance only and cannot
+  authorize a door state or sound event.
 
 ## Invitation admission and launch grants
 

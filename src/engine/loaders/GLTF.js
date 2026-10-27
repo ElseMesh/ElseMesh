@@ -2,7 +2,7 @@
 // scans use the smaller world/debris/GLB.js). Returns plain data, no GPU objects:
 //
 //   const gltf = await loadGLB( url )            // or parseGLB( arrayBuffer | ArrayBufferView )
-//   gltf.nodes[ i ]  = { name, children: [ ... ], t: [ x, y, z ], r: [ x, y, z, w ], s: [ x, y, z ], mesh, skin }
+//   gltf.nodes[ i ]  = { name, children: [ ... ], t: [ x, y, z ], r: [ x, y, z, w ], s: [ x, y, z ], mesh, skin, extras }
 //   gltf.roots       = scene root node indices
 //   gltf.meshes[ i ] = [ { attributes: { POSITION: { array, itemSize, normalized }, ... }, indices, material } ]
 //   gltf.skins[ i ]  = { joints: [ node indices ], inverseBindMatrices: Float32Array( 16 * n ) }
@@ -123,7 +123,7 @@ export function parseGLB( buffer ) {
 
 		}
 
-		return { name: n.name || '', children: n.children || [], t: T.slice(), r: R.slice(), s: S.slice(), mesh: n.mesh, skin: n.skin };
+		return { name: n.name || '', children: n.children || [], t: T.slice(), r: R.slice(), s: S.slice(), mesh: n.mesh, skin: n.skin, extras: n.extras || null };
 
 	} );
 
