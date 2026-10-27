@@ -47,6 +47,10 @@ format. The current GLB loader, WebGPU renderer, and WebGL fallback remain the
 first supported render path; add streamed region lifecycle to these interfaces
 instead of replacing the engine or requiring Unreal. Tidewater continues using
 the static-package adapter and its current signed manifests and content hashes.
+The provider contract need not mandate GLB: a source-specific importer may
+construct ElseMesh runtime resources directly, provided it preserves content
+integrity, declared resource limits, collision readiness, and the same region
+lifecycle.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.
 
