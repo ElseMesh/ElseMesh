@@ -11,6 +11,7 @@ export function selectedWorldEntryAppearance( entry, storage = globalThis.localS
 export async function chooseWorldEntryPoint( manifest, { storage = globalThis.localStorage, documentRef = globalThis.document } = {} ) {
 	const entries = manifest?.entryPoints || [];
 	if ( ! entries.length ) return null;
+	if ( typeof manifest.entryPointPrompt !== 'string' || ! manifest.entryPointPrompt.trim() ) throw new Error( 'World is missing its entry point prompt' );
 	let saved = null;
 	try { saved = entries.find( entry => entry.id === storage?.getItem( `${STORAGE_PREFIX}${manifest.worldId}` ) ) || null; } catch {}
 	if ( saved ) return saved;
@@ -25,11 +26,8 @@ export async function chooseWorldEntryPoint( manifest, { storage = globalThis.lo
 		Object.assign( panel.style, { width: 'min(440px, calc(100vw - 32px))', padding: '24px', border: '1px solid #b99b65', borderRadius: '12px', background: '#17191d', boxShadow: '0 18px 70px #000a' } );
 		const title = documentRef.createElement( 'h2' );
 		title.id = 'world-entry-title';
-		title.textContent = 'Choose your arrival';
+		title.textContent = manifest.entryPointPrompt;
 		panel.append( title );
-		const subtitle = documentRef.createElement( 'p' );
-		subtitle.textContent = 'Your choice sets your arrival point and this world’s uniform.';
-		panel.append( subtitle );
 		for ( const entry of entries ) {
 			const button = documentRef.createElement( 'button' );
 			button.type = 'button';

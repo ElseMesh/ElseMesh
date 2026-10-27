@@ -24,6 +24,7 @@ type worldSourceDocument struct {
 	Experience       *worldExperience  `json:"experience,omitempty"`
 	Spawn            *worldSpawn       `json:"spawn,omitempty"`
 	EntryPoints      []worldEntryPoint `json:"entryPoints,omitempty"`
+	EntryPointPrompt string            `json:"entryPointPrompt,omitempty"`
 	CoordinateSystem string            `json:"coordinateSystem"`
 	StyleGuide       string            `json:"styleGuide"`
 	Rules            worldRules        `json:"rules"`
@@ -163,23 +164,24 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	}
 	sourceHash := sha256.Sum256(raw)
 	manifest := worldManifest{
-		Protocol:        manifestProtocol,
-		WorldID:         source.WorldID,
-		SourceHash:      "sha256:" + hex.EncodeToString(sourceHash[:]),
-		OwnerPeerID:     localPeerID,
-		AuthorityPeerID: localPeerID,
-		AuthorityEpoch:  1,
-		Version:         1,
-		Title:           source.Title,
-		Experience:      source.Experience,
-		Spawn:           source.Spawn,
-		EntryPoints:     source.EntryPoints,
-		Rules:           source.Rules,
-		Objects:         source.Objects,
-		Components:      source.Components,
-		Portals:         source.Portals,
-		Hosts:           source.Hosts,
-		UpdatedAt:       updatedAt.Unix(),
+		Protocol:         manifestProtocol,
+		WorldID:          source.WorldID,
+		SourceHash:       "sha256:" + hex.EncodeToString(sourceHash[:]),
+		OwnerPeerID:      localPeerID,
+		AuthorityPeerID:  localPeerID,
+		AuthorityEpoch:   1,
+		Version:          1,
+		Title:            source.Title,
+		Experience:       source.Experience,
+		Spawn:            source.Spawn,
+		EntryPoints:      source.EntryPoints,
+		EntryPointPrompt: source.EntryPointPrompt,
+		Rules:            source.Rules,
+		Objects:          source.Objects,
+		Components:       source.Components,
+		Portals:          source.Portals,
+		Hosts:            source.Hosts,
+		UpdatedAt:        updatedAt.Unix(),
 	}
 	manifest.Rules.StyleGuide = source.StyleGuide
 	manifest.Assets, err = worldSourceAssets(directory, source)

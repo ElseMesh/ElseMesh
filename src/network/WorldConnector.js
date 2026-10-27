@@ -1032,7 +1032,7 @@ export async function verifySignedWorldManifest( document ) {
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience );
 	validateWorldSpawn( manifest.spawn );
-	validateWorldEntryPoints( manifest.entryPoints );
+	validateWorldEntryPoints( manifest.entryPoints, manifest.entryPointPrompt );
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );
 	validateWorldPortals( manifest.portals, entityIDs, manifest.rules );
 	validateWorldComponents( manifest.components, manifest.rules, entityIDs, manifest.assets, manifest.objects );
