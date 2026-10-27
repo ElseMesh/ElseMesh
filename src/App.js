@@ -75,7 +75,8 @@ import { Group } from './engine/scene/Group.js';
 import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { worldSeaLevel } from './network/WorldRules.js';
-import { worldSpawnPose } from './network/WorldSource.js';
+import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
+import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { HostedBoat } from './network/HostedBoat.js';
@@ -556,9 +557,10 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const connector = this.worldConnector;
 			const manifestResult = await this.worldManifestPromise;
 			if ( manifestResult.error ) throw manifestResult.error;
+			const entrySelection = await chooseWorldEntryPoint( connector.manifest );
 			this.player.setWorldRules( connector.manifest.rules );
 			G.seaLevel.value = worldSeaLevel( connector.manifest.rules );
-			const spawn = worldSpawnPose( connector.manifest );
+			const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
 			this.camera.position.set( ...spawn.position );
 			this.player.yaw = spawn.yaw;
 			this.player.pitch = spawn.pitch;
@@ -581,7 +583,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			try {
 				const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders );
 				if ( ! candidates.length ) throw new Error( 'No free player position exists within this world’s spawn radius' );
-				admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot } );
+				admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
 				const admitted = await admissionSession.admit( this.player, candidates );
 				this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 				this.camera.position.copy( this.player.camera.position );
@@ -1297,6 +1299,10 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		const ridingVehicle = this.player.mode === 'boat' || this.player.mode === 'deck';
 		const vehicleTransfer = preparation.connector ? this.vehicleTransferStatus( preparation.connector ) : preparation.vehicleTransfer;
+		if ( preparation.status === 'ready' && preparation.connector.manifest.entryPoints?.length && ! preparation.entrySelectionPromise ) {
+			preparation.entrySelectionReady = false;
+			preparation.entrySelectionPromise = chooseWorldEntryPoint( preparation.connector.manifest ).then( entry => { preparation.entrySelection = entry; } ).catch( error => { preparation.entrySelectionError = error; } ).finally( () => { preparation.entrySelectionReady = true; } );
+		}
 		if ( portal.openView && preparation.root && ( ! ridingVehicle || vehicleTransfer?.allowed ) ) {
 			if ( this.portalPreviewId !== portalKey ) this.clearPortalPreview();
 			this.portalPreviewId = portalKey;
@@ -1307,6 +1313,22 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		if ( ! crossed ) return;
 		if ( preparation.status === 'ready' ) {
+			if ( preparation.entrySelectionPromise && ! preparation.entrySelectionReady ) {
+				this.camera.position.copy( previous );
+				this.portalPreviousPosition.copy( previous );
+				this.holdPlayerAtPortal( previous );
+				return;
+			}
+			if ( preparation.entrySelectionError ) {
+				this.camera.position.copy( previous );
+				this.portalPreviousPosition.copy( previous );
+				this.holdPlayerAtPortal( previous );
+				if ( ! preparation.entrySelectionNoticeShown ) {
+					preparation.entrySelectionNoticeShown = true;
+					this.ui?.ui?.toast( 'Could not choose an arrival point for this world', 3500 );
+				}
+				return;
+			}
 			if ( ridingVehicle && ! vehicleTransfer?.allowed ) {
 				this.holdPlayerAtPortal( previous );
 				if ( ! preparation.vehicleBlockedNoticeShown ) {
@@ -1315,7 +1337,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				}
 				return;
 			}
-			this.enterWorldPortal( portal, preparation, previous ).catch( ( error ) => {
+			this.enterWorldPortal( portal, preparation, previous, preparation.entrySelection ).catch( ( error ) => {
 				this.portalAdmissionPending = null;
 				this.camera.position.copy( previous );
 				this.portalPreviousPosition.copy( previous );
@@ -1397,7 +1419,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 	}
 
-	async enterWorldPortal( portal, preparation, previous ) {
+	async enterWorldPortal( portal, preparation, previous, entrySelection = null ) {
 
 		const sourceConnector = this.worldConnector;
 		const destinationConnector = preparation.connector;
@@ -1407,7 +1429,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const sourceVehicle = [ 'boat', 'deck' ].includes( sourceVehicleMode ) ? this.activeHostedBoat?.boat.controller?.transferState() : null;
 		const deckPosition = this.player.deckPos.clone();
 		const deckYaw = this.player.deckYaw;
-		const arrival = mapPortalPlayerState( {
+		const arrival = entrySelection ? {
+			position: new Vector3( ...entrySelection.position ), velocity: new Vector3(), yaw: entrySelection.yaw, pitch: entrySelection.pitch ?? - 0.1,
+		} : mapPortalPlayerState( {
 			position: this.camera.position, velocity: this.player.velocity,
 			yaw: this.player.yaw, pitch: this.player.pitch,
 		}, portal.entry, portal.exit );
@@ -1416,7 +1440,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.portalPreviousPosition.copy( previous );
 		this.holdPlayerAtPortal( previous );
 		const arrivalPlayer = { ...this.player, position: new Vector3( arrival.position.x, arrival.position.y - 1.62, arrival.position.z ), yaw: arrival.yaw, pitch: arrival.pitch };
-		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot } );
+		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
 		try {
 			await admissionSession.admit( arrivalPlayer, undefined, { yaw: arrival.yaw } );
 		} catch ( error ) {

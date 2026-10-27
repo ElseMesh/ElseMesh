@@ -31,6 +31,7 @@ var (
 	assetIDPattern           = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	sourceContentHashPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	worldFeaturePattern      = regexp.MustCompile(`^tidewater\.[a-z0-9.-]+/\d+$`)
+	entryPointIDPattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,63}$`)
 )
 
 type vector3 [3]float64
@@ -407,25 +408,40 @@ type worldSpawn struct {
 	Pitch    *float64  `json:"pitch"`
 }
 
+type worldUniform struct {
+	Shirt    string `json:"shirt"`
+	Trousers string `json:"trousers"`
+}
+
+type worldEntryPoint struct {
+	ID       string        `json:"id"`
+	Label    string        `json:"label"`
+	Position []float64     `json:"position"`
+	Yaw      float64       `json:"yaw"`
+	Pitch    *float64      `json:"pitch,omitempty"`
+	Uniform  *worldUniform `json:"uniform,omitempty"`
+}
+
 type worldManifest struct {
-	Protocol        string           `json:"protocol"`
-	WorldID         string           `json:"worldId"`
-	SourceHash      string           `json:"sourceHash,omitempty"`
-	OwnerPeerID     string           `json:"ownerPeerId"`
-	AuthorityPeerID string           `json:"authorityPeerId"`
-	AuthorityEpoch  uint64           `json:"authorityEpoch"`
-	Discoverable    bool             `json:"discoverable"`
-	Version         uint64           `json:"version"`
-	Title           string           `json:"title"`
-	Experience      *worldExperience `json:"experience,omitempty"`
-	Spawn           *worldSpawn      `json:"spawn,omitempty"`
-	Rules           worldRules       `json:"rules"`
-	Assets          []assetRef       `json:"assets"`
-	Objects         []worldObject    `json:"objects"`
-	Components      []worldComponent `json:"components,omitempty"`
-	Portals         []portal         `json:"portals"`
-	Hosts           []hostingGrant   `json:"hosts,omitempty"`
-	UpdatedAt       int64            `json:"updatedAt"`
+	Protocol        string            `json:"protocol"`
+	WorldID         string            `json:"worldId"`
+	SourceHash      string            `json:"sourceHash,omitempty"`
+	OwnerPeerID     string            `json:"ownerPeerId"`
+	AuthorityPeerID string            `json:"authorityPeerId"`
+	AuthorityEpoch  uint64            `json:"authorityEpoch"`
+	Discoverable    bool              `json:"discoverable"`
+	Version         uint64            `json:"version"`
+	Title           string            `json:"title"`
+	Experience      *worldExperience  `json:"experience,omitempty"`
+	Spawn           *worldSpawn       `json:"spawn,omitempty"`
+	EntryPoints     []worldEntryPoint `json:"entryPoints,omitempty"`
+	Rules           worldRules        `json:"rules"`
+	Assets          []assetRef        `json:"assets"`
+	Objects         []worldObject     `json:"objects"`
+	Components      []worldComponent  `json:"components,omitempty"`
+	Portals         []portal          `json:"portals"`
+	Hosts           []hostingGrant    `json:"hosts,omitempty"`
+	UpdatedAt       int64             `json:"updatedAt"`
 }
 
 type worldExperience struct {
@@ -466,6 +482,24 @@ func validateWorldExperience(experience *worldExperience) error {
 }
 
 func validateManifest(manifest worldManifest, localPeerID string, now time.Time) error {
+	if len(manifest.EntryPoints) > 16 {
+		return errors.New("manifest contains too many world entry points")
+	}
+	seenEntryPoints := make(map[string]bool, len(manifest.EntryPoints))
+	for _, entry := range manifest.EntryPoints {
+		if !entryPointIDPattern.MatchString(entry.ID) || seenEntryPoints[entry.ID] || strings.TrimSpace(entry.Label) == "" || len(entry.Label) > 80 || len(entry.Position) != 3 || math.IsNaN(entry.Yaw) || math.IsInf(entry.Yaw, 0) || math.Abs(entry.Yaw) > 360 || entry.Pitch != nil && (math.IsNaN(*entry.Pitch) || math.IsInf(*entry.Pitch, 0) || math.Abs(*entry.Pitch) > 1.5) {
+			return errors.New("invalid or duplicate world entry point")
+		}
+		for _, value := range entry.Position {
+			if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > 1e6 {
+				return errors.New("invalid world entry point position")
+			}
+		}
+		if entry.Uniform != nil && (!presenceColorPattern.MatchString(entry.Uniform.Shirt) || !presenceColorPattern.MatchString(entry.Uniform.Trousers)) {
+			return errors.New("invalid world entry point uniform")
+		}
+		seenEntryPoints[entry.ID] = true
+	}
 	if spawn := manifest.Spawn; spawn != nil {
 		if len(spawn.Position) != 3 || spawn.Yaw == nil || spawn.Pitch == nil || math.IsNaN(*spawn.Yaw) || math.IsInf(*spawn.Yaw, 0) || math.Abs(*spawn.Yaw) > 360 || math.IsNaN(*spawn.Pitch) || math.IsInf(*spawn.Pitch, 0) || math.Abs(*spawn.Pitch) > 1.5 {
 			return errors.New("invalid world spawn pose")

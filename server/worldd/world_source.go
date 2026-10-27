@@ -18,19 +18,20 @@ import (
 )
 
 type worldSourceDocument struct {
-	Protocol         string           `json:"protocol"`
-	WorldID          string           `json:"worldId"`
-	Title            string           `json:"title"`
-	Experience       *worldExperience `json:"experience,omitempty"`
-	Spawn            *worldSpawn      `json:"spawn,omitempty"`
-	CoordinateSystem string           `json:"coordinateSystem"`
-	StyleGuide       string           `json:"styleGuide"`
-	Rules            worldRules       `json:"rules"`
-	Objects          []worldObject    `json:"objects"`
-	Components       []worldComponent `json:"components,omitempty"`
-	Portals          []portal         `json:"portals"`
-	Hosts            []hostingGrant   `json:"hosts,omitempty"`
-	UpdatedAt        string           `json:"updatedAt"`
+	Protocol         string            `json:"protocol"`
+	WorldID          string            `json:"worldId"`
+	Title            string            `json:"title"`
+	Experience       *worldExperience  `json:"experience,omitempty"`
+	Spawn            *worldSpawn       `json:"spawn,omitempty"`
+	EntryPoints      []worldEntryPoint `json:"entryPoints,omitempty"`
+	CoordinateSystem string            `json:"coordinateSystem"`
+	StyleGuide       string            `json:"styleGuide"`
+	Rules            worldRules        `json:"rules"`
+	Objects          []worldObject     `json:"objects"`
+	Components       []worldComponent  `json:"components,omitempty"`
+	Portals          []portal          `json:"portals"`
+	Hosts            []hostingGrant    `json:"hosts,omitempty"`
+	UpdatedAt        string            `json:"updatedAt"`
 }
 
 func readWorldSourceID(path string) (string, error) {
@@ -172,6 +173,7 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 		Title:           source.Title,
 		Experience:      source.Experience,
 		Spawn:           source.Spawn,
+		EntryPoints:     source.EntryPoints,
 		Rules:           source.Rules,
 		Objects:         source.Objects,
 		Components:      source.Components,

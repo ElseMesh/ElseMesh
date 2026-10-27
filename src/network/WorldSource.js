@@ -11,6 +11,7 @@ export function createWorldSource( { worldId = `tw-world:local-${ crypto.randomU
 		title,
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
+		entryPoints: [],
 		rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'tidewater-default', maxVisitors: 128, spawnRadius: 8, movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } },
 		hosts: [],
 		objects: [],
@@ -22,6 +23,7 @@ export function createWorldSource( { worldId = `tw-world:local-${ crypto.randomU
 
 export function validateWorldSource( source ) {
 	validateWorldSpawn( source?.spawn );
+	validateWorldEntryPoints( source?.entryPoints );
 	if ( ! source || source.protocol !== WORLD_SOURCE_PROTOCOL ) throw new Error( 'Unsupported world source format' );
 	if ( ! /^tw-world:[\w.-]{1,128}$/.test( source.worldId || '' ) ) throw new Error( 'Invalid worldId' );
 	if ( typeof source.title !== 'string' || ! source.title.trim() || source.title.length > 160 ) throw new Error( 'Invalid world title' );
@@ -197,6 +199,24 @@ export function validateObjectLODs( object, assets ) {
 export function validateWorldSpawn( spawn ) {
 	if ( spawn === undefined ) return;
 	if ( ! spawn || typeof spawn !== 'object' || Array.isArray( spawn ) || ! validVector( spawn.position ) || spawn.position.some( ( value ) => Math.abs( value ) > 1e6 ) || ! Number.isFinite( spawn.yaw ) || Math.abs( spawn.yaw ) > 360 || ! Number.isFinite( spawn.pitch ) || Math.abs( spawn.pitch ) > 1.5 ) throw new Error( 'Invalid world spawn pose' );
+}
+
+// Named arrival choices can also carry a world-specific uniform palette. The
+// player's body style, skin, and hair remain their own appearance preferences.
+export function validateWorldEntryPoints( entryPoints ) {
+	if ( entryPoints === undefined ) return;
+	if ( ! Array.isArray( entryPoints ) || entryPoints.length > 16 ) throw new Error( 'Invalid world entry point list' );
+	const ids = new Set();
+	for ( const entry of entryPoints ) {
+		if ( ! entry || typeof entry !== 'object' || Array.isArray( entry ) || Object.keys( entry ).some( key => ! [ 'id', 'label', 'position', 'yaw', 'pitch', 'uniform' ].includes( key ) ) || typeof entry.id !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}$/.test( entry.id ) || ids.has( entry.id ) || typeof entry.label !== 'string' || ! entry.label.trim() || entry.label.length > 80 || ! validVector( entry.position ) || entry.position.some( value => Math.abs( value ) > 1e6 ) || ! Number.isFinite( entry.yaw ) || Math.abs( entry.yaw ) > 360 || entry.pitch !== undefined && ( ! Number.isFinite( entry.pitch ) || Math.abs( entry.pitch ) > 1.5 ) ) throw new Error( 'Invalid or duplicate world entry point' );
+		if ( entry.uniform !== undefined && ( ! entry.uniform || typeof entry.uniform !== 'object' || Array.isArray( entry.uniform ) || Object.keys( entry.uniform ).some( key => ! [ 'shirt', 'trousers' ].includes( key ) ) || ! [ entry.uniform.shirt, entry.uniform.trousers ].every( color => typeof color === 'string' && /^#[0-9a-f]{6}$/.test( color ) ) ) ) throw new Error( 'Invalid world entry point uniform' );
+		ids.add( entry.id );
+	}
+}
+
+export function worldEntryPointPose( entry ) {
+	if ( ! entry ) return null;
+	return { position: [ ...entry.position ], yaw: entry.yaw, pitch: entry.pitch ?? - 0.1 };
 }
 
 export function worldSpawnPose( manifest ) {

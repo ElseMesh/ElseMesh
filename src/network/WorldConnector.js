@@ -1,5 +1,5 @@
 import { validatePortalBack } from './PortalSideContract.js';
-import { validateObjectLODs, validateWorldSpawn } from './WorldSource.js';
+import { validateObjectLODs, validateWorldEntryPoints, validateWorldSpawn } from './WorldSource.js';
 import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
@@ -1032,6 +1032,7 @@ export async function verifySignedWorldManifest( document ) {
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience );
 	validateWorldSpawn( manifest.spawn );
+	validateWorldEntryPoints( manifest.entryPoints );
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );
 	validateWorldPortals( manifest.portals, entityIDs, manifest.rules );
 	validateWorldComponents( manifest.components, manifest.rules, entityIDs, manifest.assets, manifest.objects );
