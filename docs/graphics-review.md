@@ -1,5 +1,37 @@
 # Reproducible graphics review
 
+## Current WebGPU/WebGL runtime check, 2026-10-29
+
+The signed Tidewater package was served by a temporary local `worldd` profile
+and loaded through the external build in Chromium 156 on a headless Weston
+display. The browser selected WebGPU for the visual captures. Both used the
+named beach pose (`p=[15,3,-58]`, `yaw=3.14`, `pitch=-0.08`, time `16.2`), a
+1280×577 CSS viewport, DPR 1, quality priority, and render scale 1. The paired
+captures below show the current built-in Example Island and the signed hosted
+package; they are diagnostic images, not a pre-split baseline comparison.
+
+![Current built-in Example Island WebGPU beach](images/parity-2026-10-29-webgpu-builtin-beach.png)
+
+![Current signed Tidewater package WebGPU beach](images/parity-2026-10-29-webgpu-hosted-beach.png)
+
+In this run the hosted foreground sand appears smoother, with lower-contrast
+fine ripples than the built-in view. The wave and foam patterns also differ,
+but their simulation phases were not aligned. Runtime inspection found the same
+WebGPU backend, terrain material module list and defines, wind speed/direction,
+and sampled heights at five aligned beach points. The earlier offline check
+also found the exported heights, normals, splat masks, and detail texture equal
+to the regenerated engine inputs. Those checks narrow the sand difference to
+runtime texture binding/sampling or another unmeasured draw input; they do not
+identify its cause. WebGPU visual parity remains open.
+
+The hosted WebGL runtime was separately checked for content and gameplay, not
+visual similarity. It activated all 38 of 38 declared components, constructed
+the fish stand, Joe's buyer, Marta's chandlery, and the boat controller, and
+opened Joe's buyer panel after a controlled in-range interaction. The registry
+registration failure found during this check was fixed in commit `5c24533`; the
+focused registry and WebGL content tests plus the production build pass. This
+does not establish WebGL visual parity.
+
 ## Tidewater split runtime parity follow-up, 2026-10-28
 
 The live signed Tidewater package was checked in an isolated Chromium session.
