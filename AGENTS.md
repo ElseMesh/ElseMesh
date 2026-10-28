@@ -9,6 +9,10 @@
 - ElseMesh is not published yet. Do not optimize for backwards compatibility by default or preserve current behavior solely because it already exists.
 - Whenever changing an existing implementation or API, always consider whether it should be redesigned. Prefer the clearest architecture for the intended product, and update callers, tests, and documentation together when changing an unstable interface.
 
+## Evidence and assumptions
+
+- Do not present guessed values or behavior as verified facts. Check source code, runtime evidence, or authoritative documentation first. If a provisional assumption must be used, label it explicitly as an assumption in the relevant code comment or documentation, and record what evidence is still needed to verify it.
+
 ## Browser process cleanup
 
 - Stop every browser process I own as soon as it is no longer needed for the task, including after a visual check. Identify owned browsers by their dedicated systemd unit, process group, or isolated profile; never kill unrelated user browsers or another agent's browser.
