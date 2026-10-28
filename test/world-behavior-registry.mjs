@@ -8,10 +8,15 @@ assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id, fishingGame, shor
 	{ id: 'elsemesh.shore-aware-boat/1', fishingGame: undefined, shoreAwareBoat: true, consumesExtensionState: false },
 ] );
 const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test', load: false } );
+const otherRuntime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
 assert.ok( runtime instanceof FishingGameRuntime );
+assert.notEqual( runtime, otherRuntime, 'each world receives its own registered gameplay runtime' );
+assert.notEqual( runtime.state, otherRuntime.state, 'world runtimes do not share game state' );
+assert.notEqual( runtime.state.storageKey, otherRuntime.state.storageKey, 'world runtimes persist under distinct world identities' );
 assert.equal( runtime.state.storageKey, 'elsemesh.save.v1:elsemesh%3Aregistry-test', 'registered game runtime receives its owning world identity' );
 dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 1.5 }, { gameRuntime: runtime } );
 assert.equal( runtime.biteRateMultiplier, 1.5, 'registered fishing behavior applies signed extension state in the browser runtime' );
+assert.equal( otherRuntime.biteRateMultiplier, 1, 'one world extension cannot mutate another world gameplay runtime' );
 runtime.bite = { phase: 'wait', t: 5 };
 runtime.stepBite( 1, { habitat: () => ( { shallows: 1 } ), hour: 12 } );
 assert.equal( runtime.bite.t, 3.5, 'extension rate changes local browser bite-wait timing' );
