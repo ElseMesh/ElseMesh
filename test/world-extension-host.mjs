@@ -11,6 +11,9 @@ registerWorldBehavior( 'elsemesh.extension-test-capability/1', { extensionCapabi
 const experience = { behaviors: [ 'elsemesh.extension-test/1', 'elsemesh.extension-test-two/1' ] };
 const descriptor = { id: 'elsemesh-extension:counter', protocol: WORLD_EXTENSION_PROTOCOL, assetId: `sha256:${'a'.repeat(64)}`, memoryPages: 2, capabilities: [], behaviorId: 'elsemesh.extension-test/1' };
 const assets = [ { id: descriptor.assetId, kind: 'application/wasm', bytes: 8 } ];
+assert.throws( () => new WorldExtensionHost( { stepTimeoutMs: 51 } ), /timeout must be an integer from 1 to 50 ms/ );
+assert.throws( () => new WorldExtensionHost( { stepTimeoutMs: 0 } ), /timeout must be an integer from 1 to 50 ms/ );
+assert.throws( () => new WorldExtensionHost( { stepTimeoutMs: Infinity } ), /timeout must be an integer from 1 to 50 ms/ );
 assert.equal( validateWorldExtensions( [ descriptor ], assets, experience )[ 0 ], descriptor );
 assert.equal( validateWorldExtensions( [ { ...descriptor, capabilities: [ 'test.rules' ], behaviorId: 'elsemesh.extension-test-capability/1' } ], assets, { behaviors: [ 'elsemesh.extension-test-capability/1' ] } )[ 0 ].capabilities[ 0 ], 'test.rules' );
 assert.throws( () => validateWorldExtensions( [ { ...descriptor, capabilities: [ 'fishing.rules' ] } ], assets, experience ), /capability not allowed by behavior/ );

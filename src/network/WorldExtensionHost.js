@@ -3,7 +3,7 @@ import { worldBehaviorsFor } from './WorldBehaviorRegistry.js';
 const MAX_MODULE_BYTES = 8 * 1024 * 1024;
 const MAX_MEMORY_PAGES = 256;
 const MAX_MESSAGE_BYTES = 64 * 1024;
-const DEFAULT_STEP_TIMEOUT_MS = 50;
+const MAX_STEP_TIMEOUT_MS = 50;
 
 export const WORLD_EXTENSION_PROTOCOL = 'elsemesh.world-extension/1';
 
@@ -38,7 +38,8 @@ export function validateWorldExtensions( extensions, assets, experience ) {
 }
 
 export class WorldExtensionHost {
-	constructor( { workerFactory = () => new Worker( new URL( './WorldExtensionWorker.js', import.meta.url ), { type: 'module' } ), stepTimeoutMs = DEFAULT_STEP_TIMEOUT_MS } = {} ) {
+	constructor( { workerFactory = () => new Worker( new URL( './WorldExtensionWorker.js', import.meta.url ), { type: 'module' } ), stepTimeoutMs = MAX_STEP_TIMEOUT_MS } = {} ) {
+		if ( ! Number.isInteger( stepTimeoutMs ) || stepTimeoutMs < 1 || stepTimeoutMs > MAX_STEP_TIMEOUT_MS ) throw new Error( `World extension step timeout must be an integer from 1 to ${MAX_STEP_TIMEOUT_MS} ms` );
 		this.workerFactory = workerFactory;
 		this.stepTimeoutMs = stepTimeoutMs;
 		this.extensions = new Map();
