@@ -62,6 +62,7 @@ export class LocalRegionConnector {
 		this.collisionAssetIDs = new Set();
 		this.collisionObjectIDByAsset = new Map();
 		this.unknownCollisionObjectIDs = new Set();
+		this.unverifiedCollisionSourceObjectIDs = new Set();
 		this.collisionObjectIDsByCell = new Map();
 		this.collisionLoadLatencyMs = 2000;
 		this.cellSizeMeters = 0;
@@ -123,12 +124,17 @@ export class LocalRegionConnector {
 			const cells = new Map();
 			for ( const cell of cellIndex.cells ) {
 				requireValue( Number.isSafeInteger( cell?.x ) && Number.isSafeInteger( cell?.y ) && Number.isSafeInteger( cell?.z ), 'Local provider returned invalid cell coordinates' );
-				cells.set( `${cell.x},${cell.y},${cell.z}`, { x: cell.x, y: cell.y, z: cell.z } );
+				const evidence = cell.collisionEvidence;
+				requireValue( [ 'all-collision-sources', 'static-mesh-components-only' ].includes( evidence?.scope ) && Number.isSafeInteger( evidence.staticMeshComponentCount ) && evidence.staticMeshComponentCount >= 0 && Number.isSafeInteger( evidence.unknownComponents ) && evidence.unknownComponents >= 0 && Number.isSafeInteger( evidence.supportedSimpleShapeComponents ) && evidence.supportedSimpleShapeComponents >= 0 && Number.isSafeInteger( evidence.explicitlyNonQueryCollidableComponents ) && evidence.explicitlyNonQueryCollidableComponents >= 0 && evidence.supportedSimpleShapeComponents + evidence.explicitlyNonQueryCollidableComponents + evidence.unknownComponents === evidence.staticMeshComponentCount && evidence.staticMeshComponentsClassified === ( evidence.unknownComponents === 0 ), 'Local provider returned invalid collision coverage evidence' );
+				cells.set( `${cell.x},${cell.y},${cell.z}`, { x: cell.x, y: cell.y, z: cell.z, evidence } );
 			}
 			const isPrimaryRegion = sourceRegion.id === region.id;
 			for ( const startupCell of startupCells ) {
 				const cellKey = startupCell.join( ',' );
-				if ( isPrimaryRegion || cells.has( cellKey ) ) cells.set( cellKey, { x: startupCell[ 0 ], y: startupCell[ 1 ], z: startupCell[ 2 ] } );
+				if ( isPrimaryRegion || cells.has( cellKey ) ) {
+					const existing = cells.get( cellKey );
+					cells.set( cellKey, { x: startupCell[ 0 ], y: startupCell[ 1 ], z: startupCell[ 2 ], evidence: existing?.evidence } );
+				}
 			}
 			for ( const cell of cells.values() ) {
 				const cellKey = `${cell.x},${cell.y},${cell.z}`;
@@ -153,6 +159,7 @@ export class LocalRegionConnector {
 				this.regionAssets.set( visualAssetId, visualURL.href );
 				this.collisionAssetIDs.add( collisionAssetId );
 				this.collisionObjectIDByAsset.set( collisionAssetId, collisionObjectId );
+				if ( cell.evidence?.scope !== 'all-collision-sources' || ! cell.evidence.staticMeshComponentsClassified ) this.unverifiedCollisionSourceObjectIDs.add( collisionObjectId );
 				cellObjectIDs.add( collisionObjectId );
 				this.collisionObjectIDsByCell.set( cellKey, cellObjectIDs );
 				if ( isStartupCell ) this.initialRegionCellObjectIDs.add( collisionObjectId );
@@ -234,7 +241,7 @@ export class LocalRegionConnector {
 			const collisionObjectID = this.collisionObjectIDByAsset.get( assetId );
 			if ( collisionObjectID ) {
 				// This distinguishes absent payloads from shape-bearing data; the provider still needs a full-cell coverage proof.
-				if ( hasEmbeddedCollisionShape( bytes ) ) this.unknownCollisionObjectIDs.delete( collisionObjectID );
+				if ( hasEmbeddedCollisionShape( bytes ) && ! this.unverifiedCollisionSourceObjectIDs.has( collisionObjectID ) ) this.unknownCollisionObjectIDs.delete( collisionObjectID );
 				else this.unknownCollisionObjectIDs.add( collisionObjectID );
 			}
 			return this.#cacheAsset( assetId, bytes );
@@ -328,6 +335,7 @@ export class LocalRegionConnector {
 		this.collisionAssetIDs.clear();
 		this.collisionObjectIDByAsset.clear();
 		this.unknownCollisionObjectIDs.clear();
+		this.unverifiedCollisionSourceObjectIDs.clear();
 		this.collisionObjectIDsByCell.clear();
 		this.collisionLoadLatencyMs = 2000;
 		this.cellSizeMeters = 0;

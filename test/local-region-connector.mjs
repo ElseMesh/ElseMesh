@@ -59,7 +59,10 @@ globalThis.fetch = async ( input, options = {} ) => {
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) return Response.json( {
-		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), cells: [ { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 } ],
+		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), cells: [
+			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true } },
+			{ x: 1, y: 0, z: 0, collisionEvidence: { scope: 'static-mesh-components-only', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, unknownComponents: 1, staticMeshComponentsClassified: false } },
+		],
 	} );
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
 		cellFetches++;
@@ -126,11 +129,12 @@ try {
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unknown collision placeholders are not cached as provider data' );
 	assert.equal( leaseReleases, 4, 'each region fetch should release its temporary visitor lease' );
 	const collisionIDs = [ ...connector.collisionObjectIDsByCell.get( '0,0,0' ), ...connector.collisionObjectIDsByCell.get( '1,0,0' ) ];
+	assert.equal( connector.isCollisionPathReady( [ 1, 0, 1 ], [ 2, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), true, 'loaded collision with complete source coverage permits a local path' );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), false, 'movement stops until collision data for every crossed cell has loaded' );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), false, 'a missing collision response remains unknown and blocks the swept path even if the loader has an empty placeholder' );
 	secondCellCollisionMissing = false;
 	await connector.getAsset( manifest.assets[ 2 ].id );
-	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), true, 'a subsequent valid collision response clears the unknown state' );
+	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), false, 'a shape-bearing response cannot clear source coverage that the provider marked unknown' );
 	assert.equal( connector.releaseAsset( manifest.assets[ 0 ].id ), true );
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unloaded cells should release cached browser bytes' );
 	assert.equal( await connector.getAsset( manifest.assets[ 0 ].id ).then( value => value.byteLength ), bytes.byteLength );
