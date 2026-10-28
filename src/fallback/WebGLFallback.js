@@ -20,13 +20,11 @@ import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern,
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
-import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
-import { WebGLChandleryAdapter } from './WebGLChandleryAdapter.js';
 import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
-import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { webglLightingForTime } from './WebGLLighting.js';
-import { hasWorldBehavior, worldBehaviorData } from '../network/WorldBehaviorRegistry.js';
+import { dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
+import './WebGLWorldBehaviorImplementations.js';
 import { WorldExtensionSession } from '../network/WorldExtensionSession.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
@@ -796,21 +794,7 @@ export class WebGLFallback {
 			this.player.position.set( this.spawn.position[ 0 ], this.spawn.position[ 1 ] - 1.62, this.spawn.position[ 2 ] );
 			this.player.camera.position.set( ...this.spawn.position );
 			this.player._camY = null;
-			this.fishStand = new WebGLFishStandAdapter( T, this.scene, {
-				terrain: this.terrain,
-				colliders: this.app.worldState.colliders,
-				loader: this.loader,
-				placement: worldBehaviorData( defaultWorldSource.experience, 'elsemesh.fishing-game/1' )?.fishStand,
-			} );
-			this.chandlery = new WebGLChandleryAdapter( T, this.scene, {
-				terrain: this.terrain, colliders: this.app.worldState.colliders, loader: this.loader,
-				placement: worldBehaviorData( defaultWorldSource.experience, 'elsemesh.fishing-game/1' )?.chandlery,
-			} );
-			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
-				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience: defaultWorldSource.experience,
-				THREE: T, scene: this.scene, camera: this.camera, query: this.waterQuery,
-				terrain: this.terrain, boatController: this.boat.controller, boatRoot: this.boat.group, audio: this.app.audio,
-			} );
+			dispatchWorldBehaviorHooks( defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T } );
 			const y = this.terrain.heightAt( STAND.x, STAND.z );
 			for ( const box of fishStandColliderVolumes( y ) ) this.blockers.push( {
 				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
@@ -839,18 +823,7 @@ export class WebGLFallback {
 				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		if ( this.worldLink && hasWorldBehavior( this.connector?.manifest?.experience, 'elsemesh.fishing-game/1' ) ) {
-			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
-			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
-			const experience = this.connector?.manifest?.experience;
-			const fishingData = worldBehaviorData( experience, 'elsemesh.fishing-game/1' );
-			this.fishStand = new WebGLFishStandAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: fishingData?.fishStand } );
-			this.chandlery = new WebGLChandleryAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: fishingData?.chandlery } );
-			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
-				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience, THREE: T, scene: this.scene,
-				worldId: this.connector.worldId, camera: this.camera, query: this.waterQuery, terrain: hostedTerrain, boatController: this.boat?.controller || null, boatRoot: this.boat?.group || null, audio: this.app.audio,
-			} );
-		}
+		if ( this.worldLink ) dispatchWorldBehaviorHooks( this.connector?.manifest?.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'hosted', THREE: T } );
 		if ( this.worldLink ) {
 			for ( const { component, assets } of this.hostedWhalePackages || [] ) {
 				if ( await this._loadWebGLWhale( component, assets, this.hostedTerrainData, this.hostedSeaLevel ?? 0 ) ) this.hostedSupportedComponents.add( component.id );

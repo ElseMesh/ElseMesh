@@ -1,6 +1,7 @@
 import { FishingGameRuntime } from '../game/FishingGameRuntime.js';
 
 const behaviors = new Map();
+const implementations = new Map();
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
@@ -22,6 +23,17 @@ export function worldBehaviorsFor( experience ) {
 
 export function worldBehaviorData( experience, id ) {
 	return worldBehaviorsFor( experience ).find( behavior => behavior.id === id )?.data;
+}
+
+export function registerWorldBehaviorImplementation( id, implementation ) {
+	if ( ! behaviors.has( id ) || ! implementation || typeof implementation !== 'object' || Array.isArray( implementation ) || implementations.has( id ) || ! Object.keys( implementation ).length || Object.entries( implementation ).some( ( [ hook, handler ] ) => ! [ 'onHostedWorldActivated', 'onWebGLWorldActivated' ].includes( hook ) || typeof handler !== 'function' ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
+	implementations.set( id, Object.freeze( { ...implementation } ) );
+}
+
+export function dispatchWorldBehaviorHooks( experience, hook, context ) {
+	if ( ! [ 'onHostedWorldActivated', 'onWebGLWorldActivated' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
+	const active = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
+	for ( const [ id, implementation ] of implementations ) implementation[ hook ]?.( { ...context, experience, active: active.has( id ), data: active.get( id )?.data, behaviorId: id } );
 }
 
 export function hasWorldBehavior( experience, id ) {

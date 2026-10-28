@@ -84,7 +84,8 @@ import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldExtensions, loadWorldPackage, registerWorldPackageCollisions, stepWorldPackageExtensions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
-import { hasWorldBehavior } from './network/WorldBehaviorRegistry.js';
+import { dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
+import './network/BrowserWorldBehaviorImplementations.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -1226,13 +1227,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				terrain.terrain.wetness = this.terrain.wetness;
 				terrain.terrain.finalizeMaterial();
 			}
-			if ( hasWorldBehavior( experience, 'elsemesh.shore-aware-boat/1' ) ) {
-				// Keep the hosted boat's hydrostatics on the same terrain-shaped, shoreline-aware
-				// surface as the built-in boat. A deep-water-only query overstates swell
-				// at the pier and can roll the moored boat over.
-				this.hostedWaterSurface.terrain = terrain.terrainGPU;
-				this.hostedWaterSurface.shore = terrain.shore;
-			}
 			terrain.underwaterLighting ||= installUnderwaterLighting( {
 				fft: this.fft, caustics: this.caustics, clouds: this.clouds, terrain: terrain.terrainGPU,
 				shore: terrain.shore, surface: this.surface, shoreSim: this.shoreSim,
@@ -1256,17 +1250,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const policy = vehiclePolicy( connector.manifest.rules );
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
 		}
-		if ( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ) ) {
-			const worldTerrain = root.userData.terrainData || this.terrainData;
-			let game = this.worldGames.get( connector.worldId );
-			if ( ! game ) {
-				game = new Game( this, { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl, experience, worldId: connector.worldId } );
-				this.worldGames.set( connector.worldId, game );
-			}
-			this.game = game;
-			game.setWorldContext( { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
-			game.setWorldActive( true );
-		} else this.game?.setWorldActive( false );
+		dispatchWorldBehaviorHooks( experience, 'onHostedWorldActivated', { app: this, connector, root, terrain, runtime } );
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
 

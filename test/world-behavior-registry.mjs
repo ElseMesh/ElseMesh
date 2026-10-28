@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createWorldBehaviorRuntime, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
 const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 } }, 'elsemesh.shore-aware-boat/1': {} } };
@@ -30,6 +30,12 @@ assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid
 registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'invalid test data' ); } } );
 assert.equal( hasWorldBehavior( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'elsemesh.registry-test/1' ), true );
 assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: () => {} } ), /Invalid or duplicate/ );
+let worldActivation = null;
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: state => { worldActivation = state; } } );
+dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onHostedWorldActivated', { marker: 7 } );
+assert.deepEqual( { active: worldActivation.active, data: worldActivation.data, behaviorId: worldActivation.behaviorId, marker: worldActivation.marker }, { active: true, data: {}, behaviorId: 'elsemesh.registry-test/1', marker: 7 }, 'registered handlers receive their active behavior data through generic dispatch' );
+dispatchWorldBehaviorHooks( { behaviors: {} }, 'onHostedWorldActivated', {} );
+assert.equal( worldActivation.active, false, 'registered handlers receive inactive lifecycle notifications for worlds without their behavior' );
 
 let consumed = null;
 registerWorldBehavior( 'elsemesh.extension-consumer/1', { onExtensionState: value => { consumed = value; } } );
