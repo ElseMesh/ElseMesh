@@ -92,6 +92,47 @@ try {
   await new Promise(resolve => setTimeout(resolve, 100));
   const fallbackManifest = await connector.getManifest();
   const fallback = fallbackManifest.worldId === manifest.worldId && connector.rtcChannel?.readyState !== 'open';
+  const { WorldExtensionHost, WORLD_EXTENSION_PROTOCOL } = await import('/src/network/WorldExtensionHost.js');
+  const leb = value => { const bytes = []; do { let byte = value & 127; value >>>= 7; if (value) byte |= 128; bytes.push(byte); } while (value); return bytes; };
+  const str = value => { const bytes = [...new TextEncoder().encode(value)]; return [...leb(bytes.length), ...bytes]; };
+  const vector = values => [...leb(values.length), ...values.flat()];
+  const section = (id, payload) => [id, ...leb(payload.length), ...payload];
+  const funcType = (parameters, results) => [96, ...vector(parameters), ...vector(results)];
+  const fnBody = instructions => [...leb(instructions.length + 1), 0, ...instructions];
+  const types = vector([funcType([], [127]), funcType([127], [127]), funcType([127, 127], [127])]);
+  const imports = vector([[...str('elsemesh_host_v1'), ...str('memory'), 2, 1, ...leb(2), ...leb(2)]]);
+  const functions = vector([[0], [1], [2], [0], [2]]);
+  const exports = vector([
+    [...str('abi_version'), 0, ...leb(0)], [...str('alloc'), 0, ...leb(1)], [...str('init'), 0, ...leb(2)],
+    [...str('output_len'), 0, ...leb(3)], [...str('step'), 0, ...leb(4)], [...str('memory'), 2, ...leb(0)],
+  ]);
+  const output = [...new TextEncoder().encode('{"tick":0}')];
+  const data = vector([[0, 65, 128, 8, 11, ...leb(output.length), ...output]]);
+  const code = vector([
+    fnBody([65, 1, 11]), fnBody([65, 128, 8, 11]), fnBody([65, 128, 8, 11]), fnBody([65, 10, 11]),
+    fnBody([3, 64, 12, 0, 11, 11]),
+  ]);
+  const loopingModule = Uint8Array.from([0, 97, 115, 109, 1, 0, 0, 0, ...section(1, types), ...section(2, imports), ...section(3, functions), ...section(7, exports), ...section(10, code), ...section(11, data)]);
+  if (!WebAssembly.validate(loopingModule)) throw new Error('infinite-loop test module is invalid');
+  let workerTerminated = false;
+  const extensionHost = new WorldExtensionHost({
+    stepTimeoutMs: 100,
+    workerFactory: () => {
+      const worker = new Worker('/src/network/WorldExtensionWorker.js', { type: 'module' });
+      return new Proxy(worker, { get(target, property) {
+        if (property === 'terminate') return () => { workerTerminated = true; return target.terminate(); };
+        const value = Reflect.get(target, property, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      }, set(target, property, value) { return Reflect.set(target, property, value, target); } });
+    },
+  });
+  const extension = { id: 'elsemesh-extension:loop', protocol: WORLD_EXTENSION_PROTOCOL, memoryPages: 2 };
+  await extensionHost.load(extension, loopingModule, { tick: 0 });
+  let timeoutObserved = false;
+  try { await extensionHost.step(extension.id, { tick: 1 }); }
+  catch (error) { timeoutObserved = /exceeded its 100 ms time limit/.test(error.message); }
+  if (!timeoutObserved || !workerTerminated) throw new Error('real browser Worker was not terminated after the Wasm step timeout');
+  extensionHost.dispose();
   document.body.textContent = direct && fallback && data.length === %d ? 'PASS direct WebRTC and gateway fallback' : 'FAIL direct or fallback transport';
   connector.close();
 } catch (error) { document.body.textContent = 'FAIL ' + String(error); }
