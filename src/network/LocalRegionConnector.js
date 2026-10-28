@@ -5,7 +5,6 @@ import { parseGLB } from '../engine/loaders/GLTF.js';
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
-const DEFAULT_WORLD_ID = 'world:hogwarts-legacy-local';
 const EMPTY_GLB = createEmptyGlb();
 
 function createEmptyGlb() {
@@ -73,7 +72,7 @@ export class LocalRegionConnector {
 		this.localOnly = true;
 		this.localProvider = new URL( localProvider ).origin;
 		this.localMap = localMap;
-		this.worldId = DEFAULT_WORLD_ID;
+		this.worldId = '';
 		this.nodeId = '';
 		this.gateway = this.localProvider;
 		this.directory = '';
@@ -96,7 +95,7 @@ export class LocalRegionConnector {
 		abortIfNeeded( signal );
 		const base = `${this.localProvider}/v1`;
 		const descriptor = await fetchJSON( `${base}/descriptor`, signal );
-		requireValue( descriptor.schema === 'elsemesh.dynamic-region-provider/1' && descriptor.readOnly === true && typeof descriptor.sourceRevision === 'string', 'Local provider returned an unsupported descriptor' );
+		requireValue( descriptor.schema === 'elsemesh.dynamic-region-provider/1' && descriptor.readOnly === true && typeof descriptor.sourceRevision === 'string' && typeof descriptor.worldId === 'string' && /^[a-z0-9][a-z0-9:._-]{0,127}$/.test( descriptor.worldId ), 'Local provider returned an unsupported descriptor' );
 		const selection = descriptor.entrySelection;
 		requireValue( selection?.schema === 'elsemesh.hogwarts-entry-selection/1' && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length >= 1 && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
 		const previewRegion = selection.previewRegion;
@@ -120,7 +119,7 @@ export class LocalRegionConnector {
 		const assetURL = new URL( region.asset, `${base}/` );
 		requireValue( assetURL.origin === this.localProvider && assetURL.pathname.startsWith( '/v1/regions/' ), 'Local provider returned an unsafe region URL' );
 		this.region = region;
-		this.worldId = descriptor.worldId || DEFAULT_WORLD_ID;
+		this.worldId = descriptor.worldId;
 		this.sourceRevision = descriptor.sourceRevision;
 		const startupCellKeys = new Set( startupCells.map( cell => cell.join( ',' ) ) );
 		this.initialRegionCellObjectIDs = new Set();
