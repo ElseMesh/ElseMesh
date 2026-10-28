@@ -106,6 +106,22 @@ func TestWorldV3RejectsLegacyProtocolAndWorldID(t *testing.T) {
 	}
 }
 
+func TestWorldManifestRequiresObjectArray(t *testing.T) {
+	owner := testKey(t)
+	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := newStarterManifest("Empty world", ownerID.String())
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("empty object array was rejected: %v", err)
+	}
+	manifest.Objects = nil
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("nil object list would serialize as null, which the browser rejects")
+	}
+}
+
 func TestWorldManifestBindsWasmExtensionToDeclaredBehavior(t *testing.T) {
 	owner := testKey(t)
 	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())

@@ -531,6 +531,9 @@ func validateWorldExperience(experience *worldExperience) error {
 }
 
 func validateManifest(manifest worldManifest, localPeerID string, now time.Time) error {
+	if manifest.Objects == nil {
+		return errors.New("world object list must be an array")
+	}
 	if len(manifest.EntryPoints) > 16 {
 		return errors.New("manifest contains too many world entry points")
 	}
