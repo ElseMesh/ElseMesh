@@ -1216,7 +1216,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		this.prepareHostedWorld( connector );
 		const experience = connector.manifest.experience;
-		// The built-in ocean belongs to the default Tidewater scene. Hosted worlds
+		// The built-in ocean belongs to the default world. Hosted worlds
 		// render water only through their own declared world components.
 		this.ocean.visible = false;
 		const terrain = ( root.userData.worldComponents || [] ).find( ( component ) => component.islandTerrain && component.terrainGPU );
@@ -1228,7 +1228,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			}
 			if ( hasWorldBehavior( experience, 'elsemesh.shore-aware-boat/1' ) ) {
 				// Keep the hosted boat's hydrostatics on the same terrain-shaped, shoreline-aware
-				// surface as the built-in Tidewater boat. A deep-water-only query overstates swell
+				// surface as the built-in boat. A deep-water-only query overstates swell
 				// at the pier and can roll the moored boat over.
 				this.hostedWaterSurface.terrain = terrain.terrainGPU;
 				this.hostedWaterSurface.shore = terrain.shore;

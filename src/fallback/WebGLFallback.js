@@ -34,7 +34,6 @@ import { WebGLReefAdapter } from './WebGLReefAdapter.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGLVillageMaterials.js';
 import { Whale } from '../world/marine/Whale.js';
-import { TIDEWATER_REEF_ASSET_URLS } from '../world/reef/TidewaterReefAssets.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
@@ -42,13 +41,11 @@ import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/Fish
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
-import terrainUrl from '../../worlds/tidewater/lod-source/terrain-full.glb?url';
-import villageUrl from '../../worlds/tidewater/lod-source/village-full.glb?url';
-import vegetationUrl from '../../worlds/tidewater/lod-source/vegetation-placements.bin?url';
-import tidewaterWorldSource from '../../worlds/tidewater/world-source.json';
+import { defaultWorldPackage } from '../../worlds/default.js';
 
-const ISLAND_WILDLIFE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' );
-const ISLAND_WHALE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'elsemesh.humpback-whale/1' );
+const { source: defaultWorldSource, assets: defaultWorldAssets } = defaultWorldPackage;
+const ISLAND_WILDLIFE_COMPONENT = defaultWorldSource.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' );
+const ISLAND_WHALE_COMPONENT = defaultWorldSource.components.find( component => component.type === 'elsemesh.humpback-whale/1' );
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -803,14 +800,14 @@ export class WebGLFallback {
 				terrain: this.terrain,
 				colliders: this.app.worldState.colliders,
 				loader: this.loader,
-				placement: tidewaterWorldSource.experience?.fishing?.fishStand,
+				placement: defaultWorldSource.experience?.fishing?.fishStand,
 			} );
 			this.chandlery = new WebGLChandleryAdapter( T, this.scene, {
 				terrain: this.terrain, colliders: this.app.worldState.colliders, loader: this.loader,
-				placement: tidewaterWorldSource.experience?.fishing?.chandlery,
+				placement: defaultWorldSource.experience?.fishing?.chandlery,
 			} );
 			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
-				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience: tidewaterWorldSource.experience,
+				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience: defaultWorldSource.experience,
 				THREE: T, scene: this.scene, camera: this.camera, query: this.waterQuery,
 				terrain: this.terrain, boatController: this.boat.controller, boatRoot: this.boat.group, audio: this.app.audio,
 			} );
@@ -921,7 +918,7 @@ export class WebGLFallback {
 	async _loadIslandWhale() {
 
 		try {
-			await this._loadWebGLWhale( ISLAND_WHALE_COMPONENT, null, this.terrain, tidewaterWorldSource.rules.seaLevel ?? 0 );
+			await this._loadWebGLWhale( ISLAND_WHALE_COMPONENT, null, this.terrain, defaultWorldSource.rules.seaLevel ?? 0 );
 		} catch ( error ) {
 			console.warn( 'WebGL island whale package unavailable:', error );
 		}
@@ -1354,7 +1351,7 @@ export class WebGLFallback {
 		this.terrain = this.app.worldState.terrain;
 		const T = this.THREE;
 		try {
-			const model = await this.loader.loadAsync( terrainUrl );
+			const model = await this.loader.loadAsync( defaultWorldAssets.terrainLOD );
 			const terrainMaterial = webglTerrainMaterial( T, this.terrain );
 			this.terrainColorTexture = terrainMaterial.userData.terrainTextures[ 0 ];
 			model.scene.traverse( object => {
@@ -1393,7 +1390,7 @@ export class WebGLFallback {
 		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, - 0.15 ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
-			const model = await this.loader.loadAsync( villageUrl );
+			const model = await this.loader.loadAsync( defaultWorldAssets.villageLOD );
 			model.scene.traverse( object => {
 				if ( ! object.isMesh ) return;
 				object.castShadow = true;
@@ -1451,7 +1448,7 @@ export class WebGLFallback {
 		try {
 			let expectedSeed;
 			if ( ! placementBytes ) {
-				const response = await fetch( vegetationUrl );
+				const response = await fetch( defaultWorldAssets.vegetationPlacements );
 				if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 				placementBytes = new Uint8Array( await response.arrayBuffer() );
 				expectedSeed = 7;
@@ -1723,12 +1720,12 @@ export class WebGLFallback {
 
 	async _loadPackagedReef() {
 
-		const components = tidewaterWorldSource.components.filter( item => item.type === 'elsemesh.static-reef/1' );
+		const components = defaultWorldSource.components.filter( item => item.type === 'elsemesh.static-reef/1' );
 		const recordsByTile = await Promise.all( components.map( async component => {
-			const url = TIDEWATER_REEF_ASSET_URLS[ component.placementAssetId ];
-			if ( ! url ) throw new Error( `Packaged reef asset ${component.placementAssetId} is missing from the Tidewater source tree` );
+			const url = defaultWorldAssets.reefPlacements[ component.placementAssetId ];
+			if ( ! url ) throw new Error( `Default world reef asset ${component.placementAssetId} is missing from its package` );
 			const response = await fetch( url );
-			if ( ! response.ok ) throw new Error( `Packaged reef asset ${component.placementAssetId} returned ${response.status}` );
+			if ( ! response.ok ) throw new Error( `Default world reef asset ${component.placementAssetId} returned ${response.status}` );
 			return decodeReefPlacements( new Uint8Array( await response.arrayBuffer() ) ).records;
 		} ) );
 		const records = recordsByTile.flat();
@@ -1890,7 +1887,7 @@ export class WebGLFallback {
 		}
 		this.fishStand?.update( dt, this.camera.position );
 		this.chandlery?.update( dt, this.camera.position );
-		this.reefAdapter?.update( this.camera, simulationTime, tidewaterWorldSource.rules.seaLevel ?? 0 );
+		this.reefAdapter?.update( this.camera, simulationTime, defaultWorldSource.rules.seaLevel ?? 0 );
 		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
 		this.gameAdapter?.update( dt, this.player || this.camera, this.input, { timeOfDay: this.app.settings.timeOfDay, freeCam: this.freeCam } );
 		this._stepWorldExtensions( dt );
