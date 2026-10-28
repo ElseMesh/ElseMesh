@@ -16,14 +16,14 @@ try {
 	const assetId = `sha256:${createHash( 'sha256' ).update( assetBytes ).digest( 'hex' )}`;
 	const lodBytes = Buffer.from( 'low-detail-glb-fixture' );
 	const lodId = `sha256:${createHash( 'sha256' ).update( lodBytes ).digest( 'hex' )}`;
-	const world = createWorldSource( { worldId: 'tw-world:ai-worker-test' } );
+	const world = createWorldSource( { worldId: 'elsemesh:ai-worker-test' } );
 	world.objects.push( {
-		id: 'tw-object:review-target', kind: 'asset-instance', label: 'Review target', assetId,
+		id: 'elsemesh-object:review-target', kind: 'asset-instance', label: 'Review target', assetId,
 		priority: 'visible', streamingBounds: { center: [ 0, 0, 0 ], radius: 2 }, lods: [ { assetId: lodId, maxScreenFraction: 0.1 } ], transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ],
 		collision: { shape: 'none', enabled: false },
 	} );
 	world.portals.push( {
-		id: 'tw-portal:review-target', destinationWorldId: 'tw-world:other',
+		id: 'elsemesh-portal:review-target', destinationWorldId: 'elsemesh:other',
 		entry: { position: [ 1, 0, 0 ], yaw: 0 }, exit: { position: [ 0, 0, 0 ], yaw: 0 },
 		openView: true, enabled: true,
 	} );
@@ -36,7 +36,7 @@ try {
 	const taskDirectory = path.join( temporaryRoot, 'task' );
 	const created = await createAITaskBundle( {
 		sourcePath, blendPath, assetsPath: assets, instruction: 'Move the selected prop one meter east.', outTaskPath: taskDirectory,
-		objectIds: [ 'tw-object:review-target' ], portalIds: [ 'tw-portal:review-target' ],
+		objectIds: [ 'elsemesh-object:review-target' ], portalIds: [ 'elsemesh-portal:review-target' ],
 	} );
 	assert.equal( created.worldId, world.worldId );
 	assert.deepEqual( new Set( created.availableAssetIds ), new Set( [ assetId, lodId ] ) );
@@ -44,21 +44,21 @@ try {
 	assert.equal( ( await readFile( path.join( taskDirectory, 'scene.blend' ) ) ).toString(), 'not a real blend; bundle tests treat it as opaque bytes' );
 	await writeFile( path.join( taskDirectory, 'plan.json' ), `${JSON.stringify( {
 		protocol: 'elsemesh.blender-actions/1', sourceHash: created.sourceHash,
-		actions: [ { op: 'object.update', id: 'tw-object:review-target', fields: { transform: { position: [ 1, 0, 0 ], yaw: 0 } } } ],
+		actions: [ { op: 'object.update', id: 'elsemesh-object:review-target', fields: { transform: { position: [ 1, 0, 0 ], yaw: 0 } } } ],
 	} )}\n` );
 	const bundle = await validateAITaskBundle( taskDirectory );
 	assert.equal( bundle.task.taskId, created.taskId );
 	assert.equal( bundle.outputAssetsRequired, false );
 	assert.deepEqual( bundle.actionCounts, { 'object.update': 1 } );
 
-	assert.throws( () => validateScopedActions( [ { op: 'object.remove', id: 'tw-object:unselected' } ], created ), /outside the task object allow-list/ );
-	assert.throws( () => validateScopedActions( [ { op: 'portal.remove', id: 'tw-portal:unselected' } ], created ), /outside the task portal allow-list/ );
+	assert.throws( () => validateScopedActions( [ { op: 'object.remove', id: 'elsemesh-object:unselected' } ], created ), /outside the task object allow-list/ );
+	assert.throws( () => validateScopedActions( [ { op: 'portal.remove', id: 'elsemesh-portal:unselected' } ], created ), /outside the task portal allow-list/ );
 	assert.throws( () => validateScopedActions( [ { op: 'object.add', object: { assetId: 'sha256:' + '0'.repeat( 64 ) } } ], created ), /explicitly included/ );
-	assert.doesNotThrow( () => validateScopedActions( [ { op: 'object.update', id: 'tw-object:review-target', fields: { assetId } } ], created ) );
-	assert.doesNotThrow( () => validateScopedActions( [ { op: 'object.update', id: 'tw-object:review-target', fields: { lods: world.objects[ 0 ].lods } } ], created ) );
+	assert.doesNotThrow( () => validateScopedActions( [ { op: 'object.update', id: 'elsemesh-object:review-target', fields: { assetId } } ], created ) );
+	assert.doesNotThrow( () => validateScopedActions( [ { op: 'object.update', id: 'elsemesh-object:review-target', fields: { lods: world.objects[ 0 ].lods } } ], created ) );
 	for ( const op of [ 'object.add', 'object.update' ] ) {
 		const record = { assetId, lods: [ { assetId: 'sha256:' + '0'.repeat( 64 ), maxScreenFraction: 0.1 } ] };
-		assert.throws( () => validateScopedActions( [ op === 'object.add' ? { op, object: record } : { op, id: 'tw-object:review-target', fields: record } ], created ), /explicitly included/ );
+		assert.throws( () => validateScopedActions( [ op === 'object.add' ? { op, object: record } : { op, id: 'elsemesh-object:review-target', fields: record } ], created ), /explicitly included/ );
 	}
 
 	const output = path.join( temporaryRoot, 'candidate' );
@@ -88,7 +88,7 @@ try {
 
 	await assert.rejects( createAITaskBundle( {
 		sourcePath, blendPath, assetsPath: assets, instruction: 'Do not overwrite existing task.', outTaskPath: taskDirectory,
-		objectIds: [ 'tw-object:review-target' ],
+		objectIds: [ 'elsemesh-object:review-target' ],
 	} ), /EEXIST/ );
 	assert.equal( JSON.parse( await readFile( path.join( taskDirectory, 'task.json' ), 'utf8' ) ).taskId, created.taskId, 'existing task remains intact after a collision' );
 

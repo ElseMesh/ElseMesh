@@ -43,13 +43,9 @@ func TestPresenceLimitsExpiryAndIdentity(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
 	legacyWalk := presenceTestPose()
-	legacyWalk.Protocol = legacyPlayerPresenceProtocol
-	if err := validatePlayerPose(legacyWalk); err != nil {
-		t.Fatalf("legacy walking pose should remain supported: %v", err)
-	}
-	legacyWalk.Mode = "boat"
-	if err := validatePlayerPose(legacyWalk); err == nil || err.Error() != "vehicle_presence_protocol_upgrade_required" {
-		t.Fatalf("legacy vehicle pose should require the speed-capable protocol: %v", err)
+	legacyWalk.Protocol = "elsemesh.player-presence/1"
+	if err := validatePlayerPose(legacyWalk); err == nil {
+		t.Fatal("unsupported legacy presence protocol accepted")
 	}
 	request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: presenceTestPose()}
 	if _, err := d.localRequest(request); err == nil {
@@ -133,7 +129,7 @@ func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 	if err := update("deck", 2); err == nil || err.Error() != "vehicle_unsupported" {
 		t.Fatalf("world without a compatible berth should reject vehicle mode, got %v", err)
 	}
-	d.world.Components = []worldComponent{{Type: "tidewater.downeast-boat/1"}}
+	d.world.Components = []worldComponent{{Type: "elsemesh.downeast-boat/1"}}
 	if err := update("boat", 3); err == nil || err.Error() != "vehicle_complexity_exceeded" {
 		t.Fatalf("vehicle above signed complexity budget should be rejected, got %v", err)
 	}

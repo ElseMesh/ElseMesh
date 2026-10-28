@@ -1,14 +1,14 @@
 import { Vector3, Color } from '../engine/index.js';
 import { WORLD } from '../world/WorldLayout.js';
 import { FISH } from './FishTable.js';
-import { habitatAt, pickSpecies, rollWeight, biteDelay } from './Bites.js';
-import { CatchMinigame } from './CatchMinigame.js';
-import { GameState } from './GameState.js';
+import { habitatAt } from './Bites.js';
+import { createWorldBehaviorRuntime } from '../network/WorldBehaviorRegistry.js';
 import { FishingRod } from './FishingRod.js';
 import { FishStand } from './FishStand.js';
 import { Chandlery } from './Chandlery.js';
 import { CatchDisplay } from './CatchDisplay.js';
-import { UPGRADES, fuelBurn } from './Gear.js';
+import { UPGRADES } from './Gear.js';
+import { BoatGameplayRuntime } from './BoatGameplayRuntime.js';
 import { GameHUD } from './GameHUD.js';
 import { Minimap } from './Minimap.js';
 import { Guide } from './Guide.js';
@@ -25,32 +25,34 @@ const CATCH_CARD_MS = 9000;
 //   E          at the fish stand: sell your catch
 export class Game {
 
-	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl } = {} ) {
+	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience = { behaviors: [ 'elsemesh.fishing-game/1' ] } } = {} ) {
 
 		this.app = app;
 		this.terrain = terrain;
 		this.boatController = boatController;
 		this.active = true;
-		this.state = new GameState();
-		this.state.load();
+		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1' );
+		this.state = this.runtime.state;
 		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query, terrain, audio: app.audio } );
 		this.rod.onLand = ( where ) => this.onBobberLanded( where );
-		this.stand = new FishStand( { scene: app.scene, terrain, colliders } );
+		this.stand = new FishStand( { scene: app.scene, terrain, colliders, placement: experience?.fishing?.fishStand } );
 		this.display = new CatchDisplay( { scene: app.scene, stall: this.stand.iceFish() } );
 		this.landing = null; // { species, kg } while the caught fish swings in view
-		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material } );
+		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material, placement: experience?.fishing?.chandlery } );
 		this.vendors = [ this.stand.vendor, this.chandlery.vendor ];
 		// boat upgrades: engine (thrust / top speed) and deck floodlights for night fishing
 		const b = boatController;
-		this._engineBase = { maxThrust: b.maxThrust, pitchSpeed: b.pitchSpeed };
+		this.boatGameplay = new BoatGameplayRuntime( {
+			state: this.state, controller: b, terrain,
+			habitatAt: ( x, z, depth ) => this.habitatAtPoint( x, z, depth ),
+			onFuelOut: () => this.toast( 'Out of fuel · buy diesel at the chandlery by the boathouse', 4000 ),
+		} );
+		this._boatGauges = { fuel: null, sonar: null };
 		this.floods = [];
 		if ( app.localLights ) this.addFloodlights( app.localLights, boatController?.model || app.boat );
-		this._fuelOut = false;
-		this._sonarT = 0;
-		this._sonar = null;
 		this.hud = null;
-		this.fight = null; // CatchMinigame while a fish is on
-		this.bite = null; // { phase: 'wait' | 'nibble' | 'take', t, nibbles, species, kg }
+		this.fight = null;
+		this.bite = null;
 		this._lmb = false;
 		this._rmb = false;
 		this._hookedSpecies = null;
@@ -61,11 +63,16 @@ export class Game {
 
 	}
 
+	get fight() { return this.runtime.fight; }
+	set fight( value ) { this.runtime.fight = value; }
+	get bite() { return this.runtime.bite; }
+	set bite( value ) { this.runtime.bite = value; }
+
 	setBoatController( boatController ) {
 
 		if ( ! boatController ) return;
 		this.boatController = boatController;
-		this._engineBase = { maxThrust: boatController.maxThrust, pitchSpeed: boatController.pitchSpeed };
+		this.boatGameplay.setController( boatController );
 		this.applyGear();
 
 	}
@@ -85,6 +92,7 @@ export class Game {
 		if ( query ) this.rod.setQuery( query );
 		if ( terrain ) {
 			this.terrain = terrain;
+			this.boatGameplay.setTerrain( terrain );
 			this.rod.terrain = terrain;
 		}
 		this.stand.setColliders( colliders );
@@ -97,13 +105,7 @@ export class Game {
 
 		const g = this.state.stats;
 		this.rod.setGear( { castM: g.castM, reelSpeed: g.reelSpeed } );
-		const b = this.boatController;
-		if ( b && this._engineBase ) {
-
-			b.maxThrust = this._engineBase.maxThrust * g.speedMul * g.speedMul;
-			b.pitchSpeed = this._engineBase.pitchSpeed * g.speedMul;
-
-		}
+		this.boatGameplay.applyGear();
 
 		for ( const f of this.floods || [] ) f.scale = g.deckLights ? 1 : 0;
 
@@ -150,7 +152,7 @@ export class Game {
 		const l = this.state.refuel();
 		if ( l > 0 ) {
 
-			this._fuelOut = false;
+			this.boatGameplay.refueled();
 			this.toast( `Filled up · ${ l.toFixed( 0 ) } L` );
 
 		}
@@ -305,8 +307,8 @@ export class Game {
 		// the catch card's live fish portrait (or one queued thumbnail)
 		if ( this.hud && this.hud.portrait ) this.hud.portrait.update( dt );
 		if ( this.hud ) this.hud.update( {
-			fuel: aboard ? { litres: this.state.fuelL, tank: this.state.stats.fuelL } : null,
-			sonar: aboard && this.state.stats.finder ? this._sonar : null,
+			fuel: this._boatGauges.fuel,
+			sonar: this._boatGauges.sonar,
 			fight: this.fight,
 			casting: rod.state === 'windup',
 			power: rod.power,
@@ -353,37 +355,7 @@ export class Game {
 	// fuel burn at the helm (the engine stops when the tank is dry) and the fish finder
 	updateBoat( dt ) {
 
-		const app = this.app, b = this.boatController, p = app.player, s = this.state;
-		if ( b.driven ) {
-
-			const left = s.burn( fuelBurn( b.rpm ) * dt );
-			if ( left <= 0 ) {
-
-				b.throttle = 0;
-				if ( ! this._fuelOut ) this.toast( 'Out of fuel · buy diesel at the chandlery by the boathouse', 4000 );
-				this._fuelOut = true;
-
-			}
-
-		} else if ( this._wasDriven ) s.save();
-		this._wasDriven = b.driven;
-
-		if ( ( p.mode === 'boat' || p.mode === 'deck' ) && s.stats.finder ) {
-
-			this._sonarT -= dt;
-			if ( this._sonarT <= 0 ) {
-
-				this._sonarT = 0.5;
-				const x = b.position.x, z = b.position.z;
-				const depth = Math.max( 0, - this.terrain.heightAt( x, z ) );
-				const h = this.habitatAtPoint( x, z, depth );
-				let rich = 0;
-				for ( const k in h ) rich += h[ k ];
-				this._sonar = { depth, fish: Math.min( 1, rich / 1.4 ) };
-
-			}
-
-		}
+		this._boatGauges = this.boatGameplay.step( dt, this.app.player.mode );
 
 	}
 
@@ -461,61 +433,16 @@ export class Game {
 
 		}
 
-		this.bite = { phase: 'wait', t: biteDelay( this.habitat(), this.hour ) };
+		this.runtime.startBite( this.habitat(), this.hour );
 
 	}
 
 	updateBite( dt ) {
 
-		const rod = this.rod;
-		const b = this.bite;
-		if ( ! b ) return;
-		b.t -= dt;
-		// bobber motion for the cues
-		if ( b.phase === 'nibble' ) rod.dip = Math.max( 0, Math.sin( Math.min( 1, ( b.pulse || 0 ) ) * Math.PI ) * 0.45 );
-		else if ( b.phase === 'take' ) rod.dip += ( 1.4 - rod.dip ) * ( 1 - Math.exp( - dt * 14 ) );
-		else rod.dip = Math.max( 0, rod.dip - dt * 3 );
-		if ( b.phase === 'nibble' ) b.pulse = ( b.pulse || 0 ) + dt * 3.2;
-
-		if ( b.t > 0 ) return;
-		if ( b.phase === 'wait' ) {
-
-			const h = this.habitat();
-			const species = pickSpecies( h, this.hour );
-			if ( ! species ) {
-
-				b.t = 8;
-				return;
-
-			}
-
-			b.species = species;
-			b.kg = rollWeight( species );
-			b.phase = 'nibble';
-			b.nibbles = 1 + Math.floor( Math.random() * 3 );
-			b.t = 0.7 + Math.random() * 0.8;
-			b.pulse = 0;
-
-		} else if ( b.phase === 'nibble' ) {
-
-			b.nibbles --;
-			b.pulse = 0;
-			if ( b.nibbles > 0 ) b.t = 0.6 + Math.random() * 1.0;
-			else {
-
-				b.phase = 'take';
-				// big, strong fish give a (slightly) shorter window
-				b.t = 2.4 - FISH[ b.species ].fight * 0.5;
-				if ( this.app.audio && this.app.audio.fishSplash ) this.app.audio.fishSplash( rod.bobber, 0.35 );
-
-			}
-
-		} else if ( b.phase === 'take' ) {
-
-			this.toast( 'It took the bait and ran', 1800 );
-			this.bite = { phase: 'wait', t: biteDelay( this.habitat(), this.hour ) };
-
-		}
+		const result = this.runtime.stepBite( dt, { habitat: () => this.habitat(), hour: this.hour, dip: this.rod.dip } );
+		this.rod.dip = result.dip;
+		if ( result.event === 'take' && this.app.audio && this.app.audio.fishSplash ) this.app.audio.fishSplash( this.rod.bobber, 0.35 );
+		if ( result.event === 'escaped' ) this.toast( 'It took the bait and ran', 1800 );
 
 	}
 
@@ -531,8 +458,7 @@ export class Game {
 		}
 
 		const g = this.state.stats;
-		this.fight = new CatchMinigame( { species: b.species, kg: b.kg, lineKg: g.lineKg, reelSpeed: g.reelSpeed, distance: Math.max( 3, this.rod.lineOut ) } );
-		this.bite = null;
+		this.runtime.strike( { lineKg: g.lineKg, reelSpeed: g.reelSpeed, distance: Math.max( 3, this.rod.lineOut ) } );
 		this.rod.hook();
 		this.toast( 'Fish on!', 1200 );
 
@@ -540,20 +466,19 @@ export class Game {
 
 	updateFight( dt, reeling ) {
 
-		const f = this.fight;
-		const st = f.update( dt, reeling );
+		const result = this.runtime.stepFight( dt, reeling, this.hour );
+		const f = result.fight, st = result.state;
 		// the fish thrashes at the surface as each run starts
 		const au = this.app.audio;
 		if ( f.surge > 0.6 && ! f._splashed && au && au.fishSplash ) au.fishSplash( this.rod.bobber, 0.3 + 0.5 * Math.min( 1, f.kg / 8 ) );
 		f._splashed = f.surge > 0.6 ? true : f.surge < 0.3 ? false : f._splashed;
 		if ( st === 'fighting' ) return;
-		this.fight = null;
 		this.rod.dip = 0;
 		const name = FISH[ f.species ].name;
 		if ( st === 'caught' ) {
 
-			const entry = this.state.addFish( f.species, f.kg, this.hour );
-			const info = this.state.lastCatch;
+			const entry = result.entry;
+			const info = result.catchInfo;
 			if ( au && au.fishSplash ) au.fishSplash( this.rod.bobber, 0.8 );
 			if ( au && au.fishFlop ) au.fishFlop();
 			// the catch card (with a HUD) while the fish hangs on the line; a toast otherwise
@@ -597,8 +522,7 @@ export class Game {
 	cancelLine( silent = false ) {
 
 		if ( this.fight && ! silent ) this.toast( 'Lost it', 1400 );
-		this.fight = null;
-		this.bite = null;
+		this.runtime.cancel();
 		if ( this.rod.state !== 'stowed' ) this.rod.setState( this.rod.equipped ? 'idle' : 'stowed' );
 
 	}

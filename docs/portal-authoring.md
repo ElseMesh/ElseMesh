@@ -10,8 +10,8 @@ A minimal front route is:
 
 ```json
 {
-  "id": "tw-portal:alice-to-bob",
-  "destinationWorldId": "tw-world:bob",
+  "id": "elsemesh-portal:alice-to-bob",
+  "destinationWorldId": "elsemesh:bob",
   "entry": { "position": [0, 2.5, 5], "yaw": 0 },
   "exit": { "position": [10, 2.5, 0], "yaw": 1.5707963267948966 },
   "openView": true,
@@ -27,13 +27,14 @@ world connection. The visitor must separately present a valid launch grant and
 admission assertion issued by the ElseMesh invitation service. A portal link,
 provider pin, or destination gateway never grants invitation access.
 
-### Preview readiness and light bridge
+### Portal view readiness and lighting
 
 The destination world may declare the assets/components required for its first
-portal view and for crossing. Clients load the preview set before displaying the
-aperture, hold the visitor at the threshold until crossing requirements are
-ready, and continue loading visible, nearby, and background content after
-entry.
+portal view and for crossing. The client connects to the destination world,
+loads its initial view content, and renders that world through the aperture
+from the mapped camera every frame. It holds the visitor at the threshold until
+crossing requirements are ready, and continues loading nearby and background
+content after entry.
 
 Portal lighting is not authored or published as a portal-side descriptor. It is
 computed from the destination scene currently downloaded and rendered by the
@@ -49,13 +50,13 @@ illumination or shadow maps are outside this first implementation.
 
 ## Two independently routed sides
 
-The legacy front fields above remain the front route. Add an optional `back` object with its own `destinationWorldId`, `exit`, `openView`, `enabled`, and optional destination provider/gateway. Its entry uses the same position with `entry.yaw + π`: it faces the other way. Add `tidewater.portal-two-sided/1` to `rules.requiredFeatures` so older clients refuse an unsupported world rather than interpreting the doorway incorrectly.
+The legacy front fields above remain the front route. Add an optional `back` object with its own `destinationWorldId`, `exit`, `openView`, `enabled`, and optional destination provider/gateway. Its entry uses the same position with `entry.yaw + π`: it faces the other way. Add `elsemesh.portal-two-sided/1` to `rules.requiredFeatures` so older clients refuse an unsupported world rather than interpreting the doorway incorrectly.
 
 The back can lead to another world. To use the same destination, give its exit the same position as the front exit with opposite yaw. This lets the two directions arrive facing opposite ways. Omitting `back` leaves the back unconfigured; it does not create an automatic return route. Each destination owner's complementary doorway is a separate authored record.
 
 ### Vehicle entry rules
 
-The bundled Downeast boat can cross a portal only when the destination explicitly opts in and declares a compatible `tidewater.downeast-boat/1` berth. Add these destination rules:
+The bundled Downeast boat can cross a portal only when the destination explicitly opts in and declares a compatible `elsemesh.downeast-boat/1` berth. Add these destination rules:
 
 ```json
 "vehiclePolicy": {
@@ -65,7 +66,7 @@ The bundled Downeast boat can cross a portal only when the destination explicitl
 }
 ```
 
-`maxSpeed` caps the boat's world-space speed in meters per second after the handoff. `maxCombinedComplexity` must accommodate the destination's configured `avatarComplexity` plus the bundled boat's measured triangle count. If the policy is omitted or disabled, the destination has no compatible berth, or its complexity budget is exceeded, crossing is held at the threshold and an open-portal preview is hidden while the visitor is aboard or at the helm. The boat pose, orientation, linear and angular velocity, and helm state transfer to the destination boat; the destination speed cap applies immediately. This is client runtime enforcement; authoritative server-side vehicle simulation and anti-cheat remain part of multiplayer simulation work.
+`maxSpeed` caps the boat's world-space speed in meters per second after the handoff. `maxCombinedComplexity` must accommodate the destination's configured `avatarComplexity` plus the bundled boat's measured triangle count. If the policy is omitted or disabled, the destination has no compatible berth, or its complexity budget is exceeded, crossing is held at the threshold and the portal view is hidden while the visitor is aboard or at the helm. The boat pose, orientation, linear and angular velocity, and helm state transfer to the destination boat; the destination speed cap applies immediately. This is client runtime enforcement; authoritative server-side vehicle simulation and anti-cheat remain part of multiplayer simulation work.
 
 ## Share one side with a friend
 
@@ -73,7 +74,7 @@ After Alice has agreed Bob's destination frame, export a small JSON connection d
 
 ```sh
 node tools/portal-link.mjs export \
-  --source alice.world-source.json --id tw-portal:alice-to-bob \
+  --source alice.world-source.json --id elsemesh-portal:alice-to-bob \
   --side front --out alice-to-bob.link.json \
   --gateway https://alice.example --node-id ALICE_NODE_PEER_ID
 ```
@@ -85,7 +86,7 @@ Bob imports it against his exact source snapshot:
 ```sh
 node tools/portal-link.mjs import \
   --source bob.world-source.json --link alice-to-bob.link.json \
-  --id tw-portal:bob-to-alice --out bob-return.proposal.json
+  --id elsemesh-portal:bob-to-alice --out bob-return.proposal.json
 node tools/apply-world-proposal.mjs \
   --source bob.world-source.json --proposal bob-return.proposal.json \
   --out bob.candidate.world-source.json
@@ -108,7 +109,7 @@ node tools/publish-world-source.mjs \
 
 Use the build-tree CLI and the actual profile/assets paths; keep source edits in the source tree. The [owner publication workflow](account-roles.md#owner-publication) validates the current signed source hash and owner identity, verifies assets, signs the next manifest revision and archives the previous revision. Restart Bob's daemon after publication, then keep the accepted candidate as the versioned source for future edits. Alice uses the same workflow with her own source and profile. Each owner retains their own keys.
 
-Run both nodes as in [testing two worlds](testing-two-worlds.md), with reachable discovery/routing between them. Inspect the preview before crossing, enter from each configured side, verify arrival orientation and return travel, and check blocked/disabled routes. Destination availability, permissions, required features and travel rules still determine whether viewing/crossing is allowed. This CLI adds reviewable metadata; it does not establish network reachability or silently publish worlds.
+Run both nodes as in [testing two worlds](testing-two-worlds.md), with reachable discovery/routing between them. Look through the doorway before crossing, enter from each configured side, verify arrival orientation and return travel, and check blocked/disabled routes. Destination availability, permissions, required features and travel rules still determine whether viewing/crossing is allowed. This CLI adds reviewable metadata; it does not establish network reachability or silently publish worlds.
 
 ## Validation
 
@@ -119,11 +120,11 @@ Run both nodes as in [testing two worlds](testing-two-worlds.md), with reachable
 The signed front/back route is selected from the viewer's side of the plane.
 Crossings retain the approach-side route even after the camera crosses the
 threshold. Each side has a separate preparation key; the back uses the opposite
-entry orientation for both preview-camera mapping and player handoff. One physical
+entry orientation for both portal-view camera mapping and player handoff. One physical
 frame serves both sides, including when only the back route is enabled.
 
 Tests exercise both App route selections and crossing paths, independent
-preparation keys, same-world opposite-facing exits, matching preview/player
+preparation keys, same-world opposite-facing exits, matching portal-view/player
 transforms, and pose/momentum round trips through an exported/imported return
 portal. The production build and focused Go contract checks pass. Live visual
 checks with two owner-published worlds, Flip7 traversal and destination travel-rule

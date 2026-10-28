@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { alignPortalPreview, crossedPortalPlane, mapPortalCamera, mapPortalPlayerState, mapPortalVehicleState, portalExitClipPlane, rotatePortalVelocity, updatePortalPreviewComponents } from '../src/network/PortalHandoff.js';
+import { alignPortalView, crossedPortalPlane, mapPortalCamera, mapPortalPlayerState, mapPortalVehicleState, portalExitClipPlane, rotatePortalVelocity, updatePortalViewComponents } from '../src/network/PortalHandoff.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 import { Quaternion } from '../src/engine/math/Quaternion.js';
@@ -14,15 +14,16 @@ import { VEGETATION_PLACEMENT_KINDS, decodeVegetationPlacements, encodeVegetatio
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
 const portal = { entry: { position: [ 0, 1, 0 ], yaw: 0 } };
-const previewDeltas = [];
-const previewCamera = {};
-const previewComponents = [ { update( dt, camera ) { previewDeltas.push( [ dt, camera ] ); } }, {} ];
-assert.equal( updatePortalPreviewComponents( previewComponents, 1000, -Infinity, previewCamera ), 0, 'first portal render starts without a synthetic time jump' );
-assert.equal( updatePortalPreviewComponents( previewComponents, 1100, 1000, previewCamera ), 0.1, 'portal animations advance during the normal 10 Hz preview cadence' );
-assert.equal( updatePortalPreviewComponents( previewComponents, 5000, 1100, previewCamera ), 0.1, 'portal animation delta is capped after a hidden or paused interval' );
-assert.equal( updatePortalPreviewComponents( previewComponents, 4900, 5000, previewCamera ), 0, 'out-of-order preview timestamps do not reverse component time' );
-assert.ok( previewDeltas.every( ( [ _dt, camera ] ) => camera === previewCamera ), 'preview components receive the mapped destination camera' );
-assert.deepEqual( previewDeltas.map( ( [ dt ] ) => dt ), [ 0, 0.1, 0.1, 0 ], 'all preview components receive the bounded animation delta' );
+const portalViewDeltas = [];
+const portalViewCamera = {};
+const portalViewComponents = [ { update( dt, camera ) { portalViewDeltas.push( [ dt, camera ] ); } }, {} ];
+assert.equal( updatePortalViewComponents( portalViewComponents, 1000, -Infinity, portalViewCamera ), 0, 'first portal view starts without a synthetic time jump' );
+assert.ok( Math.abs( updatePortalViewComponents( portalViewComponents, 1016.667, 1000, portalViewCamera ) - 1 / 60 ) < 0.00001, 'portal components advance at the rendered frame cadence' );
+assert.equal( updatePortalViewComponents( portalViewComponents, 5000, 1016.667, portalViewCamera ), 0.1, 'portal component delta is capped after a hidden or paused interval' );
+assert.equal( updatePortalViewComponents( portalViewComponents, 4900, 5000, portalViewCamera ), 0, 'out-of-order portal timestamps do not reverse component time' );
+assert.equal( updatePortalViewComponents( portalViewComponents, 1016.667, 1000, portalViewCamera, true ), 0, 'shared active-world components update for the portal camera without advancing simulation twice' );
+assert.ok( portalViewDeltas.every( ( [ _dt, camera ] ) => camera === portalViewCamera ), 'portal view components receive the mapped destination camera' );
+assert.deepEqual( portalViewDeltas.map( ( [ dt ] ) => +dt.toFixed( 6 ) ), [ 0, 0.016667, 0.1, 0, 0 ], 'portal view components receive the bounded per-frame delta' );
 const sequentialFailoverGrants = [
 	{ peerId: '12D3KooWAbcdefghijk1234567890123456', scopes: [ 'failover-authority' ], expiresAt: 2000, epoch: 1, failoverAfter: 1000, failoverSeconds: 60 },
 	{ peerId: '12D3KooWAbcdefghijk1234567890123457', scopes: [ 'failover-authority' ], expiresAt: 2000, epoch: 1, failoverAfter: 1060, failoverSeconds: 60 },
@@ -67,7 +68,7 @@ for ( const verticalSpeed of [ 4.6, - 9.81, 0 ] ) {
 
 
 const preview = { position: { set( x, y, z ) { this.x = x; this.y = y; this.z = z; } }, rotation: { y: 0 } };
-alignPortalPreview( preview, { position: [ 10, 2, 20 ], yaw: Math.PI / 2 }, { position: [ 3, 4, 5 ], yaw: 0 } );
+alignPortalView( preview, { position: [ 10, 2, 20 ], yaw: Math.PI / 2 }, { position: [ 3, 4, 5 ], yaw: 0 } );
 assert.ok( Math.abs( preview.position.x - 5 ) < 1e-9 && Math.abs( preview.position.y + 2 ) < 1e-9 && Math.abs( preview.position.z - 23 ) < 1e-9, 'preview aligns destination exit position with the local portal entry' );
 assert.ok( Math.abs( preview.rotation.y - Math.PI / 2 ) < 1e-9, 'preview aligns destination exit orientation with the local portal entry' );
 
@@ -95,12 +96,12 @@ const clippedShader = buildMeshShader( new Material( { lit: false } ), [ { name:
 assert.match( clippedShader.code, /frame\.portalClipPlane/, 'portal render pipelines discard fragments using the per-view exit plane' );
 
 const source = {
-	protocol: 'tidewater.world-source/2', worldId: 'tw-world:source', title: 'Source',
+	protocol: 'elsemesh.world-source/3', worldId: 'elsemesh:source', title: 'Source',
 	coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
-	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'tidewater-default' },
+	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 	objects: [], updatedAt: '2026-09-30T12:00:00Z',
 	portals: [ {
-		id: 'tw-portal:door', destinationWorldId: 'tw-world:destination', destinationPeerId: '12D3KooW12345678901234567890',
+		id: 'elsemesh-portal:door', destinationWorldId: 'elsemesh:destination', destinationPeerId: '12D3KooW12345678901234567890',
 		destinationGateway: 'https://world.example', entry: { position: [ 0, 0, 0 ], yaw: 0 },
 		exit: { position: [ 0, 0, 0 ], yaw: 0 }, openView: true, enabled: true,
 	} ],
@@ -113,18 +114,18 @@ delete discoveredSourcePortal.destinationPeerId;
 assert.doesNotThrow( () => validateWorldSource( { ...source, portals: [ discoveredSourcePortal ] } ), 'portal can resolve providers by stable destination world ID' );
 assert.throws( () => validateWorldSource( { ...source, portals: [ { ...discoveredSourcePortal, destinationPeerId: 'invalid' } ] } ), /Invalid or duplicate portal record/, 'portal rejects malformed optional provider identities' );
 assert.throws( () => validateWorldSource( { ...source, portals: [ { ...source.portals[ 0 ], destinationGateway: 'http://world.example' } ] } ), 'insecure destination gateways must be rejected' );
-const runtimePortal = { id: 'tw-portal:runtime-door', destinationWorldId: 'tw-world:destination', destinationPeerId: '12D3KooW12345678901234567890', entry: { position: [ 0, 0, 0 ], yaw: 0 }, exit: { position: [ 0, 0, 0 ], yaw: 0 }, openView: true, enabled: true };
-const runtimeIDs = new Set( [ 'tw-object:asset' ] );
+const runtimePortal = { id: 'elsemesh-portal:runtime-door', destinationWorldId: 'elsemesh:destination', destinationPeerId: '12D3KooW12345678901234567890', entry: { position: [ 0, 0, 0 ], yaw: 0 }, exit: { position: [ 0, 0, 0 ], yaw: 0 }, openView: true, enabled: true };
+const runtimeIDs = new Set( [ 'elsemesh-object:asset' ] );
 assert.doesNotThrow( () => validateWorldPortals( [ runtimePortal ], runtimeIDs ), 'browser accepts a valid signed portal' );
 assert.doesNotThrow( () => validateWorldPortals( [ { ...runtimePortal, visual: 'stone' } ] ), 'browser accepts signed portal frame styles' );
 assert.throws( () => validateWorldPortals( [ { ...runtimePortal, visual: 'glass' } ] ), /unsupported visual style/, 'browser rejects unknown signed portal frame styles' );
 const discoverableRuntimePortal = { ...runtimePortal };
 delete discoverableRuntimePortal.destinationPeerId;
 assert.doesNotThrow( () => validateWorldPortals( [ discoverableRuntimePortal ] ), 'browser permits world-ID discovery when the portal does not pin a provider' );
-assert.throws( () => validateWorldPortals( [ { ...runtimePortal, id: 'tw-object:asset' } ], new Set( [ 'tw-object:asset' ] ) ), /duplicate portal ID/, 'browser rejects cross-kind entity ID collisions' );
+assert.throws( () => validateWorldPortals( [ { ...runtimePortal, id: 'elsemesh-object:asset' } ], new Set( [ 'elsemesh-object:asset' ] ) ), /duplicate portal ID/, 'browser rejects cross-kind entity ID collisions' );
 assert.throws( () => validateWorldPortals( [ { ...runtimePortal, destinationGateway: 'http://world.example' } ] ), /destination gateway/, 'browser rejects insecure portal gateways' );
 const framedWorld = await loadWorldPackage( {
-	worldId: 'tw-world:framed', manifest: { objects: [], components: [], portals: [ { ...runtimePortal, visual: 'timber' } ] },
+	worldId: 'elsemesh:framed', manifest: { objects: [], components: [], portals: [ { ...runtimePortal, visual: 'timber' } ] },
 }, { assets: new Map() } );
 const portalFrame = framedWorld.children.find( ( child ) => child.userData.worldPortalFrame === runtimePortal.id );
 assert.ok( portalFrame, 'authored portal frame is included in the portable world scene' );
@@ -135,13 +136,13 @@ assert.deepEqual( portalFrame.children.map( ( child ) => child.geometry.paramete
 	{ width: 2.78, height: 0.18, depth: 0.28, widthSegments: 1, heightSegments: 1, depthSegments: 1 },
 ], 'portal frame geometry leaves the opening clear and surrounds the preview aperture' );
 disposeWorldPackage( framedWorld );
-assert.throws( () => validateWorldComponents( [ { id: 'tw-component:duplicate', type: 'tidewater.procedural-island-vegetation/1', seed: 7 } ], { requiredFeatures: [ 'tidewater.procedural-island-vegetation/1' ] }, new Set( [ 'tw-component:duplicate' ] ) ), /duplicate component ID/, 'browser rejects duplicate IDs across entity kinds' );
-const islandOcean = { id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' };
+assert.throws( () => validateWorldComponents( [ { id: 'elsemesh-component:duplicate', type: 'elsemesh.procedural-island-vegetation/1', seed: 7 } ], { requiredFeatures: [ 'elsemesh.procedural-island-vegetation/1' ] }, new Set( [ 'elsemesh-component:duplicate' ] ) ), /duplicate component ID/, 'browser rejects duplicate IDs across entity kinds' );
+const islandOcean = { id: 'elsemesh-component:island-ocean', type: 'elsemesh.island-ocean/1', priority: 'portal-preview' };
 assert.doesNotThrow( () => validateWorldComponents( [ islandOcean ], { requiredFeatures: [ islandOcean.type ] } ), 'browser accepts the versioned example-island ocean component' );
 assert.doesNotThrow( () => validateWorldRequirements( { rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1, physicsProfile: 'default', requiredFeatures: [ islandOcean.type ] } } ), 'browser recognizes the example-ocean runtime capability' );
 assert.throws( () => validateWorldComponents( [ { ...islandOcean, seaLevel: 3 } ], { requiredFeatures: [ islandOcean.type ] } ), /Unsupported or invalid world component/, 'browser rejects undeclared island-ocean parameters' );
-assert.throws( () => validateWorldComponents( [ islandOcean, { ...islandOcean, id: 'tw-component:island-ocean-copy' } ], { requiredFeatures: [ islandOcean.type ] } ), /only one island ocean/, 'browser rejects duplicate infinite ocean components' );
-const waterBody = { id: 'tw-component:water-body', type: 'tidewater.water-body/1', center: [ -20, 45 ], extent: 256, priority: 'visible' };
+assert.throws( () => validateWorldComponents( [ islandOcean, { ...islandOcean, id: 'elsemesh-component:island-ocean-copy' } ], { requiredFeatures: [ islandOcean.type ] } ), /only one island ocean/, 'browser rejects duplicate infinite ocean components' );
+const waterBody = { id: 'elsemesh-component:water-body', type: 'elsemesh.water-body/1', center: [ -20, 45 ], extent: 256, priority: 'visible' };
 const waterRules = { seaLevel: 3, requiredFeatures: [ waterBody.type ] };
 assert.doesNotThrow( () => validateWorldComponents( [ waterBody ], waterRules ), 'browser accepts a bounded terrain-independent deep-water component' );
 assert.doesNotThrow( () => validateWorldComponents( [ { ...waterBody, profile: 'calm-lagoon' } ], waterRules ), 'browser accepts a named water profile' );
@@ -149,14 +150,14 @@ assert.throws( () => validateWorldComponents( [ { ...waterBody, profile: 'custom
 assert.throws( () => validateWorldComponents( [ waterBody ], { ...waterRules, seaLevel: undefined } ), /requires seaLevel/, 'portable water requires a declared world sea level' );
 assert.throws( () => validateWorldComponents( [ { ...waterBody, extent: 7 } ], waterRules ), /Unsupported or invalid world component/, 'portable water enforces a useful bounded extent' );
 assert.throws( () => validateWorldComponents( [ { ...waterBody, center: [ 1000000, 0 ] } ], waterRules ), /Unsupported or invalid world component/, 'portable water bounds the full square inside world coordinate limits' );
-const fourWaterBodies = [ -900, -300, 300, 900 ].map( ( x, index ) => ( { ...waterBody, id: `tw-component:water-${index + 1}`, center: [ x, 0 ], extent: 100 } ) );
+const fourWaterBodies = [ -900, -300, 300, 900 ].map( ( x, index ) => ( { ...waterBody, id: `elsemesh-component:water-${index + 1}`, center: [ x, 0 ], extent: 100 } ) );
 assert.doesNotThrow( () => validateWorldComponents( fourWaterBodies, waterRules ), 'browser accepts four non-overlapping portable water bodies' );
-assert.throws( () => validateWorldComponents( [ ...fourWaterBodies, { ...fourWaterBodies[ 3 ], id: 'tw-component:water-5', center: [ 1500, 0 ] } ], waterRules ), /at most four/, 'browser limits worlds to four portable water bodies' );
-assert.throws( () => validateWorldComponents( [ waterBody, { ...waterBody, id: 'tw-component:overlap', center: [ 120, 45 ] } ], waterRules ), /bounds cannot overlap/, 'browser rejects overlapping portable water bounds' );
+assert.throws( () => validateWorldComponents( [ ...fourWaterBodies, { ...fourWaterBodies[ 3 ], id: 'elsemesh-component:water-5', center: [ 1500, 0 ] } ], waterRules ), /at most four/, 'browser limits worlds to four portable water bodies' );
+assert.throws( () => validateWorldComponents( [ waterBody, { ...waterBody, id: 'elsemesh-component:overlap', center: [ 120, 45 ] } ], waterRules ), /bounds cannot overlap/, 'browser rejects overlapping portable water bounds' );
 assert.throws( () => validateWorldComponents( [ waterBody, islandOcean ], { ...waterRules, requiredFeatures: [ waterBody.type, islandOcean.type ] } ), /combine portable water and island-ocean|cannot be combined/, 'portable water cannot silently stack with island-specific water' );
 const boatAssetID = `sha256:${'c'.repeat( 64 )}`;
-const boatBerth = { id: 'tw-object:boat-berth', kind: 'asset-instance', label: 'Boat berth', assetId: boatAssetID, priority: 'portal-preview', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } };
-const hostedBoat = { id: 'tw-component:hosted-boat', type: 'tidewater.downeast-boat/1', objectId: boatBerth.id, priority: 'portal-preview' };
+const boatBerth = { id: 'elsemesh-object:boat-berth', kind: 'asset-instance', label: 'Boat berth', assetId: boatAssetID, priority: 'portal-preview', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } };
+const hostedBoat = { id: 'elsemesh-component:hosted-boat', type: 'elsemesh.downeast-boat/1', objectId: boatBerth.id, priority: 'portal-preview' };
 const boatWorldRules = { seaLevel: 0, requiredFeatures: [ islandOcean.type, hostedBoat.type ] };
 const boatAssets = [ { id: boatAssetID, kind: 'glb', priority: 'portal-preview', bytes: 10 } ];
 assert.doesNotThrow( () => validateWorldComponents( [ islandOcean, hostedBoat ], boatWorldRules, new Set(), boatAssets, [ boatBerth ] ), 'browser accepts a signed boat component linked to a staged collision-free berth preview' );
@@ -168,12 +169,12 @@ assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ hostedBoat.type ] }, objects: [ boatBerth ], components: [ hostedBoat ] } ), /requires seaLevel and a declared water renderer/, 'authoring requires a world sea level and water renderer for a boat' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: [ waterBody ] } ), 'authoring source accepts portable bounded deep water' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: fourWaterBodies } ), 'authoring accepts four non-overlapping portable water bodies' );
-assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: [ ...fourWaterBodies, { ...fourWaterBodies[ 3 ], id: 'tw-component:water-5', center: [ 1500, 0 ] } ] } ), /at most four/, 'authoring enforces the portable water body limit' );
-assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: [ waterBody, { ...waterBody, id: 'tw-component:overlap', center: [ 120, 45 ] } ] } ), /bounds cannot overlap/, 'authoring rejects overlapping portable water bounds' );
+assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: [ ...fourWaterBodies, { ...fourWaterBodies[ 3 ], id: 'elsemesh-component:water-5', center: [ 1500, 0 ] } ] } ), /at most four/, 'authoring enforces the portable water body limit' );
+assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: [ waterBody, { ...waterBody, id: 'elsemesh-component:overlap', center: [ 120, 45 ] } ] } ), /bounds cannot overlap/, 'authoring rejects overlapping portable water bounds' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, seaLevel: 3, requiredFeatures: [ waterBody.type ] }, components: [ { ...waterBody, profile: 'storm' } ] } ), 'authoring accepts a named storm profile' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ waterBody.type ] }, components: [ waterBody ] } ), /requires seaLevel/, 'authoring requires a world sea level for portable water' );
 const placementAssetId = `sha256:${'a'.repeat( 64 )}`;
-const vegetationComponent = { id: 'tw-component:portable-vegetation', type: 'tidewater.procedural-island-vegetation/1', seed: 7, placementAssetId };
+const vegetationComponent = { id: 'elsemesh-component:portable-vegetation', type: 'elsemesh.procedural-island-vegetation/1', seed: 7, placementAssetId };
 const placementAsset = [ { id: placementAssetId, kind: 'vegetation-placement/1', priority: 'portal-preview' } ];
 assert.doesNotThrow( () => validateWorldComponents( [ vegetationComponent ], { requiredFeatures: [ vegetationComponent.type ] }, new Set(), placementAsset ), 'browser accepts a declared JSON placement asset available for portal preview' );
 assert.throws( () => validateWorldComponents( [ vegetationComponent ], { requiredFeatures: [ vegetationComponent.type ] }, new Set(), [] ), /placement asset reference/, 'browser rejects a component that points at undeclared placement data' );
@@ -182,7 +183,7 @@ assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules,
 const portablePlacements = { villagePalms: 0, ...Object.fromEntries( VEGETATION_PLACEMENT_KINDS.map( ( kind ) => [ kind, [] ] ) ) };
 const portablePlacementBytes = encodeVegetationPlacements( portablePlacements, 12345 );
 assert.deepEqual( decodeVegetationPlacements( portablePlacementBytes ), portablePlacements, 'terrain-independent placement data accepts its own deterministic embedded seed' );
-const staticVegetation = { id: 'tw-component:static-foliage', type: 'tidewater.static-vegetation/1', placementAssetId };
+const staticVegetation = { id: 'elsemesh-component:static-foliage', type: 'elsemesh.static-vegetation/1', placementAssetId };
 assert.doesNotThrow( () => validateWorldComponents( [ staticVegetation ], { requiredFeatures: [ staticVegetation.type ] }, new Set(), placementAsset ), 'browser accepts portable world-space foliage placements' );
 assert.throws( () => validateWorldComponents( [ { id: staticVegetation.id, type: staticVegetation.type } ], { requiredFeatures: [ staticVegetation.type ] } ), /requires placement data/, 'browser requires a placement asset for static vegetation' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticVegetation.type ] }, components: [ staticVegetation ] } ), 'authoring accepts portable static vegetation without island-only seed fields' );
@@ -192,41 +193,41 @@ assert.doesNotThrow( () => validateWorldComponents( [ boundedStaticVegetation ],
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticVegetation.type ] }, components: [ boundedStaticVegetation ] } ), 'authoring accepts signed world-space bounds on component data' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticVegetation.type ] }, components: [ { ...boundedStaticVegetation, streamingBounds: { center: [ 0, 0 ], radius: 0 } } ] } ), /Invalid or duplicate world component/, 'authoring rejects malformed component bounds' );
 assert.throws( () => validateWorldComponents( [ boundedStaticVegetation ], { requiredFeatures: [ staticVegetation.type ] }, new Set(), placementAsset ), /placement asset reference/, 'browser rejects component data whose component and asset priorities disagree' );
-const staticReef = { id: 'tw-component:reef-tile', type: 'tidewater.static-reef/1', priority: 'visible', placementAssetId: 'sha256:' + '3'.repeat( 64 ), streamingBounds: { center: [ 1, -4, 8 ], radius: 32 } };
+const staticReef = { id: 'elsemesh-component:reef-tile', type: 'elsemesh.static-reef/1', priority: 'visible', placementAssetId: 'sha256:' + '3'.repeat( 64 ), streamingBounds: { center: [ 1, -4, 8 ], radius: 32 } };
 assert.doesNotThrow( () => validateWorldComponents( [ staticReef ], { requiredFeatures: [ staticReef.type ] }, new Set(), [ { id: staticReef.placementAssetId, kind: 'reef-placement/1', priority: 'visible' } ] ), 'browser validates reef placement assets and bounded component tiers' );
 assert.throws( () => validateWorldComponents( [ staticReef ], { requiredFeatures: [ staticReef.type ] }, new Set(), [ { id: staticReef.placementAssetId, kind: 'vegetation-placement/1', priority: 'visible' } ] ), /placement asset reference/, 'reef components cannot consume vegetation placement assets' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticReef.type ] }, components: [ staticReef ] } ), 'authoring accepts bounded static reef tiles' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticReef.type ] }, components: [ { ...staticReef, streamingBounds: undefined } ] } ), /Invalid or duplicate world component/, 'authoring requires streaming bounds for large static reef data' );
-const staticFishProps = { id: 'tw-component:fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: `sha256:${'4'.repeat( 64 )}`, streamingBounds: { center: [ 1, 2, 3 ], radius: 8 } };
+const staticFishProps = { id: 'elsemesh-component:fish-props', type: 'elsemesh.static-fish-props/1', priority: 'visible', placementAssetId: `sha256:${'4'.repeat( 64 )}`, streamingBounds: { center: [ 1, 2, 3 ], radius: 8 } };
 const fishPropsAsset = [ { id: staticFishProps.placementAssetId, kind: 'fish-props-placement/1', priority: 'visible', bytes: 1024 } ];
 assert.doesNotThrow( () => validateWorldComponents( [ staticFishProps ], { requiredFeatures: [ staticFishProps.type ] }, new Set(), fishPropsAsset ), 'browser accepts bounded trusted fish-prop placement data' );
 assert.throws( () => validateWorldComponents( [ staticFishProps ], { requiredFeatures: [ staticFishProps.type ] }, new Set(), [ { ...fishPropsAsset[ 0 ], kind: 'reef-placement/1' } ] ), /placement asset reference/, 'fish props cannot consume another renderer asset kind' );
 assert.throws( () => validateWorldComponents( [ staticFishProps ], { requiredFeatures: [ staticFishProps.type ] }, new Set(), [ { ...fishPropsAsset[ 0 ], bytes: 16 * 1024 * 1024 + 1 } ] ), /bounded placement asset/, 'fish-prop asset size is bounded in the browser' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticFishProps.type ] }, components: [ staticFishProps ] } ), 'authoring accepts bounded static fish-prop data' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ staticFishProps.type ] }, components: [ { ...staticFishProps, streamingBounds: undefined } ] } ), /Invalid or duplicate world component/, 'authoring requires streaming bounds for fish-prop data' );
-const terrainFallback = { id: 'tw-object:terrain-fallback', kind: 'asset-instance', label: 'Terrain fallback', assetId: `sha256:${'a'.repeat( 64 )}`, transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } };
-const terrainSurface = { id: 'tw-component:terrain-surface', type: 'tidewater.terrain-surface/1', profile: 'example-island-v1', priority: 'visible', objectId: terrainFallback.id, dataAssetId: `sha256:${'b'.repeat( 64 )}` };
-const wildlife = { id: 'tw-component:wildlife', type: 'tidewater.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'visible', streamingBounds: { center: [ 0, -4, 0 ], radius: 300 }, roofPerches: [ [ 1, 4, 2 ] ], footprints: [ { x: 1, z: 2, r: 3 } ] };
+const terrainFallback = { id: 'elsemesh-object:terrain-fallback', kind: 'asset-instance', label: 'Terrain fallback', assetId: `sha256:${'a'.repeat( 64 )}`, transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } };
+const terrainSurface = { id: 'elsemesh-component:terrain-surface', type: 'elsemesh.terrain-surface/1', profile: 'example-island-v1', priority: 'visible', objectId: terrainFallback.id, dataAssetId: `sha256:${'b'.repeat( 64 )}` };
+const wildlife = { id: 'elsemesh-component:wildlife', type: 'elsemesh.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'visible', streamingBounds: { center: [ 0, -4, 0 ], radius: 300 }, roofPerches: [ [ 1, 4, 2 ] ], footprints: [ { x: 1, z: 2, r: 3 } ] };
 const wildlifeFeatures = [ terrainSurface.type, wildlife.type ];
 const wildlifeAssets = [ { id: terrainSurface.dataAssetId, kind: 'terrain-surface/1', priority: 'visible', bytes: 256 } ];
 assert.doesNotThrow( () => validateWorldComponents( [ wildlife, terrainSurface ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), wildlifeAssets, [ terrainFallback ] ), 'browser accepts wildlife with a later-listed packaged terrain dependency' );
 assert.throws( () => validateWorldComponents( [ wildlife ], { requiredFeatures: wildlifeFeatures } ), /requires a packaged terrain surface/, 'browser rejects wildlife without its terrain surface' );
 assert.throws( () => validateWorldComponents( [ { ...terrainSurface, priority: 'background' }, wildlife ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), [ { ...wildlifeAssets[ 0 ], priority: 'background' } ], [ terrainFallback ] ), /cannot stream before its terrain surface/, 'browser rejects wildlife that streams before terrain' );
-assert.throws( () => validateWorldComponents( [ terrainSurface, { ...terrainSurface, id: 'tw-component:terrain-copy' }, wildlife ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), wildlifeAssets, [ terrainFallback ] ), /at most one packaged terrain surface/, 'browser rejects duplicate terrain surfaces' );
-assert.throws( () => validateWorldComponents( [ terrainSurface, wildlife, { ...wildlife, id: 'tw-component:wildlife-copy' } ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), wildlifeAssets, [ terrainFallback ] ), /at most one Example Island wildlife/, 'browser rejects duplicate wildlife components' );
+assert.throws( () => validateWorldComponents( [ terrainSurface, { ...terrainSurface, id: 'elsemesh-component:terrain-copy' }, wildlife ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), wildlifeAssets, [ terrainFallback ] ), /at most one packaged terrain surface/, 'browser rejects duplicate terrain surfaces' );
+assert.throws( () => validateWorldComponents( [ terrainSurface, wildlife, { ...wildlife, id: 'elsemesh-component:wildlife-copy' } ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), wildlifeAssets, [ terrainFallback ] ), /at most one Example Island wildlife/, 'browser rejects duplicate wildlife components' );
 assert.throws( () => validateWorldComponents( [ terrainSurface, { ...wildlife, unsupported: true } ], { requiredFeatures: wildlifeFeatures }, new Set( [ terrainFallback.id ] ), wildlifeAssets, [ terrainFallback ] ), /Unsupported or invalid world component/, 'browser rejects unrecognized wildlife controls' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ terrainSurface, wildlife ] } ), 'authoring accepts the portable wildlife profile and terrain dependency' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ wildlife ] } ), /requires a packaged terrain surface/, 'authoring rejects a wildlife component without terrain data' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ { ...terrainSurface, priority: 'background' }, wildlife ] } ), /cannot stream before its terrain surface/, 'authoring rejects invalid wildlife streaming order' );
-assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ terrainSurface, { ...terrainSurface, id: 'tw-component:terrain-copy' }, wildlife ] } ), /at most one packaged terrain surface/, 'authoring rejects duplicate terrain surfaces' );
-assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ terrainSurface, wildlife, { ...wildlife, id: 'tw-component:wildlife-copy' } ] } ), /at most one Example Island wildlife/, 'authoring rejects duplicate wildlife components' );
+assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ terrainSurface, { ...terrainSurface, id: 'elsemesh-component:terrain-copy' }, wildlife ] } ), /at most one packaged terrain surface/, 'authoring rejects duplicate terrain surfaces' );
+assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: wildlifeFeatures }, objects: [ terrainFallback ], components: [ terrainSurface, wildlife, { ...wildlife, id: 'elsemesh-component:wildlife-copy' } ] } ), /at most one Example Island wildlife/, 'authoring rejects duplicate wildlife components' );
 const pierCollision = { ...terrainFallback, collision: { shape: 'compound', enabled: true, boxes: [ { center: [ 0, 1, 0 ], halfExtents: [ 1, 0.1, 2 ], yaw: 0, walkable: false, solid: true, tag: 'pierRail' } ] } };
 assert.doesNotThrow( () => validateWorldObjects( [ pierCollision ] ), 'browser accepts the documented pier-rail semantic tag' );
 const unknownPierCollision = structuredClone( pierCollision );
 unknownPierCollision.collision.boxes[ 0 ].tag = 'arbitrary';
 assert.throws( () => validateWorldObjects( [ unknownPierCollision ] ), /invalid collision bounds/, 'browser rejects unrecognized compound collision tags' );
 const whaleAssetIDs = [ '5', '6', '7', '8' ].map( digit => `sha256:${digit.repeat( 64 )}` );
-const humpback = { id: 'tw-component:humpback', type: 'tidewater.humpback-whale/1', profile: 'example-island-humpback-v1', priority: 'visible', streamingBounds: { center: [ 0, -4, 200 ], radius: 250 }, modelAssetId: whaleAssetIDs[ 0 ], geometryAssetId: whaleAssetIDs[ 1 ], albedoAssetId: whaleAssetIDs[ 2 ], heightAssetId: whaleAssetIDs[ 3 ], route: [ [ 70, 300 ], [ 60, 200 ], [ 35, 120 ], [ 5, 88 ] ], seed: 1, surfaceAt: 0.25, cruiseSpeed: 2.6, surfaceSpeed: 1.5 };
+const humpback = { id: 'elsemesh-component:humpback', type: 'elsemesh.humpback-whale/1', profile: 'example-island-humpback-v1', priority: 'visible', streamingBounds: { center: [ 0, -4, 200 ], radius: 250 }, modelAssetId: whaleAssetIDs[ 0 ], geometryAssetId: whaleAssetIDs[ 1 ], albedoAssetId: whaleAssetIDs[ 2 ], heightAssetId: whaleAssetIDs[ 3 ], route: [ [ 70, 300 ], [ 60, 200 ], [ 35, 120 ], [ 5, 88 ] ], seed: 1, surfaceAt: 0.25, cruiseSpeed: 2.6, surfaceSpeed: 1.5 };
 const whaleAssets = [ 'whale-model/1', 'whale-geometry/1', 'whale-albedo/1', 'whale-height/1' ].map( ( kind, index ) => ( { id: whaleAssetIDs[ index ], kind, priority: 'visible', bytes: 1024 } ) );
 assert.doesNotThrow( () => validateWorldComponents( [ humpback ], { requiredFeatures: [ humpback.type ] }, new Set(), whaleAssets ), 'browser accepts explicit whale behavior and four staged model inputs' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ humpback.type ] }, components: [ humpback ] } ), 'authoring accepts portable whale route, seed, and motion parameters' );
@@ -235,7 +236,7 @@ assert.throws( () => validateWorldComponents( [ humpback ], { requiredFeatures: 
 assert.throws( () => validateWorldComponents( [ { ...humpback, route: [ [ 0, 0 ], [ 1, Infinity ], [ 2, 2 ], [ 3, 3 ] ] } ], { requiredFeatures: [ humpback.type ] }, new Set(), whaleAssets ), /Unsupported or invalid world component/, 'browser rejects non-finite whale route coordinates' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ humpback.type ] }, components: [ { ...humpback, extra: true } ] } ), /Invalid or duplicate world component/, 'authoring rejects unknown whale fields' );
 const audioAssetID = `sha256:${'b'.repeat( 64 )}`;
-const ambientAudio = { id: 'tw-component:forest-ambience', type: 'tidewater.ambient-audio/1', priority: 'portal-preview', beds: [ { assetId: audioAssetID, gain: 0.4, condition: 'night', position: [ 0, 2, 4 ], refDistance: 2, rolloff: 1 } ] };
+const ambientAudio = { id: 'elsemesh-component:forest-ambience', type: 'elsemesh.ambient-audio/1', priority: 'portal-preview', beds: [ { assetId: audioAssetID, gain: 0.4, condition: 'night', position: [ 0, 2, 4 ], refDistance: 2, rolloff: 1 } ] };
 const audioAsset = [ { id: audioAssetID, kind: 'audio/ogg', priority: 'portal-preview', bytes: 64 } ];
 assert.doesNotThrow( () => validateWorldComponents( [ ambientAudio ], { requiredFeatures: [ ambientAudio.type ] }, new Set(), audioAsset ), 'browser accepts signed ambient audio referencing a staged OGG asset' );
 assert.throws( () => validateWorldComponents( [ ambientAudio ], { requiredFeatures: [ ambientAudio.type ] }, new Set(), [ { ...audioAsset[ 0 ], kind: 'glb' } ] ), /Unsupported or invalid world component/, 'ambient audio cannot reference non-audio assets' );
@@ -243,27 +244,27 @@ assert.throws( () => validateWorldComponents( [ ambientAudio ], { requiredFeatur
 assert.throws( () => validateWorldComponents( [ { ...ambientAudio, beds: [ { ...ambientAudio.beds[ 0 ], url: 'https://example.invalid/audio.ogg' } ] } ], { requiredFeatures: [ ambientAudio.type ] }, new Set(), audioAsset ), /Unsupported or invalid world component/, 'browser rejects untrusted URL fields on ambient beds' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ ambientAudio.type ] }, components: [ ambientAudio ] } ), 'authoring accepts the versioned portable ambience data' );
 assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, requiredFeatures: [ ambientAudio.type ] }, components: [ { ...ambientAudio, beds: [ { ...ambientAudio.beds[ 0 ], condition: 'storm' } ] } ] } ), /Invalid or duplicate world component/, 'authoring rejects conditions without runtime semantics' );
-const directoryLink = worldLinkFromLocation( { search: '?worldId=tw-world:coast&directory=https%3A%2F%2Fthruhold.org', origin: 'https://rebroad.github.io' } );
+const directoryLink = worldLinkFromLocation( { search: '?worldId=elsemesh:coast&directory=https%3A%2F%2Fthruhold.org', origin: 'https://rebroad.github.io' } );
 assert.equal( directoryLink.directory, 'https://thruhold.org', 'browser link can opt into the community directory' );
 const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';
-const pairedLink = worldLinkFromLocation( { search: `?worldId=tw-world:coast&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fdesktop.example&nodeId=${backupPeerId}&gateway=wss%3A%2F%2Fflip.example`, origin: 'https://rebroad.github.io' } );
+const pairedLink = worldLinkFromLocation( { search: `?worldId=elsemesh:coast&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fdesktop.example&nodeId=${backupPeerId}&gateway=wss%3A%2F%2Fflip.example`, origin: 'https://rebroad.github.io' } );
 assert.deepEqual( pairedLink.providers, [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ], 'browser links preserve each peer identity with its own secure gateway' );
-assert.throws( () => new WorldConnector( { worldId: 'tw-world:coast', directory: 'http://thruhold.org' } ), 'directory endpoints must use HTTPS' );
+assert.throws( () => new WorldConnector( { worldId: 'elsemesh:coast', directory: 'http://thruhold.org' } ), 'directory endpoints must use HTTPS' );
 const invite = createWorldInviteURL( {
 	pageURL: 'https://rebroad.github.io/tidewater/?noVeg=1',
-	worldId: 'tw-world:coast',
+	worldId: 'elsemesh:coast',
 	nodeId: '12D3KooWAbcdefghijk1234567890123456',
 	gateway: 'https://coast.example',
 	directory: 'https://thruhold.org',
 } );
 const inviteURL = new URL( invite );
 assert.equal( inviteURL.pathname, '/tidewater/', 'world invitations preserve the game base path' );
-assert.equal( inviteURL.searchParams.get( 'worldId' ), 'tw-world:coast', 'world invitations carry the stable world ID' );
+assert.equal( inviteURL.searchParams.get( 'worldId' ), 'elsemesh:coast', 'world invitations carry the stable world ID' );
 assert.equal( inviteURL.searchParams.get( 'nodeId' ), '12D3KooWAbcdefghijk1234567890123456', 'world invitations pin a signed provider identity' );
 assert.equal( inviteURL.searchParams.get( 'gateway' ), 'https://coast.example', 'world invitations carry the provider gateway' );
 assert.equal( inviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'world invitations retain optional decentralized discovery' );
 assert.equal( inviteURL.searchParams.get( 'noVeg' ), '1', 'world invitations preserve unrelated client options' );
-const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://rebroad.github.io/', worldId: 'tw-world:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
+const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://rebroad.github.io/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
 assert.deepEqual( redundantInvite.searchParams.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
-assert.throws( () => createWorldInviteURL( { pageURL: 'https://rebroad.github.io/tidewater/', worldId: 'tw-world:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );
+assert.throws( () => createWorldInviteURL( { pageURL: 'https://rebroad.github.io/tidewater/', worldId: 'elsemesh:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );
 console.log( 'ok   portal crossing geometry and orientation handoff' );

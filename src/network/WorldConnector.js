@@ -4,6 +4,8 @@ import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
 import { verifySignedDocument } from './SignedDocument.js';
+import { validateWorldExtensions } from './WorldExtensionHost.js';
+import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
 
@@ -66,7 +68,7 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 }
 
 export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, nodeId, gateway, providers = [], directory = '' } = {} ) {
-	invariant( /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ), 'A valid worldId is required for an invite' );
+		invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
 	url.searchParams.set( 'worldId', worldId );
@@ -94,7 +96,7 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 
 export class WorldConnector {
 	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES } = {} ) {
-		invariant( /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
+		invariant( isWorldID( worldId ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
 		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && directory, 'ZeroTier lookup requires a valid node ID, network ID, and HTTPS resolver' );
@@ -138,7 +140,7 @@ export class WorldConnector {
 			invariant( candidates.length > 0, 'ZeroTier node does not advertise the requested ThruHold' );
 			this.providers = candidates.map( ( provider ) => ( { nodeId: provider.nodeId, gateway: provider.gateway } ) );
 		}
-		invariant( /^tw-world:[\w.-]{1,128}$/.test( this.worldId || '' ), 'A valid worldId is required' );
+		invariant( isWorldID( this.worldId ), 'A valid worldId is required' );
 		let lastError = null;
 		const attempted = new Set( excludeProviders );
 		for ( const provider of this.providers ) {
@@ -207,7 +209,7 @@ export class WorldConnector {
 		invariant( this.manifest.worldId === this.worldId, 'Manifest belongs to another world' );
 		this.authorityLease = null;
 		if ( reply.authorityLease ) {
-			await verifySignedDocument( reply.authorityLease, 'tidewater.authority/2' );
+			await verifySignedDocument( reply.authorityLease, 'elsemesh.authority/2' );
 			const lease = reply.authorityLease.payload;
 			invariant( lease.worldId === this.worldId && lease.authorityPeerId === reply.authorityLease.signer && Number.isSafeInteger( lease.grantEpoch ) && lease.grantEpoch > 0 && Number.isSafeInteger( lease.epoch ) && lease.epoch === this.manifest.authorityEpoch + 1 && Number.isSafeInteger( lease.notBefore ) && lease.notBefore > 0 && Number.isSafeInteger( lease.expiresAt ) && lease.expiresAt > lease.notBefore && Date.now() / 1000 >= lease.notBefore && Date.now() / 1000 < lease.expiresAt, 'Authority lease is not valid for this world at the current time' );
 			const grant = this.manifest.hosts?.find( ( entry ) => entry.peerId === lease.authorityPeerId && entry.scopes.includes( 'failover-authority' ) && entry.epoch === lease.grantEpoch && entry.failoverAfter === lease.notBefore && entry.expiresAt >= lease.expiresAt && lease.expiresAt <= entry.failoverAfter + entry.failoverSeconds );
@@ -243,11 +245,11 @@ export class WorldConnector {
 		const providers = [];
 		for ( const document of result.providers ) {
 			throwIfAborted( signal );
-			try { await verifySignedDocument( document, 'tidewater.node/1' ); }
+			try { await verifySignedDocument( document, 'elsemesh.node/1' ); }
 			catch { continue; }
 			const node = document.payload;
 			const now = Date.now() / 1000;
-			if ( node.protocol !== 'tidewater.node/1' || node.nodeId !== document.signer || ! node.worldIds?.includes( this.worldId ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
+			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || ! node.worldIds?.includes( this.worldId ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
 			providers.push( { nodeId: node.nodeId, gateway: node.gateway } );
 		}
 		if ( providers.length === 0 ) throw new Error( 'Directory returned no valid signed provider for this world' );
@@ -264,11 +266,11 @@ export class WorldConnector {
 		const providers = [];
 		for ( const document of result.providers ) {
 			throwIfAborted( signal );
-			try { await verifySignedDocument( document, 'tidewater.node/1' ); }
+			try { await verifySignedDocument( document, 'elsemesh.node/1' ); }
 			catch { continue; }
 			const node = document.payload;
 			const now = Date.now() / 1000;
-			if ( node.protocol !== 'tidewater.node/1' || node.nodeId !== document.signer || node.zeroTierNodeId !== this.zeroTierNodeId || node.zeroTierNetworkId !== this.zeroTierNetworkId || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! /^tw-world:[\w.-]{1,128}$/.test( node.worldIds[ 0 ] ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
+			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || node.zeroTierNodeId !== this.zeroTierNodeId || node.zeroTierNetworkId !== this.zeroTierNetworkId || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! isWorldID( node.worldIds[ 0 ] ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
 			providers.push( { nodeId: node.nodeId, gateway: node.gateway, worldIds: node.worldIds } );
 		}
 		return providers;
@@ -389,9 +391,9 @@ export class WorldConnector {
 		return loaded;
 	}
 
-	// Load portal-preview content first so it can appear beyond an open doorway while
-	// the assets needed to enter the destination continue loading.
-	async preparePortal( portal, { onPreview, signal } = {} ) {
+	// Load the portal view's initial content first while the rest of the destination
+	// world continues loading through its own connector.
+	async preparePortal( portal, { onPortalView, signal } = {} ) {
 		throwIfAborted( signal );
 		invariant( portal && portal.enabled && portal.destinationWorldId, 'Portal has no active destination' );
 		const destination = new WorldConnector( {
@@ -406,11 +408,11 @@ export class WorldConnector {
 			throwIfAborted( signal );
 			const previewAssets = await destination.preload( { through: 'portal-preview', signal } );
 			throwIfAborted( signal );
-			const preview = onPreview ? await onPreview( { connector: destination, assets: previewAssets, signal } ) : null;
+			const portalView = onPortalView ? await onPortalView( { connector: destination, assets: previewAssets, signal } ) : null;
 			throwIfAborted( signal );
 			const assets = await destination.preload( { through: 'visible', signal } );
 			throwIfAborted( signal );
-			return { connector: destination, manifest: destination.manifest, assets, previewAssetIDs: new Set( previewAssets.keys() ), preview };
+			return { connector: destination, manifest: destination.manifest, assets, portalViewAssetIDs: new Set( previewAssets.keys() ), portalView };
 		} catch ( error ) {
 			destination.close();
 			throw error;
@@ -605,7 +607,7 @@ export class WorldConnector {
 		this.rtcAttempted = true;
 		throwIfAborted( signal );
 		const peer = new globalThis.RTCPeerConnection( { iceServers: this.iceServers } );
-		const channel = peer.createDataChannel( 'elsemesh-world-v1', { ordered: true } );
+		const channel = peer.createDataChannel( WORLD_PROTOCOL_NAMESPACE, { ordered: true } );
 		this.rtcPeerConnection = peer;
 		this.rtcChannel = channel;
 		channel.addEventListener( 'message', async ( event ) => {
@@ -687,8 +689,8 @@ export function validateWorldObjects( objects, assets ) {
 	invariant( Array.isArray( objects ) && objects.length <= 10000, 'World manifest has an invalid object list' );
 	const ids = new Set();
 	for ( const object of objects ) {
-		invariant( object && typeof object.id === 'string' && /^tw-object:[\w.-]{1,128}$/.test( object.id ) && ! ids.has( object.id ), 'World manifest has an invalid or duplicate object ID' );
-		invariant( object.replacesObjectId === undefined || typeof object.replacesObjectId === 'string' && /^tw-object:[\w.-]{1,128}$/.test( object.replacesObjectId ) && object.replacesObjectId !== object.id, `World object ${object.id} has an invalid replacement reference` );
+		invariant( object && typeof object.id === 'string' && /^elsemesh-object:[\w.-]{1,128}$/.test( object.id ) && ! ids.has( object.id ), 'World manifest has an invalid or duplicate object ID' );
+		invariant( object.replacesObjectId === undefined || typeof object.replacesObjectId === 'string' && /^elsemesh-object:[\w.-]{1,128}$/.test( object.replacesObjectId ) && object.replacesObjectId !== object.id, `World object ${object.id} has an invalid replacement reference` );
 		ids.add( object.id );
 		invariant( object?.priority === undefined || [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( object.priority ), `World object ${object.id || '(unknown)'} has an invalid streaming priority` );
 		if ( object?.streamingBounds !== undefined ) {
@@ -720,8 +722,8 @@ export function validateWorldObjects( objects, assets ) {
 export function validateWorldPortals( portals = [], ids = new Set(), rules = {} ) {
 	invariant( Array.isArray( portals ) && portals.length <= 1024, 'World manifest has an invalid portal list' );
 	for ( const portal of portals ) {
-		invariant( portal && typeof portal.id === 'string' && /^tw-portal:[\w.-]{1,128}$/.test( portal.id ) && ! ids.has( portal.id ), 'World manifest has an invalid or duplicate portal ID' );
-		invariant( /^tw-world:[\w.-]{1,128}$/.test( portal.destinationWorldId || '' ) && ( portal.destinationPeerId === undefined || typeof portal.destinationPeerId === 'string' && /^[A-Za-z0-9]{20,256}$/.test( portal.destinationPeerId ) ), `Portal ${portal.id} has an invalid destination` );
+		invariant( portal && typeof portal.id === 'string' && /^elsemesh-portal:[\w.-]{1,128}$/.test( portal.id ) && ! ids.has( portal.id ), 'World manifest has an invalid or duplicate portal ID' );
+		invariant( isWorldID( portal.destinationWorldId ) && ( portal.destinationPeerId === undefined || typeof portal.destinationPeerId === 'string' && /^[A-Za-z0-9]{20,256}$/.test( portal.destinationPeerId ) ), `Portal ${portal.id} has an invalid destination` );
 		invariant( portal.destinationGateway === undefined || validWorldGateway( portal.destinationGateway ), `Portal ${portal.id} has an invalid destination gateway` );
 		invariant( portal.visual === undefined || [ 'timber', 'stone', 'metal' ].includes( portal.visual ), `Portal ${portal.id} has an unsupported visual style` );
 		for ( const transform of [ portal.entry, portal.exit ] ) {
@@ -729,7 +731,7 @@ export function validateWorldPortals( portals = [], ids = new Set(), rules = {} 
 		}
 		invariant( typeof portal.openView === 'boolean' && typeof portal.enabled === 'boolean', `Portal ${portal.id} has invalid flags` );
 		if ( portal.back !== undefined ) {
-			invariant( rules.requiredFeatures?.includes( 'tidewater.portal-two-sided/1' ), 'Portal back requires tidewater.portal-two-sided/1' );
+			invariant( rules.requiredFeatures?.includes( 'elsemesh.portal-two-sided/1' ), 'Portal back requires elsemesh.portal-two-sided/1' );
 			validatePortalBack( portal.back, validWorldGateway );
 		}
 		ids.add( portal.id );
@@ -753,20 +755,20 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 	const waterBodies = [];
 	let terrainSurfaceComponent = null;
 	for ( const component of components ) {
-		invariant( component && typeof component.id === 'string' && /^tw-component:[\w.-]{1,128}$/.test( component.id ) && ! ids.has( component.id ), 'World manifest has an invalid or duplicate component ID' );
-		const vegetation = component.type === 'tidewater.procedural-island-vegetation/1' && component.seed === 7 && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'seed', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
-		const staticVegetation = component.type === 'tidewater.static-vegetation/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'grassMaskAssetId', 'streamingBounds' ].includes( key ) );
-		const staticReef = component.type === 'tidewater.static-reef/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
-		const staticFishProps = component.type === 'tidewater.static-fish-props/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
-		const islandWildlife = component.type === 'tidewater.example-island-wildlife/1' && component.profile === 'example-island-wildlife-v1' && Number.isInteger( component.seed ) && component.seed >= 1 && component.seed <= 0xffffffff && Array.isArray( component.roofPerches ) && component.roofPerches.length <= 64 && component.roofPerches.every( perch => validVector( perch ) && perch.every( value => Math.abs( value ) <= 10000 ) ) && Array.isArray( component.footprints ) && component.footprints.length <= 256 && component.footprints.every( footprint => footprint && typeof footprint === 'object' && ! Array.isArray( footprint ) && Object.keys( footprint ).every( key => [ 'x', 'z', 'r' ].includes( key ) ) && Number.isFinite( footprint.x ) && Number.isFinite( footprint.z ) && Number.isFinite( footprint.r ) && footprint.r > 0 && footprint.r <= 1000 && Math.abs( footprint.x ) <= 10000 && Math.abs( footprint.z ) <= 10000 ) && Object.keys( component ).every( key => [ 'id', 'type', 'profile', 'seed', 'priority', 'streamingBounds', 'roofPerches', 'footprints' ].includes( key ) );
-		const humpbackWhale = component.type === 'tidewater.humpback-whale/1' && validHumpbackWhaleComponent( component ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'streamingBounds', 'modelAssetId', 'geometryAssetId', 'albedoAssetId', 'heightAssetId', 'route', 'seed', 'surfaceAt', 'cruiseSpeed', 'surfaceSpeed' ].includes( key ) );
-		const islandOcean = component.type === 'tidewater.island-ocean/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'streamingBounds' ].includes( key ) );
-		const waterBody = component.type === 'tidewater.water-body/1' && ( component.profile === undefined || [ 'deep-ocean', 'calm-lagoon', 'storm' ].includes( component.profile ) ) && Array.isArray( component.center ) && component.center.length === 2 && Number.isFinite( component.extent ) && component.extent >= 8 && component.extent <= 100000 && component.center.every( ( n ) => Number.isFinite( n ) && Math.abs( n ) + component.extent <= 1e6 ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'center', 'extent', 'profile', 'streamingBounds' ].includes( key ) );
-		const ambientAudio = component.type === 'tidewater.ambient-audio/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'streamingBounds', 'beds' ].includes( key ) ) && Array.isArray( component.beds ) && component.beds.length > 0 && component.beds.length <= 16 && component.beds.every( ( bed ) => validAudioBed( bed, assetRefs, component.priority || 'portal-preview' ) );
-		const boat = component.type === 'tidewater.downeast-boat/1' && typeof component.objectId === 'string' && /^tw-object:[\w.-]{1,128}$/.test( component.objectId ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'objectId' ].includes( key ) );
-		const proceduralTerrain = component.type === 'tidewater.procedural-island-terrain/1' && component.profile === 'example-island-v1' && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'streamingBounds' ].includes( key ) );
-		const terrainSurface = component.type === 'tidewater.terrain-surface/1' && component.profile === 'example-island-v1' && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ].includes( key ) );
-		const villageMaterials = component.type === 'tidewater.village-materials/2' && component.profile === 'original-tidewater-village-v1' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ].includes( key ) );
+		invariant( component && typeof component.id === 'string' && /^elsemesh-component:[\w.-]{1,128}$/.test( component.id ) && ! ids.has( component.id ), 'World manifest has an invalid or duplicate component ID' );
+		const vegetation = component.type === 'elsemesh.procedural-island-vegetation/1' && component.seed === 7 && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'seed', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
+		const staticVegetation = component.type === 'elsemesh.static-vegetation/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'grassMaskAssetId', 'streamingBounds' ].includes( key ) );
+		const staticReef = component.type === 'elsemesh.static-reef/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
+		const staticFishProps = component.type === 'elsemesh.static-fish-props/1' && component.streamingBounds !== undefined && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ].includes( key ) );
+		const islandWildlife = component.type === 'elsemesh.example-island-wildlife/1' && component.profile === 'example-island-wildlife-v1' && Number.isInteger( component.seed ) && component.seed >= 1 && component.seed <= 0xffffffff && Array.isArray( component.roofPerches ) && component.roofPerches.length <= 64 && component.roofPerches.every( perch => validVector( perch ) && perch.every( value => Math.abs( value ) <= 10000 ) ) && Array.isArray( component.footprints ) && component.footprints.length <= 256 && component.footprints.every( footprint => footprint && typeof footprint === 'object' && ! Array.isArray( footprint ) && Object.keys( footprint ).every( key => [ 'x', 'z', 'r' ].includes( key ) ) && Number.isFinite( footprint.x ) && Number.isFinite( footprint.z ) && Number.isFinite( footprint.r ) && footprint.r > 0 && footprint.r <= 1000 && Math.abs( footprint.x ) <= 10000 && Math.abs( footprint.z ) <= 10000 ) && Object.keys( component ).every( key => [ 'id', 'type', 'profile', 'seed', 'priority', 'streamingBounds', 'roofPerches', 'footprints' ].includes( key ) );
+		const humpbackWhale = component.type === 'elsemesh.humpback-whale/1' && validHumpbackWhaleComponent( component ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'streamingBounds', 'modelAssetId', 'geometryAssetId', 'albedoAssetId', 'heightAssetId', 'route', 'seed', 'surfaceAt', 'cruiseSpeed', 'surfaceSpeed' ].includes( key ) );
+		const islandOcean = component.type === 'elsemesh.island-ocean/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'streamingBounds' ].includes( key ) );
+		const waterBody = component.type === 'elsemesh.water-body/1' && ( component.profile === undefined || [ 'deep-ocean', 'calm-lagoon', 'storm' ].includes( component.profile ) ) && Array.isArray( component.center ) && component.center.length === 2 && Number.isFinite( component.extent ) && component.extent >= 8 && component.extent <= 100000 && component.center.every( ( n ) => Number.isFinite( n ) && Math.abs( n ) + component.extent <= 1e6 ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'center', 'extent', 'profile', 'streamingBounds' ].includes( key ) );
+		const ambientAudio = component.type === 'elsemesh.ambient-audio/1' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'streamingBounds', 'beds' ].includes( key ) ) && Array.isArray( component.beds ) && component.beds.length > 0 && component.beds.length <= 16 && component.beds.every( ( bed ) => validAudioBed( bed, assetRefs, component.priority || 'portal-preview' ) );
+		const boat = component.type === 'elsemesh.downeast-boat/1' && typeof component.objectId === 'string' && /^elsemesh-object:[\w.-]{1,128}$/.test( component.objectId ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'priority', 'objectId' ].includes( key ) );
+		const proceduralTerrain = component.type === 'elsemesh.procedural-island-terrain/1' && component.profile === 'example-island-v1' && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'streamingBounds' ].includes( key ) );
+		const terrainSurface = component.type === 'elsemesh.terrain-surface/1' && component.profile === 'example-island-v1' && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ].includes( key ) );
+		const villageMaterials = component.type === 'elsemesh.village-materials/2' && component.profile === 'original-elsemesh-village-v1' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && typeof component.objectId === 'string' && objectRefs.get( component.objectId )?.kind === 'asset-instance' && Object.keys( component ).every( ( key ) => [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ].includes( key ) );
 		invariant( ( vegetation || staticVegetation || staticReef || staticFishProps || islandWildlife || humpbackWhale || islandOcean || proceduralTerrain || terrainSurface || villageMaterials || waterBody || ambientAudio || boat ) && ( component.priority === undefined || [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( component.priority ) ), `Unsupported or invalid world component ${component.id}` );
 		if ( islandOcean ) invariant( ++ islandOceanCount === 1, 'World manifest may declare only one island ocean component' );
 		if ( waterBody ) invariant( ++ waterBodyCount <= 4 && rules.seaLevel !== undefined && islandOceanCount === 0, 'Portable water requires seaLevel, allows at most four bodies, and cannot be combined with island-ocean' );
@@ -807,10 +809,10 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 				invariant( asset?.kind === kind && asset.priority === ( component.priority || 'portal-preview' ) && asset.bytes > 0 && asset.bytes <= limit, `Whale component ${component.id} has an invalid ${kind} asset` );
 			}
 		}
-		if ( component.type === 'tidewater.static-vegetation/1' ) invariant( typeof component.placementAssetId === 'string', `Static vegetation component ${component.id} requires placement data` );
+		if ( component.type === 'elsemesh.static-vegetation/1' ) invariant( typeof component.placementAssetId === 'string', `Static vegetation component ${component.id} requires placement data` );
 		if ( component.grassMaskAssetId !== undefined ) {
 			const asset = assetRefs.get( component.grassMaskAssetId );
-			invariant( component.type === 'tidewater.static-vegetation/1' && rules.requiredFeatures?.includes( 'tidewater.static-grass/1' ) && /^sha256:[0-9a-f]{64}$/.test( component.grassMaskAssetId ) && asset?.kind === 'grass-density/1' && asset.priority === ( component.priority || 'portal-preview' ) && asset.bytes > 16 && asset.bytes <= 16 * 1024 * 1024, `Static vegetation component ${component.id} has an invalid grass density asset` );
+			invariant( component.type === 'elsemesh.static-vegetation/1' && rules.requiredFeatures?.includes( 'elsemesh.static-grass/1' ) && /^sha256:[0-9a-f]{64}$/.test( component.grassMaskAssetId ) && asset?.kind === 'grass-density/1' && asset.priority === ( component.priority || 'portal-preview' ) && asset.bytes > 16 && asset.bytes <= 16 * 1024 * 1024, `Static vegetation component ${component.id} has an invalid grass density asset` );
 		}
 		if ( staticReef ) invariant( typeof component.placementAssetId === 'string', `Static reef component ${component.id} requires placement data` );
 		if ( staticFishProps ) invariant( typeof component.placementAssetId === 'string' && assetRefs.get( component.placementAssetId )?.bytes > 0 && assetRefs.get( component.placementAssetId )?.bytes <= 16 * 1024 * 1024, `Static fish-props component ${component.id} requires a bounded placement asset` );
@@ -822,7 +824,7 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 	}
 	if ( components.some( component => component.grassMaskAssetId !== undefined ) ) invariant( terrainSurfaceComponent, 'Portable grass requires a packaged terrain surface' );
 	if ( wildlifeCount ) {
-		const wildlife = components.find( component => component.type === 'tidewater.example-island-wildlife/1' );
+		const wildlife = components.find( component => component.type === 'elsemesh.example-island-wildlife/1' );
 		invariant( terrainSurfaceComponent, 'Example Island wildlife requires a packaged terrain surface' );
 		const rank = priority => PRIORITY_ORDER.indexOf( priority || 'visible' );
 		invariant( rank( terrainSurfaceComponent.priority ) <= rank( wildlife.priority ), 'Example Island wildlife cannot stream before its terrain surface' );
@@ -1043,9 +1045,9 @@ function waitWithAbort( promise, signal ) {
 }
 
 export async function verifySignedWorldManifest( document ) {
-	await verifySignedDocument( document, 'tidewater.world/2' );
+	await verifySignedDocument( document, 'elsemesh.world/3' );
 	const manifest = document.payload;
-	invariant( manifest.protocol === 'tidewater.world/2' && /^tw-world:[\w.-]{1,128}$/.test( manifest.worldId || '' ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
+	invariant( manifest.protocol === 'elsemesh.world/3' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience );
 	validateWorldSpawn( manifest.spawn );
@@ -1053,6 +1055,8 @@ export async function verifySignedWorldManifest( document ) {
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );
 	validateWorldPortals( manifest.portals, entityIDs, manifest.rules );
 	validateWorldComponents( manifest.components, manifest.rules, entityIDs, manifest.assets, manifest.objects );
+	validateWorldExtensions( manifest.extensions, manifest.assets, manifest.experience );
+	invariant( ! manifest.extensions?.length || manifest.rules.requiredFeatures?.includes( 'elsemesh.world-extension/1' ), 'World extensions require elsemesh.world-extension/1' );
 	validateWorldHosts( manifest.hosts );
 	invariant( Number.isSafeInteger( manifest.authorityEpoch ) && manifest.authorityEpoch > 0, 'Manifest authority epoch is outside the supported range' );
 	return manifest;

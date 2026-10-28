@@ -47,6 +47,11 @@ for ( let i = 0; i < args.length; i ++ ) {
 
 const sourcePath = path.join( output, 'world-source.json' );
 const terrainValidationPath = path.join( output, 'terrain-validation.json' );
+// Geometry is regenerated here; authored world behavior and extension declarations remain world data.
+const canonicalSource = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
+const presentation = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) );
+const experience = { ...canonicalSource.experience, ...presentation };
+const extensions = canonicalSource.extensions || [];
 let updatedAt = '2026-10-01T00:00:00Z';
 try {
 	const previous = JSON.parse( await readFile( sourcePath, 'utf8' ) );
@@ -66,6 +71,12 @@ const assetId = `sha256:${createHash( 'sha256' ).update( glb ).digest( 'hex' )}`
 const terrainPreviewGLB = exportTerrain( terrain, 128 );
 const terrainPreviewAssetId = `sha256:${createHash( 'sha256' ).update( terrainPreviewGLB ).digest( 'hex' )}`;
 const staticAssets = new Map( [ [ assetId, glb ], [ terrainPreviewAssetId, terrainPreviewGLB ] ] );
+for ( const extension of extensions ) {
+	if ( ! /^sha256:[0-9a-f]{64}$/.test( extension.assetId || '' ) ) throw new Error( `Invalid extension asset ID for ${extension.id}` );
+	const bytes = await readFile( path.join( REPO, 'worlds/tidewater/assets', extension.assetId.slice( 'sha256:'.length ) ) );
+	if ( `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}` !== extension.assetId ) throw new Error( `Extension asset hash mismatch for ${extension.id}` );
+	staticAssets.set( extension.assetId, bytes );
+}
 const generated = buildIslandProceduralContent( terrain );
 const terrainMaps = bakeTerrainMaps( terrain );
 const terrainDetail = getDetailImage();
@@ -101,7 +112,7 @@ const villageLODAssetId = `sha256:${createHash( 'sha256' ).update( villageLODGLB
 const villageBaseData = parseGLB( villageGLB );
 const villageLODData = parseGLB( villageLODGLB );
 const triangleCount = ( model ) => model.meshes.flat().reduce( ( total, primitive ) => total + ( primitive.indices?.length || primitive.attributes.POSITION.array.length / 3 ) / 3, 0 );
-const materialRoles = ( model ) => [ ...new Set( model.materials.map( ( material ) => material.extras?.tidewaterMaterial?.role ).filter( Boolean ) ) ].sort();
+const materialRoles = ( model ) => [ ...new Set( model.materials.map( ( material ) => material.extras?.elsemeshMaterial?.role ).filter( Boolean ) ) ].sort();
 if ( triangleCount( villageLODData ) >= triangleCount( villageBaseData ) * 0.5 ) throw new Error( 'Village distance LOD must use less than half the full-detail triangles' );
 if ( JSON.stringify( materialRoles( villageLODData ) ) !== JSON.stringify( VILLAGE_MATERIAL_ROLES.slice().sort() ) ) throw new Error( 'Village distance LOD must preserve every trusted material role' );
 if ( villageLODData.meshes.flat().some( primitive => ! primitive.attributes.COLOR_0 || primitive.attributes._TW_VDATA?.itemSize !== 4 ) ) throw new Error( 'Village distance LOD must preserve vertex tints and VEC4 material data' );
@@ -149,8 +160,8 @@ for ( const tile of reefTiles ) {
 	staticAssets.set( id, bytes );
 	reefAssetBytes += bytes.length;
 	reefComponents.push( {
-		id: `tw-component:reef-tile-${tile.x}-${tile.z}`,
-		type: 'tidewater.static-reef/1',
+		id: `elsemesh-component:reef-tile-${tile.x}-${tile.z}`,
+		type: 'elsemesh.static-reef/1',
 		priority: 'visible',
 		placementAssetId: id,
 		streamingBounds: tile.bounds,
@@ -210,10 +221,10 @@ for ( const entry of await readdir( assetsPath, { withFileTypes: true } ) ) {
 for ( const [ id, bytes ] of staticAssets ) await writeFile( path.join( assetsPath, id.slice( 'sha256:'.length ) ), bytes );
 
 const source = {
-	protocol: 'tidewater.world-source/2',
-	worldId: 'tw-world:example-island',
+	protocol: 'elsemesh.world-source/3',
+	worldId: 'elsemesh:example-island',
 	title: 'Example Island',
-	experience: JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) ),
+	experience,
 	spawn: generated.spawn,
 	coordinateSystem: 'right-handed-y-up-meters',
 	styleGuide: 'Procedural volcanic island terrain. Preserve the coast, central bay, volcanic ridge, beaches, seabed, and terrain color regions.',
@@ -223,25 +234,26 @@ const source = {
 		spawnRadius: 8,
 		seaLevel: 0,
 		avatarComplexity: 20000,
-		physicsProfile: 'tidewater-default',
+		physicsProfile: 'elsemesh-default',
 		vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 100000 },
-		requiredFeatures: [ 'tidewater.static-glb/1', 'tidewater.static-glb-quaternion/1', 'tidewater.village-materials/1', 'tidewater.village-materials/2', 'tidewater.terrain-surface/1', 'tidewater.static-vegetation/1', 'tidewater.static-grass/1', 'tidewater.static-reef/1', 'tidewater.static-fish-props/1', 'tidewater.example-island-wildlife/1', 'tidewater.humpback-whale/1', 'tidewater.island-ocean/1', 'tidewater.downeast-boat/1', 'tidewater.ambient-audio/1', 'tidewater.portal-handoff/1', 'tidewater.portal-preview-static/1' ],
+		requiredFeatures: [ 'elsemesh.static-glb/1', 'elsemesh.static-glb-quaternion/1', 'elsemesh.village-materials/1', 'elsemesh.village-materials/2', 'elsemesh.terrain-surface/1', 'elsemesh.static-vegetation/1', 'elsemesh.static-grass/1', 'elsemesh.static-reef/1', 'elsemesh.static-fish-props/1', 'elsemesh.example-island-wildlife/1', 'elsemesh.humpback-whale/1', 'elsemesh.island-ocean/1', 'elsemesh.downeast-boat/1', 'elsemesh.ambient-audio/1', 'elsemesh.portal-handoff/1', 'elsemesh.portal-preview-static/1', ...( extensions.length ? [ 'elsemesh.world-extension/1' ] : [] ) ],
 		maxPackageBytes: 128 * 1024 * 1024,
 	},
 	hosts: [],
+	...( extensions.length ? { extensions } : {} ),
 	objects: [ {
-		id: 'tw-object:island-terrain',
+		id: 'elsemesh-object:island-terrain',
 		kind: 'asset-instance',
 		label: 'Procedural island terrain',
 		assetId,
 		priority: 'visible',
-		replacesObjectId: 'tw-object:island-terrain-preview',
+		replacesObjectId: 'elsemesh-object:island-terrain-preview',
 		streamingBounds: { center: [ 0, 0, 0 ], radius: 500 },
 		transform: { position: [ 0, 0, 0 ], yaw: 0 },
 		scale: [ 1, 1, 1 ],
 		collision: { shape: 'heightfield', enabled: true, columns: 513, rows: 513, walkable: true, solid: true },
 	}, {
-		id: 'tw-object:island-terrain-preview',
+		id: 'elsemesh-object:island-terrain-preview',
 		kind: 'asset-instance',
 		label: 'Portal preview terrain',
 		assetId: terrainPreviewAssetId,
@@ -251,7 +263,7 @@ const source = {
 		scale: [ 1, 1, 1 ],
 		collision: { shape: 'none', enabled: false },
 	}, {
-		id: 'tw-object:island-village',
+		id: 'elsemesh-object:island-village',
 		kind: 'asset-instance',
 		label: 'Procedural village, pier and harbor',
 		assetId: villageAssetId,
@@ -262,7 +274,7 @@ const source = {
 		scale: [ 1, 1, 1 ],
 		collision: { shape: 'compound', enabled: true, boxes: generated.villageColliders },
 	}, {
-		id: 'tw-object:moored-lobster-boat',
+		id: 'elsemesh-object:moored-lobster-boat',
 		kind: 'asset-instance',
 		label: 'Moored lobster boat (static preview)',
 		assetId: boatAssetId,
@@ -276,7 +288,7 @@ const source = {
 		const assetName = SCAN_ASSETS[ instance.asset ];
 		const rotation = new Quaternion().setFromEuler( new Euler( instance.roll || 0, instance.yaw, instance.pitch || 0, 'YXZ' ) ).toArray();
 		return {
-			id: `tw-object:scanned-debris-${index}`,
+			id: `elsemesh-object:scanned-debris-${index}`,
 			kind: 'asset-instance',
 			label: assetName.replaceAll( '_', ' ' ),
 			assetId: debrisAssetIDs.get( assetName ),
@@ -289,26 +301,18 @@ const source = {
 		};
 	} ) ],
 	components: [
-		{ id: 'tw-component:island-village-materials', type: 'tidewater.village-materials/2', profile: 'original-tidewater-village-v1', dataAssetId: villageMaterialsAssetId, objectId: 'tw-object:island-village', priority: 'visible', streamingBounds: villageBounds },
-		{ id: 'tw-component:island-vegetation', type: 'tidewater.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId, grassMaskAssetId: grassDensityAssetId },
-		...( generated.fishProps.length ? [ { id: 'tw-component:island-fish-props', type: 'tidewater.static-fish-props/1', priority: 'visible', placementAssetId: fishPropsAssetId, streamingBounds: fishPropsBounds } ] : [] ),
-		{ id: 'tw-component:island-terrain', type: 'tidewater.terrain-surface/1', profile: 'example-island-v1', objectId: 'tw-object:island-terrain', dataAssetId: terrainSurfaceAssetId, priority: 'visible' },
-		{ id: 'tw-component:island-wildlife', type: 'tidewater.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'visible', streamingBounds: { center: [ 0, 0, - 40 ], radius: 300 }, roofPerches: generated.roofPerches, footprints: generated.villageFootprints },
-		{ id: 'tw-component:island-humpback', type: 'tidewater.humpback-whale/1', profile: 'example-island-humpback-v1', priority: 'visible', streamingBounds: { center: [ 0, - 4, 200 ], radius: 250 }, modelAssetId: whaleAssetIDs[ 0 ], geometryAssetId: whaleAssetIDs[ 1 ], albedoAssetId: whaleAssetIDs[ 2 ], heightAssetId: whaleAssetIDs[ 3 ], seed: EXAMPLE_ISLAND_WHALE_PROFILE.seed, route: EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed },
+		{ id: 'elsemesh-component:island-village-materials', type: 'elsemesh.village-materials/2', profile: 'original-elsemesh-village-v1', dataAssetId: villageMaterialsAssetId, objectId: 'elsemesh-object:island-village', priority: 'visible', streamingBounds: villageBounds },
+		{ id: 'elsemesh-component:island-vegetation', type: 'elsemesh.static-vegetation/1', priority: 'portal-preview', placementAssetId: vegetationAssetId, grassMaskAssetId: grassDensityAssetId },
+		...( generated.fishProps.length ? [ { id: 'elsemesh-component:island-fish-props', type: 'elsemesh.static-fish-props/1', priority: 'visible', placementAssetId: fishPropsAssetId, streamingBounds: fishPropsBounds } ] : [] ),
+		{ id: 'elsemesh-component:island-terrain', type: 'elsemesh.terrain-surface/1', profile: 'example-island-v1', objectId: 'elsemesh-object:island-terrain', dataAssetId: terrainSurfaceAssetId, priority: 'visible' },
+		{ id: 'elsemesh-component:island-wildlife', type: 'elsemesh.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'visible', streamingBounds: { center: [ 0, 0, - 40 ], radius: 300 }, roofPerches: generated.roofPerches, footprints: generated.villageFootprints },
+		{ id: 'elsemesh-component:island-humpback', type: 'elsemesh.humpback-whale/1', profile: 'example-island-humpback-v1', priority: 'visible', streamingBounds: { center: [ 0, - 4, 200 ], radius: 250 }, modelAssetId: whaleAssetIDs[ 0 ], geometryAssetId: whaleAssetIDs[ 1 ], albedoAssetId: whaleAssetIDs[ 2 ], heightAssetId: whaleAssetIDs[ 3 ], seed: EXAMPLE_ISLAND_WHALE_PROFILE.seed, route: EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed: EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed },
 		...reefComponents,
-		{ id: 'tw-component:island-ocean', type: 'tidewater.island-ocean/1', priority: 'portal-preview' },
-		{ id: 'tw-component:island-lobster-boat', type: 'tidewater.downeast-boat/1', objectId: 'tw-object:moored-lobster-boat', priority: 'portal-preview' },
-		{ id: 'tw-component:island-ambience', type: 'tidewater.ambient-audio/1', priority: 'portal-preview', beds: ambientBeds },
+		{ id: 'elsemesh-component:island-ocean', type: 'elsemesh.island-ocean/1', priority: 'portal-preview' },
+		{ id: 'elsemesh-component:island-lobster-boat', type: 'elsemesh.downeast-boat/1', objectId: 'elsemesh-object:moored-lobster-boat', priority: 'portal-preview' },
+		{ id: 'elsemesh-component:island-ambience', type: 'elsemesh.ambient-audio/1', priority: 'portal-preview', beds: ambientBeds },
 	],
-	portals: [ {
-		id: 'tw-portal:loz-underneath',
-		destinationWorldId: 'tw-world:loz-underneath',
-		entry: { position: [ - 340, 4.2, 80 ], yaw: Math.PI / 2 },
-		exit: { position: [ 0, 4.2, 8 ], yaw: Math.PI / 2 },
-		visual: 'timber',
-		openView: true,
-		enabled: true,
-	} ],
+	portals: [],
 	updatedAt,
 };
 await writeFile( sourcePath, `${JSON.stringify( source, null, 2 )}\n` );
@@ -324,7 +328,7 @@ const terrainValidation = {
 			bytes: terrainSurface.byteLength,
 			dimensions: { heightfield: [ terrain.res + 1, terrain.res + 1 ], normalRockAO: [ terrain.res, terrain.res ], terrainMasks: [ terrain.res, terrain.res ], detailTexture: [ terrainDetail.width, terrainDetail.height ] },
 			encoding: 'EMTERR1/DEFLATE; ETRNSF1; f32le heights; rgba8unorm normal/rock/AO and masks; rgba8unorm detail texture',
-			rendererContract: 'original-tidewater-terrain-v1',
+			rendererContract: 'original-elsemesh-terrain-v1',
 		},
 		{
 			role: 'full-terrain-collision-and-visual-fallback',
@@ -522,7 +526,7 @@ function exportBatchGLB( batches, sceneName, villageMaterials = false ) {
 		const role = name.startsWith( 'sign-' ) || name.startsWith( 'lantern-' ) ? name.slice( name.indexOf( '-' ) + 1 ) : name;
 		if ( villageMaterials && ! VILLAGE_MATERIAL_ROLES.includes( role ) ) throw new Error( `Unknown village material role: ${role}` );
 		materials.push( {
-			...( villageMaterials ? { extras: { tidewaterMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } : {} ),
+			...( villageMaterials ? { extras: { elsemeshMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } : {} ),
 			name: `${sceneName} ${name}`,
 			pbrMetallicRoughness: { baseColorFactor: [ 1, 1, 1, 1 ], metallicFactor: 0, roughnessFactor: name.includes( 'roofMetal' ) ? 0.72 : name.includes( 'boat-glass' ) ? 0.35 : 0.82 },
 			doubleSided: true,

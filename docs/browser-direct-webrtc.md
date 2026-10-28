@@ -24,7 +24,7 @@ deployment.
    handshake for a world and target PeerID. The gateway returns configured
    STUN URLs. If WebRTC is unavailable or the selected target rejects the offer,
    the client keeps the current transport.
-2. The browser creates an ordered, reliable `elsemesh-world-v1` data channel
+2. The browser creates an ordered, reliable `elsemesh` data channel
    and a WebRTC offer. It completes ICE gathering before sending the offer;
    the first version uses non-trickle ICE so signaling remains one bounded
    request and response.

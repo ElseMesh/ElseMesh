@@ -6,15 +6,14 @@ import { createViewUniforms, setFrameCamera } from '../engine/render/Frame.js';
 import { DEPTH_FORMAT, SCENE_FORMATS } from '../engine/render/SceneRenderer.js';
 import { Mesh } from '../engine/scene/Mesh.js';
 import { Vector3 } from '../engine/math/Vector3.js';
-import { mapPortalCamera, portalExitClipPlane, updatePortalPreviewComponents } from './PortalHandoff.js';
+import { mapPortalCamera, portalExitClipPlane, updatePortalViewComponents } from './PortalHandoff.js';
 
 const PORTAL_WIDTH = 2.42;
 const PORTAL_HEIGHT = 4.9;
-const UPDATE_INTERVAL_MS = 100;
 const _normal = new Vector3( 0, 0, 1 );
 const _up = new Vector3( 0, 1, 0 );
 
-// Renders only while an open portal has a prepared destination. The small target
+// Renders the open portal's destination every frame. The target
 // bounds the extra work and keeps the normal scene/post chain unchanged.
 export class WorldPortalView {
 	constructor( { scene, meshRenderer, sceneRenderer, camera } ) {
@@ -53,13 +52,13 @@ export class WorldPortalView {
 		this.aperture.visible = true;
 	}
 
-	render( now, sourceCamera, loadBias = 0 ) {
-		if ( ! this.active || now - this.lastRenderAt < UPDATE_INTERVAL_MS ) return;
+	render( now, sourceCamera, loadBias = 0, activeRoot = null ) {
+		if ( ! this.active ) return null;
 		const { root, portal } = this.active;
 		mapPortalCamera( sourceCamera, this.camera, portal.entry, portal.exit );
 		updateWorldPackageLOD( root, this.camera, loadBias );
 		setFrameCamera( this.camera, this.target.width, this.target.height, { block: this.frameBlock } );
-		updatePortalPreviewComponents( root.userData.worldComponents, now, this.lastRenderAt, this.camera );
+		updatePortalViewComponents( root.userData.worldComponents, now, this.lastRenderAt, this.camera, root === activeRoot );
 		this.frameBlock.fields.portalClipPlane.value.set( ...portalExitClipPlane( portal.exit ) );
 		this.meshRenderer.render( root, {
 			label: 'portal destination view', kind: 'main', camera: this.camera, frameBlock: this.frameBlock,
@@ -70,5 +69,6 @@ export class WorldPortalView {
 			after: this.sceneRenderer.background ? ( pass ) => this.sceneRenderer.background.draw( pass, this.frameBlock ) : null,
 		} );
 		this.lastRenderAt = now;
+		return root;
 	}
 }

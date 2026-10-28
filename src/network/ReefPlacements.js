@@ -3,7 +3,7 @@ import { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from './ReefPlacementTypes.
 // TRP1 is the fixed-width portable record format for signed static-reef placements.
 // Type IDs follow REEF_TYPE_NAMES: never reorder or reuse an existing ID; append
 // new names and introduce a new protocol/feature version for incompatible changes.
-export const REEF_PLACEMENT_PROTOCOL = 'tidewater.reef-placement/1';
+export const REEF_PLACEMENT_PROTOCOL = 'elsemesh.reef-placement/1';
 export const REEF_PLACEMENT_HEADER_BYTES = 16;
 export const REEF_PLACEMENT_RECORD_BYTES = 64;
 export const MAX_REEF_PLACEMENTS = 200000;

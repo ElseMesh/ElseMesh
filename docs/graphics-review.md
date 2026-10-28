@@ -4,8 +4,7 @@
 
 Compared the pre-split ElseMesh tree at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
 with the packaged `worlds/tidewater` content pinned at
-`cbcac318a28ccc0acfc71ee5a0ffa4f95db7b02a`. LOZ worlds were excluded. The
-WebGPU views use a 1280×577 viewport, render scale 1, shadows, TAA, fixed-time
+`cbcac318a28ccc0acfc71ee5a0ffa4f95db7b02a`. WebGPU views use a 1280×577 viewport, render scale 1, shadows, TAA, fixed-time
 named camera poses, and an isolated headless Weston display with the Radeon
 Vulkan adapter. The user's desktop browser and display were not used. The
 contact sheet pairs pre-split on the left with packaged Tidewater on the right;
@@ -43,15 +42,14 @@ at a 1280×577 viewport and the same four named camera poses. The fallback shows
 pale, flat beach ground and dark water; the village view is under the pier; the
 valley has oversized vegetation; and the summit view sees the terrain
 underside. The omitted package feature is
-`tidewater.village-materials/2` (`tw-component:island-village-materials`).
+`elsemesh.village-materials/2` (`elsemesh-component:island-village-materials`).
 This is a current-state review, not parity acceptance. WebGL parity remains
 unaccepted pending fixes to terrain placement, water, vegetation, shoreline
 presentation, and village materials.
 
 The pinned submodule check verified 60 Tidewater assets. `npm run build`, the
 full `npm test` suite, and `go test ./worldd` pass from the external build tree
-with the shared Go cache configured. The suite's Burning Horizons two-world
-test remains skipped by scope; no LOZ content was involved.
+with the shared Go cache configured. The multi-world profile fixture is not part of this renderer review.
 
 The current ElseMesh build accepts review-camera URL parameters so a view can be opened in a local build or the fork deployment:
 
@@ -151,11 +149,11 @@ The Flip7 was not reachable over ADB or SSH during this check, so Chrome on the 
 
 The island exporter currently writes its 513 × 513 heightfield as a static GLB with hand-authored `COLOR_0` values. That export choice approximates terrain zones; it is not a limit of export or of GLB. Those vertex colors cannot carry the original shader’s layered detail textures, slope-dependent rock, wetness, triplanar rock, or terrain lighting, so drawing that mesh as the final visual surface made the mountain look flatter and differently colored than upstream.
 
-The signed `tidewater.terrain-surface/1` component now carries the deterministic heightfield, baked normal/rock/AO and terrain masks, detail texture, palette, and material parameters. The terrain GLB stays for collision and fallback. The exporter test checks deterministic bytes and the versioned original-terrain material profile. Matched-view screenshots against upstream and Flip7 visual confirmation remain outstanding; see [the terrain export fidelity contract](schemas/terrain-package.md).
+The signed `elsemesh.terrain-surface/1` component now carries the deterministic heightfield, baked normal/rock/AO and terrain masks, detail texture, palette, and material parameters. The terrain GLB stays for collision and fallback. The exporter test checks deterministic bytes and the versioned original-terrain material profile. Matched-view screenshots against upstream and Flip7 visual confirmation remain outstanding; see [the terrain export fidelity contract](../worlds/tidewater/docs/schemas/terrain-package.md).
 
 ## Village texture package
 
-The Example Island package now includes the GPU-baked village PBR maps in its own content-addressed `tidewater.village-materials/2` asset. This removes the prior omission of baked wood, roof, thatch, stone, metal, grime, rope, and net texture inputs. The client regenerates only mip levels from the packaged level-zero bytes and uses the trusted original village shader profile. A matched-camera review of the packaged village against upstream and the Flip7 is still required before claiming visual parity; see [the village material asset contract](schemas/village-materials.md).
+The Example Island package now includes the GPU-baked village PBR maps in its own content-addressed `elsemesh.village-materials/2` asset. This removes the prior omission of baked wood, roof, thatch, stone, metal, grime, rope, and net texture inputs. The client regenerates only mip levels from the packaged level-zero bytes and uses the trusted original village shader profile. A matched-camera review of the packaged village against upstream and the Flip7 is still required before claiming visual parity; see [the village material asset contract](../worlds/tidewater/docs/schemas/village-materials.md).
 
 ## WebGL fallback check, 2026-10-10
 

@@ -26,15 +26,15 @@ const COLLIDERS = [
 	{ center: [ 1.95, 0.42, 1.45 ], half: [ 0.35, 0.42, 0.25 ], tag: 'fishStandProps' },
 ];
 
-export function fishStandColliderVolumes( groundY ) {
+export function fishStandColliderVolumes( groundY, stand = STAND ) {
 
-	const c = Math.cos( STAND.yaw ), s = Math.sin( STAND.yaw );
+	const c = Math.cos( stand.yaw ), s = Math.sin( stand.yaw );
 	return COLLIDERS.map( ( item ) => {
 		const [ x, y, z ] = item.center;
 		return {
-			center: [ STAND.x + x * c + z * s, groundY + y, STAND.z - x * s + z * c ],
+			center: [ stand.x + x * c + z * s, groundY + y, stand.z - x * s + z * c ],
 		half: item.half,
-			yaw: STAND.yaw,
+			yaw: stand.yaw,
 			tag: item.tag,
 		};
 	} );

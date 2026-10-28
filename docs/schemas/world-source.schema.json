@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rebroad.github.io/tidewater/schemas/world-source.schema.json",
+  "$id": "https://elsemesh.github.io/schemas/world-source.schema.json",
   "title": "ElseMesh ThruHold World Source",
   "description": "Shared authoring document exchanged by the AI editor service and Blender tools. This is unsigned source data, not a publishable server manifest.",
   "type": "object",
@@ -17,11 +17,11 @@
   ],
   "properties": {
     "protocol": {
-      "const": "tidewater.world-source/2"
+      "const": "elsemesh.world-source/3"
     },
     "worldId": {
       "type": "string",
-      "pattern": "^tw-world:[\\w.-]{1,128}$"
+      "pattern": "^elsemesh:[\\w.-]{1,128}$"
     },
     "title": {
       "type": "string",
@@ -30,7 +30,7 @@
     },
     "experience": {
       "type": "object",
-      "description": "Optional ThruHold-specific game identity and loading-page copy. All strings are rendered as text, never markup.",
+      "description": "Optional ThruHold-specific loading-page copy and required behavior registry IDs. All strings are rendered as text, never markup.",
       "required": ["genre", "tagline", "loadingNote", "tips", "stages"],
       "properties": {
         "genre": { "type": "string", "minLength": 1, "maxLength": 240 },
@@ -42,6 +42,16 @@
           "maxProperties": 12,
           "propertyNames": { "enum": ["gpu", "atmosphere", "terrain", "village", "vegetation", "ocean", "reef", "simulation", "shaders", "world", "compile", "warmup"] },
           "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 120 }
+        },
+        "behaviors": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "enum": ["elsemesh.fishing-game/1", "elsemesh.shore-aware-boat/1"] } },
+        "fishing": {
+          "type": "object",
+          "description": "Browser gameplay placement data for fishing vendors; the world server validates and relays it as signed experience data.",
+          "properties": {
+            "fishStand": { "$ref": "#/$defs/fishingLocation" },
+            "chandlery": { "$ref": "#/$defs/fishingLocation" }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -134,7 +144,7 @@
         },
         "physicsProfile": {
           "type": "string",
-          "enum": ["default", "tidewater-default"]
+          "enum": ["default", "elsemesh-default"]
         },
         "maxVisitors": {
           "type": "integer",
@@ -186,7 +196,7 @@
           "items": {
             "type": "string",
             "maxLength": 96,
-            "pattern": "^tidewater\\.[a-z0-9.-]+/\\d+$"
+            "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$"
           }
         }
       },
@@ -209,6 +219,23 @@
       "maxItems": 128,
       "items": { "$ref": "#/$defs/component" }
     },
+    "extensions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "protocol", "assetId", "memoryPages", "capabilities", "behaviorId"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^elsemesh-extension:[\\w.-]{1,128}$" },
+          "protocol": { "const": "elsemesh.world-extension/1" },
+          "assetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "behaviorId": { "type": "string", "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
+          "memoryPages": { "type": "integer", "minimum": 1, "maximum": 256 },
+          "capabilities": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,63}$" } }
+        },
+        "additionalProperties": false
+      }
+    },
     "portals": {
       "type": "array",
       "maxItems": 1024,
@@ -222,11 +249,22 @@
     }
   },
   "allOf": [
-    {"if":{"properties":{"portals":{"contains":{"required":["back"]}}},"required":["portals"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"tidewater.portal-two-sided/1"}}}}}}},
-    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.example-island-wildlife/1"}},"required":["type"]},"maxContains":1}}}},
-    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"tidewater.terrain-surface/1"}},"required":["type"]},"maxContains":1}}}}
+    {"if":{"properties":{"extensions":{"minItems":1}},"required":["extensions"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"elsemesh.world-extension/1"}}}}}}},
+    {"if":{"properties":{"portals":{"contains":{"required":["back"]}}},"required":["portals"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"elsemesh.portal-two-sided/1"}}}}}}},
+    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]},"maxContains":1}}}},
+    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.terrain-surface/1"}},"required":["type"]},"maxContains":1}}}}
   ],
   "$defs": {
+    "fishingLocation": {
+      "type": "object",
+      "required": ["position", "yaw", "interactionRadius"],
+      "properties": {
+        "position": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 } },
+        "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
+        "interactionRadius": { "type": "number", "minimum": 0.5, "maximum": 20 }
+      },
+      "additionalProperties": false
+    },
     "vector3": {
       "type": "array",
       "prefixItems": [
@@ -310,7 +348,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^tw-object:[\\w.-]{1,128}$"
+          "pattern": "^elsemesh-object:[\\w.-]{1,128}$"
         },
         "kind": {
           "const": "asset-instance"
@@ -401,7 +439,7 @@
         },
         "replacesObjectId": {
           "type": "string",
-          "pattern": "^tw-object:[\\w.-]{1,128}$",
+          "pattern": "^elsemesh-object:[\\w.-]{1,128}$",
           "description": "A higher-detail object that replaces a non-colliding portal-preview object after its asset loads."
         }
       },
@@ -431,8 +469,8 @@
         {
           "required": ["id", "type", "seed"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.procedural-island-vegetation/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.procedural-island-vegetation/1" },
             "seed": { "const": 7 },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -443,8 +481,8 @@
         {
           "required": ["id", "type"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.island-ocean/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.island-ocean/1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
           },
@@ -453,10 +491,10 @@
         {
           "required": ["id", "type", "profile", "objectId"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.procedural-island-terrain/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.procedural-island-terrain/1" },
             "profile": { "const": "example-island-v1" },
-            "objectId": { "type": "string", "pattern": "^tw-object:[\\w.-]{1,128}$", "description": "References the package heightfield mesh used for collision and visual fallback." },
+            "objectId": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$", "description": "References the package heightfield mesh used for collision and visual fallback." },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
           },
@@ -465,10 +503,10 @@
         {
           "required": ["id", "type", "profile", "objectId", "dataAssetId"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.terrain-surface/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.terrain-surface/1" },
             "profile": { "const": "example-island-v1" },
-            "objectId": { "type": "string", "pattern": "^tw-object:[\\w.-]{1,128}$", "description": "References the heightfield mesh used for collision and visual fallback." },
+            "objectId": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$", "description": "References the heightfield mesh used for collision and visual fallback." },
             "dataAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "References portable height, normal, AO, terrain masks, detail texture, and terrain metadata." },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
@@ -478,8 +516,8 @@
         {
           "required": ["id", "type", "center", "extent"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.water-body/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.water-body/1" },
             "center": { "type": "array", "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 }, "minItems": 2, "maxItems": 2, "description": "Horizontal world-space [x,z] center in meters." },
             "extent": { "type": "number", "minimum": 8, "maximum": 100000, "description": "Half-width and half-depth of a square deep-water body, in meters." },
             "profile": { "enum": ["deep-ocean", "calm-lagoon", "storm"], "description": "Optional named rendering profile; omission selects deep-ocean." },
@@ -491,11 +529,11 @@
         {
           "required": ["id", "type", "placementAssetId"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.static-vegetation/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.static-vegetation/1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "grassMaskAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "Optional grass-density/1 asset; requires tidewater.static-grass/1." },
+            "grassMaskAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "Optional grass-density/1 asset; requires elsemesh.static-grass/1." },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
           },
           "additionalProperties": false
@@ -503,8 +541,8 @@
         {
           "required": ["id", "type", "placementAssetId", "streamingBounds"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.static-reef/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.static-reef/1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
@@ -514,8 +552,8 @@
         {
           "required": ["id", "type", "placementAssetId", "streamingBounds"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.static-fish-props/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.static-fish-props/1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
@@ -525,8 +563,8 @@
         {
           "required": ["id", "type", "profile", "seed", "streamingBounds", "roofPerches", "footprints"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.example-island-wildlife/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.example-island-wildlife/1" },
             "profile": { "const": "example-island-wildlife-v1" },
             "seed": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
@@ -539,8 +577,8 @@
         {
           "required": ["id", "type", "profile", "modelAssetId", "geometryAssetId", "albedoAssetId", "heightAssetId", "route", "seed", "surfaceAt", "cruiseSpeed", "surfaceSpeed", "streamingBounds"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.humpback-whale/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.humpback-whale/1" },
             "profile": { "const": "example-island-humpback-v1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
@@ -569,8 +607,8 @@
         {
           "required": ["id", "type", "beds"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.ambient-audio/1" },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.ambient-audio/1" },
             "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
             "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
             "beds": {
@@ -597,9 +635,9 @@
         {
           "required": ["id", "type", "objectId", "priority"],
           "properties": {
-            "id": { "type": "string", "pattern": "^tw-component:[\\w.-]{1,128}$" },
-            "type": { "const": "tidewater.downeast-boat/1" },
-            "objectId": { "type": "string", "pattern": "^tw-object:[\\w.-]{1,128}$", "description": "References a collision-free portal-preview asset instance. Its transform defines the trusted built-in boat's berth and heading." },
+            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
+            "type": { "const": "elsemesh.downeast-boat/1" },
+            "objectId": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$", "description": "References a collision-free portal-preview asset instance. Its transform defines the trusted built-in boat's berth and heading." },
             "priority": { "const": "portal-preview" }
           },
           "additionalProperties": false
@@ -617,7 +655,7 @@
       "properties": {
         "destinationWorldId": {
           "type": "string",
-          "pattern": "^tw-world:[\\w.-]{1,128}$"
+          "pattern": "^elsemesh:[\\w.-]{1,128}$"
         },
         "destinationPeerId": {
           "type": "string",
@@ -658,7 +696,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "Independent rear connection. Uses the same entry position and entry yaw plus PI radians. Omission preserves the legacy portal behavior. Requires rules.requiredFeatures to include tidewater.portal-two-sided/1."
+      "description": "Independent rear connection. Uses the same entry position and entry yaw plus PI radians. Omission preserves the legacy portal behavior. Requires rules.requiredFeatures to include elsemesh.portal-two-sided/1."
     },
     "portal": {
       "type": "object",
@@ -673,11 +711,11 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^tw-portal:[\\w.-]{1,128}$"
+          "pattern": "^elsemesh-portal:[\\w.-]{1,128}$"
         },
         "destinationWorldId": {
           "type": "string",
-          "pattern": "^tw-world:[\\w.-]{1,128}$"
+          "pattern": "^elsemesh:[\\w.-]{1,128}$"
         },
         "destinationPeerId": {
           "type": "string",

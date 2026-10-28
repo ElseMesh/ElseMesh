@@ -29,12 +29,12 @@ try {
 	await writeFile( assetSource, assetBytes, { mode: 0o600 } );
 	const assetID = runCli( binary, [ '--data', ownerData, '--import-asset', assetSource ] );
 	const assetHex = assetID.slice( 'sha256:'.length );
-	const worldID = 'tw-world:live-gateway-e2e';
+	const worldID = 'elsemesh:live-gateway-e2e';
 	const manifestInput = path.join( tempRoot, 'world-unsigned.json' );
 	const manifestPath = path.join( tempRoot, 'world-signed.json' );
 	const expiresAt = Math.floor( Date.now() / 1000 ) + 3600;
 	await writeFile( manifestInput, JSON.stringify( {
-		protocol: 'tidewater.world/2',
+		protocol: 'elsemesh.world/3',
 		worldId: worldID,
 		ownerPeerId: ownerPeerID,
 		authorityPeerId: ownerPeerID,
@@ -42,7 +42,7 @@ try {
 		discoverable: true,
 		version: 1,
 		title: 'Live gateway fixture',
-		rules: { gravity: 1, maxVisitors: 2, spawnRadius: 8, avatarComplexity: 20000, physicsProfile: 'tidewater-default' },
+		rules: { gravity: 1, maxVisitors: 2, spawnRadius: 8, avatarComplexity: 20000, physicsProfile: 'elsemesh-default' },
 		assets: [ { id: assetID, bytes: assetBytes.byteLength, kind: 'glb', priority: 'visible' } ],
 		objects: [],
 		components: [],

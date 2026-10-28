@@ -31,6 +31,7 @@ type worldSourceDocument struct {
 	Rules                 worldRules        `json:"rules"`
 	Objects               []worldObject     `json:"objects"`
 	Components            []worldComponent  `json:"components,omitempty"`
+	Extensions            []worldExtension  `json:"extensions,omitempty"`
 	Portals               []portal          `json:"portals"`
 	Hosts                 []hostingGrant    `json:"hosts,omitempty"`
 	UpdatedAt             string            `json:"updatedAt"`
@@ -48,7 +49,7 @@ func readWorldSourceID(path string) (string, error) {
 	if err := json.Unmarshal(raw, &header); err != nil {
 		return "", fmt.Errorf("read world-source.json: %w", err)
 	}
-	if header.Protocol != "tidewater.world-source/2" || !worldIDPattern.MatchString(header.WorldID) {
+	if header.Protocol != "elsemesh.world-source/3" || !worldIDPattern.MatchString(header.WorldID) {
 		return "", errors.New("world-source.json has an unsupported protocol or invalid worldId")
 	}
 	return header.WorldID, nil
@@ -153,7 +154,7 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return signedDocument{}, errors.New("world-source.json must contain exactly one JSON document")
 	}
-	if source.Protocol != "tidewater.world-source/2" || source.CoordinateSystem != "right-handed-y-up-meters" || !worldIDPattern.MatchString(source.WorldID) {
+	if source.Protocol != "elsemesh.world-source/3" || source.CoordinateSystem != "right-handed-y-up-meters" || !worldIDPattern.MatchString(source.WorldID) {
 		return signedDocument{}, errors.New("world-source.json has an unsupported protocol, coordinate system, or worldId")
 	}
 	updatedAt, err := time.Parse(time.RFC3339Nano, source.UpdatedAt)
@@ -181,6 +182,7 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 		Rules:                 source.Rules,
 		Objects:               source.Objects,
 		Components:            source.Components,
+		Extensions:            source.Extensions,
 		Portals:               source.Portals,
 		Hosts:                 source.Hosts,
 		UpdatedAt:             updatedAt.Unix(),
@@ -314,9 +316,9 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 		if component.PlacementAssetID != "" {
 			kind := "vegetation-placement/1"
 			switch component.Type {
-			case "tidewater.static-reef/1":
+			case "elsemesh.static-reef/1":
 				kind = "reef-placement/1"
-			case "tidewater.static-fish-props/1":
+			case "elsemesh.static-fish-props/1":
 				kind = "fish-props-placement/1"
 			}
 			if err := add(component.PlacementAssetID, kind, priority, false); err != nil {
@@ -330,14 +332,14 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 		}
 		if component.DataAssetID != "" {
 			kind := "terrain-surface/1"
-			if component.Type == "tidewater.village-materials/2" {
+			if component.Type == "elsemesh.village-materials/2" {
 				kind = "village-materials/1"
 			}
 			if err := add(component.DataAssetID, kind, priority, false); err != nil {
 				return nil, err
 			}
 		}
-		if component.Type == "tidewater.humpback-whale/1" {
+		if component.Type == "elsemesh.humpback-whale/1" {
 			for _, item := range []struct{ id, kind string }{
 				{component.ModelAssetID, "whale-model/1"}, {component.GeometryAssetID, "whale-geometry/1"},
 				{component.AlbedoAssetID, "whale-albedo/1"}, {component.HeightAssetID, "whale-height/1"},
@@ -352,6 +354,25 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 				return nil, err
 			}
 		}
+	}
+	declaredBehaviors := make(map[string]bool)
+	if source.Experience != nil {
+		for _, behavior := range source.Experience.Behaviors {
+			declaredBehaviors[behavior] = true
+		}
+	}
+	seenExtensionBehaviors := make(map[string]bool)
+	for _, extension := range source.Extensions {
+		if !worldBehaviorPattern.MatchString(extension.BehaviorID) || !declaredBehaviors[extension.BehaviorID] || seenExtensionBehaviors[extension.BehaviorID] {
+			return nil, fmt.Errorf("world extension %s must bind to one declared behavior", extension.ID)
+		}
+		if err := add(extension.AssetID, "application/wasm", "visible", false); err != nil {
+			return nil, err
+		}
+		if assets[extension.AssetID].Bytes < 8 || assets[extension.AssetID].Bytes > 8<<20 {
+			return nil, fmt.Errorf("world extension asset %s is outside the supported size limit", extension.AssetID)
+		}
+		seenExtensionBehaviors[extension.BehaviorID] = true
 	}
 	ids := make([]string, 0, len(assets))
 	for id := range assets {

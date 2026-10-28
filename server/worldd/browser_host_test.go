@@ -22,7 +22,7 @@ func TestVerifyBrowserHostRegistrationBindsFreshOwnerProof(t *testing.T) {
 		t.Fatal(err)
 	}
 	world := newStarterManifest("Browser-hosted test", ownerID.String())
-	world.WorldID = "tw-world:browser-host-test"
+	world.WorldID = "elsemesh:browser-host-test"
 	document, err := signDocument(manifestProtocol, world, ownerKey)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestBrowserHostReverseGatewayServesManifestAndBoundedAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	world := newStarterManifest("Browser-hosted test", ownerID.String())
-	world.WorldID = "tw-world:browser-host-test"
+	world.WorldID = "elsemesh:browser-host-test"
 	assetBytes := []byte("browser-host-asset")
 	digest := sha256.Sum256(assetBytes)
 	assetID := fmt.Sprintf("sha256:%x", digest)

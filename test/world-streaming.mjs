@@ -4,10 +4,10 @@ import { assetConcurrencyForConnection, WorldConnector } from '../src/network/Wo
 import { selectWorldComponentsForView, selectWorldObjectsForView } from '../src/network/WorldStreaming.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 
-const connector = new WorldConnector( { worldId: 'tw-world:stream-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
+const connector = new WorldConnector( { worldId: 'elsemesh:stream-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 const alreadyAborted = new AbortController();
 alreadyAborted.abort( new DOMException( 'Portal is no longer in view', 'AbortError' ) );
-await assert.rejects( connector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:destination' }, { signal: alreadyAborted.signal } ), { name: 'AbortError' }, 'a world-ID portal honors cancellation before provider discovery starts' );
+await assert.rejects( connector.preparePortal( { enabled: true, destinationWorldId: 'elsemesh:destination' }, { signal: alreadyAborted.signal } ), { name: 'AbortError' }, 'a world-ID portal honors cancellation before provider discovery starts' );
 const priorities = [ 'portal-preview', 'visible', 'nearby', 'background' ];
 assert.equal( assetConcurrencyForConnection( null ), 3, 'unknown connection capability keeps the default bounded concurrency' );
 assert.equal( assetConcurrencyForConnection( { effectiveType: '4g', downlink: 12 } ), 3, 'fast links keep three parallel asset downloads' );
@@ -79,17 +79,17 @@ assert.deepEqual( viewIDs, [ 'preview-only', 'front', 'full-detail', 'near', 'le
 const startupViewIDs = selectWorldObjectsForView( { assets: [], objects }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( object ) => object.id );
 assert.deepEqual( startupViewIDs, [ 'preview-only', 'front', 'full-detail', 'near' ], 'startup selection excludes unbounded background objects while retaining immediate visible and nearby content' );
 const components = [
-	{ id: 'tw-component:front', type: 'tidewater.static-vegetation/1', placementAssetId: 'front', priority: 'visible', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
-	{ id: 'tw-component:behind', type: 'tidewater.static-vegetation/1', placementAssetId: 'behind', priority: 'nearby', streamingBounds: { center: [ 0, 0, 10 ], radius: 1 } },
-	{ id: 'tw-component:near', type: 'tidewater.static-vegetation/1', placementAssetId: 'near', priority: 'nearby', streamingBounds: { center: [ 0, 0, 3 ], radius: 0.5 } },
-	{ id: 'tw-component:legacy', type: 'tidewater.island-ocean/1', priority: 'portal-preview' },
-	{ id: 'tw-component:ambience', type: 'tidewater.ambient-audio/1', beds: [ { assetId: 'ambient-loop' } ] },
-	{ id: 'tw-component:whale', type: 'tidewater.humpback-whale/1', modelAssetId: 'whale-model', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
+	{ id: 'elsemesh-component:front', type: 'elsemesh.static-vegetation/1', placementAssetId: 'front', priority: 'visible', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
+	{ id: 'elsemesh-component:behind', type: 'elsemesh.static-vegetation/1', placementAssetId: 'behind', priority: 'nearby', streamingBounds: { center: [ 0, 0, 10 ], radius: 1 } },
+	{ id: 'elsemesh-component:near', type: 'elsemesh.static-vegetation/1', placementAssetId: 'near', priority: 'nearby', streamingBounds: { center: [ 0, 0, 3 ], radius: 0.5 } },
+	{ id: 'elsemesh-component:legacy', type: 'elsemesh.island-ocean/1', priority: 'portal-preview' },
+	{ id: 'elsemesh-component:ambience', type: 'elsemesh.ambient-audio/1', beds: [ { assetId: 'ambient-loop' } ] },
+	{ id: 'elsemesh-component:whale', type: 'elsemesh.humpback-whale/1', modelAssetId: 'whale-model', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
 ];
 const componentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5 } ).map( ( component ) => component.id );
-assert.deepEqual( componentIDs, [ 'tw-component:legacy', 'tw-component:ambience', 'tw-component:front', 'tw-component:near', 'tw-component:whale' ], 'component selection uses world-space bounds and uses the whale manifest asset priority when the component has none' );
+assert.deepEqual( componentIDs, [ 'elsemesh-component:legacy', 'elsemesh-component:ambience', 'elsemesh-component:front', 'elsemesh-component:near', 'elsemesh-component:whale' ], 'component selection uses world-space bounds and uses the whale manifest asset priority when the component has none' );
 const startupComponentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( component ) => component.id );
-assert.deepEqual( startupComponentIDs, [ 'tw-component:legacy', 'tw-component:ambience', 'tw-component:front', 'tw-component:near', 'tw-component:whale' ], 'startup component selection excludes records above the entry priority while retaining required visible and nearby systems' );
+assert.deepEqual( startupComponentIDs, [ 'elsemesh-component:legacy', 'elsemesh-component:ambience', 'elsemesh-component:front', 'elsemesh-component:near', 'elsemesh-component:whale' ], 'startup component selection excludes records above the entry priority while retaining required visible and nearby systems' );
 
 const originalWebTransport = globalThis.WebTransport;
 const originalWebSocket = globalThis.WebSocket;
@@ -146,7 +146,7 @@ class FakeWebSocket {
 try {
 	globalThis.WebTransport = FakeWebTransport;
 	globalThis.WebSocket = FakeWebSocket;
-	const retryConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
+	const retryConnector = new WorldConnector( { worldId: 'elsemesh:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
 	retryConnector.manifest = { assets: [ { id: assetId, bytes: bytes.length } ] };
 	const downloaded = await retryConnector.getAsset( assetId );
 	assert.deepEqual( downloaded, bytes, 'interrupted WebTransport asset chunks recover over WebSocket' );
@@ -157,7 +157,7 @@ try {
 	transportStream = 0;
 	webTransportRequests.length = 0;
 	transportMode = 'shared-download';
-	const sharedConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
+	const sharedConnector = new WorldConnector( { worldId: 'elsemesh:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
 	sharedConnector.manifest = { assets: [ { id: assetId, bytes: bytes.length } ] };
 	const firstCallerAbort = new AbortController();
 	const firstCaller = sharedConnector.getAsset( assetId, { signal: firstCallerAbort.signal } );
@@ -174,16 +174,16 @@ try {
 	transportStream = 0;
 	transportMode = 'gateway-error';
 	const requestCount = webSocketRequests.length;
-	const errorConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
+	const errorConnector = new WorldConnector( { worldId: 'elsemesh:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test', chunkBytes: 3 } );
 	errorConnector.manifest = { assets: [ { id: assetId, bytes: bytes.length } ] };
 	await assert.rejects( errorConnector.getAsset( assetId ), /asset is not available/, 'a gateway error response remains an application error' );
 	assert.equal( webSocketRequests.length, requestCount, 'gateway errors do not trigger transport fallback' );
 	errorConnector.close();
 	transportStream = 0;
 	transportMode = 'blocked-manifest';
-	const portalConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
+	const portalConnector = new WorldConnector( { worldId: 'elsemesh:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 	const portalAbort = new AbortController();
-	const portalPreparation = portalConnector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:pending', destinationPeerId: '12D3KooW12345678901234567890' }, { signal: portalAbort.signal } );
+	const portalPreparation = portalConnector.preparePortal( { enabled: true, destinationWorldId: 'elsemesh:pending', destinationPeerId: '12D3KooW12345678901234567890' }, { signal: portalAbort.signal } );
 	await new Promise( ( resolve ) => setTimeout( resolve, 10 ) );
 	assert.ok( webTransportRequests.some( ( request ) => request.type === 'manifest.get' ), 'portal begins the destination manifest request before cancellation' );
 	const destinationTransport = FakeWebTransport.instances.at( -1 );
@@ -193,9 +193,9 @@ try {
 	portalConnector.close();
 	transportStream = 0;
 	transportMode = 'blocked-ready';
-	const readyConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
+	const readyConnector = new WorldConnector( { worldId: 'elsemesh:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 	const readyAbort = new AbortController();
-	const readyPreparation = readyConnector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:waiting', destinationPeerId: '12D3KooW12345678901234567890' }, { signal: readyAbort.signal } );
+	const readyPreparation = readyConnector.preparePortal( { enabled: true, destinationWorldId: 'elsemesh:waiting', destinationPeerId: '12D3KooW12345678901234567890' }, { signal: readyAbort.signal } );
 	await new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
 	const waitingTransport = FakeWebTransport.instances.at( -1 );
 	readyAbort.abort( new DOMException( 'Portal left view', 'AbortError' ) );
@@ -204,9 +204,9 @@ try {
 	readyConnector.close();
 	delete globalThis.WebTransport;
 	transportMode = 'blocked-socket-connect';
-	const socketConnector = new WorldConnector( { worldId: 'tw-world:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
+	const socketConnector = new WorldConnector( { worldId: 'elsemesh:retry-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 	const socketAbort = new AbortController();
-	const socketPreparation = socketConnector.preparePortal( { enabled: true, destinationWorldId: 'tw-world:socket-wait', destinationPeerId: '12D3KooW1234567890123456' }, { signal: socketAbort.signal } );
+	const socketPreparation = socketConnector.preparePortal( { enabled: true, destinationWorldId: 'elsemesh:socket-wait', destinationPeerId: '12D3KooW1234567890123456' }, { signal: socketAbort.signal } );
 	await new Promise( ( resolve ) => setTimeout( resolve, 0 ) );
 	const pendingSocket = FakeWebSocket.instances.at( -1 );
 	socketAbort.abort( new DOMException( 'Portal left view', 'AbortError' ) );

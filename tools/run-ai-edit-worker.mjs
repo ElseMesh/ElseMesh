@@ -15,8 +15,8 @@ export const WORKER_TIMEOUT_MS = 20 * 60 * 1000;
 export const WORKER_LIMITS = Object.freeze( { cpuSeconds: 900, addressSpaceBytes: 12 * 1024 * 1024 * 1024, fileBytes: MAX_OUTPUT_BYTES, openFiles: 128, processes: 128 } );
 const HASH = /^sha256:[0-9a-f]{64}$/;
 const TASK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const OBJECT_ID = /^tw-object:[\w.-]{1,128}$/;
-const PORTAL_ID = /^tw-portal:[\w.-]{1,128}$/;
+const OBJECT_ID = /^elsemesh-object:[\w.-]{1,128}$/;
+const PORTAL_ID = /^elsemesh-portal:[\w.-]{1,128}$/;
 const ROOT = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const ACTION_RUNNER = path.join( ROOT, 'tools/blender/world_actions.py' );
 
@@ -72,7 +72,7 @@ export async function validateAITaskBundle(taskPath, { requirePlan = true } = {}
 	const hasPlan = rootEntries.some( ( entry ) => entry.name === 'plan.json' );
 	if ( rootEntries.length !== requiredEntries.size + Number( requirePlan || hasPlan ) || rootEntries.some( ( entry ) => ! allowedEntries.has( entry.name ) || entry.isSymbolicLink() ) || [ ...requiredEntries ].some( ( name ) => ! rootEntries.some( ( entry ) => entry.name === name ) ) || rootEntries.find( ( entry ) => entry.name === 'assets' )?.isDirectory() !== true ) throw new Error( 'task bundle may contain only its declared files and assets directory' );
 	const task = JSON.parse( await readFile( taskManifestPath, 'utf8' ) );
-	if ( ! task || task.protocol !== AI_TASK_PROTOCOL || ! TASK_ID.test( task.taskId || '' ) || ! HASH.test( task.sourceHash || '' ) || ! HASH.test( task.blendHash || '' ) || typeof task.worldId !== 'string' || ! /^tw-world:[\w.-]{1,128}$/.test( task.worldId ) || typeof task.instruction !== 'string' || ! task.instruction.trim() || task.instruction.length > 8000 || task.actionProtocol !== 'elsemesh.blender-actions/1' ) throw new Error( 'invalid AI edit task header' );
+	if ( ! task || task.protocol !== AI_TASK_PROTOCOL || ! TASK_ID.test( task.taskId || '' ) || ! HASH.test( task.sourceHash || '' ) || ! HASH.test( task.blendHash || '' ) || typeof task.worldId !== 'string' || ! /^elsemesh:[\w.-]{1,128}$/.test( task.worldId ) || typeof task.instruction !== 'string' || ! task.instruction.trim() || task.instruction.length > 8000 || task.actionProtocol !== 'elsemesh.blender-actions/1' ) throw new Error( 'invalid AI edit task header' );
 	if ( ! Array.isArray( task.includedObjectIds ) || task.includedObjectIds.length > 128 || new Set( task.includedObjectIds ).size !== task.includedObjectIds.length || task.includedObjectIds.some( ( id ) => ! OBJECT_ID.test( id ) ) || ! Array.isArray( task.includedPortalIds ) || task.includedPortalIds.length > 128 || new Set( task.includedPortalIds ).size !== task.includedPortalIds.length || task.includedPortalIds.some( ( id ) => ! PORTAL_ID.test( id ) ) || ! Array.isArray( task.availableAssetIds ) || task.availableAssetIds.length > 256 || task.availableAssetIds.some( ( id ) => ! HASH.test( id ) ) || new Set( task.availableAssetIds ).size !== task.availableAssetIds.length ) throw new Error( 'invalid task object, portal, or asset allow-list' );
 	if ( ! task.files || Object.keys( task.files ).sort().join( ',' ) !== 'assets,blend,plan,source' || safeRelative( task.files.source, 'source path' ) !== 'world-source.json' || safeRelative( task.files.blend, 'blend path' ) !== 'scene.blend' || safeRelative( task.files.assets, 'asset directory' ) !== 'assets' || safeRelative( task.files.plan, 'plan path' ) !== 'plan.json' ) throw new Error( 'task files must use the supported fixed names' );
 	const sourcePath = path.join( taskRoot, task.files.source );

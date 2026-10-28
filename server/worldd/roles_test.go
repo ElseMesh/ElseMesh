@@ -19,7 +19,7 @@ func TestWorldRoleGrantRequiresOwnerSignatureAndKnownScopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	grant := worldRoleGrant{
-		Protocol: worldRoleGrantProtocol, WorldID: "tw-world:role-test", OwnerPeerID: ownerID.String(),
+		Protocol: worldRoleGrantProtocol, WorldID: "elsemesh:role-test", OwnerPeerID: ownerID.String(),
 		GrantID: "grant_0123456789ab", Version: 1, AccountKeyFingerprint: fingerprint,
 		Scopes:   []string{"world.content.edit", "world.portals.manage"},
 		IssuedAt: now.Unix(), ExpiresAt: now.Add(24 * time.Hour).Unix(),
@@ -48,7 +48,7 @@ func TestOwnerRoleDocumentSigningCommandsValidateAndCreatePrivateOutputs(t *test
 	now := time.Unix(1_800_000_000, 0)
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	world := worldManifest{WorldID: "tw-world:role-signing", OwnerPeerID: ownerID}
+	world := worldManifest{WorldID: "elsemesh:role-signing", OwnerPeerID: ownerID}
 	fingerprint, err := accountKeyFingerprint(member.GetPublic())
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestWorldRoleGrantRejectsUnknownFieldsAndExpiredGrant(t *testing.T) {
 	owner := testKey(t)
 	ownerID, _ := peerIDForKey(owner.GetPublic())
 	base := worldRoleGrant{
-		Protocol: worldRoleGrantProtocol, WorldID: "tw-world:role-test", OwnerPeerID: ownerID.String(),
+		Protocol: worldRoleGrantProtocol, WorldID: "elsemesh:role-test", OwnerPeerID: ownerID.String(),
 		GrantID: "grant_0123456789ab", Version: 1,
 		Scopes: []string{"world.content.edit"}, IssuedAt: now.Add(-time.Hour).Unix(), ExpiresAt: now.Add(time.Hour).Unix(),
 	}
@@ -156,7 +156,7 @@ func TestWorldRoleRevocationsAreFreshAndMatchGrantOrKey(t *testing.T) {
 	}
 	grant := worldRoleGrant{GrantID: "grant_0123456789ab", AccountKeyFingerprint: fingerprint}
 	state := worldRoleRevocations{
-		Protocol: worldRoleRevocationsProtocol, WorldID: "tw-world:role-test", OwnerPeerID: ownerID.String(),
+		Protocol: worldRoleRevocationsProtocol, WorldID: "elsemesh:role-test", OwnerPeerID: ownerID.String(),
 		Serial: 1, IssuedAt: now.Unix(), ExpiresAt: now.Add(10 * time.Minute).Unix(),
 		AccountKeyFingerprints: []string{fingerprint},
 	}

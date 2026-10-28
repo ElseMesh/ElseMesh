@@ -27,15 +27,15 @@ import (
 )
 
 const (
-	nodeProtocol      = "tidewater.node/1"
-	manifestProtocol  = "tidewater.world/2"
-	authorityProtocol = "tidewater.authority/2"
+	nodeProtocol      = "elsemesh.node/1"
+	manifestProtocol  = "elsemesh.world/3"
+	authorityProtocol = "elsemesh.authority/2"
 	maxRecordBytes    = 1 << 20
 	maxDirectorySize  = 1024
 	maxRegistryBytes  = 64 << 20
 )
 
-var worldIDPattern = regexp.MustCompile(`^tw-world:[a-zA-Z0-9._-]{1,128}$`)
+var worldIDPattern = regexp.MustCompile(`^elsemesh:[a-zA-Z0-9._-]{1,128}$`)
 var zeroTierNodeIDPattern = regexp.MustCompile(`^[0-9a-f]{10}$`)
 var zeroTierNetworkIDPattern = regexp.MustCompile(`^[0-9a-f]{16}$`)
 

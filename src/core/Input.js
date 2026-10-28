@@ -100,13 +100,13 @@ export class Input {
 
 	_createTouchSticks() {
 
-		const root = document.querySelector( '.tw-root' );
+		const root = document.querySelector( '.em-root' );
 		if ( ! root ) return;
 		// Input can be recreated while a renderer backend is replaced; keep one engine-owned control layer.
-		root.querySelector( '.tw-touch-controls' )?.remove();
+		root.querySelector( '.em-touch-controls' )?.remove();
 
 		const controls = document.createElement( 'div' );
-		controls.className = 'tw-touch-controls';
+		controls.className = 'em-touch-controls';
 		controls.setAttribute( 'aria-label', 'Touch controls' );
 		this._touchStickResetters = [];
 		for ( const [ name, label, state ] of [
@@ -115,12 +115,12 @@ export class Input {
 		] ) {
 
 			const stick = document.createElement( 'button' );
-			stick.className = `tw-touch-stick tw-touch-stick-${ name } tw-interactive`;
+			stick.className = `em-touch-stick em-touch-stick-${ name } em-interactive`;
 			stick.type = 'button';
 			stick.setAttribute( 'aria-label', `${ label } joystick` );
 			stick.tabIndex = -1;
-			stick.innerHTML = '<span class="tw-touch-stick-label">' + label + '</span><span class="tw-touch-stick-knob" aria-hidden="true"></span>';
-			const knob = stick.querySelector( '.tw-touch-stick-knob' );
+			stick.innerHTML = '<span class="em-touch-stick-label">' + label + '</span><span class="em-touch-stick-knob" aria-hidden="true"></span>';
+			const knob = stick.querySelector( '.em-touch-stick-knob' );
 			let pointerId = null;
 
 			const reset = () => {

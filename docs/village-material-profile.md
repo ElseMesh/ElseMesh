@@ -2,10 +2,10 @@
 
 The example island's village GLB carries the original geometry and material inputs rather than flattening them into plain vertex colors. This retains the original timber grain, paint wear, roof corrosion, stone details, ropes, window glass and fabric shading.
 
-Each material declares `extras.tidewaterMaterial` with exactly two fields:
+Each material declares `extras.elsemeshMaterial` with exactly two fields:
 
 ```json
-{ "profile": "tidewater.village/1", "role": "wood" }
+{ "profile": "elsemesh.village/1", "role": "wood" }
 ```
 
 Supported roles are `wood`, `hard`, `roofMetal`, `thatch`, `stone`, `fabric`, and `net`. These select trusted client implementations from `VillageMaterials.js`; a world never supplies shader code. Unknown profiles, roles, or additional profile fields are rejected. Ordinary GLB materials without this declaration retain normal PBR handling.

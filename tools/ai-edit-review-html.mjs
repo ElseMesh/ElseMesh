@@ -6,7 +6,7 @@ function safeJSON(value) {
 
 function createAIEditDecisionRecord({ report, decision, reviewedAt = new Date().toISOString(), reviewerNote = '', inspectionConfirmed = false }) {
 	if ( decision !== 'accepted' && decision !== 'rejected' ) throw new Error( 'decision must be accepted or rejected' );
-	if ( typeof report?.worldId !== 'string' || ! /^tw-world:[\w.-]{1,128}$/.test( report.worldId ) || typeof report.taskId !== 'string' || ! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test( report.taskId ) ) throw new Error( 'decision requires valid world and task identities' );
+	if ( typeof report?.worldId !== 'string' || ! /^elsemesh:[\w.-]{1,128}$/.test( report.worldId ) || typeof report.taskId !== 'string' || ! /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test( report.taskId ) ) throw new Error( 'decision requires valid world and task identities' );
 	for ( const field of [ 'baseSourceHash', 'candidateSourceHash' ] ) {
 		if ( typeof report[ field ] !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( report[ field ] ) ) throw new Error( `decision requires a valid ${field}` );
 	}

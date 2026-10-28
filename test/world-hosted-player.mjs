@@ -103,7 +103,7 @@ assert.equal( player.mode, 'boat', 'the player can take the helm from the deck' 
 assert.equal( hostedBoat.driven, true, 'taking the helm activates the hosted boat controller' );
 // Exercise the actual application handoff, then a destination physics frame.
 // This catches missing vertical velocity becoming NaN after the portal swap.
-globalThis.location = { href: 'http://127.0.0.1:5189/?worldId=tw-world:source' };
+globalThis.location = { href: 'http://127.0.0.1:5189/?worldId=elsemesh:source' };
 globalThis.history = { replaceState( state, title, url ) { globalThis.location.href = url.href; } };
 globalThis.document = { title: '' };
 player.boat = null;
@@ -120,9 +120,9 @@ WorldPresenceSession.prototype.admit = async function ( _pose, spawnCandidates )
 	this.admitted = true;
 };
 let sourceClosed = false;
-const destination = { worldId: 'tw-world:destination', nodeId: '1234567890123456789012345', gateway: 'http://127.0.0.1:5193', manifest: { title: 'Destination', components: [], rules: { gravity: 0.5 } } };
+const destination = { worldId: 'elsemesh:destination', nodeId: '1234567890123456789012345', gateway: 'http://127.0.0.1:5193', manifest: { title: 'Destination', components: [], rules: { gravity: 0.5 } } };
 const app = Object.assign( Object.create( App.prototype ), {
-	player, camera, worldConnector: { worldId: 'tw-world:source', close() { sourceClosed = true; } },
+	player, camera, worldConnector: { worldId: 'elsemesh:source', close() { sourceClosed = true; } },
 	linkedWorldRoot: { userData: {} }, hostedColliders: new Colliders(), hostedQuery: {}, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(),
 	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
@@ -147,7 +147,7 @@ assert.ok( Math.abs( player.velocity.y - ( 4.6 - 9.81 * 0.5 / 60 ) ) < 1e-9, 'de
 const vehicleGate = Object.assign( Object.create( App.prototype ), {
 	player: { mode: 'boat' }, activeHostedBoat: { boat: { controller: {} } },
 } );
-const acceptingWorld = { manifest: { rules: { avatarComplexity: 200, vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000 } }, components: [ { type: 'tidewater.downeast-boat/1' } ] } };
+const acceptingWorld = { manifest: { rules: { avatarComplexity: 200, vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000 } }, components: [ { type: 'elsemesh.downeast-boat/1' } ] } };
 assert.deepEqual( vehicleGate.vehicleTransferStatus( acceptingWorld ), { allowed: true, maxSpeed: 8 }, 'destination accepts a vehicle within the combined triangle budget' );
 acceptingWorld.manifest.rules.vehiclePolicy.maxCombinedComplexity = 47044;
 assert.equal( vehicleGate.vehicleTransferStatus( acceptingWorld ).allowed, false, 'destination denies a vehicle above the combined triangle budget' );
@@ -173,10 +173,10 @@ const destinationBoatController = {
 };
 const sourceBoatRuntime = { boat: { controller: sourceVehicleController }, deactivate() {} };
 const destinationBoatRuntime = { hostedBoat: true, boat: { controller: destinationBoatController }, activate() { return destinationBoatController; }, deactivate() {} };
-const vehicleSourceConnector = { worldId: 'tw-world:vehicle-source', close() {} };
+const vehicleSourceConnector = { worldId: 'elsemesh:vehicle-source', close() {} };
 const vehicleDestination = {
-	worldId: 'tw-world:vehicle-destination', nodeId: '1234567890123456789012345', gateway: 'http://127.0.0.1:5193',
-	manifest: { title: 'Vehicle destination', components: [ { type: 'tidewater.downeast-boat/1' } ], rules: { gravity: 1, avatarComplexity: 200, vehiclePolicy: { enabled: true, maxSpeed: 6, maxCombinedComplexity: 1000 } } },
+	worldId: 'elsemesh:vehicle-destination', nodeId: '1234567890123456789012345', gateway: 'http://127.0.0.1:5193',
+	manifest: { title: 'Vehicle destination', components: [ { type: 'elsemesh.downeast-boat/1' } ], rules: { gravity: 1, avatarComplexity: 200, vehiclePolicy: { enabled: true, maxSpeed: 6, maxCombinedComplexity: 1000 } } },
 };
 const vehiclePortalApp = Object.assign( Object.create( App.prototype ), {
 	player: vehiclePlayer, camera: vehiclePlayer.camera, worldConnector: vehicleSourceConnector, activeHostedBoat: sourceBoatRuntime,

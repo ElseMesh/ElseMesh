@@ -7,7 +7,7 @@ import { WhaleBrain } from '../src/world/marine/WhaleBrain.js';
 
 const root = path.resolve( 'worlds/tidewater' );
 const source = JSON.parse( await readFile( path.join( root, 'world-source.json' ), 'utf8' ) );
-const component = source.components.find( item => item.type === 'tidewater.humpback-whale/1' );
+const component = source.components.find( item => item.type === 'elsemesh.humpback-whale/1' );
 assert.ok( component, 'Example Island exports a packaged humpback component' );
 const asset = async id => new Uint8Array( await readFile( path.join( root, 'assets', id.slice( 'sha256:'.length ) ) ) );
 const [ manifest, geometry, albedo, height ] = await Promise.all( [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ].map( asset ) );

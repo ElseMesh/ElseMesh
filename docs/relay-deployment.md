@@ -196,14 +196,14 @@ still needed for persistent public access.
 The current source successfully prepared and served the packaged Example
 Island after rebuilding the world daemon in the external build
 tree. The previously present daemon binary was dated October 1 and rejected
-the source's `tidewater.village-materials/2` component; the current source
+the source's `elsemesh.village-materials/2` component; the current source
 already supports that component, so this was a stale-build failure rather than
 a missing source contract. The rebuilt binary's SHA-256 was
 `36910065b44cc460114e6ccf8eb809faf359bcb86b93ab5f7be34ff798a0c33e`.
 
 A short-lived Cloudflare Quick Tunnel then forwarded to a loopback-only test
 profile. From the public `trycloudflare.com` URL, `/healthz` returned HTTP 200,
-`/api/world/manifest?worldId=tw-world%3Aexample-island` returned the signed
+`/api/world/manifest?worldId=elsemesh%3Aexample-island` returned the signed
 manifest with HTTP 200, and a WSS client received `type: connected` from
 `/gateway`. The temporary tunnel and daemon were shut down immediately after
 the checks. This proves that the gateway routes can pass through a public HTTPS

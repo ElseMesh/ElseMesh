@@ -24,7 +24,7 @@ Each account device generates an Ed25519 signing key locally and sends only its 
 
 The first role-grant format accepts Ed25519 account keys. The public fingerprint is `sha256:` followed by lowercase hex SHA-256 of the raw 32-byte Ed25519 public key. Signed role payloads use canonical JSON and reject unknown fields. Initial supported scopes are `world.content.edit`, `world.portals.manage`, and `world.roles.manage`; a client or daemon must reject any other scope until a protocol version defines it.
 
-The owner issues a versioned, owner-signed `tidewater.world-role/1` grant that binds:
+The owner issues a versioned, owner-signed `elsemesh.world-role/1` grant that binds:
 
 - the world ID and owner PeerID;
 - a random grant ID and monotonically increasing grant version;

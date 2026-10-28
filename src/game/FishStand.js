@@ -15,18 +15,20 @@ export { STAND } from './FishStandContent.js';
 
 export class FishStand {
 
-	constructor( { scene, terrain, colliders } ) {
+	constructor( { scene, terrain, colliders, placement = STAND } ) {
 
-		const y = terrain.heightAt( STAND.x, STAND.z );
+		this.placement = { x: placement.position?.[ 0 ] ?? placement.x, z: placement.position?.[ 1 ] ?? placement.z, yaw: placement.yaw };
+		const stand = this.placement;
+		const y = terrain.heightAt( stand.x, stand.z );
 		this.material = createPropMaterial( 'fishStand' );
 		this.group = new Group();
 		this.group.name = 'FishStand';
-		this.group.position.set( STAND.x, y, STAND.z );
-		this.group.rotation.y = STAND.yaw;
+		this.group.position.set( stand.x, y, stand.z );
+		this.group.rotation.y = stand.yaw;
 		scene.add( this.group );
 		this.ready = loadStallAssets().then( ( a ) => {
 
-			const mesh = new Mesh( buildStallKit( a ), a.material );
+			const mesh = new Mesh( buildFishStandKit( a ), a.material );
 			mesh.name = 'FishStandStall';
 			mesh.castShadow = true;
 			this.group.add( mesh );
@@ -42,13 +44,13 @@ export class FishStand {
 
 		// the buyer stands behind the counter (local -Z), facing out (+Z)
 		// (local z 0.12: clear of the shelf at -0.78..-0.48 and the counter top from 0.58)
-		const local = new Vector3( FISH_STAND_VENDOR.localPosition[ 0 ], 0, FISH_STAND_VENDOR.localPosition[ 2 ] ).applyAxisAngle( new Vector3( 0, 1, 0 ), STAND.yaw );
+		const local = new Vector3( FISH_STAND_VENDOR.localPosition[ 0 ], 0, FISH_STAND_VENDOR.localPosition[ 2 ] ).applyAxisAngle( new Vector3( 0, 1, 0 ), stand.yaw );
 		this.vendor = new Vendor( {
 			name: FISH_STAND_VENDOR.name,
 			kind: FISH_STAND_VENDOR.kind,
-			position: new Vector3( STAND.x + local.x, y + FISH_STAND_VENDOR.localPosition[ 1 ], STAND.z + local.z ),
-			yaw: STAND.yaw,
-			radius: FISH_STAND_VENDOR.radius,
+			position: new Vector3( stand.x + local.x, y + FISH_STAND_VENDOR.localPosition[ 1 ], stand.z + local.z ),
+			yaw: stand.yaw,
+			radius: placement.interactionRadius ?? FISH_STAND_VENDOR.radius,
 			greeting: FISH_STAND_VENDOR.greeting,
 			idle: FISH_STAND_VENDOR.idle,
 			material: this.material,
@@ -59,7 +61,7 @@ export class FishStand {
 
 		// the stall is solid (counter front and the side walls)
 		this.colliders = colliders;
-		this.colliderBoxes = colliders ? fishStandColliderVolumes( y ).map( box => colliders.addBox( new Vector3( ...box.center ), new Vector3( ...box.half ), box.yaw, { tag: box.tag } ) ) : [];
+		this.colliderBoxes = colliders ? fishStandColliderVolumes( y, stand ).map( box => colliders.addBox( new Vector3( ...box.center ), new Vector3( ...box.half ), box.yaw, { tag: box.tag } ) ) : [];
 		this.active = true;
 
 	}
@@ -69,7 +71,8 @@ export class FishStand {
 
 		const out = [];
 		const list = [ [ 'jack', 0.36 ], [ 'redSnapper', 0.34 ], [ 'yellowtail', 0.3 ], [ 'grunt', 0.26 ], [ 'mullet', 0.33 ] ];
-		const base = new Matrix4().makeRotationY( STAND.yaw ).setPosition( STAND.x, this.group.position.y, STAND.z );
+		const stand = this.placement;
+		const base = new Matrix4().makeRotationY( stand.yaw ).setPosition( stand.x, this.group.position.y, stand.z );
 		list.forEach( ( [ species, L ], i ) => {
 
 			// across the chest, nose toward the customer's right, alternating flanks, a little askew. The
@@ -99,7 +102,7 @@ export class FishStand {
 		this.vendor.group.visible = active;
 		if ( ! this.colliders ) return;
 		if ( active ) {
-			for ( const box of fishStandColliderVolumes( this.group.position.y ).map( item => this.colliders.addBox( new Vector3( ...item.center ), new Vector3( ...item.half ), item.yaw, { tag: item.tag } ) ) ) this.colliderBoxes.push( box );
+			for ( const box of fishStandColliderVolumes( this.group.position.y, this.placement ).map( item => this.colliders.addBox( new Vector3( ...item.center ), new Vector3( ...item.half ), item.yaw, { tag: item.tag } ) ) ) this.colliderBoxes.push( box );
 		} else {
 			for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders.removeBox( box );
 		}
@@ -110,7 +113,7 @@ export class FishStand {
 
 		for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders?.removeBox( box );
 		this.colliders = colliders;
-		if ( this.active && colliders ) for ( const item of fishStandColliderVolumes( this.group.position.y ) ) this.colliderBoxes.push( colliders.addBox( new Vector3( ...item.center ), new Vector3( ...item.half ), item.yaw, { tag: item.tag } ) );
+		if ( this.active && colliders ) for ( const item of fishStandColliderVolumes( this.group.position.y, this.placement ) ) this.colliderBoxes.push( colliders.addBox( new Vector3( ...item.center ), new Vector3( ...item.half ), item.yaw, { tag: item.tag } ) );
 
 	}
 
@@ -120,7 +123,7 @@ export class FishStand {
 
 // Local frame as above: 2.6 m wide (x), 1.6 m deep (z), counter and customers at +z, roof sloping
 // back. Joe stands on the floor between the shelf (z -0.78..-0.48) and the counter (top from 0.58).
-function buildStallKit( assets ) {
+export function buildFishStandKit( assets ) {
 
 	const K = new KitBuilder( assets, 7 );
 	const { WALL, DECK, TIN, SIGN, CHALK, PLAIN, FLOAT, DIAL } = LAYER;

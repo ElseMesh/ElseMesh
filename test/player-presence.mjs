@@ -4,8 +4,8 @@ import { PlayerPresence, PLAYER_PRESENCE_PROTOCOL, validatePresencePose } from '
 
 const own = 'player:' + 'a'.repeat(64), peer = 'player:' + 'b'.repeat(64);
 const pose = (sequence, x = 0, yaw = 0) => ({ id: peer, protocol: PLAYER_PRESENCE_PROTOCOL, sequence, position: [x, 2, 3], yaw, pitch: 0, moving: true, mode: 'walk', appearance: { ...DEFAULT_APPEARANCE }, updatedAt: 1000 + sequence });
-const snapshot = (requestId, players, extra = {}) => ({ type: 'presence', worldId: 'tw-world:test', requestId, playerId: own, players, ...extra });
-const state = new PlayerPresence('tw-world:test');
+const snapshot = (requestId, players, extra = {}) => ({ type: 'presence', worldId: 'elsemesh:test', requestId, playerId: own, players, ...extra });
+const state = new PlayerPresence('elsemesh:test');
 assert.equal(state.observe(snapshot('1', [pose(1, 0, Math.PI - .1)]), { requestId: '1', now: 0 }), true);
 state.observe(snapshot('2', [pose(2, 10, -Math.PI + .1)]), { requestId: '2', now: 100 });
 const mid = state.interpolated(150)[0];
@@ -14,7 +14,7 @@ assert.ok(Math.abs(mid.yaw - Math.PI) < 1e-10, 'Heading follows shortest route a
 state.observe(snapshot('3', [pose(1, 99)]), { requestId: '3', now: 200 });
 assert.equal(state.interpolated(250)[0].position[0], 10, 'Old sequence cannot replace pose');
 assert.equal(state.interpolated(1600).length, 0, 'Repeated snapshots cannot keep stalled peer visible');
-assert.throws(() => state.observe(snapshot('4', [], { worldId: 'tw-world:other' }), { requestId: '4' }));
+assert.throws(() => state.observe(snapshot('4', [], { worldId: 'elsemesh:other' }), { requestId: '4' }));
 assert.throws(() => state.observe(snapshot('4', [], { playerId: peer }), { requestId: '4' }));
 assert.throws(() => state.observe(snapshot('4', []), { requestId: 'wrong' }));
 assert.equal(state.players.size, 1, 'Rejected snapshot cannot remove peers');
@@ -27,7 +27,7 @@ for (const appearance of [{ ...DEFAULT_APPEARANCE, style: 'url' }, { ...DEFAULT_
 assert.throws(() => validatePresencePose({ ...pose(1), position: [Infinity, 0, 0] }));
 assert.throws(() => validatePresencePose({ ...pose(1), pitch: 2 }));
 assert.throws(() => validatePresencePose({ ...pose(1), mode: 'boat' }), /Invalid presence vehicle speed/, 'vehicle presence requires a reported speed in protocol v2');
-assert.doesNotThrow(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/1' }), 'legacy walking presence remains readable');
+assert.throws(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/1' }), /Invalid presence sequence or protocol/, 'unsupported presence protocol versions are rejected');
 let key, value;
 const storage = { setItem(k, v) { key = k; value = v; }, getItem() { return value; } };
 assert.equal(saveAppearance(DEFAULT_APPEARANCE, storage), true);

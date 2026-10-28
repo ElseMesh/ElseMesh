@@ -33,12 +33,12 @@ const bytes = Buffer.from( encodeGrassDensityAsset( { ...mask, size: terrain.siz
 const id = `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`;
 const sourcePath = path.join( output, 'world-source.json' );
 const source = JSON.parse( await readFile( sourcePath, 'utf8' ) );
-const component = source.components?.find( item => item.type === 'tidewater.static-vegetation/1' );
+const component = source.components?.find( item => item.type === 'elsemesh.static-vegetation/1' );
 if ( ! component ) throw new Error( 'World source has no static vegetation component' );
 source.rules.requiredFeatures ||= [];
-if ( ! source.rules.requiredFeatures.includes( 'tidewater.static-grass/1' ) ) {
-	const at = source.rules.requiredFeatures.indexOf( 'tidewater.static-vegetation/1' );
-	source.rules.requiredFeatures.splice( at < 0 ? source.rules.requiredFeatures.length : at + 1, 0, 'tidewater.static-grass/1' );
+if ( ! source.rules.requiredFeatures.includes( 'elsemesh.static-grass/1' ) ) {
+	const at = source.rules.requiredFeatures.indexOf( 'elsemesh.static-vegetation/1' );
+	source.rules.requiredFeatures.splice( at < 0 ? source.rules.requiredFeatures.length : at + 1, 0, 'elsemesh.static-grass/1' );
 }
 component.grassMaskAssetId = id;
 const assetsPath = path.join( output, 'assets' );

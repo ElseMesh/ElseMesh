@@ -20,6 +20,7 @@ async function main() {
 	const args = options( process.argv.slice( 2 ) );
 	const sourceBytes = await readFile( args.source );
 	const source = validateWorldSource( JSON.parse( sourceBytes.toString( 'utf8' ) ) );
+	if ( source.extensions?.length && ! source.rules.requiredFeatures?.includes( 'elsemesh.world-extension/1' ) ) throw new Error( 'World extensions require elsemesh.world-extension/1' );
 	const version = args.version === undefined ? 1 : Number( args.version );
 	if ( ! Number.isSafeInteger( version ) || version < 1 ) throw new Error( '--version must be a positive integer' );
 	const authorityEpoch = args[ 'authority-epoch' ] === undefined ? 1 : Number( args[ 'authority-epoch' ] );
@@ -54,10 +55,10 @@ async function main() {
 	for ( const component of source.components || [] ) {
 		const priority = component.priority || 'portal-preview';
 		const references = [
-			...( component.placementAssetId ? [ { id: component.placementAssetId, kind: component.type === 'tidewater.static-reef/1' ? 'reef-placement/1' : component.type === 'tidewater.static-fish-props/1' ? 'fish-props-placement/1' : 'vegetation-placement/1', limit: 16 * 1024 * 1024 } ] : [] ),
+			...( component.placementAssetId ? [ { id: component.placementAssetId, kind: component.type === 'elsemesh.static-reef/1' ? 'reef-placement/1' : component.type === 'elsemesh.static-fish-props/1' ? 'fish-props-placement/1' : 'vegetation-placement/1', limit: 16 * 1024 * 1024 } ] : [] ),
 			...( component.grassMaskAssetId ? [ { id: component.grassMaskAssetId, kind: 'grass-density/1', limit: 16 * 1024 * 1024 } ] : [] ),
-			...( component.dataAssetId ? [ { id: component.dataAssetId, kind: component.type === 'tidewater.village-materials/2' ? 'village-materials/1' : 'terrain-surface/1', limit: component.type === 'tidewater.village-materials/2' ? 64 * 1024 * 1024 : 128 * 1024 * 1024 } ] : [] ),
-			...( component.type === 'tidewater.humpback-whale/1' ? [ { id: component.modelAssetId, kind: 'whale-model/1', limit: 1 * 1024 * 1024 }, { id: component.geometryAssetId, kind: 'whale-geometry/1', limit: 32 * 1024 * 1024 }, { id: component.albedoAssetId, kind: 'whale-albedo/1', limit: 16 * 1024 * 1024 }, { id: component.heightAssetId, kind: 'whale-height/1', limit: 32 * 1024 * 1024 } ] : [] ),
+			...( component.dataAssetId ? [ { id: component.dataAssetId, kind: component.type === 'elsemesh.village-materials/2' ? 'village-materials/1' : 'terrain-surface/1', limit: component.type === 'elsemesh.village-materials/2' ? 64 * 1024 * 1024 : 128 * 1024 * 1024 } ] : [] ),
+			...( component.type === 'elsemesh.humpback-whale/1' ? [ { id: component.modelAssetId, kind: 'whale-model/1', limit: 1 * 1024 * 1024 }, { id: component.geometryAssetId, kind: 'whale-geometry/1', limit: 32 * 1024 * 1024 }, { id: component.albedoAssetId, kind: 'whale-albedo/1', limit: 16 * 1024 * 1024 }, { id: component.heightAssetId, kind: 'whale-height/1', limit: 32 * 1024 * 1024 } ] : [] ),
 			...( component.beds || [] ).map( ( bed ) => ( { id: bed.assetId, kind: 'audio/ogg', limit: 16 * 1024 * 1024 } ) ),
 		];
 		for ( const { id, kind, limit } of references ) {
@@ -76,12 +77,22 @@ async function main() {
 			}
 		}
 	}
+	for ( const extension of source.extensions || [] ) {
+		const assetPath = path.join( args.assets, extension.assetId.slice( 'sha256:'.length ) );
+		const info = await stat( assetPath );
+		if ( ! info.isFile() || info.size < 8 || info.size > 8 * 1024 * 1024 ) throw new Error( `World extension asset ${extension.assetId} must be an 8 MiB-or-smaller Wasm module` );
+		const hasher = createHash( 'sha256' );
+		for await ( const chunk of createReadStream( assetPath ) ) hasher.update( chunk );
+		if ( `sha256:${hasher.digest( 'hex' )}` !== extension.assetId ) throw new Error( `Hash mismatch for world extension asset ${extension.assetId}` );
+		if ( assets.has( extension.assetId ) ) throw new Error( `World extension asset ${extension.assetId} conflicts with another package asset` );
+		assets.set( extension.assetId, { id: extension.assetId, bytes: info.size, kind: 'application/wasm', priority: 'visible' } );
+	}
 	if ( source.rules.maxPackageBytes !== undefined ) {
 		const packageBytes = [ ...assets.values() ].reduce( ( total, asset ) => total + asset.bytes, 0 );
 		if ( packageBytes > source.rules.maxPackageBytes ) throw new Error( `World package uses ${packageBytes} bytes, over its declared ${source.rules.maxPackageBytes}-byte budget` );
 	}
 	const manifest = {
-		protocol: 'tidewater.world/2',
+		protocol: 'elsemesh.world/3',
 		worldId: source.worldId,
 		sourceHash: `sha256:${createHash( 'sha256' ).update( sourceBytes ).digest( 'hex' )}`,
 		ownerPeerId: args.owner,
@@ -96,6 +107,7 @@ async function main() {
 		assets: [ ...assets.values() ],
 		objects: source.objects.map( ( { id, kind, label, assetId, priority, streamingBounds, transform, scale, collision, replacesObjectId, lods } ) => ( { id, kind, label, assetId, priority, streamingBounds, transform, scale, collision, replacesObjectId, lods } ) ),
 		components: source.components || [],
+		...( ( source.extensions || [] ).length ? { extensions: source.extensions } : {} ),
 		portals: source.portals,
 		hosts: ( source.hosts || [] ).map( ( grant ) => ( { ...grant, scopes: [ ...grant.scopes ] } ) ),
 		updatedAt: Math.floor( updatedAt / 1000 ),

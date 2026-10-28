@@ -9,16 +9,18 @@ import { decodeVillageMaterialAsset } from '../src/network/VillageMaterialAsset.
 import { VILLAGE_MATERIAL_PROFILE, VILLAGE_MATERIAL_ROLES } from '../src/network/WorldVillageMaterial.js';
 
 const source = JSON.parse( await readFile( new URL( '../worlds/tidewater/world-source.json', import.meta.url ) ) );
-const village = source.objects.find( object => object.id === 'tw-object:island-village' );
+const village = source.objects.find( object => object.id === 'elsemesh-object:island-village' );
 const previewObject = source.objects.find( object => object.priority === 'portal-preview' && object.id !== village.id );
 const bytes = new Uint8Array( await readFile( new URL( `../worlds/tidewater/assets/${village.assetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
 assert.equal( `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`, village.assetId );
-const materialComponent = source.components.find( component => component.type === 'tidewater.village-materials/2' );
+const materialComponent = source.components.find( component => component.type === 'elsemesh.village-materials/2' );
 assert.ok( materialComponent, 'the island package must include its portable village maps' );
 const materialBytes = new Uint8Array( await readFile( new URL( `../worlds/tidewater/assets/${materialComponent.dataAssetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
 assert.equal( `sha256:${createHash( 'sha256' ).update( materialBytes ).digest( 'hex' )}`, materialComponent.dataAssetId );
 const previewBytes = new Uint8Array( await readFile( new URL( `../worlds/tidewater/assets/${previewObject.assetId.slice( 'sha256:'.length )}`, import.meta.url ) ) );
 const materialData = await decodeVillageMaterialAsset( materialBytes );
+assert.equal( materialData.metadata.protocol, 'elsemesh.village-material-data/1' );
+assert.equal( materialData.metadata.rendererProfile, 'original-elsemesh-village-v1' );
 await GPU.init( { headless: true } );
 const materials = Object.fromEntries( VILLAGE_MATERIAL_ROLES.map( role => [ role, { name: role, userData: {}, dispose() { this.disposed = true; } } ] ) );
 const materialContext = { materials, textures: { bake() {} } };
@@ -44,7 +46,7 @@ const previewRoot = await loadWorldPackage( previewConnector, { objectIDs: [ pre
 assert.equal( previewMapReads, 0, 'a portal preview must not fetch the village texture bundle' );
 disposeWorldPackage( previewRoot );
 
-await assert.rejects( loadWorldPackage( makeConnector( source.rules.requiredFeatures.filter( feature => feature !== 'tidewater.village-materials/1' ) ), { objectIDs: [ village.id ], assets: new Map( [ [ village.assetId, bytes ] ] ), materialContext } ), /missing tidewater.village-materials\/1/ );
+await assert.rejects( loadWorldPackage( makeConnector( source.rules.requiredFeatures.filter( feature => feature !== 'elsemesh.village-materials/1' ) ), { objectIDs: [ village.id ], assets: new Map( [ [ village.assetId, bytes ] ] ), materialContext } ), /missing elsemesh.village-materials\/1/ );
 const root = await loadWorldPackage( makeConnector( source.rules.requiredFeatures ), { objectIDs: [ village.id ], assets: new Map( [ [ village.assetId, bytes ] ] ), materialContext } );
 const meshes = [];
 root.traverse( object => { if ( object.isMesh ) meshes.push( object ); } );

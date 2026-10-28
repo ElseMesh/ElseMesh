@@ -32,7 +32,7 @@ class BlenderWorldActionsTests(unittest.TestCase):
 
     def test_add_and_update_asset_object(self):
         item = {
-            "id": "tw-object:test-prop",
+            "id": "elsemesh-object:test-prop",
             "kind": "asset-instance",
             "label": "Test prop",
             "assetId": "sha256:" + "a" * 64,
@@ -50,7 +50,7 @@ class BlenderWorldActionsTests(unittest.TestCase):
 
     def test_update_asset_object_content_reference(self):
         item = {
-            "id": "tw-object:test-prop",
+            "id": "elsemesh-object:test-prop",
             "kind": "asset-instance",
             "label": "Test prop",
             "assetId": "sha256:" + "a" * 64,
@@ -69,7 +69,7 @@ class BlenderWorldActionsTests(unittest.TestCase):
 
     def test_create_bounded_mesh_asset(self):
         item = {
-            "id": "tw-object:generated-prop",
+            "id": "elsemesh-object:generated-prop",
             "kind": "asset-instance",
             "label": "Generated prop",
             "priority": "visible",
@@ -88,7 +88,7 @@ class BlenderWorldActionsTests(unittest.TestCase):
 
     def test_rejects_unsafe_or_unbounded_mesh_creation(self):
         item = {
-            "id": "tw-object:generated-prop",
+            "id": "elsemesh-object:generated-prop",
             "kind": "asset-instance",
             "label": "Generated prop",
             "transform": {"position": [0, 0, 0], "yaw": 0},
@@ -115,7 +115,7 @@ class BlenderWorldActionsTests(unittest.TestCase):
         actions = []
         for index in range(world_actions.MAX_CREATED_MESHES + 1):
             item = {
-                "id": "tw-object:generated-%d" % index,
+                "id": "elsemesh-object:generated-%d" % index,
                 "kind": "asset-instance",
                 "label": "Generated prop",
                 "transform": {"position": [0, 0, 0], "yaw": 0},

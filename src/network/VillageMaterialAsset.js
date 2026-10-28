@@ -2,7 +2,7 @@ const OUTER_MAGIC = new TextEncoder().encode( 'EMVLG1\0\0' );
 const INNER_MAGIC = new TextEncoder().encode( 'EVLGMA1\0' );
 const MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
 
-export const VILLAGE_MATERIAL_RENDERER_PROFILE = 'original-tidewater-village-v1';
+export const VILLAGE_MATERIAL_RENDERER_PROFILE = 'original-elsemesh-village-v1';
 export const VILLAGE_MATERIAL_MAPS = Object.freeze( [
 	{ name: 'woodA', width: 1024, height: 1024, tileMeters: [ 2, 1 ], channels: [ 'weathered-albedo', 'paint-chip-mask' ] },
 	{ name: 'woodN', width: 1024, height: 1024, tileMeters: [ 2, 1 ], channels: [ 'normal-x', 'normal-y', 'roughness', 'ambient-occlusion' ] },
@@ -30,7 +30,7 @@ export function encodeVillageMaterialAsset( maps ) {
 		byteLength += data.byteLength;
 	}
 	const metadata = new TextEncoder().encode( JSON.stringify( {
-		protocol: 'tidewater.village-material-data/1', rendererProfile: VILLAGE_MATERIAL_RENDERER_PROFILE,
+		protocol: 'elsemesh.village-material-data/1', rendererProfile: VILLAGE_MATERIAL_RENDERER_PROFILE,
 		format: 'rgba8unorm', mipmaps: 'client-box-filter-v1', sampler: 'repeat-trilinear-anisotropy-8', maps: descriptors,
 	} ) );
 	const payloadOffset = align4( 12 + metadata.length );
@@ -71,7 +71,7 @@ export async function decodeVillageMaterialAsset( compressed ) {
 	let metadata;
 	try { metadata = JSON.parse( new TextDecoder().decode( raw.subarray( 12, 12 + metadataLength ) ) ); }
 	catch { throw new Error( 'Invalid village material metadata' ); }
-	if ( metadata.protocol !== 'tidewater.village-material-data/1' || metadata.rendererProfile !== VILLAGE_MATERIAL_RENDERER_PROFILE || metadata.format !== 'rgba8unorm' || metadata.mipmaps !== 'client-box-filter-v1' || metadata.sampler !== 'repeat-trilinear-anisotropy-8' || !Array.isArray( metadata.maps ) || metadata.maps.length !== VILLAGE_MATERIAL_MAPS.length ) throw new Error( 'Unsupported village material data profile' );
+	if ( metadata.protocol !== 'elsemesh.village-material-data/1' || metadata.rendererProfile !== VILLAGE_MATERIAL_RENDERER_PROFILE || metadata.format !== 'rgba8unorm' || metadata.mipmaps !== 'client-box-filter-v1' || metadata.sampler !== 'repeat-trilinear-anisotropy-8' || !Array.isArray( metadata.maps ) || metadata.maps.length !== VILLAGE_MATERIAL_MAPS.length ) throw new Error( 'Unsupported village material data profile' );
 	let payloadOffset = align4( 12 + metadataLength );
 	const maps = {};
 	for ( let i = 0; i < VILLAGE_MATERIAL_MAPS.length; i ++ ) {

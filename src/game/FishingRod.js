@@ -76,7 +76,7 @@ export const POSES = {
 
 export class FishingRod {
 
-	constructor( { scene, camera, query, terrain, audio = null } ) {
+	constructor( { scene, camera, query, terrain, audio = null, render = true } ) {
 
 		this.camera = camera;
 		this.query = query;
@@ -116,7 +116,19 @@ export class FishingRod {
 		this.lineFill = 1; // line left on the spool (1 = full)
 		this._lastOut = 0;
 
-		// ---- meshes
+		// ---- presentation
+		if ( ! render ) {
+			// Keep the rod simulation usable by renderer adapters that own their own
+			// presentation objects. These math records replace GPU resources.
+			const vector = () => new Vector4();
+			this.rodMesh = { matrix: new Matrix4(), visible: false };
+			this.rodMat = { uniforms: { rodBend: { value: vector() }, rodShape: { value: new Vector4( 3, 0, 0, 0 ) }, reelAnim: { value: vector() }, reelAnim2: { value: new Vector4( 0, 1, 0, 0 ) } } };
+			this.bobberMesh = { visible: false, position: new Vector3(), scale: { x: 1, setScalar( value ) { this.x = value; } }, rotation: { set() {} } };
+			this.lineMesh = { visible: false };
+			this.lineMat = { uniforms: { lineA: { value: new Vector3() }, lineB: { value: new Vector3() }, lineCtl: { value: new Vector3() }, lineShow: { value: 0 } } };
+			return;
+		}
+
 		const f = ( x ) => x.toFixed( 4 );
 		this.rodMat = createPropMaterial( 'fishingRod', {
 			clearcoat: true,

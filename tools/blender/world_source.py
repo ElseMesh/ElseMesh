@@ -11,7 +11,7 @@ import pathlib
 import sys
 import bpy
 
-PROTOCOL = "tidewater.world-source/2"
+PROTOCOL = "elsemesh.world-source/3"
 TEXT_NAME = "ElseMeshThruHoldSource"
 PREVIOUS_TEXT_NAME = "ThruholdWorldSource"
 LEGACY_TEXT_NAME = "TidewaterWorldSource"
@@ -27,7 +27,7 @@ def args():
 def validate(source):
     if source.get("protocol") != PROTOCOL:
         raise ValueError("unsupported ThruHold source protocol")
-    if not str(source.get("worldId", "")).startswith("tw-world:"):
+    if not str(source.get("worldId", "")).startswith("world:"):
         raise ValueError("missing worldId")
     if not isinstance(source.get("objects"), list) or not isinstance(source.get("portals"), list):
         raise ValueError("objects and portals must be arrays")
@@ -64,8 +64,8 @@ def validate(source):
         if not isinstance(portal, dict) or visual is not None and (not isinstance(visual, str) or visual not in {"timber", "stone", "metal"}):
             raise ValueError("portal visual must be timber, stone, or metal when specified")
         if "back" in portal:
-            if "tidewater.portal-two-sided/1" not in source.get("rules", {}).get("requiredFeatures", []):
-                raise ValueError("portal back requires tidewater.portal-two-sided/1")
+            if "elsemesh.portal-two-sided/1" not in source.get("rules", {}).get("requiredFeatures", []):
+                raise ValueError("portal back requires elsemesh.portal-two-sided/1")
             from world_actions import validate_portal_back
             validate_portal_back(portal["back"])
     return source

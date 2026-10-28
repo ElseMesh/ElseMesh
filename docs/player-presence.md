@@ -1,12 +1,6 @@
 # Shared player presence
 
-Players in a ThruHold need a visible avatar and a live position/orientation. Presence is transient, self-reported presentation state, separate from immutable world content and from authoritative boat, fishing, inventory or physics simulation. Guest presence does not require a Google account. The current implementation establishes the owner-hosted protocol and transport path; the production `WorldConnector` exposes update/leave requests and validates outgoing poses. `PlayerPresence` validates snapshots, binds world/session/request IDs, removes departed peers and interpolates remote poses with shortest-path heading rotation. The active-world frame publisher and animated remote avatar renderer are integrated. Only entered worlds publish presence; handoff disposes the previous session and its avatar resources.
-
-## Existing LOZ work and reuse
-
-The archived `loz/main` ref is `717d054eed7c4e69289d0bbcbe778d18f4aeadf0`. Its `src/network/PlayerProtocol.js`, `NetworkDemo.js`, `OnlineRoomTransport.js` and `tools/networking/online-server.mjs` provide bounded pose validation, a 100 ms send/interpolation cadence, server-assigned room identities and departure handling. The fixed Burning Horizons world/sector IDs, ten named role slots and central relay cannot express arbitrary ThruHolds or their existing world gateways. ElseMesh uses those validation/lifecycle ideas with its own world transport and owner identity.
-
-`src/player/AvatarAppearance.js` on that ref has an engine-independent five-field appearance contract, reused below. `PlayerAvatar.js` contains a procedural fallback and animated stock-character loading but assumes a boat model, helm constants and deck-local modes. Adapt the general remote-avatar portion when integrating the renderer. The allowlisted stock male/female GLBs use Microsoft Rocketbox m014/f001 sources with MIT attribution in `public/models/characters/LICENSE-Rocketbox.md`. Preserve that notice when copying assets. `AvatarMaterials.js` tints specially authored ORM-red masks; arbitrary GLBs cannot be substituted for those prepared assets. Avoid overwriting main's loader: main supports ArrayBuffer views that LOZ's loader lacks. Character selection must not permit peer-supplied URLs, shaders or executable code.
+Each visitor's browser runs local gameplay and physics wherever practical. Presence is the transient, self-reported avatar state that the world server validates, stores, and relays so other visitors can render that player; it does not move ordinary gameplay simulation onto the server. Guest presence does not require a Google account. The production `WorldConnector` exposes update/leave requests and validates outgoing poses. `PlayerPresence` validates snapshots, binds world/session/request IDs, removes departed peers and interpolates remote poses with shortest-path heading rotation. The active-world frame publisher and animated remote avatar renderer are integrated. Only entered worlds publish presence; handoff disposes the previous session and its avatar resources.
 
 ## Connection and ownership
 
@@ -76,7 +70,7 @@ waits for submission when an encoder is pending. A regression test verifies
 resources remain alive until the submit hook and are released only once.
 
 Local Chrome verification on 2026-10-02 used two independent visitors to an
-isolated loz-underneath world at loopback port 5206. The second visitor's
+isolated hosted world at loopback port 5206. The second visitor's
 textured avatar appeared, then disappeared on disconnect. Reloading the cleanup
 fix produced no additional WebGPU errors in the captured log; earlier errors
 remained in the log history. The overlapping default spawn put the camera inside

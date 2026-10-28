@@ -126,7 +126,7 @@ export class LocalRegionConnector {
 		this.initialRegionVisualObjectIDs = new Set();
 		const spawn = selection.previewSpawn;
 		this.manifest = {
-			protocol: 'elsemesh.world/1', worldId: this.worldId, title: `Hogwarts Legacy · ${region.label}`,
+			protocol: 'elsemesh.world/3', worldId: this.worldId, title: `Hogwarts Legacy · ${region.label}`,
 			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
 			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.
 			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0 },

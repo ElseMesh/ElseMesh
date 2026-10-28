@@ -2,6 +2,8 @@
 import { FISH, FISH_IDS, fishValue, fishLengthCm } from '../src/game/FishTable.js';
 import { habitatAt, pickSpecies, rollWeight, biteDelay } from '../src/game/Bites.js';
 import { CatchMinigame } from '../src/game/CatchMinigame.js';
+import { startFishingBite, stepFishingBite } from '../src/game/FishingBiteSimulation.js';
+import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 import { GameState } from '../src/game/GameState.js';
 import { gearStats, defaultUpgrades, UPGRADES } from '../src/game/Gear.js';
 
@@ -69,6 +71,37 @@ for ( const id of FISH_IDS ) {
 
 }
 ok( fishValue( 'redSnapper', 5 ) > fishValue( 'redSnapper', 2 ), 'bigger fish is worth more' );
+
+// Renderer-neutral bite-state transitions used by WebGPU and WebGL presentations.
+{
+	const rng = () => 0;
+	const habitat = () => ( { shallows: 1, reef: 0, pier: 0, bay: 0, deep: 0 } );
+	let bite = startFishingBite( habitat(), 12, rng );
+	let step = stepFishingBite( bite, 2.1, { habitat, hour: 12, rng } );
+	bite = step.bite;
+	ok( bite.phase === 'nibble' && bite.species === 'silverside', 'shared bite simulation selects a fish from the supplied habitat' );
+	step = stepFishingBite( bite, 0.8, { habitat, hour: 12, rng } );
+	bite = step.bite;
+	ok( bite.phase === 'take' && step.event === 'take', 'shared bite simulation signals the hook window' );
+	step = stepFishingBite( bite, 2.5, { habitat, hour: 12, rng, dip: 0 } );
+	ok( step.event === 'escaped' && step.bite.phase === 'wait', 'missed fish returns the shared bite simulation to waiting' );
+}
+
+// The renderer adapters share the same browser-side fish fight and catch rules.
+{
+	const memory = new Map();
+	const state = new GameState( { getItem: key => memory.get( key ) ?? null, setItem: ( key, value ) => memory.set( key, value ) } );
+	const runtime = new FishingGameRuntime( { state, load: false } );
+	runtime.bite = { phase: 'take', species: 'grunt', kg: 0.8 };
+	const fight = runtime.strike( { lineKg: 7, reelSpeed: 1.1, distance: 3 } );
+	ok( fight?.state === 'fighting' && runtime.bite === null, 'shared browser runtime starts a catch fight from the bite state' );
+	let result;
+	for ( let i = 0; i < 60 * 30; i ++ ) {
+		result = runtime.stepFight( 1 / 60, fight.tension < 0.68 && fight.surge < 0.6, 12 );
+		if ( result.state !== 'fighting' ) break;
+	}
+	ok( result?.state === 'caught' && result.entry && result.catchInfo === state.lastCatch && state.inventory.length === 1, 'shared browser runtime records a landed fish in the player state' );
+}
 
 // ---- the fight: three players
 const policies = {

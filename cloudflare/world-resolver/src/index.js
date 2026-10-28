@@ -1,13 +1,13 @@
 import { verifySignedDocument } from '../../../src/network/SignedDocument.js';
 
-const NODE_PROTOCOL = 'tidewater.node/1';
-const WORLD_PROTOCOL = 'tidewater.world/2';
-const AUTHORITY_PROTOCOL = 'tidewater.authority/2';
+const NODE_PROTOCOL = 'elsemesh.node/1';
+const WORLD_PROTOCOL = 'elsemesh.world/3';
+const AUTHORITY_PROTOCOL = 'elsemesh.authority/2';
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_RECORD_BYTES = 1024 * 1024;
 const MAX_ADVERTISEMENT_AGE_SECONDS = 15 * 60;
 const MAX_LOOKUP_PROVIDERS = 256;
-const WORLD_ID = /^tw-world:[A-Za-z0-9._-]{1,128}$/;
+const WORLD_ID = /^elsemesh:[A-Za-z0-9._-]{1,128}$/;
 const PEER_ID = /^[A-Za-z0-9]{20,256}$/;
 const ZT_NODE_ID = /^[0-9a-f]{10}$/;
 const ZT_NETWORK_ID = /^[0-9a-f]{16}$/;

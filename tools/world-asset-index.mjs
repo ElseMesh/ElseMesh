@@ -7,13 +7,14 @@ import { fileURLToPath } from 'node:url';
 const repo = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 
 const componentNames = new Map( [
-	[ 'tidewater.village-materials/2', 'Village PBR material package' ],
-	[ 'tidewater.static-vegetation/1', 'Vegetation placement data' ],
-	[ 'tidewater.static-fish-props/1', 'Fish-prop placement data' ],
-	[ 'tidewater.terrain-surface/1', 'Terrain visual-surface data' ],
-	[ 'tidewater.static-reef/1', 'Reef placement tile' ],
-	[ 'tidewater.humpback-whale/1', 'Humpback-whale asset' ],
-	[ 'tidewater.ambient-audio/1', 'Ambient audio loop' ],
+	[ 'elsemesh.village-materials/2', 'Village PBR material package' ],
+	[ 'elsemesh.static-vegetation/1', 'Vegetation placement data' ],
+	[ 'elsemesh.static-fish-props/1', 'Fish-prop placement data' ],
+	[ 'elsemesh.terrain-surface/1', 'Terrain visual-surface data' ],
+	[ 'elsemesh.static-reef/1', 'Reef placement tile' ],
+	[ 'elsemesh.humpback-whale/1', 'Humpback-whale asset' ],
+	[ 'elsemesh.ambient-audio/1', 'Ambient audio loop' ],
+	[ 'elsemesh.world-extension/1', 'World extension' ],
 ] );
 
 const fieldNames = new Map( [
@@ -33,6 +34,7 @@ function formatBytes( bytes ) {
 
 function detectFormat( bytes, refs ) {
 	if ( bytes.subarray( 0, 4 ).toString( 'ascii' ) === 'glTF' ) return 'glTF binary (GLB)';
+	if ( bytes.subarray( 0, 4 ).equals( Buffer.from( [ 0x00, 0x61, 0x73, 0x6d ] ) ) ) return 'WebAssembly module';
 	if ( bytes.subarray( 0, 4 ).toString( 'ascii' ) === 'OggS' ) return 'Ogg audio';
 	if ( bytes.subarray( 0, 8 ).equals( Buffer.from( [ 137, 80, 78, 71, 13, 10, 26, 10 ] ) ) ) return 'PNG image';
 	if ( bytes[ 0 ] === 0xff && bytes[ 1 ] === 0xd8 ) return 'JPEG image';
@@ -71,7 +73,8 @@ export async function renderWorldAssetIndex( worldRoot ) {
 			const refs = references.get( id ) || [];
 			const field = pathParts.at( -1 ) || 'asset';
 			const role = field === 'assetId' && pathParts.includes( 'lods' ) ? 'LOD mesh'
-				: field === 'assetId' && componentType === 'tidewater.ambient-audio/1' ? 'audio bed'
+				: field === 'assetId' && componentType === 'elsemesh.ambient-audio/1' ? 'audio bed'
+					: field === 'assetId' && componentType === 'elsemesh.world-extension/1' ? 'WebAssembly module'
 					: fieldNames.get( field ) || ( field === 'assetId' ? 'mesh' : field.replace( /Id$/, '' ) );
 			refs.push( { owner: owner || 'World asset', role, componentType } );
 			references.set( id, refs );
@@ -86,11 +89,15 @@ export async function renderWorldAssetIndex( worldRoot ) {
 		let nextOwner = owner;
 		let nextType = componentType;
 		if ( typeof value.label === 'string' ) nextOwner = value.label;
-		if ( typeof value.type === 'string' && value.type.startsWith( 'tidewater.' ) ) {
+		if ( typeof value.type === 'string' && value.type.startsWith( 'elsemesh.' ) ) {
 			nextType = value.type;
 			const friendly = componentNames.get( value.type ) || value.type;
-			const componentId = typeof value.id === 'string' ? value.id.replace( /^tw-component:/, '' ) : '';
-			nextOwner = value.type === 'tidewater.static-reef/1' ? `${friendly} ${componentId.replace( /^reef-tile-/, '' )}` : friendly;
+			const componentId = typeof value.id === 'string' ? value.id.replace( /^elsemesh-component:/, '' ) : '';
+			nextOwner = value.type === 'elsemesh.static-reef/1' ? `${friendly} ${componentId.replace( /^reef-tile-/, '' )}` : friendly;
+		}
+		if ( value.protocol === 'elsemesh.world-extension/1' ) {
+			nextType = value.protocol;
+			nextOwner = `${String( value.id || 'World' ).replace( /^elsemesh-extension:/, '' ).replaceAll( '-', ' ' )} extension`;
 		}
 		for ( const [ key, child ] of Object.entries( value ) ) collect( child, [ ...pathParts, key ], nextOwner, nextType );
 	}

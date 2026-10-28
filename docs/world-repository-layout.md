@@ -6,13 +6,11 @@ ElseMesh engine owns exporters, validators, package schemas, networking, and
 runtime execution. Downloaded content may select only versioned behavior
 handlers implemented by the engine; it does not execute arbitrary scripts.
 
-The current content repositories are [Tidewater](../worlds/tidewater/README.md),
-[Burning Horizons](https://github.com/ElseMesh/burning-horizons), and the private
-[Hogwarts-World bridge repository](../worlds/Hogwarts/README.md). Tidewater and
-Hogwarts-World are mounted as Git submodules. Burning Horizons is a separate
-checkout selected by `BURNING_HORIZONS_DIR` when running its exporter. The
-Hogwarts submodule stores bridge code and private project documentation. Its
-own design page records the game-content boundary and implementation target.
+The current content repositories are [Tidewater](../worlds/tidewater/README.md)
+and the private [Hogwarts-World bridge repository](../worlds/Hogwarts/README.md).
+Both are mounted as Git submodules. The Hogwarts submodule stores bridge code
+and private project documentation. Its own design page records the game-content
+boundary and implementation target.
 
 ## Shared package layout
 
@@ -31,8 +29,7 @@ world-repository/
 
 Worlds may add source-specific metadata and nested folders. For example,
 Tidewater groups audio under `source/audio` and model inputs under
-`source/models/{debris,props,whale}`; Burning Horizons currently keeps its cave
-GLB, layout data, and ambience recording directly under `source/`.
+`source/models/{debris,props,whale}`.
 
 | Path | Definition and editing rules |
 | --- | --- |
@@ -65,18 +62,6 @@ textures. `source/audio/` contains source OGG recordings and credits.
 `lod-source/` contains low-detail village and boat GLBs. See the
 [Tidewater README](../worlds/tidewater/README.md) and its [asset index](../worlds/tidewater/ASSET-INDEX.md).
 
-### Burning Horizons
-
-Burning Horizons holds the UNDERNEATH cave world independently. Its current
-`source/caves.glb` is the editable cave scene input,
-`source/underneath-layout.json` contains authoring geometry such as passages,
-landing areas, and the entrance, and `source/under_reef.ogg` is its ambience
-source. `lod-source/cave-low.glb` supplies its lower-detail mesh. Exported cave,
-LOD, and ambience blobs live in `assets/` and are linked from its
-`world-source.json`. Its exporter is `tools/export-loz-underneath.mjs` in
-ElseMesh; set `BURNING_HORIZONS_DIR` to the separate checkout. The repository
-README and generated asset index are the content-side entry points.
-
 ### Hogwarts-World
 
 `worlds/Hogwarts` is the private `rebroad/Hogwarts-World` submodule. It is an
@@ -91,7 +76,6 @@ Run the appropriate exporter from an ElseMesh checkout:
 
 ```sh
 npm run export:island
-BURNING_HORIZONS_DIR=/path/to/burning-horizons npm run export:burning-horizons
 ```
 
 Both exporters update `world-source.json`, content-addressed `assets/`, and
@@ -102,7 +86,6 @@ index is current without rewriting it:
 
 ```sh
 node tools/world-asset-index.mjs --check worlds/tidewater
-node tools/world-asset-index.mjs --check /path/to/burning-horizons
 ```
 
 Commit package and source changes to the world repository, then update the

@@ -18,21 +18,21 @@ try {
 	await mkdir( assetsPath, { recursive: true } );
 	const assetBytes = Buffer.from( 'fixture-glb' );
 	const assetId = `sha256:${createHash( 'sha256' ).update( assetBytes ).digest( 'hex' )}`;
-	const world = createWorldSource( { worldId: 'tw-world:ai-mcp-test', title: 'MCP test world' } );
-	world.objects.push( { id: 'tw-object:selected', kind: 'asset-instance', label: 'Selected prop', assetId, priority: 'visible', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } );
-	world.objects.push( { id: 'tw-object:unselected', kind: 'asset-instance', label: 'Private prop', assetId, priority: 'visible', transform: { position: [ 1, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } );
+	const world = createWorldSource( { worldId: 'elsemesh:ai-mcp-test', title: 'MCP test world' } );
+	world.objects.push( { id: 'elsemesh-object:selected', kind: 'asset-instance', label: 'Selected prop', assetId, priority: 'visible', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } );
+	world.objects.push( { id: 'elsemesh-object:unselected', kind: 'asset-instance', label: 'Private prop', assetId, priority: 'visible', transform: { position: [ 1, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } );
 	const sourcePath = path.join( input, 'world-source.json' );
 	const blendPath = path.join( input, 'scene.blend' );
 	await writeFile( sourcePath, `${JSON.stringify( world, null, 2 )}\n` );
 	await writeFile( blendPath, 'opaque-scene-fixture' );
 	await writeFile( path.join( assetsPath, assetId.slice( 7 ) ), assetBytes );
 	const taskPath = path.join( temporaryRoot, 'task' );
-	const task = await createAITaskBundle( { sourcePath, blendPath, assetsPath, instruction: 'Move the selected prop slightly east.', outTaskPath: taskPath, objectIds: [ 'tw-object:selected' ] } );
+	const task = await createAITaskBundle( { sourcePath, blendPath, assetsPath, instruction: 'Move the selected prop slightly east.', outTaskPath: taskPath, objectIds: [ 'elsemesh-object:selected' ] } );
 
 	const context = await readAIEditTaskContext( taskPath );
 	assert.equal( context.protocol, 'elsemesh.ai-edit-context/1' );
 	assert.equal( context.task.taskId, task.taskId );
-	assert.deepEqual( context.editableObjects.map( ( object ) => object.id ), [ 'tw-object:selected' ] );
+	assert.deepEqual( context.editableObjects.map( ( object ) => object.id ), [ 'elsemesh-object:selected' ] );
 	assert.deepEqual( context.availableAssets, [ assetId ] );
 	assert.equal( context.worker.ownerKeysAvailable, false );
 
@@ -74,13 +74,13 @@ try {
 	assert.equal( JSON.parse( toolContext.result.content[ 0 ].text ).task.taskId, task.taskId );
 	const submitted = await request( 'tools/call', {
 		name: 'submit_action_plan',
-		arguments: { actions: [ { op: 'object.update', id: 'tw-object:selected', fields: { transform: { position: [ 0.25, 0, 0 ], yaw: 0 } } } ] },
+		arguments: { actions: [ { op: 'object.update', id: 'elsemesh-object:selected', fields: { transform: { position: [ 0.25, 0, 0 ], yaw: 0 } } } ] },
 	} );
 	assert.equal( submitted.result.isError, undefined );
 	assert.equal( JSON.parse( submitted.result.content[ 0 ].text ).actionCount, 1 );
 	const planPath = path.join( taskPath, 'plan.json' );
 	assert.equal( ( await readFile( planPath, 'utf8' ) ).includes( task.sourceHash ), true );
-	const rejected = await request( 'tools/call', { name: 'submit_action_plan', arguments: { actions: [ { op: 'object.remove', id: 'tw-object:unselected' } ] } } );
+	const rejected = await request( 'tools/call', { name: 'submit_action_plan', arguments: { actions: [ { op: 'object.remove', id: 'elsemesh-object:unselected' } ] } } );
 	assert.equal( rejected.error, undefined );
 	assert.equal( rejected.result.isError, true );
 	assert.match( rejected.result.content[ 0 ].text, /outside the task object allow-list/ );

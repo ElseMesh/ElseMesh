@@ -50,6 +50,7 @@ import { LocalLights, addVillageLights, addBoatLights } from './materials/LocalL
 import { WaterQuery } from './ocean/WaterQuery.js';
 import { Breakers } from './ocean/Breakers.js';
 import { SurfFoam } from './ocean/SurfFoam.js';
+import { updateWorldOceanFrame } from './ocean/WorldOceanFrame.js';
 import { Spray } from './fx/Spray.js';
 import { SeaDetail } from './ocean/SeaDetail.js';
 import { MarineSnow } from './fx/MarineSnow.js';
@@ -76,12 +77,14 @@ import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.j
 import { Group } from './engine/scene/Group.js';
 import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.js';
 import { LocalRegionConnector } from './network/LocalRegionConnector.js';
+import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { worldHasWater, worldSeaLevel } from './network/WorldRules.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldExtensions, loadWorldPackage, registerWorldPackageCollisions, stepWorldPackageExtensions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { hasWorldBehavior } from './network/WorldBehaviorRegistry.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -144,7 +147,7 @@ export class App {
 		this._scaleAboveTarget = 0;
 		this.remoteWorlds = new Map();
 		this.portalPreparations = new Map();
-		this.portalPreviewId = null;
+		this.portalViewId = null;
 		this.worldBackgroundLoads = new Map();
 		this.worldStreamState = new Map();
 		this.portalPreviousPosition = null;
@@ -204,7 +207,7 @@ export class App {
 		const qs = this.qs;
 		const worldLink = worldLinkFromLocation();
 		this.loadingExperience = worldLink?.localProvider ? null : worldLink ? GENERIC_WORLD_EXPERIENCE : DEFAULT_WORLD_EXPERIENCE;
-		this.loadingTitle = worldLink?.localProvider ? 'Connecting to world' : worldLink ? 'ThruHold' : 'Example Island';
+		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
 		if ( worldLink ) {
 			this.worldConnector = worldLink.localProvider ? new LocalRegionConnector( worldLink ) : new WorldConnector( worldLink );
@@ -220,7 +223,7 @@ export class App {
 		// report a stage, then let the page paint it before the (synchronous) stage work starts
 		const progress = async ( p, text, until, stage ) => {
 
-			const status = worldLink?.localProvider && ! this.loadingExperience ? 'Connecting to world…' : stage ? this.loadingExperience?.stages?.[ stage ] || text : text;
+			const status = worldLink?.localProvider && ! this.loadingExperience ? 'Connecting to ThruHold…' : stage ? this.loadingExperience?.stages?.[ stage ] || text : text;
 			onProgress( p, status, until );
 			if ( typeof requestAnimationFrame === 'function' ) await new Promise( ( r ) => requestAnimationFrame( () => setTimeout( r, 0 ) ) );
 
@@ -564,7 +567,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.updateSun();
 		if ( worldLink ) {
 
-			await progress( 0.33, 'Connecting to world…', undefined, 'world' );
+			await progress( 0.33, 'Connecting to ThruHold…', undefined, 'world' );
 			this.proceduralWorldRoot = new Group();
 			this.proceduralWorldRoot.name = 'procedural-example-world';
 			for ( const child of scene.children.slice() ) if ( ! this._sharedSceneRoots.has( child ) ) this.proceduralWorldRoot.add( child );
@@ -591,6 +594,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
 			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs } );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
+			await loadWorldExtensions( connector, this.linkedWorldRoot );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
@@ -600,7 +604,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			try {
 				if ( ! connector.localOnly ) {
 					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders );
-					if ( ! candidates.length ) throw new Error( 'No free player position exists within this world’s spawn radius' );
+					if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
 					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
 					const admitted = await admissionSession.admit( this.player, candidates );
 					this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
@@ -611,7 +615,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				unregisterWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 				this.disposeUncommittedWorldComponents( this.linkedWorldRoot );
 				connector.close();
-				throw new Error( `Unable to enter this world: ${error.message}` );
+				throw new Error( `Unable to enter this ThruHold: ${error.message}` );
 			}
 			this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
 			scene.add( this.linkedWorldRoot );
@@ -670,7 +674,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			camera, input: this.input, terrain: { heightAt: () => - 1000000 },
 			colliders: this.hostedColliders, query: this.hostedQuery, boat: null,
 		} );
-		await progress( 0.08, 'Preparing the world lighting…', undefined, 'atmosphere' );
+		await progress( 0.08, 'Preparing the ThruHold lighting…', undefined, 'atmosphere' );
 		this.atmosphere = new Atmosphere( engine );
 		this.sky = new Sky( this.atmosphere );
 		this.environment = new Environment( engine, scene, this.sky );
@@ -695,7 +699,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		} );
 		engine.setRenderScale( this.settings.renderScale );
 
-		await progress( 0.18, 'Connecting to world…', undefined, 'world' );
+		await progress( 0.18, 'Connecting to ThruHold…', undefined, 'world' );
 		const connector = this.worldConnector;
 		const manifestResult = await this.worldManifestPromise;
 		if ( manifestResult.error ) throw manifestResult.error;
@@ -711,11 +715,13 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const initialObjects = this.localStaticWorld ? [] : selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 160 } );
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 		for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
+		for ( const objectID of connector.initialRegionVisualObjectIDs || [] ) initialObjectIDs.add( objectID );
 		for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
 		const assets = await connector.preload( { through: 'background', assetIDs, concurrency: 2 } );
 		this.linkedWorldRoot = await loadWorldPackage( connector, { assets, objectIDs: initialObjectIDs } );
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
+		this.player.hostedCollisionGuard = ( from, to ) => connector.isCollisionPathReady( from, to, this.linkedWorldRoot?.userData?.worldPackage );
 		this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
 		scene.add( this.linkedWorldRoot );
 		this.player.setHostedWorldPose( camera.position, spawn.yaw, spawn.pitch );
@@ -1045,15 +1051,15 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
-		const installRank = { 'tidewater.terrain-surface/1': 0, 'tidewater.static-vegetation/1': 1, 'tidewater.downeast-boat/1': 1, 'tidewater.example-island-wildlife/1': 2 };
+		const installRank = { 'elsemesh.terrain-surface/1': 0, 'elsemesh.static-vegetation/1': 1, 'elsemesh.downeast-boat/1': 1, 'elsemesh.example-island-wildlife/1': 2 };
 		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( installRank[ a.type ] ?? 1 ) - ( installRank[ b.type ] ?? 1 ) );
 		for ( const component of components ) {
-			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.grassMaskAssetId && ! connector.assets.has( component.grassMaskAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'tidewater.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'tidewater.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
+			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.grassMaskAssetId && ! connector.assets.has( component.grassMaskAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'elsemesh.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'elsemesh.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
 			const count = installed.length;
-			if ( component.type === 'tidewater.procedural-island-vegetation/1' || component.type === 'tidewater.static-vegetation/1' ) {
+			if ( component.type === 'elsemesh.procedural-island-vegetation/1' || component.type === 'elsemesh.static-vegetation/1' ) {
 				if ( ! this.vegetationEnabled ) continue;
 				const placementRecords = component.placementAssetId ? readVegetationPlacements( connector, component ) : null;
-				const staticVegetation = component.type === 'tidewater.static-vegetation/1';
+				const staticVegetation = component.type === 'elsemesh.static-vegetation/1';
 				const grassMask = component.grassMaskAssetId ? decodeGrassDensityAsset( connector.assets.get( component.grassMaskAssetId ) ) : null;
 				const grassTerrain = staticVegetation ? root.userData.terrainData : this.terrainData;
 				if ( grassMask && ! grassTerrain ) continue;
@@ -1064,7 +1070,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				} else {
 					installed.push( new Vegetation( { scene: root, terrain: staticVegetation ? grassTerrain : this.terrainData, village: staticVegetation ? null : this.village, includeGrass: staticVegetation ? !! grassMask : true, grassMask, placementRecords } ) );
 				}
-			} else if ( component.type === 'tidewater.terrain-surface/1' ) {
+			} else if ( component.type === 'elsemesh.terrain-surface/1' ) {
 				const fallback = root.children.find( ( child ) => child.userData.worldObjectId === component.objectId );
 				const replacedObjects = root.userData.worldPackage?.replacedByComponents || ( root.userData.worldPackage.replacedByComponents = new Set() );
 				replacedObjects.add( component.objectId );
@@ -1076,11 +1082,11 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				const terrain = new Terrain( { scene: root, terrainData, terrainGPU } );
 				if ( fallback ) fallback.visible = false;
 				installed.push( {
-					islandTerrain: true, terrainGPU,
+					islandTerrain: true, terrain, terrainGPU,
 					update: ( _dt, camera ) => terrain.update( camera, true ),
 					dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); terrainGPU.dispose(); if ( fallback ) fallback.visible = true; },
 				} );
-			} else if ( component.type === 'tidewater.example-island-wildlife/1' ) {
+			} else if ( component.type === 'elsemesh.example-island-wildlife/1' ) {
 				const terrain = root.userData.terrainData;
 				if ( ! terrain ) throw new Error( `Wildlife component ${component.id} requires the packaged terrain surface to install first` );
 				const vegetation = [ ...( root.userData.worldComponents || [] ), ...installed ].find( runtime => runtime.records?.palms ) || null;
@@ -1093,7 +1099,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					update: ( dt, camera, player ) => wildlife.update( dt, camera, player ),
 					dispose: () => wildlife.dispose(),
 				} );
-			} else if ( component.type === 'tidewater.procedural-island-terrain/1' ) {
+			} else if ( component.type === 'elsemesh.procedural-island-terrain/1' ) {
 				const fallback = root.children.find( ( child ) => child.userData.worldObjectId === component.objectId );
 				const replacedObjects = root.userData.worldPackage?.replacedByComponents || ( root.userData.worldPackage.replacedByComponents = new Set() );
 				replacedObjects.add( component.objectId );
@@ -1104,7 +1110,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					update: ( _dt, camera ) => terrain.update( camera, false ),
 					dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); if ( fallback ) fallback.visible = true; },
 				} );
-			} else if ( component.type === 'tidewater.static-reef/1' ) {
+			} else if ( component.type === 'elsemesh.static-reef/1' ) {
 				const { records } = readReefPlacements( connector, component );
 				let reef = root.userData.staticReef;
 				if ( reef ) {
@@ -1123,7 +1129,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					} );
 				}
 				installedIDs.add( component.id );
-			} else if ( component.type === 'tidewater.static-fish-props/1' ) {
+			} else if ( component.type === 'elsemesh.static-fish-props/1' ) {
 				const fishProps = new FishProps();
 				fishProps.items = readFishPropPlacements( connector, component );
 				const mesh = fishProps.build();
@@ -1132,7 +1138,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					fishProps: true,
 					dispose: () => { root.remove( mesh ); fishProps.dispose(); },
 				} );
-			} else if ( component.type === 'tidewater.humpback-whale/1' ) {
+			} else if ( component.type === 'elsemesh.humpback-whale/1' ) {
 				const whale = new Whale( {
 					scene: root,
 					terrain: root.userData.terrainData || null,
@@ -1151,7 +1157,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					throw error;
 				}
 				installed.push( { whale: true, whaleInstance: whale, update: ( dt, camera ) => whale.update( dt, camera ), dispose: () => whale.dispose() } );
-			} else if ( component.type === 'tidewater.island-ocean/1' ) {
+			} else if ( component.type === 'elsemesh.island-ocean/1' ) {
 				const lod = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
 				const mesh = new Mesh( lod.geometry, this.waterMaterial );
 				mesh.frustumCulled = false;
@@ -1159,7 +1165,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				mesh.layers.set( LAYERS.WATER );
 				root.add( mesh );
 				installed.push( { islandOcean: true, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); } } );
-			} else if ( component.type === 'tidewater.water-body/1' ) {
+			} else if ( component.type === 'elsemesh.water-body/1' ) {
 				const extent = component.extent;
 				const lod = new CDLOD( {
 					gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25,
@@ -1178,14 +1184,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				mesh.layers.set( LAYERS.WATER );
 				root.add( mesh );
 				installed.push( { waterBody: true, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
-			} else if ( component.type === 'tidewater.ambient-audio/1' ) {
+			} else if ( component.type === 'elsemesh.ambient-audio/1' ) {
 				// SoundScape consumes the signed component from the connector directly; record
 				// installation here so view streaming does not repeatedly request its loop assets.
 				installedIDs.add( component.id );
-			} else if ( component.type === 'tidewater.village-materials/2' ) {
+			} else if ( component.type === 'elsemesh.village-materials/2' ) {
 				// WorldPackage loads these maps only when the associated village object is needed.
 				installed.push( { dispose() {} } );
-			} else if ( component.type === 'tidewater.downeast-boat/1' ) {
+			} else if ( component.type === 'elsemesh.downeast-boat/1' ) {
 				const object = connector.manifest.objects.find( ( candidate ) => candidate.id === component.objectId );
 				if ( ! object ) throw new Error( `Boat component ${component.id} has no berth object` );
 				const boat = new HostedBoat( { root, component, object } );
@@ -1207,13 +1213,18 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	activateHostedWorld( root, connector, presenceSession = null ) {
 
 		this.prepareHostedWorld( connector );
+		const experience = connector.manifest.experience;
 		// The built-in ocean belongs to the default Tidewater scene. Hosted worlds
 		// render water only through their own declared world components.
 		this.ocean.visible = false;
 		const terrain = ( root.userData.worldComponents || [] ).find( ( component ) => component.islandTerrain && component.terrainGPU );
 		if ( terrain ) {
 			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
-			if ( connector.worldId === 'tw-world:example-island' ) {
+			if ( terrain.terrain && this.terrain.wetness ) {
+				terrain.terrain.wetness = this.terrain.wetness;
+				terrain.terrain.finalizeMaterial();
+			}
+			if ( hasWorldBehavior( experience, 'elsemesh.shore-aware-boat/1' ) ) {
 				// Keep the hosted boat's hydrostatics on the same terrain-shaped, shoreline-aware
 				// surface as the built-in Tidewater boat. A deep-water-only query overstates swell
 				// at the pier and can roll the moored boat over.
@@ -1230,6 +1241,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			terrain.groundBounce.activate();
 		}
 		const runtime = ( root.userData.worldComponents || [] ).find( ( component ) => component.hostedBoat );
+		this.activeHostedOcean = ( root.userData.worldComponents || [] ).some( ( component ) => component.islandOcean );
 		this.activeHostedBoat = runtime || null;
 		this.player.boat = runtime ? runtime.activate( { query: this.hostedQuery, colliders: this.hostedColliders } ) : null;
 		const wildlife = ( root.userData.worldComponents || [] ).find( ( component ) => component.wildlife )?.wildlifeRuntime;
@@ -1242,9 +1254,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const policy = vehiclePolicy( connector.manifest.rules );
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
 		}
-		if ( connector.worldId === 'tw-world:example-island' ) {
+		if ( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ) ) {
 			const worldTerrain = root.userData.terrainData || this.terrainData;
-			if ( ! this.game ) this.game = new Game( this, { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
+			if ( ! this.game ) this.game = new Game( this, { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl, experience } );
 			this.game.setWorldContext( { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
 			this.game.setWorldActive( true );
 		} else this.game?.setWorldActive( false );
@@ -1284,6 +1296,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		this.activeHostedWildlife = null;
 		this.activeHostedWhale = null;
+		this.activeHostedOcean = false;
 		const runtime = this.activeHostedBoat;
 		if ( ! runtime ) return;
 		const controller = runtime.boat.controller;
@@ -1301,8 +1314,29 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	}
 
 	updateWorldComponents( root, dt, camera ) {
+		stepWorldPackageExtensions( root, dt, {
+			player: this.player,
+			input: this.input,
+			boat: this.activeHostedBoat?.boat.controller || ( this.remoteWorldActive ? null : this.boatCtl ),
+			gameRuntime: this.game?.runtime || null,
+			timeOfDay: this.settings.timeOfDay,
+		} );
 		const components = root?.userData?.worldComponents || [];
 		for ( const component of components ) component.update?.( dt, camera, this.player );
+	}
+
+	updateFreeCamera( dt ) {
+		const previous = this.camera.position.clone();
+		this.fly.update( dt );
+		const connector = this.worldConnector;
+		const packageState = this.linkedWorldRoot?.userData?.worldPackage;
+		if ( ! this.remoteWorldActive || ! connector?.localOnly || ! packageState ) return;
+		const from = previous.clone().setY( previous.y - 1.62 );
+		const to = this.camera.position.clone().setY( this.camera.position.y - 1.62 );
+		if ( ! connector.isCollisionPathReady( from, to, packageState ) ) {
+			this.camera.position.copy( previous );
+			this.fly.velocity.set( 0, 0, 0 );
+		}
 	}
 
 	updateWorldStreaming() {
@@ -1323,6 +1357,35 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			if ( releaseObjectIDs.size ) unloadWorldPackageObjects( root, connector, this.hostedColliders, releaseObjectIDs );
 		}
 		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: this.localStaticWorld ? 48 : connector.localOnly ? 160 : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
+		if ( connector.localOnly && connector.collisionObjectIDsAlongPath ) {
+			const flying = this.freeCam;
+			const position = flying ? this.camera.position.clone().setY( this.camera.position.y - 1.62 ) : this.player.position.clone();
+			const direction = new Vector3();
+			let speed;
+			if ( flying ) {
+				if ( this.fly.velocity.lengthSq() > 0.01 ) direction.copy( this.fly.velocity );
+				else this.camera.getWorldDirection( direction );
+				speed = this.fly.speed * ( this.input.down( 'ShiftLeft' ) || this.input.down( 'ShiftRight' ) ? 6 : 1 );
+				speed = Math.max( speed, this.fly.velocity.length() );
+			} else {
+				const axes = this.input.moveAxes();
+				const forward = new Vector3( - Math.sin( this.player.yaw ), 0, - Math.cos( this.player.yaw ) );
+				const right = new Vector3( - forward.z, 0, forward.x );
+				direction.addScaledVector( forward, axes.y ).addScaledVector( right, axes.x );
+				if ( direction.lengthSq() < 0.01 ) direction.set( - Math.sin( this.player.yaw ), 0, - Math.cos( this.player.yaw ) );
+				const sprinting = this.input.down( 'ShiftLeft' ) || this.input.down( 'ShiftRight' );
+				speed = Math.max( sprinting ? this.player.worldMovement.sprintSpeed : this.player.worldMovement.walkSpeed, this.player.velocity.length() );
+			}
+			if ( direction.lengthSq() > 0 ) direction.normalize();
+			const cellSize = connector.cellSizeMeters || 8;
+			const lookahead = collisionLookaheadDistance( speed, connector.collisionLoadLatencyMs || 2000, cellSize );
+			const destination = position.clone().addScaledVector( direction, lookahead );
+			const objectByID = new Map( connector.manifest.objects.map( object => [ object.id, object ] ) );
+			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) {
+				const object = objectByID.get( objectID );
+				if ( object && ! loaded.has( objectID ) && ! objects.some( selected => selected.id === objectID ) ) objects.push( object );
+			}
+		}
 		const wantedObjectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const installedComponents = root.userData.installedWorldComponentIDs || new Set();
 		const components = this.localStaticWorld ? [] : selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationComponent( component ) ) && ! installedComponents.has( component.id ) );
@@ -1380,7 +1443,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		const connector = this.worldConnector;
 		if ( ! this.remoteWorldActive || ! connector?.manifest?.portals ) {
-			this.clearPortalPreview();
+			this.clearPortalView();
 			return;
 		}
 		const current = this.camera.position;
@@ -1401,14 +1464,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const target = crossed || inRange.filter( ( candidate ) => candidate.portal.openView ).sort( ( a, b ) => a.distanceSq - b.distanceSq )[ 0 ] || inRange.sort( ( a, b ) => a.distanceSq - b.distanceSq )[ 0 ];
 		if ( ! target ) {
 			this.cancelUnneededPortalPreparations( null );
-			this.clearPortalPreview();
+			this.clearPortalView();
 			return;
 		}
 
 		const { portal } = target;
 		const portalKey = portal.connectionKey || portal.id;
 		this.cancelUnneededPortalPreparations( portalKey );
-		if ( ! portal.openView ) this.clearPortalPreview();
+		if ( ! portal.openView ) this.clearPortalView();
 		let preparation = this.portalPreparations.get( portalKey );
 		const attempt = preparation?.attempt || 0;
 		if ( preparation?.status === 'failed' && Date.now() >= preparation.retryAt ) {
@@ -1424,7 +1487,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			preparation = { status: 'loading', noticeShown: false, attempt, controller: new AbortController() };
 			this.portalPreparations.set( portalKey, preparation );
 			const signal = preparation.controller.signal;
-			connector.preparePortal( portal, { signal, onPreview: async ( { connector: destination, assets } ) => {
+			connector.preparePortal( portal, { signal, onPortalView: async ( { connector: destination, assets } ) => {
 				if ( signal.aborted ) return null;
 				if ( ! portal.openView ) return null;
 				const root = await loadWorldPackage( destination, { assets, signal, materialContext: this.worldVillageMaterialContext } );
@@ -1435,7 +1498,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				return { root };
 			} } ).then( async ( prepared ) => {
 			if ( signal.aborted ) { prepared.connector.close(); return; }
-			const root = prepared.preview?.root || await loadWorldPackage( prepared.connector, { assets: prepared.assets, signal, materialContext: this.worldVillageMaterialContext } );
+			const root = prepared.portalView?.root || await loadWorldPackage( prepared.connector, { assets: prepared.assets, signal, materialContext: this.worldVillageMaterialContext } );
 			preparation.root = root;
 			if ( signal.aborted ) { this.disposeUncommittedWorldComponents( root ); prepared.connector.close(); return; }
 			await this.installWorldComponents( root, prepared.connector, componentsThroughPriority( prepared.connector, 'visible', this.vegetationEnabled ) );
@@ -1464,11 +1527,11 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			preparation.entrySelectionPromise = chooseWorldEntryPoint( preparation.connector.manifest ).then( entry => { preparation.entrySelection = entry; } ).catch( error => { preparation.entrySelectionError = error; } ).finally( () => { preparation.entrySelectionReady = true; } );
 		}
 		if ( portal.openView && preparation.root && ( ! ridingVehicle || vehicleTransfer?.allowed ) ) {
-			if ( this.portalPreviewId !== portalKey ) this.clearPortalPreview();
-			this.portalPreviewId = portalKey;
+			if ( this.portalViewId !== portalKey ) this.clearPortalView();
+			this.portalViewId = portalKey;
 			this.portalView.setTarget( preparation.root, portal );
 		} else {
-			this.clearPortalPreview();
+			this.clearPortalView();
 		}
 
 		if ( ! crossed ) return;
@@ -1485,7 +1548,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				this.holdPlayerAtPortal( previous );
 				if ( ! preparation.entrySelectionNoticeShown ) {
 					preparation.entrySelectionNoticeShown = true;
-					this.ui?.ui?.toast( 'Could not choose an arrival point for this world', 3500 );
+					this.ui?.ui?.toast( 'Could not choose an arrival point for this ThruHold', 3500 );
 				}
 				return;
 			}
@@ -1515,7 +1578,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.holdPlayerAtPortal( previous );
 		if ( ! preparation.noticeShown ) {
 			preparation.noticeShown = true;
-			this.ui?.ui?.toast( preparation.status === 'failed' ? 'This portal could not load its destination' : 'Preparing the world beyond this portal…', 3500 );
+			this.ui?.ui?.toast( preparation.status === 'failed' ? 'This portal could not load its destination' : 'Preparing the next ThruHold…', 3500 );
 		}
 
 	}
@@ -1546,16 +1609,16 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		if ( ! sourceController ) return { allowed: false, reason: 'The current vehicle cannot be transferred' };
 		const policy = vehiclePolicy( destinationConnector.manifest.rules );
 		if ( ! policy.enabled ) return { allowed: false, reason: 'This ThruHold does not accept vehicles' };
-		if ( ! destinationConnector.manifest.components.some( ( component ) => component.type === 'tidewater.downeast-boat/1' ) ) return { allowed: false, reason: 'This ThruHold has no compatible boat berth' };
+		if ( ! destinationConnector.manifest.components.some( ( component ) => component.type === 'elsemesh.downeast-boat/1' ) ) return { allowed: false, reason: 'This ThruHold has no compatible boat berth' };
 		const combinedComplexity = destinationConnector.manifest.rules.avatarComplexity + DOWNEAST_BOAT_TRIANGLES;
 		if ( combinedComplexity > policy.maxCombinedComplexity ) return { allowed: false, reason: 'This vehicle exceeds the ThruHold complexity limit' };
 		return { allowed: true, maxSpeed: policy.maxSpeed };
 	}
 
-	clearPortalPreview() {
+	clearPortalView() {
 
 		this.portalView?.setTarget( null, null );
-		this.portalPreviewId = null;
+		this.portalViewId = null;
 
 	}
 
@@ -1584,7 +1647,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const sourceConnector = this.worldConnector;
 		const destinationConnector = preparation.connector;
 		const destinationRoot = preparation.root;
-		this.clearPortalPreview();
+		await loadWorldExtensions( destinationConnector, destinationRoot );
+		this.clearPortalView();
 		const sourceVehicleMode = this.player.mode;
 		const sourceVehicle = [ 'boat', 'deck' ].includes( sourceVehicleMode ) ? this.activeHostedBoat?.boat.controller?.transferState() : null;
 		const deckPosition = this.player.deckPos.clone();
@@ -1711,7 +1775,17 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				this.player.waterH = this.player.waterHeight();
 				this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
 			}
-			if ( this.freeCam ) this.fly.update( dt );
+			if ( this.activeHostedOcean ) {
+				// The packaged island-ocean mesh uses the shared water surface, so keep its
+				// shore simulation, breakers, spray, and camera query advancing while hosted.
+				updateWorldOceanFrame( {
+					dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
+					marineSnowUnderwater: this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH,
+					query: this.query, wake: this.wake, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
+					shoreSim: this.shoreSim, underwaterLighting: this.underwaterLighting, breakers: this.breakers, spray: this.spray,
+				} );
+			}
+			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.updateHostedWorld( dt );
 			if ( this.game?.active ) this.game.update( dt );
 			this.updateWorldPortals();
@@ -1724,8 +1798,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			if ( this.game && ! this.game.active ) this.game.setWorldActive( true );
 			this.boatCtl.update( dt );
 			this.boatSpray.update( dt );
-			this.wake.update( dt );
-			if ( this.freeCam ) this.fly.update( dt );
+			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.update( dt );
 			this.game.update( dt );
 
@@ -1750,9 +1823,13 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			// ---- water simulation
 			this.fft.update( dt );
 			this.seaDetail.update( dt );
-			this.query.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boatCtl.queueQueries();
-			this.query.update();
+			updateWorldOceanFrame( {
+				dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
+				marineSnowUnderwater: this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH,
+				query: this.query, wake: this.wake, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
+				shoreSim: this.shoreSim, underwaterLighting: this.underwaterLighting, breakers: this.breakers, spray: this.spray,
+			} );
 			if ( this.query.cpuValid ) {
 
 			const h0 = this.query.cpu[ 0 ];
@@ -1763,14 +1840,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 			}
 
-		if ( this.caustics ) this.caustics.update();
-		// drawn while any part of the view can be under water (the specks above the surface are dropped)
-		this.marineSnow.update( this.camera, this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH );
-		this.airMotes.update( dt, this.camera, this.cameraWaterHeight ?? 0 );
-		if ( this.shoreSim ) this.shoreSim.update();
-		this.underwaterLighting.update( this.camera );
-		this.breakers.update( this.camera );
-		this.spray.update();
 		if ( this.clouds ) this.clouds.update( dt, this.camera );
 		this.environment.update( dt );
 
@@ -1809,8 +1878,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.post.beginFrame();
 		this.underwater.updateCamera( this.camera );
 		this.shadows.render( this.scene, this.engine.meshRenderer, this.shadows.update( this.camera, G.sunDir.value ) );
-		this.portalView.render( performance.now(), this.camera, this.renderLoadBias );
-		if ( this.remoteWorldActive ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera );
+		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
+		if ( this.remoteWorldActive && portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera );
 		this.sceneRenderer.render();
 		if ( this.post.flare ) this.post.flare.kernel.dispatch( 1 );
 		this.post.render();
@@ -1855,7 +1924,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const listener = { position: p, forward: f.fwd, up: f.up };
 		if ( this.remoteWorldActive && this.worldConnector ) {
 			const connector = this.worldConnector;
-			const components = ( connector.manifest.components || [] ).filter( ( component ) => component.type === 'tidewater.ambient-audio/1' );
+			const components = ( connector.manifest.components || [] ).filter( ( component ) => component.type === 'elsemesh.ambient-audio/1' );
 			this.audio.setWorldAmbience( connector.worldId, components, connector.assets );
 			if ( this.audio.enabled ) {
 				const h = this.cameraWaterHeight ?? G.seaLevel.value;
@@ -1907,7 +1976,7 @@ function readVegetationPlacements( connector, component ) {
 }
 
 function componentAssetIDs( component ) {
-	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.grassMaskAssetId ? [ component.grassMaskAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.type === 'tidewater.humpback-whale/1' ? [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
+	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.grassMaskAssetId ? [ component.grassMaskAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.type === 'elsemesh.humpback-whale/1' ? [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
 }
 
 function readReefPlacements( connector, component ) {
@@ -1926,7 +1995,7 @@ function reefPlacementCapacity( connector ) {
 	const assets = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset ] ) );
 	let capacity = 0;
 	for ( const component of connector.manifest.components || [] ) {
-		if ( component.type !== 'tidewater.static-reef/1' ) continue;
+		if ( component.type !== 'elsemesh.static-reef/1' ) continue;
 		const asset = assets.get( component.placementAssetId );
 		if ( ! asset || ! Number.isSafeInteger( asset.bytes ) || asset.bytes < REEF_PLACEMENT_HEADER_BYTES || ( asset.bytes - REEF_PLACEMENT_HEADER_BYTES ) % REEF_PLACEMENT_RECORD_BYTES !== 0 ) throw new Error( `Reef component ${component.id} has an invalid placement asset size` );
 		capacity += ( asset.bytes - REEF_PLACEMENT_HEADER_BYTES ) / REEF_PLACEMENT_RECORD_BYTES;
@@ -1944,7 +2013,7 @@ function componentsThroughPriority( connector, through, vegetationEnabled ) {
 }
 
 function isVegetationComponent( component ) {
-	return component.type === 'tidewater.procedural-island-vegetation/1' || component.type === 'tidewater.static-vegetation/1';
+	return component.type === 'elsemesh.procedural-island-vegetation/1' || component.type === 'elsemesh.static-vegetation/1';
 }
 
 function sameVegetationPlacements( left, right ) {

@@ -55,7 +55,7 @@ func TestBrowserWebRTCDataChannelServesSignedManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	channel, err := client.CreateDataChannel("elsemesh-world-v1", &webrtc.DataChannelInit{Ordered: ptrBool(true)})
+	channel, err := client.CreateDataChannel("elsemesh", &webrtc.DataChannelInit{Ordered: ptrBool(true)})
 	if err != nil {
 		t.Fatal(err)
 	}

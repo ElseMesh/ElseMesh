@@ -14,11 +14,11 @@ func TestWorldProfileDataDirectoriesAreIsolated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := worldProfileDataDir(root, "loz-forest")
+	second, err := worldProfileDataDir(root, "second-world")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first == second || first != filepath.Join(root, "example-island") || second != filepath.Join(root, "loz-forest") {
+	if first == second || first != filepath.Join(root, "example-island") || second != filepath.Join(root, "second-world") {
 		t.Fatalf("profile data directories are not isolated: %q, %q", first, second)
 	}
 }
@@ -35,7 +35,7 @@ func TestWorldProfileRejectsPathTraversalAndInvalidNames(t *testing.T) {
 
 func TestListWorldProfilesReturnsOnlySelectableDirectories(t *testing.T) {
 	root := t.TempDir()
-	for _, name := range []string{"example-island", "loz_forest", "Not-A-Profile"} {
+	for _, name := range []string{"example-island", "second_world", "Not-A-Profile"} {
 		if err := os.Mkdir(filepath.Join(root, name), 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,7 @@ func TestListWorldProfilesReturnsOnlySelectableDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"example-island", "loz_forest"}; !reflect.DeepEqual(profiles, want) {
+	if want := []string{"example-island", "second_world"}; !reflect.DeepEqual(profiles, want) {
 		t.Fatalf("world profiles = %v; want %v", profiles, want)
 	}
 }

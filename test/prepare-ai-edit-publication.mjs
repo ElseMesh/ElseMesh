@@ -62,9 +62,9 @@ try {
 	await writeFile( path.join( candidatePath, 'assets', newAssetId.slice( 7 ) ), newAssetBytes );
 	await writeFile( path.join( candidatePath, 'assets', newLODId.slice( 7 ) ), newLODBytes );
 
-	const base = createWorldSource( { worldId: 'tw-world:prepare-publication-test', title: 'Owner world' } );
+	const base = createWorldSource( { worldId: 'elsemesh:prepare-publication-test', title: 'Owner world' } );
 	base.objects.push( {
-		id: 'tw-object:base-prop', kind: 'asset-instance', label: 'Existing prop', assetId: baseAssetId, streamingBounds: { center: [ 0, 0, 0 ], radius: 2 }, lods: [ { assetId: baseLODId, maxScreenFraction: 0.1 } ],
+		id: 'elsemesh-object:base-prop', kind: 'asset-instance', label: 'Existing prop', assetId: baseAssetId, streamingBounds: { center: [ 0, 0, 0 ], radius: 2 }, lods: [ { assetId: baseLODId, maxScreenFraction: 0.1 } ],
 		transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ],
 		collision: { shape: 'none', enabled: false },
 	} );
@@ -74,7 +74,7 @@ try {
 	const candidate = structuredClone( base );
 	candidate.title = 'Owner world with a new prop';
 	candidate.objects.push( {
-		id: 'tw-object:ai-prop', kind: 'asset-instance', label: 'AI-created prop', assetId: newAssetId, streamingBounds: { center: [ 0, 0, 0 ], radius: 2 }, lods: [ { assetId: newLODId, maxScreenFraction: 0.1 } ],
+		id: 'elsemesh-object:ai-prop', kind: 'asset-instance', label: 'AI-created prop', assetId: newAssetId, streamingBounds: { center: [ 0, 0, 0 ], radius: 2 }, lods: [ { assetId: newLODId, maxScreenFraction: 0.1 } ],
 		transform: { position: [ 2, 0, 1 ], yaw: 0 }, scale: [ 1, 1, 1 ],
 		collision: { shape: 'none', enabled: false },
 	} );
@@ -109,7 +109,7 @@ try {
 	assert.equal( preparedReport.preview.sha256, hash( previewBytes ) );
 	assert.match( preparedReport.candidateBlendHash, /^sha256:[0-9a-f]{64}$/ );
 	assert.deepEqual( await readFile( path.join( outputPath, 'review-preview.png' ) ), previewBytes );
-	assert.deepEqual( preparedReport.addedObjectIds, [ 'tw-object:ai-prop' ], 'prepared review is derived from source snapshots rather than the worker change summary' );
+	assert.deepEqual( preparedReport.addedObjectIds, [ 'elsemesh-object:ai-prop' ], 'prepared review is derived from source snapshots rather than the worker change summary' );
 	assert.deepEqual( preparedReport.changedWorldFields, [ 'title' ] );
 	const preparedHTML = await readFile( path.join( outputPath, 'review.html' ), 'utf8' );
 	assert.ok( preparedHTML.includes( 'base.world-source.json' ) );

@@ -6,58 +6,58 @@ import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 //    markers pulse on the minimap). Enter / Space / click: next, Esc: skip. Replay from the help (F1).
 //  - one-time tips the first time something happens (rod out, first nibble, fish on, first catch,
 //    full cooler, next to the boat, at Joe's, at Marta's), in a card above the minimap.
-// Seen state in localStorage ('tidewater.guide'), wrapped in try/catch.
+// Seen state in localStorage ('elsemesh.guide'), wrapped in try/catch.
 //   const guide = new Guide( ui, game, minimap );  guide.update( dt );  guide.replay()
 
-const KEY = 'tidewater.guide';
+const KEY = 'elsemesh.guide';
 
 const CSS = /* css */`
 .gm-guide { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; visibility: hidden;
 	background: radial-gradient(70% 70% at 50% 50%, rgba(4, 10, 16, 0.2), rgba(4, 10, 16, 0.55));
-	transition: opacity 420ms var(--tw-ease), visibility 0s linear 420ms; }
-.gm-guide.is-on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 420ms var(--tw-ease), visibility 0s; }
-.gm-guide-card { width: min(calc(480 * var(--tw-u)), calc(100vw - 2 * var(--tw-edge))); padding: var(--tw-5) var(--tw-5) var(--tw-4); border-radius: var(--tw-r-lg);
-	color: var(--tw-ink); font: 500 var(--tw-fs-md) var(--tw-font); transform: translateY(calc(10 * var(--tw-u))); transition: transform 520ms var(--tw-ease); }
+	transition: opacity 420ms var(--em-ease), visibility 0s linear 420ms; }
+.gm-guide.is-on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 420ms var(--em-ease), visibility 0s; }
+.gm-guide-card { width: min(calc(480 * var(--em-u)), calc(100vw - 2 * var(--em-edge))); padding: var(--em-5) var(--em-5) var(--em-4); border-radius: var(--em-r-lg);
+	color: var(--em-ink); font: 500 var(--em-fs-md) var(--em-font); transform: translateY(calc(10 * var(--em-u))); transition: transform 520ms var(--em-ease); }
 .gm-guide.is-on .gm-guide-card { transform: none; }
-.gm-guide-eyebrow { font-size: var(--tw-fs-xs); font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tw-sun); }
-.gm-guide-card h2 { margin: var(--tw-2) 0 var(--tw-3); font-size: calc(24 * var(--tw-u)); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
-.gm-guide-body { color: var(--tw-ink-2); line-height: 1.55; }
-.gm-guide-body p { margin: 0 0 var(--tw-3); }
-.gm-guide-body b { color: var(--tw-ink); font-weight: 600; }
-.gm-guide-list { display: grid; gap: calc(7 * var(--tw-u)); margin: 0 0 var(--tw-3); }
-.gm-guide-row { display: grid; grid-template-columns: calc(92 * var(--tw-u)) 1fr; gap: var(--tw-3); align-items: baseline; }
+.gm-guide-eyebrow { font-size: var(--em-fs-xs); font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--em-sun); }
+.gm-guide-card h2 { margin: var(--em-2) 0 var(--em-3); font-size: calc(24 * var(--em-u)); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+.gm-guide-body { color: var(--em-ink-2); line-height: 1.55; }
+.gm-guide-body p { margin: 0 0 var(--em-3); }
+.gm-guide-body b { color: var(--em-ink); font-weight: 600; }
+.gm-guide-list { display: grid; gap: calc(7 * var(--em-u)); margin: 0 0 var(--em-3); }
+.gm-guide-row { display: grid; grid-template-columns: calc(92 * var(--em-u)) 1fr; gap: var(--em-3); align-items: baseline; }
 .gm-guide-row .k { display: flex; flex-wrap: wrap; gap: 3px; }
-.gm-guide-row kbd { font: 600 var(--tw-fs-xs) var(--tw-mono); color: var(--tw-ink); padding: 1px calc(6 * var(--tw-u)); border-radius: calc(4 * var(--tw-u));
-	border: 1px solid var(--tw-line-2); background: var(--tw-fill); }
-.gm-guide-where { display: grid; gap: var(--tw-2); margin: var(--tw-1) 0 var(--tw-3); }
-.gm-guide-where div { display: flex; align-items: center; gap: var(--tw-3); padding: var(--tw-2) var(--tw-3); border-radius: var(--tw-r-md); background: var(--tw-fill); border: 1px solid var(--tw-line); }
-.gm-guide-where i { width: calc(12 * var(--tw-u)); height: calc(12 * var(--tw-u)); border-radius: 50%; flex: none; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8); }
-.gm-guide-where .is-joe i { background: var(--tw-sun); }
-.gm-guide-where .is-marta i { background: var(--tw-aqua); }
+.gm-guide-row kbd { font: 600 var(--em-fs-xs) var(--em-mono); color: var(--em-ink); padding: 1px calc(6 * var(--em-u)); border-radius: calc(4 * var(--em-u));
+	border: 1px solid var(--em-line-2); background: var(--em-fill); }
+.gm-guide-where { display: grid; gap: var(--em-2); margin: var(--em-1) 0 var(--em-3); }
+.gm-guide-where div { display: flex; align-items: center; gap: var(--em-3); padding: var(--em-2) var(--em-3); border-radius: var(--em-r-md); background: var(--em-fill); border: 1px solid var(--em-line); }
+.gm-guide-where i { width: calc(12 * var(--em-u)); height: calc(12 * var(--em-u)); border-radius: 50%; flex: none; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.8); }
+.gm-guide-where .is-joe i { background: var(--em-sun); }
+.gm-guide-where .is-marta i { background: var(--em-aqua); }
 .gm-guide-where span { flex: 1; }
-.gm-guide-where em { font-style: normal; font-family: var(--tw-mono); font-size: var(--tw-fs-sm); color: var(--tw-ink-2); white-space: nowrap; }
-.gm-guide-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--tw-3); margin-top: var(--tw-4); }
+.gm-guide-where em { font-style: normal; font-family: var(--em-mono); font-size: var(--em-fs-sm); color: var(--em-ink-2); white-space: nowrap; }
+.gm-guide-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--em-3); margin-top: var(--em-4); }
 .gm-guide-dots { display: flex; gap: 6px; }
-.gm-guide-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--tw-fill-2); transition: background var(--tw-med), width var(--tw-med) var(--tw-ease); }
-.gm-guide-dots span.is-on { width: 18px; border-radius: 3px; background: var(--tw-sun); }
-.gm-guide-btns { display: flex; align-items: center; gap: var(--tw-2); }
-.gm-guide-hint { color: var(--tw-ink-3); font-size: var(--tw-fs-xs); margin-right: var(--tw-2); }
-.gm-coach { position: absolute; right: var(--tw-edge); bottom: calc(var(--tw-edge) + 184 * var(--tw-u) + var(--tw-3)); width: min(calc(290 * var(--tw-u)), calc(100vw - 2 * var(--tw-edge)));
-	padding: var(--tw-3) var(--tw-4); border-radius: var(--tw-r-lg); color: var(--tw-ink); font: 500 var(--tw-fs-sm) var(--tw-font); line-height: 1.5;
-	pointer-events: none; opacity: 0; transform: translateY(calc(8 * var(--tw-u))); visibility: hidden;
-	transition: opacity 360ms var(--tw-ease), transform 480ms var(--tw-ease), visibility 0s linear 480ms, right var(--tw-slow) var(--tw-ease); }
-.tw-root[data-panel='open'] .gm-coach { right: calc(var(--tw-panel-w) + 2 * var(--tw-3)); }
-.gm-coach.is-on { opacity: 1; transform: none; visibility: visible; transition: opacity 360ms var(--tw-ease), transform 480ms var(--tw-ease), visibility 0s, right var(--tw-slow) var(--tw-ease); }
-.gm-coach-eyebrow { display: block; margin-bottom: 3px; font-size: var(--tw-fs-xs); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--tw-aqua); }
-.gm-coach b { color: var(--tw-ink); font-weight: 600; }
-.gm-coach kbd { font: 600 var(--tw-fs-xs) var(--tw-mono); color: var(--tw-ink); padding: 0 calc(5 * var(--tw-u)); border-radius: calc(4 * var(--tw-u)); border: 1px solid var(--tw-line-2); background: var(--tw-fill); }
+.gm-guide-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--em-fill-2); transition: background var(--em-med), width var(--em-med) var(--em-ease); }
+.gm-guide-dots span.is-on { width: 18px; border-radius: 3px; background: var(--em-sun); }
+.gm-guide-btns { display: flex; align-items: center; gap: var(--em-2); }
+.gm-guide-hint { color: var(--em-ink-3); font-size: var(--em-fs-xs); margin-right: var(--em-2); }
+.gm-coach { position: absolute; right: var(--em-edge); bottom: calc(var(--em-edge) + 184 * var(--em-u) + var(--em-3)); width: min(calc(290 * var(--em-u)), calc(100vw - 2 * var(--em-edge)));
+	padding: var(--em-3) var(--em-4); border-radius: var(--em-r-lg); color: var(--em-ink); font: 500 var(--em-fs-sm) var(--em-font); line-height: 1.5;
+	pointer-events: none; opacity: 0; transform: translateY(calc(8 * var(--em-u))); visibility: hidden;
+	transition: opacity 360ms var(--em-ease), transform 480ms var(--em-ease), visibility 0s linear 480ms, right var(--em-slow) var(--em-ease); }
+.em-root[data-panel='open'] .gm-coach { right: calc(var(--em-panel-w) + 2 * var(--em-3)); }
+.gm-coach.is-on { opacity: 1; transform: none; visibility: visible; transition: opacity 360ms var(--em-ease), transform 480ms var(--em-ease), visibility 0s, right var(--em-slow) var(--em-ease); }
+.gm-coach-eyebrow { display: block; margin-bottom: 3px; font-size: var(--em-fs-xs); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--em-aqua); }
+.gm-coach b { color: var(--em-ink); font-weight: 600; }
+.gm-coach kbd { font: 600 var(--em-fs-xs) var(--em-mono); color: var(--em-ink); padding: 0 calc(5 * var(--em-u)); border-radius: calc(4 * var(--em-u)); border: 1px solid var(--em-line-2); background: var(--em-fill); }
 
-.tw-help-guide { display: flex; align-items: center; gap: var(--tw-4); margin-top: var(--tw-4); padding-top: var(--tw-4); border-top: 1px solid var(--tw-line);
-	color: var(--tw-ink-2); font-size: var(--tw-fs-sm); line-height: 1.5; }
-.tw-help-guide b { color: var(--tw-ink); }
-.tw-help-guide .gm-btn { flex: none; }
-@media (max-height: 860px) { .gm-coach { right: calc(var(--tw-edge) + 58 * var(--tw-u)); } }
-@media (max-width: 640px) { .tw-help-guide { flex-direction: column; align-items: flex-start; } .gm-coach { bottom: calc(var(--tw-edge) + 128 * var(--tw-u) + var(--tw-3)); } .gm-guide-row { grid-template-columns: calc(78 * var(--tw-u)) 1fr; } }
+.em-help-guide { display: flex; align-items: center; gap: var(--em-4); margin-top: var(--em-4); padding-top: var(--em-4); border-top: 1px solid var(--em-line);
+	color: var(--em-ink-2); font-size: var(--em-fs-sm); line-height: 1.5; }
+.em-help-guide b { color: var(--em-ink); }
+.em-help-guide .gm-btn { flex: none; }
+@media (max-height: 860px) { .gm-coach { right: calc(var(--em-edge) + 58 * var(--em-u)); } }
+@media (max-width: 640px) { .em-help-guide { flex-direction: column; align-items: flex-start; } .gm-coach { bottom: calc(var(--em-edge) + 128 * var(--em-u) + var(--em-3)); } .gm-guide-row { grid-template-columns: calc(78 * var(--em-u)) 1fr; } }
 @media (prefers-reduced-motion: reduce) { .gm-guide-card, .gm-coach { transform: none !important; } }
 `;
 
@@ -95,7 +95,7 @@ const CARDS = [
 			<div class="is-joe"><i></i><span><b>Joe</b> · fish stand by the pier</span><em data-where="joe"></em></div>
 			<div class="is-marta"><i></i><span><b>Marta</b> · chandlery by the boathouse</span><em data-where="marta"></em></div>
 		</div>
-		<p style="margin:0;color:var(--tw-ink-3);font-size:var(--tw-fs-sm)">Both are marked on the map in the lower right.</p>`,
+		<p style="margin:0;color:var(--em-ink-3);font-size:var(--em-fs-sm)">Both are marked on the map in the lower right.</p>`,
 	},
 ];
 
@@ -140,7 +140,7 @@ export class Guide {
 		document.head.append( style );
 
 		this.seen = this._load();
-		this.el = h( 'div', 'gm-guide tw-interactive', `<div class="gm-guide-card tw-glass" role="dialog" aria-modal="true" aria-live="polite">
+		this.el = h( 'div', 'gm-guide em-interactive', `<div class="gm-guide-card em-glass" role="dialog" aria-modal="true" aria-live="polite">
 			<div class="gm-guide-eyebrow"></div><h2></h2><div class="gm-guide-body"></div>
 			<div class="gm-guide-foot"><div class="gm-guide-dots">${ CARDS.map( () => '<span></span>' ).join( '' ) }</div>
 			<div class="gm-guide-btns"><span class="gm-guide-hint">Enter · Esc to skip</span><button type="button" class="gm-btn is-ghost gm-guide-skip">Skip</button><button type="button" class="gm-btn gm-guide-next">Next</button></div></div></div>` );
@@ -164,7 +164,7 @@ export class Guide {
 		} );
 		ui.root.append( this.el );
 
-		this.coach = h( 'div', 'gm-coach tw-glass', '<span class="gm-coach-eyebrow">Tip</span><span class="gm-coach-text"></span>' );
+		this.coach = h( 'div', 'gm-coach em-glass', '<span class="gm-coach-eyebrow">Tip</span><span class="gm-coach-text"></span>' );
 		this.coachText = this.coach.lastChild;
 		( ui.hud || ui.root ).append( this.coach );
 

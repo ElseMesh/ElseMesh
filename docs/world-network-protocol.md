@@ -11,7 +11,7 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
 
 ## Identity and trust boundaries
 
-- `worldId` is the stable `tw-world:...` identifier. The owner's signed
+- `worldId` is the stable `elsemesh:...` identifier. The owner's signed
   manifest is the authority for world content and rules.
 - For provider discovery, the stable ElseMesh HostID is the owner's profile
   PeerID derived from `node.key`, bound to `worldId` by a signed host/session
@@ -21,6 +21,9 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   same HostID through their gateway without a ZeroTier client.
 - `ownerPeerId` identifies the owner node. Optional portal peer/gateway fields
   are routing hints. Browser routes use HTTPS/WSS.
+- Daemon-to-daemon world RPC streams negotiate `/elsemesh/world/3.0.0`. This
+  protocol ID follows the current ElseMesh world-manifest generation; v1 stream
+  peers are not negotiated as a compatibility fallback.
 - Content is addressed by SHA-256; clients verify signed declarations and
   downloaded bytes. A cache provider is not thereby a world owner.
 - The signed manifest may contain up to 256 host grants. Each grant names a
@@ -90,9 +93,12 @@ and revocation checks at the admission service and world authority.
 4. Optional libp2p/ZeroTier connects daemons, including authorized content
    caches. It does not make an ordinary browser a ZeroTier participant.
 
-Presence updates must reach the owner. The owner validates and stores the
-latest pose for each active connection, then returns a sorted snapshot. A cache
-or failover provider returns `presence_owner_required` rather than becoming a
+Gameplay and physics run in each visitor's browser wherever practical. Presence
+updates must reach the owner so other visitors can see the resulting avatar
+positions and modes. The owner validates and stores the latest pose for each
+active connection, then returns a sorted snapshot; receiving presence does not
+make the server run that visitor's ordinary gameplay simulation. A cache or
+failover provider returns `presence_owner_required` rather than becoming a
 second simulation authority.
 
 ## Neighbor redundancy: current protocol and requested preference model
@@ -160,8 +166,8 @@ owner resynchronization, and read-only portal traversal are future behavior.
 
 ## Current presence limits and checks
 
-The presence protocol is `elsemesh.player-presence/2` (legacy `/1` accepted for
-non-vehicle poses). A pose includes monotonic per-session sequence, bounded
+The presence protocol is `elsemesh.player-presence/2`; other protocol versions
+are rejected. A pose includes monotonic per-session sequence, bounded
 position/orientation, mode, appearance and optional vehicle speed. Position is
 limited to ±100,000 m; yaw to ±1,000 radians; pitch to ±1.5 radians. Appearance
 is selected from built-in male/female styles and four hex colors; no arbitrary
@@ -197,7 +203,7 @@ does not sum avatar costs into an owner-enforced aggregate budget.
 
 Vehicle pose is accepted only for the bundled boat/deck modes, only when the
 signed world enables `vehiclePolicy`, includes a compatible
-`tidewater.downeast-boat/1` component and supplies valid maximum speed and
+`elsemesh.downeast-boat/1` component and supplies valid maximum speed and
 combined complexity limits. The server uses the fixed 46,845-triangle boat
 contract and checks `avatarComplexity + boat triangles` against the signed
 maximum. The browser additionally checks destination policy before a portal
@@ -215,12 +221,14 @@ details.
 
 1. Select the signed route matching the side of the portal plane. Front and
    optional back routes have distinct destination records; the back requires
-   `tidewater.portal-two-sided/1`.
+   `elsemesh.portal-two-sided/1`.
 2. Resolve the destination by world ID (or validate the pinned provider), fetch
    and verify its owner-signed manifest, then stage `portal-preview` and
-   `visible` assets. Abort preparation if the portal is no longer selected.
-3. Render a read-only static preview when requested and prepared. Do not start
-   destination presence during preview.
+   `visible` assets. A reused source-world gateway is only a route/discovery
+   service unless it is also authorized to serve the destination world. Abort
+   preparation if the portal is no longer selected.
+3. Render a read-only view of the destination when requested and prepared. Do
+   not start destination presence while the visitor is only looking through it.
 4. Hold the player at the source threshold until destination content is ready.
    For a boat, check destination opt-in, component/berth compatibility, and
    combined complexity; hold at the threshold if any check fails.
@@ -236,7 +244,7 @@ details.
 
 Signed world experience metadata may declare a readiness contract containing
 bootstrap assets/components, the minimum visible set, required collision,
-spawn, lighting, and simulation state, and per-portal preview and crossing
+spawn, lighting, and simulation state, and per-portal view and crossing
 requirements. The client should release the loading screen after that contract
 is satisfied, then stream nearby and background content according to view,
 distance, bandwidth, and cancellation priority. Remote launches should
@@ -250,8 +258,8 @@ other objects nearest to and visible through the aperture, using progressive
 arrival similar to Second Life. Bootstrap the destination's global environment
 and dominant light sources too: a distant sun, sky, or emissive object can
 illuminate the doorway without appearing through the aperture. Render a
-provisional portal view from the data available so far, then refine its lighting
-as higher-priority destination data arrives. Apply the contribution only in a
+portal view from the destination data currently available, then refine its
+lighting as higher-priority destination data arrives. Apply the contribution only in a
 portal-local volume and cap its cost and intensity. When the scene is
 incomplete, use provisional or neutral lighting rather than presenting it as
 final. Full cross-world shadow maps and global-illumination transfer are

@@ -1,11 +1,11 @@
 # Ambient audio component
 
-`tidewater.ambient-audio/1` declares trusted data for continuous world ambience. It does not execute scripts or fetch an author-selected URL. Each bed points to an `audio/ogg` asset by its `sha256:<hex>` ID. The source converter verifies the bytes and records the asset reference in the signed manifest; `WorldConnector` verifies downloaded bytes before `SoundScape` decodes them.
+`elsemesh.ambient-audio/1` declares trusted data for continuous world ambience. It does not execute scripts or fetch an author-selected URL. Each bed points to an `audio/ogg` asset by its `sha256:<hex>` ID. The source converter verifies the bytes and records the asset reference in the signed manifest; `WorldConnector` verifies downloaded bytes before `SoundScape` decodes them.
 
 ```json
 {
-  "id": "tw-component:forest-ambience",
-  "type": "tidewater.ambient-audio/1",
+  "id": "elsemesh-component:forest-ambience",
+  "type": "elsemesh.ambient-audio/1",
   "priority": "portal-preview",
   "beds": [
     {

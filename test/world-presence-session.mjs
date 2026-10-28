@@ -7,7 +7,7 @@ const own = 'player:' + 'a'.repeat(64), remote = 'player:' + 'b'.repeat(64);
 let now = 0, options, sent = [], pending, closed = 0, disposed = 0;
 const created = [];
 const player = { position: new Vector3(1,2,3), velocity: new Vector3(0,0,-3), mode: 'walk', yaw: 10000, pitch: .1 };
-const connector = { worldId: 'tw-world:test', gateway: 'http://127.0.0.1:5193', manifest: { ownerPeerId: 'owner', rules: { avatarComplexity: 20000 } } };
+const connector = { worldId: 'elsemesh:test', gateway: 'http://127.0.0.1:5193', manifest: { ownerPeerId: 'owner', rules: { avatarComplexity: 20000 } } };
 const session = new WorldPresenceSession({connector, parent: {add(group){created.push(group)}}, clock: () => now,
  createConnector(value){ options=value; return {updatePresence(pose,{signal}){ sent.push({pose,signal}); return new Promise((resolve,reject)=>{pending={resolve,reject}})},close(){closed++}} },
  createAvatar({appearance,maxComplexity}){ assert.equal(maxComplexity,20000); return {group:{},setAppearance(){},update(dt,pose){this.pose=pose},dispose(){disposed++}} },

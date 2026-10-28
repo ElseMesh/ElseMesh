@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rebroad.github.io/tidewater/schemas/world-proposal.schema.json",
+  "$id": "https://elsemesh.github.io/schemas/world-proposal.schema.json",
   "title": "ElseMesh World Source Proposal",
   "description": "Unsigned, reviewable operations against one exact world-source snapshot. This document cannot authorize or publish a world.",
   "type": "object",
   "required": ["protocol", "worldId", "sourceHash", "operations"],
   "properties": {
     "protocol": { "const": "elsemesh.world-proposal/1" },
-    "worldId": { "type": "string", "pattern": "^tw-world:[\\w.-]{1,128}$" },
+    "worldId": { "type": "string", "pattern": "^elsemesh:[\\w.-]{1,128}$" },
     "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "operations": {
       "type": "array",
@@ -21,12 +21,12 @@
           },
           {
             "type": "object", "required": ["op", "id", "fields"],
-            "properties": { "op": { "const": "object.update" }, "id": { "type": "string", "pattern": "^tw-object:[\\w.-]{1,128}$" }, "fields": { "$ref": "#/$defs/objectFields" } },
+            "properties": { "op": { "const": "object.update" }, "id": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$" }, "fields": { "$ref": "#/$defs/objectFields" } },
             "additionalProperties": false
           },
           {
             "type": "object", "required": ["op", "id"],
-            "properties": { "op": { "const": "object.remove" }, "id": { "type": "string", "pattern": "^tw-object:[\\w.-]{1,128}$" } },
+            "properties": { "op": { "const": "object.remove" }, "id": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$" } },
             "additionalProperties": false
           },
           {
@@ -36,12 +36,12 @@
           },
           {
             "type": "object", "required": ["op", "id", "fields"],
-            "properties": { "op": { "const": "portal.update" }, "id": { "type": "string", "pattern": "^tw-portal:[\\w.-]{1,128}$" }, "fields": { "$ref": "#/$defs/portalFields" } },
+            "properties": { "op": { "const": "portal.update" }, "id": { "type": "string", "pattern": "^elsemesh-portal:[\\w.-]{1,128}$" }, "fields": { "$ref": "#/$defs/portalFields" } },
             "additionalProperties": false
           },
           {
             "type": "object", "required": ["op", "id"],
-            "properties": { "op": { "const": "portal.remove" }, "id": { "type": "string", "pattern": "^tw-portal:[\\w.-]{1,128}$" } },
+            "properties": { "op": { "const": "portal.remove" }, "id": { "type": "string", "pattern": "^elsemesh-portal:[\\w.-]{1,128}$" } },
             "additionalProperties": false
           },
           {
@@ -70,7 +70,7 @@
     "portalFields": {
       "type": "object", "minProperties": 1,
       "properties": {
-        "destinationWorldId": { "type": "string", "pattern": "^tw-world:[\\w.-]{1,128}$" },
+        "destinationWorldId": { "type": "string", "pattern": "^elsemesh:[\\w.-]{1,128}$" },
         "destinationPeerId": { "type": "string", "minLength": 20, "maxLength": 128 },
         "destinationGateway": { "type": "string", "format": "uri" },
         "entry": { "$ref": "world-source.schema.json#/$defs/transform" },

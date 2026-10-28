@@ -77,6 +77,22 @@ function arrayTexture( label, imgs, srgb ) {
 }
 
 let _assets = null;
+let _geometryData = null;
+
+export function loadStallGeometryData() {
+
+	return _geometryData || ( _geometryData = ( async () => {
+		const info = JSON.parse( new TextDecoder().decode( await bytes( BASE + 'props.json' ) ) );
+		const bin = await bytes( BASE + 'props.bin' );
+		return {
+			info,
+			verts: new Float32Array( bin, 0, info.vertexCount * info.vertexFloats ),
+			index: new Uint32Array( bin, info.indexByteOffset, info.indexCount ),
+		};
+	} )() );
+
+}
+
 export function loadStallAssets() {
 
 	return _assets || ( _assets = _load() );
@@ -86,14 +102,11 @@ export function loadStallAssets() {
 async function _load() {
 
 	const t0 = performance.now();
-	const info = JSON.parse( new TextDecoder().decode( await bytes( BASE + 'props.json' ) ) );
-	const bin = await bytes( BASE + 'props.bin' );
-	const verts = new Float32Array( bin, 0, info.vertexCount * info.vertexFloats );
-	const index = new Uint32Array( bin, info.indexByteOffset, info.indexCount );
 	const set = ( names, prefix ) => Promise.all( [ 'a', 'n', 'r' ].map( ( m ) => Promise.all( names.map( ( n ) => pixels( BASE + prefix + n + '_' + m + '.jpg' ) ) ) ) );
-	const [ surf, prop, signs ] = await Promise.all( [ set( SURF.map( ( s ) => s.name ), 's_' ), set( info.layers, 'p_' ), pixels( BASE + 'signs.png' ) ] );
+	const geometry = await loadStallGeometryData();
+	const [ surf, prop, signs ] = await Promise.all( [ set( SURF.map( ( s ) => s.name ), 's_' ), set( geometry.info.layers, 'p_' ), pixels( BASE + 'signs.png' ) ] );
 	const assets = {
-		info, verts, index,
+		...geometry,
 		surf: { a: arrayTexture( 'stallSurfA', surf[ 0 ], true ), n: arrayTexture( 'stallSurfN', surf[ 1 ], false ), r: arrayTexture( 'stallSurfR', surf[ 2 ], false ) },
 		prop: { a: arrayTexture( 'stallPropA', prop[ 0 ], true ), n: arrayTexture( 'stallPropN', prop[ 1 ], false ), r: arrayTexture( 'stallPropR', prop[ 2 ], false ) },
 		signs: arrayTexture( 'stallSigns', [ signs ], true ),

@@ -10,7 +10,7 @@ const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..
 const worldRoot = path.join( root, 'worlds', 'tidewater' );
 const source = validateWorldSource( JSON.parse( await readFile( path.join( worldRoot, 'world-source.json' ), 'utf8' ) ) );
 const objectIDsWithoutLOD = source.objects.filter( object => ! object.lods?.length ).map( object => object.id ).sort();
-assert.deepEqual( objectIDsWithoutLOD, [ 'tw-object:island-terrain', 'tw-object:island-terrain-preview' ], 'only the full terrain and its portal-preview representation omit geometry LODs' );
+assert.deepEqual( objectIDsWithoutLOD, [ 'elsemesh-object:island-terrain', 'elsemesh-object:island-terrain-preview' ], 'only the full terrain and its portal-preview representation omit geometry LODs' );
 
 const triangleCount = model => model.meshes.flat().reduce( ( total, primitive ) => {
   const indices = primitive.indices?.length;

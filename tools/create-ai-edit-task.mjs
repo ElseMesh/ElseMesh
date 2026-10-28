@@ -13,8 +13,8 @@ export const MAX_BLEND_BYTES = 1024 * 1024 * 1024;
 export const MAX_ASSET_BYTES = 256 * 1024 * 1024;
 export const MAX_TASK_BYTES = 2 * 1024 * 1024 * 1024;
 const ASSET_ID = /^sha256:[0-9a-f]{64}$/;
-const OBJECT_ID = /^tw-object:[\w.-]{1,128}$/;
-const PORTAL_ID = /^tw-portal:[\w.-]{1,128}$/;
+const OBJECT_ID = /^elsemesh-object:[\w.-]{1,128}$/;
+const PORTAL_ID = /^elsemesh-portal:[\w.-]{1,128}$/;
 
 function parseArgs(argv) {
 	const result = { objectIds: [], portalIds: [], assetIds: [] };

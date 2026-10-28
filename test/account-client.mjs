@@ -19,7 +19,7 @@ assert.equal( await webcrypto.subtle.verify( { name: 'Ed25519' }, pair.publicKey
 assert.equal( pair.privateKey.extractable, false, 'account private key is non-extractable' );
 assert.equal( pair.publicKey.extractable, true, 'account public key remains exportable for broker registration' );
 
-const roleGrant = { protocol: 'tidewater.world-role/1', worldId: 'tw-world:account-client-test', scopes: [ 'world.content.edit' ] };
+const roleGrant = { protocol: 'elsemesh.world-role/1', worldId: 'elsemesh:account-client-test', scopes: [ 'world.content.edit' ] };
 const proposal = { protocol: 'elsemesh.world-proposal/1', worldId: roleGrant.worldId, sourceHash: `sha256:${'1'.repeat( 64 )}`, operations: [ { op: 'world.update', fields: { title: '<A proposed & reviewed world>' } } ] };
 const submission = await createWorldProposalSubmission( proposal, roleGrant, pair );
 assert.equal( submission.protocol, 'elsemesh.world-proposal-submission/1' );

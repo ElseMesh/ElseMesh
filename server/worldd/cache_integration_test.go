@@ -64,7 +64,7 @@ func TestAuthorizedNeighborFetchesSignedManifestAndAssetOverLibp2p(t *testing.T)
 	assetID := "sha256:" + hex.EncodeToString(digest[:])
 	grantExpiry := time.Now().Add(time.Hour).Unix()
 	manifest := newStarterManifest("Cache integration", ownerID.String())
-	manifest.WorldID = "tw-world:cache-integration"
+	manifest.WorldID = "elsemesh:cache-integration"
 	manifest.Assets = []assetRef{{ID: assetID, Bytes: int64(len(content)), Kind: "glb", Priority: "visible"}}
 	manifest.Hosts = []hostingGrant{
 		{PeerID: cacheID.String(), Scopes: []string{"content-cache"}, ExpiresAt: grantExpiry, Epoch: 1},

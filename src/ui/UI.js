@@ -3,7 +3,7 @@ import { builtInWorldURL, clearHomeWorld, getHomeWorld, listVisitedWorlds, parse
 
 // ElseMesh UI: settings panel (tabs → folders → controls), HUD, help,
 // photo mode, start overlay and loader. Plain DOM, no dependencies.
-// All styling lives in ui.css (class prefix `tw-`).
+// All styling lives in ui.css (class prefix `em-`).
 
 const clamp = ( v, a, b ) => ( v < a ? a : v > b ? b : v );
 const lerp = ( a, b, t ) => a + ( b - a ) * t;
@@ -208,7 +208,7 @@ class Control {
 		this.enabled = true;
 		this._default = undefined;
 		this._mod = false;
-		this.el = h( 'div', `tw-ctl tw-ctl-${ type }` );
+		this.el = h( 'div', `em-ctl em-ctl-${ type }` );
 		parent._append( this.el );
 		this.ui._controls.add( this );
 
@@ -329,8 +329,8 @@ class Control {
 	// that appears while the value differs from its default.
 	_makeLabel( text, tooltip ) {
 
-		const lab = h( 'span', 'tw-label' );
-		const txt = h( 'span', 'tw-label-text', { text } );
+		const lab = h( 'span', 'em-label' );
+		const txt = h( 'span', 'em-label-text', { text } );
 		if ( tooltip ) {
 
 			txt.dataset.tip = tooltip;
@@ -338,7 +338,7 @@ class Control {
 
 		}
 
-		const rst = h( 'button', 'tw-reset', { type: 'button', tabindex: '-1', 'aria-label': `Reset ${ text }`, 'data-tip': 'Reset to default', html: icon( 'reset' ) } );
+		const rst = h( 'button', 'em-reset', { type: 'button', tabindex: '-1', 'aria-label': `Reset ${ text }`, 'data-tip': 'Reset to default', html: icon( 'reset' ) } );
 		rst.addEventListener( 'click', ( e ) => {
 
 			e.stopPropagation();
@@ -397,16 +397,16 @@ class SliderControl extends Control {
 		this.decimals = o.decimals ?? ( this.step ? decimalsOf( this.step ) : autoDecimals( max - min ) );
 		this._default = this.value;
 
-		const head = h( 'div', 'tw-row' );
+		const head = h( 'div', 'em-row' );
 		head.append( this._makeLabel( this.label, o.tooltip ) );
-		this.valueEl = h( 'button', 'tw-value', { type: 'button', tabindex: '-1', 'data-tip': 'Click to type a value' } );
+		this.valueEl = h( 'button', 'em-value', { type: 'button', tabindex: '-1', 'data-tip': 'Click to type a value' } );
 		head.append( this.valueEl );
 
-		this.track = h( 'div', 'tw-slider', { role: 'slider', tabindex: '0', 'aria-label': this.label, 'aria-valuemin': min, 'aria-valuemax': max } );
-		this.rail = h( 'div', 'tw-slider-rail' );
-		this.fill = h( 'div', 'tw-slider-fill' );
-		this.mark = h( 'div', 'tw-slider-mark' );
-		this.thumb = h( 'div', 'tw-slider-thumb' );
+		this.track = h( 'div', 'em-slider', { role: 'slider', tabindex: '0', 'aria-label': this.label, 'aria-valuemin': min, 'aria-valuemax': max } );
+		this.rail = h( 'div', 'em-slider-rail' );
+		this.fill = h( 'div', 'em-slider-fill' );
+		this.mark = h( 'div', 'em-slider-mark' );
+		this.thumb = h( 'div', 'em-slider-thumb' );
 		this.rail.append( this.fill, this.mark, this.thumb );
 		this.track.append( this.rail );
 		this.el.append( head, this.track );
@@ -502,7 +502,7 @@ class SliderControl extends Control {
 
 		if ( ! this.unit ) return esc( this._num( v ) );
 		const tight = /^(°|%|×|x)$/.test( this.unit ) ? ' is-tight' : '';
-		return `${ esc( this._num( v ) ) }<span class="tw-unit${ tight }">${ esc( this.unit ) }</span>`;
+		return `${ esc( this._num( v ) ) }<span class="em-unit${ tight }">${ esc( this.unit ) }</span>`;
 
 	}
 
@@ -671,7 +671,7 @@ class SliderControl extends Control {
 		if ( ! this.enabled || this._editing ) return;
 		this._editing = true;
 		const v = this.value;
-		const inp = h( 'input', 'tw-value-input', {
+		const inp = h( 'input', 'em-value-input', {
 			type: 'text', inputmode: 'decimal', spellcheck: 'false', autocomplete: 'off', 'aria-label': this.label,
 			value: typeof v === 'number' ? String( + v.toFixed( Math.max( this.decimals, 4 ) ) ) : String( v ?? '' ),
 		} );
@@ -727,13 +727,13 @@ class ToggleControl extends Control {
 
 		super( parent, o, 'toggle' );
 		this._default = !! this.value;
-		this.sw = h( 'button', 'tw-switch', { type: 'button', role: 'switch', 'aria-checked': 'false', 'aria-label': this.label } );
-		this.sw.append( h( 'span', 'tw-switch-knob' ) );
+		this.sw = h( 'button', 'em-switch', { type: 'button', role: 'switch', 'aria-checked': 'false', 'aria-label': this.label } );
+		this.sw.append( h( 'span', 'em-switch-knob' ) );
 		this.el.append( this._makeLabel( this.label, o.tooltip ), this.sw );
 		// whole row toggles; the 2nd click of a double-click is left to the reset gesture
 		this.el.addEventListener( 'click', ( e ) => {
 
-			if ( ! this.enabled || e.detail > 1 || e.target.closest( '.tw-reset' ) ) return;
+			if ( ! this.enabled || e.detail > 1 || e.target.closest( '.em-reset' ) ) return;
 			this.setValue( ! this.value );
 
 		} );
@@ -816,15 +816,15 @@ class SelectControl extends Control {
 
 	_buildSegmented() {
 
-		const head = h( 'div', 'tw-row' );
+		const head = h( 'div', 'em-row' );
 		head.append( this._makeLabel( this.label, this.opts.tooltip ) );
-		const seg = h( 'div', 'tw-seg', { role: 'radiogroup', 'aria-label': this.label } );
+		const seg = h( 'div', 'em-seg', { role: 'radiogroup', 'aria-label': this.label } );
 		seg.style.setProperty( '--n', Math.max( 1, this.options.length ) );
-		this.ind = h( 'span', 'tw-seg-ind' );
+		this.ind = h( 'span', 'em-seg-ind' );
 		seg.append( this.ind );
 		this.btns = this.options.map( ( opt, i ) => {
 
-			const b = h( 'button', 'tw-seg-btn', { type: 'button', role: 'radio', 'aria-checked': 'false', tabindex: '-1', text: opt.label } );
+			const b = h( 'button', 'em-seg-btn', { type: 'button', role: 'radio', 'aria-checked': 'false', tabindex: '-1', text: opt.label } );
 			b.addEventListener( 'click', () => this._pick( i ) );
 			seg.append( b );
 			return b;
@@ -848,10 +848,10 @@ class SelectControl extends Control {
 
 	_buildDropdown() {
 
-		this.btn = h( 'button', 'tw-dd', { type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false', 'aria-label': this.label } );
-		this.btnText = h( 'span', 'tw-dd-text' );
+		this.btn = h( 'button', 'em-dd', { type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false', 'aria-label': this.label } );
+		this.btnText = h( 'span', 'em-dd-text' );
 		this.btn.append( this.btnText );
-		this.btn.insertAdjacentHTML( 'beforeend', icon( 'chevron-down', 'tw-dd-chev' ) );
+		this.btn.insertAdjacentHTML( 'beforeend', icon( 'chevron-down', 'em-dd-chev' ) );
 		const open = () => this.ui._openMenu( this.btn, this.options.map( ( o ) => o.label ), this._index(), ( i ) => this._pick( i ) );
 		this.btn.addEventListener( 'click', () => {
 
@@ -936,10 +936,10 @@ class ColorControl extends Control {
 
 		super( parent, o, 'color' );
 		this._default = this._read();
-		const wrap = h( 'label', 'tw-color' );
-		this.hexEl = h( 'span', 'tw-hex' );
-		this.swatch = h( 'span', 'tw-swatch' );
-		this.input = h( 'input', 'tw-color-input', { type: 'color', 'aria-label': this.label } );
+		const wrap = h( 'label', 'em-color' );
+		this.hexEl = h( 'span', 'em-hex' );
+		this.swatch = h( 'span', 'em-swatch' );
+		this.input = h( 'input', 'em-color-input', { type: 'color', 'aria-label': this.label } );
 		wrap.append( this.hexEl, this.swatch, this.input );
 		this.input.addEventListener( 'input', () => {
 
@@ -1043,8 +1043,8 @@ class ButtonControl extends Control {
 
 		super( parent, o, 'button' );
 		const variant = o.variant === 'primary' || o.variant === 'ghost' ? o.variant : 'default';
-		this.btn = h( 'button', `tw-btn tw-btn-${ variant }`, { type: 'button' } );
-		this.btn.innerHTML = ( o.icon ? icon( o.icon ) : '' ) + `<span class="tw-btn-text">${ esc( this.label ) }</span>`;
+		this.btn = h( 'button', `em-btn em-btn-${ variant }`, { type: 'button' } );
+		this.btn.innerHTML = ( o.icon ? icon( o.icon ) : '' ) + `<span class="em-btn-text">${ esc( this.label ) }</span>`;
 		if ( o.tooltip ) this.btn.dataset.tip = o.tooltip;
 		this.btn.addEventListener( 'click', ( e ) => {
 
@@ -1067,7 +1067,7 @@ class ButtonControl extends Control {
 	setLabel( text ) {
 
 		this.label = String( text );
-		this.btn.querySelector( '.tw-btn-text' ).textContent = this.label;
+		this.btn.querySelector( '.em-btn-text' ).textContent = this.label;
 		return this;
 
 	}
@@ -1091,20 +1091,20 @@ class PresetsControl extends Control {
 		this.active = this._resolve( o.active );
 		if ( o.label ) {
 
-			const head = h( 'div', 'tw-row' );
-			const lab = h( 'span', 'tw-label' );
-			this.labelText = h( 'span', 'tw-label-text', { text: o.label } );
+			const head = h( 'div', 'em-row' );
+			const lab = h( 'span', 'em-label' );
+			this.labelText = h( 'span', 'em-label-text', { text: o.label } );
 			lab.append( this.labelText );
 			head.append( lab );
 			this.el.append( head );
 
 		}
 
-		const grid = h( 'div', 'tw-presets', { role: 'radiogroup', 'aria-label': o.label || 'Presets' } );
+		const grid = h( 'div', 'em-presets', { role: 'radiogroup', 'aria-label': o.label || 'Presets' } );
 		grid.style.setProperty( '--n', Math.min( 4, Math.max( 1, this.presets.length ) ) );
 		this.chips = this.presets.map( ( p, i ) => {
 
-			const b = h( 'button', 'tw-chip', { type: 'button', role: 'radio', 'aria-checked': 'false' } );
+			const b = h( 'button', 'em-chip', { type: 'button', role: 'radio', 'aria-checked': 'false' } );
 			b.innerHTML = ( p.icon ? icon( p.icon ) : '' ) + `<span>${ esc( p.label ) }</span>`;
 			if ( p.tooltip || p.description ) b.dataset.tip = p.tooltip || p.description;
 			b.addEventListener( 'click', () => this.apply( i ) );
@@ -1217,11 +1217,11 @@ class InfoControl extends Control {
 
 		super( parent, o, 'info' );
 		this.getter = typeof o.get === 'function' ? o.get : () => this.object[ this.key ];
-		const lab = h( 'span', 'tw-label' );
-		this.labelText = h( 'span', 'tw-label-text', { text: this.label } );
+		const lab = h( 'span', 'em-label' );
+		this.labelText = h( 'span', 'em-label-text', { text: this.label } );
 		if ( o.tooltip ) this.labelText.dataset.tip = o.tooltip;
 		lab.append( this.labelText );
-		this.valEl = h( 'span', 'tw-info-value' );
+		this.valEl = h( 'span', 'em-info-value' );
 		this.el.append( lab, this.valEl );
 		this.update();
 
@@ -1314,7 +1314,7 @@ function todSVG( id ) {
 	const labels = [ [ '06', cx - rx, cy + 13 ], [ '12', cx, cy - up - 7 ], [ '18', cx + rx, cy + 13 ], [ '00', cx, cy + down + 11 ] ]
 		.map( ( [ t, x, y ] ) => `<text x="${ x }" y="${ y }">${ t }</text>` ).join( '' );
 
-	return `<svg class="tw-tod-svg" viewBox="0 0 ${ w } ${ h }" role="slider" tabindex="0" aria-label="Time of day" aria-valuemin="0" aria-valuemax="24">
+	return `<svg class="em-tod-svg" viewBox="0 0 ${ w } ${ h }" role="slider" tabindex="0" aria-label="Time of day" aria-valuemin="0" aria-valuemax="24">
 		<defs>
 			<linearGradient id="${ id }-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c74c6"/><stop offset="1" stop-color="#c2e4f6"/></linearGradient>
 			<linearGradient id="${ id }-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d2a3a"/><stop offset="1" stop-color="#03101a"/></linearGradient>
@@ -1326,19 +1326,19 @@ function todSVG( id ) {
 		</defs>
 		<g clip-path="url(#${ id }-clip)">
 			<rect width="${ w }" height="${ cy + 1 }" fill="url(#${ id }-sky)"/>
-			<g class="tw-tod-stars" fill="#fff">${ stars }</g>
-			<ellipse class="tw-tod-haze" cx="${ cx }" cy="${ cy }" rx="96" ry="30" fill="url(#${ id }-haze)"/>
+			<g class="em-tod-stars" fill="#fff">${ stars }</g>
+			<ellipse class="em-tod-haze" cx="${ cx }" cy="${ cy }" rx="96" ry="30" fill="url(#${ id }-haze)"/>
 			<rect y="${ cy }" width="${ w }" height="${ h - cy }" fill="url(#${ id }-sea)"/>
-			<ellipse class="tw-tod-glint" cx="${ cx }" cy="${ cy + 8 }" rx="5" ry="10" fill="url(#${ id }-glint)"/>
-			<line class="tw-tod-horizon" x1="0" y1="${ cy + 0.5 }" x2="${ w }" y2="${ cy + 0.5 }"/>
-			<path class="tw-tod-path" d="M${ cx - rx } ${ cy } A${ rx } ${ up } 0 0 1 ${ cx + rx } ${ cy }"/>
-			<path class="tw-tod-path is-down" d="M${ cx + rx } ${ cy } A${ rx } ${ down } 0 0 1 ${ cx - rx } ${ cy }"/>
-			<g class="tw-tod-ticks">${ ticks }</g>
-			<g class="tw-tod-labels">${ labels }</g>
-			<g class="tw-tod-moon"><circle r="5.4" fill="#e3ecff" mask="url(#${ id }-moon)"/></g>
-			<g class="tw-tod-sun"><circle r="24" fill="url(#${ id }-glow)"/><circle class="tw-tod-disc" r="7"/></g>
+			<ellipse class="em-tod-glint" cx="${ cx }" cy="${ cy + 8 }" rx="5" ry="10" fill="url(#${ id }-glint)"/>
+			<line class="em-tod-horizon" x1="0" y1="${ cy + 0.5 }" x2="${ w }" y2="${ cy + 0.5 }"/>
+			<path class="em-tod-path" d="M${ cx - rx } ${ cy } A${ rx } ${ up } 0 0 1 ${ cx + rx } ${ cy }"/>
+			<path class="em-tod-path is-down" d="M${ cx + rx } ${ cy } A${ rx } ${ down } 0 0 1 ${ cx - rx } ${ cy }"/>
+			<g class="em-tod-ticks">${ ticks }</g>
+			<g class="em-tod-labels">${ labels }</g>
+			<g class="em-tod-moon"><circle r="5.4" fill="#e3ecff" mask="url(#${ id }-moon)"/></g>
+			<g class="em-tod-sun"><circle r="24" fill="url(#${ id }-glow)"/><circle class="em-tod-disc" r="7"/></g>
 		</g>
-		<text class="tw-tod-phase" x="14" y="23"></text>
+		<text class="em-tod-phase" x="14" y="23"></text>
 	</svg>`;
 
 }
@@ -1364,34 +1364,34 @@ class TimeOfDayControl extends Control {
 		super( parent, Object.assign( {}, o, { label: o.label ?? 'Time of day' } ), 'time' );
 		this._default = Number( this.value ) || 0;
 		this.onFinishChange = o.onFinishChange || null;
-		const id = uid( 'tw-tod' );
+		const id = uid( 'em-tod' );
 
-		const head = h( 'div', 'tw-row' );
+		const head = h( 'div', 'em-row' );
 		head.append( this._makeLabel( this.label, o.tooltip ) );
-		this.valueEl = h( 'button', 'tw-value tw-clock', { type: 'button', tabindex: '-1', 'data-tip': 'Click to type a time' } );
+		this.valueEl = h( 'button', 'em-value em-clock', { type: 'button', tabindex: '-1', 'data-tip': 'Click to type a time' } );
 		head.append( this.valueEl );
 
-		const dial = h( 'div', 'tw-tod' );
+		const dial = h( 'div', 'em-tod' );
 		dial.innerHTML = todSVG( id );
 		this.svg = dial.firstElementChild;
 		const q = ( s ) => this.svg.querySelector( s );
 		this.stopZ = q( `#${ id }-sky stop:first-child` );
 		this.stopH = q( `#${ id }-sky stop:last-child` );
 		this.stopSea = q( `#${ id }-sea stop:first-child` );
-		this.stars = q( '.tw-tod-stars' );
-		this.haze = q( '.tw-tod-haze' );
-		this.glint = q( '.tw-tod-glint' );
-		this.moon = q( '.tw-tod-moon' );
-		this.sun = q( '.tw-tod-sun' );
+		this.stars = q( '.em-tod-stars' );
+		this.haze = q( '.em-tod-haze' );
+		this.glint = q( '.em-tod-glint' );
+		this.moon = q( '.em-tod-moon' );
+		this.sun = q( '.em-tod-sun' );
 		this.sunGlow = this.sun.firstElementChild;
-		this.disc = q( '.tw-tod-disc' );
-		this.phase = q( '.tw-tod-phase' );
+		this.disc = q( '.em-tod-disc' );
+		this.phase = q( '.em-tod-phase' );
 
-		this.track = h( 'div', 'tw-tod-track' );
-		this.bar = h( 'div', 'tw-tod-bar' );
+		this.track = h( 'div', 'em-tod-track' );
+		this.bar = h( 'div', 'em-tod-bar' );
 		this.bar.style.background = TOD_TRACK_BG;
-		this.knob = h( 'div', 'tw-tod-knob' );
-		const scale = h( 'div', 'tw-tod-scale', { 'aria-hidden': 'true' } );
+		this.knob = h( 'div', 'em-tod-knob' );
+		const scale = h( 'div', 'em-tod-scale', { 'aria-hidden': 'true' } );
 		scale.innerHTML = [ 0, 6, 12, 18, 24 ].map( ( hh ) => `<span style="left:${ hh / 24 * 100 }%">${ String( hh ).padStart( 2, '0' ) }</span>` ).join( '' );
 		this.track.append( this.bar, this.knob, scale );
 
@@ -1511,7 +1511,7 @@ class TimeOfDayControl extends Control {
 
 		if ( ! this.enabled || this._editing ) return;
 		this._editing = true;
-		const inp = h( 'input', 'tw-value-input', { type: 'text', spellcheck: 'false', autocomplete: 'off', 'aria-label': this.label, value: fmtClock( Number( this.value ) || 0 ) } );
+		const inp = h( 'input', 'em-value-input', { type: 'text', spellcheck: 'false', autocomplete: 'off', 'aria-label': this.label, value: fmtClock( Number( this.value ) || 0 ) } );
 		this.valueEl.replaceWith( inp );
 		inp.focus();
 		inp.select();
@@ -1738,14 +1738,14 @@ class Folder extends Container {
 		super( parent.ui, parent );
 		this.label = String( label ?? '' );
 		this.isOpen = true;
-		this.el = h( 'section', 'tw-folder' + ( parent instanceof Folder ? ' is-nested' : '' ) );
-		const bodyId = uid( 'tw-fb' );
-		this.head = h( 'button', 'tw-folder-head', { type: 'button', 'aria-expanded': 'true', 'aria-controls': bodyId } );
-		this.head.innerHTML = ( iconName ? icon( iconName, 'tw-folder-ico' ) : '' ) +
-			`<span class="tw-folder-title">${ esc( this.label ) }</span>` + icon( 'chevron-down', 'tw-folder-chev' );
+		this.el = h( 'section', 'em-folder' + ( parent instanceof Folder ? ' is-nested' : '' ) );
+		const bodyId = uid( 'em-fb' );
+		this.head = h( 'button', 'em-folder-head', { type: 'button', 'aria-expanded': 'true', 'aria-controls': bodyId } );
+		this.head.innerHTML = ( iconName ? icon( iconName, 'em-folder-ico' ) : '' ) +
+			`<span class="em-folder-title">${ esc( this.label ) }</span>` + icon( 'chevron-down', 'em-folder-chev' );
 		if ( tooltip ) this.head.dataset.tip = tooltip;
-		this.wrap = h( 'div', 'tw-folder-wrap', { id: bodyId } );
-		this.body = h( 'div', 'tw-folder-body' );
+		this.wrap = h( 'div', 'em-folder-wrap', { id: bodyId } );
+		this.body = h( 'div', 'em-folder-body' );
 		this.wrap.append( this.body );
 		this.el.append( this.head, this.wrap );
 		parent._append( this.el );
@@ -1793,7 +1793,7 @@ class Folder extends Container {
 	setLabel( text ) {
 
 		this.label = String( text );
-		this.head.querySelector( '.tw-folder-title' ).textContent = this.label;
+		this.head.querySelector( '.em-folder-title' ).textContent = this.label;
 		return this;
 
 	}
@@ -1811,12 +1811,12 @@ class Tab extends Container {
 		this.label = String( label );
 		this.iconName = iconName;
 		this._scroll = 0;
-		const pageId = uid( 'tw-page' ), tabId = uid( 'tw-tab' );
-		this.page = h( 'div', 'tw-page', { role: 'tabpanel', id: pageId, 'aria-labelledby': tabId, hidden: true } );
+		const pageId = uid( 'em-page' ), tabId = uid( 'em-tab' );
+		this.page = h( 'div', 'em-page', { role: 'tabpanel', id: pageId, 'aria-labelledby': tabId, hidden: true } );
 		this.body = this.page;
-		this.btn = h( 'button', 'tw-tab', { type: 'button', role: 'tab', id: tabId, 'aria-selected': 'false', 'aria-controls': pageId, tabindex: '-1', 'data-tip': this.label } );
-		this.btn.innerHTML = icon( iconName ) + `<span class="tw-tab-label">${ esc( this.label ) }</span>`;
-		this.railBtn = h( 'button', 'tw-rail-btn', { type: 'button', 'aria-label': this.label, 'data-tip': this.label, 'data-tip-side': 'left' } );
+		this.btn = h( 'button', 'em-tab', { type: 'button', role: 'tab', id: tabId, 'aria-selected': 'false', 'aria-controls': pageId, tabindex: '-1', 'data-tip': this.label } );
+		this.btn.innerHTML = icon( iconName ) + `<span class="em-tab-label">${ esc( this.label ) }</span>`;
+		this.railBtn = h( 'button', 'em-rail-btn', { type: 'button', 'aria-label': this.label, 'data-tip': this.label, 'data-tip-side': 'left' } );
 		this.railBtn.innerHTML = icon( iconName );
 		this.btn.addEventListener( 'click', () => ui.selectTab( id ) );
 		this.railBtn.addEventListener( 'click', () => {
@@ -1902,12 +1902,12 @@ export class UI {
 		// index.html ships a temporary FPS counter; the HUD replaces it.
 		document.getElementById( 'fps' )?.remove();
 
-		this.root = h( 'div', 'tw-root', { 'data-panel': 'closed' } );
+		this.root = h( 'div', 'em-root', { 'data-panel': 'closed' } );
 		this._buildHUD();
 		this._buildPanel();
 		this._buildHelp();
 		this._buildStart();
-		this.tipEl = h( 'div', 'tw-tip', { role: 'tooltip', 'aria-hidden': 'true' } );
+		this.tipEl = h( 'div', 'em-tip', { role: 'tooltip', 'aria-hidden': 'true' } );
 		this.root.append( this.tipEl );
 		this.container.append( this.root );
 
@@ -1920,61 +1920,61 @@ export class UI {
 
 	_buildHUD() {
 
-		const hud = this.hud = h( 'div', 'tw-hud' );
+		const hud = this.hud = h( 'div', 'em-hud' );
 
 		// top-left: frame rate, then brand + traversal mode
-		const tl = h( 'div', 'tw-tl' );
-		const stats = this.statsEl = h( 'div', 'tw-stats tw-glass', { 'data-level': 'good', 'aria-hidden': 'true' } );
+		const tl = h( 'div', 'em-tl' );
+		const stats = this.statsEl = h( 'div', 'em-stats em-glass', { 'data-level': 'good', 'aria-hidden': 'true' } );
 		stats.innerHTML = `
-			<div class="tw-stats-main"><span class="tw-fps">--</span><span class="tw-fps-unit">fps</span></div>
-			<canvas class="tw-spark"></canvas>
-			<div class="tw-stats-sub">
-				<span class="tw-kv"><span class="tw-k">frame</span><span class="tw-v tw-ms">--</span></span>
-				<span class="tw-kv tw-kv-gpu" hidden><span class="tw-k">gpu</span><span class="tw-v tw-gpu">--</span></span>
+			<div class="em-stats-main"><span class="em-fps">--</span><span class="em-fps-unit">fps</span></div>
+			<canvas class="em-spark"></canvas>
+			<div class="em-stats-sub">
+				<span class="em-kv"><span class="em-k">frame</span><span class="em-v em-ms">--</span></span>
+				<span class="em-kv em-kv-gpu" hidden><span class="em-k">gpu</span><span class="em-v em-gpu">--</span></span>
 			</div>`;
-		this.fpsEl = stats.querySelector( '.tw-fps' );
-		this.msEl = stats.querySelector( '.tw-ms' );
-		this.gpuEl = stats.querySelector( '.tw-gpu' );
-		this.gpuKv = stats.querySelector( '.tw-kv-gpu' );
-		this.sparkEl = stats.querySelector( '.tw-spark' );
+		this.fpsEl = stats.querySelector( '.em-fps' );
+		this.msEl = stats.querySelector( '.em-ms' );
+		this.gpuEl = stats.querySelector( '.em-gpu' );
+		this.gpuKv = stats.querySelector( '.em-kv-gpu' );
+		this.sparkEl = stats.querySelector( '.em-spark' );
 
-		const brand = h( 'div', 'tw-brand' );
-		brand.innerHTML = `${ brandMark() }<span class="tw-brand-name">ELSEMESH</span>`;
-		this.modeEl = h( 'div', 'tw-mode is-empty', { role: 'status' } );
-		this.modeIco = h( 'span', 'tw-mode-ico' );
-		this.modeText = h( 'span', 'tw-mode-text' );
+		const brand = h( 'div', 'em-brand' );
+		brand.innerHTML = `${ brandMark() }<span class="em-brand-name">ELSEMESH</span>`;
+		this.modeEl = h( 'div', 'em-mode is-empty', { role: 'status' } );
+		this.modeIco = h( 'span', 'em-mode-ico' );
+		this.modeText = h( 'span', 'em-mode-text' );
 		this.modeEl.append( this.modeIco, this.modeText );
 		brand.append( this.modeEl );
 		tl.append( stats, brand );
 
 		// top-centre: notifications
-		this.toastsEl = h( 'div', 'tw-toasts', { 'aria-live': 'polite' } );
+		this.toastsEl = h( 'div', 'em-toasts', { 'aria-live': 'polite' } );
 
 		// bottom-centre: interaction prompt
-		this.promptEl = h( 'div', 'tw-prompt tw-glass', { 'aria-live': 'polite' } );
-		this.promptKey = h( 'kbd', 'tw-prompt-key' );
-		this.promptText = h( 'span', 'tw-prompt-text' );
+		this.promptEl = h( 'div', 'em-prompt em-glass', { 'aria-live': 'polite' } );
+		this.promptKey = h( 'kbd', 'em-prompt-key' );
+		this.promptText = h( 'span', 'em-prompt-text' );
 		this.promptEl.append( this.promptKey, this.promptText );
 
 		// bottom-left: boat instruments
 		this.boatEl = this._buildBoat();
 
 		// left: depth sounder
-		this.depthEl = h( 'div', 'tw-depth tw-glass', { 'aria-hidden': 'true' } );
+		this.depthEl = h( 'div', 'em-depth em-glass', { 'aria-hidden': 'true' } );
 		this.depthEl.innerHTML = `
-			<canvas class="tw-depth-tape"></canvas>
-			<span class="tw-depth-mark"></span>
-			<div class="tw-depth-read">
-				<div class="tw-depth-line"><span class="tw-depth-num">0.0</span><span class="tw-unit">m</span></div>
-				<span class="tw-g-lab">Depth</span>
+			<canvas class="em-depth-tape"></canvas>
+			<span class="em-depth-mark"></span>
+			<div class="em-depth-read">
+				<div class="em-depth-line"><span class="em-depth-num">0.0</span><span class="em-unit">m</span></div>
+				<span class="em-g-lab">Depth</span>
 			</div>`;
-		this.depthCanvas = this.depthEl.querySelector( '.tw-depth-tape' );
-		this.depthNum = this.depthEl.querySelector( '.tw-depth-num' );
+		this.depthCanvas = this.depthEl.querySelector( '.em-depth-tape' );
+		this.depthNum = this.depthEl.querySelector( '.em-depth-num' );
 
 		hud.append( tl, this.toastsEl, this.promptEl, this.boatEl, this.depthEl );
 
 		// the one element that survives photo mode
-		this.photoHint = h( 'div', 'tw-photo-hint' );
+		this.photoHint = h( 'div', 'em-photo-hint' );
 		this.photoHint.innerHTML = '<kbd>P</kbd><span>Exit photo mode</span>';
 
 		this.root.append( hud, this.photoHint );
@@ -1983,7 +1983,7 @@ export class UI {
 
 	_buildBoat() {
 
-		const el = h( 'div', 'tw-boat tw-glass', { 'aria-hidden': 'true' } );
+		const el = h( 'div', 'em-boat em-glass', { 'aria-hidden': 'true' } );
 		const P = ( cx, r, deg ) => {
 
 			const a = deg * Math.PI / 180;
@@ -2021,57 +2021,57 @@ export class UI {
 
 		}
 
-		const gid = uid( 'tw-rpm' );
+		const gid = uid( 'em-rpm' );
 		el.innerHTML = `
-			<div class="tw-thr">
-				<div class="tw-thr-bar"><span class="tw-thr-pos"></span><span class="tw-thr-neg"></span><span class="tw-thr-zero"></span></div>
-				<span class="tw-thr-val">0%</span>
+			<div class="em-thr">
+				<div class="em-thr-bar"><span class="em-thr-pos"></span><span class="em-thr-neg"></span><span class="em-thr-zero"></span></div>
+				<span class="em-thr-val">0%</span>
 			</div>
-			<div class="tw-dial">
+			<div class="em-dial">
 				<svg viewBox="0 0 120 120">
 					<defs><linearGradient id="${ gid }" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3fc0d6"/><stop offset=".62" stop-color="#5fe3d4"/><stop offset="1" stop-color="#ffb86b"/></linearGradient></defs>
-					<path class="tw-dial-bg" d="${ ARC }"/>
-					<path class="tw-dial-red" d="${ ARC }" pathLength="100" stroke-dasharray="14 100" stroke-dashoffset="-86"/>
-					<path class="tw-dial-val" d="${ ARC }" pathLength="100" stroke-dasharray="0 100" stroke="url(#${ gid })"/>
-					<g class="tw-dial-ticks">${ ticks }</g>
-					<circle class="tw-dial-head" r="3" cx="24.64" cy="95.36"/>
-					<text class="tw-dial-rpm" x="60" y="105">rpm 0%</text>
+					<path class="em-dial-bg" d="${ ARC }"/>
+					<path class="em-dial-red" d="${ ARC }" pathLength="100" stroke-dasharray="14 100" stroke-dashoffset="-86"/>
+					<path class="em-dial-val" d="${ ARC }" pathLength="100" stroke-dasharray="0 100" stroke="url(#${ gid })"/>
+					<g class="em-dial-ticks">${ ticks }</g>
+					<circle class="em-dial-head" r="3" cx="24.64" cy="95.36"/>
+					<text class="em-dial-rpm" x="60" y="105">rpm 0%</text>
 				</svg>
-				<div class="tw-dial-center"><span class="tw-speed">0.0</span><span class="tw-g-unit">knots</span></div>
+				<div class="em-dial-center"><span class="em-speed">0.0</span><span class="em-g-unit">knots</span></div>
 			</div>
-			<div class="tw-compass">
+			<div class="em-compass">
 				<svg viewBox="0 0 100 100">
-					<circle class="tw-compass-ring" cx="50" cy="50" r="47"/>
-					<g class="tw-compass-card">${ card }</g>
-					<path class="tw-lubber" d="M45.5 1.5h9L50 8.5z"/>
+					<circle class="em-compass-ring" cx="50" cy="50" r="47"/>
+					<g class="em-compass-card">${ card }</g>
+					<path class="em-lubber" d="M45.5 1.5h9L50 8.5z"/>
 				</svg>
-				<div class="tw-hdg"><span class="tw-hdg-num">000°</span><span class="tw-hdg-card">N</span></div>
+				<div class="em-hdg"><span class="em-hdg-num">000°</span><span class="em-hdg-card">N</span></div>
 			</div>`;
-		this.bThrPos = el.querySelector( '.tw-thr-pos' );
-		this.bThrNeg = el.querySelector( '.tw-thr-neg' );
-		this.bThrText = el.querySelector( '.tw-thr-val' );
-		this.bArc = el.querySelector( '.tw-dial-val' );
-		this.bHead = el.querySelector( '.tw-dial-head' );
-		this.bRpmText = el.querySelector( '.tw-dial-rpm' );
-		this.bSpeed = el.querySelector( '.tw-speed' );
-		this.bCard = el.querySelector( '.tw-compass-card' );
-		this.bHdgText = el.querySelector( '.tw-hdg-num' );
-		this.bHdgCard = el.querySelector( '.tw-hdg-card' );
+		this.bThrPos = el.querySelector( '.em-thr-pos' );
+		this.bThrNeg = el.querySelector( '.em-thr-neg' );
+		this.bThrText = el.querySelector( '.em-thr-val' );
+		this.bArc = el.querySelector( '.em-dial-val' );
+		this.bHead = el.querySelector( '.em-dial-head' );
+		this.bRpmText = el.querySelector( '.em-dial-rpm' );
+		this.bSpeed = el.querySelector( '.em-speed' );
+		this.bCard = el.querySelector( '.em-compass-card' );
+		this.bHdgText = el.querySelector( '.em-hdg-num' );
+		this.bHdgCard = el.querySelector( '.em-hdg-card' );
 		return el;
 
 	}
 
 	_buildPanel() {
 
-		const panel = this.panel = h( 'aside', 'tw-panel tw-glass tw-interactive', { 'aria-label': 'Settings' } );
+		const panel = this.panel = h( 'aside', 'em-panel em-glass em-interactive', { 'aria-label': 'Settings' } );
 		panel.inert = true;
 
-		const head = h( 'header', 'tw-panel-head' );
-		head.append( h( 'div', 'tw-panel-title', { text: 'Settings' } ) );
-		const actions = h( 'div', 'tw-panel-actions' );
+		const head = h( 'header', 'em-panel-head' );
+		head.append( h( 'div', 'em-panel-title', { text: 'Settings' } ) );
+		const actions = h( 'div', 'em-panel-actions' );
 		const action = ( name, tip, fn ) => {
 
-			const b = h( 'button', 'tw-icon-btn', { type: 'button', 'aria-label': tip, 'data-tip': tip, html: icon( name ) } );
+			const b = h( 'button', 'em-icon-btn', { type: 'button', 'aria-label': tip, 'data-tip': tip, html: icon( name ) } );
 			b.addEventListener( 'click', fn );
 			actions.append( b );
 
@@ -2082,7 +2082,7 @@ export class UI {
 		action( 'chevrons-right', 'Collapse (H)', () => this.togglePanel( false ) );
 		head.append( actions );
 
-		this.tabBar = h( 'div', 'tw-tabs', { role: 'tablist', 'aria-label': 'Settings sections' } );
+		this.tabBar = h( 'div', 'em-tabs', { role: 'tablist', 'aria-label': 'Settings sections' } );
 		this.tabBar.addEventListener( 'keydown', ( e ) => {
 
 			const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? - 1 : 0;
@@ -2101,20 +2101,20 @@ export class UI {
 
 		} );
 
-		this.pages = h( 'div', 'tw-pages' );
+		this.pages = h( 'div', 'em-pages' );
 
-		const foot = h( 'footer', 'tw-panel-foot' );
+		const foot = h( 'footer', 'em-panel-foot' );
 		foot.innerHTML = '<span><kbd>H</kbd>Hide</span><span><kbd>F1</kbd>Controls</span><span><kbd>P</kbd>Photo mode</span>';
 		panel.append( head, this.tabBar, this.pages, foot );
 
 		// collapsed state: a slim rail of tab icons
-		const rail = this.rail = h( 'nav', 'tw-rail tw-glass tw-interactive', { 'aria-label': 'Settings' } );
-		const open = h( 'button', 'tw-rail-btn tw-rail-open', { type: 'button', 'aria-label': 'Open settings', 'data-tip': 'Settings (H)', 'data-tip-side': 'left', html: icon( 'sliders' ) } );
+		const rail = this.rail = h( 'nav', 'em-rail em-glass em-interactive', { 'aria-label': 'Settings' } );
+		const open = h( 'button', 'em-rail-btn em-rail-open', { type: 'button', 'aria-label': 'Open settings', 'data-tip': 'Settings (H)', 'data-tip-side': 'left', html: icon( 'sliders' ) } );
 		open.addEventListener( 'click', () => this.togglePanel( true ) );
-		this.railTabs = h( 'div', 'tw-rail-tabs' );
-		const help = h( 'button', 'tw-rail-btn', { type: 'button', 'aria-label': 'Controls', 'data-tip': 'Controls (F1)', 'data-tip-side': 'left', html: icon( 'help' ) } );
+		this.railTabs = h( 'div', 'em-rail-tabs' );
+		const help = h( 'button', 'em-rail-btn', { type: 'button', 'aria-label': 'Controls', 'data-tip': 'Controls (F1)', 'data-tip-side': 'left', html: icon( 'help' ) } );
 		help.addEventListener( 'click', () => this.toggleHelp() );
-		rail.append( open, h( 'span', 'tw-rail-sep' ), this.railTabs, h( 'span', 'tw-rail-sep' ), help );
+		rail.append( open, h( 'span', 'em-rail-sep' ), this.railTabs, h( 'span', 'em-rail-sep' ), help );
 
 		this.root.append( rail, panel );
 
@@ -2123,22 +2123,22 @@ export class UI {
 	_buildHelp() {
 
 		const k = ( ...keys ) => keys.map( ( x ) => `<kbd>${ x }</kbd>` ).join( '' );
-		const row = ( keys, text ) => `<div class="tw-help-row"><span class="tw-keys">${ keys }</span><span class="tw-help-text">${ text }</span></div>`;
-		const wasd = '<span class="tw-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>';
-		const mouse = `<kbd class="tw-kbd-ico" aria-label="Mouse">${ icon( 'mouse' ) }</kbd>`;
+		const row = ( keys, text ) => `<div class="em-help-row"><span class="em-keys">${ keys }</span><span class="em-help-text">${ text }</span></div>`;
+		const wasd = '<span class="em-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>';
+		const mouse = `<kbd class="em-kbd-ico" aria-label="Mouse">${ icon( 'mouse' ) }</kbd>`;
 
-		const el = this.helpEl = h( 'div', 'tw-help tw-interactive', { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'tw-help-title', hidden: true } );
+		const el = this.helpEl = h( 'div', 'em-help em-interactive', { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'em-help-title', hidden: true } );
 		el.innerHTML = `
-			<div class="tw-help-card tw-glass">
-				<header class="tw-help-head">
+			<div class="em-help-card em-glass">
+				<header class="em-help-head">
 					<div>
-						<h2 id="tw-help-title">Controls</h2>
+						<h2 id="em-help-title">Controls</h2>
 						<p>Click the view to capture the mouse. Esc releases it.</p>
-						<p class="tw-help-touch-hint">On a touch screen, use the left stick to move and the right stick to look. Tap an action prompt to interact.</p>
+						<p class="em-help-touch-hint">On a touch screen, use the left stick to move and the right stick to look. Tap an action prompt to interact.</p>
 					</div>
-					<button type="button" class="tw-icon-btn tw-help-close" aria-label="Close" data-tip="Close (F1)">${ icon( 'close' ) }</button>
+					<button type="button" class="em-icon-btn em-help-close" aria-label="Close" data-tip="Close (F1)">${ icon( 'close' ) }</button>
 				</header>
-				<div class="tw-help-grid">
+				<div class="em-help-grid">
 					<section>
 						<h3>Move</h3>
 						${ row( wasd, 'Move' ) }
@@ -2169,13 +2169,13 @@ export class UI {
 						${ row( k( 'Esc' ), 'Release the mouse' ) }
 					</section>
 				</div>
-				<div class="tw-help-guide">
+				<div class="em-help-guide">
 					<span><b>How to play:</b> catch fish, sell them to Joe at the fish stand by the pier, and buy upgrades from Marta at the chandlery by the boathouse. Both are on the map (lower right).</span>
-					<button type="button" class="gm-btn is-ghost tw-help-replay">Replay the guide</button>
+					<button type="button" class="gm-btn is-ghost em-help-replay">Replay the guide</button>
 				</div>
 			</div>`;
-		el.querySelector( '.tw-help-close' ).addEventListener( 'click', () => this.toggleHelp( false ) );
-		el.querySelector( '.tw-help-replay' ).addEventListener( 'click', () => callHook( this.onReplayGuide ) );
+		el.querySelector( '.em-help-close' ).addEventListener( 'click', () => this.toggleHelp( false ) );
+		el.querySelector( '.em-help-replay' ).addEventListener( 'click', () => callHook( this.onReplayGuide ) );
 		el.addEventListener( 'click', ( e ) => {
 
 			if ( e.target === el ) this.toggleHelp( false );
@@ -2187,44 +2187,44 @@ export class UI {
 
 	_buildStart() {
 
-		const el = this.startEl = h( 'div', 'tw-start tw-interactive', { hidden: true } );
+		const el = this.startEl = h( 'div', 'em-start em-interactive', { hidden: true } );
 		el.innerHTML = `
-			<div class="tw-start-inner">
-				${ brandMark( 'tw-start-mark' ) }
-				<div class="tw-start-title">ELSEMESH</div>
-				<button type="button" class="tw-start-cta"><span class="tw-start-pulse" aria-hidden="true"></span>${ icon( 'mouse' ) }<span>Tap or click to explore</span></button>
-				<button type="button" class="tw-start-world-toggle" aria-expanded="false" aria-controls="tw-world-picker">Choose a ThruHold</button>
-				<section id="tw-world-picker" class="tw-world-picker" aria-label="Choose a ThruHold" hidden>
-					<h2>Choose a world</h2>
-					<div class="tw-world-options">
-						<button type="button" class="tw-world-option tw-world-default"><span>Original island (offline)</span><small>Complete procedural example</small></button>
+			<div class="em-start-inner">
+				${ brandMark( 'em-start-mark' ) }
+				<div class="em-start-title">ELSEMESH</div>
+				<button type="button" class="em-start-cta"><span class="em-start-pulse" aria-hidden="true"></span>${ icon( 'mouse' ) }<span>Tap or click to explore</span></button>
+				<button type="button" class="em-start-world-toggle" aria-expanded="false" aria-controls="em-world-picker">Choose a ThruHold</button>
+				<section id="em-world-picker" class="em-world-picker" aria-label="Choose a ThruHold" hidden>
+					<h2>Choose a ThruHold</h2>
+					<div class="em-world-options">
+						<button type="button" class="em-world-option em-world-default"><span>Original island (offline)</span><small>Complete procedural example</small></button>
 					</div>
-					<p class="tw-world-empty" hidden>No hosted worlds saved yet. Open an invite to add one here.</p>
-					<form class="tw-world-invite-form">
-						<label for="tw-world-invite-url">Open an invite</label>
-						<div class="tw-world-invite-row"><input id="tw-world-invite-url" name="invite" type="text" inputmode="url" autocomplete="url" placeholder="Invite URL, ThruHold ID, or ZeroTier ID" required /><button type="submit">Open</button></div>
-						<p class="tw-world-invite-error" role="status" aria-live="polite"></p>
+					<p class="em-world-empty" hidden>No hosted ThruHolds saved yet. Open an invite to add one here.</p>
+					<form class="em-world-invite-form">
+						<label for="em-world-invite-url">Open an invite</label>
+						<div class="em-world-invite-row"><input id="em-world-invite-url" name="invite" type="text" inputmode="url" autocomplete="url" placeholder="Invite URL, ThruHold ID, or ZeroTier ID" required /><button type="submit">Open</button></div>
+						<p class="em-world-invite-error" role="status" aria-live="polite"></p>
 					</form>
-					<button type="button" class="tw-world-picker-close">Done</button>
+					<button type="button" class="em-world-picker-close">Done</button>
 				</section>
-				<div class="tw-start-touch-hint">Left stick moves · right stick looks · tap action prompts</div>
-				<div class="tw-start-keys">
-					<span><span class="tw-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</span>
+				<div class="em-start-touch-hint">Left stick moves · right stick looks · tap action prompts</div>
+				<div class="em-start-keys">
+					<span><span class="em-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</span>
 					<span><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>Look</span>
-					<span><kbd class="tw-kbd-ico">${ icon( 'mouse' ) }</kbd>Look</span>
+					<span><kbd class="em-kbd-ico">${ icon( 'mouse' ) }</kbd>Look</span>
 					<span><kbd>E</kbd>Interact</span>
 					<span><kbd>H</kbd>Settings</span>
 					<span><kbd>F1</kbd>All controls</span>
 				</div>
 			</div>`;
 		this.root.append( el );
-		this.startWorldPicker = el.querySelector( '.tw-world-picker' );
-		this.startWorldToggle = el.querySelector( '.tw-start-world-toggle' );
-		this.startWorldOptions = el.querySelector( '.tw-world-options' );
-		this.startWorldEmpty = el.querySelector( '.tw-world-empty' );
-		this.startWorldInviteForm = el.querySelector( '.tw-world-invite-form' );
-		this.startWorldInviteInput = el.querySelector( '#tw-world-invite-url' );
-		this.startWorldInviteError = el.querySelector( '.tw-world-invite-error' );
+		this.startWorldPicker = el.querySelector( '.em-world-picker' );
+		this.startWorldToggle = el.querySelector( '.em-start-world-toggle' );
+		this.startWorldOptions = el.querySelector( '.em-world-options' );
+		this.startWorldEmpty = el.querySelector( '.em-world-empty' );
+		this.startWorldInviteForm = el.querySelector( '.em-world-invite-form' );
+		this.startWorldInviteInput = el.querySelector( '#em-world-invite-url' );
+		this.startWorldInviteError = el.querySelector( '.em-world-invite-error' );
 		this.startWorldToggle.addEventListener( 'click', () => {
 
 			const open = this.startWorldPicker.hidden;
@@ -2233,12 +2233,12 @@ export class UI {
 			if ( open ) this._refreshWorldPicker();
 
 		} );
-		el.querySelector( '.tw-world-default' ).addEventListener( 'click', () => {
+		el.querySelector( '.em-world-default' ).addEventListener( 'click', () => {
 			const url = new URL( builtInWorldURL() );
 			if ( getHomeWorld() ) url.searchParams.set( 'example', '1' );
 			window.location.assign( url.href );
 		} );
-		el.querySelector( '.tw-world-picker-close' ).addEventListener( 'click', () => {
+		el.querySelector( '.em-world-picker-close' ).addEventListener( 'click', () => {
 
 			this.startWorldPicker.hidden = true;
 			this.startWorldToggle.setAttribute( 'aria-expanded', 'false' );
@@ -2273,19 +2273,19 @@ export class UI {
 
 	_refreshWorldPicker() {
 
-		for ( const row of [ ...this.startWorldOptions.querySelectorAll( '.tw-world-option-row' ) ] ) row.remove();
-		for ( const option of [ ...this.startWorldOptions.querySelectorAll( '.tw-world-option:not(.tw-world-default)' ) ] ) option.remove();
+		for ( const row of [ ...this.startWorldOptions.querySelectorAll( '.em-world-option-row' ) ] ) row.remove();
+		for ( const option of [ ...this.startWorldOptions.querySelectorAll( '.em-world-option:not(.em-world-default)' ) ] ) option.remove();
 		const visited = listVisitedWorlds();
 		const home = getHomeWorld();
 		this.startWorldEmpty.hidden = visited.length > 0;
 		for ( const world of visited ) {
 
-			const row = h( 'div', 'tw-world-option-row' );
-			const open = h( 'button', 'tw-world-option', { type: 'button' } );
+			const row = h( 'div', 'em-world-option-row' );
+			const open = h( 'button', 'em-world-option', { type: 'button' } );
 			open.append( h( 'span', '', { text: world.title } ), h( 'small', '', { text: `Hosted ThruHold · ${world.worldId}` } ) );
 			open.addEventListener( 'click', () => { window.location.assign( world.url ); } );
 			const isHome = home?.url === world.url;
-			const homeButton = h( 'button', 'tw-world-home', { type: 'button', text: isHome ? 'Clear home' : 'Set as home' } );
+			const homeButton = h( 'button', 'em-world-home', { type: 'button', text: isHome ? 'Clear home' : 'Set as home' } );
 			homeButton.setAttribute( 'aria-label', isHome ? `Clear ${world.title} as my home ThruHold` : `Set ${world.title} as my home ThruHold` );
 			homeButton.addEventListener( 'click', () => {
 				const saved = isHome ? clearHomeWorld() : setHomeWorld( world );
@@ -2324,7 +2324,7 @@ export class UI {
 
 				if ( e.detail === 0 ) return;
 				const b = e.target.closest?.( 'button' );
-				if ( b && ! b.classList.contains( 'tw-dd' ) ) b.blur();
+				if ( b && ! b.classList.contains( 'em-dd' ) ) b.blur();
 
 			} );
 
@@ -2342,7 +2342,7 @@ export class UI {
 		document.addEventListener( 'pointermove', ( e ) => {
 
 			const locked = !! document.pointerLockElement;
-			this._overUI = ! locked && !! e.target?.closest?.( '.tw-interactive' );
+			this._overUI = ! locked && !! e.target?.closest?.( '.em-interactive' );
 			this._activity();
 			if ( this._photo && ! locked ) this._pokePhotoHint();
 
@@ -2350,7 +2350,7 @@ export class UI {
 
 		document.addEventListener( 'pointerdown', ( e ) => {
 
-			const inUI = !! e.target?.closest?.( '.tw-interactive' );
+			const inUI = !! e.target?.closest?.( '.em-interactive' );
 			this._overUI = inUI && ! document.pointerLockElement;
 			if ( this._menu && ! this._menu.contains( e.target ) && ! this._menuAnchor?.contains( e.target ) ) this._closeMenu();
 			if ( ! inUI ) {
@@ -2533,7 +2533,7 @@ export class UI {
 		this._hideTip();
 		if ( ! t || this._drag || document.pointerLockElement ) return;
 		this._tipT = t;
-		this._tipTimer = setTimeout( () => this._showTip( t ), t.closest( '.tw-rail' ) ? 220 : 520 );
+		this._tipTimer = setTimeout( () => this._showTip( t ), t.closest( '.em-rail' ) ? 220 : 520 );
 
 	}
 
@@ -2545,7 +2545,7 @@ export class UI {
 
 	_showTip( t ) {
 
-		if ( ! t.isConnected || ( t.classList.contains( 'tw-tab' ) && t.classList.contains( 'is-active' ) ) ) return;
+		if ( ! t.isConnected || ( t.classList.contains( 'em-tab' ) && t.classList.contains( 'is-active' ) ) ) return;
 		const tip = this.tipEl;
 		tip.innerHTML = esc( t.dataset.tip ) + ( t.dataset.tipHint ? `<small>${ esc( t.dataset.tipHint ) }</small>` : '' );
 		tip.classList.add( 'is-on' );
@@ -2584,10 +2584,10 @@ export class UI {
 	_openMenu( anchor, labels, index, onPick ) {
 
 		this._closeMenu();
-		const menu = h( 'div', 'tw-menu tw-interactive', { role: 'listbox' } );
+		const menu = h( 'div', 'em-menu em-interactive', { role: 'listbox' } );
 		labels.forEach( ( text, i ) => {
 
-			const it = h( 'button', 'tw-menu-item', { type: 'button', role: 'option', 'aria-selected': String( i === index ), tabindex: '-1' } );
+			const it = h( 'button', 'em-menu-item', { type: 'button', role: 'option', 'aria-selected': String( i === index ), tabindex: '-1' } );
 			it.innerHTML = `<span>${ esc( text ) }</span>${ i === index ? icon( 'check' ) : '' }`;
 			it.addEventListener( 'click', ( e ) => {
 
@@ -2674,7 +2674,7 @@ export class UI {
 		let saved = null;
 		try {
 
-			saved = localStorage.getItem( 'tidewater.ui.tab' );
+			saved = localStorage.getItem( 'elsemesh.ui.tab' );
 
 		} catch { /* storage unavailable */ }
 
@@ -2730,7 +2730,7 @@ export class UI {
 
 			try {
 
-				localStorage.setItem( 'tidewater.ui.tab', tab.id );
+				localStorage.setItem( 'elsemesh.ui.tab', tab.id );
 
 			} catch { /* storage unavailable */ }
 
@@ -2831,7 +2831,7 @@ export class UI {
 				this.promptKey.classList.toggle( 'is-wide', promptKeyLabel.length > 1 );
 				this.promptText.textContent = t;
 				this.promptEl.classList.toggle( 'is-touch-action', touchAction );
-				this.promptEl.classList.toggle( 'tw-interactive', touchAction );
+				this.promptEl.classList.toggle( 'em-interactive', touchAction );
 				this.promptEl.setAttribute( 'role', touchAction ? 'button' : 'status' );
 				this.promptEl.setAttribute( 'aria-label', touchAction ? `Tap to ${ t.toLowerCase() }` : t );
 				this.promptEl.classList.remove( 'is-bump' );
@@ -3144,10 +3144,10 @@ export class UI {
 
 		}
 
-		const el = h( 'div', 'tw-toast tw-glass', { role: 'status' } );
-		const bar = h( 'span', 'tw-toast-bar' );
+		const el = h( 'div', 'em-toast em-glass', { role: 'status' } );
+		const bar = h( 'span', 'em-toast-bar' );
 		bar.style.setProperty( '--life', `${ ms }ms` );
-		el.append( h( 'span', 'tw-toast-dot' ), h( 'span', 'tw-toast-text', { text } ), bar );
+		el.append( h( 'span', 'em-toast-dot' ), h( 'span', 'em-toast-text', { text } ), bar );
 		this.toastsEl.append( el );
 		void el.offsetWidth;
 		el.classList.add( 'is-in' );
@@ -3190,7 +3190,7 @@ export class UI {
 			el.hidden = false;
 			void el.offsetWidth;
 			el.classList.add( 'is-on' );
-			if ( ! document.pointerLockElement ) el.querySelector( '.tw-help-close' )?.focus( { preventScroll: true } );
+			if ( ! document.pointerLockElement ) el.querySelector( '.em-help-close' )?.focus( { preventScroll: true } );
 
 		} else {
 
@@ -3278,7 +3278,7 @@ export class UI {
 			const go = ( e ) => {
 
 				if ( this.startWorldPicker.contains( e.target ) ) return;
-				if ( e.type === 'click' && ! this.startWorldPicker.hidden && ! e.target.closest?.( '.tw-start-cta, .tw-start-world-toggle' ) ) {
+				if ( e.type === 'click' && ! this.startWorldPicker.hidden && ! e.target.closest?.( '.em-start-cta, .em-start-world-toggle' ) ) {
 
 					this.startWorldPicker.hidden = true;
 					this.startWorldToggle.setAttribute( 'aria-expanded', 'false' );
@@ -3286,8 +3286,8 @@ export class UI {
 					return;
 
 				}
-				if ( e.type === 'click' && e.target.closest?.( 'button, input, form, a' ) && ! e.target.closest( '.tw-start-cta' ) ) return;
-				if ( e.type === 'keydown' && e.target.closest?.( 'button, input, form, a' ) && ! e.target.closest( '.tw-start-cta' ) ) return;
+				if ( e.type === 'click' && e.target.closest?.( 'button, input, form, a' ) && ! e.target.closest( '.em-start-cta' ) ) return;
+				if ( e.type === 'keydown' && e.target.closest?.( 'button, input, form, a' ) && ! e.target.closest( '.em-start-cta' ) ) return;
 
 				if ( e.type === 'keydown' ) {
 
@@ -3422,7 +3422,7 @@ export class UI {
 		const L = document.getElementById( 'loader' );
 		if ( ! L ) return;
 		const ld = this._loaderState();
-		L.classList.add( 'tw-error' );
+		L.classList.add( 'em-error' );
 		L.classList.remove( 'is-compiling' );
 		ld.status = String( message );
 		if ( ld.statusEl ) ld.statusEl.textContent = ld.status;
@@ -3485,7 +3485,7 @@ export class UI {
 		if ( this._loaderGone ) return this._loaderGone;
 		this.setLoading( 1, 'Ready' );
 		L.classList.remove( 'is-compiling' );
-		L.classList.add( 'tw-hidden' );
+		L.classList.add( 'em-hidden' );
 		this._loaderGone = new Promise( ( resolve ) => setTimeout( () => {
 
 			if ( this._ld ) {

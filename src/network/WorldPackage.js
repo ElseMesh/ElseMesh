@@ -24,6 +24,7 @@ import { villageMaterialRole } from './WorldVillageMaterial.js';
 import { decodeVillageMaterialAsset } from './VillageMaterialAsset.js';
 import { VillageTextures } from '../world/village/TextureBaker.js';
 import { createVillageMaterials } from '../world/village/VillageMaterials.js';
+import { WorldExtensionSession } from './WorldExtensionSession.js';
 
 const COMPONENTS = Object.freeze( {
 	POSITION: [ 'position', 3 ],
@@ -47,7 +48,7 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 	root.name = `world:${connector.worldId}`;
 	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext };
 	try {
-		const materialComponent = connector.manifest.components?.find( ( component ) => component.type === 'tidewater.village-materials/2' );
+		const materialComponent = connector.manifest.components?.find( ( component ) => component.type === 'elsemesh.village-materials/2' );
 		const selectedObjectIDs = objectIDs ? ( objectIDs instanceof Set ? objectIDs : new Set( objectIDs ) ) : null;
 		if ( materialComponent && ( ! selectedObjectIDs || selectedObjectIDs.has( materialComponent.objectId ) ) ) await installPackagedVillageMaterials( connector, root, signal );
 		await appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } );
@@ -68,7 +69,7 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 	}
 	const objectRecords = connector.manifest.objects || [];
 	const selectedObjects = objectIDs ? new Set( objectIDs ) : null;
-	const materialComponent = connector.manifest.components?.find( ( component ) => component.type === 'tidewater.village-materials/2' );
+	const materialComponent = connector.manifest.components?.find( ( component ) => component.type === 'elsemesh.village-materials/2' );
 	if ( materialComponent && ( ! selectedObjects || selectedObjects.has( materialComponent.objectId ) ) ) await installPackagedVillageMaterials( connector, root, signal );
 
 	for ( const object of objectRecords ) {
@@ -121,10 +122,27 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 
 }
 
+export async function loadWorldExtensions( connector, root ) {
+	const descriptors = connector.manifest.extensions || [];
+	if ( ! descriptors.length ) return;
+	const state = root?.userData?.worldPackage;
+	if ( ! state || state.disposed ) throw new Error( 'World package is not available for extension loading' );
+	if ( state.extensionSession ) return;
+	const session = state.extensionSession = new WorldExtensionSession( { connector, root } );
+	try { state.extensionStates = await session.load( descriptors ); }
+	catch ( error ) { state.extensionSession = null; throw error; }
+}
+
+export function stepWorldPackageExtensions( root, deltaSeconds, context = {} ) {
+	const state = root?.userData?.worldPackage;
+	if ( state?.disposed ) return;
+	state?.extensionSession?.step( deltaSeconds, context );
+}
+
 async function installPackagedVillageMaterials( connector, root, signal ) {
 	const state = root.userData.worldPackage;
 	if ( state.ownedMaterialContext || state.disposed ) return;
-	const component = connector.manifest.components.find( ( candidate ) => candidate.type === 'tidewater.village-materials/2' );
+	const component = connector.manifest.components.find( ( candidate ) => candidate.type === 'elsemesh.village-materials/2' );
 	const packed = await connector.getAsset( component.dataAssetId, { signal } );
 	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
 	const decoded = await decodeVillageMaterialAsset( packed );
@@ -514,6 +532,7 @@ export function disposeWorldPackage( root ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! root || state?.disposed ) return;
 	if ( state ) state.disposed = true;
+	state?.extensionSession?.dispose();
 	for ( const controller of state?.lodControllers?.values() || [] ) controller.dispose();
 	const geometries = new Set(), materials = new Set(), textures = new Set();
 	const roots = [ root, ...( state?.parsed?.values?.() || [] ) ];
@@ -555,7 +574,7 @@ async function buildGLTF( gltf, packageState = null ) {
 		const pbr = source.pbrMetallicRoughness || {};
 		const role = villageMaterialRole( source );
 		if ( role ) {
-			if ( ! packageState?.connector?.manifest?.rules?.requiredFeatures?.includes( 'tidewater.village-materials/1' ) ) throw new Error( 'Village material profile is missing tidewater.village-materials/1' );
+			if ( ! packageState?.connector?.manifest?.rules?.requiredFeatures?.includes( 'elsemesh.village-materials/1' ) ) throw new Error( 'Village material profile is missing elsemesh.village-materials/1' );
 			const vdata = gltf.meshes.flat().filter( primitive => primitive.material === index ).map( primitive => primitive.attributes._TW_VDATA );
 			if ( vdata.some( attribute => ! attribute || attribute.itemSize !== 4 ) ) throw new Error( `Village material ${role} requires a VEC4 _TW_VDATA attribute` );
 			const context = packageState.materialContext;

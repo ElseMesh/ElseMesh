@@ -11,9 +11,8 @@ these estimates when new verification evidence is recorded.
 **Repository separation: 100% — complete.** The structural split and its
 verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
 
-**Tidewater package integration and parity: 75%.** This goal covers only the
-Example Island content now stored in the pinned Tidewater submodule. Exclude the
-LOZ cave and Burning Horizons from its checks. ElseMesh builds with Tidewater
+**Tidewater package integration and parity: 75%.** This goal covers the
+Example Island content now stored in the pinned Tidewater submodule. ElseMesh builds with Tidewater
 mounted, verifies its content-addressed assets, and loads portable worlds
 through versioned interfaces. Matched hosted/built-in start and village views
 render on Android. The package includes a signed, content-addressed grass-density
@@ -75,7 +74,7 @@ in `docs/`.
   Tidewater manifests, asset hashes, startup, and package behavior remain
   unchanged while dynamic providers are introduced.
   See [world authoring](docs/world-authoring.md#replaceable-world-content-and-packaging), the
-  [terrain package contract](docs/schemas/terrain-package.md),
+  [terrain package contract](worlds/tidewater/docs/schemas/terrain-package.md),
   [world and network design](docs/world-network-design.md#world-hosts-and-dynamic-region-providers),
   [graphics priority](docs/graphics-priority.md), and
   [graphics review](docs/graphics-review.md).
@@ -105,8 +104,8 @@ in `docs/`.
   and [AI editing](docs/ai-editor-worker.md).
 - **Portals and multiple worlds (75%):** support independently configured portal
   sides, mapped arrival orientation/travel direction, owner-authorized sharing,
-  preview/entry rules, and at least two separately hosted worlds including a
-  LOZ-derived world. See [portal authoring](docs/portal-authoring.md#share-one-side-with-a-friend) and the
+  preview/entry rules, and at least two separately hosted worlds including an
+  independently authored world. See [portal authoring](docs/portal-authoring.md#share-one-side-with-a-friend) and the
   [two-world test runbook](docs/testing-two-worlds.md).
 - **Loading and transport (70%):** use signed experience metadata for world-specific
   loading stages and readiness, stream content by priority, and derive portal
@@ -127,11 +126,9 @@ in `docs/`.
   mode may expose Central credentials; treat physical path observations as
   transient. Verify routing, ports, peer discovery, and operation without
   Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
-- **Publishing (90%):** host the current ElseMesh client at `elsemesh.github.io/`
-  and archived `loz/main` at `/loz`, retire `/elsemesh`, and show an eight
-  character source stamp matching each published ref; inspect the archived
-  `loz/main` implementation for reusable avatar/multiplayer work before
-  replacing it. See
+- **Publishing (90%):** host the current ElseMesh client at `elsemesh.github.io/`, retire
+  `/elsemesh`, and show an eight-character source stamp matching the published
+  ref. See
   [deployment](docs/deployment.md#github-pages).
 
 ## Personal ThruHold and provider failover (70%)

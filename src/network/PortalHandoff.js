@@ -8,12 +8,12 @@ const _portalPlane = new Vector4();
 const _portalFarCorner = new Vector4();
 const _transpose = new Matrix4();
 
-// Open portal previews render at a bounded rate, so advance their self-contained
-// component animations by the time between preview renders without simulating a
-// long hidden-tab pause in one large step.
-export function updatePortalPreviewComponents(components, now, lastRenderedAt, camera) {
+// Portal views render every frame. Advance destination components by the elapsed
+// frame time, while avoiding a second simulation step when the view shares the
+// currently active world root.
+export function updatePortalViewComponents(components, now, lastRenderedAt, camera, activeRoot = false) {
 	const elapsed = Number.isFinite( lastRenderedAt ) ? ( now - lastRenderedAt ) / 1000 : 0;
-	const dt = Number.isFinite( elapsed ) ? Math.min( 0.1, Math.max( 0, elapsed ) ) : 0;
+	const dt = activeRoot ? 0 : Number.isFinite( elapsed ) ? Math.min( 0.1, Math.max( 0, elapsed ) ) : 0;
 	for ( const component of components || [] ) component.update?.( dt, camera );
 	return dt;
 }
@@ -87,7 +87,7 @@ export function mapPortalPlayerState( state, entry, exit ) {
 }
 
 // Place destination-world geometry so its signed exit transform meets the local entry.
-export function alignPortalPreview( root, entry, exit ) {
+export function alignPortalView( root, entry, exit ) {
 	const yaw = entry.yaw - exit.yaw;
 	const cos = Math.cos( yaw ), sin = Math.sin( yaw );
 	const [ x, y, z ] = exit.position;

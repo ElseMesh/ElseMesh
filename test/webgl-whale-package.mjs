@@ -7,7 +7,7 @@ import { WhaleBrain } from '../src/world/marine/WhaleBrain.js';
 
 const root = path.resolve( 'worlds/tidewater' );
 const world = JSON.parse( await readFile( path.join( root, 'world-source.json' ), 'utf8' ) );
-const component = world.components.find( item => item.type === 'tidewater.humpback-whale/1' );
+const component = world.components.find( item => item.type === 'elsemesh.humpback-whale/1' );
 assert.ok( component, 'Tidewater exports a packaged whale component' );
 const queryNames = [];
 const query = { allocate: name => { queryNames.push( name ); return queryNames.length - 1; } };

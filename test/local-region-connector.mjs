@@ -46,7 +46,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && ( options.method === undefined || options.method === 'GET' ) && url.searchParams.has( 'lease' ) ) payloadFetchOrder.push( url.searchParams.get( 'payload' ) );
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
-		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'world:hogwarts-legacy-local',
+		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'elsemesh:hogwarts-legacy-local',
 		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
 		entrySelection: {
 			schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house',
@@ -93,13 +93,13 @@ try {
 	assert.deepEqual( link, { localProvider: 'http://127.0.0.1:4179', localMap: 'Great Hall' } );
 	const localPage = 'http://127.0.0.1:5189/?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall';
 	assert.equal( await discoverLocalWorldURL( { pageURL: localPage, fetchImpl: () => { throw new Error( 'must not query the default world for a local bridge link' ); } } ), null );
-	assert.equal( defaultHomeWorldURL( { pageURL: localPage, storage: { getItem: () => '{"worldId":"world:example-island"}' } } ), null );
+	assert.equal( defaultHomeWorldURL( { pageURL: localPage, storage: { getItem: () => '{"worldId":"elsemesh:example-island"}' } } ), null );
 	assert.throws( () => worldLinkFromLocation( {
 		search: '?localProvider=http%3A%2F%2Fexample.com&localMap=Great%20Hall',
 		href: 'http://127.0.0.1:5189/',
 	} ), /loopback/ );
 	assert.throws( () => worldLinkFromLocation( {
-		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=world%3Atidewater',
+		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=elsemesh%3Atidewater',
 		href: 'http://127.0.0.1:5189/',
 	} ), /cannot be combined/ );
 

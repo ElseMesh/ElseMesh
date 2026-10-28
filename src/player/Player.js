@@ -77,6 +77,7 @@ export class Player {
 		this.hostedSeaLevel = null;
 		this._previousPosition = new THREE.Vector3();
 		this.worldMovement = movementParameters( null );
+		this.hostedCollisionGuard = null;
 
 		// boat cameras
 		this.orbitYaw = 0;
@@ -152,6 +153,10 @@ export class Player {
 		this.velocity.y -= this.gravity * dt;
 		this._previousPosition.copy( this.position );
 		this.position.addScaledVector( this.velocity, dt );
+		if ( this.hostedCollisionGuard && ! this.hostedCollisionGuard( this._previousPosition, this.position ) ) {
+			this.position.copy( this._previousPosition );
+			this.velocity.set( 0, 0, 0 );
+		}
 		this.colliders.resolveCapsule( this.position, RADIUS, HEIGHT, 0.4 );
 		this.resolveBoatCollision( this.position, HEIGHT );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;

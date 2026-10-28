@@ -15,7 +15,7 @@ export async function readBrowserWorldProfile( directory ) {
 	const manifestFile = await directory.getFileHandle( 'world.json' ).then( handle => handle.getFile() );
 	const keyFile = await directory.getFileHandle( 'node.key' ).then( handle => handle.getFile() );
 	const manifest = JSON.parse( await manifestFile.text() );
-	if ( manifest?.protocol !== 'tidewater.world/2' || ! manifest.payload || typeof manifest.payload.worldId !== 'string' || ! Array.isArray( manifest.payload.assets ) ) throw new Error( 'Selected directory does not contain a signed ElseMesh world profile' );
+	if ( manifest?.protocol !== 'elsemesh.world/3' || ! manifest.payload || typeof manifest.payload.worldId !== 'string' || ! Array.isArray( manifest.payload.assets ) ) throw new Error( 'Selected directory does not contain a signed ElseMesh world profile' );
 	const assetsDirectory = await directory.getDirectoryHandle( 'assets' );
 	const files = new Map();
 	let total = 0;
@@ -44,7 +44,7 @@ export async function pickBrowserWorldProfile() {
 		const manifestFile = byPath.get( 'world.json' ), keyFile = byPath.get( 'node.key' );
 		if ( ! manifestFile || ! keyFile ) throw new Error( 'Selected directory must contain world.json and node.key' );
 		const manifest = JSON.parse( await manifestFile.text() );
-		if ( manifest?.protocol !== 'tidewater.world/2' || ! manifest.payload || typeof manifest.payload.worldId !== 'string' || ! Array.isArray( manifest.payload.assets ) ) throw new Error( 'Selected directory does not contain a signed ElseMesh world profile' );
+		if ( manifest?.protocol !== 'elsemesh.world/3' || ! manifest.payload || typeof manifest.payload.worldId !== 'string' || ! Array.isArray( manifest.payload.assets ) ) throw new Error( 'Selected directory does not contain a signed ElseMesh world profile' );
 		const files = new Map(); let total = 0;
 		for ( const [ name, file ] of byPath ) {
 			const match = /^assets\/([0-9a-f]{64})$/.exec( name );

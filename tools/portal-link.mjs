@@ -7,8 +7,8 @@ import { validateWorldSource } from '../src/network/WorldSource.js';
 
 const MAX_SOURCE = 16 * 1024 * 1024;
 const MAX_LINK = 16384;
-const worldId = ( value ) => typeof value === 'string' && /^tw-world:[\w.-]{1,128}$/.test( value );
-const portalId = ( value ) => typeof value === 'string' && /^tw-portal:[\w.-]{1,128}$/.test( value );
+const worldId = ( value ) => typeof value === 'string' && /^elsemesh:[\w.-]{1,128}$/.test( value );
+const portalId = ( value ) => typeof value === 'string' && /^elsemesh-portal:[\w.-]{1,128}$/.test( value );
 function exact( value, required, optional = [] ) {
 	if ( ! value || typeof value !== 'object' || Array.isArray( value ) || required.some( ( key ) => ! Object.hasOwn( value, key ) ) || Object.keys( value ).some( ( key ) => ! [ ...required, ...optional ].includes( key ) ) ) throw new Error( 'Invalid portal link fields' );
 }

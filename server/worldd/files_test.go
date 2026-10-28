@@ -127,7 +127,7 @@ func TestImportAuthorizedPackageDoesNotTreatFailoverAsCacheGrant(t *testing.T) {
 	}
 	now := time.Now()
 	manifest := newStarterManifest("Grant scope test", ownerID.String())
-	manifest.WorldID = "tw-world:package-grant-test"
+	manifest.WorldID = "elsemesh:package-grant-test"
 	packageAssets := t.TempDir()
 	content := []byte("cache-authorized asset")
 	assetID := assetHash(content)
@@ -170,7 +170,7 @@ func TestOwnerSignsValidatedRuntimeManifest(t *testing.T) {
 	root := t.TempDir()
 	source, destination := filepath.Join(root, "unsigned.json"), filepath.Join(root, "signed.json")
 	manifest := newStarterManifest("Island", owner.String())
-	manifest.WorldID = "tw-world:authoring-test"
+	manifest.WorldID = "elsemesh:authoring-test"
 	encoded, err := json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)

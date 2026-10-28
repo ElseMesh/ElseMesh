@@ -21,7 +21,7 @@ func TestWorldProposalSubmissionRequiresFreshGrantAndPersistsForOwnerReview(t *t
 	now := time.Now().Truncate(time.Second)
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:proposal-inbox"
+	worldID := "elsemesh:proposal-inbox"
 	proposalDir := filepath.Join(t.TempDir(), "proposals")
 	if err := os.Mkdir(proposalDir, 0700); err != nil {
 		t.Fatal(err)
@@ -91,16 +91,16 @@ func TestWorldProposalCanonicalEnvelopeEscapesHTMLLikeBrowserSigner(t *testing.T
 	unsigned := unsignedWorldProposalSubmission{
 		Protocol: worldProposalSubmissionProtocol, AccountPublicKey: "AQID",
 		Grant: signedDocument{
-			Protocol: "tidewater.world-role/1", Signer: "owner", PublicKey: "public", Signature: "signature",
+			Protocol: "elsemesh.world-role/1", Signer: "owner", PublicKey: "public", Signature: "signature",
 			Payload: json.RawMessage(`{"name":"<A&B>","n":1}`),
 		},
-		Proposal: json.RawMessage(`{"protocol":"elsemesh.world-proposal/1","worldId":"tw-world:canonical","sourceHash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operations":[],"title":"<A&B>"}`),
+		Proposal: json.RawMessage(`{"protocol":"elsemesh.world-proposal/1","worldId":"elsemesh:canonical","sourceHash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operations":[],"title":"<A&B>"}`),
 	}
 	canonical, err := canonicalJSON(unsigned)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"accountPublicKey":"AQID","grant":{"payload":{"n":1,"name":"\u003cA\u0026B\u003e"},"protocol":"tidewater.world-role/1","publicKey":"public","signature":"signature","signer":"owner"},"proposal":{"operations":[],"protocol":"elsemesh.world-proposal/1","sourceHash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","title":"\u003cA\u0026B\u003e","worldId":"tw-world:canonical"},"protocol":"elsemesh.world-proposal-submission/1"}`
+	want := `{"accountPublicKey":"AQID","grant":{"payload":{"n":1,"name":"\u003cA\u0026B\u003e"},"protocol":"elsemesh.world-role/1","publicKey":"public","signature":"signature","signer":"owner"},"proposal":{"operations":[],"protocol":"elsemesh.world-proposal/1","sourceHash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","title":"\u003cA\u0026B\u003e","worldId":"elsemesh:canonical"},"protocol":"elsemesh.world-proposal-submission/1"}`
 	if string(canonical) != want {
 		t.Fatalf("canonical submission = %s, want %s", canonical, want)
 	}
@@ -110,7 +110,7 @@ func TestOwnerCanListAndExportVerifiedQueuedWorldProposal(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:proposal-review"
+	worldID := "elsemesh:proposal-review"
 	fingerprint, err := accountKeyFingerprint(member.GetPublic())
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func TestOwnerCanListAndExportVerifiedQueuedWorldProposal(t *testing.T) {
 	}
 	for _, wrong := range []struct{ id, world, owner string }{
 		{"../outside", worldID, ownerID},
-		{id, "tw-world:other", ownerID},
+		{id, "elsemesh:other", ownerID},
 		{id, worldID, peerIDForTest(t, member.GetPublic())},
 	} {
 		if _, err := removeWorldProposal(inbox, wrong.id, wrong.world, wrong.owner); err == nil {
@@ -196,7 +196,7 @@ func TestOwnerCanListAndExportVerifiedQueuedWorldProposal(t *testing.T) {
 func TestOwnerProposalReviewRejectsTamperedInboxEntry(t *testing.T) {
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:proposal-tamper"
+	worldID := "elsemesh:proposal-tamper"
 	fingerprint, err := accountKeyFingerprint(member.GetPublic())
 	if err != nil {
 		t.Fatal(err)
@@ -259,7 +259,7 @@ func TestWorldProposalSubmissionRejectsMissingStaleRevokedAndNonOwnerCases(t *te
 	now := time.Now().Truncate(time.Second)
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:proposal-denials"
+	worldID := "elsemesh:proposal-denials"
 	fingerprint, err := accountKeyFingerprint(member.GetPublic())
 	if err != nil {
 		t.Fatal(err)
@@ -284,7 +284,7 @@ func TestWorldProposalSubmissionRejectsMissingStaleRevokedAndNonOwnerCases(t *te
 		{name: "missing revocation state", localKey: owner, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest(worldID, "world.update"))},
 		{name: "stale revocation state", localKey: owner, state: signRoleRevocationsForProposalTest(t, owner, worldID, ownerID, 1, now.Add(-20*time.Minute), now.Add(-10*time.Minute), nil, nil), serial: 1, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest(worldID, "world.update"))},
 		{name: "revoked grant", localKey: owner, state: signRoleRevocationsForProposalTest(t, owner, worldID, ownerID, 1, now.Add(-time.Minute), now.Add(10*time.Minute), []string{grant.GrantID}, nil), serial: 1, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest(worldID, "world.update"))},
-		{name: "wrong world", localKey: owner, state: validState, serial: 1, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest("tw-world:other", "world.update"))},
+		{name: "wrong world", localKey: owner, state: validState, serial: 1, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest("elsemesh:other", "world.update"))},
 		{name: "unsupported operation", localKey: owner, state: validState, serial: 1, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest(worldID, "run-script"))},
 		{name: "not owner node", localKey: testKey(t), state: validState, serial: 1, submission: makeSignedProposalSubmission(t, member, grantDocument, proposalForTest(worldID, "world.update"))},
 	}
@@ -316,7 +316,7 @@ func TestWorldProposalSubmissionRequiresScopesForEachOperation(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:proposal-scopes"
+	worldID := "elsemesh:proposal-scopes"
 	fingerprint, err := accountKeyFingerprint(member.GetPublic())
 	if err != nil {
 		t.Fatal(err)
@@ -375,7 +375,7 @@ func TestPortalOnlyGrantCanQueueAndExportPortalProposal(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	owner, member := testKey(t), testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:portal-proposal"
+	worldID := "elsemesh:portal-proposal"
 	fingerprint, err := accountKeyFingerprint(member.GetPublic())
 	if err != nil {
 		t.Fatal(err)
@@ -388,7 +388,7 @@ func TestPortalOnlyGrantCanQueueAndExportPortalProposal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal := json.RawMessage(`{"protocol":"elsemesh.world-proposal/1","worldId":"tw-world:portal-proposal","sourceHash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operations":[{"op":"portal.add","fields":{"id":"portal-1"}}]}`)
+	proposal := json.RawMessage(`{"protocol":"elsemesh.world-proposal/1","worldId":"elsemesh:portal-proposal","sourceHash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operations":[{"op":"portal.add","fields":{"id":"portal-1"}}]}`)
 	submission := makeSignedProposalSubmission(t, member, grant, proposal)
 	inbox := filepath.Join(t.TempDir(), "proposals")
 	if err := os.Mkdir(inbox, 0700); err != nil {

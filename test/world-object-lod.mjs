@@ -16,7 +16,7 @@ import { Vector3 } from '../src/engine/math/Vector3.js';
 import { transformBoundsCenter } from '../src/network/WorldStreaming.js';
 
 const camera = new PerspectiveCamera(60,1,.1,1000);
-const object = {id:'tw-object:lod', kind:'asset-instance', label:'LOD fixture', assetId:'full', transform:{position:[0,0,-10],yaw:0},scale:[1,1,1], streamingBounds:{center:[0,0,0],radius:1}, collision:{enabled:true,shape:'box',center:[0,0,0],halfExtents:[1,1,1],walkable:true,solid:true},lods:[{assetId:'medium',maxScreenFraction:.12},{assetId:'low',maxScreenFraction:.04}]};
+const object = {id:'elsemesh-object:lod', kind:'asset-instance', label:'LOD fixture', assetId:'full', transform:{position:[0,0,-10],yaw:0},scale:[1,1,1], streamingBounds:{center:[0,0,0],radius:1}, collision:{enabled:true,shape:'box',center:[0,0,0],halfExtents:[1,1,1],walkable:true,solid:true},lods:[{assetId:'medium',maxScreenFraction:.12},{assetId:'low',maxScreenFraction:.04}]};
 assert.equal(selectObjectLOD(object,camera),0);
 camera.position.z = 20;
 assert.equal(selectObjectLOD(object,camera),1);
@@ -61,7 +61,7 @@ function meshGLB(triangles) {
 }
 const payloads = new Map([['full',meshGLB(8)],['medium',meshGLB(4)],['low',meshGLB(2)]]);
 const requests=[];
-const connector={worldId:'tw-world:lod',manifest:{objects:[object],portals:[]},getAsset:async id => {requests.push(id);return payloads.get(id);}};
+const connector={worldId:'elsemesh:lod',manifest:{objects:[object],portals:[]},getAsset:async id => {requests.push(id);return payloads.get(id);}};
 const root = await loadWorldPackage(connector,{assets:new Map([['full',payloads.get('full')]])});
 const instance=root.children[0]; const colliders = new Colliders(); registerWorldPackageCollisions(root,colliders);
 const originalCollider=root.userData.worldPackage.activeColliders.get(object.id).collider;
@@ -92,7 +92,7 @@ assert.equal(root.userData.worldPackage.activeColliders.get(object.id).collider,
 camera.position.z=0;now+=10;updateWorldPackageLOD(root,camera,0,now);assert.equal(visibleTriangles(),10,'Returning close cross-fades to the full-detail base');
 now+=200;updateWorldPackageLOD(root,camera,0,now);assert.equal(visibleTriangles(),8);
 const authoredWorld=JSON.parse(readFileSync(new URL('../worlds/tidewater/world-source.json',import.meta.url)));
-const boatObject=authoredWorld.objects.find(item=>item.id==='tw-object:moored-lobster-boat');
+const boatObject=authoredWorld.objects.find(item=>item.id==='elsemesh-object:moored-lobster-boat');
 assert.ok(boatObject?.lods?.length===1,'checked-in moored boat has a packaged distance level');
 const boatAsset=id=>readFileSync(new URL(`../worlds/tidewater/assets/${id.slice(7)}`,import.meta.url));
 const boatBaseBytes=boatAsset(boatObject.assetId),boatLowBytes=boatAsset(boatObject.lods[0].assetId);

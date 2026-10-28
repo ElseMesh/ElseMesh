@@ -11,8 +11,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ACTION_RUNNER = ROOT / "tools/blender/world_actions.py"
 SOURCE_PATH = ROOT / "worlds/tidewater/world-source.json"
-OBJECT_ID = "tw-object:blender-runtime-check"
-MESH_ID = "tw-object:blender-generated-check"
+OBJECT_ID = "elsemesh-object:blender-runtime-check"
+MESH_ID = "elsemesh-object:blender-generated-check"
 
 
 def temporary_root():
@@ -40,7 +40,7 @@ def main():
         raise SystemExit("runtime-check object ID already exists in the example source")
     asset_ids = list(dict.fromkeys(
         record["assetId"] for record in source["objects"]
-        if record["id"].startswith("tw-object:scanned-debris-")
+        if record["id"].startswith("elsemesh-object:scanned-debris-")
     ))
     if len(asset_ids) < 2:
         raise SystemExit("runtime check needs two source assets to exercise asset replacement")

@@ -50,31 +50,31 @@ const failoverSeconds = 120;
 const expiresAt = now + 3600;
 const providers = [];
 for ( const [ id, gateway ] of [ [ first, 'https://offline.example' ], [ second, 'https://online.example' ], [ third, 'https://cache.example' ] ] ) {
-	providers.push( await signedDocument( 'tidewater.node/1', {
-		protocol: 'tidewater.node/1', nodeId: id.peerId, gateway,
-		worldIds: [ 'tw-world:directory-test' ], issuedAt: now, expiresAt: now + 3600,
+	providers.push( await signedDocument( 'elsemesh.node/1', {
+		protocol: 'elsemesh.node/1', nodeId: id.peerId, gateway,
+		worldIds: [ 'elsemesh:directory-test' ], issuedAt: now, expiresAt: now + 3600,
 	}, id ) );
 }
-const zeroTierProvider = await signedDocument( 'tidewater.node/1', {
-	protocol: 'tidewater.node/1', nodeId: second.peerId, gateway: 'https://online.example',
-	worldIds: [ 'tw-world:directory-test' ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+const zeroTierProvider = await signedDocument( 'elsemesh.node/1', {
+	protocol: 'elsemesh.node/1', nodeId: second.peerId, gateway: 'https://online.example',
+	worldIds: [ 'elsemesh:directory-test' ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 	issuedAt: now, expiresAt: now + 3600,
 }, second );
 const assetBytes = new Map( [ [ 'mesh', new Uint8Array( [ 17, 29, 43, 61 ] ) ], [ 'texture', new Uint8Array( [ 5, 11, 23, 47, 89 ] ) ] ] );
 const assetIDs = new Map();
 for ( const [ name, bytes ] of assetBytes ) assetIDs.set( name, `sha256:${Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' )}` );
-let manifest = await signedDocument( 'tidewater.world/2', {
-	protocol: 'tidewater.world/2', worldId: 'tw-world:directory-test', ownerPeerId: second.peerId,
+let manifest = await signedDocument( 'elsemesh.world/3', {
+	protocol: 'elsemesh.world/3', worldId: 'elsemesh:directory-test', ownerPeerId: second.peerId,
 	authorityPeerId: second.peerId, authorityEpoch: 1, version: 1, discoverable: true,
-	title: 'Directory test', rules: { gravity: 1, maxVisitors: 12, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'tidewater-default' },
+	title: 'Directory test', rules: { gravity: 1, maxVisitors: 12, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 	assets: [ ...assetBytes ].map( ( [ name, bytes ] ) => ( { id: assetIDs.get( name ), bytes: bytes.length, priority: 'visible' } ) ), objects: [], portals: [], hosts: [
 		{ peerId: first.peerId, scopes: [ 'failover-authority' ], expiresAt, epoch: grantEpoch, failoverAfter, failoverSeconds },
 		{ peerId: third.peerId, scopes: [ 'content-cache' ], expiresAt, epoch: 1 },
 	], updatedAt: now,
 }, second );
 const validManifest = manifest;
-let authorityLease = await signedDocument( 'tidewater.authority/2', {
-	worldId: 'tw-world:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch,
+let authorityLease = await signedDocument( 'elsemesh.authority/2', {
+	worldId: 'elsemesh:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch,
 	notBefore: failoverAfter, expiresAt: Math.min( expiresAt, failoverAfter + failoverSeconds ),
 }, first );
 const validAuthorityLease = authorityLease;
@@ -86,8 +86,8 @@ let failoverProviderReachable = false;
 let directoryProviders = providers;
 globalThis.fetch = async ( input ) => {
 	const url = new URL( input );
-	if ( url.pathname === '/v1/zerotier/e3918db4832a3056/3af4fd5d50' ) return { ok: true, json: async () => ( { networkId: 'e3918db4832a3056', nodeId: '3af4fd5d50', worldIds: [ 'tw-world:directory-test' ], providers: [ zeroTierProvider ] } ) };
-	return { ok: true, json: async () => ( { worldId: 'tw-world:directory-test', providers: directoryProviders } ) };
+	if ( url.pathname === '/v1/zerotier/e3918db4832a3056/3af4fd5d50' ) return { ok: true, json: async () => ( { networkId: 'e3918db4832a3056', nodeId: '3af4fd5d50', worldIds: [ 'elsemesh:directory-test' ], providers: [ zeroTierProvider ] } ) };
+	return { ok: true, json: async () => ( { worldId: 'elsemesh:directory-test', providers: directoryProviders } ) };
 };
 globalThis.WebSocket = class extends EventTarget {
 	static OPEN = 1;
@@ -127,20 +127,20 @@ globalThis.WebSocket = class extends EventTarget {
 };
 
 try {
-	const connector = new WorldConnector( { worldId: 'tw-world:directory-test', directory: 'https://thruhold.org' } );
+	const connector = new WorldConnector( { worldId: 'elsemesh:directory-test', directory: 'https://thruhold.org' } );
 	const loaded = await connector.getManifest();
-	assert.equal( loaded.worldId, 'tw-world:directory-test' );
+	assert.equal( loaded.worldId, 'elsemesh:directory-test' );
 	assert.equal( connector.nodeId, second.peerId, 'unreachable directory providers should fall through to the next signed gateway' );
 	assert.equal( connector.gateway, 'https://online.example' );
 	assert.equal( connector.authorityLease.grantEpoch, grantEpoch, 'signed temporary authority lease binds to its owner grant revision' );
 	connector.close();
 	failoverProviderReachable = true;
 	directoryProviders = [ providers[ 1 ], providers[ 0 ], providers[ 2 ] ];
-	const recoveredOwner = new WorldConnector( { worldId: 'tw-world:directory-test', directory: 'https://thruhold.org' } );
+	const recoveredOwner = new WorldConnector( { worldId: 'elsemesh:directory-test', directory: 'https://thruhold.org' } );
 	await recoveredOwner.getManifest();
 	assert.equal( recoveredOwner.nodeId, second.peerId, 'directory ordering lets a recovered owner reclaim preferred authority over an active delegate' );
 	recoveredOwner.close();
-	const failoverConnector = new WorldConnector( { worldId: 'tw-world:directory-test', nodeId: first.peerId, gateway: 'https://offline.example', directory: 'https://thruhold.org' } );
+	const failoverConnector = new WorldConnector( { worldId: 'elsemesh:directory-test', nodeId: first.peerId, gateway: 'https://offline.example', directory: 'https://thruhold.org' } );
 	await failoverConnector.getManifest();
 	assert.equal( failoverConnector.nodeId, first.peerId, 'an active failover-only delegate may serve the signed world manifest' );
 	assert.equal( failoverConnector.authorityLease.authorityPeerId, first.peerId, 'the browser records the delegate as current authority' );
@@ -148,61 +148,61 @@ try {
 	assert.equal( failoverConnector.nodeId, second.peerId, 'asset fallback selects the owner after the failover node denies content access' );
 	failoverConnector.close();
 	failoverProviderReachable = false;
-	const invitedReplicas = new WorldConnector( { worldId: 'tw-world:directory-test', providers: [ { nodeId: first.peerId, gateway: 'https://offline.example' }, { nodeId: second.peerId, gateway: 'https://online.example' } ] } );
+	const invitedReplicas = new WorldConnector( { worldId: 'elsemesh:directory-test', providers: [ { nodeId: first.peerId, gateway: 'https://offline.example' }, { nodeId: second.peerId, gateway: 'https://online.example' } ] } );
 	await invitedReplicas.getManifest();
 	assert.equal( invitedReplicas.nodeId, second.peerId, 'a shareable invite falls through from an offline desktop node to its independent replica gateway' );
 	assert.equal( invitedReplicas.gateway, 'https://online.example' );
 	invitedReplicas.close();
 	const zeroTierConnector = new WorldConnector( { zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org' } );
 	const zeroTierManifest = await zeroTierConnector.getManifest();
-	assert.equal( zeroTierManifest.worldId, 'tw-world:directory-test', 'a ZeroTier node locator resolves through its signed provider record to the canonical ThruHold ID' );
+	assert.equal( zeroTierManifest.worldId, 'elsemesh:directory-test', 'a ZeroTier node locator resolves through its signed provider record to the canonical ThruHold ID' );
 	assert.equal( zeroTierConnector.nodeId, second.peerId, 'ZeroTier lookup selects the signed provider gateway and verifies the world manifest' );
 	zeroTierConnector.close();
 	failoverProviderReachable = false;
-	authorityLease = await signedDocument( 'tidewater.authority/2', {
-		worldId: 'tw-world:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch: grantEpoch - 1,
+	authorityLease = await signedDocument( 'elsemesh.authority/2', {
+		worldId: 'elsemesh:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch: grantEpoch - 1,
 		notBefore: failoverAfter, expiresAt: Math.min( expiresAt, failoverAfter + failoverSeconds ),
 	}, first );
-	const stale = new WorldConnector( { worldId: 'tw-world:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
+	const stale = new WorldConnector( { worldId: 'elsemesh:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
 	await assert.rejects( stale.getManifest(), /no matching owner grant/, 'browser rejects a validly signed but stale grant epoch' );
 	stale.close();
-	authorityLease = await signedDocument( 'tidewater.authority/2', {
-		worldId: 'tw-world:directory-test', authorityPeerId: first.peerId, epoch: 3, grantEpoch,
+	authorityLease = await signedDocument( 'elsemesh.authority/2', {
+		worldId: 'elsemesh:directory-test', authorityPeerId: first.peerId, epoch: 3, grantEpoch,
 		notBefore: failoverAfter, expiresAt: Math.min( expiresAt, failoverAfter + failoverSeconds ),
 	}, first );
-	const skippedEpoch = new WorldConnector( { worldId: 'tw-world:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
+	const skippedEpoch = new WorldConnector( { worldId: 'elsemesh:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
 	await assert.rejects( skippedEpoch.getManifest(), /Authority lease is not valid/, 'browser requires failover authority to advance exactly one epoch' );
 	skippedEpoch.close();
-	authorityLease = await signedDocument( 'tidewater.authority/2', {
-		worldId: 'tw-world:directory-test', authorityPeerId: first.peerId, epoch: Number.MAX_SAFE_INTEGER + 1, grantEpoch,
+	authorityLease = await signedDocument( 'elsemesh.authority/2', {
+		worldId: 'elsemesh:directory-test', authorityPeerId: first.peerId, epoch: Number.MAX_SAFE_INTEGER + 1, grantEpoch,
 		notBefore: failoverAfter, expiresAt: Math.min( expiresAt, failoverAfter + failoverSeconds ),
 	}, first );
-	const unsafeEpoch = new WorldConnector( { worldId: 'tw-world:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
+	const unsafeEpoch = new WorldConnector( { worldId: 'elsemesh:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
 	await assert.rejects( unsafeEpoch.getManifest(), /Authority lease is not valid/, 'browser rejects authority epochs outside JavaScript safe integer range' );
 	unsafeEpoch.close();
 	authorityLease = validAuthorityLease;
-	manifest = await signedDocument( 'tidewater.world/2', {
-		protocol: 'tidewater.world/2', worldId: 'tw-world:directory-test', ownerPeerId: second.peerId,
+	manifest = await signedDocument( 'elsemesh.world/3', {
+		protocol: 'elsemesh.world/3', worldId: 'elsemesh:directory-test', ownerPeerId: second.peerId,
 		authorityPeerId: second.peerId, authorityEpoch: Number.MAX_SAFE_INTEGER + 1, version: 1, discoverable: true,
-		title: 'Directory test', rules: { gravity: 1, maxVisitors: 12, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'tidewater-default' },
+		title: 'Directory test', rules: { gravity: 1, maxVisitors: 12, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 		assets: [], objects: [], portals: [], hosts: [], updatedAt: now,
 	}, second );
-	const unsafeManifestEpoch = new WorldConnector( { worldId: 'tw-world:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
+	const unsafeManifestEpoch = new WorldConnector( { worldId: 'elsemesh:directory-test', nodeId: second.peerId, gateway: 'https://online.example' } );
 	await assert.rejects( unsafeManifestEpoch.getManifest(), /Manifest authority epoch/, 'browser rejects a manifest epoch outside safe integer range' );
 	unsafeManifestEpoch.close();
 	manifest = validManifest;
 	globalThis.fetch = async ( input ) => {
 		const pathname = new URL( input ).pathname;
-		if ( pathname === '/api/lookup' ) return { ok: true, json: async () => ( { worldId: 'tw-world:directory-test', providers: [ first.peerId, second.peerId, third.peerId ] } ) };
-		assert.equal( pathname, '/v1/worlds/tw-world%3Adirectory-test' );
+		if ( pathname === '/api/lookup' ) return { ok: true, json: async () => ( { worldId: 'elsemesh:directory-test', providers: [ first.peerId, second.peerId, third.peerId ] } ) };
+		assert.equal( pathname, '/v1/worlds/elsemesh%3Adirectory-test' );
 		return { ok: true, json: async () => ( { providers } ) };
 	};
-	const dhtFallback = new WorldConnector( { worldId: 'tw-world:directory-test', gateway: 'https://bootstrap.example' } );
-	assert.equal( ( await dhtFallback.getManifest() ).worldId, 'tw-world:directory-test' );
+	const dhtFallback = new WorldConnector( { worldId: 'elsemesh:directory-test', gateway: 'https://bootstrap.example' } );
+	assert.equal( ( await dhtFallback.getManifest() ).worldId, 'elsemesh:directory-test' );
 	assert.equal( dhtFallback.nodeId, second.peerId, 'DHT lookup should fall through from an unreachable cache to another provider without a directory' );
 	dhtFallback.close();
 	staleSecondAssets = new Set( assetIDs.values() );
-	const staleCache = new WorldConnector( { worldId: 'tw-world:directory-test', directory: 'https://thruhold.org' } );
+	const staleCache = new WorldConnector( { worldId: 'elsemesh:directory-test', directory: 'https://thruhold.org' } );
 	await staleCache.getManifest();
 	assert.equal( staleCache.nodeId, second.peerId, 'asset recovery starts from the current owner provider' );
 	const recovered = await Promise.all( [ ...assetIDs ].map( async ( [ name, assetId ] ) => [ name, await staleCache.getAsset( assetId ) ] ) );

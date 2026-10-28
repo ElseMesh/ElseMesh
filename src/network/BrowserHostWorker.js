@@ -1,3 +1,4 @@
+import { isWorldID } from './WorldIdentity.js';
 import { verifySignedWorldManifest } from './WorldConnector.js';
 
 const MAX_CHUNK = 192 * 1024;
@@ -20,7 +21,7 @@ async function start( message ) {
 	try {
 		stopped = false;
 		worldId = message.document?.payload?.worldId;
-		if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) ) throw new Error( 'Invalid world ID in selected profile' );
+		if ( ! isWorldID( worldId ) ) throw new Error( 'Invalid world ID in selected profile' );
 		const manifest = await verifySignedWorldManifest( message.document );
 		if ( ! Array.isArray( manifest.assets ) ) throw new Error( 'Signed manifest asset list is invalid' );
 		const refs = new Map();

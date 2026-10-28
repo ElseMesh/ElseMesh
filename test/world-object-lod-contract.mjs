@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { validateObjectLODs } from '../src/network/WorldSource.js';
 import { validateWorldObjects } from '../src/network/WorldConnector.js';
 const ids = [ 'a', 'b', 'c', 'd', 'e' ].map( ( x ) => `sha256:${x.repeat( 64 )}` );
-const object = { id: 'tw-object:lod', assetId: ids[ 0 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 4 }, lods: [ { assetId: ids[ 1 ], maxScreenFraction: 0.2 }, { assetId: ids[ 2 ], maxScreenFraction: 0.05 } ] };
+const object = { id: 'elsemesh-object:lod', assetId: ids[ 0 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 4 }, lods: [ { assetId: ids[ 1 ], maxScreenFraction: 0.2 }, { assetId: ids[ 2 ], maxScreenFraction: 0.05 } ] };
 const assets = ids.map( ( id ) => ( { id, kind: 'glb' } ) );
 validateObjectLODs( object );
 validateWorldObjects( [ object ], assets );
@@ -24,7 +24,7 @@ try {
   const hash = createHash( 'sha256' ).update( content ).digest( 'hex' ); hashes.push( `sha256:${hash}` );
   await writeFile( `${root}/assets/${hash}`, content );
  }
- const source = createWorldSource( { worldId: 'tw-world:lod-test' } );
+ const source = createWorldSource( { worldId: 'elsemesh:lod-test' } );
  source.updatedAt = '2026-10-02T00:00:00Z';
  source.objects = [ { ...object, kind: 'asset-instance', label: 'LOD', assetId: hashes[ 0 ], lods: hashes.slice( 1 ).map( ( assetId, i ) => ( { assetId, maxScreenFraction: [ 0.2, 0.05 ][ i ] } ) ), transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } ];
  validateWorldSource( source );

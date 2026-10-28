@@ -15,7 +15,7 @@ func TestRoleRevocationsPersistMonotonicOwnerStateAcrossRestart(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	owner := testKey(t)
 	ownerID := peerIDForTest(t, owner.GetPublic())
-	worldID := "tw-world:role-state"
+	worldID := "elsemesh:role-state"
 	path := filepath.Join(t.TempDir(), "role-revocations.json")
 	d := &daemon{world: worldManifest{WorldID: worldID, OwnerPeerID: ownerID}, roleStatePath: path}
 	makeDocument := func(serial uint64) signedDocument {

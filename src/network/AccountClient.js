@@ -1,3 +1,5 @@
+import { isWorldID } from './WorldIdentity.js';
+
 const DB_NAME = 'elsemesh-account-v1';
 const STORE_NAME = 'device-keys';
 const KEY_ID = 'account-key';
@@ -23,7 +25,7 @@ export function createAccountProofMessage( challenge, origin ) {
 }
 
 export async function createWorldProposalSubmission( proposal, grant, keyPair ) {
-	if ( ! keyPair?.privateKey || ! keyPair?.publicKey || proposal?.protocol !== 'elsemesh.world-proposal/1' || ! /^tw-world:[\w.-]{1,128}$/.test( proposal.worldId || '' ) || grant?.protocol !== 'tidewater.world-role/1' ) throw new Error( 'Invalid world proposal submission inputs' );
+	if ( ! keyPair?.privateKey || ! keyPair?.publicKey || proposal?.protocol !== 'elsemesh.world-proposal/1' || ! isWorldID( proposal.worldId ) || grant?.protocol !== 'elsemesh.world-role/1' ) throw new Error( 'Invalid world proposal submission inputs' );
 	const accountPublicKey = encodeBase64URL( new Uint8Array( await crypto.subtle.exportKey( 'raw', keyPair.publicKey ) ) );
 	const unsigned = { protocol: WORLD_PROPOSAL_PROTOCOL, accountPublicKey, grant: JSON.parse( JSON.stringify( grant ) ), proposal: JSON.parse( JSON.stringify( proposal ) ) };
 	const message = new TextEncoder().encode( WORLD_PROPOSAL_DOMAIN + canonicalJSONStringify( unsigned ) );

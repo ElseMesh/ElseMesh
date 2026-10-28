@@ -223,7 +223,7 @@ func TestWorldManifestRejectsMalformedSourceHash(t *testing.T) {
 
 func TestHashWorldSourceFileUsesExactFileBytes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "world-source.json")
-	content := []byte("{ \"worldId\": \"tw-world:hash\" }\n")
+	content := []byte("{ \"worldId\": \"elsemesh:hash\" }\n")
 	if err := os.WriteFile(path, content, 0600); err != nil {
 		t.Fatal(err)
 	}

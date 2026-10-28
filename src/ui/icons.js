@@ -105,7 +105,7 @@ export function icon( name, className = '' ) {
 
 	if ( typeof name === 'string' && name.trim().startsWith( '<svg' ) ) return name;
 	const body = PATHS[ ALIASES[ name ] || name ] || PATHS.dot;
-	return `<svg class="tw-ico${className ? ' ' + className : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+	return `<svg class="em-ico${className ? ' ' + className : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 
 }
 
@@ -114,8 +114,8 @@ export function icon( name, className = '' ) {
 let brandId = 0;
 export function brandMark( className = '' ) {
 
-	const id = `tw-bm-${ ++ brandId }`;
-	return `<svg class="tw-mark${className ? ' ' + className : ''}" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+	const id = `em-bm-${ ++ brandId }`;
+	return `<svg class="em-mark${className ? ' ' + className : ''}" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
 		<defs>
 			<linearGradient id="${id}-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a8fbf1"/><stop offset="1" stop-color="#3fb4d6"/></linearGradient>
 			<linearGradient id="${id}-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd8a6"/><stop offset="1" stop-color="#ff9f5a"/></linearGradient>

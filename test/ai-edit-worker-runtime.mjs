@@ -30,7 +30,7 @@ try {
 	const outputPath = path.join( temporaryRoot, 'candidate' );
 	const publicationPath = path.join( temporaryRoot, 'publication-package' );
 	await mkdir( assetsPath );
-	const source = createWorldSource( { worldId: 'tw-world:ai-worker-runtime' } );
+	const source = createWorldSource( { worldId: 'elsemesh:ai-worker-runtime' } );
 	await writeFile( sourcePath, `${JSON.stringify( source, null, 2 )}\n` );
 	const blenderEnvironment = {
 		...process.env,
@@ -50,7 +50,7 @@ try {
 	const task = await createAITaskBundle( {
 		sourcePath, blendPath, assetsPath, instruction: 'Add a bounded wooden test prop.', outTaskPath: taskPath,
 	} );
-	const objectId = 'tw-object:worker-runtime-prop';
+	const objectId = 'elsemesh-object:worker-runtime-prop';
 	await writeFile( path.join( taskPath, 'plan.json' ), `${JSON.stringify( {
 		protocol: task.actionProtocol,
 		sourceHash: task.sourceHash,

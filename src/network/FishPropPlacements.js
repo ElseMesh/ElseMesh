@@ -1,6 +1,6 @@
 import { SPECIES } from '../world/fish/FishSpecies.js';
 
-export const FISH_PROP_PLACEMENT_PROTOCOL = 'tidewater.fish-props-placement/1';
+export const FISH_PROP_PLACEMENT_PROTOCOL = 'elsemesh.fish-props-placement/1';
 export const MAX_FISH_PROP_PLACEMENTS = 20000;
 export const MAX_FISH_PROP_PLACEMENT_BYTES = 16 * 1024 * 1024;
 

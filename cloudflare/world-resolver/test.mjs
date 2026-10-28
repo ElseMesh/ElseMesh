@@ -43,14 +43,14 @@ class MemoryKV {
 
 const owner = await identity();
 const now = Math.floor( Date.now() / 1000 );
-const worldId = 'tw-world:worker-test';
-const node = await signedDocument( 'tidewater.node/1', {
-	protocol: 'tidewater.node/1', nodeId: owner.peerId, gateway: 'https://owner.example',
+const worldId = 'elsemesh:worker-test';
+const node = await signedDocument( 'elsemesh.node/1', {
+	protocol: 'elsemesh.node/1', nodeId: owner.peerId, gateway: 'https://owner.example',
 	worldIds: [ worldId ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 	issuedAt: now, expiresAt: now + 600,
 }, owner );
-const manifest = await signedDocument( 'tidewater.world/2', {
-	protocol: 'tidewater.world/2', worldId, ownerPeerId: owner.peerId, authorityEpoch: 1,
+const manifest = await signedDocument( 'elsemesh.world/3', {
+	protocol: 'elsemesh.world/3', worldId, ownerPeerId: owner.peerId, authorityEpoch: 1,
 	discoverable: true, hosts: [],
 }, owner );
 const announcement = { node, manifest };
@@ -75,7 +75,7 @@ const nodeResult = await nodeLookup.json();
 assert.deepEqual( nodeResult.worldIds, [ worldId ] );
 assert.deepEqual( nodeResult.providers, [ node ] );
 
-const options = await handleRequest( new Request( 'https://resolver.example/v1/worlds/tw-world%3Aworker-test', { method: 'OPTIONS' } ), env );
+const options = await handleRequest( new Request( 'https://resolver.example/v1/worlds/elsemesh%3Aworker-test', { method: 'OPTIONS' } ), env );
 assert.equal( options.status, 204 );
 assert.equal( options.headers.get( 'access-control-allow-methods' ), 'GET, OPTIONS' );
 

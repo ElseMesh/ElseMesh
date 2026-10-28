@@ -8,7 +8,7 @@ export async function generateTidewaterReefURLs() {
 
 	const sourcePath = path.join( REPO, 'worlds', 'tidewater', 'world-source.json' );
 	const source = JSON.parse( await readFile( sourcePath, 'utf8' ) );
-	const assetIDs = [ ...new Set( source.components.filter( component => component.type === 'tidewater.static-reef/1' ).map( component => component.placementAssetId ) ) ].sort();
+	const assetIDs = [ ...new Set( source.components.filter( component => component.type === 'elsemesh.static-reef/1' ).map( component => component.placementAssetId ) ) ].sort();
 	if ( ! assetIDs.length || assetIDs.some( id => ! /^sha256:[0-9a-f]{64}$/.test( id ) ) ) throw new Error( 'Tidewater source has no valid static Reef placement assets' );
 	const imports = assetIDs.map( ( id, index ) => `import asset${index} from '../../../worlds/tidewater/assets/${id.slice( 7 )}?url';` );
 	const entries = assetIDs.map( ( id, index ) => `\t'${id}': asset${index},` );

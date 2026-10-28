@@ -133,7 +133,7 @@ func (d *daemon) acceptWebRTCOffer(request gatewayMessage) (peerResponse, error)
 		}
 		channelAccepted = true
 		channelMu.Unlock()
-		if channel.Label() != "elsemesh-world-v1" || channel.Ordered() == false {
+		if channel.Label() != worldProtocolNamespace || channel.Ordered() == false {
 			_ = channel.Close()
 			return
 		}

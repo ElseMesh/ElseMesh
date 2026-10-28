@@ -15,23 +15,27 @@ import (
 )
 
 const (
-	manifestProtocol  = "tidewater.world/2"
-	authorityProtocol = "tidewater.authority/2"
-	maxManifestBytes  = 1 << 20
-	maxAssetBytes     = 2 << 30
-	maxSafeJSInteger  = uint64(9007199254740991)
-	maxCollisionBoxes = 2048
+	manifestProtocol       = "elsemesh.world/3"
+	worldProtocolNamespace = "elsemesh"
+	authorityProtocol      = "elsemesh.authority/2"
+	maxManifestBytes       = 1 << 20
+	maxAssetBytes          = 2 << 30
+	maxSafeJSInteger       = uint64(9007199254740991)
+	maxCollisionBoxes      = 2048
 )
 
 var (
-	worldIDPattern           = regexp.MustCompile(`^tw-world:[a-zA-Z0-9._-]{1,128}$`)
-	objectIDPattern          = regexp.MustCompile(`^tw-object:[\w.-]{1,128}$`)
-	portalIDPattern          = regexp.MustCompile(`^tw-portal:[\w.-]{1,128}$`)
-	componentIDPattern       = regexp.MustCompile(`^tw-component:[\w.-]{1,128}$`)
-	assetIDPattern           = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	sourceContentHashPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	worldFeaturePattern      = regexp.MustCompile(`^tidewater\.[a-z0-9.-]+/\d+$`)
-	entryPointIDPattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,63}$`)
+	worldIDPattern             = regexp.MustCompile(`^elsemesh:[a-zA-Z0-9._-]{1,128}$`)
+	objectIDPattern            = regexp.MustCompile(`^elsemesh-object:[\w.-]{1,128}$`)
+	portalIDPattern            = regexp.MustCompile(`^elsemesh-portal:[\w.-]{1,128}$`)
+	componentIDPattern         = regexp.MustCompile(`^elsemesh-component:[\w.-]{1,128}$`)
+	assetIDPattern             = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	sourceContentHashPattern   = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	worldFeaturePattern        = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
+	worldBehaviorPattern       = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
+	entryPointIDPattern        = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,63}$`)
+	extensionIDPattern         = regexp.MustCompile(`^elsemesh-extension:[\w.-]{1,128}$`)
+	extensionCapabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]{0,63}$`)
 )
 
 type vector3 [3]float64
@@ -54,6 +58,15 @@ type assetRef struct {
 	Kind     string `json:"kind"`
 	Priority string `json:"priority"`
 	Path     string `json:"path,omitempty"`
+}
+
+type worldExtension struct {
+	ID           string   `json:"id"`
+	Protocol     string   `json:"protocol"`
+	AssetID      string   `json:"assetId"`
+	BehaviorID   string   `json:"behaviorId"`
+	MemoryPages  uint32   `json:"memoryPages"`
+	Capabilities []string `json:"capabilities"`
 }
 
 type objectLOD struct {
@@ -283,34 +296,34 @@ func (component *worldComponent) UnmarshalJSON(data []byte) error {
 	}
 	allowed := map[string]bool{"id": true, "type": true, "priority": true}
 	switch typeName {
-	case "tidewater.procedural-island-vegetation/1":
+	case "elsemesh.procedural-island-vegetation/1":
 		allowed["seed"], allowed["placementAssetId"] = true, true
-	case "tidewater.static-vegetation/1":
+	case "elsemesh.static-vegetation/1":
 		allowed["placementAssetId"], allowed["grassMaskAssetId"] = true, true
-	case "tidewater.static-reef/1":
+	case "elsemesh.static-reef/1":
 		allowed["placementAssetId"] = true
-	case "tidewater.static-fish-props/1":
+	case "elsemesh.static-fish-props/1":
 		allowed["placementAssetId"] = true
-	case "tidewater.example-island-wildlife/1":
+	case "elsemesh.example-island-wildlife/1":
 		allowed["profile"], allowed["seed"] = true, true
 		allowed["roofPerches"], allowed["footprints"] = true, true
-	case "tidewater.humpback-whale/1":
+	case "elsemesh.humpback-whale/1":
 		allowed["profile"], allowed["seed"], allowed["route"] = true, true, true
 		allowed["surfaceAt"], allowed["cruiseSpeed"], allowed["surfaceSpeed"] = true, true, true
 		allowed["modelAssetId"], allowed["geometryAssetId"] = true, true
 		allowed["albedoAssetId"], allowed["heightAssetId"] = true, true
-	case "tidewater.island-ocean/1":
-	case "tidewater.procedural-island-terrain/1":
+	case "elsemesh.island-ocean/1":
+	case "elsemesh.procedural-island-terrain/1":
 		allowed["objectId"], allowed["profile"] = true, true
-	case "tidewater.terrain-surface/1":
+	case "elsemesh.terrain-surface/1":
 		allowed["objectId"], allowed["profile"], allowed["dataAssetId"] = true, true, true
-	case "tidewater.village-materials/2":
+	case "elsemesh.village-materials/2":
 		allowed["objectId"], allowed["profile"], allowed["dataAssetId"] = true, true, true
-	case "tidewater.water-body/1":
+	case "elsemesh.water-body/1":
 		allowed["center"], allowed["extent"], allowed["profile"] = true, true, true
-	case "tidewater.ambient-audio/1":
+	case "elsemesh.ambient-audio/1":
 		allowed["beds"] = true
-	case "tidewater.downeast-boat/1":
+	case "elsemesh.downeast-boat/1":
 		allowed["objectId"] = true
 	default:
 		return fmt.Errorf("unsupported world component type %q", typeName)
@@ -441,17 +454,31 @@ type worldManifest struct {
 	Assets                []assetRef        `json:"assets"`
 	Objects               []worldObject     `json:"objects"`
 	Components            []worldComponent  `json:"components,omitempty"`
+	Extensions            []worldExtension  `json:"extensions,omitempty"`
 	Portals               []portal          `json:"portals"`
 	Hosts                 []hostingGrant    `json:"hosts,omitempty"`
 	UpdatedAt             int64             `json:"updatedAt"`
 }
 
 type worldExperience struct {
-	Genre       string            `json:"genre"`
-	Tagline     string            `json:"tagline"`
-	LoadingNote string            `json:"loadingNote"`
-	Tips        []string          `json:"tips"`
-	Stages      map[string]string `json:"stages"`
+	Genre       string             `json:"genre"`
+	Tagline     string             `json:"tagline"`
+	LoadingNote string             `json:"loadingNote"`
+	Tips        []string           `json:"tips"`
+	Stages      map[string]string  `json:"stages"`
+	Behaviors   []string           `json:"behaviors,omitempty"`
+	Fishing     *fishingExperience `json:"fishing,omitempty"`
+}
+
+type fishingExperience struct {
+	FishStand *fishingLocation `json:"fishStand,omitempty"`
+	Chandlery *fishingLocation `json:"chandlery,omitempty"`
+}
+
+type fishingLocation struct {
+	Position          []float64 `json:"position"`
+	Yaw               float64   `json:"yaw"`
+	InteractionRadius float64   `json:"interactionRadius"`
 }
 
 func validateWorldExperience(experience *worldExperience) error {
@@ -478,6 +505,26 @@ func validateWorldExperience(experience *worldExperience) error {
 	for stage, text := range experience.Stages {
 		if !allowedStages[stage] || strings.TrimSpace(text) == "" || len(text) > 120 {
 			return fmt.Errorf("world experience loading stage %q is invalid", stage)
+		}
+	}
+	if len(experience.Behaviors) > 16 {
+		return errors.New("world experience has too many runtime behaviors")
+	}
+	seenBehaviors := make(map[string]bool, len(experience.Behaviors))
+	for _, behavior := range experience.Behaviors {
+		if !worldBehaviorPattern.MatchString(behavior) || seenBehaviors[behavior] {
+			return fmt.Errorf("world experience contains an invalid or duplicate behavior %q", behavior)
+		}
+		seenBehaviors[behavior] = true
+	}
+	if experience.Fishing != nil {
+		for name, location := range map[string]*fishingLocation{"fishStand": experience.Fishing.FishStand, "chandlery": experience.Fishing.Chandlery} {
+			if location == nil {
+				continue
+			}
+			if len(location.Position) != 2 || math.IsNaN(location.Position[0]) || math.IsInf(location.Position[0], 0) || math.Abs(location.Position[0]) > 1_000_000 || math.IsNaN(location.Position[1]) || math.IsInf(location.Position[1], 0) || math.Abs(location.Position[1]) > 1_000_000 || math.IsNaN(location.Yaw) || math.IsInf(location.Yaw, 0) || math.Abs(location.Yaw) > 360 || math.IsNaN(location.InteractionRadius) || math.IsInf(location.InteractionRadius, 0) || location.InteractionRadius < 0.5 || location.InteractionRadius > 20 {
+				return fmt.Errorf("world experience fishing location %q is invalid", name)
+			}
 		}
 	}
 	return nil
@@ -550,7 +597,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	if manifest.Rules.AvatarComplexity == 0 || manifest.Rules.AvatarComplexity > 100000 || len(manifest.Rules.PhysicsProfile) > 64 || len(manifest.Rules.StyleGuide) > 512 {
 		return errors.New("invalid world rules")
 	}
-	if manifest.Rules.PhysicsProfile != "default" && manifest.Rules.PhysicsProfile != "tidewater-default" {
+	if manifest.Rules.PhysicsProfile != "default" && manifest.Rules.PhysicsProfile != "elsemesh-default" {
 		return errors.New("unsupported world physics profile")
 	}
 	if movement := manifest.Rules.Movement; movement != nil {
@@ -576,7 +623,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		}
 		seenFeatures[feature] = true
 	}
-	if len(manifest.Assets) > 10000 || len(manifest.Objects) > 10000 || len(manifest.Components) > 128 || len(manifest.Portals) > 1024 || len(manifest.Hosts) > 256 {
+	if len(manifest.Assets) > 10000 || len(manifest.Objects) > 10000 || len(manifest.Components) > 128 || len(manifest.Extensions) > 8 || len(manifest.Portals) > 1024 || len(manifest.Hosts) > 256 {
 		return errors.New("manifest contains too many entries")
 	}
 	permitted := manifest.OwnerPeerID == localPeerID
@@ -649,8 +696,38 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		seenAssets[asset.ID] = true
 	}
 	assetKinds := make(map[string]string, len(manifest.Assets))
+	wasmAssetRefs := make(map[string]assetRef, len(manifest.Assets))
 	for _, asset := range manifest.Assets {
 		assetKinds[asset.ID] = asset.Kind
+		wasmAssetRefs[asset.ID] = asset
+	}
+	if len(manifest.Extensions) > 0 && !seenFeatures["elsemesh.world-extension/1"] {
+		return errors.New("world extensions require elsemesh.world-extension/1")
+	}
+	seenExtensions := make(map[string]bool, len(manifest.Extensions))
+	seenExtensionAssets := make(map[string]bool, len(manifest.Extensions))
+	seenExtensionBehaviors := make(map[string]bool, len(manifest.Extensions))
+	declaredBehaviors := make(map[string]bool)
+	if manifest.Experience != nil {
+		for _, behavior := range manifest.Experience.Behaviors {
+			declaredBehaviors[behavior] = true
+		}
+	}
+	for _, extension := range manifest.Extensions {
+		asset, ok := wasmAssetRefs[extension.AssetID]
+		if !extensionIDPattern.MatchString(extension.ID) || seenExtensions[extension.ID] || extension.Protocol != "elsemesh.world-extension/1" || !worldBehaviorPattern.MatchString(extension.BehaviorID) || !declaredBehaviors[extension.BehaviorID] || seenExtensionBehaviors[extension.BehaviorID] || !assetIDPattern.MatchString(extension.AssetID) || seenExtensionAssets[extension.AssetID] || !ok || asset.Kind != "application/wasm" || asset.Bytes < 8 || asset.Bytes > 8<<20 || extension.MemoryPages < 1 || extension.MemoryPages > 256 || len(extension.Capabilities) > 16 {
+			return errors.New("invalid or duplicate world extension descriptor")
+		}
+		seenCaps := make(map[string]bool, len(extension.Capabilities))
+		for _, capability := range extension.Capabilities {
+			if !extensionCapabilityPattern.MatchString(capability) || seenCaps[capability] {
+				return errors.New("invalid or duplicate world extension capability")
+			}
+			seenCaps[capability] = true
+		}
+		seenExtensions[extension.ID] = true
+		seenExtensionAssets[extension.AssetID] = true
+		seenExtensionBehaviors[extension.BehaviorID] = true
 	}
 	seenObjects := make(map[string]bool, len(manifest.Objects))
 	for _, object := range manifest.Objects {
@@ -792,8 +869,8 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			}
 		}
 		if p.Back != nil {
-			if !seenFeatures["tidewater.portal-two-sided/1"] {
-				return errors.New("portal back requires tidewater.portal-two-sided/1")
+			if !seenFeatures["elsemesh.portal-two-sided/1"] {
+				return errors.New("portal back requires elsemesh.portal-two-sided/1")
 			}
 			back := p.Back
 			if !worldIDPattern.MatchString(back.Destination) || back.Gateway != "" && !validPortalGateway(back.Gateway) {
@@ -834,11 +911,11 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		assetRefs[asset.ID] = asset
 	}
 	for _, component := range manifest.Components {
-		vegetation := component.Type == "tidewater.procedural-island-vegetation/1" && component.Seed == 7
-		staticVegetation := component.Type == "tidewater.static-vegetation/1" && component.Seed == 0 && component.PlacementAssetID != ""
-		staticReef := component.Type == "tidewater.static-reef/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
-		staticFishProps := component.Type == "tidewater.static-fish-props/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
-		islandWildlife := component.Type == "tidewater.example-island-wildlife/1" && component.Seed > 0 && component.Profile == "example-island-wildlife-v1" && component.PlacementAssetID == "" && component.StreamingBounds != nil && component.RoofPerches != nil && len(component.RoofPerches) <= 64 && component.Footprints != nil && len(component.Footprints) <= 256
+		vegetation := component.Type == "elsemesh.procedural-island-vegetation/1" && component.Seed == 7
+		staticVegetation := component.Type == "elsemesh.static-vegetation/1" && component.Seed == 0 && component.PlacementAssetID != ""
+		staticReef := component.Type == "elsemesh.static-reef/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
+		staticFishProps := component.Type == "elsemesh.static-fish-props/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
+		islandWildlife := component.Type == "elsemesh.example-island-wildlife/1" && component.Seed > 0 && component.Profile == "example-island-wildlife-v1" && component.PlacementAssetID == "" && component.StreamingBounds != nil && component.RoofPerches != nil && len(component.RoofPerches) <= 64 && component.Footprints != nil && len(component.Footprints) <= 256
 		if islandWildlife {
 			for _, perch := range component.RoofPerches {
 				if len(perch) != 3 || vector3OutOfBounds(vector3{perch[0], perch[1], perch[2]}, 10000) {
@@ -853,7 +930,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 				}
 			}
 		}
-		humpbackWhale := component.Type == "tidewater.humpback-whale/1" && component.Seed > 0 && component.PlacementAssetID == "" && component.Profile == "example-island-humpback-v1" && component.ModelAssetID != "" && component.GeometryAssetID != "" && component.AlbedoAssetID != "" && component.HeightAssetID != "" && component.StreamingBounds != nil && len(component.Route) >= 4 && len(component.Route) <= 32 && component.SurfaceAt != nil && *component.SurfaceAt >= 0 && *component.SurfaceAt <= 1 && component.CruiseSpeed != nil && *component.CruiseSpeed >= 0 && *component.CruiseSpeed <= 10 && component.SurfaceSpeed != nil && *component.SurfaceSpeed >= 0 && *component.SurfaceSpeed <= 10
+		humpbackWhale := component.Type == "elsemesh.humpback-whale/1" && component.Seed > 0 && component.PlacementAssetID == "" && component.Profile == "example-island-humpback-v1" && component.ModelAssetID != "" && component.GeometryAssetID != "" && component.AlbedoAssetID != "" && component.HeightAssetID != "" && component.StreamingBounds != nil && len(component.Route) >= 4 && len(component.Route) <= 32 && component.SurfaceAt != nil && *component.SurfaceAt >= 0 && *component.SurfaceAt <= 1 && component.CruiseSpeed != nil && *component.CruiseSpeed >= 0 && *component.CruiseSpeed <= 10 && component.SurfaceSpeed != nil && *component.SurfaceSpeed >= 0 && *component.SurfaceSpeed <= 10
 		if humpbackWhale {
 			for _, point := range component.Route {
 				if len(point) != 2 {
@@ -868,13 +945,13 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 				}
 			}
 		}
-		ambientAudio := component.Type == "tidewater.ambient-audio/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Beds) > 0 && len(component.Beds) <= 16
-		boat := component.Type == "tidewater.downeast-boat/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.ObjectID != ""
-		islandOcean := component.Type == "tidewater.island-ocean/1" && component.Seed == 0 && component.PlacementAssetID == ""
-		proceduralTerrain := component.Type == "tidewater.procedural-island-terrain/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "example-island-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance"
-		terrainSurface := component.Type == "tidewater.terrain-surface/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "example-island-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance" && component.DataAssetID != ""
-		villageMaterials := component.Type == "tidewater.village-materials/2" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "original-tidewater-village-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance" && component.DataAssetID != ""
-		waterBody := component.Type == "tidewater.water-body/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Center) == 2 && component.Extent >= 8 && component.Extent <= 100000 && (component.Profile == "" || component.Profile == "deep-ocean" || component.Profile == "calm-lagoon" || component.Profile == "storm")
+		ambientAudio := component.Type == "elsemesh.ambient-audio/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Beds) > 0 && len(component.Beds) <= 16
+		boat := component.Type == "elsemesh.downeast-boat/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.ObjectID != ""
+		islandOcean := component.Type == "elsemesh.island-ocean/1" && component.Seed == 0 && component.PlacementAssetID == ""
+		proceduralTerrain := component.Type == "elsemesh.procedural-island-terrain/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "example-island-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance"
+		terrainSurface := component.Type == "elsemesh.terrain-surface/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "example-island-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance" && component.DataAssetID != ""
+		villageMaterials := component.Type == "elsemesh.village-materials/2" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "original-elsemesh-village-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance" && component.DataAssetID != ""
+		waterBody := component.Type == "elsemesh.water-body/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Center) == 2 && component.Extent >= 8 && component.Extent <= 100000 && (component.Profile == "" || component.Profile == "deep-ocean" || component.Profile == "calm-lagoon" || component.Profile == "storm")
 		if waterBody {
 			waterBodyCount++
 			for _, coordinate := range component.Center {
@@ -954,7 +1031,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			if priority == "" {
 				priority = "portal-preview"
 			}
-			if !staticVegetation || !seenFeatures["tidewater.static-grass/1"] || !assetIDPattern.MatchString(component.GrassMaskAssetID) || !exists || asset.Kind != "grass-density/1" || asset.Priority != priority || asset.Bytes <= 16 || asset.Bytes > 16<<20 {
+			if !staticVegetation || !seenFeatures["elsemesh.static-grass/1"] || !assetIDPattern.MatchString(component.GrassMaskAssetID) || !exists || asset.Kind != "grass-density/1" || asset.Priority != priority || asset.Bytes <= 16 || asset.Bytes > 16<<20 {
 				return fmt.Errorf("invalid grass density asset reference on world component %q", component.ID)
 			}
 		}

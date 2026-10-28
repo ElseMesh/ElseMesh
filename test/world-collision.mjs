@@ -9,12 +9,12 @@ import { validateWorldObjects } from '../src/network/WorldConnector.js';
 
 const collision = { shape: 'box', enabled: true, center: [ 1, 1, 1 ], halfExtents: [ 1, 2, 3 ], walkable: true, solid: true };
 const object = {
-	id: 'tw-object:platform', kind: 'asset-instance', label: 'Platform', assetId: `sha256:${'a'.repeat( 64 )}`,
+	id: 'elsemesh-object:platform', kind: 'asset-instance', label: 'Platform', assetId: `sha256:${'a'.repeat( 64 )}`,
 	transform: { position: [ 10, 20, 30 ], yaw: Math.PI / 2 }, scale: [ 2, 3, 4 ], collision,
 };
 const source = {
-	protocol: 'tidewater.world-source/2', worldId: 'tw-world:test', title: 'Collision', coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
-	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'tidewater-default' }, objects: [ object ], portals: [], updatedAt: '2026-10-01T00:00:00Z',
+	protocol: 'elsemesh.world-source/3', worldId: 'elsemesh:test', title: 'Collision', coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
+	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' }, objects: [ object ], portals: [], updatedAt: '2026-10-01T00:00:00Z',
 };
 assert.doesNotThrow( () => validateWorldSource( source ), 'enabled box collision with bounded dimensions is valid' );
 assert.throws( () => validateWorldSource( { ...source, objects: [ { ...object, collision: { ...collision, halfExtents: [ 1, 0, 3 ] } } ] } ), /bounded box, compound, or heightfield data/, 'zero collision extents are rejected' );
@@ -37,7 +37,7 @@ assert.equal( colliders.boxes.length, 0, 'world handoff removes old-world collid
 
 const compoundObject = {
 	...object,
-	id: 'tw-object:compound-platform',
+	id: 'elsemesh-object:compound-platform',
 	collision: { shape: 'compound', enabled: true, boxes: [
 		{ center: [ 1, 1, 1 ], halfExtents: [ 1, 2, 3 ], yaw: 0.25, walkable: true, solid: true },
 		{ center: [ - 1, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ], yaw: 0, walkable: false, solid: true },
@@ -91,8 +91,8 @@ const bodySetupMetadata = {
 	taperedCapsules: [],
 	convexes: [ { vertices: [ [ 6, 0, 0 ], [ 7, 0, 0 ], [ 6, 1, 0 ], [ 6, 0, 1 ] ], indices: [ 0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3 ] } ],
 };
-const bridgedObject = { id: 'tw-object:bridged', kind: 'asset-instance', assetId: `sha256:${'b'.repeat( 64 )}`, transform: { position: [ 10, 2, 30 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } };
-const bridgedConnector = { worldId: 'tw-world:bridge-collision', manifest: { objects: [ bridgedObject ], portals: [] } };
+const bridgedObject = { id: 'elsemesh-object:bridged', kind: 'asset-instance', assetId: `sha256:${'b'.repeat( 64 )}`, transform: { position: [ 10, 2, 30 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } };
+const bridgedConnector = { worldId: 'elsemesh:bridge-collision', manifest: { objects: [ bridgedObject ], portals: [] } };
 const bridgedRoot = await loadWorldPackage( bridgedConnector, { assets: new Map( [ [ bridgedObject.assetId, bodySetupGLB( { elsemeshCollision: bodySetupMetadata } ) ] ] ) } );
 bridgedRoot.children[ 0 ].children[ 0 ].position.y = 1;
 const bridgedColliders = new Colliders();
@@ -108,7 +108,7 @@ assert.equal( bridgedColliders.boxes.length, 0, 'world handoff removes embedded 
 assert.equal( bridgedColliders.cylinders.length, 0, 'world handoff removes embedded sphere and capsule colliders' );
 
 const previewSupport = {
-	id: 'tw-object:preview-support', kind: 'asset-instance', label: 'Provisional preview support', assetId: null,
+	id: 'elsemesh-object:preview-support', kind: 'asset-instance', label: 'Provisional preview support', assetId: null,
 	transform: { position: [ 0, 6.75, 8 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: 'visible',
 	collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 2, 0.25, 3 ], walkable: true, solid: true },
 };
@@ -123,7 +123,7 @@ unregisterWorldPackageCollisions( supportRoot, supportColliders );
 
 const invalidCollisionRoot = new Group();
 const invalidCollisionInstance = new Group();
-invalidCollisionInstance.userData.worldObjectId = 'tw-object:invalid-body-setup';
+invalidCollisionInstance.userData.worldObjectId = 'elsemesh-object:invalid-body-setup';
 const invalidCollisionNode = new Group();
 invalidCollisionNode.userData.elsemeshCollision = {
 	source: 'Unreal UBodySetup.AggGeom', coordinateSystem: 'elsemesh-y-up-meters/1',

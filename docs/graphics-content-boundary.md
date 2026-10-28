@@ -42,7 +42,7 @@ descriptors plus current simulation state.
 ## Renderer-free reef placement contract
 
 The stable type order and model-variant counts for
-`tidewater.reef-placement/1` live in `src/network/ReefPlacementTypes.js`.
+`elsemesh.reef-placement/1` live in `src/network/ReefPlacementTypes.js`.
 The placement codec consumes only that registry; `Reef.js` verifies its
 renderer definitions against it. This keeps reef content serialization
 independent of engine, GPU-batch, material, and fish-simulation imports. The
@@ -130,15 +130,16 @@ remaining effects are verified.
 The fish stand's identity, placement, vendor interaction descriptor, collision
 volumes, material pattern IDs, and procedural fallback geometry now live in
 backend-neutral content modules. `WebGLFishStandAdapter` consumes the same
-placement, collision descriptors, and generated geometry as the WebGPU-side
-stand fallback, and loads Joe's shared character asset. `WebGLGameAdapter`
-connects the fallback buyer to the existing `GameState` and `GameHUD`, restores
-the same browser-saved inventory, and routes selling through the shared game
-rules. The headless fish-stand and game-adapter checks pass. The WebGL path
-does not yet implement the rod/casting/bite/fight simulation, render the static
-fish display, or use the photo-scanned StallKit surface textures. This buyer
-integration is partial gameplay parity, not a complete game runtime. The
-backend-specific early return and separate island scene remain in place.
+authored placement and collision descriptors as the WebGPU game and loads Joe's
+shared character asset. `WebGLGameAdapter` uses the registry-created
+`FishingGameRuntime`, shared `FishingRod` and `BoatGameplayRuntime`, `GameState`,
+and `GameHUD`; it supports casting, bite/fight transitions, selling, upgrades,
+fuel, sonar, the catch card, and the matching fishing-event cues. World-authored
+fishing placement and the bounded Wasm rule extension feed this browser-local
+gameplay in both renderers. Focused headless checks cover these paths. Remaining
+parity work includes live matched-browser gameplay, scanned StallKit surface
+materials, and broader visual comparison. The backend-specific early return
+and separate island scene remain in place.
 
 ## Acceptance criteria
 

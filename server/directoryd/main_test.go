@@ -15,14 +15,26 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+func TestDirectoryWorldIDNamespaceV3RejectsLegacyIDs(t *testing.T) {
+	if worldIDPattern.MatchString("world:legacy") {
+		t.Fatal("directory accepted a legacy world ID")
+	}
+	if worldIDPattern.MatchString("elsemesh:world:legacy") {
+		t.Fatal("directory accepted the previous ElseMesh world ID namespace")
+	}
+	if !worldIDPattern.MatchString("elsemesh:current") {
+		t.Fatal("directory rejected the canonical ElseMesh world ID")
+	}
+}
+
 func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	owner, ownerID := testIdentity(t)
 	node, nodeID := testIdentity(t)
 	now := time.Now()
 	manifestPayload := map[string]any{
-		"protocol": manifestProtocol, "worldId": "tw-world:coast", "ownerPeerId": ownerID,
+		"protocol": manifestProtocol, "worldId": "elsemesh:coast", "ownerPeerId": ownerID,
 		"authorityPeerId": ownerID, "authorityEpoch": 1, "discoverable": true,
-		"version": 1, "title": "Coast", "rules": map[string]any{"gravity": 1, "avatarComplexity": 1000, "physicsProfile": "tidewater-default"},
+		"version": 1, "title": "Coast", "rules": map[string]any{"gravity": 1, "avatarComplexity": 1000, "physicsProfile": "elsemesh-default"},
 		"assets": []any{}, "objects": []any{}, "portals": []any{},
 		"hosts": []any{map[string]any{"peerId": nodeID, "scopes": []string{"content-cache"}, "expiresAt": now.Add(time.Hour).Unix()}},
 	}
@@ -30,7 +42,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	nodeRecord := testSignedDocument(t, nodeProtocol, map[string]any{
 		"protocol": nodeProtocol, "nodeId": nodeID, "gateway": "https://node.example",
 		"zeroTierNodeId": "3af4fd5d50", "zeroTierNetworkId": "e3918db4832a3056",
-		"worldIds": []string{"tw-world:coast"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
+		"worldIds": []string{"elsemesh:coast"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
 	}, node)
 	store := &directory{path: filepath.Join(t.TempDir(), "providers.json"), entries: make(map[string]provider)}
 	body, err := json.Marshal(announcement{Node: nodeRecord, Manifest: manifest})
@@ -55,7 +67,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	lookup := httptest.NewRecorder()
-	loaded.handleWorld(lookup, httptest.NewRequest(http.MethodGet, "/v1/worlds/tw-world:coast", nil))
+	loaded.handleWorld(lookup, httptest.NewRequest(http.MethodGet, "/v1/worlds/elsemesh:coast", nil))
 	if got := lookup.Header().Get("Access-Control-Allow-Origin"); got != "*" {
 		t.Fatalf("browser directory lookup CORS origin = %q; want *", got)
 	}
@@ -66,7 +78,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	if err := json.Unmarshal(lookup.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if lookup.Code != http.StatusOK || result.WorldID != "tw-world:coast" || len(result.Providers) != 1 || result.Providers[0].Signer != nodeID {
+	if lookup.Code != http.StatusOK || result.WorldID != "elsemesh:coast" || len(result.Providers) != 1 || result.Providers[0].Signer != nodeID {
 		t.Fatalf("lookup did not return the verified provider: status=%d result=%+v", lookup.Code, result)
 	}
 	zeroTierLookup := httptest.NewRecorder()
@@ -80,7 +92,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	if err := json.Unmarshal(zeroTierLookup.Body.Bytes(), &overlayResult); err != nil {
 		t.Fatal(err)
 	}
-	if zeroTierLookup.Code != http.StatusOK || overlayResult.NetworkID != "e3918db4832a3056" || overlayResult.NodeID != "3af4fd5d50" || len(overlayResult.Providers) != 1 || overlayResult.Providers[0].Signer != nodeID || len(overlayResult.WorldIDs) != 1 || overlayResult.WorldIDs[0] != "tw-world:coast" {
+	if zeroTierLookup.Code != http.StatusOK || overlayResult.NetworkID != "e3918db4832a3056" || overlayResult.NodeID != "3af4fd5d50" || len(overlayResult.Providers) != 1 || overlayResult.Providers[0].Signer != nodeID || len(overlayResult.WorldIDs) != 1 || overlayResult.WorldIDs[0] != "elsemesh:coast" {
 		t.Fatalf("ZeroTier lookup did not return the current signed provider/world: status=%d result=%+v", zeroTierLookup.Code, overlayResult)
 	}
 
@@ -93,7 +105,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 	malformedOverlay := testSignedDocument(t, nodeProtocol, map[string]any{
 		"protocol": nodeProtocol, "nodeId": nodeID, "gateway": "https://node.example",
 		"zeroTierNodeId": "3af4fd5d5z", "zeroTierNetworkId": "e3918db4832a3056",
-		"worldIds": []string{"tw-world:coast"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
+		"worldIds": []string{"elsemesh:coast"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
 	}, node)
 	if _, _, err := validateAnnouncement(announcement{Node: malformedOverlay, Manifest: manifest}, now); err == nil {
 		t.Fatal("invalid ZeroTier identity locator was accepted")
@@ -103,7 +115,7 @@ func TestDirectoryAnnounceRequiresNodeSignatureAndWorldGrant(t *testing.T) {
 func TestDirectoryWorldLookupSupportsCredentialFreePreflight(t *testing.T) {
 	store := &directory{entries: make(map[string]provider)}
 	response := httptest.NewRecorder()
-	store.handleWorld(response, httptest.NewRequest(http.MethodOptions, "/v1/worlds/tw-world:coast", nil))
+	store.handleWorld(response, httptest.NewRequest(http.MethodOptions, "/v1/worlds/elsemesh:coast", nil))
 	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "*" || response.Header().Get("Access-Control-Allow-Methods") != "GET, OPTIONS" {
 		t.Fatalf("directory CORS preflight = status %d, headers %v", response.Code, response.Header())
 	}
@@ -117,16 +129,16 @@ func TestDirectoryAnnounceValidatesFailoverLeaseAlongsideCacheRights(t *testing.
 	grantExpires := now.Add(time.Hour).Unix()
 	leaseExpires := now.Add(28 * time.Minute).Unix()
 	manifest := testSignedDocument(t, manifestProtocol, map[string]any{
-		"protocol": manifestProtocol, "worldId": "tw-world:failover", "ownerPeerId": ownerID,
+		"protocol": manifestProtocol, "worldId": "elsemesh:failover", "ownerPeerId": ownerID,
 		"authorityPeerId": ownerID, "authorityEpoch": 7, "discoverable": true,
 		"hosts": []any{map[string]any{"peerId": delegateID, "scopes": []string{"content-cache", "failover-authority"}, "expiresAt": grantExpires, "epoch": 3, "failoverAfter": failoverAfter, "failoverSeconds": 1800}},
 	}, owner)
 	node := testSignedDocument(t, nodeProtocol, map[string]any{
 		"protocol": nodeProtocol, "nodeId": delegateID, "gateway": "https://delegate.example",
-		"worldIds": []string{"tw-world:failover"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
+		"worldIds": []string{"elsemesh:failover"}, "issuedAt": now.Unix(), "expiresAt": now.Add(24 * time.Hour).Unix(),
 	}, delegate)
 	lease := testSignedDocument(t, authorityProtocol, map[string]any{
-		"worldId": "tw-world:failover", "authorityPeerId": delegateID, "epoch": 8, "grantEpoch": 3,
+		"worldId": "elsemesh:failover", "authorityPeerId": delegateID, "epoch": 8, "grantEpoch": 3,
 		"notBefore": failoverAfter, "expiresAt": leaseExpires,
 	}, delegate)
 	entry, _, err := validateAnnouncement(announcement{Node: node, Manifest: manifest, AuthorityLease: &lease}, now)
@@ -150,7 +162,7 @@ func TestDirectoryAnnounceValidatesFailoverLeaseAlongsideCacheRights(t *testing.
 		t.Fatalf("directory rejected active failover-only provider: %d %s", response.Code, response.Body.String())
 	}
 	lookup := httptest.NewRecorder()
-	store.handleWorld(lookup, httptest.NewRequest(http.MethodGet, "/v1/worlds/tw-world:failover", nil))
+	store.handleWorld(lookup, httptest.NewRequest(http.MethodGet, "/v1/worlds/elsemesh:failover", nil))
 	var result struct {
 		Providers []signedDocument `json:"providers"`
 	}
@@ -158,7 +170,7 @@ func TestDirectoryAnnounceValidatesFailoverLeaseAlongsideCacheRights(t *testing.
 		t.Fatalf("directory lookup omitted failover-only provider: %+v, %v", result, err)
 	}
 	badLease := testSignedDocument(t, authorityProtocol, map[string]any{
-		"worldId": "tw-world:failover", "authorityPeerId": delegateID, "epoch": 9, "grantEpoch": 3,
+		"worldId": "elsemesh:failover", "authorityPeerId": delegateID, "epoch": 9, "grantEpoch": 3,
 		"notBefore": failoverAfter, "expiresAt": leaseExpires,
 	}, delegate)
 	if _, _, err := validateAnnouncement(announcement{Node: node, Manifest: manifest, AuthorityLease: &badLease}, now); err == nil {
@@ -175,20 +187,20 @@ func TestDirectoryRejectsUntrustedWorldClaims(t *testing.T) {
 	node, nodeID := testIdentity(t)
 	now := time.Now()
 	manifest := testSignedDocument(t, manifestProtocol, map[string]any{
-		"protocol": manifestProtocol, "worldId": "tw-world:private", "ownerPeerId": ownerID,
+		"protocol": manifestProtocol, "worldId": "elsemesh:private", "ownerPeerId": ownerID,
 		"discoverable": true, "hosts": []any{},
 	}, owner)
 	nodeRecord := testSignedDocument(t, nodeProtocol, map[string]any{
-		"protocol": nodeProtocol, "nodeId": nodeID, "gateway": "https://node.example", "worldIds": []string{"tw-world:private"},
+		"protocol": nodeProtocol, "nodeId": nodeID, "gateway": "https://node.example", "worldIds": []string{"elsemesh:private"},
 		"issuedAt": now.Unix(), "expiresAt": now.Add(time.Hour).Unix(),
 	}, node)
 	if _, _, err := validateAnnouncement(announcement{Node: nodeRecord, Manifest: manifest}, now); err == nil {
 		t.Fatal("node without an owner content-cache grant was allowed to list a world")
 	}
-	manifestPayload := map[string]any{"protocol": manifestProtocol, "worldId": "tw-world:private", "ownerPeerId": ownerID, "discoverable": false}
+	manifestPayload := map[string]any{"protocol": manifestProtocol, "worldId": "elsemesh:private", "ownerPeerId": ownerID, "discoverable": false}
 	privateManifest := testSignedDocument(t, manifestProtocol, manifestPayload, owner)
 	nodeRecord = testSignedDocument(t, nodeProtocol, map[string]any{
-		"protocol": nodeProtocol, "nodeId": ownerID, "gateway": "https://node.example", "worldIds": []string{"tw-world:private"},
+		"protocol": nodeProtocol, "nodeId": ownerID, "gateway": "https://node.example", "worldIds": []string{"elsemesh:private"},
 		"issuedAt": now.Unix(), "expiresAt": now.Add(time.Hour).Unix(),
 	}, owner)
 	if _, _, err := validateAnnouncement(announcement{Node: nodeRecord, Manifest: privateManifest}, now); err == nil {
@@ -215,7 +227,7 @@ func TestDirectoryLookupOrdersOwnerThenActiveFailoverThenCache(t *testing.T) {
 	delegate, delegateID := testIdentity(t)
 	cache, cacheID := testIdentity(t)
 	now := time.Now()
-	worldID := "tw-world:provider-order"
+	worldID := "elsemesh:provider-order"
 	grantExpires := now.Add(time.Hour).Unix()
 	failoverAfter := now.Add(-time.Minute).Unix()
 	manifest := testSignedDocument(t, manifestProtocol, map[string]any{

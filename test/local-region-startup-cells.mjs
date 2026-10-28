@@ -3,7 +3,7 @@ import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 
 const startupCells = [ [ -1, 0, 4 ], [ 0, 0, 4 ], [ 1, 0, 4 ], [ -1, 0, 5 ], [ 0, 0, 5 ], [ 1, 0, 5 ], [ -1, 0, 6 ], [ 0, 0, 6 ], [ 1, 0, 6 ] ];
 const descriptor = {
-	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', worldId: 'tw-world:test', regions: '/v1/regions',
+	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', worldId: 'elsemesh:test', regions: '/v1/regions',
 	entrySelection: {
 		schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ],

@@ -213,9 +213,9 @@ const TYPES = {
 
 // Keep the runtime renderer definitions aligned with the renderer-free placement registry.
 const rendererTypeNames = Object.keys( TYPES );
-if ( rendererTypeNames.length !== REEF_TYPE_NAMES.length || rendererTypeNames.some( ( name, index ) => name !== REEF_TYPE_NAMES[ index ] ) ) throw new Error( 'Reef renderer type order does not match tidewater.reef-placement/1' );
+if ( rendererTypeNames.length !== REEF_TYPE_NAMES.length || rendererTypeNames.some( ( name, index ) => name !== REEF_TYPE_NAMES[ index ] ) ) throw new Error( 'Reef renderer type order does not match elsemesh.reef-placement/1' );
 for ( const name of REEF_TYPE_NAMES ) {
-	if ( MODELS[ TYPES[ name ].model ].variants !== REEF_TYPE_VARIANT_COUNTS[ name ] ) throw new Error( `Reef renderer variant count does not match tidewater.reef-placement/1 for ${name}` );
+	if ( MODELS[ TYPES[ name ].model ].variants !== REEF_TYPE_VARIANT_COUNTS[ name ] ) throw new Error( `Reef renderer variant count does not match elsemesh.reef-placement/1 for ${name}` );
 }
 
 // Relative abundance of each type per zone and layer:

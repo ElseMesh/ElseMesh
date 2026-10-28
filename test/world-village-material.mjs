@@ -6,17 +6,17 @@ import { villageMaterialRole, VILLAGE_MATERIAL_PROFILE, VILLAGE_MATERIAL_ROLES }
 
 assert.equal( villageMaterialRole( {} ), null );
 for ( const role of VILLAGE_MATERIAL_ROLES ) {
-	assert.equal( villageMaterialRole( { extras: { tidewaterMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } ), role );
+	assert.equal( villageMaterialRole( { extras: { elsemeshMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } ), role );
 }
 for ( const profile of [ null, [], { profile: 'unknown', role: 'wood' }, { profile: VILLAGE_MATERIAL_PROFILE, role: 'rope' }, { profile: VILLAGE_MATERIAL_PROFILE, role: 'wood', shader: 'untrusted' } ] ) {
-	assert.throws( () => villageMaterialRole( { extras: { tidewaterMaterial: profile } } ), /material profile/ );
+	assert.throws( () => villageMaterialRole( { extras: { elsemeshMaterial: profile } } ), /material profile/ );
 }
 
 // Accept an independently generated export so callers can check before publishing it.
 if ( process.argv[ 2 ] ) {
 	const directory = path.resolve( process.argv[ 2 ] );
 	const source = JSON.parse( await readFile( path.join( directory, 'world-source.json' ) ) );
-	const village = source.objects.find( ( object ) => object.id === 'tw-object:island-village' );
+	const village = source.objects.find( ( object ) => object.id === 'elsemesh-object:island-village' );
 	const gltf = parseGLB( await readFile( path.join( directory, 'assets', village.assetId.slice( 7 ) ) ) );
 	for ( const primitives of gltf.meshes ) for ( const primitive of primitives ) {
 		assert.ok( villageMaterialRole( gltf.materials[ primitive.material ] ) );

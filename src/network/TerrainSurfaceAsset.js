@@ -19,7 +19,7 @@ export function encodeTerrainSurfaceAsset( terrain, maps, detail ) {
 	if ( terrain.heights.constructor !== Float32Array || maps.normal.constructor !== Uint8Array || maps.splat.constructor !== Uint8Array || detail.data.constructor !== Uint8Array ) throw new Error( 'Terrain surface maps have unsupported typed arrays' );
 	if ( maps.normal.length !== terrain.res * terrain.res * 4 || maps.splat.length !== terrain.res * terrain.res * 4 || detail.data.length !== detail.width * detail.height * 4 ) throw new Error( 'Terrain surface maps do not match their declared dimensions' );
 	const metadata = new TextEncoder().encode( JSON.stringify( {
-		protocol: 'tidewater.terrain-data/1', rendererProfile: 'original-tidewater-terrain-v1', size: terrain.size, origin: terrain.origin,
+		protocol: 'elsemesh.terrain-data/1', rendererProfile: 'original-elsemesh-terrain-v1', size: terrain.size, origin: terrain.origin,
 		resolution: terrain.res, heightEncoding: 'f32le', maskEncoding: 'rgba8unorm',
 		detailWidth: detail.width, detailHeight: detail.height, detailEncoding: 'rgba8unorm',
 		material: { roughness: 0.9, wetDarken: 0.58, paletteLinear: palette( PALETTE ), meadowLinear: palette( MEADOW ) },
@@ -76,7 +76,7 @@ export async function decodeTerrainSurfaceAsset( compressed ) {
 	let metadata;
 	try { metadata = JSON.parse( new TextDecoder().decode( raw.subarray( 12, 12 + metadataBytes ) ) ); }
 	catch { throw new Error( 'Invalid terrain surface metadata' ); }
-	if ( metadata.protocol !== 'tidewater.terrain-data/1' || metadata.rendererProfile !== 'original-tidewater-terrain-v1' || metadata.heightEncoding !== 'f32le' || metadata.maskEncoding !== 'rgba8unorm' || metadata.detailEncoding !== 'rgba8unorm' || metadata.material?.roughness !== 0.9 || metadata.material?.wetDarken !== 0.58 || ! validPalette( metadata.material?.paletteLinear ) || ! validPalette( metadata.material?.meadowLinear ) ) throw new Error( 'Unsupported terrain surface data protocol, renderer profile, or material parameters' );
+	if ( metadata.protocol !== 'elsemesh.terrain-data/1' || metadata.rendererProfile !== 'original-elsemesh-terrain-v1' || metadata.heightEncoding !== 'f32le' || metadata.maskEncoding !== 'rgba8unorm' || metadata.detailEncoding !== 'rgba8unorm' || metadata.material?.roughness !== 0.9 || metadata.material?.wetDarken !== 0.58 || ! validPalette( metadata.material?.paletteLinear ) || ! validPalette( metadata.material?.meadowLinear ) ) throw new Error( 'Unsupported terrain surface data protocol, renderer profile, or material parameters' );
 	const { size, origin, resolution, detailWidth, detailHeight } = metadata;
 	if ( ! Number.isFinite( size ) || size <= 0 || size > 100000 || ! Number.isFinite( origin ) || Math.abs( origin ) > 100000 || ! Number.isInteger( resolution ) || resolution < 2 || resolution > 4097 || ! Number.isInteger( detailWidth ) || detailWidth < 1 || detailWidth > 4096 || ! Number.isInteger( detailHeight ) || detailHeight < 1 || detailHeight > 4096 ) throw new Error( 'Terrain surface dimensions or bounds are invalid' );
 	const count = resolution * resolution, detailCount = detailWidth * detailHeight;

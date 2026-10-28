@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	worldRoleGrantProtocol       = "tidewater.world-role/1"
-	worldRoleRevocationsProtocol = "tidewater.world-role-revocations/1"
+	worldRoleGrantProtocol       = "elsemesh.world-role/1"
+	worldRoleRevocationsProtocol = "elsemesh.world-role-revocations/1"
 	maxRoleGrantLifetime         = 90 * 24 * time.Hour
 	maxRevocationStateLifetime   = 15 * time.Minute
 	maxRoleClockSkew             = 5 * time.Minute

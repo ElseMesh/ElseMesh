@@ -13,14 +13,16 @@ export const CHANDLERY = ISLAND_DEFINITION.chandlery; // faces the beach and the
 
 export class Chandlery {
 
-	constructor( { scene, terrain, colliders, material = null } ) {
+	constructor( { scene, terrain, colliders, material = null, placement = CHANDLERY } ) {
 
-		const y = terrain.heightAt( CHANDLERY.x, CHANDLERY.z );
+		this.placement = { x: placement.position?.[ 0 ] ?? placement.x, z: placement.position?.[ 1 ] ?? placement.z, yaw: placement.yaw, interactionRadius: placement.interactionRadius };
+		const location = this.placement;
+		const y = terrain.heightAt( location.x, location.z );
 		this.material = material || createPropMaterial( 'chandlery' );
 		this.group = new Group();
 		this.group.name = 'Chandlery';
-		this.group.position.set( CHANDLERY.x, y, CHANDLERY.z );
-		this.group.rotation.y = CHANDLERY.yaw;
+		this.group.position.set( location.x, y, location.z );
+		this.group.rotation.y = location.yaw;
 		scene.add( this.group );
 		this.ready = loadStallAssets().then( ( a ) => {
 
@@ -38,14 +40,14 @@ export class Chandlery {
 
 		} );
 
-		const local = new Vector3( 0, 0, - 0.75 ).applyAxisAngle( new Vector3( 0, 1, 0 ), CHANDLERY.yaw );
-		const vx = CHANDLERY.x + local.x, vz = CHANDLERY.z + local.z;
+		const local = new Vector3( 0, 0, - 0.75 ).applyAxisAngle( new Vector3( 0, 1, 0 ), location.yaw );
+		const vx = location.x + local.x, vz = location.z + local.z;
 		this.vendor = new Vendor( {
 			name: 'Marta · Chandlery',
 			kind: 'shop',
 			position: new Vector3( vx, terrain.heightAt( vx, vz ), vz ),
-			yaw: CHANDLERY.yaw,
-			radius: 3.0,
+			yaw: location.yaw,
+			radius: location.interactionRadius ?? 3.0,
 			greeting: 'Line, reels, a bigger hold, diesel. What do you need?',
 			material: this.material,
 			// realistic character (Rocketbox, MIT): the stand-in shows until it has loaded
@@ -58,12 +60,12 @@ export class Chandlery {
 		this.active = true;
 		if ( colliders ) {
 
-			this.colliderBoxes.push( colliders.addBox( new Vector3( CHANDLERY.x, y + 0.45, CHANDLERY.z ), new Vector3( 1.0, 0.45, 0.4 ), CHANDLERY.yaw, { tag: 'chandlery' } ) );
+			this.colliderBoxes.push( colliders.addBox( new Vector3( location.x, y + 0.45, location.z ), new Vector3( 1.0, 0.45, 0.4 ), location.yaw, { tag: 'chandlery' } ) );
 			// shelves and sign posts behind her, the jerrycans and the rod rack
 			for ( const [ lx, lz, hx, hz, hy ] of [ [ 0, - 1.4, 0.62, 0.22, 0.8 ], [ 1.25, 0.2, 0.3, 0.3, 0.26 ], [ - 1.35, - 0.9, 0.15, 0.3, 0.9 ] ] ) {
 
-				const w = new Vector3( lx, 0, lz ).applyAxisAngle( new Vector3( 0, 1, 0 ), CHANDLERY.yaw );
-				this.colliderBoxes.push( colliders.addBox( new Vector3( CHANDLERY.x + w.x, y + hy, CHANDLERY.z + w.z ), new Vector3( hx, hy, hz ), CHANDLERY.yaw, { tag: 'chandleryProps' } ) );
+				const w = new Vector3( lx, 0, lz ).applyAxisAngle( new Vector3( 0, 1, 0 ), location.yaw );
+				this.colliderBoxes.push( colliders.addBox( new Vector3( location.x + w.x, y + hy, location.z + w.z ), new Vector3( hx, hy, hz ), location.yaw, { tag: 'chandleryProps' } ) );
 
 			}
 
@@ -88,11 +90,12 @@ export class Chandlery {
 			for ( const box of this.colliderBoxes.splice( 0 ) ) this.colliders.removeBox( box );
 			return;
 		}
-		const y = terrain?.heightAt( CHANDLERY.x, CHANDLERY.z ) ?? this.group.position.y;
-		this.colliderBoxes.push( this.colliders.addBox( new Vector3( CHANDLERY.x, y + 0.45, CHANDLERY.z ), new Vector3( 1.0, 0.45, 0.4 ), CHANDLERY.yaw, { tag: 'chandlery' } ) );
+		const location = this.placement;
+		const y = terrain?.heightAt( location.x, location.z ) ?? this.group.position.y;
+		this.colliderBoxes.push( this.colliders.addBox( new Vector3( location.x, y + 0.45, location.z ), new Vector3( 1.0, 0.45, 0.4 ), location.yaw, { tag: 'chandlery' } ) );
 		for ( const [ lx, lz, hx, hz, hy ] of [ [ 0, - 1.4, 0.62, 0.22, 0.8 ], [ 1.25, 0.2, 0.3, 0.3, 0.26 ], [ - 1.35, - 0.9, 0.15, 0.3, 0.9 ] ] ) {
-			const w = new Vector3( lx, 0, lz ).applyAxisAngle( new Vector3( 0, 1, 0 ), CHANDLERY.yaw );
-			this.colliderBoxes.push( this.colliders.addBox( new Vector3( CHANDLERY.x + w.x, y + hy, CHANDLERY.z + w.z ), new Vector3( hx, hy, hz ), CHANDLERY.yaw, { tag: 'chandleryProps' } ) );
+			const w = new Vector3( lx, 0, lz ).applyAxisAngle( new Vector3( 0, 1, 0 ), location.yaw );
+			this.colliderBoxes.push( this.colliders.addBox( new Vector3( location.x + w.x, y + hy, location.z + w.z ), new Vector3( hx, hy, hz ), location.yaw, { tag: 'chandleryProps' } ) );
 		}
 
 	}
@@ -150,7 +153,7 @@ function buildTable() {
 
 // Local frame: table centred at the origin (long side along x), the trader behind it at z -0.75,
 // customers at +z.
-function buildChandleryKit( assets ) {
+export function buildChandleryKit( assets ) {
 
 	const K = new KitBuilder( assets, 11 );
 	const { DECK, SIGN, PLAIN, ROPE, FLOAT } = LAYER;

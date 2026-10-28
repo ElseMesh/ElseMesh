@@ -12,7 +12,7 @@ import { encodeVegetationPlacements } from '../src/network/VegetationPlacements.
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const worldRoot = path.join( root, 'worlds', 'tidewater' );
 const source = JSON.parse( await readFile( path.join( worldRoot, 'world-source.json' ), 'utf8' ) );
-const component = source.components.find( item => item.type === 'tidewater.static-vegetation/1' );
+const component = source.components.find( item => item.type === 'elsemesh.static-vegetation/1' );
 assert.ok( component?.placementAssetId && component.grassMaskAssetId, 'Tidewater static vegetation references exported placements and its grass-density mask' );
 
 const assetID = component.grassMaskAssetId.slice( 'sha256:'.length );

@@ -185,7 +185,7 @@ export class Colliders {
 
 			if ( ! b.solid ) continue;
 			const ox = origin.x - b.center.x, oz = origin.z - b.center.z, oy = origin.y - b.center.y;
-			const lox = ox * b.cos - oz * b.sin, loz = ox * b.sin + oz * b.cos;
+			const lox = ox * b.cos - oz * b.sin, localZ = ox * b.sin + oz * b.cos;
 			const ldx = dir.x * b.cos - dir.z * b.sin, ldz = dir.x * b.sin + dir.z * b.cos;
 			let tmin = 0, tmax = best;
 			const slab = ( o, d, h ) => {
@@ -199,7 +199,7 @@ export class Colliders {
 
 			};
 
-			if ( slab( lox, ldx, b.half.x ) && slab( oy, dir.y, b.half.y ) && slab( loz, ldz, b.half.z ) ) best = Math.min( best, tmin );
+			if ( slab( lox, ldx, b.half.x ) && slab( oy, dir.y, b.half.y ) && slab( localZ, ldz, b.half.z ) ) best = Math.min( best, tmin );
 
 		}
 

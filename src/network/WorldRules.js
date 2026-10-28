@@ -1,39 +1,40 @@
 // Runtime capability identifiers are part of the signed world contract. Add an
 // identifier only after the browser loader actually implements that capability.
 export const SUPPORTED_WORLD_FEATURES = new Set( [
-	'tidewater.static-glb/1',
-	'tidewater.static-glb-emissive-strength/1',
-	'tidewater.portal-handoff/1',
-	'tidewater.portal-two-sided/1',
-	'tidewater.portal-preview-static/1',
-	'tidewater.static-glb-quaternion/1',
-	'tidewater.procedural-island-vegetation/1',
-	'tidewater.static-vegetation/1',
-	'tidewater.static-grass/1',
-	'tidewater.static-reef/1',
-	'tidewater.static-fish-props/1',
-	'tidewater.example-island-wildlife/1',
-	'tidewater.humpback-whale/1',
-	'tidewater.island-ocean/1',
-	'tidewater.water-body/1',
-	'tidewater.ambient-audio/1',
-	'tidewater.downeast-boat/1',
-	'tidewater.village-materials/1',
-	'tidewater.village-materials/2',
-	'tidewater.procedural-island-terrain/1',
-	'tidewater.terrain-surface/1',
+	'elsemesh.static-glb/1',
+	'elsemesh.static-glb-emissive-strength/1',
+	'elsemesh.portal-handoff/1',
+	'elsemesh.portal-two-sided/1',
+	'elsemesh.portal-preview-static/1',
+	'elsemesh.static-glb-quaternion/1',
+	'elsemesh.procedural-island-vegetation/1',
+	'elsemesh.static-vegetation/1',
+	'elsemesh.static-grass/1',
+	'elsemesh.static-reef/1',
+	'elsemesh.static-fish-props/1',
+	'elsemesh.example-island-wildlife/1',
+	'elsemesh.humpback-whale/1',
+	'elsemesh.island-ocean/1',
+	'elsemesh.water-body/1',
+	'elsemesh.ambient-audio/1',
+	'elsemesh.downeast-boat/1',
+	'elsemesh.village-materials/1',
+	'elsemesh.village-materials/2',
+	'elsemesh.procedural-island-terrain/1',
+	'elsemesh.terrain-surface/1',
+	'elsemesh.world-extension/1',
 ] );
-export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'tidewater-default' ] );
+export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'elsemesh-default' ] );
 export const DEFAULT_WORLD_MOVEMENT = Object.freeze( { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } );
 export const DEFAULT_VEHICLE_POLICY = Object.freeze( { enabled: false } );
 export const MAX_WORLD_VISITORS = 128;
 export const MAX_WORLD_SPAWN_RADIUS = 100;
-// Fixed complexity contract for tidewater.downeast-boat/1. Keep synchronized
+// Fixed complexity contract for elsemesh.downeast-boat/1. Keep synchronized
 // with BoatModel.triangleCount and the worldd validator.
 export const DOWNEAST_BOAT_TRIANGLES = 46845;
 export const MAX_WORLD_PACKAGE_BYTES = 16 * 1024 * 1024 * 1024;
 
-const FEATURE_ID = /^tidewater\.[a-z0-9.-]+\/\d+$/;
+const FEATURE_ID = /^elsemesh\.[a-z0-9.-]+\/\d+$/;
 
 export function validateWorldRequirements( manifest ) {
 	const rules = manifest?.rules;
@@ -76,7 +77,7 @@ export function worldSeaLevel( rules ) {
 
 export function worldHasWater( manifest ) {
 	return Number.isFinite( manifest?.rules?.seaLevel ) && manifest?.components?.some( component =>
-		component?.type === 'tidewater.island-ocean/1' || component?.type === 'tidewater.water-body/1'
+		component?.type === 'elsemesh.island-ocean/1' || component?.type === 'elsemesh.water-body/1'
 	) === true;
 }
 

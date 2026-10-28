@@ -1,85 +1,17 @@
 # Client deployment and domain
 
-The repository moved on 2026-10-02 to https://github.com/ElseMesh/elsemesh.
-Local `origin` and `main` tracking now point there; `upstream` retains the original
-Tidewater repository. The `rebroad` remote is a compatibility alias for the new
-repository. Source/build directory names remain unchanged. Archived LOZ branches
-were retained by the transfer.
+The client is deployed from the ElseMesh engine repository. The build uses the
+current `main` revision and displays its eight-character source stamp. Check the
+Actions run for success and compare the published stamp with the source HEAD.
 
 ## GitHub Pages
 
 Client: https://elsemesh.github.io/
-Archived LOZ client: https://elsemesh.github.io/loz/
 
-`.github/workflows/deploy.yml` deploys every push to `main`. It builds the
-archived LOZ client from `loz/main` when that mirror branch exists. Check Actions
-for success and compare the client bottom-right eight-digit stamp with the
-source HEAD. GitHub repository URL redirects do not guarantee
-redirects for old `rebroad.github.io/tidewater/` links; use the new address.
-
-The root client's Vite build stamp comes from `main` HEAD. The workflow stamps
-the archived page after building it, using the checked-out `loz/main` HEAD, so
-`/` and `/loz/` identify their own source revisions.
-The LOZ stamp sits above its bottom-right Credits link.
-
-## Mirroring Loz branches
-
-The hourly refresh workflow and `tools/mirror-loz.sh` now live in the
-[Burning Horizons content repository](https://github.com/ElseMesh/burning-horizons).
-That workflow fetches branches from `lozknowles/ElseMesh` and
-`lozknowles/ElseMesh-preview`, then publishes them under `loz/<branch>` and
-`loz/preview/<branch>` refs in the Burning Horizons repository. Replaced or
-deleted refs are preserved under `archive/loz-preserved/` there.
-
-This engine repository retains its existing `loz/main` ref for the archived
-`/loz/` Pages build. That ref is no longer refreshed by this repository's
-Actions workflow; the source mirror is maintained in Burning Horizons. The
-mirror is an upstream reference archive only, not a statement of ElseMesh's
-project direction or a decision to adopt upstream engine changes.
-
-### Historical Pages deployments
-
-On 2026-10-10, Pages run `38080038023` successfully built and deployed main at
-`ac86602eaf860a8f0615db6333dd6fbfdb9ea756` and the preserved
-`archive/loz/main` ref at `f691cd9`. The archive includes the imported `loz/main`
-history and its later arrow-key look-controls change; its build passed
-`test/input-look-keys.mjs`. After this deployment, both `https://elsemesh.github.io/`
-and `https://elsemesh.github.io/loz/` returned HTTP 200 and referenced their
-respective JavaScript bundles.
-
-On 2026-10-11, Pages run `38148318847` succeeded for main commit
-`1964d7557952d2c567b99bb442a9a1d233aac488`; the archived ref was
-`f691cd9e`. At that point the current edge response had not yet been
-revalidated against these refs; the later verification is recorded below.
-
-Rechecked after Pages run `38151990451` deployed main commit
-`0e49a73fbb8ccfeff15e13382ced0cbd33ee3524`: both
-`https://elsemesh.github.io/` and `https://elsemesh.github.io/loz/` returned
-HTTP 200. The root HTML contained stamp `0e49a73f`, matching `main` at that
-observation. The archived page contained `f691cd9e`, matching
-`archive/loz/main`. The Pages API
-reported `cname: null` and HTTPS enforcement enabled. These checks verify the
-static clients and their revision stamps; they do not verify gateway or world
-server reachability.
-
-The follow-up documentation commit `8626e94982f7c7e26e1a7dfbdc841c54b55ac9cb`
-also deployed successfully in Pages run `38152524653`. After deployment, the
-root returned HTTP 200 with stamp `8626e949` and `/loz/` returned HTTP 200 with
-stamp `f691cd9e`, matching their refs at that time. Each later push triggers a
-new build and root stamp; check the latest run and live page before reporting
-the current revision.
-
-After Pages run `38175268904` deployed commit `6543171c` on 2026-10-11, the
-custom-domain root returned HTTP 200 with stamp `6543171c` and `/loz/` returned
-HTTP 200 with stamp `f691cd9e`. The root stamp matched `main`; the archive
-stamp matched `archive/loz/main`. `https://elsemesh.github.io/` redirected to
-`https://elsemesh.org/`, and the authenticated Pages API reported
-`cname: elsemesh.org` with HTTPS enforcement enabled.
-
-The later Pages run `38176009348` deployed main commit `58365976` on
-2026-10-11. The custom-domain root returned HTTP 200 with stamp `58365976`,
-matching `main`; `/loz/` returned HTTP 200 with stamp `f691cd9e`, matching
-`archive/loz/main`.
+`.github/workflows/deploy.yml` deploys pushes to `main`. The root client's Vite
+build stamp comes from the checked-out source revision. GitHub repository URL
+redirects do not guarantee redirects for old project URLs; use the current
+ElseMesh address.
 
 ## Selected ThruHolds
 
@@ -103,7 +35,7 @@ The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
 arguments. For example (replace the placeholder with an actual world gateway):
 
 ```text
-https://elsemesh.github.io/?worldId=tw-world%3Aexample-island&gateway=https%3A%2F%2Fworld-host.example
+https://elsemesh.github.io/?worldId=elsemesh%3Aexample-island&gateway=https%3A%2F%2Fworld-host.example
 ```
 
 Pages hosts the renderer, not `worldd` or discovery. A hosted-world invite needs a
@@ -154,14 +86,7 @@ browser's home makes it the default for that browser.
 An earlier 2026-10-11 check found Namecheap parking records and an incomplete
 GitHub Pages setup. That observation is superseded by the live recheck below.
 
-At 22:00 BST on 2026-10-11, `https://elsemesh.org/` and
-`https://elsemesh.org/loz/` both returned HTTP 200. The root page showed stamp
-`c5fc3fd5`, matching `main`; `/loz/` showed `f691cd9e`, matching
-`archive/loz/main`. `https://elsemesh.github.io/` now redirects to the custom
-domain. The authenticated GitHub Pages API reports `cname: elsemesh.org` and
-`https_enforced: true`. The custom-domain `elsemesh-config.js` serves the
-resolver configuration. The static client is live; this does not make Pages a
-world gateway.
+The custom domain and Pages source stamp were verified in the deployment checks recorded at the time. The static client is live; this does not make Pages a world gateway.
 
 `http://elsemesh.com/` currently redirects to `https://elsemesh.org/`, but a
 direct HTTPS request to `https://elsemesh.com/` timed out in this check. The
@@ -182,7 +107,7 @@ behavior. Preserve the MX and SPF records in either configuration. See
 [Namecheap URL redirect guidance](https://www.namecheap.com/support/knowledgebase/article.aspx/385/2237/how-to-set-up-a-url-redirect-for-a-domain/).
 
 The resolver is live, but its read-only lookup for
-`tw-world:example-island` returned an empty provider list. Do not infer that a
+`elsemesh:example-island` returned an empty provider list. Do not infer that a
 world is discoverable merely because the client and resolver are deployed.
 The private direct gateway invite used for the current test is intentionally
 not written here or published through the resolver.

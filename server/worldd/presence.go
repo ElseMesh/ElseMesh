@@ -14,14 +14,13 @@ import (
 )
 
 const playerPresenceProtocol = "elsemesh.player-presence/2"
-const legacyPlayerPresenceProtocol = "elsemesh.player-presence/1"
 const maxPresencePlayers = 128
 const maxSpawnCandidates = 1024
 const presenceTTL = 10 * time.Second
 const presencePlayerRadius = 0.3
 const presencePlayerHeight = 1.75
 const playerEyeHeight = 1.62
-const downeastBoatTriangles = 46845 // tidewater.downeast-boat/1 complexity contract
+const downeastBoatTriangles = 46845 // elsemesh.downeast-boat/1 complexity contract
 
 var presenceSessionPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var presenceColorPattern = regexp.MustCompile(`^#[0-9a-f]{6}$`)
@@ -63,7 +62,7 @@ func presenceKey(gatewayID, session string) string {
 	return "player:" + hex.EncodeToString(digest[:])
 }
 func validatePlayerPose(p *playerPose) error {
-	if p == nil || (p.Protocol != playerPresenceProtocol && p.Protocol != legacyPlayerPresenceProtocol) || p.Sequence > 9007199254740991 || len(p.Position) != 3 {
+	if p == nil || p.Protocol != playerPresenceProtocol || p.Sequence > 9007199254740991 || len(p.Position) != 3 {
 		return errors.New("invalid_presence_pose")
 	}
 	for _, v := range p.Position {
@@ -78,13 +77,10 @@ func validatePlayerPose(p *playerPose) error {
 		return errors.New("invalid_presence_mode")
 	}
 	if p.Mode == "boat" || p.Mode == "deck" {
-		if p.Protocol != playerPresenceProtocol {
-			return errors.New("vehicle_presence_protocol_upgrade_required")
-		}
 		if p.VehicleSpeed == nil || math.IsNaN(*p.VehicleSpeed) || math.IsInf(*p.VehicleSpeed, 0) || *p.VehicleSpeed < 0 || *p.VehicleSpeed > 100 {
 			return errors.New("invalid_vehicle_speed")
 		}
-	} else if p.Protocol == playerPresenceProtocol && p.VehicleSpeed != nil {
+	} else if p.VehicleSpeed != nil {
 		return errors.New("unexpected_vehicle_speed")
 	}
 	if p.Appearance.Style != "male" && p.Appearance.Style != "female" {
@@ -114,7 +110,7 @@ func (d *daemon) validateVehiclePresence(p *playerPose) error {
 	}
 	hasBoat := false
 	for _, component := range d.world.Components {
-		if component.Type == "tidewater.downeast-boat/1" {
+		if component.Type == "elsemesh.downeast-boat/1" {
 			hasBoat = true
 			break
 		}

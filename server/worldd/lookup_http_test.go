@@ -43,7 +43,7 @@ func TestWorldLookupReturnsActiveBrowserHostOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	world := newStarterManifest("Browser-hosted test", ownerID.String())
-	world.WorldID = "tw-world:browser-host-test"
+	world.WorldID = "elsemesh:browser-host-test"
 	if err := d.installBrowserHost(&browserHostSession{world: world}); err != nil {
 		t.Fatal(err)
 	}

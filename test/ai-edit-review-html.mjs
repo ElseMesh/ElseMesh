@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { createAIEditDecisionRecord, renderAIEditReviewHTML } from '../tools/ai-edit-review-html.mjs';
 
 const report = {
-	worldId: 'tw-world:review-page-test', taskId: '123e4567-e89b-42d3-a456-426614174000',
+	worldId: 'elsemesh:review-page-test', taskId: '123e4567-e89b-42d3-a456-426614174000',
 	baseSourceHash: `sha256:${'a'.repeat( 64 )}`,
 	candidateSourceHash: `sha256:${'b'.repeat( 64 )}`,
 };
@@ -29,14 +29,14 @@ assert.equal( decisionSchema.properties.publication.const, 'not-performed' );
 const hostile = '</script><img src=x onerror=alert(1)>&\u2028';
 const html = renderAIEditReviewHTML( {
 	worldTitle: hostile,
-	worldId: 'tw-world:review-page-test',
+	worldId: 'elsemesh:review-page-test',
 	taskId: report.taskId,
 	instruction: hostile,
 	baseSourceHash: `sha256:${'a'.repeat( 64 )}`,
 	candidateSourceHash: `sha256:${'b'.repeat( 64 )}`,
 	validation: { candidateSource: 'passed' },
 	preview: { file: 'review-preview.png', bytes: 1234, sha256: `sha256:${'c'.repeat( 64 )}` },
-	objectChanges: [ { id: 'tw-object:test', status: 'added', before: null, after: { label: hostile } } ],
+	objectChanges: [ { id: 'elsemesh-object:test', status: 'added', before: null, after: { label: hostile } } ],
 	portalChanges: [], worldChanges: [], generatedAssets: [],
 } );
 

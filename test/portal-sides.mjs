@@ -8,20 +8,20 @@ import { exportPortalLink, importPortalLink } from '../tools/portal-link.mjs';
 import { applyWorldProposal } from '../tools/apply-world-proposal.mjs';
 import { App } from '../src/App.js';
 
-const portal = {id:'tw-portal:two-sided',destinationWorldId:'tw-world:front',entry:{position:[0,2,0],yaw:0},exit:{position:[10,2,0],yaw:.4},enabled:true,openView:true,back:{destinationWorldId:'tw-world:back',exit:{position:[50,2,0],yaw:Math.PI},enabled:true,openView:true}};
+const portal = {id:'elsemesh-portal:two-sided',destinationWorldId:'elsemesh:front',entry:{position:[0,2,0],yaw:0},exit:{position:[10,2,0],yaw:.4},enabled:true,openView:true,back:{destinationWorldId:'elsemesh:back',exit:{position:[50,2,0],yaw:Math.PI},enabled:true,openView:true}};
 const front = new Vector3(0,2,2), back = new Vector3(0,2,-2);
 const frontRoute = portalRouteFromPosition(portal,front), backRoute=portalRouteFromPosition(portal,back);
 assert.equal(frontRoute,portal);
-assert.equal(backRoute.destinationWorldId,'tw-world:back');
+assert.equal(backRoute.destinationWorldId,'elsemesh:back');
 assert.equal(backRoute.entry.yaw,Math.PI);
-assert.equal(backRoute.connectionKey,'tw-portal:two-sided#back');
+assert.equal(backRoute.connectionKey,'elsemesh-portal:two-sided#back');
 assert.equal(portalRouteFromPosition(portal,back),backRoute,'Derived back route identity stays stable for preview cadence');
 assert.ok(crossedPortalPlane(front,back,frontRoute));
 assert.ok(crossedPortalPlane(back,front,backRoute));
 assert.equal(crossedPortalPlane(back,front,frontRoute),false);
 assert.equal(portalRouteFromPosition({...portal,back:undefined},back),null,'Legacy front does not preview from back');
 assert.equal(portalRouteFromPosition({...portal,enabled:false},front),null);
-assert.equal(portalRouteFromPosition({...portal,enabled:false},back).destinationWorldId,'tw-world:back');
+assert.equal(portalRouteFromPosition({...portal,enabled:false},back).destinationWorldId,'elsemesh:back');
 
 function exercise(previous,current,{crossing=false}={}) {
  const selected=[];
@@ -31,9 +31,9 @@ function exercise(previous,current,{crossing=false}={}) {
  assert.equal(!!app.crossed,crossing);
  return {app,route:selected.at(-1)};
 }
-assert.equal(exercise(front,front).route.destinationWorldId,'tw-world:front');
-assert.equal(exercise(back,back).route.destinationWorldId,'tw-world:back');
-assert.equal(exercise(front,back,{crossing:true}).route.destinationWorldId,'tw-world:front','Crossing retains approach side after crossing plane');
+assert.equal(exercise(front,front).route.destinationWorldId,'elsemesh:front');
+assert.equal(exercise(back,back).route.destinationWorldId,'elsemesh:back');
+assert.equal(exercise(front,back,{crossing:true}).route.destinationWorldId,'elsemesh:front','Crossing retains approach side after crossing plane');
 assert.equal(exercise(back,front,{crossing:true}).app.selectedKey,backRoute.connectionKey);
 
 const sourceCamera=new PerspectiveCamera(60,1,.1,1000),destinationCamera=sourceCamera.clone();sourceCamera.position.copy(back);
@@ -47,16 +47,16 @@ assert.equal(portalRouteFromPosition(sameWorld,back).exit.yaw-portal.exit.yaw,Ma
 console.log('Two-sided portal: approach selection, distinct preparation keys, both crossings, previews and opposite-facing same destination passed');
 
 const rearOnly = {...portal,enabled:false,visual:'stone'};
-const framed = await loadWorldPackage({worldId:'tw-world:frame',manifest:{objects:[],portals:[rearOnly]}},{assets:new Map()});
+const framed = await loadWorldPackage({worldId:'elsemesh:frame',manifest:{objects:[],portals:[rearOnly]}},{assets:new Map()});
 assert.equal(framed.children.length,1,'Rear-only portal retains its physical frame');
 assert.equal(framed.children[0].children.length,3,'One frame serves both sides');
 disposeWorldPackage(framed);
 
-const aliceSource={...createWorldSource(),worldId:'tw-world:alice',portals:[{...portal,back:undefined}]};
+const aliceSource={...createWorldSource(),worldId:'elsemesh:alice',portals:[{...portal,back:undefined}]};
 const bobSource={...createWorldSource(),worldId:portal.destinationWorldId,portals:[]};
 const bobBytes=new TextEncoder().encode(JSON.stringify(bobSource));
 const shared=exportPortalLink(aliceSource,portal.id);
-const proposal=importPortalLink(bobBytes,shared,'tw-portal:return-to-alice');
+const proposal=importPortalLink(bobBytes,shared,'elsemesh-portal:return-to-alice');
 const bobCandidate=applyWorldProposal(bobBytes,proposal);
 const reciprocal=bobCandidate.source.portals[0];
 const original={position:back,velocity:{x:1,y:2,z:-3},yaw:.7,pitch:.2};

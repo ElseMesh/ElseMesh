@@ -7,8 +7,8 @@ vertex weights, UVs, armatures and NLA animation tracks. Import and export use
 
 ```sh
 blender --background --factory-startup --python tools/blender/export-avatar-lods.py \
-  -- --source public/models/characters --out /var/tmp/tidewater-avatar-lods
-cp /var/tmp/tidewater-avatar-lods/*.glb public/models/characters/
+  -- --source public/models/characters --out /var/tmp/elsemesh-avatar-lods
+cp /var/tmp/elsemesh-avatar-lods/*.glb public/models/characters/
 node test/avatar-lod-assets.mjs
 ```
 

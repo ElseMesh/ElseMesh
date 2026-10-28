@@ -1,4 +1,4 @@
-export const VEGETATION_PLACEMENT_PROTOCOL = 'tidewater.vegetation-placement/1';
+export const VEGETATION_PLACEMENT_PROTOCOL = 'elsemesh.vegetation-placement/1';
 export const VEGETATION_PLACEMENT_KINDS = Object.freeze( [ 'palms', 'trees', 'bananas', 'shrubs', 'youngPalms', 'ferns', 'monsteras', 'elephantEars', 'heliconias', 'strelitzias' ] );
 
 const MAGIC = [ 0x54, 0x56, 0x50, 0x31 ]; // TVP1

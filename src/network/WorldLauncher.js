@@ -1,3 +1,5 @@
+import { isWorldID } from './WorldIdentity.js';
+
 const STORAGE_KEY = 'elsemesh.visited-worlds.v1';
 const HOME_STORAGE_KEY = 'elsemesh.home-world.v1';
 const MAX_VISITED_WORLDS = 12;
@@ -34,7 +36,7 @@ export async function discoverLocalWorldURL( { pageURL = globalThis.location?.hr
 		const document = ( await response.json() )?.document;
 		const worldId = document?.payload?.worldId;
 		const nodeId = document?.payload?.ownerPeerId;
-		if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) || ! /^[A-Za-z0-9]{20,256}$/.test( nodeId || '' ) ) return null;
+		if ( ! isWorldID( worldId ) || ! /^[A-Za-z0-9]{20,256}$/.test( nodeId || '' ) ) return null;
 		page.searchParams.set( 'worldId', worldId );
 		page.searchParams.delete( 'ztNodeId' );
 		page.searchParams.delete( 'directory' );
@@ -60,7 +62,7 @@ function validGateway( value, page ) {
 
 function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', nodeId = '', gateway = '', providers = [], directory = '' } ) {
 	const page = appPageURL( pageURL );
-	if ( ! /^tw-world:[\w.-]{1,128}$/.test( worldId || '' ) && ! ( ! worldId && /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) ) throw new Error( 'Invite does not contain a valid ThruHold ID or ZeroTier node ID' );
+	if ( ! isWorldID( worldId ) && ! ( ! worldId && /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) ) throw new Error( 'Invite does not contain a valid ThruHold ID or ZeroTier node ID' );
 	if ( zeroTierNodeId && ! /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) throw new Error( 'Invite contains an invalid ZeroTier node ID' );
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	if ( candidates.length > 8 ) throw new Error( 'Invite contains too many gateway candidates' );
@@ -99,7 +101,7 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 	const input = String( value ).trim();
 	if ( input.length > MAX_INVITE_URL_CHARS ) throw new Error( 'Invite URL is too long' );
 	const resolver = configuredWorldResolver();
-	if ( /^tw-world:[\w.-]{1,128}$/.test( input ) ) {
+	if ( isWorldID( input ) ) {
 		if ( ! resolver ) throw new Error( 'No ThruHold resolver is configured; paste a full invite URL or configure worldResolver in elsemesh-config.js' );
 		return normalizedWorldURL( { pageURL: page.href, worldId: input, directory: resolver } ).href;
 	}

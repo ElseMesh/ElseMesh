@@ -2,7 +2,7 @@
 
 Status: signed contract, runtime switching, and complementary screen-door
 transitions implemented; the portable island village, static moored lobster
-boat, and UNDERNEATH cave have authored lower-detail variants. Matched-view
+boat have authored lower-detail variants. Matched-view
 visual validation remains outstanding.
 Avatar distance LOD is implemented separately in `RemoteAvatar.js`.
 
@@ -97,18 +97,7 @@ visual. The moored lobster boat's portal-preview GLB also declares one lower-
 detail level at the same projected-size threshold. Its Blender 4.3.2 variant
 preserves all 12 material assignments, vertex colors and UVs, reducing it from
 46,845 to 16,395 triangles (65%) and from 2.55 MB to 1.26 MB. The base GLB
-remains the close-view source. The UNDERNEATH cave scene declares one lower-
-detail level at the same threshold. Its Blender 4.3.2 variant reduces the
-scene from 13,248 to 9,198 triangles (31%) and from 736,336 to 655,876 bytes.
-The cave packager restores material definitions by name from the full-detail
-GLB after Blender export, preserving its authored emissive strength and
-per-object color. A more aggressive 0.35 ratio visibly broke up cave surfaces
-in the station view, so it was rejected. The checked-in 0.70-ratio result was
-visually compared against the full mesh from the same 640 by 360 Blender
-camera at `(-230, 7, 30)` looking toward `(-220, 5, 8)`; its station-view SSIM
-was 0.9905. This is an offline geometry check, not browser or Flip7 validation.
-The comparison is included below. The full cave GLB remains the collision and
-close-view source. The 141 scanned debris placements across four source models
+remains the close-view source. The 141 scanned debris placements across four source models
 now use the source GLBs' authored third mesh as their shared far LOD. It reduces
 each model from 700 to 160 triangles, 500 to 119, 500 to 119, and 299 to 80,
 while retaining the exact same embedded albedo bytes, UV channel, and normals.
@@ -135,8 +124,6 @@ The script writes the eight PNGs to
 can reproduce the four metrics above. This isolated GLB review does not include
 the Example Island scene, browser post-processing, or portal cameras.
 
-![Matched Blender render of the full and distance-level cave meshes](images/underneath-cave-lod-station.jpg)
-
 To regenerate the checked-in village level, export the full package to a
 temporary directory and use its full-detail village GLB as the Blender input:
 
@@ -151,16 +138,6 @@ npm run export:island
 Regenerate the boat preview variant the same way, using its content-addressed
 full-detail GLB from the temporary export and writing to
 `worlds/tidewater/lod-source/moored-boat-low.glb` with `--ratio 0.35`.
-
-Regenerate the UNDERNEATH cave variant from a clean package export using
-`--ratio 0.70`, write the Blender result to
-`/var/tmp/underneath-cave-low.glb`, then copy that file to
-`$BURNING_HORIZONS_DIR/lod-source/cave-low.glb` and run
-`BURNING_HORIZONS_DIR=/path/to/burning-horizons npm run export:burning-horizons`.
-The cave exporter maps the reduced
-primitives to the original material definitions by material name; do not
-publish a Blender GLB directly as the packaged cave LOD because Blender can
-change the authored emissive strengths.
 
 The checked-in low-detail GLB is a stable export input. Package export hashes it
 into the signed content-addressed asset directory, so repeated exports do not

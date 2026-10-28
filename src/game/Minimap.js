@@ -20,10 +20,10 @@ const ROWS_PER_FRAME = 48;
 const _vehicleForward = new Vector3();
 
 const CSS = /* css */`
-.gm-map { position: absolute; right: var(--tw-edge); bottom: var(--tw-edge); width: calc(184 * var(--tw-u)); height: calc(184 * var(--tw-u));
-	border-radius: 50%; padding: calc(5 * var(--tw-u)); pointer-events: none;
-	transition: right var(--tw-slow) var(--tw-ease), opacity var(--tw-med) var(--tw-ease); }
-.tw-root[data-panel='open'] .gm-map { right: calc(var(--tw-panel-w) + 2 * var(--tw-3)); }
+.gm-map { position: absolute; right: var(--em-edge); bottom: var(--em-edge); width: calc(184 * var(--em-u)); height: calc(184 * var(--em-u));
+	border-radius: 50%; padding: calc(5 * var(--em-u)); pointer-events: none;
+	transition: right var(--em-slow) var(--em-ease), opacity var(--em-med) var(--em-ease); }
+.em-root[data-panel='open'] .gm-map { right: calc(var(--em-panel-w) + 2 * var(--em-3)); }
 .gm-map-view { position: relative; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: #0b2c48;
 	box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), inset 0 0 18px rgba(0,0,0,0.45); }
 .gm-map-view canvas { position: absolute; left: 0; top: 0; width: ${ N }px; height: ${ N }px; transform-origin: 0 0; image-rendering: auto; }
@@ -31,37 +31,37 @@ const CSS = /* css */`
 	background: radial-gradient(circle at 50% 50%, transparent 58%, rgba(4, 12, 20, 0.45) 100%); }
 .gm-map-marks { position: absolute; inset: 0; }
 .gm-mk { position: absolute; left: 0; top: 0; width: 0; height: 0; }
-.gm-mk > i { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: calc(20 * var(--tw-u)); height: calc(20 * var(--tw-u));
-	margin: calc(-10 * var(--tw-u)) 0 0 calc(-10 * var(--tw-u)); border-radius: 50%; font: 700 calc(10 * var(--tw-u)) var(--tw-font); font-style: normal;
+.gm-mk > i { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: calc(20 * var(--em-u)); height: calc(20 * var(--em-u));
+	margin: calc(-10 * var(--em-u)) 0 0 calc(-10 * var(--em-u)); border-radius: 50%; font: 700 calc(10 * var(--em-u)) var(--em-font); font-style: normal;
 	color: #0b1418; box-shadow: 0 1px 3px rgba(0,0,0,0.55), 0 0 0 1.5px rgba(255,255,255,0.85); }
 .gm-mk > i svg { width: 64%; height: 64%; }
-.gm-mk.is-joe > i { background: var(--tw-sun); }
-.gm-mk.is-marta > i { background: var(--tw-aqua); }
+.gm-mk.is-joe > i { background: var(--em-sun); }
+.gm-mk.is-marta > i { background: var(--em-aqua); }
 .gm-mk.is-boat > i { background: #f2efe6; }
-.gm-mk > b { position: absolute; left: 0; top: 0; width: 0; height: 0; border-left: calc(5 * var(--tw-u)) solid transparent; border-right: calc(5 * var(--tw-u)) solid transparent;
-	border-bottom: calc(7 * var(--tw-u)) solid rgba(255,255,255,0.9); margin: calc(-19 * var(--tw-u)) 0 0 calc(-5 * var(--tw-u)); transform-origin: calc(5 * var(--tw-u)) calc(19 * var(--tw-u)); display: none; }
+.gm-mk > b { position: absolute; left: 0; top: 0; width: 0; height: 0; border-left: calc(5 * var(--em-u)) solid transparent; border-right: calc(5 * var(--em-u)) solid transparent;
+	border-bottom: calc(7 * var(--em-u)) solid rgba(255,255,255,0.9); margin: calc(-19 * var(--em-u)) 0 0 calc(-5 * var(--em-u)); transform-origin: calc(5 * var(--em-u)) calc(19 * var(--em-u)); display: none; }
 .gm-mk.is-edge > b { display: block; }
 .gm-mk.is-edge > i { transform: scale(0.82); }
-.gm-mk.is-hot > i { animation: gm-map-pulse 1.3s var(--tw-ease-io) infinite; }
+.gm-mk.is-hot > i { animation: gm-map-pulse 1.3s var(--em-ease-io) infinite; }
 @keyframes gm-map-pulse { 0%, 100% { box-shadow: 0 1px 3px rgba(0,0,0,0.55), 0 0 0 1.5px rgba(255,255,255,0.85), 0 0 0 0 rgba(255,255,255,0.6); }
-	60% { box-shadow: 0 1px 3px rgba(0,0,0,0.55), 0 0 0 1.5px rgba(255,255,255,0.85), 0 0 0 calc(10 * var(--tw-u)) rgba(255,255,255,0); } }
+	60% { box-shadow: 0 1px 3px rgba(0,0,0,0.55), 0 0 0 1.5px rgba(255,255,255,0.85), 0 0 0 calc(10 * var(--em-u)) rgba(255,255,255,0); } }
 .gm-map-me { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-.gm-map-me svg { position: absolute; width: calc(18 * var(--tw-u)); height: calc(18 * var(--tw-u)); left: calc(-9 * var(--tw-u)); top: calc(-10 * var(--tw-u));
+.gm-map-me svg { position: absolute; width: calc(18 * var(--em-u)); height: calc(18 * var(--em-u)); left: calc(-9 * var(--em-u)); top: calc(-10 * var(--em-u));
 	filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
-.gm-map-n { position: absolute; left: 0; top: 0; width: calc(14 * var(--tw-u)); height: calc(14 * var(--tw-u)); margin: calc(-7 * var(--tw-u)) 0 0 calc(-7 * var(--tw-u));
-	border-radius: 50%; display: grid; place-items: center; font: 700 calc(9 * var(--tw-u)) var(--tw-font); color: #0b1418; background: rgba(255,255,255,0.9);
+.gm-map-n { position: absolute; left: 0; top: 0; width: calc(14 * var(--em-u)); height: calc(14 * var(--em-u)); margin: calc(-7 * var(--em-u)) 0 0 calc(-7 * var(--em-u));
+	border-radius: 50%; display: grid; place-items: center; font: 700 calc(9 * var(--em-u)) var(--em-font); color: #0b1418; background: rgba(255,255,255,0.9);
 	box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-.gm-map-fish { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity 600ms var(--tw-ease); }
+.gm-map-fish { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity 600ms var(--em-ease); }
 .gm-map-fish.is-on { opacity: 0.9; }
-.gm-map-fish > i { position: absolute; left: calc(-12 * var(--tw-u)); top: calc(-12 * var(--tw-u)); width: calc(24 * var(--tw-u)); height: calc(24 * var(--tw-u));
-	border-radius: 50%; border: 1.5px solid rgba(var(--tw-aqua-rgb), 0.9); animation: gm-map-ring 2.2s var(--tw-ease-io) infinite; }
+.gm-map-fish > i { position: absolute; left: calc(-12 * var(--em-u)); top: calc(-12 * var(--em-u)); width: calc(24 * var(--em-u)); height: calc(24 * var(--em-u));
+	border-radius: 50%; border: 1.5px solid rgba(var(--em-aqua-rgb), 0.9); animation: gm-map-ring 2.2s var(--em-ease-io) infinite; }
 .gm-map-fish > i + i { animation-delay: -1.1s; }
-@keyframes gm-map-ring { 0% { transform: scale(0.45); } 100% { transform: scale(1.15); border-color: rgba(var(--tw-aqua-rgb), 0); } }
-.gm-map-label { position: absolute; left: 50%; bottom: calc(-2 * var(--tw-u)); transform: translate(-50%, 100%); padding-top: calc(4 * var(--tw-u));
-	font: 500 var(--tw-fs-xs) var(--tw-mono); color: var(--tw-ink-3); white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.7); display: none; }
+@keyframes gm-map-ring { 0% { transform: scale(0.45); } 100% { transform: scale(1.15); border-color: rgba(var(--em-aqua-rgb), 0); } }
+.gm-map-label { position: absolute; left: 50%; bottom: calc(-2 * var(--em-u)); transform: translate(-50%, 100%); padding-top: calc(4 * var(--em-u));
+	font: 500 var(--em-fs-xs) var(--em-mono); color: var(--em-ink-3); white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.7); display: none; }
 /* short windows: the settings rail (right, vertically centred) reaches down to the corner */
-@media (max-height: 860px) { .gm-map { right: calc(var(--tw-edge) + 58 * var(--tw-u)); } }
-@media (max-width: 640px) { .gm-map { width: calc(128 * var(--tw-u)); height: calc(128 * var(--tw-u)); } }
+@media (max-height: 860px) { .gm-map { right: calc(var(--em-edge) + 58 * var(--em-u)); } }
+@media (max-width: 640px) { .gm-map { width: calc(128 * var(--em-u)); height: calc(128 * var(--em-u)); } }
 @media (prefers-reduced-motion: reduce) { .gm-mk.is-hot > i, .gm-map-fish > i { animation: none; } }
 `;
 
@@ -106,7 +106,7 @@ export class Minimap {
 		style.textContent = CSS;
 		document.head.append( style );
 
-		this.el = h( 'div', 'gm-map tw-glass', `<div class="gm-map-view"><canvas width="${ N }" height="${ N }"></canvas><div class="gm-map-vig"></div>
+		this.el = h( 'div', 'gm-map em-glass', `<div class="gm-map-view"><canvas width="${ N }" height="${ N }"></canvas><div class="gm-map-vig"></div>
 			<div class="gm-map-marks"></div>
 			<div class="gm-map-me"><svg viewBox="0 0 24 24"><path d="M12 2 20 21 12 16.5 4 21Z" fill="#fff" stroke="#0b1418" stroke-width="1.4" stroke-linejoin="round"/></svg></div></div>` );
 		this.el.setAttribute( 'aria-hidden', 'true' );

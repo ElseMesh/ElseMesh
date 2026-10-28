@@ -8,10 +8,10 @@ import { applyWorldProposal } from '../tools/apply-world-proposal.mjs';
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const root = await mkdtemp( path.join( temporaryRoot, 'elsemesh-proposal-test-' ) );
 const source = {
-	protocol: 'tidewater.world-source/2', worldId: 'tw-world:proposal-test', title: 'Proposal test',
+	protocol: 'elsemesh.world-source/3', worldId: 'elsemesh:proposal-test', title: 'Proposal test',
 	coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
 	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 100, physicsProfile: 'default' },
-	objects: [ { id: 'tw-object:crate', kind: 'asset-instance', label: 'Crate', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } ],
+	objects: [ { id: 'elsemesh-object:crate', kind: 'asset-instance', label: 'Crate', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } ],
 	portals: [], updatedAt: '2026-10-01T00:00:00Z',
 };
 
@@ -21,8 +21,8 @@ try {
 	const proposal = {
 		protocol: 'elsemesh.world-proposal/1', worldId: source.worldId, sourceHash,
 		operations: [
-			{ op: 'object.update', id: 'tw-object:crate', fields: { transform: { position: [ 4, 0, 0 ], yaw: 0 }, priority: 'nearby' } },
-			{ op: 'object.add', object: { id: 'tw-object:lamp', kind: 'asset-instance', label: 'Lamp', transform: { position: [ 2, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } },
+			{ op: 'object.update', id: 'elsemesh-object:crate', fields: { transform: { position: [ 4, 0, 0 ], yaw: 0 }, priority: 'nearby' } },
+			{ op: 'object.add', object: { id: 'elsemesh-object:lamp', kind: 'asset-instance', label: 'Lamp', transform: { position: [ 2, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { shape: 'none', enabled: false } } },
 			{ op: 'world.update', fields: { title: 'Revised proposal world' } },
 		],
 	};
@@ -32,11 +32,11 @@ try {
 	assert.equal( revised.objects.length, 2 );
 	assert.deepEqual( counts, { added: 1, updated: 2, removed: 0 } );
 	assert.equal( source.title, 'Proposal test', 'proposal application never mutates the source snapshot' );
-	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, operations: [ { op: 'object.update', id: 'tw-object:crate', fields: { id: 'tw-object:takeover' } } ] } ), /protected or unsupported/ );
+	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, operations: [ { op: 'object.update', id: 'elsemesh-object:crate', fields: { id: 'elsemesh-object:takeover' } } ] } ), /protected or unsupported/ );
 	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, operations: [ { op: 'object.add', object: source.objects[ 0 ] } ] } ), /Invalid or duplicate object/ );
 	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, operations: [ { op: 'run-python', script: 'raise SystemExit' } ] } ), /Unsupported proposal operation/ );
 	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, sourceHash: `sha256:${'0'.repeat( 64 )}` } ), /source hash mismatch/ );
-	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, worldId: 'tw-world:someone-elses-world' } ), /world ID does not match/ );
+	assert.throws( () => applyWorldProposal( sourceBytes, { ...proposal, worldId: 'elsemesh:someone-elses-world' } ), /world ID does not match/ );
 
 	const sourcePath = path.join( root, 'source.json' );
 	const proposalPath = path.join( root, 'proposal.json' );

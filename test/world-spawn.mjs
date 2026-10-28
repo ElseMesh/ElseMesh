@@ -14,10 +14,10 @@ const free = worldSpawnCandidates( { ...spawn, position: [ 10, 2.62, 10 ] }, 0, 
 assert.deepEqual( free, [ [ 10, 1, 10 ] ], 'zero radius keeps the exact preferred point and ground adjusts its feet height' );
 assert.throws( () => worldSpawnCandidates( spawn, -1, colliders ), /Invalid world spawn search/ );
 const objectIDs = worldSpawnCollisionObjectIDs( { objects: [
-	{ id: 'tw-object:near', transform: { position: [ 2, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
-	{ id: 'tw-object:far', transform: { position: [ 50, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
-	{ id: 'tw-object:terrain', transform: { position: [ 500, 0, 500 ], yaw: 0 }, collision: { enabled: true, shape: 'heightfield' } },
-	{ id: 'tw-object:decor', transform: { position: [ 0, 0, 0 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } },
+	{ id: 'elsemesh-object:near', transform: { position: [ 2, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
+	{ id: 'elsemesh-object:far', transform: { position: [ 50, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
+	{ id: 'elsemesh-object:terrain', transform: { position: [ 500, 0, 500 ], yaw: 0 }, collision: { enabled: true, shape: 'heightfield' } },
+	{ id: 'elsemesh-object:decor', transform: { position: [ 0, 0, 0 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } },
 ] }, spawn, 2 );
-assert.deepEqual( [ ...objectIDs ].sort(), [ 'tw-object:near', 'tw-object:terrain' ], 'spawn loads every potentially intersecting collider and heightfield, but skips distant or noncolliding objects' );
+assert.deepEqual( [ ...objectIDs ].sort(), [ 'elsemesh-object:near', 'elsemesh-object:terrain' ], 'spawn loads every potentially intersecting collider and heightfield, but skips distant or noncolliding objects' );
 console.log( 'world spawn placement invariants passed' );

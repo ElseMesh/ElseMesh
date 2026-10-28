@@ -18,7 +18,7 @@ node tools/create-ai-edit-task.mjs \
   --blend /path/to/owner-reviewed-island.blend \
   --assets worlds/tidewater/assets \
   --instruction 'Add a small timber fish-cleaning table beside the selected work area.' \
-  --include-object tw-object:example-work-area \
+  --include-object elsemesh-object:example-work-area \
   --out-task /var/tmp/elsemesh-fish-table-task
 ```
 

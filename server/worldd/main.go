@@ -37,7 +37,8 @@ import (
 	"github.com/quic-go/webtransport-go"
 )
 
-const worldProtocol protocol.ID = "/tidewater/world/1.0.0"
+const worldProtocol protocol.ID = "/elsemesh/world/3.0.0"
+const worldDHTProtocolPrefix = "/elsemesh/kad/1.0.0"
 
 var buildRevision = "development"
 
@@ -531,7 +532,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("bootstrap address: %w", err)
 	}
-	dhtOptions := []dht.Option{dht.Mode(mode), dht.ProtocolPrefix("/tidewater/kad/1.0.0")}
+	dhtOptions := []dht.Option{dht.Mode(mode), dht.ProtocolPrefix(worldDHTProtocolPrefix)}
 	if len(bootPeers) > 0 {
 		dhtOptions = append(dhtOptions, dht.BootstrapPeers(bootPeers...))
 	}
@@ -625,7 +626,7 @@ func run() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", d.handleHealth)
-	mux.HandleFunc("/.well-known/tidewater/node", d.handleNodeRecord)
+	mux.HandleFunc("/.well-known/elsemesh/node", d.handleNodeRecord)
 	mux.HandleFunc("/api/lookup", d.handleLookup)
 	mux.HandleFunc("/api/world/manifest", d.handleManifest)
 	mux.HandleFunc("/api/world/roles/revocations", d.handleRoleRevocations)
@@ -839,8 +840,8 @@ func newStarterManifest(title, owner string) worldManifest {
 	if _, err := rand.Read(random[:]); err != nil {
 		panic(err)
 	}
-	return worldManifest{Protocol: manifestProtocol, WorldID: fmt.Sprintf("tw-world:%x", random[:]), OwnerPeerID: owner, AuthorityPeerID: owner, AuthorityEpoch: 1, Version: 1, Title: title,
-		Rules: worldRules{Gravity: 1, MaxVisitors: 128, SpawnRadius: 8, AvatarComplexity: 20000, PhysicsProfile: "tidewater-default", Movement: &movementRules{WalkSpeed: 3, SprintSpeed: 6.2, JumpSpeed: 4.6}}, Assets: []assetRef{}, Portals: []portal{}, UpdatedAt: time.Now().Unix()}
+	return worldManifest{Protocol: manifestProtocol, WorldID: fmt.Sprintf("elsemesh:%x", random[:]), OwnerPeerID: owner, AuthorityPeerID: owner, AuthorityEpoch: 1, Version: 1, Title: title,
+		Rules: worldRules{Gravity: 1, MaxVisitors: 128, SpawnRadius: 8, AvatarComplexity: 20000, PhysicsProfile: "elsemesh-default", Movement: &movementRules{WalkSpeed: 3, SprintSpeed: 6.2, JumpSpeed: 4.6}}, Assets: []assetRef{}, Portals: []portal{}, UpdatedAt: time.Now().Unix()}
 }
 
 func (d *daemon) advertiseWorld() {
@@ -863,7 +864,7 @@ func (d *daemon) advertiseWorld() {
 		}
 		break
 	}
-	namespace := "tidewater-world-v1:" + d.world.WorldID
+	namespace := worldProtocolNamespace + ":" + d.world.WorldID
 	for {
 		if !d.canAnnounceWorld(time.Now()) || d.canServeAssets(time.Now()) && !d.hasCompleteAssets() && d.currentAuthorityLease() == nil {
 			return
@@ -1024,7 +1025,7 @@ func (d *daemon) currentAuthorityLease() *signedDocument {
 
 func (d *daemon) handleNodeRecord(w http.ResponseWriter, _ *http.Request) {
 	now := time.Now()
-	doc, err := signDocument("tidewater.node/1", d.nodeRecordPayload(now), d.key)
+	doc, err := signDocument("elsemesh.node/1", d.nodeRecordPayload(now), d.key)
 	if err != nil {
 		http.Error(w, "could not sign node record", http.StatusInternalServerError)
 		return
@@ -1033,7 +1034,7 @@ func (d *daemon) handleNodeRecord(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (d *daemon) nodeRecordPayload(now time.Time) map[string]any {
-	record := map[string]any{"protocol": "tidewater.node/1", "nodeId": d.host.ID().String(), "addresses": d.peerAddresses(), "worldIds": []string{d.world.WorldID}, "gateway": d.publicGateway, "issuedAt": now.Unix(), "expiresAt": now.Add(15 * time.Minute).Unix()}
+	record := map[string]any{"protocol": "elsemesh.node/1", "nodeId": d.host.ID().String(), "addresses": d.peerAddresses(), "worldIds": []string{d.world.WorldID}, "gateway": d.publicGateway, "issuedAt": now.Unix(), "expiresAt": now.Add(15 * time.Minute).Unix()}
 	if d.zeroTierNodeID != "" && d.zeroTierNetworkID != "" {
 		record["zeroTierNodeId"] = d.zeroTierNodeID
 		record["zeroTierNetworkId"] = d.zeroTierNetworkID
@@ -1066,7 +1067,7 @@ func (d *daemon) publishDirectory() {
 			}
 		}
 		now := time.Now()
-		nodeDocument, err := signDocument("tidewater.node/1", d.nodeRecordPayload(now), d.key)
+		nodeDocument, err := signDocument("elsemesh.node/1", d.nodeRecordPayload(now), d.key)
 		if err == nil {
 			body, marshalErr := json.Marshal(map[string]any{"node": nodeDocument, "manifest": d.manifest, "authorityLease": d.currentAuthorityLease()})
 			if marshalErr == nil {
@@ -1152,7 +1153,7 @@ func (d *daemon) handleLookup(w http.ResponseWriter, r *http.Request) {
 	browserProviders := d.browserHostProviders(worldID)
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	peers, err := d.discovery.FindPeers(ctx, "tidewater-world-v1:"+worldID)
+	peers, err := d.discovery.FindPeers(ctx, worldProtocolNamespace+":"+worldID)
 	if err != nil {
 		if localCanServe {
 			providers := appendBrowserHostProviders([]string{d.host.ID().String()}, browserProviders, 16)
@@ -1669,7 +1670,7 @@ func (d *daemon) gatewayRequest(ctx context.Context, request gatewayMessage) (pe
 func (d *daemon) discoverTarget(ctx context.Context, worldID string, target peer.ID) error {
 	lookupCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	peers, err := d.discovery.FindPeers(lookupCtx, "tidewater-world-v1:"+worldID)
+	peers, err := d.discovery.FindPeers(lookupCtx, worldProtocolNamespace+":"+worldID)
 	if err != nil {
 		return errors.New("world_discovery_unavailable")
 	}

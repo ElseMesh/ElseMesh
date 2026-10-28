@@ -78,11 +78,11 @@ func TestNodeIdentityImportRejectsInsecureBackupPermissions(t *testing.T) {
 
 func TestSignedDocumentVerifiesAndRejectsTampering(t *testing.T) {
 	key := testKey(t)
-	document, err := signDocument("tidewater.test/1", map[string]any{"z": 2, "a": map[string]any{"second": true, "first": 1}}, key)
+	document, err := signDocument("elsemesh.test/1", map[string]any{"z": 2, "a": map[string]any{"second": true, "first": 1}}, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyDocument(document, "tidewater.test/1"); err != nil {
+	if err := verifyDocument(document, "elsemesh.test/1"); err != nil {
 		t.Fatalf("valid signature rejected: %v", err)
 	}
 	var payload map[string]any
@@ -91,7 +91,48 @@ func TestSignedDocumentVerifiesAndRejectsTampering(t *testing.T) {
 	}
 	payload["z"] = 3
 	document.Payload, _ = json.Marshal(payload)
-	if err := verifyDocument(document, "tidewater.test/1"); err == nil {
+	if err := verifyDocument(document, "elsemesh.test/1"); err == nil {
 		t.Fatal("tampered payload verified")
+	}
+}
+
+func TestLibp2pProtocolsUseElseMeshNamespace(t *testing.T) {
+	if got := string(worldProtocol); got != "/elsemesh/world/3.0.0" {
+		t.Fatalf("world stream protocol = %q, want ElseMesh namespace", got)
+	}
+	if worldDHTProtocolPrefix != "/elsemesh/kad/1.0.0" {
+		t.Fatalf("DHT protocol prefix = %q, want ElseMesh namespace", worldDHTProtocolPrefix)
+	}
+}
+
+func TestWorldExperienceAcceptsGenericElseMeshBehaviors(t *testing.T) {
+	base := worldExperience{
+		Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"},
+		Stages: map[string]string{},
+	}
+	base.Behaviors = []string{"elsemesh.fishing-game/1", "elsemesh.shore-aware-boat/1"}
+	if err := validateWorldExperience(&base); err != nil {
+		t.Fatalf("registered world behaviors rejected: %v", err)
+	}
+	base.Behaviors = []string{"elsemesh.example-world/1"}
+	if err := validateWorldExperience(&base); err != nil {
+		t.Fatalf("generic ElseMesh world behavior rejected by the server: %v", err)
+	}
+	base.Behaviors = []string{"elsemesh.fishing-game/1", "elsemesh.fishing-game/1"}
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("duplicate world behavior was accepted")
+	}
+	base.Behaviors = []string{"legacy.fishing-game/1"}
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("non-ElseMesh world behavior was accepted")
+	}
+	base.Behaviors = []string{"elsemesh.fishing-game/1"}
+	base.Fishing = &fishingExperience{FishStand: &fishingLocation{Position: []float64{12, -8}, Yaw: 1.2, InteractionRadius: 4}}
+	if err := validateWorldExperience(&base); err != nil {
+		t.Fatalf("valid browser fishing placement rejected: %v", err)
+	}
+	base.Fishing.FishStand.Position = []float64{12}
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("invalid browser fishing placement was accepted")
 	}
 }

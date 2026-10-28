@@ -2,6 +2,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ISLAND_DEFINITION as WORLD } from '../world/IslandDefinition.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
+import { makePresencePose } from '../network/WorldPresenceSession.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
 import { Player } from '../player/Player.js';
@@ -11,6 +12,7 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { appendVegetationPlacements, decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
+import { decodeVillageMaterialAsset } from '../network/VillageMaterialAsset.js';
 import { decodeFishPropPlacements } from '../network/FishPropPlacements.js';
 import { decodeReefPlacements } from '../network/ReefPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
@@ -19,15 +21,21 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLFishStandAdapter } from './WebGLFishStandAdapter.js';
+import { WebGLChandleryAdapter } from './WebGLChandleryAdapter.js';
 import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
+import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
+import { webglLightingForTime } from './WebGLLighting.js';
+import { hasWorldBehavior } from '../network/WorldBehaviorRegistry.js';
+import { WorldExtensionSession } from '../network/WorldExtensionSession.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';
 import { WebGLSpray } from './WebGLSpray.js';
+import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGLVillageMaterials.js';
 import { Whale } from '../world/marine/Whale.js';
 import { TIDEWATER_REEF_ASSET_URLS } from '../world/reef/TidewaterReefAssets.js';
-import { initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
+import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
@@ -39,9 +47,8 @@ import villageUrl from '../../worlds/tidewater/lod-source/village-full.glb?url';
 import vegetationUrl from '../../worlds/tidewater/lod-source/vegetation-placements.bin?url';
 import tidewaterWorldSource from '../../worlds/tidewater/world-source.json';
 
-const PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
-const ISLAND_WILDLIFE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'tidewater.example-island-wildlife/1' );
-const ISLAND_WHALE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'tidewater.humpback-whale/1' );
+const ISLAND_WILDLIFE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' );
+const ISLAND_WHALE_COMPONENT = tidewaterWorldSource.components.find( component => component.type === 'elsemesh.humpback-whale/1' );
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -227,83 +234,6 @@ function setWebGLLODFade( root, value ) {
 			if ( material?.userData?.elsemeshLODFade ) material.userData.elsemeshLODFade.value = value;
 		}
 	} );
-}
-
-// Backend-neutral gameplay needs a water query even when the presentation uses
-// WebGL. This follows the WebGL water shader's wave field and exposes the same
-// CPU query contract consumed by BoatController.
-class WebGLWaterQuery {
-
-	constructor( terrain, seaLevel = - 0.15 ) {
-
-		this.terrain = terrain;
-		this.seaLevel = seaLevel;
-		this.inputs = new Float32Array( 64 * 4 );
-		this.cpu = new Float32Array( 64 * 4 );
-		this.resultInputs = new Float32Array( 64 * 4 );
-		this.count = 1;
-		this.slots = new Map();
-		this.cpuValid = false;
-		this.version = 0;
-		this.resultTime = 0;
-		this.latency = 0.016;
-		this.time = 0;
-
-	}
-
-	allocate( name, n ) {
-
-		if ( this.slots.has( name ) ) return this.slots.get( name ).start;
-		const start = this.count;
-		this.slots.set( name, { start, n } );
-		this.count += n;
-		return start;
-
-	}
-
-	setPoint( i, x, z ) {
-
-		this.inputs[ i * 4 ] = x;
-		this.inputs[ i * 4 + 1 ] = z;
-
-	}
-
-	get( i, out = {} ) {
-
-		const offset = i * 4;
-		out.height = this.cpu[ offset ];
-		out.nx = this.cpu[ offset + 1 ];
-		out.nz = this.cpu[ offset + 2 ];
-		out.floor = this.cpu[ offset + 3 ];
-		return out;
-
-	}
-
-	_height( x, z ) {
-
-		const t = this.time;
-		return this.seaLevel + 0.95 * Math.sin( x * 0.035 + z * 0.025 + t * 0.3 ) + 0.55 * Math.sin( - x * 0.07 + z * 0.15 - t * 0.55 ) + 0.08 * Math.sin( x * 0.21 - z * 0.16 + t * 0.7 ) + 0.03 * Math.sin( x * 0.42 + z * 0.09 + t * 1.3 );
-
-	}
-
-	update( dt ) {
-
-		this.time += Math.max( 0, dt );
-		this.resultInputs.set( this.inputs );
-		const e = 0.35;
-		for ( let i = 0; i < this.count; i ++ ) {
-			const x = this.inputs[ i * 4 ], z = this.inputs[ i * 4 + 1 ], h = this._height( x, z );
-			const nx = ( h - this._height( x + e, z ) ) / e, nz = ( h - this._height( x, z + e ) ) / e;
-			const n = Math.sqrt( nx * nx + nz * nz + 1 );
-			const k = i * 4;
-			this.cpu[ k ] = h; this.cpu[ k + 1 ] = nx / n; this.cpu[ k + 2 ] = nz / n; this.cpu[ k + 3 ] = this.terrain.heightAt( x, z );
-		}
-		this.cpuValid = true;
-		this.version ++;
-		this.resultTime = this.time;
-
-	}
-
 }
 
 function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
@@ -802,6 +732,9 @@ export class WebGLFallback {
 		this.keys = new Set();
 		this.velocityY = 0;
 		this.sequence = 0;
+		this.presenceConnector = null;
+		this.presencePending = false;
+		this.presenceNextSend = 0;
 		this.debugNoWater = new URLSearchParams( location.search ).has( 'noWater' );
 		this.portals = [];
 		this.blockers = [];
@@ -816,6 +749,7 @@ export class WebGLFallback {
 		this.vegetationRecords = null;
 		this.wildlifeRuntime = null;
 		this.wildlifeAdapter = null;
+		this.worldExtensionSession = null;
 
 	}
 
@@ -832,9 +766,11 @@ export class WebGLFallback {
 		const sunDirection = this._sunDirection( this.app.settings.timeOfDay );
 		this.cloudLayer = this._makeCloudLayer( sunDirection );
 		this.scene.add( this.cloudLayer );
-		this.scene.add( new T.HemisphereLight( 0xd9f1ff, 0x42513f, 1.5 ) );
+		this.hemisphereLight = new T.HemisphereLight( 0xd9f1ff, 0x42513f, 1.5 );
+		this.scene.add( this.hemisphereLight );
 		const sun = new T.DirectionalLight( 0xfff0d2, 2.4 );
 		sun.position.copy( sunDirection ).multiplyScalar( 500 );
+		this.sunLight = sun;
 		sun.castShadow = true;
 		sun.shadow.mapSize.set( 1024, 1024 );
 		sun.shadow.camera.left = sun.shadow.camera.bottom = - 300;
@@ -845,6 +781,7 @@ export class WebGLFallback {
 		sun.shadow.normalBias = 0.025;
 		this.scene.add( sun );
 		this.sunDirection = sunDirection;
+		this._updateLighting();
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
@@ -866,8 +803,17 @@ export class WebGLFallback {
 				terrain: this.terrain,
 				colliders: this.app.worldState.colliders,
 				loader: this.loader,
+				placement: tidewaterWorldSource.experience?.fishing?.fishStand,
 			} );
-			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor );
+			this.chandlery = new WebGLChandleryAdapter( T, this.scene, {
+				terrain: this.terrain, colliders: this.app.worldState.colliders, loader: this.loader,
+				placement: tidewaterWorldSource.experience?.fishing?.chandlery,
+			} );
+			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
+				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience: tidewaterWorldSource.experience,
+				THREE: T, scene: this.scene, camera: this.camera, query: this.waterQuery,
+				terrain: this.terrain, boatController: this.boat.controller, boatRoot: this.boat.group, audio: this.app.audio,
+			} );
 			const y = this.terrain.heightAt( STAND.x, STAND.z );
 			for ( const box of fishStandColliderVolumes( y ) ) this.blockers.push( {
 				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
@@ -896,11 +842,16 @@ export class WebGLFallback {
 				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		if ( this.worldLink && this.connector?.worldId === 'tw-world:example-island' ) {
+		if ( this.worldLink && hasWorldBehavior( this.connector?.manifest?.experience, 'elsemesh.fishing-game/1' ) ) {
 			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
-			this.fishStand = new WebGLFishStandAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader } );
-			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor );
+			const experience = this.connector?.manifest?.experience;
+			this.fishStand = new WebGLFishStandAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: experience?.fishing?.fishStand } );
+			this.chandlery = new WebGLChandleryAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: experience?.fishing?.chandlery } );
+			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
+				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience, THREE: T, scene: this.scene,
+				camera: this.camera, query: this.waterQuery, terrain: hostedTerrain, boatController: this.boat?.controller || null, boatRoot: this.boat?.group || null, audio: this.app.audio,
+			} );
 		}
 		if ( this.worldLink ) {
 			for ( const { component, assets } of this.hostedWhalePackages || [] ) {
@@ -1380,11 +1331,20 @@ export class WebGLFallback {
 
 	_sunDirection( hours ) {
 
-		const T = this.THREE, phi = T.MathUtils.degToRad( 24 ), dec = T.MathUtils.degToRad( 6 ), H = T.MathUtils.degToRad( ( hours - 12 ) * 15 );
-		const east = - Math.cos( dec ) * Math.sin( H );
-		const north = Math.cos( phi ) * Math.sin( dec ) - Math.sin( phi ) * Math.cos( dec ) * Math.cos( H );
-		const up = Math.sin( phi ) * Math.sin( dec ) + Math.cos( phi ) * Math.cos( dec ) * Math.cos( H );
-		return new T.Vector3( east, up, - north ).normalize();
+		return webglLightingForTime( this.THREE, hours ).sunDirection;
+
+	}
+
+	_updateLighting() {
+
+		const T = this.THREE, lighting = webglLightingForTime( T, this.app.settings.timeOfDay );
+		this.sunDirection.copy( lighting.sunDirection );
+		this.sunLight.position.copy( lighting.keyDirection ).multiplyScalar( 500 );
+		this.sunLight.color.setHex( lighting.keyColor );
+		this.sunLight.intensity = lighting.keyIntensity;
+		this.hemisphereLight.intensity = lighting.ambientIntensity;
+		this.cloudLayer.material.uniforms.uSunDirection.value.copy( this.sunDirection );
+		for ( const water of this.waterScene.children ) water.material.uniforms.uSunDirection?.value.copy( this.sunDirection );
 
 	}
 
@@ -1595,8 +1555,18 @@ export class WebGLFallback {
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.worldLODs = new Map();
 		const components = manifest.components || [];
-		this.hostedWildlifeComponent = components.find( component => component.type === 'tidewater.example-island-wildlife/1' ) || null;
-		const terrainComponent = components.find( component => component.type === 'tidewater.terrain-surface/1' );
+		this.hostedWildlifeComponent = components.find( component => component.type === 'elsemesh.example-island-wildlife/1' ) || null;
+		const terrainComponent = components.find( component => component.type === 'elsemesh.terrain-surface/1' );
+		const villageMaterialComponent = components.find( component => component.type === 'elsemesh.village-materials/2' );
+		let villageMaterials = null, villageMaterialApplied = 0;
+		if ( villageMaterialComponent && assets.has( villageMaterialComponent.dataAssetId ) ) {
+			try {
+				const decoded = await decodeVillageMaterialAsset( asBytes( assets.get( villageMaterialComponent.dataAssetId ) ) );
+				villageMaterials = createWebGLVillageMaterials( T, decoded, { anisotropy: this.renderer.capabilities.getMaxAnisotropy() } );
+			} catch ( error ) {
+				console.warn( 'WebGL fallback village materials unavailable:', error );
+			}
+		}
 		let terrainSurface = null, hostedTerrainMaterial = null, hostedTerrainVisualReady = false;
 		if ( terrainComponent && assets.has( terrainComponent.dataAssetId ) ) {
 			const terrainBytes = assets.get( terrainComponent.dataAssetId );
@@ -1618,6 +1588,7 @@ export class WebGLFallback {
 			const root = new T.Group();
 			const base = model.scene.clone( true );
 			prepareHostedWebGLModel( base );
+			if ( object.id === villageMaterialComponent?.objectId && villageMaterials ) villageMaterialApplied += applyWebGLVillageMaterials( base, villageMaterials );
 			if ( object.id === terrainComponent?.objectId && terrainSurface ) {
 				hostedTerrainMaterial ||= webglTerrainMaterial( T, this.hostedTerrainData, terrainSurface );
 				applyHostedTerrainMaterial( base, hostedTerrainMaterial );
@@ -1652,6 +1623,7 @@ export class WebGLFallback {
 						if ( signal.aborted ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 						const visual = variant.scene.clone( true );
 						prepareHostedWebGLModel( visual );
+						if ( object.id === villageMaterialComponent?.objectId && villageMaterials ) villageMaterialApplied += applyWebGLVillageMaterials( visual, villageMaterials );
 						if ( object.id === terrainComponent?.objectId && hostedTerrainMaterial ) applyHostedTerrainMaterial( visual, hostedTerrainMaterial );
 						prepareWebGLLODFade( visual );
 						visual.name = `${ object.label || object.id } · LOD ${ level }`;
@@ -1685,9 +1657,10 @@ export class WebGLFallback {
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			terrainReady: !! this.hostedTerrainData, boatReady: !! this.hostedBoatSpec,
 		} );
+		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
 		const hostedReefRecords = [], hostedReefIds = [];
-		for ( const reef of components.filter( component => component.type === 'tidewater.static-reef/1' ) ) {
+		for ( const reef of components.filter( component => component.type === 'elsemesh.static-reef/1' ) ) {
 			const placementBytes = assets.get( reef.placementAssetId );
 			if ( ! placementBytes ) continue;
 			const decoded = decodeReefPlacements( asBytes( placementBytes ) );
@@ -1698,7 +1671,7 @@ export class WebGLFallback {
 			this.hostedReefAdapter = new WebGLReefAdapter( T, this.scene, hostedReefRecords );
 			for ( const id of hostedReefIds ) supportedComponents.add( id );
 		}
-		for ( const vegetation of components.filter( component => component.type === 'tidewater.static-vegetation/1' ) ) {
+		for ( const vegetation of components.filter( component => component.type === 'elsemesh.static-vegetation/1' ) ) {
 			const placementBytes = assets.get( vegetation.placementAssetId );
 			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
 			if ( ! placementBytes || vegetation.grassMaskAssetId && ! grassMaskBytes ) continue;
@@ -1710,7 +1683,7 @@ export class WebGLFallback {
 			await this._loadVegetation( { placementBytes, centerPosition: [ ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 0 ], ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 2 ] ] } );
 			supportedComponents.add( vegetation.id );
 		}
-		for ( const fishProps of components.filter( component => component.type === 'tidewater.static-fish-props/1' ) ) {
+		for ( const fishProps of components.filter( component => component.type === 'elsemesh.static-fish-props/1' ) ) {
 			const placementBytes = assets.get( fishProps.placementAssetId );
 			if ( ! placementBytes ) continue;
 			const records = decodeFishPropPlacements( asBytes( placementBytes ) );
@@ -1718,7 +1691,7 @@ export class WebGLFallback {
 			this.hostedFishProps.push( new WebGLFishPropsAdapter( T, this.scene, records ) );
 			supportedComponents.add( fishProps.id );
 		}
-		for ( const ambience of components.filter( component => component.type === 'tidewater.ambient-audio/1' ) ) {
+		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
 		}
 		const spawn = manifest.spawn || {};
@@ -1727,15 +1700,21 @@ export class WebGLFallback {
 		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
 			this.spawn = { position: transfer.slice( 0, 3 ), yaw: transfer[ 3 ], pitch: transfer[ 4 ] };
 		}
-		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'tidewater.island-ocean/1', 'tidewater.water-body/1' ].includes( component.type ) )
+		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'elsemesh.island-ocean/1', 'elsemesh.water-body/1' ].includes( component.type ) )
 			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
 		this.hostedComponents = components;
 		this.hostedTitle = manifest.title || 'Hosted world';
 		this.hostedSupportedComponents = supportedComponents;
 		this.hostedWhalePackages = [];
-		for ( const component of components.filter( candidate => candidate.type === 'tidewater.humpback-whale/1' ) ) {
+		for ( const component of components.filter( candidate => candidate.type === 'elsemesh.humpback-whale/1' ) ) {
 			const ids = [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ];
 			if ( ids.every( id => assets.has( id ) ) ) this.hostedWhalePackages.push( { component, assets: { manifest: assets.get( ids[ 0 ] ), geometry: assets.get( ids[ 1 ] ), albedo: assets.get( ids[ 2 ] ), height: assets.get( ids[ 3 ] ) } } );
+		}
+		if ( manifest.extensions?.length ) {
+			const session = this.worldExtensionSession = new WorldExtensionSession( { connector: this.connector, root: this } );
+			try { this.worldExtensionStates = await session.load( manifest.extensions ); }
+			catch ( error ) { this.worldExtensionSession = null; throw error; }
+			window.addEventListener( 'pagehide', () => session.dispose(), { once: true } );
 		}
 		this._updateHostedWebGLStatus();
 		progress( 0.9, 'Preparing hosted world…' );
@@ -1744,7 +1723,7 @@ export class WebGLFallback {
 
 	async _loadPackagedReef() {
 
-		const components = tidewaterWorldSource.components.filter( item => item.type === 'tidewater.static-reef/1' );
+		const components = tidewaterWorldSource.components.filter( item => item.type === 'elsemesh.static-reef/1' );
 		const recordsByTile = await Promise.all( components.map( async component => {
 			const url = TIDEWATER_REEF_ASSET_URLS[ component.placementAssetId ];
 			if ( ! url ) throw new Error( `Packaged reef asset ${component.placementAssetId} is missing from the Tidewater source tree` );
@@ -1775,14 +1754,14 @@ export class WebGLFallback {
 
 		for ( const object of objects ) {
 			const collision = object.collision;
-			if ( ! collision?.enabled || ! collision.solid || ! [ 'box', 'compound' ].includes( collision.shape ) ) continue;
+			if ( ! collision?.enabled || ! [ 'box', 'compound' ].includes( collision.shape ) ) continue;
 			const scale = object.scale || [ 1, 1, 1 ], transform = object.transform;
-			const boxes = collision.shape === 'box' ? [ { center: collision.center, halfExtents: collision.halfExtents, yaw: 0 } ] : collision.boxes;
+			const boxes = hostedCollisionBoxes( collision );
 			for ( const item of boxes ) {
 				const yaw = ( transform.yaw || 0 ) + ( item.yaw || 0 ), cos = Math.cos( transform.yaw || 0 ), sin = Math.sin( transform.yaw || 0 );
 				const lx = item.center[ 0 ] * scale[ 0 ], lz = item.center[ 2 ] * scale[ 2 ];
 				const hx = item.halfExtents[ 0 ] * scale[ 0 ], hz = item.halfExtents[ 2 ] * scale[ 2 ];
-				( this.app.worldState.hostedColliders || this.app.worldState.colliders ).addBox( new EngineVector3( transform.position[ 0 ] + lx * cos + lz * sin, transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ], transform.position[ 2 ] - lx * sin + lz * cos ), new EngineVector3( hx, item.halfExtents[ 1 ] * scale[ 1 ], hz ), yaw, { walkable: collision.walkable, solid: collision.solid, tag: `world:${object.id}` } );
+				( this.app.worldState.hostedColliders || this.app.worldState.colliders ).addBox( new EngineVector3( transform.position[ 0 ] + lx * cos + lz * sin, transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ], transform.position[ 2 ] - lx * sin + lz * cos ), new EngineVector3( hx, item.halfExtents[ 1 ] * scale[ 1 ], hz ), yaw, { walkable: item.walkable, solid: item.solid, tag: `world:${object.id}` } );
 			}
 		}
 
@@ -1792,9 +1771,9 @@ export class WebGLFallback {
 
 		const T = this.THREE;
 		for ( const component of components ) {
-			if ( component.type === 'tidewater.island-ocean/1' ) {
+			if ( component.type === 'elsemesh.island-ocean/1' ) {
 				this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000 ), rules.seaLevel ?? - 4.5 ) );
-			} else if ( component.type === 'tidewater.water-body/1' ) {
+			} else if ( component.type === 'elsemesh.water-body/1' ) {
 				const water = this._makeWater( new T.CircleGeometry( component.extent, 64 ), rules.seaLevel ?? 0 );
 				water.position.x = component.center[ 0 ]; water.position.z = component.center[ 1 ]; this.waterScene.add( water );
 			}
@@ -1881,6 +1860,7 @@ export class WebGLFallback {
 		for ( const whale of this.whales || [] ) whale.update( dt, this.camera );
 		this.spray?.update( dt );
 		const T = this.THREE;
+		this._updateLighting();
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;
 		this.cloudLayer.material.uniforms.uCameraPosition.value.copy( this.camera.position );
@@ -1909,9 +1889,11 @@ export class WebGLFallback {
 			}
 		}
 		this.fishStand?.update( dt, this.camera.position );
+		this.chandlery?.update( dt, this.camera.position );
 		this.reefAdapter?.update( this.camera, simulationTime, tidewaterWorldSource.rules.seaLevel ?? 0 );
 		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
-		this.gameAdapter?.update( dt, this.player?.position || this.camera.position );
+		this.gameAdapter?.update( dt, this.player || this.camera, this.input, { timeOfDay: this.app.settings.timeOfDay, freeCam: this.freeCam } );
+		this._stepWorldExtensions( dt );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;
 			this.wildlifeRuntime.update( dt, this.camera, this.player, {
@@ -1934,6 +1916,17 @@ export class WebGLFallback {
 
 	}
 
+	_stepWorldExtensions( deltaSeconds ) {
+		this.worldExtensionSession?.step( deltaSeconds, {
+			timeOfDay: this.app.settings.timeOfDay,
+			player: this.player,
+			input: this.input,
+			boat: this.boat?.controller || null,
+			gameRuntime: this.gameAdapter?.runtime || null,
+		} );
+
+	}
+
 	_updateAudio( dt ) {
 
 		const audio = this.app.audio;
@@ -1941,7 +1934,7 @@ export class WebGLFallback {
 		const p = this.camera.position, fwd = new this.THREE.Vector3();
 		this.camera.getWorldDirection( fwd );
 		if ( this.worldLink && this.connector?.manifest ) {
-			const components = ( this.connector.manifest.components || [] ).filter( component => component.type === 'tidewater.ambient-audio/1' );
+			const components = ( this.connector.manifest.components || [] ).filter( component => component.type === 'elsemesh.ambient-audio/1' );
 			audio.setWorldAmbience( this.connector.worldId, components, this.connector.assets );
 			if ( ! audio.enabled ) return;
 			const seaLevel = this.hostedSeaLevel ?? 0;
@@ -1997,15 +1990,30 @@ export class WebGLFallback {
 
 	_startPresence() {
 
-		if ( ! this.connector || ! this.worldLink ) return;
-		const send = () => this.connector.updatePresence( {
-			protocol: PRESENCE_PROTOCOL, sequence: this.sequence ++,
-			position: [ this.camera.position.x, this.camera.position.y - 1.7, this.camera.position.z ], yaw: this.player?.yaw || 0, pitch: this.player?.pitch || 0,
-			moving: !! this.player?.velocity?.lengthSq?.(), mode: this.player?.mode || 'walk', appearance: { ...DEFAULT_APPEARANCE },
-		} ).then( snapshot => this._updateRemotePlayers( snapshot ) ).catch( error => { if ( ! this.presenceFailed ) console.warn( 'WebGL fallback presence unavailable:', error.message ); this.presenceFailed = true; } );
-		this.presenceTimer = setInterval( send, 1800 );
+		if ( ! this.connector || ! this.worldLink || ! this.connector.manifest?.ownerPeerId || this.connector.localOnly ) return;
+		this.presenceConnector = new WorldConnector( {
+			worldId: this.connector.worldId, nodeId: this.connector.manifest.ownerPeerId,
+			gateway: this.connector.gateway, directory: this.connector.directory,
+		} );
+		const send = () => {
+			if ( this.presencePending || performance.now() < this.presenceNextSend ) return;
+			this.presencePending = true;
+			this.presenceConnector.updatePresence( makePresencePose( this.player, this.sequence ++, DEFAULT_APPEARANCE ) )
+				.then( snapshot => { this._updateRemotePlayers( snapshot ); this.presenceFailed = false; } )
+				.catch( error => {
+					this.presenceNextSend = performance.now() + 2000;
+					if ( ! this.presenceFailed ) console.warn( 'WebGL fallback presence unavailable:', error.message );
+					this.presenceFailed = true;
+				} )
+				.finally( () => { this.presencePending = false; } );
+		};
+		this.presenceTimer = setInterval( send, 100 );
 		send();
-		window.addEventListener( 'pagehide', () => this.connector.leavePresence().catch( () => {} ), { once: true } );
+		window.addEventListener( 'pagehide', () => {
+			clearInterval( this.presenceTimer );
+			const connector = this.presenceConnector;
+			connector?.leavePresence().catch( () => {} ).finally( () => connector.close() );
+		}, { once: true } );
 
 	}
 

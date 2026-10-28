@@ -25,9 +25,9 @@ const profileDir = path.join( worldsDir, profile );
 const processes = [];
 const assetBytes = Buffer.from( 'browser-host-worker-verified-asset' );
 const assetID = `sha256:${createHash( 'sha256' ).update( assetBytes ).digest( 'hex' )}`;
-const source = createWorldSource( { worldId: 'tw-world:browser-host-worker-test', title: 'Browser host worker test' } );
+const source = createWorldSource( { worldId: 'elsemesh:browser-host-worker-test', title: 'Browser host worker test' } );
 source.objects.push( {
-	id: 'tw-object:browser-host-asset', kind: 'asset-instance', label: 'Host test asset', assetId: assetID,
+	id: 'elsemesh-object:browser-host-asset', kind: 'asset-instance', label: 'Host test asset', assetId: assetID,
 	priority: 'visible', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ],
 	collision: { shape: 'none', enabled: false },
 } );

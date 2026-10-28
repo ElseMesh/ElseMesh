@@ -10,15 +10,11 @@ broader integration and acceptance work remains in the active direction file.
 - Tidewater is the separate content repository at
   `https://github.com/ElseMesh/tidewater`, mounted at `worlds/tidewater` as a
   Git submodule pinned to a specific content commit.
-- Burning Horizons is maintained independently at
-  `https://github.com/ElseMesh/burning-horizons`; it is not included as a
-  Tidewater submodule or bundled world in ElseMesh.
 - Tidewater is content data, not an independently compiled game. Its content
   is checked out separately and consumed by ElseMesh's world package system.
 - `node test/world-content-submodules.mjs` passed on 2026-10-22: the Tidewater
   submodule was pinned, 59 content-addressed assets verified against their
-  hashes, source asset links resolved into Tidewater, and Burning Horizons was
-  confirmed external.
+  hashes, and source asset links resolved into Tidewater.
 - `npm run build` passed on 2026-10-22 with the content submodule present.
 
 This records completion of the repository-boundary work. Portable gameplay
@@ -27,8 +23,7 @@ world editor are still active or later goals; see [PROJECT-DIRECTION.md](PROJECT
 
 The split acceptance was to initialize the Tidewater submodule and build ElseMesh
 with the package available, verify imported content hashes and deployment
-checkout, and keep Burning Horizons independently cloneable as a separate
-two-world fixture. The checks above establish those repository-boundary gates.
+checkout, and build ElseMesh with the package available. The checks above establish those repository-boundary gates.
 The remaining parity and runtime acceptance belongs to the active project
 direction. This completed record replaces the former repository split roadmap.
 

@@ -1,4 +1,4 @@
-// Stable type IDs and model-variant counts for tidewater.reef-placement/1.
+// Stable type IDs and model-variant counts for elsemesh.reef-placement/1.
 // Keep this renderer-free registry append-only; changing an existing entry requires a new format.
 export const REEF_TYPE_VARIANT_COUNTS = Object.freeze( {
 	slab: 2, rock: 2, boulder: 1, lobes: 1, brain: 1, brainWide: 1, starlet: 1, knobby: 1, pillar: 1,

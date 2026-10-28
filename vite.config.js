@@ -84,7 +84,7 @@ function worldPackageAssets() {
 }
 
 export default defineConfig( {
-	// Relative asset paths let the client run at the GitHub Pages root and under /loz.
+	// Relative asset paths let the client run at the GitHub Pages root and under a deployment subpath.
 	base: './',
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],

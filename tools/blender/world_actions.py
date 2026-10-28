@@ -26,8 +26,8 @@ MAX_ACTIONS = 256
 MAX_CREATED_MESHES = 16
 MAX_MESH_PARTS = 12
 MAX_TOTAL_MESH_PARTS = 96
-OBJECT_ID = re.compile(r"^tw-object:[\w.-]{1,128}$")
-PORTAL_ID = re.compile(r"^tw-portal:[\w.-]{1,128}$")
+OBJECT_ID = re.compile(r"^elsemesh-object:[\w.-]{1,128}$")
+PORTAL_ID = re.compile(r"^elsemesh-portal:[\w.-]{1,128}$")
 ASSET_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 OBJECT_FIELDS = {"label", "assetId", "lods", "priority", "streamingBounds", "transform", "scale", "collision"}
 PORTAL_FIELDS = {"destinationWorldId", "destinationPeerId", "destinationGateway", "entry", "exit", "openView", "enabled", "visual", "back"}
@@ -62,7 +62,7 @@ def require_keys(record, required, allowed, name):
 
 
 def validate_source(source):
-    if not isinstance(source, dict) or source.get("protocol") != "tidewater.world-source/2":
+    if not isinstance(source, dict) or source.get("protocol") != "elsemesh.world-source/3":
         raise ValueError("unsupported world source protocol")
     rules = source.get("rules")
     if (not isinstance(rules, dict) or not isinstance(rules.get("maxVisitors"), int)
@@ -162,13 +162,13 @@ def validate_source(source):
             if not isinstance(point, dict) or not finite_number(point.get("yaw")):
                 raise ValueError("portal %s has an invalid %s transform" % (record["id"], key))
             vector(point.get("position"), "portal %s position" % key)
-        if not isinstance(record.get("destinationWorldId"), str) or not record["destinationWorldId"].startswith("tw-world:"):
+        if not isinstance(record.get("destinationWorldId"), str) or not record["destinationWorldId"].startswith("world:"):
             raise ValueError("portal %s requires a destination world" % record["id"])
         if not isinstance(record.get("openView"), bool) or not isinstance(record.get("enabled"), bool):
             raise ValueError("portal %s requires boolean openView and enabled" % record["id"])
         if "back" in record:
-            if "tidewater.portal-two-sided/1" not in source.get("rules", {}).get("requiredFeatures", []):
-                raise ValueError("portal back requires tidewater.portal-two-sided/1")
+            if "elsemesh.portal-two-sided/1" not in source.get("rules", {}).get("requiredFeatures", []):
+                raise ValueError("portal back requires elsemesh.portal-two-sided/1")
             validate_portal_back(record["back"])
         visual = record.get("visual")
         if visual is not None and (not isinstance(visual, str) or visual not in {"timber", "stone", "metal"}):
@@ -179,7 +179,7 @@ def validate_source(source):
 def validate_portal_back(back):
     from urllib.parse import urlparse
     fields = {"destinationWorldId", "destinationPeerId", "destinationGateway", "exit", "openView", "enabled"}
-    if not isinstance(back, dict) or set(back) - fields or not re.fullmatch(r"tw-world:[\w.-]{1,128}", str(back.get("destinationWorldId", ""))):
+    if not isinstance(back, dict) or set(back) - fields or not re.fullmatch(r"world:[\w.-]{1,128}", str(back.get("destinationWorldId", ""))):
         raise ValueError("invalid portal back fields or destination")
     if "destinationPeerId" in back and (not isinstance(back["destinationPeerId"], str) or not re.fullmatch(r"[A-Za-z0-9]{20,256}", back["destinationPeerId"])):
         raise ValueError("invalid portal back peer")

@@ -1,7 +1,5 @@
 # ElseMesh
 
-The archived `loz/main` build is also published at [elsemesh.github.io/loz](https://elsemesh.github.io/loz/).
-
 A mesh of independently owned ThruHolds, connected through portals, with an island fishing game as its original example. Cast from the pier, the beach or your own boat, fight the fish,
 sell your catch to Joe at the fish stand, and spend it on better gear at Marta's chandlery. Around it is a
 real-time tropical island and ocean: swim the reef, drive the boat out to deep water, and watch a humpback
@@ -18,7 +16,7 @@ Hosting, selected-world URLs and the `elsemesh.org` DNS setup are documented in 
 
 ## Requirements
 
-Check out the content repositories before building: `git submodule update --init --recursive`. Tidewater and the LOZ cave are data-only world packages mounted under `worlds/`; the engine builds and serves them.
+Check out the content repositories before building: `git submodule update --init --recursive`. Tidewater is a data-only world package mounted under `worlds/`; the engine builds and serves it.
 
 - For the primary renderer, a browser with WebGPU, such as a recent Chrome, Edge or Safari. A WebGL
   fallback is available, though it does not yet support every world feature.
@@ -172,4 +170,4 @@ technique references are listed in [CREDITS.md](CREDITS.md).
 
 ## ThruHolds and authoring
 
-ElseMesh's ThruHold network and authoring design is documented in [docs/thruholds.md](docs/thruholds.md) and [docs/world-authoring.md](docs/world-authoring.md). The current implementation and remaining acceptance gates are tracked in [docs/elsemesh-status.md](docs/elsemesh-status.md). Each ThruHold is an independently owned and hosted world that can connect to others through portals. The current source format is `tidewater.world-source/2`, with protocol versions tracking document structure; the planned AI editor will work through reviewed source patches and isolated Blender operations. See the Go node prototype under `server/worldd`.
+ElseMesh's ThruHold network and authoring design is documented in [docs/thruholds.md](docs/thruholds.md) and [docs/world-authoring.md](docs/world-authoring.md). The current implementation and remaining acceptance gates are tracked in [docs/elsemesh-status.md](docs/elsemesh-status.md). Each ThruHold is an independently owned and hosted world that can connect to others through portals. The current source format is `elsemesh.world-source/3`; the planned AI editor will work through reviewed source patches and isolated Blender operations. See the Go node prototype under `server/worldd`.
