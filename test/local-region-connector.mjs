@@ -33,6 +33,7 @@ const hash = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toStr
 const originalFetch = globalThis.fetch;
 let cellFetches = 0;
 let leaseReleases = 0;
+let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 const payloadFetchOrder = [];
 let secondCellCollisionMissing = true;
 let abortNextCellFetch = false;
@@ -46,7 +47,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && ( options.method === undefined || options.method === 'GET' ) && url.searchParams.has( 'lease' ) ) payloadFetchOrder.push( url.searchParams.get( 'payload' ) );
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
-		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'elsemesh:hogwarts-legacy-local', title: 'Hogwarts Legacy',
+		schema: 'elsemesh.dynamic-region-provider/1', worldId: descriptorWorldId, title: 'Hogwarts Legacy',
 		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
 		entrySelection: {
 			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
@@ -102,6 +103,12 @@ try {
 		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=elsemesh%3Atidewater',
 		href: 'http://127.0.0.1:5189/',
 	} ), /cannot be combined/ );
+	const invalidIDConnector = new LocalRegionConnector( link );
+	for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) {
+		descriptorWorldId = worldId;
+		await assert.rejects( invalidIDConnector.getManifest(), /unsupported descriptor/, `dynamic world providers must reject ${worldId}` );
+	}
+	descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
