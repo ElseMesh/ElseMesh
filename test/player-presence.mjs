@@ -6,6 +6,7 @@ const own = 'player:' + 'a'.repeat(64), peer = 'player:' + 'b'.repeat(64);
 const pose = (sequence, x = 0, yaw = 0) => ({ id: peer, protocol: PLAYER_PRESENCE_PROTOCOL, sequence, position: [x, 2, 3], yaw, pitch: 0, moving: true, mode: 'walk', appearance: { ...DEFAULT_APPEARANCE }, updatedAt: 1000 + sequence });
 const snapshot = (requestId, players, extra = {}) => ({ type: 'presence', worldId: 'elsemesh:test', requestId, playerId: own, players, ...extra });
 const state = new PlayerPresence('elsemesh:test');
+for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) assert.throws( () => new PlayerPresence( worldId ), /Invalid presence configuration/, `presence rejects ${worldId}` );
 assert.equal(state.observe(snapshot('1', [pose(1, 0, Math.PI - .1)]), { requestId: '1', now: 0 }), true);
 state.observe(snapshot('2', [pose(2, 10, -Math.PI + .1)]), { requestId: '2', now: 100 });
 const mid = state.interpolated(150)[0];

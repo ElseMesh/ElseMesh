@@ -1,5 +1,6 @@
 import { FISH, fishValue, fishLengthCm } from './FishTable.js';
 import { defaultUpgrades, gearStats, nextLevel, UPGRADES, FUEL_PRICE } from './Gear.js';
+import { isWorldID } from '../network/WorldIdentity.js';
 
 const SAVE_KEY_PREFIX = 'elsemesh.save.v1:';
 
@@ -10,7 +11,7 @@ export class GameState {
 
 	constructor( storage = safeStorage(), worldId = 'elsemesh:local' ) {
 
-		if ( typeof worldId !== 'string' || ! worldId.trim() ) throw new Error( 'Game state requires a world ID' );
+		if ( ! isWorldID( worldId ) ) throw new Error( 'Game state requires a valid ElseMesh world ID' );
 
 		this.storage = storage;
 		// Keep the existing built-in island save stable while giving every hosted world

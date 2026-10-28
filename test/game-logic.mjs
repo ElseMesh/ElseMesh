@@ -1,4 +1,5 @@
 // Plain-node tests of the fishing game logic (no GPU): bites, the catch fight, inventory, save.
+import assert from 'node:assert/strict';
 import { FISH, FISH_IDS, fishValue, fishLengthCm } from '../src/game/FishTable.js';
 import { habitatAt, pickSpecies, rollWeight, biteDelay } from '../src/game/Bites.js';
 import { CatchMinigame } from '../src/game/CatchMinigame.js';
@@ -141,6 +142,7 @@ ok( fight( 'tarpon', 35, policies.careful, 50, 2.2 ).st === 'caught', 'the top l
 const mem = new Map();
 const storage = { getItem: ( k ) => mem.get( k ) ?? null, setItem: ( k, v ) => mem.set( k, v ) };
 const s = new GameState( storage );
+for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) assert.throws( () => new GameState( storage, worldId ), /valid ElseMesh world ID/, `game state rejects ${worldId}` );
 ok( s.stats.holdKg === 30, 'cooler holds 30 kg' );
 const a = s.addFish( 'grunt', 0.84, 9.5 );
 const b = s.addFish( 'yellowtail', 1.31, 10 );

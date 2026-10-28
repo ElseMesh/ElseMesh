@@ -1,4 +1,5 @@
 import { validateAppearance } from '../player/AvatarAppearance.js';
+import { isWorldID } from './WorldIdentity.js';
 
 export const PLAYER_PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
 const playerID = /^player:[0-9a-f]{64}$/;
@@ -16,7 +17,7 @@ export function validatePresencePose(pose) {
 // One instance belongs to one transport session. Reset it on reconnect or handoff.
 export class PlayerPresence {
 	constructor(worldId, { interpolationMs = 100, staleMs = 1500 } = {}) {
-		if (typeof worldId !== 'string' || !worldId || !Number.isFinite(interpolationMs) || interpolationMs <= 0 || !Number.isFinite(staleMs) || staleMs <= 0) throw new Error('Invalid presence configuration');
+		if (!isWorldID(worldId) || !Number.isFinite(interpolationMs) || interpolationMs <= 0 || !Number.isFinite(staleMs) || staleMs <= 0) throw new Error('Invalid presence configuration');
 		this.worldId = worldId; this.interpolationMs = interpolationMs; this.staleMs = staleMs;
 		this.reset();
 	}
