@@ -12,24 +12,35 @@ const descriptor = {
 			stages: { world: 'Loading the starting area…' }, theme: { logo: { src: '/v1/presentation/logo.svg', alt: 'Castle mark' }, colors: { accent: '#c6a664' } },
 		},
 		previewSpawn: { position: [ 0, 8.62, 90 ], yaw: 0 },
-		previewRegion: { cell: [ 0, 0, 5 ], cellSizeMeters: 16, startupCells },
+		previewRegion: { cellSizeMeters: 16, startupCellOffsetBounds: { min: [ -1, 0, -1 ], max: [ 1, 0, 1 ] } },
 	},
 };
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async url => {
 	const path = new URL( url ).pathname;
 	const payload = path.endsWith( '/descriptor' ) ? descriptor : path === '/v1/regions' ? { regions: [ { id: 'hall', label: 'Great Hall', asset: '/v1/regions/hall' } ] } : { sourceRevision: 'test-revision', cellSizeMeters: 16, cells: [ { x: 0, y: 0, z: 5 } ] };
+	if ( path !== '/v1/descriptor' && path !== '/v1/regions' ) {
+		payload.collisionSourceInventory = {
+			staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0,
+			explicitlyNonQueryOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {},
+		};
+		payload.cells = [ { x: 0, y: 0, z: 5, collisionEvidence: {
+			scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0,
+			supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, staticMeshComponentsClassified: true,
+		} } ];
+	}
 	return new Response( JSON.stringify( payload ), { status: 200, headers: { 'Content-Type': 'application/json' } } );
 };
 
 try {
 	const connector = new LocalRegionConnector( { localProvider: 'http://127.0.0.1:4179', localMap: 'hall' } );
 	const manifest = await connector.getManifest();
-	assert.equal( connector.initialRegionCellObjectIDs.size, startupCells.length, 'every world-authored startup cell is marked for preload' );
+	assert.equal( connector.initialRegionCellObjectIDs.size, startupCells.length, 'every world-authored startup collision cell is marked for preload' );
+	assert.equal( connector.initialRegionVisualObjectIDs.size, startupCells.length, 'the matching startup visuals are also available before entry' );
 	assert.equal( manifest.experience.genre, 'The Great Hall', 'the local world controls its loading copy' );
 	assert.equal( manifest.experience.theme.logo.src, 'http://127.0.0.1:4179/v1/presentation/logo.svg', 'world logo paths resolve against the local content provider' );
-	assert.equal( manifest.objects.filter( object => object.priority === 'visible' && object.regionCell ).length, startupCells.length, 'startup cells receive the required-load priority' );
-	assert.equal( manifest.objects.filter( object => object.regionCell ).length, startupCells.length, 'unindexed startup cells are still requested as empty-or-present cells' );
+	assert.equal( manifest.objects.filter( object => object.priority === 'visible' && object.regionCell && object.collisionPayload ).length, startupCells.length, 'startup collision cells receive the required-load priority' );
+	assert.equal( manifest.objects.filter( object => object.regionCell && object.collisionPayload ).length, startupCells.length, 'unindexed startup collision cells are still requested as empty-or-present cells' );
 	connector.close();
 } finally {
 	globalThis.fetch = originalFetch;

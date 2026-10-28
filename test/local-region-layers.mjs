@@ -6,7 +6,7 @@ const descriptor = {
 	entrySelection: {
 		schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ], previewSpawn: { position: [ 0, 8, 0 ], yaw: 0 },
-		previewRegion: { cell: [ 0, 0, 0 ], cellSizeMeters: 8, startupCells: [ [ 0, 0, 0 ], [ 1, 0, 0 ] ], layers: [ 'Tech', 'Lighting', 'Collision' ] },
+		previewRegion: { cellSizeMeters: 8, startupCellOffsetBounds: { min: [ 0, 0, 0 ], max: [ 1, 0, 0 ] }, layers: [ 'Tech', 'Lighting', 'Collision' ] },
 	},
 };
 const regions = [
@@ -27,7 +27,11 @@ globalThis.fetch = async url => {
 	if ( request.pathname.endsWith( '/descriptor' ) ) return new Response( JSON.stringify( descriptor ) );
 	if ( request.pathname === '/v1/regions' ) return new Response( JSON.stringify( { regions } ) );
 	const regionId = request.pathname.split( '/' )[ 3 ];
-	return new Response( JSON.stringify( { sourceRevision: 'test-revision', cellSizeMeters: 8, cells: cellsByRegion[ regionId ] || [] } ) );
+	return new Response( JSON.stringify( {
+		sourceRevision: 'test-revision', cellSizeMeters: 8,
+		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {} },
+		cells: ( cellsByRegion[ regionId ] || [] ).map( cell => ( { ...cell, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, staticMeshComponentsClassified: true } } ) ),
+	} ) );
 };
 
 try {
@@ -35,11 +39,16 @@ try {
 	const manifest = await connector.getManifest();
 	const cellObjects = manifest.objects.filter( object => object.regionCell );
 	assert.deepEqual( cellObjects.map( object => object.label ), [
-		'GreatHall_Int cell 0,0,0', 'GreatHall_Int cell 1,0,0', 'Tech cell 0,0,0', 'Lighting cell 1,0,0',
+		'GreatHall_Int collision cell 0,0,0', 'GreatHall_Int visual cell 0,0,0',
+		'GreatHall_Int collision cell 0,1,0', 'GreatHall_Int visual cell 0,1,0',
+		'GreatHall_Int collision cell 1,1,0', 'GreatHall_Int visual cell 1,1,0',
+		'Tech collision cell 0,0,0', 'Tech visual cell 0,0,0',
+		'Lighting collision cell 1,0,0', 'Lighting visual cell 1,0,0',
 	], 'the manifest combines only occupied cells from each authored layer' );
-	assert.equal( connector.initialRegionCellObjectIDs.size, 4, 'primary startup cells and occupied layer startup cells are required before entry' );
-	assert.equal( cellObjects.filter( object => object.priority === 'visible' ).length, 4, 'each occupied startup layer receives visible priority' );
-	assert.equal( manifest.assets.length, 4, 'each composed region cell has its own streamed asset' );
+	assert.equal( connector.initialRegionCellObjectIDs.size, 2, 'primary startup collision cells are required before entry' );
+	assert.equal( connector.initialRegionVisualObjectIDs.size, 2, 'primary startup visuals are also required before entry' );
+	assert.equal( cellObjects.filter( object => object.priority === 'visible' ).length, 4, 'startup collision and visual payloads receive visible priority' );
+	assert.equal( manifest.assets.length, 10, 'each composed collision and visual cell has its own streamed asset' );
 	connector.close();
 } finally {
 	globalThis.fetch = originalFetch;
