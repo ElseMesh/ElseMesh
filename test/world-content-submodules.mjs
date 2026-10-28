@@ -18,7 +18,7 @@ async function verifyWorld( directory, expectedWorldId ) {
 	const worldRoot = path.join( root, directory );
 	const source = JSON.parse( await readFile( path.join( worldRoot, 'world-source.json' ), 'utf8' ) );
 	assert.equal( source.worldId, expectedWorldId );
-	if ( directory === 'worlds/tidewater' ) assert.deepEqual( source.experience?.behaviors, [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ], 'Tidewater declares its registered world behaviors in signed experience data' );
+	if ( directory === 'worlds/tidewater' ) assert.deepEqual( Object.keys( source.experience?.behaviors || {} ), [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ], 'Tidewater declares registered behaviors with behavior-owned signed experience data' );
 	const ids = new Set();
 	const collect = value => {
 		if ( typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test( value ) ) ids.add( value.slice( 7 ) );

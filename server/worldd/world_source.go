@@ -357,7 +357,7 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 	}
 	declaredBehaviors := make(map[string]bool)
 	if source.Experience != nil {
-		for _, behavior := range source.Experience.Behaviors {
+		for behavior := range source.Experience.Behaviors {
 			declaredBehaviors[behavior] = true
 		}
 	}

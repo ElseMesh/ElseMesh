@@ -30,7 +30,7 @@
     },
     "experience": {
       "type": "object",
-      "description": "Optional ThruHold-specific loading-page copy and required behavior registry IDs. All strings are rendered as text, never markup.",
+      "description": "Optional ThruHold-specific loading-page copy and data for required engine-registered behaviors. All strings are rendered as text, never markup.",
       "required": ["genre", "tagline", "loadingNote", "tips", "stages"],
       "properties": {
         "genre": { "type": "string", "minLength": 1, "maxLength": 240 },
@@ -43,15 +43,12 @@
           "propertyNames": { "enum": ["gpu", "atmosphere", "terrain", "village", "vegetation", "ocean", "reef", "simulation", "shaders", "world", "compile", "warmup"] },
           "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 120 }
         },
-        "behaviors": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "enum": ["elsemesh.fishing-game/1", "elsemesh.shore-aware-boat/1"] } },
-        "fishing": {
+        "behaviors": {
           "type": "object",
-          "description": "Browser gameplay placement data for fishing vendors; the world server validates and relays it as signed experience data.",
-          "properties": {
-            "fishStand": { "$ref": "#/$defs/fishingLocation" },
-            "chandlery": { "$ref": "#/$defs/fishingLocation" }
-          },
-          "additionalProperties": false
+          "maxProperties": 16,
+          "propertyNames": { "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
+          "additionalProperties": { "type": "object" },
+          "description": "Maps each required ElseMesh behavior ID to its behavior-owned authored data. The server validates the bounded generic envelope; clients validate data through their registered behavior implementation."
         }
       },
       "additionalProperties": false
@@ -255,16 +252,6 @@
     {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.terrain-surface/1"}},"required":["type"]},"maxContains":1}}}}
   ],
   "$defs": {
-    "fishingLocation": {
-      "type": "object",
-      "required": ["position", "yaw", "interactionRadius"],
-      "properties": {
-        "position": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 } },
-        "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
-        "interactionRadius": { "type": "number", "minimum": 0.5, "maximum": 20 }
-      },
-      "additionalProperties": false
-    },
     "vector3": {
       "type": "array",
       "prefixItems": [

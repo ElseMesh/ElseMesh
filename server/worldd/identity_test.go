@@ -110,29 +110,24 @@ func TestWorldExperienceAcceptsGenericElseMeshBehaviors(t *testing.T) {
 		Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"},
 		Stages: map[string]string{},
 	}
-	base.Behaviors = []string{"elsemesh.fishing-game/1", "elsemesh.shore-aware-boat/1"}
+	base.Behaviors = map[string]json.RawMessage{"elsemesh.fishing-game/1": json.RawMessage(`{}`), "elsemesh.shore-aware-boat/1": json.RawMessage(`{}`)}
 	if err := validateWorldExperience(&base); err != nil {
 		t.Fatalf("registered world behaviors rejected: %v", err)
 	}
-	base.Behaviors = []string{"elsemesh.example-world/1"}
+	base.Behaviors = map[string]json.RawMessage{"elsemesh.example-world/1": json.RawMessage(`{"key":true}`)}
 	if err := validateWorldExperience(&base); err != nil {
 		t.Fatalf("generic ElseMesh world behavior rejected by the server: %v", err)
 	}
-	base.Behaviors = []string{"elsemesh.fishing-game/1", "elsemesh.fishing-game/1"}
-	if err := validateWorldExperience(&base); err == nil {
-		t.Fatal("duplicate world behavior was accepted")
-	}
-	base.Behaviors = []string{"legacy.fishing-game/1"}
+	base.Behaviors = map[string]json.RawMessage{"legacy.fishing-game/1": json.RawMessage(`{}`)}
 	if err := validateWorldExperience(&base); err == nil {
 		t.Fatal("non-ElseMesh world behavior was accepted")
 	}
-	base.Behaviors = []string{"elsemesh.fishing-game/1"}
-	base.Fishing = &fishingExperience{FishStand: &fishingLocation{Position: []float64{12, -8}, Yaw: 1.2, InteractionRadius: 4}}
+	base.Behaviors = map[string]json.RawMessage{"elsemesh.fishing-game/1": json.RawMessage(`{"fishStand":{"position":[12,-8],"yaw":1.2,"interactionRadius":4}}`)}
 	if err := validateWorldExperience(&base); err != nil {
-		t.Fatalf("valid browser fishing placement rejected: %v", err)
+		t.Fatalf("valid opaque browser behavior data rejected: %v", err)
 	}
-	base.Fishing.FishStand.Position = []float64{12}
+	base.Behaviors["elsemesh.fishing-game/1"] = json.RawMessage(`[]`)
 	if err := validateWorldExperience(&base); err == nil {
-		t.Fatal("invalid browser fishing placement was accepted")
+		t.Fatal("non-object behavior data was accepted")
 	}
 }

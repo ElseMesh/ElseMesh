@@ -4,18 +4,24 @@ const behaviors = new Map();
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
-	if ( Object.keys( descriptor ).some( key => ! [ 'fishingGame', 'shoreAwareBoat', 'createRuntime', 'onExtensionState', 'extensionCapabilities' ].includes( key ) ) || descriptor.fishingGame !== undefined && descriptor.fishingGame !== true || descriptor.shoreAwareBoat !== undefined && descriptor.shoreAwareBoat !== true || descriptor.createRuntime !== undefined && typeof descriptor.createRuntime !== 'function' || descriptor.onExtensionState !== undefined && typeof descriptor.onExtensionState !== 'function' || descriptor.extensionCapabilities !== undefined && ( ! Array.isArray( descriptor.extensionCapabilities ) || descriptor.extensionCapabilities.length > 16 || new Set( descriptor.extensionCapabilities ).size !== descriptor.extensionCapabilities.length || descriptor.extensionCapabilities.some( capability => typeof capability !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( capability ) ) ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
+	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'createRuntime', 'onExtensionState', 'extensionCapabilities' ].includes( key ) ) || descriptor.validateExperienceData !== undefined && typeof descriptor.validateExperienceData !== 'function' || descriptor.createRuntime !== undefined && typeof descriptor.createRuntime !== 'function' || descriptor.onExtensionState !== undefined && typeof descriptor.onExtensionState !== 'function' || descriptor.extensionCapabilities !== undefined && ( ! Array.isArray( descriptor.extensionCapabilities ) || descriptor.extensionCapabilities.length > 16 || new Set( descriptor.extensionCapabilities ).size !== descriptor.extensionCapabilities.length || descriptor.extensionCapabilities.some( capability => typeof capability !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( capability ) ) ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
 	behaviors.set( id, Object.freeze( { id, ...descriptor, ...( descriptor.extensionCapabilities ? { extensionCapabilities: Object.freeze( [ ...descriptor.extensionCapabilities ] ) } : {} ) } ) );
 }
 
 export function worldBehaviorsFor( experience ) {
-	const ids = experience?.behaviors ?? [];
-	if ( ! Array.isArray( ids ) || ids.length > 16 || new Set( ids ).size !== ids.length ) throw new Error( 'Invalid world behavior list' );
-	return ids.map( id => {
+	const dataById = experience?.behaviors ?? {};
+	if ( ! dataById || typeof dataById !== 'object' || Array.isArray( dataById ) || Object.keys( dataById ).length > 16 || JSON.stringify( dataById ).length > 64 * 1024 ) throw new Error( 'Invalid world behavior map' );
+	return Object.entries( dataById ).map( ( [ id, data ] ) => {
 		const behavior = behaviors.get( id );
 		if ( ! behavior ) throw new Error( `This client does not support required world behavior: ${id}` );
-		return behavior;
+		if ( ! data || typeof data !== 'object' || Array.isArray( data ) ) throw new Error( `Invalid world behavior data: ${id}` );
+		behavior.validateExperienceData?.( data );
+		return { ...behavior, data };
 	} );
+}
+
+export function worldBehaviorData( experience, id ) {
+	return worldBehaviorsFor( experience ).find( behavior => behavior.id === id )?.data;
 }
 
 export function hasWorldBehavior( experience, id ) {
@@ -36,7 +42,10 @@ export function dispatchWorldExtensionState( experience, behaviorId, extensionId
 }
 
 registerWorldBehavior( 'elsemesh.fishing-game/1', {
-	fishingGame: true,
+	validateExperienceData: data => {
+		if ( Object.keys( data ).some( key => ! [ 'fishStand', 'chandlery' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold fishing data' );
+		for ( const [ name, location ] of Object.entries( data ) ) if ( ! location || typeof location !== 'object' || Array.isArray( location ) || Object.keys( location ).some( key => ! [ 'position', 'yaw', 'interactionRadius' ].includes( key ) ) || ! Array.isArray( location.position ) || location.position.length !== 2 || location.position.some( value => ! Number.isFinite( value ) || Math.abs( value ) > 1000000 ) || ! Number.isFinite( location.yaw ) || Math.abs( location.yaw ) > 360 || ! Number.isFinite( location.interactionRadius ) || location.interactionRadius < 0.5 || location.interactionRadius > 20 ) throw new Error( `Invalid ThruHold fishing location ${name}` );
+	},
 	extensionCapabilities: [ 'fishing.rules' ],
 	createRuntime: options => new FishingGameRuntime( options ),
 	onExtensionState: ( { extensionId, state, gameRuntime } ) => {
@@ -44,4 +53,4 @@ registerWorldBehavior( 'elsemesh.fishing-game/1', {
 		gameRuntime.setExtensionState( extensionId, state );
 	},
 } );
-registerWorldBehavior( 'elsemesh.shore-aware-boat/1', { shoreAwareBoat: true } );
+registerWorldBehavior( 'elsemesh.shore-aware-boat/1', { validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'Invalid shore-aware boat data' ); } } );

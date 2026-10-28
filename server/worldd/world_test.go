@@ -129,7 +129,7 @@ func TestWorldManifestBindsWasmExtensionToDeclaredBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifest := newStarterManifest("Wasm extension", ownerID.String())
-	manifest.Experience = &worldExperience{Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{}, Behaviors: []string{"elsemesh.example-simulation/1"}}
+	manifest.Experience = &worldExperience{Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{}, Behaviors: map[string]json.RawMessage{"elsemesh.example-simulation/1": json.RawMessage(`{}`)}}
 	manifest.Rules.RequiredFeatures = []string{"elsemesh.world-extension/1"}
 	assetID := "sha256:" + strings.Repeat("a", 64)
 	manifest.Assets = []assetRef{{ID: assetID, Bytes: 8, Kind: "application/wasm", Priority: "visible"}}

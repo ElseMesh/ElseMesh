@@ -50,7 +50,7 @@ const terrainValidationPath = path.join( output, 'terrain-validation.json' );
 // Geometry is regenerated here; authored world behavior and extension declarations remain world data.
 const canonicalSource = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
 const presentation = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) );
-const experience = { ...canonicalSource.experience, ...presentation };
+const experience = { ...canonicalSource.experience, ...presentation, behaviors: { ...canonicalSource.experience.behaviors, ...presentation.behaviors } };
 const extensions = canonicalSource.extensions || [];
 let updatedAt = '2026-10-01T00:00:00Z';
 try {

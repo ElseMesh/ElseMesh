@@ -63,7 +63,7 @@ try {
 		protocol: 'elsemesh.world-source/3',
 		worldId: 'elsemesh:manifest-test',
 		title: 'Manifest test',
-		experience: { genre: 'Fishing', tagline: 'Explore', loadingNote: 'Loading', tips: [ 'Cast a line' ], stages: {}, behaviors: [ 'elsemesh.fishing-game/1' ], fishing: { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } } },
+		experience: { genre: 'Fishing', tagline: 'Explore', loadingNote: 'Loading', tips: [ 'Cast a line' ], stages: {}, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } } } },
 		spawn: { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 },
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
@@ -90,7 +90,7 @@ try {
 	assert.deepEqual( first, second, 'same source must produce byte-identical manifests' );
 	const manifest = JSON.parse( first );
 	assert.deepEqual( manifest.spawn, { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 }, 'authored spawn survives signed-manifest conversion' );
-	assert.deepEqual( manifest.experience.fishing, { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } }, 'browser gameplay placements survive signed-manifest conversion' );
+	assert.deepEqual( manifest.experience.behaviors[ 'elsemesh.fishing-game/1' ], { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } }, 'behavior-owned gameplay placements survive signed-manifest conversion' );
 	assert.deepEqual( worldSpawnPose( manifest ), manifest.spawn );
 	assert.deepEqual( worldSpawnPose( {} ), { position: [ 0, 3, 8 ], yaw: Math.PI, pitch: -0.1 }, 'legacy cave entrance remains compatible' );
 	for ( const spawn of [ null, [], { position: [ 1, 2 ], yaw: 0, pitch: 0 }, { position: [ 0, Infinity, 0 ], yaw: 0, pitch: 0 }, { position: [ 0, 1000001, 0 ], yaw: 0, pitch: 0 }, { position: [ 0, 3, 8 ], yaw: NaN, pitch: 0 }, { position: [ 0, 3, 8 ], yaw: 0, pitch: 1.6 }, { position: [ 0, 3, 8 ], yaw: 0 } ] ) assert.throws( () => validateWorldSpawn( spawn ), /spawn pose/ );

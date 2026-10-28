@@ -461,24 +461,12 @@ type worldManifest struct {
 }
 
 type worldExperience struct {
-	Genre       string             `json:"genre"`
-	Tagline     string             `json:"tagline"`
-	LoadingNote string             `json:"loadingNote"`
-	Tips        []string           `json:"tips"`
-	Stages      map[string]string  `json:"stages"`
-	Behaviors   []string           `json:"behaviors,omitempty"`
-	Fishing     *fishingExperience `json:"fishing,omitempty"`
-}
-
-type fishingExperience struct {
-	FishStand *fishingLocation `json:"fishStand,omitempty"`
-	Chandlery *fishingLocation `json:"chandlery,omitempty"`
-}
-
-type fishingLocation struct {
-	Position          []float64 `json:"position"`
-	Yaw               float64   `json:"yaw"`
-	InteractionRadius float64   `json:"interactionRadius"`
+	Genre       string                     `json:"genre"`
+	Tagline     string                     `json:"tagline"`
+	LoadingNote string                     `json:"loadingNote"`
+	Tips        []string                   `json:"tips"`
+	Stages      map[string]string          `json:"stages"`
+	Behaviors   map[string]json.RawMessage `json:"behaviors,omitempty"`
 }
 
 func validateWorldExperience(experience *worldExperience) error {
@@ -510,22 +498,19 @@ func validateWorldExperience(experience *worldExperience) error {
 	if len(experience.Behaviors) > 16 {
 		return errors.New("world experience has too many runtime behaviors")
 	}
-	seenBehaviors := make(map[string]bool, len(experience.Behaviors))
-	for _, behavior := range experience.Behaviors {
-		if !worldBehaviorPattern.MatchString(behavior) || seenBehaviors[behavior] {
-			return fmt.Errorf("world experience contains an invalid or duplicate behavior %q", behavior)
+	var behaviorDataBytes int
+	for behavior, raw := range experience.Behaviors {
+		if !worldBehaviorPattern.MatchString(behavior) {
+			return fmt.Errorf("world experience contains an invalid behavior %q", behavior)
 		}
-		seenBehaviors[behavior] = true
+		behaviorDataBytes += len(raw)
+		var data map[string]json.RawMessage
+		if len(raw) == 0 || len(raw) > 64<<10 || string(raw) == "null" || json.Unmarshal(raw, &data) != nil || data == nil {
+			return fmt.Errorf("world experience behavior data %q must be a bounded object", behavior)
+		}
 	}
-	if experience.Fishing != nil {
-		for name, location := range map[string]*fishingLocation{"fishStand": experience.Fishing.FishStand, "chandlery": experience.Fishing.Chandlery} {
-			if location == nil {
-				continue
-			}
-			if len(location.Position) != 2 || math.IsNaN(location.Position[0]) || math.IsInf(location.Position[0], 0) || math.Abs(location.Position[0]) > 1_000_000 || math.IsNaN(location.Position[1]) || math.IsInf(location.Position[1], 0) || math.Abs(location.Position[1]) > 1_000_000 || math.IsNaN(location.Yaw) || math.IsInf(location.Yaw, 0) || math.Abs(location.Yaw) > 360 || math.IsNaN(location.InteractionRadius) || math.IsInf(location.InteractionRadius, 0) || location.InteractionRadius < 0.5 || location.InteractionRadius > 20 {
-				return fmt.Errorf("world experience fishing location %q is invalid", name)
-			}
-		}
+	if behaviorDataBytes > 64<<10 {
+		return errors.New("world experience behavior data exceeds its size limit")
 	}
 	return nil
 }
@@ -712,7 +697,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	seenExtensionBehaviors := make(map[string]bool, len(manifest.Extensions))
 	declaredBehaviors := make(map[string]bool)
 	if manifest.Experience != nil {
-		for _, behavior := range manifest.Experience.Behaviors {
+		for behavior := range manifest.Experience.Behaviors {
 			declaredBehaviors[behavior] = true
 		}
 	}

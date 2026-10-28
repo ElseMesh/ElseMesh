@@ -5,9 +5,9 @@ assert.match( GENERIC_WORLD_EXPERIENCE.tagline, /place shaped by its owner/i, 'r
 assert.equal( Object.values( GENERIC_WORLD_EXPERIENCE.stages ).every( ( text ) => text.includes( 'ThruHold' ) ), true, 'generic stage labels do not impose game-specific copy' );
 assert.equal( GENERIC_WORLD_EXPERIENCE.behaviors, undefined, 'the generic loading presentation does not select world behavior' );
 const fishing = { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } };
-assert.deepEqual( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, fishing } ).fishing, fishing, 'vendor placement is validated browser gameplay data' );
-assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, fishing: { fishStand: { position: [ 1 ], yaw: 0, interactionRadius: 3 } } } ), /fishing location/ );
-assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: [ 'elsemesh.unregistered/1' ] } ), /does not support required world behavior/ );
+assert.deepEqual( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing } } ).behaviors[ 'elsemesh.fishing-game/1' ], fishing, 'behavior-owned vendor placements are validated by their registry entry' );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 1 ], yaw: 0, interactionRadius: 3 } } } } ), /fishing location/ );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.unregistered/1': {} } } ), /does not support required world behavior/ );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, extra: 'not allowed' } ), /descriptor/ );
 const markupText = '<script>alert(1)</script>';
 assert.equal( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, tips: [ markupText ] } ).tips[ 0 ], markupText, 'authored text remains data for the UI text renderer, never HTML' );

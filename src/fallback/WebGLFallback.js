@@ -26,7 +26,7 @@ import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { WebGLGameAdapter } from './WebGLGameAdapter.js';
 import { webglLightingForTime } from './WebGLLighting.js';
-import { hasWorldBehavior } from '../network/WorldBehaviorRegistry.js';
+import { hasWorldBehavior, worldBehaviorData } from '../network/WorldBehaviorRegistry.js';
 import { WorldExtensionSession } from '../network/WorldExtensionSession.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
@@ -800,11 +800,11 @@ export class WebGLFallback {
 				terrain: this.terrain,
 				colliders: this.app.worldState.colliders,
 				loader: this.loader,
-				placement: defaultWorldSource.experience?.fishing?.fishStand,
+				placement: worldBehaviorData( defaultWorldSource.experience, 'elsemesh.fishing-game/1' )?.fishStand,
 			} );
 			this.chandlery = new WebGLChandleryAdapter( T, this.scene, {
 				terrain: this.terrain, colliders: this.app.worldState.colliders, loader: this.loader,
-				placement: defaultWorldSource.experience?.fishing?.chandlery,
+				placement: worldBehaviorData( defaultWorldSource.experience, 'elsemesh.fishing-game/1' )?.chandlery,
 			} );
 			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
 				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience: defaultWorldSource.experience,
@@ -843,8 +843,9 @@ export class WebGLFallback {
 			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
 			const experience = this.connector?.manifest?.experience;
-			this.fishStand = new WebGLFishStandAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: experience?.fishing?.fishStand } );
-			this.chandlery = new WebGLChandleryAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: experience?.fishing?.chandlery } );
+			const fishingData = worldBehaviorData( experience, 'elsemesh.fishing-game/1' );
+			this.fishStand = new WebGLFishStandAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: fishingData?.fishStand } );
+			this.chandlery = new WebGLChandleryAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: fishingData?.chandlery } );
 			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
 				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience, THREE: T, scene: this.scene,
 				worldId: this.connector.worldId, camera: this.camera, query: this.waterQuery, terrain: hostedTerrain, boatController: this.boat?.controller || null, boatRoot: this.boat?.group || null, audio: this.app.audio,

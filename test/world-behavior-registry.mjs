@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
-import { createWorldBehaviorRuntime, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorRuntime, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
-const experience = { behaviors: [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ] };
-assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id, fishingGame, shoreAwareBoat, onExtensionState } ) => ( { id, fishingGame, shoreAwareBoat, consumesExtensionState: typeof onExtensionState === 'function' } ) ), [
-	{ id: 'elsemesh.fishing-game/1', fishingGame: true, shoreAwareBoat: undefined, consumesExtensionState: true },
-	{ id: 'elsemesh.shore-aware-boat/1', fishingGame: undefined, shoreAwareBoat: true, consumesExtensionState: false },
+const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 } }, 'elsemesh.shore-aware-boat/1': {} } };
+assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id, onExtensionState } ) => ( { id, consumesExtensionState: typeof onExtensionState === 'function' } ) ), [
+	{ id: 'elsemesh.fishing-game/1', consumesExtensionState: true },
+	{ id: 'elsemesh.shore-aware-boat/1', consumesExtensionState: false },
 ] );
+assert.deepEqual( worldBehaviorData( experience, 'elsemesh.fishing-game/1' ).fishStand, experience.behaviors[ 'elsemesh.fishing-game/1' ].fishStand, 'behavior-owned experience data is available through the registry' );
 const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test', load: false } );
 const otherRuntime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
 assert.ok( runtime instanceof FishingGameRuntime );
@@ -23,17 +24,17 @@ assert.equal( runtime.bite.t, 3.5, 'extension rate changes local browser bite-wa
 assert.throws( () => dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 20 }, { gameRuntime: runtime } ), /Invalid fishing extension state/ );
 assert.throws( () => dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 1 }, {} ), /no active browser game runtime/ );
 assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
-assert.throws( () => worldBehaviorsFor( { behaviors: [ 'tidewater.fishing-game/1' ] } ), /does not support required world behavior/ );
+assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /does not support required world behavior/ );
 assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
 
-registerWorldBehavior( 'elsemesh.registry-test/1', { fishingGame: true } );
-assert.equal( hasWorldBehavior( { behaviors: [ 'elsemesh.registry-test/1' ] }, 'elsemesh.registry-test/1' ), true );
-assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { fishingGame: true } ), /Invalid or duplicate/ );
+registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'invalid test data' ); } } );
+assert.equal( hasWorldBehavior( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'elsemesh.registry-test/1' ), true );
+assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: () => {} } ), /Invalid or duplicate/ );
 
 let consumed = null;
 registerWorldBehavior( 'elsemesh.extension-consumer/1', { onExtensionState: value => { consumed = value; } } );
 	const extensionState = { extensionId: 'elsemesh-extension:simulation', state: { tick: 7 }, root: {}, connector: {} };
-	dispatchWorldExtensionState( { behaviors: [ 'elsemesh.extension-consumer/1' ] }, 'elsemesh.extension-consumer/1', extensionState.extensionId, extensionState.state, { root: extensionState.root, connector: extensionState.connector } );
+	dispatchWorldExtensionState( { behaviors: { 'elsemesh.extension-consumer/1': {} } }, 'elsemesh.extension-consumer/1', extensionState.extensionId, extensionState.state, { root: extensionState.root, connector: extensionState.connector } );
 assert.equal( consumed.extensionId, extensionState.extensionId );
 assert.equal( consumed.state, extensionState.state );
 assert.equal( consumed.root, extensionState.root );

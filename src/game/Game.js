@@ -2,7 +2,7 @@ import { Vector3, Color } from '../engine/index.js';
 import { WORLD } from '../world/WorldLayout.js';
 import { FISH } from './FishTable.js';
 import { habitatAt } from './Bites.js';
-import { createWorldBehaviorRuntime } from '../network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorRuntime, worldBehaviorData } from '../network/WorldBehaviorRegistry.js';
 import { FishingRod } from './FishingRod.js';
 import { FishStand } from './FishStand.js';
 import { Chandlery } from './Chandlery.js';
@@ -25,7 +25,7 @@ const CATCH_CARD_MS = 9000;
 //   E          at the fish stand: sell your catch
 export class Game {
 
-	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience = { behaviors: [ 'elsemesh.fishing-game/1' ] }, worldId = 'elsemesh:local' } = {} ) {
+	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience = { behaviors: { 'elsemesh.fishing-game/1': {} } }, worldId = 'elsemesh:local' } = {} ) {
 
 		this.app = app;
 		this.terrain = terrain;
@@ -35,10 +35,11 @@ export class Game {
 		this.state = this.runtime.state;
 		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query, terrain, audio: app.audio } );
 		this.rod.onLand = ( where ) => this.onBobberLanded( where );
-		this.stand = new FishStand( { scene: app.scene, terrain, colliders, placement: experience?.fishing?.fishStand } );
+		const fishingData = worldBehaviorData( experience, 'elsemesh.fishing-game/1' );
+		this.stand = new FishStand( { scene: app.scene, terrain, colliders, placement: fishingData?.fishStand } );
 		this.display = new CatchDisplay( { scene: app.scene, stall: this.stand.iceFish() } );
 		this.landing = null; // { species, kg } while the caught fish swings in view
-		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material, placement: experience?.fishing?.chandlery } );
+		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material, placement: fishingData?.chandlery } );
 		this.vendors = [ this.stand.vendor, this.chandlery.vendor ];
 		// boat upgrades: engine (thrust / top speed) and deck floodlights for night fishing
 		const b = boatController;
