@@ -160,7 +160,12 @@ export class Player {
 		this.colliders.resolveCapsule( this.position, RADIUS, HEIGHT, 0.4 );
 		this.resolveBoatCollision( this.position, HEIGHT );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;
-		const ground = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, 0.15 );
+		// Hosted collision data includes object and deck colliders, while the signed
+		// terrain heightfield is the ground surface between them. Never sample the
+		// hidden local procedural island for a hosted world.
+		const terrainGround = this.terrain?.heightAt( this.position.x, this.position.z ) ?? - Infinity;
+		const colliderGround = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, 0.15 );
+		const ground = Math.max( terrainGround, colliderGround );
 		if ( this.position.y <= ground ) {
 			this.position.y = ground;
 			if ( this.velocity.y < 0 ) this.velocity.y = 0;

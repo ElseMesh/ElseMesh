@@ -41,6 +41,23 @@ assert.equal( player.position.y, 0, 'hosted player remains grounded on the activ
 assert.equal( player.grounded, true );
 assert.ok( camera.position.z < -1, 'camera follows the hosted player' );
 assert.ok( Math.abs( player.velocity.z + 1.5 ) < 0.01, 'hosted walk speed follows the signed world rule' );
+
+// Signed world terrain is a ground surface even when the package has no object
+// collider at the player's position (for example, open beach sand).
+const terrainGroundPlayer = Object.assign( Object.create( Player.prototype ), {
+	camera: { position: new Vector3(), quaternion: new Quaternion() },
+	input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 0, y: 0, sprint: 0 } ), down: () => false, hit: () => false },
+	terrain: { heightAt: () => 1.2 }, colliders: new Colliders(),
+	position: new Vector3(), velocity: new Vector3(), _previousPosition: new Vector3(),
+	yaw: 0, pitch: 0, grounded: false, gravity: 9.81, mode: 'walk', hostedSeaLevel: 0,
+	worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
+} );
+Player.prototype.setHostedWorldPose.call( terrainGroundPlayer, new Vector3( 15, 3, - 58 ), 0, 0 );
+for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( terrainGroundPlayer, 1 / 60 );
+assert.ok( Math.abs( terrainGroundPlayer.position.y - 1.2 ) < 1e-6, 'hosted player lands on signed terrain between object colliders' );
+assert.ok( Math.abs( terrainGroundPlayer.camera.position.y - 2.82 ) < 1e-6, 'hosted camera stays above signed beach terrain' );
+assert.equal( terrainGroundPlayer.mode, 'walk', 'hosted player does not enter the ocean through missing terrain collision' );
+
 axes = { x: 0, y: 1, sprint: 1 };
 for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( player, 1 / 60 );
 assert.ok( Math.abs( player.velocity.z + 4 ) < 0.01, 'hosted sprint speed follows the signed world rule' );

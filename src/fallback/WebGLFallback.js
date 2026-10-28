@@ -356,7 +356,7 @@ function webglTerrainWaterTexture( T, terrain ) {
 		const normalized = T.MathUtils.clamp( ( terrain.heights[ source ] - minHeight ) / ( maxHeight - minHeight ), 0, 1 ), height = Math.round( normalized * 65535 );
 		data[ out ] = height >>> 8;
 		data[ out + 1 ] = height & 255;
-		data[ out + 2 ] = terrain.sand[ source ];
+		data[ out + 2 ] = terrain.sand?.[ source ] ?? terrain.splat?.[ source * 4 ] ?? 0;
 		data[ out + 3 ] = 255;
 	}
 	const texture = new T.DataTexture( data, resolution, resolution, T.RGBAFormat, T.UnsignedByteType );
@@ -1767,11 +1767,20 @@ export class WebGLFallback {
 	_addHostedWater( components, rules ) {
 
 		const T = this.THREE;
+		const terrain = this.hostedTerrainData;
+		const terrainWater = terrain ? webglTerrainWaterTexture( T, terrain ) : null;
 		for ( const component of components ) {
 			if ( component.type === 'elsemesh.island-ocean/1' ) {
-				this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000 ), rules.seaLevel ?? - 4.5 ) );
+				const size = Math.max( 4000, ( terrain?.size || 2000 ) * 2 );
+				const segments = Math.max( 128, Math.min( 768, Math.ceil( size / 5 ) ) );
+				const water = this._makeWater( new T.PlaneGeometry( size, size, segments, segments ), rules.seaLevel ?? - 4.5, terrainWater, terrainWater ? 1 : 0 );
+				if ( terrain ) {
+					water.position.x = terrain.origin + terrain.size * 0.5;
+					water.position.z = terrain.origin + terrain.size * 0.5;
+				}
+				this.waterScene.add( water );
 			} else if ( component.type === 'elsemesh.water-body/1' ) {
-				const water = this._makeWater( new T.CircleGeometry( component.extent, 64 ), rules.seaLevel ?? 0 );
+				const water = this._makeWater( new T.CircleGeometry( component.extent, 128 ), rules.seaLevel ?? 0, terrainWater, terrainWater ? 1 : 0 );
 				water.position.x = component.center[ 0 ]; water.position.z = component.center[ 1 ]; this.waterScene.add( water );
 			}
 		}

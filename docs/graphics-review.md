@@ -43,6 +43,41 @@ parity; the isolated WebGL capture did not produce a usable world image.
 
 ![Built-in and signed-package WebGPU beach comparison](images/parity-2026-10-28-webgpu-beach.png)
 
+### 2026-10-28 hosted ground and WebGL water follow-up
+
+The signed package was reopened at the named beach pose in an isolated
+Radeon-backed Chromium display. A direct provider ID was included in the local
+invite. The browser connected to `elsemesh:example-island`; the initial
+discovery-only link returned HTTP 400 because no directory was configured.
+
+The live WebGL player had fallen below the signed terrain: at the beach spawn,
+the packaged heightfield returned `1.203 m`, while the player's feet had fallen
+below sea level. Hosted movement considered object colliders but omitted the
+signed terrain heightfield. `Player.updateHostedWorld` now takes the higher of
+the signed terrain surface and signed object colliders, without consulting the
+hidden local island terrain. In the post-fix sample, the WebGL player's feet
+were at `1.203 m` and its camera at `2.823 m` in walk mode.
+The WebGPU player was also switched from the named review camera back to walk
+mode; it remained grounded on the hosted collision surface at the same spawn.
+
+The hosted WebGL ocean also used an unsubdivided four-vertex plane with no
+terrain-height texture, so its deep-water waves covered the beach. It now uses
+the packaged height and sand data and a subdivided water surface. The beach and
+sky remain visible, though the WebGL shoreline and ground materials still
+differ substantially from WebGPU. These matched renderer captures are not the
+pre-split visual baseline and do not close parity.
+
+`npm run build`, `node test/world-hosted-player.mjs`, and
+`npm run test:webgl-content` passed in the external build tree. The WebGPU
+capture retained the beach view; WebGL was grounded and connected to the same
+signed world. The WebGL image still shows a pale terrain patch, simplified
+hills, and a narrow teal water band compared with WebGPU's broader water,
+shallow surf, and foam.
+
+![Hosted Tidewater beach after the shared WebGPU ground fix](images/parity-2026-10-28-webgpu-hosted-ground-fix.png)
+
+![Hosted Tidewater beach after the WebGL ground and water fix](images/parity-2026-10-28-webgl-hosted-ground-water-fix.png)
+
 ## Tidewater post-split parity review, 2026-10-27
 
 Compared the pre-split ElseMesh tree at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
