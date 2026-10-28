@@ -1,16 +1,21 @@
 import { FISH, fishValue, fishLengthCm } from './FishTable.js';
 import { defaultUpgrades, gearStats, nextLevel, UPGRADES, FUEL_PRICE } from './Gear.js';
 
-const SAVE_KEY = 'elsemesh.save.v1';
+const SAVE_KEY_PREFIX = 'elsemesh.save.v1:';
 
 // Everything the player owns: wallet, the fish in the cooler / hold, the fish log and the gear
 // levels. Saved to localStorage (per browser) after every change; storage can be missing or throw
 // (private windows, blocked site data), so every access is guarded and the game runs without it.
 export class GameState {
 
-	constructor( storage = safeStorage() ) {
+	constructor( storage = safeStorage(), worldId = 'elsemesh:local' ) {
+
+		if ( typeof worldId !== 'string' || ! worldId.trim() ) throw new Error( 'Game state requires a world ID' );
 
 		this.storage = storage;
+		// Keep the existing built-in island save stable while giving every hosted world
+		// its own browser-local state namespace.
+		this.storageKey = worldId === 'elsemesh:local' ? 'elsemesh.save.v1' : SAVE_KEY_PREFIX + encodeURIComponent( worldId );
 		this.money = 0;
 		this.inventory = []; // { id, species, kg, cm, value, caughtAt (game hours), record }
 		this.log = {}; // species -> { count, bestKg, bestCm }
@@ -213,7 +218,7 @@ export class GameState {
 		if ( ! this.storage ) return;
 		try {
 
-			this.storage.setItem( SAVE_KEY, JSON.stringify( this.toJSON() ) );
+			this.storage.setItem( this.storageKey, JSON.stringify( this.toJSON() ) );
 
 		} catch ( e ) { /* storage full or blocked: keep playing */ }
 
@@ -224,7 +229,7 @@ export class GameState {
 		if ( ! this.storage ) return false;
 		try {
 
-			const raw = this.storage.getItem( SAVE_KEY );
+			const raw = this.storage.getItem( this.storageKey );
 			return raw ? this.fromJSON( JSON.parse( raw ) ) : false;
 
 		} catch ( e ) {

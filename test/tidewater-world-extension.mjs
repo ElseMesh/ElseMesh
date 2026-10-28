@@ -27,7 +27,7 @@ const moduleBytes = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + byt
 assert.deepEqual( await send( { type: 'load', bytes: moduleBytes, memoryPages: descriptor.memoryPages } ), { type: 'ready' } );
 assert.deepEqual( await send( { type: 'init', requestId: 1, input: {} } ), { type: 'result', requestId: 1, value: { biteRateMultiplier: 1 } } );
 
-const runtime = createWorldBehaviorRuntime( source.experience, descriptor.behaviorId, { load: false } );
+const runtime = createWorldBehaviorRuntime( source.experience, descriptor.behaviorId, { load: false, worldId: source.worldId } );
 assert.ok( runtime instanceof FishingGameRuntime );
 for ( const [ requestId, hour, expected ] of [ [ 2, 6.5, 1.4 ], [ 3, 12, 1 ], [ 4, 23, 0.8 ] ] ) {
 	const result = await send( { type: 'step', requestId, input: { timeOfDay: hour } } );

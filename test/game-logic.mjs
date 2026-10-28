@@ -154,6 +154,17 @@ const s2 = new GameState( storage );
 s.save();
 ok( s2.load() && s2.money === s.money && s2.inventory.length === 1 && s2.log.grunt.bestKg === 0.84 && s2.stats.holdKg === 70, 'save / load round trip' );
 ok( s2.addFish( 'grunt', 0.5 ).id > b.id, 'ids keep counting after a load' );
+const worldMemory = new Map();
+const worldStorage = { getItem: key => worldMemory.get( key ) ?? null, setItem: ( key, value ) => worldMemory.set( key, value ) };
+ok( new GameState( worldStorage ).storageKey === 'elsemesh.save.v1', 'the built-in island keeps its existing save key' );
+const alpha = new GameState( worldStorage, 'elsemesh:alpha' );
+alpha.money = 125;
+alpha.save();
+const beta = new GameState( worldStorage, 'elsemesh:beta' );
+ok( beta.load() === false && beta.money === 0, 'a different world cannot read another world game save' );
+const alphaReloaded = new GameState( worldStorage, 'elsemesh:alpha' );
+ok( alphaReloaded.load() && alphaReloaded.money === 125, 'a world reload restores only its own game save' );
+ok( alpha.storageKey !== beta.storageKey, 'world save keys use distinct world identity namespaces' );
 // ---- lengths and the catch card's record logic
 {
 

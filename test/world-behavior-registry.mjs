@@ -7,8 +7,9 @@ assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id, fishingGame, shor
 	{ id: 'elsemesh.fishing-game/1', fishingGame: true, shoreAwareBoat: undefined, consumesExtensionState: true },
 	{ id: 'elsemesh.shore-aware-boat/1', fishingGame: undefined, shoreAwareBoat: true, consumesExtensionState: false },
 ] );
-const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1' );
+const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test', load: false } );
 assert.ok( runtime instanceof FishingGameRuntime );
+assert.equal( runtime.state.storageKey, 'elsemesh.save.v1:elsemesh%3Aregistry-test', 'registered game runtime receives its owning world identity' );
 dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 1.5 }, { gameRuntime: runtime } );
 assert.equal( runtime.biteRateMultiplier, 1.5, 'registered fishing behavior applies signed extension state in the browser runtime' );
 runtime.bite = { phase: 'wait', t: 5 };

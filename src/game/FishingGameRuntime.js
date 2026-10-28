@@ -7,9 +7,9 @@ import { startFishingBite, stepFishingBite } from './FishingBiteSimulation.js';
 // their respective client systems.
 export class FishingGameRuntime {
 
-	constructor( { state = new GameState(), load = true } = {} ) {
+	constructor( { state, load = true, worldId = 'elsemesh:local' } = {} ) {
 
-		this.state = state;
+		this.state = state || new GameState( undefined, worldId );
 		if ( load ) this.state.load();
 		this.bite = null;
 		this.fight = null;

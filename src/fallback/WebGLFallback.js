@@ -850,7 +850,7 @@ export class WebGLFallback {
 			this.chandlery = new WebGLChandleryAdapter( T, this.scene, { terrain: hostedTerrain, colliders: hostedColliders, loader: this.loader, placement: experience?.fishing?.chandlery } );
 			this.gameAdapter = new WebGLGameAdapter( this.fishStand.vendor, {
 				vendors: [ this.fishStand.vendor, this.chandlery.vendor ], experience, THREE: T, scene: this.scene,
-				camera: this.camera, query: this.waterQuery, terrain: hostedTerrain, boatController: this.boat?.controller || null, boatRoot: this.boat?.group || null, audio: this.app.audio,
+				worldId: this.connector.worldId, camera: this.camera, query: this.waterQuery, terrain: hostedTerrain, boatController: this.boat?.controller || null, boatRoot: this.boat?.group || null, audio: this.app.audio,
 			} );
 		}
 		if ( this.worldLink ) {

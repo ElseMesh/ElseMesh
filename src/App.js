@@ -536,7 +536,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// the fishing game (rod, bites, catch, cooler, fish stand)
 		// The built-in save, vendors and fishing simulation belong only to the local
 		// Example Island. Hosted worlds install their own declared behavior components.
-		this.game = worldLink ? null : new Game( this );
+		this.worldGames = new Map();
+		this.game = worldLink ? null : new Game( this, { worldId: 'elsemesh:local' } );
+		if ( this.game ) this.worldGames.set( 'elsemesh:local', this.game );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
 		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
 		for ( const [ s, lx, ly, lz ] of [ [ ISLAND_DEFINITION.fishStand, - 0.9, 1.85, 0.1 ], [ ISLAND_DEFINITION.chandlery, - 0.75, 1.58, - 1.45 ] ] ) {
@@ -1256,9 +1258,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		if ( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ) ) {
 			const worldTerrain = root.userData.terrainData || this.terrainData;
-			if ( ! this.game ) this.game = new Game( this, { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl, experience } );
-			this.game.setWorldContext( { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
-			this.game.setWorldActive( true );
+			let game = this.worldGames.get( connector.worldId );
+			if ( ! game ) {
+				game = new Game( this, { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl, experience, worldId: connector.worldId } );
+				this.worldGames.set( connector.worldId, game );
+			}
+			this.game = game;
+			game.setWorldContext( { query: this.hostedQuery, terrain: worldTerrain, colliders: this.hostedColliders, boatController: this.player.boat || this.boatCtl } );
+			game.setWorldActive( true );
 		} else this.game?.setWorldActive( false );
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
@@ -1318,7 +1325,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			player: this.player,
 			input: this.input,
 			boat: this.activeHostedBoat?.boat.controller || ( this.remoteWorldActive ? null : this.boatCtl ),
-			gameRuntime: this.game?.runtime || null,
+			gameRuntime: this.game?.active ? this.game.runtime : null,
 			timeOfDay: this.settings.timeOfDay,
 		} );
 		const components = root?.userData?.worldComponents || [];
