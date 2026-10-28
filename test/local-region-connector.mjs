@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
+import { parseGLB } from '../src/engine/loaders/GLTF.js';
 import { worldLinkFromLocation } from '../src/network/WorldConnector.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL } from '../src/network/WorldLauncher.js';
 
@@ -32,6 +33,8 @@ const hash = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toStr
 const originalFetch = globalThis.fetch;
 let cellFetches = 0;
 let leaseReleases = 0;
+const payloadFetchOrder = [];
+let secondCellCollisionMissing = true;
 let abortNextCellFetch = false;
 let abortableFetchStarted;
 globalThis.fetch = async ( input, options = {} ) => {
@@ -41,8 +44,9 @@ globalThis.fetch = async ( input, options = {} ) => {
 		leaseReleases++;
 		return new Response( null, { status: 204 } );
 	}
+	if ( url.pathname === '/v1/regions/great-hall' && ( options.method === undefined || options.method === 'GET' ) && url.searchParams.has( 'lease' ) ) payloadFetchOrder.push( url.searchParams.get( 'payload' ) );
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
-		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'tw-world:hogwarts-legacy-local',
+		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'world:hogwarts-legacy-local',
 		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
 		entrySelection: {
 			schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house',
@@ -68,6 +72,12 @@ globalThis.fetch = async ( input, options = {} ) => {
 			'Content-Length': String( bytes.byteLength ), ETag: `"sha256-${hash}"`,
 		} } );
 	}
+	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '1,0,0,16' && url.searchParams.get( 'payload' ) === 'collision' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
+		if ( secondCellCollisionMissing ) return new Response( 'not found', { status: 404 } );
+		return new Response( bytes, { headers: {
+			'Content-Length': String( bytes.byteLength ), ETag: `"sha256-${hash}"`,
+		} } );
+	}
 	return new Response( 'not found', { status: 404 } );
 };
 
@@ -79,13 +89,13 @@ try {
 	assert.deepEqual( link, { localProvider: 'http://127.0.0.1:4179', localMap: 'Great Hall' } );
 	const localPage = 'http://127.0.0.1:5189/?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall';
 	assert.equal( await discoverLocalWorldURL( { pageURL: localPage, fetchImpl: () => { throw new Error( 'must not query the default world for a local bridge link' ); } } ), null );
-	assert.equal( defaultHomeWorldURL( { pageURL: localPage, storage: { getItem: () => '{"worldId":"tw-world:example-island"}' } } ), null );
+	assert.equal( defaultHomeWorldURL( { pageURL: localPage, storage: { getItem: () => '{"worldId":"world:example-island"}' } } ), null );
 	assert.throws( () => worldLinkFromLocation( {
 		search: '?localProvider=http%3A%2F%2Fexample.com&localMap=Great%20Hall',
 		href: 'http://127.0.0.1:5189/',
 	} ), /loopback/ );
 	assert.throws( () => worldLinkFromLocation( {
-		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=tw-world%3Atidewater',
+		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=world%3Atidewater',
 		href: 'http://127.0.0.1:5189/',
 	} ), /cannot be combined/ );
 
@@ -98,24 +108,34 @@ try {
 	assert.deepEqual( manifest.entryPoints.map( entry => entry.id ), [ 'gryffindor', 'hufflepuff' ] );
 	assert.equal( manifest.rules.physicsProfile, 'default' );
 	assert.equal( 'seaLevel' in manifest.rules, false, 'local Hogwarts preview does not activate a default waterline' );
-	assert.equal( manifest.assets.length, 2, 'all occupied cells should be declared for view-driven loading' );
-	assert.equal( manifest.objects.length, 3, 'both cells plus the world-authored preview collider should be present' );
-	assert.equal( manifest.assets[ 0 ].id, 'local-region:great-hall:16:0,0,0' );
+	assert.equal( manifest.assets.length, 4, 'each occupied cell should have distinct collision and visual assets' );
+	assert.equal( manifest.objects.length, 5, 'both collision and visual cell objects plus the preview collider should be present' );
+	assert.equal( manifest.assets[ 0 ].id, 'local-region:great-hall:16:0,0,0:collision' );
 	assert.equal( manifest.objects[ 0 ].assetId, manifest.assets[ 0 ].id );
 	assert.equal( manifest.objects[ 0 ].regionCell, true );
+	assert.equal( manifest.objects[ 0 ].collisionPayload, true );
+	assert.equal( connector.initialRegionCellObjectIDs.has( manifest.objects[ 0 ].id ), true, 'startup preloads collision objects before visuals' );
 	assert.deepEqual( manifest.objects[ 0 ].streamingBounds.center, [ 8, 8, 8 ] );
-	assert.equal( manifest.objects[ 2 ].assetId, null );
-	assert.equal( manifest.objects[ 2 ].collision.enabled, true );
+	assert.equal( manifest.objects[ 4 ].assetId, null );
+	assert.equal( manifest.objects[ 4 ].collision.enabled, true );
 	const loaded = await connector.preload();
 	assert.equal( loaded.get( manifest.assets[ 0 ].id ).byteLength, bytes.byteLength );
-	assert.ok( loaded.get( manifest.assets[ 1 ].id ).byteLength > 20, 'empty cell responses should become a tiny empty GLB and stay loaded' );
-	assert.equal( connector.assetBytes, bytes.byteLength + loaded.get( manifest.assets[ 1 ].id ).byteLength );
-	assert.equal( leaseReleases, 2, 'each region fetch should release its temporary visitor lease' );
+	assert.equal( parseGLB( loaded.get( manifest.assets[ 0 ].id ) ).nodes[ 0 ].extras.elsemeshCollision.coordinateSystem, 'elsemesh-y-up-meters/1', 'collision-only GLB metadata is readable by the ElseMesh loader' );
+	assert.deepEqual( parseGLB( loaded.get( manifest.assets[ 2 ].id ) ).nodes, [], 'missing collision bytes remain representable to the package loader' );
+	assert.deepEqual( payloadFetchOrder.slice( 0, 4 ), [ 'collision', 'collision', 'visual', 'visual' ], 'collision requests must be fetched before visual requests' );
+	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unknown collision placeholders are not cached as provider data' );
+	assert.equal( leaseReleases, 4, 'each region fetch should release its temporary visitor lease' );
+	const collisionIDs = [ ...connector.collisionObjectIDsByCell.get( '0,0,0' ), ...connector.collisionObjectIDsByCell.get( '1,0,0' ) ];
+	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), false, 'movement stops until collision data for every crossed cell has loaded' );
+	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), false, 'a missing collision response remains unknown and blocks the swept path even if the loader has an empty placeholder' );
+	secondCellCollisionMissing = false;
+	await connector.getAsset( manifest.assets[ 2 ].id );
+	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), true, 'a subsequent valid collision response clears the unknown state' );
 	assert.equal( connector.releaseAsset( manifest.assets[ 0 ].id ), true );
-	assert.equal( connector.assetBytes, loaded.get( manifest.assets[ 1 ].id ).byteLength, 'unloaded cells should release cached browser bytes' );
+	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unloaded cells should release cached browser bytes' );
 	assert.equal( await connector.getAsset( manifest.assets[ 0 ].id ).then( value => value.byteLength ), bytes.byteLength );
-	assert.equal( cellFetches, 2, 'a released cell should be fetched again on demand' );
-	assert.equal( leaseReleases, 3, 'the refetched cell should also release its lease' );
+	assert.equal( cellFetches, 3, 'a released cell should be fetched again on demand' );
+	assert.equal( leaseReleases, 6, 'the refetched cells should also release their leases' );
 	connector.releaseAsset( manifest.assets[ 0 ].id );
 	abortNextCellFetch = true;
 	const requestStarted = new Promise( resolve => { abortableFetchStarted = resolve; } );
@@ -124,7 +144,7 @@ try {
 	await requestStarted;
 	abortController.abort();
 	await assert.rejects( abortedRequest, { name: 'AbortError' } );
-	assert.equal( leaseReleases, 4, 'aborting a visitor fetch should release its server lease' );
+	assert.equal( leaseReleases, 7, 'aborting a visitor fetch should release its server lease' );
 	connector.close();
 	assert.equal( connector.assets.size, 0 );
 	console.log( 'local region connector tests passed' );
