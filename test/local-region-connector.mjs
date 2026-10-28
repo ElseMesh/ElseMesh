@@ -52,7 +52,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 			schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house',
 			entryPointPrompt: 'Which Hogwarts house will you join?',
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
-			previewRegion: { cellSizeMeters: 16, cell: [ 0, 0, 0 ] },
+			previewRegion: { cellSizeMeters: 16, startupCellOffsetBounds: { min: [ -1, 0, 0 ], max: [ 0, 0, 0 ] } },
 			previewSupport: { status: 'provisional', position: [ 0, 6.75, 8 ], halfExtents: [ 2, 0.25, 3 ], basis: 'synthetic rendered floor bounds' },
 			choices: [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ],
 		},
@@ -81,6 +81,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 			'Content-Length': String( bytes.byteLength ), ETag: `"sha256-${hash}"`,
 		} } );
 	}
+	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.has( 'cell' ) && url.searchParams.has( 'lease' ) ) return new Response( bytes, { headers: { 'Content-Length': String( bytes.byteLength ), ETag: `"sha256-${hash}"` } } );
 	return new Response( 'not found', { status: 404 } );
 };
 
@@ -111,23 +112,25 @@ try {
 	assert.deepEqual( manifest.entryPoints.map( entry => entry.id ), [ 'gryffindor', 'hufflepuff' ] );
 	assert.equal( manifest.rules.physicsProfile, 'default' );
 	assert.equal( 'seaLevel' in manifest.rules, false, 'local Hogwarts preview does not activate a default waterline' );
-	assert.equal( manifest.assets.length, 4, 'each occupied cell should have distinct collision and visual assets' );
-	assert.equal( manifest.objects.length, 5, 'both collision and visual cell objects plus the preview collider should be present' );
+	assert.equal( manifest.assets.length, 6, 'the derived two-cell startup footprint and indexed neighbor should have distinct collision and visual assets' );
+	assert.equal( manifest.objects.length, 7, 'collision and visual cell objects plus the preview collider should be present' );
 	assert.equal( manifest.assets[ 0 ].id, 'local-region:great-hall:16:0,0,0:collision' );
 	assert.equal( manifest.objects[ 0 ].assetId, manifest.assets[ 0 ].id );
 	assert.equal( manifest.objects[ 0 ].regionCell, true );
 	assert.equal( manifest.objects[ 0 ].collisionPayload, true );
 	assert.equal( connector.initialRegionCellObjectIDs.has( manifest.objects[ 0 ].id ), true, 'startup preloads collision objects before visuals' );
+	assert.equal( connector.initialRegionCellObjectIDs.size, 2, 'startup cells are derived from the spawn cell and authored offset bounds' );
+	assert.ok( manifest.objects.some( object => object.id.endsWith( '-1,0,0:collision' ) ), 'negative startup cell offsets are applied to the derived spawn cell' );
 	assert.deepEqual( manifest.objects[ 0 ].streamingBounds.center, [ 8, 8, 8 ] );
-	assert.equal( manifest.objects[ 4 ].assetId, null );
-	assert.equal( manifest.objects[ 4 ].collision.enabled, true );
+	assert.equal( manifest.objects[ 6 ].assetId, null );
+	assert.equal( manifest.objects[ 6 ].collision.enabled, true );
 	const loaded = await connector.preload();
 	assert.equal( loaded.get( manifest.assets[ 0 ].id ).byteLength, bytes.byteLength );
 	assert.equal( parseGLB( loaded.get( manifest.assets[ 0 ].id ) ).nodes[ 0 ].extras.elsemeshCollision.coordinateSystem, 'elsemesh-y-up-meters/1', 'collision-only GLB metadata is readable by the ElseMesh loader' );
 	assert.deepEqual( parseGLB( loaded.get( manifest.assets[ 2 ].id ) ).nodes, [], 'missing collision bytes remain representable to the package loader' );
-	assert.deepEqual( payloadFetchOrder.slice( 0, 4 ), [ 'collision', 'collision', 'visual', 'visual' ], 'collision requests must be fetched before visual requests' );
+	assert.deepEqual( payloadFetchOrder, [ 'collision', 'collision', 'collision', 'visual', 'visual', 'visual' ], 'collision requests must be fetched before visual requests' );
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unknown collision placeholders are not cached as provider data' );
-	assert.equal( leaseReleases, 4, 'each region fetch should release its temporary visitor lease' );
+	assert.equal( leaseReleases, 6, 'each region fetch should release its temporary visitor lease' );
 	const collisionIDs = [ ...connector.collisionObjectIDsByCell.get( '0,0,0' ), ...connector.collisionObjectIDsByCell.get( '1,0,0' ) ];
 	assert.equal( connector.isCollisionPathReady( [ 1, 0, 1 ], [ 2, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), true, 'loaded collision with complete source coverage permits a local path' );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), false, 'movement stops until collision data for every crossed cell has loaded' );
@@ -139,7 +142,7 @@ try {
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unloaded cells should release cached browser bytes' );
 	assert.equal( await connector.getAsset( manifest.assets[ 0 ].id ).then( value => value.byteLength ), bytes.byteLength );
 	assert.equal( cellFetches, 3, 'a released cell should be fetched again on demand' );
-	assert.equal( leaseReleases, 6, 'the refetched cells should also release their leases' );
+	assert.equal( leaseReleases, 8, 'the refetched cell should also release its lease' );
 	connector.releaseAsset( manifest.assets[ 0 ].id );
 	abortNextCellFetch = true;
 	const requestStarted = new Promise( resolve => { abortableFetchStarted = resolve; } );
@@ -148,7 +151,7 @@ try {
 	await requestStarted;
 	abortController.abort();
 	await assert.rejects( abortedRequest, { name: 'AbortError' } );
-	assert.equal( leaseReleases, 7, 'aborting a visitor fetch should release its server lease' );
+	assert.equal( leaseReleases, 9, 'aborting a visitor fetch should release its server lease' );
 	connector.close();
 	assert.equal( connector.assets.size, 0 );
 	console.log( 'local region connector tests passed' );

@@ -27,6 +27,28 @@ function requireValue( value, message ) {
 	if ( ! value ) throw new Error( message );
 }
 
+function cellCoordinate( position, sizeMeters ) {
+	const coordinate = Math.floor( position / sizeMeters );
+	requireValue( Number.isSafeInteger( coordinate ), 'Local provider has a preview spawn outside the supported cell range' );
+	return coordinate;
+}
+
+function deriveStartupCells( position, previewRegion ) {
+	const { cellSizeMeters, startupCellOffsetBounds } = previewRegion;
+	const origin = position.map( coordinate => cellCoordinate( coordinate, cellSizeMeters ) );
+	const { min, max } = startupCellOffsetBounds || {};
+	requireValue( Array.isArray( min ) && Array.isArray( max ) && min.length === 3 && max.length === 3 && min.every( Number.isSafeInteger ) && max.every( Number.isSafeInteger ) && min.every( ( value, axis ) => value <= max[ axis ] ), 'Local provider has invalid startup cell offset bounds' );
+	const count = min.reduce( ( total, value, axis ) => total * ( max[ axis ] - value + 1 ), 1 );
+	requireValue( count >= 1 && count <= 64, 'Local provider startup cell footprint exceeds its limit' );
+	const cells = [];
+	for ( let x = min[ 0 ]; x <= max[ 0 ]; x ++ ) {
+		for ( let y = min[ 1 ]; y <= max[ 1 ]; y ++ ) {
+			for ( let z = min[ 2 ]; z <= max[ 2 ]; z ++ ) cells.push( [ origin[ 0 ] + x, origin[ 1 ] + y, origin[ 2 ] + z ] );
+		}
+	}
+	return cells;
+}
+
 function abortIfNeeded( signal ) {
 	if ( signal?.aborted ) throw signal.reason || new DOMException( 'Aborted', 'AbortError' );
 }
@@ -78,9 +100,8 @@ export class LocalRegionConnector {
 		const selection = descriptor.entrySelection;
 		requireValue( selection?.schema === 'elsemesh.hogwarts-entry-selection/1' && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length >= 1 && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
 		const previewRegion = selection.previewRegion;
-		requireValue( previewRegion && Array.isArray( previewRegion.cell ) && previewRegion.cell.length === 3 && previewRegion.cell.every( Number.isSafeInteger ) && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell' );
-		const startupCells = previewRegion.startupCells || [ previewRegion.cell ];
-		requireValue( Array.isArray( startupCells ) && startupCells.length >= 1 && startupCells.length <= 64 && startupCells.every( cell => Array.isArray( cell ) && cell.length === 3 && cell.every( Number.isSafeInteger ) ), 'Local provider has invalid startup cells' );
+		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
+		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
 			requireValue( support?.status === 'provisional' && typeof support.basis === 'string' && support.basis.length <= 500 && Array.isArray( support.position ) && support.position.length === 3 && support.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( support.halfExtents ) && support.halfExtents.length === 3 && support.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) && ( support.yaw === undefined || Number.isFinite( support.yaw ) && Math.abs( support.yaw ) <= 360 ), 'Local provider has invalid provisional preview support' );
