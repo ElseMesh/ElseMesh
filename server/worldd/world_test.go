@@ -78,6 +78,9 @@ func TestWorldV3RejectsLegacyProtocolAndWorldID(t *testing.T) {
 	if worldIDPattern.MatchString("elsemesh:world:legacy") {
 		t.Fatal("previous ElseMesh world ID namespace was accepted")
 	}
+	if worldIDPattern.MatchString("elsemesh-world:legacy") || worldIDPattern.MatchString("em-world:legacy") {
+		t.Fatal("obsolete prefixed world ID namespace was accepted")
+	}
 	if !worldIDPattern.MatchString("elsemesh:current") {
 		t.Fatal("canonical ElseMesh world ID was rejected")
 	}
@@ -94,7 +97,7 @@ func TestWorldV3RejectsLegacyProtocolAndWorldID(t *testing.T) {
 	}
 
 	manifest.WorldID = "elsemesh:current"
-	document, err := signDocument("elsemesh.world/1", manifest, owner)
+	document, err := signDocument("elsemesh.world/2", manifest, owner)
 	if err != nil {
 		t.Fatal(err)
 	}

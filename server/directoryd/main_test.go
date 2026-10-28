@@ -22,6 +22,9 @@ func TestDirectoryWorldIDNamespaceV3RejectsLegacyIDs(t *testing.T) {
 	if worldIDPattern.MatchString("elsemesh:world:legacy") {
 		t.Fatal("directory accepted the previous ElseMesh world ID namespace")
 	}
+	if worldIDPattern.MatchString("elsemesh-world:legacy") || worldIDPattern.MatchString("em-world:legacy") {
+		t.Fatal("directory accepted an obsolete prefixed world ID namespace")
+	}
 	if !worldIDPattern.MatchString("elsemesh:current") {
 		t.Fatal("directory rejected the canonical ElseMesh world ID")
 	}

@@ -15,7 +15,10 @@ const root = await mkdtemp( path.join( temporaryRoot, 'elsemesh-manifest-test-' 
 
 assert.equal( WORLD_SOURCE_PROTOCOL, 'elsemesh.world-source/3' );
 assert.throws( () => validateWorldSource( { protocol: 'elsemesh.world-source/1' } ), /Unsupported world source format/ );
+assert.throws( () => validateWorldSource( { protocol: 'elsemesh.world-source/2' } ), /Unsupported world source format/ );
 assert.throws( () => validateWorldSource( { protocol: WORLD_SOURCE_PROTOCOL, worldId: 'world:legacy' } ), /Invalid worldId/ );
+assert.throws( () => validateWorldSource( { protocol: WORLD_SOURCE_PROTOCOL, worldId: 'elsemesh-world:legacy' } ), /Invalid worldId/ );
+assert.throws( () => validateWorldSource( { protocol: WORLD_SOURCE_PROTOCOL, worldId: 'em-world:legacy' } ), /Invalid worldId/ );
 
 try {
 	const sourcePath = path.join( root, 'world-source.json' );

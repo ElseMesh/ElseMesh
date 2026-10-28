@@ -7,7 +7,7 @@ assert.equal( isWorldID( 'elsemesh:shoreline_1' ), true );
 assert.equal( isWorldID( 'elsemesh:world:shoreline_1' ), false );
 assert.equal( isWorldID( 'world:shoreline_1' ), false );
 assert.equal( isWorldID( 'elsemesh-world:shoreline_1' ), false );
-assert.equal( isWorldID( 'elsemesh-world:shoreline_1' ), false );
+assert.equal( isWorldID( 'em-world:shoreline_1' ), false );
 assert.equal( isWorldID( 'tw-world:shoreline_1' ), false );
 assert.equal( isWorldID( 'elsemesh:' ), false );
 assert.equal( isWorldID( `elsemesh:${'x'.repeat(129)}` ), false );
