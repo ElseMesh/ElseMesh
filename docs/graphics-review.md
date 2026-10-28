@@ -1,5 +1,29 @@
 # Reproducible graphics review
 
+## Tidewater split runtime parity follow-up, 2026-10-28
+
+The live signed Tidewater package was checked in an isolated Chromium session.
+The WebGPU run used the Radeon Vulkan adapter. It connected to
+`elsemesh:example-island`,
+activated the fishing behavior and hosted boat, and showed the fish stand and
+Joe's vendor as active. During a 6.4-second idle sample, the moored boat moved
+2.9 cm from its starting position; peak roll was 5.1° and pitch 1.7°.
+
+The same hosted manifest was then loaded with the WebGL fallback. All 38
+declared world components were supported, with none omitted. The packaged fish
+stand geometry and Joe's vendor loaded; invoking the in-range interaction
+opened Joe's buyer panel. In a 4-second idle sample the boat remained moored
+and upright (peak roll 9.6°, pitch 5.3°). Focused checks passed for WebGL boat
+stability, fish-stand placement and colliders, vendor/gameplay behavior, and
+the signed Tidewater extension runtime.
+
+This verifies the fish stand and idle-boat gameplay paths in both renderers;
+it does not close visual parity. The matched WebGPU comparison below still
+records small water, foam, shoreline, debris, and minimap differences. The
+current WebGL live capture also shows renderer-specific water and ground
+artifacts, so WebGL is accepted here for shared content and gameplay only, not
+as a visual match to the pre-split WebGPU renderer.
+
 ## Tidewater post-split parity review, 2026-10-27
 
 Compared the pre-split ElseMesh tree at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
