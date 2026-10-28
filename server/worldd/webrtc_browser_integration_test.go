@@ -116,7 +116,7 @@ try {
   if (!WebAssembly.validate(loopingModule)) throw new Error('infinite-loop test module is invalid');
   let workerTerminated = false;
   const extensionHost = new WorldExtensionHost({
-    stepTimeoutMs: 100,
+    stepTimeoutMs: 50,
     workerFactory: () => {
       const worker = new Worker('/src/network/WorldExtensionWorker.js', { type: 'module' });
       return new Proxy(worker, { get(target, property) {
@@ -130,7 +130,7 @@ try {
   await extensionHost.load(extension, loopingModule, { tick: 0 });
   let timeoutObserved = false;
   try { await extensionHost.step(extension.id, { tick: 1 }); }
-  catch (error) { timeoutObserved = /exceeded its 100 ms time limit/.test(error.message); }
+  catch (error) { timeoutObserved = /exceeded its 50 ms time limit/.test(error.message); }
   if (!timeoutObserved || !workerTerminated) throw new Error('real browser Worker was not terminated after the Wasm step timeout');
   extensionHost.dispose();
   document.body.textContent = direct && fallback && data.length === %d ? 'PASS direct WebRTC and gateway fallback' : 'FAIL direct or fallback transport';
