@@ -95,9 +95,9 @@ export class LocalRegionConnector {
 		abortIfNeeded( signal );
 		const base = `${this.localProvider}/v1`;
 		const descriptor = await fetchJSON( `${base}/descriptor`, signal );
-		requireValue( descriptor.schema === 'elsemesh.dynamic-region-provider/1' && descriptor.readOnly === true && typeof descriptor.sourceRevision === 'string' && typeof descriptor.worldId === 'string' && /^[a-z0-9][a-z0-9:._-]{0,127}$/.test( descriptor.worldId ), 'Local provider returned an unsupported descriptor' );
+		requireValue( descriptor.schema === 'elsemesh.dynamic-region-provider/1' && descriptor.readOnly === true && typeof descriptor.sourceRevision === 'string' && typeof descriptor.worldId === 'string' && /^[a-z0-9][a-z0-9:._-]{0,127}$/.test( descriptor.worldId ) && ( descriptor.title === undefined || typeof descriptor.title === 'string' && descriptor.title.trim() && descriptor.title.length <= 160 ), 'Local provider returned an unsupported descriptor' );
 		const selection = descriptor.entrySelection;
-		requireValue( selection?.schema === 'elsemesh.hogwarts-entry-selection/1' && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length >= 1 && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
+		requireValue( selection && ( selection.schema === undefined || selection.schema === 'elsemesh.world-entry-selection/1' ) && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length >= 1 && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
 		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion );
@@ -126,7 +126,7 @@ export class LocalRegionConnector {
 		this.initialRegionVisualObjectIDs = new Set();
 		const spawn = selection.previewSpawn;
 		this.manifest = {
-			protocol: 'elsemesh.world/3', worldId: this.worldId, title: `Hogwarts Legacy · ${region.label}`,
+			protocol: 'elsemesh.world/3', worldId: this.worldId, title: descriptor.title ? `${descriptor.title} · ${region.label}` : region.label,
 			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
 			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.
 			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0 },
@@ -171,9 +171,9 @@ export class LocalRegionConnector {
 				const isStartupCell = startupCellKeys.has( cellKey );
 				const cellObjectIDs = this.collisionObjectIDsByCell.get( cellKey ) || new Set();
 				const collisionAssetId = `${assetId}:collision`;
-				const collisionObjectId = `elsemesh-object:hogwarts-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}:collision`;
+				const collisionObjectId = `elsemesh-object:region-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}:collision`;
 				const visualAssetId = `${assetId}:visual`;
-				const visualObjectId = `elsemesh-object:hogwarts-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}:visual`;
+				const visualObjectId = `elsemesh-object:region-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}:visual`;
 				const collisionURL = new URL( sourceRegion.asset, `${base}/` );
 				collisionURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
 				collisionURL.searchParams.set( 'payload', 'collision' );
@@ -209,7 +209,7 @@ export class LocalRegionConnector {
 		const support = selection.previewSupport;
 		if ( support ) {
 			this.manifest.objects.push( {
-				id: 'elsemesh-object:hogwarts-preview-floor-support', label: 'Provisional preview floor support', kind: 'asset-instance', assetId: null,
+				id: 'elsemesh-object:region-preview-floor-support', label: 'Provisional preview floor support', kind: 'asset-instance', assetId: null,
 				transform: { position: support.position, yaw: support.yaw || 0 }, scale: [ 1, 1, 1 ], priority: 'visible',
 				collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: support.halfExtents, walkable: true, solid: true },
 			} );

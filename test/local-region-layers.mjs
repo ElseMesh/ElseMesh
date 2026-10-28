@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 
 const descriptor = {
-	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', worldId: 'elsemesh:test', regions: '/v1/regions',
+	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', worldId: 'elsemesh:test', title: 'Test world', regions: '/v1/regions',
 	entrySelection: {
-		schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
+		schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ], previewSpawn: { position: [ 0, 8, 0 ], yaw: 0 },
 		previewRegion: { cellSizeMeters: 8, startupCellOffsetBounds: { min: [ 0, 0, 0 ], max: [ 1, 0, 0 ] }, layers: [ 'Tech', 'Lighting', 'Collision' ] },
 	},

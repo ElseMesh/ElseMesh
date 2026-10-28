@@ -5,7 +5,7 @@ const startupCells = [ [ -1, 0, 4 ], [ 0, 0, 4 ], [ 1, 0, 4 ], [ -1, 0, 5 ], [ 0
 const descriptor = {
 	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', worldId: 'elsemesh:test', regions: '/v1/regions',
 	entrySelection: {
-		schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
+		entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ],
 		experience: {
 			genre: 'The Great Hall', tagline: 'Choose your house.', loadingNote: 'Preparing the Hall.', tips: [ 'Nearby rooms load as you explore.' ],
@@ -35,6 +35,7 @@ globalThis.fetch = async url => {
 try {
 	const connector = new LocalRegionConnector( { localProvider: 'http://127.0.0.1:4179', localMap: 'hall' } );
 	const manifest = await connector.getManifest();
+	assert.equal( manifest.title, 'Great Hall', 'providers without an optional title use the selected region label' );
 	assert.equal( connector.initialRegionCellObjectIDs.size, startupCells.length, 'every world-authored startup collision cell is marked for preload' );
 	assert.equal( connector.initialRegionVisualObjectIDs.size, startupCells.length, 'the matching startup visuals are also available before entry' );
 	assert.equal( manifest.experience.genre, 'The Great Hall', 'the local world controls its loading copy' );

@@ -42,6 +42,12 @@ and region ID. Active reads stay pinned; unused entries are evicted by LRU
 policy. Clients separately release decoded CPU objects and GPU buffers/textures
 when a region leaves their active set.
 
+Dynamic-provider entry metadata uses the generic
+`elsemesh.world-entry-selection/1` schema. Provider titles are optional; without
+one, the selected region label is used as the display title. The renderer and
+package adapter do not interpret world-specific choice names or encode a game's
+identity in runtime object IDs.
+
 For HTTP providers, bind each active region request to a short renewable lease
 scoped to its host, world, and region. Clients renew while they still need the
 result and release on completion or abort; lease expiry handles abrupt client

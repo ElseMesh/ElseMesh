@@ -46,10 +46,10 @@ globalThis.fetch = async ( input, options = {} ) => {
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && ( options.method === undefined || options.method === 'GET' ) && url.searchParams.has( 'lease' ) ) payloadFetchOrder.push( url.searchParams.get( 'payload' ) );
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
-		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'elsemesh:hogwarts-legacy-local',
+		schema: 'elsemesh.dynamic-region-provider/1', worldId: 'elsemesh:hogwarts-legacy-local', title: 'Hogwarts Legacy',
 		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
 		entrySelection: {
-			schema: 'elsemesh.hogwarts-entry-selection/1', entryPointActionLabel: 'Choose your house',
+			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
 			entryPointPrompt: 'Which Hogwarts house will you join?',
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
 			previewRegion: { cellSizeMeters: 16, startupCellOffsetBounds: { min: [ -1, 0, 0 ], max: [ 0, 0, 0 ] } },
