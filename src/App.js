@@ -93,7 +93,7 @@ import { WorldPresenceSession } from './network/WorldPresenceSession.js';
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
 import { FrameWorkMeter } from './core/FrameWorkMeter.js';
-import { DEFAULT_WORLD_EXPERIENCE, GENERIC_WORLD_EXPERIENCE } from './network/WorldExperience.js';
+import { GENERIC_WORLD_EXPERIENCE } from './network/WorldExperience.js';
 
 const _up = new Vector3( 0, 1, 0 );
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
@@ -206,7 +206,7 @@ export class App {
 
 		const qs = this.qs;
 		const worldLink = worldLinkFromLocation();
-		this.loadingExperience = worldLink?.localProvider ? null : worldLink ? GENERIC_WORLD_EXPERIENCE : DEFAULT_WORLD_EXPERIENCE;
+		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
 		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
 		if ( worldLink ) {

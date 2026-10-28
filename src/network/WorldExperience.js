@@ -1,11 +1,9 @@
-import defaultIslandExperience from '../../worlds/tidewater/presentation.json' with { type: 'json' };
 import { worldBehaviorsFor } from './WorldBehaviorRegistry.js';
 
 const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'behaviors', 'fishing' ];
 const LOADING_STAGES = new Set( [ 'gpu', 'atmosphere', 'terrain', 'village', 'vegetation', 'ocean', 'reef', 'simulation', 'shaders', 'world', 'compile', 'warmup' ] );
 const THEME_COLORS = [ 'background', 'surface', 'accent', 'text', 'muted', 'button', 'buttonText', 'border' ];
 
-export const DEFAULT_WORLD_EXPERIENCE = Object.freeze( validateWorldExperience( defaultIslandExperience ) );
 export const GENERIC_WORLD_EXPERIENCE = Object.freeze( validateWorldExperience( {
 	genre: 'A connected world',
 	tagline: 'Explore a place shaped by its owner.',
