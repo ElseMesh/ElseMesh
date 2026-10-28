@@ -4,6 +4,11 @@
 
 - Always run network-related commands in an escalated shell, even when they only access localhost. This includes `curl`, HTTP clients, browser/CDP checks, SSH, and Git fetch/push. Use an escalated shell for other commands that require elevated permissions as well.
 
+## Design maturity and compatibility
+
+- ElseMesh is not published yet. Do not optimize for backwards compatibility by default or preserve current behavior solely because it already exists.
+- Whenever changing an existing implementation or API, always consider whether it should be redesigned. Prefer the clearest architecture for the intended product, and update callers, tests, and documentation together when changing an unstable interface.
+
 ## Browser process cleanup
 
 - Stop every browser process I own as soon as it is no longer needed for the task, including after a visual check. Identify owned browsers by their dedicated systemd unit, process group, or isolated profile; never kill unrelated user browsers or another agent's browser.
