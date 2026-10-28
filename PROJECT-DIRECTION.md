@@ -22,17 +22,18 @@ geometry-reducing distance levels. The 2026-10-22/23 captures establish selected
 hosted-versus-built-in views and grass presence, but do not yet establish visual
 parity with the retained in-engine Example Island across the world.
 
-The remaining parity task is to compare the retained in-engine Example Island
-(the pre-split reference) with the Tidewater package loaded by the same ElseMesh
-build. Use matched renderer, device, camera pose, time, viewport, render scale,
-and graphics settings for the beach, village, valley, and summit views, plus
-close views where material, vegetation, or authored LOD differences are visible.
-Review the primary WebGPU renderer and the WebGL fallback separately; for WebGL,
-also compare matched views against WebGPU and record renderer-specific
-differences. Track content omissions, terrain/material appearance, vegetation
+The remaining visual parity task is to compare the retained in-engine Example
+Island (the pre-split WebGPU reference) with the Tidewater package loaded by the
+same ElseMesh build. Use matched device, camera pose, time, viewport, render
+scale, and graphics settings for the beach, village, valley, and summit views,
+plus close views where material, vegetation, or authored LOD differences are
+visible. Track content omissions, terrain/material appearance, vegetation
 density, object LOD transitions, water, and lighting/shadows as separate
-findings. Treat the existing captures as partial evidence, not completion.
-Desktop visual acceptance and complete gameplay parity remain open. Keep
+findings. WebGL was never the visual parity baseline; check it for the same
+world content and gameplay behavior as WebGPU without using its appearance as a
+comparison target. Treat the existing captures as partial evidence, not
+completion. Desktop WebGPU visual acceptance and complete gameplay parity
+remain open. Keep
 Tidewater authored content in its repository and reusable execution code in
 ElseMesh. Tidewater is content data, not a separately compiled application;
 ElseMesh validates and executes its versioned behavior data. Do not introduce a

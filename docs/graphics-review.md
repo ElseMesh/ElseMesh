@@ -117,22 +117,23 @@ text and the client also decodes binary `ArrayBuffer`/`Blob` frames. The live
 isolated browser then loaded the packaged manifest over WebRTC and captured all
 four views.
 
-### WebGL separate review
+### WebGL content and gameplay review
 
 ![Packaged Tidewater WebGL views at the four review poses](images/webgl-2026-10-27-review.png)
 
-WebGL was reviewed separately at the same four named camera poses; it was not
-compared with the pre-split WebGL renderer as a parity baseline. The isolated
-page selected WebGL and reported one omitted package feature. It used Chromium
-ANGLE/OpenGL on the Radeon Graphics adapter (Mesa 26.1.6), with Vulkan disabled,
-at a 1280×577 viewport and the same four named camera poses. The fallback shows
-pale, flat beach ground and dark water; the village view is under the pier; the
-valley has oversized vegetation; and the summit view sees the terrain
-underside. The omitted package feature is
+WebGL was reviewed separately at the same four named camera poses to check
+content support and runtime behavior. It is not a visual parity baseline: the
+original ElseMesh renderer was WebGPU, and WebGL never achieved visual parity.
+The isolated page selected WebGL and reported one omitted package feature. It
+used Chromium ANGLE/OpenGL on the Radeon Graphics adapter (Mesa 26.1.6), with
+Vulkan disabled, at a 1280×577 viewport and the same four named camera poses.
+The fallback shows pale, flat beach ground and dark water; the village view is
+under the pier; the valley has oversized vegetation; and the summit view sees
+the terrain underside. The omitted package feature is
 `elsemesh.village-materials/2` (`elsemesh-component:island-village-materials`).
-This is a current-state review, not parity acceptance. WebGL parity remains
-unaccepted pending fixes to terrain placement, water, vegetation, shoreline
-presentation, and village materials.
+These are recorded as renderer limitations; they do not define the WebGPU
+visual parity target. WebGL acceptance concerns shared world content and
+gameplay behavior, including fishing and boat interaction.
 
 The pinned submodule check verified 60 Tidewater assets. `npm run build`, the
 full `npm test` suite, and `go test ./worldd` pass from the external build tree
