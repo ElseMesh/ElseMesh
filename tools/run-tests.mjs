@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 const tests = [
 	'test/world-identity.mjs', 'test/world-behavior-registry.mjs', 'test/world-extension-host.mjs', 'test/world-extension-binary.mjs', 'test/world-extension-worker.mjs', 'test/world-extension-frame.mjs', 'test/tidewater-world-extension.mjs',
 	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
-	'test/vite-world-assets.mjs', 'test/vegetation-placement-codec.mjs',
+	'test/vite-world-assets.mjs', 'test/require-external-build-tree.mjs', 'test/vegetation-placement-codec.mjs',
 	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'test/tidewater-reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
 	'test/grass-density-asset.mjs', 'test/grass-density-parity.mjs', 'test/reef-placement-render.mjs',
 	'test/game-logic.mjs', 'test/fishing-rod-runtime.mjs', 'test/boat-gameplay-runtime.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
