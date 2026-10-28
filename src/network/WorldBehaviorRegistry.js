@@ -26,8 +26,10 @@ export function worldBehaviorData( experience, id ) {
 }
 
 export function registerWorldBehaviorImplementation( id, implementation ) {
-	if ( ! behaviors.has( id ) || ! implementation || typeof implementation !== 'object' || Array.isArray( implementation ) || implementations.has( id ) || ! Object.keys( implementation ).length || Object.entries( implementation ).some( ( [ hook, handler ] ) => ! [ 'onHostedWorldActivated', 'onWebGLWorldActivated' ].includes( hook ) || typeof handler !== 'function' ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
-	implementations.set( id, Object.freeze( { ...implementation } ) );
+	const existing = implementations.get( id ) || {};
+	const entries = implementation && typeof implementation === 'object' && ! Array.isArray( implementation ) ? Object.entries( implementation ) : [];
+	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onHostedWorldActivated', 'onWebGLWorldActivated' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
+	implementations.set( id, Object.freeze( { ...existing, ...implementation } ) );
 }
 
 export function dispatchWorldBehaviorHooks( experience, hook, context ) {

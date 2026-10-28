@@ -31,11 +31,16 @@ registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: dat
 assert.equal( hasWorldBehavior( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'elsemesh.registry-test/1' ), true );
 assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: () => {} } ), /Invalid or duplicate/ );
 let worldActivation = null;
+let webglActivation = null;
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: state => { worldActivation = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldActivated: state => { webglActivation = state; } } );
 dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onHostedWorldActivated', { marker: 7 } );
 assert.deepEqual( { active: worldActivation.active, data: worldActivation.data, behaviorId: worldActivation.behaviorId, marker: worldActivation.marker }, { active: true, data: {}, behaviorId: 'elsemesh.registry-test/1', marker: 7 }, 'registered handlers receive their active behavior data through generic dispatch' );
+dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWebGLWorldActivated', { marker: 8 } );
+assert.deepEqual( { active: webglActivation.active, data: webglActivation.data, behaviorId: webglActivation.behaviorId, marker: webglActivation.marker }, { active: true, data: {}, behaviorId: 'elsemesh.registry-test/1', marker: 8 }, 'separate renderers can register different hooks for one behavior' );
 dispatchWorldBehaviorHooks( { behaviors: {} }, 'onHostedWorldActivated', {} );
 assert.equal( worldActivation.active, false, 'registered handlers receive inactive lifecycle notifications for worlds without their behavior' );
+assert.throws( () => registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: () => {} } ), /Invalid or duplicate/ );
 
 let consumed = null;
 registerWorldBehavior( 'elsemesh.extension-consumer/1', { onExtensionState: value => { consumed = value; } } );
