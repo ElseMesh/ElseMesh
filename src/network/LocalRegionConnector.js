@@ -121,6 +121,9 @@ export class LocalRegionConnector {
 			cellIndexURL.searchParams.set( 'size', String( previewRegion.cellSizeMeters ) );
 			const cellIndex = await fetchJSON( cellIndexURL, signal );
 			requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === previewRegion.cellSizeMeters && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= 50000, 'Local provider returned an invalid occupied-cell index' );
+			const sourceInventory = cellIndex.collisionSourceInventory;
+			requireValue( Number.isSafeInteger( sourceInventory?.staticMeshComponents ) && sourceInventory.staticMeshComponents >= 0 && Number.isSafeInteger( sourceInventory.otherPrimitiveComponents ) && sourceInventory.otherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.unclassifiedOtherPrimitiveComponents ) && sourceInventory.unclassifiedOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.explicitlyNonQueryOtherPrimitiveComponents ) && sourceInventory.explicitlyNonQueryOtherPrimitiveComponents >= 0 && sourceInventory.unclassifiedOtherPrimitiveComponents + sourceInventory.explicitlyNonQueryOtherPrimitiveComponents === sourceInventory.otherPrimitiveComponents && Number.isSafeInteger( sourceInventory.landscapeHeightfieldCollisionComponents ) && sourceInventory.landscapeHeightfieldCollisionComponents >= 0 && sourceInventory.otherPrimitiveStatuses && typeof sourceInventory.otherPrimitiveStatuses === 'object' && Object.values( sourceInventory.otherPrimitiveStatuses ).every( count => Number.isSafeInteger( count ) && count >= 0 ) && Object.values( sourceInventory.otherPrimitiveStatuses ).reduce( ( total, count ) => total + count, 0 ) === sourceInventory.otherPrimitiveComponents, 'Local provider returned invalid collision source inventory' );
+			const allCollisionSourcesIndexed = sourceInventory.unclassifiedOtherPrimitiveComponents === 0 && sourceInventory.landscapeHeightfieldCollisionComponents === 0;
 			const cells = new Map();
 			for ( const cell of cellIndex.cells ) {
 				requireValue( Number.isSafeInteger( cell?.x ) && Number.isSafeInteger( cell?.y ) && Number.isSafeInteger( cell?.z ), 'Local provider returned invalid cell coordinates' );
@@ -159,7 +162,7 @@ export class LocalRegionConnector {
 				this.regionAssets.set( visualAssetId, visualURL.href );
 				this.collisionAssetIDs.add( collisionAssetId );
 				this.collisionObjectIDByAsset.set( collisionAssetId, collisionObjectId );
-				if ( cell.evidence?.scope !== 'all-collision-sources' || ! cell.evidence.staticMeshComponentsClassified ) this.unverifiedCollisionSourceObjectIDs.add( collisionObjectId );
+				if ( ! allCollisionSourcesIndexed || cell.evidence?.scope !== 'all-collision-sources' || ! cell.evidence.staticMeshComponentsClassified ) this.unverifiedCollisionSourceObjectIDs.add( collisionObjectId );
 				cellObjectIDs.add( collisionObjectId );
 				this.collisionObjectIDsByCell.set( cellKey, cellObjectIDs );
 				if ( isStartupCell ) this.initialRegionCellObjectIDs.add( collisionObjectId );

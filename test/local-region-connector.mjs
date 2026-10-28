@@ -59,7 +59,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) return Response.json( {
-		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), cells: [
+		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: { staticMeshComponents: 2, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {} }, cells: [
 			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true } },
 			{ x: 1, y: 0, z: 0, collisionEvidence: { scope: 'static-mesh-components-only', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, unknownComponents: 1, staticMeshComponentsClassified: false } },
 		],
