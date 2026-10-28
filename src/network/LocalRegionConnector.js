@@ -128,7 +128,8 @@ export class LocalRegionConnector {
 		this.manifest = {
 			protocol: 'elsemesh.world/1', worldId: this.worldId, title: `Hogwarts Legacy · ${region.label}`,
 			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
-			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } },
+			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.
+			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0 },
 			spawn,
 			entryPointActionLabel: selection.entryPointActionLabel,
 			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ) } ) ),
