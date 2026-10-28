@@ -24,6 +24,25 @@ current WebGL live capture also shows renderer-specific water and ground
 artifacts, so WebGL is accepted here for shared content and gameplay only, not
 as a visual match to the pre-split WebGPU renderer.
 
+### 2026-10-28 WebGPU terrain follow-up
+
+The built-in Example Island and signed Tidewater package were captured in the
+same ElseMesh build with the same WebGPU adapter and beach camera pose
+(`p=[15,3,-58]`, `yaw=3.14`, `pitch=-0.08`, time `16.2`). The hosted beach
+shows a stronger repeated ripple pattern across the foreground sand. The
+water/foam pattern differs too, but its simulation phase was not controlled, so
+that part of the comparison is inconclusive.
+
+The sand pattern is a runtime/rendering candidate, not evidence of stale
+Tidewater data. A fresh export from the current engine reproduced the checked-in
+terrain-surface asset exactly (`sha256:0d22d7f65330eaf827604de10d3d1e77af7c43ad08b1991dca31781129dc037a`),
+and the packaged 512×512 detail texture is byte-for-byte equal to the engine's
+generated detail texture. The terrain appearance difference still needs a
+controlled shader/runtime comparison. This check does not accept WebGL visual
+parity; the isolated WebGL capture did not produce a usable world image.
+
+![Built-in and signed-package WebGPU beach comparison](images/parity-2026-10-28-webgpu-beach.png)
+
 ## Tidewater post-split parity review, 2026-10-27
 
 Compared the pre-split ElseMesh tree at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
