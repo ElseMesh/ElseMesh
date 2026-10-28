@@ -37,9 +37,18 @@ The sand pattern is a runtime/rendering candidate, not evidence of stale
 Tidewater data. A fresh export from the current engine reproduced the checked-in
 terrain-surface asset exactly (`sha256:0d22d7f65330eaf827604de10d3d1e77af7c43ad08b1991dca31781129dc037a`),
 and the packaged 512×512 detail texture is byte-for-byte equal to the engine's
-generated detail texture. The terrain appearance difference still needs a
-controlled shader/runtime comparison. This check does not accept WebGL visual
-parity; the isolated WebGL capture did not produce a usable world image.
+generated detail texture. A second read-only check reconstructed the built-in
+terrain, including the village's pad flattening, baked its normal and splat
+maps, and compared all four arrays with the decoded package asset. Heights,
+normals, splat masks, and detail texture were byte-for-byte equal. This rules
+out those terrain inputs as the source of the stronger hosted ripples, but does
+not prove that the live shader inputs and sampling state matched during the
+captures. The shared terrain shader deliberately adds fine wind ripples to dry
+sand; a controlled runtime comparison still needs to record aligned world
+points, height and mask samples, wind state, CDLOD level and morph, and material
+defines, then isolate that ripple contribution. This check does not accept
+WebGL visual parity; the isolated WebGL capture did not produce a usable world
+image.
 
 ![Built-in and signed-package WebGPU beach comparison](images/parity-2026-10-28-webgpu-beach.png)
 
