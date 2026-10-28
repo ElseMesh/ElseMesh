@@ -18,11 +18,14 @@ export function validateWorldExtensions( extensions, assets, experience ) {
 		if ( ! extension || typeof extension !== 'object' || Array.isArray( extension ) || Object.keys( extension ).some( key => ! [ 'id', 'protocol', 'assetId', 'memoryPages', 'capabilities', 'behaviorId' ].includes( key ) ) ) throw new Error( 'Invalid world extension descriptor' );
 		if ( typeof extension.id !== 'string' || ! /^elsemesh-extension:[\w.-]{1,128}$/.test( extension.id ) || ids.has( extension.id ) ) throw new Error( 'Invalid or duplicate world extension ID' );
 		if ( typeof extension.behaviorId !== 'string' || behaviorIDs.has( extension.behaviorId ) ) throw new Error( 'World extension behavior binding is invalid or duplicated' );
-		if ( ! behaviors.some( behavior => behavior.id === extension.behaviorId && typeof behavior.onExtensionState === 'function' ) ) throw new Error( 'World extension must bind to a declared behavior with a registered state consumer' );
+		const behavior = behaviors.find( item => item.id === extension.behaviorId && typeof item.onExtensionState === 'function' );
+		if ( ! behavior ) throw new Error( 'World extension must bind to a declared behavior with a registered state consumer' );
 		if ( extension.protocol !== WORLD_EXTENSION_PROTOCOL ) throw new Error( `Unsupported world extension protocol ${extension.protocol}` );
 		if ( typeof extension.assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( extension.assetId ) || assetIDs.has( extension.assetId ) ) throw new Error( 'Invalid or duplicate world extension asset ID' );
 		if ( ! Number.isInteger( extension.memoryPages ) || extension.memoryPages < 1 || extension.memoryPages > MAX_MEMORY_PAGES ) throw new Error( 'Invalid world extension memory limit' );
 		if ( ! Array.isArray( extension.capabilities ) || extension.capabilities.length > 16 || new Set( extension.capabilities ).size !== extension.capabilities.length || extension.capabilities.some( capability => typeof capability !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( capability ) ) ) throw new Error( 'Invalid world extension capabilities' );
+		const allowedCapabilities = new Set( behavior.extensionCapabilities ?? [] );
+		if ( extension.capabilities.some( capability => ! allowedCapabilities.has( capability ) ) ) throw new Error( `World extension requests a capability not allowed by behavior ${behavior.id}` );
 		if ( assets !== undefined ) {
 			const asset = assets.find?.( item => item.id === extension.assetId );
 			if ( ! asset || asset.kind !== 'application/wasm' || ! Number.isSafeInteger( asset.bytes ) || asset.bytes < 8 || asset.bytes > MAX_MODULE_BYTES ) throw new Error( 'World extension must reference a declared bounded application/wasm asset' );
