@@ -46,9 +46,9 @@ try {
 	const ambientBytes = Buffer.from( 'fake OGG bytes for manifest conversion' );
 	const ambientAssetID = `sha256:${createHashForTest( ambientBytes )}`;
 	await writeFile( path.join( assetsPath, ambientAssetID.slice( 'sha256:'.length ) ), ambientBytes );
-	const wasmBytes = Buffer.from( [ 0, 97, 115, 109, 1, 0, 0, 0 ] );
-	const wasmAssetID = `sha256:${createHashForTest( wasmBytes )}`;
-	await writeFile( path.join( assetsPath, wasmAssetID.slice( 'sha256:'.length ) ), wasmBytes );
+	const javascriptBytes = Buffer.from( 'export function run(event) { return { type: event.type }; }\n' );
+	const javascriptAssetID = `sha256:${createHashForTest( javascriptBytes )}`;
+	await writeFile( path.join( assetsPath, javascriptAssetID.slice( 'sha256:'.length ) ), javascriptBytes );
 	const whaleAssetIDs = [];
 	for ( const [ index, name ] of [ 'manifest', 'geometry', 'albedo', 'height' ].entries() ) {
 		const bytes = Buffer.from( `whale ${name} test asset` );
@@ -66,7 +66,7 @@ try {
 		protocol: 'elsemesh.world-source/3',
 		worldId: 'elsemesh:manifest-test',
 		title: 'Manifest test',
-		experience: { genre: 'Fishing', tagline: 'Explore', loadingNote: 'Loading', tips: [ 'Cast a line' ], stages: {}, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } } }, extensions: [ { behaviorId: 'elsemesh.fishing-game/1', assetId: wasmAssetID } ] },
+		experience: { genre: 'Fishing', tagline: 'Explore', loadingNote: 'Loading', tips: [ 'Cast a line' ], stages: {}, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } } }, extensions: [ { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID } ] },
 		spawn: { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 },
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
@@ -94,7 +94,7 @@ try {
 	const manifest = JSON.parse( first );
 	assert.deepEqual( manifest.spawn, { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 }, 'authored spawn survives signed-manifest conversion' );
 	assert.deepEqual( manifest.experience.behaviors[ 'elsemesh.fishing-game/1' ], { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } }, 'behavior-owned gameplay placements survive signed-manifest conversion' );
-	assert.deepEqual( manifest.experience.extensions, [ { behaviorId: 'elsemesh.fishing-game/1', assetId: wasmAssetID } ], 'signed manifest retains the behavior-bound Wasm extension reference' );
+	assert.deepEqual( manifest.experience.extensions, [ { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID } ], 'signed manifest retains the behavior-bound JavaScript extension reference' );
 	assert.deepEqual( worldSpawnPose( manifest ), manifest.spawn );
 	assert.deepEqual( worldSpawnPose( {} ), { position: [ 0, 3, 8 ], yaw: Math.PI, pitch: -0.1 }, 'legacy cave entrance remains compatible' );
 	for ( const spawn of [ null, [], { position: [ 1, 2 ], yaw: 0, pitch: 0 }, { position: [ 0, Infinity, 0 ], yaw: 0, pitch: 0 }, { position: [ 0, 1000001, 0 ], yaw: 0, pitch: 0 }, { position: [ 0, 3, 8 ], yaw: NaN, pitch: 0 }, { position: [ 0, 3, 8 ], yaw: 0, pitch: 1.6 }, { position: [ 0, 3, 8 ], yaw: 0 } ] ) assert.throws( () => validateWorldSpawn( spawn ), /spawn pose/ );
@@ -108,7 +108,18 @@ try {
 	assert.deepEqual( manifest.components.at( -1 ), { id: 'elsemesh-component:test-ambience', type: 'elsemesh.ambient-audio/1', priority: 'portal-preview', beds: [ { assetId: ambientAssetID, gain: 0.3, condition: 'underwater', position: [ 1, 2, 3 ] } ] }, 'ambient bed contract survives deterministic conversion' );
 	assert.deepEqual( manifest.components.find( ( component ) => component.type === 'elsemesh.downeast-boat/1' ), { id: 'elsemesh-component:hosted-boat', type: 'elsemesh.downeast-boat/1', objectId: 'elsemesh-object:boat-preview', priority: 'portal-preview' }, 'boat runtime binds through stable world object ID' );
 	assert.ok( manifest.assets.some( ( asset ) => asset.id === ambientAssetID && asset.kind === 'audio/ogg' && asset.priority === 'portal-preview' ), 'audio bytes are included in the signed manifest at the component streaming priority' );
-	assert.ok( manifest.assets.some( asset => asset.id === wasmAssetID && asset.kind === 'wasm/1' && asset.bytes === wasmBytes.byteLength && asset.priority === 'visible' ), 'referenced Wasm bytes are included as a bounded visible asset' );
+	assert.ok( manifest.assets.some( asset => asset.id === javascriptAssetID && asset.kind === 'javascript/1' && asset.bytes === javascriptBytes.byteLength && asset.priority === 'visible' ), 'referenced JavaScript bytes are included as a bounded visible asset' );
+	const javascriptPath = path.join( assetsPath, javascriptAssetID.slice( 'sha256:'.length ) );
+	const rejectInvalidJavaScriptAsset = async ( bytes, expected ) => {
+		await writeFile( javascriptPath, bytes );
+		assert.throws( () => execFileSync( process.execPath, [ 'tools/world-source-to-manifest.mjs', '--source', sourcePath, '--owner', 'owner-peer', '--assets', assetsPath, '--out', path.join( root, 'invalid.json' ) ] ), error => {
+			assert.match( String( error.stderr ), expected );
+			return true;
+		} );
+		await writeFile( javascriptPath, javascriptBytes );
+	};
+	await rejectInvalidJavaScriptAsset( Uint8Array.of( 0xff ), /not valid for encoding utf-8/ );
+	await rejectInvalidJavaScriptAsset( Buffer.from( 'export function run() { return import("https://example.invalid/module.js"); }' ), /self-contained/ );
 	const invalidAmbientSource = JSON.parse( await readFile( sourcePath, 'utf8' ) );
 	invalidAmbientSource.components.at( -1 ).beds[ 0 ].condition = 'storm';
 	assert.throws( () => validateWorldSource( invalidAmbientSource ), /world component/, 'source validation rejects unimplemented ambient audio conditions' );

@@ -4,6 +4,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import { validateWorldSource } from '../src/network/WorldSource.js';
+import { decodeWorldJavaScriptExtension } from '../src/network/WorldJavaScriptExtension.js';
 
 function options(argv) {
 	const result = {};
@@ -80,13 +81,15 @@ async function main() {
 		const id = extension.assetId;
 		const assetPath = path.join( args.assets, id.slice( 'sha256:'.length ) );
 		const info = await stat( assetPath );
-		if ( ! info.isFile() || info.size < 8 || info.size > 1024 * 1024 ) throw new Error( `Invalid or oversized Wasm extension ${id}` );
+		if ( ! info.isFile() || info.size < 1 || info.size > 1024 * 1024 ) throw new Error( `Invalid or oversized JavaScript extension ${id}` );
+		const source = await readFile( assetPath );
+		try { decodeWorldJavaScriptExtension( source ); } catch ( error ) { throw new Error( `Invalid JavaScript extension ${id}: ${error.message}` ); }
 		const hasher = createHash( 'sha256' );
 		for await ( const chunk of createReadStream( assetPath ) ) hasher.update( chunk );
-		if ( `sha256:${hasher.digest( 'hex' )}` !== id ) throw new Error( `Hash mismatch for Wasm extension ${id}` );
-		const ref = { id, bytes: info.size, kind: 'wasm/1', priority: 'visible' };
+		if ( `sha256:${hasher.digest( 'hex' )}` !== id ) throw new Error( `Hash mismatch for JavaScript extension ${id}` );
+		const ref = { id, bytes: info.size, kind: 'javascript/1', priority: 'visible' };
 		const existing = assets.get( id );
-		if ( existing && ( existing.kind !== ref.kind || existing.priority !== ref.priority || existing.bytes !== ref.bytes ) ) throw new Error( `Wasm extension ${id} conflicts with another asset reference` );
+		if ( existing && ( existing.kind !== ref.kind || existing.priority !== ref.priority || existing.bytes !== ref.bytes ) ) throw new Error( `JavaScript extension ${id} conflicts with another asset reference` );
 		assets.set( id, ref );
 	}
 	if ( source.rules.maxPackageBytes !== undefined ) {

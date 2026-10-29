@@ -83,7 +83,7 @@ import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
-import { BUILTIN_WORLD_EXPERIENCE, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
+import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import './network/BrowserWorldBehaviorImplementations.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
@@ -593,6 +593,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
 			const initialAssetIDs = new Set( connector.manifest.objects.filter( ( object ) => initialObjectIDs.has( object.id ) && object.assetId ).map( ( object ) => object.assetId ) );
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
+			for ( const extension of connector.manifest.experience?.extensions || [] ) initialAssetIDs.add( extension.assetId );
 			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs } );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
@@ -718,6 +719,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		for ( const objectID of connector.initialRegionVisualObjectIDs || [] ) initialObjectIDs.add( objectID );
 		for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
+		for ( const extension of connector.manifest.experience?.extensions || [] ) assetIDs.add( extension.assetId );
 		const assets = await connector.preload( { through: 'background', assetIDs, concurrency: 2 } );
 		this.linkedWorldRoot = await loadWorldPackage( connector, { assets, objectIDs: initialObjectIDs } );
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
@@ -1247,8 +1249,16 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const policy = vehiclePolicy( connector.manifest.rules );
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
 		}
-		dispatchWorldBehaviorHooks( experience, 'onHostedWorldActivated', { app: this, connector, root, terrain, runtime } );
+		this.activeHostedExtensions = createWorldBehaviorExtensions( experience, connector.assets );
 		this.activeHostedExperience = experience;
+		try {
+			dispatchWorldBehaviorHooks( experience, 'onHostedWorldActivated', { app: this, connector, root, terrain, runtime, extensions: this.activeHostedExtensions } );
+		} catch ( error ) {
+			this.activeHostedExtensions.dispose();
+			this.activeHostedExtensions = null;
+			this.activeHostedExperience = null;
+			throw error;
+		}
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
 
@@ -1280,7 +1290,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.underwaterLighting = this.baseUnderwaterLighting;
 		this.baseUnderwaterLighting.activate();
 		this.baseGroundBounce.activate();
-		if ( this.activeHostedExperience ) dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldDeactivated', { app: this, mode: 'hosted' } );
+		if ( this.activeHostedExperience ) dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldDeactivated', { app: this, mode: 'hosted', extensions: this.activeHostedExtensions } );
+		this.activeHostedExtensions?.dispose();
+		this.activeHostedExtensions = null;
 		this.activeHostedExperience = null;
 
 		this.activeHostedWildlife = null;
@@ -1768,7 +1780,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			}
 			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.updateHostedWorld( dt );
-			dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt } );
+			dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
 			this.updateWorldPortals();
 			this.updateWorldStreaming();
 			this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );

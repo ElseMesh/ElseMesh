@@ -6,15 +6,18 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-10-29
 
-- A signed Wasm extension prototype had a module
-  guard that rejects
-  imports, tables, start functions, incompatible exports, unbounded or oversized
-  memory, and modules above 1 MiB. A dedicated Worker owns compilation and
-  execution with bounded JSON exchange and a terminable timeout. The focused
-  binary/worker-controller test, full `npm test`, and external-tree production
-  build passed at that time. This Wasm prototype is retired. Do not implement,
-  extend, or activate it: Wasm is too CPU-heavy for this project. Replace its
-  remaining code with the selected browser-native JavaScript worker approach.
+- Removed the retired Wasm guard, worker, and `wasm/1` manifest validation. The
+  publisher, world daemon, and browser now use bounded signed `javascript/1`
+  modules in a dedicated Worker with UTF-8, message-size, startup, and execution
+  limits. Hosted WebGPU and WebGL activation pass the generic Worker manager
+  through registry hooks and dispose it with the world. No world package consumes
+  it yet, and fishing behavior still needs to move out of engine code.
+- The focused Worker, registry, experience, manifest, and Go worldd tests pass;
+  `npm run build` passes in the external build tree. The full `npm test` run
+  passed through the engine smoke checks, then its gateway E2E could not find
+  the required Go toolchain in its isolated module cache. Re-running that E2E
+  with the installed toolchain cache and running the final browser-host test
+  separately both passed.
 - Tidewater package-specific export, authored collision, boat LOD, and Blender
   checks now live in `worlds/tidewater/test/` and pass from the engine runner.
 - World sources also gained signed Wasm asset references for that prototype.

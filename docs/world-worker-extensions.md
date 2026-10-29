@@ -11,11 +11,13 @@ gameplay rules.
 - Each `experience.extensions` entry binds one declared behavior ID to one
   signed asset ID. The manifest lists that asset as `kind: "javascript/1"` with
   `priority: "visible"`.
+- Modules are self-contained and cannot use JavaScript `import` syntax; imported
+  code would not be covered by the module asset's content hash.
 - The host starts one disposable module Worker for each active world behavior.
   It passes JSON messages only; it does not expose engine objects, credentials,
   renderer instances, or world-server connections.
-- Requests and responses use a versioned envelope and have a bounded encoded
-  size. The engine validates the envelope and the world-owned behavior module
+- Requests and responses use the `elsemesh.world-extension/1` envelope and
+  have a bounded encoded size. The engine validates the envelope and the world-owned behavior module
   validates its event and result data.
 - The host allows one outstanding call per worker, applies an execution
   deadline, and terminates the worker on timeout, malformed output, world
@@ -36,7 +38,9 @@ receive only the authoritative shared state required by the world protocol.
 
 ## Implementation status
 
-The source tree still contains the earlier Wasm guard, Wasm asset kind, and
-Wasm-specific validation. They must be replaced by the JavaScript Worker
-contract above before extensions are activated. No world-specific extension
-has been wired into the shared engine gameplay path.
+The engine and publisher use the signed `javascript/1` asset kind and a
+dedicated Worker host. JavaScript module bytes are UTF-8 checked and bounded;
+startup and each call have a deadline, and message payloads are size-limited.
+WebGPU and WebGL hosted-world activation now create, expose, and dispose the
+generic runtime through behavior registry contexts. No world package consumes
+the runtime yet; the world-owned behavior migration remains open.

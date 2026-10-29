@@ -1,5 +1,6 @@
 import { FishingGameRuntime } from '../game/FishingGameRuntime.js';
 import { validateFishingBiteSchedule } from '../game/FishingBiteSchedule.js';
+import { createWorldJavaScriptExtensionRuntime } from './WorldJavaScriptExtension.js';
 
 const behaviors = new Map();
 const implementations = new Map();
@@ -9,7 +10,7 @@ export const BUILTIN_WORLD_EXPERIENCE = Object.freeze( { behaviors: Object.freez
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
-	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'createRuntime' ].includes( key ) ) || descriptor.validateExperienceData !== undefined && typeof descriptor.validateExperienceData !== 'function' || descriptor.createRuntime !== undefined && typeof descriptor.createRuntime !== 'function' || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
+	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].includes( key ) ) || [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].some( key => descriptor[ key ] !== undefined && typeof descriptor[ key ] !== 'function' ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
 	behaviors.set( id, Object.freeze( { id, ...descriptor } ) );
 }
 
@@ -56,6 +57,49 @@ export function createWorldBehaviorRuntime( experience, id, options ) {
 	const behavior = worldBehaviorsFor( experience ).find( item => item.id === id );
 	if ( typeof behavior?.createRuntime !== 'function' ) throw new Error( `World behavior has no browser runtime: ${id}` );
 	return behavior.createRuntime( { ...options, behaviorData: behavior.data } );
+}
+
+export function createWorldBehaviorExtensions( experience, assets, options = {} ) {
+	const resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
+	const runtimes = new Map();
+	try {
+		for ( const reference of experience?.extensions || [] ) {
+			const behavior = resolved.get( reference.behaviorId );
+			const moduleBytes = assets instanceof Map ? assets.get( reference.assetId ) : assets?.[ reference.assetId ];
+			if ( ! ( moduleBytes instanceof Uint8Array || moduleBytes instanceof ArrayBuffer || typeof moduleBytes === 'string' ) ) throw new Error( `World behavior JavaScript asset is not loaded: ${reference.behaviorId}` );
+			const workerRuntime = createWorldJavaScriptExtensionRuntime( {
+				moduleBytes,
+				timeoutMs: options.timeoutMs,
+				workerFactory: options.workerFactory,
+			} );
+			runtimes.set( reference.behaviorId, Object.freeze( {
+				async run( event ) {
+					behavior.validateExtensionEvent?.( event );
+					const result = await workerRuntime.run( event );
+					behavior.validateExtensionResult?.( result, event );
+					return result;
+				},
+				dispose() { workerRuntime.dispose(); },
+			} ) );
+		}
+	} catch ( error ) {
+		for ( const runtime of runtimes.values() ) runtime.dispose();
+		throw error;
+	}
+	let disposed = false;
+	return Object.freeze( {
+		run( behaviorId, event ) {
+			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
+			const runtime = runtimes.get( behaviorId );
+			if ( ! runtime ) throw new Error( `World behavior has no JavaScript extension: ${behaviorId}` );
+			return runtime.run( event );
+		},
+		dispose() {
+			if ( disposed ) return;
+			disposed = true;
+			for ( const runtime of runtimes.values() ) runtime.dispose();
+		},
+	} );
 }
 
 registerWorldBehavior( 'elsemesh.fishing-game/1', {

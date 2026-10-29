@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
 const biteRateSchedule = { defaultMultiplier: 1, windows: [ { startHour: 0, endHour: 5, multiplier: 0.8 }, { startHour: 5, endHour: 8.1, multiplier: 1.4 }, { startHour: 17, endHour: 20.1, multiplier: 1.4 }, { startHour: 22, endHour: 24, multiplier: 0.8 } ] };
@@ -23,7 +24,11 @@ assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
 assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /does not support required world behavior/ );
 assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
 
-registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'invalid test data' ); } } );
+registerWorldBehavior( 'elsemesh.registry-test/1', {
+	validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'invalid test data' ); },
+	validateExtensionEvent: event => { if ( event.type !== 'ping' ) throw new Error( 'invalid test event' ); },
+	validateExtensionResult: result => { if ( result.echo?.type !== 'ping' ) throw new Error( 'invalid test result' ); },
+} );
 assert.equal( hasWorldBehavior( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'elsemesh.registry-test/1' ), true );
 assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: () => {} } ), /Invalid or duplicate/ );
 let worldActivation = null;
@@ -58,5 +63,22 @@ assert.equal( webglKey.active, false );
 dispatchWorldBehaviorHooks( { behaviors: {} }, 'onHostedWorldActivated', {} );
 assert.equal( worldActivation.active, false, 'registered handlers receive inactive lifecycle notifications for worlds without their behavior' );
 assert.throws( () => registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: () => {} } ), /Invalid or duplicate/ );
+
+class FakeWorker {
+	terminated = false;
+	postMessage( message ) {
+		if ( message.type === 'init' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, type: 'ready' } } ) );
+		if ( message.type === 'run' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, id: message.id, result: { echo: message.event } } } ) );
+	}
+	terminate() { this.terminated = true; }
+}
+const worker = new FakeWorker();
+const extensionAssetID = `sha256:${'c'.repeat( 64 )}`;
+const extensionExperience = { behaviors: { 'elsemesh.registry-test/1': {} }, extensions: [ { behaviorId: 'elsemesh.registry-test/1', assetId: extensionAssetID } ] };
+const extensions = createWorldBehaviorExtensions( extensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { echo: event }; }' ) ] ] ), { workerFactory: () => worker } );
+assert.deepEqual( await extensions.run( 'elsemesh.registry-test/1', { type: 'ping' } ), { echo: { type: 'ping' } }, 'generic behavior extensions exchange bounded JSON through the Worker manager' );
+await assert.rejects( extensions.run( 'elsemesh.registry-test/1', { type: 'unknown' } ), /invalid test event/, 'event meaning stays in the registered behavior package' );
+extensions.dispose();
+assert.equal( worker.terminated, true, 'world extension teardown terminates its Worker' );
 
 console.log( 'world behavior registry: ok' );

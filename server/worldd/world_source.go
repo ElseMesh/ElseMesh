@@ -355,7 +355,7 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 	}
 	if source.Experience != nil {
 		for _, extension := range source.Experience.Extensions {
-			if err := add(extension.AssetID, "wasm/1", "visible", false); err != nil {
+			if err := add(extension.AssetID, "javascript/1", "visible", false); err != nil {
 				return nil, err
 			}
 		}

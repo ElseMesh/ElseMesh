@@ -23,7 +23,7 @@ import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { webglLightingForTime } from './WebGLLighting.js';
-import { dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
 import './WebGLWorldBehaviorImplementations.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
@@ -821,7 +821,16 @@ export class WebGLFallback {
 				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		if ( this.worldLink ) dispatchWorldBehaviorHooks( this.connector?.manifest?.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'hosted', THREE: T } );
+		if ( this.worldLink ) {
+			this.activeWorldExtensions = createWorldBehaviorExtensions( this.connector?.manifest?.experience, this.connector?.assets );
+			try {
+				dispatchWorldBehaviorHooks( this.connector?.manifest?.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'hosted', THREE: T, extensions: this.activeWorldExtensions } );
+			} catch ( error ) {
+				this.activeWorldExtensions.dispose();
+				this.activeWorldExtensions = null;
+				throw error;
+			}
+		}
 		if ( this.worldLink ) {
 			for ( const { component, assets } of this.hostedWhalePackages || [] ) {
 				if ( await this._loadWebGLWhale( component, assets, this.hostedTerrainData, this.hostedSeaLevel ?? 0 ) ) this.hostedSupportedComponents.add( component.id );
@@ -1798,7 +1807,7 @@ export class WebGLFallback {
 			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
 			const experience = this.worldLink ? this.connector?.manifest?.experience : defaultWorldSource.experience;
-			if ( dispatchWorldBehaviorHooks( experience, 'onWebGLKeyDown', { fallback: this, event } ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+			if ( dispatchWorldBehaviorHooks( experience, 'onWebGLKeyDown', { fallback: this, event, extensions: this.activeWorldExtensions } ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
 			if ( this.worldLink && event.code === 'KeyE' ) this._useNearestPortal();
 		};
 		this._resize = () => {
@@ -1842,7 +1851,7 @@ export class WebGLFallback {
 			object.material.uniforms.uCameraPosition?.value.copy( this.camera.position );
 		}
 		const experience = this.worldLink ? this.connector?.manifest?.experience : defaultWorldSource.experience;
-		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWebGLBlocksPlayerInput', { fallback: this } );
+		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWebGLBlocksPlayerInput', { fallback: this, extensions: this.activeWorldExtensions } );
 		if ( this.player && ! gamePanelOpen ) {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );
@@ -1864,7 +1873,7 @@ export class WebGLFallback {
 		}
 		this.reefAdapter?.update( this.camera, simulationTime, defaultWorldSource.rules.seaLevel ?? 0 );
 		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
-		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime } );
+		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;
 			this.wildlifeRuntime.update( dt, this.camera, this.player, {

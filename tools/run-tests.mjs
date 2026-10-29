@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const tests = [
-	'test/world-identity.mjs', 'test/world-behavior-registry.mjs', 'test/world-wasm-extension.mjs', 'test/fishing-bite-schedule.mjs', 'worlds/tidewater/test/fishing-rules.mjs',
+	'test/world-identity.mjs', 'test/world-behavior-registry.mjs', 'test/world-javascript-extension.mjs', 'test/fishing-bite-schedule.mjs', 'worlds/tidewater/test/fishing-rules.mjs',
 	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
 	'test/vite-world-assets.mjs', 'test/require-external-build-tree.mjs', 'test/vegetation-placement-codec.mjs',
 	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'worlds/tidewater/test/reef-assets.mjs', 'test/webgl-reef-adapter.mjs',

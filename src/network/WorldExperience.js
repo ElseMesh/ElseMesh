@@ -1,5 +1,5 @@
 import { worldBehaviorsFor } from './WorldBehaviorRegistry.js';
-import { WORLD_WASM_EXTENSION_MAX_BYTES } from './WorldWasmExtension.js';
+import { WORLD_JAVASCRIPT_EXTENSION_MAX_BYTES } from './WorldJavaScriptExtension.js';
 
 const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'behaviors', 'extensions' ];
 const LOADING_STAGES = new Set( [ 'gpu', 'atmosphere', 'terrain', 'village', 'vegetation', 'ocean', 'reef', 'simulation', 'shaders', 'world', 'compile', 'warmup' ] );
@@ -22,18 +22,18 @@ export function validateWorldExperience( experience, assets ) {
 	for ( const [ stage, text ] of Object.entries( experience.stages ) ) if ( ! LOADING_STAGES.has( stage ) || typeof text !== 'string' || ! text.trim() || text.length > 120 ) throw new Error( `Invalid ThruHold loading stage ${stage}` );
 	worldBehaviorsFor( experience );
 	if ( experience.extensions !== undefined ) {
-		if ( ! Array.isArray( experience.extensions ) || experience.extensions.length > 16 ) throw new Error( 'Invalid world Wasm extensions' );
+		if ( ! Array.isArray( experience.extensions ) || experience.extensions.length > 16 ) throw new Error( 'Invalid world JavaScript extensions' );
 		const behaviorIDs = new Set();
 		for ( const extension of experience.extensions ) {
-			if ( ! extension || typeof extension !== 'object' || Array.isArray( extension ) || Object.keys( extension ).some( key => ! [ 'behaviorId', 'assetId' ].includes( key ) ) || typeof extension.behaviorId !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( extension.behaviorId ) || ! Object.hasOwn( experience.behaviors || {}, extension.behaviorId ) || typeof extension.assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( extension.assetId ) || behaviorIDs.has( extension.behaviorId ) ) throw new Error( 'Invalid world Wasm extension reference' );
+			if ( ! extension || typeof extension !== 'object' || Array.isArray( extension ) || Object.keys( extension ).some( key => ! [ 'behaviorId', 'assetId' ].includes( key ) ) || typeof extension.behaviorId !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( extension.behaviorId ) || ! Object.hasOwn( experience.behaviors || {}, extension.behaviorId ) || typeof extension.assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( extension.assetId ) || behaviorIDs.has( extension.behaviorId ) ) throw new Error( 'Invalid world JavaScript extension reference' );
 			behaviorIDs.add( extension.behaviorId );
 		}
 		if ( assets !== undefined ) {
-			if ( ! Array.isArray( assets ) ) throw new Error( 'Invalid world Wasm extension assets' );
+			if ( ! Array.isArray( assets ) ) throw new Error( 'Invalid world JavaScript extension assets' );
 			for ( const extension of experience.extensions ) {
 				const matches = assets.filter( asset => asset?.id === extension.assetId );
 				const asset = matches[ 0 ];
-				if ( matches.length !== 1 || asset?.kind !== 'wasm/1' || ! Number.isSafeInteger( asset.bytes ) || asset.bytes < 8 || asset.bytes > WORLD_WASM_EXTENSION_MAX_BYTES || asset.priority !== 'visible' ) throw new Error( `World behavior ${extension.behaviorId} has an invalid Wasm asset reference` );
+				if ( matches.length !== 1 || asset?.kind !== 'javascript/1' || ! Number.isSafeInteger( asset.bytes ) || asset.bytes < 1 || asset.bytes > WORLD_JAVASCRIPT_EXTENSION_MAX_BYTES || asset.priority !== 'visible' ) throw new Error( `World behavior ${extension.behaviorId} has an invalid JavaScript asset reference` );
 			}
 		}
 	}
