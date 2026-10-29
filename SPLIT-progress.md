@@ -28,6 +28,19 @@ The current v3 cleanup removes obsolete local migration aliases in Blender and
 `worldd`. The Hogwarts submodule is reported dirty and is outside this work;
 preserve it without inspection beyond its pointer/status or staging.
 
+### Fish-prop ownership boundary
+
+Fish-prop placements, species presentation, and model-specific geometry belong
+to Tidewater. ElseMesh owns renderer selection, GPU resource creation, drawing,
+culling, and LOD. A world Worker may produce or transform renderer-neutral
+typed-array data once and transfer its buffers to the client; the render loop
+must not depend on per-frame Worker messages. The current `FishProps` class
+mixes fish-specific geometry with ElseMesh rendering APIs, and the WebGPU and
+WebGL component adapters still interpret Tidewater's fish-prop component in
+the engine. This is a known separation gap, not a completed migration. Any
+refactor must preserve the existing batched draw, culling, shadow, and LOD
+behavior while keeping world code independent of the selected renderer.
+
 Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then remove
 Tidewater-specific WebGL component dispatch and material handling from
