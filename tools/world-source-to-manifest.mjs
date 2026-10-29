@@ -76,6 +76,19 @@ async function main() {
 			}
 		}
 	}
+	for ( const extension of source.experience?.extensions || [] ) {
+		const id = extension.assetId;
+		const assetPath = path.join( args.assets, id.slice( 'sha256:'.length ) );
+		const info = await stat( assetPath );
+		if ( ! info.isFile() || info.size < 8 || info.size > 1024 * 1024 ) throw new Error( `Invalid or oversized Wasm extension ${id}` );
+		const hasher = createHash( 'sha256' );
+		for await ( const chunk of createReadStream( assetPath ) ) hasher.update( chunk );
+		if ( `sha256:${hasher.digest( 'hex' )}` !== id ) throw new Error( `Hash mismatch for Wasm extension ${id}` );
+		const ref = { id, bytes: info.size, kind: 'wasm/1', priority: 'visible' };
+		const existing = assets.get( id );
+		if ( existing && ( existing.kind !== ref.kind || existing.priority !== ref.priority || existing.bytes !== ref.bytes ) ) throw new Error( `Wasm extension ${id} conflicts with another asset reference` );
+		assets.set( id, ref );
+	}
 	if ( source.rules.maxPackageBytes !== undefined ) {
 		const packageBytes = [ ...assets.values() ].reduce( ( total, asset ) => total + asset.bytes, 0 );
 		if ( packageBytes > source.rules.maxPackageBytes ) throw new Error( `World package uses ${packageBytes} bytes, over its declared ${source.rules.maxPackageBytes}-byte budget` );

@@ -1048,7 +1048,7 @@ export async function verifySignedWorldManifest( document ) {
 	const manifest = document.payload;
 	invariant( manifest.protocol === 'elsemesh.world/3' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
 	validateWorldRequirements( manifest );
-	validateWorldExperience( manifest.experience );
+	validateWorldExperience( manifest.experience, manifest.assets ?? null );
 	validateWorldSpawn( manifest.spawn );
 	validateWorldEntryPoints( manifest.entryPoints, manifest.entryPointPrompt, manifest.entryPointActionLabel );
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
@@ -125,6 +126,23 @@ func TestWorldExperienceAcceptsGenericElseMeshBehaviors(t *testing.T) {
 	base.Behaviors = map[string]json.RawMessage{"elsemesh.fishing-game/1": json.RawMessage(`{"fishStand":{"position":[12,-8],"yaw":1.2,"interactionRadius":4}}`)}
 	if err := validateWorldExperience(&base); err != nil {
 		t.Fatalf("valid opaque browser behavior data rejected: %v", err)
+	}
+	base.Extensions = []worldWasmExtension{{BehaviorID: "elsemesh.fishing-game/1", AssetID: "sha256:" + strings.Repeat("a", 64)}}
+	if err := validateWorldExperience(&base); err != nil {
+		t.Fatalf("valid behavior-bound Wasm reference rejected: %v", err)
+	}
+	base.Extensions[0].BehaviorID = "elsemesh.unregistered/1"
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("Wasm reference to an undeclared behavior was accepted")
+	}
+	base.Extensions[0].BehaviorID = "elsemesh.fishing-game/1"
+	base.Extensions = append(base.Extensions, base.Extensions[0])
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("duplicate behavior extension was accepted")
+	}
+	var unknownExtensionField []worldWasmExtension
+	if err := json.Unmarshal([]byte(`[{"behaviorId":"elsemesh.fishing-game/1","assetId":"sha256:`+strings.Repeat("a", 64)+`","entry":"run"}]`), &unknownExtensionField); err == nil {
+		t.Fatal("unknown Wasm extension fields were accepted")
 	}
 	base.Behaviors["elsemesh.fishing-game/1"] = json.RawMessage(`[]`)
 	if err := validateWorldExperience(&base); err == nil {

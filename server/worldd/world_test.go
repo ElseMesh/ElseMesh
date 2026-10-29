@@ -140,6 +140,42 @@ func TestWorldManifestAcceptsDeclarativeFishingRules(t *testing.T) {
 	}
 }
 
+func TestWorldManifestValidatesWasmBehaviorAssets(t *testing.T) {
+	owner := testKey(t)
+	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetID := "sha256:" + strings.Repeat("a", 64)
+	manifest := newStarterManifest("Wasm behavior", ownerID.String())
+	manifest.Experience = &worldExperience{
+		Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{},
+		Behaviors:  map[string]json.RawMessage{"elsemesh.example-world/1": json.RawMessage(`{}`)},
+		Extensions: []worldWasmExtension{{BehaviorID: "elsemesh.example-world/1", AssetID: assetID}},
+	}
+	manifest.Assets = []assetRef{{ID: assetID, Bytes: 8, Kind: "wasm/1", Priority: "visible"}}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid signed Wasm behavior asset rejected: %v", err)
+	}
+	for _, invalid := range []struct {
+		name string
+		edit func(*worldManifest)
+	}{
+		{"missing asset", func(m *worldManifest) { m.Assets = nil }},
+		{"wrong kind", func(m *worldManifest) { m.Assets[0].Kind = "glb" }},
+		{"wrong priority", func(m *worldManifest) { m.Assets[0].Priority = "background" }},
+		{"empty module", func(m *worldManifest) { m.Assets[0].Bytes = 7 }},
+		{"oversized module", func(m *worldManifest) { m.Assets[0].Bytes = (1 << 20) + 1 }},
+	} {
+		bad := manifest
+		bad.Assets = append([]assetRef(nil), manifest.Assets...)
+		invalid.edit(&bad)
+		if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+			t.Errorf("%s Wasm asset reference was accepted", invalid.name)
+		}
+	}
+}
+
 func TestWorldManifestRejectsUnsafeAuthorityEpochAndVersion(t *testing.T) {
 	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

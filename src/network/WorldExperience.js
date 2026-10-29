@@ -1,6 +1,7 @@
 import { worldBehaviorsFor } from './WorldBehaviorRegistry.js';
+import { WORLD_WASM_EXTENSION_MAX_BYTES } from './WorldWasmExtension.js';
 
-const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'behaviors' ];
+const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'behaviors', 'extensions' ];
 const LOADING_STAGES = new Set( [ 'gpu', 'atmosphere', 'terrain', 'village', 'vegetation', 'ocean', 'reef', 'simulation', 'shaders', 'world', 'compile', 'warmup' ] );
 const THEME_COLORS = [ 'background', 'surface', 'accent', 'text', 'muted', 'button', 'buttonText', 'border' ];
 
@@ -12,7 +13,7 @@ export const GENERIC_WORLD_EXPERIENCE = Object.freeze( validateWorldExperience( 
 	stages: Object.fromEntries( [ ...LOADING_STAGES ].map( ( stage ) => [ stage, 'Preparing this ThruHold…' ] ) ),
 } ) );
 
-export function validateWorldExperience( experience ) {
+export function validateWorldExperience( experience, assets ) {
 	if ( experience === undefined ) return undefined;
 	if ( ! experience || typeof experience !== 'object' || Array.isArray( experience ) || Object.keys( experience ).some( ( key ) => ! EXPERIENCE_FIELDS.includes( key ) ) ) throw new Error( 'Invalid ThruHold experience descriptor' );
 	for ( const key of [ 'genre', 'tagline', 'loadingNote' ] ) if ( typeof experience[ key ] !== 'string' || ! experience[ key ].trim() || experience[ key ].length > 240 ) throw new Error( `Invalid ThruHold experience ${key}` );
@@ -20,6 +21,22 @@ export function validateWorldExperience( experience ) {
 	if ( ! experience.stages || typeof experience.stages !== 'object' || Array.isArray( experience.stages ) || Object.keys( experience.stages ).length > LOADING_STAGES.size ) throw new Error( 'Invalid ThruHold loading stages' );
 	for ( const [ stage, text ] of Object.entries( experience.stages ) ) if ( ! LOADING_STAGES.has( stage ) || typeof text !== 'string' || ! text.trim() || text.length > 120 ) throw new Error( `Invalid ThruHold loading stage ${stage}` );
 	worldBehaviorsFor( experience );
+	if ( experience.extensions !== undefined ) {
+		if ( ! Array.isArray( experience.extensions ) || experience.extensions.length > 16 ) throw new Error( 'Invalid world Wasm extensions' );
+		const behaviorIDs = new Set();
+		for ( const extension of experience.extensions ) {
+			if ( ! extension || typeof extension !== 'object' || Array.isArray( extension ) || Object.keys( extension ).some( key => ! [ 'behaviorId', 'assetId' ].includes( key ) ) || typeof extension.behaviorId !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( extension.behaviorId ) || ! Object.hasOwn( experience.behaviors || {}, extension.behaviorId ) || typeof extension.assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( extension.assetId ) || behaviorIDs.has( extension.behaviorId ) ) throw new Error( 'Invalid world Wasm extension reference' );
+			behaviorIDs.add( extension.behaviorId );
+		}
+		if ( assets !== undefined ) {
+			if ( ! Array.isArray( assets ) ) throw new Error( 'Invalid world Wasm extension assets' );
+			for ( const extension of experience.extensions ) {
+				const matches = assets.filter( asset => asset?.id === extension.assetId );
+				const asset = matches[ 0 ];
+				if ( matches.length !== 1 || asset?.kind !== 'wasm/1' || ! Number.isSafeInteger( asset.bytes ) || asset.bytes < 8 || asset.bytes > WORLD_WASM_EXTENSION_MAX_BYTES || asset.priority !== 'visible' ) throw new Error( `World behavior ${extension.behaviorId} has an invalid Wasm asset reference` );
+			}
+		}
+	}
 	if ( experience.theme !== undefined ) {
 		const theme = experience.theme;
 		if ( ! theme || typeof theme !== 'object' || Array.isArray( theme ) || Object.keys( theme ).some( key => ! [ 'logo', 'colors' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold loading theme' );

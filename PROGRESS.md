@@ -6,16 +6,24 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-10-29
 
-- Began the signed Wasm extension runtime foundation. The module guard rejects
+- At this stage, the signed Wasm extension runtime foundation had a module
+  guard that rejects
   imports, tables, start functions, incompatible exports, unbounded or oversized
   memory, and modules above 1 MiB. A dedicated Worker owns compilation and
   execution with bounded JSON exchange and a terminable timeout. The focused
   binary/worker-controller test, full `npm test`, and external-tree production
   build pass. Signed manifest references, server validation, behavior dispatch,
-  state lifetime, and example extensions remain open; Wasm extensions are not
-  yet activated by a world.
+  state lifetime, and example extensions were still open; Wasm extensions were
+  not yet activated by a world.
 - Tidewater package-specific export, authored collision, boat LOD, and Blender
   checks now live in `worlds/tidewater/test/` and pass from the engine runner.
+- World sources can now bind optional Wasm assets to declared registered
+  behaviors. The JS publisher includes verified `wasm/1` assets in the signed
+  manifest; browser and `worldd` validators require matching, visible assets
+  from 8 bytes through 1 MiB. Focused source, manifest, behavior, and server
+  tests pass. Browser lifecycle activation, per-world state, behavior-specific
+  output validation, and world examples remain open; extensions still do not
+  execute as part of gameplay.
 
 ## 2026-10-24
 

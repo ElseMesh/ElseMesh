@@ -27,6 +27,18 @@ contract before applying any effect. The module cannot publish presence, alter
 signed world data, or perform a network request. A future behavior may expose
 additional capabilities only through a separately versioned host contract.
 
+## Signed package reference
+
+World source binds an optional module to a declared behavior through
+`experience.extensions`, with one `{ "behaviorId", "assetId" }` record per
+behavior. The world publisher includes the referenced bytes in the owner-signed
+manifest as `kind: "wasm/1"`, `priority: "visible"`; the asset must be between
+8 bytes and 1 MiB. Source and manifest validators require the target behavior
+to be declared, verify the hash reference, and reject absent or mismatched
+asset metadata. Source-to-manifest publishers hash the module file before
+including it; the browser's normal asset path verifies downloaded bytes
+against that signed SHA-256 ID before any runtime validator sees them.
+
 ## Implementation status
 
 `src/network/WorldWasmExtension.js` enforces the binary header, module size,
@@ -36,7 +48,8 @@ memory, bounded JSON exchange, and the worker termination boundary. Focused
 tests cover valid and rejected binary layouts, fixed memory limits, and the
 timeout/disposal controller.
 
-World-source and signed-manifest references, browser lifecycle integration,
-per-world state, server-side reference validation, and Tidewater/Hogwarts
-extension examples remain unfinished. Until those pieces land, the engine does
-not claim to load Wasm extensions into a world.
+World-source and signed-manifest references plus browser and server reference
+validation are implemented. Browser lifecycle activation, per-world state,
+behavior-specific result contracts, and Tidewater/Hogwarts extension examples
+remain unfinished. The engine still does not claim to execute a world Wasm
+extension as part of gameplay.

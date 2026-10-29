@@ -455,6 +455,24 @@ type worldExperience struct {
 	Tips        []string                   `json:"tips"`
 	Stages      map[string]string          `json:"stages"`
 	Behaviors   map[string]json.RawMessage `json:"behaviors,omitempty"`
+	Extensions  []worldWasmExtension       `json:"extensions,omitempty"`
+}
+
+type worldWasmExtension struct {
+	BehaviorID string `json:"behaviorId"`
+	AssetID    string `json:"assetId"`
+}
+
+func (extension *worldWasmExtension) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if len(fields) != 2 || fields["behaviorId"] == nil || fields["assetId"] == nil {
+		return errors.New("Wasm extension requires only behaviorId and assetId")
+	}
+	type plainExtension worldWasmExtension
+	return json.Unmarshal(data, (*plainExtension)(extension))
 }
 
 func validateWorldExperience(experience *worldExperience) error {
@@ -497,8 +515,35 @@ func validateWorldExperience(experience *worldExperience) error {
 			return fmt.Errorf("world experience behavior data %q must be a bounded object", behavior)
 		}
 	}
+	if len(experience.Extensions) > 16 {
+		return errors.New("world experience has too many Wasm extensions")
+	}
+	seenExtensions := make(map[string]bool, len(experience.Extensions))
+	for _, extension := range experience.Extensions {
+		if !worldBehaviorPattern.MatchString(extension.BehaviorID) || experience.Behaviors[extension.BehaviorID] == nil || !assetIDPattern.MatchString(extension.AssetID) || seenExtensions[extension.BehaviorID] {
+			return errors.New("world experience contains an invalid Wasm extension reference")
+		}
+		seenExtensions[extension.BehaviorID] = true
+	}
 	if behaviorDataBytes > 64<<10 {
 		return errors.New("world experience behavior data exceeds its size limit")
+	}
+	return nil
+}
+
+func validateWorldWasmExtensionAssets(experience *worldExperience, assets []assetRef) error {
+	if experience == nil || len(experience.Extensions) == 0 {
+		return nil
+	}
+	assetByID := make(map[string]assetRef, len(assets))
+	for _, asset := range assets {
+		assetByID[asset.ID] = asset
+	}
+	for _, extension := range experience.Extensions {
+		asset, ok := assetByID[extension.AssetID]
+		if !ok || asset.Kind != "wasm/1" || asset.Bytes < 8 || asset.Bytes > 1<<20 || asset.Priority != "visible" {
+			return fmt.Errorf("world behavior %s has an invalid Wasm asset reference", extension.BehaviorID)
+		}
 	}
 	return nil
 }
@@ -670,6 +715,9 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			return fmt.Errorf("invalid priority for asset %s", asset.ID)
 		}
 		seenAssets[asset.ID] = true
+	}
+	if err := validateWorldWasmExtensionAssets(manifest.Experience, manifest.Assets); err != nil {
+		return err
 	}
 	assetKinds := make(map[string]string, len(manifest.Assets))
 	for _, asset := range manifest.Assets {

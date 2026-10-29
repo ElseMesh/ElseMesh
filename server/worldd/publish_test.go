@@ -235,3 +235,27 @@ func TestHashWorldSourceFileUsesExactFileBytes(t *testing.T) {
 		t.Fatalf("source hash = %s, want %s", got, want)
 	}
 }
+
+func TestWorldSourceAssetsIncludesWasmBehaviorExtensions(t *testing.T) {
+	directory := t.TempDir()
+	assetsDirectory := filepath.Join(directory, "assets")
+	if err := os.MkdirAll(assetsDirectory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	module := []byte("valid wasm payload")
+	assetID := assetHash(module)
+	if err := os.WriteFile(filepath.Join(assetsDirectory, assetID[len("sha256:"):]), module, 0600); err != nil {
+		t.Fatal(err)
+	}
+	source := worldSourceDocument{Experience: &worldExperience{
+		Behaviors:  map[string]json.RawMessage{"elsemesh.example-world/1": json.RawMessage(`{}`)},
+		Extensions: []worldWasmExtension{{BehaviorID: "elsemesh.example-world/1", AssetID: assetID}},
+	}}
+	assets, err := worldSourceAssets(directory, source)
+	if err != nil {
+		t.Fatalf("world source Wasm extension asset rejected: %v", err)
+	}
+	if len(assets) != 1 || assets[0].ID != assetID || assets[0].Bytes != int64(len(module)) || assets[0].Kind != "wasm/1" || assets[0].Priority != "visible" {
+		t.Fatalf("world source Wasm asset reference = %#v", assets)
+	}
+}

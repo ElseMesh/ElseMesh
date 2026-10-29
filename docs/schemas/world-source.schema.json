@@ -49,6 +49,20 @@
           "propertyNames": { "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
           "additionalProperties": { "type": "object" },
           "description": "Maps each required ElseMesh behavior ID to its behavior-owned authored data. The server validates the bounded generic envelope; clients validate data through their registered behavior implementation."
+        },
+        "extensions": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": ["behaviorId", "assetId"],
+            "properties": {
+              "behaviorId": { "type": "string", "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
+              "assetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+            },
+            "additionalProperties": false
+          },
+          "description": "Optional owner-signed Wasm asset bindings. Each extension must target a behavior declared in behaviors; its asset is included in the signed manifest as kind wasm/1 and capped at 1 MiB."
         }
       },
       "additionalProperties": false
