@@ -21,14 +21,12 @@ unfinished runtime boundary or parity gate.
 
 ## Current work and next gates
 
-The source tree currently has uncommitted edits in `src/App.js`,
-`src/network/WorldComponentRegistry.js`, `src/network/WorldStreaming.js`,
-`test/world-streaming.mjs`, and this ledger, plus a Tidewater submodule edit to
-`register-components.js`. The Hogwarts submodule is also reported dirty and is
-outside this work; preserve it without inspection beyond its pointer/status or
-staging. The current App edit makes component asset readiness consume generic
-`component.assets` references and uses the registered vegetation trait for
-streaming selection. It does not yet remove the Tidewater installer switch.
+The latest pushed source commit is `d1e6ea8`; it records generic component
+asset readiness and registered vegetation streaming traits. The Tidewater
+registration correction is committed at submodule revision `9a651e1`. The
+Hogwarts submodule is reported dirty and is outside this work; preserve it
+without inspection beyond its pointer/status or staging. The Tidewater
+installer switch remains in `App.js`.
 
 Next, finish generic component dispatch and Tidewater-owned installers; remove
 Tidewater-specific WebGL component dispatch; audit protocol/ID and Wasm
@@ -44,3 +42,5 @@ when a gate is newly supported or a finding changes them.
   external build tree. These verify the current suite/build, not visual parity
   in the browser; component installer extraction and isolated-browser review
   remain open.
+- 2026-10-29: the verified source changes and this ledger were committed and
+  pushed; Hogwarts was not staged.
