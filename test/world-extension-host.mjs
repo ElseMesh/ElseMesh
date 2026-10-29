@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { validateWorldExtensions, WorldExtensionHost, WORLD_EXTENSION_PROTOCOL } from '../src/network/WorldExtensionHost.js';
+import { validateWorldExtensions, WorldExtensionHost, WORLD_EXTENSION_PROTOCOL, WORLD_EXTENSION_STEP_BUDGET_MS, WORLD_EXTENSION_STEP_BUDGET_WINDOW_MS } from '../src/network/WorldExtensionHost.js';
 import { registerWorldBehavior } from '../src/network/WorldBehaviorRegistry.js';
 import { WorldExtensionSession } from '../src/network/WorldExtensionSession.js';
 import { stepWorldPackageExtensions } from '../src/network/WorldPackage.js';
@@ -14,6 +14,7 @@ const assets = [ { id: descriptor.assetId, kind: 'application/wasm', bytes: 8 } 
 assert.throws( () => new WorldExtensionHost( { stepTimeoutMs: 51 } ), /timeout must be an integer from 1 to 50 ms/ );
 assert.throws( () => new WorldExtensionHost( { stepTimeoutMs: 0 } ), /timeout must be an integer from 1 to 50 ms/ );
 assert.throws( () => new WorldExtensionHost( { stepTimeoutMs: Infinity } ), /timeout must be an integer from 1 to 50 ms/ );
+assert.throws( () => new WorldExtensionHost( { clock: 1 } ), /clock must be a function/ );
 assert.equal( validateWorldExtensions( [ descriptor ], assets, experience )[ 0 ], descriptor );
 assert.equal( validateWorldExtensions( [ { ...descriptor, capabilities: [ 'test.rules' ], behaviorId: 'elsemesh.extension-test-capability/1' } ], assets, { behaviors: { 'elsemesh.extension-test-capability/1': {} } } )[ 0 ].capabilities[ 0 ], 'test.rules' );
 assert.throws( () => validateWorldExtensions( [ { ...descriptor, capabilities: [ 'fishing.rules' ] } ], assets, experience ), /capability not allowed by behavior/ );
@@ -99,5 +100,42 @@ const timeoutHost = new WorldExtensionHost( { workerFactory: () => timeoutWorker
 await timeoutHost.load( descriptor, new Uint8Array( 8 ), {} );
 await assert.rejects( timeoutHost.step( descriptor.id, {} ), /exceeded its 10 ms time limit/ );
 assert.equal( timeoutWorker.terminated, true );
+
+let budgetTime = 0;
+const budgetWorker = {
+	terminated: false,
+	postMessage( message ) {
+		if ( message.type === 'step' ) budgetTime += 100;
+		queueMicrotask( () => {
+			if ( this.terminated ) return;
+			if ( message.type === 'load' ) this.onmessage( { data: { type: 'ready' } } );
+			else this.onmessage( { data: { type: 'result', requestId: message.requestId, value: {} } } );
+		} );
+	},
+	terminate() { this.terminated = true; },
+};
+const budgetHost = new WorldExtensionHost( { workerFactory: () => budgetWorker, clock: () => budgetTime } );
+await budgetHost.load( descriptor, new Uint8Array( 8 ), {} );
+await budgetHost.step( descriptor.id, {} );
+await budgetHost.step( descriptor.id, {} );
+await assert.rejects( budgetHost.step( descriptor.id, {} ), new RegExp( `exceeded its ${WORLD_EXTENSION_STEP_BUDGET_MS} ms execution budget in a ${WORLD_EXTENSION_STEP_BUDGET_WINDOW_MS / 1000} s window` ) );
+assert.equal( budgetWorker.terminated, true, 'the host terminates a module that exhausts its aggregate step budget' );
+
+const invalidClockWorker = {
+	terminated: false,
+	postMessage( message ) {
+		queueMicrotask( () => {
+			if ( this.terminated ) return;
+			if ( message.type === 'load' ) this.onmessage( { data: { type: 'ready' } } );
+			else this.onmessage( { data: { type: 'result', requestId: message.requestId, value: {} } } );
+		} );
+	},
+	terminate() { this.terminated = true; },
+};
+let invalidClockCalls = 0;
+const invalidClockHost = new WorldExtensionHost( { workerFactory: () => invalidClockWorker, clock: () => ++ invalidClockCalls === 3 ? NaN : invalidClockCalls } );
+await invalidClockHost.load( descriptor, new Uint8Array( 8 ), {} );
+await assert.rejects( invalidClockHost.step( descriptor.id, {} ), /clock returned an invalid value/ );
+assert.equal( invalidClockWorker.terminated, true, 'the host terminates a module when budget accounting cannot read its clock' );
 
 console.log( 'world extension host: ok' );

@@ -4,8 +4,12 @@ const MAX_MODULE_BYTES = 8 * 1024 * 1024;
 const MAX_MEMORY_PAGES = 256;
 const MAX_MESSAGE_BYTES = 64 * 1024;
 const MAX_STEP_TIMEOUT_MS = 50;
+const MAX_STEP_BUDGET_MS = 250;
+const STEP_BUDGET_WINDOW_MS = 60_000;
 
 export const WORLD_EXTENSION_PROTOCOL = 'elsemesh.world-extension/1';
+export const WORLD_EXTENSION_STEP_BUDGET_MS = MAX_STEP_BUDGET_MS;
+export const WORLD_EXTENSION_STEP_BUDGET_WINDOW_MS = STEP_BUDGET_WINDOW_MS;
 
 export function validateWorldExtensions( extensions, assets, experience ) {
 	if ( extensions === undefined ) return [];
@@ -38,10 +42,12 @@ export function validateWorldExtensions( extensions, assets, experience ) {
 }
 
 export class WorldExtensionHost {
-	constructor( { workerFactory = () => new Worker( new URL( './WorldExtensionWorker.js', import.meta.url ), { type: 'module' } ), stepTimeoutMs = MAX_STEP_TIMEOUT_MS } = {} ) {
+	constructor( { workerFactory = () => new Worker( new URL( './WorldExtensionWorker.js', import.meta.url ), { type: 'module' } ), stepTimeoutMs = MAX_STEP_TIMEOUT_MS, clock = () => globalThis.performance?.now?.() ?? Date.now() } = {} ) {
 		if ( ! Number.isInteger( stepTimeoutMs ) || stepTimeoutMs < 1 || stepTimeoutMs > MAX_STEP_TIMEOUT_MS ) throw new Error( `World extension step timeout must be an integer from 1 to ${MAX_STEP_TIMEOUT_MS} ms` );
+		if ( typeof clock !== 'function' ) throw new Error( 'World extension clock must be a function' );
 		this.workerFactory = workerFactory;
 		this.stepTimeoutMs = stepTimeoutMs;
+		this.clock = clock;
 		this.extensions = new Map();
 		this.nextRequestId = 1;
 	}
@@ -50,8 +56,9 @@ export class WorldExtensionHost {
 		if ( descriptor?.protocol !== WORLD_EXTENSION_PROTOCOL || typeof descriptor.id !== 'string' || ! descriptor.id.startsWith( 'elsemesh-extension:' ) ) throw new Error( 'Invalid world extension descriptor' );
 		if ( ! ( moduleBytes instanceof Uint8Array ) || moduleBytes.byteLength < 8 || moduleBytes.byteLength > MAX_MODULE_BYTES ) throw new Error( 'World extension module is outside the supported size limit' );
 		if ( this.extensions.has( descriptor.id ) ) throw new Error( `World extension ${descriptor.id} is already loaded` );
+		const stepWindowStartedAt = this._now();
 		const worker = this.workerFactory();
-		const extension = { worker, behaviorId: descriptor.behaviorId, pending: new Map(), failed: null, lastState: null };
+		const extension = { worker, behaviorId: descriptor.behaviorId, pending: new Map(), failed: null, lastState: null, stepWindowStartedAt, stepWindowElapsedMs: 0 };
 		worker.onmessage = ( event ) => this._onMessage( descriptor.id, event.data );
 		worker.onerror = ( event ) => this._fail( descriptor.id, new Error( event.message || 'World extension worker failed' ) );
 		this.extensions.set( descriptor.id, extension );
@@ -70,7 +77,10 @@ export class WorldExtensionHost {
 	step( id, input ) {
 		const encoded = new TextEncoder().encode( JSON.stringify( input ) );
 		if ( encoded.byteLength > MAX_MESSAGE_BYTES ) return Promise.reject( new Error( 'World extension input exceeds the size limit' ) );
+		const startedAt = this._now();
 		return this._request( id, 'step', { input }, this.stepTimeoutMs ).then( ( state ) => {
+			const completedAt = this._now();
+			this._chargeStepBudget( id, completedAt - startedAt, completedAt );
 			const outputBytes = new TextEncoder().encode( JSON.stringify( state ) ).byteLength;
 			if ( outputBytes > MAX_MESSAGE_BYTES ) throw new Error( 'World extension output exceeds the size limit' );
 			const extension = this.extensions.get( id );
@@ -80,6 +90,25 @@ export class WorldExtensionHost {
 			this._fail( id, error );
 			throw error;
 		} );
+	}
+
+	_now() {
+		const now = this.clock();
+		if ( ! Number.isFinite( now ) ) throw new Error( 'World extension clock returned an invalid value' );
+		return now;
+	}
+
+	_chargeStepBudget( id, elapsedMs, now ) {
+		const extension = this.extensions.get( id );
+		if ( ! extension ) return;
+		if ( ! Number.isFinite( elapsedMs ) || elapsedMs < 0 ) throw new Error( 'World extension clock returned an invalid elapsed time' );
+		if ( now - extension.stepWindowStartedAt >= STEP_BUDGET_WINDOW_MS ) {
+			extension.stepWindowStartedAt = now;
+			extension.stepWindowElapsedMs = 0;
+		}
+		const nextElapsedMs = extension.stepWindowElapsedMs + Math.max( 0, elapsedMs );
+		if ( nextElapsedMs > MAX_STEP_BUDGET_MS ) throw new Error( `World extension ${id} exceeded its ${MAX_STEP_BUDGET_MS} ms execution budget in a ${STEP_BUDGET_WINDOW_MS / 1000} s window` );
+		extension.stepWindowElapsedMs = nextElapsedMs;
 	}
 
 	getState( id ) { return this.extensions.get( id )?.lastState ?? null; }
