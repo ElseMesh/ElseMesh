@@ -17,8 +17,6 @@ from world_identity import is_world_id
 
 PROTOCOL = "elsemesh.world-source/3"
 TEXT_NAME = "ElseMeshThruHoldSource"
-PREVIOUS_TEXT_NAME = "ThruholdWorldSource"
-LEGACY_TEXT_NAME = "TidewaterWorldSource"
 
 
 def args():
@@ -94,7 +92,7 @@ def metadata_items(source):
 
 def import_source(path):
     source = validate(json.loads(path.read_text(encoding="utf-8")))
-    collection = bpy.data.collections.get("ElseMesh ThruHold Source") or bpy.data.collections.get("Thruhold World Source") or bpy.data.collections.get("Tidewater World Source")
+    collection = bpy.data.collections.get("ElseMesh ThruHold Source")
     if collection is None:
         collection = bpy.data.collections.new("ElseMesh ThruHold Source")
         bpy.context.scene.collection.children.link(collection)
@@ -111,7 +109,7 @@ def import_source(path):
         if kind == "object":
             empty.scale = item.get("scale", (1, 1, 1))
             empty.rotation_euler[2] = float(item["transform"].get("yaw", 0))
-    text = bpy.data.texts.get(TEXT_NAME) or bpy.data.texts.get(PREVIOUS_TEXT_NAME) or bpy.data.texts.get(LEGACY_TEXT_NAME) or bpy.data.texts.new(TEXT_NAME)
+    text = bpy.data.texts.get(TEXT_NAME) or bpy.data.texts.new(TEXT_NAME)
     text.clear()
     text.write(json.dumps(source, indent=2) + "\n")
     bpy.context.scene["thruhold_world_id"] = source["worldId"]
@@ -119,17 +117,17 @@ def import_source(path):
 
 
 def export_source(path):
-    text = bpy.data.texts.get(TEXT_NAME) or bpy.data.texts.get(PREVIOUS_TEXT_NAME) or bpy.data.texts.get(LEGACY_TEXT_NAME)
+    text = bpy.data.texts.get(TEXT_NAME)
     if text is None:
         raise ValueError("ElseMeshThruHoldSource text block is missing; import a source file first")
     source = validate(json.loads(text.as_string()))
     objects, portals = [], []
     for obj in bpy.data.objects:
-        raw = obj.get("thruhold_record") or obj.get("tidewater_record")
+        raw = obj.get("thruhold_record")
         if not raw:
             continue
         item = json.loads(raw)
-        kind = obj.get("thruhold_kind") or obj.get("tidewater_kind")
+        kind = obj.get("thruhold_kind")
         position = list(to_world_coordinates(obj.location))
         if kind == "object":
             item["transform"]["position"] = position

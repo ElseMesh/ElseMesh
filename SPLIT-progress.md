@@ -14,25 +14,23 @@ unfinished runtime boundary or parity gate.
 | Requirement | Estimate | Evidence and remaining acceptance gate |
 | --- | ---: | --- |
 | Keep authored Tidewater and Hogwarts world data in their own repositories | **100%** | Both are mounted as submodules and documented in [`docs/world-repository-layout.md`](docs/world-repository-layout.md). Repository separation is recorded complete in [`GOAL-done.md`](GOAL-done.md). This measures authored-data ownership only; engine-side runtime handlers still need extraction. |
-| ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **90%** | Signed manifests use `elsemesh.world/3`; source uses `elsemesh.world-source/3`; the server and client reject legacy world IDs/protocols (including checks in `test/world-identity.mjs` and `server/worldd/world_test.go`). Remaining: complete the current cross-surface audit and run the full client/server verification after the ongoing changes. Historical negative tests may mention old forms only to prove rejection. |
+| ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **100%** | Signed manifests require `elsemesh.world/3`; source requires `elsemesh.world-source/3`; client/server/Blender reject old world IDs and manifest/source protocols. Obsolete Blender metadata aliases and the daemon's Tidewater-named local profile/ZeroTier auto-migration paths have been removed. Focused identity/Blender checks, `go test ./...`, the full client suite, and the external build passed. Historical negative tests mention old forms only to prove rejection. |
 | Owner-signed JavaScript world extensions run in dedicated browser Workers; no Wasm implementation | **90%** | `src/network/WorldJavaScriptExtension.js` and its Worker enforce message bounds, startup/run limits, and worker teardown; server manifest validation binds extension assets to signed `javascript/1` assets. No Wasm runtime is implemented. Remaining: re-run extension lifecycle and signed-manifest integration checks against the final tree and ensure the world package integration uses this generic host path. |
 | Registry-based, world-agnostic engine behavior and component installation | **45%** | `WorldBehaviorRegistry.js`, generic component envelopes, renderer-neutral traits, and registered installers exist. WebGPU component installation in `src/App.js` now dispatches through the registry; Tidewater’s terrain, vegetation, reef, wildlife, fish prop, whale, ocean, village material, and boat installers live in `worlds/tidewater/component-installers.js`. Focused registry/streaming checks, the full suite, and the external build pass. **Still incomplete:** WebGL presentation in `src/fallback/WebGLFallback.js` and Tidewater-specific material handling in `WorldPackage.js` remain; the default app still loads Tidewater registrations. Acceptance requires moving those handlers into world packages and proving an independent world can load without Tidewater code. |
 | Tidewater gameplay and content parity: WebGPU baseline, WebGL aligned | **75%** | Tidewater has deterministic pre-split WebGPU fishing and boat traces plus WebGPU/WebGL fishing and WebGL fish-stand/boat content checks under `worlds/tidewater/test/`. [`PROJECT-DIRECTION.md`](PROJECT-DIRECTION.md) records package integration/parity at 75%. Remaining: verify the complete gameplay/content path after the final separation edits, compare the split build with the pre-split WebGPU reference, inspect the world in the isolated browser display, and resolve any differences. WebGL appearance is not a visual baseline. |
 
 ## Current work and next gates
 
-The latest implementation commits are ElseMesh `69e8805` and Tidewater
-`4896050`. Together they move WebGPU component installers into Tidewater and
-dispatch them through the registry. The Hogwarts submodule is reported dirty
-and is outside this work; preserve it without inspection beyond its
-pointer/status or staging.
+Earlier commits ElseMesh `69e8805` and Tidewater `4896050` moved WebGPU
+component installers into Tidewater and dispatched them through the registry.
+The current v3 cleanup removes obsolete local migration aliases in Blender and
+`worldd`. The Hogwarts submodule is reported dirty and is outside this work;
+preserve it without inspection beyond its pointer/status or staging.
 
 Next, remove Tidewater-specific WebGL component dispatch and Tidewater-specific
-material handling from `WorldPackage.js`; audit whether the remaining local
-profile/name migration paths conflict with the v3 no-compatibility requirement;
-then sync to the external build tree and run isolated-browser parity checks.
-Update the estimates above only when a gate is newly supported or a finding
-changes them.
+material handling from `WorldPackage.js`; then sync to the external build tree
+and run isolated-browser parity checks. Update the estimates above only when a
+gate is newly supported or a finding changes them.
 
 ## Verification record
 
@@ -50,3 +48,6 @@ changes them.
   remain unextracted.
 - 2026-10-29: the WebGPU installer extraction and progress update were pushed
   as ElseMesh `69e8805` and Tidewater `4896050`; Hogwarts was not staged.
+- 2026-10-29: removed obsolete Blender metadata aliases and Tidewater-named
+  `worldd` data/ZeroTier profile migration paths. Blender identity checks,
+  `go test ./...`, the full client suite, and external build passed.

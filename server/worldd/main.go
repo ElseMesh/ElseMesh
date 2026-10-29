@@ -228,12 +228,7 @@ func run() error {
 		if sourceErr != nil {
 			return fmt.Errorf("world directory: %w", sourceErr)
 		}
-		profileData, profileErr := worldSourceProfileDataDir(
-			*worldsDir,
-			worldID,
-			*dataDir,
-			filepath.Join(configDir, "tidewater", "worldd"),
-		)
+		profileData, profileErr := worldSourceProfileDataDir(*worldsDir, worldID)
 		if profileErr != nil {
 			return profileErr
 		}
@@ -276,17 +271,6 @@ func run() error {
 	allowedBrowserOrigins, err := parseAllowedBrowserOrigins(allowedBrowserOriginsFlags)
 	if err != nil {
 		return fmt.Errorf("allow-browser-origin: %w", err)
-	}
-	if !dataWasSet && *worldProfile == "" {
-		legacyDataDir := filepath.Join(configDir, "tidewater", "worldd")
-		if err := migrateLegacyZeroTierStorage(filepath.Join(legacyDataDir, "zerotier"), *zeroTierDataDir); err != nil {
-			return fmt.Errorf("migrate existing ZeroTier identity: %w", err)
-		}
-		if worldDirectory == "" {
-			if err := migrateLegacyWorldData(legacyDataDir, *dataDir); err != nil {
-				return fmt.Errorf("migrate existing world data: %w", err)
-			}
-		}
 	}
 	if *listProposals || *removeProposalID != "" || *exportProposalID != "" || *inspectManifest || *publishManifestPath != "" {
 		identityPath := filepath.Join(*dataDir, "node.key")
@@ -480,9 +464,6 @@ func run() error {
 		}
 	}()
 	if *zeroTierNetwork != "" {
-		if err := migrateLegacyZeroTierStorage(filepath.Join(configDir, "tidewater", "worldd", "zerotier"), *zeroTierDataDir); err != nil {
-			return fmt.Errorf("migrate existing ZeroTier identity: %w", err)
-		}
 		zeroTier, err = startZeroTier(*zeroTierNetwork, *zeroTierDataDir, zeroTierBlacklistInterfaces)
 		if err != nil {
 			return fmt.Errorf("start ZeroTier: %w", err)

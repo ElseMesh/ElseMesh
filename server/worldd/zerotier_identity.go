@@ -44,38 +44,6 @@ func prepareZeroTierIdentityStorage(path string) error {
 	return nil
 }
 
-func migrateLegacyZeroTierStorage(legacyPath, currentPath string) error {
-	currentExists, err := fileExists(currentPath)
-	if err != nil {
-		return err
-	}
-	if currentExists {
-		for _, name := range []string{"identity.public", "identity.secret", "elsemesh-node-id"} {
-			exists, statErr := fileExists(filepath.Join(currentPath, name))
-			if statErr != nil || exists {
-				return statErr
-			}
-		}
-		if err := os.Remove(currentPath); err != nil {
-			return fmt.Errorf("remove empty ZeroTier state directory before migration: %w", err)
-		}
-	}
-	legacyExists, err := fileExists(legacyPath)
-	if err != nil || !legacyExists {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(currentPath), 0700); err != nil {
-		return fmt.Errorf("create parent for migrated ZeroTier identity: %w", err)
-	}
-	if err := os.Rename(legacyPath, currentPath); err != nil {
-		return fmt.Errorf("preserve existing ZeroTier identity from %s: %w", legacyPath, err)
-	}
-	if err := os.Chmod(currentPath, 0700); err != nil {
-		return fmt.Errorf("secure migrated ZeroTier identity directory: %w", err)
-	}
-	return nil
-}
-
 func verifyZeroTierNodeID(path string, nodeID uint64) error {
 	markerPath := filepath.Join(path, "elsemesh-node-id")
 	marker := fmt.Sprintf("%010x\n", nodeID)

@@ -54,7 +54,7 @@ func readWorldSourceID(path string) (string, error) {
 	return header.WorldID, nil
 }
 
-func worldSourceProfileDataDir(worldsDir, worldID string, legacyDataDirs ...string) (string, error) {
+func worldSourceProfileDataDir(worldsDir, worldID string) (string, error) {
 	profiles, err := listWorldProfilesIn(worldsDir)
 	if err != nil {
 		return "", err
@@ -64,11 +64,6 @@ func worldSourceProfileDataDir(worldsDir, worldID string, legacyDataDirs ...stri
 		path := filepath.Join(worldsDir, profile, "world.json")
 		if savedWorldID(path) == worldID {
 			matchedPaths[filepath.Dir(path)] = true
-		}
-	}
-	for _, directory := range legacyDataDirs {
-		if savedWorldID(filepath.Join(directory, "world.json")) == worldID {
-			matchedPaths[directory] = true
 		}
 	}
 	if len(matchedPaths) > 1 {

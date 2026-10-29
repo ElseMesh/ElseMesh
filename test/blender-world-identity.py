@@ -61,6 +61,11 @@ class BlenderWorldIdentityTests(unittest.TestCase):
         self.assertIs(world_source.validate(self.source), self.source)
         self.assertIs(world_actions.validate_source(self.source), self.source)
 
+    def test_blender_world_source_uses_only_current_thruhold_metadata(self):
+        for legacy_name in ("PREVIOUS_TEXT_NAME", "LEGACY_TEXT_NAME"):
+            with self.subTest(legacy_name=legacy_name):
+                self.assertFalse(hasattr(world_source, legacy_name))
+
     def test_blender_source_and_action_validators_reject_old_world_ids(self):
         for old_id in ("world:legacy", "elsemesh:world:legacy"):
             with self.subTest(old_id=old_id):
