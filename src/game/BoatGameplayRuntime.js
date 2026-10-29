@@ -64,7 +64,7 @@ export class BoatGameplayRuntime {
 				const richness = Object.values( habitat ).reduce( ( sum, value ) => sum + value, 0 );
 				this._sonar = { depth, fish: Math.min( 1, richness / 1.4 ) };
 			}
-		} else if ( ! aboard || ! state.stats.finder ) this._sonar = null;
+		}
 
 		return {
 			fuel: aboard ? { litres: state.fuelL, tank: state.stats.fuelL } : null,

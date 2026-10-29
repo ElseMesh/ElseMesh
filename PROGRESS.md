@@ -52,6 +52,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   confirm v3 `elsemesh:` world IDs are accepted and legacy `world:` IDs
   rejected. Boat parity, the broader fishing/input matrix, and visual parity
   remain open.
+- `BoatGameplayRuntime` now matches the pre-split `Game.updateBoat` rules
+  frame-by-frame for engine upgrades, fuel burn/depletion, one-shot out-of-fuel
+  notification, stop-time persistence, and fish-finder sampling/visibility.
+  This exposed and fixed a reboarding discrepancy: the separated runtime had
+  discarded the last sonar result while the historical game retained it until
+  the next 0.5 s sample. The new package test is
+  `worlds/tidewater/test/pre-split-boat-gameplay-parity.mjs`. Boat-controller
+  hydrodynamics and WebGPU/WebGL water-query trajectories still need matched
+  runtime parity checks; this does not close the boat parity gate.
 - An earlier extension prototype used signed Wasm asset references. The active
   implementation uses JavaScript Workers; Wasm is not part of the plan.
 
