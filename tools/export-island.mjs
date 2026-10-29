@@ -50,11 +50,12 @@ const terrainValidationPath = path.join( output, 'terrain-validation.json' );
 // Geometry is regenerated here; authored world behavior remains world data.
 const canonicalSource = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
 const presentation = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) );
+const fishingBehavior = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/fishing.json' ), 'utf8' ) );
 const fishingRulesExtension = await readFile( path.join( REPO, 'worlds/tidewater/extensions/fishing-game-rules.js' ) );
 const fishingRulesExtensionID = `sha256:${createHash( 'sha256' ).update( fishingRulesExtension ).digest( 'hex' )}`;
 if ( ! canonicalSource.experience.extensions?.some( extension => extension.behaviorId === 'elsemesh.fishing-game/1' && extension.assetId === fishingRulesExtensionID ) ) throw new Error( 'Tidewater fishing rules extension reference does not match its package source' );
 const behaviors = { ...canonicalSource.experience.behaviors };
-for ( const [ id, data ] of Object.entries( presentation.behaviors || {} ) ) behaviors[ id ] = { ...behaviors[ id ], ...data };
+for ( const [ id, data ] of Object.entries( { ...presentation.behaviors, 'elsemesh.fishing-game/1': fishingBehavior } ) ) behaviors[ id ] = { ...behaviors[ id ], ...data };
 const experience = { ...canonicalSource.experience, ...presentation, behaviors };
 let updatedAt = '2026-10-01T00:00:00Z';
 try {

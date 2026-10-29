@@ -22,6 +22,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   consume the resulting table; the world package owns the schedule validator
   and its tests. Other fishing gameplay and renderer adapters remain in the
   engine and still need to move behind world-owned behavior modules.
+- Tidewater's 18-species fishing catalog has moved from `src/game/FishTable.js`
+  into `worlds/tidewater/fishing.json`; the engine now applies generic bite,
+  catch, save, HUD, and fish-display calculations to the signed catalog. Its
+  values match the pre-split table exactly, and focused WebGPU-shared game logic,
+  WebGL adapter, registry, manifest, export, and content checks pass. Fishing
+  mechanics and fish model implementations still remain partly engine-owned.
 - The focused Worker, registry, experience, manifest, and Go worldd tests pass;
   `npm run build` passes in the external build tree. The full `npm test` run
   passed through the engine smoke checks, then its gateway E2E could not find

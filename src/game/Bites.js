@@ -1,4 +1,4 @@
-import { FISH, FISH_IDS } from './FishTable.js';
+import { fishIds } from './FishTable.js';
 
 // Where the bobber is and what lives there.
 //   depth     water depth under the bobber (m)
@@ -37,13 +37,14 @@ export function activity( pref, hour ) {
 
 // Weighted pick of the species that bites here; null when nothing lives here.
 // rng: () => [0, 1)
-export function pickSpecies( habitat, hour, rng = Math.random ) {
+export function pickSpecies( fishCatalog, habitat, hour, rng = Math.random ) {
 
 	let total = 0;
 	const w = [];
-	for ( const id of FISH_IDS ) {
+	const ids = fishIds( fishCatalog );
+	for ( const id of ids ) {
 
-		const f = FISH[ id ];
+		const f = fishCatalog[ id ];
 		let hw = 0;
 		for ( const k in f.habitat ) hw += f.habitat[ k ] * habitat[ k ];
 		const x = hw * f.rarity * activity( f.time, hour );
@@ -57,18 +58,18 @@ export function pickSpecies( habitat, hour, rng = Math.random ) {
 	for ( let i = 0; i < w.length; i ++ ) {
 
 		r -= w[ i ];
-		if ( r <= 0 ) return FISH_IDS[ i ];
+		if ( r <= 0 ) return ids[ i ];
 
 	}
 
-	return FISH_IDS[ FISH_IDS.length - 1 ];
+	return ids[ ids.length - 1 ];
 
 }
 
 // Weight in kg: skewed toward the small end (most fish are small, trophies are rare)
-export function rollWeight( id, rng = Math.random ) {
+export function rollWeight( fishCatalog, id, rng = Math.random ) {
 
-	const [ a, b ] = FISH[ id ].kg;
+	const [ a, b ] = fishCatalog[ id ].kg;
 	const t = Math.pow( rng(), 2.2 );
 	return a + ( b - a ) * t;
 

@@ -1,15 +1,18 @@
 import { CatchMinigame } from './CatchMinigame.js';
 import { GameState } from './GameState.js';
 import { startFishingBite, stepFishingBite } from './FishingBiteSimulation.js';
+import { isFishCatalog } from './FishTable.js';
 
 // Browser-side fishing rules shared by renderer adapters. This owns game state
 // transitions only; world queries, input, visuals, audio and presence stay with
 // their respective client systems.
 export class FishingGameRuntime {
 
-	constructor( { state, load = true, worldId = 'elsemesh:local' } = {} ) {
+	constructor( { state, load = true, worldId = 'elsemesh:local', behaviorData = {} } = {} ) {
 
-		this.state = state || new GameState( undefined, worldId );
+		this.fishCatalog = behaviorData.fishCatalog || state?.fishCatalog;
+		if ( ! isFishCatalog( this.fishCatalog ) ) throw new Error( 'World fishing behavior requires a valid authored fish catalog' );
+		this.state = state || new GameState( undefined, worldId, this.fishCatalog );
 		if ( load ) this.state.load();
 		this.bite = null;
 		this.fight = null;
@@ -35,7 +38,7 @@ export class FishingGameRuntime {
 
 		const hour = ( context.hour % 24 + 24 ) % 24;
 		const biteRateMultiplier = this.biteRateMultipliers[ Math.min( 239, Math.floor( hour * 10 ) ) ];
-		const result = stepFishingBite( this.bite, dt, { ...context, biteRateMultiplier } );
+		const result = stepFishingBite( this.bite, dt, { ...context, fishCatalog: this.fishCatalog, biteRateMultiplier } );
 		this.bite = result.bite;
 		return result;
 
@@ -45,7 +48,7 @@ export class FishingGameRuntime {
 
 		const bite = this.bite;
 		if ( ! bite || bite.phase !== 'take' ) return null;
-		this.fight = new CatchMinigame( { species: bite.species, kg: bite.kg, lineKg, reelSpeed, distance } );
+		this.fight = new CatchMinigame( { species: bite.species, kg: bite.kg, fishCatalog: this.fishCatalog, lineKg, reelSpeed, distance } );
 		this.bite = null;
 		return this.fight;
 

@@ -2,7 +2,7 @@ import { Scene, PerspectiveCamera, Matrix4, Quaternion, Vector3, Vector4 } from 
 import { GPU, Texture, MeshRenderer, FullscreenPass, createViewUniforms, setFrameCamera, UniformBlock } from '../engine/webgpu.js';
 import { FishProps } from '../world/fish/FishProps.js';
 import { ACES_WGSL } from '../post/PostFX.js';
-import { FISH, FISH_IDS, fishLengthCm } from './FishTable.js';
+import { fishIds, fishLengthCm } from './FishTable.js';
 
 // Studio portraits of the catchable fish: the real game models (world/fish, through FishProps) in a
 // neutral photo studio, side-on and horizontal (nose left, as in a field guide).
@@ -37,15 +37,16 @@ const hasDOM = typeof HTMLCanvasElement !== 'undefined' && typeof document !== '
 
 export class FishPortrait {
 
-	constructor() {
+	constructor( fishCatalog ) {
 
+		this.fishCatalog = fishCatalog;
 		// one 'whole' fish per species, all parked; the one being drawn moves to the studio
 		const fp = this.props = new FishProps();
 		this.slot = {};
 		_f.makeTranslation( PARK.x, PARK.y, PARK.z );
-		FISH_IDS.forEach( ( id, i ) => {
+		fishIds( fishCatalog ).forEach( ( id, i ) => {
 
-			fp.add( 'whole', FISH[ id ].model, _f, 'side', 0.3, { cloudy: 0.08, wet: 1, seed: 0.37 } );
+			fp.add( 'whole', fishCatalog[ id ].model, _f, 'side', 0.3, { cloudy: 0.08, wet: 1, seed: 0.37 } );
 			this.slot[ id ] = i;
 
 		} );
@@ -154,7 +155,7 @@ fn fragment( in: FSIn ) -> vec4f {
 
 		if ( this.shown && this.shown !== species ) this._park( this.shown );
 		this.shown = species;
-		const L = fishLengthCm( species, kg ) / 100;
+		const L = fishLengthCm( this.fishCatalog, species, kg ) / 100;
 		_q.setFromAxisAngle( _a.set( 0, 1, 0 ), yaw );
 		_q2.setFromAxisAngle( _a.set( 0, 0, 1 ), pitch );
 		_q.multiply( _q2 );
@@ -296,7 +297,7 @@ fn fragment( in: FSIn ) -> vec4f {
 		const { species } = job;
 		const T = this._target( 'thumb', THUMB_W * SS, THUMB_H * SS );
 		// a mid-sized specimen: proportions of an adult
-		const kg = FISH[ species ].kg[ 0 ] * 0.4 + FISH[ species ].kg[ 1 ] * 0.6;
+		const kg = this.fishCatalog[ species ].kg[ 0 ] * 0.4 + this.fishCatalog[ species ].kg[ 1 ] * 0.6;
 		const L = this._place( species, kg, { yaw: - 0.05, pitch: 0.02, curl: 0.06, jaw: 0.1 } );
 		this.light.sweep = 0.45;
 		this._frame( L, T.w, T.h, 0.84 );

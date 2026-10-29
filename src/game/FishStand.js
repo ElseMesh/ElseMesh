@@ -3,7 +3,6 @@ import { createPropMaterial } from './GameMaterials.js';
 import { Vendor } from './Vendor.js';
 import { loadStallAssets, KitBuilder, LAYER, ATLAS, place, Shapes } from './StallKit.js';
 import { FishProps } from '../world/fish/FishProps.js';
-import { FISH } from './FishTable.js';
 import { STAND, FISH_STAND_FLOOR, FISH_STAND_ICE_TOP, FISH_STAND_VENDOR, buildFishStandGeometry, fishStandColliderVolumes } from './FishStandContent.js';
 
 // The fish buyer's stall on the beach by the pier: a weathered plank shack with a rusty tin roof,
@@ -15,8 +14,9 @@ export { STAND } from './FishStandContent.js';
 
 export class FishStand {
 
-	constructor( { scene, terrain, colliders, placement = STAND } ) {
+	constructor( { scene, terrain, colliders, placement = STAND, fishCatalog } ) {
 
+		this.fishCatalog = fishCatalog;
 		this.placement = { x: placement.position?.[ 0 ] ?? placement.x, z: placement.position?.[ 1 ] ?? placement.z, yaw: placement.yaw };
 		const stand = this.placement;
 		const y = terrain.heightAt( stand.x, stand.z );
@@ -79,7 +79,7 @@ export class FishStand {
 			// frame origin is the fish's body axis: lift it by the half thickness of the fish lying on its
 			// side so it rests on the ice instead of sinking into it; later fish lie a little higher,
 			// overlapping the one before like a real display.
-			const rest = FishProps.restHeight( FISH[ species ].model, L );
+			const rest = FishProps.restHeight( this.fishCatalog[ species ].model, L );
 			const local = new Matrix4().makeRotationY( ( i % 2 ? 0.12 : - 0.1 ) ).setPosition( - 0.55 + ( i % 2 ? 0.04 : - 0.04 ), FISH_STAND_ICE_TOP + rest + 0.006 * i, 0.7 + i * 0.085 );
 			out.push( { species, frame: new Matrix4().multiplyMatrices( base, local ), L, pose: i % 2 ? 'sideFlip' : 'side' } );
 

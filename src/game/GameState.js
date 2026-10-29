@@ -1,4 +1,4 @@
-import { FISH, fishValue, fishLengthCm } from './FishTable.js';
+import { fishValue, fishLengthCm } from './FishTable.js';
 import { defaultUpgrades, gearStats, nextLevel, UPGRADES, FUEL_PRICE } from './Gear.js';
 import { isWorldID } from '../network/WorldIdentity.js';
 
@@ -9,11 +9,12 @@ const SAVE_KEY_PREFIX = 'elsemesh.save.v1:';
 // (private windows, blocked site data), so every access is guarded and the game runs without it.
 export class GameState {
 
-	constructor( storage = safeStorage(), worldId = 'elsemesh:local' ) {
+	constructor( storage = safeStorage(), worldId = 'elsemesh:local', fishCatalog = null ) {
 
 		if ( ! isWorldID( worldId ) ) throw new Error( 'Game state requires a valid ElseMesh world ID' );
 
 		this.storage = storage;
+		this.fishCatalog = fishCatalog;
 		// Keep the existing built-in island save stable while giving every hosted world
 		// its own browser-local state namespace.
 		this.storageKey = worldId === 'elsemesh:local' ? 'elsemesh.save.v1' : SAVE_KEY_PREFIX + encodeURIComponent( worldId );
@@ -63,10 +64,10 @@ export class GameState {
 	addFish( species, kg, timeOfDay = 12 ) {
 
 		kg = Math.round( kg * 100 ) / 100;
-		const cm = Math.round( fishLengthCm( species, kg ) );
+		const cm = Math.round( fishLengthCm( this.fishCatalog, species, kg ) );
 		const logEntry = this.log[ species ] || ( this.log[ species ] = { count: 0, bestKg: 0 } );
 		const newSpecies = logEntry.count === 0;
-		const prevBestKg = logEntry.bestKg, prevBestCm = logEntry.bestCm ?? ( prevBestKg > 0 ? Math.round( fishLengthCm( species, prevBestKg ) ) : 0 );
+		const prevBestKg = logEntry.bestKg, prevBestCm = logEntry.bestCm ?? ( prevBestKg > 0 ? Math.round( fishLengthCm( this.fishCatalog, species, prevBestKg ) ) : 0 );
 		const record = ! newSpecies && kg > prevBestKg;
 		logEntry.count ++;
 		if ( kg > prevBestKg ) {
@@ -76,7 +77,7 @@ export class GameState {
 
 		}
 
-		const value = fishValue( species, kg );
+		const value = fishValue( this.fishCatalog, species, kg );
 		const kept = this.fits( kg );
 		this.lastCatch = { species, kg, cm, value, newSpecies, record, prevBestKg, prevBestCm, kept };
 		if ( ! kept ) {
@@ -202,11 +203,11 @@ export class GameState {
 
 		if ( ! d || d.v !== 1 ) return false;
 		this.money = Number.isFinite( d.money ) ? d.money : 0;
-		this.inventory = Array.isArray( d.inventory ) ? d.inventory.filter( ( f ) => f && FISH[ f.species ] && Number.isFinite( f.kg ) ) : [];
+		this.inventory = Array.isArray( d.inventory ) ? d.inventory.filter( ( f ) => f && this.fishCatalog[ f.species ] && Number.isFinite( f.kg ) ) : [];
 		// saves from before lengths were recorded
-		for ( const f of this.inventory ) if ( ! Number.isFinite( f.cm ) ) f.cm = Math.round( fishLengthCm( f.species, f.kg ) );
+		for ( const f of this.inventory ) if ( ! Number.isFinite( f.cm ) ) f.cm = Math.round( fishLengthCm( this.fishCatalog, f.species, f.kg ) );
 		this.log = d.log && typeof d.log === 'object' ? d.log : {};
-		for ( const [ k, v ] of Object.entries( this.log ) ) if ( FISH[ k ] && v && v.bestKg > 0 && ! Number.isFinite( v.bestCm ) ) v.bestCm = Math.round( fishLengthCm( k, v.bestKg ) );
+		for ( const [ k, v ] of Object.entries( this.log ) ) if ( this.fishCatalog[ k ] && v && v.bestKg > 0 && ! Number.isFinite( v.bestCm ) ) v.bestCm = Math.round( fishLengthCm( this.fishCatalog, k, v.bestKg ) );
 		this.upgrades = { ...defaultUpgrades(), ...( d.upgrades || {} ) };
 		this.fuel = Number.isFinite( d.fuel ) ? d.fuel : null;
 		this._nextId = Math.max( d.nextId | 0, ...this.inventory.map( ( f ) => f.id + 1 ), 1 );

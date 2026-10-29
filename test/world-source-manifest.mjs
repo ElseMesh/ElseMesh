@@ -62,11 +62,12 @@ try {
 	await writeFile( path.join( assetsPath, terrainSurfaceAssetID.slice( 'sha256:'.length ) ), terrainSurfaceBytes );
 	const terrainSurface = { id: 'elsemesh-component:test-terrain-surface', type: 'elsemesh.terrain-surface/1', profile: 'example-island-v1', priority: 'visible', objectId: 'elsemesh-object:bounded', dataAssetId: terrainSurfaceAssetID };
 	const wildlife = { id: 'elsemesh-component:test-wildlife', type: 'elsemesh.example-island-wildlife/1', profile: 'example-island-wildlife-v1', seed: 5, priority: 'nearby', streamingBounds: { center: [ 0, -4, 0 ], radius: 300 }, roofPerches: [ [ 1, 2, 3 ] ], footprints: [ { x: 1, z: 2, r: 3 } ] };
+	const testFishCatalog = { testFish: { name: 'Test fish', sci: 'Piscis testus', lw: [ 1, 3 ], model: 'testFish', habitat: { bay: 1 }, kg: [ 1, 2 ], price: 2, fight: 0.5, stamina: 3, time: 'any', rarity: 1 } };
 	await writeFile( sourcePath, JSON.stringify( {
 		protocol: 'elsemesh.world-source/3',
 		worldId: 'elsemesh:manifest-test',
 		title: 'Manifest test',
-		experience: { genre: 'Fishing', tagline: 'Explore', loadingNote: 'Loading', tips: [ 'Cast a line' ], stages: {}, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } } }, extensions: [ { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID } ] },
+		experience: { genre: 'Fishing', tagline: 'Explore', loadingNote: 'Loading', tips: [ 'Cast a line' ], stages: {}, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 }, fishCatalog: testFishCatalog } }, extensions: [ { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID } ] },
 		spawn: { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 },
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
@@ -93,7 +94,7 @@ try {
 	assert.deepEqual( first, second, 'same source must produce byte-identical manifests' );
 	const manifest = JSON.parse( first );
 	assert.deepEqual( manifest.spawn, { position: [ 53.6, 4.447713719743241, -77 ], yaw: Math.PI, pitch: -0.05 }, 'authored spawn survives signed-manifest conversion' );
-	assert.deepEqual( manifest.experience.behaviors[ 'elsemesh.fishing-game/1' ], { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } }, 'behavior-owned gameplay placements survive signed-manifest conversion' );
+	assert.deepEqual( manifest.experience.behaviors[ 'elsemesh.fishing-game/1' ], { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 }, fishCatalog: testFishCatalog }, 'world-authored fishing data survives signed-manifest conversion' );
 	assert.deepEqual( manifest.experience.extensions, [ { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID } ], 'signed manifest retains the behavior-bound JavaScript extension reference' );
 	assert.deepEqual( worldSpawnPose( manifest ), manifest.spawn );
 	assert.deepEqual( worldSpawnPose( {} ), { position: [ 0, 3, 8 ], yaw: Math.PI, pitch: -0.1 }, 'legacy cave entrance remains compatible' );

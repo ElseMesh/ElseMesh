@@ -1,5 +1,3 @@
-import { FISH } from './FishTable.js';
-
 // Line-tension fight. Hold to reel: the line shortens and the tension climbs; let go and it eases
 // off, but a running fish then takes line. Keep the tension in the green band: the fish tires there
 // fastest. Too much tension (above the line's strength for about half a second) snaps it; too little
@@ -11,9 +9,9 @@ import { FISH } from './FishTable.js';
 //   g.band = [ lo, hi ] (the green band)
 export class CatchMinigame {
 
-	constructor( { species, kg, lineKg = 7, reelSpeed = 1.1, distance = 15, rng = Math.random } ) {
+	constructor( { species, kg, fishCatalog, lineKg = 7, reelSpeed = 1.1, distance = 15, rng = Math.random } ) {
 
-		const f = FISH[ species ];
+		const f = fishCatalog[ species ];
 		this.species = species;
 		this.kg = kg;
 		this.rng = rng;

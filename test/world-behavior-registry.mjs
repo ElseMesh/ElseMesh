@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
-import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
-const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 } }, 'elsemesh.shore-aware-boat/1': {} } };
-assert.deepEqual( worldBehaviorsFor( BUILTIN_WORLD_EXPERIENCE ).map( behavior => behavior.id ), [ 'elsemesh.fishing-game/1' ], 'offline built-in gameplay is activated through its registered behavior descriptor' );
+const fishCatalog = { testFish: { name: 'Test fish', sci: 'Piscis testus', lw: [ 1, 3 ], model: 'testFish', habitat: { bay: 1 }, kg: [ 1, 2 ], price: 2, fight: 0.5, stamina: 3, time: 'any', rarity: 1 } };
+const fishingData = { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, fishCatalog };
+const fishingExtension = { behaviorId: 'elsemesh.fishing-game/1', assetId: `sha256:${'1'.repeat(64)}` };
+const experience = { behaviors: { 'elsemesh.fishing-game/1': fishingData, 'elsemesh.shore-aware-boat/1': {} }, extensions: [ fishingExtension ] };
+assert.deepEqual( worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': fishingData }, extensions: [ fishingExtension ] } ).map( behavior => behavior.id ), [ 'elsemesh.fishing-game/1' ], 'offline built-in gameplay is activated through its registered behavior descriptor' );
 assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id } ) => id ), [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ] );
 assert.deepEqual( worldBehaviorData( experience, 'elsemesh.fishing-game/1' ).fishStand, experience.behaviors[ 'elsemesh.fishing-game/1' ].fishStand, 'behavior-owned experience data is available through the registry' );
 const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test', load: false } );
-const otherRuntime = createWorldBehaviorRuntime( { behaviors: { 'elsemesh.fishing-game/1': {} } }, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
+const otherRuntime = createWorldBehaviorRuntime( { behaviors: { 'elsemesh.fishing-game/1': fishingData }, extensions: [ fishingExtension ] }, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
 assert.ok( runtime instanceof FishingGameRuntime );
 assert.notEqual( runtime, otherRuntime, 'each world receives its own registered gameplay runtime' );
 assert.notEqual( runtime.state, otherRuntime.state, 'world runtimes do not share game state' );

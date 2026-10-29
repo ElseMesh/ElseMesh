@@ -54,10 +54,11 @@ function createGameUI() {
 // presents the shared rod simulation with Three.js while keeping world/input/render work local.
 export class WebGLGameAdapter {
 
-	constructor( vendor, { vendors = [ vendor ], experience = { behaviors: { 'elsemesh.fishing-game/1': {} } }, worldId = 'elsemesh:local', extensions = null, THREE, scene, camera, query, terrain, boatController = null, boatRoot = null, audio = null } = {} ) {
+	constructor( vendor, { vendors = [ vendor ], experience, worldId = 'elsemesh:local', extensions = null, THREE, scene, camera, query, terrain, boatController = null, boatRoot = null, audio = null } = {} ) {
 
 		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId, extensions } );
 		this.state = this.runtime.state;
+		this.fishCatalog = this.runtime.fishCatalog;
 		this.ui = createGameUI();
 		this.vendor = vendor;
 		this.audio = audio;

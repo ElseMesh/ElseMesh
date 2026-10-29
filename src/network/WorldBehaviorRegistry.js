@@ -1,11 +1,10 @@
 import { FishingGameRuntime } from '../game/FishingGameRuntime.js';
+import { isFishCatalog } from '../game/FishTable.js';
 import { createWorldJavaScriptExtensionRuntime } from './WorldJavaScriptExtension.js';
 
 const behaviors = new Map();
 const implementations = new Map();
 const resolvedExperiences = new WeakMap();
-
-export const BUILTIN_WORLD_EXPERIENCE = Object.freeze( { behaviors: Object.freeze( { 'elsemesh.fishing-game/1': Object.freeze( {} ) } ) } );
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
@@ -119,7 +118,8 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 
 registerWorldBehavior( 'elsemesh.fishing-game/1', {
 	validateExperienceData: ( data, hasExtension ) => {
-		if ( Object.keys( data ).some( key => ! [ 'fishStand', 'chandlery' ].includes( key ) ) && ! hasExtension ) throw new Error( 'World-owned fishing data requires a signed JavaScript extension' );
+		if ( ! hasExtension ) throw new Error( 'Fishing behavior requires a signed JavaScript extension' );
+		if ( ! isFishCatalog( data.fishCatalog ) ) throw new Error( 'Fishing behavior requires a valid world-authored fish catalog' );
 		for ( const name of [ 'fishStand', 'chandlery' ] ) {
 			const location = data[ name ];
 			if ( location === undefined ) continue;

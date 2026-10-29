@@ -1,6 +1,5 @@
 import { Vector3, Color } from '../engine/index.js';
 import { WORLD } from '../world/WorldLayout.js';
-import { FISH } from './FishTable.js';
 import { habitatAt } from './Bites.js';
 import { createWorldBehaviorRuntime, worldBehaviorData } from '../network/WorldBehaviorRegistry.js';
 import { FishingRod } from './FishingRod.js';
@@ -25,7 +24,7 @@ const CATCH_CARD_MS = 9000;
 //   E          at the fish stand: sell your catch
 export class Game {
 
-	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience = { behaviors: { 'elsemesh.fishing-game/1': {} } }, worldId = 'elsemesh:local', extensions = null } = {} ) {
+	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience, worldId = 'elsemesh:local', extensions = null } = {} ) {
 
 		this.app = app;
 		this.terrain = terrain;
@@ -33,11 +32,12 @@ export class Game {
 		this.active = true;
 		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId, extensions } );
 		this.state = this.runtime.state;
+		this.fishCatalog = this.runtime.fishCatalog;
 		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query, terrain, audio: app.audio } );
 		this.rod.onLand = ( where ) => this.onBobberLanded( where );
 		const fishingData = worldBehaviorData( experience, 'elsemesh.fishing-game/1' );
-		this.stand = new FishStand( { scene: app.scene, terrain, colliders, placement: fishingData?.fishStand } );
-		this.display = new CatchDisplay( { scene: app.scene, stall: this.stand.iceFish() } );
+		this.stand = new FishStand( { scene: app.scene, terrain, colliders, placement: fishingData?.fishStand, fishCatalog: this.fishCatalog } );
+		this.display = new CatchDisplay( { scene: app.scene, stall: this.stand.iceFish(), fishCatalog: this.fishCatalog } );
 		this.landing = null; // { species, kg } while the caught fish swings in view
 		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material, placement: fishingData?.chandlery } );
 		this.vendors = [ this.stand.vendor, this.chandlery.vendor ];
@@ -482,7 +482,7 @@ export class Game {
 		f._splashed = f.surge > 0.6 ? true : f.surge < 0.3 ? false : f._splashed;
 		if ( st === 'fighting' ) return;
 		this.rod.dip = 0;
-		const name = FISH[ f.species ].name;
+		const name = this.fishCatalog[ f.species ].name;
 		if ( st === 'caught' ) {
 
 			const entry = result.entry;

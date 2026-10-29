@@ -1,4 +1,4 @@
-import { FISH, fishLengthCm } from './FishTable.js';
+import { fishLengthCm } from './FishTable.js';
 import { UPGRADES, nextLevel, FUEL_PRICE } from './Gear.js';
 import { FishPortrait } from './FishPortrait.js';
 
@@ -301,7 +301,7 @@ export class GameHUD {
 	// info: GameState.lastCatch ({ species, kg, cm, value, newSpecies, record, prevBestKg, prevBestCm, kept })
 	showCatch( info, ms = 9000 ) {
 
-		const f = FISH[ info.species ];
+		const f = this.game.fishCatalog[ info.species ];
 		const inch = info.cm / 2.54, lb = info.kg * 2.20462;
 		const badge = info.record ? '<span class="gm-badge is-record">★ New record</span>'
 			: info.newSpecies ? '<span class="gm-badge is-new">New species</span>' : '<span class="gm-badge is-plain">Catch</span>';
@@ -346,7 +346,7 @@ export class GameHUD {
 		// the fish itself: the real model in a studio, drawn live into the stage canvas
 		try {
 
-			if ( ! this.portrait ) this.portrait = new FishPortrait();
+			if ( ! this.portrait ) this.portrait = new FishPortrait( this.game.fishCatalog );
 			if ( this.portrait.attach( c.querySelector( '.gm-catch-stage canvas' ) ) ) this.portrait.show( info.species, info.kg );
 
 		} catch ( e ) {
@@ -385,8 +385,8 @@ export class GameHUD {
 	renderInventory() {
 
 		const s = this.game.state;
-		const rows = s.inventory.map( ( f ) => `<div class="gm-row has-cm"><span>${ FISH[ f.species ].name }${ f.record ? '<small>record</small>' : '' }</span><span class="gm-cm">${ f.cm ?? Math.round( fishLengthCm( f.species, f.kg ) ) } cm</span><span class="gm-kg">${ f.kg.toFixed( 2 ) } kg</span><span class="gm-val">$${ f.value }</span><button class="gm-mini" data-release="${ f.id }">Release</button></div>` ).join( '' );
-		const logged = Object.entries( s.log ).filter( ( [ k ] ) => FISH[ k ] ).map( ( [ k, v ] ) => `${ FISH[ k ].name }: ${ v.count } caught, best ${ v.bestKg.toFixed( 2 ) } kg · ${ v.bestCm ?? Math.round( fishLengthCm( k, v.bestKg ) ) } cm` ).join( '<br>' );
+		const rows = s.inventory.map( ( f ) => `<div class="gm-row has-cm"><span>${ this.game.fishCatalog[ f.species ].name }${ f.record ? '<small>record</small>' : '' }</span><span class="gm-cm">${ f.cm ?? Math.round( fishLengthCm( this.game.fishCatalog, f.species, f.kg ) ) } cm</span><span class="gm-kg">${ f.kg.toFixed( 2 ) } kg</span><span class="gm-val">$${ f.value }</span><button class="gm-mini" data-release="${ f.id }">Release</button></div>` ).join( '' );
+		const logged = Object.entries( s.log ).filter( ( [ k ] ) => this.game.fishCatalog[ k ] ).map( ( [ k, v ] ) => `${ this.game.fishCatalog[ k ].name }: ${ v.count } caught, best ${ v.bestKg.toFixed( 2 ) } kg · ${ v.bestCm ?? Math.round( fishLengthCm( this.game.fishCatalog, k, v.bestKg ) ) } cm` ).join( '<br>' );
 		this.inv.innerHTML = `
 			<h2>${ s.upgrades.hold > 0 ? 'Fish hold' : 'Cooler' }</h2>
 			<p class="gm-sub">${ s.inventory.length } fish · ${ s.holdKg.toFixed( 1 ) } of ${ s.stats.holdKg } kg · worth $${ s.holdValue }</p>
@@ -422,7 +422,7 @@ export class GameHUD {
 
 		const s = this.game.state;
 		const v = this.vendor || { name: 'Fish buyer' };
-		const rows = s.inventory.map( ( f ) => `<div class="gm-row has-cm"><span>${ FISH[ f.species ].name }</span><span class="gm-cm">${ f.cm ?? Math.round( fishLengthCm( f.species, f.kg ) ) } cm</span><span class="gm-kg">${ f.kg.toFixed( 2 ) } kg</span><span class="gm-val">$${ f.value }</span><button class="gm-mini" data-sell="${ f.id }">Sell</button></div>` ).join( '' );
+	const rows = s.inventory.map( ( f ) => `<div class="gm-row has-cm"><span>${ this.game.fishCatalog[ f.species ].name }</span><span class="gm-cm">${ f.cm ?? Math.round( fishLengthCm( this.game.fishCatalog, f.species, f.kg ) ) } cm</span><span class="gm-kg">${ f.kg.toFixed( 2 ) } kg</span><span class="gm-val">$${ f.value }</span><button class="gm-mini" data-sell="${ f.id }">Sell</button></div>` ).join( '' );
 		this.stand.innerHTML = `
 			<h2>${ v.name }</h2>
 			<p class="gm-sub">${ s.inventory.length ? v.greeting || 'Let\'s see what you caught.' : v.idle || 'Come back when you\'ve got fish.' }</p>
