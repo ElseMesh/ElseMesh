@@ -11,14 +11,15 @@ opaque object. The server bounds and signs the containing manifest; the client
 registry rejects unknown behavior IDs and validates each supported payload
 before a runtime consumes it. Behavior-specific authoring contracts belong
 with the world content that uses them. Standard behavior implementations
-remain part of the trusted client. The extension boundary is restricted to
-owner-signed, content-addressed WebAssembly modules under the fixed contract in
-[`world-wasm-extensions.md`](world-wasm-extensions.md); downloaded JavaScript
-and ambient browser or system APIs are not permitted.
+remain part of the trusted client. Optional world-owned JavaScript extensions
+run in dedicated browser workers with a message-only interface; their module
+and lifecycle contract is described in
+[`world-worker-extensions.md`](world-worker-extensions.md). The engine does
+not provide world-specific events or gameplay rules.
 
 Optional modules are listed in `experience.extensions` as `{ behaviorId,
 assetId }` records. The behavior must also be declared in `experience.behaviors`.
-The signed manifest carries each module as a `wasm/1` asset, limited to 1 MiB
-and `visible` priority. Browser and server manifest validation reject missing
-or mismatched asset references. This metadata does not itself activate a
-module; the world lifecycle integration remains a separate gate.
+The signed manifest carries each module as a `javascript/1` asset with
+`visible` priority. Browser and server manifest validation reject missing or
+mismatched asset references. The engine owns the generic worker and lifecycle;
+the world package owns module behavior and its event vocabulary.
