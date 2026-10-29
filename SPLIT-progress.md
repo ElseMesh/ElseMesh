@@ -1,0 +1,46 @@
+# ElseMesh world-split progress
+
+Last assessed: 2026-10-29. Percentages are rough completion estimates for the
+active engine/world-separation and Tidewater parity goal. They measure the
+acceptance gates met, not code volume or test coverage. Reassess a percentage
+only when implementation or verification evidence changes; update this file
+in the same change that moves it.
+
+There is no overall average: a high score on repository layout cannot offset an
+unfinished runtime boundary or parity gate.
+
+## Progress by requirement
+
+| Requirement | Estimate | Evidence and remaining acceptance gate |
+| --- | ---: | --- |
+| Keep authored Tidewater and Hogwarts world data in their own repositories | **100%** | Both are mounted as submodules and documented in [`docs/world-repository-layout.md`](docs/world-repository-layout.md). Repository separation is recorded complete in [`GOAL-done.md`](GOAL-done.md). This measures authored-data ownership only; engine-side runtime handlers still need extraction. |
+| ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **90%** | Signed manifests use `elsemesh.world/3`; source uses `elsemesh.world-source/3`; the server and client reject legacy world IDs/protocols (including checks in `test/world-identity.mjs` and `server/worldd/world_test.go`). Remaining: complete the current cross-surface audit and run the full client/server verification after the ongoing changes. Historical negative tests may mention old forms only to prove rejection. |
+| Owner-signed JavaScript world extensions run in dedicated browser Workers; no Wasm implementation | **90%** | `src/network/WorldJavaScriptExtension.js` and its Worker enforce message bounds, startup/run limits, and worker teardown; server manifest validation binds extension assets to signed `javascript/1` assets. No Wasm runtime is implemented. Remaining: re-run extension lifecycle and signed-manifest integration checks against the final tree and ensure the world package integration uses this generic host path. |
+| Registry-based, world-agnostic engine behavior and component installation | **35%** | `WorldBehaviorRegistry.js`, `WorldComponentRegistry.js`, and generic component envelopes exist. Tidewater registers capabilities in `worlds/tidewater/register-components.js`. **Still incomplete:** WebGPU installation in `src/App.js` and WebGL presentation in `src/fallback/WebGLFallback.js` contain Tidewater component-type branches; other Tidewater-specific runtime coupling remains. Acceptance requires moving those handlers/registrations into the Tidewater package and proving an independent world can load without Tidewater code. |
+| Tidewater gameplay and content parity: WebGPU baseline, WebGL aligned | **75%** | Tidewater has deterministic pre-split WebGPU fishing and boat traces plus WebGPU/WebGL fishing and WebGL fish-stand/boat content checks under `worlds/tidewater/test/`. [`PROJECT-DIRECTION.md`](PROJECT-DIRECTION.md) records package integration/parity at 75%. Remaining: verify the complete gameplay/content path after the final separation edits, compare the split build with the pre-split WebGPU reference, inspect the world in the isolated browser display, and resolve any differences. WebGL appearance is not a visual baseline. |
+
+## Current work and next gates
+
+The source tree currently has uncommitted edits in `src/App.js`,
+`src/network/WorldComponentRegistry.js`, `src/network/WorldStreaming.js`,
+`test/world-streaming.mjs`, and this ledger, plus a Tidewater submodule edit to
+`register-components.js`. The Hogwarts submodule is also reported dirty and is
+outside this work; preserve it without inspection beyond its pointer/status or
+staging. The current App edit makes component asset readiness consume generic
+`component.assets` references and uses the registered vegetation trait for
+streaming selection. It does not yet remove the Tidewater installer switch.
+
+Next, finish generic component dispatch and Tidewater-owned installers; remove
+Tidewater-specific WebGL component dispatch; audit protocol/ID and Wasm
+constraints; then sync to the external build tree and run the relevant full
+test/build and isolated-browser parity checks. Update the estimates above only
+when a gate is newly supported or a finding changes them.
+
+## Verification record
+
+- 2026-10-29: focused streaming, registry, v3 identity, signed Worker, and
+  content-submodule checks passed in the external build tree.
+- 2026-10-29: `node tools/run-tests.mjs` and `npm run build` both passed in the
+  external build tree. These verify the current suite/build, not visual parity
+  in the browser; component installer extraction and isolated-browser review
+  remain open.

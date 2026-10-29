@@ -1,4 +1,5 @@
 import { Frustum, Matrix4, Sphere, Vector3 } from '../engine/index.js';
+import { worldComponentDescriptor } from './WorldComponentRegistry.js';
 
 const VIEW_RANK = Object.freeze( { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 } );
 const _frustum = new Frustum();
@@ -53,7 +54,7 @@ export function selectWorldComponentsForView( manifest, camera, { nearbyDistance
 	const maxRank = VIEW_RANK[ maxPriority ] ?? VIEW_RANK.background;
 	const selected = [];
 	for ( const component of manifest.components || [] ) {
-		const priority = component.priority || assets.get( component.placementAssetId ) || assets.get( component.modelAssetId ) || assets.get( component.beds?.[ 0 ]?.assetId ) || 'visible';
+		const priority = worldComponentPriority( component, assets );
 		const rank = VIEW_RANK[ priority ] ?? VIEW_RANK.visible;
 		const bounds = component.streamingBounds;
 		if ( ! bounds ) { if ( rank <= maxRank ) selected.push( component ); continue; }
@@ -63,7 +64,20 @@ export function selectWorldComponentsForView( manifest, camera, { nearbyDistance
 		const distance = camera.position.distanceTo( _center );
 		if ( distance <= maxDistance && ( distance <= nearbyDistance || _frustum.intersectsSphere( _sphere ) ) ) selected.push( component );
 	}
-	return selected.sort( ( a, b ) => ( VIEW_RANK[ a.priority || assets.get( a.placementAssetId ) || assets.get( a.modelAssetId ) || assets.get( a.beds?.[ 0 ]?.assetId ) ] ?? 1 ) - ( VIEW_RANK[ b.priority || assets.get( b.placementAssetId ) || assets.get( b.modelAssetId ) || assets.get( b.beds?.[ 0 ]?.assetId ) ] ?? 1 ) );
+	return selected.sort( ( a, b ) => ( VIEW_RANK[ worldComponentPriority( a, assets ) ] ?? 1 ) - ( VIEW_RANK[ worldComponentPriority( b, assets ) ] ?? 1 ) );
+}
+
+function worldComponentPriority( component, assets ) {
+	if ( component.priority ) return component.priority;
+	for ( const reference of component.assets || [] ) {
+		const priority = assets.get( reference.assetId );
+		if ( priority ) return priority;
+	}
+	return component.assets?.length ? 'portal-preview' : 'visible';
+}
+
+export function isVegetationWorldComponent( component ) {
+	return worldComponentDescriptor( component?.type )?.vegetation === true;
 }
 
 export function transformBoundsCenter( object, center, target ) {

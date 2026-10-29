@@ -89,7 +89,7 @@ import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, l
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import { defaultWorldPackage } from '../worlds/default.js';
 import { HostedBoat } from './network/HostedBoat.js';
-import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
+import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { DOWNEAST_BOAT_TRIANGLES, vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
@@ -1059,9 +1059,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
-		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => worldComponentDescriptor( a.type ).installRank - worldComponentDescriptor( b.type ).installRank );
+		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( worldComponentDescriptor( a.type )?.installRank ?? 1 ) - ( worldComponentDescriptor( b.type )?.installRank ?? 1 ) );
 		for ( const component of components ) {
-			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.grassMaskAssetId && ! connector.assets.has( component.grassMaskAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'elsemesh.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'elsemesh.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
+			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) ) continue;
 			const count = installed.length;
 			if ( component.type === 'elsemesh.procedural-island-vegetation/1' || component.type === 'elsemesh.static-vegetation/1' ) {
 				if ( ! this.vegetationEnabled ) continue;
@@ -2010,7 +2010,7 @@ function readVegetationPlacements( connector, component ) {
 }
 
 function componentAssetIDs( component ) {
-	return [ ...( component.placementAssetId ? [ component.placementAssetId ] : [] ), ...( component.grassMaskAssetId ? [ component.grassMaskAssetId ] : [] ), ...( component.dataAssetId ? [ component.dataAssetId ] : [] ), ...( component.type === 'elsemesh.humpback-whale/1' ? [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ] : [] ), ...( component.beds || [] ).map( ( bed ) => bed.assetId ) ];
+	return ( component.assets || [] ).map( reference => reference.assetId );
 }
 
 function readReefPlacements( connector, component ) {
@@ -2042,12 +2042,8 @@ function componentsThroughPriority( connector, through, vegetationEnabled ) {
 	const ranks = { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 };
 	const end = ranks[ through ];
 	return new Set( ( connector.manifest.components || [] )
-		.filter( ( component ) => ( vegetationEnabled || ! isVegetationComponent( component ) ) && ( ranks[ component.priority || ( component.placementAssetId ? 'portal-preview' : 'visible' ) ] ?? 1 ) <= end )
+		.filter( ( component ) => ( vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ( ranks[ component.priority || ( component.assets?.length ? 'portal-preview' : 'visible' ) ] ?? 1 ) <= end )
 		.map( ( component ) => component.id ) );
-}
-
-function isVegetationComponent( component ) {
-	return component.type === 'elsemesh.procedural-island-vegetation/1' || component.type === 'elsemesh.static-vegetation/1';
 }
 
 function sameVegetationPlacements( left, right ) {

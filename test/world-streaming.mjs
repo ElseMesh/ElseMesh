@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { assetConcurrencyForConnection, WorldConnector } from '../src/network/WorldConnector.js';
-import { selectWorldComponentsForView, selectWorldObjectsForView } from '../src/network/WorldStreaming.js';
+import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView } from '../src/network/WorldStreaming.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
+await import( '../worlds/tidewater/register-components.js' );
 
 const connector = new WorldConnector( { worldId: 'elsemesh:stream-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
 const alreadyAborted = new AbortController();
@@ -79,15 +80,16 @@ assert.deepEqual( viewIDs, [ 'preview-only', 'front', 'full-detail', 'near', 'le
 const startupViewIDs = selectWorldObjectsForView( { assets: [], objects }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( object ) => object.id );
 assert.deepEqual( startupViewIDs, [ 'preview-only', 'front', 'full-detail', 'near' ], 'startup selection excludes unbounded background objects while retaining immediate visible and nearby content' );
 const components = [
-	{ id: 'elsemesh-component:front', type: 'elsemesh.static-vegetation/1', placementAssetId: 'front', priority: 'visible', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
-	{ id: 'elsemesh-component:behind', type: 'elsemesh.static-vegetation/1', placementAssetId: 'behind', priority: 'nearby', streamingBounds: { center: [ 0, 0, 10 ], radius: 1 } },
-	{ id: 'elsemesh-component:near', type: 'elsemesh.static-vegetation/1', placementAssetId: 'near', priority: 'nearby', streamingBounds: { center: [ 0, 0, 3 ], radius: 0.5 } },
+	{ id: 'elsemesh-component:front', type: 'elsemesh.static-vegetation/1', assets: [ { assetId: 'front', kind: 'vegetation-placement/1' } ], priority: 'visible', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
+	{ id: 'elsemesh-component:behind', type: 'elsemesh.static-vegetation/1', assets: [ { assetId: 'behind', kind: 'vegetation-placement/1' } ], priority: 'nearby', streamingBounds: { center: [ 0, 0, 10 ], radius: 1 } },
+	{ id: 'elsemesh-component:near', type: 'elsemesh.static-vegetation/1', assets: [ { assetId: 'near', kind: 'vegetation-placement/1' } ], priority: 'nearby', streamingBounds: { center: [ 0, 0, 3 ], radius: 0.5 } },
 	{ id: 'elsemesh-component:legacy', type: 'elsemesh.island-ocean/1', priority: 'portal-preview' },
-	{ id: 'elsemesh-component:ambience', type: 'elsemesh.ambient-audio/1', beds: [ { assetId: 'ambient-loop' } ] },
-	{ id: 'elsemesh-component:whale', type: 'elsemesh.humpback-whale/1', modelAssetId: 'whale-model', streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
+	{ id: 'elsemesh-component:ambience', type: 'elsemesh.ambient-audio/1', assets: [ { assetId: 'ambient-loop', kind: 'audio/ogg' } ] },
+	{ id: 'elsemesh-component:whale', type: 'elsemesh.humpback-whale/1', assets: [ { assetId: 'whale-model', kind: 'model/gltf-binary' } ], streamingBounds: { center: [ 0, 0, -10 ], radius: 1 } },
 ];
 const componentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5 } ).map( ( component ) => component.id );
 assert.deepEqual( componentIDs, [ 'elsemesh-component:legacy', 'elsemesh-component:ambience', 'elsemesh-component:front', 'elsemesh-component:near', 'elsemesh-component:whale' ], 'component selection uses world-space bounds and uses the whale manifest asset priority when the component has none' );
+assert.equal( isVegetationWorldComponent( components[ 0 ] ), true, 'vegetation filtering reads the package registered capability instead of component type names' );
 const startupComponentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( component ) => component.id );
 assert.deepEqual( startupComponentIDs, [ 'elsemesh-component:legacy', 'elsemesh-component:ambience', 'elsemesh-component:front', 'elsemesh-component:near', 'elsemesh-component:whale' ], 'startup component selection excludes records above the entry priority while retaining required visible and nearby systems' );
 
