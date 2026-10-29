@@ -86,8 +86,9 @@ layout no longer imports the full engine entry point.
 The procedural boat geometry, materials, equipment, and existing game
 behavior remain the presentation reference. The simulation can now be
 constructed from a `BoatDesign` without constructing a `BoatModel` or a GPU
-backend. `test/boat-design.mjs` exercises that path; the full suite and
-production build remain required after later changes.
+backend. `worlds/tidewater/test/boat-design.mjs` exercises that Tidewater
+design contract; the full suite and production build remain required after
+later changes.
 
 This completes only the boat's first ownership split. The WebGL fallback still
 builds a separate reduced world, but its hosted boat adapter now converts the
