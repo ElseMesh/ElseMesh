@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -295,444 +294,99 @@ func TestWorldManifestValidatesRequiredFeatureIdentifiers(t *testing.T) {
 	}
 }
 
-func TestWorldManifestValidatesProceduralComponents(t *testing.T) {
-	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := newStarterManifest("Procedural component", ownerID.String())
-	manifest.WorldID = "elsemesh:procedural-component"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.procedural-island-vegetation/1"}
-	placementID := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	manifest.Assets = []assetRef{{ID: placementID, Bytes: 1, Kind: "vegetation-placement/1", Priority: "portal-preview"}}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:island-vegetation", Type: "elsemesh.procedural-island-vegetation/1", Seed: 7, Priority: "portal-preview", PlacementAssetID: placementID}}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid procedural component rejected: %v", err)
-	}
-	manifest.Rules.RequiredFeatures = append(manifest.Rules.RequiredFeatures, "elsemesh.island-ocean/1")
-	manifest.Components = append(manifest.Components, worldComponent{ID: "elsemesh-component:island-ocean", Type: "elsemesh.island-ocean/1", Priority: "portal-preview"})
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid island ocean component rejected: %v", err)
-	}
-	oceanJSON, err := json.Marshal(manifest.Components[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(oceanJSON), `"seed"`) {
-		t.Fatalf("island ocean serialization includes a vegetation-only field: %s", oceanJSON)
-	}
-	manifest.Components = append(manifest.Components, worldComponent{ID: "elsemesh-component:island-ocean-copy", Type: "elsemesh.island-ocean/1"})
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("duplicate island ocean components accepted")
-	}
-	manifest.Components = manifest.Components[:1]
-	manifest.Rules.RequiredFeatures = manifest.Rules.RequiredFeatures[:1]
-	manifest.Components[0].PlacementAssetID = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("procedural component referencing an undeclared placement asset accepted")
-	}
-	manifest.Components[0].PlacementAssetID = placementID
-	manifest.Assets[0].Priority = "visible"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("procedural placement data not available for portal preview accepted")
-	}
-	manifest.Assets[0].Priority = "portal-preview"
-
-	manifest.Rules.RequiredFeatures = nil
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("component missing its required feature declaration accepted")
-	}
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.procedural-island-vegetation/1"}
-	manifest.Components[0].Seed = 8
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("unsupported procedural seed accepted")
-	}
-	manifest.Components[0].Seed = 7
-	manifest.Components = append(manifest.Components, manifest.Components[0])
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("duplicate procedural component ID accepted")
-	}
-	manifest.Components = manifest.Components[:1]
-	manifest.Components[0].ID = "elsemesh-object:invalid-kind-collision"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("component ID using another entity prefix accepted")
-	}
-}
-
-func TestWorldManifestValidatesProceduralIslandTerrain(t *testing.T) {
+func TestWorldComponentsUseGenericExtensibleEnvelope(t *testing.T) {
 	owner := testKey(t)
 	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := newStarterManifest("Terrain fidelity", ownerID.String())
-	manifest.WorldID = "elsemesh:terrain-fidelity"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.procedural-island-terrain/1"}
-	assetID := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	manifest.Assets = []assetRef{{ID: assetID, Bytes: 1, Kind: "glb", Priority: "visible"}}
-	var fallback worldObject
-	if err := json.Unmarshal([]byte(`{"id":"elsemesh-object:terrain-fallback","kind":"asset-instance","label":"Terrain fallback","assetId":"`+assetID+`","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"none","enabled":false}}`), &fallback); err != nil {
-		t.Fatal(err)
-	}
-	manifest.Objects = []worldObject{fallback}
+	assetID := "sha256:" + strings.Repeat("a", 64)
+	manifest := newStarterManifest("Generic component", ownerID.String())
+	manifest.WorldID = "elsemesh:generic-component"
+	manifest.Rules.RequiredFeatures = []string{"elsemesh.custom-runtime/42"}
+	manifest.Assets = []assetRef{{ID: assetID, Bytes: 12, Kind: "custom/binary-1", Priority: "nearby"}}
 	manifest.Components = []worldComponent{{
-		ID: "elsemesh-component:procedural-terrain", Type: "elsemesh.procedural-island-terrain/1",
-		Profile: "example-island-v1", ObjectID: manifest.Objects[0].ID, Priority: "visible",
+		ID: "elsemesh-component:custom", Type: "elsemesh.custom-runtime/42", Priority: "nearby",
+		StreamingBounds: &streamingBounds{Center: vector3{1, 2, 3}, Radius: 20},
+		Assets:          []componentAssetReference{{AssetID: assetID, Kind: "custom/binary-1"}}, Data: json.RawMessage(`{"opaque":[1,{"nested":true}]}`),
 	}}
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid procedural terrain component rejected: %v", err)
-	}
-	manifest.Components[0].Profile = "unknown-profile"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("unsupported procedural terrain profile accepted")
-	}
-}
-
-func TestWorldManifestValidatesPortableTerrainSurface(t *testing.T) {
-	owner := testKey(t)
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := newStarterManifest("Portable terrain", ownerID.String())
-	manifest.WorldID = "elsemesh:portable-terrain"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.terrain-surface/1"}
-	glbID := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	dataID := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-	manifest.Assets = []assetRef{{ID: glbID, Bytes: 1, Kind: "glb", Priority: "visible"}, {ID: dataID, Bytes: 100, Kind: "terrain-surface/1", Priority: "visible"}}
-	var fallback worldObject
-	if err := json.Unmarshal([]byte(`{"id":"elsemesh-object:terrain-fallback","kind":"asset-instance","label":"Terrain fallback","assetId":"`+glbID+`","priority":"visible","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"heightfield","enabled":true,"columns":2,"rows":2,"walkable":true,"solid":true}}`), &fallback); err != nil {
-		t.Fatal(err)
-	}
-	manifest.Objects = []worldObject{fallback}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:terrain-surface", Type: "elsemesh.terrain-surface/1", Profile: "example-island-v1", ObjectID: fallback.ID, DataAssetID: dataID, Priority: "visible"}}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid portable terrain surface rejected: %v", err)
-	}
-	manifest.Components[0].DataAssetID = glbID
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("terrain component referencing a non-terrain asset accepted")
-	}
-}
-
-func TestWorldManifestValidatesExampleIslandWildlifeDependency(t *testing.T) {
-	owner := testKey(t)
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := newStarterManifest("Portable wildlife", ownerID.String())
-	manifest.WorldID = "elsemesh:portable-wildlife"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.terrain-surface/1", "elsemesh.example-island-wildlife/1"}
-	glbID := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	terrainID := "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	manifest.Assets = []assetRef{
-		{ID: glbID, Bytes: 1, Kind: "glb", Priority: "visible"},
-		{ID: terrainID, Bytes: 16, Kind: "terrain-surface/1", Priority: "visible"},
-	}
-	var fallback worldObject
-	if err := json.Unmarshal([]byte(`{"id":"elsemesh-object:terrain-fallback","kind":"asset-instance","label":"Terrain fallback","assetId":"`+glbID+`","priority":"visible","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"none","enabled":false}}`), &fallback); err != nil {
-		t.Fatal(err)
-	}
-	manifest.Objects = []worldObject{fallback}
-	wildlife := worldComponent{
-		ID: "elsemesh-component:island-wildlife", Type: "elsemesh.example-island-wildlife/1",
-		Profile: "example-island-wildlife-v1", Seed: 5, Priority: "visible",
-		StreamingBounds: &streamingBounds{Center: vector3{0, -4, 0}, Radius: 300},
-		RoofPerches:     [][]float64{{1, 2, 3}}, Footprints: []wildlifeFootprint{{X: 1, Z: 2, R: 3}},
-	}
-	terrain := worldComponent{
-		ID: "elsemesh-component:terrain-surface", Type: "elsemesh.terrain-surface/1",
-		Profile: "example-island-v1", ObjectID: fallback.ID, DataAssetID: terrainID, Priority: "visible",
-	}
-	manifest.Components = []worldComponent{wildlife, terrain}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid wildlife with a later-listed terrain dependency rejected: %v", err)
-	}
-	manifest.Components = []worldComponent{wildlife}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("wildlife without packaged terrain accepted")
-	}
-	manifest.Components = []worldComponent{wildlife, terrain}
-	manifest.Components[1].Priority = "background"
-	manifest.Assets[1].Priority = "background"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("wildlife that streams before terrain accepted")
-	}
-	manifest.Components[1].Priority = "visible"
-	manifest.Assets[1].Priority = "visible"
-	manifest.Components = append(manifest.Components, terrain)
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("duplicate terrain surfaces accepted")
-	}
-	var unknownFields []worldComponent
-	if err := json.Unmarshal([]byte(`[{"id":"elsemesh-component:wildlife","type":"elsemesh.example-island-wildlife/1","profile":"example-island-wildlife-v1","seed":5,"streamingBounds":{"center":[0,0,0],"radius":1},"roofPerches":[],"footprints":[],"extra":true}]`), &unknownFields); err == nil {
-		t.Fatal("unknown wildlife controls accepted")
-	}
-}
-
-func TestWorldManifestValidatesHostedBoatBerthAsset(t *testing.T) {
-	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := newStarterManifest("Hosted boat", ownerID.String())
-	manifest.WorldID = "elsemesh:hosted-boat"
-	seaLevel := 0.0
-	manifest.Rules.SeaLevel = &seaLevel
-	assetID := "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.island-ocean/1", "elsemesh.downeast-boat/1"}
-	manifest.Assets = []assetRef{{ID: assetID, Bytes: 10, Kind: "glb", Priority: "portal-preview"}}
-	var berth worldObject
-	if err := json.Unmarshal([]byte(`{"id":"elsemesh-object:boat-berth","kind":"asset-instance","label":"Boat berth","assetId":"`+assetID+`","priority":"portal-preview","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"none","enabled":false}}`), &berth); err != nil {
-		t.Fatal(err)
-	}
-	manifest.Objects = []worldObject{berth}
-	manifest.Components = []worldComponent{
-		{ID: "elsemesh-component:island-ocean", Type: "elsemesh.island-ocean/1", Priority: "portal-preview"},
-		{ID: "elsemesh-component:hosted-boat", Type: "elsemesh.downeast-boat/1", ObjectID: berth.ID, Priority: "portal-preview"},
-	}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid hosted boat berth rejected: %v", err)
-	}
-
-	manifest.Assets[0].Kind = "audio/ogg"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("hosted boat berth with a non-GLB asset was accepted")
-	}
-	manifest.Assets[0].Kind = "glb"
-	manifest.Assets[0].Priority = "background"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("hosted boat berth asset not staged for portal preview was accepted")
-	}
-	manifest.Assets[0].Priority = "portal-preview"
-	manifest.Assets = nil
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("hosted boat berth referencing an undeclared asset was accepted")
-	}
-}
-
-func TestWorldComponentRejectsUnknownFields(t *testing.T) {
-	var component worldComponent
-	err := json.Unmarshal([]byte(`{"id":"elsemesh-component:vegetation","type":"elsemesh.procedural-island-vegetation/1","seed":7,"extra":true}`), &component)
-	if err == nil || !strings.Contains(err.Error(), `unknown field "extra"`) {
-		t.Fatalf("unknown component field should be rejected, got %v", err)
-	}
-	err = json.Unmarshal([]byte(`{"id":"elsemesh-component:vegetation","type":"elsemesh.static-vegetation/1","seed":7,"placementAssetId":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}`), &component)
-	if err == nil || !strings.Contains(err.Error(), `unknown field "seed"`) {
-		t.Fatalf("island-only seed should be rejected on static vegetation, got %v", err)
-	}
-	err = json.Unmarshal([]byte(`{"id":"elsemesh-component:vegetation","type":"elsemesh.static-vegetation/1","placementAssetId":"sha256:0000000000000000000000000000000000000000000000000000000000000000","streamingBounds":{"center":[0,0,0],"radius":10,"extra":1}}`), &component)
-	if err == nil || !strings.Contains(err.Error(), "only center and radius") {
-		t.Fatalf("unknown component bound fields should be rejected, got %v", err)
-	}
-	err = json.Unmarshal([]byte(`{"id":"elsemesh-component:vegetation","type":"elsemesh.static-vegetation/1","placementAssetId":"sha256:0000000000000000000000000000000000000000000000000000000000000000","streamingBounds":{"center":[0,0],"radius":10}}`), &component)
-	if err == nil || !strings.Contains(err.Error(), "three coordinates") {
-		t.Fatalf("short component bound centers should be rejected, got %v", err)
-	}
-}
-
-func TestWorldManifestValidatesStaticVegetationComponent(t *testing.T) {
-	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := newStarterManifest("Portable foliage", ownerID.String())
-	manifest.WorldID = "elsemesh:portable-foliage"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.static-vegetation/1", "elsemesh.static-grass/1", "elsemesh.terrain-surface/1"}
-	placementID := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	grassMaskID := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-	glbID := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-	terrainID := "sha256:3333333333333333333333333333333333333333333333333333333333333333"
-	manifest.Assets = []assetRef{
-		{ID: placementID, Bytes: 1, Kind: "vegetation-placement/1", Priority: "visible"},
-		{ID: grassMaskID, Bytes: 32, Kind: "grass-density/1", Priority: "visible"},
-		{ID: glbID, Bytes: 1, Kind: "glb", Priority: "visible"},
-		{ID: terrainID, Bytes: 100, Kind: "terrain-surface/1", Priority: "visible"},
-	}
-	var terrainFallback worldObject
-	if err := json.Unmarshal([]byte(`{"id":"elsemesh-object:terrain-fallback","kind":"asset-instance","label":"Terrain fallback","assetId":"`+glbID+`","priority":"visible","transform":{"position":[0,0,0],"yaw":0},"scale":[1,1,1],"collision":{"shape":"none","enabled":false}}`), &terrainFallback); err != nil {
-		t.Fatal(err)
-	}
-	manifest.Objects = []worldObject{terrainFallback}
-	manifest.Components = []worldComponent{
-		{ID: "elsemesh-component:portable-foliage", Type: "elsemesh.static-vegetation/1", Priority: "visible", PlacementAssetID: placementID, GrassMaskAssetID: grassMaskID, StreamingBounds: &streamingBounds{Center: vector3{0, 2, -10}, Radius: 12}},
-		{ID: "elsemesh-component:terrain-surface", Type: "elsemesh.terrain-surface/1", Profile: "example-island-v1", ObjectID: terrainFallback.ID, DataAssetID: terrainID, Priority: "visible"},
-	}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid bounded static vegetation component rejected: %v", err)
+		t.Fatalf("unknown registered component type was rejected: %v", err)
 	}
 	document, err := signDocument(manifestProtocol, manifest, owner)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("signed bounded static vegetation component failed runtime decoding: %v", err)
+		t.Fatalf("generic component envelope failed signed decode: %v", err)
 	}
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.static-vegetation/1", "elsemesh.terrain-surface/1"}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("grass density asset without its required feature accepted")
-	}
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.static-vegetation/1", "elsemesh.static-grass/1", "elsemesh.terrain-surface/1"}
-	manifest.Assets[0].Priority = "portal-preview"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("component with mismatched asset streaming priority accepted")
-	}
-	manifest.Assets[0].Priority = "visible"
-	manifest.Components[0].StreamingBounds = &streamingBounds{Center: vector3{0, 0, 0}, Radius: 0}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("component with invalid streaming bounds accepted")
-	}
-	manifest.Components[0].PlacementAssetID = ""
-	manifest.Components[0].StreamingBounds = nil
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("static vegetation without placement data accepted")
-	}
-}
 
-func TestWorldManifestValidatesStaticReefComponent(t *testing.T) {
-	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
+	bad := manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Data = json.RawMessage(`[]`)
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("array component data accepted instead of an object")
 	}
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Data = json.RawMessage(`null`)
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("null component data accepted")
 	}
-	manifest := newStarterManifest("Portable reef", ownerID.String())
-	manifest.WorldID = "elsemesh:portable-reef"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.static-reef/1"}
-	placementID := "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-	manifest.Assets = []assetRef{{ID: placementID, Bytes: 1, Kind: "reef-placement/1", Priority: "visible"}}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:reef-tile", Type: "elsemesh.static-reef/1", Priority: "visible", PlacementAssetID: placementID, StreamingBounds: &streamingBounds{Center: vector3{0, -4, 0}, Radius: 32}}}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid bounded static reef component rejected: %v", err)
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Data = json.RawMessage(`{"large":"` + strings.Repeat("x", maxComponentDataBytes) + `"}`)
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("oversized opaque component data accepted")
 	}
-	manifest.Assets[0].Kind = "vegetation-placement/1"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("static reef component accepted a vegetation placement asset")
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Type = "elsemesh.unregistered-runtime/1"
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("component without a required feature declaration accepted")
 	}
-}
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Assets[0].AssetID = "sha256:bad"
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("malformed component asset ID accepted")
+	}
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Assets[0].AssetID = "sha256:" + strings.Repeat("b", 64)
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("undeclared component asset reference accepted")
+	}
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Assets[0].Kind = "other/binary-1"
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("component reference kind mismatch accepted")
+	}
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].Assets[0].AssetID = "sha256:" + strings.Repeat("a", 64)
+	bad.Components[0].Assets = append(bad.Components[0].Assets, bad.Components[0].Assets[0])
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("duplicate component asset reference accepted")
+	}
+	bad = manifest
+	bad.Components = append([]worldComponent(nil), manifest.Components...)
+	bad.Components[0].StreamingBounds = &streamingBounds{Radius: 0}
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("invalid generic streaming bounds accepted")
+	}
 
-func TestWorldManifestValidatesStaticFishPropsComponent(t *testing.T) {
-	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := newStarterManifest("Portable fish props", ownerID.String())
-	manifest.WorldID = "elsemesh:portable-fish-props"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.static-fish-props/1"}
-	placementID := "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-	manifest.Assets = []assetRef{{ID: placementID, Bytes: 64, Kind: "fish-props-placement/1", Priority: "visible"}}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:fish-props", Type: "elsemesh.static-fish-props/1", Priority: "visible", PlacementAssetID: placementID, StreamingBounds: &streamingBounds{Center: vector3{0, 2, 0}, Radius: 8}}}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid bounded fish-props component rejected: %v", err)
-	}
-	manifest.Assets[0].Kind = "reef-placement/1"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("fish-props component accepted a reef placement asset")
-	}
-	manifest.Assets[0].Kind = "fish-props-placement/1"
-	manifest.Assets[0].Bytes = 16<<20 + 1
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("fish-props component accepted an oversized placement asset")
-	}
-}
-
-func TestWorldManifestValidatesHumpbackWhaleAssets(t *testing.T) {
-	owner := testKey(t)
-	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	newManifest := func() worldManifest {
-		ids := []string{
-			"sha256:" + strings.Repeat("a", 64),
-			"sha256:" + strings.Repeat("b", 64),
-			"sha256:" + strings.Repeat("c", 64),
-			"sha256:" + strings.Repeat("d", 64),
+	for _, raw := range []string{
+		`{"id":"elsemesh-component:x","type":"elsemesh.custom-runtime/1","assets":[],"data":[]}`,
+		`{"id":"elsemesh-component:x","type":"elsemesh.custom-runtime/1","assets":[],"data":{},"extra":true}`,
+		`{"id":"elsemesh-component:x","type":"elsemesh.custom-runtime/1","assets":null,"data":{}}`,
+		`{"id":"elsemesh-component:x","type":"elsemesh.custom-runtime/1","assets":[],"data":{},"streamingBounds":{"center":[0,0],"radius":1}}`,
+	} {
+		var component worldComponent
+		if err := json.Unmarshal([]byte(raw), &component); err == nil {
+			t.Errorf("invalid generic component envelope accepted: %s", raw)
 		}
-		manifest := newStarterManifest("Whale assets", ownerID.String())
-		manifest.WorldID = "elsemesh:whale-assets"
-		manifest.Rules.RequiredFeatures = []string{"elsemesh.humpback-whale/1"}
-		manifest.Assets = []assetRef{
-			{ID: ids[0], Bytes: 4096, Kind: "whale-model/1", Priority: "visible"},
-			{ID: ids[1], Bytes: 3 << 20, Kind: "whale-geometry/1", Priority: "visible"},
-			{ID: ids[2], Bytes: 4 << 20, Kind: "whale-albedo/1", Priority: "visible"},
-			{ID: ids[3], Bytes: 12 << 20, Kind: "whale-height/1", Priority: "visible"},
-		}
-		seed := uint32(1)
-		surfaceAt, cruiseSpeed, surfaceSpeed := 0.25, 2.6, 1.5
-		manifest.Components = []worldComponent{{
-			ID: "elsemesh-component:humpback", Type: "elsemesh.humpback-whale/1", Profile: "example-island-humpback-v1", Priority: "visible",
-			StreamingBounds: &streamingBounds{Center: vector3{0, -4, 180}, Radius: 1800},
-			ModelAssetID:    ids[0], GeometryAssetID: ids[1], AlbedoAssetID: ids[2], HeightAssetID: ids[3],
-			Seed: seed, Route: [][]float64{{70, 300}, {60, 200}, {35, 120}, {5, 88}}, SurfaceAt: &surfaceAt, CruiseSpeed: &cruiseSpeed, SurfaceSpeed: &surfaceSpeed,
-		}}
-		return manifest
-	}
-
-	manifest := newManifest()
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid humpback component rejected: %v", err)
-	}
-	document, err := signDocument(manifestProtocol, manifest, owner)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("signed humpback component failed daemon JSON decode: %v", err)
-	}
-
-	tests := []struct {
-		name   string
-		mutate func(*worldManifest)
-	}{
-		{"missing model reference", func(m *worldManifest) { m.Components[0].ModelAssetID = "" }},
-		{"malformed geometry id", func(m *worldManifest) { m.Components[0].GeometryAssetID = "sha256:bad" }},
-		{"unlisted albedo asset", func(m *worldManifest) { m.Components[0].AlbedoAssetID = "sha256:" + strings.Repeat("e", 64) }},
-		{"wrong asset kind", func(m *worldManifest) { m.Assets[2].Kind = "image/png" }},
-		{"priority mismatch", func(m *worldManifest) { m.Assets[3].Priority = "background" }},
-		{"empty height texture", func(m *worldManifest) { m.Assets[3].Bytes = 0 }},
-		{"oversized geometry", func(m *worldManifest) { m.Assets[1].Bytes = 32<<20 + 1 }},
-		{"unknown profile", func(m *worldManifest) { m.Components[0].Profile = "custom-route" }},
-		{"missing streaming bounds", func(m *worldManifest) { m.Components[0].StreamingBounds = nil }},
-		{"missing seed", func(m *worldManifest) { m.Components[0].Seed = 0 }},
-		{"short route", func(m *worldManifest) { m.Components[0].Route = m.Components[0].Route[:3] }},
-		{"out of bounds route", func(m *worldManifest) { m.Components[0].Route[0][0] = 10001 }},
-		{"invalid surface fraction", func(m *worldManifest) { value := 1.1; m.Components[0].SurfaceAt = &value }},
-		{"invalid cruise speed", func(m *worldManifest) { value := 10.1; m.Components[0].CruiseSpeed = &value }},
-		{"duplicate whale component", func(m *worldManifest) { m.Components = append(m.Components, m.Components[0]) }},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			bad := newManifest()
-			test.mutate(&bad)
-			if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
-				t.Fatal("invalid humpback component accepted")
-			}
-		})
-	}
-
-	var unknownField []worldComponent
-	if err := json.Unmarshal([]byte(`[{"id":"elsemesh-component:humpback","type":"elsemesh.humpback-whale/1","profile":"example-island-humpback-v1","modelAssetId":"sha256:`+strings.Repeat("a", 64)+`","geometryAssetId":"sha256:`+strings.Repeat("b", 64)+`","albedoAssetId":"sha256:`+strings.Repeat("c", 64)+`","heightAssetId":"sha256:`+strings.Repeat("d", 64)+`","route":[],"path":[]}]`), &unknownField); err == nil {
-		t.Fatal("unknown humpback component field accepted")
 	}
 }
 
@@ -821,108 +475,6 @@ func TestWorldManifestValidatesOptionalEnvironmentLevels(t *testing.T) {
 	atmosphere = 1e6 + 1
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("out-of-bounds atmosphere level accepted")
-	}
-}
-
-func TestWorldManifestValidatesPortableWaterBody(t *testing.T) {
-	key := testKey(t)
-	ownerID, err := peer.IDFromPublicKey(key.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	seaLevel := 2.5
-	manifest := newStarterManifest("Portable water", ownerID.String())
-	manifest.WorldID = "elsemesh:portable-water"
-	manifest.Rules.SeaLevel = &seaLevel
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.water-body/1"}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:water", Type: "elsemesh.water-body/1", Center: []float64{-20, 45}, Extent: 256, Profile: "storm"}}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid terrain-independent water body rejected: %v", err)
-	}
-	manifest.Components = make([]worldComponent, 4)
-	for i, x := range []float64{-900, -300, 300, 900} {
-		manifest.Components[i] = worldComponent{ID: fmt.Sprintf("elsemesh-component:water-%d", i+1), Type: "elsemesh.water-body/1", Center: []float64{x, 0}, Extent: 100}
-	}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("four non-overlapping portable water bodies rejected: %v", err)
-	}
-	manifest.Components = append(manifest.Components, worldComponent{ID: "elsemesh-component:water-5", Type: "elsemesh.water-body/1", Center: []float64{1500, 0}, Extent: 100})
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("more than four portable water bodies accepted")
-	}
-	manifest.Components = manifest.Components[:4]
-	manifest.Components[1].Center = []float64{-850, 0}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("overlapping portable water body bounds accepted")
-	}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:water", Type: "elsemesh.water-body/1", Center: []float64{-20, 45}, Extent: 256, Profile: "storm"}}
-	document, err := signDocument(manifestProtocol, manifest, key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("signed portable water component failed daemon JSON decode: %v", err)
-	}
-	var unknownField []worldComponent
-	if err := json.Unmarshal([]byte(`[{"id":"elsemesh-component:water","type":"elsemesh.water-body/1","center":[0,0],"extent":256,"extra":true}]`), &unknownField); err == nil {
-		t.Fatal("unknown portable water component field accepted")
-	}
-	manifest.Components[0].Profile = "custom"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("unknown portable water component profile accepted")
-	}
-	manifest.Components[0].Profile = "storm"
-	manifest.Rules.SeaLevel = nil
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("water body without a declared sea level accepted")
-	}
-	manifest.Rules.SeaLevel = &seaLevel
-	manifest.Components[0].Center = []float64{1e6, 0}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("water body extending beyond world bounds accepted")
-	}
-}
-
-func TestWorldManifestValidatesAmbientAudioBeds(t *testing.T) {
-	key := testKey(t)
-	ownerID, err := peer.IDFromPublicKey(key.GetPublic())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assetID := "sha256:" + strings.Repeat("a", 64)
-	manifest := newStarterManifest("Ambient audio", ownerID.String())
-	manifest.WorldID = "elsemesh:ambient-audio"
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.ambient-audio/1"}
-	manifest.Assets = []assetRef{{ID: assetID, Bytes: 12, Kind: "audio/ogg", Priority: "portal-preview"}}
-	manifest.Components = []worldComponent{{ID: "elsemesh-component:ambience", Type: "elsemesh.ambient-audio/1", Beds: []audioBed{{AssetID: assetID, Gain: 0.4, Condition: "underwater", Position: &vector3{1, 2, 3}}}}}
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid ambient audio component rejected: %v", err)
-	}
-	document, err := signDocument(manifestProtocol, manifest, key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("signed ambient audio component failed daemon JSON decode: %v", err)
-	}
-	bad := manifest
-	bad.Components = append([]worldComponent(nil), manifest.Components...)
-	bad.Components[0].Beds = []audioBed{{AssetID: assetID, Gain: 0.4, Condition: "storms"}}
-	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("unknown ambient audio condition accepted")
-	}
-	bad = manifest
-	bad.Assets = []assetRef{{ID: assetID, Bytes: 12, Kind: "glb", Priority: "portal-preview"}}
-	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("non-audio asset accepted as an ambient bed")
-	}
-	bad.Assets = []assetRef{{ID: assetID, Bytes: 0, Kind: "audio/ogg", Priority: "portal-preview"}}
-	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("empty audio asset accepted as an ambient bed")
-	}
-	var unknownBedField []worldComponent
-	if err := json.Unmarshal([]byte(`[{"id":"elsemesh-component:ambience","type":"elsemesh.ambient-audio/1","beds":[{"assetId":"`+assetID+`","gain":0.4,"url":"https://invalid.example/audio.ogg"}]}]`), &unknownBedField); err == nil {
-		t.Fatal("unknown ambient audio bed field accepted")
 	}
 }
 

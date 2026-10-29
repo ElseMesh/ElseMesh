@@ -61,7 +61,7 @@ const _lanternEuler = new Euler();
 
 export class Village {
 
-	constructor( { scene, terrain, colliders } ) {
+	constructor( { scene, terrain, colliders, fishPresentation = null } ) {
 
 		this.scene = scene;
 		this.terrain = terrain;
@@ -80,6 +80,7 @@ export class Village {
 		this.materials = createVillageMaterials( this.textures );
 		// one builder: everything static merges into a single mesh per material
 		this.B = new Builder();
+		this.B.fishPresentation = fishPresentation;
 		this.harbor = this.B;
 		this.town = this.B;
 		this.inst = new InstancedProps( this.B );

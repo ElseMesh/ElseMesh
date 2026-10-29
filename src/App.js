@@ -71,6 +71,9 @@ import { decodeTerrainSurfaceAsset } from './network/TerrainSurfaceAsset.js';
 import { decodeGrassDensityAsset } from './network/GrassDensityAsset.js';
 import { decodeReefPlacements, MAX_REEF_PLACEMENTS, REEF_PLACEMENT_HEADER_BYTES, REEF_PLACEMENT_RECORD_BYTES } from './network/ReefPlacements.js';
 import { decodeFishPropPlacements } from './network/FishPropPlacements.js';
+import { worldComponentDescriptor } from './network/WorldComponentRegistry.js';
+import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
+import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
 import { Group } from './engine/scene/Group.js';
@@ -126,6 +129,9 @@ export class App {
 	constructor() {
 
 		this.qs = new URLSearchParams( location.search );
+		this.hostedQueries = new WeakMap();
+		this.localWorldExperience = defaultWorldPackage.source.experience;
+		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
 		const platform = navigator.userAgentData?.platform || navigator.platform || '';
 		this.isLinuxDesktop = /linux/i.test( platform ) && ! /android/i.test( navigator.userAgent );
 		const savedGraphicsPriority = readGraphicsPriority();
@@ -318,7 +324,7 @@ export class App {
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
-		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders } );
+		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, fishPresentation: this.fishPresentation } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
 		this.vegetationEnabled = ! qs.has( 'noVeg' );
 		if ( this.vegetationEnabled ) {
@@ -342,7 +348,7 @@ export class App {
 		this.rocks.material.appliesHillShadow = true;
 
 		await progress( 0.23, 'Growing the reef…', undefined, 'reef' );
-		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField } );
+		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField, fishPresentation: this.fishPresentation } );
 
 		this.boat = new BoatModel();
 		scene.add( this.boat.group );
@@ -536,7 +542,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// World gameplay is installed from the active world's declared behaviors.
 		this.worldGames = new Map();
 		this.game = null;
-		this.localWorldExperience = defaultWorldPackage.source.experience;
 		this.localWorldExtensions = ! worldLink ? createWorldBehaviorExtensions( this.localWorldExperience, defaultWorldPackage.assets.extensionModules ) : null;
 		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local', extensions: this.localWorldExtensions } );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
@@ -1054,8 +1059,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
-		const installRank = { 'elsemesh.terrain-surface/1': 0, 'elsemesh.static-vegetation/1': 1, 'elsemesh.downeast-boat/1': 1, 'elsemesh.example-island-wildlife/1': 2 };
-		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( installRank[ a.type ] ?? 1 ) - ( installRank[ b.type ] ?? 1 ) );
+		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => worldComponentDescriptor( a.type ).installRank - worldComponentDescriptor( b.type ).installRank );
 		for ( const component of components ) {
 			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || component.placementAssetId && ! connector.assets.has( component.placementAssetId ) || component.grassMaskAssetId && ! connector.assets.has( component.grassMaskAssetId ) || component.dataAssetId && ! connector.assets.has( component.dataAssetId ) || component.type === 'elsemesh.humpback-whale/1' && componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) || component.type === 'elsemesh.ambient-audio/1' && component.beds.some( ( bed ) => ! connector.assets.has( bed.assetId ) ) ) continue;
 			const count = installed.length;
@@ -1133,8 +1137,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				}
 				installedIDs.add( component.id );
 			} else if ( component.type === 'elsemesh.static-fish-props/1' ) {
-				const fishProps = new FishProps();
-				fishProps.items = readFishPropPlacements( connector, component );
+				const presentation = worldFishPresentationFor( connector.manifest.experience );
+				const fishProps = new FishProps( presentation );
+				fishProps.items = readFishPropPlacements( connector, component, presentation );
 				const mesh = fishProps.build();
 				root.add( mesh );
 				installed.push( {
@@ -1167,7 +1172,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				mesh.receiveShadow = true;
 				mesh.layers.set( LAYERS.WATER );
 				root.add( mesh );
-				installed.push( { islandOcean: true, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); } } );
+				installed.push( { islandOcean: true, isWorldOcean: true, surface: this.surface, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); } } );
 			} else if ( component.type === 'elsemesh.water-body/1' ) {
 				const extent = component.extent;
 				const lod = new CDLOD( {
@@ -1175,6 +1180,12 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					center: { x: component.center[ 0 ] - extent, z: component.center[ 1 ] - extent, size: extent * 2 },
 				} );
 				const surface = new WaterSurface( { fft: this.fft, cdlod: lod, foamTexture: this.foamTexture, seaLevel: connector.manifest.rules.seaLevel } );
+				const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
+				if ( terrain ) {
+					terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
+					surface.terrain = terrain.terrainGPU;
+					surface.shore = terrain.shore;
+				}
 				applyWaterBodyProfile( surface, component.profile );
 				const material = new WaterMaterial( {
 					surface, sky: this.sky, sceneCopy: this.sceneRenderer.opaqueCopy, sceneDepthHalf: this.sceneRenderer.opaqueDepthHalf.texture,
@@ -1186,7 +1197,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				mesh.receiveShadow = true;
 				mesh.layers.set( LAYERS.WATER );
 				root.add( mesh );
-				installed.push( { waterBody: true, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
+				installed.push( { waterBody: true, surface, waterBounds: { center: component.center, extent }, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
 			} else if ( component.type === 'elsemesh.ambient-audio/1' ) {
 				// SoundScape consumes the signed component from the connector directly; record
 				// installation here so view streaming does not repeatedly request its loop assets.
@@ -1239,7 +1250,26 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const runtime = ( root.userData.worldComponents || [] ).find( ( component ) => component.hostedBoat );
 		this.activeHostedOcean = ( root.userData.worldComponents || [] ).some( ( component ) => component.islandOcean );
 		this.activeHostedBoat = runtime || null;
-		this.player.boat = runtime ? runtime.activate( { query: this.hostedQuery, colliders: this.hostedColliders } ) : null;
+		const berthComponent = connector.manifest.components?.find( component => component.type === 'elsemesh.downeast-boat/1' );
+		const berthObject = connector.manifest.objects?.find( object => object.id === berthComponent?.objectId );
+		const waterSurface = worldWaterSurfaceFor( root.userData.worldComponents, berthObject?.transform?.position, this.hostedWaterSurface );
+		this.hostedSurfaceState = { surface: waterSurface, terrain: waterSurface.terrain, shore: waterSurface.shore, wake: waterSurface.wake };
+		if ( terrain?.terrainGPU ) {
+			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
+			waterSurface.terrain = terrain.terrainGPU;
+			waterSurface.shore = terrain.shore;
+		}
+		const hostedQuery = this.hostedQueries.get( waterSurface ) || new WaterQuery( this.renderer, waterSurface );
+		this.hostedQueries.set( waterSurface, hostedQuery );
+		this.hostedQuery = hostedQuery;
+		this.hostedPlayerSlot = hostedQuery.allocate( 'player', 1 );
+		this.player.query = hostedQuery;
+		this.player.slot = this.hostedPlayerSlot;
+		this.player.boat = runtime ? runtime.activate( { query: hostedQuery, colliders: this.hostedColliders } ) : null;
+		if ( runtime && this.wake ) {
+			waterSurface.wake = this.wake;
+			this.wake.boat = this.player.boat;
+		}
 		const wildlife = ( root.userData.worldComponents || [] ).find( ( component ) => component.wildlife )?.wildlifeRuntime;
 		this.activeHostedWildlife = wildlife || null;
 		if ( wildlife ) {
@@ -1300,6 +1330,14 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.activeHostedWhale = null;
 		this.activeHostedOcean = false;
 		const runtime = this.activeHostedBoat;
+		if ( this.wake ) this.wake.boat = this.boatCtl;
+		if ( this.hostedSurfaceState ) {
+			const { surface, terrain, shore, wake } = this.hostedSurfaceState;
+			surface.terrain = terrain;
+			surface.shore = shore;
+			surface.wake = wake;
+			this.hostedSurfaceState = null;
+		}
 		if ( ! runtime ) return;
 		const controller = runtime.boat.controller;
 		const wasDriving = controller?.driven;
@@ -1764,7 +1802,10 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
 				this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
 				hostedBoat?.queueQueries();
-				this.hostedQuery.update();
+				if ( ! this.activeHostedOcean ) {
+					if ( hostedBoat ) this.wake?.update( dt );
+					this.hostedQuery.update();
+				}
 				hostedBoat?.update( dt );
 				this.player.waterH = this.player.waterHeight();
 				this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
@@ -1775,7 +1816,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				updateWorldOceanFrame( {
 					dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
 					marineSnowUnderwater: this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH,
-					query: this.query, wake: this.wake, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
+					query: this.hostedQuery, wake: this.wake, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
 					shoreSim: this.shoreSim, underwaterLighting: this.underwaterLighting, breakers: this.breakers, spray: this.spray,
 				} );
 			}
@@ -1978,10 +2019,10 @@ function readReefPlacements( connector, component ) {
 	return decodeReefPlacements( bytes );
 }
 
-function readFishPropPlacements( connector, component ) {
+function readFishPropPlacements( connector, component, presentation ) {
 	const bytes = connector.assets.get( component.placementAssetId );
 	if ( ! bytes ) throw new Error( `Fish-prop component ${component.id} is missing its placement asset` );
-	return decodeFishPropPlacements( bytes );
+	return decodeFishPropPlacements( bytes, presentation );
 }
 
 function reefPlacementCapacity( connector ) {

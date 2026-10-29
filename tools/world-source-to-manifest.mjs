@@ -54,19 +54,12 @@ async function main() {
 	}
 	for ( const component of source.components || [] ) {
 		const priority = component.priority || 'portal-preview';
-		const references = [
-			...( component.placementAssetId ? [ { id: component.placementAssetId, kind: component.type === 'elsemesh.static-reef/1' ? 'reef-placement/1' : component.type === 'elsemesh.static-fish-props/1' ? 'fish-props-placement/1' : 'vegetation-placement/1', limit: 16 * 1024 * 1024 } ] : [] ),
-			...( component.grassMaskAssetId ? [ { id: component.grassMaskAssetId, kind: 'grass-density/1', limit: 16 * 1024 * 1024 } ] : [] ),
-			...( component.dataAssetId ? [ { id: component.dataAssetId, kind: component.type === 'elsemesh.village-materials/2' ? 'village-materials/1' : 'terrain-surface/1', limit: component.type === 'elsemesh.village-materials/2' ? 64 * 1024 * 1024 : 128 * 1024 * 1024 } ] : [] ),
-			...( component.type === 'elsemesh.humpback-whale/1' ? [ { id: component.modelAssetId, kind: 'whale-model/1', limit: 1 * 1024 * 1024 }, { id: component.geometryAssetId, kind: 'whale-geometry/1', limit: 32 * 1024 * 1024 }, { id: component.albedoAssetId, kind: 'whale-albedo/1', limit: 16 * 1024 * 1024 }, { id: component.heightAssetId, kind: 'whale-height/1', limit: 32 * 1024 * 1024 } ] : [] ),
-			...( component.beds || [] ).map( ( bed ) => ( { id: bed.assetId, kind: 'audio/ogg', limit: 16 * 1024 * 1024 } ) ),
-		];
-		for ( const { id, kind, limit } of references ) {
+		for ( const { assetId: id, kind } of component.assets ) {
 			let ref = assets.get( id );
 			if ( ! ref ) {
 				const assetPath = path.join( args.assets, id.slice( 'sha256:'.length ) );
 				const info = await stat( assetPath );
-				if ( ! info.isFile() || info.size < 1 || info.size > limit ) throw new Error( `Invalid or oversized component asset ${id}` );
+				if ( ! info.isFile() || info.size < 1 || info.size > 2 * 1024 * 1024 * 1024 ) throw new Error( `Invalid or oversized component asset ${id}` );
 				const hasher = createHash( 'sha256' );
 				for await ( const chunk of createReadStream( assetPath ) ) hasher.update( chunk );
 				if ( `sha256:${hasher.digest( 'hex' )}` !== id ) throw new Error( `Hash mismatch for component asset ${id}` );

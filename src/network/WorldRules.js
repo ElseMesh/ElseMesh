@@ -1,3 +1,5 @@
+import { worldComponentDescriptor } from './WorldComponentRegistry.js';
+
 // Runtime capability identifiers are part of the signed world contract. Add an
 // identifier only after the browser loader actually implements that capability.
 export const SUPPORTED_WORLD_FEATURES = new Set( [
@@ -7,21 +9,8 @@ export const SUPPORTED_WORLD_FEATURES = new Set( [
 	'elsemesh.portal-two-sided/1',
 	'elsemesh.portal-preview-static/1',
 	'elsemesh.static-glb-quaternion/1',
-	'elsemesh.procedural-island-vegetation/1',
-	'elsemesh.static-vegetation/1',
-	'elsemesh.static-grass/1',
-	'elsemesh.static-reef/1',
-	'elsemesh.static-fish-props/1',
-	'elsemesh.example-island-wildlife/1',
-	'elsemesh.humpback-whale/1',
-	'elsemesh.island-ocean/1',
 	'elsemesh.water-body/1',
 	'elsemesh.ambient-audio/1',
-	'elsemesh.downeast-boat/1',
-	'elsemesh.village-materials/1',
-	'elsemesh.village-materials/2',
-	'elsemesh.procedural-island-terrain/1',
-	'elsemesh.terrain-surface/1',
 ] );
 export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'elsemesh-default' ] );
 export const DEFAULT_WORLD_MOVEMENT = Object.freeze( { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } );
@@ -50,7 +39,7 @@ export function validateWorldRequirements( manifest ) {
 	const seen = new Set();
 	for ( const feature of required ) {
 		if ( typeof feature !== 'string' || feature.length > 96 || ! FEATURE_ID.test( feature ) || seen.has( feature ) ) throw new Error( 'World manifest contains an invalid or duplicate required feature' );
-		if ( ! SUPPORTED_WORLD_FEATURES.has( feature ) ) throw new Error( `This client does not support required world feature: ${feature}` );
+		if ( ! SUPPORTED_WORLD_FEATURES.has( feature ) && ! worldComponentDescriptor( feature ) ) throw new Error( `This client does not support required world feature: ${feature}` );
 		seen.add( feature );
 	}
 	return manifest;
@@ -76,7 +65,7 @@ export function worldSeaLevel( rules ) {
 
 export function worldHasWater( manifest ) {
 	return Number.isFinite( manifest?.rules?.seaLevel ) && manifest?.components?.some( component =>
-		component?.type === 'elsemesh.island-ocean/1' || component?.type === 'elsemesh.water-body/1'
+		worldComponentDescriptor( component?.type )?.waterSurface === true
 	) === true;
 }
 

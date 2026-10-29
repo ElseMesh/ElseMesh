@@ -22,6 +22,8 @@ const (
 	maxAssetBytes          = 2 << 30
 	maxSafeJSInteger       = uint64(9007199254740991)
 	maxCollisionBoxes      = 2048
+	maxComponentDataBytes  = 64 << 10
+	maxComponentAssets     = 256
 )
 
 var (
@@ -30,6 +32,7 @@ var (
 	portalIDPattern          = regexp.MustCompile(`^elsemesh-portal:[\w.-]{1,128}$`)
 	componentIDPattern       = regexp.MustCompile(`^elsemesh-component:[\w.-]{1,128}$`)
 	assetIDPattern           = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	assetKindPattern         = regexp.MustCompile(`^[a-z0-9][a-z0-9./-]{0,63}$`)
 	sourceContentHashPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 	worldFeaturePattern      = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
 	worldBehaviorPattern     = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
@@ -206,146 +209,93 @@ func (object *worldObject) UnmarshalJSON(data []byte) error {
 }
 
 type worldComponent struct {
-	ID               string              `json:"id"`
-	Type             string              `json:"type"`
-	ObjectID         string              `json:"objectId,omitempty"`
-	Seed             uint32              `json:"seed,omitempty"`
-	Priority         string              `json:"priority,omitempty"`
-	PlacementAssetID string              `json:"placementAssetId,omitempty"`
-	GrassMaskAssetID string              `json:"grassMaskAssetId,omitempty"`
-	DataAssetID      string              `json:"dataAssetId,omitempty"`
-	ModelAssetID     string              `json:"modelAssetId,omitempty"`
-	GeometryAssetID  string              `json:"geometryAssetId,omitempty"`
-	AlbedoAssetID    string              `json:"albedoAssetId,omitempty"`
-	HeightAssetID    string              `json:"heightAssetId,omitempty"`
-	Route            [][]float64         `json:"route,omitempty"`
-	SurfaceAt        *float64            `json:"surfaceAt,omitempty"`
-	CruiseSpeed      *float64            `json:"cruiseSpeed,omitempty"`
-	SurfaceSpeed     *float64            `json:"surfaceSpeed,omitempty"`
-	StreamingBounds  *streamingBounds    `json:"streamingBounds,omitempty"`
-	Center           []float64           `json:"center,omitempty"`
-	Extent           float64             `json:"extent,omitempty"`
-	Profile          string              `json:"profile,omitempty"`
-	RoofPerches      [][]float64         `json:"roofPerches,omitempty"`
-	Footprints       []wildlifeFootprint `json:"footprints,omitempty"`
-	Beds             []audioBed          `json:"beds,omitempty"`
+	ID              string                    `json:"id"`
+	Type            string                    `json:"type"`
+	Priority        string                    `json:"priority,omitempty"`
+	StreamingBounds *streamingBounds          `json:"streamingBounds,omitempty"`
+	Assets          []componentAssetReference `json:"assets"`
+	Data            json.RawMessage           `json:"data"`
 }
 
-type wildlifeFootprint struct {
-	X float64 `json:"x"`
-	Z float64 `json:"z"`
-	R float64 `json:"r"`
+type componentAssetReference struct {
+	AssetID string `json:"assetId"`
+	Kind    string `json:"kind"`
 }
 
-type audioBed struct {
-	AssetID     string   `json:"assetId"`
-	Gain        float64  `json:"gain"`
-	Condition   string   `json:"condition,omitempty"`
-	Position    *vector3 `json:"position,omitempty"`
-	RefDistance *float64 `json:"refDistance,omitempty"`
-	Rolloff     *float64 `json:"rolloff,omitempty"`
-}
-
-func (bed *audioBed) UnmarshalJSON(data []byte) error {
+func (reference *componentAssetReference) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("component asset reference must be an object")
 	}
-	for key := range fields {
-		if key != "assetId" && key != "gain" && key != "condition" && key != "position" && key != "refDistance" && key != "rolloff" {
-			return fmt.Errorf("unknown field %q in ambient audio bed", key)
-		}
+	if len(fields) != 2 || fields["assetId"] == nil || fields["kind"] == nil {
+		return errors.New("component asset reference requires only assetId and kind")
 	}
-	if fields["assetId"] == nil || fields["gain"] == nil {
-		return errors.New("ambient audio bed requires assetId and gain")
+	var decoded struct {
+		AssetID string `json:"assetId"`
+		Kind    string `json:"kind"`
 	}
-	if rawPosition, exists := fields["position"]; exists {
-		var position []float64
-		if err := json.Unmarshal(rawPosition, &position); err != nil || len(position) != 3 {
-			return errors.New("ambient audio bed position must contain three coordinates")
-		}
-	}
-	type plain audioBed
-	var decoded plain
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	*bed = audioBed(decoded)
+	*reference = componentAssetReference(decoded)
 	return nil
 }
 
 func (component *worldComponent) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-	var typeName string
-	if err := json.Unmarshal(fields["type"], &typeName); err != nil {
-		return errors.New("world component has no valid type")
-	}
-	allowed := map[string]bool{"id": true, "type": true, "priority": true}
-	switch typeName {
-	case "elsemesh.procedural-island-vegetation/1":
-		allowed["seed"], allowed["placementAssetId"] = true, true
-	case "elsemesh.static-vegetation/1":
-		allowed["placementAssetId"], allowed["grassMaskAssetId"] = true, true
-	case "elsemesh.static-reef/1":
-		allowed["placementAssetId"] = true
-	case "elsemesh.static-fish-props/1":
-		allowed["placementAssetId"] = true
-	case "elsemesh.example-island-wildlife/1":
-		allowed["profile"], allowed["seed"] = true, true
-		allowed["roofPerches"], allowed["footprints"] = true, true
-	case "elsemesh.humpback-whale/1":
-		allowed["profile"], allowed["seed"], allowed["route"] = true, true, true
-		allowed["surfaceAt"], allowed["cruiseSpeed"], allowed["surfaceSpeed"] = true, true, true
-		allowed["modelAssetId"], allowed["geometryAssetId"] = true, true
-		allowed["albedoAssetId"], allowed["heightAssetId"] = true, true
-	case "elsemesh.island-ocean/1":
-	case "elsemesh.procedural-island-terrain/1":
-		allowed["objectId"], allowed["profile"] = true, true
-	case "elsemesh.terrain-surface/1":
-		allowed["objectId"], allowed["profile"], allowed["dataAssetId"] = true, true, true
-	case "elsemesh.village-materials/2":
-		allowed["objectId"], allowed["profile"], allowed["dataAssetId"] = true, true, true
-	case "elsemesh.water-body/1":
-		allowed["center"], allowed["extent"], allowed["profile"] = true, true, true
-	case "elsemesh.ambient-audio/1":
-		allowed["beds"] = true
-	case "elsemesh.downeast-boat/1":
-		allowed["objectId"] = true
-	default:
-		return fmt.Errorf("unsupported world component type %q", typeName)
-	}
-	allowed["streamingBounds"] = true
-	if rawBounds, exists := fields["streamingBounds"]; exists {
-		var boundsFields map[string]json.RawMessage
-		if err := json.Unmarshal(rawBounds, &boundsFields); err != nil {
-			return errors.New("invalid component streaming bounds")
-		}
-		if len(boundsFields) != 2 || boundsFields["center"] == nil || boundsFields["radius"] == nil {
-			return errors.New("component streaming bounds must contain only center and radius")
-		}
-		var center []float64
-		var radius float64
-		if err := json.Unmarshal(boundsFields["center"], &center); err != nil || len(center) != 3 {
-			return errors.New("component streaming bounds center must have three coordinates")
-		}
-		if err := json.Unmarshal(boundsFields["radius"], &radius); err != nil {
-			return errors.New("component streaming bounds radius must be numeric")
-		}
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("world component must be an object")
 	}
 	for key := range fields {
-		if !allowed[key] {
+		switch key {
+		case "id", "type", "priority", "streamingBounds", "assets", "data":
+		default:
 			return fmt.Errorf("unknown field %q in world component", key)
 		}
 	}
-	type plain worldComponent
-	var decoded plain
+	for _, key := range []string{"id", "type", "assets", "data"} {
+		if raw, ok := fields[key]; !ok || strings.TrimSpace(string(raw)) == "null" {
+			return fmt.Errorf("world component requires %s", key)
+		}
+	}
+	var assets []componentAssetReference
+	if err := json.Unmarshal(fields["assets"], &assets); err != nil || assets == nil {
+		return errors.New("world component assets must be an array")
+	}
+	var dataObject map[string]json.RawMessage
+	if err := json.Unmarshal(fields["data"], &dataObject); err != nil || dataObject == nil {
+		return errors.New("world component data must be an object")
+	}
+	var bounds *streamingBounds
+	if raw, ok := fields["streamingBounds"]; ok {
+		var shape map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &shape); err != nil || shape == nil || len(shape) != 2 || shape["center"] == nil || shape["radius"] == nil {
+			return errors.New("component streamingBounds requires only center and radius")
+		}
+		var center []json.RawMessage
+		if err := json.Unmarshal(shape["center"], &center); err != nil || len(center) != 3 {
+			return errors.New("component streamingBounds center must have three coordinates")
+		}
+		for _, coordinate := range center {
+			var value float64
+			if err := json.Unmarshal(coordinate, &value); err != nil {
+				return errors.New("component streamingBounds coordinates must be numeric")
+			}
+		}
+		if err := json.Unmarshal(raw, &bounds); err != nil {
+			return errors.New("invalid component streamingBounds")
+		}
+	}
+	var decoded struct {
+		ID       string          `json:"id"`
+		Type     string          `json:"type"`
+		Priority string          `json:"priority"`
+		Data     json.RawMessage `json:"data"`
+	}
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	*component = worldComponent(decoded)
+	*component = worldComponent{ID: decoded.ID, Type: decoded.Type, Priority: decoded.Priority, StreamingBounds: bounds, Assets: assets, Data: decoded.Data}
 	return nil
 }
 
@@ -888,255 +838,45 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		seenPortals[p.ID] = true
 	}
 	seenComponents := make(map[string]bool, len(manifest.Components))
-	islandOceanCount := 0
-	waterBodyCount := 0
-	ambientAudioCount := 0
-	boatCount := 0
-	fishPropsCount := 0
-	whaleCount := 0
-	wildlifeCount := 0
-	terrainSurfaceCount := 0
-	wildlifePriority := ""
-	terrainSurfacePriority := ""
-	var boatObject worldObject
-	waterBodies := make([]worldComponent, 0, 4)
 	assetRefs := make(map[string]assetRef, len(manifest.Assets))
 	for _, asset := range manifest.Assets {
 		assetRefs[asset.ID] = asset
 	}
 	for _, component := range manifest.Components {
-		vegetation := component.Type == "elsemesh.procedural-island-vegetation/1" && component.Seed == 7
-		staticVegetation := component.Type == "elsemesh.static-vegetation/1" && component.Seed == 0 && component.PlacementAssetID != ""
-		staticReef := component.Type == "elsemesh.static-reef/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
-		staticFishProps := component.Type == "elsemesh.static-fish-props/1" && component.Seed == 0 && component.PlacementAssetID != "" && component.StreamingBounds != nil
-		islandWildlife := component.Type == "elsemesh.example-island-wildlife/1" && component.Seed > 0 && component.Profile == "example-island-wildlife-v1" && component.PlacementAssetID == "" && component.StreamingBounds != nil && component.RoofPerches != nil && len(component.RoofPerches) <= 64 && component.Footprints != nil && len(component.Footprints) <= 256
-		if islandWildlife {
-			for _, perch := range component.RoofPerches {
-				if len(perch) != 3 || vector3OutOfBounds(vector3{perch[0], perch[1], perch[2]}, 10000) {
-					islandWildlife = false
-					break
-				}
-			}
-			for _, footprint := range component.Footprints {
-				if math.IsNaN(footprint.X) || math.IsInf(footprint.X, 0) || math.Abs(footprint.X) > 10000 || math.IsNaN(footprint.Z) || math.IsInf(footprint.Z, 0) || math.Abs(footprint.Z) > 10000 || math.IsNaN(footprint.R) || math.IsInf(footprint.R, 0) || footprint.R <= 0 || footprint.R > 1000 {
-					islandWildlife = false
-					break
-				}
-			}
-		}
-		humpbackWhale := component.Type == "elsemesh.humpback-whale/1" && component.Seed > 0 && component.PlacementAssetID == "" && component.Profile == "example-island-humpback-v1" && component.ModelAssetID != "" && component.GeometryAssetID != "" && component.AlbedoAssetID != "" && component.HeightAssetID != "" && component.StreamingBounds != nil && len(component.Route) >= 4 && len(component.Route) <= 32 && component.SurfaceAt != nil && *component.SurfaceAt >= 0 && *component.SurfaceAt <= 1 && component.CruiseSpeed != nil && *component.CruiseSpeed >= 0 && *component.CruiseSpeed <= 10 && component.SurfaceSpeed != nil && *component.SurfaceSpeed >= 0 && *component.SurfaceSpeed <= 10
-		if humpbackWhale {
-			for _, point := range component.Route {
-				if len(point) != 2 {
-					humpbackWhale = false
-					break
-				}
-				for _, coordinate := range point {
-					if math.IsNaN(coordinate) || math.IsInf(coordinate, 0) || math.Abs(coordinate) > 10000 {
-						humpbackWhale = false
-						break
-					}
-				}
-			}
-		}
-		ambientAudio := component.Type == "elsemesh.ambient-audio/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Beds) > 0 && len(component.Beds) <= 16
-		boat := component.Type == "elsemesh.downeast-boat/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.ObjectID != ""
-		islandOcean := component.Type == "elsemesh.island-ocean/1" && component.Seed == 0 && component.PlacementAssetID == ""
-		proceduralTerrain := component.Type == "elsemesh.procedural-island-terrain/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "example-island-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance"
-		terrainSurface := component.Type == "elsemesh.terrain-surface/1" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "example-island-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance" && component.DataAssetID != ""
-		villageMaterials := component.Type == "elsemesh.village-materials/2" && component.Seed == 0 && component.PlacementAssetID == "" && component.Profile == "original-elsemesh-village-v1" && component.ObjectID != "" && objectByID[component.ObjectID].Kind == "asset-instance" && component.DataAssetID != ""
-		waterBody := component.Type == "elsemesh.water-body/1" && component.Seed == 0 && component.PlacementAssetID == "" && len(component.Center) == 2 && component.Extent >= 8 && component.Extent <= 100000 && (component.Profile == "" || component.Profile == "deep-ocean" || component.Profile == "calm-lagoon" || component.Profile == "storm")
-		if waterBody {
-			waterBodyCount++
-			for _, coordinate := range component.Center {
-				if math.IsNaN(coordinate) || math.IsInf(coordinate, 0) || math.Abs(coordinate)+component.Extent > 1e6 {
-					waterBody = false
-				}
-			}
-			if math.IsNaN(component.Extent) || math.IsInf(component.Extent, 0) {
-				waterBody = false
-			}
-		}
-		if islandOcean {
-			islandOceanCount++
-		}
-		if ambientAudio {
-			ambientAudioCount++
-		}
-		if staticFishProps {
-			fishPropsCount++
-		}
-		if islandWildlife {
-			wildlifeCount++
-			wildlifePriority = component.Priority
-		}
-		if terrainSurface {
-			terrainSurfaceCount++
-			if terrainSurfaceCount > 1 {
-				return errors.New("world may declare at most one packaged terrain surface")
-			}
-			terrainSurfacePriority = component.Priority
-		}
-		if humpbackWhale {
-			whaleCount++
-		}
-		if boat {
-			boatCount++
-			preview, exists := objectByID[component.ObjectID]
-			previewAsset, assetExists := assetRefs[preview.AssetID]
-			if !exists || !assetExists || previewAsset.Kind != "glb" || previewAsset.Priority != "portal-preview" || preview.Kind != "asset-instance" || preview.Priority != "portal-preview" || preview.Collision.Enabled || preview.Collision.Shape != "none" || preview.Transform.Rotation != nil || preview.Scale != (vector3{1, 1, 1}) || component.Priority != "portal-preview" {
-				return fmt.Errorf("invalid berth preview object on boat component %q", component.ID)
-			}
-			boatObject = preview
-		}
-		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || (!vegetation && !staticVegetation && !staticReef && !staticFishProps && !islandWildlife && !humpbackWhale && !islandOcean && !proceduralTerrain && !terrainSurface && !villageMaterials && !waterBody && !ambientAudio && !boat) || islandOceanCount > 1 || waterBodyCount > 4 || ambientAudioCount > 16 || boatCount > 1 || fishPropsCount > 1 || whaleCount > 1 || wildlifeCount > 1 || component.Priority != "" && component.Priority != "portal-preview" && component.Priority != "visible" && component.Priority != "nearby" && component.Priority != "background" || !seenFeatures[component.Type] {
+		if !componentIDPattern.MatchString(component.ID) || seenComponents[component.ID] || seenObjects[component.ID] || seenPortals[component.ID] || !worldBehaviorPattern.MatchString(component.Type) || !seenFeatures[component.Type] {
 			return fmt.Errorf("invalid or unsupported world component %q", component.ID)
 		}
-		if waterBody && (manifest.Rules.SeaLevel == nil || islandOceanCount > 0) || islandOcean && waterBodyCount > 0 {
-			return errors.New("portable water requires seaLevel and cannot be combined with island-ocean")
+		if component.Priority != "" && !validWorldPriority(component.Priority) {
+			return fmt.Errorf("invalid priority on world component %q", component.ID)
 		}
-		if waterBody {
-			for _, other := range waterBodies {
-				if math.Abs(component.Center[0]-other.Center[0]) < component.Extent+other.Extent && math.Abs(component.Center[1]-other.Center[1]) < component.Extent+other.Extent {
-					return errors.New("portable water body bounds cannot overlap")
-				}
-			}
-			waterBodies = append(waterBodies, component)
+		if len(component.Data) == 0 || len(component.Data) > maxComponentDataBytes {
+			return fmt.Errorf("world component %q data is missing or exceeds %d bytes", component.ID, maxComponentDataBytes)
 		}
-		if component.PlacementAssetID != "" {
-			asset, exists := assetRefs[component.PlacementAssetID]
-			priority := component.Priority
-			if priority == "" {
-				priority = "portal-preview"
-			}
-			kind := "vegetation-placement/1"
-			if staticReef {
-				kind = "reef-placement/1"
-			} else if staticFishProps {
-				kind = "fish-props-placement/1"
-			}
-			if !assetIDPattern.MatchString(component.PlacementAssetID) || !exists || asset.Kind != kind || asset.Priority != priority || staticFishProps && (asset.Bytes == 0 || asset.Bytes > 16<<20) {
-				return fmt.Errorf("invalid placement asset reference on world component %q", component.ID)
-			}
-		}
-		if component.GrassMaskAssetID != "" {
-			asset, exists := assetRefs[component.GrassMaskAssetID]
-			priority := component.Priority
-			if priority == "" {
-				priority = "portal-preview"
-			}
-			if !staticVegetation || !seenFeatures["elsemesh.static-grass/1"] || !assetIDPattern.MatchString(component.GrassMaskAssetID) || !exists || asset.Kind != "grass-density/1" || asset.Priority != priority || asset.Bytes <= 16 || asset.Bytes > 16<<20 {
-				return fmt.Errorf("invalid grass density asset reference on world component %q", component.ID)
-			}
-		}
-		if terrainSurface {
-			asset, exists := assetRefs[component.DataAssetID]
-			priority := component.Priority
-			if priority == "" {
-				priority = "portal-preview"
-			}
-			if !assetIDPattern.MatchString(component.DataAssetID) || !exists || asset.Kind != "terrain-surface/1" || asset.Priority != priority || asset.Bytes == 0 || asset.Bytes > 128<<20 {
-				return fmt.Errorf("invalid terrain surface asset reference on world component %q", component.ID)
-			}
-		}
-		if villageMaterials {
-			asset, exists := assetRefs[component.DataAssetID]
-			priority := component.Priority
-			if priority == "" {
-				priority = "portal-preview"
-			}
-			if !assetIDPattern.MatchString(component.DataAssetID) || !exists || asset.Kind != "village-materials/1" || asset.Priority != priority || asset.Bytes == 0 || asset.Bytes > 64<<20 {
-				return fmt.Errorf("invalid village materials asset reference on world component %q", component.ID)
-			}
-		}
-		if humpbackWhale {
-			priority := component.Priority
-			if priority == "" {
-				priority = "portal-preview"
-			}
-			whaleAssets := []struct {
-				id       string
-				kind     string
-				maxBytes int64
-			}{
-				{component.ModelAssetID, "whale-model/1", 1 << 20},
-				{component.GeometryAssetID, "whale-geometry/1", 32 << 20},
-				{component.AlbedoAssetID, "whale-albedo/1", 16 << 20},
-				{component.HeightAssetID, "whale-height/1", 32 << 20},
-			}
-			for _, reference := range whaleAssets {
-				asset, exists := assetRefs[reference.id]
-				if !assetIDPattern.MatchString(reference.id) || !exists || asset.Kind != reference.kind || asset.Priority != priority || asset.Bytes == 0 || asset.Bytes > reference.maxBytes {
-					return fmt.Errorf("invalid %s asset reference on world component %q", reference.kind, component.ID)
-				}
-			}
-		}
-		if ambientAudio {
-			priority := component.Priority
-			if priority == "" {
-				priority = "portal-preview"
-			}
-			for _, bed := range component.Beds {
-				asset, exists := assetRefs[bed.AssetID]
-				invalidPosition := bed.Position != nil && vector3OutOfBounds(*bed.Position, 100000)
-				invalidRefDistance := bed.RefDistance != nil && (math.IsNaN(*bed.RefDistance) || math.IsInf(*bed.RefDistance, 0) || *bed.RefDistance < 0.5 || *bed.RefDistance > 1000)
-				invalidRolloff := bed.Rolloff != nil && (math.IsNaN(*bed.Rolloff) || math.IsInf(*bed.Rolloff, 0) || *bed.Rolloff < 0 || *bed.Rolloff > 10)
-				if !assetIDPattern.MatchString(bed.AssetID) || !exists || asset.Kind != "audio/ogg" || asset.Bytes == 0 || asset.Bytes > 16<<20 || asset.Priority != priority || math.IsNaN(bed.Gain) || math.IsInf(bed.Gain, 0) || bed.Gain < 0 || bed.Gain > 1 || bed.Condition != "" && bed.Condition != "always" && bed.Condition != "day" && bed.Condition != "night" && bed.Condition != "dawn" && bed.Condition != "underwater" || invalidPosition || invalidRefDistance || invalidRolloff {
-					return fmt.Errorf("invalid ambient audio bed on world component %q", component.ID)
-				}
-			}
+		var dataObject map[string]json.RawMessage
+		if err := json.Unmarshal(component.Data, &dataObject); err != nil || dataObject == nil {
+			return fmt.Errorf("world component %q data must be a JSON object", component.ID)
 		}
 		if bounds := component.StreamingBounds; bounds != nil {
-			if math.IsNaN(bounds.Radius) || math.IsInf(bounds.Radius, 0) || bounds.Radius <= 0 || bounds.Radius > 10000 {
-				return errors.New("component streaming bounds radius out of bounds")
+			if math.IsNaN(bounds.Radius) || math.IsInf(bounds.Radius, 0) || bounds.Radius <= 0 || bounds.Radius > 10000 || vector3OutOfBounds(vector3(bounds.Center), 10000) {
+				return fmt.Errorf("invalid streaming bounds on world component %q", component.ID)
 			}
-			for _, coordinate := range bounds.Center {
-				if math.IsNaN(coordinate) || math.IsInf(coordinate, 0) || math.Abs(coordinate) > 10000 {
-					return errors.New("component streaming bounds center out of bounds")
-				}
+		}
+		if len(component.Assets) > maxComponentAssets {
+			return fmt.Errorf("world component %q references too many assets", component.ID)
+		}
+		priority := component.Priority
+		if priority == "" {
+			priority = "portal-preview"
+		}
+		seenComponentAssets := make(map[string]bool, len(component.Assets))
+		for _, reference := range component.Assets {
+			asset, exists := assetRefs[reference.AssetID]
+			if !assetIDPattern.MatchString(reference.AssetID) || seenComponentAssets[reference.AssetID] || !exists || reference.Kind == "" || len(reference.Kind) > 64 || !assetKindPattern.MatchString(reference.Kind) || asset.Kind != reference.Kind || asset.Priority != priority {
+				return fmt.Errorf("invalid asset reference on world component %q", component.ID)
 			}
+			seenComponentAssets[reference.AssetID] = true
 		}
 		seenComponents[component.ID] = true
-	}
-	if wildlifeCount > 0 && terrainSurfaceCount == 0 {
-		return errors.New("Example Island wildlife requires a packaged terrain surface")
-	}
-	for _, component := range manifest.Components {
-		if component.GrassMaskAssetID != "" && terrainSurfaceCount == 0 {
-			return errors.New("portable grass requires a packaged terrain surface")
-		}
-	}
-	if wildlifeCount > 0 {
-		rank := func(priority string) int {
-			for index, candidate := range []string{"portal-preview", "visible", "nearby", "background"} {
-				if priority == candidate {
-					return index
-				}
-			}
-			if priority == "" {
-				return 1
-			}
-			return -1
-		}
-		if rank(terrainSurfacePriority) > rank(wildlifePriority) {
-			return errors.New("Example Island wildlife cannot stream before its terrain surface")
-		}
-	}
-	if boatCount > 0 {
-		if manifest.Rules.SeaLevel == nil || islandOceanCount != 1 && waterBodyCount == 0 {
-			return errors.New("a Downeast boat requires seaLevel and a declared water renderer")
-		}
-		if waterBodyCount > 0 {
-			inside := false
-			for _, water := range waterBodies {
-				if math.Abs(boatObject.Transform.Position[0]-water.Center[0]) <= water.Extent && math.Abs(boatObject.Transform.Position[2]-water.Center[1]) <= water.Extent {
-					inside = true
-				}
-			}
-			if !inside {
-				return errors.New("a Downeast boat berth must be inside a declared water body")
-			}
-		}
 	}
 	return nil
 }
@@ -1148,6 +888,10 @@ func vector3OutOfBounds(vector vector3, limit float64) bool {
 		}
 	}
 	return false
+}
+
+func validWorldPriority(priority string) bool {
+	return priority == "portal-preview" || priority == "visible" || priority == "nearby" || priority == "background"
 }
 
 func validUnitQuaternion(rotation *vector4) bool {

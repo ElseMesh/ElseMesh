@@ -294,14 +294,14 @@ export function bucket( B, x, y, z, tint = C.blue, seed = 0.5 ) {
 // with the fish material, collected on the builder as B.fishProps).
 
 const _fm = new Matrix4();
-const fishProps = ( B ) => B.fishProps || ( B.fishProps = new FishProps() );
+const fishProps = ( B ) => B.fishProps || ( B.fishProps = new FishProps( B.fishPresentation ) );
 
 // A fish in B's local frame. o.pose:
 //   'side': lying on its side, nose toward local +x; (x, y, z) = the surface under its middle
 //   'tail': hung by the tail, nose down, left flank toward local +z; (x, y, z) = the twine loop
 //           ('split' fish: the flesh side faces +z)
 //   'gill': hung from a hook through the gill cover and mouth, nose up; (x, y, z) = the hook
-// o: species (fish/FishSpecies.js), len (m), ry / rx / rz (rotation of the placement, as for the
+// o: species (world fish-presentation profile), len (m), ry / rx / rz (rotation of the placement, as for the
 //   other props), flip (the other flank up), curl / sag (sideways / up-down bend, 1 / length), jaw
 //   (mouth opening, rad), kind ('whole', 'split' (salted, butterflied), 'head' / 'trunk' (cut
 //   behind the head)), seed, cloudy (eyes), wet, dried, blood (gills, cut faces)
@@ -313,13 +313,13 @@ export function fish( B, x, y, z, o = {} ) {
 	let py = y;
 	if ( pose === 'tail' ) {
 
-		anchor = FishProps.tailAnchor( species );
+		anchor = FishProps.tailAnchor( species, B.fishPresentation );
 		if ( kind === 'split' ) pose = 'tailFlat';
 
-	} else if ( pose === 'gill' ) anchor = FishProps.gillAnchor( species );
+	} else if ( pose === 'gill' ) anchor = FishProps.gillAnchor( species, B.fishPresentation );
 	else {
 
-		py += kind === 'split' ? 0.012 : FishProps.restHeight( species, len );
+		py += kind === 'split' ? 0.012 : FishProps.restHeight( species, len, B.fishPresentation );
 		if ( o.flip ) pose = 'sideFlip';
 
 	}

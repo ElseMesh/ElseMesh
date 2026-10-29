@@ -259,3 +259,27 @@ func TestWorldSourceAssetsIncludesJavaScriptBehaviorExtensions(t *testing.T) {
 		t.Fatalf("world source JavaScript asset reference = %#v", assets)
 	}
 }
+
+func TestWorldSourceAssetsImportsGenericComponentReferences(t *testing.T) {
+	directory := t.TempDir()
+	assetsDirectory := filepath.Join(directory, "assets")
+	if err := os.MkdirAll(assetsDirectory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	content := []byte("custom component payload")
+	assetID := assetHash(content)
+	if err := os.WriteFile(filepath.Join(assetsDirectory, assetID[len("sha256:"):]), content, 0600); err != nil {
+		t.Fatal(err)
+	}
+	source := worldSourceDocument{Components: []worldComponent{{
+		ID: "elsemesh-component:custom", Type: "elsemesh.custom-runtime/1", Priority: "nearby",
+		Assets: []componentAssetReference{{AssetID: assetID, Kind: "custom/payload-1"}}, Data: json.RawMessage(`{"custom":true}`),
+	}}}
+	assets, err := worldSourceAssets(directory, source)
+	if err != nil {
+		t.Fatalf("generic component asset reference rejected: %v", err)
+	}
+	if len(assets) != 1 || assets[0].ID != assetID || assets[0].Bytes != int64(len(content)) || assets[0].Kind != "custom/payload-1" || assets[0].Priority != "nearby" {
+		t.Fatalf("generic component asset reference = %#v", assets)
+	}
+}

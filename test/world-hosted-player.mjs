@@ -138,9 +138,15 @@ WorldPresenceSession.prototype.admit = async function ( _pose, spawnCandidates )
 };
 let sourceClosed = false;
 const destination = { worldId: 'elsemesh:destination', nodeId: '1234567890123456789012345', gateway: 'http://127.0.0.1:5193', manifest: { title: 'Destination', components: [], rules: { gravity: 0.5 } } };
+const hostedWaterSurface = { terrain: null, shore: null, wake: null };
+const hostedQuery = {
+	cpu: new Float32Array( 4 ), cpuValid: false,
+	allocate: () => 0, setCamera() {}, setPoint() {}, update() {},
+};
 const app = Object.assign( Object.create( App.prototype ), {
 	player, camera, worldConnector: { worldId: 'elsemesh:source', close() { sourceClosed = true; } },
-	linkedWorldRoot: { userData: {} }, hostedColliders: new Colliders(), hostedQuery: {}, hostedPlayerSlot: 0,
+	linkedWorldRoot: { userData: {} }, hostedColliders: new Colliders(), hostedWaterSurface,
+	hostedQueries: new WeakMap( [ [ hostedWaterSurface, hostedQuery ] ] ), hostedQuery, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(),
 	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
 	portalPreviousPosition: new Vector3(), portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
@@ -197,7 +203,8 @@ const vehicleDestination = {
 };
 const vehiclePortalApp = Object.assign( Object.create( App.prototype ), {
 	player: vehiclePlayer, camera: vehiclePlayer.camera, worldConnector: vehicleSourceConnector, activeHostedBoat: sourceBoatRuntime,
-	linkedWorldRoot: { userData: {} }, hostedColliders: colliders, hostedQuery: {}, hostedPlayerSlot: 0,
+	linkedWorldRoot: { userData: {} }, hostedColliders: colliders, hostedWaterSurface,
+	hostedQueries: new WeakMap( [ [ hostedWaterSurface, hostedQuery ] ] ), hostedQuery, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(), portalPreviousPosition: new Vector3(),
 	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
 	portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},

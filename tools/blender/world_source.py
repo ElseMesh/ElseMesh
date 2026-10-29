@@ -157,8 +157,13 @@ def export_source(path):
     print("Exported %d objects and %d portals to %s" % (len(objects), len(portals), path))
 
 
-mode, target = args()
-if mode == "import":
-    import_source(target)
-else:
-    export_source(target)
+def main():
+    mode, target = args()
+    if mode == "import":
+        import_source(target)
+    else:
+        export_source(target)
+
+
+if __name__ == "__main__":
+    main()

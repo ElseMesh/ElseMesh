@@ -34,7 +34,7 @@ async function verifyWorld( directory, expectedWorldId ) {
 	}
 	const index = await readFile( path.join( worldRoot, 'ASSET-INDEX.md' ), 'utf8' );
 	assert.equal( index, await renderWorldAssetIndex( worldRoot ), `${directory} asset index is current` );
-	assert.match( index, /Procedural island terrain|Island terrain/i, `${directory} asset index includes human-readable uses` );
+	assert.match( index, /terrain-surface\/1/i, `${directory} asset index names the generic referenced asset kind` );
 	return ids.size;
 }
 

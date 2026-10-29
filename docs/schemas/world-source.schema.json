@@ -31,23 +31,73 @@
     "experience": {
       "type": "object",
       "description": "Optional ThruHold-specific loading-page copy and data for required engine-registered behaviors. All strings are rendered as text, never markup.",
-      "required": ["genre", "tagline", "loadingNote", "tips", "stages"],
+      "required": [
+        "genre",
+        "tagline",
+        "loadingNote",
+        "tips",
+        "stages"
+      ],
       "properties": {
-        "genre": { "type": "string", "minLength": 1, "maxLength": 240 },
-        "tagline": { "type": "string", "minLength": 1, "maxLength": 240 },
-        "loadingNote": { "type": "string", "minLength": 1, "maxLength": 240 },
-        "tips": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "type": "string", "minLength": 1, "maxLength": 320 } },
+        "genre": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "tagline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "loadingNote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "tips": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          }
+        },
         "stages": {
           "type": "object",
           "maxProperties": 12,
-          "propertyNames": { "enum": ["gpu", "atmosphere", "terrain", "village", "vegetation", "ocean", "reef", "simulation", "shaders", "world", "compile", "warmup"] },
-          "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 120 }
+          "propertyNames": {
+            "enum": [
+              "gpu",
+              "atmosphere",
+              "terrain",
+              "village",
+              "vegetation",
+              "ocean",
+              "reef",
+              "simulation",
+              "shaders",
+              "world",
+              "compile",
+              "warmup"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
         },
         "behaviors": {
           "type": "object",
           "maxProperties": 16,
-          "propertyNames": { "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
-          "additionalProperties": { "type": "object" },
+          "propertyNames": {
+            "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$"
+          },
+          "additionalProperties": {
+            "type": "object"
+          },
           "description": "Maps each required ElseMesh behavior ID to its behavior-owned authored data. The server validates the bounded generic envelope; clients validate data through their registered behavior implementation."
         },
         "extensions": {
@@ -55,10 +105,19 @@
           "maxItems": 16,
           "items": {
             "type": "object",
-            "required": ["behaviorId", "assetId"],
+            "required": [
+              "behaviorId",
+              "assetId"
+            ],
             "properties": {
-              "behaviorId": { "type": "string", "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
-              "assetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+              "behaviorId": {
+                "type": "string",
+                "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$"
+              },
+              "assetId": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
             },
             "additionalProperties": false
           },
@@ -70,11 +129,32 @@
     "spawn": {
       "type": "object",
       "description": "Initial camera eye pose in world-space meters; yaw and pitch in radians. Omission uses the legacy entrance.",
-      "required": ["position", "yaw", "pitch"],
+      "required": [
+        "position",
+        "yaw",
+        "pitch"
+      ],
       "properties": {
-        "position": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 } },
-        "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
-        "pitch": { "type": "number", "minimum": -1.5, "maximum": 1.5 }
+        "position": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        },
+        "yaw": {
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360
+        },
+        "pitch": {
+          "type": "number",
+          "minimum": -1.5,
+          "maximum": 1.5
+        }
       },
       "additionalProperties": false
     },
@@ -94,19 +174,57 @@
       "maxItems": 16,
       "items": {
         "type": "object",
-        "required": ["id", "label", "position", "yaw"],
+        "required": [
+          "id",
+          "label",
+          "position",
+          "yaw"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$" },
-          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
-          "position": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 } },
-          "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
-          "pitch": { "type": "number", "minimum": -1.5, "maximum": 1.5 },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "position": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": -1000000,
+              "maximum": 1000000
+            }
+          },
+          "yaw": {
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          },
+          "pitch": {
+            "type": "number",
+            "minimum": -1.5,
+            "maximum": 1.5
+          },
           "uniform": {
             "type": "object",
-            "required": ["shirt", "trousers"],
+            "required": [
+              "shirt",
+              "trousers"
+            ],
             "properties": {
-              "shirt": { "type": "string", "pattern": "^#[0-9a-f]{6}$" },
-              "trousers": { "type": "string", "pattern": "^#[0-9a-f]{6}$" }
+              "shirt": {
+                "type": "string",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "trousers": {
+                "type": "string",
+                "pattern": "^#[0-9a-f]{6}$"
+              }
             },
             "additionalProperties": false
           }
@@ -155,7 +273,10 @@
         },
         "physicsProfile": {
           "type": "string",
-          "enum": ["default", "elsemesh-default"]
+          "enum": [
+            "default",
+            "elsemesh-default"
+          ]
         },
         "maxVisitors": {
           "type": "integer",
@@ -171,25 +292,97 @@
         },
         "movement": {
           "type": "object",
-          "required": ["walkSpeed", "sprintSpeed", "jumpSpeed"],
+          "required": [
+            "walkSpeed",
+            "sprintSpeed",
+            "jumpSpeed"
+          ],
           "properties": {
-            "walkSpeed": { "type": "number", "minimum": 0.5, "maximum": 10 },
-            "sprintSpeed": { "type": "number", "minimum": 0.5, "maximum": 15 },
-            "jumpSpeed": { "type": "number", "minimum": 0, "maximum": 10 }
+            "walkSpeed": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 10
+            },
+            "sprintSpeed": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 15
+            },
+            "jumpSpeed": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            }
           },
           "additionalProperties": false
         },
         "vehiclePolicy": {
           "type": "object",
-          "required": ["enabled"],
+          "required": [
+            "enabled"
+          ],
           "properties": {
-            "enabled": { "type": "boolean" },
-            "maxSpeed": { "type": "number", "minimum": 0.5, "maximum": 16 },
-            "maxCombinedComplexity": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+            "enabled": {
+              "type": "boolean"
+            },
+            "maxSpeed": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 16
+            },
+            "maxCombinedComplexity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            }
           },
           "allOf": [
-            {"if":{"properties":{"enabled":{"const":true}},"required":["enabled"]},"then":{"required":["maxSpeed","maxCombinedComplexity"]}},
-            {"if":{"properties":{"enabled":{"const":false}},"required":["enabled"]},"then":{"not":{"anyOf":[{"required":["maxSpeed"]},{"required":["maxCombinedComplexity"]}]}}}
+            {
+              "if": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              },
+              "then": {
+                "required": [
+                  "maxSpeed",
+                  "maxCombinedComplexity"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "enabled": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "maxSpeed"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "maxCombinedComplexity"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
           ],
           "additionalProperties": false,
           "description": "Optional destination acceptance for the built-in Downeast boat. Accepted transfers apply maxSpeed and require configured avatar complexity plus the bundled boat's triangle count to fit maxCombinedComplexity. Omission or enabled=false denies vehicle transfer and suppresses open-portal previews while the player is aboard or at the helm."
@@ -216,7 +409,9 @@
     "hosts": {
       "type": "array",
       "maxItems": 256,
-      "items": { "$ref": "#/$defs/hostGrant" }
+      "items": {
+        "$ref": "#/$defs/hostGrant"
+      }
     },
     "objects": {
       "type": "array",
@@ -228,7 +423,9 @@
     "components": {
       "type": "array",
       "maxItems": 128,
-      "items": { "$ref": "#/$defs/component" }
+      "items": {
+        "$ref": "#/$defs/component"
+      }
     },
     "portals": {
       "type": "array",
@@ -243,9 +440,24 @@
     }
   },
   "allOf": [
-    {"if":{"properties":{"portals":{"contains":{"required":["back"]}}},"required":["portals"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"elsemesh.portal-two-sided/1"}}}}}}},
-    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]},"maxContains":1}}}},
-    {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.terrain-surface/1"}},"required":["type"]},"maxContains":1}}}}
+    {
+      "if": {
+        "required": [
+          "entryPoints"
+        ],
+        "properties": {
+          "entryPoints": {
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "entryPointActionLabel",
+          "entryPointPrompt"
+        ]
+      }
+    }
   ],
   "$defs": {
     "vector3": {
@@ -267,10 +479,26 @@
     "streamingBounds": {
       "type": "object",
       "description": "Optional world-space bounding sphere used for view- and distance-driven component data requests.",
-      "required": ["center", "radius"],
+      "required": [
+        "center",
+        "radius"
+      ],
       "properties": {
-        "center": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number", "minimum": -10000, "maximum": 10000 } },
-        "radius": { "type": "number", "exclusiveMinimum": 0, "maximum": 10000 }
+        "center": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "minimum": -10000,
+            "maximum": 10000
+          }
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        }
       },
       "additionalProperties": false
     },
@@ -292,27 +520,97 @@
           "description": "Optional normalized [x,y,z,w] quaternion for collision-free asset instances.",
           "minItems": 4,
           "maxItems": 4,
-          "items": { "type": "number" }
+          "items": {
+            "type": "number"
+          }
         }
       },
       "additionalProperties": true
     },
     "hostGrant": {
       "type": "object",
-      "required": ["peerId", "scopes", "expiresAt", "epoch"],
+      "required": [
+        "peerId",
+        "scopes",
+        "expiresAt",
+        "epoch"
+      ],
       "properties": {
-        "peerId": { "type": "string", "minLength": 20, "maxLength": 256, "pattern": "^[A-Za-z0-9]+$" },
-        "scopes": { "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["content-cache", "failover-authority"] } },
-        "expiresAt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-        "epoch": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-        "failoverAfter": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-        "failoverSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+        "peerId": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9]+$"
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "content-cache",
+              "failover-authority"
+            ]
+          }
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "failoverAfter": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "failoverSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "scopes": { "contains": { "const": "failover-authority" } } }, "required": ["scopes"] },
-          "then": { "required": ["failoverAfter", "failoverSeconds"] },
-          "else": { "not": { "anyOf": [ { "required": ["failoverAfter"] }, { "required": ["failoverSeconds"] } ] } }
+          "if": {
+            "properties": {
+              "scopes": {
+                "contains": {
+                  "const": "failover-authority"
+                }
+              }
+            },
+            "required": [
+              "scopes"
+            ]
+          },
+          "then": {
+            "required": [
+              "failoverAfter",
+              "failoverSeconds"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "failoverAfter"
+                  ]
+                },
+                {
+                  "required": [
+                    "failoverSeconds"
+                  ]
+                }
+              ]
+            }
+          }
         }
       ],
       "additionalProperties": false
@@ -356,30 +654,59 @@
         "streamingBounds": {
           "type": "object",
           "description": "Optional object-local bounding sphere used for view- and distance-driven asset requests.",
-          "required": ["center", "radius"],
+          "required": [
+            "center",
+            "radius"
+          ],
           "properties": {
             "center": {
               "type": "array",
               "minItems": 3,
               "maxItems": 3,
-              "items": { "type": "number", "minimum": -10000, "maximum": 10000 }
+              "items": {
+                "type": "number",
+                "minimum": -10000,
+                "maximum": 10000
+              }
             },
-            "radius": { "type": "number", "exclusiveMinimum": 0, "maximum": 10000 }
+            "radius": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10000
+            }
           },
           "additionalProperties": false
         },
         "collision": {
           "type": "object",
-          "required": ["shape", "enabled"],
+          "required": [
+            "shape",
+            "enabled"
+          ],
           "properties": {
-            "shape": { "enum": ["box", "compound", "heightfield", "none"] },
-            "enabled": { "type": "boolean" },
-            "center": { "$ref": "#/$defs/vector3" },
+            "shape": {
+              "enum": [
+                "box",
+                "compound",
+                "heightfield",
+                "none"
+              ]
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "center": {
+              "$ref": "#/$defs/vector3"
+            },
             "halfExtents": {
               "type": "array",
               "minItems": 3,
               "maxItems": 3,
-              "items": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 }
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1000
+              }
             },
             "boxes": {
               "type": "array",
@@ -387,27 +714,62 @@
               "maxItems": 2048,
               "items": {
                 "type": "object",
-                "required": ["center", "halfExtents", "yaw", "walkable", "solid"],
+                "required": [
+                  "center",
+                  "halfExtents",
+                  "yaw",
+                  "walkable",
+                  "solid"
+                ],
                 "properties": {
-                  "center": { "$ref": "#/$defs/vector3" },
+                  "center": {
+                    "$ref": "#/$defs/vector3"
+                  },
                   "halfExtents": {
                     "type": "array",
                     "minItems": 3,
                     "maxItems": 3,
-                    "items": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 }
+                    "items": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 1000
+                    }
                   },
-                  "yaw": { "type": "number", "minimum": -360, "maximum": 360 },
-                  "walkable": { "type": "boolean" },
-                  "solid": { "type": "boolean" },
-                  "tag": { "const": "pierRail", "description": "Optional semantic tag retained for bird perching on the Example Island pier rails." }
+                  "yaw": {
+                    "type": "number",
+                    "minimum": -360,
+                    "maximum": 360
+                  },
+                  "walkable": {
+                    "type": "boolean"
+                  },
+                  "solid": {
+                    "type": "boolean"
+                  },
+                  "tag": {
+                    "const": "pierRail",
+                    "description": "Optional semantic tag retained for bird perching on the Example Island pier rails."
+                  }
                 },
                 "additionalProperties": false
               }
             },
-            "walkable": { "type": "boolean" },
-            "solid": { "type": "boolean" },
-            "columns": { "type": "integer", "minimum": 2, "maximum": 4097 },
-            "rows": { "type": "integer", "minimum": 2, "maximum": 4097 }
+            "walkable": {
+              "type": "boolean"
+            },
+            "solid": {
+              "type": "boolean"
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 4097
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 4097
+            }
           },
           "additionalProperties": true
         },
@@ -430,15 +792,65 @@
       "allOf": [
         {
           "if": {
-            "properties": { "collision": { "properties": { "enabled": { "const": true } } } }
+            "properties": {
+              "collision": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                }
+              }
+            }
           },
           "then": {
             "properties": {
               "collision": {
                 "oneOf": [
-                  { "required": ["shape", "center", "halfExtents", "walkable", "solid"], "properties": { "shape": { "const": "box" } } },
-                  { "required": ["shape", "boxes"], "properties": { "shape": { "const": "compound" } } },
-                  { "required": ["shape", "columns", "rows", "walkable", "solid"], "properties": { "shape": { "const": "heightfield" }, "walkable": { "const": true }, "solid": { "const": true } } }
+                  {
+                    "required": [
+                      "shape",
+                      "center",
+                      "halfExtents",
+                      "walkable",
+                      "solid"
+                    ],
+                    "properties": {
+                      "shape": {
+                        "const": "box"
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "shape",
+                      "boxes"
+                    ],
+                    "properties": {
+                      "shape": {
+                        "const": "compound"
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "shape",
+                      "columns",
+                      "rows",
+                      "walkable",
+                      "solid"
+                    ],
+                    "properties": {
+                      "shape": {
+                        "const": "heightfield"
+                      },
+                      "walkable": {
+                        "const": true
+                      },
+                      "solid": {
+                        "const": true
+                      }
+                    }
+                  }
                 ]
               }
             }
@@ -448,184 +860,63 @@
     },
     "component": {
       "type": "object",
-      "oneOf": [
-        {
-          "required": ["id", "type", "seed"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.procedural-island-vegetation/1" },
-            "seed": { "const": 7 },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
+      "required": [
+        "id",
+        "type",
+        "assets",
+        "data"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^elsemesh-component:[\\w.-]{1,128}$"
         },
-        {
-          "required": ["id", "type"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.island-ocean/1" },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
+        "type": {
+          "type": "string",
+          "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$",
+          "description": "Versioned component capability identifier. Component semantics are defined by the owning world package."
         },
-        {
-          "required": ["id", "type", "profile", "objectId"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.procedural-island-terrain/1" },
-            "profile": { "const": "example-island-v1" },
-            "objectId": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$", "description": "References the package heightfield mesh used for collision and visual fallback." },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
+        "priority": {
+          "enum": [
+            "portal-preview",
+            "visible",
+            "nearby",
+            "background"
+          ]
         },
-        {
-          "required": ["id", "type", "profile", "objectId", "dataAssetId"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.terrain-surface/1" },
-            "profile": { "const": "example-island-v1" },
-            "objectId": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$", "description": "References the heightfield mesh used for collision and visual fallback." },
-            "dataAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "References portable height, normal, AO, terrain masks, detail texture, and terrain metadata." },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
+        "streamingBounds": {
+          "$ref": "#/$defs/streamingBounds"
         },
-        {
-          "required": ["id", "type", "center", "extent"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.water-body/1" },
-            "center": { "type": "array", "items": { "type": "number", "minimum": -1000000, "maximum": 1000000 }, "minItems": 2, "maxItems": 2, "description": "Horizontal world-space [x,z] center in meters." },
-            "extent": { "type": "number", "minimum": 8, "maximum": 100000, "description": "Half-width and half-depth of a square deep-water body, in meters." },
-            "profile": { "enum": ["deep-ocean", "calm-lagoon", "storm"], "description": "Optional named rendering profile; omission selects deep-ocean." },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": ["id", "type", "placementAssetId"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.static-vegetation/1" },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "grassMaskAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "Optional grass-density/1 asset; requires elsemesh.static-grass/1." },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": ["id", "type", "placementAssetId", "streamingBounds"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.static-reef/1" },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": ["id", "type", "placementAssetId", "streamingBounds"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.static-fish-props/1" },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "placementAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": ["id", "type", "profile", "seed", "streamingBounds", "roofPerches", "footprints"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.example-island-wildlife/1" },
-            "profile": { "const": "example-island-wildlife-v1" },
-            "seed": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
-            "roofPerches": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/vector3" }, "description": "Explicit world-space roof perches used by the Example Island bird simulation." },
-            "footprints": { "type": "array", "maxItems": 256, "items": { "type": "object", "required": ["x", "z", "r"], "properties": { "x": { "type": "number", "minimum": -10000, "maximum": 10000 }, "z": { "type": "number", "minimum": -10000, "maximum": 10000 }, "r": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000 } }, "additionalProperties": false }, "description": "Portable building and prop exclusion circles used when placing shore wildlife." }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": ["id", "type", "profile", "modelAssetId", "geometryAssetId", "albedoAssetId", "heightAssetId", "route", "seed", "surfaceAt", "cruiseSpeed", "surfaceSpeed", "streamingBounds"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.humpback-whale/1" },
-            "profile": { "const": "example-island-humpback-v1" },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
-            "modelAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "geometryAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "albedoAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "heightAssetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-            "route": {
-              "type": "array",
-              "minItems": 4,
-              "maxItems": 32,
-              "items": {
-                "type": "array",
-                "minItems": 2,
-                "maxItems": 2,
-                "items": { "type": "number", "minimum": -10000, "maximum": 10000 }
+        "assets": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": [
+              "assetId",
+              "kind"
+            ],
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "kind": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9./-]{0,63}$"
               }
             },
-            "seed": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
-            "surfaceAt": { "type": "number", "minimum": 0, "maximum": 1 },
-            "cruiseSpeed": { "type": "number", "minimum": 0, "maximum": 10 },
-            "surfaceSpeed": { "type": "number", "minimum": 0, "maximum": 10 }
-          },
-          "additionalProperties": false
+            "additionalProperties": false
+          }
         },
-        {
-          "required": ["id", "type", "beds"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.ambient-audio/1" },
-            "priority": { "enum": ["portal-preview", "visible", "nearby", "background"] },
-            "streamingBounds": { "$ref": "#/$defs/streamingBounds" },
-            "beds": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 16,
-              "items": {
-                "type": "object",
-                "required": ["assetId", "gain"],
-                "properties": {
-                  "assetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-                  "gain": { "type": "number", "minimum": 0, "maximum": 1 },
-                  "condition": { "enum": ["always", "day", "night", "dawn", "underwater"] },
-                  "position": { "type": "array", "items": { "type": "number", "minimum": -100000, "maximum": 100000 }, "minItems": 3, "maxItems": 3 },
-                  "refDistance": { "type": "number", "minimum": 0.5, "maximum": 1000 },
-                  "rolloff": { "type": "number", "minimum": 0, "maximum": 10 }
-                },
-                "additionalProperties": false
-              }
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": ["id", "type", "objectId", "priority"],
-          "properties": {
-            "id": { "type": "string", "pattern": "^elsemesh-component:[\\w.-]{1,128}$" },
-            "type": { "const": "elsemesh.downeast-boat/1" },
-            "objectId": { "type": "string", "pattern": "^elsemesh-object:[\\w.-]{1,128}$", "description": "References a collision-free portal-preview asset instance. Its transform defines the trusted built-in boat's berth and heading." },
-            "priority": { "const": "portal-preview" }
-          },
-          "additionalProperties": false
+        "data": {
+          "type": "object",
+          "maxProperties": 256,
+          "description": "Opaque component settings validated by the owning world package."
         }
-      ]
+      },
+      "additionalProperties": false,
+      "description": "Generic component envelope. The engine validates identity, resource bounds, and declared assets; the owning world package validates data."
     },
     "portalBack": {
       "type": "object",
@@ -725,24 +1016,21 @@
         "enabled": {
           "type": "boolean"
         },
-        "back": { "$ref": "#/$defs/portalBack" },
+        "back": {
+          "$ref": "#/$defs/portalBack"
+        },
         "visual": {
           "type": "string",
-          "enum": ["timber", "stone", "metal"],
+          "enum": [
+            "timber",
+            "stone",
+            "metal"
+          ],
           "description": "Optional client-rendered doorway frame material. Omit to render no frame."
         }
       },
       "additionalProperties": true
     }
   },
-  "allOf": [
-    {
-      "if": {
-        "required": ["entryPoints"],
-        "properties": { "entryPoints": { "minItems": 1 } }
-      },
-      "then": { "required": ["entryPointActionLabel", "entryPointPrompt"] }
-    }
-  ],
   "additionalProperties": true
 }

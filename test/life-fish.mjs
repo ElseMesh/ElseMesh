@@ -6,13 +6,14 @@ import * as E from '../src/engine/index.js';
 import { WORLD } from '../src/world/WorldLayout.js';
 import { FishSchools } from '../src/world/Fish.js';
 import { FishProps } from '../src/world/fish/FishProps.js';
+import * as fishPresentation from '../worlds/tidewater/FishPresentation.js';
 
-const out = process.argv[ 2 ] || '/tmp';
+const out = process.argv[ 2 ] || '/var/tmp';
 const W = 2560, H = 1267;
 const rc = WORLD.reef.center;
 const L = await setupLife( { W, H, ground: { center: [ rc.x, rc.z ], size: 360, res: 0.75 }, water: true, near: 0.05 } );
 const t0 = performance.now();
-const fish = new FishSchools( { parent: L.scene, terrain: L.terrain, center: rc.clone(), radius: WORLD.reef.radius + 10 } );
+const fish = new FishSchools( { parent: L.scene, terrain: L.terrain, center: rc.clone(), radius: WORLD.reef.radius + 10, presentation: fishPresentation } );
 console.log( 'fish', fish.fishCount, 'groups', fish.groups.length, 'build ms', ( performance.now() - t0 ).toFixed( 0 ) );
 
 // pick the reef group nearest to the reef centre with a decent count, to aim the camera at
@@ -126,7 +127,7 @@ let bx = rc.x, bz = rc.z;
 for ( let k = 0; k < 400 && L.terrain.heightAt( bx, bz ) < 1.2; k ++ ) { bx += 1; bz -= 0.6; }
 const by = L.terrain.heightAt( bx, bz ) + 0.9;
 console.log( 'props at', bx.toFixed( 1 ), by.toFixed( 2 ), bz.toFixed( 1 ) );
-const props = new FishProps();
+const props = new FishProps( fishPresentation );
 const fm = new E.Matrix4();
 const at = ( x, y, z, ry = 0 ) => fm.makeRotationY( ry ).setPosition( bx + x, by + y, bz + z );
 props.add( 'ice', null, at( 0, 0, 0 ), 'flat', 0.45, { seed: 0.3, flags: 0 } );
@@ -135,11 +136,11 @@ const sp = [ 'redSnapper', 'grouper', 'tuna', 'mahi', 'parrot', 'grunt' ];
 sp.forEach( ( s, i ) => {
 
 	const len = s === 'tuna' || s === 'mahi' ? 0.55 : 0.35;
-	props.add( 'whole', s, at( - 0.25 + ( i % 3 ) * 0.25, 0.05 + FishProps.restHeight( s, len ), - 0.2 + Math.floor( i / 3 ) * 0.3, 0.2 * i ), i % 2 ? 'side' : 'sideFlip', len, { seed: i * 0.17, jaw: 0.25, curl: 0.4 * ( i % 2 ? 1 : - 1 ), anchor: [ 0, 0, 0 ] } );
+	props.add( 'whole', s, at( - 0.25 + ( i % 3 ) * 0.25, 0.05 + FishProps.restHeight( s, len, fishPresentation ), - 0.2 + Math.floor( i / 3 ) * 0.3, 0.2 * i ), i % 2 ? 'side' : 'sideFlip', len, { seed: i * 0.17, jaw: 0.25, curl: 0.4 * ( i % 2 ? 1 : - 1 ), anchor: [ 0, 0, 0 ] } );
 
 } );
-props.add( 'split', 'redSnapper', at( 1.4, 0.8, - 0.3 ), 'tailFlat', 0.45, { anchor: FishProps.tailAnchor( 'redSnapper' ), dried: 0.8, wet: 0 } );
-props.add( 'whole', 'mullet', at( 1.8, 0.8, - 0.3 ), 'tail', 0.35, { anchor: FishProps.tailAnchor( 'mullet' ) } );
+props.add( 'split', 'redSnapper', at( 1.4, 0.8, - 0.3 ), 'tailFlat', 0.45, { anchor: FishProps.tailAnchor( 'redSnapper', fishPresentation ), dried: 0.8, wet: 0 } );
+props.add( 'whole', 'mullet', at( 1.8, 0.8, - 0.3 ), 'tail', 0.35, { anchor: FishProps.tailAnchor( 'mullet', fishPresentation ) } );
 props.add( 'head', 'tuna', at( 0.9, 0.08, 0.6 ), 'side', 0.6, { blood: 1 } );
 props.add( 'trunk', 'tuna', at( 1.3, 0.08, 0.6 ), 'side', 0.6, { blood: 1 } );
 props.add( 'lobster', null, at( 0.7, 0.04, - 0.4, 1 ), 'flat', 0.35, {} );

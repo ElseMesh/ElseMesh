@@ -2,7 +2,6 @@ import * as THREE from '../engine/index.js';
 import { mulberry32 } from '../util/Noise.js';
 import { ReefBatch } from './reef/ReefBatch.js';
 import { WORLD } from './WorldLayout.js';
-import { SPECIES } from './fish/FishSpecies.js';
 import { fishGeometry } from './fish/FishGeometry.js';
 import { rayGeometry, turtleGeometry } from './fish/CreatureGeometry.js';
 import { createSwimMaterial } from './fish/FishMaterial.js';
@@ -40,7 +39,7 @@ const GRAVITY = 9.81;
 const LOD_PX = [ 320, 80, 22 ]; // screen length (px) below which the next level of detail takes over
 const LOD_BAND = 1.15; // cross-fade band above each switch (screen length ratio)
 
-// Behaviour per kind of swimmer. model: anatomy (FishSpecies.js) or 'stingray' / 'eagleRay' /
+// Behaviour per kind of swimmer. model: anatomy supplied by the world presentation profile or 'stingray' / 'eagleRay' /
 // 'turtle'; length range (m); mode (see stepGroup); speeds in body lengths / s (cruise, max,
 // burst when fleeing), steering accel, boids (separation distance and neighbour radius in body
 // lengths, weights); depth: preferred height above the bottom (fraction of the local water
@@ -85,7 +84,7 @@ const BEHAVIOUR = {
 for ( const k in BEHAVIOUR ) BEHAVIOUR[ k ] = { name: k, ...base, ...BEHAVIOUR[ k ] };
 
 // models per level of detail (0 nearest .. 3)
-function buildModels( names ) {
+function buildModels( names, presentation ) {
 
 	const kinds = [], first = {};
 	for ( const name of names ) {
@@ -105,7 +104,7 @@ function buildModels( names ) {
 
 		} else {
 
-			const S = SPECIES[ name ];
+			const S = presentation.SPECIES[ name ];
 			geos = [ 0, 1, 2, 3 ].map( ( lod ) => fishGeometry( S, { lod, pose: 'swim' } ) );
 
 		}
@@ -156,7 +155,10 @@ export class FishSchools {
 	// floorAt( x, z ): highest obstacle (seabed or reef); anchors: [ [ x, z ], ... ] coral heads;
 	// bay: also populate the bay, the pier and the beach; shoreField (optional, ShoreField.js)
 	// locates the breakers (without it every beach counts as fully exposed)
-	constructor( { parent, terrain, floorAt = null, center, radius, anchors = [], seed = 23, bay = true, shoreField = null } ) {
+	constructor( { parent, terrain, floorAt = null, center, radius, anchors = [], seed = 23, bay = true, shoreField = null, presentation } ) {
+
+		if ( ! presentation?.SPECIES || ! presentation?.PATTERN || ! presentation?.SKIN ) throw new Error( 'Fish schools require a registered world fish-presentation profile' );
+		this.presentation = presentation;
 
 		this.terrain = terrain;
 		this.floorAt = floorAt ?? ( ( x, z ) => terrain.heightAt( x, z ) );
@@ -178,7 +180,7 @@ export class FishSchools {
 
 		// ---- models
 		const models = [ ...new Set( this.groups.map( ( g ) => g.sp.model ) ) ];
-		const { kinds, first } = buildModels( models );
+		const { kinds, first } = buildModels( models, presentation );
 		this.modelKind = first;
 
 		// ---- fish state
@@ -205,8 +207,8 @@ export class FishSchools {
 		for ( const g of this.groups ) this.initGroup( g );
 
 		this.batch = new ReefBatch( 'Fish', kinds, { maxInstances: n, dynamic: true, fade: true } );
-		this.material = createSwimMaterial( this.batch );
-		this.fadeMaterial = createSwimMaterial( this.batch, { fade: true } );
+		this.material = createSwimMaterial( this.batch, { presentation } );
+		this.fadeMaterial = createSwimMaterial( this.batch, { fade: true, presentation } );
 		this.mesh = this.batch.createMesh( this.material );
 		this.group.add( this.batch.createFadeMesh( this.fadeMaterial ) );
 		this.viewHeight = 1267;
@@ -467,7 +469,7 @@ export class FishSchools {
 		g.goal.copy( g.home );
 		g.center.copy( g.home );
 		const kind0 = this.modelKind[ sp.model ];
-		const pattern = SPECIES[ sp.model ].pattern;
+		const pattern = this.presentation.SPECIES[ sp.model ].pattern;
 		for ( let k = 0; k < g.count; k ++ ) {
 
 			const i = g.offset + k;

@@ -1,6 +1,5 @@
 import { PART } from '../world/fish/FishGeometry.js';
 import { deformFishPropPoint, fishPropGeometry } from '../world/fish/FishProps.js';
-import { SKIN, SPECIES } from '../world/fish/FishSpecies.js';
 
 const clamp01 = value => Math.max( 0, Math.min( 1, value ) );
 const smoothstep = ( a, b, value ) => {
@@ -8,15 +7,15 @@ const smoothstep = ( a, b, value ) => {
 	return t * t * ( 3 - 2 * t );
 };
 
-function bodyColor( T, record, attributes, index ) {
+function bodyColor( T, record, attributes, index, presentation ) {
 	if ( record.kind === 'ice' ) return new T.Color( 0xc8e4ed );
 	if ( record.kind === 'leaf' ) return new T.Color( 0x4f7e3b );
 	if ( record.kind === 'lobster' ) return new T.Color( 0xa74b29 );
-	const skin = SKIN[ record.species ];
+	const skin = presentation.SKIN[ record.species ];
 	const partData = attributes.getX( index ), part = Math.floor( attributes.getY( index ) + 0.01 );
 	const h = attributes.getW( index );
 	let color;
-	if ( part === PART.EYE ) color = new T.Color( SPECIES[ record.species ].iris );
+	if ( part === PART.EYE ) color = new T.Color( presentation.SPECIES[ record.species ].iris );
 	else if ( part === PART.FLESH || part === PART.FILLET || part === PART.MOUTH ) color = new T.Color( 0xe8b596 );
 	else if ( part > PART.BODY && part < PART.EYE ) color = new T.Color( skin.fin );
 	else {
@@ -35,7 +34,9 @@ function bodyColor( T, record, attributes, index ) {
 // in FishPropPlacements.js; this adapter reuses the same procedural model geometry and anatomy.
 export class WebGLFishPropsAdapter {
 
-	constructor( T, scene, records ) {
+	constructor( T, scene, records, presentation ) {
+
+		if ( ! presentation?.SPECIES || ! presentation?.SKIN ) throw new Error( 'WebGL fish props require a world fish-presentation profile' );
 
 		this.T = T;
 		this.group = new T.Group();
@@ -44,7 +45,7 @@ export class WebGLFishPropsAdapter {
 		const position = new T.Vector3(), rotation = new T.Quaternion();
 
 		for ( const record of records ) {
-			const source = fishPropGeometry( record.kind, record.species, 0 );
+			const source = fishPropGeometry( record.kind, record.species, 0, presentation );
 			const sourcePosition = source.getAttribute( 'position' ), sourceData = source.getAttribute( 'aData' ), sourceIndex = source.getIndex();
 			if ( ! sourcePosition || ! sourceData || ! sourceIndex ) throw new Error( `Fish-prop geometry is incomplete for ${record.kind}` );
 			rotation.fromArray( record.q );
@@ -52,10 +53,10 @@ export class WebGLFishPropsAdapter {
 			const vertexOffset = positions.length / 3;
 			for ( let i = 0; i < sourcePosition.count; i ++ ) {
 				const p = new T.Vector3().fromBufferAttribute( sourcePosition, i );
-				deformFishPropPoint( p, sourceData.getY( i ), record, record.species ? SPECIES[ record.species ] : null );
+				deformFishPropPoint( p, sourceData.getY( i ), record, record.species ? presentation.SPECIES[ record.species ] : null );
 				p.multiplyScalar( record.L ).applyQuaternion( rotation ).add( position );
 				positions.push( p.x, p.y, p.z );
-				const color = bodyColor( T, record, sourceData, i );
+				const color = bodyColor( T, record, sourceData, i, presentation );
 				colors.push( color.r, color.g, color.b );
 			}
 			for ( let i = 0; i < sourceIndex.count; i ++ ) indices.push( vertexOffset + sourceIndex.getX( i ) );

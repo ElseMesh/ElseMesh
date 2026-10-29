@@ -1,7 +1,6 @@
 import * as THREE from '../../engine/index.js';
 import { ReefBatch } from '../reef/ReefBatch.js';
 import { GPU } from '../../engine/gpu/GPU.js';
-import { SPECIES } from './FishSpecies.js';
 import { fishGeometry, splitFishGeometry, section, PART } from './FishGeometry.js';
 import { createPropMaterial } from './FishMaterial.js';
 import { bandFade } from '../../materials/LODFade.js';
@@ -386,8 +385,9 @@ const POSE = {
 export { iceGeometry, leafGeometry, lobsterGeometry };
 
 // Keep model selection shared by the native batch renderer and alternate backends.
-export function fishPropGeometry( kind, species, lod = 0 ) {
-	const S = species ? SPECIES[ species ] : null;
+export function fishPropGeometry( kind, species, lod = 0, presentation ) {
+	const S = species ? presentation?.SPECIES?.[ species ] : null;
+	if ( species && ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
 	switch ( kind ) {
 		case 'split': return splitFishGeometry( S, { lod } );
 		case 'head': return fishGeometry( S, { lod, pose: 'dead', u1: S.opercle + 0.02, eyes: lod === 0 } );
@@ -402,7 +402,10 @@ export function fishPropGeometry( kind, species, lod = 0 ) {
 
 export class FishProps {
 
-	constructor() {
+	constructor( presentation ) {
+
+		if ( ! presentation?.SPECIES || ! presentation?.PATTERN || ! presentation?.SKIN ) throw new Error( 'Fish props require a registered world fish-presentation profile' );
+		this.presentation = presentation;
 
 		this.items = [];
 		this.mesh = null;
@@ -414,7 +417,8 @@ export class FishProps {
 	// placed at the frame origin (after bending).
 	add( kind, species, frame, pose, L, o = {} ) {
 
-		const S = species ? SPECIES[ species ] : null;
+		const S = species ? this.presentation.SPECIES[ species ] : null;
+		if ( species && ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
 		const curl = o.curl ?? 0, sag = o.sag ?? 0;
 		_m.multiplyMatrices( frame, POSE[ pose ] );
 		_m.decompose( _p, _q, _s );
@@ -433,9 +437,10 @@ export class FishProps {
 	}
 
 	// half thickness of a fish lying on its side (m)
-	static restHeight( species, L ) {
+	static restHeight( species, L, presentation ) {
 
-		const S = SPECIES[ species ];
+		const S = presentation?.SPECIES?.[ species ];
+		if ( ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
 		let w = 0;
 		for ( let u = 0.1; u < 0.9; u += 0.05 ) w = Math.max( w, section( S, u ).W );
 		return w * L * 0.85;
@@ -443,16 +448,18 @@ export class FishProps {
 	}
 
 	// model z of the caudal peduncle / the hook through the gill cover
-	static tailAnchor( species ) {
+	static tailAnchor( species, presentation ) {
 
-		const S = SPECIES[ species ];
+		const S = presentation?.SPECIES?.[ species ];
+		if ( ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
 		return [ 0, 0, 0.5 - S.body * 0.985 ];
 
 	}
 
-	static gillAnchor( species ) {
+	static gillAnchor( species, presentation ) {
 
-		const S = SPECIES[ species ];
+		const S = presentation?.SPECIES?.[ species ];
+		if ( ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
 		return [ 0, S.mouth.y * 0.5, 0.5 - S.body * ( S.mouth.corner + 0.03 ) ];
 
 	}
@@ -472,7 +479,7 @@ export class FishProps {
 		const base = new Map();
 		for ( const [ key, k ] of keys ) {
 
-			const geo = lod => fishPropGeometry( k.kind, k.species, lod );
+			const geo = lod => fishPropGeometry( k.kind, k.species, lod, this.presentation );
 
 			base.set( key, kinds.length );
 			const g1 = geo( 1 );
@@ -498,11 +505,11 @@ export class FishProps {
 		} );
 		batch.upload();
 		this.batch = batch;
-		this.material = createPropMaterial( batch );
+		this.material = createPropMaterial( batch, { presentation: this.presentation } );
 		const mesh = batch.createMesh( this.material, { castShadow: true, receiveShadow: true } );
 		mesh.name = 'village_fish';
 		// level-of-detail cross-fades (dithered) as a child: it follows the prop mesh
-		this.fadeMaterial = createPropMaterial( batch, { fade: true } );
+		this.fadeMaterial = createPropMaterial( batch, { fade: true, presentation: this.presentation } );
 		mesh.add( batch.createFadeMesh( this.fadeMaterial ) );
 		const draw = mesh.onBeforeRender;
 		this._frame = - 1;

@@ -82,83 +82,14 @@ export function validateWorldSource( source ) {
 		}
 		ids.add( portal.id );
 	}
-	let islandOceanCount = 0;
-	let waterBodyCount = 0;
-	let ambientAudioCount = 0;
-	let boatCount = 0;
-	let fishPropsCount = 0;
-	let islandWildlifeCount = 0;
-	let terrainSurfaceCount = 0;
-	let boatObject = null;
-	const waterBodies = [];
 	for ( const component of components ) {
-		const vegetation = component?.type === 'elsemesh.procedural-island-vegetation/1' && component.seed === 7 && ( component.placementAssetId === undefined || /^sha256:[0-9a-f]{64}$/.test( component.placementAssetId ) );
-		const staticVegetation = component?.type === 'elsemesh.static-vegetation/1' && /^sha256:[0-9a-f]{64}$/.test( component.placementAssetId || '' ) && ( component.grassMaskAssetId === undefined || /^sha256:[0-9a-f]{64}$/.test( component.grassMaskAssetId ) );
-		const staticReef = component?.type === 'elsemesh.static-reef/1' && /^sha256:[0-9a-f]{64}$/.test( component.placementAssetId || '' ) && validStreamingBounds( component.streamingBounds );
-		const staticFishProps = component?.type === 'elsemesh.static-fish-props/1' && /^sha256:[0-9a-f]{64}$/.test( component.placementAssetId || '' ) && validStreamingBounds( component.streamingBounds );
-		const islandWildlife = component?.type === 'elsemesh.example-island-wildlife/1' && component.profile === 'example-island-wildlife-v1' && Number.isInteger( component.seed ) && component.seed >= 1 && component.seed <= 0xffffffff && Array.isArray( component.roofPerches ) && component.roofPerches.length <= 64 && component.roofPerches.every( perch => validVector( perch ) && perch.every( value => Math.abs( value ) <= 10000 ) ) && Array.isArray( component.footprints ) && component.footprints.length <= 256 && component.footprints.every( footprint => footprint && Number.isFinite( footprint.x ) && Number.isFinite( footprint.z ) && Number.isFinite( footprint.r ) && footprint.r > 0 && footprint.r <= 1000 && Math.abs( footprint.x ) <= 10000 && Math.abs( footprint.z ) <= 10000 ) && validStreamingBounds( component.streamingBounds );
-		const humpbackWhale = component?.type === 'elsemesh.humpback-whale/1' && validHumpbackWhaleComponent( component );
-		const islandOcean = component?.type === 'elsemesh.island-ocean/1';
-		const waterBody = component?.type === 'elsemesh.water-body/1' && validWaterBody( component );
-		const ambientAudio = component?.type === 'elsemesh.ambient-audio/1' && validAmbientAudio( component );
-		const villageMaterials = component?.type === 'elsemesh.village-materials/2' && component.profile === 'original-elsemesh-village-v1' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' ) && /^elsemesh-object:[\w.-]{1,128}$/.test( component.objectId || '' ) && objectByID.get( component.objectId )?.kind === 'asset-instance' && validStreamingBounds( component.streamingBounds );
-		const boat = component?.type === 'elsemesh.downeast-boat/1' && /^elsemesh-object:[\w.-]{1,128}$/.test( component.objectId || '' );
-		const proceduralTerrain = component?.type === 'elsemesh.procedural-island-terrain/1' && component.profile === 'example-island-v1' && /^elsemesh-object:[\w.-]{1,128}$/.test( component.objectId || '' ) && objectByID.get( component.objectId )?.kind === 'asset-instance';
-		const terrainSurface = component?.type === 'elsemesh.terrain-surface/1' && component.profile === 'example-island-v1' && /^elsemesh-object:[\w.-]{1,128}$/.test( component.objectId || '' ) && objectByID.get( component.objectId )?.kind === 'asset-instance' && /^sha256:[0-9a-f]{64}$/.test( component.dataAssetId || '' );
-		const allowedKeys = vegetation ? [ 'id', 'type', 'seed', 'priority', 'placementAssetId', 'streamingBounds' ] : staticVegetation ? [ 'id', 'type', 'priority', 'placementAssetId', 'grassMaskAssetId', 'streamingBounds' ] : staticReef || staticFishProps ? [ 'id', 'type', 'priority', 'placementAssetId', 'streamingBounds' ] : islandWildlife ? [ 'id', 'type', 'profile', 'seed', 'priority', 'streamingBounds', 'roofPerches', 'footprints' ] : humpbackWhale ? [ 'id', 'type', 'profile', 'priority', 'streamingBounds', 'modelAssetId', 'geometryAssetId', 'albedoAssetId', 'heightAssetId', 'route', 'seed', 'surfaceAt', 'cruiseSpeed', 'surfaceSpeed' ] : islandOcean ? [ 'id', 'type', 'priority', 'streamingBounds' ] : proceduralTerrain ? [ 'id', 'type', 'profile', 'priority', 'objectId', 'streamingBounds' ] : terrainSurface || villageMaterials ? [ 'id', 'type', 'profile', 'priority', 'objectId', 'dataAssetId', 'streamingBounds' ] : waterBody ? [ 'id', 'type', 'priority', 'center', 'extent', 'profile', 'streamingBounds' ] : ambientAudio ? [ 'id', 'type', 'priority', 'streamingBounds', 'beds' ] : boat ? [ 'id', 'type', 'priority', 'objectId' ] : [];
-		if ( ! component || typeof component.id !== 'string' || ! /^elsemesh-component:[\w.-]{1,128}$/.test( component.id ) || ids.has( component.id ) || ( ! vegetation && ! staticVegetation && ! staticReef && ! staticFishProps && ! islandWildlife && ! humpbackWhale && ! islandOcean && ! proceduralTerrain && ! terrainSurface && ! villageMaterials && ! waterBody && ! ambientAudio && ! boat ) || component.priority !== undefined && ! [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( component.priority ) || component.streamingBounds !== undefined && ! validStreamingBounds( component.streamingBounds ) || Object.keys( component ).some( ( key ) => ! allowedKeys.includes( key ) ) ) throw new Error( 'Invalid or duplicate world component' );
-		if ( islandWildlife && ++ islandWildlifeCount > 1 ) throw new Error( 'A world may declare at most one Example Island wildlife component' );
-		if ( terrainSurface ) terrainSurfaceCount ++;
-		if ( islandOcean && ++ islandOceanCount > 1 ) throw new Error( 'A world may declare only one island ocean component' );
-		if ( waterBody && ++ waterBodyCount > 4 ) throw new Error( 'A world may declare at most four water body components' );
-		if ( ambientAudio && ++ ambientAudioCount > 16 ) throw new Error( 'A world may declare at most 16 ambient audio components' );
-		if ( staticFishProps && ++ fishPropsCount > 1 ) throw new Error( 'A world may declare at most one static fish-props component' );
-		if ( humpbackWhale && source.components.filter( item => item?.type === 'elsemesh.humpback-whale/1' ).length > 1 ) throw new Error( 'A world may declare at most one humpback whale component' );
-		if ( boat ) {
-			boatCount ++;
-			boatObject = objectByID.get( component.objectId );
-			if ( component.priority !== 'portal-preview' || ! boatObject || boatObject.kind !== 'asset-instance' || boatObject.priority !== 'portal-preview' || boatObject.collision.enabled || boatObject.collision.shape !== 'none' || boatObject.transform.rotation !== undefined || boatObject.scale.some( ( value ) => value !== 1 ) || ! /^sha256:[0-9a-f]{64}$/.test( boatObject.assetId || '' ) ) throw new Error( `Invalid berth preview object on boat component ${component.id}` );
-			if ( boatCount > 1 ) throw new Error( 'A world may declare only one Downeast boat component' );
-		}
-		if ( waterBody && ( source.rules.seaLevel === undefined || islandOceanCount > 0 ) ) throw new Error( 'A portable water body requires seaLevel and cannot be combined with island-ocean' );
-		if ( islandOcean && waterBodyCount > 0 ) throw new Error( 'A world cannot combine portable water and island-ocean components' );
-		if ( waterBody ) {
-			if ( waterBodies.some( ( other ) => Math.abs( component.center[ 0 ] - other.center[ 0 ] ) < component.extent + other.extent && Math.abs( component.center[ 1 ] - other.center[ 1 ] ) < component.extent + other.extent ) ) throw new Error( 'Portable water body bounds cannot overlap' );
-			waterBodies.push( component );
-		}
+		if ( ! component || typeof component !== 'object' || Array.isArray( component ) || Object.keys( component ).some( key => ! [ 'id', 'type', 'priority', 'streamingBounds', 'assets', 'data' ].includes( key ) ) || typeof component.id !== 'string' || ! /^elsemesh-component:[\w.-]{1,128}$/.test( component.id ) || ids.has( component.id ) || typeof component.type !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( component.type ) || component.priority !== undefined && ! [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( component.priority ) || component.streamingBounds !== undefined && ! validStreamingBounds( component.streamingBounds ) || ! Array.isArray( component.assets ) || component.assets.length > 256 || ! component.data || typeof component.data !== 'object' || Array.isArray( component.data ) || JSON.stringify( component.data ).length > 64 * 1024 ) throw new Error( 'Invalid or duplicate world component envelope' );
+		const assetIDs = new Set();
+		for ( const asset of component.assets ) if ( ! asset || typeof asset !== 'object' || Array.isArray( asset ) || Object.keys( asset ).length !== 2 || Object.keys( asset ).some( key => ! [ 'assetId', 'kind' ].includes( key ) ) || ! /^sha256:[0-9a-f]{64}$/.test( asset.assetId || '' ) || typeof asset.kind !== 'string' || ! /^[a-z0-9][a-z0-9./-]{0,63}$/.test( asset.kind ) || assetIDs.has( asset.assetId ) ) throw new Error( `Invalid component asset reference on ${component.id}` ); else assetIDs.add( asset.assetId );
 		if ( ! source.rules.requiredFeatures?.includes( component.type ) ) throw new Error( `World component ${component.type} must be listed in requiredFeatures` );
-		if ( component.grassMaskAssetId !== undefined && ! source.rules.requiredFeatures?.includes( 'elsemesh.static-grass/1' ) ) throw new Error( 'Portable grass requires elsemesh.static-grass/1' );
 		ids.add( component.id );
 	}
-	if ( terrainSurfaceCount > 1 ) throw new Error( 'A world may declare at most one packaged terrain surface' );
-	if ( components.some( component => component?.grassMaskAssetId !== undefined ) && terrainSurfaceCount === 0 ) throw new Error( 'Portable grass requires a packaged terrain surface' );
-	if ( islandWildlifeCount && terrainSurfaceCount === 0 ) throw new Error( 'Example Island wildlife requires a packaged terrain surface' );
-	if ( islandWildlifeCount ) {
-		const wildlife = components.find( component => component?.type === 'elsemesh.example-island-wildlife/1' );
-		const terrain = components.find( component => component?.type === 'elsemesh.terrain-surface/1' );
-		const priority = { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 };
-		if ( ( priority[ terrain.priority || 'visible' ] ?? 1 ) > ( priority[ wildlife.priority || 'visible' ] ?? 1 ) ) throw new Error( 'Example Island wildlife cannot stream before its terrain surface' );
-	}
-	if ( boatCount && ( source.rules.seaLevel === undefined || islandOceanCount !== 1 && waterBodyCount === 0 ) ) throw new Error( 'A Downeast boat requires seaLevel and a declared water renderer' );
-	if ( boatCount && waterBodyCount && ! waterBodies.some( ( water ) => Math.abs( boatObject.transform.position[ 0 ] - water.center[ 0 ] ) <= water.extent && Math.abs( boatObject.transform.position[ 2 ] - water.center[ 1 ] ) <= water.extent ) ) throw new Error( 'A Downeast boat berth must be inside a declared water body' );
 	return source;
-}
-
-function validAmbientAudio( component ) {
-	return Array.isArray( component.beds ) && component.beds.length > 0 && component.beds.length <= 16 && component.beds.every( ( bed ) => {
-		if ( ! bed || typeof bed !== 'object' || Array.isArray( bed ) || Object.keys( bed ).some( ( key ) => ! [ 'assetId', 'gain', 'condition', 'position', 'refDistance', 'rolloff' ].includes( key ) ) ) return false;
-		if ( typeof bed.assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( bed.assetId ) || ! Number.isFinite( bed.gain ) || bed.gain < 0 || bed.gain > 1 || bed.condition !== undefined && ! [ 'always', 'day', 'night', 'dawn', 'underwater' ].includes( bed.condition ) ) return false;
-		if ( bed.position !== undefined && ( ! validVector( bed.position ) || bed.position.some( ( value ) => Math.abs( value ) > 100000 ) ) ) return false;
-		return ( bed.refDistance === undefined || Number.isFinite( bed.refDistance ) && bed.refDistance >= 0.5 && bed.refDistance <= 1000 ) && ( bed.rolloff === undefined || Number.isFinite( bed.rolloff ) && bed.rolloff >= 0 && bed.rolloff <= 10 );
-	} );
-}
-
-function validHumpbackWhaleComponent( component ) {
-	return component.profile === 'example-island-humpback-v1' && [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ].every( id => /^sha256:[0-9a-f]{64}$/.test( id || '' ) ) && Number.isInteger( component.seed ) && component.seed >= 1 && component.seed <= 0xffffffff && Array.isArray( component.route ) && component.route.length >= 4 && component.route.length <= 32 && component.route.every( point => Array.isArray( point ) && point.length === 2 && point.every( value => Number.isFinite( value ) && Math.abs( value ) <= 10000 ) ) && Number.isFinite( component.surfaceAt ) && component.surfaceAt >= 0 && component.surfaceAt <= 1 && Number.isFinite( component.cruiseSpeed ) && component.cruiseSpeed >= 0 && component.cruiseSpeed <= 10 && Number.isFinite( component.surfaceSpeed ) && component.surfaceSpeed >= 0 && component.surfaceSpeed <= 10 && validStreamingBounds( component.streamingBounds );
-}
-
-function validWaterBody( component ) {
-	return ( component.profile === undefined || [ 'deep-ocean', 'calm-lagoon', 'storm' ].includes( component.profile ) ) && Array.isArray( component.center ) && component.center.length === 2 && component.center.every( ( n ) => Number.isFinite( n ) && Math.abs( n ) + component.extent <= 1e6 ) && Number.isFinite( component.extent ) && component.extent >= 8 && component.extent <= 100000;
 }
 
 function validStreamingBounds( bounds ) {

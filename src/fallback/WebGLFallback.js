@@ -14,6 +14,7 @@ import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeVillageMaterialAsset } from '../network/VillageMaterialAsset.js';
 import { decodeFishPropPlacements } from '../network/FishPropPlacements.js';
+import { worldFishPresentationFor } from '../network/WorldFishPresentation.js';
 import { decodeReefPlacements } from '../network/ReefPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
@@ -1661,9 +1662,10 @@ export class WebGLFallback {
 		for ( const fishProps of components.filter( component => component.type === 'elsemesh.static-fish-props/1' ) ) {
 			const placementBytes = assets.get( fishProps.placementAssetId );
 			if ( ! placementBytes ) continue;
-			const records = decodeFishPropPlacements( asBytes( placementBytes ) );
+			const presentation = worldFishPresentationFor( manifest.experience );
+			const records = decodeFishPropPlacements( asBytes( placementBytes ), presentation );
 			this.hostedFishProps ||= [];
-			this.hostedFishProps.push( new WebGLFishPropsAdapter( T, this.scene, records ) );
+			this.hostedFishProps.push( new WebGLFishPropsAdapter( T, this.scene, records, presentation ) );
 			supportedComponents.add( fishProps.id );
 		}
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {

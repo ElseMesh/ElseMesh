@@ -6,27 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 const repo = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 
-const componentNames = new Map( [
-	[ 'elsemesh.village-materials/2', 'Village PBR material package' ],
-	[ 'elsemesh.static-vegetation/1', 'Vegetation placement data' ],
-	[ 'elsemesh.static-fish-props/1', 'Fish-prop placement data' ],
-	[ 'elsemesh.terrain-surface/1', 'Terrain visual-surface data' ],
-	[ 'elsemesh.static-reef/1', 'Reef placement tile' ],
-	[ 'elsemesh.humpback-whale/1', 'Humpback-whale asset' ],
-	[ 'elsemesh.ambient-audio/1', 'Ambient audio loop' ],
-] );
-
-const fieldNames = new Map( [
-	[ 'assetId', 'mesh' ],
-	[ 'dataAssetId', 'component data' ],
-	[ 'placementAssetId', 'placement data' ],
-	[ 'grassMaskAssetId', 'grass density mask' ],
-	[ 'modelAssetId', 'model metadata' ],
-	[ 'geometryAssetId', 'model geometry' ],
-	[ 'albedoAssetId', 'albedo texture' ],
-	[ 'heightAssetId', 'height texture' ],
-] );
-
 function formatBytes( bytes ) {
 	return bytes >= 1024 * 1024 ? `${( bytes / ( 1024 * 1024 ) ).toFixed( 2 )} MiB` : `${( bytes / 1024 ).toFixed( 1 )} KiB`;
 }
@@ -42,8 +21,8 @@ function detectFormat( bytes, refs ) {
 		JSON.parse( text );
 		return 'JSON';
 	} catch {}
-	const componentType = refs.find( ref => ref.componentType )?.componentType;
-	return componentType ? `Binary (${componentType})` : 'Binary data';
+	const kind = refs.find( ref => ref.kind )?.kind;
+	return kind ? `Binary (${kind})` : 'Binary data';
 }
 
 async function listFiles( directory ) {
@@ -66,38 +45,23 @@ export async function renderWorldAssetIndex( worldRoot ) {
 	const source = JSON.parse( await readFile( sourcePath, 'utf8' ) );
 	const references = new Map();
 
-	function collect( value, pathParts = [], owner = null, componentType = null ) {
-		if ( typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test( value ) ) {
-			const id = value.slice( 'sha256:'.length );
-			const refs = references.get( id ) || [];
-			const field = pathParts.at( -1 ) || 'asset';
-			const role = field === 'assetId' && pathParts.includes( 'extensions' ) ? 'world behavior module'
-				: field === 'assetId' && pathParts.includes( 'lods' ) ? 'LOD mesh'
-				: field === 'assetId' && componentType === 'elsemesh.ambient-audio/1' ? 'audio bed'
-					: fieldNames.get( field ) || ( field === 'assetId' ? 'mesh' : field.replace( /Id$/, '' ) );
-			refs.push( { owner: owner || 'World asset', role, componentType } );
-			references.set( id, refs );
-			return;
-		}
-		if ( Array.isArray( value ) ) {
-			value.forEach( ( item, index ) => collect( item, [ ...pathParts, `[${index}]` ], owner, componentType ) );
-			return;
-		}
-		if ( ! value || typeof value !== 'object' ) return;
-
-		let nextOwner = owner;
-		let nextType = componentType;
-		if ( typeof value.label === 'string' ) nextOwner = value.label;
-		if ( typeof value.type === 'string' && value.type.startsWith( 'elsemesh.' ) ) {
-			nextType = value.type;
-			const friendly = componentNames.get( value.type ) || value.type;
-			const componentId = typeof value.id === 'string' ? value.id.replace( /^elsemesh-component:/, '' ) : '';
-			nextOwner = value.type === 'elsemesh.static-reef/1' ? `${friendly} ${componentId.replace( /^reef-tile-/, '' )}` : friendly;
-		}
-		for ( const [ key, child ] of Object.entries( value ) ) collect( child, [ ...pathParts, key ], nextOwner, nextType );
+	function addReference( assetId, owner, kind ) {
+		if ( typeof assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( assetId ) ) throw new Error( `Invalid content-addressed reference on ${owner}` );
+		const id = assetId.slice( 'sha256:'.length );
+		const refs = references.get( id ) || [];
+		refs.push( { owner, kind: kind || 'asset' } );
+		references.set( id, refs );
 	}
-
-	collect( source );
+	for ( const object of source.objects || [] ) {
+		const owner = object.label || `Object ${object.id}`;
+		if ( object.assetId ) addReference( object.assetId, owner, 'glb' );
+		for ( const level of object.lods || [] ) addReference( level.assetId, `${owner} distance mesh`, 'glb' );
+	}
+	for ( const component of source.components || [] ) {
+		const owner = `Component ${component.id}`;
+		for ( const asset of component.assets || [] ) addReference( asset.assetId, owner, asset.kind );
+	}
+	for ( const extension of source.experience?.extensions || [] ) addReference( extension.assetId, `Behavior ${extension.behaviorId}`, 'javascript/1' );
 	const sourceByHash = new Map();
 	const sourceDirectory = path.join( worldRoot, 'source' );
 	try {
@@ -118,7 +82,7 @@ export async function renderWorldAssetIndex( worldRoot ) {
 		const digest = createHash( 'sha256' ).update( bytes ).digest( 'hex' );
 		if ( digest !== id ) throw new Error( `Asset hash mismatch: ${path.relative( worldRoot, filePath )}` );
 		const refs = references.get( id );
-	const descriptions = [ ...new Set( refs.map( ref => `${ref.owner} — ${ref.role}` ) ) ];
+		const descriptions = [ ...new Set( refs.map( ref => `${ref.owner} — ${ref.kind}` ) ) ];
 		for ( const sourceFile of sourceByHash.get( id ) || [] ) descriptions.push( `Editable source: ${sourceFile}` );
 		descriptions.sort();
 		entries.set( id, { id, bytes: bytes.length, format: detectFormat( bytes, refs ), descriptions } );
@@ -144,7 +108,7 @@ export async function renderWorldAssetIndex( worldRoot ) {
 		const description = row.descriptions.join( '<br>' ).replaceAll( '|', '\\|' );
 		lines.push( `| ${description} | ${row.format} | ${formatBytes( row.bytes )} | [\`${row.id}\`](assets/${row.id}) |` );
 	}
-	lines.push( '', 'Regenerate with the ElseMesh exporter for this world. The exporter verifies every hash and fails if package files do not match the manifest.', '' );
+	lines.push( '', 'Regenerate this index with the owning world repository exporter. Every referenced package file is checked against its SHA-256.', '' );
 	return lines.join( '\n' );
 }
 
@@ -158,7 +122,9 @@ export async function writeWorldAssetIndex( worldRoot ) {
 if ( process.argv[ 1 ] && path.resolve( process.argv[ 1 ] ) === fileURLToPath( import.meta.url ) ) {
 	const args = process.argv.slice( 2 );
 	const check = args.includes( '--check' );
-	const worldRoot = path.resolve( repo, args.find( arg => arg !== '--check' ) || 'worlds/tidewater' );
+	const worldRootArg = args.find( arg => arg !== '--check' );
+	if ( ! worldRootArg ) throw new Error( 'Usage: node tools/world-asset-index.mjs [--check] <world-root>' );
+	const worldRoot = path.resolve( repo, worldRootArg );
 	const expected = await renderWorldAssetIndex( worldRoot );
 	const target = path.join( worldRoot, 'ASSET-INDEX.md' );
 	if ( check ) {

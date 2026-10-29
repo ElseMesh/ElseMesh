@@ -39,7 +39,10 @@ export class HostedBoat {
 			initialHeading: this.homeHeading,
 		} );
 		this.controller.model = this.model;
-		this.controller.query = query;
+		if ( this.controller.query !== query ) {
+			this.controller.query = query;
+			this.controller.slot = query.allocate( `boatHull:${this.component.id}`, this.controller.samples.length );
+		}
 		this.controller.colliders = colliders;
 		this.active = true;
 		return this.controller;

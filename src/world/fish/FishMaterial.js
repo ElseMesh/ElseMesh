@@ -3,7 +3,6 @@ import { Material } from '../../engine/render/Material.js';
 import { ShaderModule, UniformBlock } from '../../engine/gpu/Shader.js';
 import { commonModule } from '../../engine/render/wgsl/common.js';
 import { lodFadeModule } from '../../materials/LODFade.js';
-import { SPECIES, SKIN, PATTERN } from './FishSpecies.js';
 import { PART } from './FishGeometry.js';
 
 // The fish material (WGSL, ported from TSL), shared by the swimming fish (FishSchools) and the
@@ -38,15 +37,14 @@ const ROWS = 8; // vec4 rows per species in the table
 export const FISH_SPECULAR = 'intended';
 
 // species order = pattern ids
-const NAMES = Object.keys( PATTERN ).sort( ( a, b ) => PATTERN[ a ] - PATTERN[ b ] );
-
-function buildTable() {
+function buildTable( presentation ) {
 
 	const rows = [];
 	const lin = ( hex ) => new Color( hex );
-	for ( const name of NAMES ) {
+	const names = Object.keys( presentation.PATTERN ).sort( ( a, b ) => presentation.PATTERN[ a ] - presentation.PATTERN[ b ] );
+	for ( const name of names ) {
 
-		const S = SPECIES[ name ], K = SKIN[ name ];
+		const S = presentation.SPECIES[ name ], K = presentation.SKIN[ name ];
 		const b = lin( K.back ), f = lin( K.flank ), be = lin( K.belly ), fi = lin( K.fin ), e = lin( K.edge ), ir = lin( S.iris );
 		const L = S.body;
 		rows.push(
@@ -68,8 +66,13 @@ function buildTable() {
 
 }
 
-let _table = null;
-export const skinTable = () => _table || ( _table = buildTable() );
+const _tables = new WeakMap();
+export function skinTable( presentation ) {
+	if ( ! presentation || typeof presentation !== 'object' ) throw new Error( 'Fish material requires a world fish-presentation profile' );
+	let table = _tables.get( presentation );
+	if ( ! table ) _tables.set( presentation, table = buildTable( presentation ) );
+	return table;
+}
 
 // float literal of a table constant
 const f = ( x ) => {
@@ -78,17 +81,21 @@ const f = ( x ) => {
 	return s.includes( '.' ) || s.includes( 'e' ) ? s : s + '.0';
 
 };
-const PT = ( name ) => f( PATTERN[ name ] );
 const PA = ( name ) => f( PART[ name ] );
 
-let _module = null;
-export function fishModule() {
+const _modules = new WeakMap();
+export function fishModule( presentation ) {
 
-	if ( _module ) return _module;
-	_module = new ShaderModule( {
+	if ( ! presentation || typeof presentation !== 'object' ) throw new Error( 'Fish material requires a world fish-presentation profile' );
+	let module = _modules.get( presentation );
+	if ( module ) return module;
+	const PATTERN = presentation.PATTERN;
+	const NAMES = Object.keys( PATTERN ).sort( ( a, b ) => PATTERN[ a ] - PATTERN[ b ] );
+	const PT = ( name ) => f( PATTERN[ name ] );
+	module = new ShaderModule( {
 		name: 'fish',
 		deps: [ commonModule, lodFadeModule ],
-		uniforms: skinTable(),
+		uniforms: skinTable( presentation ),
 		uniformName: 'fishSkin',
 		code: /* wgsl */`
 fn fishRotateQ( q: vec4f, v: vec3f ) -> vec3f { return v + cross( q.xyz, cross( q.xyz, v ) + v * q.w ) * 2.0; }
@@ -149,7 +156,8 @@ fn fishEyeCol( r: f32, ang: f32, irisC: vec3f, cloudy: f32 ) -> vec3f {
 }
 `,
 	} );
-	return _module;
+	_modules.set( presentation, module );
+	return module;
 
 }
 
@@ -182,7 +190,8 @@ function recordOf( batch, fade ) {
 // Swimming fish. Record: r0 = ( position, length ), r1 = orientation, r2 = ( wave phase,
 // amplitude, turning bend, pattern + seed * 0.9 ), r3 = ( world motion since the last frame,
 // phase change )
-function swimVertex( batch, fade ) {
+function swimVertex( batch, fade, presentation ) {
+	const PT = name => f( presentation.PATTERN[ name ] );
 
 	return /* wgsl */`
 	${ recordOf( batch, fade ) }
@@ -306,7 +315,8 @@ const COMMON = /* wgsl */`
 	}
 	let dhdx = dpdx( bumpH ); let dhdy = dpdy( bumpH );`;
 
-function surface( prop, lodFade ) {
+function surface( prop, lodFade, presentation ) {
+	const PT = name => f( presentation.PATTERN[ name ] );
 
 	return /* wgsl */`
 	${ COMMON }
@@ -716,15 +726,16 @@ const PROP_MASK = /* wgsl */`
 	}`;
 
 function baseMaterial( batch, name, extra ) {
+	const { presentation, ...material } = extra;
 
 	return new Material( {
 		name,
 		roughness: 0.4,
 		metalness: 0,
-		modules: [ fishModule(), batch.module ],
+		modules: [ fishModule( presentation ), batch.module ],
 		attributes: { aData: 'vec4f', aKind: 'f32' },
 		varyings: VARYINGS,
-		...extra,
+		...material,
 	} );
 
 }
@@ -734,21 +745,23 @@ function baseMaterial( batch, name, extra ) {
 // Material of the swimming fish (batch: ReefBatch with the fish kinds).
 // fade: the material of the batch's level-of-detail cross-fade channel
 // Motion vectors: camera motion (as for static geometry) plus the fish's own motion (vertex stage).
-export function createSwimMaterial( batch, { fade = false } = {} ) {
+export function createSwimMaterial( batch, { fade = false, presentation } = {} ) {
 
 	return baseMaterial( batch, fade ? 'FishFade' : 'Fish', {
-		vertex: swimVertex( batch, fade ),
-		surface: surface( false, fade ),
+		presentation,
+		vertex: swimVertex( batch, fade, presentation ),
+		surface: surface( false, fade, presentation ),
 	} );
 
 }
 
 // Material of the fish props: wet, glossy (clear coat), static.
-export function createPropMaterial( batch, { fade = false } = {} ) {
+export function createPropMaterial( batch, { fade = false, presentation } = {} ) {
 
 	return baseMaterial( batch, fade ? 'FishPropsFade' : 'FishProps', {
+		presentation,
 		vertex: propVertex( batch, fade ),
-		surface: PROP_MASK + surface( true, fade ),
+		surface: PROP_MASK + surface( true, fade, presentation ),
 		shadow: PROP_MASK + '\n\treturn true;',
 		defines: { CLEARCOAT: 1 },
 	} );

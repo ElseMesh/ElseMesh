@@ -311,44 +311,8 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 		if priority == "" {
 			priority = "portal-preview"
 		}
-		if component.PlacementAssetID != "" {
-			kind := "vegetation-placement/1"
-			switch component.Type {
-			case "elsemesh.static-reef/1":
-				kind = "reef-placement/1"
-			case "elsemesh.static-fish-props/1":
-				kind = "fish-props-placement/1"
-			}
-			if err := add(component.PlacementAssetID, kind, priority, false); err != nil {
-				return nil, err
-			}
-		}
-		if component.GrassMaskAssetID != "" {
-			if err := add(component.GrassMaskAssetID, "grass-density/1", priority, false); err != nil {
-				return nil, err
-			}
-		}
-		if component.DataAssetID != "" {
-			kind := "terrain-surface/1"
-			if component.Type == "elsemesh.village-materials/2" {
-				kind = "village-materials/1"
-			}
-			if err := add(component.DataAssetID, kind, priority, false); err != nil {
-				return nil, err
-			}
-		}
-		if component.Type == "elsemesh.humpback-whale/1" {
-			for _, item := range []struct{ id, kind string }{
-				{component.ModelAssetID, "whale-model/1"}, {component.GeometryAssetID, "whale-geometry/1"},
-				{component.AlbedoAssetID, "whale-albedo/1"}, {component.HeightAssetID, "whale-height/1"},
-			} {
-				if err := add(item.id, item.kind, priority, false); err != nil {
-					return nil, err
-				}
-			}
-		}
-		for _, bed := range component.Beds {
-			if err := add(bed.AssetID, "audio/ogg", priority, false); err != nil {
+		for _, reference := range component.Assets {
+			if err := add(reference.AssetID, reference.Kind, priority, false); err != nil {
 				return nil, err
 			}
 		}

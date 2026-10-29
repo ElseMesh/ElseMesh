@@ -1,6 +1,6 @@
 import * as THREE from '../../engine/index.js';
 
-// Procedural fish meshes built from the anatomy tables in FishSpecies.js.
+// Procedural fish meshes built from an injected world's anatomy profile.
 //
 // Local frame (total length 1): snout at z = +0.5, tip of the tail fin at z = -0.5, back at +y,
 // the body axis on y = 0. Parts:

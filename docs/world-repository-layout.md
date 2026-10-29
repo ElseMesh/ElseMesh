@@ -75,7 +75,7 @@ the private submodule; see its [bridge design](../worlds/Hogwarts/docs/bridge-de
 Run the appropriate exporter from an ElseMesh checkout:
 
 ```sh
-npm run export:island
+npm --prefix worlds/tidewater run export
 ```
 
 Both exporters update `world-source.json`, content-addressed `assets/`, and

@@ -128,11 +128,11 @@ To regenerate the checked-in village level, export the full package to a
 temporary directory and use its full-detail village GLB as the Blender input:
 
 ```sh
-npm run export:island -- --out /var/tmp/elsemesh-island-full
+npm --prefix worlds/tidewater run export -- --out /var/tmp/elsemesh-island-full
 blender --background --python tools/blender/export-world-object-lod.py -- \
   --source /var/tmp/elsemesh-island-full/assets/<village-asset-sha256> \
   --out worlds/tidewater/lod-source/village-low.glb --ratio 0.35
-npm run export:island
+npm --prefix worlds/tidewater run export
 ```
 
 Regenerate the boat preview variant the same way, using its content-addressed
