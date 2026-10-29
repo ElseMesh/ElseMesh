@@ -29,6 +29,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   imports or names those behaviors. The engine's fishing runtime is now a
   bounded Worker-request adapter; browser presentation and environment samples
   remain in the renderer.
+- Moved Tidewater's `FishingGameRuntime` event vocabulary, request queues, and
+  worker-result handling from `src/game/` into `worlds/tidewater/`. The generic
+  engine registry test now uses a synthetic behavior and no longer imports
+  Tidewater. Tidewater tests cover per-world runtime and save isolation, while
+  the pre-split bite/fight and WebGPU/WebGL fishing traces continue to pass.
+  `Game`, `GameState`, rod controls, vendor presentation, and some fishing
+  calculations still live in the engine and remain separation work.
 - Tidewater's 18-species fishing catalog has moved from `src/game/FishTable.js`
   into `worlds/tidewater/fishing.json`; its values match the pre-split table
   exactly. Fish catalog validation, catch inventory, save, HUD, and fish-display

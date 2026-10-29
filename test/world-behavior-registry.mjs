@@ -1,35 +1,28 @@
 import assert from 'node:assert/strict';
-import '../worlds/tidewater/register-behavior.js';
 import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
-import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
-
-const fishCatalog = { testFish: { name: 'Test fish', sci: 'Piscis testus', lw: [ 1, 3 ], model: 'testFish', habitat: { bay: 1 }, kg: [ 1, 2 ], price: 2, fight: 0.5, stamina: 3, time: 'any', rarity: 1 } };
-const fishingData = { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, fishCatalog };
-const fishingExtension = { behaviorId: 'elsemesh.fishing-game/1', assetId: `sha256:${'1'.repeat(64)}` };
-const experience = { behaviors: { 'elsemesh.fishing-game/1': fishingData, 'elsemesh.shore-aware-boat/1': {} }, extensions: [ fishingExtension ] };
-assert.deepEqual( worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': fishingData }, extensions: [ fishingExtension ] } ).map( behavior => behavior.id ), [ 'elsemesh.fishing-game/1' ], 'offline built-in gameplay is activated through its registered behavior descriptor' );
-assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id } ) => id ), [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ] );
-assert.deepEqual( worldBehaviorData( experience, 'elsemesh.fishing-game/1' ).fishStand, experience.behaviors[ 'elsemesh.fishing-game/1' ].fishStand, 'behavior-owned experience data is available through the registry' );
-const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test', load: false } );
-const otherRuntime = createWorldBehaviorRuntime( { behaviors: { 'elsemesh.fishing-game/1': fishingData }, extensions: [ fishingExtension ] }, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
-assert.ok( runtime instanceof FishingGameRuntime );
-assert.notEqual( runtime, otherRuntime, 'each world receives its own registered gameplay runtime' );
-assert.notEqual( runtime.state, otherRuntime.state, 'world runtimes do not share game state' );
-assert.notEqual( runtime.state.storageKey, otherRuntime.state.storageKey, 'world runtimes persist under distinct world identities' );
-assert.equal( runtime.state.storageKey, 'elsemesh.save.v1:elsemesh%3Aregistry-test', 'registered game runtime receives its owning world identity' );
-await assert.rejects( runtime.startBite( { shallows: 1 }, 6.5 ), /signed JavaScript extension/, 'world-specific fishing simulation requires its signed module' );
-assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': { worldRule: true } } } ), /requires a signed JavaScript extension/, 'unhandled behavior data is rejected unless a signed module owns it' );
-assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
-assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /Invalid world behavior ID/, 'world-owned behavior IDs stay inside the ElseMesh namespace' );
-assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
 
 registerWorldBehavior( 'elsemesh.registry-test/1', {
 	validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'invalid test data' ); },
 	validateExtensionEvent: event => { if ( event.type !== 'ping' ) throw new Error( 'invalid test event' ); },
 	validateExtensionResult: result => { if ( result.echo?.type !== 'ping' ) throw new Error( 'invalid test result' ); },
+	createRuntime: options => ( { options } ),
 } );
-assert.equal( hasWorldBehavior( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'elsemesh.registry-test/1' ), true );
+const behaviorID = 'elsemesh.registry-test/1';
+const extensionAsset = `sha256:${'1'.repeat(64)}`;
+const experience = { behaviors: { [ behaviorID ]: {} }, extensions: [ { behaviorId: behaviorID, assetId: extensionAsset } ] };
+assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id } ) => id ), [ behaviorID ] );
+assert.deepEqual( worldBehaviorData( experience, behaviorID ), {}, 'behavior-owned data is available through the registry' );
+assert.equal( hasWorldBehavior( experience, behaviorID ), true );
+const runtime = createWorldBehaviorRuntime( experience, behaviorID, { worldId: 'elsemesh:registry-test' } );
+const otherRuntime = createWorldBehaviorRuntime( experience, behaviorID, { worldId: 'elsemesh:registry-test-other' } );
+assert.notEqual( runtime, otherRuntime, 'each world receives its own registered runtime' );
+assert.notEqual( runtime.options, otherRuntime.options, 'world runtimes receive isolated creation options' );
+assert.equal( runtime.options.worldId, 'elsemesh:registry-test' );
+assert.throws( () => worldBehaviorsFor( { behaviors: { [ behaviorID ]: { worldRule: true } } } ), /invalid test data/ );
+assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.owner-defined/1': {} } } ), /does not support required world behavior/ );
+assert.throws( () => worldBehaviorsFor( { behaviors: { 'owner.fishing-game/1': {} } } ), /Invalid world behavior ID/, 'behavior IDs remain in the ElseMesh wire namespace' );
+assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
 assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: () => {} } ), /Invalid or duplicate/ );
 let worldActivation = null;
 let webglActivation = null;
@@ -76,7 +69,7 @@ class FakeWorker {
 }
 const worker = new FakeWorker();
 const extensionAssetID = `sha256:${'c'.repeat( 64 )}`;
-const extensionExperience = { behaviors: { 'elsemesh.registry-test/1': {} }, extensions: [ { behaviorId: 'elsemesh.registry-test/1', assetId: extensionAssetID } ] };
+const extensionExperience = { behaviors: { [ behaviorID ]: {} }, extensions: [ { behaviorId: behaviorID, assetId: extensionAssetID } ] };
 const extensions = createWorldBehaviorExtensions( extensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { echo: event }; }' ) ] ] ), { workerFactory: () => worker } );
 assert.equal( extensions.has( 'elsemesh.registry-test/1' ), true, 'the manager exposes registered Worker availability without custom hooks' );
 assert.deepEqual( await extensions.run( 'elsemesh.registry-test/1', { type: 'ping' } ), { echo: { type: 'ping' } }, 'generic behavior extensions exchange bounded JSON through the Worker manager' );
