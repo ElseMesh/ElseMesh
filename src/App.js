@@ -66,11 +66,6 @@ import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
-import { decodeVegetationPlacements } from './network/VegetationPlacements.js';
-import { decodeTerrainSurfaceAsset } from './network/TerrainSurfaceAsset.js';
-import { decodeGrassDensityAsset } from './network/GrassDensityAsset.js';
-import { decodeReefPlacements, MAX_REEF_PLACEMENTS, REEF_PLACEMENT_HEADER_BYTES, REEF_PLACEMENT_RECORD_BYTES } from './network/ReefPlacements.js';
-import { decodeFishPropPlacements } from './network/FishPropPlacements.js';
 import { worldComponentDescriptor } from './network/WorldComponentRegistry.js';
 import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
@@ -88,10 +83,9 @@ import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/Wo
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import { defaultWorldPackage } from '../worlds/default.js';
-import { HostedBoat } from './network/HostedBoat.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
-import { DOWNEAST_BOAT_TRIANGLES, vehiclePolicy } from './network/WorldRules.js';
+import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
@@ -592,7 +586,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			this.player.pitch = spawn.pitch;
 			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0 ) );
 			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
-			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationComponent( component ) );
+			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
 			for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
@@ -1062,121 +1056,19 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( worldComponentDescriptor( a.type )?.installRank ?? 1 ) - ( worldComponentDescriptor( b.type )?.installRank ?? 1 ) );
 		for ( const component of components ) {
 			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) ) continue;
+			const descriptor = worldComponentDescriptor( component.type );
+			if ( descriptor?.vegetation && ! this.vegetationEnabled ) continue;
 			const count = installed.length;
-			if ( component.type === 'elsemesh.procedural-island-vegetation/1' || component.type === 'elsemesh.static-vegetation/1' ) {
-				if ( ! this.vegetationEnabled ) continue;
-				const placementRecords = component.placementAssetId ? readVegetationPlacements( connector, component ) : null;
-				const staticVegetation = component.type === 'elsemesh.static-vegetation/1';
-				const grassMask = component.grassMaskAssetId ? decodeGrassDensityAsset( connector.assets.get( component.grassMaskAssetId ) ) : null;
-				const grassTerrain = staticVegetation ? root.userData.terrainData : this.terrainData;
-				if ( grassMask && ! grassTerrain ) continue;
-				if ( grassMask && ( grassMask.size !== grassTerrain.size || grassMask.origin !== grassTerrain.origin ) ) throw new Error( `Static vegetation component ${component.id} grass mask does not match its terrain surface` );
-				if ( ! staticVegetation && ! this.remoteWorldActive && this.vegetation && this.vegetation.group.parent !== root && ( ! placementRecords || sameVegetationPlacements( this.vegetation.records, placementRecords ) ) ) {
-					root.add( this.vegetation.group );
-					installed.push( this.vegetation );
-				} else {
-					installed.push( new Vegetation( { scene: root, terrain: staticVegetation ? grassTerrain : this.terrainData, village: staticVegetation ? null : this.village, includeGrass: staticVegetation ? !! grassMask : true, grassMask, placementRecords } ) );
-				}
-			} else if ( component.type === 'elsemesh.terrain-surface/1' ) {
-				const fallback = root.children.find( ( child ) => child.userData.worldObjectId === component.objectId );
-				const replacedObjects = root.userData.worldPackage?.replacedByComponents || ( root.userData.worldPackage.replacedByComponents = new Set() );
-				replacedObjects.add( component.objectId );
-				const maps = await decodeTerrainSurfaceAsset( connector.assets.get( component.dataAssetId ) );
-				const terrainData = new HeightfieldTerrainData( maps );
-				root.userData.terrainData = terrainData;
-				const surfaceMaps = { normal: maps.normal, splat: maps.splat, detailWidth: maps.detailWidth, detailHeight: maps.detailHeight, detail: maps.detail };
-				const terrainGPU = new TerrainGPU( terrainData, null, surfaceMaps );
-				const terrain = new Terrain( { scene: root, terrainData, terrainGPU } );
-				if ( fallback ) fallback.visible = false;
-				installed.push( {
-					islandTerrain: true, terrain, terrainGPU,
-					update: ( _dt, camera ) => terrain.update( camera, true ),
-					dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); terrainGPU.dispose(); if ( fallback ) fallback.visible = true; },
-				} );
-			} else if ( component.type === 'elsemesh.example-island-wildlife/1' ) {
-				const terrain = root.userData.terrainData;
-				if ( ! terrain ) throw new Error( `Wildlife component ${component.id} requires the packaged terrain surface to install first` );
-				const vegetation = [ ...( root.userData.worldComponents || [] ), ...installed ].find( runtime => runtime.records?.palms ) || null;
-				const wildlife = new Wildlife( {
-					scene: root, renderer: this.renderer, terrain, footprints: component.footprints, roofPerches: component.roofPerches,
-					colliders: this.hostedColliders, vegetation, query: this.hostedQuery, spray: this.spray, csm: this.csm, seed: component.seed,
-				} );
-				installed.push( {
-					wildlife: true, wildlifeRuntime: wildlife,
-					update: ( dt, camera, player ) => wildlife.update( dt, camera, player ),
-					dispose: () => wildlife.dispose(),
-				} );
-			} else if ( component.type === 'elsemesh.procedural-island-terrain/1' ) {
-				const fallback = root.children.find( ( child ) => child.userData.worldObjectId === component.objectId );
-				const replacedObjects = root.userData.worldPackage?.replacedByComponents || ( root.userData.worldPackage.replacedByComponents = new Set() );
-				replacedObjects.add( component.objectId );
-				const terrain = new Terrain( { scene: root, terrainData: this.terrainData, terrainGPU: this.terrainGPU } );
-				if ( fallback ) fallback.visible = false;
-				installed.push( {
-					islandTerrain: true,
-					update: ( _dt, camera ) => terrain.update( camera, false ),
-					dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); if ( fallback ) fallback.visible = true; },
-				} );
-			} else if ( component.type === 'elsemesh.static-reef/1' ) {
-				const { records } = readReefPlacements( connector, component );
-				let reef = root.userData.staticReef;
-				if ( reef ) {
-					reef.appendPlacements( records );
-				} else {
-					reef = new Reef( { scene: root, terrain: null, placementRecords: records, maxInstances: reefPlacementCapacity( connector ) } );
-					reef.setOcean( this.fft );
-					root.userData.staticReef = reef;
-					installed.push( {
-						reef: true,
-						update: ( dt, camera ) => reef.update( dt, camera?.position ),
-						dispose: () => {
-							if ( root.userData.staticReef === reef ) delete root.userData.staticReef;
-							reef.dispose();
-						},
-					} );
-				}
-				installedIDs.add( component.id );
-			} else if ( component.type === 'elsemesh.static-fish-props/1' ) {
-				const presentation = worldFishPresentationFor( connector.manifest.experience );
-				const fishProps = new FishProps( presentation );
-				fishProps.items = readFishPropPlacements( connector, component, presentation );
-				const mesh = fishProps.build();
-				root.add( mesh );
-				installed.push( {
-					fishProps: true,
-					dispose: () => { root.remove( mesh ); fishProps.dispose(); },
-				} );
-			} else if ( component.type === 'elsemesh.humpback-whale/1' ) {
-				const whale = new Whale( {
-					scene: root,
-					terrain: root.userData.terrainData || null,
-					seaLevel: connector.manifest.rules.seaLevel ?? 0,
-					profile: { seed: component.seed, route: component.route, surfaceAt: component.surfaceAt, cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed },
-				} );
-				try {
-					await whale.loadPackage( {
-						manifest: connector.assets.get( component.modelAssetId ),
-						geometry: connector.assets.get( component.geometryAssetId ),
-						albedo: connector.assets.get( component.albedoAssetId ),
-						height: connector.assets.get( component.heightAssetId ),
-					} );
-				} catch ( error ) {
-					whale.dispose();
-					throw error;
-				}
-				installed.push( { whale: true, whaleInstance: whale, update: ( dt, camera ) => whale.update( dt, camera ), dispose: () => whale.dispose() } );
-			} else if ( component.type === 'elsemesh.island-ocean/1' ) {
-				const lod = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
-				const mesh = new Mesh( lod.geometry, this.waterMaterial );
-				mesh.frustumCulled = false;
-				mesh.receiveShadow = true;
-				mesh.layers.set( LAYERS.WATER );
-				root.add( mesh );
-				installed.push( { islandOcean: true, isWorldOcean: true, surface: this.surface, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); } } );
-			} else if ( component.type === 'elsemesh.water-body/1' ) {
+			if ( descriptor?.install ) {
+				const result = await descriptor.install( { app: this, root, connector, installed }, component );
+				if ( result?.runtime ) installed.push( result.runtime );
+				if ( result === true || result?.installed || installed.length > count ) installedIDs.add( component.id );
+				continue;
+			}
+			if ( component.type === 'elsemesh.water-body/1' ) {
 				const extent = component.extent;
 				const lod = new CDLOD( {
-					gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25,
+					gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25,
 					center: { x: component.center[ 0 ] - extent, z: component.center[ 1 ] - extent, size: extent * 2 },
 				} );
 				const surface = new WaterSurface( { fft: this.fft, cdlod: lod, foamTexture: this.foamTexture, seaLevel: connector.manifest.rules.seaLevel } );
@@ -1199,24 +1091,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 				root.add( mesh );
 				installed.push( { waterBody: true, surface, waterBounds: { center: component.center, extent }, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
 			} else if ( component.type === 'elsemesh.ambient-audio/1' ) {
-				// SoundScape consumes the signed component from the connector directly; record
-				// installation here so view streaming does not repeatedly request its loop assets.
+				// SoundScape consumes the signed component from the connector directly.
 				installedIDs.add( component.id );
-			} else if ( component.type === 'elsemesh.village-materials/2' ) {
-				// WorldPackage loads these maps only when the associated village object is needed.
-				installed.push( { dispose() {} } );
-			} else if ( component.type === 'elsemesh.downeast-boat/1' ) {
-				const object = connector.manifest.objects.find( ( candidate ) => candidate.id === component.objectId );
-				if ( ! object ) throw new Error( `Boat component ${component.id} has no berth object` );
-				const boat = new HostedBoat( { root, component, object } );
-				installed.push( {
-					hostedBoat: true,
-					boat,
-					activate: ( context ) => boat.activate( context ),
-					deactivate: () => boat.deactivate(),
-					update: ( dt ) => boat.update( dt ),
-					dispose: () => boat.dispose(),
-				} );
 			}
 			if ( installed.length > count ) installedIDs.add( component.id );
 		}
@@ -1250,7 +1126,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const runtime = ( root.userData.worldComponents || [] ).find( ( component ) => component.hostedBoat );
 		this.activeHostedOcean = ( root.userData.worldComponents || [] ).some( ( component ) => component.islandOcean );
 		this.activeHostedBoat = runtime || null;
-		const berthComponent = connector.manifest.components?.find( component => component.type === 'elsemesh.downeast-boat/1' );
+		const berthComponent = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
 		const berthObject = connector.manifest.objects?.find( object => object.id === berthComponent?.objectId );
 		const waterSurface = worldWaterSurfaceFor( root.userData.worldComponents, berthObject?.transform?.position, this.hostedWaterSurface );
 		this.hostedSurfaceState = { surface: waterSurface, terrain: waterSurface.terrain, shore: waterSurface.shore, wake: waterSurface.wake };
@@ -1421,7 +1297,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		const wantedObjectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const installedComponents = root.userData.installedWorldComponentIDs || new Set();
-		const components = this.localStaticWorld ? [] : selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationComponent( component ) ) && ! installedComponents.has( component.id ) );
+		const components = this.localStaticWorld ? [] : selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ! installedComponents.has( component.id ) );
 		const wantedComponentIDs = new Set( components.map( ( component ) => component.id ) );
 		const assetPriorities = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset.priority ] ) );
 		const rank = { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 };
@@ -1642,8 +1518,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		if ( ! sourceController ) return { allowed: false, reason: 'The current vehicle cannot be transferred' };
 		const policy = vehiclePolicy( destinationConnector.manifest.rules );
 		if ( ! policy.enabled ) return { allowed: false, reason: 'This ThruHold does not accept vehicles' };
-		if ( ! destinationConnector.manifest.components.some( ( component ) => component.type === 'elsemesh.downeast-boat/1' ) ) return { allowed: false, reason: 'This ThruHold has no compatible boat berth' };
-		const combinedComplexity = destinationConnector.manifest.rules.avatarComplexity + DOWNEAST_BOAT_TRIANGLES;
+		const vehicleComponent = destinationConnector.manifest.components.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
+		if ( ! vehicleComponent ) return { allowed: false, reason: 'This ThruHold has no compatible vehicle berth' };
+		const combinedComplexity = destinationConnector.manifest.rules.avatarComplexity + worldComponentDescriptor( vehicleComponent.type ).complexityTriangles;
 		if ( combinedComplexity > policy.maxCombinedComplexity ) return { allowed: false, reason: 'This vehicle exceeds the ThruHold complexity limit' };
 		return { allowed: true, maxSpeed: policy.maxSpeed };
 	}
@@ -2003,39 +1880,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 }
 
-function readVegetationPlacements( connector, component ) {
-	const bytes = connector.assets.get( component.placementAssetId );
-	if ( ! bytes ) throw new Error( `Vegetation component ${component.id} is missing its placement asset` );
-	return decodeVegetationPlacements( bytes, component.seed );
-}
-
 function componentAssetIDs( component ) {
 	return ( component.assets || [] ).map( reference => reference.assetId );
-}
-
-function readReefPlacements( connector, component ) {
-	const bytes = connector.assets.get( component.placementAssetId );
-	if ( ! bytes ) throw new Error( `Reef component ${component.id} is missing its placement asset` );
-	return decodeReefPlacements( bytes );
-}
-
-function readFishPropPlacements( connector, component, presentation ) {
-	const bytes = connector.assets.get( component.placementAssetId );
-	if ( ! bytes ) throw new Error( `Fish-prop component ${component.id} is missing its placement asset` );
-	return decodeFishPropPlacements( bytes, presentation );
-}
-
-function reefPlacementCapacity( connector ) {
-	const assets = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset ] ) );
-	let capacity = 0;
-	for ( const component of connector.manifest.components || [] ) {
-		if ( component.type !== 'elsemesh.static-reef/1' ) continue;
-		const asset = assets.get( component.placementAssetId );
-		if ( ! asset || ! Number.isSafeInteger( asset.bytes ) || asset.bytes < REEF_PLACEMENT_HEADER_BYTES || ( asset.bytes - REEF_PLACEMENT_HEADER_BYTES ) % REEF_PLACEMENT_RECORD_BYTES !== 0 ) throw new Error( `Reef component ${component.id} has an invalid placement asset size` );
-		capacity += ( asset.bytes - REEF_PLACEMENT_HEADER_BYTES ) / REEF_PLACEMENT_RECORD_BYTES;
-		if ( capacity > MAX_REEF_PLACEMENTS ) throw new Error( 'World reef placements exceed the supported instance capacity' );
-	}
-	return Math.max( 1, capacity );
 }
 
 function componentsThroughPriority( connector, through, vegetationEnabled ) {
@@ -2044,19 +1890,4 @@ function componentsThroughPriority( connector, through, vegetationEnabled ) {
 	return new Set( ( connector.manifest.components || [] )
 		.filter( ( component ) => ( vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ( ranks[ component.priority || ( component.assets?.length ? 'portal-preview' : 'visible' ) ] ?? 1 ) <= end )
 		.map( ( component ) => component.id ) );
-}
-
-function sameVegetationPlacements( left, right ) {
-	for ( const key of Object.keys( left ) ) {
-		const a = left[ key ], b = right[ key ];
-		if ( Array.isArray( a ) ) {
-			if ( ! Array.isArray( b ) || a.length !== b.length ) return false;
-			for ( let index = 0; index < a.length; index ++ ) {
-				const aRecord = a[ index ], bRecord = b[ index ];
-				const keys = Object.keys( aRecord );
-				if ( ! bRecord || keys.length !== Object.keys( bRecord ).length || keys.some( ( field ) => ! Object.hasOwn( bRecord, field ) || Math.fround( aRecord[ field ] ) !== bRecord[ field ] ) ) return false;
-			}
-		} else if ( a !== b ) return false;
-	}
-	return true;
 }
