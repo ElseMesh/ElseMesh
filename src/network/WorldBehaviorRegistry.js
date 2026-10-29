@@ -73,8 +73,15 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 				timeoutMs: options.timeoutMs,
 				workerFactory: options.workerFactory,
 			} );
+			const initialization = workerRuntime.run( { type: 'initialize', behaviorData: behavior.data } );
+			// A world may declare an extension without consuming its initialization
+			// result. Keep teardown/startup failures observable without an unhandled
+			// rejection in that case.
+			initialization.catch( () => {} );
 			runtimes.set( reference.behaviorId, Object.freeze( {
+				ready() { return initialization; },
 				async run( event ) {
+					await initialization;
 					behavior?.validateExtensionEvent?.( event );
 					const result = await workerRuntime.run( event );
 					behavior?.validateExtensionResult?.( result, event );
@@ -94,6 +101,12 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 			const runtime = runtimes.get( behaviorId );
 			if ( ! runtime ) throw new Error( `World behavior has no JavaScript extension: ${behaviorId}` );
 			return runtime.run( event );
+		},
+		ready( behaviorId ) {
+			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
+			const runtime = runtimes.get( behaviorId );
+			if ( ! runtime ) throw new Error( `World behavior has no JavaScript extension: ${behaviorId}` );
+			return runtime.ready();
 		},
 		dispose() {
 			if ( disposed ) return;

@@ -66,7 +66,9 @@ assert.throws( () => registerWorldBehaviorImplementation( 'elsemesh.registry-tes
 
 class FakeWorker {
 	terminated = false;
+	messages = [];
 	postMessage( message ) {
+		this.messages.push( message );
 		if ( message.type === 'init' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, type: 'ready' } } ) );
 		if ( message.type === 'run' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, id: message.id, result: { echo: message.event } } } ) );
 	}
@@ -77,6 +79,7 @@ const extensionAssetID = `sha256:${'c'.repeat( 64 )}`;
 const extensionExperience = { behaviors: { 'elsemesh.registry-test/1': {} }, extensions: [ { behaviorId: 'elsemesh.registry-test/1', assetId: extensionAssetID } ] };
 const extensions = createWorldBehaviorExtensions( extensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { echo: event }; }' ) ] ] ), { workerFactory: () => worker } );
 assert.deepEqual( await extensions.run( 'elsemesh.registry-test/1', { type: 'ping' } ), { echo: { type: 'ping' } }, 'generic behavior extensions exchange bounded JSON through the Worker manager' );
+assert.deepEqual( worker.messages.filter( message => message.type === 'run' ).map( message => message.event.type ), [ 'initialize', 'ping' ], 'the worker receives behavior data before normal events' );
 await assert.rejects( extensions.run( 'elsemesh.registry-test/1', { type: 'unknown' } ), /invalid test event/, 'event meaning stays in the registered behavior package' );
 extensions.dispose();
 assert.equal( worker.terminated, true, 'world extension teardown terminates its Worker' );
@@ -89,6 +92,7 @@ const worldOwnedExtensionExperience = {
 assert.deepEqual( worldBehaviorsFor( worldOwnedExtensionExperience ).map( ( { id } ) => id ), [ worldOwnedBehaviorID ], 'an owner-signed extension can define a behavior without an engine registration' );
 const worldOwnedWorker = new FakeWorker();
 const worldOwnedExtensions = createWorldBehaviorExtensions( worldOwnedExtensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { accepted: event }; }' ) ] ] ), { workerFactory: () => worldOwnedWorker } );
+assert.deepEqual( await worldOwnedExtensions.ready( worldOwnedBehaviorID ), { echo: { type: 'initialize', behaviorData: { privateRule: 'module-owned' } } }, 'the generic Worker initialization receives its owner-authored behavior data' );
 assert.deepEqual( await worldOwnedExtensions.run( worldOwnedBehaviorID, { action: 'world-specific' } ), { echo: { action: 'world-specific' } }, 'unregistered world behavior messages are delegated to the owner module' );
 worldOwnedExtensions.dispose();
 assert.equal( worldOwnedWorker.terminated, true, 'owner-defined behavior worker is terminated with its world' );

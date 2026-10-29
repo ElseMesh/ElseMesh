@@ -15,6 +15,10 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   it to a Worker module; the module owns that behavior's event validation. No
   world package consumes the runtime yet, and fishing behavior still needs to
   move out of engine code.
+- Worker activation now sends a generic `initialize` message with the signed
+  behavior data, exposes the result through `ready(behaviorId)`, and waits for
+  successful initialization before dispatching later messages. The focused
+  test verifies initialization ordering and data delivery.
 - The focused Worker, registry, experience, manifest, and Go worldd tests pass;
   `npm run build` passes in the external build tree. The full `npm test` run
   passed through the engine smoke checks, then its gateway E2E could not find
