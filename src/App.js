@@ -25,7 +25,6 @@ import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
-import { ISLAND_DEFINITION } from './world/IslandDefinition.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
 import { BoatModel } from './world/BoatModel.js';
@@ -544,16 +543,6 @@ export class App {
 		this.game = null;
 		this.localWorldExtensions = ! worldLink ? createWorldBehaviorExtensions( this.localWorldExperience, this.worldPackage.assets.extensionModules ) : null;
 		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local', extensions: this.localWorldExtensions } );
-		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
-		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
-		for ( const [ s, lx, ly, lz ] of [ [ ISLAND_DEFINITION.fishStand, - 0.9, 1.85, 0.1 ], [ ISLAND_DEFINITION.chandlery, - 0.75, 1.58, - 1.45 ] ] ) {
-
-			const c = Math.cos( s.yaw ), sn = Math.sin( s.yaw );
-			const x = s.x + lx * c + lz * sn, z = s.z - lx * sn + lz * c;
-			this.localLights.add( { position: new Vector3( x, this.terrainData.heightAt( s.x, s.z ) + ly, z ), color: new Color( 1.0, 0.72, 0.42 ), intensity: 5 * 1.5, range: 11, kind: 'lantern', flicker: 0.08 } );
-
-		}
-
 		this.boatCtl.onSlam = ( s ) => this.audio && this.audio.hullSlap( s );
 		engine.domElement.addEventListener( 'click', () => {
 
