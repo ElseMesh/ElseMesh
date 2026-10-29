@@ -1,6 +1,5 @@
 import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
-import './WebGLFishPropsComponentAdapters.js';
 import './WebGLWaterComponentAdapters.js';
 
 // Return the solid, authored boxes in either supported manifest collision shape.
