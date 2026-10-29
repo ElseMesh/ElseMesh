@@ -61,6 +61,10 @@ the file wholesale would therefore relocate backend rendering code rather
 than establish a world-owned fish presentation on a generic engine renderer.
 The call sites need to be split between Tidewater's fish-specific data and
 placement rules and an engine-owned reusable batch-rendering interface.
+The per-species stand-height scale and tail/gill anchors are now data in
+Tidewater's registered fish-presentation profile; the engine's `FishProps`
+static placement helpers were removed. WebGPU/WebGL rendering code remains in
+ElseMesh, and the WebGL mesh expansion/LOD gap is unchanged.
 
 Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then remove
@@ -132,3 +136,11 @@ newly supported or a finding changes them.
   full client suite and external production build passed. This creates a
   package seam but does not complete separation: `main.js` still assembles the
   built-in Tidewater world, and `App.js` still owns built-in island systems.
+- 2026-10-29: moved Tidewater fish stand-height and hook-anchor data out of
+  engine `FishProps` helpers and into the registered Tidewater presentation
+  profile. Placement tables are data-only, and checks compare their derived
+  values to the original geometry formula. Tidewater fish-presentation and
+  deterministic world-export checks, the village render, the full client
+  suite (including WebGPU/WebGL and pre-split gameplay traces), and the
+  external production build passed. Fish geometry/material ownership and the
+  WebGL per-item culling/LOD gap remain.

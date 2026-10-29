@@ -5,6 +5,7 @@ const profile = Object.freeze( {
 	PATTERN: { generic: 0 },
 	SPECIES: { generic: { pattern: 0 } },
 	SKIN: { generic: {} },
+	PLACEMENT: { restHeightScale: { generic: 0.1 }, tailAnchor: { generic: [ 0, 0, 0 ] }, gillAnchor: { generic: [ 0, 0, 0 ] } },
 } );
 const behaviorId = 'elsemesh.presentation-test/1';
 

@@ -136,11 +136,11 @@ const sp = [ 'redSnapper', 'grouper', 'tuna', 'mahi', 'parrot', 'grunt' ];
 sp.forEach( ( s, i ) => {
 
 	const len = s === 'tuna' || s === 'mahi' ? 0.55 : 0.35;
-	props.add( 'whole', s, at( - 0.25 + ( i % 3 ) * 0.25, 0.05 + FishProps.restHeight( s, len, fishPresentation ), - 0.2 + Math.floor( i / 3 ) * 0.3, 0.2 * i ), i % 2 ? 'side' : 'sideFlip', len, { seed: i * 0.17, jaw: 0.25, curl: 0.4 * ( i % 2 ? 1 : - 1 ), anchor: [ 0, 0, 0 ] } );
+	props.add( 'whole', s, at( - 0.25 + ( i % 3 ) * 0.25, 0.05 + fishPresentation.PLACEMENT.restHeightScale[ s ] * len, - 0.2 + Math.floor( i / 3 ) * 0.3, 0.2 * i ), i % 2 ? 'side' : 'sideFlip', len, { seed: i * 0.17, jaw: 0.25, curl: 0.4 * ( i % 2 ? 1 : - 1 ), anchor: [ 0, 0, 0 ] } );
 
 } );
-props.add( 'split', 'redSnapper', at( 1.4, 0.8, - 0.3 ), 'tailFlat', 0.45, { anchor: FishProps.tailAnchor( 'redSnapper', fishPresentation ), dried: 0.8, wet: 0 } );
-props.add( 'whole', 'mullet', at( 1.8, 0.8, - 0.3 ), 'tail', 0.35, { anchor: FishProps.tailAnchor( 'mullet', fishPresentation ) } );
+props.add( 'split', 'redSnapper', at( 1.4, 0.8, - 0.3 ), 'tailFlat', 0.45, { anchor: fishPresentation.PLACEMENT.tailAnchor.redSnapper, dried: 0.8, wet: 0 } );
+props.add( 'whole', 'mullet', at( 1.8, 0.8, - 0.3 ), 'tail', 0.35, { anchor: fishPresentation.PLACEMENT.tailAnchor.mullet } );
 props.add( 'head', 'tuna', at( 0.9, 0.08, 0.6 ), 'side', 0.6, { blood: 1 } );
 props.add( 'trunk', 'tuna', at( 1.3, 0.08, 0.6 ), 'side', 0.6, { blood: 1 } );
 props.add( 'lobster', null, at( 0.7, 0.04, - 0.4, 1 ), 'flat', 0.35, {} );

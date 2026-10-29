@@ -1,7 +1,7 @@
 import * as THREE from '../../engine/index.js';
 import { ReefBatch } from '../reef/ReefBatch.js';
 import { GPU } from '../../engine/gpu/GPU.js';
-import { fishGeometry, splitFishGeometry, section, PART } from './FishGeometry.js';
+import { fishGeometry, splitFishGeometry, PART } from './FishGeometry.js';
 import { createPropMaterial } from './FishMaterial.js';
 import { bandFade } from '../../materials/LODFade.js';
 
@@ -433,34 +433,6 @@ export class FishProps {
 			curl, sag, jaw: o.jaw ?? 0,
 			flags: [ o.cloudy ?? 0.4, o.wet ?? 1, o.dried ?? 0, o.blood ?? 0 ],
 		} );
-
-	}
-
-	// half thickness of a fish lying on its side (m)
-	static restHeight( species, L, presentation ) {
-
-		const S = presentation?.SPECIES?.[ species ];
-		if ( ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
-		let w = 0;
-		for ( let u = 0.1; u < 0.9; u += 0.05 ) w = Math.max( w, section( S, u ).W );
-		return w * L * 0.85;
-
-	}
-
-	// model z of the caudal peduncle / the hook through the gill cover
-	static tailAnchor( species, presentation ) {
-
-		const S = presentation?.SPECIES?.[ species ];
-		if ( ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
-		return [ 0, 0, 0.5 - S.body * 0.985 ];
-
-	}
-
-	static gillAnchor( species, presentation ) {
-
-		const S = presentation?.SPECIES?.[ species ];
-		if ( ! S ) throw new Error( `Fish species is not present in the world fish-presentation profile: ${species}` );
-		return [ 0, S.mouth.y * 0.5, 0.5 - S.body * ( S.mouth.corner + 0.03 ) ];
 
 	}
 

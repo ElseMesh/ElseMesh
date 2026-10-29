@@ -313,13 +313,13 @@ export function fish( B, x, y, z, o = {} ) {
 	let py = y;
 	if ( pose === 'tail' ) {
 
-		anchor = FishProps.tailAnchor( species, B.fishPresentation );
+		anchor = B.fishPresentation.PLACEMENT.tailAnchor[ species ];
 		if ( kind === 'split' ) pose = 'tailFlat';
 
-	} else if ( pose === 'gill' ) anchor = FishProps.gillAnchor( species, B.fishPresentation );
+	} else if ( pose === 'gill' ) anchor = B.fishPresentation.PLACEMENT.gillAnchor[ species ];
 	else {
 
-		py += kind === 'split' ? 0.012 : FishProps.restHeight( species, len, B.fishPresentation );
+		py += kind === 'split' ? 0.012 : B.fishPresentation.PLACEMENT.restHeightScale[ species ] * len;
 		if ( o.flip ) pose = 'sideFlip';
 
 	}
