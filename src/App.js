@@ -483,7 +483,7 @@ export class App {
 		// dust, pollen, salt aerosol, seed fluff and gnats drifting around the camera
 		this.airMotes = new AirMotes( { terrain: this.terrainGPU, clouds: this.clouds, csm: this.csm, reversedDepth: true } );
 		scene.add( this.airMotes.mesh );
-		this.boatCtl = new BoatController( { design: this.boat.design, query: this.query, terrain: this.terrainData, colliders: this.colliders } );
+		this.boatCtl = new BoatController( { design: this.boat.design, query: this.query, terrain: this.terrainData, colliders: this.colliders, initialPosition: WORLD.boatDock.position, initialHeading: WORLD.boatDock.heading } );
 		// Player interaction uses the controller for physics and this presentation model for
 		// boarding, helm, and exit anchors.
 		this.boatCtl.model = this.boat;

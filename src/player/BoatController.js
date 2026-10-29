@@ -1,5 +1,4 @@
 import { MathUtils, Quaternion, Vector3 } from '../engine/math/index.js';
-import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 
 const RHO = 1025; // sea water density
 const GRAV = 9.81;
@@ -49,7 +48,8 @@ const _dq = new Quaternion();
 // mooring lines as before.
 export class BoatController {
 
-	constructor( { design, query, terrain, colliders, initialPosition = new Vector3( ...ISLAND_DEFINITION.boatDock.position ), initialHeading = ISLAND_DEFINITION.boatDock.heading } ) {
+	constructor( { design, query, terrain, colliders, initialPosition, initialHeading = 0 } ) {
+		if ( ! initialPosition || ! [ initialPosition.x, initialPosition.y, initialPosition.z ].every( Number.isFinite ) ) throw new Error( 'BoatController requires an explicit initialPosition from its world caller' );
 
 		this.design = design;
 		this.query = query;
@@ -87,7 +87,7 @@ export class BoatController {
 		this.hullLift = 0.5; // lift coefficient of the hull + keel per radian of drift
 		this.rudderLift = 2.8; // rudder lift slope (x area 0.12 m^2), includes the hull's flap effect
 
-		// Each world supplies its own berth. Defaults preserve the built-in island placement.
+		// The world supplies its berth; this reusable physics model has no default location.
 		this.homePosition = new Vector3().copy( initialPosition );
 		this.homeHeading = initialHeading;
 
