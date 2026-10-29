@@ -284,6 +284,19 @@ fn sprayRand( a: u32, b: u32 ) -> f32 {
 
 	// ------------------------------------------------------------------ hooks
 
+	setWorldEffects( { shoreSim = this.shoreSim, waveShadow = this.waveShadow, query = this.query, terrain = this.terrain } = {} ) {
+
+		const hooksChanged = this.shoreSim !== shoreSim || this.waveShadow !== waveShadow;
+		if ( ! hooksChanged && this.query === query && this.terrain === terrain ) return;
+		this.shoreSim = shoreSim;
+		this.waveShadow = waveShadow;
+		this.query = query;
+		this.terrain = terrain;
+		if ( hooksChanged ) this._hookModule = null;
+		this.updateKernel = null;
+
+	}
+
 	// shoreSim / waveShadow / clouds are optional and may be attached after construction: one
 	// module wraps them for the kernel and the sprites (built once, on first use)
 	_hooks() {

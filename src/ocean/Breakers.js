@@ -136,8 +136,11 @@ fn breakersSprayShadow( p: vec3f, seedTag: f32 ) -> f32 {
 
 			// the spray shader asks the crests for the wave's shadow on the particles they made, and the
 			// drops falling back into the water leave foam in the shore simulation
-			spray.waveShadow = this.sprayShadowModule;
-			if ( ! spray.shoreSim && surface.shoreSim ) spray.shoreSim = surface.shoreSim;
+			if ( spray.setWorldEffects ) spray.setWorldEffects( { shoreSim: surface.shoreSim || spray.shoreSim, waveShadow: this.sprayShadowModule } );
+			else {
+				spray.waveShadow = this.sprayShadowModule;
+				if ( ! spray.shoreSim && surface.shoreSim ) spray.shoreSim = surface.shoreSim;
+			}
 
 		}
 
@@ -162,6 +165,16 @@ fn breakersSprayShadow( p: vec3f, seedTag: f32 ) -> f32 {
 		if ( this.surface && this.surface.amplitude ) this.uniforms.fields.amplitude.value = this.surface.amplitude.value;
 		if ( this.kernel ) this.kernel.dispatch( Math.ceil( this.NS / 64 ) );
 		this._budget();
+
+	}
+
+	dispose() {
+
+		this.mesh?.parent?.remove( this.mesh );
+		this.mesh?.geometry?.dispose();
+		this.mesh?.material?.dispose();
+		this.stations?.destroy();
+		this.crest?.destroy();
 
 	}
 

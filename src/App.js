@@ -28,7 +28,6 @@ import { WORLD } from './world/WorldLayout.js';
 import { ISLAND_DEFINITION } from './world/IslandDefinition.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
-import { FishProps } from './world/fish/FishProps.js';
 import { BoatModel } from './world/BoatModel.js';
 import { Rocks } from './world/Rocks.js';
 import { Debris } from './world/Debris.js';
@@ -67,8 +66,7 @@ import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
 import { worldComponentDescriptor } from './network/WorldComponentRegistry.js';
-import { registerWorldComponentBackendAdapter, worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
-import { decodeFishPropPlacements } from './network/FishPropPlacements.js';
+import { worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
 import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
@@ -89,6 +87,8 @@ import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldOb
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
+import './network/WebGPUWorldComponentAdapters.js';
+import { createWebGPUHostedOceanEffects } from './ocean/WebGPUHostedOceanEffects.js';
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
 import { FrameWorkMeter } from './core/FrameWorkMeter.js';
@@ -97,46 +97,19 @@ import { GENERIC_WORLD_EXPERIENCE } from './network/WorldExperience.js';
 const _up = new Vector3( 0, 1, 0 );
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
 
-registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWebGPUWaterBody );
-registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.static-fish-props/1', installWebGPUFishProps );
+function terrainWetnessFor( shoreSim ) {
 
-function installWebGPUFishProps( { root, connector }, component ) {
-	const presentation = worldFishPresentationFor( connector.manifest.experience );
-	const placementBytes = connector.assets.get( component.placementAssetId );
-	if ( ! placementBytes ) throw new Error( `Fish-prop component ${component.id} is missing its placement asset` );
-	const fishProps = new FishProps( presentation );
-	fishProps.items = decodeFishPropPlacements( placementBytes, presentation );
-	const mesh = fishProps.build();
-	root.add( mesh );
-	return { installed: true, runtime: { dispose: () => { root.remove( mesh ); fishProps.dispose(); } } };
-}
+	return {
+		modules: [ shoreSim.module ],
+		code: /* wgsl */`
+fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
+	let s = shoreSimSample( xz );
+	let inside = shoreSimInside( shoreSimUvOf( xz ) );
+	let band = smoothstep( 0.45, 0.0, h );
+	return vec2f( max( s.y, band * ( 1.0 - inside ) ), shoreSimSandFoam( xz, s, h ) );
+}`,
+	};
 
-function installWebGPUWaterBody( { app, root, connector, installed }, component ) {
-	const extent = component.extent;
-	const lod = new CDLOD( {
-		gridSize: Number( app.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25,
-		center: { x: component.center[ 0 ] - extent, z: component.center[ 1 ] - extent, size: extent * 2 },
-	} );
-	const surface = new WaterSurface( { fft: app.fft, cdlod: lod, foamTexture: app.foamTexture, seaLevel: connector.manifest.rules.seaLevel } );
-	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
-	if ( terrain ) {
-		terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
-		surface.terrain = terrain.terrainGPU;
-		surface.shore = terrain.shore;
-	}
-	applyWaterBodyProfile( surface, component.profile );
-	const material = new WaterMaterial( {
-		surface, sky: app.sky, sceneCopy: app.sceneRenderer.opaqueCopy, sceneDepthHalf: app.sceneRenderer.opaqueDepthHalf.texture,
-	} );
-	material.clouds = app.clouds;
-	if ( app.desktopAdaptiveScale ) material.params.ssr.value = 0;
-	const mesh = new Mesh( lod.geometry, material );
-	mesh.frustumCulled = false;
-	mesh.receiveShadow = true;
-	mesh.layers.set( LAYERS.WATER );
-	root.add( mesh );
-	installed.push( { waterBody: true, surface, waterBounds: { center: component.center, extent }, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
-	return true;
 }
 
 function readGraphicsPriority() {
@@ -412,19 +385,7 @@ export class App {
 
 			this.shoreSim = new ShoreSim( renderer, { terrainGPU: this.terrainGPU, shore: this.shore } );
 			this.surface.shoreSim = this.shoreSim;
-			// WGSL: fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f (x = wetness, y = sand foam)
-			this.terrain.wetness = {
-				modules: [ this.shoreSim.module ],
-				code: /* wgsl */`
-fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
-	let s = shoreSimSample( xz );
-	let inside = shoreSimInside( shoreSimUvOf( xz ) );
-	// outside the simulated region fall back to a static damp band
-	let band = smoothstep( 0.45, 0.0, h );
-	// foam left on the sand: the lace the water carried, stranded and popping (ShoreSim.sandFoam)
-	return vec2f( max( s.y, band * ( 1.0 - inside ) ), shoreSimSandFoam( xz, s, h ) );
-}`,
-			};
+			this.terrain.wetness = terrainWetnessFor( this.shoreSim );
 			this.terrain.finalizeMaterial();
 			// surf-zone foam look (whitewater, lace) used by the water shader
 			this.surfFoam = new SurfFoam( { shoreSim: this.shoreSim } );
@@ -1133,38 +1094,64 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// The built-in ocean belongs to the default world. Hosted worlds
 		// render water only through their own declared world components.
 		this.ocean.visible = false;
-		const terrain = ( root.userData.worldComponents || [] ).find( ( component ) => component.islandTerrain && component.terrainGPU );
-		if ( terrain ) {
+		const components = root.userData.worldComponents || [];
+		const terrain = components.find( ( component ) => component.islandTerrain && component.terrainGPU );
+		const runtime = components.find( ( component ) => component.hostedBoat );
+		this.activeHostedOcean = components.some( ( component ) => component.islandOcean );
+		this.activeHostedBoat = runtime || null;
+		const berthComponent = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
+		const berthObject = connector.manifest.objects?.find( object => object.id === berthComponent?.objectId );
+		const waterSurface = worldWaterSurfaceFor( components, berthObject?.transform?.position, this.hostedWaterSurface );
+		this.hostedSurfaceState = {
+			surface: waterSurface, terrain: waterSurface.terrain, shore: waterSurface.shore, wake: waterSurface.wake,
+			shoreSim: waterSurface.shoreSim, foamShading: waterSurface.foamShading,
+		};
+		if ( terrain?.terrainGPU ) {
 			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
-			if ( terrain.terrain && this.terrain.wetness ) {
-				terrain.terrain.wetness = this.terrain.wetness;
+			waterSurface.terrain = terrain.terrainGPU;
+			waterSurface.shore = terrain.shore;
+			let effects = root.userData.hostedWaterEffects;
+			if ( ! effects && this.shoreSim ) {
+				effects = createWebGPUHostedOceanEffects( {
+					renderer: this.renderer, root, terrainGPU: terrain.terrainGPU, terrainData: root.userData.terrainData,
+					surface: waterSurface, sky: this.sky, spray: this.spray, clouds: this.clouds, includeBreakers: this.activeHostedOcean,
+				} );
+				root.userData.hostedWaterEffects = effects;
+				components.push( effects );
+			}
+			if ( effects ) {
+				waterSurface.shoreSim = effects.shoreSim;
+				waterSurface.foamShading = ( args ) => effects.surfFoam.shading( args );
+			}
+			this.hostedBreakers = effects?.breakers || null;
+			this.breakers.mesh.visible = ! this.hostedBreakers;
+			waterSurface._module = null;
+			const waterMaterial = waterSurface === this.surface ? this.waterMaterial : components.find( component => component.surface === waterSurface )?.material;
+			if ( waterMaterial ) {
+				waterMaterial._built = false;
+				waterMaterial.needsUpdate = true;
+			}
+			if ( terrain.terrain && effects ) {
+				terrain.terrain.wetness = terrainWetnessFor( effects.shoreSim );
 				terrain.terrain.finalizeMaterial();
 			}
 			terrain.underwaterLighting ||= installUnderwaterLighting( {
 				fft: this.fft, caustics: this.caustics, clouds: this.clouds, terrain: terrain.terrainGPU,
-				shore: terrain.shore, surface: this.surface, shoreSim: this.shoreSim,
+				shore: terrain.shore, surface: waterSurface, shoreSim: effects?.shoreSim || null,
 			} );
 			terrain.groundBounce ||= installGroundBounce( { terrain: terrain.terrainGPU, clouds: this.clouds } );
 			this.underwaterLighting = terrain.underwaterLighting;
 			this.underwaterLighting.activate();
 			terrain.groundBounce.activate();
 		}
-		const runtime = ( root.userData.worldComponents || [] ).find( ( component ) => component.hostedBoat );
-		this.activeHostedOcean = ( root.userData.worldComponents || [] ).some( ( component ) => component.islandOcean );
-		this.activeHostedBoat = runtime || null;
-		const berthComponent = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
-		const berthObject = connector.manifest.objects?.find( object => object.id === berthComponent?.objectId );
-		const waterSurface = worldWaterSurfaceFor( root.userData.worldComponents, berthObject?.transform?.position, this.hostedWaterSurface );
-		this.hostedSurfaceState = { surface: waterSurface, terrain: waterSurface.terrain, shore: waterSurface.shore, wake: waterSurface.wake };
-		if ( terrain?.terrainGPU ) {
-			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
-			waterSurface.terrain = terrain.terrainGPU;
-			waterSurface.shore = terrain.shore;
-		}
 		const hostedQuery = this.hostedQueries.get( waterSurface ) || new WaterQuery( this.renderer, waterSurface );
 		this.hostedQueries.set( waterSurface, hostedQuery );
 		this.hostedQuery = hostedQuery;
 		this.hostedPlayerSlot = hostedQuery.allocate( 'player', 1 );
+		if ( this.activeHostedOcean && terrain?.terrainGPU ) this.spray.setWorldEffects?.( {
+			shoreSim: waterSurface.shoreSim, waveShadow: this.hostedBreakers?.sprayShadowModule || this.breakers.sprayShadowModule,
+			query: hostedQuery, terrain: terrain.terrainGPU,
+		} );
 		this.player.query = hostedQuery;
 		this.player.slot = this.hostedPlayerSlot;
 		this.player.boat = runtime ? runtime.activate( { query: hostedQuery, colliders: this.hostedColliders } ) : null;
@@ -1231,13 +1218,26 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.activeHostedWildlife = null;
 		this.activeHostedWhale = null;
 		this.activeHostedOcean = false;
+		if ( this.hostedBreakers ) {
+			this.hostedBreakers.mesh.visible = false;
+			this.hostedBreakers = null;
+		}
+		if ( this.breakers?.mesh ) this.breakers.mesh.visible = true;
+		this.spray?.setWorldEffects?.( { shoreSim: this.shoreSim, waveShadow: this.breakers?.sprayShadowModule, query: this.query, terrain: this.terrainGPU } );
 		const runtime = this.activeHostedBoat;
 		if ( this.wake ) this.wake.boat = this.boatCtl;
 		if ( this.hostedSurfaceState ) {
-			const { surface, terrain, shore, wake } = this.hostedSurfaceState;
+			const { surface, terrain, shore, wake, shoreSim, foamShading } = this.hostedSurfaceState;
 			surface.terrain = terrain;
 			surface.shore = shore;
 			surface.wake = wake;
+			surface.shoreSim = shoreSim;
+			surface.foamShading = foamShading;
+			surface._module = null;
+			if ( surface === this.surface ) {
+				this.waterMaterial._built = false;
+				this.waterMaterial.needsUpdate = true;
+			}
 			this.hostedSurfaceState = null;
 		}
 		if ( ! runtime ) return;
@@ -1720,7 +1720,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 					dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
 					marineSnowUnderwater: this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH,
 					query: this.hostedQuery, wake: this.wake, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
-					shoreSim: this.shoreSim, underwaterLighting: this.underwaterLighting, breakers: this.breakers, spray: this.spray,
+					shoreSim: this.hostedSurfaceState?.surface.shoreSim || this.shoreSim,
+					underwaterLighting: this.underwaterLighting, breakers: this.hostedBreakers || this.breakers, spray: this.spray,
 				} );
 			}
 			if ( this.freeCam ) this.updateFreeCamera( dt );

@@ -250,9 +250,20 @@ fn main( @builtin( global_invocation_id ) gid: vec3u ) {
 
 	update() {
 
+		if ( this.disposed ) return;
 		this.kernel.dispatch( this.kernel.groups( this.res, this.res ) );
 		const size = { width: this.res, height: this.res };
 		GPU.getEncoder().copyTextureToTexture( { texture: this.stateB.getGPU() }, { texture: this.stateA.getGPU() }, size );
+
+	}
+
+	dispose() {
+
+		if ( this.disposed ) return;
+		this.disposed = true;
+		this.stateA.destroy();
+		this.stateB.destroy();
+		this.deposit.destroy();
 
 	}
 

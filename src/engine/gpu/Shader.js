@@ -520,10 +520,15 @@ export function composeShader( { modules = [], bindings = {}, code = '', defines
 
 	const mods = collectModules( modules );
 	const specs = {};
+	const bindingModules = {};
 	for ( const m of mods ) for ( const k in m.bindings ) {
 
-		if ( specs[ k ] && specs[ k ] !== m.bindings[ k ] && ! sameSpec( specs[ k ], m.bindings[ k ] ) ) throw new Error( `${ label }: binding ${ k } declared twice (${ m.name })` );
+		if ( specs[ k ] && specs[ k ] !== m.bindings[ k ] && ! sameSpec( specs[ k ], m.bindings[ k ] ) ) {
+			const previous = bindingModules[ k ];
+			throw new Error( `${ label }: binding ${ k } declared by incompatible modules ${ previous.name }#${ previous.id } and ${ m.name }#${ m.id }` );
+		}
 		specs[ k ] = m.bindings[ k ];
+		bindingModules[ k ] = m;
 
 	}
 
