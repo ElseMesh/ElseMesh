@@ -8,6 +8,7 @@ assert.equal( GENERIC_WORLD_EXPERIENCE.behaviors, undefined, 'the generic loadin
 const fishing = {
 	fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 },
 	chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 },
+	fishingAreas: { pier: { x: 20, zStart: -10, zEnd: 30, width: 3, headWidth: 12, headDepth: 6 }, reef: { center: [ -40, 60 ], radius: 50 } },
 	fishCatalog: { testFish: { name: 'Test fish', lw: [ 1, 3 ], model: 'test', habitat: { shallows: 1 }, kg: [ 1, 2 ], price: 2, fight: 0.5, stamina: 3, time: 'any', rarity: 1 } },
 };
 const javascriptAssetID = `sha256:${'a'.repeat( 64 )}`;
@@ -15,6 +16,7 @@ const javascriptExtension = { behaviorId: 'elsemesh.fishing-game/1', assetId: ja
 assert.deepEqual( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing }, extensions: [ javascriptExtension ] } ).behaviors[ 'elsemesh.fishing-game/1' ], fishing, 'behavior-owned vendor placements are validated by their registry entry' );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { ...fishing, fishStand: { position: [ 1 ], yaw: 0, interactionRadius: 3 } } }, extensions: [ javascriptExtension ] } ), /fishing location/ );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { ...fishing, chandlery: undefined } }, extensions: [ javascriptExtension ] } ), /fishing location chandlery/, 'the fishing behavior requires its world-authored chandlery placement' );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { ...fishing, fishingAreas: undefined } }, extensions: [ javascriptExtension ] } ), /fishing areas/, 'the fishing behavior requires world-authored pier and reef areas' );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.unregistered/1': {} } } ), /does not support required world behavior/ );
 const withJavaScript = { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing }, extensions: [ javascriptExtension ] };
 assert.deepEqual( validateWorldExperience( withJavaScript ).extensions, [ javascriptExtension ], 'signed JavaScript modules bind to a declared registered behavior' );
