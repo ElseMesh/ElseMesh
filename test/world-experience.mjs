@@ -14,6 +14,7 @@ const javascriptAssetID = `sha256:${'a'.repeat( 64 )}`;
 const javascriptExtension = { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID };
 assert.deepEqual( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing }, extensions: [ javascriptExtension ] } ).behaviors[ 'elsemesh.fishing-game/1' ], fishing, 'behavior-owned vendor placements are validated by their registry entry' );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { ...fishing, fishStand: { position: [ 1 ], yaw: 0, interactionRadius: 3 } } }, extensions: [ javascriptExtension ] } ), /fishing location/ );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { ...fishing, chandlery: undefined } }, extensions: [ javascriptExtension ] } ), /fishing location chandlery/, 'the fishing behavior requires its world-authored chandlery placement' );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.unregistered/1': {} } } ), /does not support required world behavior/ );
 const withJavaScript = { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing }, extensions: [ javascriptExtension ] };
 assert.deepEqual( validateWorldExperience( withJavaScript ).extensions, [ javascriptExtension ], 'signed JavaScript modules bind to a declared registered behavior' );
