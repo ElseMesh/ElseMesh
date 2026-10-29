@@ -70,7 +70,7 @@ stand geometry and Joe's vendor loaded; invoking the in-range interaction
 opened Joe's buyer panel. In a 4-second idle sample the boat remained moored
 and upright (peak roll 9.6°, pitch 5.3°). Focused checks passed for WebGL boat
 stability, fish-stand placement and colliders, vendor/gameplay behavior, and
-the signed Tidewater extension runtime.
+the Tidewater-authored declarative fishing rules.
 
 This verifies the fish stand and idle-boat gameplay paths in both renderers;
 it does not close visual parity. The matched WebGPU comparison below still
