@@ -1,6 +1,6 @@
 import * as THREE from '../engine/index.js';
 import { mulberry32 } from '../util/Noise.js';
-import { ReefBatch } from './reef/ReefBatch.js';
+import { MultiKindInstanceBatch } from '../engine/render/MultiKindInstanceBatch.js';
 import { WORLD } from './WorldLayout.js';
 import { fishGeometry } from './fish/FishGeometry.js';
 import { rayGeometry, turtleGeometry } from './fish/CreatureGeometry.js';
@@ -10,7 +10,7 @@ import { WhaleWater } from '../ocean/WhaleWater.js';
 import { FrameUniforms } from '../engine/render/Frame.js';
 
 // Fish and other swimmers of the reef and the bay, simulated on the CPU and drawn in a single
-// render object (ReefBatch: one indirect draw per model and level of detail) with the
+// render object (MultiKindInstanceBatch: one indirect draw per model and level of detail) with the
 // procedural fish models (fish/FishGeometry.js, fish/CreatureGeometry.js) and material
 // (fish/FishMaterial.js).
 //
@@ -206,7 +206,7 @@ export class FishSchools {
 		this.tmpC = new Uint16Array( n ); // neighbour counts
 		for ( const g of this.groups ) this.initGroup( g );
 
-		this.batch = new ReefBatch( 'Fish', kinds, { maxInstances: n, dynamic: true, fade: true } );
+		this.batch = new MultiKindInstanceBatch( 'Fish', kinds, { maxInstances: n, dynamic: true, fade: true } );
 		this.material = createSwimMaterial( this.batch, { presentation } );
 		this.fadeMaterial = createSwimMaterial( this.batch, { fade: true, presentation } );
 		this.mesh = this.batch.createMesh( this.material );

@@ -32,7 +32,11 @@ preserve it without inspection beyond its pointer/status or staging.
 
 Fish-prop placements, species presentation, and model-specific geometry belong
 to Tidewater. ElseMesh owns renderer selection, GPU resource creation, drawing,
-culling, and LOD. The fish-prop record codec now lives in Tidewater and
+culling, and LOD. The generic WebGPU multi-kind instance batch has been moved
+from `src/world/reef/ReefBatch.js` to the public engine render surface as
+`MultiKindInstanceBatch`; Reef, swimming fish, and props now consume that engine
+primitive. This extracts batching infrastructure only: fish-specific geometry,
+materials, and component adapters are still in ElseMesh. The fish-prop record codec now lives in Tidewater and
 registers as the `fish-props-placement/1` asset decoder; ElseMesh adapters invoke
 that generic decoder registry. The adapters still know the fish-prop component
 and construct its renderer. The current signed behavior Worker only accepts
@@ -168,3 +172,11 @@ them.
   registry, adapter, and manifest checks, full client suite (including
   WebGPU/WebGL and pre-split gameplay traces), and external production build
   passed. Renderer extraction and visual parity remain open.
+- 2026-10-29: moved the reusable multi-kind indirect instance batch from the
+  reef world module into `src/engine/render/MultiKindInstanceBatch.js`, exported
+  it on the WebGPU engine surface, and updated Reef, swimming fish, and fish
+  props to consume the engine primitive. Syntax/import checks, the WebGL fish
+  prop adapter check, and a headless reef render passed. This extracts batching
+  infrastructure only; Tidewater model/material ownership, WebGL fish-prop
+  culling and LOD, and visual parity remain open. The dirty external build tree
+  was left untouched.

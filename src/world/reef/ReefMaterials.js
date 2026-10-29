@@ -11,7 +11,7 @@ import { NOISE_SCALE } from './ReefNoise.js';
 // noise evaluation: one fetch gives four noise values, which made the reef several times cheaper
 // to shade.
 //
-// Both reef batches share the vertex stage: the instance record (see Reef.js) places,
+// Both reef instance batches share the vertex stage: the instance record (see Reef.js) places,
 // rotates and scales the model, massive forms get a per-colony warp, flexible organisms
 // sway with the surge of the swell, and everything the fragment stage needs is passed as
 // a few varyings.
@@ -184,7 +184,7 @@ export function createReefView() {
 // and the varyings. view = ReefView uniforms: the main camera (not the shadow camera) and the draw
 // distance; instances shrink away over the last fifth of their draw distance so that nothing pops
 // when the culling adds or drops them.
-// fade: level-of-detail cross-fade (ReefBatch fade channel): o.vReefFade = ( share of this level,
+// fade: level-of-detail cross-fade (instance batch fade channel): o.vReefFade = ( share of this level,
 // outgoing (1) or not )
 export function reefVertex( batch, surge, view, fade = false ) {
 

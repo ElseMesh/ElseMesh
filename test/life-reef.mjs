@@ -1,4 +1,4 @@
-// Reef (ReefBatch + ReefMaterials) headless render: views from above the water and underwater,
+// Reef (MultiKindInstanceBatch + ReefMaterials) headless render: views from above the water and underwater,
 // velocity view, GPU time. Usage: node test/life-reef.mjs [outDir]   (REEF_STUB_FISH=1 stubs the fish)
 import { register } from 'node:module';
 register( './life-reef-stubs.mjs', import.meta.url );

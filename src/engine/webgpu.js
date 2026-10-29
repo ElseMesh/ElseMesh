@@ -9,6 +9,7 @@ export { generateMipmaps } from './gpu/Mipmaps.js';
 export { FrameUniforms, G, GRAVITY, setFrameCamera, createViewUniforms } from './render/Frame.js';
 export { Material, basicMaterial, blendState } from './render/Material.js';
 export { MeshRenderer } from './render/MeshRenderer.js';
+export { MultiKindInstanceBatch } from './render/MultiKindInstanceBatch.js';
 export { SceneRenderer, LAYERS, SCENE_FORMATS, DEPTH_FORMAT } from './render/SceneRenderer.js';
 export { SunShadows } from './render/Shadows.js';
 export { FullscreenPass } from './render/FullscreenPass.js';

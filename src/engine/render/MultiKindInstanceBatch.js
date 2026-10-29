@@ -15,7 +15,7 @@ import { ShaderModule } from '../../engine/gpu/Shader.js';
 // Per-instance data lives in a storage buffer (4 vec4 per instance, owner defined).
 // Nothing is allocated per frame.
 //
-// The shadow pass draws only the kinds flagged `shadow` (large near corals): the
+// The shadow pass draws only the kinds flagged `shadow` (for example, nearby proxy geometry): the
 // indirect offsets are swapped in onBeforeRender when the camera is a shadow camera.
 //
 // Level-of-detail cross-fades (option `fade`): instances in a transition band are listed in a
@@ -26,7 +26,7 @@ import { ShaderModule } from '../../engine/gpu/Shader.js';
 // The fade channel casts no shadows (the main channel's shadow proxies do).
 //
 // WGSL port: the batch exposes `batch.module` (a ShaderModule; add it to the material's modules)
-// with prefix P = batch.prefix (from the name: 'Reef.hard' -> 'reefHard', 'Fish' -> 'fish'):
+// with prefix P = batch.prefix (from the name: 'World.hard' -> 'worldHard', 'Fish' -> 'fish'):
 //   bindings  P + 'Instances' (array<vec4f>, 4 per instance), P + 'List' / P + 'Base' (array<u32>),
 //             P + 'FadeList' / P + 'FadeBase' (with `fade`)
 //   fn P + 'RecordIndex'( kind: u32, instance: u32 ) -> u32
@@ -43,7 +43,7 @@ function prefixOf( name ) {
 
 }
 
-export class ReefBatch {
+export class MultiKindInstanceBatch {
 
 	constructor( name, kinds, { maxInstances, dynamic = false, fade = false } ) {
 

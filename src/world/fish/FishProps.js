@@ -1,5 +1,5 @@
 import * as THREE from '../../engine/index.js';
-import { ReefBatch } from '../reef/ReefBatch.js';
+import { MultiKindInstanceBatch } from '../../engine/render/MultiKindInstanceBatch.js';
 import { GPU } from '../../engine/gpu/GPU.js';
 import { fishGeometry, splitFishGeometry, PART } from './FishGeometry.js';
 import { createPropMaterial } from './FishMaterial.js';
@@ -460,7 +460,7 @@ export class FishProps {
 		}
 
 		const n = this.items.length;
-		const batch = new ReefBatch( 'FishProps', kinds, { maxInstances: Math.max( 1, n ), fade: true } );
+		const batch = new MultiKindInstanceBatch( 'FishProps', kinds, { maxInstances: Math.max( 1, n ), fade: true } );
 		const D = batch.data;
 		this.kind0 = new Uint16Array( n );
 		this.pos = new Float32Array( n * 4 );

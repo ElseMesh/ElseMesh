@@ -20,7 +20,7 @@ import { PART } from './FishGeometry.js';
 // body (props: fish lying on ice or hanging from a hook).
 //
 // Port notes:
-//  - the instance record comes from the ReefBatch module (see recordOf() below and reef/ReefBatch.js);
+//  - the instance record comes from the engine instance batch (see recordOf() and engine/render/MultiKindInstanceBatch.js);
 //  - motion vectors: the TSL version added the fish's own motion (vFishDelta) to the static
 //    (camera) velocity in the MRT output; here the vertex stage sets the previous world position
 //    ( world - delta ), which the mesh template turns into exactly that velocity;
@@ -267,7 +267,7 @@ function propVertex( batch, fade ) {
 // ---------------------------------------------------------------------------
 // fragment stage
 
-// Level-of-detail cross-fade (see ReefBatch fade channel, materials/LODFade.js): the incoming level
+// Level-of-detail cross-fade (see instance batch fade channel, materials/LODFade.js): the incoming level
 // keeps the Bayer cells below the fade, the outgoing one the others.
 const FADE_DISCARD = /* wgsl */`
 	if ( ! lodFadeVisible( in.pixel, in.vs.vFishFade.x, in.vs.vFishFade.y > 0.5 ) ) { discard; }`;
@@ -742,7 +742,7 @@ function baseMaterial( batch, name, extra ) {
 
 // ---------------------------------------------------------------------------
 
-// Material of the swimming fish (batch: ReefBatch with the fish kinds).
+// Material of the swimming fish (batch: MultiKindInstanceBatch with the fish kinds).
 // fade: the material of the batch's level-of-detail cross-fade channel
 // Motion vectors: camera motion (as for static geometry) plus the fish's own motion (vertex stage).
 export function createSwimMaterial( batch, { fade = false, presentation } = {} ) {

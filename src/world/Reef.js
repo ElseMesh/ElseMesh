@@ -2,7 +2,7 @@ import * as THREE from '../engine/index.js';
 import { WORLD } from './WorldLayout.js';
 import { mulberry32, Noise2D, smoothstep } from '../util/Noise.js';
 import * as Geo from './reef/ReefGeometry.js';
-import { ReefBatch } from './reef/ReefBatch.js';
+import { MultiKindInstanceBatch } from '../engine/render/MultiKindInstanceBatch.js';
 import { createReefMaterials, createReefView, SURFACE, packColor } from './reef/ReefMaterials.js';
 import { bandFade } from '../materials/LODFade.js';
 import { createNoiseVolume } from './reef/ReefNoise.js';
@@ -29,7 +29,7 @@ export { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacem
 // rasterized into a height field that later organisms settle on, which also serves
 // collisions (floorHeightAt) and the fish.
 //
-// Rendering: two ReefBatch render objects (opaque rocks and colonies; alpha-tested fans and
+// Rendering: two MultiKindInstanceBatch render objects (opaque rocks and colonies; alpha-tested fans and
 // plumes) plus one for the fish, each a single pipeline issuing one indirect draw per model
 // and level of detail in use. Each frame the instances in range of the camera frustum pick a
 // level of detail by distance relative to their size; the shadow pass draws low-detail
@@ -1241,7 +1241,7 @@ export class Reef {
 		for ( const which of [ 'hard', 'soft' ] ) {
 
 			const items = this.items[ which ];
-			const batch = new ReefBatch( 'Reef.' + which, this.kinds[ which ], { maxInstances: this.maxInstances ?? items.length + 1, fade: true } );
+			const batch = new MultiKindInstanceBatch( 'Reef.' + which, this.kinds[ which ], { maxInstances: this.maxInstances ?? items.length + 1, fade: true } );
 			this.batches[ which ] = batch;
 			this.writeBatchData( which, 0 );
 			batch.upload();
