@@ -11,12 +11,23 @@ assert.throws( () => decodeWorldJavaScriptExtension( 'export async function run(
 
 class FakeWorker {
 	terminated = false;
+	maximumConcurrentRuns = 0;
+	activeRuns = 0;
+	seenEvents = [];
 	onmessage = null;
 	onerror = null;
 	onmessageerror = null;
 	postMessage( message ) {
 		if ( message.type === 'init' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, type: 'ready' } } ) );
-		else if ( message.type === 'run' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, id: message.id, result: { echo: message.event } } } ) );
+		else if ( message.type === 'run' ) {
+			this.activeRuns ++;
+			this.maximumConcurrentRuns = Math.max( this.maximumConcurrentRuns, this.activeRuns );
+			this.seenEvents.push( message.event );
+			setTimeout( () => {
+				this.activeRuns --;
+				this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, id: message.id, result: { echo: message.event } } } );
+			}, 1 );
+		}
 	}
 	terminate() { this.terminated = true; }
 }
@@ -24,6 +35,10 @@ class FakeWorker {
 const fake = new FakeWorker();
 const runtime = createWorldJavaScriptExtensionRuntime( { moduleBytes: bytes, workerFactory: () => fake } );
 assert.deepEqual( await runtime.run( { type: 'tick', dt: 1 / 60 } ), { echo: { type: 'tick', dt: 1 / 60 } } );
+const orderedEvents = Array.from( { length: 16 }, ( _, sequence ) => ( { type: 'frame', sequence } ) );
+assert.deepEqual( await Promise.all( orderedEvents.map( event => runtime.run( event ) ) ), orderedEvents.map( event => ( { echo: event } ) ), 'concurrent callers receive matching responses' );
+assert.deepEqual( fake.seenEvents.slice( 1 ), orderedEvents, 'queued Worker events preserve submission order' );
+assert.equal( fake.maximumConcurrentRuns, 1, 'stateful Worker calls never overlap' );
 await assert.rejects( runtime.run( { payload: 'x'.repeat( 20 * 1024 ) } ), /16 KiB/ );
 runtime.dispose();
 assert.equal( fake.terminated, true, 'disposing the runtime terminates its worker' );
@@ -41,6 +56,16 @@ timeoutWorker.postMessage = message => {
 const timeoutRuntime = createWorldJavaScriptExtensionRuntime( { moduleBytes: bytes, timeoutMs: 1, workerFactory: () => timeoutWorker } );
 await assert.rejects( timeoutRuntime.run( { type: 'loop' } ), /run limit/ );
 assert.equal( timeoutWorker.terminated, true, 'a timed-out call terminates the worker' );
+
+const saturatedWorker = new FakeWorker();
+saturatedWorker.postMessage = message => {
+	if ( message.type === 'init' ) queueMicrotask( () => saturatedWorker.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, type: 'ready' } } ) );
+};
+const saturatedRuntime = createWorldJavaScriptExtensionRuntime( { moduleBytes: bytes, workerFactory: () => saturatedWorker } );
+const outstanding = Array.from( { length: 32 }, ( _, sequence ) => saturatedRuntime.run( { type: 'frame', sequence } ) );
+await assert.rejects( saturatedRuntime.run( { type: 'frame', sequence: 32 } ), /at most 32 pending calls/ );
+saturatedRuntime.dispose();
+await Promise.all( outstanding.map( request => assert.rejects( request, /disposed/ ) ) );
 
 const vite = await createServer( { configFile: './vite.config.js', server: { middlewareMode: true }, appType: 'custom' } );
 try {

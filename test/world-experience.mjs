@@ -4,12 +4,16 @@ import { GENERIC_WORLD_EXPERIENCE, validateWorldExperience } from '../src/networ
 assert.match( GENERIC_WORLD_EXPERIENCE.tagline, /place shaped by its owner/i, 'remote worlds without copy use neutral loader text' );
 assert.equal( Object.values( GENERIC_WORLD_EXPERIENCE.stages ).every( ( text ) => text.includes( 'ThruHold' ) ), true, 'generic stage labels do not impose game-specific copy' );
 assert.equal( GENERIC_WORLD_EXPERIENCE.behaviors, undefined, 'the generic loading presentation does not select world behavior' );
-const fishing = { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 } };
-assert.deepEqual( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing } } ).behaviors[ 'elsemesh.fishing-game/1' ], fishing, 'behavior-owned vendor placements are validated by their registry entry' );
-assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 1 ], yaw: 0, interactionRadius: 3 } } } } ), /fishing location/ );
-assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.unregistered/1': {} } } ), /does not support required world behavior/ );
+const fishing = {
+	fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 },
+	chandlery: { position: [ 30, 5 ], yaw: -0.5, interactionRadius: 3 },
+	fishCatalog: { testFish: { name: 'Test fish', lw: [ 1, 3 ], model: 'test', habitat: { shallows: 1 }, kg: [ 1, 2 ], price: 2, fight: 0.5, stamina: 3, time: 'any', rarity: 1 } },
+};
 const javascriptAssetID = `sha256:${'a'.repeat( 64 )}`;
 const javascriptExtension = { behaviorId: 'elsemesh.fishing-game/1', assetId: javascriptAssetID };
+assert.deepEqual( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing }, extensions: [ javascriptExtension ] } ).behaviors[ 'elsemesh.fishing-game/1' ], fishing, 'behavior-owned vendor placements are validated by their registry entry' );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': { ...fishing, fishStand: { position: [ 1 ], yaw: 0, interactionRadius: 3 } } }, extensions: [ javascriptExtension ] } ), /fishing location/ );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.unregistered/1': {} } } ), /does not support required world behavior/ );
 const withJavaScript = { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fishing-game/1': fishing }, extensions: [ javascriptExtension ] };
 assert.deepEqual( validateWorldExperience( withJavaScript ).extensions, [ javascriptExtension ], 'signed JavaScript modules bind to a declared registered behavior' );
 assert.doesNotThrow( () => validateWorldExperience( withJavaScript, [ { id: javascriptAssetID, kind: 'javascript/1', bytes: 1, priority: 'visible' } ] ), 'signed javascript/1 asset matches the bounded module reference' );
