@@ -24,7 +24,6 @@ import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
-import './WebGLWorldBehaviorImplementations.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';

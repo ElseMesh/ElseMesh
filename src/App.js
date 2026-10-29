@@ -85,7 +85,6 @@ import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/Wo
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import { defaultWorldPackage } from '../worlds/default.js';
-import './network/BrowserWorldBehaviorImplementations.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';

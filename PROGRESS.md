@@ -90,6 +90,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   results. Both renderers obtain the adapter through Tidewater's registered
   behavior runtime; neither engine adapter imports Tidewater boat rules.
   Boat-controller hydrodynamics and matched live renderer checks remain open.
+- Moved the built-in and hosted behavior hook implementations for Tidewater's
+  fishing and shore-aware boat from engine `src/` into the Tidewater repository.
+  The engine now reaches them through the built-in world package's behavior
+  registration. Tidewater's hook modules still use engine presentation classes
+  (`Game`, `ShoreWaves`, and WebGL adapters); moving world-specific presentation
+  and its engine-facing API remains separation work.
 - An earlier extension prototype used signed Wasm asset references. The active
   implementation uses JavaScript Workers; Wasm is not part of the plan.
 
