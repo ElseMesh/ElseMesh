@@ -6,7 +6,7 @@ const tests = [
 	'test/vite-world-assets.mjs', 'test/require-external-build-tree.mjs', 'test/vegetation-placement-codec.mjs',
 	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'test/tidewater-reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
 	'test/grass-density-asset.mjs', 'test/grass-density-parity.mjs', 'test/reef-placement-render.mjs',
-	'test/game-logic.mjs', 'test/fishing-rod-runtime.mjs', 'test/boat-gameplay-runtime.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
+	'test/game-logic.mjs', 'test/game-vendor-locations.mjs', 'test/fishing-rod-runtime.mjs', 'test/boat-gameplay-runtime.mjs', 'test/heightfield-terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
 	'test/camera-review.mjs', 'test/input-look-keys.mjs', 'test/input-pointer-lock.mjs', 'test/touch-control-ownership.mjs', 'test/world-experience.mjs',
 	'test/boat-controller-origin.mjs', 'test/boat-design.mjs', 'test/webgl-boat-adapter.mjs', 'test/webgl-boat-idle.mjs', 'test/webgl-lighting-parity.mjs', 'test/webgl-fish-stand-adapter.mjs', 'test/webgl-chandlery-adapter.mjs',
 	'test/webgl-game-adapter.mjs', 'test/webgl-wildlife-adapter.mjs', 'test/webgl-swash-probe.mjs', 'test/webgl-component-support.mjs', 'test/world-vehicle-policy.mjs',

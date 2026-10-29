@@ -41,6 +41,7 @@ export class Game {
 		this.landing = null; // { species, kg } while the caught fish swings in view
 		this.chandlery = new Chandlery( { scene: app.scene, terrain, colliders, material: this.stand.material, placement: fishingData?.chandlery } );
 		this.vendors = [ this.stand.vendor, this.chandlery.vendor ];
+		this.vendorLocations = new Map( [ [ 'joe', this.stand.vendor.position ], [ 'marta', this.chandlery.vendor.position ] ] );
 		// boat upgrades: engine (thrust / top speed) and deck floodlights for night fishing
 		const b = boatController;
 		this.boatGameplay = new BoatGameplayRuntime( {
@@ -68,6 +69,12 @@ export class Game {
 	set fight( value ) { this.runtime.fight = value; }
 	get bite() { return this.runtime.bite; }
 	set bite( value ) { this.runtime.bite = value; }
+
+	vendorPosition( id ) {
+
+		return this.vendorLocations.get( id ) || null;
+
+	}
 
 	setBoatController( boatController ) {
 

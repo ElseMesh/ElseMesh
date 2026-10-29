@@ -145,6 +145,8 @@ The world behavior registry now owns browser fishing activation, hosted-world
 teardown, and per-frame updates. WebGL key handling, gameplay input blocking,
 and fishing updates also dispatch through registered hooks, so the fallback no
 longer calls its fishing adapter directly from the frame and input loops.
+The fishing guide and minimap also read the resolved vendor positions from the
+active behavior runtime instead of the built-in island coordinates.
 
 ## Acceptance criteria
 

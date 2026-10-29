@@ -1,5 +1,3 @@
-import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
-
 // First-play guide:
 //  - an intro (3 cards) the first time the game starts, after the start overlay: the goal, the fishing
 //    controls, getting around and where Joe and Marta are (live direction and distance; their
@@ -313,7 +311,10 @@ export class Guide {
 
 				this._whereT = 0.25;
 				const x = p.position.x, z = p.position.z;
-				for ( const [ id, t ] of [ [ 'joe', ISLAND_DEFINITION.fishStand ], [ 'marta', ISLAND_DEFINITION.chandlery ] ] ) {
+				for ( const id of [ 'joe', 'marta' ] ) {
+
+					const t = g.vendorPosition( id );
+					if ( ! t ) continue;
 
 					const el = this.body.querySelector( `[data-where="${ id }"]` );
 					if ( el ) el.textContent = `${ Math.round( Math.hypot( t.x - x, t.z - z ) ) } m ${ compassWord( x, z, t.x, t.z ) }`;

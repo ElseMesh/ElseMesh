@@ -1,5 +1,4 @@
 import { WORLD } from '../world/WorldLayout.js';
-import { ISLAND_DEFINITION } from '../world/IslandDefinition.js';
 import { Vector3 } from '../engine/math/index.js';
 
 // Minimap, lower right: the island baked once from the terrain data into a 2D canvas (depth-tinted
@@ -124,8 +123,8 @@ export class Minimap {
 		};
 
 		this.markers = [
-			{ id: 'joe', ...mk( 'joe', ICON.fish ), pos: () => ( { x: ISLAND_DEFINITION.fishStand.x, z: ISLAND_DEFINITION.fishStand.z } ) },
-			{ id: 'marta', ...mk( 'marta', ICON.anchor ), pos: () => ( { x: ISLAND_DEFINITION.chandlery.x, z: ISLAND_DEFINITION.chandlery.z } ) },
+			{ id: 'joe', ...mk( 'joe', ICON.fish ), pos: () => game.vendorPosition( 'joe' ) },
+			{ id: 'marta', ...mk( 'marta', ICON.anchor ), pos: () => game.vendorPosition( 'marta' ) },
 			{ id: 'boat', ...mk( 'boat', ICON.boat ), pos: () => {
 
 				const b = game.app.boatCtl;
