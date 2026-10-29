@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import '../worlds/tidewater/register-behavior.js';
 import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';

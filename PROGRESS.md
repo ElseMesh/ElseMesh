@@ -22,6 +22,11 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   consume the resulting table; the world package owns the schedule validator
   and its tests. Other fishing gameplay and renderer adapters remain in the
   engine and still need to move behind world-owned behavior modules.
+- Tidewater's fishing and shore-aware boat descriptors, including fishing
+  experience-field validation and built-in runtime binding, now register from
+  `worlds/tidewater/register-behavior.js`; the generic engine registry no longer
+  imports or names those behaviors. The engine's fishing runtime itself still
+  owns the bite/fight simulation and remains a separation gap.
 - Tidewater's 18-species fishing catalog has moved from `src/game/FishTable.js`
   into `worlds/tidewater/fishing.json`; the engine now applies generic bite,
   catch, save, HUD, and fish-display calculations to the signed catalog. Its

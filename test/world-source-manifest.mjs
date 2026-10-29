@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import '../worlds/tidewater/register-behavior.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';

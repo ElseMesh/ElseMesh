@@ -1,5 +1,3 @@
-import { FishingGameRuntime } from '../game/FishingGameRuntime.js';
-import { isFishCatalog } from '../game/FishTable.js';
 import { createWorldJavaScriptExtensionRuntime } from './WorldJavaScriptExtension.js';
 
 const behaviors = new Map();
@@ -11,7 +9,6 @@ export function registerWorldBehavior( id, descriptor ) {
 	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].includes( key ) ) || [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].some( key => descriptor[ key ] !== undefined && typeof descriptor[ key ] !== 'function' ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
 	behaviors.set( id, Object.freeze( { id, ...descriptor } ) );
 }
-
 export function worldBehaviorsFor( experience ) {
 	const dataById = experience?.behaviors ?? {};
 	if ( ! dataById || typeof dataById !== 'object' || Array.isArray( dataById ) || Object.keys( dataById ).length > 16 || JSON.stringify( dataById ).length > 64 * 1024 ) throw new Error( 'Invalid world behavior map' );
@@ -115,27 +112,3 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 		},
 	} );
 }
-
-registerWorldBehavior( 'elsemesh.fishing-game/1', {
-	validateExperienceData: ( data, hasExtension ) => {
-		if ( ! hasExtension ) throw new Error( 'Fishing behavior requires a signed JavaScript extension' );
-		if ( ! isFishCatalog( data.fishCatalog ) ) throw new Error( 'Fishing behavior requires a valid world-authored fish catalog' );
-		for ( const name of [ 'fishStand', 'chandlery' ] ) {
-			const location = data[ name ];
-			if ( location === undefined ) continue;
-			if ( ! location || typeof location !== 'object' || Array.isArray( location ) || Object.keys( location ).some( key => ! [ 'position', 'yaw', 'interactionRadius' ].includes( key ) ) || ! Array.isArray( location.position ) || location.position.length !== 2 || location.position.some( value => ! Number.isFinite( value ) || Math.abs( value ) > 1000000 ) || ! Number.isFinite( location.yaw ) || Math.abs( location.yaw ) > 360 || ! Number.isFinite( location.interactionRadius ) || location.interactionRadius < 0.5 || location.interactionRadius > 20 ) throw new Error( `Invalid ThruHold fishing location ${name}` );
-		}
-	},
-	createRuntime: options => {
-		const runtime = new FishingGameRuntime( options );
-		if ( options.extensions?.has?.( 'elsemesh.fishing-game/1' ) ) {
-			runtime.extensionReady = options.extensions.ready( 'elsemesh.fishing-game/1' ).then( result => {
-				runtime.setBiteRateMultipliers( result.biteRateMultipliers );
-				return runtime;
-			} );
-			runtime.extensionReady.catch( () => {} );
-		}
-		return runtime;
-	},
-} );
-registerWorldBehavior( 'elsemesh.shore-aware-boat/1', { validateExperienceData: data => { if ( Object.keys( data ).length ) throw new Error( 'Invalid shore-aware boat data' ); } } );

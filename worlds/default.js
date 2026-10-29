@@ -1,3 +1,4 @@
+import './tidewater/register-behavior.js';
 import source from './tidewater/world-source.json';
 import fishingRulesExtension from './tidewater/extensions/fishing-game-rules.js?raw';
 import terrainLOD from './tidewater/lod-source/terrain-full.glb?url';

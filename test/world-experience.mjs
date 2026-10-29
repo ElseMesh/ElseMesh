@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import '../worlds/tidewater/register-behavior.js';
 import { GENERIC_WORLD_EXPERIENCE, validateWorldExperience } from '../src/network/WorldExperience.js';
 
 assert.match( GENERIC_WORLD_EXPERIENCE.tagline, /place shaped by its owner/i, 'remote worlds without copy use neutral loader text' );
