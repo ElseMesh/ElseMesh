@@ -18,22 +18,23 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   successful initialization before dispatching later messages. The focused
   test verifies initialization ordering and data delivery.
 - Tidewater's signed fishing module validates and compiles its authored
-  bite-rate schedule and now owns catch-fight initialization, ordered frame
-  steps, and cancellation inside the Worker. The WebGPU and WebGL runtimes
-  exchange bounded JSON snapshots; player inventory and presentation remain
-  client-side. Biting, casting, and the fishing HUD still need separation work.
+  bite-rate schedule and owns species selection, bite phases, weight rolls,
+  catch-fight initialization, ordered frame steps, and cancellation inside the
+  Worker. The WebGPU and WebGL runtimes exchange bounded JSON snapshots; the
+  browser samples habitat and retains input, inventory, audio, and presentation.
+  Casting and the fishing HUD still need separation work.
 - Tidewater's fishing and shore-aware boat descriptors, including fishing
   experience-field validation and built-in runtime binding, now register from
   `worlds/tidewater/register-behavior.js`; the generic engine registry no longer
-  imports or names those behaviors. The engine's fishing runtime still owns
-  bite timing and browser presentation; catch-fight mechanics now execute in
-  Tidewater's signed module.
+  imports or names those behaviors. The engine's fishing runtime is now a
+  bounded Worker-request adapter; browser presentation and environment samples
+  remain in the renderer.
 - Tidewater's 18-species fishing catalog has moved from `src/game/FishTable.js`
-  into `worlds/tidewater/fishing.json`; the engine now applies generic bite,
-  catch, save, HUD, and fish-display calculations to the signed catalog. Its
-  values match the pre-split table exactly, and focused WebGPU-shared game logic,
-  WebGL adapter, registry, manifest, export, and content checks pass. Fishing
-  mechanics and fish model implementations still remain partly engine-owned.
+  into `worlds/tidewater/fishing.json`; its values match the pre-split table
+  exactly. Fish catalog validation, catch inventory, save, HUD, and fish-display
+  calculations remain client-side; species selection and bite/fight mechanics
+  execute in Tidewater's signed module. Fishing casting and fish model
+  implementations still remain partly engine-owned.
 - The focused Worker, registry, experience, manifest, and Go worldd tests pass;
   `npm run build` passes in the external build tree. The full `npm test` run
   passed through the engine smoke checks, then its gateway E2E could not find
@@ -45,12 +46,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 - The paired fishing trace now drives the Tidewater module through both the
   retained WebGPU `Game` path and the WebGL adapter. Fight snapshots, terminal
   rod state, inventory, catch card, audio cues, and toasts match over a 987-frame
-  encounter. A golden trace captured from pre-split WebGPU `CatchMinigame` at
-  `23c30bf` now matches the signed Worker frame by frame for the same fish,
-  inputs, and random stream. The focused checks and Blender CLI confirm v3
-  `elsemesh:` world IDs are accepted and legacy `world:` IDs rejected. Boat
-  parity, the broader fishing/input matrix, and visual parity remain open; bite
-  timing and presentation remain engine-owned.
+  encounter. Golden traces captured from the pre-split WebGPU bite simulation
+  and `CatchMinigame` at `23c30bf` now match the signed Worker frame by frame for
+  2400 bite frames and the 987-frame fight. The focused checks and Blender CLI
+  confirm v3 `elsemesh:` world IDs are accepted and legacy `world:` IDs
+  rejected. Boat parity, the broader fishing/input matrix, and visual parity
+  remain open.
 - An earlier extension prototype used signed Wasm asset references. The active
   implementation uses JavaScript Workers; Wasm is not part of the plan.
 

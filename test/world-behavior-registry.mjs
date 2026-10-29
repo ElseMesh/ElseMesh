@@ -18,11 +18,7 @@ assert.notEqual( runtime, otherRuntime, 'each world receives its own registered 
 assert.notEqual( runtime.state, otherRuntime.state, 'world runtimes do not share game state' );
 assert.notEqual( runtime.state.storageKey, otherRuntime.state.storageKey, 'world runtimes persist under distinct world identities' );
 assert.equal( runtime.state.storageKey, 'elsemesh.save.v1:elsemesh%3Aregistry-test', 'registered game runtime receives its owning world identity' );
-runtime.bite = { phase: 'wait', t: 5 };
-runtime.stepBite( 1, { habitat: () => ( { shallows: 1 } ), hour: 6.5 } );
-assert.equal( runtime.bite.t, 4, 'the shared runtime uses its neutral rule table until a world module initializes it' );
-assert.equal( otherRuntime.biteRateMultipliers[ 65 ], 1, 'worlds without an extension keep the neutral game behavior' );
-assert.throws( () => runtime.setBiteRateMultipliers( [ 1 ] ), /Invalid world-provided fishing rate table/ );
+await assert.rejects( runtime.startBite( { shallows: 1 }, 6.5 ), /signed JavaScript extension/, 'world-specific fishing simulation requires its signed module' );
 assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': { worldRule: true } } } ), /requires a signed JavaScript extension/, 'unhandled behavior data is rejected unless a signed module owns it' );
 assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
 assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /Invalid world behavior ID/, 'world-owned behavior IDs stay inside the ElseMesh namespace' );

@@ -1,10 +1,9 @@
 import { GameState } from './GameState.js';
-import { startFishingBite, stepFishingBite } from './FishingBiteSimulation.js';
 import { isFishCatalog } from './FishTable.js';
 
-// Browser-side fishing rules shared by renderer adapters. This owns game state
-// transitions only; world queries, input, visuals, audio and presence stay with
-// their respective client systems.
+// Browser-side adapter shared by renderer backends. The signed world Worker
+// owns fishing simulation; this adapter queues bounded state snapshots while
+// browser systems retain world queries, input, visuals, audio and persistence.
 export class FishingGameRuntime {
 
 	constructor( { state, load = true, worldId = 'elsemesh:local', behaviorData = {}, extensions = null } = {} ) {
@@ -15,35 +14,71 @@ export class FishingGameRuntime {
 		if ( load ) this.state.load();
 		this.bite = null;
 		this.fight = null;
-		this.biteRateMultipliers = Array( 240 ).fill( 1 );
 		this.extensions = extensions;
+		this.biteGeneration = 0;
+		this.biteReady = Promise.resolve();
+		this.biteQueue = [];
+		this.biteRunning = false;
 		this.fightGeneration = 0;
 		this.fightQueue = [];
 		this.fightRunning = false;
 
 	}
 
-	setBiteRateMultipliers( multipliers ) {
+	startBite( habitat, hour, seed = Math.floor( Math.random() * 0x100000000 ) ) {
 
-		if ( ! Array.isArray( multipliers ) || multipliers.length !== 240 || multipliers.some( value => ! Number.isFinite( value ) || value < 0.5 || value > 2 ) ) throw new Error( 'Invalid world-provided fishing rate table' );
-		this.biteRateMultipliers = multipliers.slice();
-
-	}
-
-	startBite( habitat, hour, rng ) {
-
-		this.bite = startFishingBite( habitat, hour, rng );
-		return this.bite;
+		const generation = ++ this.biteGeneration;
+		this.bite = null;
+		this.biteReady = this._runExtension( { type: 'start-bite', habitat, hour, seed } ).then( result => {
+			if ( generation !== this.biteGeneration ) return null;
+			this.bite = result.bite;
+			return this.bite;
+		} );
+		return this.biteReady;
 
 	}
 
 	stepBite( dt, context ) {
 
-		const hour = ( context.hour % 24 + 24 ) % 24;
-		const biteRateMultiplier = this.biteRateMultipliers[ Math.min( 239, Math.floor( hour * 10 ) ) ];
-		const result = stepFishingBite( this.bite, dt, { ...context, fishCatalog: this.fishCatalog, biteRateMultiplier } );
-		this.bite = result.bite;
-		return result;
+		const habitat = typeof context.habitat === 'function' ? context.habitat() : context.habitat;
+		if ( ! Number.isFinite( dt ) || dt < 0 || dt > 1 || ! Number.isFinite( context.hour ) || !habitat || typeof habitat !== 'object' ) return Promise.reject( new Error( 'Invalid fishing bite step' ) );
+		if ( this.biteQueue.length >= 64 ) return Promise.reject( new Error( 'Fishing bite worker is behind by more than 64 frames' ) );
+		return new Promise( ( resolve, reject ) => {
+			const hour = ( context.hour % 24 + 24 ) % 24;
+			this.biteQueue.push( { dt, habitat, hour, generation: this.biteGeneration, resolve, reject } );
+			this._pumpBiteQueue();
+		} );
+
+	}
+
+	async _pumpBiteQueue() {
+
+		if ( this.biteRunning || ! this.biteQueue.length ) return;
+		this.biteRunning = true;
+		const batch = this.biteQueue.splice( 0, 32 );
+		const generation = batch[ 0 ].generation;
+		try {
+			await this.biteReady;
+			if ( generation !== this.biteGeneration ) {
+				for ( const request of batch ) request.resolve( { bite: null, dip: 0, event: null } );
+				return;
+			}
+			const response = await this._runExtension( { type: 'step-bite', steps: batch.map( ( { dt, habitat, hour } ) => ( { dt, habitat, hour } ) ) } );
+			for ( let index = 0; index < batch.length; index ++ ) {
+				const request = batch[ index ];
+				const result = response.results[ index ];
+				if ( request.generation !== this.biteGeneration || generation !== this.biteGeneration || !result ) request.resolve( { bite: null, dip: 0, event: null } );
+				else {
+					this.bite = result.bite;
+					request.resolve( result );
+				}
+			}
+		} catch ( error ) {
+			for ( const request of batch ) request.reject( error );
+		} finally {
+			this.biteRunning = false;
+			this._pumpBiteQueue();
+		}
 
 	}
 
@@ -51,6 +86,8 @@ export class FishingGameRuntime {
 
 		const bite = this.bite;
 		if ( ! bite || bite.phase !== 'take' ) return null;
+		this.biteGeneration ++;
+		for ( const request of this.biteQueue.splice( 0 ) ) request.resolve( { bite: null, dip: 0, event: null } );
 		const generation = this.fightGeneration;
 		this.bite = null;
 		let result;
@@ -122,8 +159,10 @@ export class FishingGameRuntime {
 	cancel() {
 
 		this.fightGeneration ++;
+		this.biteGeneration ++;
 		this.bite = null;
 		this.fight = null;
+		for ( const request of this.biteQueue.splice( 0 ) ) request.resolve( { bite: null, dip: 0, event: null } );
 		for ( const request of this.fightQueue.splice( 0 ) ) request.resolve( { state: null, fight: null } );
 		this._runExtension( { type: 'cancel' } ).catch( () => {} );
 

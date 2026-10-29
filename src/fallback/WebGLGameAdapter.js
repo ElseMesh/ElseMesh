@@ -143,13 +143,15 @@ export class WebGLGameAdapter {
 				if ( rod.state === 'idle' && leftDown ) rod.startWindup();
 				else if ( rod.state === 'windup' && leftUp ) rod.release();
 				else if ( rod.state === 'floating' && leftDown ) this._strike().catch( error => console.error( 'Fishing fight worker failed', error ) );
-				else if ( [ 'floating', 'flying' ].includes( rod.state ) && rightDown ) { rod.retrieve(); this.runtime.bite = null; }
+				else if ( [ 'floating', 'flying' ].includes( rod.state ) && rightDown ) { rod.retrieve(); this.runtime.cancel(); }
 			}
 			if ( rod.state === 'floating' ) {
-				const result = this.runtime.stepBite( dt, { habitat: () => this._habitat( rod ), hour: timeOfDay, dip: rod.dip } );
-				rod.dip = result.dip;
-				if ( result.event === 'take' ) this.audio?.fishSplash?.( rod.bobber, 0.35 );
-				if ( result.event === 'escaped' ) this.toast( 'It took the bait and ran', 1800 );
+				this.runtime.stepBite( dt, { habitat: () => this._habitat( rod ), hour: timeOfDay } ).then( result => {
+					if ( rod.state !== 'floating' ) return;
+					rod.dip = result.dip;
+					if ( result.event === 'take' ) this.audio?.fishSplash?.( rod.bobber, 0.35 );
+					if ( result.event === 'escaped' ) this.toast( 'It took the bait and ran', 1800 );
+				} ).catch( error => console.error( 'Fishing bite worker failed', error ) );
 			}
 			if ( this.runtime.fight ) this._stepFight( dt, left && ! panelOpen, timeOfDay ).catch( error => console.error( 'Fishing fight worker failed', error ) );
 			rod.update( dt, { visible: canFish, fight: this.runtime.fight } );
@@ -191,8 +193,9 @@ export class WebGLGameAdapter {
 
 	_onBobberLanded( where ) {
 
-		if ( where === 'water' ) this.runtime.startBite( this._habitat( this.rod ), this.timeOfDay ?? 12 );
-		else this.toast( 'Landed on the sand', 1400 );
+		if ( where === 'water' ) return this.runtime.startBite( this._habitat( this.rod ), this.timeOfDay ?? 12 ).catch( error => { console.error( 'Fishing bite worker failed', error ); return null; } );
+		this.toast( 'Landed on the sand', 1400 );
+		return Promise.resolve( null );
 
 	}
 

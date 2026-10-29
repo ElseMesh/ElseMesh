@@ -241,7 +241,7 @@ export class Game {
 				else if ( rDown ) {
 
 					rod.retrieve();
-					this.bite = null;
+					this.runtime.cancel();
 
 				}
 
@@ -250,7 +250,7 @@ export class Game {
 		}
 
 		// bites and the fight
-		if ( rod.state === 'floating' ) this.updateBite( dt );
+		if ( rod.state === 'floating' ) this.updateBite( dt ).catch( error => console.error( 'Fishing bite worker failed', error ) );
 		else if ( ! this.fight ) rod.dip = Math.max( 0, rod.dip - dt * 4 );
 		if ( this.fight ) this.updateFight( dt, lmb && ! panelOpen ).catch( error => console.error( 'Fishing fight worker failed', error ) );
 
@@ -441,16 +441,18 @@ export class Game {
 
 		}
 
-		this.runtime.startBite( this.habitat(), this.hour );
+		return this.runtime.startBite( this.habitat(), this.hour ).catch( error => { console.error( 'Fishing bite worker failed', error ); return null; } );
 
 	}
 
 	updateBite( dt ) {
 
-		const result = this.runtime.stepBite( dt, { habitat: () => this.habitat(), hour: this.hour, dip: this.rod.dip } );
-		this.rod.dip = result.dip;
-		if ( result.event === 'take' && this.app.audio && this.app.audio.fishSplash ) this.app.audio.fishSplash( this.rod.bobber, 0.35 );
-		if ( result.event === 'escaped' ) this.toast( 'It took the bait and ran', 1800 );
+		return this.runtime.stepBite( dt, { habitat: () => this.habitat(), hour: this.hour } ).then( result => {
+			if ( this.rod.state !== 'floating' ) return;
+			this.rod.dip = result.dip;
+			if ( result.event === 'take' && this.app.audio && this.app.audio.fishSplash ) this.app.audio.fishSplash( this.rod.bobber, 0.35 );
+			if ( result.event === 'escaped' ) this.toast( 'It took the bait and ran', 1800 );
+		} );
 
 	}
 
