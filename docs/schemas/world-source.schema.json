@@ -62,7 +62,7 @@
             },
             "additionalProperties": false
           },
-          "description": "Optional owner-signed JavaScript worker asset bindings. Each extension must target a behavior declared in behaviors; its asset is included in the signed manifest as kind javascript/1."
+          "description": "Optional owner-signed Wasm asset bindings. Each extension must target a behavior declared in behaviors; its asset is included in the signed manifest as kind wasm/1 and capped at 1 MiB."
         }
       },
       "additionalProperties": false
