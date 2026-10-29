@@ -237,7 +237,7 @@ export class Game {
 			else if ( rod.state === 'windup' && lUp ) rod.release();
 			else if ( rod.state === 'floating' ) {
 
-				if ( lDown ) this.strike();
+				if ( lDown ) this.strike().catch( error => console.error( 'Fishing fight worker failed', error ) );
 				else if ( rDown ) {
 
 					rod.retrieve();
@@ -252,7 +252,7 @@ export class Game {
 		// bites and the fight
 		if ( rod.state === 'floating' ) this.updateBite( dt );
 		else if ( ! this.fight ) rod.dip = Math.max( 0, rod.dip - dt * 4 );
-		if ( this.fight ) this.updateFight( dt, lmb && ! panelOpen );
+		if ( this.fight ) this.updateFight( dt, lmb && ! panelOpen ).catch( error => console.error( 'Fishing fight worker failed', error ) );
 
 		rod.update( dt, { visible: can, fight: this.fight } );
 		// the landed fish hangs on the end of the line, turned to face you, then goes in the cooler. With
@@ -454,7 +454,7 @@ export class Game {
 
 	}
 
-	strike() {
+	async strike() {
 
 		const b = this.bite;
 		if ( ! b || b.phase === 'wait' || b.phase === 'nibble' ) {
@@ -466,16 +466,18 @@ export class Game {
 		}
 
 		const g = this.state.stats;
-		this.runtime.strike( { lineKg: g.lineKg, reelSpeed: g.reelSpeed, distance: Math.max( 3, this.rod.lineOut ) } );
+		const fight = await this.runtime.strike( { lineKg: g.lineKg, reelSpeed: g.reelSpeed, distance: Math.max( 3, this.rod.lineOut ) } );
+		if ( ! fight ) return;
 		this.rod.hook();
 		this.toast( 'Fish on!', 1200 );
 
 	}
 
-	updateFight( dt, reeling ) {
+	async updateFight( dt, reeling ) {
 
-		const result = this.runtime.stepFight( dt, reeling, this.hour );
+		const result = await this.runtime.stepFight( dt, reeling, this.hour );
 		const f = result.fight, st = result.state;
+		if ( ! f || ! st ) return;
 		// the fish thrashes at the surface as each run starts
 		const au = this.app.audio;
 		if ( f.surge > 0.6 && ! f._splashed && au && au.fishSplash ) au.fishSplash( this.rod.bobber, 0.3 + 0.5 * Math.min( 1, f.kg / 8 ) );

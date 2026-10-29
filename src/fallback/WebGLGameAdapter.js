@@ -142,7 +142,7 @@ export class WebGLGameAdapter {
 			if ( rod.equipped && ! panelOpen ) {
 				if ( rod.state === 'idle' && leftDown ) rod.startWindup();
 				else if ( rod.state === 'windup' && leftUp ) rod.release();
-				else if ( rod.state === 'floating' && leftDown ) this._strike();
+				else if ( rod.state === 'floating' && leftDown ) this._strike().catch( error => console.error( 'Fishing fight worker failed', error ) );
 				else if ( [ 'floating', 'flying' ].includes( rod.state ) && rightDown ) { rod.retrieve(); this.runtime.bite = null; }
 			}
 			if ( rod.state === 'floating' ) {
@@ -151,7 +151,7 @@ export class WebGLGameAdapter {
 				if ( result.event === 'take' ) this.audio?.fishSplash?.( rod.bobber, 0.35 );
 				if ( result.event === 'escaped' ) this.toast( 'It took the bait and ran', 1800 );
 			}
-			if ( this.runtime.fight ) this._stepFight( dt, left && ! panelOpen, timeOfDay );
+			if ( this.runtime.fight ) this._stepFight( dt, left && ! panelOpen, timeOfDay ).catch( error => console.error( 'Fishing fight worker failed', error ) );
 			rod.update( dt, { visible: canFish, fight: this.runtime.fight } );
 			this.rodPresentation?.update();
 			const landing = this.landing;
@@ -212,7 +212,7 @@ export class WebGLGameAdapter {
 
 	}
 
-	_strike() {
+	async _strike() {
 
 		const rod = this.rod, bite = this.runtime.bite;
 		if ( ! bite || bite.phase === 'wait' ) return;
@@ -222,17 +222,18 @@ export class WebGLGameAdapter {
 		}
 		if ( bite.phase !== 'take' ) return;
 		const stats = this.state.stats;
-		if ( this.runtime.strike( { lineKg: stats.lineKg, reelSpeed: stats.reelSpeed, distance: Math.max( 3, rod.lineOut ) } ) ) {
+		if ( await this.runtime.strike( { lineKg: stats.lineKg, reelSpeed: stats.reelSpeed, distance: Math.max( 3, rod.lineOut ) } ) ) {
 			rod.hook();
 			this.toast( 'Fish on!', 1200 );
 		}
 
 	}
 
-	_stepFight( dt, reeling, timeOfDay ) {
+	async _stepFight( dt, reeling, timeOfDay ) {
 
-		const result = this.runtime.stepFight( dt, reeling, timeOfDay );
+		const result = await this.runtime.stepFight( dt, reeling, timeOfDay );
 		const fight = result.fight;
+		if ( ! fight || ! result.state ) return;
 		if ( fight?.surge > 0.6 && ! fight._splashed ) this.audio?.fishSplash?.( this.rod.bobber, 0.3 + 0.5 * Math.min( 1, fight.kg / 8 ) );
 		if ( fight ) fight._splashed = fight.surge > 0.6 ? true : fight.surge < 0.3 ? false : fight._splashed;
 		if ( result.state === 'fighting' ) return;
