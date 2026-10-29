@@ -36,6 +36,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   separately both passed.
 - Tidewater package-specific export, authored collision, boat LOD, and Blender
   checks now live in `worlds/tidewater/test/` and pass from the engine runner.
+- Added a deterministic paired fishing trace that drives the retained WebGPU
+  `Game` path and the WebGL adapter through the same hook and 987 fight frames.
+  Fight state, terminal rod state, inventory, catch card, audio cues, and toasts
+  match exactly. This verifies the two current browser paths for that encounter;
+  it does not establish boat parity, a broader fishing/input matrix, or visual
+  parity, and fishing rules still remain partly engine-owned.
 - An earlier extension prototype used signed Wasm asset references. The active
   implementation uses JavaScript Workers; Wasm is not part of the plan.
 
