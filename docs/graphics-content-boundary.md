@@ -137,8 +137,8 @@ shared character asset. `WebGLGameAdapter` uses Tidewater's
 `FishingRod` and `GameHUD`; Tidewater supplies its `BoatGameplayRuntime`.
 Together, these pieces support casting, bite/fight transitions, selling,
 upgrades, fuel, sonar, the catch card, and matching fishing-event cues. The
-signed Tidewater JavaScript Worker owns bite and fight simulation; both
-renderers send it bounded habitat/time samples and present the returned state.
+signed Tidewater JavaScript Worker owns bite, fight, and boat simulation; both
+renderers send it bounded environment samples and present the returned state.
 Focused headless checks cover these paths. Remaining
 parity work includes live matched-browser gameplay, scanned StallKit surface
 materials, and broader visual comparison. The backend-specific early return

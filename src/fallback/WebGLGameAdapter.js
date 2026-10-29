@@ -2,7 +2,6 @@ import { GameHUD } from '../game/GameHUD.js';
 import { createWorldBehaviorRuntime } from '../network/WorldBehaviorRegistry.js';
 import { FishingRod } from '../game/FishingRod.js';
 import { habitatAt } from '../game/Bites.js';
-import { BoatGameplayRuntime } from '../../worlds/tidewater/BoatGameplayRuntime.js';
 import { WORLD } from '../world/WorldLayout.js';
 import { WebGLFishingRodPresentation } from './WebGLFishingRodPresentation.js';
 
@@ -56,8 +55,13 @@ export class WebGLGameAdapter {
 
 	constructor( vendor, { vendors = [ vendor ], experience, worldId = 'elsemesh:local', extensions = null, THREE, scene, camera, query, terrain, boatController = null, boatRoot = null, audio = null } = {} ) {
 
-		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId, extensions } );
+		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', {
+			worldId, extensions, controller: boatController, terrain,
+			habitatAt: ( x, z, depth ) => this._habitatAtPoint( x, z, depth ),
+		} );
 		this.state = this.runtime.state;
+		this.boatGameplay = this.runtime.boatGameplay;
+		this.boatGameplay.onFuelOut = () => this.toast( 'Out of fuel · buy diesel at the chandlery by the boathouse', 4000 );
 		this.fishCatalog = this.runtime.fishCatalog;
 		this.ui = createGameUI();
 		this.vendor = vendor;
@@ -69,11 +73,6 @@ export class WebGLGameAdapter {
 		this.landing = null;
 		this.rod = camera && query && terrain ? new FishingRod( { camera, query, terrain, audio, render: false } ) : null;
 		this.rodPresentation = this.rod && THREE && scene ? new WebGLFishingRodPresentation( THREE, scene, this.rod ) : null;
-		this.boatGameplay = new BoatGameplayRuntime( {
-			state: this.state, controller: boatController, terrain,
-			habitatAt: ( x, z, depth ) => this._habitatAtPoint( x, z, depth ),
-			onFuelOut: () => this.toast( 'Out of fuel · buy diesel at the chandlery by the boathouse', 4000 ),
-		} );
 		this.deckFloodlights = createDeckFloodlights( THREE, boatRoot );
 		this._lmb = false;
 		this._rmb = false;
@@ -209,7 +208,6 @@ export class WebGLGameAdapter {
 
 	_applyGear() {
 
-		this.boatGameplay?.applyGear();
 		this.rod?.setGear( { castM: this.state.stats.castM, reelSpeed: this.state.stats.reelSpeed } );
 		for ( const light of this.deckFloodlights || [] ) light.visible = this.state.stats.deckLights;
 
@@ -269,15 +267,13 @@ export class WebGLGameAdapter {
 
 	buy( key ) {
 
-		return this.state.buy( key );
+		return this.runtime.buyUpgrade( key );
 
 	}
 
 	refuel() {
 
-		const litres = this.state.refuel();
-		if ( litres > 0 ) this.boatGameplay.refueled();
-		return litres;
+		return this.runtime.refuel();
 
 	}
 

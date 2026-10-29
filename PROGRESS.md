@@ -70,10 +70,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   `worlds/tidewater/test/pre-split-boat-gameplay-parity.mjs`. Boat-controller
   hydrodynamics and WebGPU/WebGL water-query trajectories still need matched
   runtime parity checks; this does not close the boat parity gate.
-- Moved `BoatGameplayRuntime` into the Tidewater world repository with its
-  engine-upgrade, fuel, and fish-finder rules. Both renderer adapters still call
-  it as a browser-local package module; this ownership move does not yet move
-  those rules into Tidewater's signed Worker.
+- Moved `BoatGameplayRuntime` into Tidewater and delegated its engine-upgrade,
+  fuel, and fish-finder rules to the signed Worker. The client supplies terrain
+  and habitat samples and applies the returned fuel, throttle, save, and HUD
+  results. Both renderers obtain the adapter through Tidewater's registered
+  behavior runtime; neither engine adapter imports Tidewater boat rules.
+  Boat-controller hydrodynamics and matched live renderer checks remain open.
 - An earlier extension prototype used signed Wasm asset references. The active
   implementation uses JavaScript Workers; Wasm is not part of the plan.
 

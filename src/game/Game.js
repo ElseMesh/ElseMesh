@@ -6,8 +6,6 @@ import { FishingRod } from './FishingRod.js';
 import { FishStand } from './FishStand.js';
 import { Chandlery } from './Chandlery.js';
 import { CatchDisplay } from './CatchDisplay.js';
-import { UPGRADES } from '../../worlds/tidewater/Gear.js';
-import { BoatGameplayRuntime } from '../../worlds/tidewater/BoatGameplayRuntime.js';
 import { GameHUD } from './GameHUD.js';
 import { Minimap } from './Minimap.js';
 import { Guide } from './Guide.js';
@@ -30,8 +28,13 @@ export class Game {
 		this.terrain = terrain;
 		this.boatController = boatController;
 		this.active = true;
-		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId, extensions } );
+		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', {
+			worldId, extensions, controller: boatController, terrain,
+			habitatAt: ( x, z, depth ) => this.habitatAtPoint( x, z, depth ),
+		} );
 		this.state = this.runtime.state;
+		this.boatGameplay = this.runtime.boatGameplay;
+		this.boatGameplay.onFuelOut = () => this.toast( 'Out of fuel · buy diesel at the chandlery by the boathouse', 4000 );
 		this.fishCatalog = this.runtime.fishCatalog;
 		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query, terrain, audio: app.audio } );
 		this.rod.onLand = ( where ) => this.onBobberLanded( where );
@@ -43,12 +46,6 @@ export class Game {
 		this.vendors = [ this.stand.vendor, this.chandlery.vendor ];
 		this.vendorLocations = new Map( [ [ 'joe', this.stand.vendor.position ], [ 'marta', this.chandlery.vendor.position ] ] );
 		// boat upgrades: engine (thrust / top speed) and deck floodlights for night fishing
-		const b = boatController;
-		this.boatGameplay = new BoatGameplayRuntime( {
-			state: this.state, controller: b, terrain,
-			habitatAt: ( x, z, depth ) => this.habitatAtPoint( x, z, depth ),
-			onFuelOut: () => this.toast( 'Out of fuel · buy diesel at the chandlery by the boathouse', 4000 ),
-		} );
 		this._boatGauges = { fuel: null, sonar: null };
 		this.floods = [];
 		if ( app.localLights ) this.addFloodlights( app.localLights, boatController?.model || app.boat );
@@ -113,7 +110,6 @@ export class Game {
 
 		const g = this.state.stats;
 		this.rod.setGear( { castM: g.castM, reelSpeed: g.reelSpeed } );
-		this.boatGameplay.applyGear();
 
 		for ( const f of this.floods || [] ) f.scale = g.deckLights ? 1 : 0;
 
@@ -149,18 +145,17 @@ export class Game {
 
 	buy( key ) {
 
-		const r = this.state.buy( key );
-		if ( r ) this.toast( `${ UPGRADES[ key ].name }: ${ r.label }` );
+		const r = this.runtime.buyUpgrade( key );
+		if ( r ) this.toast( `${ r.name }: ${ r.label }` );
 		return r;
 
 	}
 
 	refuel() {
 
-		const l = this.state.refuel();
+		const l = this.runtime.refuel();
 		if ( l > 0 ) {
 
-			this.boatGameplay.refueled();
 			this.toast( `Filled up · ${ l.toFixed( 0 ) } L` );
 
 		}
