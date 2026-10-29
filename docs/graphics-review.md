@@ -18,11 +18,12 @@ In this run the hosted foreground sand appears smoother, with lower-contrast
 fine ripples than the built-in view. The wave and foam patterns also differ,
 but their simulation phases were not aligned. Runtime inspection found the same
 WebGPU backend, terrain material module list and defines, wind speed/direction,
-and sampled heights at five aligned beach points. The earlier offline check
+and sampled heights at five aligned beach points. An earlier offline check
 also found the exported heights, normals, splat masks, and detail texture equal
-to the regenerated engine inputs. Those checks narrow the sand difference to
-runtime texture binding/sampling or another unmeasured draw input; they do not
-identify its cause. WebGPU visual parity remains open.
+to the regenerated engine inputs. A deterministic follow-up below did not
+reproduce the apparent sand difference, so this initial capture is not
+sufficient evidence of a sand rendering defect. The water comparison remains
+open.
 
 The hosted WebGL runtime was separately checked for content and gameplay, not
 visual similarity. It activated all 38 of 38 declared components, constructed
@@ -31,6 +32,28 @@ opened Joe's buyer panel after a controlled in-range interaction. The registry
 registration failure found during this check was fixed in commit `5c24533`; the
 focused registry and WebGL content tests plus the production build pass. This
 does not establish WebGL visual parity.
+
+### 2026-10-29 deterministic WebGPU follow-up
+
+The apparent hosted-sand difference above did not reproduce in a seeded
+`Bench.shots` capture. Built-in Example Island and the signed hosted package
+were rendered by WebGPU at 1280×577, render scale 1, with the same beach view,
+wind speed and direction, and `G.time=1000`. The hosted package was fully
+precompiled and warmed before its capture. Randomness was seeded and the
+benchmark used `dt=0`, holding the scene at the same simulation time.
+
+![Deterministic built-in WebGPU beach](images/parity-2026-10-29-webgpu-deterministic-builtin.png)
+
+![Deterministic hosted WebGPU beach](images/parity-2026-10-29-webgpu-deterministic-hosted.png)
+
+An RGB pixel comparison found a mean absolute difference of 0.23/255 across
+the beach region and 0.04/255 across the sky; the sea region differed by
+2.36/255. The foreground sand therefore appears closely matched in this
+controlled run, and the earlier apparent sand-ripple discrepancy remains
+unreproduced rather than confirmed. The water still has visible pattern
+differences and remains an open parity item. These two current-build captures
+do not compare against the pre-split renderer and do not close overall visual
+parity.
 
 ## Tidewater split runtime parity follow-up, 2026-10-28
 
