@@ -14,4 +14,4 @@ For each profiled primitive, `COLOR_0` is the original linear RGB `tint` attribu
 
 The client binds these attributes to the original shaders and bakes `VillageTextures` before drawing. Hosted island rendering reuses the original procedural island material and texture catalog, so the package never disposes resources still owned by the App. These versioned material semantics are specific to this example's visual vocabulary; they are not a replacement for general portable PBR materials or Blender authoring.
 
-Check an export before publishing with `node test/world-village-material.mjs PATH_TO_EXPORTED_WORLD`. The full `test/world-export.mjs` additionally checks deterministic source and asset identity against the checked-in package.
+Check an export before publishing with `node test/world-village-material.mjs PATH_TO_EXPORTED_WORLD`. Tidewater's `worlds/tidewater/test/world-export.mjs` additionally checks deterministic source and asset identity against the checked-in package.

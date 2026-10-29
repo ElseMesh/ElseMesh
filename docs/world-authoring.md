@@ -109,8 +109,8 @@ An account with an owner-issued `world.content.edit` grant can submit the unsign
 Run it in a disposable copy of the scene. It writes an unsigned source candidate and a separate `.blend` candidate, refusing to overwrite either destination. When a plan includes `mesh.create`, also pass a new `--out-assets` directory; the runner refuses to overwrite it. Review all candidates and run the ordinary source and asset validators before publishing. The runner does not sign or publish. Pure plan validation does not require Blender. The runtime integration check imports a hash-verified island GLB, creates and hashes a primitive mesh GLB, writes all candidate artifacts, reopens the `.blend`, and verifies both stable IDs and the generated content hash:
 
 ```sh
-python3 test/blender-world-actions.py
-BLENDER_EXECUTABLE=/path/to/blender python3 test/blender-world-actions-runtime.py
+python3 worlds/tidewater/test/blender-world-actions.py
+BLENDER_EXECUTABLE=/path/to/blender python3 worlds/tidewater/test/blender-world-actions-runtime.py
 ```
 
 An example data-only mesh action is:

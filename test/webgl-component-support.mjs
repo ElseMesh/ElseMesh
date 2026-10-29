@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from '../src/fallback/WebGLComponentSupport.js';
-import { Colliders } from '../src/world/Colliders.js';
-import { Vector3 } from '../src/engine/math/Vector3.js';
-import tidewaterSource from '../worlds/tidewater/world-source.json' with { type: 'json' };
 
 const pierCollision = {
 	enabled: true,
@@ -15,13 +12,6 @@ const pierCollision = {
 };
 assert.deepEqual( hostedCollisionBoxes( pierCollision ), pierCollision.boxes.slice( 0, 2 ), 'hosted WebGL keeps walkable deck and solid rail records from compound collision' );
 assert.deepEqual( hostedCollisionBoxes( { ...pierCollision, enabled: false } ), [], 'disabled hosted collision does not create WebGL blockers' );
-
-const village = tidewaterSource.objects.find( object => object.id === 'elsemesh-object:island-village' );
-const authoredDeck = hostedCollisionBoxes( village.collision ).find( box => box.center[ 0 ] === 55 && box.halfExtents[ 2 ] > 40 );
-assert.ok( authoredDeck?.walkable && authoredDeck.solid, 'the hosted WebGL collision adapter recognizes Tidewater’s authored pier deck' );
-const hostedColliders = new Colliders();
-hostedColliders.addBox( new Vector3( ...authoredDeck.center ), new Vector3( ...authoredDeck.halfExtents ), authoredDeck.yaw, { walkable: authoredDeck.walkable, solid: authoredDeck.solid } );
-assert.equal( hostedColliders.groundHeightAt( 55, - 30, 3 ), 2.3, 'the hosted WebGL pier deck is a ground surface rather than a fall-through solid' );
 
 const components = [
 	{ id: 'ocean', type: 'elsemesh.island-ocean/1' },
