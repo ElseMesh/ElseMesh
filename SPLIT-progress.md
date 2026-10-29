@@ -47,6 +47,14 @@ Preserve batching, shadows, distance LOD, and appearance against the original
 WebGPU baseline. Any Worker data-preparation path must be a one-time transferable
 handoff; frame rendering stays in ElseMesh.
 
+Moving fish-specific source or data into the Tidewater repository does not by
+itself change runtime cost. The engine must retain batched GPU submission,
+visibility culling, shadow handling, and distance LOD behind a backend-neutral
+rendering API. The current WebGL fish-prop adapter's single draw call is not
+proof of equivalent efficiency: it expands every placement into full-detail
+CPU-side geometry and has no per-placement culling or LOD. Do not move that
+implementation into Tidewater unchanged and call the performance goal met.
+
 Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then remove
 Tidewater-specific WebGL component dispatch and material handling from
