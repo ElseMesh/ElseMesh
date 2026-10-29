@@ -74,8 +74,16 @@ Do not admit a player into a streamed area until its required spawn/traversal
 collision is installed. Dynamic actors use stable world-scoped IDs and
 versioned, host-authoritative state transitions; moving collision changes
 atomically with actor state. Sound is a replicated event reference, not an
-arbitrary client command, and clients deduplicate it by event ID. The protocol
-must not execute downloaded scripts.
+arbitrary client command, and clients deduplicate it by event ID. Network
+messages and world data do not execute arbitrary scripts. A signed manifest
+may explicitly require `elsemesh.world-extension/1`; clients that implement
+that feature may run its content-addressed Wasm modules in the constrained
+extension Worker described in [world extensions](world-extensions.md). Those
+modules can only return data to behavior handlers already registered by the
+client; they cannot install new engine or gameplay code. This boundary exists
+for limited world-authored rules without granting modules arbitrary browser or
+engine access. It is separate from the network protocol and is not a general
+downloaded-script mechanism.
 
 This is a general engine evolution; bridge-specific milestones, source data,
 and acceptance evidence remain in the corresponding private world repository.
