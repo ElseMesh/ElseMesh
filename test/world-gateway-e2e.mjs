@@ -16,7 +16,7 @@ const processes = [];
 
 try {
 	const binary = path.join( tempRoot, 'worldd' );
-	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: goBuildEnvironment( { GOCACHE: process.env.GOCACHE || path.join( tempDirectory, 'elsemesh-go-build-cache' ) } ) } );
+	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
 	assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
 
 	const ownerData = path.join( tempRoot, 'owner' );
