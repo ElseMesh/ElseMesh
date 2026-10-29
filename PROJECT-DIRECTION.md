@@ -33,13 +33,17 @@ findings. WebGL was never the visual parity baseline; check it for the same
 world content and gameplay behavior as WebGPU without using its appearance as a
 comparison target. Treat the existing captures as partial evidence, not
 completion. Desktop WebGPU visual acceptance and complete gameplay parity
-remain open. Keep
-Tidewater authored content in its repository and reusable execution code in
-ElseMesh. Tidewater is content data, not a separately compiled application;
-ElseMesh validates and executes its versioned behavior data. Do not introduce a
-general downloaded-script runtime. Preserve per-world state isolation and the
-declared shared, player, group, or persistent scopes. Keep player platform
-identity across portals without leaking instance state.
+remain open. Keep Tidewater authored content in its repository and reusable
+execution code in ElseMesh. Tidewater is content data, not a separately
+compiled application; ElseMesh validates and executes its versioned behavior
+data. Optional downloaded extensions are WebAssembly modules referenced by
+owner-signed, hash-verified world assets. They must run in disposable workers
+with a fixed ABI, no host imports, bounded memory and message sizes, and a
+terminable execution budget; JavaScript modules, WASI, browser APIs, and direct
+network/filesystem access are outside the extension contract. Preserve
+per-world state isolation and the declared shared, player, group, or persistent
+scopes. Keep player platform identity across portals without leaking instance
+state.
 
 **Graphical world editor: 0%.** After package import and multiplayer acceptance
 pass, build the editor in ElseMesh so it edits the mounted Tidewater repository.
@@ -47,6 +51,25 @@ pass, build the editor in ElseMesh so it edits the mounted Tidewater repository.
 The repository split itself is complete. Its boundary decisions and acceptance
 record are in [GOAL-done.md](GOAL-done.md); this file tracks the remaining
 product work.
+
+## Active engine/world-separation continuation
+
+The current implementation goal also requires finishing the behavior and
+identity boundary across world packages:
+
+- Keep reusable behavior dispatch in the engine registry, and allow downloaded
+  behavior code only as owner-signed Wasm assets under the constrained ABI in
+  [world Wasm extensions](docs/world-wasm-extensions.md).
+- Complete the ElseMesh v3 wire and ID namespace migration without parsing old
+  identifiers as a compatibility path.
+- Keep Tidewater and Hogwarts authored world data in their world repositories;
+  the engine supplies generic providers and versioned runtime contracts.
+- Verify Tidewater gameplay against the pre-split WebGPU behavior, and check
+  WebGL for content and gameplay parity without treating its visuals as a
+  baseline.
+
+These gates are not complete merely because repository separation and the
+existing registered browser behaviors are in place.
 
 ## Remaining goals
 

@@ -4,6 +4,19 @@ This is the dated implementation and verification log. Current priorities and
 open product requirements are tracked in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md);
 completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
+## 2026-10-29
+
+- Began the signed Wasm extension runtime foundation. The module guard rejects
+  imports, tables, start functions, incompatible exports, unbounded or oversized
+  memory, and modules above 1 MiB. A dedicated Worker owns compilation and
+  execution with bounded JSON exchange and a terminable timeout. The focused
+  binary/worker-controller test, full `npm test`, and external-tree production
+  build pass. Signed manifest references, server validation, behavior dispatch,
+  state lifetime, and example extensions remain open; Wasm extensions are not
+  yet activated by a world.
+- Tidewater package-specific export, authored collision, boat LOD, and Blender
+  checks now live in `worlds/tidewater/test/` and pass from the engine runner.
+
 ## 2026-10-24
 
 - WebGL whale LODs now cast shadows through a custom depth material that uses

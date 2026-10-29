@@ -10,5 +10,8 @@ The shared source schema intentionally treats each behavior's payload as an
 opaque object. The server bounds and signs the containing manifest; the client
 registry rejects unknown behavior IDs and validates each supported payload
 before a runtime consumes it. Behavior-specific authoring contracts belong
-with the world content that uses them, while executable behavior code remains
-part of the trusted client.
+with the world content that uses them. Standard behavior implementations
+remain part of the trusted client. The extension boundary is restricted to
+owner-signed, content-addressed WebAssembly modules under the fixed contract in
+[`world-wasm-extensions.md`](world-wasm-extensions.md); downloaded JavaScript
+and ambient browser or system APIs are not permitted.
