@@ -28,7 +28,7 @@ const CLR = [ 0, 0, 0, 0 ];
 //  - history resampling is a 5-tap Catmull-Rom (FSR2: Lanczos-2), in motion the accumulation is
 //    capped (fast response) and the box is tightened
 // Two changes for native resolution, measured against a 16x supersampled reference walking the pier
-// (test/taa-pier.mjs): a wider box while still, and an accumulation cap by the history's resampling
+// (pier temporal review): a wider box while still, and an accumulation cap by the history's resampling
 // blur (see the resolve).
 // FSR2's reactive and transparency masks are not used. The water surface (it moves on its own and its
 // motion vectors only carry the camera's) keeps its history through the disocclusion test.
