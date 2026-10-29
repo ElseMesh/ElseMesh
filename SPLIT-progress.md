@@ -63,6 +63,19 @@ the file wholesale would therefore relocate backend rendering code rather
 than establish a world-owned fish presentation on a generic engine renderer.
 The call sites need to be split between Tidewater's fish-specific data and
 placement rules and an engine-owned reusable batch-rendering interface.
+`FishGeometry.js` is also used by the engine's swimming `Fish.js`, and
+`FishMaterial.js` supplies both swimming-fish and prop shaders, so moving either
+file wholesale would pull Tidewater model code and renderer implementation
+together. Treat those as separate extraction points. The first hosted-content
+slice should replace the fish-named render contract with a generic static model
+instance set: Tidewater supplies content-addressed per-LOD model data, material
+inputs, placements, bounds, and any authored deformation parameters; ElseMesh
+chooses WebGPU or WebGL and owns the shared instancing, visibility, LOD fades,
+and shadow policy. Do not claim the boundary is complete while the generic
+format or either backend implementation remains absent. The live stand, catch
+display, and portrait call sites then need a dynamic form of that same engine
+rendering interface, with game decisions staying in Tidewater behavior and
+instance updates staying local to the browser renderer.
 The per-species stand-height scale and tail/gill anchors are now data in
 Tidewater's registered fish-presentation profile; the engine's `FishProps`
 static placement helpers were removed. WebGPU/WebGL rendering code remains in
@@ -72,9 +85,12 @@ Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then remove
 Tidewater-specific WebGL component dispatch and material handling from
 `WorldPackage.js`. Keep renderer choice in ElseMesh and expose backend-neutral
-contracts to worlds. Then sync to the external build tree and run
-isolated-browser parity checks. Update the estimates above only when a gate is
-newly supported or a finding changes them.
+contracts to worlds. In parallel with that extraction, implement the generic
+static-model instance set above and remove the fish-specific renderer from
+both hosted adapters; do not move `FishProps.js` wholesale. Then sync to an
+available external build tree and run isolated-browser parity checks. Update
+the estimates above only when a gate is newly supported or a finding changes
+them.
 
 ## Verification record
 
