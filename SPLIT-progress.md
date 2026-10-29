@@ -32,14 +32,20 @@ preserve it without inspection beyond its pointer/status or staging.
 
 Fish-prop placements, species presentation, and model-specific geometry belong
 to Tidewater. ElseMesh owns renderer selection, GPU resource creation, drawing,
-culling, and LOD. A world Worker may produce or transform renderer-neutral
-typed-array data once and transfer its buffers to the client; the render loop
-must not depend on per-frame Worker messages. The current `FishProps` class
-mixes fish-specific geometry with ElseMesh rendering APIs, and the WebGPU and
-WebGL component adapters still interpret Tidewater's fish-prop component in
-the engine. This is a known separation gap, not a completed migration. Any
-refactor must preserve the existing batched draw, culling, shadow, and LOD
-behavior while keeping world code independent of the selected renderer.
+culling, and LOD. The current signed behavior Worker only accepts self-contained
+modules, JSON messages/results up to 16 KiB, and calls up to 50 ms; it cannot
+currently transfer prepared mesh buffers. Do not route geometry or per-frame
+render updates through that API. The current `FishProps` class mixes fish
+anatomy generation and shader semantics with ElseMesh rendering APIs; the
+WebGPU and WebGL adapters also interpret Tidewater's fish-specific placement
+format in the engine. The WebGL adapter bakes one full-detail mesh, without the
+WebGPU path's per-item culling and LOD. This remains an engine/world gap and a
+renderer-parity gap. The migration needs world-owned model/material/placement
+assets plus a generic renderer-neutral instance-set contract whose WebGPU and
+WebGL implementations share asset references, transforms, and LOD policy.
+Preserve batching, shadows, distance LOD, and appearance against the original
+WebGPU baseline. Any Worker data-preparation path must be a one-time transferable
+handoff; frame rendering stays in ElseMesh.
 
 Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then remove
