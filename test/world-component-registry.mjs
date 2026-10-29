@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { registerWorldComponent, registeredWorldComponents, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
+import { decodeWorldComponentAsset, registerWorldComponentAssetDecoder } from '../src/network/WorldComponentAssetCodecRegistry.js';
 await import( '../worlds/tidewater/register-components.js' );
 
 assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, true );
@@ -25,4 +26,10 @@ assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).complexityT
 assert.throws( () => registerWorldComponent( 'elsemesh.vehicle-without-complexity/1', { vehicle: true } ), /Invalid/ );
 assert.throws( () => registerWorldComponent( 'elsemesh.invalid/1', { renderer: 'webgpu' } ), /Invalid/ );
 
-console.log( 'World component registry: generic registrations and water traits passed' );
+registerWorldComponentAssetDecoder( 'registry-fixture/1', bytes => JSON.parse( new TextDecoder().decode( bytes ) ) );
+assert.deepEqual( decodeWorldComponentAsset( 'registry-fixture/1', new TextEncoder().encode( '{"ok":true}' ) ), { ok: true } );
+assert.throws( () => decodeWorldComponentAsset( 'missing-fixture/1', new Uint8Array( [ 1 ] ) ), /Unsupported/ );
+assert.throws( () => registerWorldComponentAssetDecoder( 'registry-fixture/1', () => null ), /duplicate/ );
+assert.throws( () => registerWorldComponentAssetDecoder( 'invalid kind', () => null ), /Invalid/ );
+
+console.log( 'World component and asset-codec registries: generic registrations and water traits passed' );

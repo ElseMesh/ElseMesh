@@ -16,7 +16,7 @@ unfinished runtime boundary or parity gate.
 | Keep authored Tidewater and Hogwarts world data in their own repositories | **100%** | Both are mounted as submodules and documented in [`docs/world-repository-layout.md`](docs/world-repository-layout.md). Repository separation is recorded complete in [`GOAL-done.md`](GOAL-done.md). This measures authored-data ownership only; engine-side runtime handlers still need extraction. |
 | ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **100%** | Signed manifests require `elsemesh.world/3`; source requires `elsemesh.world-source/3`; client/server/Blender reject old world IDs and manifest/source protocols. Obsolete Blender metadata aliases and the daemon's Tidewater-named local profile/ZeroTier auto-migration paths have been removed. Focused identity/Blender checks, `go test ./...`, the full client suite, and the external build passed. Historical negative tests mention old forms only to prove rejection. |
 | Owner-signed JavaScript world extensions run in dedicated browser Workers; no Wasm implementation | **90%** | `src/network/WorldJavaScriptExtension.js` and its Worker enforce message bounds, startup/run limits, and worker teardown; server manifest validation binds extension assets to signed `javascript/1` assets. No Wasm runtime is implemented. Remaining: re-run extension lifecycle and signed-manifest integration checks against the final tree and ensure the world package integration uses this generic host path. |
-| Registry-based, world-agnostic engine behavior and component installation | **55%** | `WorldBehaviorRegistry.js`, generic component envelopes, renderer-neutral traits, and registered installers exist. `App.installWorldComponents()` selects ElseMesh-owned backend adapters for `elsemesh.water-body/1` and `elsemesh.static-fish-props/1`; the WebGL fallback dispatches those plus `island-ocean` through the same adapter registry. Tidewater now declares fish-props without supplying a renderer installer. WebGL support readiness requires registered adapters for water-surface traits, with tests proving unhandled surfaces remain unsupported. Tidewater's terrain, vegetation, reef, wildlife, whale, village material, and boat installers still live in `worlds/tidewater/component-installers.js`. **Still incomplete:** other WebGL presentation in `src/fallback/WebGLFallback.js` and Tidewater-specific material handling in `WorldPackage.js` remain; the default app still loads Tidewater registrations. Acceptance requires migrating the remaining handlers and proving an independent world can load without Tidewater code. |
+| Registry-based, world-agnostic engine behavior and component installation | **56%** | `WorldBehaviorRegistry.js`, generic component envelopes, renderer-neutral traits, and registered installers exist. `App.installWorldComponents()` selects ElseMesh-owned backend adapters for `elsemesh.water-body/1` and `elsemesh.static-fish-props/1`; the WebGL fallback dispatches those plus `island-ocean` through the same adapter registry. Tidewater now declares fish-props without supplying a renderer installer, and its fish-prop asset decoder registers through the generic `WorldComponentAssetCodecRegistry.js`. WebGL support readiness requires registered adapters for water-surface traits, with tests proving unhandled surfaces remain unsupported. Tidewater's terrain, vegetation, reef, wildlife, whale, village material, and boat installers still live in `worlds/tidewater/component-installers.js`. **Still incomplete:** other WebGL presentation in `src/fallback/WebGLFallback.js` and Tidewater-specific material handling in `WorldPackage.js` remain; the default app still loads Tidewater registrations. Acceptance requires migrating the remaining handlers and proving an independent world can load without Tidewater code. |
 | World packages remain renderer-neutral; ElseMesh selects WebGPU or WebGL | **39%** | `elsemesh.water-body/1` and `elsemesh.static-fish-props/1` use engine-owned WebGPU and WebGL adapters selected by the active backend registry; the WebGL ocean component also uses an engine-owned adapter. Hosted WebGL sea-level detection consumes the registry's generic `waterSurface` trait rather than enumerating water component IDs. The village vertex-data attribute is now `_ELSEMESH_VDATA`, removing the Tidewater-specific `_TW_` tag from the engine loader; the Tidewater package exporter regenerates the content-addressed assets with the new attribute. Integration checks confirm both fish-props adapters register and the WebGL adapter installs from a backend-neutral component declaration. However, `worlds/tidewater/webgl-behavior.js` still contains Tidewater WebGL dispatch/adapters, `component-installers.js` still supplies backend-dependent installers for other components, and other `WebGLFallback.js` component paths remain world-specific. Acceptance requires migrating the remaining handlers behind engine-owned registries and verifying the same world package behavior on both renderers. |
 | Tidewater gameplay and content parity: WebGPU baseline, WebGL aligned | **80%** | Tidewater has deterministic pre-split WebGPU fishing and boat traces plus WebGPU/WebGL fishing and WebGL fish-stand/boat content checks under `worlds/tidewater/test/`. The full client suite passes after the hosted-water fixes. An isolated WebGPU capture shows the hosted shoreline foam and surf restored against the pre-split reference; WebGL runtime checks confirm the packaged fish stand/content is present and the moored boat remains stable. Remaining: compare more reference views, exercise fish-stand interaction and underway boat behavior in the live split build, and resolve any visual differences. WebGL appearance is not a visual baseline. |
 
@@ -32,13 +32,15 @@ preserve it without inspection beyond its pointer/status or staging.
 
 Fish-prop placements, species presentation, and model-specific geometry belong
 to Tidewater. ElseMesh owns renderer selection, GPU resource creation, drawing,
-culling, and LOD. The current signed behavior Worker only accepts self-contained
-modules, JSON messages/results up to 16 KiB, and calls up to 50 ms; it cannot
-currently transfer prepared mesh buffers. Do not route geometry or per-frame
-render updates through that API. The current `FishProps` class mixes fish
-anatomy generation and shader semantics with ElseMesh rendering APIs; the
-WebGPU and WebGL adapters also interpret Tidewater's fish-specific placement
-format in the engine. The WebGL adapter bakes one full-detail mesh, without the
+culling, and LOD. The fish-prop record codec now lives in Tidewater and
+registers as the `fish-props-placement/1` asset decoder; ElseMesh adapters invoke
+that generic decoder registry. The adapters still know the fish-prop component
+and construct its renderer. The current signed behavior Worker only accepts
+self-contained modules, JSON messages/results up to 16 KiB, and calls up to
+50 ms; it cannot currently transfer prepared mesh buffers. Do not route geometry
+or per-frame render updates through that API. The current `FishProps` class mixes
+fish anatomy generation and shader semantics with ElseMesh rendering APIs. The
+WebGL adapter bakes one full-detail mesh, without the
 WebGPU path's per-item culling and LOD. This remains an engine/world gap and a
 renderer-parity gap. The migration needs world-owned model/material/placement
 assets plus a generic renderer-neutral instance-set contract whose WebGPU and
@@ -144,3 +146,9 @@ newly supported or a finding changes them.
   suite (including WebGPU/WebGL and pre-split gameplay traces), and the
   external production build passed. Fish geometry/material ownership and the
   WebGL per-item culling/LOD gap remain.
+- 2026-10-29: moved the fish-prop placement codec into the Tidewater repository
+  and added a generic engine component-asset decoder registry. Both backend
+  adapters now request decoded records through the registry. The focused codec,
+  registry, adapter, and manifest checks, full client suite (including
+  WebGPU/WebGL and pre-split gameplay traces), and external production build
+  passed. Renderer extraction and visual parity remain open.

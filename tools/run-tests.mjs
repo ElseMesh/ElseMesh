@@ -5,7 +5,7 @@ const tests = [
 	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
 	'test/world-water-surface.mjs',
 	'test/vite-world-assets.mjs', 'test/require-external-build-tree.mjs', 'test/vegetation-placement-codec.mjs',
-	'test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'worlds/tidewater/test/reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
+	'worlds/tidewater/test/fish-prop-placements.mjs', 'test/webgl-fish-props-adapter.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'worlds/tidewater/test/reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
 	'test/grass-density-asset.mjs', 'worlds/tidewater/test/vegetation-parity.mjs', 'test/reef-placement-render.mjs',
 	'worlds/tidewater/test/game-logic.mjs', 'worlds/tidewater/test/renderer-gameplay-parity.mjs', 'worlds/tidewater/test/pre-split-fishing-parity.mjs', 'worlds/tidewater/test/game-vendor-locations.mjs', 'worlds/tidewater/test/fishing-rod-runtime.mjs', 'worlds/tidewater/test/boat-gameplay-runtime.mjs', 'worlds/tidewater/test/pre-split-boat-gameplay-parity.mjs', 'worlds/tidewater/test/life-player.mjs', 'worlds/tidewater/test/terrain-data.mjs', 'test/hermit-crab-step.mjs', 'test/desktop-adaptive-scale.mjs',
 	'test/camera-review.mjs', 'test/input-look-keys.mjs', 'test/input-pointer-lock.mjs', 'test/touch-control-ownership.mjs', 'test/world-experience.mjs',

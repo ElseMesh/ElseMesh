@@ -6,7 +6,7 @@ import { WaterSurface } from '../ocean/WaterSurface.js';
 import { WaterMaterial } from '../ocean/WaterMaterial.js';
 import { ShoreWaves } from '../ocean/ShoreWaves.js';
 import { applyWaterBodyProfile } from '../ocean/WaterProfiles.js';
-import { decodeFishPropPlacements } from './FishPropPlacements.js';
+import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js';
 import { worldFishPresentationFor } from './WorldFishPresentation.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 
@@ -19,7 +19,7 @@ function installFishProps( { root, connector }, component ) {
 	const placementBytes = connector.assets.get( component.placementAssetId );
 	if ( ! placementBytes ) throw new Error( `Fish-prop component ${component.id} is missing its placement asset` );
 	const fishProps = new FishProps( presentation );
-	fishProps.items = decodeFishPropPlacements( placementBytes, presentation );
+	fishProps.items = decodeWorldComponentAsset( 'fish-props-placement/1', placementBytes );
 	const mesh = fishProps.build();
 	root.add( mesh );
 	return { installed: true, runtime: { dispose: () => { root.remove( mesh ); fishProps.dispose(); } } };

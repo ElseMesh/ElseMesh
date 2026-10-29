@@ -31,7 +31,7 @@ function bodyColor( T, record, attributes, index, presentation ) {
 }
 
 // Build the signed static fish-prop placements as one Three.js mesh. Placement decoding remains
-// in FishPropPlacements.js; this adapter reuses the same procedural model geometry and anatomy.
+// in Tidewater's registered asset codec; this adapter reuses shared model geometry and anatomy.
 export class WebGLFishPropsAdapter {
 
 	constructor( T, scene, records, presentation ) {
