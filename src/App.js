@@ -67,6 +67,7 @@ import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
 import { worldComponentDescriptor } from './network/WorldComponentRegistry.js';
+import { registerWorldComponentBackendAdapter, worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
 import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
@@ -94,6 +95,36 @@ import { GENERIC_WORLD_EXPERIENCE } from './network/WorldExperience.js';
 
 const _up = new Vector3( 0, 1, 0 );
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
+
+registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWebGPUWaterBody );
+
+function installWebGPUWaterBody( { app, root, connector, installed }, component ) {
+	const extent = component.extent;
+	const lod = new CDLOD( {
+		gridSize: Number( app.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25,
+		center: { x: component.center[ 0 ] - extent, z: component.center[ 1 ] - extent, size: extent * 2 },
+	} );
+	const surface = new WaterSurface( { fft: app.fft, cdlod: lod, foamTexture: app.foamTexture, seaLevel: connector.manifest.rules.seaLevel } );
+	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
+	if ( terrain ) {
+		terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
+		surface.terrain = terrain.terrainGPU;
+		surface.shore = terrain.shore;
+	}
+	applyWaterBodyProfile( surface, component.profile );
+	const material = new WaterMaterial( {
+		surface, sky: app.sky, sceneCopy: app.sceneRenderer.opaqueCopy, sceneDepthHalf: app.sceneRenderer.opaqueDepthHalf.texture,
+	} );
+	material.clouds = app.clouds;
+	if ( app.desktopAdaptiveScale ) material.params.ssr.value = 0;
+	const mesh = new Mesh( lod.geometry, material );
+	mesh.frustumCulled = false;
+	mesh.receiveShadow = true;
+	mesh.layers.set( LAYERS.WATER );
+	root.add( mesh );
+	installed.push( { waterBody: true, surface, waterBounds: { center: component.center, extent }, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
+	return true;
+}
 
 function readGraphicsPriority() {
 	try {
@@ -1059,38 +1090,20 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			const descriptor = worldComponentDescriptor( component.type );
 			if ( descriptor?.vegetation && ! this.vegetationEnabled ) continue;
 			const count = installed.length;
+			const backendAdapter = worldComponentBackendAdapter( this.backend, component.type );
+			if ( backendAdapter ) {
+				const result = await backendAdapter( { app: this, root, connector, installed }, component );
+				if ( result?.runtime ) installed.push( result.runtime );
+				if ( result === true || result?.installed || installed.length > count ) installedIDs.add( component.id );
+				continue;
+			}
 			if ( descriptor?.install ) {
 				const result = await descriptor.install( { app: this, root, connector, installed }, component );
 				if ( result?.runtime ) installed.push( result.runtime );
 				if ( result === true || result?.installed || installed.length > count ) installedIDs.add( component.id );
 				continue;
 			}
-			if ( component.type === 'elsemesh.water-body/1' ) {
-				const extent = component.extent;
-				const lod = new CDLOD( {
-					gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25,
-					center: { x: component.center[ 0 ] - extent, z: component.center[ 1 ] - extent, size: extent * 2 },
-				} );
-				const surface = new WaterSurface( { fft: this.fft, cdlod: lod, foamTexture: this.foamTexture, seaLevel: connector.manifest.rules.seaLevel } );
-				const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
-				if ( terrain ) {
-					terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
-					surface.terrain = terrain.terrainGPU;
-					surface.shore = terrain.shore;
-				}
-				applyWaterBodyProfile( surface, component.profile );
-				const material = new WaterMaterial( {
-					surface, sky: this.sky, sceneCopy: this.sceneRenderer.opaqueCopy, sceneDepthHalf: this.sceneRenderer.opaqueDepthHalf.texture,
-				} );
-				material.clouds = this.clouds;
-				if ( this.desktopAdaptiveScale ) material.params.ssr.value = 0;
-				const mesh = new Mesh( lod.geometry, material );
-				mesh.frustumCulled = false;
-				mesh.receiveShadow = true;
-				mesh.layers.set( LAYERS.WATER );
-				root.add( mesh );
-				installed.push( { waterBody: true, surface, waterBounds: { center: component.center, extent }, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
-			} else if ( component.type === 'elsemesh.ambient-audio/1' ) {
+			if ( component.type === 'elsemesh.ambient-audio/1' ) {
 				// SoundScape consumes the signed component from the connector directly.
 				installedIDs.add( component.id );
 			}

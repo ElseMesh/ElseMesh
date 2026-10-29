@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const tests = [
-	'test/world-identity.mjs', 'test/blender-world-identity.mjs', 'test/world-component-registry.mjs', 'test/world-behavior-registry.mjs', 'test/world-javascript-extension.mjs', 'worlds/tidewater/test/fishing-rules.mjs',
+	'test/world-identity.mjs', 'test/blender-world-identity.mjs', 'test/world-component-registry.mjs', 'test/world-component-backend-registry.mjs', 'test/world-behavior-registry.mjs', 'test/world-javascript-extension.mjs', 'worlds/tidewater/test/fishing-rules.mjs',
 	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
 	'test/world-water-surface.mjs',
 	'test/vite-world-assets.mjs', 'test/require-external-build-tree.mjs', 'test/vegetation-placement-codec.mjs',
@@ -25,7 +25,7 @@ const tests = [
 const dawnTests = new Set( [
 	'test/reef-placement-render.mjs', 'worlds/tidewater/test/village-materials.mjs', 'worlds/tidewater/test/world-export.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'test/engine-smoke.mjs',
 ] );
-const viteAssetTests = new Set( [ 'test/desktop-adaptive-scale.mjs', 'test/portal-sides.mjs', 'test/world-hosted-player.mjs' ] );
+const viteAssetTests = new Set( [ 'test/desktop-adaptive-scale.mjs', 'test/portal-sides.mjs', 'test/world-hosted-player.mjs', 'test/world-component-backend-registry.mjs' ] );
 const android = process.platform === 'android';
 
 for ( const file of tests ) {

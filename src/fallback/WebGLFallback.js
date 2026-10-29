@@ -33,6 +33,7 @@ import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGL
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
+import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
@@ -1746,19 +1747,7 @@ export class WebGLFallback {
 		const terrain = this.hostedTerrainData;
 		const terrainWater = terrain ? webglTerrainWaterTexture( T, terrain ) : null;
 		for ( const component of components ) {
-			if ( component.type === 'elsemesh.island-ocean/1' ) {
-				const size = Math.max( 4000, ( terrain?.size || 2000 ) * 2 );
-				const segments = Math.max( 128, Math.min( 768, Math.ceil( size / 5 ) ) );
-				const water = this._makeWater( new T.PlaneGeometry( size, size, segments, segments ), rules.seaLevel ?? - 4.5, terrainWater, terrainWater ? 1 : 0 );
-				if ( terrain ) {
-					water.position.x = terrain.origin + terrain.size * 0.5;
-					water.position.z = terrain.origin + terrain.size * 0.5;
-				}
-				this.waterScene.add( water );
-			} else if ( component.type === 'elsemesh.water-body/1' ) {
-				const water = this._makeWater( new T.CircleGeometry( component.extent, 128 ), rules.seaLevel ?? 0, terrainWater, terrainWater ? 1 : 0 );
-				water.position.x = component.center[ 0 ]; water.position.z = component.center[ 1 ]; this.waterScene.add( water );
-			}
+			worldComponentBackendAdapter( this.engine.backend, component.type )?.( { fallback: this, rules, terrain, terrainWater }, component );
 		}
 
 	}

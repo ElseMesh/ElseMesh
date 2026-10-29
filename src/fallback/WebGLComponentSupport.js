@@ -1,4 +1,6 @@
 import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
+import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
+import './WebGLWaterComponentAdapters.js';
 
 // Return the solid, authored boxes in either supported manifest collision shape.
 // Compound records carry solidity and walkability on each box, not on the parent.
@@ -12,7 +14,7 @@ export function hostedCollisionBoxes( collision ) {
 
 // Components whose hosted WebGL implementation is ready before asset-specific loaders run.
 export function initialHostedWebGLSupport( components, { terrainReady = false, vehicleComponentId = null } = {} ) {
-	const supported = new Set( components.filter( component => worldComponentDescriptor( component.type )?.waterSurface ).map( component => component.id ) );
+	const supported = new Set( components.filter( component => worldComponentDescriptor( component.type )?.waterSurface && worldComponentBackendAdapter( 'webgl', component.type ) ).map( component => component.id ) );
 	if ( terrainReady ) for ( const component of components ) if ( worldComponentDescriptor( component.type )?.wildlifeSimulation ) supported.add( component.id );
 	if ( vehicleComponentId && components.some( component => component.id === vehicleComponentId && worldComponentDescriptor( component.type )?.vehicle ) ) supported.add( vehicleComponentId );
 	return supported;

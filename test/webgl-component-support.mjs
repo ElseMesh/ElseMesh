@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import '../worlds/tidewater/register-components.js';
 import { registerWorldComponent } from '../src/network/WorldComponentRegistry.js';
+import { registerWorldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from '../src/fallback/WebGLComponentSupport.js';
 
 registerWorldComponent( 'elsemesh.fixture-water/1', { waterSurface: true } );
+registerWorldComponent( 'elsemesh.fixture-unhandled-water/1', { waterSurface: true } );
 registerWorldComponent( 'elsemesh.fixture-wildlife/1', { wildlifeSimulation: true } );
 registerWorldComponent( 'elsemesh.fixture-vehicle/1', { vehicle: true, complexityTriangles: 12 } );
+registerWorldComponentBackendAdapter( 'webgl', 'elsemesh.fixture-water/1', () => true );
 
 const pierCollision = {
 	enabled: true,
@@ -54,14 +57,15 @@ assert.equal( resolveHostedWebGLVehicleSpec( [ boatComponent ], [ berth ], new M
 
 const neutralComponents = [
 	{ id: 'water', type: 'elsemesh.fixture-water/1' },
+	{ id: 'unhandled-water', type: 'elsemesh.fixture-unhandled-water/1' },
 	{ id: 'wildlife', type: 'elsemesh.fixture-wildlife/1' },
 	{ id: 'vehicle', type: 'elsemesh.fixture-vehicle/1', objectId: 'vehicle-object' },
 ];
 const neutralSupport = initialHostedWebGLSupport( neutralComponents, { terrainReady: true, vehicleComponentId: 'vehicle' } );
-assert.deepEqual( unsupportedHostedWebGLComponents( neutralComponents, neutralSupport ), [], 'renderer support classification follows generic registry traits for non-Tidewater components' );
+assert.deepEqual( unsupportedHostedWebGLComponents( neutralComponents, neutralSupport ), [ 'elsemesh.fixture-unhandled-water/1' ], 'registered water without a WebGL adapter remains explicitly unsupported' );
 const vehicleObject = { id: 'vehicle-object', transform: { position: [ 1, 2, 3 ] } };
 assert.deepEqual( resolveHostedWebGLVehicleSpec( neutralComponents, [ vehicleObject ], new Map( [ [ vehicleObject.id, preview ] ] ) ), {
-	component: neutralComponents[ 2 ], object: vehicleObject, preview,
+	component: neutralComponents[ 3 ], object: vehicleObject, preview,
 }, 'vehicle setup resolves a registered component without Tidewater IDs' );
 
 console.log( 'WebGL hosted component support classification passed' );
