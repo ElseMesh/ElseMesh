@@ -180,3 +180,10 @@ them.
   infrastructure only; Tidewater model/material ownership, WebGL fish-prop
   culling and LOD, and visual parity remain open. The dirty external build tree
   was left untouched.
+- 2026-10-29: a real headless Chromium run loaded a self-contained world module
+  through `createWorldJavaScriptExtensionRuntime`, executed it in the dedicated
+  module Worker, and received the expected result over the Worker message
+  protocol. The browser used an isolated profile and process group, both
+  cleaned up after the check. This verifies real browser Worker execution, not
+  the full signed Tidewater package lifecycle; package integration and broader
+  separation remain open.
