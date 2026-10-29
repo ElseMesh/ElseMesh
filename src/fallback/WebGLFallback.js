@@ -1668,7 +1668,7 @@ export class WebGLFallback {
 		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
 			this.spawn = { position: transfer.slice( 0, 3 ), yaw: transfer[ 3 ], pitch: transfer[ 4 ] };
 		}
-		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'elsemesh.island-ocean/1', 'elsemesh.water-body/1' ].includes( component.type ) )
+		this.hostedSeaLevel = ( manifest.components || [] ).some( component => worldComponentDescriptor( component.type )?.waterSurface )
 			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
 		this.worldSeaLevel = this.hostedSeaLevel ?? 0;
 		this.hostedComponents = components;

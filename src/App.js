@@ -1714,7 +1714,7 @@ export class App {
 				this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
 			}
 			if ( this.activeHostedOcean ) {
-				// The packaged island-ocean mesh uses the shared water surface, so keep its
+				// The packaged ocean mesh uses the shared water surface, so keep its
 				// shore simulation, breakers, spray, and camera query advancing while hosted.
 				updateWorldOceanFrame( {
 					dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
