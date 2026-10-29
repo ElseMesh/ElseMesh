@@ -1805,7 +1805,8 @@ export class WebGLFallback {
 		this._keyDown = event => {
 			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
-			if ( this.gameAdapter?.handleKey( event.code ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+			const experience = this.worldLink ? this.connector?.manifest?.experience : defaultWorldSource.experience;
+			if ( dispatchWorldBehaviorHooks( experience, 'onWebGLKeyDown', { fallback: this, event } ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
 			if ( this.worldLink && event.code === 'KeyE' ) this._useNearestPortal();
 		};
 		this._resize = () => {
@@ -1848,7 +1849,8 @@ export class WebGLFallback {
 			object.material.uniforms.uTime.value = simulationTime;
 			object.material.uniforms.uCameraPosition?.value.copy( this.camera.position );
 		}
-		const gamePanelOpen = !! ( this.gameAdapter?.hud.standOpen || this.gameAdapter?.hud.invOpen );
+		const experience = this.worldLink ? this.connector?.manifest?.experience : defaultWorldSource.experience;
+		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWebGLBlocksPlayerInput', { fallback: this } );
 		if ( this.player && ! gamePanelOpen ) {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );
@@ -1868,11 +1870,9 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		this.fishStand?.update( dt, this.camera.position );
-		this.chandlery?.update( dt, this.camera.position );
 		this.reefAdapter?.update( this.camera, simulationTime, defaultWorldSource.rules.seaLevel ?? 0 );
 		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
-		this.gameAdapter?.update( dt, this.player || this.camera, this.input, { timeOfDay: this.app.settings.timeOfDay, freeCam: this.freeCam } );
+		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime } );
 		this._stepWorldExtensions( dt );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;

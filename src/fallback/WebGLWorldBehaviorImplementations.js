@@ -24,4 +24,16 @@ registerWorldBehaviorImplementation( 'elsemesh.fishing-game/1', {
 			terrain, boatController: fallback.boat?.controller || null, boatRoot: fallback.boat?.group || null, audio: fallback.app.audio,
 		} );
 	},
+	onWebGLKeyDown( { active, fallback, event } ) {
+		return !! active && !! fallback.gameAdapter?.handleKey( event.code );
+	},
+	onWebGLBlocksPlayerInput( { active, fallback } ) {
+		return !! active && !! ( fallback.gameAdapter?.hud.standOpen || fallback.gameAdapter?.hud.invOpen );
+	},
+	onWebGLWorldFrame( { active, fallback, dt } ) {
+		if ( ! active ) return;
+		fallback.fishStand?.update( dt, fallback.camera.position );
+		fallback.chandlery?.update( dt, fallback.camera.position );
+		fallback.gameAdapter?.update( dt, fallback.player || fallback.camera, fallback.input, { timeOfDay: fallback.app.settings.timeOfDay, freeCam: fallback.freeCam } );
+	},
 } );

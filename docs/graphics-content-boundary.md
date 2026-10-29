@@ -141,6 +141,11 @@ parity work includes live matched-browser gameplay, scanned StallKit surface
 materials, and broader visual comparison. The backend-specific early return
 and separate island scene remain in place.
 
+The world behavior registry now owns browser fishing activation, hosted-world
+teardown, and per-frame updates. WebGL key handling, gameplay input blocking,
+and fishing updates also dispatch through registered hooks, so the fallback no
+longer calls its fishing adapter directly from the frame and input loops.
+
 ## Acceptance criteria
 
 - Backend selection does not skip creation of the boat, fish stand, vendors,

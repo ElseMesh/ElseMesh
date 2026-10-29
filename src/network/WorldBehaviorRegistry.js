@@ -2,6 +2,9 @@ import { FishingGameRuntime } from '../game/FishingGameRuntime.js';
 
 const behaviors = new Map();
 const implementations = new Map();
+const resolvedExperiences = new WeakMap();
+
+export const BUILTIN_WORLD_EXPERIENCE = Object.freeze( { behaviors: Object.freeze( { 'elsemesh.fishing-game/1': Object.freeze( {} ) } ) } );
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
@@ -28,14 +31,20 @@ export function worldBehaviorData( experience, id ) {
 export function registerWorldBehaviorImplementation( id, implementation ) {
 	const existing = implementations.get( id ) || {};
 	const entries = implementation && typeof implementation === 'object' && ! Array.isArray( implementation ) ? Object.entries( implementation ) : [];
-	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onHostedWorldActivated', 'onWebGLWorldActivated' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
+	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown', 'onWebGLBlocksPlayerInput' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
 	implementations.set( id, Object.freeze( { ...existing, ...implementation } ) );
 }
 
 export function dispatchWorldBehaviorHooks( experience, hook, context ) {
-	if ( ! [ 'onHostedWorldActivated', 'onWebGLWorldActivated' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
-	const active = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
-	for ( const [ id, implementation ] of implementations ) implementation[ hook ]?.( { ...context, experience, active: active.has( id ), data: active.get( id )?.data, behaviorId: id } );
+	if ( ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown', 'onWebGLBlocksPlayerInput' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
+	let resolved = resolvedExperiences.get( experience );
+	if ( ! resolved ) {
+		resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
+		if ( experience && typeof experience === 'object' ) resolvedExperiences.set( experience, resolved );
+	}
+	let handled = false;
+	for ( const [ id, implementation ] of implementations ) if ( implementation[ hook ]?.( { ...context, experience, active: resolved.has( id ), data: resolved.get( id )?.data, behaviorId: id } ) === true ) handled = true;
+	return handled;
 }
 
 export function hasWorldBehavior( experience, id ) {

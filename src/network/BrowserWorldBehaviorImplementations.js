@@ -17,6 +17,15 @@ registerWorldBehaviorImplementation( 'elsemesh.shore-aware-boat/1', {
 } );
 
 registerWorldBehaviorImplementation( 'elsemesh.fishing-game/1', {
+	onBuiltinWorldActivated( { app, experience, worldId } ) {
+		let game = app.worldGames.get( worldId );
+		if ( ! game ) {
+			game = new Game( app, { query: app.query, terrain: app.terrainData, colliders: app.colliders, boatController: app.boatCtl, experience, worldId } );
+			app.worldGames.set( worldId, game );
+		}
+		app.game = game;
+		game.setWorldActive( true );
+	},
 	onHostedWorldActivated( { app, connector, root, active } ) {
 		if ( ! active ) {
 			app.game?.setWorldActive( false );
@@ -31,5 +40,13 @@ registerWorldBehaviorImplementation( 'elsemesh.fishing-game/1', {
 		app.game = game;
 		game.setWorldContext( { query: app.hostedQuery, terrain: worldTerrain, colliders: app.hostedColliders, boatController: app.player.boat || app.boatCtl } );
 		game.setWorldActive( true );
+	},
+	onWorldDeactivated( { app, mode } ) {
+		if ( ! app.game ) return;
+		if ( mode === 'hosted' ) app.game.setWorldContext( { query: app.query, terrain: app.terrainData, colliders: app.colliders, boatController: app.boatCtl } );
+		app.game.setWorldActive( false );
+	},
+	onWorldFrame( { app, active, dt } ) {
+		if ( active && app.game?.active ) app.game.update( dt );
 	},
 } );

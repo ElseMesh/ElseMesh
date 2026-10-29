@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
 const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 } }, 'elsemesh.shore-aware-boat/1': {} } };
+assert.deepEqual( worldBehaviorsFor( BUILTIN_WORLD_EXPERIENCE ).map( behavior => behavior.id ), [ 'elsemesh.fishing-game/1' ], 'offline built-in gameplay is activated through its registered behavior descriptor' );
 assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id, onExtensionState } ) => ( { id, consumesExtensionState: typeof onExtensionState === 'function' } ) ), [
 	{ id: 'elsemesh.fishing-game/1', consumesExtensionState: true },
 	{ id: 'elsemesh.shore-aware-boat/1', consumesExtensionState: false },
@@ -32,12 +33,33 @@ assert.equal( hasWorldBehavior( { behaviors: { 'elsemesh.registry-test/1': {} } 
 assert.throws( () => registerWorldBehavior( 'elsemesh.registry-test/1', { validateExperienceData: () => {} } ), /Invalid or duplicate/ );
 let worldActivation = null;
 let webglActivation = null;
+let builtInActivation = null;
+let worldFrame = null;
+let worldDeactivation = null;
+let webglFrame = null;
+let webglKey = null;
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: state => { worldActivation = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldActivated: state => { webglActivation = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onBuiltinWorldActivated: state => { builtInActivation = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldFrame: state => { worldFrame = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldDeactivated: state => { worldDeactivation = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldFrame: state => { webglFrame = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLKeyDown: state => { webglKey = state; return state.active && state.code === 'KeyE'; } } );
 dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onHostedWorldActivated', { marker: 7 } );
 assert.deepEqual( { active: worldActivation.active, data: worldActivation.data, behaviorId: worldActivation.behaviorId, marker: worldActivation.marker }, { active: true, data: {}, behaviorId: 'elsemesh.registry-test/1', marker: 7 }, 'registered handlers receive their active behavior data through generic dispatch' );
 dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWebGLWorldActivated', { marker: 8 } );
 assert.deepEqual( { active: webglActivation.active, data: webglActivation.data, behaviorId: webglActivation.behaviorId, marker: webglActivation.marker }, { active: true, data: {}, behaviorId: 'elsemesh.registry-test/1', marker: 8 }, 'separate renderers can register different hooks for one behavior' );
+dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onBuiltinWorldActivated', { marker: 9 } );
+assert.equal( builtInActivation.active, true, 'built-in world behavior activation uses the same registry' );
+dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWorldFrame', { dt: 1 / 60 } );
+assert.equal( worldFrame.dt, 1 / 60, 'browser behavior frame work is registry-dispatched' );
+dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWorldDeactivated', { mode: 'hosted' } );
+assert.equal( worldDeactivation.mode, 'hosted', 'world teardown is registry-dispatched' );
+dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWebGLWorldFrame', { dt: 1 / 30 } );
+assert.equal( webglFrame.dt, 1 / 30, 'WebGL behavior frame work is registry-dispatched' );
+assert.equal( dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWebGLKeyDown', { code: 'KeyE' } ), true, 'input hooks can claim a behavior-specific key' );
+assert.equal( dispatchWorldBehaviorHooks( { behaviors: {} }, 'onWebGLKeyDown', { code: 'KeyE' } ), false, 'inactive behaviors cannot claim input' );
+assert.equal( webglKey.active, false );
 dispatchWorldBehaviorHooks( { behaviors: {} }, 'onHostedWorldActivated', {} );
 assert.equal( worldActivation.active, false, 'registered handlers receive inactive lifecycle notifications for worlds without their behavior' );
 assert.throws( () => registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: () => {} } ), /Invalid or duplicate/ );

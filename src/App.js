@@ -62,7 +62,6 @@ import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
 import { Colliders } from './world/Colliders.js';
-import { Game } from './game/Game.js';
 import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
@@ -84,7 +83,7 @@ import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldExtensions, loadWorldPackage, registerWorldPackageCollisions, stepWorldPackageExtensions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
-import { dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
+import { BUILTIN_WORLD_EXPERIENCE, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import './network/BrowserWorldBehaviorImplementations.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
@@ -534,12 +533,11 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// recorded field recordings (public/audio, credits in public/audio/CREDITS.md); ?noAudio turns it off
 		this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
 		this.player.audio = this.audio;
-		// the fishing game (rod, bites, catch, cooler, fish stand)
-		// The built-in save, vendors and fishing simulation belong only to the local
-		// Example Island. Hosted worlds install their own declared behavior components.
+		// World gameplay is installed from the active world's declared behaviors.
 		this.worldGames = new Map();
-		this.game = worldLink ? null : new Game( this, { worldId: 'elsemesh:local' } );
-		if ( this.game ) this.worldGames.set( 'elsemesh:local', this.game );
+		this.game = null;
+		this.localWorldExperience = BUILTIN_WORLD_EXPERIENCE;
+		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local' } );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
 		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
 		for ( const [ s, lx, ly, lz ] of [ [ ISLAND_DEFINITION.fishStand, - 0.9, 1.85, 0.1 ], [ ISLAND_DEFINITION.chandlery, - 0.75, 1.58, - 1.45 ] ] ) {
@@ -1251,6 +1249,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			if ( policy.enabled ) this.player.boat.setMaxSpeed( policy.maxSpeed );
 		}
 		dispatchWorldBehaviorHooks( experience, 'onHostedWorldActivated', { app: this, connector, root, terrain, runtime } );
+		this.activeHostedExperience = experience;
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
 
@@ -1282,8 +1281,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.underwaterLighting = this.baseUnderwaterLighting;
 		this.baseUnderwaterLighting.activate();
 		this.baseGroundBounce.activate();
-		this.game?.setWorldContext( { query: this.query, terrain: this.terrainData, colliders: this.colliders, boatController: this.boatCtl } );
-		this.game?.setWorldActive( false );
+		if ( this.activeHostedExperience ) dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldDeactivated', { app: this, mode: 'hosted' } );
+		this.activeHostedExperience = null;
 
 		this.activeHostedWildlife = null;
 		this.activeHostedWhale = null;
@@ -1778,7 +1777,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			}
 			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.updateHostedWorld( dt );
-			if ( this.game?.active ) this.game.update( dt );
+			dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt } );
 			this.updateWorldPortals();
 			this.updateWorldStreaming();
 			this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
@@ -1786,12 +1785,11 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 		else {
 
-			if ( this.game && ! this.game.active ) this.game.setWorldActive( true );
 			this.boatCtl.update( dt );
 			this.boatSpray.update( dt );
 			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.update( dt );
-			this.game.update( dt );
+			dispatchWorldBehaviorHooks( this.localWorldExperience, 'onWorldFrame', { app: this, mode: 'builtin', dt } );
 
 		}
 		this.updateSun();
