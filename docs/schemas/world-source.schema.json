@@ -48,6 +48,12 @@
           "maxProperties": 16,
           "propertyNames": { "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
           "additionalProperties": { "type": "object" },
+          "patternProperties": {
+            "^elsemesh\\.fishing-game/1$": {
+              "properties": { "biteRateSchedule": { "$ref": "#/$defs/fishingBiteRateSchedule" } },
+              "additionalProperties": true
+            }
+          },
           "description": "Maps each required ElseMesh behavior ID to its behavior-owned authored data. The server validates the bounded generic envelope; clients validate data through their registered behavior implementation."
         }
       },
@@ -216,23 +222,6 @@
       "maxItems": 128,
       "items": { "$ref": "#/$defs/component" }
     },
-    "extensions": {
-      "type": "array",
-      "maxItems": 8,
-      "items": {
-        "type": "object",
-        "required": ["id", "protocol", "assetId", "memoryPages", "capabilities", "behaviorId"],
-        "properties": {
-          "id": { "type": "string", "pattern": "^elsemesh-extension:[\\w.-]{1,128}$" },
-          "protocol": { "const": "elsemesh.world-extension/1" },
-          "assetId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-          "behaviorId": { "type": "string", "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" },
-          "memoryPages": { "type": "integer", "minimum": 1, "maximum": 256 },
-          "capabilities": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,63}$" } }
-        },
-        "additionalProperties": false
-      }
-    },
     "portals": {
       "type": "array",
       "maxItems": 1024,
@@ -246,12 +235,34 @@
     }
   },
   "allOf": [
-    {"if":{"properties":{"extensions":{"minItems":1}},"required":["extensions"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"elsemesh.world-extension/1"}}}}}}},
     {"if":{"properties":{"portals":{"contains":{"required":["back"]}}},"required":["portals"]},"then":{"properties":{"rules":{"required":["requiredFeatures"],"properties":{"requiredFeatures":{"contains":{"const":"elsemesh.portal-two-sided/1"}}}}}}},
     {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]},"maxContains":1}}}},
     {"if":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.example-island-wildlife/1"}},"required":["type"]}}},"required":["components"]},"then":{"properties":{"components":{"contains":{"properties":{"type":{"const":"elsemesh.terrain-surface/1"}},"required":["type"]},"maxContains":1}}}}
   ],
   "$defs": {
+    "fishingBiteRateSchedule": {
+      "type": "object",
+      "required": ["defaultMultiplier", "windows"],
+      "properties": {
+        "defaultMultiplier": { "type": "number", "minimum": 0.5, "maximum": 2 },
+        "windows": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": ["startHour", "endHour", "multiplier"],
+            "properties": {
+              "startHour": { "type": "number", "minimum": 0, "maximum": 24, "multipleOf": 0.1 },
+              "endHour": { "type": "number", "minimum": 0, "maximum": 24, "multipleOf": 0.1 },
+              "multiplier": { "type": "number", "minimum": 0.5, "maximum": 2 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "Half-open time-of-day ranges [startHour, endHour), in 0.1-hour increments, applied to the shared fishing bite-wait simulation. Windows must be sorted and non-overlapping."
+    },
     "vector3": {
       "type": "array",
       "prefixItems": [

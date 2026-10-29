@@ -1,29 +1,24 @@
 import assert from 'node:assert/strict';
-import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, dispatchWorldExtensionState, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
-const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 } }, 'elsemesh.shore-aware-boat/1': {} } };
+const biteRateSchedule = { defaultMultiplier: 1, windows: [ { startHour: 0, endHour: 5, multiplier: 0.8 }, { startHour: 5, endHour: 8.1, multiplier: 1.4 }, { startHour: 17, endHour: 20.1, multiplier: 1.4 }, { startHour: 22, endHour: 24, multiplier: 0.8 } ] };
+const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, biteRateSchedule }, 'elsemesh.shore-aware-boat/1': {} } };
 assert.deepEqual( worldBehaviorsFor( BUILTIN_WORLD_EXPERIENCE ).map( behavior => behavior.id ), [ 'elsemesh.fishing-game/1' ], 'offline built-in gameplay is activated through its registered behavior descriptor' );
-assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id, onExtensionState } ) => ( { id, consumesExtensionState: typeof onExtensionState === 'function' } ) ), [
-	{ id: 'elsemesh.fishing-game/1', consumesExtensionState: true },
-	{ id: 'elsemesh.shore-aware-boat/1', consumesExtensionState: false },
-] );
+assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id } ) => id ), [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ] );
 assert.deepEqual( worldBehaviorData( experience, 'elsemesh.fishing-game/1' ).fishStand, experience.behaviors[ 'elsemesh.fishing-game/1' ].fishStand, 'behavior-owned experience data is available through the registry' );
 const runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test', load: false } );
-const otherRuntime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
+const otherRuntime = createWorldBehaviorRuntime( { behaviors: { 'elsemesh.fishing-game/1': {} } }, 'elsemesh.fishing-game/1', { worldId: 'elsemesh:registry-test-other', load: false } );
 assert.ok( runtime instanceof FishingGameRuntime );
 assert.notEqual( runtime, otherRuntime, 'each world receives its own registered gameplay runtime' );
 assert.notEqual( runtime.state, otherRuntime.state, 'world runtimes do not share game state' );
 assert.notEqual( runtime.state.storageKey, otherRuntime.state.storageKey, 'world runtimes persist under distinct world identities' );
 assert.equal( runtime.state.storageKey, 'elsemesh.save.v1:elsemesh%3Aregistry-test', 'registered game runtime receives its owning world identity' );
-dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 1.5 }, { gameRuntime: runtime } );
-assert.equal( runtime.biteRateMultiplier, 1.5, 'registered fishing behavior applies signed extension state in the browser runtime' );
-assert.equal( otherRuntime.biteRateMultiplier, 1, 'one world extension cannot mutate another world gameplay runtime' );
 runtime.bite = { phase: 'wait', t: 5 };
-runtime.stepBite( 1, { habitat: () => ( { shallows: 1 } ), hour: 12 } );
-assert.equal( runtime.bite.t, 3.5, 'extension rate changes local browser bite-wait timing' );
-assert.throws( () => dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 20 }, { gameRuntime: runtime } ), /Invalid fishing extension state/ );
-assert.throws( () => dispatchWorldExtensionState( experience, 'elsemesh.fishing-game/1', 'elsemesh-extension:fishing-rhythm', { biteRateMultiplier: 1 }, {} ), /no active browser game runtime/ );
+runtime.stepBite( 1, { habitat: () => ( { shallows: 1 } ), hour: 6.5 } );
+assert.equal( runtime.bite.t, 3.6, 'signed declarative fishing rules change local browser bite-wait timing' );
+assert.equal( otherRuntime.biteRateSchedule, undefined, 'a world without a bite-rate rule retains the default game behavior' );
+assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': { biteRateSchedule: { defaultMultiplier: 1, windows: [ { startHour: 4, endHour: 6, multiplier: 1.2 }, { startHour: 5, endHour: 7, multiplier: 1.3 } ] } } } } ), /Invalid fishing bite-rate schedule window/ );
 assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
 assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /does not support required world behavior/ );
 assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
@@ -63,14 +58,5 @@ assert.equal( webglKey.active, false );
 dispatchWorldBehaviorHooks( { behaviors: {} }, 'onHostedWorldActivated', {} );
 assert.equal( worldActivation.active, false, 'registered handlers receive inactive lifecycle notifications for worlds without their behavior' );
 assert.throws( () => registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: () => {} } ), /Invalid or duplicate/ );
-
-let consumed = null;
-registerWorldBehavior( 'elsemesh.extension-consumer/1', { onExtensionState: value => { consumed = value; } } );
-	const extensionState = { extensionId: 'elsemesh-extension:simulation', state: { tick: 7 }, root: {}, connector: {} };
-	dispatchWorldExtensionState( { behaviors: { 'elsemesh.extension-consumer/1': {} } }, 'elsemesh.extension-consumer/1', extensionState.extensionId, extensionState.state, { root: extensionState.root, connector: extensionState.connector } );
-assert.equal( consumed.extensionId, extensionState.extensionId );
-assert.equal( consumed.state, extensionState.state );
-assert.equal( consumed.root, extensionState.root );
-assert.equal( consumed.connector, extensionState.connector );
 
 console.log( 'world behavior registry: ok' );

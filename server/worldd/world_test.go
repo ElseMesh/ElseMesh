@@ -122,29 +122,21 @@ func TestWorldManifestRequiresObjectArray(t *testing.T) {
 	}
 }
 
-func TestWorldManifestBindsWasmExtensionToDeclaredBehavior(t *testing.T) {
+func TestWorldManifestAcceptsDeclarativeFishingRules(t *testing.T) {
 	owner := testKey(t)
 	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := newStarterManifest("Wasm extension", ownerID.String())
-	manifest.Experience = &worldExperience{Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{}, Behaviors: map[string]json.RawMessage{"elsemesh.example-simulation/1": json.RawMessage(`{}`)}}
-	manifest.Rules.RequiredFeatures = []string{"elsemesh.world-extension/1"}
-	assetID := "sha256:" + strings.Repeat("a", 64)
-	manifest.Assets = []assetRef{{ID: assetID, Bytes: 8, Kind: "application/wasm", Priority: "visible"}}
-	manifest.Extensions = []worldExtension{{ID: "elsemesh-extension:simulation", Protocol: "elsemesh.world-extension/1", AssetID: assetID, BehaviorID: "elsemesh.example-simulation/1", MemoryPages: 2, Capabilities: []string{}}}
+	manifest := newStarterManifest("Declarative fishing rules", ownerID.String())
+	manifest.Experience = &worldExperience{
+		Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{},
+		Behaviors: map[string]json.RawMessage{
+			"elsemesh.fishing-game/1": json.RawMessage(`{"biteRateSchedule":{"defaultMultiplier":1,"windows":[{"startHour":5,"endHour":8.1,"multiplier":1.4}]}}`),
+		},
+	}
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
-		t.Fatalf("valid signed extension binding rejected: %v", err)
-	}
-	manifest.Extensions[0].BehaviorID = "elsemesh.unknown/1"
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("extension bound to undeclared behavior was accepted")
-	}
-	manifest.Extensions[0].BehaviorID = "elsemesh.example-simulation/1"
-	manifest.Experience.Behaviors = nil
-	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("extension without its declared behavior was accepted")
+		t.Fatalf("valid declarative fishing behavior rejected: %v", err)
 	}
 }
 

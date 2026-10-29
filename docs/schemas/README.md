@@ -3,7 +3,7 @@
 This directory contains engine-level document schemas and portable component
 contracts. Some component records currently supported by the source schema are
 still specific to the built-in example world; extracting those validators into
-the world-extension boundary remains part of the separation work. Renderer or
+world-owned contracts remains part of the separation work. Renderer or
 behavior documentation authored for one world belongs in that world's content
 repository, alongside its source and package assets.
 

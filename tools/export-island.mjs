@@ -47,11 +47,12 @@ for ( let i = 0; i < args.length; i ++ ) {
 
 const sourcePath = path.join( output, 'world-source.json' );
 const terrainValidationPath = path.join( output, 'terrain-validation.json' );
-// Geometry is regenerated here; authored world behavior and extension declarations remain world data.
+// Geometry is regenerated here; authored world behavior remains world data.
 const canonicalSource = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
 const presentation = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) );
-const experience = { ...canonicalSource.experience, ...presentation, behaviors: { ...canonicalSource.experience.behaviors, ...presentation.behaviors } };
-const extensions = canonicalSource.extensions || [];
+const behaviors = { ...canonicalSource.experience.behaviors };
+for ( const [ id, data ] of Object.entries( presentation.behaviors || {} ) ) behaviors[ id ] = { ...behaviors[ id ], ...data };
+const experience = { ...canonicalSource.experience, ...presentation, behaviors };
 let updatedAt = '2026-10-01T00:00:00Z';
 try {
 	const previous = JSON.parse( await readFile( sourcePath, 'utf8' ) );
@@ -71,12 +72,6 @@ const assetId = `sha256:${createHash( 'sha256' ).update( glb ).digest( 'hex' )}`
 const terrainPreviewGLB = exportTerrain( terrain, 128 );
 const terrainPreviewAssetId = `sha256:${createHash( 'sha256' ).update( terrainPreviewGLB ).digest( 'hex' )}`;
 const staticAssets = new Map( [ [ assetId, glb ], [ terrainPreviewAssetId, terrainPreviewGLB ] ] );
-for ( const extension of extensions ) {
-	if ( ! /^sha256:[0-9a-f]{64}$/.test( extension.assetId || '' ) ) throw new Error( `Invalid extension asset ID for ${extension.id}` );
-	const bytes = await readFile( path.join( REPO, 'worlds/tidewater/assets', extension.assetId.slice( 'sha256:'.length ) ) );
-	if ( `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}` !== extension.assetId ) throw new Error( `Extension asset hash mismatch for ${extension.id}` );
-	staticAssets.set( extension.assetId, bytes );
-}
 const generated = buildIslandProceduralContent( terrain );
 const terrainMaps = bakeTerrainMaps( terrain );
 const terrainDetail = getDetailImage();
@@ -236,11 +231,10 @@ const source = {
 		avatarComplexity: 20000,
 		physicsProfile: 'elsemesh-default',
 		vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 100000 },
-		requiredFeatures: [ 'elsemesh.static-glb/1', 'elsemesh.static-glb-quaternion/1', 'elsemesh.village-materials/1', 'elsemesh.village-materials/2', 'elsemesh.terrain-surface/1', 'elsemesh.static-vegetation/1', 'elsemesh.static-grass/1', 'elsemesh.static-reef/1', 'elsemesh.static-fish-props/1', 'elsemesh.example-island-wildlife/1', 'elsemesh.humpback-whale/1', 'elsemesh.island-ocean/1', 'elsemesh.downeast-boat/1', 'elsemesh.ambient-audio/1', 'elsemesh.portal-handoff/1', 'elsemesh.portal-preview-static/1', ...( extensions.length ? [ 'elsemesh.world-extension/1' ] : [] ) ],
+		requiredFeatures: [ 'elsemesh.static-glb/1', 'elsemesh.static-glb-quaternion/1', 'elsemesh.village-materials/1', 'elsemesh.village-materials/2', 'elsemesh.terrain-surface/1', 'elsemesh.static-vegetation/1', 'elsemesh.static-grass/1', 'elsemesh.static-reef/1', 'elsemesh.static-fish-props/1', 'elsemesh.example-island-wildlife/1', 'elsemesh.humpback-whale/1', 'elsemesh.island-ocean/1', 'elsemesh.downeast-boat/1', 'elsemesh.ambient-audio/1', 'elsemesh.portal-handoff/1', 'elsemesh.portal-preview-static/1' ],
 		maxPackageBytes: 128 * 1024 * 1024,
 	},
 	hosts: [],
-	...( extensions.length ? { extensions } : {} ),
 	objects: [ {
 		id: 'elsemesh-object:island-terrain',
 		kind: 'asset-instance',

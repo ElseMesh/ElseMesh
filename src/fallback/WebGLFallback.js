@@ -25,7 +25,6 @@ import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
 import './WebGLWorldBehaviorImplementations.js';
-import { WorldExtensionSession } from '../network/WorldExtensionSession.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';
@@ -744,7 +743,6 @@ export class WebGLFallback {
 		this.vegetationRecords = null;
 		this.wildlifeRuntime = null;
 		this.wildlifeAdapter = null;
-		this.worldExtensionSession = null;
 
 	}
 
@@ -1681,12 +1679,6 @@ export class WebGLFallback {
 			const ids = [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ];
 			if ( ids.every( id => assets.has( id ) ) ) this.hostedWhalePackages.push( { component, assets: { manifest: assets.get( ids[ 0 ] ), geometry: assets.get( ids[ 1 ] ), albedo: assets.get( ids[ 2 ] ), height: assets.get( ids[ 3 ] ) } } );
 		}
-		if ( manifest.extensions?.length ) {
-			const session = this.worldExtensionSession = new WorldExtensionSession( { connector: this.connector, root: this } );
-			try { this.worldExtensionStates = await session.load( manifest.extensions ); }
-			catch ( error ) { this.worldExtensionSession = null; throw error; }
-			window.addEventListener( 'pagehide', () => session.dispose(), { once: true } );
-		}
 		this._updateHostedWebGLStatus();
 		progress( 0.9, 'Preparing hosted world…' );
 
@@ -1873,7 +1865,6 @@ export class WebGLFallback {
 		this.reefAdapter?.update( this.camera, simulationTime, defaultWorldSource.rules.seaLevel ?? 0 );
 		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime } );
-		this._stepWorldExtensions( dt );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;
 			this.wildlifeRuntime.update( dt, this.camera, this.player, {
@@ -1893,17 +1884,6 @@ export class WebGLFallback {
 			this.renderer.render( this.waterScene, this.camera );
 			this.renderer.autoClear = true;
 		}
-
-	}
-
-	_stepWorldExtensions( deltaSeconds ) {
-		this.worldExtensionSession?.step( deltaSeconds, {
-			timeOfDay: this.app.settings.timeOfDay,
-			player: this.player,
-			input: this.input,
-			boat: this.boat?.controller || null,
-			gameRuntime: this.gameAdapter?.runtime || null,
-		} );
 
 	}
 

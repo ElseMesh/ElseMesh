@@ -82,7 +82,7 @@ import { worldHasWater, worldSeaLevel } from './network/WorldRules.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldExtensions, loadWorldPackage, registerWorldPackageCollisions, stepWorldPackageExtensions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { BUILTIN_WORLD_EXPERIENCE, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import './network/BrowserWorldBehaviorImplementations.js';
 import { HostedBoat } from './network/HostedBoat.js';
@@ -595,7 +595,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
 			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs } );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
-			await loadWorldExtensions( connector, this.linkedWorldRoot );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
@@ -1304,13 +1303,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	}
 
 	updateWorldComponents( root, dt, camera ) {
-		stepWorldPackageExtensions( root, dt, {
-			player: this.player,
-			input: this.input,
-			boat: this.activeHostedBoat?.boat.controller || ( this.remoteWorldActive ? null : this.boatCtl ),
-			gameRuntime: this.game?.active ? this.game.runtime : null,
-			timeOfDay: this.settings.timeOfDay,
-		} );
 		const components = root?.userData?.worldComponents || [];
 		for ( const component of components ) component.update?.( dt, camera, this.player );
 	}
@@ -1637,7 +1629,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		const sourceConnector = this.worldConnector;
 		const destinationConnector = preparation.connector;
 		const destinationRoot = preparation.root;
-		await loadWorldExtensions( destinationConnector, destinationRoot );
 		this.clearPortalView();
 		const sourceVehicleMode = this.player.mode;
 		const sourceVehicle = [ 'boat', 'deck' ].includes( sourceVehicleMode ) ? this.activeHostedBoat?.boat.controller?.transferState() : null;

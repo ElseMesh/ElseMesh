@@ -4,7 +4,6 @@ import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
 import { verifySignedDocument } from './SignedDocument.js';
-import { validateWorldExtensions } from './WorldExtensionHost.js';
 import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
@@ -1055,8 +1054,6 @@ export async function verifySignedWorldManifest( document ) {
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );
 	validateWorldPortals( manifest.portals, entityIDs, manifest.rules );
 	validateWorldComponents( manifest.components, manifest.rules, entityIDs, manifest.assets, manifest.objects );
-	validateWorldExtensions( manifest.extensions, manifest.assets, manifest.experience );
-	invariant( ! manifest.extensions?.length || manifest.rules.requiredFeatures?.includes( 'elsemesh.world-extension/1' ), 'World extensions require elsemesh.world-extension/1' );
 	validateWorldHosts( manifest.hosts );
 	invariant( Number.isSafeInteger( manifest.authorityEpoch ) && manifest.authorityEpoch > 0, 'Manifest authority epoch is outside the supported range' );
 	return manifest;

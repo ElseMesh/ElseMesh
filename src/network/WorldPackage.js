@@ -1,5 +1,5 @@
 // Build the static, GLB-backed portion of a verified world manifest as a replaceable scene root.
-// Dynamic world extensions (terrain simulation, water, wildlife, gameplay) are deliberately not
+// Dynamic world systems (terrain simulation, water, wildlife, gameplay) are deliberately not
 // inferred from a mesh export; they need explicit, versioned runtime components.
 
 import { LODLoadQueue, WorldObjectLOD } from './WorldObjectLOD.js';
@@ -24,7 +24,6 @@ import { villageMaterialRole } from './WorldVillageMaterial.js';
 import { decodeVillageMaterialAsset } from './VillageMaterialAsset.js';
 import { VillageTextures } from '../world/village/TextureBaker.js';
 import { createVillageMaterials } from '../world/village/VillageMaterials.js';
-import { WorldExtensionSession } from './WorldExtensionSession.js';
 
 const COMPONENTS = Object.freeze( {
 	POSITION: [ 'position', 3 ],
@@ -120,23 +119,6 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 	}
 	return root;
 
-}
-
-export async function loadWorldExtensions( connector, root ) {
-	const descriptors = connector.manifest.extensions || [];
-	if ( ! descriptors.length ) return;
-	const state = root?.userData?.worldPackage;
-	if ( ! state || state.disposed ) throw new Error( 'World package is not available for extension loading' );
-	if ( state.extensionSession ) return;
-	const session = state.extensionSession = new WorldExtensionSession( { connector, root } );
-	try { state.extensionStates = await session.load( descriptors ); }
-	catch ( error ) { state.extensionSession = null; throw error; }
-}
-
-export function stepWorldPackageExtensions( root, deltaSeconds, context = {} ) {
-	const state = root?.userData?.worldPackage;
-	if ( state?.disposed ) return;
-	state?.extensionSession?.step( deltaSeconds, context );
 }
 
 async function installPackagedVillageMaterials( connector, root, signal ) {
@@ -532,7 +514,6 @@ export function disposeWorldPackage( root ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! root || state?.disposed ) return;
 	if ( state ) state.disposed = true;
-	state?.extensionSession?.dispose();
 	for ( const controller of state?.lodControllers?.values() || [] ) controller.dispose();
 	const geometries = new Set(), materials = new Set(), textures = new Set();
 	const roots = [ root, ...( state?.parsed?.values?.() || [] ) ];

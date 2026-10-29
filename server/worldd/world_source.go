@@ -31,7 +31,6 @@ type worldSourceDocument struct {
 	Rules                 worldRules        `json:"rules"`
 	Objects               []worldObject     `json:"objects"`
 	Components            []worldComponent  `json:"components,omitempty"`
-	Extensions            []worldExtension  `json:"extensions,omitempty"`
 	Portals               []portal          `json:"portals"`
 	Hosts                 []hostingGrant    `json:"hosts,omitempty"`
 	UpdatedAt             string            `json:"updatedAt"`
@@ -182,7 +181,6 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 		Rules:                 source.Rules,
 		Objects:               source.Objects,
 		Components:            source.Components,
-		Extensions:            source.Extensions,
 		Portals:               source.Portals,
 		Hosts:                 source.Hosts,
 		UpdatedAt:             updatedAt.Unix(),
@@ -354,25 +352,6 @@ func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef
 				return nil, err
 			}
 		}
-	}
-	declaredBehaviors := make(map[string]bool)
-	if source.Experience != nil {
-		for behavior := range source.Experience.Behaviors {
-			declaredBehaviors[behavior] = true
-		}
-	}
-	seenExtensionBehaviors := make(map[string]bool)
-	for _, extension := range source.Extensions {
-		if !worldBehaviorPattern.MatchString(extension.BehaviorID) || !declaredBehaviors[extension.BehaviorID] || seenExtensionBehaviors[extension.BehaviorID] {
-			return nil, fmt.Errorf("world extension %s must bind to one declared behavior", extension.ID)
-		}
-		if err := add(extension.AssetID, "application/wasm", "visible", false); err != nil {
-			return nil, err
-		}
-		if assets[extension.AssetID].Bytes < 8 || assets[extension.AssetID].Bytes > 8<<20 {
-			return nil, fmt.Errorf("world extension asset %s is outside the supported size limit", extension.AssetID)
-		}
-		seenExtensionBehaviors[extension.BehaviorID] = true
 	}
 	ids := make([]string, 0, len(assets))
 	for id := range assets {

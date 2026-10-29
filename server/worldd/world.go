@@ -25,17 +25,15 @@ const (
 )
 
 var (
-	worldIDPattern             = regexp.MustCompile(`^elsemesh:[a-zA-Z0-9._-]{1,128}$`)
-	objectIDPattern            = regexp.MustCompile(`^elsemesh-object:[\w.-]{1,128}$`)
-	portalIDPattern            = regexp.MustCompile(`^elsemesh-portal:[\w.-]{1,128}$`)
-	componentIDPattern         = regexp.MustCompile(`^elsemesh-component:[\w.-]{1,128}$`)
-	assetIDPattern             = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	sourceContentHashPattern   = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	worldFeaturePattern        = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
-	worldBehaviorPattern       = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
-	entryPointIDPattern        = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,63}$`)
-	extensionIDPattern         = regexp.MustCompile(`^elsemesh-extension:[\w.-]{1,128}$`)
-	extensionCapabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]{0,63}$`)
+	worldIDPattern           = regexp.MustCompile(`^elsemesh:[a-zA-Z0-9._-]{1,128}$`)
+	objectIDPattern          = regexp.MustCompile(`^elsemesh-object:[\w.-]{1,128}$`)
+	portalIDPattern          = regexp.MustCompile(`^elsemesh-portal:[\w.-]{1,128}$`)
+	componentIDPattern       = regexp.MustCompile(`^elsemesh-component:[\w.-]{1,128}$`)
+	assetIDPattern           = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	sourceContentHashPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	worldFeaturePattern      = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
+	worldBehaviorPattern     = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
+	entryPointIDPattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,63}$`)
 )
 
 type vector3 [3]float64
@@ -58,15 +56,6 @@ type assetRef struct {
 	Kind     string `json:"kind"`
 	Priority string `json:"priority"`
 	Path     string `json:"path,omitempty"`
-}
-
-type worldExtension struct {
-	ID           string   `json:"id"`
-	Protocol     string   `json:"protocol"`
-	AssetID      string   `json:"assetId"`
-	BehaviorID   string   `json:"behaviorId"`
-	MemoryPages  uint32   `json:"memoryPages"`
-	Capabilities []string `json:"capabilities"`
 }
 
 type objectLOD struct {
@@ -454,7 +443,6 @@ type worldManifest struct {
 	Assets                []assetRef        `json:"assets"`
 	Objects               []worldObject     `json:"objects"`
 	Components            []worldComponent  `json:"components,omitempty"`
-	Extensions            []worldExtension  `json:"extensions,omitempty"`
 	Portals               []portal          `json:"portals"`
 	Hosts                 []hostingGrant    `json:"hosts,omitempty"`
 	UpdatedAt             int64             `json:"updatedAt"`
@@ -611,7 +599,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		}
 		seenFeatures[feature] = true
 	}
-	if len(manifest.Assets) > 10000 || len(manifest.Objects) > 10000 || len(manifest.Components) > 128 || len(manifest.Extensions) > 8 || len(manifest.Portals) > 1024 || len(manifest.Hosts) > 256 {
+	if len(manifest.Assets) > 10000 || len(manifest.Objects) > 10000 || len(manifest.Components) > 128 || len(manifest.Portals) > 1024 || len(manifest.Hosts) > 256 {
 		return errors.New("manifest contains too many entries")
 	}
 	permitted := manifest.OwnerPeerID == localPeerID
@@ -684,38 +672,8 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		seenAssets[asset.ID] = true
 	}
 	assetKinds := make(map[string]string, len(manifest.Assets))
-	wasmAssetRefs := make(map[string]assetRef, len(manifest.Assets))
 	for _, asset := range manifest.Assets {
 		assetKinds[asset.ID] = asset.Kind
-		wasmAssetRefs[asset.ID] = asset
-	}
-	if len(manifest.Extensions) > 0 && !seenFeatures["elsemesh.world-extension/1"] {
-		return errors.New("world extensions require elsemesh.world-extension/1")
-	}
-	seenExtensions := make(map[string]bool, len(manifest.Extensions))
-	seenExtensionAssets := make(map[string]bool, len(manifest.Extensions))
-	seenExtensionBehaviors := make(map[string]bool, len(manifest.Extensions))
-	declaredBehaviors := make(map[string]bool)
-	if manifest.Experience != nil {
-		for behavior := range manifest.Experience.Behaviors {
-			declaredBehaviors[behavior] = true
-		}
-	}
-	for _, extension := range manifest.Extensions {
-		asset, ok := wasmAssetRefs[extension.AssetID]
-		if !extensionIDPattern.MatchString(extension.ID) || seenExtensions[extension.ID] || extension.Protocol != "elsemesh.world-extension/1" || !worldBehaviorPattern.MatchString(extension.BehaviorID) || !declaredBehaviors[extension.BehaviorID] || seenExtensionBehaviors[extension.BehaviorID] || !assetIDPattern.MatchString(extension.AssetID) || seenExtensionAssets[extension.AssetID] || !ok || asset.Kind != "application/wasm" || asset.Bytes < 8 || asset.Bytes > 8<<20 || extension.MemoryPages < 1 || extension.MemoryPages > 256 || len(extension.Capabilities) > 16 {
-			return errors.New("invalid or duplicate world extension descriptor")
-		}
-		seenCaps := make(map[string]bool, len(extension.Capabilities))
-		for _, capability := range extension.Capabilities {
-			if !extensionCapabilityPattern.MatchString(capability) || seenCaps[capability] {
-				return errors.New("invalid or duplicate world extension capability")
-			}
-			seenCaps[capability] = true
-		}
-		seenExtensions[extension.ID] = true
-		seenExtensionAssets[extension.AssetID] = true
-		seenExtensionBehaviors[extension.BehaviorID] = true
 	}
 	seenObjects := make(map[string]bool, len(manifest.Objects))
 	for _, object := range manifest.Objects {

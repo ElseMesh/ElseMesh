@@ -22,7 +22,6 @@ export const SUPPORTED_WORLD_FEATURES = new Set( [
 	'elsemesh.village-materials/2',
 	'elsemesh.procedural-island-terrain/1',
 	'elsemesh.terrain-surface/1',
-	'elsemesh.world-extension/1',
 ] );
 export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'elsemesh-default' ] );
 export const DEFAULT_WORLD_MOVEMENT = Object.freeze( { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } );

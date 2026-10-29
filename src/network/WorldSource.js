@@ -1,7 +1,6 @@
 import { validatePortalBack } from './PortalSideContract.js';
 import { MAX_WORLD_PACKAGE_BYTES, movementParameters, SUPPORTED_PHYSICS_PROFILES, validateWorldLevels, vehiclePolicy, visitorRules } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
-import { validateWorldExtensions } from './WorldExtensionHost.js';
 import { WORLD_ID_PREFIX, isWorldID } from './WorldIdentity.js';
 
 export const WORLD_SOURCE_PROTOCOL = 'elsemesh.world-source/3';
@@ -21,7 +20,6 @@ export function createWorldSource( { worldId = `${WORLD_ID_PREFIX}local-${ crypt
 		objects: [],
 		components: [],
 		portals: [],
-		extensions: [],
 		updatedAt: new Date().toISOString(),
 	};
 }
@@ -42,8 +40,6 @@ export function validateWorldSource( source ) {
 	if ( source.rules.maxPackageBytes !== undefined && ( ! Number.isSafeInteger( source.rules.maxPackageBytes ) || source.rules.maxPackageBytes < 1 || source.rules.maxPackageBytes > MAX_WORLD_PACKAGE_BYTES ) ) throw new Error( 'Invalid world package byte budget' );
 	if ( source.rules.requiredFeatures !== undefined && ( ! Array.isArray( source.rules.requiredFeatures ) || source.rules.requiredFeatures.length > 64 || new Set( source.rules.requiredFeatures ).size !== source.rules.requiredFeatures.length || source.rules.requiredFeatures.some( ( feature ) => typeof feature !== 'string' || feature.length > 96 || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( feature ) ) ) ) throw new Error( 'Invalid required world features' );
 	if ( ! Array.isArray( source.objects ) || ! Array.isArray( source.portals ) || source.objects.length > 10000 || source.portals.length > 1024 || source.hosts !== undefined && ( ! Array.isArray( source.hosts ) || source.hosts.length > 256 ) || source.components !== undefined && ( ! Array.isArray( source.components ) || source.components.length > 128 ) ) throw new Error( 'Invalid world object, portal, component, or host grant list' );
-	validateWorldExtensions( source.extensions, undefined, source.experience );
-	if ( source.extensions?.length && ! source.rules.requiredFeatures?.includes( 'elsemesh.world-extension/1' ) ) throw new Error( 'World extensions require elsemesh.world-extension/1' );
 	const components = source.components || [];
 	const hosts = new Set();
 	const failoverWindows = [];

@@ -135,7 +135,7 @@ shared character asset. `WebGLGameAdapter` uses the registry-created
 `FishingGameRuntime`, shared `FishingRod` and `BoatGameplayRuntime`, `GameState`,
 and `GameHUD`; it supports casting, bite/fight transitions, selling, upgrades,
 fuel, sonar, the catch card, and the matching fishing-event cues. World-authored
-fishing placement and the bounded Wasm rule extension feed this browser-local
+fishing placement and the bounded declarative bite-rate schedule feed this browser-local
 gameplay in both renderers. Focused headless checks cover these paths. Remaining
 parity work includes live matched-browser gameplay, scanned StallKit surface
 materials, and broader visual comparison. The backend-specific early return
