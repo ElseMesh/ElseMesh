@@ -20,7 +20,7 @@ registerWorldBehaviorImplementation( 'elsemesh.fishing-game/1', {
 		fallback.gameAdapter = new WebGLGameAdapter( fishStand.vendor, {
 			vendors: [ fishStand.vendor, chandlery.vendor ], experience,
 			...( builtIn ? {} : { worldId: fallback.connector.worldId } ),
-			THREE, scene: fallback.scene, camera: fallback.camera, query: fallback.waterQuery,
+			THREE, scene: fallback.scene, camera: fallback.camera, query: fallback.waterQuery, extensions: fallback.activeWorldExtensions,
 			terrain, boatController: fallback.boat?.controller || null, boatRoot: fallback.boat?.group || null, audio: fallback.app.audio,
 		} );
 	},

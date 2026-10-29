@@ -25,13 +25,13 @@ const CATCH_CARD_MS = 9000;
 //   E          at the fish stand: sell your catch
 export class Game {
 
-	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience = { behaviors: { 'elsemesh.fishing-game/1': {} } }, worldId = 'elsemesh:local' } = {} ) {
+	constructor( app, { query = app.query, terrain = app.terrainData, colliders = app.colliders, boatController = app.boatCtl, experience = { behaviors: { 'elsemesh.fishing-game/1': {} } }, worldId = 'elsemesh:local', extensions = null } = {} ) {
 
 		this.app = app;
 		this.terrain = terrain;
 		this.boatController = boatController;
 		this.active = true;
-		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId } );
+		this.runtime = createWorldBehaviorRuntime( experience, 'elsemesh.fishing-game/1', { worldId, extensions } );
 		this.state = this.runtime.state;
 		this.rod = new FishingRod( { scene: app.scene, camera: app.camera, query, terrain, audio: app.audio } );
 		this.rod.onLand = ( where ) => this.onBobberLanded( where );

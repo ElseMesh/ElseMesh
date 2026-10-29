@@ -17,16 +17,16 @@ registerWorldBehaviorImplementation( 'elsemesh.shore-aware-boat/1', {
 } );
 
 registerWorldBehaviorImplementation( 'elsemesh.fishing-game/1', {
-	onBuiltinWorldActivated( { app, experience, worldId } ) {
+	onBuiltinWorldActivated( { app, experience, worldId, extensions } ) {
 		let game = app.worldGames.get( worldId );
 		if ( ! game ) {
-			game = new Game( app, { query: app.query, terrain: app.terrainData, colliders: app.colliders, boatController: app.boatCtl, experience, worldId } );
+			game = new Game( app, { query: app.query, terrain: app.terrainData, colliders: app.colliders, boatController: app.boatCtl, experience, worldId, extensions } );
 			app.worldGames.set( worldId, game );
 		}
 		app.game = game;
 		game.setWorldActive( true );
 	},
-	onHostedWorldActivated( { app, connector, root, active } ) {
+	onHostedWorldActivated( { app, connector, root, active, extensions } ) {
 		if ( ! active ) {
 			app.game?.setWorldActive( false );
 			return;
@@ -34,7 +34,7 @@ registerWorldBehaviorImplementation( 'elsemesh.fishing-game/1', {
 		const worldTerrain = root.userData.terrainData || app.terrainData;
 		let game = app.worldGames.get( connector.worldId );
 		if ( ! game ) {
-			game = new Game( app, { query: app.hostedQuery, terrain: worldTerrain, colliders: app.hostedColliders, boatController: app.player.boat || app.boatCtl, experience: connector.manifest.experience, worldId: connector.worldId } );
+			game = new Game( app, { query: app.hostedQuery, terrain: worldTerrain, colliders: app.hostedColliders, boatController: app.player.boat || app.boatCtl, experience: connector.manifest.experience, worldId: connector.worldId, extensions } );
 			app.worldGames.set( connector.worldId, game );
 		}
 		app.game = game;

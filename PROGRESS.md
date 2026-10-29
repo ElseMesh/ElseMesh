@@ -12,13 +12,16 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   limits. Hosted WebGPU and WebGL activation pass the generic Worker manager
   through registry hooks and dispose it with the world. The behavior registry
   now accepts an engine-unknown behavior only when the signed experience binds
-  it to a Worker module; the module owns that behavior's event validation. No
-  world package consumes the runtime yet, and fishing behavior still needs to
-  move out of engine code.
+  it to a Worker module; the module owns that behavior's event validation.
 - Worker activation now sends a generic `initialize` message with the signed
   behavior data, exposes the result through `ready(behaviorId)`, and waits for
   successful initialization before dispatching later messages. The focused
   test verifies initialization ordering and data delivery.
+- Tidewater's signed fishing module now validates and compiles its authored
+  bite-rate schedule inside the Worker. Both WebGPU and WebGL game runtimes
+  consume the resulting table; the world package owns the schedule validator
+  and its tests. Other fishing gameplay and renderer adapters remain in the
+  engine and still need to move behind world-owned behavior modules.
 - The focused Worker, registry, experience, manifest, and Go worldd tests pass;
   `npm run build` passes in the external build tree. The full `npm test` run
   passed through the engine smoke checks, then its gateway E2E could not find

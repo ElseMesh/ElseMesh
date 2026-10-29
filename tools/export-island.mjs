@@ -50,6 +50,9 @@ const terrainValidationPath = path.join( output, 'terrain-validation.json' );
 // Geometry is regenerated here; authored world behavior remains world data.
 const canonicalSource = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/world-source.json' ), 'utf8' ) );
 const presentation = JSON.parse( await readFile( path.join( REPO, 'worlds/tidewater/presentation.json' ), 'utf8' ) );
+const fishingRulesExtension = await readFile( path.join( REPO, 'worlds/tidewater/extensions/fishing-game-rules.js' ) );
+const fishingRulesExtensionID = `sha256:${createHash( 'sha256' ).update( fishingRulesExtension ).digest( 'hex' )}`;
+if ( ! canonicalSource.experience.extensions?.some( extension => extension.behaviorId === 'elsemesh.fishing-game/1' && extension.assetId === fishingRulesExtensionID ) ) throw new Error( 'Tidewater fishing rules extension reference does not match its package source' );
 const behaviors = { ...canonicalSource.experience.behaviors };
 for ( const [ id, data ] of Object.entries( presentation.behaviors || {} ) ) behaviors[ id ] = { ...behaviors[ id ], ...data };
 const experience = { ...canonicalSource.experience, ...presentation, behaviors };
@@ -72,6 +75,7 @@ const assetId = `sha256:${createHash( 'sha256' ).update( glb ).digest( 'hex' )}`
 const terrainPreviewGLB = exportTerrain( terrain, 128 );
 const terrainPreviewAssetId = `sha256:${createHash( 'sha256' ).update( terrainPreviewGLB ).digest( 'hex' )}`;
 const staticAssets = new Map( [ [ assetId, glb ], [ terrainPreviewAssetId, terrainPreviewGLB ] ] );
+staticAssets.set( fishingRulesExtensionID, fishingRulesExtension );
 const generated = buildIslandProceduralContent( terrain );
 const terrainMaps = bakeTerrainMaps( terrain );
 const terrainDetail = getDetailImage();

@@ -792,7 +792,9 @@ export class WebGLFallback {
 			this.player.position.set( this.spawn.position[ 0 ], this.spawn.position[ 1 ] - 1.62, this.spawn.position[ 2 ] );
 			this.player.camera.position.set( ...this.spawn.position );
 			this.player._camY = null;
-			dispatchWorldBehaviorHooks( defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T } );
+			this.activeWorldExtensions?.dispose();
+			this.activeWorldExtensions = createWorldBehaviorExtensions( defaultWorldSource.experience, defaultWorldPackage.assets.extensionModules );
+			dispatchWorldBehaviorHooks( defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T, extensions: this.activeWorldExtensions } );
 			const y = this.terrain.heightAt( STAND.x, STAND.z );
 			for ( const box of fishStandColliderVolumes( y ) ) this.blockers.push( {
 				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
@@ -822,6 +824,7 @@ export class WebGLFallback {
 			}
 		}
 		if ( this.worldLink ) {
+			this.activeWorldExtensions?.dispose();
 			this.activeWorldExtensions = createWorldBehaviorExtensions( this.connector?.manifest?.experience, this.connector?.assets );
 			try {
 				dispatchWorldBehaviorHooks( this.connector?.manifest?.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'hosted', THREE: T, extensions: this.activeWorldExtensions } );

@@ -3,8 +3,7 @@ import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorExtensions, createWorldBeh
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 import { FishingGameRuntime } from '../src/game/FishingGameRuntime.js';
 
-const biteRateSchedule = { defaultMultiplier: 1, windows: [ { startHour: 0, endHour: 5, multiplier: 0.8 }, { startHour: 5, endHour: 8.1, multiplier: 1.4 }, { startHour: 17, endHour: 20.1, multiplier: 1.4 }, { startHour: 22, endHour: 24, multiplier: 0.8 } ] };
-const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 }, biteRateSchedule }, 'elsemesh.shore-aware-boat/1': {} } };
+const experience = { behaviors: { 'elsemesh.fishing-game/1': { fishStand: { position: [ 12, -8 ], yaw: 1.2, interactionRadius: 4 } }, 'elsemesh.shore-aware-boat/1': {} } };
 assert.deepEqual( worldBehaviorsFor( BUILTIN_WORLD_EXPERIENCE ).map( behavior => behavior.id ), [ 'elsemesh.fishing-game/1' ], 'offline built-in gameplay is activated through its registered behavior descriptor' );
 assert.deepEqual( worldBehaviorsFor( experience ).map( ( { id } ) => id ), [ 'elsemesh.fishing-game/1', 'elsemesh.shore-aware-boat/1' ] );
 assert.deepEqual( worldBehaviorData( experience, 'elsemesh.fishing-game/1' ).fishStand, experience.behaviors[ 'elsemesh.fishing-game/1' ].fishStand, 'behavior-owned experience data is available through the registry' );
@@ -17,9 +16,10 @@ assert.notEqual( runtime.state.storageKey, otherRuntime.state.storageKey, 'world
 assert.equal( runtime.state.storageKey, 'elsemesh.save.v1:elsemesh%3Aregistry-test', 'registered game runtime receives its owning world identity' );
 runtime.bite = { phase: 'wait', t: 5 };
 runtime.stepBite( 1, { habitat: () => ( { shallows: 1 } ), hour: 6.5 } );
-assert.equal( runtime.bite.t, 3.6, 'signed declarative fishing rules change local browser bite-wait timing' );
-assert.equal( otherRuntime.biteRateSchedule, undefined, 'a world without a bite-rate rule retains the default game behavior' );
-assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': { biteRateSchedule: { defaultMultiplier: 1, windows: [ { startHour: 4, endHour: 6, multiplier: 1.2 }, { startHour: 5, endHour: 7, multiplier: 1.3 } ] } } } } ), /Invalid fishing bite-rate schedule window/ );
+assert.equal( runtime.bite.t, 4, 'the shared runtime uses its neutral rule table until a world module initializes it' );
+assert.equal( otherRuntime.biteRateMultipliers[ 65 ], 1, 'worlds without an extension keep the neutral game behavior' );
+assert.throws( () => runtime.setBiteRateMultipliers( [ 1 ] ), /Invalid world-provided fishing rate table/ );
+assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': { worldRule: true } } } ), /requires a signed JavaScript extension/, 'unhandled behavior data is rejected unless a signed module owns it' );
 assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
 assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /Invalid world behavior ID/, 'world-owned behavior IDs stay inside the ElseMesh namespace' );
 assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
@@ -78,6 +78,7 @@ const worker = new FakeWorker();
 const extensionAssetID = `sha256:${'c'.repeat( 64 )}`;
 const extensionExperience = { behaviors: { 'elsemesh.registry-test/1': {} }, extensions: [ { behaviorId: 'elsemesh.registry-test/1', assetId: extensionAssetID } ] };
 const extensions = createWorldBehaviorExtensions( extensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { echo: event }; }' ) ] ] ), { workerFactory: () => worker } );
+assert.equal( extensions.has( 'elsemesh.registry-test/1' ), true, 'the manager exposes registered Worker availability without custom hooks' );
 assert.deepEqual( await extensions.run( 'elsemesh.registry-test/1', { type: 'ping' } ), { echo: { type: 'ping' } }, 'generic behavior extensions exchange bounded JSON through the Worker manager' );
 assert.deepEqual( worker.messages.filter( message => message.type === 'run' ).map( message => message.event.type ), [ 'initialize', 'ping' ], 'the worker receives behavior data before normal events' );
 await assert.rejects( extensions.run( 'elsemesh.registry-test/1', { type: 'unknown' } ), /invalid test event/, 'event meaning stays in the registered behavior package' );

@@ -83,7 +83,8 @@ import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
-import { BUILTIN_WORLD_EXPERIENCE, createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
+import { defaultWorldPackage } from '../worlds/default.js';
 import './network/BrowserWorldBehaviorImplementations.js';
 import { HostedBoat } from './network/HostedBoat.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
@@ -536,8 +537,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// World gameplay is installed from the active world's declared behaviors.
 		this.worldGames = new Map();
 		this.game = null;
-		this.localWorldExperience = BUILTIN_WORLD_EXPERIENCE;
-		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local' } );
+		this.localWorldExperience = defaultWorldPackage.source.experience;
+		this.localWorldExtensions = ! worldLink ? createWorldBehaviorExtensions( this.localWorldExperience, defaultWorldPackage.assets.extensionModules ) : null;
+		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local', extensions: this.localWorldExtensions } );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
 		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
 		for ( const [ s, lx, ly, lz ] of [ [ ISLAND_DEFINITION.fishStand, - 0.9, 1.85, 0.1 ], [ ISLAND_DEFINITION.chandlery, - 0.75, 1.58, - 1.45 ] ] ) {
@@ -1792,7 +1794,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			this.boatSpray.update( dt );
 			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.update( dt );
-			dispatchWorldBehaviorHooks( this.localWorldExperience, 'onWorldFrame', { app: this, mode: 'builtin', dt } );
+			dispatchWorldBehaviorHooks( this.localWorldExperience, 'onWorldFrame', { app: this, mode: 'builtin', dt, extensions: this.localWorldExtensions } );
 
 		}
 		this.updateSun();

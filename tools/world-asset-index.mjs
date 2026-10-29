@@ -32,6 +32,7 @@ function formatBytes( bytes ) {
 }
 
 function detectFormat( bytes, refs ) {
+	if ( refs.some( ref => ref.role === 'world behavior module' ) ) return 'JavaScript module';
 	if ( bytes.subarray( 0, 4 ).toString( 'ascii' ) === 'glTF' ) return 'glTF binary (GLB)';
 	if ( bytes.subarray( 0, 4 ).toString( 'ascii' ) === 'OggS' ) return 'Ogg audio';
 	if ( bytes.subarray( 0, 8 ).equals( Buffer.from( [ 137, 80, 78, 71, 13, 10, 26, 10 ] ) ) ) return 'PNG image';
@@ -70,7 +71,8 @@ export async function renderWorldAssetIndex( worldRoot ) {
 			const id = value.slice( 'sha256:'.length );
 			const refs = references.get( id ) || [];
 			const field = pathParts.at( -1 ) || 'asset';
-			const role = field === 'assetId' && pathParts.includes( 'lods' ) ? 'LOD mesh'
+			const role = field === 'assetId' && pathParts.includes( 'extensions' ) ? 'world behavior module'
+				: field === 'assetId' && pathParts.includes( 'lods' ) ? 'LOD mesh'
 				: field === 'assetId' && componentType === 'elsemesh.ambient-audio/1' ? 'audio bed'
 					: fieldNames.get( field ) || ( field === 'assetId' ? 'mesh' : field.replace( /Id$/, '' ) );
 			refs.push( { owner: owner || 'World asset', role, componentType } );

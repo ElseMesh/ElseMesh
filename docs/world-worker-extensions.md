@@ -44,9 +44,11 @@ receive only the authoritative shared state required by the world protocol.
 The engine and publisher use the signed `javascript/1` asset kind and a
 dedicated Worker host. JavaScript module bytes are UTF-8 checked and bounded;
 startup and each call have a deadline, and message payloads are size-limited.
-WebGPU and WebGL hosted-world activation now create, expose, and dispose the
-generic runtime through behavior registry contexts. No world package consumes
-the runtime yet. The engine now accepts an otherwise unknown behavior ID only
-when the signed experience binds it to a Worker extension, allowing a world
-package to define its own behavior contract. The world-owned gameplay migration
-and first package consumer remain open.
+WebGPU and WebGL world activation create, expose, and dispose the generic
+runtime through behavior registry contexts. The Tidewater package is its first
+consumer: its signed fishing rules module receives the authored schedule during
+Worker initialization and returns the rate table used by both renderer paths.
+The engine also accepts an otherwise unknown behavior ID only when the signed
+experience binds it to a Worker extension, allowing a world package to define
+its own behavior contract. The rest of the world-owned gameplay migration
+remains open.
