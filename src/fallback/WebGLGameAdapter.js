@@ -2,7 +2,7 @@ import { GameHUD } from '../game/GameHUD.js';
 import { createWorldBehaviorRuntime } from '../network/WorldBehaviorRegistry.js';
 import { FishingRod } from '../game/FishingRod.js';
 import { habitatAt } from '../game/Bites.js';
-import { BoatGameplayRuntime } from '../game/BoatGameplayRuntime.js';
+import { BoatGameplayRuntime } from '../../worlds/tidewater/BoatGameplayRuntime.js';
 import { WORLD } from '../world/WorldLayout.js';
 import { WebGLFishingRodPresentation } from './WebGLFishingRodPresentation.js';
 

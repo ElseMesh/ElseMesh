@@ -7,7 +7,7 @@ import { FishStand } from './FishStand.js';
 import { Chandlery } from './Chandlery.js';
 import { CatchDisplay } from './CatchDisplay.js';
 import { UPGRADES } from '../../worlds/tidewater/Gear.js';
-import { BoatGameplayRuntime } from './BoatGameplayRuntime.js';
+import { BoatGameplayRuntime } from '../../worlds/tidewater/BoatGameplayRuntime.js';
 import { GameHUD } from './GameHUD.js';
 import { Minimap } from './Minimap.js';
 import { Guide } from './Guide.js';
