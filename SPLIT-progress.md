@@ -111,3 +111,9 @@ newly supported or a finding changes them.
   tree and removing only its two obsolete content-addressed asset files, the
   full client suite and external production build passed. The cpto dry run
   showed only the requested changed files; no submodule was pruned.
+- 2026-10-29: moved the default world-package dependency out of `App.js` and
+  `WebGLFallback.js`; the entry point now injects it, and the hosted-player
+  test explicitly imports Tidewater registrations for its boat fixture. The
+  full client suite and external production build passed. This creates a
+  package seam but does not complete separation: `main.js` still assembles the
+  built-in Tidewater world, and `App.js` still owns built-in island systems.

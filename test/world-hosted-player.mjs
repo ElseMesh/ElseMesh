@@ -7,6 +7,7 @@ import { mapPortalPlayerState, mapPortalVehicleState } from '../src/network/Port
 import { Colliders } from '../src/world/Colliders.js';
 import { keyboardLookDelta } from '../src/core/Input.js';
 import { WorldPresenceSession } from '../src/network/WorldPresenceSession.js';
+import '../worlds/tidewater/register-behavior.js';
 
 const positions = new Float32Array( 11 * 11 * 3 );
 for ( let row = 0; row < 11; row ++ ) for ( let column = 0; column < 11; column ++ ) {

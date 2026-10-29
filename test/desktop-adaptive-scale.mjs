@@ -10,6 +10,9 @@ globalThis.location = { search: '' };
 Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { platform: 'Linux x86_64', userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' } } );
 const stored = new Map();
 globalThis.localStorage = { getItem: ( key ) => stored.get( key ) ?? null, setItem: ( key, value ) => stored.set( key, value ) };
+const worldPackage = { source: { experience: { behaviors: {} } }, assets: { extensionModules: {} } };
+const injected = new App( { worldPackage } );
+if ( injected.worldPackage !== worldPackage || injected.localWorldExperience !== worldPackage.source.experience ) throw new Error( 'App should use the world package supplied by its entry point' );
 const linux = new App();
 if ( linux.graphicsPriority !== 'fps' || ! linux.desktopAdaptiveScale || linux.settings.renderScale !== 0.75 || linux.desktopCanvasScale !== 0.7 || linux.desktopFrameRateLimit !== 24 || linux.desktopAntiAliasingMode !== 'none' || linux.desktopRefractionScale !== 0.35 ) throw new Error( 'Linux desktop should default to FPS priority with adaptive scaling and a 24 fps GPU budget' );
 

@@ -36,11 +36,6 @@ import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERI
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
-import { defaultWorldPackage } from '../../worlds/default.js';
-
-const { source: defaultWorldSource, assets: defaultWorldAssets } = defaultWorldPackage;
-const ISLAND_WILDLIFE_COMPONENT = defaultWorldSource.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' );
-const ISLAND_WHALE_COMPONENT = defaultWorldSource.components.find( component => component.type === 'elsemesh.humpback-whale/1' );
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -709,6 +704,11 @@ export class WebGLFallback {
 	constructor( app, engine ) {
 
 		this.app = app;
+		this.defaultWorldPackage = app.worldPackage;
+		this.defaultWorldSource = this.defaultWorldPackage?.source || null;
+		this.defaultWorldAssets = this.defaultWorldPackage?.assets || null;
+		this.islandWildlifeComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' ) || null;
+		this.islandWhaleComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.humpback-whale/1' ) || null;
 		this.engine = engine;
 		this.THREE = engine.THREE;
 		this.renderer = engine.renderer;
@@ -737,7 +737,7 @@ export class WebGLFallback {
 		this.input = null;
 		this.player = null;
 		this.hostedSeaLevel = null;
-		this.worldSeaLevel = defaultWorldSource.rules.seaLevel ?? 0;
+		this.worldSeaLevel = this.defaultWorldSource?.rules.seaLevel ?? 0;
 		this.hostedWildlifeComponent = null;
 		this.vegetationRecords = null;
 		this.wildlifeRuntime = null;
@@ -792,8 +792,8 @@ export class WebGLFallback {
 			this.player.camera.position.set( ...this.spawn.position );
 			this.player._camY = null;
 			this.activeWorldExtensions?.dispose();
-			this.activeWorldExtensions = createWorldBehaviorExtensions( defaultWorldSource.experience, defaultWorldPackage.assets.extensionModules );
-			dispatchWorldBehaviorHooks( defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T, extensions: this.activeWorldExtensions } );
+			this.activeWorldExtensions = createWorldBehaviorExtensions( this.defaultWorldSource.experience, this.defaultWorldAssets.extensionModules );
+			dispatchWorldBehaviorHooks( this.defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T, extensions: this.activeWorldExtensions } );
 		} else {
 			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
@@ -839,7 +839,7 @@ export class WebGLFallback {
 				if ( ! this.hostedTerrainData ) throw new Error( `Wildlife component ${this.hostedWildlifeComponent.id} requires its packaged terrain surface` );
 				this._createWildlifeRuntime( this.hostedTerrainData, this.app.worldState.hostedColliders || this.app.worldState.colliders, this.hostedWildlifeComponent );
 			}
-		} else this._createWildlifeRuntime( this.terrain, this.app.worldState.colliders, ISLAND_WILDLIFE_COMPONENT );
+		} else this._createWildlifeRuntime( this.terrain, this.app.worldState.colliders, this.islandWildlifeComponent );
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -896,7 +896,7 @@ export class WebGLFallback {
 	async _loadIslandWhale() {
 
 		try {
-			await this._loadWebGLWhale( ISLAND_WHALE_COMPONENT, null, this.terrain, defaultWorldSource.rules.seaLevel ?? 0 );
+			await this._loadWebGLWhale( this.islandWhaleComponent, null, this.terrain, this.defaultWorldSource.rules.seaLevel ?? 0 );
 		} catch ( error ) {
 			console.warn( 'WebGL island whale package unavailable:', error );
 		}
@@ -1329,7 +1329,7 @@ export class WebGLFallback {
 		this.terrain = this.app.worldState.terrain;
 		const T = this.THREE;
 		try {
-			const model = await this.loader.loadAsync( defaultWorldAssets.terrainLOD );
+			const model = await this.loader.loadAsync( this.defaultWorldAssets.terrainLOD );
 			const terrainMaterial = webglTerrainMaterial( T, this.terrain );
 			this.terrainColorTexture = terrainMaterial.userData.terrainTextures[ 0 ];
 			model.scene.traverse( object => {
@@ -1368,7 +1368,7 @@ export class WebGLFallback {
 		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
-			const model = await this.loader.loadAsync( defaultWorldAssets.villageLOD );
+			const model = await this.loader.loadAsync( this.defaultWorldAssets.villageLOD );
 			model.scene.traverse( object => {
 				if ( ! object.isMesh ) return;
 				object.castShadow = true;
@@ -1426,7 +1426,7 @@ export class WebGLFallback {
 		try {
 			let expectedSeed;
 			if ( ! placementBytes ) {
-				const response = await fetch( defaultWorldAssets.vegetationPlacements );
+				const response = await fetch( this.defaultWorldAssets.vegetationPlacements );
 				if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 				placementBytes = new Uint8Array( await response.arrayBuffer() );
 				expectedSeed = 7;
@@ -1686,9 +1686,9 @@ export class WebGLFallback {
 
 	async _loadPackagedReef() {
 
-		const components = defaultWorldSource.components.filter( item => item.type === 'elsemesh.static-reef/1' );
+		const components = this.defaultWorldSource.components.filter( item => item.type === 'elsemesh.static-reef/1' );
 		const recordsByTile = await Promise.all( components.map( async component => {
-			const url = defaultWorldAssets.reefPlacements[ component.placementAssetId ];
+			const url = this.defaultWorldAssets.reefPlacements[ component.placementAssetId ];
 			if ( ! url ) throw new Error( `Default world reef asset ${component.placementAssetId} is missing from its package` );
 			const response = await fetch( url );
 			if ( ! response.ok ) throw new Error( `Default world reef asset ${component.placementAssetId} returned ${response.status}` );
@@ -1788,7 +1788,7 @@ export class WebGLFallback {
 		this._keyDown = event => {
 			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
-			const experience = this.worldLink ? this.connector?.manifest?.experience : defaultWorldSource.experience;
+			const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
 			if ( dispatchWorldBehaviorHooks( experience, 'onWebGLKeyDown', { fallback: this, event, extensions: this.activeWorldExtensions } ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
 			if ( this.worldLink && event.code === 'KeyE' ) this._useNearestPortal();
 		};
@@ -1832,7 +1832,7 @@ export class WebGLFallback {
 			object.material.uniforms.uTime.value = simulationTime;
 			object.material.uniforms.uCameraPosition?.value.copy( this.camera.position );
 		}
-		const experience = this.worldLink ? this.connector?.manifest?.experience : defaultWorldSource.experience;
+		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
 		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWebGLBlocksPlayerInput', { fallback: this, extensions: this.activeWorldExtensions } );
 		if ( this.player && ! gamePanelOpen ) {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
@@ -1853,7 +1853,7 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		this.reefAdapter?.update( this.camera, simulationTime, defaultWorldSource.rules.seaLevel ?? 0 );
+		this.reefAdapter?.update( this.camera, simulationTime, this.defaultWorldSource.rules.seaLevel ?? 0 );
 		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
 		if ( this.wildlifeRuntime ) {

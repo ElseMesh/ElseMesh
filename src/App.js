@@ -82,7 +82,6 @@ import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldE
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
-import { defaultWorldPackage } from '../worlds/default.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { vehiclePolicy } from './network/WorldRules.js';
@@ -137,11 +136,12 @@ export function resolveGraphicsPriority( { isLinuxDesktop, backend = null, query
 
 export class App {
 
-	constructor() {
+	constructor( { worldPackage = null } = {} ) {
 
 		this.qs = new URLSearchParams( location.search );
+		this.worldPackage = worldPackage;
 		this.hostedQueries = new WeakMap();
-		this.localWorldExperience = defaultWorldPackage.source.experience;
+		this.localWorldExperience = worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
 		const platform = navigator.userAgentData?.platform || navigator.platform || '';
 		this.isLinuxDesktop = /linux/i.test( platform ) && ! /android/i.test( navigator.userAgent );
@@ -223,6 +223,7 @@ export class App {
 
 		const qs = this.qs;
 		const worldLink = worldLinkFromLocation();
+		if ( ! worldLink && ! this.worldPackage ) throw new Error( 'The application entry point must provide a default world package for local play' );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
 		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
@@ -541,7 +542,7 @@ export class App {
 		// World gameplay is installed from the active world's declared behaviors.
 		this.worldGames = new Map();
 		this.game = null;
-		this.localWorldExtensions = ! worldLink ? createWorldBehaviorExtensions( this.localWorldExperience, defaultWorldPackage.assets.extensionModules ) : null;
+		this.localWorldExtensions = ! worldLink ? createWorldBehaviorExtensions( this.localWorldExperience, this.worldPackage.assets.extensionModules ) : null;
 		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local', extensions: this.localWorldExtensions } );
 		// the lanterns at Joe's fish stand and Marta's chandlery (lit from dusk like the village lamps);
 		// positions are in each stall's frame (x right, z toward the customer), turned by its yaw
