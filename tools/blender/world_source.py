@@ -10,6 +10,10 @@ import os
 import pathlib
 import sys
 import bpy
+TOOL_DIR = str(pathlib.Path(__file__).resolve().parent)
+if TOOL_DIR not in sys.path:
+    sys.path.insert(0, TOOL_DIR)
+from world_identity import is_world_id
 
 PROTOCOL = "elsemesh.world-source/3"
 TEXT_NAME = "ElseMeshThruHoldSource"
@@ -27,7 +31,7 @@ def args():
 def validate(source):
     if source.get("protocol") != PROTOCOL:
         raise ValueError("unsupported ThruHold source protocol")
-    if not str(source.get("worldId", "")).startswith("world:"):
+    if not is_world_id(source.get("worldId")):
         raise ValueError("missing worldId")
     if not isinstance(source.get("objects"), list) or not isinstance(source.get("portals"), list):
         raise ValueError("objects and portals must be arrays")

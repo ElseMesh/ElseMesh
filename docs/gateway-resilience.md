@@ -6,7 +6,7 @@ ElseMesh separates a world's identity from the machines that can serve it. This 
 
 | Value | Identifies | Browser can connect directly? |
 | --- | --- | --- |
-| `world:<name>` ThruHold ID | The signed world and its content | No; it needs a provider route |
+| `elsemesh:<name>` ThruHold ID | The signed world and its content | No; it needs a provider route |
 | ZeroTier node ID (10 hex characters) | A persistent `thruholdd` overlay identity | No; a browser is not on the ZeroTier network |
 | libp2p PeerID | One daemon/provider identity | No; it is not a network address |
 | HTTPS/WSS gateway origin | A public endpoint for that provider | Yes, subject to TLS, availability, and world authorization |

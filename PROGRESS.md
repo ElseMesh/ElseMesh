@@ -44,10 +44,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   checks now live in `worlds/tidewater/test/` and pass from the engine runner.
 - The paired fishing trace now drives the Tidewater module through both the
   retained WebGPU `Game` path and the WebGL adapter. Fight snapshots, terminal
-  rod state, inventory, catch card, audio cues, and toasts match over a 975-frame
-  encounter. This verifies the two current paths for that encounter; it does
-  not establish pre-split WebGPU parity, boat parity, the broader fishing/input
-  matrix, or visual parity. Bite timing and presentation remain engine-owned.
+  rod state, inventory, catch card, audio cues, and toasts match over a 987-frame
+  encounter. A golden trace captured from pre-split WebGPU `CatchMinigame` at
+  `23c30bf` now matches the signed Worker frame by frame for the same fish,
+  inputs, and random stream. The focused checks and Blender CLI confirm v3
+  `elsemesh:` world IDs are accepted and legacy `world:` IDs rejected. Boat
+  parity, the broader fishing/input matrix, and visual parity remain open; bite
+  timing and presentation remain engine-owned.
 - An earlier extension prototype used signed Wasm asset references. The active
   implementation uses JavaScript Workers; Wasm is not part of the plan.
 

@@ -18,6 +18,10 @@ import re
 import sys
 import os
 import tempfile
+TOOL_DIR = str(pathlib.Path(__file__).resolve().parent)
+if TOOL_DIR not in sys.path:
+    sys.path.insert(0, TOOL_DIR)
+from world_identity import is_world_id
 
 PROTOCOL = "elsemesh.blender-actions/1"
 MAX_PLAN_BYTES = 16 * 1024 * 1024
@@ -162,7 +166,7 @@ def validate_source(source):
             if not isinstance(point, dict) or not finite_number(point.get("yaw")):
                 raise ValueError("portal %s has an invalid %s transform" % (record["id"], key))
             vector(point.get("position"), "portal %s position" % key)
-        if not isinstance(record.get("destinationWorldId"), str) or not record["destinationWorldId"].startswith("world:"):
+        if not is_world_id(record.get("destinationWorldId")):
             raise ValueError("portal %s requires a destination world" % record["id"])
         if not isinstance(record.get("openView"), bool) or not isinstance(record.get("enabled"), bool):
             raise ValueError("portal %s requires boolean openView and enabled" % record["id"])
@@ -179,7 +183,7 @@ def validate_source(source):
 def validate_portal_back(back):
     from urllib.parse import urlparse
     fields = {"destinationWorldId", "destinationPeerId", "destinationGateway", "exit", "openView", "enabled"}
-    if not isinstance(back, dict) or set(back) - fields or not re.fullmatch(r"world:[\w.-]{1,128}", str(back.get("destinationWorldId", ""))):
+    if not isinstance(back, dict) or set(back) - fields or not is_world_id(back.get("destinationWorldId")):
         raise ValueError("invalid portal back fields or destination")
     if "destinationPeerId" in back and (not isinstance(back["destinationPeerId"], str) or not re.fullmatch(r"[A-Za-z0-9]{20,256}", back["destinationPeerId"])):
         raise ValueError("invalid portal back peer")

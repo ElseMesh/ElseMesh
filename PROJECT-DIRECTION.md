@@ -8,8 +8,8 @@ these estimates when new verification evidence is recorded.
 
 **Extension constraint: do not implement or extend Wasm.** It is too CPU-heavy.
 Use the lighter owner-signed JavaScript module path in dedicated browser
-Workers. Treat the existing Wasm guard and asset validators as a retired
-prototype to remove, not as the basis for future runtime work.
+Workers. The retired Wasm guard, worker, and asset validators have been removed;
+do not reintroduce them as part of world-runtime work.
 
 ## Current priority: finish Tidewater package integration and parity
 
