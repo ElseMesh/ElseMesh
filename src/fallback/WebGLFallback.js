@@ -739,6 +739,7 @@ export class WebGLFallback {
 		this.input = null;
 		this.player = null;
 		this.hostedSeaLevel = null;
+		this.worldSeaLevel = defaultWorldSource.rules.seaLevel ?? 0;
 		this.hostedWildlifeComponent = null;
 		this.vegetationRecords = null;
 		this.wildlifeRuntime = null;
@@ -782,7 +783,7 @@ export class WebGLFallback {
 		this.camera.position.set( ...this.spawn.position );
 		this.input = new Input( this.engine.canvas );
 		if ( ! this.worldLink ) {
-			this.waterQuery = new WebGLWaterQuery( this.terrain, - 0.15 );
+			this.waterQuery = new WebGLWaterQuery( this.terrain, this.worldSeaLevel );
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders } );
 			this.boat.controller.model = this.boat.model;
 			this._addIslandGameplayColliders();
@@ -867,7 +868,7 @@ export class WebGLFallback {
 			boat: this.boat?.controller || null,
 			boatModel: this.boat?.model || null,
 			shoreProbe: this.shoreField ? new WebGLSwashProbe( {
-				field: this.shoreField, terrain, seaLevel: this.hostedSeaLevel ?? - 0.15,
+				field: this.shoreField, terrain, seaLevel: this.worldSeaLevel,
 				time: () => this.animationStartTime ? ( performance.now() - this.animationStartTime ) * 0.001 : 0,
 			} ) : null,
 			query: this.waterQuery, seed: component?.seed ?? 5,
@@ -1364,14 +1365,14 @@ export class WebGLFallback {
 		}
 		progress( 0.52, 'Mapping the coastal swell…' );
 		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
-		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, - 0.15 );
+		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, this.worldSeaLevel );
 		this.shoreField = waterTerrain.shore?.field || null;
-		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), - 0.15, waterTerrain, 1 ) );
-		const beachPatch = this._makeWater( new T.PlaneGeometry( WORLD.beach.xMax - WORLD.beach.xMin + 100, 160, 672, 256 ), - 0.15, waterTerrain, 2 );
+		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), this.worldSeaLevel, waterTerrain, 1 ) );
+		const beachPatch = this._makeWater( new T.PlaneGeometry( WORLD.beach.xMax - WORLD.beach.xMin + 100, 160, 672, 256 ), this.worldSeaLevel, waterTerrain, 2 );
 		beachPatch.position.x = ( WORLD.beach.xMin + WORLD.beach.xMax ) * 0.5;
 		beachPatch.position.z = - 40;
 		this.waterScene.add( beachPatch );
-		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, - 0.15 ) );
+		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( defaultWorldAssets.villageLOD );
@@ -1683,6 +1684,7 @@ export class WebGLFallback {
 		}
 		this.hostedSeaLevel = ( manifest.components || [] ).some( component => [ 'elsemesh.island-ocean/1', 'elsemesh.water-body/1' ].includes( component.type ) )
 			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
+		this.worldSeaLevel = this.hostedSeaLevel ?? 0;
 		this.hostedComponents = components;
 		this.hostedTitle = manifest.title || 'Hosted world';
 		this.hostedSupportedComponents = supportedComponents;
@@ -1925,8 +1927,8 @@ export class WebGLFallback {
 		const boat = this.boat?.controller;
 		audio.update( dt, {
 			listener: { position: p, forward: fwd, up: new this.THREE.Vector3( 0, 1, 0 ) },
-			underwater: p.y < - 0.15 ? 1 : 0,
-			depthBelowSurface: Math.max( 0, - 0.15 - p.y ),
+			underwater: p.y < this.worldSeaLevel ? 1 : 0,
+			depthBelowSurface: Math.max( 0, this.worldSeaLevel - p.y ),
 			distanceToShore: Math.abs( coast ), coastDistance: coast,
 			nearPier: Math.abs( p.x - WORLD.pier.x ) < 12 && p.z > WORLD.pier.zStart - 5 && p.z < WORLD.pier.zEnd + 8,
 			boat: { active: !! boat?.driven, rpm: boat?.rpm || 0, speed: boat?.velocity?.length?.() || 0, position: this.boat?.model?.group?.position, listenerInside: false },
