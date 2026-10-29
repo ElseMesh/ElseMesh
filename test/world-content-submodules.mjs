@@ -9,6 +9,7 @@ import { renderWorldAssetIndex } from '../tools/world-asset-index.mjs';
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const modules = await readFile( path.join( root, '.gitmodules' ), 'utf8' );
 assert.match( modules, /path = worlds\/tidewater\n\s*url = https:\/\/github\.com\/ElseMesh\/tidewater\.git/ );
+assert.match( modules, /path = worlds\/Hogwarts\n\s*url = git@github\.com:rebroad\/Hogwarts-World\.git/ );
 
 const superproject = execFileSync( 'git', [ '-C', path.join( root, 'worlds/tidewater' ), 'rev-parse', '--show-superproject-working-tree' ], { encoding: 'utf8' } ).trim();
 const status = execFileSync( 'git', [ '-C', superproject || root, 'submodule', 'status' ], { encoding: 'utf8' } );
@@ -38,6 +39,9 @@ async function verifyWorld( directory, expectedWorldId ) {
 }
 
 const tidewaterAssets = await verifyWorld( 'worlds/tidewater', 'elsemesh:example-island' );
+const hogwartsEntry = JSON.parse( await readFile( path.join( root, 'worlds/Hogwarts/entry-point-selection.json' ), 'utf8' ) );
+assert.equal( hogwartsEntry.worldId, 'elsemesh:hogwarts-legacy-local', 'Hogwarts-authored entry metadata remains in its world repository' );
+assert.ok( hogwartsEntry.previewRegion.mapPath && hogwartsEntry.previewSpawn.position.length === 3, 'Hogwarts retains its authored region and preview spawn metadata' );
 
 for ( const link of [ 'public/audio', 'public/models/debris', 'public/models/props', 'public/models/whale' ] ) {
 	const resolved = await realpath( path.join( root, link ) );
@@ -45,4 +49,4 @@ for ( const link of [ 'public/audio', 'public/models/debris', 'public/models/pro
 	assert.ok( ( await stat( resolved ) ).isDirectory(), `${link} resolves to a directory` );
 }
 
-console.log( `ok Tidewater content submodule (${tidewaterAssets} verified assets)` );
+console.log( `ok world content repositories (Tidewater: ${tidewaterAssets} verified assets; Hogwarts: authored entry metadata)` );
