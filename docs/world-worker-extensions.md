@@ -43,4 +43,7 @@ dedicated Worker host. JavaScript module bytes are UTF-8 checked and bounded;
 startup and each call have a deadline, and message payloads are size-limited.
 WebGPU and WebGL hosted-world activation now create, expose, and dispose the
 generic runtime through behavior registry contexts. No world package consumes
-the runtime yet; the world-owned behavior migration remains open.
+the runtime yet. The engine now accepts an otherwise unknown behavior ID only
+when the signed experience binds it to a Worker extension, allowing a world
+package to define its own behavior contract. The world-owned gameplay migration
+and first package consumer remain open.

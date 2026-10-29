@@ -21,7 +21,7 @@ assert.equal( runtime.bite.t, 3.6, 'signed declarative fishing rules change loca
 assert.equal( otherRuntime.biteRateSchedule, undefined, 'a world without a bite-rate rule retains the default game behavior' );
 assert.throws( () => worldBehaviorsFor( { behaviors: { 'elsemesh.fishing-game/1': { biteRateSchedule: { defaultMultiplier: 1, windows: [ { startHour: 4, endHour: 6, multiplier: 1.2 }, { startHour: 5, endHour: 7, multiplier: 1.3 } ] } } } } ), /Invalid fishing bite-rate schedule window/ );
 assert.equal( hasWorldBehavior( experience, 'elsemesh.fishing-game/1' ), true );
-assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /does not support required world behavior/ );
+assert.throws( () => worldBehaviorsFor( { behaviors: { 'tidewater.fishing-game/1': {} } } ), /Invalid world behavior ID/, 'world-owned behavior IDs stay inside the ElseMesh namespace' );
 assert.throws( () => registerWorldBehavior( 'elsemesh.invalid/1', {} ), /Invalid world behavior/ );
 
 registerWorldBehavior( 'elsemesh.registry-test/1', {
@@ -80,5 +80,17 @@ assert.deepEqual( await extensions.run( 'elsemesh.registry-test/1', { type: 'pin
 await assert.rejects( extensions.run( 'elsemesh.registry-test/1', { type: 'unknown' } ), /invalid test event/, 'event meaning stays in the registered behavior package' );
 extensions.dispose();
 assert.equal( worker.terminated, true, 'world extension teardown terminates its Worker' );
+
+const worldOwnedBehaviorID = 'elsemesh.world-owned-test/1';
+const worldOwnedExtensionExperience = {
+	behaviors: { [ worldOwnedBehaviorID ]: { privateRule: 'module-owned' } },
+	extensions: [ { behaviorId: worldOwnedBehaviorID, assetId: extensionAssetID } ],
+};
+assert.deepEqual( worldBehaviorsFor( worldOwnedExtensionExperience ).map( ( { id } ) => id ), [ worldOwnedBehaviorID ], 'an owner-signed extension can define a behavior without an engine registration' );
+const worldOwnedWorker = new FakeWorker();
+const worldOwnedExtensions = createWorldBehaviorExtensions( worldOwnedExtensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { accepted: event }; }' ) ] ] ), { workerFactory: () => worldOwnedWorker } );
+assert.deepEqual( await worldOwnedExtensions.run( worldOwnedBehaviorID, { action: 'world-specific' } ), { echo: { action: 'world-specific' } }, 'unregistered world behavior messages are delegated to the owner module' );
+worldOwnedExtensions.dispose();
+assert.equal( worldOwnedWorker.terminated, true, 'owner-defined behavior worker is terminated with its world' );
 
 console.log( 'world behavior registry: ok' );

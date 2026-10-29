@@ -18,11 +18,12 @@ export function worldBehaviorsFor( experience ) {
 	const dataById = experience?.behaviors ?? {};
 	if ( ! dataById || typeof dataById !== 'object' || Array.isArray( dataById ) || Object.keys( dataById ).length > 16 || JSON.stringify( dataById ).length > 64 * 1024 ) throw new Error( 'Invalid world behavior map' );
 	return Object.entries( dataById ).map( ( [ id, data ] ) => {
+		if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) ) throw new Error( `Invalid world behavior ID: ${id}` );
 		const behavior = behaviors.get( id );
-		if ( ! behavior ) throw new Error( `This client does not support required world behavior: ${id}` );
 		if ( ! data || typeof data !== 'object' || Array.isArray( data ) ) throw new Error( `Invalid world behavior data: ${id}` );
-		behavior.validateExperienceData?.( data );
-		return { ...behavior, data };
+		if ( ! behavior && ! ( Array.isArray( experience?.extensions ) && experience.extensions.some( extension => extension?.behaviorId === id ) ) ) throw new Error( `This client does not support required world behavior: ${id}` );
+		behavior?.validateExperienceData?.( data );
+		return { ...( behavior || { id } ), data };
 	} );
 }
 
@@ -74,9 +75,9 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 			} );
 			runtimes.set( reference.behaviorId, Object.freeze( {
 				async run( event ) {
-					behavior.validateExtensionEvent?.( event );
+					behavior?.validateExtensionEvent?.( event );
 					const result = await workerRuntime.run( event );
-					behavior.validateExtensionResult?.( result, event );
+					behavior?.validateExtensionResult?.( result, event );
 					return result;
 				},
 				dispose() { workerRuntime.dispose(); },

@@ -10,8 +10,11 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   publisher, world daemon, and browser now use bounded signed `javascript/1`
   modules in a dedicated Worker with UTF-8, message-size, startup, and execution
   limits. Hosted WebGPU and WebGL activation pass the generic Worker manager
-  through registry hooks and dispose it with the world. No world package consumes
-  it yet, and fishing behavior still needs to move out of engine code.
+  through registry hooks and dispose it with the world. The behavior registry
+  now accepts an engine-unknown behavior only when the signed experience binds
+  it to a Worker module; the module owns that behavior's event validation. No
+  world package consumes the runtime yet, and fishing behavior still needs to
+  move out of engine code.
 - The focused Worker, registry, experience, manifest, and Go worldd tests pass;
   `npm run build` passes in the external build tree. The full `npm test` run
   passed through the engine smoke checks, then its gateway E2E could not find
@@ -20,9 +23,8 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   separately both passed.
 - Tidewater package-specific export, authored collision, boat LOD, and Blender
   checks now live in `worlds/tidewater/test/` and pass from the engine runner.
-- World sources also gained signed Wasm asset references for that prototype.
-  Those references and validators still exist in code and need removal; they
-  are not part of the active implementation plan.
+- An earlier extension prototype used signed Wasm asset references. The active
+  implementation uses JavaScript Workers; Wasm is not part of the plan.
 
 ## 2026-10-24
 
