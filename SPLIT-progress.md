@@ -16,7 +16,7 @@ unfinished runtime boundary or parity gate.
 | Keep authored Tidewater and Hogwarts world data in their own repositories | **100%** | Both are mounted as submodules and documented in [`docs/world-repository-layout.md`](docs/world-repository-layout.md). Repository separation is recorded complete in [`GOAL-done.md`](GOAL-done.md). This measures authored-data ownership only; engine-side runtime handlers still need extraction. |
 | ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **100%** | Signed manifests require `elsemesh.world/3`; source requires `elsemesh.world-source/3`; client/server/Blender reject old world IDs and manifest/source protocols. Obsolete Blender metadata aliases and the daemon's Tidewater-named local profile/ZeroTier auto-migration paths have been removed. Focused identity/Blender checks, `go test ./...`, the full client suite, and the external build passed. Historical negative tests mention old forms only to prove rejection. |
 | Owner-signed JavaScript world extensions run in dedicated browser Workers; no Wasm implementation | **90%** | `src/network/WorldJavaScriptExtension.js` and its Worker enforce message bounds, startup/run limits, and worker teardown; server manifest validation binds extension assets to signed `javascript/1` assets. No Wasm runtime is implemented. Remaining: re-run extension lifecycle and signed-manifest integration checks against the final tree and ensure the world package integration uses this generic host path. |
-| Registry-based, world-agnostic engine behavior and component installation | **58%** | `WorldBehaviorRegistry.js`, generic component envelopes, renderer-neutral traits, and registered installers exist. `App.installWorldComponents()` selects backend adapters from the generic registry. Tidewater registers its fish-prop WebGPU and WebGL installers from its own component module; ElseMesh chooses the active backend. Tidewater's fish-prop asset decoder registers through `WorldComponentAssetCodecRegistry.js`. `worlds/tidewater/test/webgl-fish-props-adapter-build.mjs` checks Node-side mesh construction and registry installation only; it does not create a GPU context or verify pixels/FPS. WebGL support readiness requires registered adapters for water-surface traits, with tests proving unhandled surfaces remain unsupported. Tidewater's terrain, vegetation, reef, wildlife, whale, village material, and boat installers still live in `worlds/tidewater/component-installers.js`. **Still incomplete:** other WebGL presentation in `src/fallback/WebGLFallback.js` and Tidewater-specific material handling in `WorldPackage.js` remain; the default app still loads Tidewater registrations. Acceptance requires migrating the remaining handlers and proving an independent world can load without Tidewater code. |
+| Registry-based, world-agnostic engine behavior and component installation | **60%** | `WorldBehaviorRegistry.js`, generic component envelopes, renderer-neutral traits, and registered installers exist. `App.installWorldComponents()` selects backend adapters from the generic registry. Tidewater registers its fish-prop WebGPU and WebGL installers from its own component module; ElseMesh chooses the active backend. Tidewater's fish-prop asset decoder registers through `WorldComponentAssetCodecRegistry.js`. World package material adapters now register by component type; `WorldPackage.js` no longer imports or names Tidewater's village material profile, decoder, or shader builder. `worlds/tidewater/test/webgl-fish-props-adapter-build.mjs` checks Node-side mesh construction and registry installation only; it does not create a GPU context or verify pixels/FPS. WebGL support readiness requires registered adapters for water-surface traits, with tests proving unhandled surfaces remain unsupported. Tidewater's terrain, vegetation, reef, wildlife, whale, village material, and boat installers still live in `worlds/tidewater/component-installers.js`. **Still incomplete:** Tidewater-specific presentation in `src/fallback/WebGLFallback.js`/`WebGLVillageMaterials.js` and renderer dependencies inside Tidewater's package material adapter remain; the default app still loads Tidewater registrations. Acceptance requires migrating the remaining handlers and proving an independent world can load without Tidewater code. |
 | World packages remain renderer-neutral; ElseMesh selects WebGPU or WebGL | **39%** | `elsemesh.water-body/1` uses engine-owned adapters selected by the active backend registry; the WebGL ocean component also uses an engine-owned adapter. Fish-prop placement data stays backend-neutral, and Tidewater now owns its two backend installers while ElseMesh selects one through the registry. Those installers still contain WebGPU/WebGL-specific paths, so this ownership move does not yet make the fish renderer backend-neutral. Hosted WebGL sea-level detection consumes the registry's generic `waterSurface` trait rather than enumerating water component IDs. The village vertex-data attribute is now `_ELSEMESH_VDATA`, removing the Tidewater-specific `_TW_` tag from the engine loader; the Tidewater package exporter regenerates the content-addressed assets with the new attribute. `component-installers.js` still supplies backend-dependent installers for other components, and other `WebGLFallback.js` component paths remain world-specific. Acceptance requires a generic renderer contract and verification of the same world package behavior on both renderers. |
 | Tidewater gameplay and content parity: WebGPU baseline, WebGL aligned | **80%** | Tidewater has deterministic pre-split WebGPU fishing and boat traces plus WebGPU/WebGL fishing and WebGL fish-stand/boat content checks under `worlds/tidewater/test/`. The full client suite passes after the hosted-water fixes. An isolated WebGPU capture shows the hosted shoreline foam and surf restored against the pre-split reference; WebGL runtime checks confirm the packaged fish stand/content is present and the moored boat remains stable. Remaining: compare more reference views, exercise fish-stand interaction and underway boat behavior in the live split build, and resolve any visual differences. WebGL appearance is not a visual baseline. |
 
@@ -85,11 +85,18 @@ Tidewater's registered fish-presentation profile; the engine's `FishProps`
 static placement helpers were removed. WebGPU/WebGL rendering code remains in
 ElseMesh, and the WebGL mesh expansion/LOD gap is unchanged.
 
+Village material profile names and role sets now register in the generic
+`WorldMaterialProfileRegistry`. A generic package-material adapter registry
+dispatches profile preparation and GLB material resolution to Tidewater's
+provider; `WorldPackage.js` no longer imports Tidewater's decoder or shader
+builder. The provider still imports engine renderer APIs, and the WebGL
+presentation path remains profile-specific; those are still separation work.
+
 Next, migrate the remaining world-supplied component installer callbacks and
-backend-specific behavior hooks behind engine-owned registries, then remove
-Tidewater-specific WebGL component dispatch and material handling from
-`WorldPackage.js`. Keep renderer choice in ElseMesh and expose backend-neutral
-contracts to worlds. In parallel with that extraction, implement the generic
+backend-specific behavior hooks behind engine-owned registries, then move
+Tidewater's WebGL presentation and its renderer-dependent package material
+adapter behind backend-neutral contracts. Keep renderer choice in ElseMesh and
+expose backend-neutral contracts to worlds. In parallel with that extraction, implement the generic
 static-model instance set above and remove the fish-specific renderer from
 both hosted adapters; do not move `FishProps.js` wholesale. Then sync to an
 available external build tree and run isolated-browser parity checks. Update
@@ -148,6 +155,19 @@ them.
   to `_ELSEMESH_VDATA` across the engine loader, Tidewater exporter, checks,
   and generated content-addressed package. Tidewater world-export and
   village-material tests plus the engine profile test passed.
+- 2026-10-29: moved Tidewater's village material profile and allowed role list
+  into the Tidewater repository and made ElseMesh package/WebGL code resolve
+  roles through a generic registry. This removes the engine's direct import of
+  Tidewater's profile parser; village material decoding and renderer creation
+  are still directly coupled and remain open.
+- 2026-10-29: moved village package material preparation and GLB material
+  resolution behind a generic world-package material adapter registry. The
+  Tidewater package module now supplies its own adapter; `WorldPackage.js`
+  handles registered profiles and lifetimes without a Tidewater component ID
+  or direct Tidewater renderer imports. Focused profile/package checks,
+  Tidewater world export, and the full client suite passed. The Tidewater
+  adapter still imports engine material/rendering APIs, so renderer-neutral
+  world presentation remains unfinished.
 - 2026-10-29: after syncing the regenerated package into the external build
   tree and removing only its two obsolete content-addressed asset files, the
   full client suite and external production build passed. The cpto dry run

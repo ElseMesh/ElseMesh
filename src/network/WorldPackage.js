@@ -20,10 +20,8 @@ import { Quaternion } from '../engine/math/Quaternion.js';
 import { UniformBlock } from '../engine/gpu/Uniforms.js';
 import { Vector2 } from '../engine/math/Vector2.js';
 import { lodFadeModule } from '../materials/LODFade.js';
-import { villageMaterialRole } from './WorldVillageMaterial.js';
-import { decodeVillageMaterialAsset } from './VillageMaterialAsset.js';
-import { VillageTextures } from '../world/village/TextureBaker.js';
-import { createVillageMaterials } from '../world/village/VillageMaterials.js';
+import { worldMaterialRole } from './WorldMaterialProfileRegistry.js';
+import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
 
 const COMPONENTS = Object.freeze( {
 	POSITION: [ 'position', 3 ],
@@ -45,11 +43,8 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 	const assets = preloadedAssets || await connector.preload();
 	const root = new Group();
 	root.name = `world:${connector.worldId}`;
-	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext };
+	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext, materialAdapterContexts: new Map() };
 	try {
-		const materialComponent = connector.manifest.components?.find( ( component ) => component.type === 'elsemesh.village-materials/2' );
-		const selectedObjectIDs = objectIDs ? ( objectIDs instanceof Set ? objectIDs : new Set( objectIDs ) ) : null;
-		if ( materialComponent && ( ! selectedObjectIDs || selectedObjectIDs.has( materialComponent.objectId ) ) ) await installPackagedVillageMaterials( connector, root, signal );
 		await appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } );
 		return root;
 	} catch ( error ) {
@@ -62,15 +57,13 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 export async function appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } = {} ) {
 
 	const state = root.userData.worldPackage || ( root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set() } );
+	await prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs );
 	if ( ! state.portalFramesBuilt ) {
 		addPortalFrames( root, connector.manifest.portals || [] );
 		state.portalFramesBuilt = true;
 	}
 	const objectRecords = connector.manifest.objects || [];
 	const selectedObjects = objectIDs ? new Set( objectIDs ) : null;
-	const materialComponent = connector.manifest.components?.find( ( component ) => component.type === 'elsemesh.village-materials/2' );
-	if ( materialComponent && ( ! selectedObjects || selectedObjects.has( materialComponent.objectId ) ) ) await installPackagedVillageMaterials( connector, root, signal );
-
 	for ( const object of objectRecords ) {
 
 		if ( signal?.aborted ) throw signal.reason || new DOMException( 'Aborted', 'AbortError' );
@@ -121,22 +114,22 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 
 }
 
-async function installPackagedVillageMaterials( connector, root, signal ) {
+async function prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs ) {
 	const state = root.userData.worldPackage;
-	if ( state.ownedMaterialContext || state.disposed ) return;
-	const component = connector.manifest.components.find( ( candidate ) => candidate.type === 'elsemesh.village-materials/2' );
-	const packed = await connector.getAsset( component.dataAssetId, { signal } );
-	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const decoded = await decodeVillageMaterialAsset( packed );
-	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const textures = new VillageTextures( { bakedMaps: decoded.maps } );
-	try {
-		textures.prepareBakedMaps();
-		state.ownedMaterialContext = { textures, materials: createVillageMaterials( textures ) };
-		state.materialContext = state.ownedMaterialContext;
-	} catch ( error ) {
-		textures.dispose();
-		throw error;
+	if ( state.disposed ) return;
+	const selected = objectIDs ? new Set( objectIDs ) : null;
+	for ( const adapter of registeredWorldPackageMaterialAdapters() ) {
+		if ( state.materialAdapterContexts?.has( adapter.componentType ) ) continue;
+		const component = connector.manifest.components?.find( candidate => candidate.type === adapter.componentType );
+		if ( ! component || selected && ! selected.has( component.objectId ) ) continue;
+		const prepared = await adapter.prepare( { connector, root, signal, component } );
+		if ( signal?.aborted || state.disposed ) {
+			prepared?.dispose?.();
+			throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
+		}
+		if ( ! prepared?.context ) throw new Error( `World package material adapter ${adapter.componentType} did not provide a context` );
+		state.materialAdapterContexts ||= new Map();
+		state.materialAdapterContexts.set( adapter.componentType, { adapter, component, context: prepared.context, dispose: prepared.dispose || null } );
 	}
 }
 
@@ -533,8 +526,8 @@ export function disposeWorldPackage( root ) {
 		for ( const geometry of geometries ) geometry.dispose();
 		for ( const material of materials ) material.dispose?.();
 		for ( const texture of textures ) texture.destroy();
-		for ( const material of Object.values( state?.ownedMaterialContext?.materials || {} ) ) material.dispose?.();
-		state?.ownedMaterialContext?.textures?.dispose();
+		for ( const entry of state?.materialAdapterContexts?.values() || [] ) entry.dispose?.();
+		state?.materialAdapterContexts?.clear();
 	};
 	if ( GPU.encoder ) GPU.onSubmit( null, release );
 	else release();
@@ -547,24 +540,23 @@ async function buildGLTF( gltf, packageState = null ) {
 	const root = new Group();
 	const textures = new Map();
 	const resolvedMaterials = [];
-	const villageMaterialRoles = [];
+	const materialHooks = [];
 	for ( let index = 0; index < gltf.materials.length; index ++ ) {
 
 		const source = gltf.materials[ index ];
 
 		const pbr = source.pbrMetallicRoughness || {};
-		const role = villageMaterialRole( source );
-		if ( role ) {
-			if ( ! packageState?.connector?.manifest?.rules?.requiredFeatures?.includes( 'elsemesh.village-materials/1' ) ) throw new Error( 'Village material profile is missing elsemesh.village-materials/1' );
-			const vdata = gltf.meshes.flat().filter( primitive => primitive.material === index ).map( primitive => primitive.attributes._ELSEMESH_VDATA );
-			if ( vdata.some( attribute => ! attribute || attribute.itemSize !== 4 ) ) throw new Error( `Village material ${role} requires a VEC4 _ELSEMESH_VDATA attribute` );
-			const context = packageState.materialContext;
-			if ( ! context?.materials?.[ role ] || typeof context.textures?.bake !== 'function' ) throw new Error( `Village material renderer is unavailable for ${role}` );
-			const material = context.materials[ role ];
-			material.userData ||= {};
-			material.userData.borrowedWorldMaterial = true;
-			resolvedMaterials.push( material );
-			villageMaterialRoles.push( role );
+		const profileRole = worldMaterialRole( source );
+		if ( profileRole ) {
+			let resolution = null;
+			for ( const adapter of registeredWorldPackageMaterialAdapters() ) {
+				const context = packageState?.materialAdapterContexts?.get( adapter.componentType )?.context || packageState?.materialContext || null;
+				resolution = adapter.resolve( { source, index, gltf, profileRole, context, connector: packageState?.connector } );
+				if ( resolution ) break;
+			}
+			if ( ! resolution?.material ) throw new Error( `World material profile has no registered package renderer for role ${profileRole}` );
+			resolvedMaterials.push( resolution.material );
+			materialHooks.push( resolution );
 			continue;
 		}
 		const textureInfo = pbr.baseColorTexture;
@@ -599,7 +591,7 @@ async function buildGLTF( gltf, packageState = null ) {
 			defines: { WORLD_HAS_ALBEDO: albedo ? 1 : 0 },
 			surface: `#if WORLD_HAS_ALBEDO\n\tlet baseColor = textureSample( worldAlbedo, smpAnisoRepeat, in.uv );\n\ts.albedo *= baseColor.rgb;\n\ts.alpha *= baseColor.a;\n#endif\n`,
 		} ) );
-		villageMaterialRoles.push( null );
+		materialHooks.push( null );
 
 	}
 	const builtMeshes = gltf.meshes.map( ( primitives ) => primitives.map( ( primitive ) => {
@@ -612,18 +604,14 @@ async function buildGLTF( gltf, packageState = null ) {
 			const values = floatAttribute( attribute );
 			geometry.setAttribute( name, new BufferAttribute( values, gltfName === 'COLOR_0' ? attribute.itemSize : size ) );
 		}
-		if ( villageMaterialRoles[ primitive.material ] ) {
-			const tint = geometry.getAttribute( 'color' );
-			if ( ! tint ) throw new Error( `Village material ${villageMaterialRoles[ primitive.material ]} requires a COLOR_0 tint attribute` );
-			geometry.setAttribute( 'tint', tint );
-		}
+		materialHooks[ primitive.material ]?.prepareGeometry?.( geometry, primitive );
 		if ( primitive.indices ) geometry.setIndex( new BufferAttribute( asIndexArray( primitive.indices ), 1 ) );
 		if ( ! geometry.getAttribute( 'position' ) ) throw new Error( 'GLB primitive has no POSITION attribute' );
 		if ( ! geometry.getAttribute( 'normal' ) ) geometry.computeVertexNormals();
 		geometry.computeBoundingSphere();
 		const material = resolvedMaterials[ primitive.material ] || standard( { name: 'world-default', color: 0xffffff, roughness: 1, metalness: 0 } );
 		const mesh = new Mesh( geometry, material );
-		if ( material.userData?.borrowedWorldMaterial ) mesh.onBeforeRender = () => packageState.materialContext.textures.bake();
+		if ( materialHooks[ primitive.material ]?.beforeRender ) mesh.onBeforeRender = materialHooks[ primitive.material ].beforeRender;
 		return mesh;
 
 	} ) );

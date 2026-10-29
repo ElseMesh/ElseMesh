@@ -1,5 +1,5 @@
 import { VILLAGE_MATERIAL_MAPS } from '../network/VillageMaterialAsset.js';
-import { villageMaterialRole } from '../network/WorldVillageMaterial.js';
+import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
 
 const ROLE_SPECS = Object.freeze( {
 	wood: { albedo: 'woodA', packed: 'woodN', metalness: 0 },
@@ -146,7 +146,7 @@ export function applyWebGLVillageMaterials( root, materials ) {
 	root?.traverse?.( object => {
 		if ( ! object.isMesh || ! object.material ) return;
 		const apply = material => {
-			const role = villageMaterialRole( { extras: { elsemeshMaterial: material.userData?.elsemeshMaterial } } );
+			const role = worldMaterialRole( { extras: { elsemeshMaterial: material.userData?.elsemeshMaterial } } );
 			const replacement = role && materials[ role ];
 			if ( ! replacement ) return material;
 			if ( object.geometry?.attributes?.uv && ! object.geometry.attributes.uv2 ) object.geometry.setAttribute( 'uv2', object.geometry.attributes.uv );
