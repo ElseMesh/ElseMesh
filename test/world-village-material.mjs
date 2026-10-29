@@ -3,10 +3,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import '../worlds/tidewater/register-behavior.js';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
-import { worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
+import { worldMaterialProfile, worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
 import { VILLAGE_MATERIAL_PROFILE, VILLAGE_MATERIAL_ROLES } from '../worlds/tidewater/VillageMaterialProfile.js';
 
 assert.equal( worldMaterialRole( {} ), null );
+assert.deepEqual( worldMaterialProfile( VILLAGE_MATERIAL_PROFILE ).roles, VILLAGE_MATERIAL_ROLES );
+assert.equal( worldMaterialProfile( VILLAGE_MATERIAL_PROFILE ).maps.length, 14 );
 for ( const role of VILLAGE_MATERIAL_ROLES ) {
 	assert.equal( worldMaterialRole( { extras: { elsemeshMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } ), role );
 }

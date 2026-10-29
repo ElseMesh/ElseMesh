@@ -1,4 +1,3 @@
-import { VILLAGE_MATERIAL_MAPS } from '../network/VillageMaterialAsset.js';
 import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
 
 const ROLE_SPECS = Object.freeze( {
@@ -25,8 +24,8 @@ function makeTexture( THREE, data, spec, { color = false, anisotropy = 1 } = {} 
 	return texture;
 }
 
-function sourceSpec( name ) {
-	const spec = VILLAGE_MATERIAL_MAPS.find( map => map.name === name );
+function sourceSpec( name, decoded ) {
+	const spec = decoded?.metadata?.maps?.find( map => map.name === name );
 	if ( ! spec ) throw new Error( `Unknown packaged village map: ${name}` );
 	return spec;
 }
@@ -90,14 +89,14 @@ export function createWebGLVillageMaterials( THREE, decoded, { anisotropy = 1 } 
 	const materials = {};
 	for ( const [ role, config ] of Object.entries( ROLE_SPECS ) ) {
 		const packedName = config.packed;
-		const packedSpec = sourceSpec( packedName );
+		const packedSpec = sourceSpec( packedName, decoded );
 		const packed = decoded.maps[ packedName ];
 		if ( ! ( packed instanceof Uint8Array ) || packed.byteLength !== packedSpec.width * packedSpec.height * 4 ) throw new Error( `WebGL village role ${role} has no valid ${packedName} map` );
 		const maps = packedName === 'net'
 			? packedNetTextures( THREE, packed, packedSpec, anisotropy )
 			: packedMapTextures( THREE, packed, packedSpec, anisotropy );
 		const albedoName = config.albedo || ( role === 'hard' ? 'hardA' : role === 'roofMetal' ? 'roofA' : null );
-		const albedoSpec = albedoName ? sourceSpec( albedoName ) : null;
+		const albedoSpec = albedoName ? sourceSpec( albedoName, decoded ) : null;
 		const albedo = albedoSpec ? decoded.maps[ albedoName ] : null;
 		if ( albedoSpec && ( ! ( albedo instanceof Uint8Array ) || albedo.byteLength !== albedoSpec.width * albedoSpec.height * 4 ) ) throw new Error( `WebGL village role ${role} has no valid ${config.albedo} map` );
 		const colorMap = role === 'hard' || role === 'roofMetal' || role === 'net'

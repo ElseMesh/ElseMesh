@@ -85,12 +85,15 @@ Tidewater's registered fish-presentation profile; the engine's `FishProps`
 static placement helpers were removed. WebGPU/WebGL rendering code remains in
 ElseMesh, and the WebGL mesh expansion/LOD gap is unchanged.
 
-Village material profile names and role sets now register in the generic
-`WorldMaterialProfileRegistry`. A generic package-material adapter registry
-dispatches profile preparation and GLB material resolution to Tidewater's
-provider; `WorldPackage.js` no longer imports Tidewater's decoder or shader
-builder. The provider still imports engine renderer APIs, and the WebGL
-presentation path remains profile-specific; those are still separation work.
+Village material profile names, roles, and map metadata now register in the
+generic `WorldMaterialProfileRegistry`. Tidewater owns the packaged map schema
+and binary codec and registers it through the generic component-asset decoder;
+WebGL hosted loading consumes the decoded asset through that registry. A
+generic package-material adapter registry dispatches profile preparation and
+GLB material resolution to Tidewater's provider; `WorldPackage.js` no longer
+imports Tidewater's decoder or shader builder. The provider still imports
+engine renderer APIs, and the WebGL presentation path remains profile-specific;
+those are still separation work.
 
 Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then move
@@ -168,6 +171,14 @@ them.
   Tidewater world export, and the full client suite passed. The Tidewater
   adapter still imports engine material/rendering APIs, so renderer-neutral
   world presentation remains unfinished.
+- 2026-10-29: moved the village map catalog and binary encoder/decoder into
+  Tidewater. Tidewater registers the asset decoder generically, and the WebGL
+  fallback consumes decoded map metadata instead of importing a Tidewater
+  asset module. The focused material checks, Tidewater world export, WebGL
+  content checks, and full client suite passed. No production build or visual
+  browser comparison was run; the existing build tree was left untouched due
+  to 412 tracked modifications. Live renderer behavior still needs
+  cross-backend visual verification.
 - 2026-10-29: after syncing the regenerated package into the external build
   tree and removing only its two obsolete content-addressed asset files, the
   full client suite and external production build passed. The cpto dry run

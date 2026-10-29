@@ -12,7 +12,7 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { appendVegetationPlacements, decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
-import { decodeVillageMaterialAsset } from '../network/VillageMaterialAsset.js';
+import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { decodeReefPlacements } from '../network/ReefPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
@@ -1536,7 +1536,7 @@ export class WebGLFallback {
 		let villageMaterials = null, villageMaterialApplied = 0;
 		if ( villageMaterialComponent && assets.has( villageMaterialComponent.dataAssetId ) ) {
 			try {
-				const decoded = await decodeVillageMaterialAsset( asBytes( assets.get( villageMaterialComponent.dataAssetId ) ) );
+				const decoded = await decodeWorldComponentAsset( 'village-materials/1', asBytes( assets.get( villageMaterialComponent.dataAssetId ) ) );
 				villageMaterials = createWebGLVillageMaterials( T, decoded, { anisotropy: this.renderer.capabilities.getMaxAnisotropy() } );
 			} catch ( error ) {
 				console.warn( 'WebGL fallback village materials unavailable:', error );
