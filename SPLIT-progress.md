@@ -54,6 +54,13 @@ rendering API. The current WebGL fish-prop adapter's single draw call is not
 proof of equivalent efficiency: it expands every placement into full-detail
 CPU-side geometry and has no per-placement culling or LOD. Do not move that
 implementation into Tidewater unchanged and call the performance goal met.
+The class also serves Tidewater's live fish stand, catch display, portraits, and
+built-in world props; it is not only a hosted static-content installer. It
+directly depends on ElseMesh `ReefBatch` and fish shader internals. Extracting
+the file wholesale would therefore relocate backend rendering code rather
+than establish a world-owned fish presentation on a generic engine renderer.
+The call sites need to be split between Tidewater's fish-specific data and
+placement rules and an engine-owned reusable batch-rendering interface.
 
 Next, migrate the remaining world-supplied component installer callbacks and
 backend-specific behavior hooks behind engine-owned registries, then remove
