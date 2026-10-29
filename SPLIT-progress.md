@@ -195,7 +195,9 @@ them.
   placements from their game and WebGL modules. Both now require the signed
   fishing behavior to provide those locations, and the registry rejects a
   fishing world that omits either one. Tests source built-in placement from
-  Tidewater's world data rather than the engine's island defaults.
+  Tidewater's world data rather than the engine's island defaults. The focused
+  fish-stand, chandlery, behavior-validation checks, and full client suite
+  passed; no production build or visual parity capture was run.
 - 2026-10-29: after syncing the regenerated package into the external build
   tree and removing only its two obsolete content-addressed asset files, the
   full client suite and external production build passed. The cpto dry run
