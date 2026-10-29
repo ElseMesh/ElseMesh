@@ -17,6 +17,7 @@ assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).vehicle, 
 assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).complexityTriangles, 12 );
 assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).install, installer );
 assert.equal( worldComponentDescriptor( 'elsemesh.static-vegetation/1' ).vegetation, true );
+assert.equal( worldComponentDescriptor( 'elsemesh.static-fish-props/1' ).install, null, 'fish-props rendering is selected by the engine backend registry' );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.static-reef/1' ).install, 'function' );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).vehicle, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.example-island-wildlife/1' ).wildlifeSimulation, true );

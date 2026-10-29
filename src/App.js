@@ -68,6 +68,7 @@ import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
 import { worldComponentDescriptor } from './network/WorldComponentRegistry.js';
 import { registerWorldComponentBackendAdapter, worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
+import { decodeFishPropPlacements } from './network/FishPropPlacements.js';
 import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
@@ -97,6 +98,18 @@ const _up = new Vector3( 0, 1, 0 );
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
 
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWebGPUWaterBody );
+registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.static-fish-props/1', installWebGPUFishProps );
+
+function installWebGPUFishProps( { root, connector }, component ) {
+	const presentation = worldFishPresentationFor( connector.manifest.experience );
+	const placementBytes = connector.assets.get( component.placementAssetId );
+	if ( ! placementBytes ) throw new Error( `Fish-prop component ${component.id} is missing its placement asset` );
+	const fishProps = new FishProps( presentation );
+	fishProps.items = decodeFishPropPlacements( placementBytes, presentation );
+	const mesh = fishProps.build();
+	root.add( mesh );
+	return { installed: true, runtime: { dispose: () => { root.remove( mesh ); fishProps.dispose(); } } };
+}
 
 function installWebGPUWaterBody( { app, root, connector, installed }, component ) {
 	const extent = component.extent;

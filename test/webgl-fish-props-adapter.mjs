@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { encodeFishPropPlacements } from '../src/network/FishPropPlacements.js';
+import { registerWorldFishPresentation } from '../src/network/WorldFishPresentation.js';
+import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { deformFishPropPoint, fishPropGeometry } from '../src/world/fish/FishProps.js';
 import * as fishPresentation from '../worlds/tidewater/FishPresentation.js';
 import { WebGLFishPropsAdapter } from '../src/fallback/WebGLFishPropsAdapter.js';
+import '../src/fallback/WebGLFishPropsComponentAdapters.js';
+
+registerWorldFishPresentation( 'elsemesh.fishing-game/1', fishPresentation );
 
 const records = [
 	{ kind: 'whole', species: 'mullet', L: 0.4, x: 1.25, y: 3, z: -2.5, q: [ 0, 0.7071067811865475, 0, 0.7071067811865476 ], pattern: 14, seed: 0.972, curl: -0.1, sag: 0.15, jaw: 0.2, flags: [ 0.6, 0.6, 0, 0 ] },
@@ -30,4 +35,16 @@ assert( renderedPoint.distanceTo( localPoint ) < 1e-5, 'WebGL vertex placement u
 whole.dispose();
 adapter.dispose();
 assert.equal( scene.children.length, 0, 'disposing removes the hosted fish props' );
+
+const componentScene = new THREE.Scene();
+const componentType = 'elsemesh.static-fish-props/1';
+const componentAdapter = worldComponentBackendAdapter( 'webgl', componentType );
+const componentFallback = { THREE, scene: componentScene };
+assert.equal( componentAdapter( {
+	fallback: componentFallback,
+	manifest: { experience: { behaviors: { 'elsemesh.fishing-game/1': {} } } },
+	assets: new Map( [ [ 'placements', bytes ] ] ),
+}, { id: 'fish-props', type: componentType, placementAssetId: 'placements' } ), true, 'backend adapter installs the signed component' );
+assert.equal( componentScene.children.length, 1, 'registered component adapter owns hosted WebGL dispatch' );
+componentFallback.hostedFishProps[ 0 ].dispose();
 console.log( 'webgl fish props adapter passed (canonical placements and shared geometry)' );

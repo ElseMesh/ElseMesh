@@ -13,15 +13,12 @@ import { appendVegetationPlacements, decodeVegetationPlacements } from '../netwo
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeVillageMaterialAsset } from '../network/VillageMaterialAsset.js';
-import { decodeFishPropPlacements } from '../network/FishPropPlacements.js';
-import { worldFishPresentationFor } from '../network/WorldFishPresentation.js';
 import { decodeReefPlacements } from '../network/ReefPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { buildPalmFar, buildTreeNear, buildShrubNear, buildYoungPalm, buildFern, buildBanana, buildMonstera, buildElephantEar, buildHeliconia, buildStrelitzia, TREE_LOBES } from '../world/vegetation/PlantGeometry.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
-import { WebGLFishPropsAdapter } from './WebGLFishPropsAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
@@ -1630,11 +1627,12 @@ export class WebGLFallback {
 		this.portals = ( manifest.portals || [] ).filter( portal => portal.enabled || portal.back?.enabled );
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
-		this._addHostedWater( components, manifest.rules || {} );
+		const backendComponentIDs = this._installHostedBackendComponents( components, manifest, assets );
 		this.hostedVehicleSpec = resolveHostedWebGLVehicleSpec( components, manifest.objects || [], this.hostedObjectRoots );
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			terrainReady: !! this.hostedTerrainData, vehicleComponentId: this.hostedVehicleSpec?.component.id,
 		} );
+		for ( const id of backendComponentIDs ) supportedComponents.add( id );
 		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
 		const hostedReefRecords = [], hostedReefIds = [];
@@ -1660,15 +1658,6 @@ export class WebGLFallback {
 			}
 			await this._loadVegetation( { placementBytes, centerPosition: [ ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 0 ], ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 2 ] ] } );
 			supportedComponents.add( vegetation.id );
-		}
-		for ( const fishProps of components.filter( component => component.type === 'elsemesh.static-fish-props/1' ) ) {
-			const placementBytes = assets.get( fishProps.placementAssetId );
-			if ( ! placementBytes ) continue;
-			const presentation = worldFishPresentationFor( manifest.experience );
-			const records = decodeFishPropPlacements( asBytes( placementBytes ), presentation );
-			this.hostedFishProps ||= [];
-			this.hostedFishProps.push( new WebGLFishPropsAdapter( T, this.scene, records, presentation ) );
-			supportedComponents.add( fishProps.id );
 		}
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
@@ -1741,14 +1730,17 @@ export class WebGLFallback {
 
 	}
 
-	_addHostedWater( components, rules ) {
+	_installHostedBackendComponents( components, manifest, assets ) {
 
 		const T = this.THREE;
 		const terrain = this.hostedTerrainData;
 		const terrainWater = terrain ? webglTerrainWaterTexture( T, terrain ) : null;
+		const installed = new Set();
 		for ( const component of components ) {
-			worldComponentBackendAdapter( this.engine.backend, component.type )?.( { fallback: this, rules, terrain, terrainWater }, component );
+			const adapter = worldComponentBackendAdapter( this.engine.backend, component.type );
+			if ( adapter?.( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component ) === true ) installed.add( component.id );
 		}
+		return installed;
 
 	}
 
