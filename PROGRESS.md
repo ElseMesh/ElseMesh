@@ -8,7 +8,7 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 - WebGL whale LODs now cast shadows through a custom depth material that uses
   the same authored height relief and animated CPU rig pose as the visible
-  whale. `test/webgl-whale-package.mjs` verifies visible and depth shader
+  whale. `worlds/tidewater/test/webgl-whale-package.mjs` verifies visible and depth shader
   injection and that all LODs use the matching shadow material. Vite now serves
   extensionless content-addressed world assets as raw bytes for runtime fetches
   while retaining URL-module handling for imports. The WebGL fallback now
@@ -179,7 +179,7 @@ after entry.
   Android because this Termux Node installation lacks
   `webgpu/dist/android-arm64/dawn.node`; those checks remain enabled elsewhere.
   Migration to the Android headless-browser path is a low-priority follow-up.
-- Added `test/grass-density-parity.mjs` to regenerate built-in vegetation from
+- Added `worlds/tidewater/test/vegetation-parity.mjs` to regenerate built-in vegetation from
   Tidewater's source terrain and village. The seeded plant-placement asset
   matches byte for byte, and all channels of the 1024×1024 grass mask match
   exactly. Visual density distribution and LOD behavior still need matched-view

@@ -47,8 +47,8 @@ recorded below.
 ## Android test suite (2026-10-24)
 
 The default Node suite skips only `reef-placement-render.mjs`,
-`world-package-village-materials.mjs`, `world-export.mjs`, and
-`whale-world-package.mjs`, and `engine-smoke.mjs` on Android because they
+`worlds/tidewater/test/village-materials.mjs`, `world-export.mjs`,
+`worlds/tidewater/test/whale-world-package.mjs`, and `engine-smoke.mjs` on Android because they
 require the Node Dawn binding for rendering or GPU texture baking; all
 remaining suite commands still run. These checks remain enabled on other
 platforms. Migrating them to an
@@ -93,7 +93,7 @@ LOD levels into a Three.js material that uses the existing Whale simulation
 and rig pose; hosted capability is reported only after package loading
 succeeds. WebGL whale LODs now cast shadows through a custom depth material
 that applies the same height relief and animated rig pose as the visible
-material; its shader setup is covered by `test/webgl-whale-package.mjs`. The
+material; its shader setup is covered by `worlds/tidewater/test/webgl-whale-package.mjs`. The
 Flip7 native Chrome WebGL fallback now serves Tidewater's extensionless assets
 correctly, merges only plant-placement arrays, and exposes the shared
 water-query sample API used by WhaleBrain. Whale's existing spray emissions now
@@ -153,7 +153,7 @@ parity remain open. See [graphics-review.md](graphics-review.md) for capture
 conditions and limits. A 2026-10-24 multi-view follow-up stopped when the
 wireless ADB transport disconnected before hosted and built-in frames could be
 matched; the 2026-10-23 captures remain the latest visual evidence. The
-new `test/grass-density-parity.mjs` regenerates built-in vegetation from the
+new `worlds/tidewater/test/vegetation-parity.mjs` regenerates built-in vegetation from the
 source terrain and village. It verifies that the seeded plant-placement asset
 matches byte for byte and all four channels of the 1024×1024 grass mask match
 the content-addressed Tidewater mask. This verifies deterministic
@@ -196,7 +196,7 @@ Graphics comparisons can use the named and captured camera URL parameters docume
 ## Client suite and production build (2026-10-11)
 
 The checked-in `package.json` test command had duplicate and concatenated paths,
-introduced when `heightfield-terrain-data.mjs` was added in commit `61977c5`.
+introduced when `terrain-data.mjs` was added in commit `61977c5`.
 The command has been reconstructed from its last valid predecessor with that
 test added once. After syncing the current source to the external `.make` tree,
 `npm test` passed with exit code 0 across 44 commands, and `npm run build`
