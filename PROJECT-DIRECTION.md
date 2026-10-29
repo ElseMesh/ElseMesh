@@ -6,6 +6,11 @@ and the linked runbooks. They measure requirement completion, not code volume.
 Completed milestones have been moved to [GOAL-done.md](GOAL-done.md). Reassess
 these estimates when new verification evidence is recorded.
 
+**Extension constraint: do not implement or extend Wasm.** It is too CPU-heavy.
+Use the lighter owner-signed JavaScript module path in dedicated browser
+Workers. Treat the existing Wasm guard and asset validators as a retired
+prototype to remove, not as the basis for future runtime work.
+
 ## Current priority: finish Tidewater package integration and parity
 
 **Repository separation: 100% — complete.** The structural split and its

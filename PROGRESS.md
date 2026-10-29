@@ -12,16 +12,14 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   memory, and modules above 1 MiB. A dedicated Worker owns compilation and
   execution with bounded JSON exchange and a terminable timeout. The focused
   binary/worker-controller test, full `npm test`, and external-tree production
-  build pass. Signed manifest references, server validation, behavior dispatch,
-  state lifetime, and example extensions were still open. This prototype is
-  superseded by the selected browser-native JavaScript worker approach; Wasm is
-  no longer the active extension goal.
+  build passed at that time. This Wasm prototype is retired. Do not implement,
+  extend, or activate it: Wasm is too CPU-heavy for this project. Replace its
+  remaining code with the selected browser-native JavaScript worker approach.
 - Tidewater package-specific export, authored collision, boat LOD, and Blender
   checks now live in `worlds/tidewater/test/` and pass from the engine runner.
-- World sources also gained signed Wasm asset references for the prototype.
-  Those references and validators still exist in code, but are no longer the
-  selected extension design and must be replaced by signed JavaScript worker
-  modules before extension lifecycle work continues.
+- World sources also gained signed Wasm asset references for that prototype.
+  Those references and validators still exist in code and need removal; they
+  are not part of the active implementation plan.
 
 ## 2026-10-24
 
