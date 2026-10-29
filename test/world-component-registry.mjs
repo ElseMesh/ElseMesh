@@ -19,6 +19,7 @@ assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).install, 
 assert.equal( worldComponentDescriptor( 'elsemesh.static-vegetation/1' ).vegetation, true );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.static-reef/1' ).install, 'function' );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).vehicle, true );
+assert.equal( worldComponentDescriptor( 'elsemesh.example-island-wildlife/1' ).wildlifeSimulation, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).complexityTriangles, 46845 );
 assert.throws( () => registerWorldComponent( 'elsemesh.vehicle-without-complexity/1', { vehicle: true } ), /Invalid/ );
 assert.throws( () => registerWorldComponent( 'elsemesh.invalid/1', { renderer: 'webgpu' } ), /Invalid/ );

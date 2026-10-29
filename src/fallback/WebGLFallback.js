@@ -31,7 +31,8 @@ import { WebGLReefAdapter } from './WebGLReefAdapter.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGLVillageMaterials.js';
 import { Whale } from '../world/marine/Whale.js';
-import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
+import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
+import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
@@ -802,8 +803,8 @@ export class WebGLFallback {
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
-			if ( this.hostedBoatSpec ) {
-				const { berth, preview } = this.hostedBoatSpec;
+			if ( this.hostedVehicleSpec ) {
+				const { object: berth, preview } = this.hostedVehicleSpec;
 				preview.visible = false;
 				this.boat = new WebGLBoatAdapter( T, this.scene, {
 					query: this.waterQuery, terrain: this.hostedTerrainData || null, colliders: hostedColliders,
@@ -1531,7 +1532,7 @@ export class WebGLFallback {
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.worldLODs = new Map();
 		const components = manifest.components || [];
-		this.hostedWildlifeComponent = components.find( component => component.type === 'elsemesh.example-island-wildlife/1' ) || null;
+		this.hostedWildlifeComponent = components.find( component => worldComponentDescriptor( component.type )?.wildlifeSimulation ) || null;
 		const terrainComponent = components.find( component => component.type === 'elsemesh.terrain-surface/1' );
 		const villageMaterialComponent = components.find( component => component.type === 'elsemesh.village-materials/2' );
 		let villageMaterials = null, villageMaterialApplied = 0;
@@ -1629,9 +1630,9 @@ export class WebGLFallback {
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
 		this._addHostedWater( components, manifest.rules || {} );
-		this.hostedBoatSpec = resolveHostedWebGLBoatSpec( components, manifest.objects || [], this.hostedObjectRoots );
+		this.hostedVehicleSpec = resolveHostedWebGLVehicleSpec( components, manifest.objects || [], this.hostedObjectRoots );
 		const supportedComponents = initialHostedWebGLSupport( components, {
-			terrainReady: !! this.hostedTerrainData, boatReady: !! this.hostedBoatSpec,
+			terrainReady: !! this.hostedTerrainData, vehicleComponentId: this.hostedVehicleSpec?.component.id,
 		} );
 		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );

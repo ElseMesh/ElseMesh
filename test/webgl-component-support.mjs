@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from '../src/fallback/WebGLComponentSupport.js';
+import '../worlds/tidewater/register-components.js';
+import { registerWorldComponent } from '../src/network/WorldComponentRegistry.js';
+import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from '../src/fallback/WebGLComponentSupport.js';
+
+registerWorldComponent( 'elsemesh.fixture-water/1', { waterSurface: true } );
+registerWorldComponent( 'elsemesh.fixture-wildlife/1', { wildlifeSimulation: true } );
+registerWorldComponent( 'elsemesh.fixture-vehicle/1', { vehicle: true, complexityTriangles: 12 } );
 
 const pierCollision = {
 	enabled: true,
@@ -33,17 +39,29 @@ assert.deepEqual( unsupportedHostedWebGLComponents( components, withTerrain ), [
 	'elsemesh.terrain-surface/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1', 'elsemesh.downeast-boat/1',
 ], 'decoded terrain data alone does not claim visual terrain support; shared wildlife is ready' );
 
-const withBoat = initialHostedWebGLSupport( components, { terrainReady: true, boatReady: true } );
-assert.deepEqual( unsupportedHostedWebGLComponents( components, withBoat ), [
-	'elsemesh.terrain-surface/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1',
-], 'hosted boat is reported ready only after its signed berth preview is available' );
-
 const boatComponent = { ...components.find( component => component.id === 'boat' ), objectId: 'berth' };
+const withVehicle = initialHostedWebGLSupport( components, { terrainReady: true, vehicleComponentId: boatComponent.id } );
+assert.deepEqual( unsupportedHostedWebGLComponents( components, withVehicle ), [
+	'elsemesh.terrain-surface/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1',
+], 'hosted vehicle is reported ready only after its signed object preview is available' );
+
 const berth = { id: 'berth', transform: { position: [ 12, 0.8, - 42 ], yaw: 1.1 } };
 const preview = { visible: true };
-assert.deepEqual( resolveHostedWebGLBoatSpec( [ boatComponent ], [ berth ], new Map( [ [ berth.id, preview ] ] ) ), {
-	component: boatComponent, berth, preview,
+assert.deepEqual( resolveHostedWebGLVehicleSpec( [ boatComponent ], [ berth ], new Map( [ [ berth.id, preview ] ] ) ), {
+	component: boatComponent, object: berth, preview,
 }, 'boat setup binds the exact signed berth to its loaded preview object' );
-assert.equal( resolveHostedWebGLBoatSpec( [ boatComponent ], [ berth ], new Map() ), null, 'missing berth preview keeps the component reported as unsupported' );
+assert.equal( resolveHostedWebGLVehicleSpec( [ boatComponent ], [ berth ], new Map() ), null, 'missing vehicle preview keeps the component reported as unsupported' );
+
+const neutralComponents = [
+	{ id: 'water', type: 'elsemesh.fixture-water/1' },
+	{ id: 'wildlife', type: 'elsemesh.fixture-wildlife/1' },
+	{ id: 'vehicle', type: 'elsemesh.fixture-vehicle/1', objectId: 'vehicle-object' },
+];
+const neutralSupport = initialHostedWebGLSupport( neutralComponents, { terrainReady: true, vehicleComponentId: 'vehicle' } );
+assert.deepEqual( unsupportedHostedWebGLComponents( neutralComponents, neutralSupport ), [], 'renderer support classification follows generic registry traits for non-Tidewater components' );
+const vehicleObject = { id: 'vehicle-object', transform: { position: [ 1, 2, 3 ] } };
+assert.deepEqual( resolveHostedWebGLVehicleSpec( neutralComponents, [ vehicleObject ], new Map( [ [ vehicleObject.id, preview ] ] ) ), {
+	component: neutralComponents[ 2 ], object: vehicleObject, preview,
+}, 'vehicle setup resolves a registered component without Tidewater IDs' );
 
 console.log( 'WebGL hosted component support classification passed' );
