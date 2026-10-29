@@ -495,7 +495,7 @@ export class SoundScape {
 
 	}
 
-	// ------------------------------------------------------------------ fishing (src/game)
+	// ------------------------------------------------------------------ fishing
 
 	// the rod came out: load its sounds
 	rodReady() {

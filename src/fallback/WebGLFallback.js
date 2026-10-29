@@ -33,7 +33,6 @@ import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLBoatSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
-import { STAND, FISH_STAND_VENDOR, fishStandColliderVolumes } from '../game/FishStandContent.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
@@ -795,11 +794,6 @@ export class WebGLFallback {
 			this.activeWorldExtensions?.dispose();
 			this.activeWorldExtensions = createWorldBehaviorExtensions( defaultWorldSource.experience, defaultWorldPackage.assets.extensionModules );
 			dispatchWorldBehaviorHooks( defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T, extensions: this.activeWorldExtensions } );
-			const y = this.terrain.heightAt( STAND.x, STAND.z );
-			for ( const box of fishStandColliderVolumes( y ) ) this.blockers.push( {
-				centerX: box.center[ 0 ], centerZ: box.center[ 2 ], halfX: box.half[ 0 ], halfZ: box.half[ 2 ], yaw: box.yaw,
-				minY: box.center[ 1 ] - box.half[ 1 ], maxY: box.center[ 1 ] + box.half[ 1 ],
-			} );
 		} else {
 			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
