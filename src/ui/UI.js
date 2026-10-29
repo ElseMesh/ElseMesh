@@ -10,7 +10,7 @@ const lerp = ( a, b, t ) => a + ( b - a ) * t;
 const TAU = Math.PI * 2;
 
 let uidCounter = 0;
-const uid = ( p = 'tw' ) => `${ p }-${ ++ uidCounter }`;
+const uid = ( p = 'em' ) => `${ p }-${ ++ uidCounter }`;
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
 const esc = ( s ) => String( s ?? '' ).replace( /[&<>"']/g, ( c ) => ESC[ c ] );
