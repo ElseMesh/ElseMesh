@@ -90,7 +90,7 @@ variants use hysteresis and complementary screen-door dither cross-fades. The ho
 one lower-detail level at a 0.45 viewport-height threshold. Its checked-in GLB is
 generated from the full-detail village GLB with
 `tools/blender/export-world-object-lod.py` under Blender 4.3.2; the export tool
-checks that all trusted village material roles, vertex tint and `_TW_VDATA`
+checks that all trusted village material roles, vertex tint and `_ELSEMESH_VDATA`
 survive. It reduces this object from 137,888 to 48,260 triangles (65%) and from
 14.3 MB to 7.5 MB. The base GLB remains the collision source and full-detail
 visual. The moored lobster boat's portal-preview GLB also declares one lower-

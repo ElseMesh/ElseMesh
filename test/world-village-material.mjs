@@ -20,8 +20,8 @@ if ( process.argv[ 2 ] ) {
 	const gltf = parseGLB( await readFile( path.join( directory, 'assets', village.assetId.slice( 7 ) ) ) );
 	for ( const primitives of gltf.meshes ) for ( const primitive of primitives ) {
 		assert.ok( villageMaterialRole( gltf.materials[ primitive.material ] ) );
-		assert.equal( primitive.attributes._TW_VDATA.itemSize, 4 );
-		assert.equal( primitive.attributes._TW_VDATA.array.length / 4, primitive.attributes.POSITION.array.length / 3 );
+		assert.equal( primitive.attributes._ELSEMESH_VDATA.itemSize, 4 );
+		assert.equal( primitive.attributes._ELSEMESH_VDATA.array.length / 4, primitive.attributes.POSITION.array.length / 3 );
 		assert.equal( primitive.attributes.COLOR_0.itemSize, 3 );
 	}
 	assert.ok( gltf.materials.some( ( material ) => villageMaterialRole( material ) === 'fabric' ) );

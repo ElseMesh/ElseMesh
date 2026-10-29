@@ -556,8 +556,8 @@ async function buildGLTF( gltf, packageState = null ) {
 		const role = villageMaterialRole( source );
 		if ( role ) {
 			if ( ! packageState?.connector?.manifest?.rules?.requiredFeatures?.includes( 'elsemesh.village-materials/1' ) ) throw new Error( 'Village material profile is missing elsemesh.village-materials/1' );
-			const vdata = gltf.meshes.flat().filter( primitive => primitive.material === index ).map( primitive => primitive.attributes._TW_VDATA );
-			if ( vdata.some( attribute => ! attribute || attribute.itemSize !== 4 ) ) throw new Error( `Village material ${role} requires a VEC4 _TW_VDATA attribute` );
+			const vdata = gltf.meshes.flat().filter( primitive => primitive.material === index ).map( primitive => primitive.attributes._ELSEMESH_VDATA );
+			if ( vdata.some( attribute => ! attribute || attribute.itemSize !== 4 ) ) throw new Error( `Village material ${role} requires a VEC4 _ELSEMESH_VDATA attribute` );
 			const context = packageState.materialContext;
 			if ( ! context?.materials?.[ role ] || typeof context.textures?.bake !== 'function' ) throw new Error( `Village material renderer is unavailable for ${role}` );
 			const material = context.materials[ role ];
@@ -606,7 +606,7 @@ async function buildGLTF( gltf, packageState = null ) {
 
 		if ( primitive.mode !== 4 ) throw new Error( `GLB primitive mode ${primitive.mode} is not supported (triangle list required)` );
 		const geometry = new BufferGeometry();
-		for ( const [ gltfName, [ name, size ] ] of Object.entries( { ...COMPONENTS, _TW_VDATA: [ 'vdata', 4 ] } ) ) {
+		for ( const [ gltfName, [ name, size ] ] of Object.entries( { ...COMPONENTS, _ELSEMESH_VDATA: [ 'vdata', 4 ] } ) ) {
 			const attribute = primitive.attributes[ gltfName ];
 			if ( ! attribute ) continue;
 			const values = floatAttribute( attribute );
