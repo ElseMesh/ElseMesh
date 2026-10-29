@@ -21,11 +21,11 @@ unfinished runtime boundary or parity gate.
 
 ## Current work and next gates
 
-The latest pushed source commit is `e7e92a0`; it records the prior streaming
-work and progress ledger. Tidewater is pinned at `9a651e1`; the current source
-edits extract WebGPU installers into that submodule and dispatch them through
-the registry. The Hogwarts submodule is reported dirty and is outside this
-work; preserve it without inspection beyond its pointer/status or staging.
+The latest implementation commits are ElseMesh `69e8805` and Tidewater
+`4896050`. Together they move WebGPU component installers into Tidewater and
+dispatch them through the registry. The Hogwarts submodule is reported dirty
+and is outside this work; preserve it without inspection beyond its
+pointer/status or staging.
 
 Next, remove Tidewater-specific WebGL component dispatch and Tidewater-specific
 material handling from `WorldPackage.js`; audit whether the remaining local
@@ -48,3 +48,5 @@ changes them.
   Tidewater submodule. Focused registry/streaming checks, the full test suite,
   and external production build passed. WebGL and `WorldPackage.js` dispatch
   remain unextracted.
+- 2026-10-29: the WebGPU installer extraction and progress update were pushed
+  as ElseMesh `69e8805` and Tidewater `4896050`; Hogwarts was not staged.
