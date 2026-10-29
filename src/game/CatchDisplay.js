@@ -1,7 +1,7 @@
 import { Matrix4, Quaternion, Vector3 } from '../engine/index.js';
 import { FishProps } from '../world/fish/FishProps.js';
 import { SPECIES } from '../world/fish/FishSpecies.js';
-import { fishIds, fishLengthCm } from './FishTable.js';
+import { fishIds, fishLengthCm } from '../../worlds/tidewater/FishTable.js';
 
 // Real fish (the world's fish models and wet skin, world/fish/FishProps) for the game:
 //  - the fish you just landed, hanging from the line by the gills and flapping, for a moment

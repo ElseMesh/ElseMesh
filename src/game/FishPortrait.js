@@ -2,7 +2,7 @@ import { Scene, PerspectiveCamera, Matrix4, Quaternion, Vector3, Vector4 } from 
 import { GPU, Texture, MeshRenderer, FullscreenPass, createViewUniforms, setFrameCamera, UniformBlock } from '../engine/webgpu.js';
 import { FishProps } from '../world/fish/FishProps.js';
 import { ACES_WGSL } from '../post/PostFX.js';
-import { fishIds, fishLengthCm } from './FishTable.js';
+import { fishIds, fishLengthCm } from '../../worlds/tidewater/FishTable.js';
 
 // Studio portraits of the catchable fish: the real game models (world/fish, through FishProps) in a
 // neutral photo studio, side-on and horizontal (nose left, as in a field guide).

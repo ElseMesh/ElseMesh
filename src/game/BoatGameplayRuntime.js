@@ -1,4 +1,4 @@
-import { fuelBurn } from './Gear.js';
+import { fuelBurn } from '../../worlds/tidewater/Gear.js';
 
 // Browser-owned boat game rules shared by the WebGPU and WebGL presentations.
 // The world server receives resulting avatar poses through presence; it does

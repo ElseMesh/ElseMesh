@@ -1,5 +1,5 @@
-import { fishLengthCm } from './FishTable.js';
-import { UPGRADES, nextLevel, FUEL_PRICE } from './Gear.js';
+import { fishLengthCm } from '../../worlds/tidewater/FishTable.js';
+import { UPGRADES, nextLevel, FUEL_PRICE } from '../../worlds/tidewater/Gear.js';
 import { FishPortrait } from './FishPortrait.js';
 
 // DOM for the fishing game, in the look of the rest of the HUD (ui/ui.css tokens, .em-glass):

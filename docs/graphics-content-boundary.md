@@ -132,9 +132,10 @@ The fish stand's identity, placement, vendor interaction descriptor, collision
 volumes, material pattern IDs, and procedural fallback geometry now live in
 backend-neutral content modules. `WebGLFishStandAdapter` consumes the same
 authored placement and collision descriptors as the WebGPU game and loads Joe's
-shared character asset. `WebGLGameAdapter` uses Tidewater's registry-created
-`FishingGameRuntime` plus the shared `FishingRod`, `BoatGameplayRuntime`,
-`GameState`, and `GameHUD`; it supports casting, bite/fight transitions, selling, upgrades,
+shared character asset. `WebGLGameAdapter` uses Tidewater's
+`FishingGameRuntime`, `GameState`, and `Gear`, plus the shared browser
+`FishingRod`, `BoatGameplayRuntime`, and `GameHUD`; it supports casting,
+bite/fight transitions, selling, upgrades,
 fuel, sonar, the catch card, and the matching fishing-event cues. The signed
 Tidewater JavaScript Worker owns bite and fight simulation; both renderers send
 it bounded habitat/time samples and present the returned state. Focused headless

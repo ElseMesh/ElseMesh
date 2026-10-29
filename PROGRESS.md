@@ -34,7 +34,9 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   engine registry test now uses a synthetic behavior and no longer imports
   Tidewater. Tidewater tests cover per-world runtime and save isolation, while
   the pre-split bite/fight and WebGPU/WebGL fishing traces continue to pass.
-  `Game`, `GameState`, rod controls, vendor presentation, and some fishing
+  Also moved Tidewater's `GameState`, `Gear`, and fish-catalog calculations
+  into its world repository, with the standalone HUD review page beside the
+  world tests. `Game`, rod controls, vendor presentation, and some fishing
   calculations still live in the engine and remain separation work.
 - Tidewater's 18-species fishing catalog has moved from `src/game/FishTable.js`
   into `worlds/tidewater/fishing.json`; its values match the pre-split table
