@@ -782,7 +782,7 @@ export class WebGLFallback {
 		this.camera.position.set( ...this.spawn.position );
 		this.input = new Input( this.engine.canvas );
 		if ( ! this.worldLink ) {
-			this.waterQuery = new WebGLWaterQuery( this.terrain );
+			this.waterQuery = new WebGLWaterQuery( this.terrain, - 0.15 );
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders } );
 			this.boat.controller.model = this.boat.model;
 			this._addIslandGameplayColliders();
@@ -1839,7 +1839,7 @@ export class WebGLFallback {
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
 		if ( this.waterQuery ) {
 			this.boat?.controller?.queueQueries();
-			this.waterQuery.update( dt );
+			this.waterQuery.update( dt, simulationTime );
 		}
 		this.boat?.update( dt );
 		for ( const whale of this.whales || [] ) whale.update( dt, this.camera );

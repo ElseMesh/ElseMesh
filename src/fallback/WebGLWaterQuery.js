@@ -1,12 +1,12 @@
-// CPU surface queries for WebGL gameplay. Keep the base-wave terms aligned
-// with WebGLFallback's water vertex shader so boat physics follows the rendered
-// offshore surface.
+// CPU surface queries for WebGL gameplay. The generic fallback supplies its
+// base surface; registered world behavior may add a world-specific height term.
 export class WebGLWaterQuery {
 
-	constructor( terrain, seaLevel = - 0.15 ) {
+	constructor( terrain, seaLevel = 0 ) {
 
 		this.terrain = terrain;
 		this.seaLevel = seaLevel;
+		this.surfaceOffsetAt = null;
 		this.inputs = new Float32Array( 64 * 4 );
 		this.cpu = new Float32Array( 64 * 4 );
 		this.resultInputs = new Float32Array( 64 * 4 );
@@ -17,6 +17,13 @@ export class WebGLWaterQuery {
 		this.resultTime = 0;
 		this.latency = 0.016;
 		this.time = 0;
+
+	}
+
+	setSurfaceOffsetSampler( sampler ) {
+
+		if ( sampler !== null && typeof sampler !== 'function' ) throw new TypeError( 'Water surface sampler must be a function or null' );
+		this.surfaceOffsetAt = sampler;
 
 	}
 
@@ -51,18 +58,19 @@ export class WebGLWaterQuery {
 	_height( x, z ) {
 
 		const t = this.time;
-		return this.seaLevel
+		const base = this.seaLevel
 			+ 0.95 * Math.sin( x * 0.035 + z * 0.025 + t * 0.3 )
 			+ 0.55 * Math.sin( - x * 0.07 + z * 0.15 - t * 0.55 )
 			+ 0.08 * Math.sin( x * 0.21 - z * 0.16 + t * 0.7 )
 			+ 0.03 * Math.sin( x * 0.42 + z * 0.09 + t * 1.3 )
 			+ 0.01 * Math.sin( x * 0.72 - z * 0.48 + t * 1.6 );
+		return base + ( this.surfaceOffsetAt?.( x, z, t ) || 0 );
 
 	}
 
-	update( dt ) {
+	update( dt, simulationTime = null ) {
 
-		this.time += Math.max( 0, dt );
+		this.time = Number.isFinite( simulationTime ) ? simulationTime : this.time + Math.max( 0, dt );
 		this.resultInputs.set( this.inputs );
 		const e = 0.35;
 		for ( let i = 0; i < this.count; i ++ ) {

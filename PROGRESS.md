@@ -70,6 +70,17 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   `worlds/tidewater/test/pre-split-boat-gameplay-parity.mjs`. Boat-controller
   hydrodynamics and WebGPU/WebGL water-query trajectories still need matched
   runtime parity checks; this does not close the boat parity gate.
+- The WebGL boat query now takes its simulation time from the renderer and lets
+  the registered Tidewater shore-aware-boat behavior add Tidewater's depth-aware
+  shore crest from the same shoreline field used by the WebGL water shader. At
+  the default berth, the previous sine-only query differed from the shore-aware
+  water height by 0.21 m at one fixed time and position. The 90-second idle-boat
+  simulation remains upright (15.1° maximum tilt, 0.89 m/s maximum speed), and
+  the production build, WebGL game adapter, registry, and pre-split boat-rules
+  checks pass. This improves WebGL's local water/physics agreement but is not a
+  matched WebGPU-vs-WebGL or pre-split hydrodynamics trace. The isolated Xvfb
+  Chromium check could not create a WebGL2 context (blocklisted without DRI3);
+  live WebGL visual review and full boat parity remain open.
 - Moved `BoatGameplayRuntime` into Tidewater and delegated its engine-upgrade,
   fuel, and fish-finder rules to the signed Worker. The client supplies terrain
   and habitat samples and applies the returned fuel, throttle, save, and HUD
