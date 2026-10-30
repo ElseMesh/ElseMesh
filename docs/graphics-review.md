@@ -1,5 +1,33 @@
 # Reproducible graphics review
 
+## 2026-10-30 matched hosted WebGPU/WebGL check
+
+Both isolated browsers loaded the same signed Tidewater package and were set
+to the same camera pose (`[56.08, 3.92, -55.2]`, yaw `π`, pitch `0`) with an
+emulated 1280×720 viewport. The other browser was moved away for each capture
+to avoid its remote avatar overlapping the camera. These captures are a visual
+diagnostic; they were made at different simulation times and are not a
+pixel-difference comparison.
+
+![Hosted WebGPU pier view at the matched pose](images/parity-2026-10-30-hosted-webgpu-pier.png)
+
+![Hosted WebGL pier view at the matched pose](images/parity-2026-10-30-hosted-webgl-pier.png)
+
+The WebGL view has obvious visual differences: the near shore is strongly
+striped and pale, and the sea is flatter and darker than the WebGPU view. This
+is not visual parity. The 1280×720 captures were taken separately, so wave
+phase and other animated details are not aligned.
+
+A synchronized two-second forward sprint started both players at
+`[56.176, 1.633, -65.873]`, facing along the pier. WebGPU advanced 2.253 seconds
+of simulation and moved 11.583 m; WebGL advanced 2.111 seconds and moved
+10.603 m. Their distance per simulated second was 5.14 m/s and 5.02 m/s
+respectively. This is one short walking segment, not broad gameplay parity.
+Both browsers were running at very low frame rates together, so this result
+does not establish an FPS comparison. Matched normal boarding, helm control,
+drive/steer behavior, and visual checks against the retained pre-split WebGPU
+baseline remain open.
+
 ## 2026-10-30 hosted shoreline field correction
 
 A matched live WebGPU beach capture exposed that the hosted `TerrainGPU` had
