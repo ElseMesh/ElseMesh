@@ -786,7 +786,7 @@ export class WebGLFallback {
 		this.camera.position.set( ...this.spawn.position );
 		this.input = new Input( this.engine.canvas );
 		if ( ! this.worldLink ) {
-			this.waterQuery = new WebGLWaterQuery( this.terrain, this.worldSeaLevel );
+			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...WORLD.boatDock.position ), initialHeading: WORLD.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
 			this._addIslandGameplayColliders();
@@ -802,7 +802,7 @@ export class WebGLFallback {
 		} else {
 			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
-			this.waterQuery = new WebGLWaterQuery( hostedTerrain, this.hostedSeaLevel ?? 0 );
+			this.waterQuery = new WebGLWaterQuery( T, this.renderer, hostedTerrain, this.hostedSeaLevel ?? 0 );
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
@@ -1822,6 +1822,7 @@ export class WebGLFallback {
 		this.lastFrame = now;
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
 		if ( this.waterQuery ) {
+			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();
 			this.waterQuery.update( dt, simulationTime );
 		}
