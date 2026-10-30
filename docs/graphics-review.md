@@ -35,11 +35,15 @@ terrain package's shore field and to build a high-resolution shore patch from
 the packaged sand and height data. The isolated 1280×720 WebGL capture below
 loaded both ocean and shore meshes with no unsupported hosted components. It
 still shows obvious differences in water color and shape, beach presentation,
-terrain, and wood materials. A live WebGPU adapter was unavailable on this
-host, so this capture could not be paired with a same-build WebGPU image; it
-does not close visual parity. Vite, the gateway, and both libp2p transports
-bound OS-assigned ports for this run; the capture used the addresses announced
-at startup rather than reserved port numbers.
+terrain, and wood materials. A same-build hosted WebGPU pairing could not be
+captured: Chromium exposed the WebGPU API and entered the WebGPU startup path,
+but `App.init()` constructed the built-in Tidewater village before loading the
+hosted package, then failed because the hosted launch has no local fish
+presentation profile (`Cannot read properties of null (reading 'PLACEMENT')`).
+This is an initialization coupling to remove, not evidence of missing GPU
+support; the WebGL capture does not close visual parity. Vite, the gateway, and
+both libp2p transports bound OS-assigned ports for this run; the capture used
+the addresses announced at startup rather than reserved port numbers.
 
 ![Hosted WebGL pier view after consuming the packaged shoreline field](images/parity-2026-10-30-hosted-webgl-shorefield-pier.png)
 
