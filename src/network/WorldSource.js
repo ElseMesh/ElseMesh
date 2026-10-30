@@ -30,13 +30,13 @@ export function createWorldSource( { worldId = `${WORLD_ID_PREFIX}local-${ crypt
 	};
 }
 
-export function validateWorldSource( source ) {
+export function validateWorldSource( source, { allowUnregisteredBehaviors = false } = {} ) {
 	validateWorldSpawn( source?.spawn );
 	validateWorldEntryPoints( source?.entryPoints, source?.entryPointPrompt, source?.entryPointActionLabel );
 	if ( ! source || source.protocol !== WORLD_SOURCE_PROTOCOL ) throw new Error( 'Unsupported world source format' );
 	if ( ! isWorldID( source.worldId ) ) throw new Error( 'Invalid worldId' );
 	if ( typeof source.title !== 'string' || ! source.title.trim() || source.title.length > 160 ) throw new Error( 'Invalid world title' );
-	try { validateWorldExperience( source.experience ); } catch ( error ) { throw new Error( `Invalid ThruHold experience: ${error.message}` ); }
+	try { validateWorldExperience( source.experience, undefined, { allowUnregisteredBehaviors } ); } catch ( error ) { throw new Error( `Invalid ThruHold experience: ${error.message}` ); }
 	if ( source.coordinateSystem !== 'right-handed-y-up-meters' ) throw new Error( 'Unsupported world coordinate system' );
 	if ( typeof source.styleGuide !== 'string' || source.styleGuide.length > 10000 || ! source.rules || ! Number.isFinite( source.rules.gravity ) || source.rules.gravity < 0.2 || source.rules.gravity > 2 || ! Number.isInteger( source.rules.avatarComplexity ) || source.rules.avatarComplexity < 1 || source.rules.avatarComplexity > 100000 || ! SUPPORTED_PHYSICS_PROFILES.has( source.rules.physicsProfile ) ) throw new Error( 'Invalid or unsupported world rules or style guide' );
 	try { validateWorldLevels( source.rules ); } catch { throw new Error( 'Invalid world sea or atmosphere level' ); }

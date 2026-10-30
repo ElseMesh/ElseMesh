@@ -13,14 +13,14 @@ export const GENERIC_WORLD_EXPERIENCE = Object.freeze( validateWorldExperience( 
 	stages: Object.fromEntries( [ ...LOADING_STAGES ].map( ( stage ) => [ stage, 'Preparing this ThruHold…' ] ) ),
 } ) );
 
-export function validateWorldExperience( experience, assets ) {
+export function validateWorldExperience( experience, assets, options = {} ) {
 	if ( experience === undefined ) return undefined;
 	if ( ! experience || typeof experience !== 'object' || Array.isArray( experience ) || Object.keys( experience ).some( ( key ) => ! EXPERIENCE_FIELDS.includes( key ) ) ) throw new Error( 'Invalid ThruHold experience descriptor' );
 	for ( const key of [ 'genre', 'tagline', 'loadingNote' ] ) if ( typeof experience[ key ] !== 'string' || ! experience[ key ].trim() || experience[ key ].length > 240 ) throw new Error( `Invalid ThruHold experience ${key}` );
 	if ( ! Array.isArray( experience.tips ) || experience.tips.length < 1 || experience.tips.length > 12 || experience.tips.some( ( tip ) => typeof tip !== 'string' || ! tip.trim() || tip.length > 320 ) ) throw new Error( 'Invalid ThruHold loading tips' );
 	if ( ! experience.stages || typeof experience.stages !== 'object' || Array.isArray( experience.stages ) || Object.keys( experience.stages ).length > LOADING_STAGES.size ) throw new Error( 'Invalid ThruHold loading stages' );
 	for ( const [ stage, text ] of Object.entries( experience.stages ) ) if ( ! LOADING_STAGES.has( stage ) || typeof text !== 'string' || ! text.trim() || text.length > 120 ) throw new Error( `Invalid ThruHold loading stage ${stage}` );
-	worldBehaviorsFor( experience );
+	worldBehaviorsFor( experience, options );
 	if ( experience.extensions !== undefined ) {
 		if ( ! Array.isArray( experience.extensions ) || experience.extensions.length > 16 ) throw new Error( 'Invalid world JavaScript extensions' );
 		const behaviorIDs = new Set();

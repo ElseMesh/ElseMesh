@@ -2,6 +2,7 @@ node_modules
 dist
 .elsemesh-source-root
 server/bin/
+/HogwartsBridge.build/
 main-merge-check/
 fish-stand-check/
 .DS_Store

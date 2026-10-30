@@ -9,7 +9,7 @@ export function registerWorldBehavior( id, descriptor ) {
 	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].includes( key ) ) || [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].some( key => descriptor[ key ] !== undefined && typeof descriptor[ key ] !== 'function' ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
 	behaviors.set( id, Object.freeze( { id, ...descriptor } ) );
 }
-export function worldBehaviorsFor( experience ) {
+export function worldBehaviorsFor( experience, { allowUnregisteredBehaviors = false } = {} ) {
 	const dataById = experience?.behaviors ?? {};
 	if ( ! dataById || typeof dataById !== 'object' || Array.isArray( dataById ) || Object.keys( dataById ).length > 16 || JSON.stringify( dataById ).length > 64 * 1024 ) throw new Error( 'Invalid world behavior map' );
 	return Object.entries( dataById ).map( ( [ id, data ] ) => {
@@ -17,7 +17,7 @@ export function worldBehaviorsFor( experience ) {
 		const behavior = behaviors.get( id );
 		if ( ! data || typeof data !== 'object' || Array.isArray( data ) ) throw new Error( `Invalid world behavior data: ${id}` );
 		const hasExtension = Array.isArray( experience?.extensions ) && experience.extensions.some( extension => extension?.behaviorId === id );
-		if ( ! behavior && ! hasExtension ) throw new Error( `This client does not support required world behavior: ${id}` );
+		if ( ! behavior && ! hasExtension && ! allowUnregisteredBehaviors ) throw new Error( `This client does not support required world behavior: ${id}` );
 		behavior?.validateExperienceData?.( data, hasExtension );
 		return { ...( behavior || { id } ), data };
 	} );

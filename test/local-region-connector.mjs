@@ -3,6 +3,7 @@ import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
 import { worldLinkFromLocation } from '../src/network/WorldConnector.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL } from '../src/network/WorldLauncher.js';
+import { chooseWorldEntryPoint } from '../src/ui/WorldEntryPointPicker.js';
 
 function makeGlb() {
 	const document = {
@@ -34,6 +35,7 @@ const originalFetch = globalThis.fetch;
 let cellFetches = 0;
 let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
+let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
 const payloadFetchOrder = [];
 let secondCellCollisionMissing = true;
 let abortNextCellFetch = false;
@@ -55,7 +57,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
 			previewRegion: { cellSizeMeters: 16, startupCellOffsetBounds: { min: [ -1, 0, 0 ], max: [ 0, 0, 0 ] } },
 			previewSupport: { status: 'provisional', position: [ 0, 6.75, 8 ], halfExtents: [ 2, 0.25, 3 ], basis: 'synthetic rendered floor bounds' },
-			choices: [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ],
+			choices: descriptorChoices,
 		},
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
@@ -161,6 +163,12 @@ try {
 	assert.equal( leaseReleases, 9, 'aborting a visitor fetch should release its server lease' );
 	connector.close();
 	assert.equal( connector.assets.size, 0 );
+	descriptorChoices = [];
+	const singleSpawnConnector = new LocalRegionConnector( link );
+	const singleSpawnManifest = await singleSpawnConnector.getManifest();
+	assert.deepEqual( singleSpawnManifest.entryPoints, [], 'a world may temporarily disable optional entry-point choices' );
+	assert.equal( await chooseWorldEntryPoint( singleSpawnManifest, { documentRef: null } ), null, 'no choices means entry directly at the world spawn without opening a prompt' );
+	singleSpawnConnector.close();
 	console.log( 'local region connector tests passed' );
 } finally {
 	globalThis.fetch = originalFetch;

@@ -20,7 +20,10 @@ function options(argv) {
 async function main() {
 	const args = options( process.argv.slice( 2 ) );
 	const sourceBytes = await readFile( args.source );
-	const source = validateWorldSource( JSON.parse( sourceBytes.toString( 'utf8' ) ) );
+	// Conversion validates the generic source contract before a client-specific
+	// world provider is installed. The browser loads matching providers before it
+	// verifies the signed manifest and performs strict behavior validation.
+	const source = validateWorldSource( JSON.parse( sourceBytes.toString( 'utf8' ) ), { allowUnregisteredBehaviors: true } );
 	const version = args.version === undefined ? 1 : Number( args.version );
 	if ( ! Number.isSafeInteger( version ) || version < 1 ) throw new Error( '--version must be a positive integer' );
 	const authorityEpoch = args[ 'authority-epoch' ] === undefined ? 1 : Number( args[ 'authority-epoch' ] );

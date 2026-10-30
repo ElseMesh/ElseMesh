@@ -13,6 +13,14 @@
 
 - Do not present guessed values or behavior as verified facts. Check source code, runtime evidence, or authoritative documentation first. If a provisional assumption must be used, label it explicitly as an assumption in the relevant code comment or documentation, and record what evidence is still needed to verify it.
 
+## Shared-file commits
+
+- If a commit includes edits from another agent in a shared file, that is allowed. Mention both the requested change and the other agent's change in the commit message.
+
+## Hogwarts bridge build output
+
+- Build the Hogwarts .NET bridge from the external ElseMesh build tree with `--artifacts-path HogwartsBridge.build`. The root `.gitignore` protects this persistent build directory from `cpto` cleanup; do not put generated bridge output under the Hogwarts source sub-repo.
+
 ## Browser process cleanup
 
 - Stop every browser process I own as soon as it is no longer needed for the task, including after a visual check. Identify owned browsers by their dedicated systemd unit, process group, or isolated profile; never kill unrelated user browsers or another agent's browser.
