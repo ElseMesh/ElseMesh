@@ -24,9 +24,16 @@ of simulation and moved 11.583 m; WebGL advanced 2.111 seconds and moved
 10.603 m. Their distance per simulated second was 5.14 m/s and 5.02 m/s
 respectively. This is one short walking segment, not broad gameplay parity.
 Both browsers were running at very low frame rates together, so this result
-does not establish an FPS comparison. Matched normal boarding, helm control,
-drive/steer behavior, and visual checks against the retained pre-split WebGPU
-baseline remain open.
+does not establish an FPS comparison.
+
+A separate controlled boarding input was then run in each live renderer. From
+the same pier-edge player pose (`[57.5, 2.3, 36.5]`, yaw `π`), holding A, Space,
+and Shift for 1.2 seconds put both players in `deck` mode with the “Take the
+helm” prompt. The runs were sequential, so the boat was at a different wave
+phase in each; this confirms the same boarding outcome, not an identical
+trajectory or boat motion. At the farther pose `[56.08, 2.3, 36.5]`, both
+renderers missed the deck. WebGPU helm entry, matched drive/steer behavior, and
+visual checks against the retained pre-split WebGPU baseline remain open.
 
 ## 2026-10-30 hosted shoreline field correction
 
