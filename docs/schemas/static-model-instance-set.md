@@ -33,7 +33,8 @@ component asset list. The JSON asset has this shape:
       ],
       "lodThresholds": [0.018, 0.004],
       "shadowLod": 1,
-      "shadowMaxDistance": 22
+      "shadowMaxDistance": 22,
+      "drawMaxDistance": 90
     }
   ],
   "instances": [
@@ -57,7 +58,9 @@ rejects thresholds whose transition bands overlap. The renderer-neutral planner
 selects visible instances and complementary incoming/outgoing fade weights; it
 produces shadow candidates by distance independently of the camera frustum.
 Both renderers must consume those same selections. Model bounds are in local
-space and drive culling and streaming. Instance transforms use a normalized
+space and drive culling and streaming. `drawMaxDistance` limits color rendering
+in world units, accounting for the model's bounding sphere; shadows use the
+independent `shadowMaxDistance`. Instance transforms use a normalized
 quaternion and positive scale. The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 

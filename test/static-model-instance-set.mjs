@@ -26,6 +26,7 @@ const valid = {
 		lodThresholds: [ 0.018, 0.004 ],
 		shadowLod: 1,
 		shadowMaxDistance: 22,
+		drawMaxDistance: 350,
 	} ],
 	instances: [ { model: 'market-table-fish', position: [ 1, 2, 3 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
@@ -40,6 +41,7 @@ assert.throws( () => validateStaticModelInstanceSet( { ...valid, renderer: 'webg
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], rotation: [ 0, 0, 0, 0 ] } ] } ), /normalized quaternion/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.004, 0.018 ] } ] } ), /overlapping LOD/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawMaxDistance: 0 } ] } ), /draw distance/ );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
 
 const loadedGLB = staticModelGLB();
@@ -65,10 +67,11 @@ await assert.rejects( () => loadStaticModelInstanceSetAssets( assetConnector, { 
 const placements = [ 20, 35, 100, 300 ].map( z => ( { model: 'market-table-fish', position: [ 1, 2, z ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ) );
 placements.push( { model: 'market-table-fish', position: [ 500, 2, 20 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
 placements.push( { model: 'market-table-fish', position: [ 5, 2, 20 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
+placements.push( { model: 'market-table-fish', position: [ 1, 2, 400 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
 const planner = new StaticModelInstanceSetPlanner( {
 	...valid,
-	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], shadowLod: 0, shadowMaxDistance: 10 } ],
-	instances: [ ...placements, { model: 'single-lod-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
+	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 100 }, { id: 'short-range-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 4 } ],
+	instances: [ ...placements, { model: 'single-lod-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] }, { model: 'short-range-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 } ).update( {
 	position: [ 0, 0, 0 ],
 	verticalFovRadians: Math.PI / 2,
@@ -90,6 +93,9 @@ assert.equal( planner.shadowGroups[ 0 ].indices[ 1 ], 5 );
 assert.equal( planner.groups[ 3 ].indices.length, 1, 'per-model output buffers use that model\'s instance count' );
 assert.equal( planner.shadowGroups[ 1 ].indices.length, 1 );
 assert.equal( planner.groups[ 3 ].incoming[ 0 ], 2, 'a steady LOD is distinct from the outgoing transition side' );
+assert.ok( ! Array.from( farLod.indices.subarray( 0, farLod.count ) ).includes( 6 ), 'instances beyond drawMaxDistance are omitted from color draws' );
+assert.equal( planner.groups[ 4 ].count, 0, 'color draw distance can hide a model independently of its shadow range' );
+assert.equal( planner.shadowGroups[ 2 ].indices[ 0 ], 8, 'shadow selection remains independent of color draw distance' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
 for ( const camera of [ new PerspectiveCamera( 60, 1, 0.1, 100 ), new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) ] ) {

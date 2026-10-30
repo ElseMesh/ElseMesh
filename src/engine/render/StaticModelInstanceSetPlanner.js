@@ -102,6 +102,7 @@ export class StaticModelInstanceSetPlanner {
 				const shadowGroup = this._shadowsByModel[ modelIndex ];
 				shadowGroup.indices[ shadowGroup.count ++ ] = instanceIndex;
 			}
+			if ( distance - radius > model.drawMaxDistance ) continue;
 			let visible = true;
 			for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
 				const offset = planeIndex * 4;

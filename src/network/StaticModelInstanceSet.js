@@ -32,7 +32,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 
 	const modelIDs = new Set();
 	for ( const model of document.models ) {
-		if ( ! hasExactKeys( model, [ 'id', 'bounds', 'lods', 'lodThresholds', 'shadowLod', 'shadowMaxDistance' ] ) || typeof model.id !== 'string' || ! MODEL_ID.test( model.id ) || modelIDs.has( model.id ) ) throw new Error( 'Invalid or duplicate static model record' );
+		if ( ! hasExactKeys( model, [ 'id', 'bounds', 'lods', 'lodThresholds', 'shadowLod', 'shadowMaxDistance', 'drawMaxDistance' ] ) || typeof model.id !== 'string' || ! MODEL_ID.test( model.id ) || modelIDs.has( model.id ) ) throw new Error( 'Invalid or duplicate static model record' );
 		modelIDs.add( model.id );
 		if ( ! hasExactKeys( model.bounds, [ 'center', 'radius' ] ) || ! validVector( model.bounds.center, 3, 1e6 ) || ! Number.isFinite( model.bounds.radius ) || model.bounds.radius <= 0 || model.bounds.radius > 1e6 ) throw new Error( `Invalid bounds for static model ${model.id}` );
 		if ( ! Array.isArray( model.lods ) || model.lods.length === 0 || model.lods.length > MAX_STATIC_MODEL_INSTANCE_LODS ) throw new Error( `Invalid LOD list for static model ${model.id}` );
@@ -47,6 +47,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 			previousThreshold = threshold;
 		}
 		if ( ! Number.isInteger( model.shadowLod ) || model.shadowLod < 0 || model.shadowLod >= model.lods.length || ! Number.isFinite( model.shadowMaxDistance ) || model.shadowMaxDistance < 0 || model.shadowMaxDistance > 1e6 ) throw new Error( `Invalid shadow policy for static model ${model.id}` );
+		if ( ! Number.isFinite( model.drawMaxDistance ) || model.drawMaxDistance <= 0 || model.drawMaxDistance > 1e6 ) throw new Error( `Invalid draw distance for static model ${model.id}` );
 	}
 
 	for ( const instance of document.instances ) {
