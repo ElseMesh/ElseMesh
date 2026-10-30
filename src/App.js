@@ -222,7 +222,9 @@ export class App {
 
 		const qs = this.qs;
 		const worldLink = worldLinkFromLocation();
-		if ( ! worldLink && ! this.worldPackage ) throw new Error( 'The application entry point must provide a default world package for local play' );
+		if ( ! worldLink && ! this.worldPackage ) this.worldPackage = ( await import( 'virtual:elsemesh-default-world' ) ).defaultWorldPackage;
+		this.localWorldExperience = this.worldPackage?.source?.experience || null;
+		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
 		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
