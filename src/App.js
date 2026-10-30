@@ -259,8 +259,15 @@ export class App {
 			await engine.init();
 			this.backend = engine.backend;
 			console.info( 'ElseMesh renderer selected:', engine.backend === 'webgpu' ? 'WebGPU' : 'WebGL fallback', engine.fallbackReason || '' );
-			if ( engine.backend !== 'webgpu' ) throw new Error( 'The local world bridge currently requires the ElseMesh WebGPU renderer' );
-			return this.initLocalStaticWorld( progress );
+			if ( engine.backend === 'webgpu' ) return this.initLocalStaticWorld( progress );
+			this.hostedColliders = new Colliders();
+			this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
+			const { WebGLFallback } = await import( './fallback/WebGLFallback.js' );
+			this.webglFallback = new WebGLFallback( this, engine );
+			await this.webglFallback.init( onProgress );
+			if ( this.audio ) engine.domElement.addEventListener( 'click', () => this.audio.resume(), { passive: true } );
+			window.__app = this;
+			return this;
 
 		}
 		await progress( 0.02, worldLink ? 'Preparing the world runtime…' : 'Preparing the island state…', undefined, 'terrain' );

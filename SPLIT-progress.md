@@ -170,7 +170,14 @@ finding changes them.
   WebGPU/WebGL packaged-shore and underway-boat browser comparison: 13-point
   height MAE 0.0094 m, max 0.0504 m, and 18-second boat endpoint delta 0.103 m
   with max speed delta 0.012 m/s. These checks do not render the visible WebGL
-  water parity target, which source review found still uses analytic waves.
+  water parity target. A subsequent shader change bound the visible WebGL mesh
+  to the WebGL FFT displacement texture and derives its fragment normals from
+  the displaced geometry. Its isolated 192×144 render compiled all five
+  programs without GL errors and FFT changed 9,268 pixels. This does not verify
+  hosted-scene visual parity: foam/color, synchronized phase, and comparison to
+  the retained pre-split WebGPU baseline remain open. Full client tests,
+  production build, and Go server tests passed; the focused water render and
+  final production build passed after the geometry-normal change.
 - 2026-10-30: reran `test/world-javascript-extension-browser.mjs` in isolated Chromium; owner signing, package assembly, stateful Worker execution, and browser cleanup passed. The test uses a local in-page connector fixture and direct Worker-manager calls, so it does not prove live gateway transfer or hosted-world activation.
 - 2026-10-29: focused streaming, registry, v3 identity, signed Worker, and
   content-submodule checks passed in the external build tree.

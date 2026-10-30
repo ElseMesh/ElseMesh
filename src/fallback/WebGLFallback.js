@@ -36,7 +36,10 @@ import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERI
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
-import { worldComponentRuntimeRecord } from '../network/WorldSource.js';
+import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
+import { worldSpawnCollisionObjectIDs } from '../network/WorldSpawn.js';
+import { selectWorldObjectsForView } from '../network/WorldStreaming.js';
+import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -788,6 +791,7 @@ export class WebGLFallback {
 		this.input = new Input( this.engine.canvas );
 		if ( ! this.worldLink ) {
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
+			this._bindOceanFFTToWater();
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...WORLD.boatDock.position ), initialHeading: WORLD.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
 			this._addIslandGameplayColliders();
@@ -804,8 +808,10 @@ export class WebGLFallback {
 			const hostedColliders = this.app.hostedColliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, hostedTerrain, this.hostedSeaLevel ?? 0 );
+			this._bindOceanFFTToWater();
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
+			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
 			if ( this.hostedVehicleSpec ) {
 				const { object: berth, preview } = this.hostedVehicleSpec;
@@ -922,6 +928,7 @@ export class WebGLFallback {
 		const material = new T.ShaderMaterial( {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
+				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
 				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
@@ -932,6 +939,9 @@ export class WebGLFallback {
 			},
 			vertexShader: /* glsl */`
 				uniform float uTime;
+				uniform sampler2D uOceanDisplacement;
+				uniform vec4 uOceanSizes;
+				uniform int uOceanEnabled;
 				uniform sampler2D uTerrainHeight;
 				uniform sampler2D uShoreField;
 				uniform float uTerrainOrigin;
@@ -954,6 +964,24 @@ export class WebGLFallback {
 				varying float vShoreSlope;
 				varying float vSwashFront;
 				varying float vSwashFoam;
+				vec3 oceanDisplacementCascade( vec2 xz, int cascade ) {
+					vec2 g = fract( xz / uOceanSizes[ cascade ] ) * 256.0 - 0.5;
+					// Keep hardware bilinear filtering inside the selected 256x256 cascade
+					// tile; the atlas stores four cascades in vertically adjacent tiles.
+					g = clamp( g, vec2( 0.0 ), vec2( 255.0 ) );
+					vec2 atlasPixel = vec2( g.x, float( cascade * 256 ) + g.y );
+					return texture2D( uOceanDisplacement, ( atlasPixel + 0.5 ) / vec2( 256.0, 1024.0 ) ).xyz;
+				}
+				vec3 oceanDisplacementAt( vec2 xz, float depth ) {
+					vec3 displacement = vec3( 0.0 );
+					for ( int cascade = 0; cascade < 4; cascade ++ ) {
+						float d0 = min( 40.0, uOceanSizes[ cascade ] * 0.08 );
+						float floorAmount = cascade == 0 ? 0.0 : cascade == 1 ? 0.05 : cascade == 2 ? 0.25 : 0.5;
+						float attenuation = mix( floorAmount * smoothstep( 0.0, 0.6, depth ), 1.0, smoothstep( 0.0, d0, depth ) );
+						displacement += oceanDisplacementCascade( xz, cascade ) * attenuation;
+					}
+					return displacement;
+				}
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
 					vec2 p = world.xz;
@@ -962,6 +990,7 @@ export class WebGLFallback {
 					vSwashFoam = 0.0;
 					float vertexGroundHeight = uHeightRange.x;
 					float vertexSandCoverage = 0.0;
+					float shoreWaveHeight = 0.0;
 					float a = dot( p, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
 					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
 					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.7;
@@ -1022,16 +1051,24 @@ export class WebGLFallback {
 								vShoreEnv = env;
 								float preHeight = shoaledAmplitude * 2.0 * ( pow( skewCrest, sharpness ) - meanProfile ) * ( 1.0 + smoothstep( -1.0, 0.3, breaking ) * 0.22 );
 								vShoreSlope = 2.0 * shoaledAmplitude * sharpness * 3.14159265 * pow( skewCrest, max( sharpness - 1.0, 0.0 ) ) * sin( phaseSkew * 6.2831853 ) * ( 1.0 - skew * sin( u * 6.2831853 ) ) / ( sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0 ) * env;
-								vWaveHeight += preHeight * env;
+								shoreWaveHeight += preHeight * env;
 								float bore = smoothstep( 0.85, 1.35, breaking );
 								float waveHeight = shoaledAmplitude * 2.0 * ( 1.0 - meanProfile );
 								float lipHeight = min( waveHeight * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
 								float lip = smoothstep( -0.17, -0.12, u ) * ( 1.0 - smoothstep( -0.025, 0.015, u ) );
 								float crestHeight = preHeight + lipHeight * bore * curl * lip;
 								world.xz += shoreDirection * ( sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 + lipHeight * 0.55 * bore * curl * lip ) * env;
-								vWaveHeight += ( crestHeight - preHeight ) * env;
+								shoreWaveHeight += ( crestHeight - preHeight ) * env;
 							}
 						}
+					}
+					if ( uOceanEnabled == 1 ) {
+						float oceanDepth = uSeaLevel - vertexGroundHeight;
+						vec2 rest = p, displaced = p;
+						for ( int iteration = 0; iteration < 2; iteration ++ ) displaced = rest - oceanDisplacementAt( displaced, oceanDepth ).xz;
+						vec3 ocean = oceanDisplacementAt( displaced, oceanDepth );
+						world.xz += ocean.xz;
+						vWaveHeight = ocean.y + shoreWaveHeight;
 					}
 					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vertexSandCoverage > 0.05 ) {
 						vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
@@ -1101,17 +1138,17 @@ export class WebGLFallback {
 					vec2 p = vWorldPosition.xz;
 					bool inBeachPatch = vRestPosition.x >= uBeachPatchBounds.x && vRestPosition.x <= uBeachPatchBounds.z && vRestPosition.y >= uBeachPatchBounds.y && vRestPosition.y <= uBeachPatchBounds.w;
 					if ( ( uBeachPatchMode == 1 && inBeachPatch ) || ( uBeachPatchMode == 2 && ! inBeachPatch ) ) discard;
-					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 ), kD = vec2( 0.42, 0.09 ), kE = vec2( 0.72, -0.48 );
+					vec2 kA = vec2( 0.035, 0.025 ), kB = vec2( -0.07, 0.15 ), kC = vec2( 0.21, -0.16 );
 					float a = dot( p, kA ) + uTime * 0.3;
 					float b = dot( p, kB ) - uTime * 0.55;
 					float c = dot( p, kC ) + uTime * 0.7;
-					float d = dot( p, kD ) + uTime * 1.3;
-					float e = dot( p, kE ) + uTime * 1.6;
 					vec2 waterUv = p * 0.024 + vec2( uTime * 0.0013, -uTime * 0.0008 );
 					vec4 waterNoise = texture2D( uCloudNoise, waterUv );
 					vec2 fineUv = p * 0.19 + vec2( -uTime * 0.0021, uTime * 0.0015 );
 					vec4 fineNoise = texture2D( uCloudNoise, fineUv );
-					vec2 slope = kA * cos( a ) * 0.95 + kB * cos( b ) * 0.55 + kC * cos( c ) * 0.08 + kD * cos( d ) * 0.03 + kE * cos( e ) * 0.01;
+					vec3 geometricNormal = normalize( cross( dFdx( vWorldPosition ), dFdy( vWorldPosition ) ) );
+					if ( geometricNormal.y < 0.0 ) geometricNormal = -geometricNormal;
+					vec2 slope = vec2( -geometricNormal.x, -geometricNormal.z ) / max( geometricNormal.y, 0.05 );
 					vec2 fineStep = vec2( 0.0012, 0.0 );
 					float fineSlopeX = texture2D( uCloudNoise, fineUv + fineStep ).r - texture2D( uCloudNoise, fineUv - fineStep ).r;
 					float fineSlopeY = texture2D( uCloudNoise, fineUv + fineStep.yx ).r - texture2D( uCloudNoise, fineUv - fineStep.yx ).r;
@@ -1217,6 +1254,20 @@ export class WebGLFallback {
 			material.uniforms.uViewProjection.value.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
 		};
 		return water;
+
+	}
+
+	_bindOceanFFTToWater() {
+
+		const fft = this.waterQuery?.fft;
+		if ( ! fft ) return;
+		for ( const water of this.waterScene.children ) {
+			const uniforms = water.material?.uniforms;
+			if ( ! uniforms?.uOceanDisplacement ) continue;
+			uniforms.uOceanDisplacement.value = fft.displacementTarget.texture;
+			uniforms.uOceanSizes.value.set( ...fft.parameters.sizes );
+			uniforms.uOceanEnabled.value = 1;
+		}
 
 	}
 
@@ -1532,7 +1583,23 @@ export class WebGLFallback {
 			if ( result.error ) throw result.error;
 			manifest = result.manifest;
 		} else manifest = await this.connector.getManifest();
-		const assets = await this.connector.preload( { through: 'visible' } );
+		let localSpawn = null;
+		let assets;
+		if ( this.connector.localOnly ) {
+			const entry = await chooseWorldEntryPoint( manifest );
+			localSpawn = worldEntryPointPose( entry ) || worldSpawnPose( manifest );
+			this.camera.position.set( ...localSpawn.position );
+			this.camera.rotation.order = 'YXZ';
+			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
+			const initialObjects = selectWorldObjectsForView( manifest, this.camera, { maxPriority: 'nearby', maxDistance: 160 } );
+			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
+			const spawnPoint = { x: localSpawn.position[ 0 ], y: localSpawn.position[ 1 ], z: localSpawn.position[ 2 ] };
+			for ( const objectID of this.connector.collisionObjectIDsAlongPath( spawnPoint, spawnPoint ) ) initialObjectIDs.add( objectID );
+			for ( const objectID of worldSpawnCollisionObjectIDs( manifest, localSpawn, manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
+			assets = await this.connector.preload( { assetIDs } );
+			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => assets.has( object.assetId ) ).map( object => object.id ) );
+		} else assets = await this.connector.preload( { through: 'visible' } );
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.worldLODs = new Map();
 		const components = manifest.components || [];
@@ -1668,7 +1735,7 @@ export class WebGLFallback {
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
 		}
-		const spawn = manifest.spawn || {};
+		const spawn = localSpawn || manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
 		const transfer = new URLSearchParams( location.search ).get( 'webglSpawn' )?.split( ',' ).map( Number );
 		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
