@@ -56,6 +56,7 @@ export class TerrainGPU {
 	constructor( terrain, shoreField, surfaceMaps = null ) {
 
 		this.terrain = terrain;
+		this.shoreField = shoreField || null;
 		const res = terrain.res;
 		const t0 = performance.now();
 
@@ -211,6 +212,7 @@ fn main( @builtin( global_invocation_id ) gid: vec3u ) {
 
 	setShoreField( f ) {
 
+		this.shoreField = f;
 		this.shoreRes = f.res;
 		if ( this.shoreTexture.width !== f.res ) {
 

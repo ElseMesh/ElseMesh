@@ -1,7 +1,7 @@
 import { PALETTE, MEADOW } from '../world/terrain/TerrainShading.js';
 
-const OUTER_MAGIC = new TextEncoder().encode( 'EMTERR1\0' );
-const INNER_MAGIC = new TextEncoder().encode( 'ETRNSF1\0' );
+const OUTER_MAGIC = new TextEncoder().encode( 'EMTERR2\0' );
+const INNER_MAGIC = new TextEncoder().encode( 'ETRNSF2\0' );
 const MAX_UNCOMPRESSED_BYTES = 128 * 1024 * 1024;
 
 const palette = ( colors ) => Object.fromEntries( Object.entries( colors ).map( ( [ name, expression ] ) => {
@@ -10,7 +10,7 @@ const palette = ( colors ) => Object.fromEntries( Object.entries( colors ).map( 
 	return [ name, match.slice( 1 ).map( Number ) ];
 } ) );
 
-export function encodeTerrainSurfaceAsset( terrain, maps, detail ) {
+export function encodeTerrainSurfaceAsset( terrain, maps, detail, shoreField ) {
 
 	const heightBytes = new Uint8Array( terrain.heights.buffer, terrain.heights.byteOffset, terrain.heights.byteLength );
 	const normalBytes = new Uint8Array( maps.normal.buffer, maps.normal.byteOffset, maps.normal.byteLength );
@@ -18,16 +18,22 @@ export function encodeTerrainSurfaceAsset( terrain, maps, detail ) {
 	const detailBytes = new Uint8Array( detail.data.buffer, detail.data.byteOffset, detail.data.byteLength );
 	if ( terrain.heights.constructor !== Float32Array || maps.normal.constructor !== Uint8Array || maps.splat.constructor !== Uint8Array || detail.data.constructor !== Uint8Array ) throw new Error( 'Terrain surface maps have unsupported typed arrays' );
 	if ( maps.normal.length !== terrain.res * terrain.res * 4 || maps.splat.length !== terrain.res * terrain.res * 4 || detail.data.length !== detail.width * detail.height * 4 ) throw new Error( 'Terrain surface maps do not match their declared dimensions' );
+	if ( shoreField?.data?.constructor !== Float32Array || ! Number.isInteger( shoreField.res ) || shoreField.res < 2 || shoreField.res > 2048 || shoreField.data.length !== shoreField.res * shoreField.res * 4 || shoreField.origin !== terrain.origin || shoreField.size !== terrain.size ) throw new Error( 'Terrain shore field does not match its declared domain' );
+	for ( const value of shoreField.data ) if ( ! Number.isFinite( value ) ) throw new Error( 'Terrain shore field contains a non-finite value' );
+	const shoreBytes = new Uint8Array( shoreField.data.length * 4 );
+	const shoreView = new DataView( shoreBytes.buffer );
+	for ( let i = 0; i < shoreField.data.length; i ++ ) shoreView.setFloat32( i * 4, shoreField.data[ i ], true );
 	const metadata = new TextEncoder().encode( JSON.stringify( {
-		protocol: 'elsemesh.terrain-data/1', rendererProfile: 'original-elsemesh-terrain-v1', size: terrain.size, origin: terrain.origin,
+		protocol: 'elsemesh.terrain-data/2', rendererProfile: 'original-elsemesh-terrain-v1', size: terrain.size, origin: terrain.origin,
 		resolution: terrain.res, heightEncoding: 'f32le', maskEncoding: 'rgba8unorm',
 		detailWidth: detail.width, detailHeight: detail.height, detailEncoding: 'rgba8unorm',
+		shoreField: { resolution: shoreField.res, encoding: 'rgba32f', channels: [ 'arrival-time', 'direction-x-exposure', 'direction-z-exposure', 'shore-arrival-time' ] },
 		material: { roughness: 0.9, wetDarken: 0.58, paletteLinear: palette( PALETTE ), meadowLinear: palette( MEADOW ) },
 		normalChannels: [ 'normal-x', 'normal-z', 'rock', 'ambient-occlusion' ],
 		splatChannels: [ 'sand', 'path', 'gully-or-seagrass', 'rubble-or-scarp' ],
 	} ) );
 	const metadataPadding = ( 4 - metadata.length % 4 ) % 4;
-	const rawLength = 12 + metadata.length + metadataPadding + heightBytes.length + normalBytes.length + splatBytes.length + detailBytes.length;
+	const rawLength = 12 + metadata.length + metadataPadding + heightBytes.length + normalBytes.length + splatBytes.length + detailBytes.length + shoreBytes.length;
 	if ( rawLength > MAX_UNCOMPRESSED_BYTES ) throw new Error( 'Terrain surface asset exceeds the uncompressed size limit' );
 	const raw = new Uint8Array( rawLength );
 	raw.set( INNER_MAGIC, 0 );
@@ -40,7 +46,8 @@ export function encodeTerrainSurfaceAsset( terrain, maps, detail ) {
 	offset += heightBytes.length;
 	raw.set( normalBytes, offset ); offset += normalBytes.length;
 	raw.set( splatBytes, offset ); offset += splatBytes.length;
-	raw.set( detailBytes, offset );
+	raw.set( detailBytes, offset ); offset += detailBytes.length;
+	raw.set( shoreBytes, offset );
 	return raw;
 
 }
@@ -50,7 +57,7 @@ export async function decodeTerrainSurfaceAsset( compressed ) {
 	const bytes = compressed instanceof Uint8Array ? compressed : new Uint8Array( compressed );
 	if ( bytes.length < 17 || ! matches( bytes, OUTER_MAGIC, 0 ) ) throw new Error( 'Invalid terrain surface asset header' );
 	const header = new DataView( bytes.buffer, bytes.byteOffset, bytes.byteLength );
-	if ( header.getUint32( 8, true ) !== 1 ) throw new Error( 'Unsupported terrain surface asset version' );
+	if ( header.getUint32( 8, true ) !== 2 ) throw new Error( 'Unsupported terrain surface asset version' );
 	const expectedBytes = header.getUint32( 12, true );
 	if ( expectedBytes < 16 || expectedBytes > MAX_UNCOMPRESSED_BYTES ) throw new Error( 'Terrain surface asset has an invalid expanded size' );
 	if ( typeof DecompressionStream !== 'function' ) throw new Error( 'This browser cannot decompress terrain surface assets' );
@@ -76,14 +83,16 @@ export async function decodeTerrainSurfaceAsset( compressed ) {
 	let metadata;
 	try { metadata = JSON.parse( new TextDecoder().decode( raw.subarray( 12, 12 + metadataBytes ) ) ); }
 	catch { throw new Error( 'Invalid terrain surface metadata' ); }
-	if ( metadata.protocol !== 'elsemesh.terrain-data/1' || metadata.rendererProfile !== 'original-elsemesh-terrain-v1' || metadata.heightEncoding !== 'f32le' || metadata.maskEncoding !== 'rgba8unorm' || metadata.detailEncoding !== 'rgba8unorm' || metadata.material?.roughness !== 0.9 || metadata.material?.wetDarken !== 0.58 || ! validPalette( metadata.material?.paletteLinear ) || ! validPalette( metadata.material?.meadowLinear ) ) throw new Error( 'Unsupported terrain surface data protocol, renderer profile, or material parameters' );
+	if ( metadata.protocol !== 'elsemesh.terrain-data/2' || metadata.rendererProfile !== 'original-elsemesh-terrain-v1' || metadata.heightEncoding !== 'f32le' || metadata.maskEncoding !== 'rgba8unorm' || metadata.detailEncoding !== 'rgba8unorm' || metadata.shoreField?.encoding !== 'rgba32f' || JSON.stringify( metadata.shoreField?.channels ) !== JSON.stringify( [ 'arrival-time', 'direction-x-exposure', 'direction-z-exposure', 'shore-arrival-time' ] ) || metadata.material?.roughness !== 0.9 || metadata.material?.wetDarken !== 0.58 || ! validPalette( metadata.material?.paletteLinear ) || ! validPalette( metadata.material?.meadowLinear ) ) throw new Error( 'Unsupported terrain surface data protocol, renderer profile, or material parameters' );
 	const { size, origin, resolution, detailWidth, detailHeight } = metadata;
+	const shoreResolution = metadata.shoreField.resolution;
 	if ( ! Number.isFinite( size ) || size <= 0 || size > 100000 || ! Number.isFinite( origin ) || Math.abs( origin ) > 100000 || ! Number.isInteger( resolution ) || resolution < 2 || resolution > 4097 || ! Number.isInteger( detailWidth ) || detailWidth < 1 || detailWidth > 4096 || ! Number.isInteger( detailHeight ) || detailHeight < 1 || detailHeight > 4096 ) throw new Error( 'Terrain surface dimensions or bounds are invalid' );
-	const count = resolution * resolution, detailCount = detailWidth * detailHeight;
-	const heightLength = count * 4, mapLength = count * 4, detailLength = detailCount * 4;
+	if ( ! Number.isInteger( shoreResolution ) || shoreResolution < 2 || shoreResolution > 2048 ) throw new Error( 'Terrain shore field dimensions are invalid' );
+	const count = resolution * resolution, detailCount = detailWidth * detailHeight, shoreCount = shoreResolution * shoreResolution;
+	const heightLength = count * 4, mapLength = count * 4, detailLength = detailCount * 4, shoreLength = shoreCount * 16;
 	let offset = 12 + metadataBytes;
 	offset += ( 4 - offset % 4 ) % 4;
-	if ( offset + heightLength + mapLength * 2 + detailLength !== raw.length ) throw new Error( 'Terrain surface payload dimensions do not match its byte length' );
+	if ( offset + heightLength + mapLength * 2 + detailLength + shoreLength !== raw.length ) throw new Error( 'Terrain surface payload dimensions do not match its byte length' );
 	const heights = new Float32Array( count );
 	const heightView = new DataView( raw.buffer, raw.byteOffset + offset, heightLength );
 	for ( let i = 0; i < count; i ++ ) heights[ i ] = heightView.getFloat32( i * 4, true );
@@ -92,7 +101,15 @@ export async function decodeTerrainSurfaceAsset( compressed ) {
 	const splat = new Uint8Array( raw.buffer, raw.byteOffset + offset, mapLength ); offset += mapLength;
 	const detail = new Uint8Array( raw.buffer, raw.byteOffset + offset, detailLength );
 	for ( let i = 0; i < heights.length; i ++ ) if ( ! Number.isFinite( heights[ i ] ) ) throw new Error( 'Terrain surface contains a non-finite height' );
-	return { size, origin, resolution, heights, normal, splat, detailWidth, detailHeight, detail, metadata };
+	offset += detailLength;
+	const shoreFieldData = new Float32Array( shoreCount * 4 );
+	const shoreView = new DataView( raw.buffer, raw.byteOffset + offset, shoreLength );
+	for ( let i = 0; i < shoreFieldData.length; i ++ ) {
+		shoreFieldData[ i ] = shoreView.getFloat32( i * 4, true );
+		if ( ! Number.isFinite( shoreFieldData[ i ] ) ) throw new Error( 'Terrain shore field contains a non-finite value' );
+	}
+	const shoreField = { data: shoreFieldData, res: shoreResolution, cellSize: size / shoreResolution, origin, size };
+	return { size, origin, resolution, heights, normal, splat, detailWidth, detailHeight, detail, shoreField, metadata };
 
 }
 

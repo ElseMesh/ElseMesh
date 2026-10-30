@@ -1,5 +1,24 @@
 # Reproducible graphics review
 
+## 2026-10-30 hosted shoreline field correction
+
+A matched live WebGPU beach capture exposed that the hosted `TerrainGPU` had
+only its 1×1 no-shore placeholder. Tidewater's terrain component had constructed
+it with no shore field, so the hosted water lacked the incoming-wave direction
+and exposure data. Terrain package protocol 2 now includes Tidewater's baked
+four-channel shore field, generated from the authored swell direction in its
+world repository. The hosted component passes the decoded field to the generic
+terrain renderer.
+
+The isolated browser loaded a 512×512 field, built the 128×128 shore-direction
+lookup, and activated all 577 hosted breaker stations at the matched beach
+pose. The screenshot shows the restored turquoise shallows and breaking foam.
+This confirms the shoreline correction against the retained pre-split capture
+in [`parity-2026-10-27-webgpu.png`](images/parity-2026-10-27-webgpu.png); it
+does not close the remaining water-pattern or multi-view parity checks.
+
+![Hosted WebGPU beach after packaging the shoreline field](images/parity-2026-10-30-webgpu-shorefield.png)
+
 ## Current WebGPU/WebGL runtime check, 2026-10-29
 
 The signed Tidewater package was served by a temporary local `worldd` profile
