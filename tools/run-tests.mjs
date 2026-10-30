@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 
 const tests = [
 	'test/world-identity.mjs', 'test/blender-world-identity.mjs', 'test/world-component-registry.mjs', 'test/world-component-backend-registry.mjs', 'test/world-behavior-registry.mjs', 'test/world-javascript-extension.mjs', 'test/world-village-material.mjs', 'worlds/tidewater/test/fishing-rules.mjs',
-	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs',
+	'test/world-content-submodules.mjs', 'test/world-spawn.mjs', 'test/wildlife-runtime.mjs', 'test/wildlife-frame.mjs', 'test/ocean-spectrum-parity.mjs',
 	'test/world-water-surface.mjs', 'test/world-component-runtime-record.mjs',
 	'test/vite-world-assets.mjs', 'test/require-external-build-tree.mjs', 'test/vegetation-placement-codec.mjs',
 	'worlds/tidewater/test/fish-prop-placements.mjs', 'worlds/tidewater/test/webgl-fish-props-adapter-build.mjs', 'worlds/tidewater/test/webgpu-fish-props-adapter-build.mjs', 'test/reef-placement-codec.mjs', 'test/reef-placements.mjs', 'worlds/tidewater/test/reef-assets.mjs', 'test/webgl-reef-adapter.mjs',
@@ -23,7 +23,7 @@ const tests = [
 	'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/collision-frontier.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
 ];
 const dawnTests = new Set( [
-	'test/reef-placement-render.mjs', 'worlds/tidewater/test/village-materials.mjs', 'worlds/tidewater/test/world-export.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'worlds/tidewater/test/webgpu-fish-props-adapter-build.mjs', 'test/engine-smoke.mjs',
+	'test/reef-placement-render.mjs', 'worlds/tidewater/test/village-materials.mjs', 'worlds/tidewater/test/world-export.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'worlds/tidewater/test/webgpu-fish-props-adapter-build.mjs', 'test/engine-smoke.mjs', 'test/ocean-spectrum-parity.mjs',
 ] );
 const viteAssetTests = new Set( [ 'test/desktop-adaptive-scale.mjs', 'test/portal-sides.mjs', 'test/world-hosted-player.mjs', 'test/world-component-backend-registry.mjs' ] );
 const android = process.platform === 'android';

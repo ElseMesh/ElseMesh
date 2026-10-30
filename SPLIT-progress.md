@@ -283,3 +283,14 @@ them.
   the production parity gap, so the estimate moved from 75% to 65%. The
   pre-split boat trace, synthetic query sensitivity, fishing renderer trace,
   and WebGL underway stability checks pass; they do not close this gap.
+- 2026-10-30: added a shared JavaScript ocean-spectrum parameter/coefficient
+  generator while leaving WebGPU spectrum generation on its existing GPU path.
+  A headless GPU comparison checks all 262,144 modes against WebGPU storage
+  buffers; coefficient and wavenumber errors remain within the asserted bounds.
+  This establishes shared spectral inputs for the WebGL backend, but no WebGL
+  runtime consumes them yet, so the gameplay parity estimate remains unchanged.
+- 2026-10-30: pinned the pre-refactor default spectrum uniforms and a custom
+  wave-profile/seed fixture independently of the shared helper. The coefficient
+  comparison and external production build pass. The next required parity slice
+  is a WebGL GPU FFT that produces the shared displacement field; CPU sparse
+  spectral evaluation is too expensive for production use.

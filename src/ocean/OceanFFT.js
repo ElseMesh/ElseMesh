@@ -1,6 +1,9 @@
-import { Vector4, MathUtils } from '../engine/index.js';
+import { Vector4 } from '../engine/index.js';
 import { GPU, UniformBlock, Texture, StorageBuffer, ShaderModule, ComputeKernel, GRAVITY } from '../engine/webgpu.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
+import { createOceanSpectrumParameters, DEFAULT_CASCADE_SIZES, DEFAULT_LOCAL_WAVE_SYSTEM, DEFAULT_SWELL_WAVE_SYSTEM } from './OceanSpectrum.js';
+
+export { DEFAULT_CASCADE_SIZES } from './OceanSpectrum.js';
 
 // Multi-cascade FFT ocean (Tessendorf) with a Horvath/JONSWAP spectrum.
 //
@@ -27,9 +30,6 @@ export const FFT_SIZE = 256;
 const N = FFT_SIZE;
 const LOG2N = 8;
 const HALF = N / 2;
-
-// Non-integer ratios between cascade sizes avoid visible repetition.
-export const DEFAULT_CASCADE_SIZES = [ 733, 157, 33.3, 7.1 ];
 
 const TWO_PI = Math.PI * 2;
 
@@ -87,8 +87,8 @@ export class OceanFFT {
 		this.sizes = ( options.sizes ?? DEFAULT_CASCADE_SIZES ).slice( 0, this.cascades );
 		this.depth = options.depth ?? 500;
 
-		this.local = new WaveSystem( options.local ?? { windSpeed: 7, windDirection: 25, fetch: 120, spreadBlend: 0.85, swell: 0.05 } );
-		this.swell = new WaveSystem( options.swell ?? { scale: 0.48, windSpeed: 6, windDirection: 5, fetch: 1200, spreadBlend: 1.0, swell: 0.9, shortWavesFade: 0.1 } );
+		this.local = new WaveSystem( options.local ?? DEFAULT_LOCAL_WAVE_SYSTEM );
+		this.swell = new WaveSystem( options.swell ?? DEFAULT_SWELL_WAVE_SYSTEM );
 
 		const C = this.cascades;
 		this.params = new UniformBlock( 'OceanParams', {
@@ -198,29 +198,24 @@ fn oceanSampleDisplacementWeighted( xz: vec2f, level: f32, w: vec4f ) -> vec3f {
 
 		const C = this.cascades;
 		const P = this.params.fields;
+		const spectrum = createOceanSpectrumParameters( {
+			cascades: C, sizes: this.sizes, depth: this.depth,
+			local: this.local, swell: this.swell, seed: this.uSeed.value,
+		} );
 
 		for ( let i = 0; i < C; i ++ ) {
 
-			const low = i === 0 ? 0.0001 : ( TWO_PI / this.sizes[ i ] ) * 6;
-			const high = i === C - 1 ? 9999 : ( TWO_PI / this.sizes[ i + 1 ] ) * 6;
-			P.cuts.value[ i ].set( low, high, 0, 0 );
-			P.sizes.value[ i ].set( this.sizes[ i ], 0, 0, 0 );
+			P.cuts.value[ i ].set( ...spectrum.cuts[ i ], 0, 0 );
+			P.sizes.value[ i ].set( spectrum.sizes[ i ], 0, 0, 0 );
 
 		}
 
-		P.depth.value = this.depth;
-
-		const sys = [ this.local, this.swell ];
+		P.depth.value = spectrum.depth;
 
 		for ( let i = 0; i < 2; i ++ ) {
 
-			const s = sys[ i ];
-			const fetchM = Math.max( 1, s.fetch ) * 1000;
-			const U = Math.max( 0.1, s.windSpeed );
-			const alpha = 0.076 * Math.pow( GRAVITY * fetchM / ( U * U ), - 0.22 );
-			const peakOmega = 22 * Math.pow( U * fetchM / ( GRAVITY * GRAVITY ), - 0.33 );
-			P.sysA.value[ i ].set( s.scale, MathUtils.degToRad( s.windDirection ), s.spreadBlend, s.swell );
-			P.sysB.value[ i ].set( alpha, peakOmega, s.peakEnhancement, s.shortWavesFade );
+			P.sysA.value[ i ].set( ...spectrum.sysA[ i ] );
+			P.sysB.value[ i ].set( ...spectrum.sysB[ i ] );
 
 		}
 
