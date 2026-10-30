@@ -317,3 +317,8 @@ them.
   tests now use a Tidewater-owned synthetic query fixture; the actual GPU query
   is covered by the isolated browser parity check. Hogwarts remains dirty and
   was not inspected, staged, or changed.
+- 2026-10-30: tested direct same-browser WebGPU/WebGL query comparison under
+  SwiftShader. Chromium exposes a WebGPU adapter, but its four storage textures
+  per compute stage are below ElseMesh's required five for the ocean FFT. The
+  browser check now uses a direct WebGPU query only when full backend limits are
+  met; otherwise it compares against the passing headless Dawn reference.
