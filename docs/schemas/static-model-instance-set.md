@@ -1,7 +1,8 @@
 # Static model instance sets
 
-**Status: partial.** The engine validates and decodes the data shape. Component
-installation, WebGPU/WebGL renderers, and Tidewater export are not implemented.
+**Status: partial.** The engine's shared component asset-codec registry validates
+and decodes the data shape. Component installation, WebGPU/WebGL renderers, and
+Tidewater export are not implemented.
 
 This generic package format is the intended replacement for content-specific
 static renderer components. A world describes models, LOD assets, materials,

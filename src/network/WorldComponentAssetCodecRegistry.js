@@ -1,4 +1,10 @@
+import { decodeStaticModelInstanceSet, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
+
 const decoders = new Map();
+
+// Static model instance sets are an engine-defined backend-neutral package
+// format, so every world uses the same validator without registering a codec.
+decoders.set( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, decodeStaticModelInstanceSet );
 
 export function registerWorldComponentAssetDecoder( kind, decode ) {
 	if ( typeof kind !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}\/\d+$/.test( kind ) || typeof decode !== 'function' || decoders.has( kind ) ) {

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCodecRegistry.js';
 import {
 	decodeStaticModelInstanceSet,
+	STATIC_MODEL_INSTANCE_SET_ASSET_KIND,
 	STATIC_MODEL_INSTANCE_SET_FORMAT,
 	validateStaticModelInstanceSet,
 } from '../src/network/StaticModelInstanceSet.js';
@@ -20,12 +22,14 @@ const valid = {
 };
 
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
-assert.equal( decodeStaticModelInstanceSet( new TextEncoder().encode( JSON.stringify( valid ) ), { availableAssetIDs: new Set( [ hi, low ] ) } ).instances.length, 1 );
+const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
+assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set( [ hi, low ] ) } ).instances.length, 1 );
+assert.equal( decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes ).models[ 0 ].id, 'market-table-fish', 'the engine asset-codec registry applies the generic validator' );
 assert.throws( () => validateStaticModelInstanceSet( valid, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, renderer: 'webgpu' } ), /format or fields/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], rotation: [ 0, 0, 0, 0 ] } ] } ), /normalized quaternion/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ ...valid.models[ 0 ].lods ].reverse() } ] } ), /unordered LOD/ );
-assert.throws( () => decodeStaticModelInstanceSet( new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
+assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
 
 console.log( 'static model instance-set contract checks passed' );
