@@ -41,6 +41,9 @@ backend-neutral content, placements, material inputs, and behavior data while
 ElseMesh owns renderer selection and both backend implementations. Standard
 generic content formats fit this boundary: they describe what to render without
 choosing a renderer or putting Tidewater-specific semantics in engine code.
+The proposed static model instance-set contract is documented in
+[`docs/schemas/static-model-instance-set.md`](docs/schemas/static-model-instance-set.md);
+it is a design target only and has no runtime implementation yet.
 
 ## Current work and next gates
 
