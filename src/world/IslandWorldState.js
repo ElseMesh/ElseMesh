@@ -9,7 +9,6 @@ export class IslandWorldState {
 
 		this.terrain = new TerrainData( terrainSeed );
 		this.colliders = new Colliders();
-		this.hostedColliders = new Colliders();
 
 	}
 

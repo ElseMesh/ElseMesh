@@ -801,7 +801,7 @@ export class WebGLFallback {
 			this.activeWorldExtensions = createWorldBehaviorExtensions( this.defaultWorldSource.experience, this.defaultWorldAssets.extensionModules );
 			dispatchWorldBehaviorHooks( this.defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T, extensions: this.activeWorldExtensions } );
 		} else {
-			const hostedColliders = this.app.worldState.hostedColliders || this.app.worldState.colliders;
+			const hostedColliders = this.app.hostedColliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, hostedTerrain, this.hostedSeaLevel ?? 0 );
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
@@ -843,7 +843,7 @@ export class WebGLFallback {
 		if ( this.worldLink ) {
 			if ( this.hostedWildlifeComponent ) {
 				if ( ! this.hostedTerrainData ) throw new Error( `Wildlife component ${this.hostedWildlifeComponent.id} requires its packaged terrain surface` );
-				this._createWildlifeRuntime( this.hostedTerrainData, this.app.worldState.hostedColliders || this.app.worldState.colliders, this.hostedWildlifeComponent );
+				this._createWildlifeRuntime( this.hostedTerrainData, this.app.hostedColliders, this.hostedWildlifeComponent );
 			}
 		} else this._createWildlifeRuntime( this.terrain, this.app.worldState.colliders, this.islandWildlifeComponent );
 		if ( this.terrain ) {
@@ -1730,7 +1730,7 @@ export class WebGLFallback {
 				const yaw = ( transform.yaw || 0 ) + ( item.yaw || 0 ), cos = Math.cos( transform.yaw || 0 ), sin = Math.sin( transform.yaw || 0 );
 				const lx = item.center[ 0 ] * scale[ 0 ], lz = item.center[ 2 ] * scale[ 2 ];
 				const hx = item.halfExtents[ 0 ] * scale[ 0 ], hz = item.halfExtents[ 2 ] * scale[ 2 ];
-				( this.app.worldState.hostedColliders || this.app.worldState.colliders ).addBox( new EngineVector3( transform.position[ 0 ] + lx * cos + lz * sin, transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ], transform.position[ 2 ] - lx * sin + lz * cos ), new EngineVector3( hx, item.halfExtents[ 1 ] * scale[ 1 ], hz ), yaw, { walkable: item.walkable, solid: item.solid, tag: `world:${object.id}` } );
+				this.app.hostedColliders.addBox( new EngineVector3( transform.position[ 0 ] + lx * cos + lz * sin, transform.position[ 1 ] + item.center[ 1 ] * scale[ 1 ], transform.position[ 2 ] - lx * sin + lz * cos ), new EngineVector3( hx, item.halfExtents[ 1 ] * scale[ 1 ], hz ), yaw, { walkable: item.walkable, solid: item.solid, tag: `world:${object.id}` } );
 			}
 		}
 

@@ -260,7 +260,9 @@ export class App {
 		this.worldState = new IslandWorldState();
 		this.terrainData = this.worldState.terrain;
 		this.colliders = this.worldState.colliders;
-		this.hostedColliders = this.worldState.hostedColliders;
+		// Hosted package collision state belongs to the active world package, not
+		// the built-in island's backend-neutral state.
+		this.hostedColliders = new Colliders();
 		await progress( 0.03, 'Starting the graphics backend…', undefined, 'gpu' );
 		const engine = this.engine = new Engine( document.getElementById( 'app' ) );
 		await engine.init();
