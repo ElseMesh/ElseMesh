@@ -47,6 +47,9 @@ func TestAppendAnnouncedAddresses(t *testing.T) {
 }
 
 func TestLibp2pListenAddressesMatchAnnouncedFamilies(t *testing.T) {
+	if got := libp2pListenAddresses(0, nil); !reflect.DeepEqual(got, []string{"/ip4/0.0.0.0/tcp/0", "/ip4/0.0.0.0/udp/0/quic-v1"}) {
+		t.Fatalf("ephemeral peer listeners should request OS-assigned ports: %v", got)
+	}
 	ipv4, _ := parseAnnounceAddresses([]string{"/ip4/192.168.1.42/tcp/42901"})
 	if got := libp2pListenAddresses(42901, ipv4); !reflect.DeepEqual(got, []string{"/ip4/0.0.0.0/tcp/42901", "/ip4/0.0.0.0/udp/42901/quic-v1"}) {
 		t.Fatalf("IPv4-only listener addresses changed unexpectedly: %v", got)

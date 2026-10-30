@@ -30,6 +30,19 @@ Color, breaker foam, synchronized wave phase, and performance still need
 matched live captures and comparison against the retained pre-split WebGPU
 baseline.
 
+After that paired capture, hosted WebGL was updated to consume the signed
+terrain package's shore field and to build a high-resolution shore patch from
+the packaged sand and height data. The isolated 1280×720 WebGL capture below
+loaded both ocean and shore meshes with no unsupported hosted components. It
+still shows obvious differences in water color and shape, beach presentation,
+terrain, and wood materials. A live WebGPU adapter was unavailable on this
+host, so this capture could not be paired with a same-build WebGPU image; it
+does not close visual parity. Vite, the gateway, and both libp2p transports
+bound OS-assigned ports for this run; the capture used the addresses announced
+at startup rather than reserved port numbers.
+
+![Hosted WebGL pier view after consuming the packaged shoreline field](images/parity-2026-10-30-hosted-webgl-shorefield-pier.png)
+
 A synchronized two-second forward sprint started both players at
 `[56.176, 1.633, -65.873]`, facing along the pier. WebGPU advanced 2.253 seconds
 of simulation and moved 11.583 m; WebGL advanced 2.111 seconds and moved

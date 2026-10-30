@@ -122,7 +122,7 @@ func run() error {
 	exportNodeKey := flag.String("export-node-key", "", "write this data directory's private identity key to a new 0600 file, then exit")
 	importNodeKey := flag.String("import-node-key", "", "install a 0600 private identity key if node.key does not exist, then exit")
 	worldName := flag.String("world-name", "My ThruHold", "create a local starter world when none is supplied")
-	listenPort := flag.Int("p2p-port", 42901, "libp2p TCP and QUIC listen port")
+	listenPort := flag.Int("p2p-port", 42901, "libp2p TCP and QUIC listen port (0 selects ephemeral ports)")
 	zeroTierNetwork := flag.String("zerotier-network", defaultZeroTierNetworkID, "ZeroTier network ID to join through embedded libzt (requires a zerotier build)")
 	zeroTierPathDiagnostics := flag.Bool("zerotier-path-diagnostics", false, "enable a loopback-only endpoint for querying observed embedded ZeroTier peer IP/UDP-port paths")
 	httpAddress := flag.String("http", "127.0.0.1:5200", "HTTP/WebSocket gateway listen address; place behind TLS for public browser access")
@@ -234,8 +234,11 @@ func run() error {
 		}
 		*dataDir = profileData
 	}
-	if *listenPort < 1 || *listenPort > 65535 {
-		return errors.New("p2p-port must be between 1 and 65535")
+	if *listenPort < 0 || *listenPort > 65535 {
+		return errors.New("p2p-port must be 0 (automatic) or between 1 and 65535")
+	}
+	if *listenPort == 0 && *zeroTierNetwork != "" {
+		return errors.New("p2p-port 0 (automatic) cannot be combined with ZeroTier")
 	}
 	if *dhtMode != "auto" && *dhtMode != "client" && *dhtMode != "server" {
 		return errors.New("dht-mode must be auto, client, or server")

@@ -34,7 +34,7 @@ export function parseArguments( argv ) {
 	if ( options[ '--autoport' ] && options[ '--http' ] ) throw new Error( '--autoport cannot be combined with --http' );
 	if ( ! /^[a-z0-9][a-z0-9_-]{0,63}$/.test( options[ '--profile' ] ) ) throw new Error( '--profile must be 1 to 64 lowercase letters, digits, hyphens, or underscores and start with a letter or digit' );
 	if ( options[ '--http' ] && ! /^(?:localhost|127\.0\.0\.1|\[[0-9a-f:]+\]|[^\s:]+):\d{1,5}$/.test( options[ '--http' ] ) ) throw new Error( '--http must be a host:port address' );
-	if ( options[ '--p2p-port' ] && ( ! /^\d+$/.test( options[ '--p2p-port' ] ) || Number( options[ '--p2p-port' ] ) < 1 || Number( options[ '--p2p-port' ] ) > 65535 ) ) throw new Error( '--p2p-port must be between 1 and 65535' );
+	if ( options[ '--p2p-port' ] && ( ! /^\d+$/.test( options[ '--p2p-port' ] ) || Number( options[ '--p2p-port' ] ) > 65535 ) ) throw new Error( '--p2p-port must be 0 (automatic) or between 1 and 65535' );
 	if ( options[ '--directory-url' ] && ! options[ '--public-gateway' ] ) throw new Error( '--directory-url requires --public-gateway' );
 	if ( options[ '--discoverable' ] && ! [ 'true', 'false' ].includes( options[ '--discoverable' ] ) ) throw new Error( '--discoverable must be true or false' );
 	if ( options[ '--directory-url' ] && options[ '--discoverable' ] === 'false' ) throw new Error( '--directory-url cannot be combined with --discoverable false' );

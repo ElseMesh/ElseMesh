@@ -58,7 +58,11 @@ For temporary local hosting, replace `--http` with `--autoport`. The daemon
 binds an OS-assigned loopback port and prints the selected address in its
 `worldd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
 mutually exclusive; it only selects the HTTP gateway port, so give concurrent
-profiles distinct `--p2p-port` values as usual.
+profiles distinct `--p2p-port` values as usual. For temporary local hosting,
+`--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; worldd
+prints both actual peer addresses at startup. Do not use ephemeral peer ports
+when a deployment depends on fixed firewall forwarding or ZeroTier's shared
+bridge port.
 
 Build `thruholdd` for the host first, then run (from the repository root):
 

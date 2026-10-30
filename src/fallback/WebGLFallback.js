@@ -24,6 +24,7 @@ import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
+import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGLVillageMaterials.js';
@@ -364,37 +365,8 @@ function webglShoreFieldTexture( T, terrain, seaLevel ) {
 
 	const swellLength = Math.hypot( ...WORLD.swellDir ), swell = WORLD.swellDir.map( value => value / swellLength );
 	const field = computeShoreField( terrain, { res: 512, swellDir: swell, seaLevel } );
-	const data = new Uint8Array( field.res * field.res * 4 ), swashData = new Uint8Array( field.res * field.res * 4 );
-	let minTime = Infinity, maxTime = - Infinity, minSwashTime = Infinity, maxSwashTime = - Infinity;
-	for ( let i = 0; i < field.res * field.res; i ++ ) {
-		const source = i * 4, arrival = field.data[ source ], swashArrival = field.data[ source + 3 ];
-		if ( field.depth[ i ] > 0 && arrival < 10000 ) { minTime = Math.min( minTime, arrival ); maxTime = Math.max( maxTime, arrival ); }
-		if ( swashArrival < 10000 ) { minSwashTime = Math.min( minSwashTime, swashArrival ); maxSwashTime = Math.max( maxSwashTime, swashArrival ); }
-	}
-	if ( ! Number.isFinite( minTime ) || ! Number.isFinite( maxTime ) || ! Number.isFinite( minSwashTime ) || ! Number.isFinite( maxSwashTime ) ) return null;
-	const timeRange = Math.max( maxTime - minTime, 1e-6 ), swashTimeRange = Math.max( maxSwashTime - minSwashTime, 1e-6 );
-	for ( let i = 0; i < field.res * field.res; i ++ ) {
-		const source = i * 4, directionLength = Math.hypot( field.data[ source + 1 ], field.data[ source + 2 ] );
-		const exposure = Math.min( 1, directionLength ), arrival = Math.max( minTime, Math.min( maxTime, field.data[ source ] ) );
-		const swashArrival = Math.max( minSwashTime, Math.min( maxSwashTime, field.data[ source + 3 ] ) ), out = source;
-		data[ source ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 1 ] / directionLength : swell[ 0 ] ) * 0.5 + 0.5 ) * 255 );
-		data[ source + 1 ] = Math.round( ( ( directionLength > 1e-5 ? field.data[ source + 2 ] / directionLength : swell[ 1 ] ) * 0.5 + 0.5 ) * 255 );
-		data[ source + 2 ] = Math.round( exposure * 255 );
-		data[ source + 3 ] = Math.round( ( arrival - minTime ) / timeRange * 255 );
-		swashData[ out ] = Math.round( ( swashArrival - minSwashTime ) / swashTimeRange * 255 );
-		swashData[ out + 3 ] = 255;
-	}
-	const texture = new T.DataTexture( data, field.res, field.res, T.RGBAFormat, T.UnsignedByteType );
-	texture.wrapS = texture.wrapT = T.ClampToEdgeWrapping;
-	texture.magFilter = texture.minFilter = T.LinearFilter;
-	texture.generateMipmaps = false;
-	texture.needsUpdate = true;
-	const swashTexture = new T.DataTexture( swashData, field.res, field.res, T.RGBAFormat, T.UnsignedByteType );
-	swashTexture.wrapS = swashTexture.wrapT = T.ClampToEdgeWrapping;
-	swashTexture.magFilter = swashTexture.minFilter = T.LinearFilter;
-	swashTexture.generateMipmaps = false;
-	swashTexture.needsUpdate = true;
-	return { texture, swashTexture, timeRange: new T.Vector2( minTime, maxTime ), swashTimeRange: new T.Vector2( minSwashTime, maxSwashTime ), origin: field.origin, size: field.size, field };
+	const encoded = encodeWebGLShoreField( T, field, swell );
+	return encoded ? { ...encoded, field } : null;
 
 }
 
@@ -922,7 +894,7 @@ export class WebGLFallback {
 
 	}
 
-	_makeWater( geometry, seaLevel, terrainWater, beachPatchMode = 0 ) {
+	_makeWater( geometry, seaLevel, terrainWater, beachPatchMode = 0, beachPatchBounds = null ) {
 
 		const T = this.THREE;
 		const material = new T.ShaderMaterial( {
@@ -935,7 +907,7 @@ export class WebGLFallback {
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
 				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
 				uShoreTimeRange: { value: terrainWater?.shore?.timeRange || new T.Vector2() }, uSwashField: { value: terrainWater?.shore?.swashTexture || null }, uSwashTimeRange: { value: terrainWater?.shore?.swashTimeRange || new T.Vector2() },
-				uBeachPatchMode: { value: beachPatchMode }, uBeachPatchBounds: { value: new T.Vector4( WORLD.beach.xMin - 50, - 120, WORLD.beach.xMax + 50, 40 ) },
+				uBeachPatchMode: { value: beachPatchMode }, uBeachPatchBounds: { value: beachPatchBounds ? new T.Vector4( beachPatchBounds.xMin, beachPatchBounds.zMin, beachPatchBounds.xMax, beachPatchBounds.zMax ) : new T.Vector4() },
 			},
 			vertexShader: /* glsl */`
 				uniform float uTime;
@@ -1168,8 +1140,8 @@ export class WebGLFallback {
 							sandCoverage = terrain.b;
 						}
 					}
-					if ( uBeachPatchMode == 2 && groundHeight > uSeaLevel && sandCoverage > 0.05 ) {
-						if ( vSwashFront <= 0.0 ) discard;
+					if ( uBeachPatchMode == 2 && groundHeight > uSeaLevel ) {
+						if ( sandCoverage <= 0.05 || vSwashFront <= 0.0 ) discard;
 					}
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
@@ -1418,7 +1390,8 @@ export class WebGLFallback {
 		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, this.worldSeaLevel );
 		this.shoreField = waterTerrain.shore?.field || null;
 		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), this.worldSeaLevel, waterTerrain, 1 ) );
-		const beachPatch = this._makeWater( new T.PlaneGeometry( WORLD.beach.xMax - WORLD.beach.xMin + 100, 160, 672, 256 ), this.worldSeaLevel, waterTerrain, 2 );
+		const beachBounds = { xMin: WORLD.beach.xMin - 50, xMax: WORLD.beach.xMax + 50, zMin: - 120, zMax: 40 };
+		const beachPatch = this._makeWater( new T.PlaneGeometry( beachBounds.xMax - beachBounds.xMin, beachBounds.zMax - beachBounds.zMin, 672, 256 ), this.worldSeaLevel, waterTerrain, 2, beachBounds );
 		beachPatch.position.x = ( WORLD.beach.xMin + WORLD.beach.xMax ) * 0.5;
 		beachPatch.position.z = - 40;
 		this.waterScene.add( beachPatch );
@@ -1808,6 +1781,7 @@ export class WebGLFallback {
 		const T = this.THREE;
 		const terrain = this.hostedTerrainData;
 		const terrainWater = terrain ? webglTerrainWaterTexture( T, terrain ) : null;
+		if ( terrainWater && this.hostedTerrainSurface?.shoreField ) terrainWater.shore = encodeWebGLShoreField( T, this.hostedTerrainSurface.shoreField );
 		const installed = new Set();
 		for ( const component of components ) {
 			const adapter = worldComponentBackendAdapter( this.engine.backend, component.type );
