@@ -43,7 +43,9 @@ generic content formats fit this boundary: they describe what to render without
 choosing a renderer or putting Tidewater-specific semantics in engine code.
 The proposed static model instance-set contract is documented in
 [`docs/schemas/static-model-instance-set.md`](docs/schemas/static-model-instance-set.md);
-it is a design target only and has no runtime implementation yet.
+its strict decoder and validator now exist in `src/network/StaticModelInstanceSet.js`
+with a focused contract test. Component installation, dual-backend rendering,
+and Tidewater export have not been migrated to it, so this is still groundwork.
 
 ## Current work and next gates
 

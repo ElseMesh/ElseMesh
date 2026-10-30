@@ -1,6 +1,7 @@
 # Static model instance sets
 
-**Status: design target; the runtime does not implement this contract yet.**
+**Status: partial.** The engine validates and decodes the data shape. Component
+installation, WebGPU/WebGL renderers, and Tidewater export are not implemented.
 
 This generic package format is the intended replacement for content-specific
 static renderer components. A world describes models, LOD assets, materials,
@@ -49,9 +50,11 @@ source, renderer names, backend flags, or engine class names.
 
 The component's streaming bounds enclose the transformed model bounds. Asset
 references are content-addressed and verified by the signed manifest before
-loading. The engine rejects unknown format versions, missing model/LOD assets,
-invalid transforms, duplicate model IDs, and records that exceed configured
-count or byte limits.
+loading. The contract validator rejects unknown format versions, invalid
+transforms, duplicate model IDs, unordered LOD thresholds, and records that
+exceed its configured count or byte limits. It checks model/LOD asset presence
+when the caller supplies the resolved asset-ID set. Package installation does
+not yet call this validator.
 
 ## Separation and parity gates
 
