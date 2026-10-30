@@ -1,8 +1,9 @@
 # Static model instance sets
 
 **Status: partial.** The engine's shared component asset-codec registry validates
-and decodes the data shape. Component installation, WebGPU/WebGL renderers, and
-Tidewater export are not implemented.
+and decodes the data shape, and `StaticModelInstanceSetPlanner` shares frustum
+culling, LOD selection/fades, and shadow-distance selection. Component package
+installation, WebGPU/WebGL draw adapters, and Tidewater export are not implemented.
 
 This generic package format is the intended replacement for content-specific
 static renderer components. A world describes models, LOD assets, materials,
@@ -22,9 +23,11 @@ A signed component references one content-addressed JSON asset with kind
       "id": "market-table-fish",
       "bounds": { "center": [0, 0.1, 0], "radius": 0.6 },
       "lods": [
-        { "assetId": "sha256:...", "enterBelowProjectedRadius": 0.018 },
-        { "assetId": "sha256:...", "enterBelowProjectedRadius": 0.004 }
+        { "assetId": "sha256:..." },
+        { "assetId": "sha256:..." },
+        { "assetId": "sha256:..." }
       ],
+      "lodThresholds": [0.018, 0.004],
       "shadowLod": 1,
       "shadowMaxDistance": 22
     }
@@ -41,18 +44,22 @@ A signed component references one content-addressed JSON asset with kind
 ```
 
 Each model asset is a GLB using core glTF materials and local-space geometry.
-LOD entries are ordered from highest to lowest detail. `enterBelowProjectedRadius`
-is the normalized projected radius at which that level becomes eligible; the
-engine applies one shared transition policy across renderers. Model bounds are
-in local space and drive culling and streaming. Instance transforms use a
-normalized quaternion and positive scale. Additional standard glTF material
-variants may be referenced by a model, but the package cannot contain shader
-source, renderer names, backend flags, or engine class names.
+LOD entries are ordered from highest to lowest detail. Each value in
+`lodThresholds` is the normalized projected-radius boundary between adjacent
+LOD entries. The engine uses a 10% transition band below each threshold and
+rejects thresholds whose transition bands overlap. The renderer-neutral planner
+selects visible instances and complementary incoming/outgoing fade weights; it
+produces shadow candidates by distance independently of the camera frustum.
+Both renderers must consume those same selections. Model bounds are in local
+space and drive culling and streaming. Instance transforms use a normalized
+quaternion and positive scale. Additional standard glTF material variants may
+be referenced by a model, but the package cannot contain shader source,
+renderer names, backend flags, or engine class names.
 
 The component's streaming bounds enclose the transformed model bounds. Asset
 references are content-addressed and verified by the signed manifest before
 loading. The contract validator rejects unknown format versions, invalid
-transforms, duplicate model IDs, unordered LOD thresholds, and records that
+transforms, duplicate model IDs, invalid or overlapping LOD thresholds, and records that
 exceed its configured count or byte limits. It checks model/LOD asset presence
 when the caller supplies the resolved asset-ID set. Package installation does
 not yet call this validator.
@@ -63,7 +70,9 @@ This contract is generic: no fish, Tidewater, WebGPU, or WebGL concepts appear
 in its fields. Tidewater can use it for hosted market contents by exporting its
 authored models and placements as ordinary assets. Its fish placement codec,
 species data, and game rules remain world-owned. The engine implements the same
-instance selection and LOD policy for WebGPU and WebGL.
+instance visibility, LOD selection/fades, and shadow-distance policy for WebGPU
+and WebGL. The shared planner is implemented and unit-checked; backend draw
+adapters do not consume it yet.
 
 The current WebGL fish-prop mesh expansion is not a valid implementation of
 this target: it loses the WebGPU skin appearance, per-instance culling, LOD

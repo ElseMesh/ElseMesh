@@ -370,3 +370,11 @@ them.
   complete isolated Chromium parity run passed. This updates gameplay
   parity from 75% to 78%; live visuals, async readback, wake/collision,
   boarding, and hardware FPS remain open.
+- 2026-10-30: clarified the generic static-model instance-set schema to use
+  exactly one projected-radius threshold per LOD transition, and added the
+  engine-owned renderer-neutral planner for sphere frustum culling, shared
+  10% LOD fade weights, and shadow-distance selection. Contract and planner
+  checks plus the full client suite passed. This does not change the boundary
+  estimates: package installation and WebGPU/WebGL draw adapters still do not
+  consume the planner, and no Tidewater export or fish-stand visual comparison
+  has been completed.
