@@ -294,3 +294,11 @@ them.
   comparison and external production build pass. The next required parity slice
   is a WebGL GPU FFT that produces the shared displacement field; CPU sparse
   spectral evaluation is too expensive for production use.
+- 2026-10-30: added a WebGL GPU FFT prototype and a browser comparison page using
+  a separately generated headless WebGPU displacement baseline. On Chromium
+  SwiftShader, all four 256x256 cascades passed the configured field tolerance
+  at simulation time 4.25 s (786,432 displacement channels, 0.006 m mean and
+  0.133 m maximum absolute error). The extra inverse-FFT normalization was
+  removed after this comparison exposed it. This is a shader correctness check,
+  not hardware performance or gameplay parity; WebGLWaterQuery does not consume
+  the generated field yet, so the gameplay estimate remains 65%.
