@@ -20,6 +20,28 @@ unfinished runtime boundary or parity gate.
 | World packages remain renderer-neutral; ElseMesh selects WebGPU or WebGL | **40%** | `elsemesh.water-body/1` uses engine-owned adapters selected by the active backend registry; the WebGL ocean component also uses an engine-owned adapter. Fish-prop placement data stays backend-neutral, and Tidewater now owns its two backend installers while ElseMesh selects one through the registry. Tidewater's WebGPU and WebGL fishing paths now use the same world-authored pier/reef areas and the same habitat calculation. Those fish-prop installers still contain WebGPU/WebGL-specific paths, so this ownership move does not yet make the fish renderer backend-neutral. Hosted WebGL sea-level detection consumes the registry's generic `waterSurface` trait rather than enumerating water component IDs. The village vertex-data attribute is now `_ELSEMESH_VDATA`, removing the Tidewater-specific `_TW_` tag from the engine loader; the Tidewater package exporter regenerates the content-addressed assets with the new attribute. `component-installers.js` still supplies backend-dependent installers for other components, and other `WebGLFallback.js` component paths remain world-specific. Acceptance requires a generic renderer contract and verification of the same world package behavior on both renderers. |
 | Tidewater gameplay and content parity: WebGPU baseline, WebGL aligned | **78%** | Tidewater has deterministic pre-split WebGPU fishing and boat traces plus WebGPU/WebGL fishing and fish-stand/boat checks in its own repository. The production-style isolated comparison is pinned to pre-split ElseMesh `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e` and uses packaged Tidewater terrain. On 13 shore/dock samples, WebGL query height MAE is 0.0094 m (max 0.0504 m), normal-component MAE 0.0045, and terrain-floor MAE 1.8e-7 m. The corrected CPU shore profile matches direct WebGPU displacement at 0.000013 m mean / 0.000056 m max; its Eulerian shore hook differs from WebGPU shore-only query by 0.0003 m mean / 0.0008 m max. A controlled 18-second moving-boat trace (production FFT and packaged shore, fixed 1/60 s input lead, no interactive wake/collisions) now ends 0.103 m apart, with max speed delta 0.012 m/s. Same-position water height along that trace differs by 0.0065 m mean / 0.0150 m max; FFT-only error is 0.0059 m mean / 0.0145 m max. The isolated correctness harness substitutes synchronous pixel readback and is not production async-readback or FPS evidence. Earlier direct WebGPU renders against the same pre-split commit were pixel-identical for four ocean views; six static island/pier views differed by at most 0.00543 RGB MAE, but neither is a live cross-renderer comparison. **Remaining:** compare production WebGPU and WebGL visuals/gameplay directly; rerun the live steering trace, verify async query and interactive wake/collision behavior, compare boarding and fishing interaction sequences, and measure hardware FPS.
 
+## Architecture assessment
+
+The intended boundary is **not complete yet**. ElseMesh is partly
+content-agnostic: world IDs, component and asset registries, and much of the
+world-package loader are generic. However, engine runtime paths still contain
+content assumptions: `src/world/fish/FishProps.js` implements fish-specific
+geometry/material presentation, `src/fallback/WebGLFallback.js` owns village
+material and other world presentation paths, and the Tidewater component
+installer imports engine rendering classes directly. Moving data into a world
+repository has therefore not yet made the engine independent of that world's
+content.
+
+World packages are also **not yet renderer-agnostic**. ElseMesh chooses the
+active WebGPU/WebGL component adapter, but Tidewater registers separate
+renderer-specific fish-prop adapters and its `webgl-behavior.js` constructs
+WebGL-only fish-stand, chandlery, and game presentation. `register-behavior.js`
+also exposes WebGL-named behavior hooks. The target is for a world to provide
+backend-neutral content, placements, material inputs, and behavior data while
+ElseMesh owns renderer selection and both backend implementations. Standard
+generic content formats fit this boundary: they describe what to render without
+choosing a renderer or putting Tidewater-specific semantics in engine code.
+
 ## Current work and next gates
 
 Earlier commits ElseMesh `69e8805` and Tidewater `4896050` moved WebGPU
