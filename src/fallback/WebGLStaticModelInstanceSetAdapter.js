@@ -60,7 +60,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 
 function createModelDraws( T, source, capacity, shadowOnly, materialCache, ownedGeometry, ownedMaterials ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
-	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 2 ), 2 );
+	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
 	source.updateMatrixWorld( true );
 	source.traverse( object => {
@@ -101,10 +101,10 @@ function staticFadeMaterial( T, source, shadowOnly ) {
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.( shader, renderer );
 		shader.vertexShader = shader.vertexShader
-			.replace( '#include <common>', '#include <common>\nattribute vec2 iStaticFade;\nvarying vec2 vStaticFade;' )
+			.replace( '#include <common>', '#include <common>\nattribute vec4 iStaticFade;\nvarying vec4 vStaticFade;' )
 			.replace( '#include <begin_vertex>', 'vStaticFade = iStaticFade;\n#include <begin_vertex>' );
 		shader.fragmentShader = shader.fragmentShader
-			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec2 vStaticFade;` )
+			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
 	material.customProgramCacheKey = () => `${ originalKey?.() || '' }|elsemesh-static-instance-fade-v1|${ shadowOnly ? 'shadow' : 'main' }`;
@@ -123,10 +123,10 @@ function staticFadeDepthMaterial( T, source ) {
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.( shader, renderer );
 		shader.vertexShader = shader.vertexShader
-			.replace( '#include <common>', '#include <common>\nattribute vec2 iStaticFade;\nvarying vec2 vStaticFade;' )
+			.replace( '#include <common>', '#include <common>\nattribute vec4 iStaticFade;\nvarying vec4 vStaticFade;' )
 			.replace( '#include <begin_vertex>', 'vStaticFade = iStaticFade;\n#include <begin_vertex>' );
 		shader.fragmentShader = shader.fragmentShader
-			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec2 vStaticFade;` )
+			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
 	material.customProgramCacheKey = () => 'elsemesh-static-instance-shadow-fade-v1';
@@ -141,8 +141,10 @@ float emStaticBayer4( vec2 pixel ) {
 	int v = ( ( x0 ^ y0 ) << 3 ) | ( y0 << 2 ) | ( ( x1 ^ y1 ) << 1 ) | y1;
 	return ( float( v ) + 0.5 ) / 16.0;
 }
-bool emStaticFadeVisible( vec2 pixel, vec2 fade ) {
-	float threshold = emStaticBayer4( pixel );
-	return fade.y > 0.5 ? threshold >= fade.x : threshold < fade.x;
+bool emStaticFadeVisible( vec2 pixel, vec4 fade ) {
+	float lodThreshold = emStaticBayer4( pixel );
+	if ( fade.y > 0.5 ? lodThreshold < fade.x : lodThreshold >= fade.x ) return false;
+	if ( fade.w > 0.5 && emStaticBayer4( pixel + vec2( 2.0, 1.0 ) ) >= fade.z ) return false;
+	return true;
 }
 `;

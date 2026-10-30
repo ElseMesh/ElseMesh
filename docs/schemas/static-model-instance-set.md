@@ -32,9 +32,12 @@ component asset list. The JSON asset has this shape:
         { "assetId": "sha256:..." }
       ],
       "lodThresholds": [0.018, 0.004],
+      "lodMetric": "projected-radius",
+      "lodFadeFraction": 0.1,
       "shadowLod": 1,
       "shadowMaxDistance": 22,
-      "drawMaxDistance": 90
+      "drawMaxDistance": 90,
+      "drawFadeStartDistance": 81
     }
   ],
   "instances": [
@@ -51,17 +54,20 @@ component asset list. The JSON asset has this shape:
 Each model asset is a static GLB using the core glTF feature subset supported by
 both renderers and local-space geometry. Skins, animation, morph targets,
 non-triangle primitives, and unsupported vertex attributes are rejected.
-LOD entries are ordered from highest to lowest detail. Each value in
-`lodThresholds` is the normalized projected-radius boundary between adjacent
-LOD entries. The engine uses a 10% transition band below each threshold and
-rejects thresholds whose transition bands overlap. The renderer-neutral planner
-selects visible instances and complementary incoming/outgoing fade weights; it
-produces shadow candidates by distance independently of the camera frustum.
-Both renderers must consume those same selections. Model bounds are in local
-space and drive culling and streaming. `drawMaxDistance` limits color rendering
-in world units, accounting for the model's bounding sphere; shadows use the
-independent `shadowMaxDistance`. Instance transforms use a normalized
-quaternion and positive scale. The package cannot contain shader source,
+LOD entries are ordered from highest to lowest detail. With `lodMetric` set to
+`projected-radius`, each `lodThresholds` entry is a normalized projected-radius
+boundary and values descend. With `scaled-distance`, each is a world distance
+divided by the instance's largest scale and values ascend. `lodFadeFraction`
+sets the transition-band width for either metric; overlapping bands are
+rejected. `drawMaxDistance` limits color rendering by world-space distance from
+the transformed bounds center, and `drawFadeStartDistance` sets where its
+screen-door fade begins. Shadows use the independent `shadowMaxDistance`.
+The renderer-neutral planner selects visible instances and complementary
+incoming/outgoing LOD fades; shadow candidates are selected by distance
+independently of the camera frustum. Both renderers consume these same
+selections. Model bounds are in local space and drive frustum culling and
+streaming. Instance transforms use a normalized quaternion and positive scale.
+The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 
 The component's streaming bounds enclose the transformed model bounds. Asset

@@ -55,7 +55,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 
 function createModelDraws( source, capacity, shadowOnly, materialCache, ownedGeometry, ownedMaterials ) {
 	const matrixAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
-	const fadeAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 2 ), 2 );
+	const fadeAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
 	source.updateMatrixWorld( true );
 	source.traverse( object => {
@@ -90,14 +90,15 @@ function createModelDraws( source, capacity, shadowOnly, materialCache, ownedGeo
 
 function staticFadeMaterial( source, shadowOnly ) {
 	const material = source.clone();
-	const attributes = { ...material.attributes, iStaticFade: 'vec2f' };
-	const varyings = { ...material.varyings, vStaticFade: 'vec2f' };
-	const fadeGuard = 'if ( ! lodFadeVisible( in.pixel, in.vs.vStaticFade.x, in.vs.vStaticFade.y > 0.5 ) ) { return false; }';
+	const attributes = { ...material.attributes, iStaticFade: 'vec4f' };
+	const varyings = { ...material.varyings, vStaticFade: 'vec4f' };
+	const fadeVisible = '( ! lodFadeVisible( in.pixel, in.vs.vStaticFade.x, in.vs.vStaticFade.y > 0.5 ) || ( in.vs.vStaticFade.w > 0.5 && ! lodFadeVisible( in.pixel + vec2f( 2.0, 1.0 ), in.vs.vStaticFade.z, false ) ) )';
+	const fadeGuard = `if ( ${fadeVisible} ) { return false; }`;
 	material.attributes = attributes;
 	material.varyings = varyings;
 	material.modules = [ ...material.modules, lodFadeModule ];
 	material.vertex = `${ material.vertex }\no.vStaticFade = v.iStaticFade;`;
-	if ( ! shadowOnly ) material.surface = `if ( ! lodFadeVisible( in.pixel, in.vs.vStaticFade.x, in.vs.vStaticFade.y > 0.5 ) ) { discard; }\n${ material.surface }`;
+	if ( ! shadowOnly ) material.surface = `if ( ${fadeVisible} ) { discard; }\n${ material.surface }`;
 	material.shadow = material.shadow
 		? `${ fadeGuard }\n${ material.shadow }`
 		: `${ fadeGuard }\nif ( mat.alphaTest > 0.0 ) { let s = surfaceOf( in ); if ( s.alpha < mat.alphaTest ) { return false; } }\nreturn true;`;

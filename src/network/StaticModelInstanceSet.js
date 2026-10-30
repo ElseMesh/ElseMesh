@@ -4,8 +4,6 @@ export const MAX_STATIC_MODEL_INSTANCE_SET_BYTES = 16 * 1024 * 1024;
 export const MAX_STATIC_MODEL_INSTANCE_MODELS = 512;
 export const MAX_STATIC_MODEL_INSTANCE_LODS = 8;
 export const MAX_STATIC_MODEL_INSTANCES = 50000;
-export const STATIC_MODEL_INSTANCE_LOD_FADE_FRACTION = 0.1;
-
 const ASSET_ID = /^sha256:[0-9a-f]{64}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const isRecord = value => !! value && typeof value === 'object' && ! Array.isArray( value );
@@ -32,7 +30,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 
 	const modelIDs = new Set();
 	for ( const model of document.models ) {
-		if ( ! hasExactKeys( model, [ 'id', 'bounds', 'lods', 'lodThresholds', 'shadowLod', 'shadowMaxDistance', 'drawMaxDistance' ] ) || typeof model.id !== 'string' || ! MODEL_ID.test( model.id ) || modelIDs.has( model.id ) ) throw new Error( 'Invalid or duplicate static model record' );
+		if ( ! hasExactKeys( model, [ 'id', 'bounds', 'lods', 'lodThresholds', 'lodMetric', 'lodFadeFraction', 'shadowLod', 'shadowMaxDistance', 'drawMaxDistance', 'drawFadeStartDistance' ] ) || typeof model.id !== 'string' || ! MODEL_ID.test( model.id ) || modelIDs.has( model.id ) ) throw new Error( 'Invalid or duplicate static model record' );
 		modelIDs.add( model.id );
 		if ( ! hasExactKeys( model.bounds, [ 'center', 'radius' ] ) || ! validVector( model.bounds.center, 3, 1e6 ) || ! Number.isFinite( model.bounds.radius ) || model.bounds.radius <= 0 || model.bounds.radius > 1e6 ) throw new Error( `Invalid bounds for static model ${model.id}` );
 		if ( ! Array.isArray( model.lods ) || model.lods.length === 0 || model.lods.length > MAX_STATIC_MODEL_INSTANCE_LODS ) throw new Error( `Invalid LOD list for static model ${model.id}` );
@@ -40,14 +38,17 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 			if ( ! hasExactKeys( lod, [ 'assetId' ] ) || typeof lod.assetId !== 'string' || ! ASSET_ID.test( lod.assetId ) ) throw new Error( `Invalid LOD record for static model ${model.id}` );
 			if ( availableAssetIDs && ! availableAssetIDs.has( lod.assetId ) ) throw new Error( `Static model LOD asset is missing: ${lod.assetId}` );
 		}
+		if ( ! [ 'projected-radius', 'scaled-distance' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );
 		if ( ! Array.isArray( model.lodThresholds ) || model.lodThresholds.length !== model.lods.length - 1 ) throw new Error( `Invalid LOD thresholds for static model ${model.id}` );
-		let previousThreshold = Infinity;
+		let previousThreshold = model.lodMetric === 'projected-radius' ? Infinity : 0;
 		for ( const threshold of model.lodThresholds ) {
-			if ( ! Number.isFinite( threshold ) || threshold <= 0 || threshold >= previousThreshold || threshold >= previousThreshold * ( 1 - STATIC_MODEL_INSTANCE_LOD_FADE_FRACTION ) ) throw new Error( `Invalid or overlapping LOD thresholds for static model ${model.id}` );
+			const invalidOrder = model.lodMetric === 'projected-radius' ? threshold >= previousThreshold || threshold >= previousThreshold * ( 1 - model.lodFadeFraction ) : threshold <= previousThreshold || threshold * ( 1 - model.lodFadeFraction ) <= previousThreshold;
+			if ( ! Number.isFinite( threshold ) || threshold <= 0 || invalidOrder ) throw new Error( `Invalid or overlapping LOD thresholds for static model ${model.id}` );
 			previousThreshold = threshold;
 		}
 		if ( ! Number.isInteger( model.shadowLod ) || model.shadowLod < 0 || model.shadowLod >= model.lods.length || ! Number.isFinite( model.shadowMaxDistance ) || model.shadowMaxDistance < 0 || model.shadowMaxDistance > 1e6 ) throw new Error( `Invalid shadow policy for static model ${model.id}` );
 		if ( ! Number.isFinite( model.drawMaxDistance ) || model.drawMaxDistance <= 0 || model.drawMaxDistance > 1e6 ) throw new Error( `Invalid draw distance for static model ${model.id}` );
+		if ( ! Number.isFinite( model.drawFadeStartDistance ) || model.drawFadeStartDistance < 0 || model.drawFadeStartDistance > model.drawMaxDistance ) throw new Error( `Invalid draw fade distance for static model ${model.id}` );
 	}
 
 	for ( const instance of document.instances ) {

@@ -24,9 +24,12 @@ const valid = {
 		bounds: { center: [ 0, 0.1, 0 ], radius: 0.6 },
 		lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ],
 		lodThresholds: [ 0.018, 0.004 ],
+		lodMetric: 'projected-radius',
+		lodFadeFraction: 0.1,
 		shadowLod: 1,
 		shadowMaxDistance: 22,
 		drawMaxDistance: 350,
+		drawFadeStartDistance: 350,
 	} ],
 	instances: [ { model: 'market-table-fish', position: [ 1, 2, 3 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
@@ -42,6 +45,8 @@ assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { 
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.004, 0.018 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawMaxDistance: 0 } ] } ), /draw distance/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodMetric: 'scaled-distance', lodThresholds: [ 28, 24 ] } ] } ), /overlapping LOD/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawFadeStartDistance: 351 } ] } ), /draw fade distance/ );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
 
 const loadedGLB = staticModelGLB();
@@ -70,7 +75,7 @@ placements.push( { model: 'market-table-fish', position: [ 5, 2, 20 ], rotation:
 placements.push( { model: 'market-table-fish', position: [ 1, 2, 400 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
 const planner = new StaticModelInstanceSetPlanner( {
 	...valid,
-	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 100 }, { id: 'short-range-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 4 } ],
+	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 100, drawFadeStartDistance: 100 }, { id: 'short-range-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 4, drawFadeStartDistance: 4 } ],
 	instances: [ ...placements, { model: 'single-lod-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] }, { model: 'short-range-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 } ).update( {
 	position: [ 0, 0, 0 ],
@@ -98,6 +103,24 @@ assert.equal( planner.groups[ 4 ].count, 0, 'color draw distance can hide a mode
 assert.equal( planner.shadowGroups[ 2 ].indices[ 0 ], 8, 'shadow selection remains independent of color draw distance' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
+const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: hi }, { assetId: low } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 1, drawMaxDistance: 90, drawFadeStartDistance: 81 };
+const distancePlanner = new StaticModelInstanceSetPlanner( {
+	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
+	models: [ distanceModel ],
+	instances: [ 24, 26.5, 30, 85 ].map( z => ( { model: distanceModel.id, position: [ 0, 0, z ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ) ),
+} ).update( {
+	position: [ 0, 0, 0 ],
+	verticalFovRadians: Math.PI / 2,
+	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
+} );
+const [ distanceNear, distanceFar ] = distancePlanner.groups;
+assert.deepEqual( Array.from( distanceNear.indices.subarray( 0, distanceNear.count ) ), [ 0, 1 ], 'scaled-distance LOD starts with the high-detail model and cross-fades by world distance divided by instance scale' );
+assert.deepEqual( Array.from( distanceFar.indices.subarray( 0, distanceFar.count ) ), [ 1, 2, 3 ] );
+assert.ok( distanceNear.fade[ 1 ] > 0.5 && distanceNear.fade[ 1 ] < 0.6, 'distance LOD fade fraction is author-configurable' );
+assert.equal( distanceNear.drawFadeEnabled[ 0 ], 1 );
+assert.equal( distanceNear.drawFade[ 0 ], 1 );
+assert.ok( distanceFar.drawFade[ 2 ] > 0 && distanceFar.drawFade[ 2 ] < 1, 'draw range fades over an authored distance band' );
+
 for ( const camera of [ new PerspectiveCamera( 60, 1, 0.1, 100 ), new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) ] ) {
 	camera.position.set( 0, 0, 0 );
 	camera.lookAt( 0, 0, - 1 );
@@ -115,7 +138,7 @@ const runtimeDocument = { ...valid, instances: [ { ...valid.instances[ 0 ], posi
 const runtimePlanner = new StaticModelInstanceSetPlanner( runtimeDocument );
 const makeRuntimeBatch = () => {
 	const capacity = 1;
-	return { mesh: { count: 0, visible: false }, matrixAttribute: { array: new Float32Array( capacity * 16 ), needsUpdate: false }, fadeAttribute: { array: new Float32Array( capacity * 2 ), needsUpdate: false } };
+	return { mesh: { count: 0, visible: false }, matrixAttribute: { array: new Float32Array( capacity * 16 ), needsUpdate: false }, fadeAttribute: { array: new Float32Array( capacity * 4 ), needsUpdate: false } };
 };
 let disposedRuntime = false;
 const runtime = new StaticModelInstanceSetRuntime( runtimeDocument, {
@@ -129,6 +152,8 @@ runtime.update( 1 / 60, runtimeCamera );
 const activeRuntimeBatch = runtime.batches.find( group => group[ 0 ].mesh.count > 0 )[ 0 ];
 assert.equal( activeRuntimeBatch.matrixAttribute.array[ 14 ], - 5, 'shared runtime compacts world transforms into renderer instance buffers' );
 assert.equal( activeRuntimeBatch.fadeAttribute.array[ 0 ], 1 );
+assert.equal( activeRuntimeBatch.fadeAttribute.array[ 2 ], 1 );
+assert.equal( activeRuntimeBatch.fadeAttribute.array[ 3 ], 0 );
 runtime.dispose();
 assert.equal( disposedRuntime, true );
 

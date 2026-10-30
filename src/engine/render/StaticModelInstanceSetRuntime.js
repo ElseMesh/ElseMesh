@@ -18,10 +18,13 @@ export function writeStaticModelInstanceMatrices( document, group, target ) {
 }
 
 export function writeStaticModelInstanceFades( group, target ) {
-	if ( ! target || target.length < group.count * 2 ) throw new Error( 'Static model instance fade output is too small' );
+	if ( ! target || target.length < group.count * 4 ) throw new Error( 'Static model instance fade output is too small' );
 	for ( let index = 0; index < group.count; index ++ ) {
-		target[ index * 2 ] = group.fade ? group.fade[ index ] : 1;
-		target[ index * 2 + 1 ] = group.fade ? ( group.incoming[ index ] === 0 ? 1 : 0 ) : 0;
+		const offset = index * 4;
+		target[ offset ] = group.fade ? group.fade[ index ] : 1;
+		target[ offset + 1 ] = group.fade ? ( group.incoming[ index ] === 0 ? 1 : 0 ) : 0;
+		target[ offset + 2 ] = group.drawFade ? group.drawFade[ index ] : 1;
+		target[ offset + 3 ] = group.drawFadeEnabled ? group.drawFadeEnabled[ index ] : 0;
 	}
 	return group.count;
 }

@@ -16,7 +16,7 @@ const hash = bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( '
 const glbBytes = staticModelGLB(), modelAssetID = hash( glbBytes );
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID } ], lodThresholds: [], shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90 } ],
+	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
 	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
@@ -44,6 +44,7 @@ assert.equal( webgpuMain.count, 1 );
 assert.equal( webgpuShadow.count, 1 );
 assert.equal( webgpuMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5, 'GLB node translation is baked into the cloned primitive geometry' );
 assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
+assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'shared adapter fade data carries LOD and draw-distance fades' );
 assert.equal( webgpuShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0, 'shadow-only instances remain fully visible with complementary fade enabled' );
 webgpuResult.runtime.dispose();
 disposeWorldPackage( webgpuRoot );
@@ -63,6 +64,7 @@ assert.equal( webglShadow.count, 1 );
 assert.ok( webglShadow.customDepthMaterial, 'shadow LOD uses its own screen-door aware depth material' );
 assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5 );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
+assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'WebGL uses the shared four-channel fade policy' );
 assert.equal( webglShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0 );
 webglResult.runtime.dispose();
 assert.equal( webglFallback.scene.children.length, 0 );

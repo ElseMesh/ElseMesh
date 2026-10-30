@@ -1,4 +1,4 @@
-import { validateStaticModelInstanceSet, STATIC_MODEL_INSTANCE_LOD_FADE_FRACTION } from '../../network/StaticModelInstanceSet.js';
+import { validateStaticModelInstanceSet } from '../../network/StaticModelInstanceSet.js';
 import { WebGLCoordinateSystem } from '../math/Matrix4.js';
 
 const finiteVector3 = value => Array.isArray( value ) && value.length === 3 && value.every( Number.isFinite );
@@ -46,12 +46,12 @@ export class StaticModelInstanceSetPlanner {
 			const model = document.models[ modelIndex ];
 			const capacity = modelInstanceCounts[ modelIndex ];
 			const modelGroups = model.lods.map( ( _lod, lodIndex ) => {
-				const group = { modelIndex, modelId: model.id, lodIndex, indices: new Uint32Array( capacity ), fade: new Float32Array( capacity ), incoming: new Uint8Array( capacity ), count: 0 };
+				const group = createGroup( modelIndex, model.id, lodIndex, capacity );
 				this.groups.push( group );
 				return group;
 			} );
 			this._groupsByModel.push( modelGroups );
-			const shadowGroup = { modelIndex, modelId: model.id, lodIndex: model.shadowLod, indices: new Uint32Array( capacity ), count: 0 };
+			const shadowGroup = createGroup( modelIndex, model.id, model.shadowLod, capacity );
 			this.shadowGroups.push( shadowGroup );
 			this._shadowsByModel.push( shadowGroup );
 		}
@@ -100,9 +100,9 @@ export class StaticModelInstanceSetPlanner {
 			const distance = Math.hypot( dx, dy, dz );
 			if ( distance <= model.shadowMaxDistance ) {
 				const shadowGroup = this._shadowsByModel[ modelIndex ];
-				shadowGroup.indices[ shadowGroup.count ++ ] = instanceIndex;
+				this._append( shadowGroup, instanceIndex, 1, 2, 1, 0 );
 			}
-			if ( distance - radius > model.drawMaxDistance ) continue;
+			if ( distance > model.drawMaxDistance ) continue;
 			let visible = true;
 			for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
 				const offset = planeIndex * 4;
@@ -110,31 +110,52 @@ export class StaticModelInstanceSetPlanner {
 			}
 			if ( ! visible ) continue;
 
-			const projectedRadius = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
+			const lodMeasure = model.lodMetric === 'projected-radius'
+				? radius / ( Math.max( distance, 1e-6 ) * tanHalfFov )
+				: distance / Math.max( sx, sy, sz );
+			const drawFade = model.drawFadeStartDistance < model.drawMaxDistance
+				? 1 - smoothstep( model.drawFadeStartDistance, model.drawMaxDistance, distance )
+				: 1;
+			const drawFadeEnabled = model.drawFadeStartDistance < model.drawMaxDistance ? 1 : 0;
 			const groups = this._groupsByModel[ modelIndex ];
 			let transition = -1;
 			for ( let thresholdIndex = 0; thresholdIndex < model.lodThresholds.length; thresholdIndex ++ ) {
 				const threshold = model.lodThresholds[ thresholdIndex ];
-				if ( projectedRadius < threshold && projectedRadius >= threshold * ( 1 - STATIC_MODEL_INSTANCE_LOD_FADE_FRACTION ) ) { transition = thresholdIndex; break; }
+				const fadeStart = threshold * ( 1 - model.lodFadeFraction );
+				if ( model.lodMetric === 'projected-radius' ? lodMeasure < threshold && lodMeasure >= fadeStart : lodMeasure >= fadeStart && lodMeasure < threshold ) { transition = thresholdIndex; break; }
 			}
 			if ( transition >= 0 ) {
 				const threshold = model.lodThresholds[ transition ];
-				const incomingFade = ( threshold - projectedRadius ) / ( threshold * STATIC_MODEL_INSTANCE_LOD_FADE_FRACTION );
-				this._append( groups[ transition ], instanceIndex, incomingFade, 0 );
-				this._append( groups[ transition + 1 ], instanceIndex, incomingFade, 1 );
+				const fadeStart = threshold * ( 1 - model.lodFadeFraction );
+				const incomingFade = model.lodMetric === 'projected-radius'
+					? ( threshold - lodMeasure ) / ( threshold - fadeStart )
+					: ( lodMeasure - fadeStart ) / ( threshold - fadeStart );
+				this._append( groups[ transition ], instanceIndex, incomingFade, 0, drawFade, drawFadeEnabled );
+				this._append( groups[ transition + 1 ], instanceIndex, incomingFade, 1, drawFade, drawFadeEnabled );
 			} else {
 				let lodIndex = 0;
-				while ( lodIndex < model.lodThresholds.length && projectedRadius < model.lodThresholds[ lodIndex ] ) lodIndex ++;
-				this._append( groups[ lodIndex ], instanceIndex, 1, 2 ); // 2 = steady, 0/1 = outgoing/incoming transition sides
+				while ( lodIndex < model.lodThresholds.length && ( model.lodMetric === 'projected-radius' ? lodMeasure < model.lodThresholds[ lodIndex ] : lodMeasure >= model.lodThresholds[ lodIndex ] ) ) lodIndex ++;
+				this._append( groups[ lodIndex ], instanceIndex, 1, 2, drawFade, drawFadeEnabled ); // 2 = steady, 0/1 = outgoing/incoming transition sides
 			}
 		}
 		return this;
 	}
 
-	_append( group, instanceIndex, fade, incoming ) {
+	_append( group, instanceIndex, fade, incoming, drawFade, drawFadeEnabled ) {
 		const offset = group.count ++;
 		group.indices[ offset ] = instanceIndex;
 		group.fade[ offset ] = fade;
 		group.incoming[ offset ] = incoming;
+		group.drawFade[ offset ] = drawFade;
+		group.drawFadeEnabled[ offset ] = drawFadeEnabled;
 	}
+}
+
+function createGroup( modelIndex, modelId, lodIndex, capacity ) {
+	return { modelIndex, modelId, lodIndex, indices: new Uint32Array( capacity ), fade: new Float32Array( capacity ), incoming: new Uint8Array( capacity ), drawFade: new Float32Array( capacity ), drawFadeEnabled: new Uint8Array( capacity ), count: 0 };
+}
+
+function smoothstep( start, end, value ) {
+	const t = Math.max( 0, Math.min( 1, ( value - start ) / ( end - start ) ) );
+	return t * t * ( 3 - 2 * t );
 }
