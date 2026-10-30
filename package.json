@@ -12,6 +12,7 @@
     "test:world-resolver": "node cloudflare/world-resolver/test.mjs",
     "test:browser-host-client": "node test/browser-host-client.mjs",
     "test:account-client": "node test/account-client.mjs",
+    "test:world-extension-browser": "node test/world-javascript-extension-browser.mjs",
     "test:webgl-backend": "node test/webgl-backend.mjs",
 		"test:webgl-content": "node --preserve-symlinks worlds/tidewater/test/webgl-boat-adapter.mjs && node --preserve-symlinks worlds/tidewater/test/webgl-boat-underway.mjs && node --preserve-symlinks worlds/tidewater/test/webgl-fish-stand.mjs && node --preserve-symlinks worlds/tidewater/test/webgl-chandlery.mjs && node --preserve-symlinks worlds/tidewater/test/webgl-fish-props-adapter-build.mjs && node test/webgl-reef-adapter.mjs && node --preserve-symlinks worlds/tidewater/test/webgl-whale-package.mjs && node --preserve-symlinks worlds/tidewater/test/webgl-game-adapter.mjs && node test/webgl-wildlife-adapter.mjs && node test/webgl-swash-probe.mjs && node test/webgl-component-support.mjs",
     "test:wildlife-runtime": "node test/wildlife-runtime.mjs && node test/wildlife-frame.mjs",
