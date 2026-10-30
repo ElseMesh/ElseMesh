@@ -208,7 +208,9 @@ combined complexity limits. The server uses the fixed 46,845-triangle boat
 contract and checks `avatarComplexity + boat triangles` against the signed
 maximum. The browser additionally checks destination policy before a portal
 crossing and applies the speed cap. This validates presence claims; it does not
-make boat physics authoritative.
+make boat physics authoritative. Presence does not carry stable avatar-profile
+or vehicle-type identity, so the owner cannot apply avatar allowlists or
+avatar/vehicle combination rules yet.
 
 Other bounded inputs include 128 KiB WebSocket messages, WebRTC session and
 in-flight RPC ceilings, bounded package/asset declarations, manifest entity

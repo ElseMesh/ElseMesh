@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { supportsWorldManifest, loadWorldProvider } from '../worlds/tidewater/world-provider.js';
+
+const viteConfig = await readFile( new URL( '../vite.config.js', import.meta.url ), 'utf8' );
+assert.doesNotMatch( viteConfig, /worlds\/tidewater/, 'the engine build does not name a specific world provider' );
+assert.match( viteConfig, /readdirSync\( worldsPath[\s\S]*?world-provider\.js/, 'the build discovers provider descriptors from mounted world repositories' );
 
 assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.water-body/1' } ] } ), false, 'generic worlds do not load Tidewater runtime modules' );
 assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.terrain-surface/1' } ] } ), true, 'Tidewater component manifests select the Tidewater provider' );

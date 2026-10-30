@@ -318,6 +318,30 @@ viewer must independently cap local rendering and downloads. Strong global
 limits on carried objects require an authoritative object/inventory protocol;
 the current presence protocol does not contain one.
 
+## Desired avatar and vehicle admission policy
+
+Avatars and occupied vehicles travel with a visitor through a portal when the
+destination accepts the visitor's presentation and entity combination. The
+destination's signed policy may set a per-avatar complexity ceiling, an
+aggregate avatar-plus-vehicle ceiling, or a moderation catalog that allows
+only named avatar profiles and explicitly permitted avatar/vehicle pairs.
+The policy must use stable, versioned profile and component IDs with
+content-addressed assets and engine-measured complexity metadata; a client may
+not claim its own triangle count or supply arbitrary model URLs.
+
+The browser checks the destination policy before showing a traversal-ready
+portal or switching worlds. An incompatible avatar or avatar/vehicle pair must
+not cross by default; the client explains the restriction and can offer an
+explicit switch to a permitted profile when the destination policy allows it.
+The owner applies the same profile, pair, speed, and resource limits when
+admitting presence. These checks govern sharing and admission, while ElseMesh
+selects the local WebGPU or WebGL presentation for the same approved profile.
+Worlds describe policy and approved content without choosing a renderer.
+
+The current bundled-boat rule is only a first instance of this contract. It
+does not yet provide a generic vehicle catalog, avatar-profile identity in
+presence, an owner-signed moderation catalog, or pair-specific portal checks.
+
 ## What the code supports today
 
 - Owner-signed manifests and hash-verified world assets, with bounded manifest
@@ -330,7 +354,9 @@ the current presence protocol does not contain one.
 - A bundled Downeast boat contract. The destination can opt in, require a
   compatible boat component/berth, cap speed, and cap avatar-plus-boat triangle
   complexity. The owner validates presence reports and portal preparation also
-  checks locally.
+  checks locally. Avatar selection is not yet governed by a world allowlist,
+  and the policy cannot name other vehicle types or permitted avatar/vehicle
+  pairs.
 - Signed front/back portal route data and client-side preview, preparation,
   pose mapping, and world switch. See [portal authoring](portal-authoring.md).
 - WebSocket/WebTransport gateway requests, optional direct WebRTC requests,
@@ -347,16 +373,19 @@ the current presence protocol does not contain one.
 1. **Population limit is fixed, not owner-configurable.** The daemon currently
    hard-codes 128 presence records. There is no signed world-level player cap,
    nor a separate gateway-wide admission budget keyed across all gateways.
-2. **Avatar complexity is per entity and viewer-enforced.** The world owner
-   sets a triangle cap, but the server does not inspect a client's actual mesh
-   or enforce aggregate visible triangle cost. A client can ignore the cap.
-3. **Vehicle support is narrow.** Only the bundled Downeast boat has a declared
-   46,845-triangle contract. Carried objects, arbitrary vehicles, inventory,
-   object ownership, and server-authoritative object simulation are not
-   represented by the presence protocol. World-owner policies for dropping,
-   throwing, persistence, claims, disconnect handling, and transfers are
-   design requirements, not runtime features.
-4. **No owner moderation list or personal override exists yet.** Presence
+2. **Avatar restrictions are incomplete.** The world can set a per-avatar
+   triangle cap, but it cannot identify and allowlist supported avatar profiles
+   or apply profile-specific limits. The server does not inspect a client's
+   actual mesh or enforce aggregate visible triangle cost; clients can ignore
+   viewer-side caps.
+3. **Vehicle support and combinations are narrow.** Only the bundled Downeast
+   boat has a declared 46,845-triangle contract. Carried objects, arbitrary
+   vehicles, inventory, avatar/vehicle allowlist pairs, object ownership, and
+   server-authoritative object simulation are not represented by the presence
+   protocol. World-owner policies for dropping, throwing, persistence, claims,
+   disconnect handling, and transfers are design requirements, not runtime
+   features.
+4. **No owner moderation catalog or personal override exists yet.** Presence
    snapshots currently go to all participants of that world connection, and
    there is no policy for selective avatar/object visibility or direct
    client-to-client content sharing. Thus the requested presentation override

@@ -13,6 +13,7 @@ unfinished runtime boundary or parity gate.
 
 | Requirement | Estimate | Evidence and remaining acceptance gate |
 | --- | ---: | --- |
+| Avatar and vehicle portal acceptance, including destination moderation | **25%** | Signed `avatarComplexity` limits remote stock avatars; the bundled Downeast boat can transfer only when the destination enables its policy, provides a compatible berth, and accepts the avatar-plus-boat complexity and speed. Owner presence validation enforces the declared boat mode and speed. **Remaining:** signed avatar catalogs/allowlists, profile-specific limits, generic vehicle types, explicit avatar/vehicle combinations, and consistent destination-policy enforcement at portal handoff and owner admission. See [world network design](docs/world-network-design.md#desired-avatar-and-vehicle-admission-policy). |
 | Keep authored Tidewater and Hogwarts world data in their own repositories | **100%** | Both are mounted as submodules and documented in [`docs/world-repository-layout.md`](docs/world-repository-layout.md). Repository separation is recorded complete in [`GOAL-done.md`](GOAL-done.md). This measures authored-data ownership only; engine-side runtime handlers still need extraction. |
 | ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **100%** | Signed manifests require `elsemesh.world/3`; source requires `elsemesh.world-source/3`; client/server/Blender reject old world IDs and manifest/source protocols. Obsolete Blender metadata aliases and the daemon's Tidewater-named local profile/ZeroTier auto-migration paths have been removed. Focused identity/Blender checks, `go test ./...`, the full client suite, and the external build passed. Historical negative tests mention old forms only to prove rejection. |
 | Owner-signed JavaScript world extensions run in dedicated browser Workers; no Wasm implementation | **95%** | `src/network/WorldJavaScriptExtension.js` and its Worker enforce message bounds, startup/run limits, and worker teardown; server manifest validation binds extension assets to signed `javascript/1` assets. On 2026-10-30, isolated Chromium generated an Ed25519 owner identity, signed and verified a v3 manifest that references the hash-addressed extension module, loaded the verified package, and ran the unregistered world behavior in its real module Worker with stateful sequential calls. Source-to-manifest, signed asset, and server validation checks also passed. No Wasm runtime is implemented. Remaining: exercise this through the live gateway download and `App.activateHostedWorld` launch path. |
@@ -67,6 +68,12 @@ constructs the state and initializes the island, which remains the next runtime
 boundary. A manifest-selected world-provider loader now restores only the
 registrations needed by a hosted package after the default-world package was
 made lazy; its matching and registration checks pass.
+
+The build now discovers lightweight provider descriptors from mounted world
+repositories instead of naming Tidewater in engine build configuration. The
+provider and backend-registry checks, external production build, and full client
+suite pass with this discovery path. Hosted WebGPU still constructs the
+built-in island state; this remains an engine/world separation gap.
 
 Earlier commits ElseMesh `69e8805` and Tidewater `4896050` moved WebGPU
 component installers into Tidewater and dispatched them through the registry.

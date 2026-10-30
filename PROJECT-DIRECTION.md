@@ -73,6 +73,12 @@ identity boundary across world packages:
 - Verify Tidewater gameplay against the pre-split WebGPU behavior, and check
   WebGL for content and gameplay parity without treating its visuals as a
   baseline.
+- Treat avatar and vehicle presentation as portal-travelling entities. A
+  destination may cap complexity or moderate participation with a signed
+  allowlist of avatar profiles and permitted avatar/vehicle combinations. The
+  engine owns backend-neutral transfer and enforcement; worlds author the
+  accepted profiles and combinations. Current support is only a per-avatar
+  stock-mesh cap and the bundled Downeast boat policy.
 
 These gates are not complete merely because repository separation and the
 existing registered browser behaviors are in place.

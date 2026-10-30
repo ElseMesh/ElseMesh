@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync, readdirSync } from 'node:fs';
 import { appendFile, mkdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
@@ -14,7 +14,14 @@ const commitShort = commitSha.slice( 0, 8 ).toLowerCase();
 
 const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
 const defaultWorldModule = resolve( process.env.ELSEMESH_DEFAULT_WORLD_MODULE || 'worlds/default.js' );
-const worldProviderModules = ( process.env.ELSEMESH_WORLD_PROVIDER_MODULES || 'worlds/tidewater/world-provider.js' ).split( ',' ).map( module => resolve( module.trim() ) ).filter( Boolean );
+const worldsPath = resolve( 'worlds' );
+const configuredWorldProviderModules = process.env.ELSEMESH_WORLD_PROVIDER_MODULES;
+const worldProviderModules = configuredWorldProviderModules === undefined
+	? readdirSync( worldsPath, { withFileTypes: true } )
+		.filter( entry => entry.isDirectory() && existsSync( resolve( worldsPath, entry.name, 'world-provider.js' ) ) )
+		.map( entry => resolve( worldsPath, entry.name, 'world-provider.js' ) )
+		.sort()
+	: configuredWorldProviderModules.split( ',' ).map( module => resolve( module.trim() ) ).filter( Boolean );
 
 function defaultWorldBinding() {
 	const id = '\0virtual:elsemesh-default-world';
