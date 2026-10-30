@@ -2,7 +2,7 @@
 	"name": "elsemesh",
   "version": "1.0.0",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 5189",
+    "dev": "vite --host 127.0.0.1 --port 0",
     "prebuild": "node tools/require-external-build-tree.mjs",
     "build": "node tools/build.mjs",
     "start": "node tools/start.mjs",

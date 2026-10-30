@@ -133,12 +133,16 @@ export default defineConfig( {
 	} ],
 	build: { target: 'esnext', chunkSizeWarningLimit: 4000 },
 	server: {
-		port: 5188,
+		port: 0,
 		strictPort: true,
 		host: '127.0.0.1',
 		proxy: {
 			'/api/world/manifest': 'http://127.0.0.1:5200',
 			'/gateway': { target: 'ws://127.0.0.1:5200', ws: true },
 		},
+	},
+	preview: {
+		port: 0,
+		strictPort: true,
 	},
 } );

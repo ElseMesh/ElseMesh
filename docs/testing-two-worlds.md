@@ -9,8 +9,9 @@ cd "$HOME/src/elsemesh"
 npm run dev
 ```
 
-Open the client at `http://127.0.0.1:5189/`. `thruholdd` does not serve the
-static ElseMesh client; it serves world and gateway APIs only.
+Open the URL printed by Vite. The dev server asks the operating system for a
+free local port. `thruholdd` does not serve the static ElseMesh client; it
+serves world and gateway APIs only.
 
 ## Hosted world
 
