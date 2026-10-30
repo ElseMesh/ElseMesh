@@ -1,6 +1,7 @@
 import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import './WebGLWaterComponentAdapters.js';
+import './WebGLStaticModelInstanceSetAdapter.js';
 
 // Return the solid, authored boxes in either supported manifest collision shape.
 // Compound records carry solidity and walkability on each box, not on the parent.

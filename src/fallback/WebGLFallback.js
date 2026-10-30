@@ -744,6 +744,7 @@ export class WebGLFallback {
 		this.hostedSeaLevel = null;
 		this.worldSeaLevel = this.defaultWorldSource?.rules.seaLevel ?? 0;
 		this.hostedWildlifeComponent = null;
+		this.hostedComponentRuntimes = [];
 		this.vegetationRecords = null;
 		this.wildlifeRuntime = null;
 		this.wildlifeAdapter = null;
@@ -1632,7 +1633,7 @@ export class WebGLFallback {
 		this.portals = ( manifest.portals || [] ).filter( portal => portal.enabled || portal.back?.enabled );
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
-		const backendComponentIDs = this._installHostedBackendComponents( components, manifest, assets );
+		const backendComponentIDs = await this._installHostedBackendComponents( components, manifest, assets );
 		this.hostedVehicleSpec = resolveHostedWebGLVehicleSpec( components, manifest.objects || [], this.hostedObjectRoots );
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			terrainReady: !! this.hostedTerrainData, vehicleComponentId: this.hostedVehicleSpec?.component.id,
@@ -1735,7 +1736,7 @@ export class WebGLFallback {
 
 	}
 
-	_installHostedBackendComponents( components, manifest, assets ) {
+	async _installHostedBackendComponents( components, manifest, assets ) {
 
 		const T = this.THREE;
 		const terrain = this.hostedTerrainData;
@@ -1743,7 +1744,10 @@ export class WebGLFallback {
 		const installed = new Set();
 		for ( const component of components ) {
 			const adapter = worldComponentBackendAdapter( this.engine.backend, component.type );
-			if ( adapter?.( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component ) === true ) installed.add( component.id );
+			if ( ! adapter ) continue;
+			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component );
+			if ( result === true || result?.installed ) installed.add( component.id );
+			if ( result?.runtime ) this.hostedComponentRuntimes.push( result.runtime );
 		}
 		return installed;
 
@@ -1821,6 +1825,7 @@ export class WebGLFallback {
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
+		for ( const runtime of this.hostedComponentRuntimes || [] ) runtime.update( dt, this.camera, this.player );
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();

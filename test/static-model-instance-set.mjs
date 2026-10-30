@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
+import { staticModelGLB } from './helpers/static-model-glb.mjs';
 import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCodecRegistry.js';
 import { loadStaticModelInstanceSetAssets } from '../src/network/StaticModelInstanceSetAssets.js';
-import { StaticModelInstanceSetPlanner } from '../src/engine/render/StaticModelInstanceSetPlanner.js';
+import { StaticModelInstanceSetRuntime } from '../src/engine/render/StaticModelInstanceSetRuntime.js';
+import { StaticModelInstanceSetPlanner, staticModelInstanceCamera } from '../src/engine/render/StaticModelInstanceSetPlanner.js';
 import {
 	decodeStaticModelInstanceSet,
 	STATIC_MODEL_INSTANCE_SET_ASSET_KIND,
@@ -38,7 +42,7 @@ assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { 
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.004, 0.018 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
 
-const loadedGLB = new Uint8Array( [ 1, 2, 3 ] );
+const loadedGLB = staticModelGLB();
 const requestedAssets = [];
 const assetConnector = {
 	manifest: { assets: [
@@ -50,11 +54,13 @@ const assetConnector = {
 	assets: new Map( [ [ setAssetID, bytes ] ] ),
 	getAsset: async assetId => { requestedAssets.push( assetId ); return loadedGLB; },
 };
-const resolved = await loadStaticModelInstanceSetAssets( assetConnector, { assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ] } );
+const componentAssets = [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: hi, kind: 'glb' }, { assetId: low, kind: 'glb' }, { assetId: lowest, kind: 'glb' } ];
+const resolved = await loadStaticModelInstanceSetAssets( assetConnector, { assets: componentAssets } );
 assert.equal( resolved.document.models[ 0 ].id, 'market-table-fish' );
 assert.deepEqual( [ ...resolved.modelAssets.keys() ], [ hi, low, lowest ], 'resolves the signed nested GLB assets referenced by all LODs' );
 assert.deepEqual( requestedAssets, [ hi, low, lowest ] );
-await assert.rejects( () => loadStaticModelInstanceSetAssets( { ...assetConnector, manifest: { assets: assetConnector.manifest.assets.map( asset => asset.id === lowest ? { ...asset, kind: 'image/1' } : asset ) } }, { assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ] } ), /missing/ );
+await assert.rejects( () => loadStaticModelInstanceSetAssets( { ...assetConnector, manifest: { assets: assetConnector.manifest.assets.map( asset => asset.id === lowest ? { ...asset, kind: 'image/1' } : asset ) } }, { assets: componentAssets } ), /missing/ );
+await assert.rejects( () => loadStaticModelInstanceSetAssets( assetConnector, { assets: [ componentAssets[ 0 ] ] } ), /component GLB/ );
 
 const placements = [ 20, 35, 100, 300 ].map( z => ( { model: 'market-table-fish', position: [ 1, 2, z ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ) );
 placements.push( { model: 'market-table-fish', position: [ 500, 2, 20 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
@@ -72,12 +78,52 @@ const [ nearLod, middleLod, farLod ] = planner.groups;
 assert.deepEqual( Array.from( nearLod.indices.subarray( 0, nearLod.count ) ), [ 0, 1 ] );
 assert.deepEqual( Array.from( middleLod.indices.subarray( 0, middleLod.count ) ), [ 1, 2 ] );
 assert.ok( middleLod.fade[ 0 ] > 0.4 && middleLod.fade[ 0 ] < 0.6, 'shared LOD transition produces a fractional incoming fade' );
+const outgoingOffset = Array.from( nearLod.indices.subarray( 0, nearLod.count ) ).indexOf( 1 );
+const incomingOffset = Array.from( middleLod.indices.subarray( 0, middleLod.count ) ).indexOf( 1 );
+assert.equal( nearLod.fade[ outgoingOffset ], middleLod.fade[ incomingOffset ], 'both transition LODs use the same complementary screen-door threshold' );
+assert.equal( nearLod.incoming[ outgoingOffset ], 0 );
+assert.equal( middleLod.incoming[ incomingOffset ], 1 );
 assert.deepEqual( Array.from( farLod.indices.subarray( 0, farLod.count ) ), [ 3 ] );
 assert.equal( planner.shadowGroups[ 0 ].count, 2, 'shadow candidates are distance-limited independently of the camera frustum' );
 assert.equal( planner.shadowGroups[ 0 ].indices[ 0 ], 0 );
 assert.equal( planner.shadowGroups[ 0 ].indices[ 1 ], 5 );
 assert.equal( planner.groups[ 3 ].indices.length, 1, 'per-model output buffers use that model\'s instance count' );
 assert.equal( planner.shadowGroups[ 1 ].indices.length, 1 );
+assert.equal( planner.groups[ 3 ].incoming[ 0 ], 2, 'a steady LOD is distinct from the outgoing transition side' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
+
+for ( const camera of [ new PerspectiveCamera( 60, 1, 0.1, 100 ), new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) ] ) {
+	camera.position.set( 0, 0, 0 );
+	camera.lookAt( 0, 0, - 1 );
+	const cameraView = staticModelInstanceCamera( camera );
+	assert.deepEqual( cameraView.position, [ 0, 0, 0 ] );
+	assert.equal( cameraView.frustumPlanes.length, 6 );
+	assert.doesNotThrow( () => planner.update( cameraView ), 'camera conversion works with both engine and Three.js perspective cameras' );
+}
+const infiniteFarCamera = new PerspectiveCamera( 60, 1, 0.1, 100 );
+infiniteFarCamera.infiniteFar = true;
+infiniteFarCamera.updateProjectionMatrix();
+assert.deepEqual( staticModelInstanceCamera( infiniteFarCamera ).frustumPlanes[ 5 ], [ 0, 0, 0, 1 ], 'an infinite far plane does not reject visible instances' );
+
+const runtimeDocument = { ...valid, instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, - 5 ] } ] };
+const runtimePlanner = new StaticModelInstanceSetPlanner( runtimeDocument );
+const makeRuntimeBatch = () => {
+	const capacity = 1;
+	return { mesh: { count: 0, visible: false }, matrixAttribute: { array: new Float32Array( capacity * 16 ), needsUpdate: false }, fadeAttribute: { array: new Float32Array( capacity * 2 ), needsUpdate: false } };
+};
+let disposedRuntime = false;
+const runtime = new StaticModelInstanceSetRuntime( runtimeDocument, {
+	batches: runtimePlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: runtimePlanner.shadowGroups.map( () => [ makeRuntimeBatch() ] ),
+	dispose: () => { disposedRuntime = true; },
+} );
+const runtimeCamera = new PerspectiveCamera( 60, 1, 0.1, 100 );
+runtimeCamera.lookAt( 0, 0, - 1 );
+runtime.update( 1 / 60, runtimeCamera );
+const activeRuntimeBatch = runtime.batches.find( group => group[ 0 ].mesh.count > 0 )[ 0 ];
+assert.equal( activeRuntimeBatch.matrixAttribute.array[ 14 ], - 5, 'shared runtime compacts world transforms into renderer instance buffers' );
+assert.equal( activeRuntimeBatch.fadeAttribute.array[ 0 ], 1 );
+runtime.dispose();
+assert.equal( disposedRuntime, true );
 
 console.log( 'static model instance-set contract checks passed' );

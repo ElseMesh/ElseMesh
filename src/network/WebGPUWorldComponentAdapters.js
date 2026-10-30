@@ -6,6 +6,7 @@ import { WaterMaterial } from '../ocean/WaterMaterial.js';
 import { ShoreWaves } from '../ocean/ShoreWaves.js';
 import { applyWaterBodyProfile } from '../ocean/WaterProfiles.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
+import './WebGPUStaticModelInstanceSetAdapter.js';
 
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWaterBody );
 function installWaterBody( { app, root, connector, installed }, component ) {

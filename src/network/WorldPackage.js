@@ -114,6 +114,30 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 
 }
 
+// Decode one content-addressed GLB through the same cache and material adapter
+// path used by ordinary world objects. Callers may clone its primitives, but
+// this cached source remains owned by disposeWorldPackage().
+export async function loadWorldPackageModelAsset( connector, root, assetId, { signal, parsedGLTF = null } = {} ) {
+	const state = root?.userData?.worldPackage;
+	if ( ! state || state.disposed ) throw new Error( 'Cannot load a model into a disposed world package' );
+	const cached = state.parsed.get( assetId );
+	if ( cached ) return cached;
+	const bytes = parsedGLTF ? null : await connector.getAsset( assetId, { signal } );
+	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
+	const decoded = await buildGLTF( parsedGLTF || parseGLB( bytes ), state );
+	if ( signal?.aborted || state.disposed ) {
+		disposeWorldPackage( decoded );
+		throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
+	}
+	const raced = state.parsed.get( assetId );
+	if ( raced ) {
+		disposeWorldPackage( decoded );
+		return raced;
+	}
+	state.parsed.set( assetId, decoded );
+	return decoded;
+}
+
 async function prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs ) {
 	const state = root.userData.worldPackage;
 	if ( state.disposed ) return;

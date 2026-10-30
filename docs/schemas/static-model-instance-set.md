@@ -1,9 +1,12 @@
 # Static model instance sets
 
-**Status: partial.** The engine's shared component asset-codec registry validates
-and decodes the data shape, and `StaticModelInstanceSetPlanner` shares frustum
-culling, LOD selection/fades, and shadow-distance selection. Component package
-installation, WebGPU/WebGL draw adapters, and Tidewater export are not implemented.
+**Status: partial.** The engine validates and decodes the data shape, resolves
+the signed GLB assets, and shares camera conversion, frustum culling, LOD
+selection/fades, and shadow-distance selection. Engine-owned WebGPU and WebGL
+draw adapters build instanced batches from those records. Generated-GLB checks
+cover adapter construction and per-frame updates on both backends; isolated
+WebGPU and WebGL renders check visible pixels and shader compilation. Tidewater
+export and its visual parity against the pre-split baseline remain unverified.
 
 This generic package format is the intended replacement for content-specific
 static renderer components. A world describes models, LOD assets, materials,
@@ -13,7 +16,8 @@ visibility, LOD transitions, shadows, and GPU resources.
 ## Package shape
 
 A signed component references one content-addressed JSON asset with kind
-`static-model-instance-set/1`. The asset has this shape:
+`static-model-instance-set/1` and each referenced LOD GLB with kind `glb` in its
+component asset list. The JSON asset has this shape:
 
 ```json
 {
@@ -43,7 +47,9 @@ A signed component references one content-addressed JSON asset with kind
 }
 ```
 
-Each model asset is a GLB using core glTF materials and local-space geometry.
+Each model asset is a static GLB using the core glTF feature subset supported by
+both renderers and local-space geometry. Skins, animation, morph targets,
+non-triangle primitives, and unsupported vertex attributes are rejected.
 LOD entries are ordered from highest to lowest detail. Each value in
 `lodThresholds` is the normalized projected-radius boundary between adjacent
 LOD entries. The engine uses a 10% transition band below each threshold and
@@ -52,17 +58,17 @@ selects visible instances and complementary incoming/outgoing fade weights; it
 produces shadow candidates by distance independently of the camera frustum.
 Both renderers must consume those same selections. Model bounds are in local
 space and drive culling and streaming. Instance transforms use a normalized
-quaternion and positive scale. Additional standard glTF material variants may
-be referenced by a model, but the package cannot contain shader source,
+quaternion and positive scale. The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 
 The component's streaming bounds enclose the transformed model bounds. Asset
 references are content-addressed and verified by the signed manifest before
 loading. The contract validator rejects unknown format versions, invalid
-transforms, duplicate model IDs, invalid or overlapping LOD thresholds, and records that
-exceed its configured count or byte limits. It checks model/LOD asset presence
-when the caller supplies the resolved asset-ID set. Package installation does
-not yet call this validator.
+transforms, duplicate model IDs, invalid or overlapping LOD thresholds, and
+records that exceed its configured count or byte limits. The package resolver
+checks each referenced GLB against the signed asset inventory, fetches it
+through the content-hash-verifying connector, and validates its static feature
+subset before either backend installs it.
 
 ## Separation and parity gates
 
@@ -71,8 +77,10 @@ in its fields. Tidewater can use it for hosted market contents by exporting its
 authored models and placements as ordinary assets. Its fish placement codec,
 species data, and game rules remain world-owned. The engine implements the same
 instance visibility, LOD selection/fades, and shadow-distance policy for WebGPU
-and WebGL. The shared planner is implemented and unit-checked; backend draw
-adapters do not consume it yet.
+and WebGL. Both adapters consume the shared planner and use the same generated
+GLB fixture and transform records. Isolated browser checks prove each backend
+renders the fixture and compiles its color and shadow programs; they do not prove
+Tidewater appearance or parity against its original WebGPU presentation.
 
 The current WebGL fish-prop mesh expansion is not a valid implementation of
 this target: it loses the WebGPU skin appearance, per-instance culling, LOD
