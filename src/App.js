@@ -19,7 +19,6 @@ import { Clouds } from './sky/Clouds.js';
 import { SkyProClouds } from './sky/SkyProClouds.js';
 import { Environment } from './sky/Environment.js';
 
-import { IslandWorldState } from './world/IslandWorldState.js';
 import { HeightfieldTerrainData } from './world/HeightfieldTerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
@@ -135,10 +134,11 @@ export function resolveGraphicsPriority( { isLinuxDesktop, backend = null, query
 
 export class App {
 
-	constructor( { worldPackage = null } = {} ) {
+	constructor( { worldPackage = null, loadDefaultWorldPackage = null } = {} ) {
 
 		this.qs = new URLSearchParams( location.search );
 		this.worldPackage = worldPackage;
+		this.loadDefaultWorldPackage = loadDefaultWorldPackage;
 		this.hostedQueries = new WeakMap();
 		this.localWorldExperience = worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
@@ -222,7 +222,10 @@ export class App {
 
 		const qs = this.qs;
 		const worldLink = worldLinkFromLocation();
-		if ( ! worldLink && ! this.worldPackage ) this.worldPackage = ( await import( 'virtual:elsemesh-default-world' ) ).defaultWorldPackage;
+		if ( ! worldLink && ! this.worldPackage ) {
+			if ( ! this.loadDefaultWorldPackage ) throw new Error( 'The application entry point must provide a default world package loader for local play' );
+			this.worldPackage = await this.loadDefaultWorldPackage();
+		}
 		this.localWorldExperience = this.worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
@@ -258,10 +261,7 @@ export class App {
 			return this.initLocalStaticWorld( progress );
 
 		}
-		await progress( 0.02, 'Preparing the shared island state…', undefined, 'terrain' );
-		this.worldState = new IslandWorldState();
-		this.terrainData = this.worldState.terrain;
-		this.colliders = this.worldState.colliders;
+		await progress( 0.02, worldLink ? 'Preparing the world runtime…' : 'Preparing the island state…', undefined, 'terrain' );
 		// Hosted package collision state belongs to the active world package, not
 		// the built-in island's backend-neutral state.
 		this.hostedColliders = new Colliders();
@@ -280,6 +280,9 @@ export class App {
 			this.graphicsPriority = backendGraphicsPriority;
 			this.configureGraphicsPriority();
 		}
+		// The WebGL hosted path builds its player and collision state from the
+		// active package. Do not instantiate the built-in island for that launch.
+		if ( engine.backend !== 'webgl' || ! worldLink ) await this.initializeIslandWorldState();
 		if ( engine.backend === 'webgl' ) {
 
 			// WebGL uses the fallback game loop, so it must own the same audio
@@ -655,6 +658,15 @@ export class App {
 				await GPU.queue.onSubmittedWorkDone();
 			}
 		}
+
+	}
+
+	async initializeIslandWorldState() {
+
+		const { IslandWorldState } = await import( './world/IslandWorldState.js' );
+		this.worldState = new IslandWorldState();
+		this.terrainData = this.worldState.terrain;
+		this.colliders = this.worldState.colliders;
 
 	}
 

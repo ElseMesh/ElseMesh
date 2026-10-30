@@ -28,7 +28,7 @@ if ( /[?&]bench\b/.test( location.search ) ) {
 }
 
 const ui = new UI();
-const app = new App();
+const app = new App( { loadDefaultWorldPackage: async () => ( await import( 'virtual:elsemesh-default-world' ) ).defaultWorldPackage } );
 window.__ui = ui;
 
 function reportConnection() {

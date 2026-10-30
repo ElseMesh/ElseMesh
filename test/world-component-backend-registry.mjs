@@ -23,8 +23,12 @@ const fallbackSource = await readFile( new URL( '../src/fallback/WebGLFallback.j
 const entrySource = await readFile( new URL( '../src/main.js', import.meta.url ), 'utf8' );
 assert.doesNotMatch( appSource, /from ['"]\.\.\/worlds\/default\.js['"]/, 'the engine App receives the default world package from its entry point' );
 assert.doesNotMatch( fallbackSource, /from ['"]\.\.\/\.\.\/worlds\/default\.js['"]/, 'the renderer fallback consumes the App-provided world package' );
-assert.doesNotMatch( entrySource, /virtual:elsemesh-default-world/, 'the application entry point does not eagerly import the built-in world' );
-assert.match( appSource, /if \( ! worldLink && ! this\.worldPackage \) this\.worldPackage = \( await import\( 'virtual:elsemesh-default-world' \) \)\.defaultWorldPackage/, 'App loads the built-in world only for a launch without a world link' );
+assert.doesNotMatch( entrySource, /from ['"]virtual:elsemesh-default-world['"]/, 'the application entry point does not eagerly import the built-in world' );
+assert.match( entrySource, /loadDefaultWorldPackage: async \(\) => \( await import\( 'virtual:elsemesh-default-world' \) \)\.defaultWorldPackage/, 'the entry point provides a lazy default-world loader' );
+assert.match( appSource, /if \( ! worldLink && ! this\.worldPackage \) \{[\s\S]*?this\.worldPackage = await this\.loadDefaultWorldPackage\(\)/, 'App requests the built-in world only for a launch without a world link' );
+assert.doesNotMatch( appSource, /import \{ IslandWorldState \} from/, 'App does not eagerly load built-in island state' );
+assert.match( appSource, /if \( engine\.backend !== 'webgl' \|\| ! worldLink \) await this\.initializeIslandWorldState\(\)/, 'hosted WebGL startup does not create built-in island state' );
+assert.match( appSource, /async initializeIslandWorldState\(\)[\s\S]*?await import\( '\.\/world\/IslandWorldState\.js' \)/, 'built-in island state is loaded on demand' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1' ), 'function', 'App registers the WebGPU water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1' ), 'function', 'WebGLFallback registers the WebGL water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );

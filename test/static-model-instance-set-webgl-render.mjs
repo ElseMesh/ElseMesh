@@ -21,7 +21,7 @@ async function stopBrowser( browser ) {
 }
 
 const profile = mkdtempSync( join( '/var/tmp', 'elsemesh-static-model-webgl-' ) );
-const vite = await createServer( { configFile: false, root: engineRoot, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
+const vite = await createServer( { configFile: false, root: engineRoot, optimizeDeps: { entries: [ 'test/static-model-instance-set-webgl-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
 let browser, socket;
 try {
 	await vite.listen();
