@@ -26,9 +26,18 @@ export function shoreWobble( along ) {
 		+ shoreBar( along ).rip * 0.045;
 }
 
+function shoreHash1( wave ) {
+	// WGSL evaluates this hash with f32 inputs and arithmetic. Keeping those rounding
+	// points here avoids a visibly different wave set from JavaScript's f64 sin path.
+	const f32 = Math.fround;
+	const x = f32( f32( f32( wave ) * f32( 127.1 ) ) + f32( 311.7 ) );
+	const value = f32( f32( Math.sin( x ) ) * f32( 43758.5453 ) );
+	return value - Math.floor( value );
+}
+
 export function shoreWaveAmplitude( wave, along, { amplitude = SHORE_DEFAULT_AMPLITUDE, variation = SHORE_DEFAULT_VARIATION } = {} ) {
 	const waveSet = Math.abs( Math.sin( wave * ( Math.PI / 7 ) ) ) * 0.6 + 0.55;
-	const random = ( ( Math.sin( wave * 127.1 + 311.7 ) * 43758.5453 ) % 1 + 1 ) % 1 * 2 - 1;
+	const random = ( shoreHash1( wave ) - 0.5 ) * 2;
 	const warp = Math.sin( along * 0.016 + wave * 0.9 ) * 1.6;
 	const a1 = Math.sin( along * 0.062 + wave * 1.7 + warp );
 	const a2 = Math.sin( along * 0.13 + wave * 4.1 + 1.3 - warp * 0.7 );
