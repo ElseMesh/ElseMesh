@@ -13,6 +13,12 @@ build stamp comes from the checked-out source revision. GitHub repository URL
 redirects do not guarantee redirects for old project URLs; use the current
 ElseMesh address.
 
+The client entry point consumes a virtual `defaultWorldPackage` binding so the
+engine entry does not import a particular world's source. Builds bind that
+contract to `worlds/default.js` by default; set `ELSEMESH_DEFAULT_WORLD_MODULE`
+to another module path (relative to the build root or absolute) to ship a
+different built-in world package.
+
 ## Selected ThruHolds
 
 ### Invitation-gated launches

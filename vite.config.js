@@ -13,6 +13,19 @@ if ( ! /^[\da-f]{40}$/i.test( commitSha ) ) throw new Error( 'Git HEAD must be a
 const commitShort = commitSha.slice( 0, 8 ).toLowerCase();
 
 const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
+const defaultWorldModule = resolve( process.env.ELSEMESH_DEFAULT_WORLD_MODULE || 'worlds/default.js' );
+
+function defaultWorldBinding() {
+	const id = '\0virtual:elsemesh-default-world';
+	return {
+		name: 'elsemesh-default-world-binding',
+		resolveId( source ) { return source === 'virtual:elsemesh-default-world' ? id : null; },
+		load( source ) {
+			if ( source !== id ) return null;
+			return `export { defaultWorldPackage } from ${ JSON.stringify( defaultWorldModule ) };`;
+		},
+	};
+}
 
 function connectionLog() {
 	const middleware = ( req, res, next ) => {
@@ -89,7 +102,7 @@ export default defineConfig( {
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ connectionLog(), worldPackageAssets(), {
+	plugins: [ defaultWorldBinding(), connectionLog(), worldPackageAssets(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html ) {
 			if ( ! html.includes( '%ELSEMESH_COMMIT%' ) ) throw new Error( 'Build commit placeholder is missing from index.html' );

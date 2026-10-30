@@ -3,7 +3,7 @@ import { App } from './App.js';
 import { UI } from './ui/UI.js';
 import { AppUI } from './ui/AppUI.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL } from './network/WorldLauncher.js';
-import { defaultWorldPackage } from '../worlds/default.js';
+import { defaultWorldPackage } from 'virtual:elsemesh-default-world';
 
 // Public deployments can opt into account sign-in without exposing secrets or
 // requiring a build change. A missing file leaves the guest experience intact.
