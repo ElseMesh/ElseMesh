@@ -209,15 +209,14 @@ export class WebGLWaterQuery {
 			const k = i * 4, x = points[ k ], z = points[ k + 1 ];
 			const offset = this.surfaceOffsetAt( x, z, time ) || 0;
 			const gx = - data[ k + 1 ] / Math.sqrt( Math.max( 1 - data[ k + 1 ] ** 2 - data[ k + 2 ] ** 2, 0.05 ) )
-				+ ( offset - ( this.surfaceOffsetAt( x + e, z, time ) || 0 ) ) / e;
+				+ ( ( this.surfaceOffsetAt( x + e, z, time ) || 0 ) - offset ) / e;
 			const gz = - data[ k + 2 ] / Math.sqrt( Math.max( 1 - data[ k + 1 ] ** 2 - data[ k + 2 ] ** 2, 0.05 ) )
-				+ ( offset - ( this.surfaceOffsetAt( x, z + e, time ) || 0 ) ) / e;
+				+ ( ( this.surfaceOffsetAt( x, z + e, time ) || 0 ) - offset ) / e;
 			const h = data[ k ] + offset;
-			const nx = gx, nz = gz;
-			const n = Math.sqrt( nx * nx + nz * nz + 1 );
+			const n = Math.sqrt( gx * gx + gz * gz + 1 );
 			data[ k ] = h;
-			data[ k + 1 ] = nx / n;
-			data[ k + 2 ] = nz / n;
+			data[ k + 1 ] = - gx / n;
+			data[ k + 2 ] = - gz / n;
 
 		}
 
