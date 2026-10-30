@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCodecRegistry.js';
+import { loadStaticModelInstanceSetAssets } from '../src/network/StaticModelInstanceSetAssets.js';
 import { StaticModelInstanceSetPlanner } from '../src/engine/render/StaticModelInstanceSetPlanner.js';
 import {
 	decodeStaticModelInstanceSet,
@@ -11,6 +12,7 @@ import {
 const hi = `sha256:${'a'.repeat( 64 )}`;
 const low = `sha256:${'b'.repeat( 64 )}`;
 const lowest = `sha256:${'c'.repeat( 64 )}`;
+const setAssetID = `sha256:${'d'.repeat( 64 )}`;
 const valid = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ {
@@ -28,12 +30,31 @@ assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-n
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
 assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set( [ hi, low, lowest ] ) } ).instances.length, 1 );
 assert.equal( decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes ).models[ 0 ].id, 'market-table-fish', 'the engine asset-codec registry applies the generic validator' );
+assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
 assert.throws( () => validateStaticModelInstanceSet( valid, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, renderer: 'webgpu' } ), /format or fields/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], rotation: [ 0, 0, 0, 0 ] } ] } ), /normalized quaternion/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.004, 0.018 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
+
+const loadedGLB = new Uint8Array( [ 1, 2, 3 ] );
+const requestedAssets = [];
+const assetConnector = {
+	manifest: { assets: [
+		{ id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND },
+		{ id: hi, kind: 'glb' },
+		{ id: low, kind: 'glb' },
+		{ id: lowest, kind: 'glb' },
+	] },
+	assets: new Map( [ [ setAssetID, bytes ] ] ),
+	getAsset: async assetId => { requestedAssets.push( assetId ); return loadedGLB; },
+};
+const resolved = await loadStaticModelInstanceSetAssets( assetConnector, { assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ] } );
+assert.equal( resolved.document.models[ 0 ].id, 'market-table-fish' );
+assert.deepEqual( [ ...resolved.modelAssets.keys() ], [ hi, low, lowest ], 'resolves the signed nested GLB assets referenced by all LODs' );
+assert.deepEqual( requestedAssets, [ hi, low, lowest ] );
+await assert.rejects( () => loadStaticModelInstanceSetAssets( { ...assetConnector, manifest: { assets: assetConnector.manifest.assets.map( asset => asset.id === lowest ? { ...asset, kind: 'image/1' } : asset ) } }, { assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ] } ), /missing/ );
 
 const placements = [ 20, 35, 100, 300 ].map( z => ( { model: 'market-table-fish', position: [ 1, 2, z ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ) );
 placements.push( { model: 'market-table-fish', position: [ 500, 2, 20 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
