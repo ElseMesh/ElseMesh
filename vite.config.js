@@ -14,6 +14,7 @@ const commitShort = commitSha.slice( 0, 8 ).toLowerCase();
 
 const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
 const defaultWorldModule = resolve( process.env.ELSEMESH_DEFAULT_WORLD_MODULE || 'worlds/default.js' );
+const worldProviderModules = ( process.env.ELSEMESH_WORLD_PROVIDER_MODULES || 'worlds/tidewater/world-provider.js' ).split( ',' ).map( module => resolve( module.trim() ) ).filter( Boolean );
 
 function defaultWorldBinding() {
 	const id = '\0virtual:elsemesh-default-world';
@@ -23,6 +24,20 @@ function defaultWorldBinding() {
 		load( source ) {
 			if ( source !== id ) return null;
 			return `export { defaultWorldPackage } from ${ JSON.stringify( defaultWorldModule ) };`;
+		},
+	};
+}
+
+function worldProviderBinding() {
+	const id = '\0virtual:elsemesh-world-providers';
+	return {
+		name: 'elsemesh-world-provider-binding',
+		resolveId( source ) { return source === 'virtual:elsemesh-world-providers' ? id : null; },
+		load( source ) {
+			if ( source !== id ) return null;
+			const imports = worldProviderModules.map( ( module, index ) => `import * as provider${index} from ${JSON.stringify( module )};` ).join( '\n' );
+			const providers = worldProviderModules.map( ( _module, index ) => `provider${index}` ).join( ', ' );
+			return `${imports}\nconst providers = [ ${providers} ];\nexport async function loadWorldProviders( manifest ) { for ( const provider of providers ) if ( await provider.supportsWorldManifest( manifest ) ) await provider.loadWorldProvider(); }`;
 		},
 	};
 }
@@ -102,7 +117,7 @@ export default defineConfig( {
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ defaultWorldBinding(), connectionLog(), worldPackageAssets(), {
+	plugins: [ defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html ) {
 			if ( ! html.includes( '%ELSEMESH_COMMIT%' ) ) throw new Error( 'Build commit placeholder is missing from index.html' );

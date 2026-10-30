@@ -3,8 +3,10 @@
 World repositories contain authored data and immutable package assets. They
 are not ElseMesh applications: they do not compile or run by themselves. The
 ElseMesh engine owns exporters, validators, package schemas, networking, and
-runtime execution. Downloaded content may select only versioned behavior
-handlers implemented by the engine; it does not execute arbitrary scripts.
+rendering. A signed manifest can select a locally installed world provider for
+its registered component types; the provider loads only after the manifest
+signature is verified. Owner-signed JavaScript behavior modules run in
+dedicated browser Workers and do not receive renderer objects.
 
 The current content repositories are [Tidewater](../worlds/tidewater/README.md)
 and the private [Hogwarts-World bridge repository](../worlds/Hogwarts/README.md).

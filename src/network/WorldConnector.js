@@ -94,7 +94,7 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 }
 
 export class WorldConnector {
-	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES } = {} ) {
+	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES, loadWorldProviders = null } = {} ) {
 		invariant( isWorldID( worldId ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
@@ -108,6 +108,7 @@ export class WorldConnector {
 		invariant( this.providers.length <= 8 && this.providers.every( ( provider ) => /^[A-Za-z0-9]{20,256}$/.test( provider.nodeId || '' ) && validGatewayForCurrentPage( provider.gateway ) ), 'Invalid world gateway candidates' );
 		this.directory = directory;
 		this.chunkBytes = chunkBytes;
+		this.loadWorldProviders = loadWorldProviders;
 		this.manifest = null;
 		this.assets = new Map();
 		this.assetDownloads = new Map();
@@ -204,7 +205,7 @@ export class WorldConnector {
 	async #fetchManifest( signal ) {
 		const reply = await this.#request( { type: 'manifest.get' }, { signal } );
 		invariant( reply.type === 'manifest' && reply.document, 'World gateway returned no manifest' );
-		this.manifest = await verifySignedWorldManifest( reply.document );
+		this.manifest = await verifySignedWorldManifest( reply.document, { loadWorldProviders: this.loadWorldProviders } );
 		invariant( this.manifest.worldId === this.worldId, 'Manifest belongs to another world' );
 		this.authorityLease = null;
 		if ( reply.authorityLease ) {
@@ -401,6 +402,7 @@ export class WorldConnector {
 			gateway: portal.destinationGateway || this.gateway,
 			directory: this.directory,
 			chunkBytes: this.chunkBytes,
+			loadWorldProviders: this.loadWorldProviders,
 		} );
 		try {
 			await destination.getManifest( { signal } );
@@ -959,10 +961,11 @@ function waitWithAbort( promise, signal ) {
 	} );
 }
 
-export async function verifySignedWorldManifest( document ) {
+export async function verifySignedWorldManifest( document, { loadWorldProviders = null } = {} ) {
 	await verifySignedDocument( document, 'elsemesh.world/3' );
 	const manifest = document.payload;
 	invariant( manifest.protocol === 'elsemesh.world/3' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
+	await loadWorldProviders?.( manifest );
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience, manifest.assets ?? null );
 	validateWorldSpawn( manifest.spawn );

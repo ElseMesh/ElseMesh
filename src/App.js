@@ -134,11 +134,12 @@ export function resolveGraphicsPriority( { isLinuxDesktop, backend = null, query
 
 export class App {
 
-	constructor( { worldPackage = null, loadDefaultWorldPackage = null } = {} ) {
+	constructor( { worldPackage = null, loadDefaultWorldPackage = null, loadWorldProviders = null } = {} ) {
 
 		this.qs = new URLSearchParams( location.search );
 		this.worldPackage = worldPackage;
 		this.loadDefaultWorldPackage = loadDefaultWorldPackage;
+		this.loadWorldProviders = loadWorldProviders;
 		this.hostedQueries = new WeakMap();
 		this.localWorldExperience = worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
@@ -232,7 +233,7 @@ export class App {
 		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
 		if ( worldLink ) {
-			this.worldConnector = worldLink.localProvider ? new LocalRegionConnector( worldLink ) : new WorldConnector( worldLink );
+			this.worldConnector = worldLink.localProvider ? new LocalRegionConnector( worldLink ) : new WorldConnector( { ...worldLink, loadWorldProviders: this.loadWorldProviders } );
 			this.worldManifestPromise = this.worldConnector.getManifest().then( ( manifest ) => ( { manifest } ), ( error ) => ( { error } ) );
 			this.worldManifestPromise.then( ( result ) => {
 				if ( result.manifest ) {
