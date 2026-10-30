@@ -166,9 +166,10 @@ owner resynchronization, and read-only portal traversal are future behavior.
 
 ## Current presence limits and checks
 
-The presence protocol is `elsemesh.player-presence/2`; other protocol versions
+The presence protocol is `elsemesh.player-presence/3`; other protocol versions
 are rejected. A pose includes monotonic per-session sequence, bounded
-position/orientation, mode, appearance and optional vehicle speed. Position is
+position/orientation, mode, avatar profile identity, appearance and optional
+vehicle type and speed. Position is
 limited to ±100,000 m; yaw to ±1,000 radians; pitch to ±1.5 radians. Appearance
 is selected from built-in male/female styles and four hex colors; no arbitrary
 URLs, shaders, or executable code are accepted.
@@ -180,7 +181,7 @@ with one update request in flight. Closing a connection sends leave when
 possible; TTL handles abrupt loss. These limits are process/world-local and do
 not create an aggregate cap across a fleet of gateways or worlds.
 
-Version-2 world rules also require `maxVisitors` and horizontal `spawnRadius`.
+World rules also require `maxVisitors` and horizontal `spawnRadius`.
 The daemon applies the per-world visitor limit during the first presence update.
 Invitation entry supplies a bounded, nearest-first `spawnCandidates` list in
 that request; each feet position must be finite, within the signed radius, and
@@ -208,9 +209,15 @@ combined complexity limits. The server uses the fixed 46,845-triangle boat
 contract and checks `avatarComplexity + boat triangles` against the signed
 maximum. The browser additionally checks destination policy before a portal
 crossing and applies the speed cap. This validates presence claims; it does not
-make boat physics authoritative. Presence does not carry stable avatar-profile
-or vehicle-type identity, so the owner cannot apply avatar allowlists or
-avatar/vehicle combination rules yet.
+make boat physics authoritative. Presence carries the stable `avatarProfileId`
+derived from the validated appearance style. Vehicle modes carry the stable
+component `vehicleType`. Signed `avatarPolicy.allowedProfiles` can restrict
+which profile IDs may enter, and `vehiclePolicy.allowedCombinations` can
+restrict exact avatar/vehicle pairs. The owner repeats these checks during
+presence admission, and the browser applies them before showing a portal view
+or completing handoff. The current runtime implements only the two stock
+avatar profiles and `elsemesh.downeast-boat/1`; other IDs cannot be selected or
+simulated until a world package and engine runtime register them.
 
 Other bounded inputs include 128 KiB WebSocket messages, WebRTC session and
 in-flight RPC ceilings, bounded package/asset declarations, manifest entity

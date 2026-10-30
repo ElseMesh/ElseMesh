@@ -338,9 +338,11 @@ admitting presence. These checks govern sharing and admission, while ElseMesh
 selects the local WebGPU or WebGL presentation for the same approved profile.
 Worlds describe policy and approved content without choosing a renderer.
 
-The current bundled-boat rule is only a first instance of this contract. It
-does not yet provide a generic vehicle catalog, avatar-profile identity in
-presence, an owner-signed moderation catalog, or pair-specific portal checks.
+The current implementation establishes signed allowlists and stable presence
+identities, but runtime selection still exposes only two stock avatar profiles
+and one bundled boat. A reusable vehicle registry and profile-specific
+complexity metadata remain future work; the current world-wide avatar cap and
+avatar-plus-boat budget are the limits the engine can measure consistently.
 
 ## What the code supports today
 
@@ -351,12 +353,14 @@ presence, an owner-signed moderation catalog, or pair-specific portal checks.
   expiry. Browser clients normally send at 10 Hz.
 - A signed `avatarComplexity` value applied by the browser to remote-avatar
   mesh selection. It caps triangles per remote avatar, not total world cost.
-- A bundled Downeast boat contract. The destination can opt in, require a
-  compatible boat component/berth, cap speed, and cap avatar-plus-boat triangle
-  complexity. The owner validates presence reports and portal preparation also
-  checks locally. Avatar selection is not yet governed by a world allowlist,
-  and the policy cannot name other vehicle types or permitted avatar/vehicle
-  pairs.
+- A signed `avatarPolicy.allowedProfiles` allowlist and stable profile IDs in
+  presence. Omission admits all profiles implemented by the client; an empty
+  list denies all. The current client exposes two stock profiles.
+- A bundled Downeast boat contract. Destinations can opt in, require a
+  compatible boat component/berth, cap speed and avatar-plus-boat triangle
+  complexity, and optionally allowlist exact avatar/vehicle pairs. The browser
+  checks before portal views and handoff; the owner repeats admission checks.
+  The runtime currently implements only this boat type.
 - Signed front/back portal route data and client-side preview, preparation,
   pose mapping, and world switch. See [portal authoring](portal-authoring.md).
 - WebSocket/WebTransport gateway requests, optional direct WebRTC requests,
@@ -373,14 +377,15 @@ presence, an owner-signed moderation catalog, or pair-specific portal checks.
 1. **Population limit is fixed, not owner-configurable.** The daemon currently
    hard-codes 128 presence records. There is no signed world-level player cap,
    nor a separate gateway-wide admission budget keyed across all gateways.
-2. **Avatar restrictions are incomplete.** The world can set a per-avatar
-   triangle cap, but it cannot identify and allowlist supported avatar profiles
-   or apply profile-specific limits. The server does not inspect a client's
-   actual mesh or enforce aggregate visible triangle cost; clients can ignore
-   viewer-side caps.
+2. **Avatar restrictions are incomplete.** Worlds can allowlist stable avatar
+   profile IDs and set a shared per-avatar triangle cap. Profile-specific
+   complexity metadata and a general avatar catalog are not implemented. The
+   server does not inspect a client's actual mesh or enforce aggregate visible
+   triangle cost; clients can ignore viewer-side caps.
 3. **Vehicle support and combinations are narrow.** Only the bundled Downeast
-   boat has a declared 46,845-triangle contract. Carried objects, arbitrary
-   vehicles, inventory, avatar/vehicle allowlist pairs, object ownership, and
+   boat has a declared 46,845-triangle contract. Signed avatar/vehicle pair
+   allowlists work for supported runtime types. Carried objects, arbitrary
+   vehicles, inventory, object ownership, and
    server-authoritative object simulation are not represented by the presence
    protocol. World-owner policies for dropping, throwing, persistence, claims,
    disconnect handling, and transfers are design requirements, not runtime

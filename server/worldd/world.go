@@ -317,6 +317,7 @@ type worldRules struct {
 	AvatarComplexity uint32         `json:"avatarComplexity"`
 	PhysicsProfile   string         `json:"physicsProfile"`
 	Movement         *movementRules `json:"movement,omitempty"`
+	AvatarPolicy     *avatarPolicy  `json:"avatarPolicy,omitempty"`
 	VehiclePolicy    *vehiclePolicy `json:"vehiclePolicy,omitempty"`
 	MaxPackageBytes  *int64         `json:"maxPackageBytes,omitempty"`
 	StyleGuide       string         `json:"styleGuide,omitempty"`
@@ -324,9 +325,41 @@ type worldRules struct {
 }
 
 type vehiclePolicy struct {
-	Enabled               bool     `json:"enabled"`
-	MaxSpeed              *float64 `json:"maxSpeed,omitempty"`
-	MaxCombinedComplexity *uint32  `json:"maxCombinedComplexity,omitempty"`
+	Enabled               bool                 `json:"enabled"`
+	MaxSpeed              *float64             `json:"maxSpeed,omitempty"`
+	MaxCombinedComplexity *uint32              `json:"maxCombinedComplexity,omitempty"`
+	AllowedCombinations   []vehicleCombination `json:"allowedCombinations,omitempty"`
+}
+
+type avatarPolicy struct {
+	AllowedProfiles []string `json:"allowedProfiles"`
+}
+
+type vehicleCombination struct {
+	AvatarProfileID string `json:"avatarProfileId"`
+	VehicleType     string `json:"vehicleType"`
+}
+
+func (pair *vehicleCombination) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("vehicle combination must be an object")
+	}
+	for field := range fields {
+		if field != "avatarProfileId" && field != "vehicleType" {
+			return fmt.Errorf("unknown vehicle combination field %q", field)
+		}
+	}
+	if fields["avatarProfileId"] == nil || fields["vehicleType"] == nil {
+		return errors.New("vehicle combination fields are required")
+	}
+	type plain vehicleCombination
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*pair = vehicleCombination(decoded)
+	return nil
 }
 
 func (policy *vehiclePolicy) UnmarshalJSON(data []byte) error {
@@ -335,7 +368,7 @@ func (policy *vehiclePolicy) UnmarshalJSON(data []byte) error {
 		return errors.New("vehicle policy must be an object")
 	}
 	for field := range fields {
-		if field != "enabled" && field != "maxSpeed" && field != "maxCombinedComplexity" {
+		if field != "enabled" && field != "maxSpeed" && field != "maxCombinedComplexity" && field != "allowedCombinations" {
 			return fmt.Errorf("unknown vehicle policy field %q", field)
 		}
 	}
@@ -345,6 +378,28 @@ func (policy *vehiclePolicy) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*policy = vehiclePolicy(decoded)
+	return nil
+}
+
+func (policy *avatarPolicy) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("avatar policy must be an object")
+	}
+	for field := range fields {
+		if field != "allowedProfiles" {
+			return fmt.Errorf("unknown avatar policy field %q", field)
+		}
+	}
+	if fields["allowedProfiles"] == nil {
+		return errors.New("avatar policy must declare allowedProfiles")
+	}
+	type plain avatarPolicy
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*policy = avatarPolicy(decoded)
 	return nil
 }
 
@@ -576,12 +631,35 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			return errors.New("world movement speeds are outside the supported range")
 		}
 	}
+	if policy := manifest.Rules.AvatarPolicy; policy != nil {
+		if policy.AllowedProfiles == nil || len(policy.AllowedProfiles) > 128 {
+			return errors.New("world avatar policy has an invalid profile list")
+		}
+		seen := make(map[string]bool, len(policy.AllowedProfiles))
+		for _, profile := range policy.AllowedProfiles {
+			if len(profile) > 96 || !avatarProfilePattern.MatchString(profile) || seen[profile] {
+				return errors.New("invalid or duplicate world avatar profile")
+			}
+			seen[profile] = true
+		}
+	}
 	if policy := manifest.Rules.VehiclePolicy; policy != nil {
-		if !policy.Enabled && (policy.MaxSpeed != nil || policy.MaxCombinedComplexity != nil) {
+		if !policy.Enabled && (policy.MaxSpeed != nil || policy.MaxCombinedComplexity != nil || policy.AllowedCombinations != nil) {
 			return errors.New("disabled vehicle policy cannot declare limits")
 		}
 		if policy.Enabled && (policy.MaxSpeed == nil || *policy.MaxSpeed < 0.5 || *policy.MaxSpeed > 16 || math.IsNaN(*policy.MaxSpeed) || math.IsInf(*policy.MaxSpeed, 0) || policy.MaxCombinedComplexity == nil || *policy.MaxCombinedComplexity < 1 || *policy.MaxCombinedComplexity > 1000000) {
 			return errors.New("world vehicle policy limits are outside the supported range")
+		}
+		if len(policy.AllowedCombinations) > 128 {
+			return errors.New("world vehicle policy has too many combinations")
+		}
+		seen := make(map[string]bool, len(policy.AllowedCombinations))
+		for _, pair := range policy.AllowedCombinations {
+			key := pair.AvatarProfileID + "\n" + pair.VehicleType
+			if len(pair.AvatarProfileID) > 96 || !avatarProfilePattern.MatchString(pair.AvatarProfileID) || len(pair.VehicleType) > 96 || !vehicleTypePattern.MatchString(pair.VehicleType) || seen[key] {
+				return errors.New("invalid or duplicate world vehicle combination")
+			}
+			seen[key] = true
 		}
 	}
 	if len(manifest.Rules.RequiredFeatures) > 64 {

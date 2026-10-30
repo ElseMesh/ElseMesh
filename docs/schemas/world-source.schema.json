@@ -271,6 +271,24 @@
           "minimum": 1,
           "maximum": 100000
         },
+        "avatarPolicy": {
+          "type": "object",
+          "required": [ "allowedProfiles" ],
+          "properties": {
+            "allowedProfiles": {
+              "type": "array",
+              "maxItems": 128,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 96,
+                "pattern": "^elsemesh\\.avatar\\.[a-z0-9.-]+/\\d+$"
+              },
+              "description": "Optional destination allowlist for stable avatar profile IDs. An empty list rejects all avatars. Omit avatarPolicy to admit every profile implemented by the client."
+            }
+          },
+          "additionalProperties": false
+        },
         "physicsProfile": {
           "type": "string",
           "enum": [
@@ -334,6 +352,20 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 1000000
+            },
+            "allowedCombinations": {
+              "type": "array",
+              "maxItems": 128,
+              "items": {
+                "type": "object",
+                "required": [ "avatarProfileId", "vehicleType" ],
+                "properties": {
+                  "avatarProfileId": { "type": "string", "maxLength": 96, "pattern": "^elsemesh\\.avatar\\.[a-z0-9.-]+/\\d+$" },
+                  "vehicleType": { "type": "string", "maxLength": 96, "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$" }
+                },
+                "additionalProperties": false
+              },
+              "description": "Optional allowlist of avatar profile and vehicle type pairs. Omit to allow every implemented vehicle for every otherwise admitted avatar; an empty list disables all vehicle pairings."
             }
           },
           "allOf": [
@@ -378,6 +410,11 @@
                       "required": [
                         "maxCombinedComplexity"
                       ]
+                    },
+                    {
+                      "required": [
+                        "allowedCombinations"
+                      ]
                     }
                   ]
                 }
@@ -385,7 +422,7 @@
             }
           ],
           "additionalProperties": false,
-          "description": "Optional destination acceptance for the built-in Downeast boat. Accepted transfers apply maxSpeed and require configured avatar complexity plus the bundled boat's triangle count to fit maxCombinedComplexity. Omission or enabled=false denies vehicle transfer and suppresses open-portal previews while the player is aboard or at the helm."
+          "description": "Optional destination vehicle acceptance. The current client implements the Downeast boat type. Accepted transfers apply maxSpeed and require configured avatar complexity plus vehicle complexity to fit maxCombinedComplexity. allowedCombinations can moderate exact avatar and vehicle types. Omission or enabled=false denies vehicle transfer."
         },
         "maxPackageBytes": {
           "type": "integer",

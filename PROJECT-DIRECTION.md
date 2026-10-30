@@ -78,7 +78,9 @@ identity boundary across world packages:
   allowlist of avatar profiles and permitted avatar/vehicle combinations. The
   engine owns backend-neutral transfer and enforcement; worlds author the
   accepted profiles and combinations. Current support is only a per-avatar
-  stock-mesh cap and the bundled Downeast boat policy.
+  stock-mesh cap and the bundled Downeast boat runtime. Signed avatar-profile
+  and avatar/vehicle allowlists now gate portal and owner admission; broader
+  avatar and vehicle catalogs and per-profile complexity metadata remain.
 
 These gates are not complete merely because repository separation and the
 existing registered browser behaviors are in place.

@@ -19,6 +19,8 @@ try {
 	const source = createWorldSource( { worldId: 'elsemesh:generic-manifest-test', title: 'Generic manifest test' } );
 	source.updatedAt = '2026-10-01T12:00:00Z';
 	source.rules.requiredFeatures = [ 'elsemesh.static-glb/1' ];
+	source.rules.avatarPolicy = { allowedProfiles: [ 'elsemesh.avatar.stock-male/1' ] };
+	source.rules.vehiclePolicy = { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000, allowedCombinations: [ { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } ] };
 	source.components = [ {
 		id: 'elsemesh-component:opaque-fixture',
 		type: 'elsemesh.static-glb/1',
@@ -43,6 +45,10 @@ try {
 	assert.deepEqual( manifest.components, source.components, 'component envelope and opaque data survive conversion unchanged' );
 	assert.deepEqual( manifest.assets, [ { id: assetId, bytes: bytes.length, kind: 'example-binary/1', priority: 'visible' } ], 'asset inventory derives only from generic references' );
 	assert.doesNotThrow( () => validateWorldRequirements( manifest ) );
+	assert.deepEqual( manifest.rules.avatarPolicy, source.rules.avatarPolicy, 'avatar allowlist survives deterministic manifest conversion' );
+	assert.deepEqual( manifest.rules.vehiclePolicy, source.rules.vehiclePolicy, 'vehicle pair moderation survives deterministic manifest conversion' );
+	assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, avatarPolicy: { allowedProfiles: [ 'elsemesh.avatar.stock-male/1', 'elsemesh.avatar.stock-male/1' ] } } } ), /avatar policy/, 'source rejects duplicate avatar profile rules' );
+	assert.throws( () => validateWorldRequirements( { ...manifest, rules: { ...manifest.rules, vehiclePolicy: { ...manifest.rules.vehiclePolicy, allowedCombinations: [ ...manifest.rules.vehiclePolicy.allowedCombinations, ...manifest.rules.vehiclePolicy.allowedCombinations ] } } } ), /duplicate/, 'manifest rejects duplicate avatar and vehicle pairs' );
 	assert.doesNotThrow( () => validateWorldComponents( manifest.components, manifest.rules, new Set(), manifest.assets, manifest.objects ) );
 	console.log( 'ok generic source-to-manifest conversion' );
 } finally {

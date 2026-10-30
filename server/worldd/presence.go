@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const playerPresenceProtocol = "elsemesh.player-presence/2"
+const playerPresenceProtocol = "elsemesh.player-presence/3"
 const maxPresencePlayers = 128
 const maxSpawnCandidates = 1024
 const presenceTTL = 10 * time.Second
@@ -24,6 +24,8 @@ const downeastBoatTriangles = 46845 // elsemesh.downeast-boat/1 complexity contr
 
 var presenceSessionPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var presenceColorPattern = regexp.MustCompile(`^#[0-9a-f]{6}$`)
+var avatarProfilePattern = regexp.MustCompile(`^elsemesh\.avatar\.[a-z0-9.-]+/\d+$`)
+var vehicleTypePattern = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
 
 type avatarAppearance struct {
 	Style    string `json:"style"`
@@ -33,15 +35,17 @@ type avatarAppearance struct {
 	Hair     string `json:"hair"`
 }
 type playerPose struct {
-	Protocol     string           `json:"protocol"`
-	Sequence     uint64           `json:"sequence"`
-	Position     []float64        `json:"position"`
-	Yaw          float64          `json:"yaw"`
-	Pitch        float64          `json:"pitch"`
-	Moving       bool             `json:"moving"`
-	Mode         string           `json:"mode"`
-	VehicleSpeed *float64         `json:"vehicleSpeed,omitempty"`
-	Appearance   avatarAppearance `json:"appearance"`
+	Protocol        string           `json:"protocol"`
+	Sequence        uint64           `json:"sequence"`
+	Position        []float64        `json:"position"`
+	Yaw             float64          `json:"yaw"`
+	Pitch           float64          `json:"pitch"`
+	Moving          bool             `json:"moving"`
+	Mode            string           `json:"mode"`
+	AvatarProfileID string           `json:"avatarProfileId"`
+	VehicleType     string           `json:"vehicleType,omitempty"`
+	VehicleSpeed    *float64         `json:"vehicleSpeed,omitempty"`
+	Appearance      avatarAppearance `json:"appearance"`
 }
 type playerPresence struct {
 	ID string `json:"id"`
@@ -77,14 +81,21 @@ func validatePlayerPose(p *playerPose) error {
 		return errors.New("invalid_presence_mode")
 	}
 	if p.Mode == "boat" || p.Mode == "deck" {
-		if p.VehicleSpeed == nil || math.IsNaN(*p.VehicleSpeed) || math.IsInf(*p.VehicleSpeed, 0) || *p.VehicleSpeed < 0 || *p.VehicleSpeed > 100 {
+		if p.VehicleSpeed == nil || math.IsNaN(*p.VehicleSpeed) || math.IsInf(*p.VehicleSpeed, 0) || *p.VehicleSpeed < 0 || *p.VehicleSpeed > 100 || !vehicleTypePattern.MatchString(p.VehicleType) {
 			return errors.New("invalid_vehicle_speed")
 		}
-	} else if p.VehicleSpeed != nil {
+	} else if p.VehicleSpeed != nil || p.VehicleType != "" {
 		return errors.New("unexpected_vehicle_speed")
 	}
 	if p.Appearance.Style != "male" && p.Appearance.Style != "female" {
 		return errors.New("invalid_avatar_style")
+	}
+	expectedProfile := "elsemesh.avatar.stock-male/1"
+	if p.Appearance.Style == "female" {
+		expectedProfile = "elsemesh.avatar.stock-female/1"
+	}
+	if !avatarProfilePattern.MatchString(p.AvatarProfileID) || p.AvatarProfileID != expectedProfile {
+		return errors.New("invalid_avatar_profile")
 	}
 	for _, color := range []string{p.Appearance.Shirt, p.Appearance.Trousers, p.Appearance.Skin, p.Appearance.Hair} {
 		if !presenceColorPattern.MatchString(color) {
@@ -94,7 +105,19 @@ func validatePlayerPose(p *playerPose) error {
 	return nil
 }
 
-func (d *daemon) validateVehiclePresence(p *playerPose) error {
+func (d *daemon) validatePresenceAdmission(p *playerPose) error {
+	if policy := d.world.Rules.AvatarPolicy; policy != nil {
+		allowed := false
+		for _, profile := range policy.AllowedProfiles {
+			if profile == p.AvatarProfileID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return errors.New("avatar_not_allowed")
+		}
+	}
 	if p.Mode != "boat" && p.Mode != "deck" {
 		return nil
 	}
@@ -117,6 +140,21 @@ func (d *daemon) validateVehiclePresence(p *playerPose) error {
 	}
 	if !hasBoat {
 		return errors.New("vehicle_unsupported")
+	}
+	if p.VehicleType != "elsemesh.downeast-boat/1" {
+		return errors.New("vehicle_unsupported")
+	}
+	if policy.AllowedCombinations != nil {
+		allowed := false
+		for _, pair := range policy.AllowedCombinations {
+			if pair.AvatarProfileID == p.AvatarProfileID && pair.VehicleType == p.VehicleType {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return errors.New("vehicle_combination_not_allowed")
+		}
 	}
 	if uint64(d.world.Rules.AvatarComplexity)+downeastBoatTriangles > uint64(*policy.MaxCombinedComplexity) {
 		return errors.New("vehicle_complexity_exceeded")
@@ -151,7 +189,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				}
 			}
 		}
-		if err := d.validateVehiclePresence(request.Pose); err != nil {
+		if err := d.validatePresenceAdmission(request.Pose); err != nil {
 			return peerResponse{}, err
 		}
 	}

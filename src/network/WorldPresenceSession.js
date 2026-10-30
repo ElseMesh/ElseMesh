@@ -1,11 +1,13 @@
 import { WorldConnector } from './WorldConnector.js';
 import { PlayerPresence, PLAYER_PRESENCE_PROTOCOL } from './PlayerPresence.js';
-import { loadAppearance } from '../player/AvatarAppearance.js';
+import { avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
 import { RemoteAvatar } from '../player/RemoteAvatar.js';
+import { worldComponentDescriptor } from './WorldComponentRegistry.js';
 
-export function makePresencePose(player, sequence, appearance) {
+export function makePresencePose(player, sequence, appearance, vehicleType = player.vehicleType) {
  const boat = player.mode === 'boat' ? player.boat : null;
  const vehicle = player.mode === 'boat' || player.mode === 'deck';
+ if ( vehicle && ( typeof vehicleType !== 'string' || ! vehicleType ) ) throw new Error( 'Vehicle presence requires a registered vehicle type' );
  const yaw = boat ? boat.getYaw() + Math.PI + (player.helmYaw || 0) : player.yaw;
  const velocity = player.mode === 'deck' ? player.deckVel : player.velocity;
  return {
@@ -14,8 +16,8 @@ export function makePresencePose(player, sequence, appearance) {
   yaw: Math.atan2(Math.sin(yaw), Math.cos(yaw)),
   pitch: boat ? player.helmPitch || 0 : player.pitch,
   moving: player.mode !== 'boat' && (velocity?.lengthSq() || 0) > 0.12,
-  mode: player.mode, appearance: {...appearance},
-  ...(vehicle ? { vehicleSpeed: player.boat?.speed ?? 0 } : {}),
+  mode: player.mode, appearance: {...appearance}, avatarProfileId: avatarProfileId( appearance ),
+  ...(vehicle ? { vehicleType, vehicleSpeed: player.boat?.speed ?? 0 } : {}),
  };
 }
 
@@ -30,6 +32,7 @@ export class WorldPresenceSession {
    nodeId: connector.manifest.ownerPeerId, gateway: connector.gateway, directory: connector.directory});
   this.parent = parent;
   this.appearance = {...appearance};
+  this.vehicleType = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true )?.type || null;
   this.maxComplexity = connector.manifest.rules.avatarComplexity;
   this.state = new PlayerPresence(connector.worldId);
   this.createAvatar = createAvatar;
@@ -46,7 +49,7 @@ export class WorldPresenceSession {
  }
  async admit(player, spawnCandidates, {yaw = null} = {}) {
   if (this.disposed || this.admitted || spawnCandidates !== undefined && (!Array.isArray(spawnCandidates) || !spawnCandidates.length)) throw new Error('Invalid world presence admission');
-  const pose = makePresencePose(player, this.sequence, this.appearance);
+  const pose = makePresencePose(player, this.sequence, this.appearance, this.vehicleType);
   if (Number.isFinite(yaw)) pose.yaw = yaw;
   return this.admitPose(pose, spawnCandidates);
  }
@@ -79,7 +82,7 @@ export class WorldPresenceSession {
   }
   if (this.pending || now < this.nextSend) return;
   this.nextSend = now + 100;
-  const pose = makePresencePose(player, ++this.sequence, this.appearance);
+  const pose = makePresencePose(player, ++this.sequence, this.appearance, this.vehicleType);
   this.pending = this.connector.updatePresence(pose,{signal:this.controller.signal})
    .then(snapshot => {
     if (this.disposed) return;

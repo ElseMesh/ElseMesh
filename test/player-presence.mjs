@@ -3,7 +3,7 @@ import { DEFAULT_APPEARANCE, loadAppearance, saveAppearance } from '../src/playe
 import { PlayerPresence, PLAYER_PRESENCE_PROTOCOL, validatePresencePose } from '../src/network/PlayerPresence.js';
 
 const own = 'player:' + 'a'.repeat(64), peer = 'player:' + 'b'.repeat(64);
-const pose = (sequence, x = 0, yaw = 0) => ({ id: peer, protocol: PLAYER_PRESENCE_PROTOCOL, sequence, position: [x, 2, 3], yaw, pitch: 0, moving: true, mode: 'walk', appearance: { ...DEFAULT_APPEARANCE }, updatedAt: 1000 + sequence });
+const pose = (sequence, x = 0, yaw = 0) => ({ id: peer, protocol: PLAYER_PRESENCE_PROTOCOL, sequence, position: [x, 2, 3], yaw, pitch: 0, moving: true, mode: 'walk', avatarProfileId: 'elsemesh.avatar.stock-male/1', appearance: { ...DEFAULT_APPEARANCE }, updatedAt: 1000 + sequence });
 const snapshot = (requestId, players, extra = {}) => ({ type: 'presence', worldId: 'elsemesh:test', requestId, playerId: own, players, ...extra });
 const state = new PlayerPresence('elsemesh:test');
 for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) assert.throws( () => new PlayerPresence( worldId ), /Invalid presence configuration/, `presence rejects ${worldId}` );
@@ -27,8 +27,9 @@ assert.equal(state.players.size, 0, 'Own session is excluded');
 for (const appearance of [{ ...DEFAULT_APPEARANCE, style: 'url' }, { ...DEFAULT_APPEARANCE, shirt: '#ABCDEF' }, { ...DEFAULT_APPEARANCE, model: '/evil.glb' }]) assert.throws(() => validatePresencePose({ ...pose(1), appearance }));
 assert.throws(() => validatePresencePose({ ...pose(1), position: [Infinity, 0, 0] }));
 assert.throws(() => validatePresencePose({ ...pose(1), pitch: 2 }));
-assert.throws(() => validatePresencePose({ ...pose(1), mode: 'boat' }), /Invalid presence vehicle speed/, 'vehicle presence requires a reported speed in protocol v2');
-assert.throws(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/1' }), /Invalid presence sequence or protocol/, 'unsupported presence protocol versions are rejected');
+assert.throws(() => validatePresencePose({ ...pose(1), mode: 'boat' }), /Invalid presence vehicle identity or speed/, 'vehicle presence requires type and speed in protocol v3');
+assert.throws(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/2' }), /Invalid presence sequence or protocol/, 'unsupported previous presence protocol versions are rejected');
+assert.throws(() => validatePresencePose({ ...pose(1), avatarProfileId: 'elsemesh.avatar.stock-female/1' }), /Invalid presence avatar profile/, 'avatar profile ID must match its validated appearance style');
 let key, value;
 const storage = { setItem(k, v) { key = k; value = v; }, getItem() { return value; } };
 assert.equal(saveAppearance(DEFAULT_APPEARANCE, storage), true);

@@ -433,6 +433,7 @@ func TestWorldManifestValidatesDestinationVehiclePolicy(t *testing.T) {
 	maxSpeed := 8.0
 	maxComplexity := uint32(50000)
 	manifest.Rules.VehiclePolicy = &vehiclePolicy{Enabled: true, MaxSpeed: &maxSpeed, MaxCombinedComplexity: &maxComplexity}
+	manifest.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-male/1", VehicleType: "elsemesh.downeast-boat/1"}}
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
 		t.Fatalf("valid destination vehicle policy rejected: %v", err)
 	}
@@ -448,6 +449,28 @@ func TestWorldManifestValidatesDestinationVehiclePolicy(t *testing.T) {
 	*manifest.Rules.VehiclePolicy.MaxCombinedComplexity = 1000001
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("vehicle complexity above supported maximum accepted")
+	}
+}
+
+func TestWorldManifestValidatesAvatarAllowlist(t *testing.T) {
+	var unknownFieldRules worldRules
+	if err := json.Unmarshal([]byte(`{"avatarPolicy":{"allowedProfiles":[],"unknown":true}}`), &unknownFieldRules); err == nil {
+		t.Fatal("unknown avatar policy field accepted")
+	}
+	key := testKey(t)
+	ownerID, err := peer.IDFromPublicKey(key.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := newStarterManifest("Avatar policy", ownerID.String())
+	manifest.WorldID = "elsemesh:avatar-policy"
+	manifest.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-female/1"}}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid avatar allowlist rejected: %v", err)
+	}
+	manifest.Rules.AvatarPolicy.AllowedProfiles = []string{"elsemesh.avatar.stock-male/1", "elsemesh.avatar.stock-male/1"}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("duplicate avatar profile accepted")
 	}
 }
 

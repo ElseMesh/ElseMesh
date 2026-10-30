@@ -1,16 +1,17 @@
-import { validateAppearance } from '../player/AvatarAppearance.js';
+import { avatarProfileId, validateAppearance } from '../player/AvatarAppearance.js';
 import { isWorldID } from './WorldIdentity.js';
 
-export const PLAYER_PRESENCE_PROTOCOL = 'elsemesh.player-presence/2';
+export const PLAYER_PRESENCE_PROTOCOL = 'elsemesh.player-presence/3';
 const playerID = /^player:[0-9a-f]{64}$/;
 export function validatePresencePose(pose) {
 	if (!pose || pose.protocol !== PLAYER_PRESENCE_PROTOCOL || !Number.isSafeInteger(pose.sequence) || pose.sequence < 0) throw new Error('Invalid presence sequence or protocol');
 	if (!Array.isArray(pose.position) || pose.position.length !== 3 || !pose.position.every(v => Number.isFinite(v) && Math.abs(v) <= 100000)) throw new Error('Invalid presence position');
 	if (!Number.isFinite(pose.yaw) || Math.abs(pose.yaw) > 1000 || !Number.isFinite(pose.pitch) || Math.abs(pose.pitch) > 1.5 || typeof pose.moving !== 'boolean' || !['walk', 'swim', 'deck', 'boat'].includes(pose.mode)) throw new Error('Invalid presence orientation or mode');
 	if ( pose.mode === 'boat' || pose.mode === 'deck' ) {
-		if ( ! Number.isFinite( pose.vehicleSpeed ) || pose.vehicleSpeed < 0 || pose.vehicleSpeed > 100 ) throw new Error( 'Invalid presence vehicle speed' );
-	} else if ( pose.vehicleSpeed !== undefined ) throw new Error( 'Unexpected presence vehicle speed' );
+		if ( ! Number.isFinite( pose.vehicleSpeed ) || pose.vehicleSpeed < 0 || pose.vehicleSpeed > 100 || typeof pose.vehicleType !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( pose.vehicleType ) ) throw new Error( 'Invalid presence vehicle identity or speed' );
+	} else if ( pose.vehicleSpeed !== undefined || pose.vehicleType !== undefined ) throw new Error( 'Unexpected presence vehicle identity' );
 	validateAppearance(pose.appearance);
+	if ( pose.avatarProfileId !== avatarProfileId( pose.appearance ) ) throw new Error( 'Invalid presence avatar profile' );
 	return pose;
 }
 

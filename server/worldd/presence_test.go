@@ -26,7 +26,7 @@ func presenceTestDaemon(t *testing.T) *daemon {
 	return &daemon{ctx: context.Background(), host: h, key: key, world: world}
 }
 func presenceTestPose() *playerPose {
-	return &playerPose{Protocol: playerPresenceProtocol, Sequence: 1, Position: []float64{1, 2, 3}, Yaw: 0.3, Pitch: -0.2, Mode: "walk", Appearance: avatarAppearance{Style: "male", Shirt: "#7194aa", Trousers: "#27313d", Skin: "#c68c67", Hair: "#33251c"}}
+	return &playerPose{Protocol: playerPresenceProtocol, Sequence: 1, Position: []float64{1, 2, 3}, Yaw: 0.3, Pitch: -0.2, Mode: "walk", AvatarProfileID: "elsemesh.avatar.stock-male/1", Appearance: avatarAppearance{Style: "male", Shirt: "#7194aa", Trousers: "#27313d", Skin: "#c68c67", Hair: "#33251c"}}
 }
 func presenceTestSpawnCandidates() [][]float64 {
 	return [][]float64{{0, 1.38, 8}, {0.6, 1.38, 8}, {-0.6, 1.38, 8}, {0, 1.38, 8.6}}
@@ -43,7 +43,7 @@ func TestPresenceLimitsExpiryAndIdentity(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
 	legacyWalk := presenceTestPose()
-	legacyWalk.Protocol = "elsemesh.player-presence/1"
+	legacyWalk.Protocol = "elsemesh.player-presence/2"
 	if err := validatePlayerPose(legacyWalk); err == nil {
 		t.Fatal("unsupported legacy presence protocol accepted")
 	}
@@ -108,6 +108,7 @@ func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 		if mode == "boat" || mode == "deck" {
 			speed := 0.0
 			pose.VehicleSpeed = &speed
+			pose.VehicleType = "elsemesh.downeast-boat/1"
 		}
 		pose.Sequence = sequence
 		request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
@@ -134,11 +135,18 @@ func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 		t.Fatalf("vehicle above signed complexity budget should be rejected, got %v", err)
 	}
 	maxComplexity = 66845
+	d.world.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-female/1", VehicleType: "elsemesh.downeast-boat/1"}}
+	if err := update("boat", 4); err == nil || err.Error() != "vehicle_combination_not_allowed" {
+		t.Fatalf("unlisted avatar/vehicle combination should be rejected, got %v", err)
+	}
+	d.world.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-male/1", VehicleType: "elsemesh.downeast-boat/1"}}
 	if err := update("boat", 4); err != nil {
 		t.Fatalf("vehicle at signed complexity budget should be admitted: %v", err)
 	}
 	tooFast := presenceTestPose()
 	tooFast.Mode = "boat"
+	tooFast.VehicleType = "elsemesh.downeast-boat/1"
+	tooFast.AvatarProfileID = "elsemesh.avatar.stock-male/1"
 	tooFast.VehicleSpeed = new(float64)
 	*tooFast.VehicleSpeed = maxSpeed + 0.02
 	tooFast.Sequence = 5
@@ -154,6 +162,21 @@ func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 	tooFast.VehicleSpeed = nil
 	if err := validatePlayerPose(tooFast); err == nil || err.Error() != "invalid_vehicle_speed" {
 		t.Fatalf("vehicle pose without reported speed should be rejected, got %v", err)
+	}
+}
+
+func TestPresenceEnforcesSignedAvatarAllowlist(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-female/1"}}
+	pose := presenceTestPose()
+	request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindPresenceRequest(&request, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(request, time.Now()); err == nil || err.Error() != "avatar_not_allowed" {
+		t.Fatalf("owner should reject an unlisted avatar profile, got %v", err)
 	}
 }
 

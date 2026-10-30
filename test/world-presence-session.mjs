@@ -38,8 +38,10 @@ assert.equal(admittedPose.sequence,0,'admission creates the session before its r
 assert.deepEqual(admissionOptions.spawnCandidates,[[1,1,3],[1.6,1,3]],'invitation candidates reach the owner for atomic player occupancy checks');
 assert.deepEqual(accepted.position,[1,1,3],'admission returns the owner-selected position');
 admissionSession.dispose();
-const boatPose=makePresencePose({...player,mode:'boat',boat:{getYaw:()=>1,speed:7.5},helmYaw:.2,helmPitch:.4},4,DEFAULT_APPEARANCE);
+const boatPose=makePresencePose({...player,mode:'boat',boat:{getYaw:()=>1,speed:7.5},helmYaw:.2,helmPitch:.4},4,DEFAULT_APPEARANCE,'elsemesh.test-vehicle/1');
 assert.ok(Math.abs(boatPose.yaw-Math.atan2(Math.sin(1+Math.PI+.2),Math.cos(1+Math.PI+.2)))<1e-9);
 assert.equal(boatPose.pitch,.4); assert.equal(boatPose.moving,false,'helm pose is distinct from walking');
 assert.equal(boatPose.vehicleSpeed,7.5,'vehicle presence includes the speed checked against destination rules');
+assert.equal(boatPose.vehicleType,'elsemesh.test-vehicle/1','vehicle presence carries its registered stable vehicle type');
+assert.equal(boatPose.avatarProfileId,'elsemesh.avatar.stock-male/1','presence carries a stable profile identity');
 console.log('ok   active-world publisher cadence, owner routing, avatar departure and handoff cleanup');

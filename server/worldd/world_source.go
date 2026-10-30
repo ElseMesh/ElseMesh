@@ -131,7 +131,7 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	}
 	allowedRuleFields := map[string]bool{
 		"gravity": true, "seaLevel": true, "atmosphereLevel": true, "avatarComplexity": true,
-		"physicsProfile": true, "maxVisitors": true, "spawnRadius": true, "movement": true, "vehiclePolicy": true, "maxPackageBytes": true,
+		"physicsProfile": true, "maxVisitors": true, "spawnRadius": true, "movement": true, "avatarPolicy": true, "vehiclePolicy": true, "maxPackageBytes": true,
 		"requiredFeatures": true,
 	}
 	for field := range sourceRules {

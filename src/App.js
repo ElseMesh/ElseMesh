@@ -74,7 +74,8 @@ import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.
 import { LocalRegionConnector } from './network/LocalRegionConnector.js';
 import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
-import { worldHasWater, worldSeaLevel } from './network/WorldRules.js';
+import { avatarPolicy, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
+import { avatarProfileId, loadAppearance } from './player/AvatarAppearance.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
@@ -1107,6 +1108,7 @@ export class App {
 		this.activeHostedOcean = components.some( ( component ) => component.islandOcean );
 		this.activeHostedBoat = runtime || null;
 		const berthComponent = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
+		this.activeHostedVehicleType = runtime ? berthComponent?.type || null : null;
 		const berthObject = connector.manifest.objects?.find( object => object.id === berthComponent?.objectId );
 		const waterSurface = worldWaterSurfaceFor( components, berthObject?.transform?.position, this.hostedWaterSurface );
 		this.hostedSurfaceState = {
@@ -1259,6 +1261,7 @@ export class App {
 		}
 		if ( wasDriving && this.player.audio ) this.player.audio.engineStop();
 		this.activeHostedBoat = null;
+		this.activeHostedVehicleType = null;
 
 	}
 
@@ -1448,7 +1451,7 @@ export class App {
 			if ( signal.aborted ) { this.disposeUncommittedWorldComponents( root ); prepared.connector.close(); return; }
 				root.name = `hosted-world:${portal.destinationWorldId}`;
 				Object.assign( preparation, { status: 'ready', connector: prepared.connector, root } );
-				preparation.vehicleTransfer = this.vehicleTransferStatus( prepared.connector );
+				preparation.portalTransfer = this.portalTransferStatus( prepared.connector );
 				this.remoteWorlds.set( portal.destinationWorldId, { connector: prepared.connector, root } );
 			} ).catch( ( error ) => {
 				if ( signal.aborted ) {
@@ -1462,13 +1465,12 @@ export class App {
 				console.warn( `Could not prepare portal ${portalKey}`, error );
 			} );
 		}
-		const ridingVehicle = this.player.mode === 'boat' || this.player.mode === 'deck';
-		const vehicleTransfer = preparation.connector ? this.vehicleTransferStatus( preparation.connector ) : preparation.vehicleTransfer;
+		const portalTransfer = preparation.connector ? this.portalTransferStatus( preparation.connector ) : preparation.portalTransfer;
 		if ( preparation.status === 'ready' && preparation.connector?.manifest?.entryPoints?.length && ! preparation.entrySelectionPromise ) {
 			preparation.entrySelectionReady = false;
 			preparation.entrySelectionPromise = chooseWorldEntryPoint( preparation.connector.manifest ).then( entry => { preparation.entrySelection = entry; } ).catch( error => { preparation.entrySelectionError = error; } ).finally( () => { preparation.entrySelectionReady = true; } );
 		}
-		if ( portal.openView && preparation.root && ( ! ridingVehicle || vehicleTransfer?.allowed ) ) {
+		if ( portal.openView && preparation.root && portalTransfer?.allowed ) {
 			if ( this.portalViewId !== portalKey ) this.clearPortalView();
 			this.portalViewId = portalKey;
 			this.portalView.setTarget( preparation.root, portal );
@@ -1494,11 +1496,11 @@ export class App {
 				}
 				return;
 			}
-			if ( ridingVehicle && ! vehicleTransfer?.allowed ) {
+			if ( ! portalTransfer?.allowed ) {
 				this.holdPlayerAtPortal( previous );
-				if ( ! preparation.vehicleBlockedNoticeShown ) {
-					preparation.vehicleBlockedNoticeShown = true;
-					this.ui?.ui?.toast( vehicleTransfer?.reason || 'This ThruHold does not accept vehicle entry', 3500 );
+				if ( ! preparation.admissionBlockedNoticeShown ) {
+					preparation.admissionBlockedNoticeShown = true;
+					this.ui?.ui?.toast( portalTransfer?.reason || 'This ThruHold does not accept this avatar or vehicle', 3500 );
 				}
 				return;
 			}
@@ -1545,17 +1547,24 @@ export class App {
 		this.player.mode = mode;
 	}
 
-	vehicleTransferStatus( destinationConnector ) {
+	portalTransferStatus( destinationConnector ) {
+		const appearance = this.worldPresence?.appearance || loadAppearance();
+		const profileId = avatarProfileId( appearance );
+		const policy = avatarPolicy( destinationConnector.manifest.rules );
+		if ( policy.allowedProfiles && ! policy.allowedProfiles.includes( profileId ) ) return { allowed: false, reason: 'This ThruHold does not accept this avatar' };
 		if ( ! [ 'boat', 'deck' ].includes( this.player.mode ) ) return { allowed: true };
 		const sourceController = this.activeHostedBoat?.boat.controller;
 		if ( ! sourceController ) return { allowed: false, reason: 'The current vehicle cannot be transferred' };
-		const policy = vehiclePolicy( destinationConnector.manifest.rules );
-		if ( ! policy.enabled ) return { allowed: false, reason: 'This ThruHold does not accept vehicles' };
+		if ( ! this.activeHostedVehicleType ) return { allowed: false, reason: 'The current vehicle has no registered transfer type' };
+		const acceptedVehicles = vehiclePolicy( destinationConnector.manifest.rules );
+		if ( ! acceptedVehicles.enabled ) return { allowed: false, reason: 'This ThruHold does not accept vehicles' };
 		const vehicleComponent = destinationConnector.manifest.components.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
 		if ( ! vehicleComponent ) return { allowed: false, reason: 'This ThruHold has no compatible vehicle berth' };
+		if ( vehicleComponent.type !== this.activeHostedVehicleType ) return { allowed: false, reason: 'This ThruHold does not support the current vehicle type' };
+		if ( acceptedVehicles.allowedCombinations && ! acceptedVehicles.allowedCombinations.some( pair => pair.avatarProfileId === profileId && pair.vehicleType === vehicleComponent.type ) ) return { allowed: false, reason: 'This ThruHold does not accept this avatar and vehicle combination' };
 		const combinedComplexity = destinationConnector.manifest.rules.avatarComplexity + worldComponentDescriptor( vehicleComponent.type ).complexityTriangles;
-		if ( combinedComplexity > policy.maxCombinedComplexity ) return { allowed: false, reason: 'This vehicle exceeds the ThruHold complexity limit' };
-		return { allowed: true, maxSpeed: policy.maxSpeed };
+		if ( combinedComplexity > acceptedVehicles.maxCombinedComplexity ) return { allowed: false, reason: 'This vehicle exceeds the ThruHold complexity limit' };
+		return { allowed: true, maxSpeed: acceptedVehicles.maxSpeed };
 	}
 
 	clearPortalView() {

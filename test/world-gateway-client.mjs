@@ -11,7 +11,7 @@ try {
 	assert.equal( manifest.ownerPeerId, ownerPeerID, 'connector verifies the owner-signed manifest through HTTPS/WSS' );
 	assert.equal( connector.nodeId, ownerPeerID, 'initial manifest is served by the requested owner peer' );
 
-	const pose = { protocol: PLAYER_PRESENCE_PROTOCOL, sequence: 1, position: [ 0, 1.38, 8 ], yaw: 0, pitch: 0, moving: false, mode: 'walk', appearance: { style: 'male', shirt: '#7194aa', trousers: '#27313d', skin: '#c68c67', hair: '#33251c' } };
+	const pose = { protocol: PLAYER_PRESENCE_PROTOCOL, sequence: 1, position: [ 0, 1.38, 8 ], yaw: 0, pitch: 0, moving: false, mode: 'walk', avatarProfileId: 'elsemesh.avatar.stock-male/1', appearance: { style: 'male', shirt: '#7194aa', trousers: '#27313d', skin: '#c68c67', hair: '#33251c' } };
 	const spawnCandidates = [ [ 0, 1.38, 8 ], [ 0.6, 1.38, 8 ], [ -0.6, 1.38, 8 ], [ 0, 1.38, 8.6 ], [ 0, 1.38, 7.4 ] ];
 	const own = await connector.updatePresence( pose, { spawnCandidates } );
 	const ownPose = own.players.find( ( player ) => player.id === own.playerId );

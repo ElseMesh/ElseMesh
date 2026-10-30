@@ -15,6 +15,7 @@ export const SUPPORTED_WORLD_FEATURES = new Set( [
 export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'elsemesh-default' ] );
 export const DEFAULT_WORLD_MOVEMENT = Object.freeze( { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } );
 export const DEFAULT_VEHICLE_POLICY = Object.freeze( { enabled: false } );
+export const DEFAULT_AVATAR_POLICY = Object.freeze( { allowedProfiles: null } );
 export const MAX_WORLD_VISITORS = 128;
 export const MAX_WORLD_SPAWN_RADIUS = 100;
 // Fixed complexity contract for elsemesh.downeast-boat/1. Keep synchronized
@@ -23,6 +24,7 @@ export const DOWNEAST_BOAT_TRIANGLES = 46845;
 export const MAX_WORLD_PACKAGE_BYTES = 16 * 1024 * 1024 * 1024;
 
 const FEATURE_ID = /^elsemesh\.[a-z0-9.-]+\/\d+$/;
+const AVATAR_PROFILE_ID = /^elsemesh\.avatar\.[a-z0-9.-]+\/\d+$/;
 
 export function validateWorldRequirements( manifest ) {
 	const rules = manifest?.rules;
@@ -33,6 +35,7 @@ export function validateWorldRequirements( manifest ) {
 	validateWorldLevels( rules );
 	movementParameters( rules );
 	vehiclePolicy( rules );
+	avatarPolicy( rules );
 	validateWorldPackageBudget( manifest );
 	const required = rules.requiredFeatures ?? [];
 	if ( ! Array.isArray( required ) || required.length > 64 ) throw new Error( 'World manifest contains an invalid requiredFeatures list' );
@@ -98,8 +101,29 @@ export function vehiclePolicy( rules ) {
 		if ( Object.keys( policy ).some( ( key ) => key !== 'enabled' ) ) throw new Error( 'Disabled world vehicle policy cannot declare limits' );
 		return { enabled: false };
 	}
-	if ( Object.keys( policy ).some( ( key ) => ! [ 'enabled', 'maxSpeed', 'maxCombinedComplexity' ].includes( key ) ) || ! Number.isFinite( policy.maxSpeed ) || policy.maxSpeed < 0.5 || policy.maxSpeed > 16 || ! Number.isInteger( policy.maxCombinedComplexity ) || policy.maxCombinedComplexity < 1 || policy.maxCombinedComplexity > 1000000 ) throw new Error( 'World vehicle policy limits are invalid' );
-	return { enabled: true, maxSpeed: policy.maxSpeed, maxCombinedComplexity: policy.maxCombinedComplexity };
+	if ( Object.keys( policy ).some( ( key ) => ! [ 'enabled', 'maxSpeed', 'maxCombinedComplexity', 'allowedCombinations' ].includes( key ) ) || ! Number.isFinite( policy.maxSpeed ) || policy.maxSpeed < 0.5 || policy.maxSpeed > 16 || ! Number.isInteger( policy.maxCombinedComplexity ) || policy.maxCombinedComplexity < 1 || policy.maxCombinedComplexity > 1000000 ) throw new Error( 'World vehicle policy limits are invalid' );
+	const allowedCombinations = policy.allowedCombinations;
+	if ( allowedCombinations !== undefined && ( ! Array.isArray( allowedCombinations ) || allowedCombinations.length > 128 ) ) throw new Error( 'World vehicle combinations are invalid' );
+	const seen = new Set();
+	for ( const pair of allowedCombinations || [] ) {
+		if ( ! pair || Array.isArray( pair ) || typeof pair !== 'object' || Object.keys( pair ).length !== 2 || ! Object.hasOwn( pair, 'avatarProfileId' ) || ! Object.hasOwn( pair, 'vehicleType' ) || ! AVATAR_PROFILE_ID.test( pair.avatarProfileId ) || ! FEATURE_ID.test( pair.vehicleType ) ) throw new Error( 'World vehicle combination is invalid' );
+		const key = `${pair.avatarProfileId}\n${pair.vehicleType}`;
+		if ( seen.has( key ) ) throw new Error( 'World vehicle combinations contain a duplicate' );
+		seen.add( key );
+	}
+	return { enabled: true, maxSpeed: policy.maxSpeed, maxCombinedComplexity: policy.maxCombinedComplexity, ...( allowedCombinations === undefined ? {} : { allowedCombinations } ) };
+}
+
+export function avatarPolicy( rules ) {
+	const policy = rules?.avatarPolicy;
+	if ( policy === undefined ) return DEFAULT_AVATAR_POLICY;
+	if ( ! policy || typeof policy !== 'object' || Array.isArray( policy ) || Object.keys( policy ).some( key => key !== 'allowedProfiles' ) || ! Array.isArray( policy.allowedProfiles ) || policy.allowedProfiles.length > 128 ) throw new Error( 'World avatar policy is invalid' );
+	const seen = new Set();
+	for ( const profile of policy.allowedProfiles ) {
+		if ( typeof profile !== 'string' || profile.length > 96 || ! AVATAR_PROFILE_ID.test( profile ) || seen.has( profile ) ) throw new Error( 'World avatar policy contains an invalid or duplicate profile' );
+		seen.add( profile );
+	}
+	return { allowedProfiles: policy.allowedProfiles };
 }
 
 export function gravityAcceleration( rules ) {
