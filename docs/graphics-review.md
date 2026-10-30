@@ -39,6 +39,19 @@ October 29 runtime check below. These probes close the live fish-stand
 interaction check on both backends, but do not establish matched boat driving
 or broad gameplay parity.
 
+## 2026-10-30 live WebGL boat boarding input
+
+The hosted WebGL player walked along the pier, jumped onto the moored boat, and
+reached the “Take the helm” prompt. Pressing E once changed the player from
+`deck` to `boat`, set `driven: true` and `moored: false`, and retained the
+“Leave helm” prompt after keyup and a later runtime sample. Before this fix,
+the WebGL frame loop did not clear the one-frame `Input.pressed` set; the same
+E press could be consumed again on the next frame and immediately leave the
+helm. Calling `input.endFrame()` at the end of the WebGL frame restores the
+same one-shot input lifecycle already used by WebGPU. This verifies WebGL
+boarding and helm entry only; matched WebGPU boarding and underway steering
+traces are still outstanding.
+
 ## Current WebGPU/WebGL runtime check, 2026-10-29
 
 The signed Tidewater package was served by a temporary local `worldd` profile

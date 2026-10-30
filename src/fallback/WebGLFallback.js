@@ -1875,6 +1875,7 @@ export class WebGLFallback {
 			this.renderer.render( this.waterScene, this.camera );
 			this.renderer.autoClear = true;
 		}
+		this.input.endFrame();
 
 	}
 
