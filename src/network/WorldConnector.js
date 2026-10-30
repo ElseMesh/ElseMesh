@@ -1,5 +1,5 @@
 import { validatePortalBack } from './PortalSideContract.js';
-import { validateObjectLODs, validateWorldEntryPoints, validateWorldSpawn } from './WorldSource.js';
+import { validateObjectLODs, validateWorldEntryPoints, validateWorldSpawn, worldComponentRuntimeRecord } from './WorldSource.js';
 import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
@@ -970,10 +970,12 @@ export async function verifySignedWorldManifest( document ) {
 	const entityIDs = validateWorldObjects( manifest.objects, manifest.assets );
 	validateWorldPortals( manifest.portals, entityIDs, manifest.rules );
 	validateWorldComponents( manifest.components, manifest.rules, entityIDs, manifest.assets );
-	for ( const component of manifest.components || [] ) Object.assign( component, component.data );
 	validateWorldHosts( manifest.hosts );
 	invariant( Number.isSafeInteger( manifest.authorityEpoch ) && manifest.authorityEpoch > 0, 'Manifest authority epoch is outside the supported range' );
-	return manifest;
+	return {
+		...manifest,
+		components: ( manifest.components || [] ).map( worldComponentRuntimeRecord ),
+	};
 }
 
 function decodeBase64( value ) {

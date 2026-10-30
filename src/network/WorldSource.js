@@ -5,6 +5,12 @@ import { WORLD_ID_PREFIX, isWorldID } from './WorldIdentity.js';
 
 export const WORLD_SOURCE_PROTOCOL = 'elsemesh.world-source/3';
 
+// Canonical source and manifest components keep authored fields inside `data`.
+// Runtime dispatch consumes a flat record after signature/source validation.
+export function worldComponentRuntimeRecord( component ) {
+	return { ...component, ...component.data };
+}
+
 export function createWorldSource( { worldId = `${WORLD_ID_PREFIX}local-${ crypto.randomUUID() }`, title = 'Untitled world' } = {} ) {
 	return {
 		protocol: WORLD_SOURCE_PROTOCOL,

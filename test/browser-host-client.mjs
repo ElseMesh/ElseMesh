@@ -154,13 +154,15 @@ try {
 		const challenge = await waitForFrame( socket, frame => frame.type === 'host.challenge', 'worldd did not issue its browser-host challenge' );
 		await waitFor( () => socket.sent.some( frame => frame.type === 'host.register' ), 'worker did not register after the gateway challenge' );
 		const registration = socket.sent.find( frame => frame.type === 'host.register' );
+		assert.deepEqual( registration.document, document, 'worker registration preserves all owner-signed document fields' );
 		const protobufPublicKey = Buffer.from( document.publicKey, 'base64' );
 		const publicKey = createPublicKey( { key: Buffer.concat( [ Buffer.from( '302a300506032b6570032100', 'hex' ), protobufPublicKey.subarray( 4 ) ] ), format: 'der', type: 'spki' } );
 		const proofMessage = Buffer.from( `elsemesh.browser-host/1\n${document.payload.worldId}\n${challenge.nonce}` );
 		assert.equal( verify( null, proofMessage, publicKey, Buffer.from( registration.proof, 'base64' ) ), true, 'registration proof must verify with the signed world owner key' );
 		assert.equal( registration.document.signer, document.signer );
 		assert.equal( Object.hasOwn( registration, 'key' ), false, 'the gateway registration must not contain the owner private key' );
-		await waitForFrame( socket, frame => frame.type === 'host.registered', 'worldd rejected the worker registration' );
+		const registrationResult = await waitForFrame( socket, frame => frame.type === 'host.registered' || frame.type === 'error', 'worldd did not answer the worker registration' );
+		assert.equal( registrationResult.type, 'host.registered', `worldd rejected the worker registration: ${registrationResult.error}` );
 		await waitFor( () => messages.some( message => message.status === `Hosting ${document.payload.title}` ), 'worker did not enter the hosting state' );
 		assert.equal( typeof heartbeatCallback, 'function', 'worker must start a heartbeat after registration' );
 		heartbeatCallback();

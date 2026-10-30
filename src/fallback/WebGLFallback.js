@@ -36,6 +36,7 @@ import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERI
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
+import { worldComponentRuntimeRecord } from '../network/WorldSource.js';
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -705,7 +706,11 @@ export class WebGLFallback {
 
 		this.app = app;
 		this.defaultWorldPackage = app.worldPackage;
-		this.defaultWorldSource = this.defaultWorldPackage?.source || null;
+		const bundledSource = this.defaultWorldPackage?.source || null;
+		this.defaultWorldSource = bundledSource ? {
+			...bundledSource,
+			components: ( bundledSource.components || [] ).map( worldComponentRuntimeRecord ),
+		} : null;
 		this.defaultWorldAssets = this.defaultWorldPackage?.assets || null;
 		this.islandWildlifeComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' ) || null;
 		this.islandWhaleComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.humpback-whale/1' ) || null;
