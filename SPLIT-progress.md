@@ -61,8 +61,10 @@ production build passed; the build emits the default package and
 `IslandWorldState` as separate dynamic chunks. An isolated Chromium WebGL
 fixture rendered 128 non-background pixels with no GL errors. Hosted WebGL
 skips `IslandWorldState` construction and uses the active package's colliders.
-Hosted WebGPU still constructs the state and initializes the island, which
-remains the next runtime boundary.
+Hosted lifecycle teardown now tolerates the absence of built-in ocean, lighting,
+and wake services, verified by a focused regression check. Hosted WebGPU still
+constructs the state and initializes the island, which remains the next runtime
+boundary.
 
 Earlier commits ElseMesh `69e8805` and Tidewater `4896050` moved WebGPU
 component installers into Tidewater and dispatched them through the registry.

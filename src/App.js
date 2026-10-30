@@ -1099,7 +1099,7 @@ export class App {
 		const experience = connector.manifest.experience;
 		// The built-in ocean belongs to the default world. Hosted worlds
 		// render water only through their own declared world components.
-		this.ocean.visible = false;
+		if ( this.ocean ) this.ocean.visible = false;
 		const components = root.userData.worldComponents || [];
 		const terrain = components.find( ( component ) => component.islandTerrain && component.terrainGPU );
 		const runtime = components.find( ( component ) => component.hostedBoat );
@@ -1130,7 +1130,7 @@ export class App {
 				waterSurface.foamShading = ( args ) => effects.surfFoam.shading( args );
 			}
 			this.hostedBreakers = effects?.breakers || null;
-			this.breakers.mesh.visible = ! this.hostedBreakers;
+			if ( this.breakers?.mesh ) this.breakers.mesh.visible = ! this.hostedBreakers;
 			waterSurface._module = null;
 			const waterMaterial = waterSurface === this.surface ? this.waterMaterial : components.find( component => component.surface === waterSurface )?.material;
 			if ( waterMaterial ) {
@@ -1154,8 +1154,8 @@ export class App {
 		this.hostedQueries.set( waterSurface, hostedQuery );
 		this.hostedQuery = hostedQuery;
 		this.hostedPlayerSlot = hostedQuery.allocate( 'player', 1 );
-		if ( this.activeHostedOcean && terrain?.terrainGPU ) this.spray.setWorldEffects?.( {
-			shoreSim: waterSurface.shoreSim, waveShadow: this.hostedBreakers?.sprayShadowModule || this.breakers.sprayShadowModule,
+		if ( this.activeHostedOcean && terrain?.terrainGPU ) this.spray?.setWorldEffects?.( {
+			shoreSim: waterSurface.shoreSim, waveShadow: this.hostedBreakers?.sprayShadowModule || this.breakers?.sprayShadowModule,
 			query: hostedQuery, terrain: terrain.terrainGPU,
 		} );
 		this.player.query = hostedQuery;
@@ -1210,12 +1210,12 @@ export class App {
 
 	deactivateHostedWorld() {
 
-		this.ocean.visible = true;
+		if ( this.ocean ) this.ocean.visible = true;
 		this.worldPresence?.dispose();
 		this.worldPresence = null;
-		this.underwaterLighting = this.baseUnderwaterLighting;
-		this.baseUnderwaterLighting.activate();
-		this.baseGroundBounce.activate();
+		this.underwaterLighting = this.baseUnderwaterLighting || null;
+		this.baseUnderwaterLighting?.activate();
+		this.baseGroundBounce?.activate();
 		if ( this.activeHostedExperience ) dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldDeactivated', { app: this, mode: 'hosted', extensions: this.activeHostedExtensions } );
 		this.activeHostedExtensions?.dispose();
 		this.activeHostedExtensions = null;
@@ -1240,7 +1240,7 @@ export class App {
 			surface.shoreSim = shoreSim;
 			surface.foamShading = foamShading;
 			surface._module = null;
-			if ( surface === this.surface ) {
+			if ( surface === this.surface && this.waterMaterial ) {
 				this.waterMaterial._built = false;
 				this.waterMaterial.needsUpdate = true;
 			}
