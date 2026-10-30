@@ -19,6 +19,26 @@ does not close the remaining water-pattern or multi-view parity checks.
 
 ![Hosted WebGPU beach after packaging the shoreline field](images/parity-2026-10-30-webgpu-shorefield.png)
 
+## 2026-10-30 live hosted WebGPU gameplay probes
+
+The isolated WebGPU browser loaded the signed Tidewater package with 38 world
+components and 61 content assets. After walking to Joe's fish stand, the
+in-world prompt appeared and pressing the use key opened Joe's buyer panel.
+The empty-cooler state was shown, confirming the hosted WebGPU interaction path
+from avatar proximity through the world behavior to its UI.
+
+The moored lobster boat was then observed without input for 10 seconds (227
+samples). It remained marked moored and undriven; planar drift was 0.020 m and
+maximum tilt was 8.07 degrees. This checks idle stability only. A later probe
+entered the boat through a runtime method rather than normal boarding and did
+not keep a matched drive-and-steer input sequence, so it is not underway parity
+evidence.
+
+The corresponding hosted WebGL fish-buyer interaction was recorded in the
+October 29 runtime check below. These probes close the live fish-stand
+interaction check on both backends, but do not establish matched boat driving
+or broad gameplay parity.
+
 ## Current WebGPU/WebGL runtime check, 2026-10-29
 
 The signed Tidewater package was served by a temporary local `worldd` profile
