@@ -18,6 +18,14 @@ striped and pale, and the sea is flatter and darker than the WebGPU view. This
 is not visual parity. The 1280×720 captures were taken separately, so wave
 phase and other animated details are not aligned.
 
+Source inspection after these captures found a concrete surface mismatch:
+`WebGLWaterQuery` uses the WebGL GPU FFT, but `WebGLFallback._makeWater()` still
+deforms the visible water mesh with five analytic sine waves and derives its
+base slope from those same waves. Therefore the passing WebGL boat/query trace
+does not prove that the rendered WebGL water follows the WebGPU surface. The
+next water-parity change needs to connect the FFT displacement field to visible
+WebGL water, then compare foam and color separately.
+
 A synchronized two-second forward sprint started both players at
 `[56.176, 1.633, -65.873]`, facing along the pier. WebGPU advanced 2.253 seconds
 of simulation and moved 11.583 m; WebGL advanced 2.111 seconds and moved
