@@ -39,7 +39,7 @@ import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
 import { worldSpawnCollisionObjectIDs } from '../network/WorldSpawn.js';
-import { selectWorldObjectsForView } from '../network/WorldStreaming.js';
+import { selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 let sharedFoamLaceTexture;
@@ -62,6 +62,24 @@ function prepareHostedWebGLModel( root ) {
 		} );
 		object.material = wasArray ? materials : materials[ 0 ];
 	} );
+}
+
+function disposeHostedWebGLModel( model ) {
+	const geometries = new Set(), materials = new Set(), textures = new Set();
+	model?.scene?.traverse( object => {
+		if ( object.geometry?.dispose ) geometries.add( object.geometry );
+		for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
+			if ( ! material ) continue;
+			materials.add( material );
+			for ( const value of Object.values( material ) ) {
+				if ( value?.isTexture ) textures.add( value );
+				else if ( Array.isArray( value ) ) for ( const item of value ) if ( item?.isTexture ) textures.add( item );
+			}
+		}
+	} );
+	for ( const geometry of geometries ) geometry.dispose();
+	for ( const material of materials ) material.dispose();
+	for ( const texture of textures ) texture.dispose();
 }
 
 function applyHostedTerrainMaterial( root, material ) {
@@ -1583,6 +1601,7 @@ export class WebGLFallback {
 		const components = manifest.components || [];
 		this.hostedWildlifeComponent = components.find( component => worldComponentDescriptor( component.type )?.wildlifeSimulation ) || null;
 		const terrainComponent = components.find( component => component.type === 'elsemesh.terrain-surface/1' );
+		this.hostedTerrainComponent = terrainComponent;
 		const villageMaterialComponent = components.find( component => component.type === 'elsemesh.village-materials/2' );
 		let villageMaterials = null, villageMaterialApplied = 0;
 		if ( villageMaterialComponent && assets.has( villageMaterialComponent.dataAssetId ) ) {
@@ -1593,6 +1612,9 @@ export class WebGLFallback {
 				console.warn( 'WebGL fallback village materials unavailable:', error );
 			}
 		}
+		this.hostedVillageMaterialComponent = villageMaterialComponent;
+		this.hostedVillageMaterials = villageMaterials;
+		this.hostedSharedMaterials = new Set( Object.values( villageMaterials || {} ) );
 		let terrainSurface = null, hostedTerrainMaterial = null, hostedTerrainVisualReady = false;
 		if ( terrainComponent && assets.has( terrainComponent.dataAssetId ) ) {
 			const terrainBytes = assets.get( terrainComponent.dataAssetId );
@@ -1617,6 +1639,7 @@ export class WebGLFallback {
 			if ( object.id === villageMaterialComponent?.objectId && villageMaterials ) villageMaterialApplied += applyWebGLVillageMaterials( base, villageMaterials );
 			if ( object.id === terrainComponent?.objectId && terrainSurface ) {
 				hostedTerrainMaterial ||= webglTerrainMaterial( T, this.hostedTerrainData, terrainSurface );
+				this.hostedTerrainMaterial = hostedTerrainMaterial;
 				applyHostedTerrainMaterial( base, hostedTerrainMaterial );
 				this.terrainColorTexture = hostedTerrainMaterial.userData.terrainTextures[ 0 ];
 				hostedTerrainVisualReady = true;
@@ -1945,6 +1968,52 @@ export class WebGLFallback {
 		const manifest = connector.manifest;
 		const loaded = this.localLoadedObjectIDs || ( this.localLoadedObjectIDs = new Set() );
 		const objects = selectWorldObjectsForView( manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } );
+		const viewObjectIDs = new Set( objects.map( object => object.id ) );
+		if ( connector.localOnly ) {
+			const released = [];
+			const center = new this.THREE.Vector3();
+			for ( const object of manifest.objects ) {
+				if ( ! object.regionCell || ! object.streamingBounds || ! loaded.has( object.id ) ) continue;
+				transformBoundsCenter( object, object.streamingBounds.center, center );
+				if ( this.camera.position.distanceTo( center ) > 64 && ! viewObjectIDs.has( object.id ) ) released.push( object );
+			}
+			for ( const object of released ) {
+				const root = this.hostedObjectRoots?.get( object.id );
+				if ( root ) {
+					root.traverse( node => {
+						for ( const material of Array.isArray( node.material ) ? node.material : [ node.material ] ) {
+							if ( material && ! this.hostedSharedMaterials?.has( material ) ) material.dispose?.();
+						}
+					} );
+					root.parent?.remove( root );
+					root.clear();
+					this.hostedObjectRoots.delete( object.id );
+				}
+				this.worldLODs?.get( object.id )?.dispose();
+				this.worldLODs?.delete( object.id );
+				loaded.delete( object.id );
+			}
+			if ( released.length ) {
+				const retainedAssets = new Set();
+				const evictedAssets = new Set();
+				for ( const object of manifest.objects ) {
+					if ( ! loaded.has( object.id ) ) continue;
+					if ( object.assetId ) retainedAssets.add( object.assetId );
+					for ( const lod of object.lods || [] ) retainedAssets.add( lod.assetId );
+				}
+				for ( const [ assetId, model ] of this.hostedModelCache || [] ) {
+					if ( retainedAssets.has( assetId ) ) continue;
+					disposeHostedWebGLModel( model );
+					this.hostedModelCache.delete( assetId );
+					connector.releaseAsset?.( assetId );
+					evictedAssets.add( assetId );
+				}
+				for ( const object of released ) {
+					if ( object.assetId && ! retainedAssets.has( object.assetId ) && ! evictedAssets.has( object.assetId ) ) connector.releaseAsset?.( object.assetId );
+					for ( const lod of object.lods || [] ) if ( ! retainedAssets.has( lod.assetId ) && ! evictedAssets.has( lod.assetId ) ) connector.releaseAsset?.( lod.assetId );
+				}
+			}
+		}
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath && this.player ) {
 			const position = this.player.position;
 			const axes = this.input.moveAxes();
@@ -1985,6 +2054,8 @@ export class WebGLFallback {
 					}
 					const root = new this.THREE.Group(), base = model.scene.clone( true );
 					prepareHostedWebGLModel( base );
+					if ( object.id === this.hostedVillageMaterialComponent?.objectId && this.hostedVillageMaterials ) applyWebGLVillageMaterials( base, this.hostedVillageMaterials );
+					if ( object.id === this.hostedTerrainComponent?.objectId && this.hostedTerrainMaterial ) applyHostedTerrainMaterial( base, this.hostedTerrainMaterial );
 					prepareWebGLLODFade( base );
 					base.name = `${ object.label || object.id } · LOD 0`;
 					root.add( base );
