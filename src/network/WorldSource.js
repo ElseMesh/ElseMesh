@@ -100,7 +100,7 @@ export function validateWorldSource( source, { allowUnregisteredBehaviors = fals
 }
 
 function validStreamingBounds( bounds ) {
-	return bounds && typeof bounds === 'object' && ! Array.isArray( bounds ) && Object.keys( bounds ).every( ( key ) => [ 'center', 'radius' ].includes( key ) ) && validVector( bounds.center ) && bounds.center.every( ( n ) => Math.abs( n ) <= 10000 ) && Number.isFinite( bounds.radius ) && bounds.radius > 0 && bounds.radius <= 10000;
+	return bounds && typeof bounds === 'object' && ! Array.isArray( bounds ) && Object.keys( bounds ).every( ( key ) => [ 'center', 'radius', 'maxDistanceMeters' ].includes( key ) ) && validVector( bounds.center ) && bounds.center.every( ( n ) => Math.abs( n ) <= 10000 ) && Number.isFinite( bounds.radius ) && bounds.radius > 0 && bounds.radius <= 10000 && ( bounds.maxDistanceMeters === undefined || Number.isFinite( bounds.maxDistanceMeters ) && bounds.maxDistanceMeters > 0 && bounds.maxDistanceMeters <= 10000 );
 }
 
 function validVector( value ) {

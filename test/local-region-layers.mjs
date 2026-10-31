@@ -6,7 +6,7 @@ const descriptor = {
 	entrySelection: {
 		schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ], previewSpawn: { position: [ 0, 8, 0 ], yaw: 0 },
-		previewRegion: { cellSizeMeters: 8, startupCellOffsetBounds: { min: [ 0, 0, 0 ], max: [ 1, 0, 0 ] }, layers: [ 'Tech', 'Lighting', 'Collision' ] },
+		previewRegion: { cellSizeMeters: 8, maxViewDistanceMeters: 16, startupCellOffsetBounds: { min: [ 0, 0, 0 ], max: [ 1, 0, 0 ] }, layers: [ 'Tech', 'Lighting', 'Collision' ] },
 	},
 };
 const regions = [
@@ -29,8 +29,8 @@ globalThis.fetch = async url => {
 	const regionId = request.pathname.split( '/' )[ 3 ];
 	return new Response( JSON.stringify( {
 		sourceRevision: 'test-revision', cellSizeMeters: 8,
-		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {} },
-		cells: ( cellsByRegion[ regionId ] || [] ).map( cell => ( { ...cell, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, staticMeshComponentsClassified: true } } ) ),
+		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {} },
+		cells: ( cellsByRegion[ regionId ] || [] ).map( cell => ( { ...cell, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, staticMeshComponentsClassified: true } } ) ),
 	} ) );
 };
 

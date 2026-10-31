@@ -63,7 +63,8 @@ export function selectWorldComponentsForView( manifest, camera, { nearbyDistance
 		_sphere.center.copy( _center );
 		_sphere.radius = bounds.radius;
 		const distance = camera.position.distanceTo( _center );
-		if ( distance <= maxDistance && ( distance <= nearbyDistance || _frustum.intersectsSphere( _sphere ) ) ) selected.push( component );
+		const componentMaxDistance = Number.isFinite( bounds.maxDistanceMeters ) ? Math.min( maxDistance, bounds.maxDistanceMeters ) : maxDistance;
+		if ( distance <= componentMaxDistance && ( distance <= nearbyDistance || _frustum.intersectsSphere( _sphere ) ) ) selected.push( component );
 	}
 	return selected.sort( ( a, b ) => ( VIEW_RANK[ worldComponentPriority( a, assets ) ] ?? 1 ) - ( VIEW_RANK[ worldComponentPriority( b, assets ) ] ?? 1 ) );
 }

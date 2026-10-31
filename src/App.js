@@ -259,7 +259,7 @@ export class App {
 			await engine.init();
 			this.backend = engine.backend;
 			console.info( 'ElseMesh renderer selected:', engine.backend === 'webgpu' ? 'WebGPU' : 'WebGL fallback', engine.fallbackReason || '' );
-			if ( engine.backend === 'webgpu' ) return this.initLocalStaticWorld( progress );
+			if ( engine.backend === 'webgpu' ) return this.initHostedPackageWorld( progress );
 			this.hostedColliders = new Colliders();
 			this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
 			const { WebGLFallback } = await import( './fallback/WebGLFallback.js' );
@@ -289,6 +289,9 @@ export class App {
 			this.graphicsPriority = backendGraphicsPriority;
 			this.configureGraphicsPriority();
 		}
+		// Hosted WebGPU launches must build only the active package. The built-in
+		// island is a world package too; it is not a hidden renderer bootstrap.
+		if ( engine.backend === 'webgpu' && worldLink ) return this.initHostedPackageWorld( progress );
 		// The WebGL hosted path builds its player and collision state from the
 		// active package. Do not instantiate the built-in island for that launch.
 		if ( engine.backend !== 'webgl' || ! worldLink ) await this.initializeIslandWorldState();
@@ -679,25 +682,31 @@ export class App {
 
 	}
 
-	async initLocalStaticWorld( progress ) {
+	async initHostedPackageWorld( progress ) {
 
 		const engine = this.engine;
 		const { scene, camera } = engine;
 		this.backend = 'webgpu';
-		this.localStaticWorld = true;
+		this.hostedPackageWorld = true;
 		this.renderer = engine;
 		this.scene = scene;
 		this.camera = camera;
 		this.input = new Input( engine.domElement );
+		this.fly = new FlyCamera( camera, engine.domElement, this.input );
 		this.hostedColliders = new Colliders();
-		this.hostedQuery = { allocate: () => 0 };
+		this.vegetationEnabled = ! this.qs.has( 'noVeg' );
 		this.player = new Player( {
 			camera, input: this.input, terrain: { heightAt: () => - 1000000 },
-			colliders: this.hostedColliders, query: this.hostedQuery, boat: null,
+			colliders: this.hostedColliders, query: { allocate: () => 0 }, boat: null,
 		} );
 		await progress( 0.08, 'Preparing the ThruHold lighting…', undefined, 'atmosphere' );
 		this.atmosphere = new Atmosphere( engine );
 		this.sky = new Sky( this.atmosphere );
+		if ( ! this.qs.has( 'noClouds' ) ) {
+			this.clouds = this.qs.has( 'oldClouds' ) ? new Clouds( engine, this.atmosphere ) : new SkyProClouds( engine, this.atmosphere );
+			if ( this.clouds.ready ) await this.clouds.ready;
+			this.sky.clouds = this.clouds;
+		}
 		this.environment = new Environment( engine, scene, this.sky );
 		this.updateSun();
 		this.shadows = new SunShadows( { size: 1024, splits: [ 12, 60, 240 ] } );
@@ -708,6 +717,26 @@ export class App {
 		this.sceneRenderer.clearColor = [ 0.018, 0.022, 0.03, 1 ];
 		this.sceneRenderer.setSize( engine.width, engine.height );
 		engine.onResize.push( () => this.sceneRenderer.setSize( engine.width, engine.height ) );
+		this.portalView = new WorldPortalView( { scene, meshRenderer: engine.meshRenderer, sceneRenderer: this.sceneRenderer, camera } );
+		this.fft = new OceanFFT( engine );
+		this.foamTexture = createFoamTexture( engine );
+		this.oceanLOD = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
+		this.surface = new WaterSurface( { fft: this.fft, cdlod: this.oceanLOD, foamTexture: this.foamTexture } );
+		this.waterMaterial = new WaterMaterial( {
+			surface: this.surface, sky: this.sky, sceneCopy: this.sceneRenderer.opaqueCopy,
+			sceneDepthHalf: this.sceneRenderer.opaqueDepthHalf.texture,
+		} );
+		this.waterMaterial.clouds = this.clouds;
+		this.hostedWaterSurface = this.surface;
+		this.hostedQuery = new WaterQuery( engine, this.hostedWaterSurface );
+		this.waterMaterial.cameraWaterHeightNode = this.hostedQuery.cameraState().x;
+		this.hostedPlayerSlot = this.hostedQuery.allocate( 'player', 1 );
+		this.player.query = this.hostedQuery;
+		this.player.slot = this.hostedPlayerSlot;
+		this.audio = this.qs.has( 'noAudio' ) ? null : new SoundScape();
+		this.player.audio = this.audio;
+		this.worldGames = new Map();
+		this.game = null;
 		this.localPresent = new FullscreenPass( {
 			label: 'world presentation', colorFormats: [ GPU.format ],
 			bindings: { sceneColor: { texture: () => this.sceneRenderer.sceneRT.texture } },
@@ -724,6 +753,7 @@ export class App {
 		const connector = this.worldConnector;
 		const manifestResult = await this.worldManifestPromise;
 		if ( manifestResult.error ) throw manifestResult.error;
+		G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
 		const entrySelection = await chooseWorldEntryPoint( connector.manifest );
 		const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
 		this.player.setWorldRules( connector.manifest.rules );
@@ -733,15 +763,20 @@ export class App {
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0 ) );
 
 		await progress( 0.34, 'Loading the starting area…', undefined, 'world' );
-		const initialObjects = this.localStaticWorld ? [] : selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 160 } );
+		const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 		for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 		for ( const objectID of connector.initialRegionVisualObjectIDs || [] ) initialObjectIDs.add( objectID );
 		for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
+		const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } );
+		const initialComponentIDs = new Set( initialComponents.map( component => component.id ) );
+		for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) assetIDs.add( id );
 		for ( const extension of connector.manifest.experience?.extensions || [] ) assetIDs.add( extension.assetId );
 		const assets = await connector.preload( { through: 'background', assetIDs, concurrency: 2 } );
 		this.linkedWorldRoot = await loadWorldPackage( connector, { assets, objectIDs: initialObjectIDs } );
+		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
+		await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 		this.player.hostedCollisionGuard = ( from, to ) => connector.isCollisionPathReady( from, to, this.linkedWorldRoot?.userData?.worldPackage );
 		this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
@@ -751,8 +786,25 @@ export class App {
 		this.worldBackgroundLoads = new Map();
 		this.worldConnector = connector;
 		this.remoteWorldActive = true;
+		this.remoteWorlds.set( connector.worldId, { connector, root: this.linkedWorldRoot } );
+		let admissionSession;
+		if ( ! connector.localOnly ) {
+			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders );
+			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
+			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
+			const admitted = await admissionSession.admit( this.player, candidates );
+			this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
+			this.camera.position.copy( this.player.camera.position );
+		}
+		this.activateHostedWorld( this.linkedWorldRoot, connector, admissionSession );
 		this.streamWorldRemainder( connector, this.linkedWorldRoot );
 		this.portalPreviousPosition = camera.position.clone();
+		this.freeCam = this.qs.has( 'fly' );
+		engine.domElement.addEventListener( 'click', () => {
+			if ( window.__ui?.isPointerOverUI ) return;
+			this.input.requestLock();
+			this.audio?.resume();
+		}, { passive: true } );
 		this.gpu = GPU;
 		window.__app = this;
 
@@ -774,25 +826,49 @@ export class App {
 
 	}
 
-	localStaticFrame( dt ) {
+	hostedPackageFrame( dt ) {
 
 		GPU.beginFrame();
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		FrameUniforms.fields.dt.value = dt;
 		FrameUniforms.fields.time.value += dt;
+		G.dt.value = dt;
+		G.time.value += dt;
 		G.exposure.value = this.settings.exposure;
 		this.updateSun();
 		this.atmosphere.update( dt, this.camera.position.y );
 		this.applyAtmosphereReadback();
+		if ( this.clouds ) this.clouds.update( dt, this.camera );
 		this.environment.update( dt );
+		this.fft.update( dt );
+		this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
+		this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
+		const hostedBoat = this.activeHostedBoat?.boat?.controller;
+		if ( this.player.hostedSeaLevel !== null ) hostedBoat?.queueQueries?.();
+		this.hostedQuery.update();
+		if ( this.player.hostedSeaLevel !== null ) {
+			hostedBoat?.update( dt );
+			this.player.waterH = this.player.waterHeight();
+			this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
+		}
+		this.cameraWaterHeight = this.player.hostedSeaLevel === null ? null : this.hostedQuery.cpuValid && Number.isFinite( this.hostedQuery.cpu[ 0 ] ) ? this.hostedQuery.cpu[ 0 ] : this.player.hostedSeaLevel;
+		G.cameraUnderwater.value = this.cameraWaterHeight !== null && this.camera.position.y < this.cameraWaterHeight - LENS_REACH ? 1 : 0;
+		G.cameraWaterHeight.value = this.cameraWaterHeight ?? G.seaLevel.value;
 		this.player.updateHostedWorld( dt );
+		dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
+		this.updateWorldPortals();
 		this.updateWorldStreaming();
+		this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
+		this.updateWorldComponents( this.linkedWorldRoot, dt, this.camera );
 		updateWorldPackageLOD( this.linkedWorldRoot, this.camera );
 		setFrameCamera( this.camera, this.engine.width, this.engine.height );
+		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
+		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera );
 		this.sceneRenderer.render();
 		this.localPresent.render( { colorViews: [ GPU.context.getCurrentTexture().createView() ] } );
 		GPU.submit();
 		this.input.endFrame();
+		this.audio && this.updateAudio( dt );
 
 	}
 
@@ -967,7 +1043,7 @@ export class App {
 	start() {
 
 		if ( this.webglFallback ) return this.webglFallback.start();
-		if ( this.localStaticWorld ) return this.engine.start( ( dt ) => this.localStaticFrame( dt ), this.desktopFrameRateLimit );
+		if ( this.hostedPackageWorld ) return this.engine.start( ( dt ) => this.hostedPackageFrame( dt ), this.desktopFrameRateLimit );
 
 		this.engine.start( ( dt, t ) => this.frame( dt, t ), this.desktopFrameRateLimit );
 	}
@@ -1304,11 +1380,11 @@ export class App {
 			for ( const object of connector.manifest.objects ) {
 				if ( ! object.regionCell || ! loaded.has( object.id ) ) continue;
 				transformBoundsCenter( object, object.streamingBounds.center, center );
-				if ( this.camera.position.distanceTo( center ) > ( this.localStaticWorld ? 64 : 192 ) ) releaseObjectIDs.add( object.id );
+				if ( this.camera.position.distanceTo( center ) > ( connector.localOnly ? 64 : 192 ) ) releaseObjectIDs.add( object.id );
 			}
 			if ( releaseObjectIDs.size ) unloadWorldPackageObjects( root, connector, this.hostedColliders, releaseObjectIDs );
 		}
-		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: this.localStaticWorld ? 48 : connector.localOnly ? 160 : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
+		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath ) {
 			const flying = this.freeCam;
 			const position = flying ? this.camera.position.clone().setY( this.camera.position.y - 1.62 ) : this.player.position.clone();
@@ -1340,7 +1416,7 @@ export class App {
 		}
 		const wantedObjectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const installedComponents = root.userData.installedWorldComponentIDs || new Set();
-		const components = this.localStaticWorld ? [] : selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ! installedComponents.has( component.id ) );
+		const components = selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ! installedComponents.has( component.id ) );
 		const wantedComponentIDs = new Set( components.map( ( component ) => component.id ) );
 		const assetPriorities = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset.priority ] ) );
 		const rank = { 'portal-preview': 0, visible: 1, nearby: 2, background: 3 };

@@ -81,6 +81,15 @@ registered behavior schema and run it through browser-owned gameplay code.
 This keeps world authorship separate from client executable code and is not a
 downloaded-script mechanism.
 
+Dynamic local providers use the world's authored startup-cell footprint for
+entry readiness. Those cells may be promoted to visible priority before the
+loading screen is released; other streamed cells stay background priority and
+respect each object's optional `streamingBounds.maxDistanceMeters` while the
+client explores. Collision-frontier requests remain independent of that visual
+distance and must still be ready before movement enters their cells. This
+prevents a wide initial camera view from making every visible region a blocking
+conversion while preserving the traversal safety gate.
+
 This is a general engine evolution; bridge-specific milestones, source data,
 and acceptance evidence remain in the corresponding private world repository.
 

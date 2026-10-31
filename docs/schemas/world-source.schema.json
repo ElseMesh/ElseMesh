@@ -535,6 +535,12 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 10000
+        },
+        "maxDistanceMeters": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "description": "Optional cap on view-driven requests for this bounded record; movement collision-frontier requests use their separate readiness contract."
         }
       },
       "additionalProperties": false
@@ -710,6 +716,12 @@
               "type": "number",
               "exclusiveMinimum": 0,
               "maximum": 10000
+            },
+            "maxDistanceMeters": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10000,
+              "description": "Optional cap on view-driven requests for this bounded record; movement collision-frontier requests use their separate readiness contract."
             }
           },
           "additionalProperties": false

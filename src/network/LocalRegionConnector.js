@@ -101,6 +101,7 @@ export class LocalRegionConnector {
 		requireValue( selection && ( selection.schema === undefined || selection.schema === 'elsemesh.world-entry-selection/1' ) && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
+		requireValue( Number.isFinite( previewRegion.maxViewDistanceMeters ) && previewRegion.maxViewDistanceMeters > 0 && previewRegion.maxViewDistanceMeters <= 10000, 'Local provider has no valid world-authored cell view distance' );
 		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
@@ -190,19 +191,19 @@ export class LocalRegionConnector {
 				if ( isStartupCell ) this.initialRegionCellObjectIDs.add( collisionObjectId );
 				if ( isStartupCell ) this.initialRegionVisualObjectIDs.add( visualObjectId );
 				this.manifest.assets.push(
-					{ id: collisionAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'nearby' },
-					{ id: visualAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'nearby' },
+					{ id: collisionAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
+					{ id: visualAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
 				);
 				this.manifest.objects.push(
 					{
 						id: collisionObjectId, label: `${sourceRegion.label} collision cell ${cellKey}`, kind: 'asset-instance', assetId: collisionAssetId,
-						transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'nearby',
-						streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2 }, regionCell: true, collisionPayload: true,
+						transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'background',
+						streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters }, regionCell: true, collisionPayload: true,
 					},
 					{
 						id: visualObjectId, label: `${sourceRegion.label} visual cell ${cellKey}`, kind: 'asset-instance', assetId: visualAssetId,
-						transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'nearby',
-						streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2 }, regionCell: true,
+						transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'background',
+						streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters }, regionCell: true,
 					},
 				);
 			}

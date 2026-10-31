@@ -27,6 +27,7 @@ try {
 		id: 'elsemesh-component:opaque-fixture',
 		type: 'elsemesh.static-glb/1',
 		priority: 'visible',
+		streamingBounds: { center: [ 0, 0, 0 ], radius: 8, maxDistanceMeters: 24 },
 		assets: [ { assetId, kind: 'example-binary/1' } ],
 		data: { ownerDefined: { nested: [ 1, true, 'opaque' ] } },
 	} ];

@@ -61,7 +61,7 @@ function reportConnection() {
 app.init( ( p, text, until ) => ui.setLoading( p, text, until ) ).then( async () => {
 
 	reportConnection();
-	if ( app.backend !== 'webgl' && ! app.localStaticWorld ) app.ui = new AppUI( app, ui );
+	if ( app.backend !== 'webgl' && ! app.hostedPackageWorld ) app.ui = new AppUI( app, ui );
 	ui.setLoading( 1, 'Ready' );
 	await ui.hideLoader();
 	// frame-time benchmark and reference shots (see core/Bench.js): it drives the frames itself

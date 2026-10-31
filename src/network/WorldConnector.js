@@ -697,6 +697,7 @@ export function validateWorldObjects( objects, assets ) {
 		if ( object?.streamingBounds !== undefined ) {
 			const bounds = object.streamingBounds;
 			invariant( bounds && validVector( bounds.center ) && bounds.center.every( ( value ) => Math.abs( value ) <= 10000 ) && Number.isFinite( bounds.radius ) && bounds.radius > 0 && bounds.radius <= 10000, `World object ${object.id || '(unknown)'} has invalid streaming bounds` );
+			invariant( bounds.maxDistanceMeters === undefined || Number.isFinite( bounds.maxDistanceMeters ) && bounds.maxDistanceMeters > 0 && bounds.maxDistanceMeters <= 10000, `World object ${object.id || '(unknown)'} has an invalid maximum streaming distance` );
 		}
 		if ( object?.transform?.rotation !== undefined ) {
 			const rotation = object.transform.rotation;
@@ -760,7 +761,7 @@ export function validateWorldComponents( components = [], rules, ids = new Set()
 }
 
 function validComponentStreamingBounds( bounds ) {
-	return bounds && typeof bounds === 'object' && ! Array.isArray( bounds ) && Object.keys( bounds ).every( ( key ) => [ 'center', 'radius' ].includes( key ) ) && validVector( bounds.center ) && bounds.center.every( ( value ) => Math.abs( value ) <= 10000 ) && Number.isFinite( bounds.radius ) && bounds.radius > 0 && bounds.radius <= 10000;
+	return bounds && typeof bounds === 'object' && ! Array.isArray( bounds ) && Object.keys( bounds ).every( ( key ) => [ 'center', 'radius', 'maxDistanceMeters' ].includes( key ) ) && validVector( bounds.center ) && bounds.center.every( ( value ) => Math.abs( value ) <= 10000 ) && Number.isFinite( bounds.radius ) && bounds.radius > 0 && bounds.radius <= 10000 && ( bounds.maxDistanceMeters === undefined || Number.isFinite( bounds.maxDistanceMeters ) && bounds.maxDistanceMeters > 0 && bounds.maxDistanceMeters <= 10000 );
 }
 
 function validWorldGateway( value ) {

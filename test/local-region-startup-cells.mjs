@@ -12,7 +12,7 @@ const descriptor = {
 			stages: { world: 'Loading the starting area…' }, theme: { logo: { src: '/v1/presentation/logo.svg', alt: 'Castle mark' }, colors: { accent: '#c6a664' } },
 		},
 		previewSpawn: { position: [ 0, 8.62, 90 ], yaw: 0 },
-		previewRegion: { cellSizeMeters: 16, startupCellOffsetBounds: { min: [ -1, 0, -1 ], max: [ 1, 0, 1 ] } },
+		previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, startupCellOffsetBounds: { min: [ -1, 0, -1 ], max: [ 1, 0, 1 ] } },
 	},
 };
 const originalFetch = globalThis.fetch;
@@ -22,11 +22,13 @@ globalThis.fetch = async url => {
 	if ( path !== '/v1/descriptor' && path !== '/v1/regions' ) {
 		payload.collisionSourceInventory = {
 			staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0,
-			explicitlyNonQueryOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {},
+			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0,
+			landscapeHeightfieldCollisionComponents: 0, otherPrimitiveStatuses: {},
 		};
 		payload.cells = [ { x: 0, y: 0, z: 5, collisionEvidence: {
 			scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0,
-			supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, staticMeshComponentsClassified: true,
+			supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0,
+			explicitlyNonBlockingForPawnComponents: 0, staticMeshComponentsClassified: true,
 		} } ];
 	}
 	return new Response( JSON.stringify( payload ), { status: 200, headers: { 'Content-Type': 'application/json' } } );
