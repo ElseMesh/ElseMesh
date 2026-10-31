@@ -40,6 +40,7 @@ import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
 import { worldSpawnCollisionObjectIDs } from '../network/WorldSpawn.js';
 import { selectWorldObjectsForView } from '../network/WorldStreaming.js';
+import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 let sharedFoamLaceTexture;
 
@@ -1571,9 +1572,13 @@ export class WebGLFallback {
 			for ( const objectID of worldSpawnCollisionObjectIDs( manifest, localSpawn, manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
 			assets = await this.connector.preload( { assetIDs } );
-			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => assets.has( object.assetId ) ).map( object => object.id ) );
-		} else assets = await this.connector.preload( { through: 'visible' } );
+			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && ( ! object.assetId || assets.has( object.assetId ) ) ).map( object => object.id ) );
+		} else {
+			assets = await this.connector.preload( { through: 'visible' } );
+			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => object.assetId && assets.has( object.assetId ) ).map( object => object.id ) );
+		}
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
+		this.hostedModelCache = cache;
 		this.worldLODs = new Map();
 		const components = manifest.components || [];
 		this.hostedWildlifeComponent = components.find( component => worldComponentDescriptor( component.type )?.wildlifeSimulation ) || null;
@@ -1890,6 +1895,7 @@ export class WebGLFallback {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );
 		}
+		if ( this.worldLink ) this._updateHostedWorldStreaming();
 		this.useButton.style.display = this._nearestPortalRoute() ? '' : 'none';
 		const grassDx = this.grassCenter ? this.camera.position.x - this.grassCenter.x : 0, grassDz = this.grassCenter ? this.camera.position.z - this.grassCenter.y : 0;
 		if ( this.grass && ( this.terrain || this.hostedTerrainData ) && grassDx * grassDx + grassDz * grassDz > 64 ) {
@@ -1928,6 +1934,74 @@ export class WebGLFallback {
 			this.renderer.autoClear = true;
 		}
 		this.input.endFrame();
+
+	}
+
+	_updateHostedWorldStreaming() {
+
+		const connector = this.connector;
+		if ( ! connector?.manifest || this.hostedWorldStreaming || performance.now() - ( this.hostedWorldStreamingAt || 0 ) < 400 ) return;
+		this.hostedWorldStreamingAt = performance.now();
+		const manifest = connector.manifest;
+		const loaded = this.localLoadedObjectIDs || ( this.localLoadedObjectIDs = new Set() );
+		const objects = selectWorldObjectsForView( manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } );
+		if ( connector.localOnly && connector.collisionObjectIDsAlongPath && this.player ) {
+			const position = this.player.position;
+			const axes = this.input.moveAxes();
+			const direction = new this.THREE.Vector3( - Math.sin( this.player.yaw ), 0, - Math.cos( this.player.yaw ) );
+			if ( axes.x || axes.y ) {
+				const forward = direction.clone().multiplyScalar( axes.y );
+				const right = new this.THREE.Vector3( - direction.z, 0, direction.x ).multiplyScalar( axes.x );
+				direction.copy( forward.add( right ) );
+			}
+			const sprinting = this.input.down( 'ShiftLeft' ) || this.input.down( 'ShiftRight' );
+			const speed = Math.max( sprinting ? this.player.worldMovement.sprintSpeed : this.player.worldMovement.walkSpeed, this.player.velocity.length() );
+			const cellSize = connector.cellSizeMeters || 8;
+			const lookahead = collisionLookaheadDistance( speed, connector.collisionLoadLatencyMs || 2000, cellSize );
+			const destination = position.clone().addScaledVector( direction.normalize(), lookahead );
+			const selected = new Set( objects.map( object => object.id ) );
+			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) selected.add( objectID );
+			const objectByID = new Map( manifest.objects.map( object => [ object.id, object ] ) );
+			for ( const objectID of selected ) {
+				const object = objectByID.get( objectID );
+				if ( object && ! objects.includes( object ) ) objects.push( object );
+			}
+		}
+		const wanted = objects.filter( object => ! loaded.has( object.id ) );
+		if ( wanted.length === 0 ) return;
+		const assetIDs = new Set( wanted.map( object => object.assetId ).filter( Boolean ) );
+		this.hostedWorldStreaming = true;
+		connector.preload( { assetIDs, concurrency: 1 } ).then( async assets => {
+			for ( const object of wanted ) {
+				if ( loaded.has( object.id ) ) continue;
+				if ( object.assetId && ! assets.has( object.assetId ) ) continue;
+				if ( object.assetId ) {
+					let model = this.hostedModelCache.get( object.assetId );
+					if ( ! model ) {
+						const bytes = assets.get( object.assetId );
+						const buffer = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
+						model = await this.loader.parseAsync( buffer, '' );
+						this.hostedModelCache.set( object.assetId, model );
+					}
+					const root = new this.THREE.Group(), base = model.scene.clone( true );
+					prepareHostedWebGLModel( base );
+					prepareWebGLLODFade( base );
+					base.name = `${ object.label || object.id } · LOD 0`;
+					root.add( base );
+					const tr = object.transform || {};
+					root.position.set( ...( tr.position || [ 0, 0, 0 ] ) );
+					if ( tr.rotation ) root.quaternion.set( ...tr.rotation ); else root.rotation.y = tr.yaw || 0;
+					root.scale.set( ...( object.scale || [ 1, 1, 1 ] ) );
+					root.updateMatrixWorld( true );
+					this.scene.add( root );
+					this.hostedObjectRoots ||= new Map();
+					this.hostedObjectRoots.set( object.id, root );
+				}
+				loaded.add( object.id );
+			}
+		} ).catch( error => {
+			console.warn( `WebGL hosted-world streaming failed for ${connector.worldId}`, error );
+		} ).finally( () => { this.hostedWorldStreaming = false; } );
 
 	}
 
