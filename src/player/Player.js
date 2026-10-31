@@ -2,10 +2,11 @@ import * as THREE from '../engine/math/index.js';
 import { WORLD } from '../world/WorldLayout.js';
 import { HOUSE } from '../world/boat/BoatSpecs.js';
 import { gravityAcceleration, movementParameters } from '../network/WorldRules.js';
+import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
 
 const HOUSE_HELM = { x: HOUSE.helmX, z: HOUSE.seatZ };
 
-const EYE = 1.62;
+const EYE = PLAYER_EYE_HEIGHT;
 const SWIM_EYE = EYE * 0.1; // eyes above the body's float point while swimming
 const RADIUS = 0.3;
 const HEIGHT = 1.75;

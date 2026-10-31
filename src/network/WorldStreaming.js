@@ -26,10 +26,10 @@ export function selectWorldObjectsForView( manifest, camera, { nearbyDistance = 
 		// placeholder. Without a replacement, it is the world's actual representation
 		// (for example a compact cave mesh), so it must also load after crossing.
 		if ( priority === 'portal-preview' && replacedPreviewIDs.has( object.id ) ) continue;
+		if ( ( VIEW_RANK[ priority ] ?? VIEW_RANK.visible ) > maxRank ) continue;
 		const bounds = object.streamingBounds;
 		if ( ! bounds ) {
-			const rank = VIEW_RANK[ object.priority || priorities.get( object.assetId ) || 'visible' ] ?? VIEW_RANK.visible;
-			if ( rank <= maxRank ) selected.push( object );
+			selected.push( object );
 			continue;
 		}
 		transformBoundsCenter( object, bounds.center, _center );
@@ -37,7 +37,8 @@ export function selectWorldObjectsForView( manifest, camera, { nearbyDistance = 
 		_sphere.center.copy( _center );
 		_sphere.radius = bounds.radius * Math.max( Math.abs( scale[ 0 ] ), Math.abs( scale[ 1 ] ), Math.abs( scale[ 2 ] ) );
 		const distance = cameraPosition.distanceTo( _center );
-		if ( distance > maxDistance ) continue;
+		const objectMaxDistance = Number.isFinite( bounds.maxDistanceMeters ) ? Math.min( maxDistance, bounds.maxDistanceMeters ) : maxDistance;
+		if ( distance > objectMaxDistance ) continue;
 		if ( distance <= nearbyDistance || _frustum.intersectsSphere( _sphere ) ) selected.push( object );
 	}
 	return selected.sort( ( a, b ) => ( VIEW_RANK[ a.priority || priorities.get( a.assetId ) ] ?? 1 ) - ( VIEW_RANK[ b.priority || priorities.get( b.assetId ) ] ?? 1 ) );

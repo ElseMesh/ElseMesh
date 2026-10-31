@@ -38,9 +38,9 @@ import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
-import { worldSpawnCollisionObjectIDs } from '../network/WorldSpawn.js';
 import { selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
+import { selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 let sharedFoamLaceTexture;
 
@@ -1583,11 +1583,8 @@ export class WebGLFallback {
 			this.camera.position.set( ...localSpawn.position );
 			this.camera.rotation.order = 'YXZ';
 			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
-			const initialObjects = selectWorldObjectsForView( manifest, this.camera, { maxPriority: 'nearby', maxDistance: 160 } );
+			const initialObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
-			const spawnPoint = { x: localSpawn.position[ 0 ], y: localSpawn.position[ 1 ], z: localSpawn.position[ 2 ] };
-			for ( const objectID of this.connector.collisionObjectIDsAlongPath( spawnPoint, spawnPoint ) ) initialObjectIDs.add( objectID );
-			for ( const objectID of worldSpawnCollisionObjectIDs( manifest, localSpawn, manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
 			assets = await this.connector.preload( { assetIDs } );
 			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && ( ! object.assetId || assets.has( object.assetId ) ) ).map( object => object.id ) );
@@ -1967,7 +1964,8 @@ export class WebGLFallback {
 		this.hostedWorldStreamingAt = performance.now();
 		const manifest = connector.manifest;
 		const loaded = this.localLoadedObjectIDs || ( this.localLoadedObjectIDs = new Set() );
-		const objects = selectWorldObjectsForView( manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } );
+		const objects = selectWorldObjectsForView( manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } )
+			.filter( object => ! connector.localOnly || ! object.collisionPayload );
 		const viewObjectIDs = new Set( objects.map( object => object.id ) );
 		if ( connector.localOnly ) {
 			const released = [];

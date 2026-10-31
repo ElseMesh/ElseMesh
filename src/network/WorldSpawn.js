@@ -1,15 +1,16 @@
 // Invitation arrivals use a grid no coarser than the player's capsule diameter.
 // The ordered candidates let the owner gateway choose atomically around visitors.
+import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
+
 export const WORLD_SPAWN_CANDIDATE_LIMIT = 1024;
 export const WORLD_SPAWN_GRID_STEP = 0.6;
 const PLAYER_RADIUS = 0.3;
 const PLAYER_HEIGHT = 1.75;
-const EYE_HEIGHT = 1.62;
 
 export function worldSpawnCandidates( spawn, radius, colliders, { limit = WORLD_SPAWN_CANDIDATE_LIMIT } = {} ) {
 	if ( ! spawn || ! Array.isArray( spawn.position ) || spawn.position.length !== 3 || ! spawn.position.every( Number.isFinite ) || ! Number.isFinite( radius ) || radius < 0 || ! Number.isInteger( limit ) || limit < 1 || limit > WORLD_SPAWN_CANDIDATE_LIMIT || ! colliders?.groundHeightAt || ! colliders?.resolveCapsule ) throw new Error( 'Invalid world spawn search' );
 	const [ eyeX, eyeY, eyeZ ] = spawn.position;
-	const start = { x: eyeX, y: eyeY - EYE_HEIGHT, z: eyeZ };
+	const start = { x: eyeX, y: eyeY - PLAYER_EYE_HEIGHT, z: eyeZ };
 	const ringLimit = Math.ceil( radius / WORLD_SPAWN_GRID_STEP );
 	const candidates = [];
 	for ( let ring = 0; ring <= ringLimit; ring ++ ) {
