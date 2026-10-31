@@ -81,6 +81,7 @@ type daemon struct {
 	webrtcUDPPortMax      uint16
 	webrtcMu              sync.Mutex
 	webrtcSessions        map[string]*worldRTCSession
+	regionProvider        *regionProviderGateway
 }
 
 func main() {
@@ -122,6 +123,7 @@ func run() error {
 	exportNodeKey := flag.String("export-node-key", "", "write this data directory's private identity key to a new 0600 file, then exit")
 	importNodeKey := flag.String("import-node-key", "", "install a 0600 private identity key if node.key does not exist, then exit")
 	worldName := flag.String("world-name", "My ThruHold", "create a local starter world when none is supplied")
+	regionProviderURL := flag.String("region-provider", "", "loopback dynamic region provider URL (requires --world-profile; local preview only)")
 	listenPort := flag.Int("p2p-port", 42901, "libp2p TCP and QUIC listen port (0 selects ephemeral ports)")
 	zeroTierNetwork := flag.String("zerotier-network", defaultZeroTierNetworkID, "ZeroTier network ID to join through embedded libzt (requires a zerotier build)")
 	zeroTierPathDiagnostics := flag.Bool("zerotier-path-diagnostics", false, "enable a loopback-only endpoint for querying observed embedded ZeroTier peer IP/UDP-port paths")
@@ -189,6 +191,9 @@ func run() error {
 	}
 	if worldDirectory != "" && (operationCount > 0 || *worldProfile != "" || *manifestPath != "") {
 		return errors.New("a world directory cannot be combined with one-shot operations, --world-profile, or --manifest")
+	}
+	if *regionProviderURL != "" && (worldDirectory != "" || *worldProfile == "" || *publicGateway != "" || *directoryURL != "" || !isLoopbackListenAddress(*httpAddress)) {
+		return errors.New("--region-provider requires --world-profile, a loopback --http address, no world directory, and no public gateway or directory")
 	}
 	if *zeroTierPathDiagnostics && operationCount > 0 {
 		return errors.New("zerotier-path-diagnostics cannot be combined with one-shot operations")
@@ -275,6 +280,19 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("allow-browser-origin: %w", err)
 	}
+	var regionProvider *regionProviderGateway
+	var regionProviderWorldID string
+	if *regionProviderURL != "" {
+		regionProvider, err = newRegionProviderGateway(*regionProviderURL, "", allowedBrowserOrigins)
+		if err != nil {
+			return fmt.Errorf("region provider: %w", err)
+		}
+		regionProviderWorldID, err = regionProvider.discoverWorldID()
+		if err != nil {
+			return fmt.Errorf("region provider descriptor: %w", err)
+		}
+		regionProvider.worldID = regionProviderWorldID
+	}
 	if *listProposals || *removeProposalID != "" || *exportProposalID != "" || *inspectManifest || *publishManifestPath != "" {
 		identityPath := filepath.Join(*dataDir, "node.key")
 		info, statErr := os.Lstat(identityPath)
@@ -317,7 +335,7 @@ func run() error {
 		return nil
 	}
 	if *listProposals || *removeProposalID != "" || *exportProposalID != "" {
-		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key)
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "")
 		if loadErr != nil {
 			return loadErr
 		}
@@ -402,7 +420,7 @@ func run() error {
 		if *manifestPath == "" {
 			return errors.New("--import-package requires an owner-signed --manifest")
 		}
-		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key)
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "")
 		if loadErr != nil {
 			return loadErr
 		}
@@ -426,7 +444,7 @@ func run() error {
 		if *roleDocumentOut == *signRoleGrantPath || *roleDocumentOut == *signRoleRevocationsPath {
 			return errors.New("role-document output must differ from its unsigned input")
 		}
-		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key)
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "")
 		if loadErr != nil {
 			return loadErr
 		}
@@ -542,7 +560,7 @@ func run() error {
 	if worldDirectory != "" {
 		manifest = *preparedWorld
 	} else {
-		manifest, err = loadWorldManifest(*manifestPath, *dataDir, *worldName, localPeerID, key)
+		manifest, err = loadWorldManifest(*manifestPath, *dataDir, *worldName, localPeerID, key, regionProviderWorldID)
 	}
 	if err != nil {
 		return err
@@ -550,6 +568,9 @@ func run() error {
 	world, err := decodeManifest(manifest, localPeerID, time.Now())
 	if err != nil {
 		return fmt.Errorf("world manifest: %w", err)
+	}
+	if regionProvider != nil && world.WorldID != regionProviderWorldID {
+		return fmt.Errorf("region provider world ID %q does not match ThruHold profile world ID %q", regionProviderWorldID, world.WorldID)
 	}
 	if worldDirectory != "" {
 		log.Printf("Serving %s (%s) from %s", world.Title, world.WorldID, worldDirectory)
@@ -560,7 +581,10 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	if regionProvider != nil {
+		log.Printf("local region provider proxy enabled for world %s", world.WorldID)
+	}
 	if zeroTier != nil {
 		d.zeroTierNodeID = zeroTier.NodeID()
 	}
@@ -616,6 +640,9 @@ func run() error {
 	mux.HandleFunc("/api/world/roles/revocations", d.handleRoleRevocations)
 	mux.HandleFunc("/api/world/proposals", d.handleWorldProposalSubmission)
 	mux.HandleFunc("/api/assets/", d.handleAsset)
+	if d.regionProvider != nil {
+		mux.Handle("/v1/", d.regionProvider)
+	}
 	mux.HandleFunc("/gateway", d.handleBrowserGateway)
 	mux.HandleFunc("/browser-host", d.handleBrowserHost)
 	if *zeroTierPathDiagnostics {
@@ -786,7 +813,7 @@ func libp2pListenAddresses(port int, announced []ma.Multiaddr) []string {
 	return addresses
 }
 
-func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey) (signedDocument, error) {
+func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey, initialWorldID string) (signedDocument, error) {
 	if path == "" {
 		path = filepath.Join(dataDir, "world.json")
 	}
@@ -805,6 +832,12 @@ func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey) (
 		return signedDocument{}, err
 	}
 	manifest := newStarterManifest(title, owner)
+	if initialWorldID != "" {
+		if !worldIDPattern.MatchString(initialWorldID) {
+			return signedDocument{}, errors.New("initial world ID is invalid")
+		}
+		manifest.WorldID = initialWorldID
+	}
 	doc, err := signDocument(manifestProtocol, manifest, key)
 	if err != nil {
 		return signedDocument{}, err
