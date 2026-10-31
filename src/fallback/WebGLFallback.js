@@ -909,7 +909,7 @@ export class WebGLFallback {
 	_updateHostedWebGLStatus() {
 
 		const unsupported = unsupportedHostedWebGLComponents( this.hostedComponents, this.hostedSupportedComponents );
-		this.worldName.textContent = `${ this.hostedTitle || 'Hosted world' } · WebGL mode${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
+		this.fallbackBadge.textContent = `WebGL fallback · ${ this.engine.fallbackReason }${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
 
 	}
 
@@ -1438,7 +1438,6 @@ export class WebGLFallback {
 		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
 		this.scene.add( this.grass );
 		this.grassCenter = new T.Vector2( start.position[ 0 ], start.position[ 2 ] );
-		this.worldName.textContent = 'WebGL mode · island rendering simplified';
 		progress( 0.9, 'Starting the WebGL island…' );
 
 	}
@@ -1586,7 +1585,10 @@ export class WebGLFallback {
 			const initialObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
-			assets = await this.connector.preload( { assetIDs } );
+			assets = await this.connector.preload( {
+				assetIDs,
+				onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
+			} );
 			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && ( ! object.assetId || assets.has( object.assetId ) ) ).map( object => object.id ) );
 		} else {
 			assets = await this.connector.preload( { through: 'visible' } );
@@ -1838,6 +1840,7 @@ export class WebGLFallback {
 		const badge = document.createElement( 'div' );
 		badge.className = 'elsemesh-webgl-badge';
 		badge.textContent = `WebGL fallback · ${ this.engine.fallbackReason }`;
+		this.fallbackBadge = badge;
 		Object.assign( badge.style, { position: 'fixed', top: '14px', right: '14px', zIndex: 30, maxWidth: 'min(440px, 80vw)', padding: '8px 11px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '12px/1.4 system-ui', pointerEvents: 'none' } );
 		document.body.appendChild( badge );
 		const hint = document.createElement( 'div' );
@@ -1848,10 +1851,7 @@ export class WebGLFallback {
 		style.textContent = '@media (hover:none), (pointer:coarse) { .elsemesh-webgl-hint { bottom:150px !important; } }';
 		document.head.appendChild( style );
 		document.body.append( hint );
-		this.worldName = document.createElement( 'div' );
-		Object.assign( this.worldName.style, { position: 'fixed', left: '16px', top: '14px', zIndex: 30, padding: '8px 11px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '12px/1.4 system-ui', pointerEvents: 'none' } );
-		document.body.append( this.worldName );
-		this.hud = [ badge, hint, this.worldName, style ];
+		this.hud = [ badge, hint, style ];
 		this.useButton = document.createElement( 'button' );
 		this.useButton.textContent = 'Use portal';
 		Object.assign( this.useButton.style, { display: 'none', position: 'fixed', left: '50%', bottom: '24px', transform: 'translateX(-50%)', zIndex: 31, padding: '12px 18px', border: '0', borderRadius: '10px', color: '#f2f7f4', background: '#14201ddd', font: 'bold 15px system-ui' } );
@@ -1888,6 +1888,8 @@ export class WebGLFallback {
 	_frame() {
 
 		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
+		this.app.updateFPS( dt );
+		this.app.hud?.setStats( { fps: this.app.fps, frameMs: dt * 1000 } );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );

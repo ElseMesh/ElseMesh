@@ -109,7 +109,6 @@ body {
 	display: none;
 }
 
-#loader.loader-world-pending .loader-picture,
 #loader.loader-world-pending .loader-world,
 #loader.loader-world-pending .loader-note,
 #loader.loader-world-pending .loader-tips {

@@ -40,13 +40,21 @@ function deriveStartupCells( position, previewRegion ) {
 	requireValue( Array.isArray( min ) && Array.isArray( max ) && min.length === 3 && max.length === 3 && min.every( Number.isSafeInteger ) && max.every( Number.isSafeInteger ) && min.every( ( value, axis ) => value <= max[ axis ] ), 'Local provider has invalid startup cell offset bounds' );
 	const count = min.reduce( ( total, value, axis ) => total * ( max[ axis ] - value + 1 ), 1 );
 	requireValue( count >= 1 && count <= 64, 'Local provider startup cell footprint exceeds its limit' );
-	const cells = [];
+	const cells = new Map();
 	for ( let x = min[ 0 ]; x <= max[ 0 ]; x ++ ) {
 		for ( let y = min[ 1 ]; y <= max[ 1 ]; y ++ ) {
-			for ( let z = min[ 2 ]; z <= max[ 2 ]; z ++ ) cells.push( [ origin[ 0 ] + x, origin[ 1 ] + y, origin[ 2 ] + z ] );
+			for ( let z = min[ 2 ]; z <= max[ 2 ]; z ++ ) {
+				const cell = [ origin[ 0 ] + x, origin[ 1 ] + y, origin[ 2 ] + z ];
+				cells.set( cell.join( ',' ), cell );
+			}
 		}
 	}
-	return cells;
+	for ( const offset of previewRegion.startupCellOffsets || [] ) {
+		const cell = origin.map( ( value, axis ) => value + offset[ axis ] );
+		cells.set( cell.join( ',' ), cell );
+	}
+	requireValue( cells.size <= 64, 'Local provider startup cell footprint exceeds its limit' );
+	return [ ...cells.values() ];
 }
 
 function abortIfNeeded( signal ) {
@@ -88,6 +96,7 @@ export class LocalRegionConnector {
 		this.collisionObjectIDsByCell = new Map();
 		this.collisionLoadLatencyMs = 2000;
 		this.cellSizeMeters = 0;
+		this.maxViewDistanceMeters = 0;
 		this.manifest = null;
 		this.closed = false;
 	}
@@ -102,6 +111,8 @@ export class LocalRegionConnector {
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
 		requireValue( Number.isFinite( previewRegion.maxViewDistanceMeters ) && previewRegion.maxViewDistanceMeters > 0 && previewRegion.maxViewDistanceMeters <= 10000, 'Local provider has no valid world-authored cell view distance' );
+		const startupCellOffsets = previewRegion.startupCellOffsets ?? [];
+		requireValue( Array.isArray( startupCellOffsets ) && startupCellOffsets.length <= 32 && startupCellOffsets.every( offset => Array.isArray( offset ) && offset.length === 3 && offset.every( value => Number.isSafeInteger( value ) && Math.abs( value ) <= 128 ) ), 'Local provider has invalid startup cell offsets' );
 		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
@@ -118,6 +129,7 @@ export class LocalRegionConnector {
 		const regions = [ region, ...layerLabels.map( label => catalog.regions.find( item => item.id === label || item.label === label ) ) ];
 		requireValue( regions.every( item => item && typeof item.id === 'string' && typeof item.asset === 'string' ) && new Set( regions.map( item => item.id ) ).size === regions.length, 'Local provider is missing or duplicates a preview layer' );
 		this.cellSizeMeters = previewRegion.cellSizeMeters;
+		this.maxViewDistanceMeters = previewRegion.maxViewDistanceMeters;
 		const assetURL = new URL( region.asset, `${base}/` );
 		requireValue( assetURL.origin === this.localProvider && assetURL.pathname.startsWith( '/v1/regions/' ), 'Local provider returned an unsafe region URL' );
 		this.region = region;
@@ -342,12 +354,16 @@ export class LocalRegionConnector {
 		return true;
 	}
 
-	async preload( { assetIDs, signal } = {} ) {
+	async preload( { assetIDs, signal, onProgress = () => {} } = {} ) {
 		requireValue( this.manifest, 'Load the local world descriptor first' );
+		requireValue( typeof onProgress === 'function', 'Local region preload progress callback must be a function' );
 		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...this.regionAssets.keys() ];
 		selected.sort( ( a, b ) => Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) ) );
 		const loaded = new Map();
-		for ( const assetId of selected ) loaded.set( assetId, await this.getAsset( assetId, { signal } ) );
+		for ( const [ index, assetId ] of selected.entries() ) {
+			loaded.set( assetId, await this.getAsset( assetId, { signal } ) );
+			onProgress( index + 1, selected.length );
+		}
 		return loaded;
 	}
 

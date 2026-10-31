@@ -599,7 +599,7 @@ export class App {
 			this.player.yaw = spawn.yaw;
 			this.player.pitch = spawn.pitch;
 			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
-			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
+			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } );
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
 			for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
@@ -763,7 +763,7 @@ export class App {
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
 
 		await progress( 0.34, 'Loading the starting area…', undefined, 'world' );
-		const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
+		const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } );
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 		for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 		for ( const objectID of connector.initialRegionVisualObjectIDs || [] ) initialObjectIDs.add( objectID );
@@ -1357,17 +1357,9 @@ export class App {
 	}
 
 	updateFreeCamera( dt ) {
-		const previous = this.camera.position.clone();
 		this.fly.update( dt );
-		const connector = this.worldConnector;
-		const packageState = this.linkedWorldRoot?.userData?.worldPackage;
-		if ( ! this.remoteWorldActive || ! connector?.localOnly || ! packageState ) return;
-		const from = previous.clone().setY( previous.y - 1.62 );
-		const to = this.camera.position.clone().setY( this.camera.position.y - 1.62 );
-		if ( ! connector.isCollisionPathReady( from, to, packageState ) ) {
-			this.camera.position.copy( previous );
-			this.fly.velocity.set( 0, 0, 0 );
-		}
+		// FreeCam is an explicit inspection camera; do not apply avatar collision gates to it.
+		// Player movement still uses the hosted collision guard and stays closed on unknown cells.
 	}
 
 	updateWorldStreaming() {
@@ -1383,11 +1375,11 @@ export class App {
 			for ( const object of connector.manifest.objects ) {
 				if ( ! object.regionCell || ! loaded.has( object.id ) ) continue;
 				transformBoundsCenter( object, object.streamingBounds.center, center );
-				if ( this.camera.position.distanceTo( center ) > ( connector.localOnly ? 64 : 192 ) ) releaseObjectIDs.add( object.id );
+				if ( this.camera.position.distanceTo( center ) > connector.maxViewDistanceMeters ) releaseObjectIDs.add( object.id );
 			}
 			if ( releaseObjectIDs.size ) unloadWorldPackageObjects( root, connector, this.hostedColliders, releaseObjectIDs );
 		}
-		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
+		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath ) {
 			const flying = this.freeCam;
 			const position = flying ? this.camera.position.clone().setY( this.camera.position.y - 1.62 ) : this.player.position.clone();

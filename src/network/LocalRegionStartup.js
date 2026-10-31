@@ -6,7 +6,7 @@ export function selectLocalRegionStartupObjects( connector, manifest, camera, sp
 	const cellSize = connector.cellSizeMeters || 8;
 	const selectedIDs = new Set( selectWorldObjectsForView( manifest, camera, {
 		nearbyDistance: cellSize,
-		maxDistance: 160,
+		maxDistance: connector.maxViewDistanceMeters,
 		maxPriority: 'visible',
 	} ).filter( object => ! object.collisionPayload ).map( object => object.id ) );
 	const spawnFoot = {
