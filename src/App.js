@@ -598,7 +598,7 @@ export class App {
 			this.camera.position.set( ...spawn.position );
 			this.player.yaw = spawn.yaw;
 			this.player.pitch = spawn.pitch;
-			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0 ) );
+			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
 			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
@@ -760,7 +760,7 @@ export class App {
 		this.camera.position.set( ...spawn.position );
 		this.player.yaw = spawn.yaw;
 		this.player.pitch = spawn.pitch;
-		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0 ) );
+		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
 
 		await progress( 0.34, 'Loading the starting area…', undefined, 'world' );
 		const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? 160 : 500 } );
@@ -829,6 +829,8 @@ export class App {
 	hostedPackageFrame( dt ) {
 
 		GPU.beginFrame();
+		this.updateFPS( dt );
+		this.hud?.setStats( { fps: this.fps, frameMs: dt * 1000 } );
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		FrameUniforms.fields.dt.value = dt;
 		FrameUniforms.fields.time.value += dt;
@@ -1081,7 +1083,8 @@ export class App {
 	// so resolution changes do not flap. Android keeps the existing full-quality path.
 	adaptRenderScale( fps ) {
 
-		if ( ! this.autoScale ) return;
+		// Hosted package worlds do not use this PostFX-backed render-scale path.
+		if ( ! this.autoScale || ! this.post ) return;
 		if ( fps < 24 ) {
 
 			this._scaleAboveTarget = 0;

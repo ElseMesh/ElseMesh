@@ -117,7 +117,7 @@ export class Player {
 		this.mode = 'walk';
 		this.grounded = false;
 		this.camera.position.set( this.position.x, this.position.y + EYE, this.position.z );
-		this.camera.quaternion.setFromEuler( _e.set( pitch, yaw, 0 ) );
+		this.camera.quaternion.setFromEuler( _e.set( pitch, yaw, 0, 'YXZ' ) );
 		this._camY = this.camera.position.y;
 	}
 
@@ -136,7 +136,7 @@ export class Player {
 		if ( this.mode === 'swim' && this.hostedSeaLevel !== null ) {
 			this.updateSwim( dt );
 			this.camera.position.set( this.position.x, this.position.y + SWIM_EYE, this.position.z );
-			this.camera.quaternion.setFromEuler( _e.set( this.pitch, this.yaw, 0 ) );
+			this.camera.quaternion.setFromEuler( _e.set( this.pitch, this.yaw, 0, 'YXZ' ) );
 			this._camY = this.camera.position.y;
 			return;
 		}
@@ -180,7 +180,7 @@ export class Player {
 			this.velocity.y = Math.max( this.velocity.y * 0.3, - 2.5 );
 		}
 		this.camera.position.set( this.position.x, this.position.y + EYE, this.position.z );
-		this.camera.quaternion.setFromEuler( _e.set( this.pitch, this.yaw, 0 ) );
+		this.camera.quaternion.setFromEuler( _e.set( this.pitch, this.yaw, 0, 'YXZ' ) );
 		this._camY = this.camera.position.y;
 	}
 

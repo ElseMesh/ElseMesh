@@ -32,6 +32,7 @@ const app = new App( {
 	loadDefaultWorldPackage: async () => ( await import( 'virtual:elsemesh-default-world' ) ).defaultWorldPackage,
 	loadWorldProviders: async ( manifest ) => ( await import( 'virtual:elsemesh-world-providers' ) ).loadWorldProviders( manifest ),
 } );
+app.hud = ui;
 window.__ui = ui;
 
 function reportConnection() {
