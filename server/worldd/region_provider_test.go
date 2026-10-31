@@ -40,6 +40,21 @@ func TestParseRegionProviderURL(t *testing.T) {
 	}
 }
 
+func TestRegionProviderUsesLoopbackP2PAddresses(t *testing.T) {
+	addresses := libp2pLocalListenAddresses(0)
+	if len(addresses) != 2 {
+		t.Fatalf("local listen addresses = %v, want IPv4 loopback TCP and QUIC", addresses)
+	}
+	for _, address := range addresses {
+		if !strings.HasPrefix(address, "/ip4/127.0.0.1/") {
+			t.Errorf("listener is not IPv4 loopback: %s", address)
+		}
+		if !strings.Contains(address, "/0") {
+			t.Errorf("listener does not request an ephemeral port: %s", address)
+		}
+	}
+}
+
 func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 	const worldID = "elsemesh:hogwarts-legacy"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +184,13 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 }
 
 func TestReadRegionProviderDescriptorBoundsResponse(t *testing.T) {
-	_, err := readRegionProviderDescriptor(strings.NewReader(strings.Repeat("x", maxRegionProviderDescriptorBytes+1)))
+	payload := `{"schema":"elsemesh.dynamic-region-provider/1","worldId":"elsemesh:hogwarts-legacy","readOnly":true,"mapGraphTrace":"` + strings.Repeat("x", 128<<10) + `"}`
+	worldID, err := readRegionProviderDescriptor(strings.NewReader(payload))
+	if err != nil || worldID != "elsemesh:hogwarts-legacy" {
+		t.Fatalf("bounded descriptor with graph metadata = %q, %v", worldID, err)
+	}
+
+	_, err = readRegionProviderDescriptor(strings.NewReader(strings.Repeat("x", maxRegionProviderDescriptorBytes+1)))
 	if err == nil {
 		t.Fatal("oversized provider descriptor was accepted")
 	}

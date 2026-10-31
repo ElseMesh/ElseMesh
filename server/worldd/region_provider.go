@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const maxRegionProviderDescriptorBytes = 64 << 10
+const maxRegionProviderDescriptorBytes = 1 << 20
 
 type dynamicRegionProviderDescriptor struct {
 	Schema   string `json:"schema"`
@@ -118,7 +118,7 @@ func readRegionProviderDescriptor(reader io.Reader) (string, error) {
 		return "", err
 	}
 	if len(data) > maxRegionProviderDescriptorBytes {
-		return "", errors.New("descriptor exceeds 64 KiB")
+		return "", errors.New("descriptor exceeds 1 MiB")
 	}
 	var descriptor dynamicRegionProviderDescriptor
 	if err := json.Unmarshal(data, &descriptor); err != nil {
@@ -144,7 +144,7 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 		return err
 	}
 	if len(data) > maxRegionProviderDescriptorBytes {
-		return errors.New("region provider descriptor exceeds 64 KiB")
+		return errors.New("region provider descriptor exceeds 1 MiB")
 	}
 	worldID, err := readRegionProviderDescriptor(bytes.NewReader(data))
 	if err != nil {

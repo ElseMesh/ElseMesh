@@ -192,8 +192,8 @@ func run() error {
 	if worldDirectory != "" && (operationCount > 0 || *worldProfile != "" || *manifestPath != "") {
 		return errors.New("a world directory cannot be combined with one-shot operations, --world-profile, or --manifest")
 	}
-	if *regionProviderURL != "" && (worldDirectory != "" || *worldProfile == "" || *publicGateway != "" || *directoryURL != "" || !isLoopbackListenAddress(*httpAddress)) {
-		return errors.New("--region-provider requires --world-profile, a loopback --http address, no world directory, and no public gateway or directory")
+	if *regionProviderURL != "" && (worldDirectory != "" || *worldProfile == "" || *publicGateway != "" || *directoryURL != "" || !isLoopbackListenAddress(*httpAddress) || *zeroTierNetwork != "" || *listenPort != 0 || *webTransportAddress != "" || *zeroTierPathDiagnostics || *serveRelay || len(bootstrap) > 0 || len(relays) > 0 || len(cacheFrom) > 0 || len(roleStateFrom) > 0 || len(announceAddresses) > 0 || len(webrtcSTUNServers) > 0) {
+		return errors.New("--region-provider requires --world-profile, loopback HTTP, --p2p-port 0, disabled ZeroTier, and no public gateway, directory, bootstrap, relay, cache sync, announced addresses, STUN, or WebTransport")
 	}
 	if *zeroTierPathDiagnostics && operationCount > 0 {
 		return errors.New("zerotier-path-diagnostics cannot be combined with one-shot operations")
@@ -279,6 +279,14 @@ func run() error {
 	allowedBrowserOrigins, err := parseAllowedBrowserOrigins(allowedBrowserOriginsFlags)
 	if err != nil {
 		return fmt.Errorf("allow-browser-origin: %w", err)
+	}
+	if *regionProviderURL != "" {
+		for origin := range allowedBrowserOrigins {
+			parsed, parseErr := url.Parse(origin)
+			if parseErr != nil || !isLoopbackBrowserHost(parsed.Hostname()) {
+				return fmt.Errorf("--region-provider only allows loopback browser origins; got %q", origin)
+			}
+		}
 	}
 	var regionProvider *regionProviderGateway
 	var regionProviderWorldID string
@@ -501,7 +509,13 @@ func run() error {
 	}
 
 	listen := libp2pListenAddresses(*listenPort, parsedAnnounceAddresses)
-	opts := []libp2p.Option{libp2p.Identity(key), libp2p.ListenAddrStrings(listen...), libp2p.EnableAutoNATv2(), libp2p.EnableHolePunching()}
+	if regionProvider != nil {
+		listen = libp2pLocalListenAddresses(*listenPort)
+	}
+	opts := []libp2p.Option{libp2p.Identity(key), libp2p.ListenAddrStrings(listen...)}
+	if regionProvider == nil {
+		opts = append(opts, libp2p.EnableAutoNATv2(), libp2p.EnableHolePunching())
+	}
 	if zeroTier != nil {
 		opts = append(opts, zeroTier.Libp2pOptions()...)
 	}
@@ -811,6 +825,13 @@ func libp2pListenAddresses(port int, announced []ma.Multiaddr) []string {
 		}
 	}
 	return addresses
+}
+
+func libp2pLocalListenAddresses(port int) []string {
+	return []string{
+		fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port),
+		fmt.Sprintf("/ip4/127.0.0.1/udp/%d/quic-v1", port),
+	}
 }
 
 func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey, initialWorldID string) (signedDocument, error) {
