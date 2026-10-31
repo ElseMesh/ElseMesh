@@ -136,8 +136,11 @@ export class LocalRegionConnector {
 		this.worldId = descriptor.worldId;
 		this.sourceRevision = descriptor.sourceRevision;
 		const startupCellKeys = new Set( startupCells.map( cell => cell.join( ',' ) ) );
+		const spawnCell = selection.previewSpawn.position.map( coordinate => cellCoordinate( coordinate, previewRegion.cellSizeMeters ) );
+		const explicitStartupCellKeys = new Set( startupCellOffsets.map( offset => spawnCell.map( ( value, axis ) => value + offset[ axis ] ).join( ',' ) ) );
 		this.initialRegionCellObjectIDs = new Set();
 		this.initialRegionVisualObjectIDs = new Set();
+		this.explicitStartupCellVisualObjectIDs = new Set();
 		const spawn = selection.previewSpawn;
 		this.manifest = {
 			protocol: 'elsemesh.world/3', worldId: this.worldId, title: descriptor.title ? `${descriptor.title} · ${region.label}` : region.label,
@@ -202,6 +205,7 @@ export class LocalRegionConnector {
 				this.collisionObjectIDsByCell.set( cellKey, cellObjectIDs );
 				if ( isStartupCell ) this.initialRegionCellObjectIDs.add( collisionObjectId );
 				if ( isStartupCell ) this.initialRegionVisualObjectIDs.add( visualObjectId );
+				if ( explicitStartupCellKeys.has( cellKey ) ) this.explicitStartupCellVisualObjectIDs.add( visualObjectId );
 				this.manifest.assets.push(
 					{ id: collisionAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
 					{ id: visualAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
@@ -374,6 +378,7 @@ export class LocalRegionConnector {
 		this.regionAssets.clear();
 		this.initialRegionCellObjectIDs.clear();
 		this.initialRegionVisualObjectIDs.clear();
+		this.explicitStartupCellVisualObjectIDs.clear();
 		this.collisionAssetIDs.clear();
 		this.collisionObjectIDByAsset.clear();
 		this.unknownCollisionObjectIDs.clear();

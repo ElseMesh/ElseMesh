@@ -42,6 +42,9 @@ import { selectWorldObjectsForView, transformBoundsCenter } from '../network/Wor
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
+
+const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
+
 let sharedFoamLaceTexture;
 
 function asBytes( bytes ) {
@@ -1966,7 +1969,10 @@ export class WebGLFallback {
 		this.hostedWorldStreamingAt = performance.now();
 		const manifest = connector.manifest;
 		const loaded = this.localLoadedObjectIDs || ( this.localLoadedObjectIDs = new Set() );
-		const objects = selectWorldObjectsForView( manifest, this.camera, { maxDistance: connector.localOnly ? 160 : 500 } )
+		const objects = selectWorldObjectsForView( manifest, this.camera, {
+			nearbyDistance: connector.localOnly ? connector.cellSizeMeters || 8 : 24,
+			maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
+		} )
 			.filter( object => ! connector.localOnly || ! object.collisionPayload );
 		const viewObjectIDs = new Set( objects.map( object => object.id ) );
 		if ( connector.localOnly ) {
@@ -2038,6 +2044,18 @@ export class WebGLFallback {
 		}
 		const wanted = objects.filter( object => ! loaded.has( object.id ) );
 		if ( wanted.length === 0 ) return;
+		if ( connector.localOnly ) {
+			const center = new this.THREE.Vector3();
+			wanted.sort( ( a, b ) => {
+				const aCollision = a.collisionPayload ? 0 : 1, bCollision = b.collisionPayload ? 0 : 1;
+				if ( aCollision !== bCollision ) return aCollision - bCollision;
+				transformBoundsCenter( a, a.streamingBounds.center, center );
+				const aDistance = this.camera.position.distanceToSquared( center );
+				transformBoundsCenter( b, b.streamingBounds.center, center );
+				return aDistance - this.camera.position.distanceToSquared( center );
+			} );
+			wanted.length = Math.min( wanted.length, LOCAL_REGION_STREAM_BATCH_SIZE );
+		}
 		const assetIDs = new Set( wanted.map( object => object.assetId ).filter( Boolean ) );
 		this.hostedWorldStreaming = true;
 		connector.preload( { assetIDs, concurrency: 1 } ).then( async assets => {

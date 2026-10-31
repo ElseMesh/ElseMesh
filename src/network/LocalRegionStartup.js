@@ -9,6 +9,7 @@ export function selectLocalRegionStartupObjects( connector, manifest, camera, sp
 		maxDistance: connector.maxViewDistanceMeters,
 		maxPriority: 'visible',
 	} ).filter( object => ! object.collisionPayload ).map( object => object.id ) );
+	for ( const objectID of connector.explicitStartupCellVisualObjectIDs || [] ) selectedIDs.add( objectID );
 	const spawnFoot = {
 		x: spawn.position[ 0 ],
 		y: spawn.position[ 1 ] - PLAYER_EYE_HEIGHT,
