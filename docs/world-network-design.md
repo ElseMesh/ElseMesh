@@ -19,6 +19,12 @@ world discovery. A browser host can advertise through the gateway with the
 same HostID and without joining ZeroTier. A ZeroTier NodeID is an optional
 route hint, not identity or membership proof.
 
+When one machine hosts multiple worlds that need distinct HostIDs, give each
+world a persistent node profile and `node.key`. Its signed node record binds
+that profile's PeerID to one `worldId`, and restarting the profile preserves
+the HostID. `thruholdd --world-profile` provides separate identities and data
+directories for this model.
+
 The ordinary package provider serves declared, hash-verified assets. A dynamic
 region provider needs signed region discovery, bounded on-demand decoding and
 delivery, cancellation, content integrity, and memory/cache limits. It must
