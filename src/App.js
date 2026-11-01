@@ -72,7 +72,7 @@ import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.j
 import { Group } from './engine/scene/Group.js';
 import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.js';
 import { LocalRegionConnector } from './network/LocalRegionConnector.js';
-import { selectLocalRegionStartupObjects } from './network/LocalRegionStartup.js';
+import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from './network/LocalRegionStartup.js';
 import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { avatarPolicy, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
@@ -601,11 +601,18 @@ export class App {
 			this.player.yaw = spawn.yaw;
 			this.player.pitch = spawn.pitch;
 			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
-			const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } );
+			const selectedObjects = connector.localOnly
+				? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
+				: selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 500 } );
+			const initialObjects = connector.localOnly
+				? selectLocalRegionEntryObjects( connector, selectedObjects, this.camera )
+				: selectedObjects;
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
-			for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
-			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+			if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
+			if ( ! connector.localOnly ) {
+				for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+			}
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
 			const initialAssetIDs = new Set( connector.manifest.objects.filter( ( object ) => initialObjectIDs.has( object.id ) && object.assetId ).map( ( object ) => object.assetId ) );
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
@@ -766,11 +773,14 @@ export class App {
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
 
 		await progress( 0.34, 'Loading the starting area…', 0.82, 'world' );
-		const initialObjects = connector.localOnly
+		const selectedObjects = connector.localOnly
 			? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
 			: selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 500 } );
+		const initialObjects = connector.localOnly
+			? selectLocalRegionEntryObjects( connector, selectedObjects, this.camera )
+			: selectedObjects;
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
-		for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
+		if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 		if ( ! connector.localOnly ) {
 			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
 		}

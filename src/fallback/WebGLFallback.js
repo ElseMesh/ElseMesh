@@ -41,7 +41,7 @@ import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
 import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
-import { selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
+import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
@@ -1611,7 +1611,8 @@ export class WebGLFallback {
 			this.camera.position.set( ...localSpawn.position );
 			this.camera.rotation.order = 'YXZ';
 			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
-			const initialObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
+			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
+			const initialObjects = selectLocalRegionEntryObjects( this.connector, selectedObjects, this.camera );
 			const initialComponents = selectWorldComponentsForView( manifest, this.camera, { maxPriority: 'nearby' } );
 			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
