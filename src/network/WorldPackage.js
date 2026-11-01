@@ -372,6 +372,7 @@ export function unregisterWorldPackageCollisions( root, colliders ) {
 	for ( const shapes of embedded?.values() || [] ) for ( const { kind, collider } of shapes ) {
 		if ( kind === 'box' ) colliders.removeBox( collider );
 		else if ( kind === 'cylinder' ) colliders.removeCylinder( collider );
+		else if ( kind === 'convex' ) colliders.removeConvex( collider );
 	}
 	embedded?.clear();
 }
@@ -391,7 +392,8 @@ export function unloadWorldPackageObjects( root, connector, colliders, objectIDs
 		for ( const { kind, collider } of state.embeddedColliders?.get( objectID ) || [] ) {
 			if ( ! colliders ) continue;
 			if ( kind === 'box' ) colliders.removeBox( collider );
-			else colliders.removeCylinder( collider );
+			else if ( kind === 'cylinder' ) colliders.removeCylinder( collider );
+			else if ( kind === 'convex' ) colliders.removeConvex( collider );
 		}
 		state.embeddedColliders?.delete( objectID );
 		const instance = root.children.find( child => child.userData.worldObjectId === objectID );
@@ -511,17 +513,15 @@ function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
 			if ( ! Array.isArray( convex.indices ) || convex.indices.length < 12 || convex.indices.length % 3 !== 0 || convex.indices.length > 196608 || convex.indices.some( index => ! Number.isInteger( index ) || index < 0 || index >= points.length ) ) throw new Error( `World object ${objectId} has invalid embedded convex collision indices` );
 			indices += convex.indices.length;
 			if ( indices > 786432 ) throw new Error( `World object ${objectId} exceeds the embedded convex index limit` );
-			const min = new Vector3( Infinity, Infinity, Infinity ), max = new Vector3( - Infinity, - Infinity, - Infinity );
-			for ( const point of points ) { node.localToWorld( point ); min.min( point ); max.max( point ); }
-			const half = max.clone().sub( min ).multiplyScalar( 0.5 );
-			const walkable = half.y <= Math.min( half.x, half.z ) * 0.1;
-			const collider = colliders.addBox( min.clone().add( max ).multiplyScalar( 0.5 ), half, 0, { walkable, solid: true, tag: `world:${objectId}:body-setup-convex-bounds` } );
-			registered.push( { kind: 'box', collider } );
+			for ( const point of points ) node.localToWorld( point );
+			const collider = colliders.addConvex( points, convex.indices, { tag: `world:${objectId}:body-setup-convex` } );
+			registered.push( { kind: 'convex', collider } );
 		}
 	} ); } catch ( error ) {
 		for ( const { kind, collider } of registered ) {
 			if ( kind === 'box' ) colliders.removeBox( collider );
-			else colliders.removeCylinder( collider );
+			else if ( kind === 'cylinder' ) colliders.removeCylinder( collider );
+			else if ( kind === 'convex' ) colliders.removeConvex( collider );
 		}
 		throw error;
 	}

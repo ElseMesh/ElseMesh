@@ -1,13 +1,14 @@
 import * as THREE from '../engine/index.js';
 
 // Lightweight collision world for the character controller and boat.
-// Boxes are oriented around Y only. Walkable boxes (decks, floors, stairs) act as ground.
+// Boxes are oriented around Y only; convexes keep world-space hull planes.
 export class Colliders {
 
 	constructor() {
 
 		this.boxes = [];
 		this.cylinders = [];
+		this.convexes = [];
 		this.heightfields = [];
 		this._v = new THREE.Vector3();
 
@@ -47,6 +48,49 @@ export class Colliders {
 		const index = this.cylinders.indexOf( cylinder );
 		if ( index === - 1 ) return false;
 		this.cylinders.splice( index, 1 );
+		return true;
+	}
+
+	addConvex( vertices, indices, { tag = '' } = {} ) {
+		// The bridge supplies Unreal ConvexElem hulls; avoid an O(vertices × faces) revalidation here.
+		if ( ! Array.isArray( vertices ) || vertices.length < 4 || ! Array.isArray( indices ) || indices.length < 12 || indices.length % 3 !== 0 ) throw new Error( 'Invalid convex collider geometry' );
+		const center = new THREE.Vector3();
+		const min = new THREE.Vector3( Infinity, Infinity, Infinity ), max = new THREE.Vector3( - Infinity, - Infinity, - Infinity );
+		for ( const vertex of vertices ) {
+			if ( ! vertex || ! [ vertex.x, vertex.y, vertex.z ].every( Number.isFinite ) ) throw new Error( 'Invalid convex collider vertex' );
+			center.add( vertex ); min.min( vertex ); max.max( vertex );
+		}
+		center.multiplyScalar( 1 / vertices.length );
+		const planes = [];
+		const planeBuckets = new Map();
+		const triangles = [];
+		const edge1 = new THREE.Vector3(), edge2 = new THREE.Vector3(), normal = new THREE.Vector3(), point = new THREE.Vector3();
+		for ( let offset = 0; offset < indices.length; offset += 3 ) {
+			const ia = indices[ offset ], ib = indices[ offset + 1 ], ic = indices[ offset + 2 ];
+			if ( ! [ ia, ib, ic ].every( index => Number.isInteger( index ) && index >= 0 && index < vertices.length ) ) throw new Error( 'Invalid convex collider index' );
+			const a = vertices[ ia ], b = vertices[ ib ], c = vertices[ ic ];
+			edge1.subVectors( b, a ); edge2.subVectors( c, a ); normal.crossVectors( edge1, edge2 );
+			if ( normal.lengthSq() < 1e-12 ) continue;
+			normal.normalize();
+			if ( normal.dot( point.subVectors( center, a ) ) > 0 ) normal.negate();
+			const distance = normal.dot( a );
+			const key = `${ Math.round( normal.x * 1e4 ) },${ Math.round( normal.y * 1e4 ) },${ Math.round( normal.z * 1e4 ) }`;
+			let bucket = planeBuckets.get( key );
+			if ( ! bucket ) planeBuckets.set( key, bucket = [] );
+			let plane = bucket.find( item => item.normal.dot( normal ) > 1 - 1e-5 && Math.abs( item.distance - distance ) < 1e-4 );
+			if ( ! plane ) { plane = { normal: normal.clone(), distance }; bucket.push( plane ); planes.push( plane ); }
+			if ( normal.y > 0.95 ) triangles.push( { a: a.clone(), b: b.clone(), c: c.clone(), normal: normal.clone(), distance } );
+		}
+		if ( planes.length < 4 ) throw new Error( 'Convex collider has fewer than four faces' );
+		const convex = { vertices, planes, triangles, min, max, tag };
+		this.convexes.push( convex );
+		return convex;
+	}
+
+	removeConvex( convex ) {
+		const index = this.convexes.indexOf( convex );
+		if ( index === - 1 ) return false;
+		this.convexes.splice( index, 1 );
 		return true;
 	}
 
@@ -100,6 +144,21 @@ export class Colliders {
 			const [ lx, lz ] = this._toLocal( b, x, z );
 			if ( Math.abs( lx ) <= b.half.x + pad && Math.abs( lz ) <= b.half.z + pad ) best = Math.max( best, b.top );
 
+		}
+		for ( const convex of this.convexes ) {
+			if ( convex.max.y > maxY || x < convex.min.x - pad || x > convex.max.x + pad || z < convex.min.z - pad || z > convex.max.z + pad ) continue;
+			for ( const triangle of convex.triangles ) {
+				const { a, b, c, normal } = triangle;
+				const v0x = c.x - a.x, v0z = c.z - a.z, v1x = b.x - a.x, v1z = b.z - a.z, v2x = x - a.x, v2z = z - a.z;
+				const dot00 = v0x * v0x + v0z * v0z, dot01 = v0x * v1x + v0z * v1z, dot02 = v0x * v2x + v0z * v2z;
+				const dot11 = v1x * v1x + v1z * v1z, dot12 = v1x * v2x + v1z * v2z;
+				const denominator = dot00 * dot11 - dot01 * dot01;
+				if ( Math.abs( denominator ) < 1e-12 ) continue;
+				const u = ( dot11 * dot02 - dot01 * dot12 ) / denominator, v = ( dot00 * dot12 - dot01 * dot02 ) / denominator;
+				if ( u < - 1e-6 || v < - 1e-6 || u + v > 1 + 1e-6 ) continue;
+				const height = ( triangle.distance - normal.x * x - normal.z * z ) / normal.y;
+				if ( height <= maxY ) best = Math.max( best, height );
+			}
 		}
 		for ( const field of this.heightfields ) {
 			const dx = x - field.position.x, dz = z - field.position.z;
@@ -171,6 +230,26 @@ export class Colliders {
 			pos.z = c.z + dz / d * r;
 			hit = true;
 
+		}
+
+		const centerY = pos.y + height * 0.5;
+		const segmentHalf = Math.max( 0, height * 0.5 - radius );
+		for ( const convex of this.convexes ) {
+			if ( pos.y > convex.max.y || pos.y + height < convex.min.y || pos.x + radius < convex.min.x || pos.x - radius > convex.max.x || pos.z + radius < convex.min.z || pos.z - radius > convex.max.z ) continue;
+			let separated = false, bestDepth = Infinity, bestNormal = null;
+			for ( const plane of convex.planes ) {
+				const n = plane.normal;
+				const support = radius + segmentHalf * Math.abs( n.y );
+				const depth = plane.distance + support - ( n.x * pos.x + n.y * centerY + n.z * pos.z );
+				if ( depth < - 1e-6 ) { separated = true; break; }
+				if ( depth < bestDepth ) { bestDepth = depth; bestNormal = n; }
+			}
+			if ( separated || ! bestNormal || bestDepth <= 1e-6 || Math.hypot( bestNormal.x, bestNormal.z ) <= 1e-4 ) continue;
+			const horizontalLength = Math.hypot( bestNormal.x, bestNormal.z );
+			const distance = bestDepth / horizontalLength;
+			pos.x += bestNormal.x / horizontalLength * distance;
+			pos.z += bestNormal.z / horizontalLength * distance;
+			hit = true;
 		}
 
 		return hit;

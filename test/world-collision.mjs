@@ -99,7 +99,7 @@ const bodySetupMetadata = {
 	spheres: [ { center: [ 5, 1, 0 ], radius: 0.5 } ],
 	capsules: [ { center: [ - 5, 1, 0 ], radius: 0.25, length: 1, rotation: [ 0, 0, 0, 1 ] } ],
 	taperedCapsules: [],
-	convexes: [ { vertices: [ [ 6, 0, 0 ], [ 7, 0, 0 ], [ 6, 1, 0 ], [ 6, 0, 1 ] ], indices: [ 0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3 ] } ],
+	convexes: [ { vertices: [ [ 6, 0, 0 ], [ 7, 0, 0 ], [ 6, 0, 1 ], [ 7, 0, 1 ], [ 6, 1, 0 ], [ 7, 1, 0 ], [ 6, 1, 1 ], [ 7, 1, 1 ] ], indices: [ 0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5 ] } ],
 };
 const bridgedObject = { id: 'elsemesh-object:bridged', kind: 'asset-instance', assetId: `sha256:${'b'.repeat( 64 )}`, transform: { position: [ 10, 2, 30 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } };
 const bridgedConnector = { worldId: 'elsemesh:bridge-collision', manifest: { objects: [ bridgedObject ], portals: [] } };
@@ -107,14 +107,23 @@ const bridgedRoot = await loadWorldPackage( bridgedConnector, { assets: new Map(
 bridgedRoot.children[ 0 ].children[ 0 ].position.y = 1;
 const bridgedColliders = new Colliders();
 registerWorldPackageCollisions( bridgedRoot, bridgedColliders );
-assert.equal( bridgedColliders.boxes.length, 2, 'bridge registers BodySetup floor boxes and convex bounds from GLB node extras' );
+assert.equal( bridgedColliders.boxes.length, 1, 'bridge registers the BodySetup floor box from GLB node extras' );
+assert.equal( bridgedColliders.convexes.length, 1, 'bridge registers convex hull geometry from GLB node extras' );
 assert.equal( bridgedColliders.cylinders.length, 2, 'bridge maps BodySetup spheres and capsules into the current vertical-cylinder collider' );
 assert.ok( Math.abs( bridgedColliders.groundHeightAt( 10, 30, 10 ) - 3 ) < 1e-6, 'zero-thickness Unreal box floor collider is transformed with the GLB node and object placement' );
+assert.ok( Math.abs( bridgedColliders.groundHeightAt( 16.5, 30.5, 10 ) - 4 ) < 1e-6, 'convex top facets provide walkable ground at their transformed height' );
+const convexTopPosition = new Vector3( 16.5, 4, 30.5 );
+assert.equal( bridgedColliders.resolveCapsule( convexTopPosition, 0.3, 1.8 ), false, 'standing on a convex top does not push the capsule sideways' );
+const convexSidePosition = new Vector3( 16.4, 3.1, 30.5 );
+assert.equal( bridgedColliders.resolveCapsule( convexSidePosition, 0.3, 1.8 ), true, 'convex wall intersects and resolves a vertical player capsule' );
+assert.ok( convexSidePosition.x <= 15.70001 || convexSidePosition.x >= 17.29999 || convexSidePosition.z <= 29.70001 || convexSidePosition.z >= 31.29999, 'convex resolution pushes the capsule beyond a hull face' );
 assert.equal( bridgedColliders.boxes[ 0 ].walkable, true, 'horizontal BodySetup box is walkable' );
 registerWorldPackageCollisions( bridgedRoot, bridgedColliders );
-assert.equal( bridgedColliders.boxes.length, 2, 'streaming registration does not duplicate embedded BodySetup colliders' );
+assert.equal( bridgedColliders.boxes.length, 1, 'streaming registration does not duplicate embedded BodySetup boxes' );
+assert.equal( bridgedColliders.convexes.length, 1, 'streaming registration does not duplicate embedded convex colliders' );
 unregisterWorldPackageCollisions( bridgedRoot, bridgedColliders );
-assert.equal( bridgedColliders.boxes.length, 0, 'world handoff removes embedded box and convex-bound colliders' );
+assert.equal( bridgedColliders.boxes.length, 0, 'world handoff removes embedded boxes' );
+assert.equal( bridgedColliders.convexes.length, 0, 'world handoff removes embedded convex colliders' );
 assert.equal( bridgedColliders.cylinders.length, 0, 'world handoff removes embedded sphere and capsule colliders' );
 
 const streamedCollisionObject = {
@@ -123,15 +132,17 @@ const streamedCollisionObject = {
 };
 const streamedColliders = new Colliders();
 const streamedShapes = registerWorldPackageCollisionPayload( bodySetupGLB( { elsemeshCollision: bodySetupMetadata } ), streamedCollisionObject, streamedColliders );
-assert.equal( streamedShapes.length, 4, 'streamed collision GLB registers its box, sphere, capsule, and convex bounds' );
-assert.equal( streamedColliders.boxes.length, 2, 'streamed collision GLB registers box and convex colliders' );
+assert.equal( streamedShapes.length, 4, 'streamed collision GLB registers its box, sphere, capsule, and convex hull' );
+assert.equal( streamedColliders.boxes.length, 1, 'streamed collision GLB registers its BodySetup box' );
+assert.equal( streamedColliders.convexes.length, 1, 'streamed collision GLB registers its convex hull' );
 assert.equal( streamedColliders.cylinders.length, 2, 'streamed collision GLB registers sphere and capsule colliders' );
 assert.ok( Math.abs( streamedColliders.groundHeightAt( 10, 30, 3 ) - 2 ) < 1e-6, 'streamed collision GLB applies its cell transform before movement uses the floor' );
 for ( const { kind, collider } of streamedShapes ) {
 	if ( kind === 'box' ) streamedColliders.removeBox( collider );
-	else streamedColliders.removeCylinder( collider );
+	else if ( kind === 'cylinder' ) streamedColliders.removeCylinder( collider );
+	else if ( kind === 'convex' ) streamedColliders.removeConvex( collider );
 }
-assert.equal( streamedColliders.boxes.length + streamedColliders.cylinders.length, 0, 'evicting a streamed collision cell removes all of its shapes' );
+assert.equal( streamedColliders.boxes.length + streamedColliders.cylinders.length + streamedColliders.convexes.length, 0, 'evicting a streamed collision cell removes all of its shapes' );
 
 const previewSupport = {
 	id: 'elsemesh-object:preview-support', kind: 'asset-instance', label: 'Provisional preview support', assetId: null,
@@ -163,5 +174,5 @@ invalidCollisionRoot.userData.worldPackage = {
 	loadedObjects: new Set( [ invalidCollisionInstance.userData.worldObjectId ] ),
 };
 assert.throws( () => registerWorldPackageCollisions( invalidCollisionRoot, bridgedColliders ), /invalid embedded collision sphere/, 'malformed BodySetup records fail closed' );
-assert.equal( bridgedColliders.boxes.length + bridgedColliders.cylinders.length, 0, 'a rejected BodySetup does not leave partially registered colliders' );
+assert.equal( bridgedColliders.boxes.length + bridgedColliders.cylinders.length + bridgedColliders.convexes.length, 0, 'a rejected BodySetup does not leave partially registered colliders' );
 console.log( 'ok   authored world collisions validate, transform, register, and clean up' );

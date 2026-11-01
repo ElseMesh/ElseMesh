@@ -2056,7 +2056,8 @@ export class WebGLFallback {
 			for ( const object of released ) {
 				for ( const { kind, collider } of this.hostedCollisionPayloads.get( object.id ) || [] ) {
 					if ( kind === 'box' ) this.app.hostedColliders.removeBox( collider );
-					else this.app.hostedColliders.removeCylinder( collider );
+					else if ( kind === 'cylinder' ) this.app.hostedColliders.removeCylinder( collider );
+					else if ( kind === 'convex' ) this.app.hostedColliders.removeConvex( collider );
 				}
 				this.hostedCollisionPayloads.delete( object.id );
 				const root = this.hostedObjectRoots?.get( object.id );
