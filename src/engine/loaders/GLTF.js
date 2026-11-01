@@ -41,7 +41,16 @@ export async function loadGLB( url ) {
 
 export function parseGLB( buffer ) {
 
-	if ( ArrayBuffer.isView( buffer ) ) buffer = buffer.buffer.slice( buffer.byteOffset, buffer.byteOffset + buffer.byteLength );
+	if ( ArrayBuffer.isView( buffer ) ) {
+
+		// Region responses already arrive as a full-span Uint8Array. Keep their backing
+		// buffer instead of briefly duplicating large GLBs; copy only subviews.
+		const view = buffer;
+		buffer = view.byteOffset === 0 && view.byteLength === view.buffer.byteLength
+			? view.buffer
+			: view.buffer.slice( view.byteOffset, view.byteOffset + view.byteLength );
+
+	}
 
 	const dv = new DataView( buffer );
 	if ( dv.getUint32( 0, true ) !== 0x46546C67 ) throw new Error( 'GLB: bad magic' );
