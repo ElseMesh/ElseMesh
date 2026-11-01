@@ -89,6 +89,31 @@
             "maxLength": 120
           }
         },
+        "environment": {
+          "type": "object",
+          "description": "Renderer-neutral world choices for visible atmosphere and clouds. Omitted choices disable those layers.",
+          "properties": {
+            "sky": {
+              "enum": [ "none", "atmosphere" ]
+            },
+            "clouds": {
+              "enum": [ "none", "procedural" ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": { "clouds": { "const": "procedural" } },
+                "required": [ "clouds" ]
+              },
+              "then": {
+                "properties": { "sky": { "const": "atmosphere" } },
+                "required": [ "sky" ]
+              }
+            }
+          ],
+          "additionalProperties": false
+        },
         "behaviors": {
           "type": "object",
           "maxProperties": 16,

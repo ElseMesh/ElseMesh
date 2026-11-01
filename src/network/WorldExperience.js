@@ -1,9 +1,19 @@
 import { worldBehaviorsFor } from './WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_MAX_BYTES } from './WorldJavaScriptExtension.js';
 
-const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'behaviors', 'extensions' ];
+const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'environment', 'behaviors', 'extensions' ];
 const LOADING_STAGES = new Set( [ 'gpu', 'atmosphere', 'terrain', 'village', 'vegetation', 'ocean', 'reef', 'simulation', 'shaders', 'world', 'compile', 'warmup' ] );
 const THEME_COLORS = [ 'background', 'surface', 'accent', 'text', 'muted', 'button', 'buttonText', 'border' ];
+const SKY_MODES = new Set( [ 'none', 'atmosphere' ] );
+const CLOUD_MODES = new Set( [ 'none', 'procedural' ] );
+
+export function worldEnvironmentSettings( experience ) {
+	const environment = experience?.environment;
+	return {
+		sky: environment?.sky === 'atmosphere',
+		clouds: environment?.clouds === 'procedural',
+	};
+}
 
 export const GENERIC_WORLD_EXPERIENCE = Object.freeze( validateWorldExperience( {
 	genre: 'A connected world',
@@ -50,6 +60,13 @@ export function validateWorldExperience( experience, assets, options = {} ) {
 			if ( ! safeURL || Object.keys( logo ).some( key => ! [ 'src', 'alt' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold loading logo' );
 		}
 		if ( theme.colors !== undefined && ( ! theme.colors || typeof theme.colors !== 'object' || Array.isArray( theme.colors ) || Object.keys( theme.colors ).some( key => ! THEME_COLORS.includes( key ) ) || Object.values( theme.colors ).some( color => typeof color !== 'string' || ! /^#[0-9a-f]{6}$/i.test( color ) ) ) ) throw new Error( 'Invalid ThruHold loading theme colors' );
+	}
+	if ( experience.environment !== undefined ) {
+		const environment = experience.environment;
+		if ( ! environment || typeof environment !== 'object' || Array.isArray( environment ) || Object.keys( environment ).some( key => ! [ 'sky', 'clouds' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold environment profile' );
+		if ( environment.sky !== undefined && ! SKY_MODES.has( environment.sky ) ) throw new Error( 'Invalid ThruHold sky mode' );
+		if ( environment.clouds !== undefined && ! CLOUD_MODES.has( environment.clouds ) ) throw new Error( 'Invalid ThruHold cloud mode' );
+		if ( environment.clouds === 'procedural' && environment.sky !== 'atmosphere' ) throw new Error( 'Procedural clouds require the atmospheric sky' );
 	}
 	return experience;
 }

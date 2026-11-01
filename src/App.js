@@ -91,7 +91,7 @@ import { createWebGPUHostedOceanEffects } from './ocean/WebGPUHostedOceanEffects
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
 import { FrameWorkMeter } from './core/FrameWorkMeter.js';
-import { GENERIC_WORLD_EXPERIENCE } from './network/WorldExperience.js';
+import { GENERIC_WORLD_EXPERIENCE, worldEnvironmentSettings } from './network/WorldExperience.js';
 
 const _up = new Vector3( 0, 1, 0 );
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
@@ -329,7 +329,8 @@ export class App {
 		await progress( 0.04, 'Building the atmosphere…', undefined, 'atmosphere' );
 		this.atmosphere = new Atmosphere( renderer );
 		this.sky = new Sky( this.atmosphere );
-		if ( ! qs.has( 'noClouds' ) ) {
+		this.worldEnvironment = worldEnvironmentSettings( this.localWorldExperience );
+		if ( this.worldEnvironment.clouds && ! qs.has( 'noClouds' ) ) {
 
 			// sky-pro-webgpu's clouds ("Partly cloudy"); ?oldClouds: the previous ones
 			this.clouds = qs.has( 'oldClouds' ) ? new Clouds( renderer, this.atmosphere ) : new SkyProClouds( renderer, this.atmosphere );
@@ -435,7 +436,7 @@ export class App {
 		// the water's refraction source: the scene below the water only, half resolution
 		this.refraction = new RefractionPass( { meshRenderer: engine.meshRenderer, scene, camera, sceneRenderer: this.sceneRenderer, scale: this.desktopRefractionScale } );
 		this.sceneRenderer.onBeforeWater = () => this.refraction.render( G.seaLevel.value );
-		if ( this.sky.background ) this.sceneRenderer.background = this.sky.background;
+		if ( this.worldEnvironment.sky && this.sky.background ) this.sceneRenderer.background = this.sky.background;
 		this.portalView = new WorldPortalView( { scene, meshRenderer: engine.meshRenderer, sceneRenderer: this.sceneRenderer, camera } );
 		// lanterns, lamp posts, path lights, lit windows, the boat's cabin / navigation lights and the
 		// flashlight (L): nearest few packed into one small uniform array each frame
@@ -687,6 +688,9 @@ export class App {
 
 		const engine = this.engine;
 		const { scene, camera } = engine;
+		const manifestResult = await this.worldManifestPromise;
+		if ( manifestResult.error ) throw manifestResult.error;
+		this.worldEnvironment = worldEnvironmentSettings( manifestResult.manifest.experience );
 		this.backend = 'webgpu';
 		this.hostedPackageWorld = true;
 		this.renderer = engine;
@@ -703,7 +707,7 @@ export class App {
 		await progress( 0.08, 'Preparing the ThruHold lighting…', undefined, 'atmosphere' );
 		this.atmosphere = new Atmosphere( engine );
 		this.sky = new Sky( this.atmosphere );
-		if ( ! this.qs.has( 'noClouds' ) ) {
+		if ( this.worldEnvironment.clouds && ! this.qs.has( 'noClouds' ) ) {
 			this.clouds = this.qs.has( 'oldClouds' ) ? new Clouds( engine, this.atmosphere ) : new SkyProClouds( engine, this.atmosphere );
 			if ( this.clouds.ready ) await this.clouds.ready;
 			this.sky.clouds = this.clouds;
@@ -714,7 +718,7 @@ export class App {
 		this.shadows.enabled = false;
 		this.shadows.update( camera, new Vector3( 0, 1, 0 ) );
 		this.sceneRenderer = new SceneRenderer( engine.meshRenderer, scene, camera );
-		if ( this.sky.background ) this.sceneRenderer.background = this.sky.background;
+		if ( this.worldEnvironment.sky && this.sky.background ) this.sceneRenderer.background = this.sky.background;
 		this.sceneRenderer.clearColor = [ 0.018, 0.022, 0.03, 1 ];
 		this.sceneRenderer.setSize( engine.width, engine.height );
 		engine.onResize.push( () => this.sceneRenderer.setSize( engine.width, engine.height ) );
@@ -752,8 +756,6 @@ export class App {
 
 		await progress( 0.18, 'Connecting to ThruHold…', undefined, 'world' );
 		const connector = this.worldConnector;
-		const manifestResult = await this.worldManifestPromise;
-		if ( manifestResult.error ) throw manifestResult.error;
 		G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
 		const entrySelection = await chooseWorldEntryPoint( connector.manifest );
 		const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );

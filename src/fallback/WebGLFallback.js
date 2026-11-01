@@ -43,6 +43,7 @@ import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
+import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
 
@@ -754,6 +755,14 @@ export class WebGLFallback {
 	async init( onProgress = () => {} ) {
 
 		const T = this.THREE;
+		let experience = this.app.localWorldExperience;
+		if ( this.worldLink ) {
+			const manifestResult = await this.app.worldManifestPromise;
+			if ( manifestResult.error ) throw manifestResult.error;
+			experience = manifestResult.manifest.experience;
+		}
+		this.worldEnvironment = worldEnvironmentSettings( experience );
+		this.cloudsEnabled = this.worldEnvironment.clouds && ! this.app.qs.has( 'noClouds' );
 		this.reviewPose = cameraPoseFromSearch( location.search );
 		if ( this.reviewPose?.time !== undefined ) this.app.settings.timeOfDay = this.reviewPose.time;
 		this.renderer.toneMapping = T.ACESFilmicToneMapping;
@@ -762,7 +771,9 @@ export class WebGLFallback {
 		this.renderer.shadowMap.type = T.PCFSoftShadowMap;
 		this.spray = new WebGLSpray( T, this.scene );
 		const sunDirection = this._sunDirection( this.app.settings.timeOfDay );
-		this.cloudLayer = this._makeCloudLayer( sunDirection );
+		this.scene.background = this.worldEnvironment.sky ? null : new T.Color( 0x080b10 );
+		this.cloudLayer = this._makeCloudLayer( sunDirection, this.cloudsEnabled );
+		this.cloudLayer.visible = this.worldEnvironment.sky;
 		this.scene.add( this.cloudLayer );
 		this.hemisphereLight = new T.HemisphereLight( 0xd9f1ff, 0x42513f, 1.5 );
 		this.scene.add( this.hemisphereLight );
@@ -926,7 +937,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -1106,6 +1117,8 @@ export class WebGLFallback {
 				uniform vec3 uCameraPosition;
 				uniform vec3 uSunDirection;
 				uniform sampler2D uCloudNoise;
+				uniform float uSkyEnabled;
+				uniform float uCloudsEnabled;
 				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
 				uniform mat4 uViewProjection;
@@ -1177,7 +1190,7 @@ export class WebGLFallback {
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
 					float fresnel = 0.025 + 0.86 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
-					vec3 sky = mix( vec3( 0.025, 0.07, 0.18 ), vec3( 0.13, 0.25, 0.43 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) );
+					vec3 sky = mix( vec3( 0.018, 0.022, 0.03 ), mix( vec3( 0.025, 0.07, 0.18 ), vec3( 0.13, 0.25, 0.43 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) ), uSkyEnabled );
 					vec2 skyUv = vec2( atan( reflectionDirection.x, reflectionDirection.z ) / 6.2831853 + 0.5, asin( clamp( reflectionDirection.y, -1.0, 1.0 ) ) / 3.1415927 + 0.5 );
 					skyUv += vec2( uTime * 0.0005, -uTime * 0.00014 );
 					vec4 cloudField = texture2D( uCloudNoise, skyUv * 0.38 );
@@ -1187,8 +1200,8 @@ export class WebGLFallback {
 					float cloudFine = texture2D( uCloudNoise, skyUv * 4.6 + vec2( 0.31, -0.19 ) ).b;
 					float reflectedCloudNoise = cloudBroad - max( 0.0, 0.52 - cloudDetail ) * 0.32 + ( cloudFine - 0.5 ) * 0.045;
 					float reflectedCloudBand = smoothstep( 0.055, 0.16, reflectionDirection.y ) * ( 1.0 - smoothstep( 0.72, 0.96, reflectionDirection.y ) );
-					float reflectedCloud = smoothstep( 0.64, 0.78, reflectedCloudNoise ) * reflectedCloudBand * 0.85;
-					float reflectedSun = pow( max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ), 96.0 );
+					float reflectedCloud = smoothstep( 0.64, 0.78, reflectedCloudNoise ) * reflectedCloudBand * 0.85 * uCloudsEnabled;
+					float reflectedSun = pow( max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ), 96.0 ) * uSkyEnabled;
 					vec3 cloudColor = mix( vec3( 0.42, 0.5, 0.62 ), vec3( 1.25, 1.16, 1.0 ), max( dot( reflectionDirection, normalize( uSunDirection ) ), 0.0 ) * 0.6 + 0.2 );
 					sky = mix( sky, cloudColor, reflectedCloud );
 					sky += vec3( 1.0, 0.72, 0.43 ) * reflectedSun * 0.14;
@@ -1208,7 +1221,7 @@ export class WebGLFallback {
 					vec3 waterBody = mix( water, transmitted, bottomVisibility * 0.18 * ( 1.0 - waterFresnel ) );
 					vec3 reflected = mix( waterBody, sky, waterFresnel * 0.82 );
 					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
-					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 96.0 );
+					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 96.0 ) * uSkyEnabled;
 					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.025 + 0.055 * ripple );
 					float foamNoise = texture2D( uCloudNoise, p * 0.09 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
 					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
@@ -1268,13 +1281,13 @@ export class WebGLFallback {
 
 	}
 
-	_makeCloudLayer( sunDirection ) {
+	_makeCloudLayer( sunDirection, cloudsEnabled ) {
 
 		const T = this.THREE, cloudNoise = webglCloudNoiseTexture( T ), cloudVolume = webglCloudVolumeTexture( T );
 		const material = new T.ShaderMaterial( {
 			uniforms: {
 				uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() }, uCameraPosition: { value: new T.Vector3() },
-				uCloudNoise: { value: cloudNoise }, uCloudVolume: { value: cloudVolume },
+				uCloudNoise: { value: cloudNoise }, uCloudVolume: { value: cloudVolume }, uCloudsEnabled: { value: cloudsEnabled ? 1 : 0 },
 			},
 			vertexShader: /* glsl */`
 				varying vec3 vDirection;
@@ -1288,6 +1301,7 @@ export class WebGLFallback {
 				uniform float uTime;
 				uniform vec3 uSunDirection;
 				uniform vec3 uCameraPosition;
+				uniform float uCloudsEnabled;
 				uniform sampler2D uCloudNoise;
 				uniform sampler3D uCloudVolume;
 				varying vec3 vDirection;
@@ -1312,7 +1326,7 @@ export class WebGLFallback {
 					float fine = texture2D( uCloudNoise, uv * 3.1 + vec2( 0.31, -0.19 ) ).b;
 					float n = broad - max( 0.0, 0.52 - detail ) * 0.32 + ( fine - 0.5 ) * 0.045;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
-					float coverage = smoothstep( 0.57, 0.73, n ) * band * 0.92;
+					float coverage = smoothstep( 0.57, 0.73, n ) * band * 0.92 * uCloudsEnabled;
 					float transmittance = 1.0;
 					vec3 cloudRadiance = vec3( 0.0 );
 					float cloudSun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
