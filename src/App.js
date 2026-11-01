@@ -605,7 +605,7 @@ export class App {
 				? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
 				: selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 500 } );
 			const initialObjects = connector.localOnly
-				? selectLocalRegionEntryObjects( connector, selectedObjects, this.camera )
+				? selectLocalRegionEntryObjects( connector, connector.manifest, selectedObjects, this.camera )
 				: selectedObjects;
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
@@ -777,7 +777,7 @@ export class App {
 			? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
 			: selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 500 } );
 		const initialObjects = connector.localOnly
-			? selectLocalRegionEntryObjects( connector, selectedObjects, this.camera )
+			? selectLocalRegionEntryObjects( connector, connector.manifest, selectedObjects, this.camera )
 			: selectedObjects;
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 		if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );

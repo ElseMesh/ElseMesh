@@ -1612,7 +1612,7 @@ export class WebGLFallback {
 			this.camera.rotation.order = 'YXZ';
 			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
 			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
-			const initialObjects = selectLocalRegionEntryObjects( this.connector, selectedObjects, this.camera );
+			const initialObjects = selectLocalRegionEntryObjects( this.connector, manifest, selectedObjects, this.camera );
 			const initialComponents = selectWorldComponentsForView( manifest, this.camera, { maxPriority: 'nearby' } );
 			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
@@ -1622,6 +1622,16 @@ export class WebGLFallback {
 				assetIDs.add( extension.assetId );
 				retainAssetIDs.add( extension.assetId );
 			}
+			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh local-region startup selection:', JSON.stringify( {
+				selectedObjects: selectedObjects.length,
+				entryObjects: initialObjects.length,
+				entryAssets: assetIDs.size,
+				collisionAssets: [ ...assetIDs ].filter( assetId => this.connector.collisionAssetIDs.has( assetId ) ).length,
+				visualAssets: [ ...assetIDs ].filter( assetId => ! this.connector.collisionAssetIDs.has( assetId ) && this.connector.regionAssets.has( assetId ) ).length,
+				explicitStartupVisualCells: this.connector.explicitStartupCellVisualObjectIDs.size,
+				components: initialComponents.length,
+				componentAssets: retainAssetIDs.size,
+			} ) );
 			const objectsByAsset = new Map();
 			for ( const object of initialObjects ) {
 				if ( ! object.assetId ) continue;

@@ -31,7 +31,7 @@ const manifest = {
 };
 const selected = selectLocalRegionStartupObjects( connector, manifest, camera, { position: [ 0, 1.62, 0 ] } );
 const selectedIDs = selected.map( object => object.id );
-const entry = selectLocalRegionEntryObjects( connector, selected, camera );
+const entry = selectLocalRegionEntryObjects( connector, manifest, selected, camera );
 const entryIDs = entry.map( object => object.id );
 
 assert.ok( selectedIDs.includes( 'visible-floor' ), 'visible startup geometry loads before the rest of the world' );
@@ -44,7 +44,7 @@ assert.deepEqual( collisionPath.from, collisionPath.to, 'initial collision reque
 
 assert.ok( selectedIDs.includes( 'visible-far-cell' ), 'world streaming selection retains farther visible geometry for background loading' );
 assert.ok( entryIDs.includes( 'visible-floor' ), 'entry retains a visual cell intersecting the spawn neighborhood' );
-assert.ok( entryIDs.includes( 'startup-roof' ), 'world-authored startup visuals remain in the entry barrier even outside the spawn view' );
+assert.ok( ! entryIDs.includes( 'startup-roof' ), 'world-authored but off-view startup visuals do not delay entry' );
 assert.ok( entryIDs.includes( 'spawn-collision' ), 'spawn collision remains in the entry barrier' );
-assert.ok( ! entryIDs.includes( 'visible-far-cell' ), 'farther visible cells do not delay the first render' );
-console.log( 'ok local startup separates world-authored entry cells from view-driven background streaming' );
+assert.ok( entryIDs.includes( 'visible-far-cell' ), 'camera-visible cells remain in the entry barrier even when farther away' );
+console.log( 'ok local startup waits for visible geometry and spawn collision, while deferring off-view authored visuals' );
