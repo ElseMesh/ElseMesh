@@ -20,7 +20,7 @@ function makeGLB( image ) {
 		images: [ { bufferView: 1, mimeType: 'image/png' } ],
 		textures: [ { source: 0 } ],
 		materials: [ {
-			emissiveFactor: [ 1, 0.1, 0 ], emissiveTexture: { index: 0 },
+			emissiveFactor: [ 1, 0.1, 0 ], emissiveTexture: { index: 0 }, normalTexture: { index: 0, scale: 0.75 },
 			pbrMetallicRoughness: { baseColorFactor: [ 0.5, 0.25, 0.1, 1 ], metallicFactor: 0, roughnessFactor: 1 },
 		} ],
 		meshes: [ { primitives: [ { attributes: { POSITION: 0 }, material: 0, mode: 4 } ] } ],
@@ -53,11 +53,15 @@ try {
 	root.traverse( node => { if ( node.isMesh ) material = node.material; } );
 	assert.ok( material, 'GLB scene contains its expected mesh' );
 	assert.ok( material.bindings.worldEmissive?.texture?.isTexture, 'GLB emissive image is bound to the engine material' );
+	assert.equal( material.bindings.worldNormal?.texture?.format, 'rgba8unorm', 'GLB normal maps use linear texture data' );
 	assert.equal( material.defines.WORLD_HAS_EMISSIVE, 1, 'emissive texture sampling is enabled' );
+	assert.equal( material.defines.WORLD_HAS_NORMAL, 1, 'normal texture sampling is enabled' );
+	assert.match( material.surface, /perturbNormalByMap\( in\.P, in\.N, in\.uv/ );
+	assert.match( material.surface, /normalSample\.xy \* 0\.75/ );
 	assert.match( material.surface, /s\.emissive \*= textureSample\( worldEmissive/ );
 	assert.ok( Math.abs( material.emissive.g - 0.1 ) < 1e-6, 'GLTF linear emissiveFactor stays linear' );
 	assert.ok( Math.abs( material.color.r - 0.5 ) < 1e-6, 'GLTF linear baseColorFactor stays linear' );
-	console.log( 'World package: emissive texture is bound and GLTF linear color factors are preserved' );
+	console.log( 'World package: normal/emissive textures are bound and GLTF linear color factors are preserved' );
 } finally {
 	if ( root ) disposeWorldPackage( root );
 	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;

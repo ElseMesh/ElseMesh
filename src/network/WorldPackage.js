@@ -592,20 +592,21 @@ async function buildGLTF( gltf, packageState = null ) {
 
 	const root = new Group();
 	const textures = new Map();
-	const loadTexture = async ( textureInfo, label ) => {
+	const loadTexture = async ( textureInfo, label, format = 'rgba8unorm-srgb' ) => {
 
 		if ( ! textureInfo ) return null;
 		const textureSource = gltf.textures[ textureInfo.index ]?.source;
 		const image = gltf.images[ textureSource ];
 		if ( ! image?.bytes ) throw new Error( `GLB ${label} texture requires an embedded image` );
-		if ( ! textures.has( textureSource ) ) {
+		const textureKey = `${ textureSource }:${ format }`;
+		if ( ! textures.has( textureKey ) ) {
 			const pixels = await decodeImage( image.bytes, image.mimeType );
-			const texture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format: 'rgba8unorm-srgb', data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
+			const texture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format, data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
 			texture.getGPU();
 			generateMipmaps( texture );
-			textures.set( textureSource, texture );
+			textures.set( textureKey, texture );
 		}
-		return textures.get( textureSource );
+		return textures.get( textureKey );
 
 	};
 	const resolvedMaterials = [];
@@ -630,6 +631,7 @@ async function buildGLTF( gltf, packageState = null ) {
 		}
 		const textureInfo = pbr.baseColorTexture;
 		const albedo = await loadTexture( textureInfo, 'albedo' );
+		const normalMap = await loadTexture( source.normalTexture, 'normal', 'rgba8unorm' );
 		const emissiveMap = await loadTexture( source.emissiveTexture, 'emissive' );
 		const base = pbr.baseColorFactor || [ 1, 1, 1, 1 ];
 		const emissive = source.emissiveFactor || [ 0, 0, 0 ];
@@ -642,9 +644,9 @@ async function buildGLTF( gltf, packageState = null ) {
 			metalness: pbr.metallicFactor ?? 1, side: source.doubleSided ? 'double' : 'front',
 			emissive: new Color().setRGB( emissive[ 0 ], emissive[ 1 ], emissive[ 2 ], LinearSRGBColorSpace ), emissiveIntensity: emissiveStrength,
 			transparent: alphaMode === 'BLEND', alphaTest: alphaMode === 'MASK' ? ( source.alphaCutoff ?? 0.5 ) : 0, vertexColors,
-			textures: { ...( albedo ? { worldAlbedo: albedo } : {} ), ...( emissiveMap ? { worldEmissive: emissiveMap } : {} ) },
-			defines: { WORLD_HAS_ALBEDO: albedo ? 1 : 0, WORLD_HAS_EMISSIVE: emissiveMap ? 1 : 0 },
-			surface: `#if WORLD_HAS_ALBEDO\n\tlet baseColor = textureSample( worldAlbedo, smpAnisoRepeat, in.uv );\n\ts.albedo *= baseColor.rgb;\n\ts.alpha *= baseColor.a;\n#endif\n#if WORLD_HAS_EMISSIVE\n\ts.emissive *= textureSample( worldEmissive, smpAnisoRepeat, in.uv ).rgb;\n#endif\n`,
+			textures: { ...( albedo ? { worldAlbedo: albedo } : {} ), ...( normalMap ? { worldNormal: normalMap } : {} ), ...( emissiveMap ? { worldEmissive: emissiveMap } : {} ) },
+			defines: { WORLD_HAS_ALBEDO: albedo ? 1 : 0, WORLD_HAS_NORMAL: normalMap ? 1 : 0, WORLD_HAS_EMISSIVE: emissiveMap ? 1 : 0 },
+			surface: `#if WORLD_HAS_ALBEDO\n\tlet baseColor = textureSample( worldAlbedo, smpAnisoRepeat, in.uv );\n\ts.albedo *= baseColor.rgb;\n\ts.alpha *= baseColor.a;\n#endif\n#if WORLD_HAS_NORMAL\n\tlet normalSample = textureSample( worldNormal, smpAnisoRepeat, in.uv ).rgb * 2.0 - vec3f( 1.0 );\n\ts.normal = perturbNormalByMap( in.P, in.N, in.uv, normalize( vec3f( normalSample.xy * ${ source.normalTexture?.scale ?? 1 }, normalSample.z ) ) );\n#endif\n#if WORLD_HAS_EMISSIVE\n\ts.emissive *= textureSample( worldEmissive, smpAnisoRepeat, in.uv ).rgb;\n#endif\n`,
 		} ) );
 		materialHooks.push( null );
 
