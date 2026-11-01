@@ -23,6 +23,7 @@ globalThis.fetch = async url => {
 		payload.collisionSourceInventory = {
 			staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0,
 			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0,
+			audioOnlyPolicyExcludedOtherPrimitiveComponents: 0,
 			landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {},
 		};
 		payload.cells = [ { x: indexedStartupCell[ 0 ], y: indexedStartupCell[ 1 ], z: indexedStartupCell[ 2 ], collisionEvidence: {
