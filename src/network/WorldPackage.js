@@ -88,7 +88,7 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 		if ( ! bytes ) continue;
 		let gltf = state.parsed.get( object.assetId );
 		if ( ! gltf ) {
-			gltf = await buildGLTF( parseGLB( bytes ), state );
+			gltf = await buildGLTF( parseGLB( bytes ), state, signal );
 			state.parsed.set( object.assetId, gltf );
 		}
 		const instance = cloneScene( gltf );
@@ -124,7 +124,7 @@ export async function loadWorldPackageModelAsset( connector, root, assetId, { si
 	if ( cached ) return cached;
 	const bytes = parsedGLTF ? null : await connector.getAsset( assetId, { signal } );
 	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const decoded = await buildGLTF( parsedGLTF || parseGLB( bytes ), state );
+	const decoded = await buildGLTF( parsedGLTF || parseGLB( bytes ), state, signal );
 	if ( signal?.aborted || state.disposed ) {
 		disposeWorldPackage( decoded );
 		throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
@@ -179,7 +179,7 @@ function installObjectLOD( connector, root, instance, object ) {
 			if ( signal.aborted || state.disposed ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 			let source = state.parsed.get( assetId );
 			if ( ! source ) {
-				source = await buildGLTF( parseGLB( bytes ), state );
+				source = await buildGLTF( parseGLB( bytes ), state, signal );
 				if ( signal.aborted || state.disposed ) { disposeWorldPackage( source ); throw signal.reason || new DOMException( 'World unloaded', 'AbortError' ); }
 				const shared = state.parsed.get( assetId );
 				if ( shared ) { disposeWorldPackage( source ); source = shared; }
@@ -604,7 +604,7 @@ export function disposeWorldPackage( root ) {
 	state?.loadedObjects?.clear();
 }
 
-async function buildGLTF( gltf, packageState = null ) {
+async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 
 	const root = new Group();
 	const textures = new Map();
@@ -614,10 +614,13 @@ async function buildGLTF( gltf, packageState = null ) {
 		const texture = gltf.textures[ textureInfo.index ];
 		const textureSource = texture?.extensions?.KHR_texture_basisu?.source ?? texture?.source;
 		const image = gltf.images[ textureSource ];
-		if ( ! image?.bytes ) throw new Error( `GLB ${label} texture requires an embedded image` );
-		const textureKey = `${ textureSource }:${ format }`;
+		const bytes = image?.bytes || ( image?.assetId
+			? await packageState?.connector?.getAsset( image.assetId, { signal } )
+			: null );
+		if ( ! bytes ) throw new Error( `GLB ${label} texture requires embedded image bytes or a declared ElseMesh image asset` );
+		const textureKey = `${ image.assetId || textureSource }:${ format }`;
 		if ( ! textures.has( textureKey ) ) {
-			const pixels = await decodeImage( image.bytes, image.mimeType );
+			const pixels = await decodeImage( bytes, image.mimeType );
 			const texture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format, data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
 			texture.getGPU();
 			generateMipmaps( texture );

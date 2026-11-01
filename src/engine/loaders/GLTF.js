@@ -8,7 +8,7 @@
 //   gltf.skins[ i ]  = { joints: [ node indices ], inverseBindMatrices: Float32Array( 16 * n ) }
 //   gltf.animations  = [ { name, duration, channels: [ { node, path: 'translation' | 'rotation' | 'scale', times, values } ] } ]
 //   gltf.materials   = the glTF material objects (name, pbrMetallicRoughness, normalTexture, alphaMode, ...)
-//   gltf.images[ i ] = { bytes: Uint8Array, mimeType }  (decode with decodeImage)
+//   gltf.images[ i ] = { bytes: Uint8Array | null, assetId, mimeType }  (decode with decodeImage)
 //
 // Handled: embedded buffer, interleaved / packed accessors of every component type (normalized
 // or not), node TRS or matrix, LINEAR / STEP samplers (CUBICSPLINE keeps the values, drops the
@@ -23,7 +23,7 @@ import { decodeKTX2 } from './KTX2.js';
 const COMPONENTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 const ARRAYS = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
 const NORM = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
-const SUPPORTED_REQUIRED_EXTENSIONS = new Set( [ 'KHR_texture_basisu' ] );
+const SUPPORTED_REQUIRED_EXTENSIONS = new Set( [ 'KHR_texture_basisu', 'EXT_elsemesh_asset_reference' ] );
 
 export async function loadGLB( url ) {
 
@@ -194,7 +194,16 @@ export function parseGLB( buffer ) {
 
 	} );
 
-	const images = ( json.images || [] ).map( ( im ) => ( { bytes: im.bufferView !== undefined ? viewBytes( im.bufferView ) : null, mimeType: im.mimeType, uri: im.uri } ) );
+	const images = ( json.images || [] ).map( ( im, index ) => {
+
+		const reference = im.extensions?.EXT_elsemesh_asset_reference;
+		if ( reference !== undefined && ( ! reference || typeof reference !== 'object' || Array.isArray( reference ) || Object.keys( reference ).length !== 1 || ! Object.hasOwn( reference, 'assetId' ) || ! /^sha256:[0-9a-f]{64}$/.test( reference.assetId || '' ) || im.bufferView !== undefined || im.uri !== undefined ) ) {
+			throw new Error( `GLB: image ${index} has an invalid ElseMesh asset reference` );
+		}
+		if ( im.bufferView === undefined && im.uri === undefined && reference === undefined ) throw new Error( `GLB: image ${index} has no image data or asset reference` );
+		return { bytes: im.bufferView !== undefined ? viewBytes( im.bufferView ) : null, assetId: reference?.assetId || null, mimeType: im.mimeType, uri: im.uri };
+
+	} );
 	for ( const [ index, texture ] of ( json.textures || [] ).entries() ) {
 		const basisSource = texture.extensions?.KHR_texture_basisu?.source;
 		const source = basisSource ?? texture.source;

@@ -115,6 +115,14 @@ each level/tile independently so caches can reuse common data without
 duplicating complete image payloads. The engine chooses and upgrades tiers;
 the world describes the variants and dependencies.
 
+For GLB images shared across regions, reference a separately declared asset
+with `image.extensions.EXT_elsemesh_asset_reference = { assetId }`, where
+`assetId` is the immutable SHA-256 ID declared in the signed world manifest.
+Do not add an arbitrary image URL. `WorldPackage` resolves this ID through
+`connector.getAsset`, so normal provider verification and cache paths apply.
+This supports shared image assets; it does not by itself implement mip-tier
+selection, partial KTX2 transfer, or live texture upgrades.
+
 Cache layers retain different representations and have separate budgets:
 shared host RAM/disk caches retain provider response variants for all visitors;
 browser RAM/OPFS caches retain received response bytes per browser profile; and
