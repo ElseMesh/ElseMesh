@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { GPU } from '../src/engine/gpu/GPU.js';
+import { composeShader } from '../src/engine/gpu/Shader.js';
+import { buildMeshShader } from '../src/engine/render/MeshShader.js';
 import { loadWorldPackage, disposeWorldPackage } from '../src/network/WorldPackage.js';
 
 await import('./headless.mjs');
@@ -61,7 +63,15 @@ try {
 	assert.match( material.surface, /s\.emissive \*= textureSample\( worldEmissive/ );
 	assert.ok( Math.abs( material.emissive.g - 0.1 ) < 1e-6, 'GLTF linear emissiveFactor stays linear' );
 	assert.ok( Math.abs( material.color.r - 0.5 ) < 1e-6, 'GLTF linear baseColorFactor stays linear' );
-	console.log( 'World package: normal/emissive textures are bound and GLTF linear color factors are preserved' );
+	const meshShader = buildMeshShader( material, [ { name: 'position', wgsl: 'vec3f', location: 0 } ], { kind: 'depth' } );
+	const composedShader = composeShader( { modules: meshShader.modules, bindings: meshShader.bindings, code: meshShader.code, defines: meshShader.defines, stage: 'render', label: material.name } );
+	assert.match( composedShader.code, /textureSample\( worldNormal/ );
+	assert.match( composedShader.code, /textureSample\( worldEmissive/ );
+	const shaderModule = GPU.device.createShaderModule( { code: composedShader.code, label: 'world-package-texture-material-test' } );
+	const compilation = await shaderModule.getCompilationInfo();
+	const errors = compilation.messages.filter( message => message.type === 'error' );
+	assert.deepEqual( errors, [], errors.map( message => message.message ).join( '\n' ) );
+	console.log( 'World package: normal/emissive textures, linear color factors, and material WGSL verified' );
 } finally {
 	if ( root ) disposeWorldPackage( root );
 	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;
