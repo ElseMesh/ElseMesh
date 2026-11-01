@@ -31,7 +31,7 @@ globalThis.fetch = async url => {
 			supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0,
 			explicitlyNonBlockingForPawnComponents: 0, staticMeshComponentsClassified: true,
 			otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0,
-		} } ];
+		}, unknownCollisionSources: [] } ];
 	}
 	return new Response( JSON.stringify( payload ), { status: 200, headers: { 'Content-Type': 'application/json' } } );
 };
