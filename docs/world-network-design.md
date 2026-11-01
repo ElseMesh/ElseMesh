@@ -72,6 +72,44 @@ lifecycle.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.
 
+### Reachability-driven content scheduling
+
+Content priority follows where the player can get by traversing the world, not
+just Euclidean distance from the player. The world supplies a navigable region
+graph (or equivalent traversal data), the links and conditions between
+regions, and the assets and quality variants needed by each region. The engine
+owns the reusable graph search, traversal-cost scheduling, request
+prioritization, cancellation/coalescing, and shared cache lifecycle. It
+recomputes priorities as the player moves, changes movement mode, or opens a
+route. A nearby region behind a wall or otherwise unreachable can therefore
+rank below a farther room connected by an easy route. Priorities should reflect
+estimated traversal time and loading/conversion latency, not assume that the
+nearest region is the next one the player can enter.
+
+For each reachable region, the engine requests collision and other movement
+constraints early enough to keep the traversal gate safe, while visual content
+is scheduled by reachability and expected arrival. Reaching a region remains
+blocked until its required collision is ready. The visual scheduler may start
+with low-resolution geometry and textures for farther reachable regions, then
+request higher-resolution variants as they become more immediate or occupy
+more of the view. Nearby, immediately enterable regions should receive the
+quality needed for a usable view first; distant or costly-to-reach regions can
+begin with cheaper variants. The engine owns this policy across worlds, while
+world packages declare traversal semantics, region-to-content associations,
+available detail tiers, and any world-specific constraints. Camera visibility
+and projected size refine visual quality; they do not replace traversal
+reachability as the basis for deciding which region to prepare next.
+
+Traversal data may be derived from authored world geometry, collision,
+navigation data, and dynamic links, but the world/provider must expose a
+predictable result to the engine. When a route is unknown or its conditions are
+not yet resolved, the engine must not treat it as traversable; it can prepare
+visible previews at low priority while keeping movement gated. The same engine
+contract applies to static packages and dynamic region providers. See
+[object LOD](world-object-lod.md) for geometry variant selection and
+[the Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md) for the
+game-content bridge application.
+
 Region data declares its collision readiness separately from visual readiness.
 The physics adapter registers/unregisters region colliders with region lifetime,
 and supports bounded primitive and convex data before any complex-triangle

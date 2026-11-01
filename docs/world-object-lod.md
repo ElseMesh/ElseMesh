@@ -31,6 +31,10 @@ A persistent instance wrapper owns its world transform; visual children may be
 replaced without moving the object or rebuilding collision. Keep a usable level
 while asynchronously loading its replacement; abort and reject stale loads on
 handoff. Use hysteresis and transition rendering to avoid oscillation and popping.
+Variant choice is a visual-quality decision; the shared engine streaming
+scheduler decides which regions and assets to request from world traversal
+reachability and expected arrival, then uses view size and proximity to choose
+the suitable variant. See [reachability-driven content scheduling](world-network-design.md#reachability-driven-content-scheduling).
 
 ## Camera selection
 
