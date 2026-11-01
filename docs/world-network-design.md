@@ -100,6 +100,42 @@ available detail tiers, and any world-specific constraints. Camera visibility
 and projected size refine visual quality; they do not replace traversal
 reachability as the basis for deciding which region to prepare next.
 
+Texture quality tiers must be explicit content variants when they change
+transfer size or decoded source data. A conventional GPU mip chain is still
+needed for minification and reduces sampling aliasing, but it does not reduce
+the bytes transferred if the full-resolution image was already downloaded.
+Where source data provides suitable mip levels, providers should serve the
+appropriate mip or mip range; otherwise they may generate tiered images during
+conversion. Prefer a mip pyramid or independently addressable texture tiles
+over point-sampled “every Nth pixel” images, which can alias and lose detail.
+Use a texture format with mip/range support and browser GPU upload support
+(for example, a validated KTX2/Basis Universal path) when it fits the target
+backends. Keep levels associated with one stable texture identity and digest
+each level/tile independently so caches can reuse common data without
+duplicating complete image payloads. The engine chooses and upgrades tiers;
+the world describes the variants and dependencies.
+
+Cache layers retain different representations and have separate budgets:
+shared host RAM/disk caches retain provider response variants for all visitors;
+browser RAM/OPFS caches retain received response bytes per browser profile; and
+the client runtime separately owns decoded images, parsed geometry, and GPU
+textures including their generated mip levels. Cache keys must include the
+variant (or mip/tile identity), and eviction of inactive runtime resources
+must not discard persistent reusable source bytes. A cache hit at one layer
+does not imply that another layer has room for the corresponding decoded or
+GPU representation.
+
+Current Hogwarts implementation status: these variant-selection and
+content-addressed texture-sharing rules are targets, not implemented behavior.
+The bridge currently embeds one source mip per texture (the largest usable
+source mip at or below 512 pixels per dimension) into each region GLB. The
+server RAM/disk cache and browser RAM/OPFS cache retain whole region responses,
+not texture-specific mip variants. ElseMesh generates a GPU mip chain from
+that single embedded image for sampling. Since images are embedded per GLB,
+the same source texture can be repeated in different region responses. See the
+[Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md) for the
+measured cache limits and current implementation details.
+
 Traversal data may be derived from authored world geometry, collision,
 navigation data, and dynamic links, but the world/provider must expose a
 predictable result to the engine. When a route is unknown or its conditions are
