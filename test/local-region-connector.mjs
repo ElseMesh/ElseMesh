@@ -177,6 +177,11 @@ try {
 	await connector.ensureCellsForView( [ 1, 0, 1 ], [ 100, 0, 1 ] );
 	assert.ok( connector.knownCells.has( '6,0,0' ), 'the projected movement frontier is queried before its cell can be entered' );
 	assert.ok( cellIndexRequests.every( cells => cells.length <= 512 ), 'movement-frontier batches remain within the provider request limit' );
+	cellIndexRequests.length = 0;
+	const largeCellQuery = Array.from( { length: 513 }, ( _, index ) => [ index + 1000, 0, 0 ] );
+	await connector.ensureCells( largeCellQuery );
+	assert.deepEqual( cellIndexRequests.map( cells => cells.length ), [ 512, 1 ], 'cell queries larger than one HTTP batch are split without dropping their tail' );
+	assert.equal( connector.knownCells.has( '1512,0,0' ), true, 'the last cell in a multi-batch query is recorded' );
 	assert.equal( manifest.title, 'Hogwarts Legacy · Great Hall' );
 	assert.deepEqual( manifest.spawn.position, [ 1, 8.62, 9 ] );
 	assert.equal( manifest.entryPointActionLabel, 'Choose your house' );
