@@ -22,7 +22,7 @@ Usage: tools/build-server.sh [options]
 Default: build ZeroTier-enabled thruholdd for the current GOOS/GOARCH.
 
 Options:
-  --target NAME          thruholdd, worldd, directoryd, accountd, or all
+  --target NAME          thruholdd, directoryd, accountd, or all
   --os GOOS              target OS (default: GOOS or go env GOOS)
   --arch GOARCH          target architecture (default: GOARCH or go env GOARCH)
   --output DIR           binary output directory (default: <build-server>/bin)
@@ -34,10 +34,9 @@ Options:
   --libzt-lib DIR        directory containing libzt.so
   --help                 show this help
 
-The default world-daemon build is thruholdd, which embeds libzt and enables
-ZeroTier. Use target worldd for a CGO-free daemon that relies on the host's
-system-managed ZeroTier interface. Target all builds thruholdd, directoryd,
-and accountd; it does not build both world-daemon variants.
+The single world-daemon build is thruholdd, which embeds libzt and can join
+ZeroTier when configured. Target all builds thruholdd, directoryd, and
+accountd.
 With cpto installed, a real adjacent build sibling is used when present; a
 sibling that resolves to the source tree is ignored. Otherwise the source tree
 is used. The helper never synchronizes source and build trees.
@@ -154,7 +153,7 @@ mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd -P)
 
 case "$TARGET" in
-	thruholdd|worldd|directoryd|accountd) TARGETS=("$TARGET") ;;
+	thruholdd|directoryd|accountd) TARGETS=("$TARGET") ;;
 	all) TARGETS=(thruholdd directoryd accountd) ;;
 	*) printf 'Invalid --target: %s\n' "$TARGET" >&2; usage >&2; exit 2 ;;
 esac

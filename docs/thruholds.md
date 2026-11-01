@@ -12,7 +12,7 @@ See [browser hosting](browser-hosting.md) for details.
 
 The daemon is a transport and content service. The world owner controls the manifest, world rules, and grants. A grant independently enables `content-cache` and/or bounded `failover-authority`; caching never grants write or authority rights. Failover windows for different delegates must not overlap, preventing two owner-authorized delegates from issuing the same next epoch at once. An owner-signed failover window permits a delegate to issue a temporary higher-epoch authority lease when its window opens; the signed lease is bound to the exact host-grant epoch, and the daemon schedules activation even when it started before the window and stops serving the lease when it expires. During a valid lease, a failover-only node can be discovered through DHT or the optional directory and serve the owner-signed manifest; the browser verifies the lease and uses that node as the current authority. Asset bytes still require a separate `content-cache` grant and are retried through other providers. Manifest versions and authority epochs must fit JavaScript's safe-integer range, and each delegated lease must advance exactly one epoch. The lease does not authorize edits, produce a delegate-signed replacement world manifest, or transfer simulation state; runtime conflict recovery and shared simulation authority still need implementation before this is suitable for concurrent writes.
 
-Run `npm run test:world-gateway` for a local owner/cache integration check. It builds temporary `worldd` nodes, signs a world manifest, syncs an owner-authorized cache over libp2p, connects the production `WorldConnector` through a trusted temporary HTTPS/WSS proxy, and verifies content-hash recovery after the owner is stopped. The test exercises Node's native WebSocket implementation with a test-scoped trusted certificate; it does not replace browser-engine or WebTransport testing.
+Run `npm run test:world-gateway` for a local owner/cache integration check. It builds temporary `thruholdd` nodes, signs a world manifest, syncs an owner-authorized cache over libp2p, connects the production `WorldConnector` through a trusted temporary HTTPS/WSS proxy, and verifies content-hash recovery after the owner is stopped. The test exercises Node's native WebSocket implementation with a test-scoped trusted certificate; it does not replace browser-engine or WebTransport testing.
 
 For the two current development-world links, build commands and restart instructions, see [testing two worlds](testing-two-worlds.md).
 
@@ -56,10 +56,10 @@ specialized setups.
 
 For temporary local hosting, replace `--http` with `--autoport`. The daemon
 binds an OS-assigned loopback port and prints the selected address in its
-`worldd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
+`thruholdd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
 mutually exclusive; it only selects the HTTP gateway port, so give concurrent
 profiles distinct `--p2p-port` values as usual. For temporary local hosting,
-`--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; worldd
+`--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; thruholdd
 prints both actual peer addresses at startup. Do not use ephemeral peer ports
 when a deployment depends on fixed firewall forwarding or ZeroTier's shared
 bridge port.
@@ -68,7 +68,7 @@ Build `thruholdd` for the host first, then run (from the repository root):
 
 ```sh
 node tools/serve-world-profile.mjs \
-  --worldd /path/to/thruholdd \
+  --thruholdd /path/to/thruholdd \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --profile island-example \
   --source worlds/tidewater/world-source.json \
@@ -110,19 +110,18 @@ Account login is optional and distinct from world identity. The Google-to-world-
 
 ## Current implementation and operation
 
-The `server/worldd` Go program persists a node identity, serves a signed local starter manifest, accepts an owner-signed manifest, exposes browser gateways and content-addressed assets, and supports optional discovery/relay configuration. It does not host the static ElseMesh browser client; host that separately. The default browser gateway is WebSocket. To enable WebTransport, provide a separate HTTP/3 UDP listener and certificate/key; make the browser's HTTPS host/port route to that listener over UDP while TCP HTTPS/WSS continues to route to the gateway or reverse proxy. For example, a public `:443/udp` forwarding rule can target `thruholdd --webtransport :5201`; the certificate must cover the public host. The client tries WebTransport at `/gateway-webtransport` on the configured HTTPS origin, then falls back to `/gateway` over WSS. `src/network/WorldConnector.js` verifies signed documents and content hashes and fetches prioritized chunks; `src/network/WorldPackage.js` builds the currently supported static GLB instances. Author a Blender source document, import its GLB assets, convert it to an unsigned runtime manifest, then sign it using the same persistent node identity:
+The `thruholdd` Go program (currently implemented in the internal `server/worldd` package) persists a node identity, serves a signed local starter manifest, accepts an owner-signed manifest, exposes browser gateways and content-addressed assets, and supports optional discovery/relay configuration. It does not host the static ElseMesh browser client; host that separately. The default browser gateway is WebSocket. To enable WebTransport, provide a separate HTTP/3 UDP listener and certificate/key; make the browser's HTTPS host/port route to that listener over UDP while TCP HTTPS/WSS continues to route to the gateway or reverse proxy. For example, a public `:443/udp` forwarding rule can target `thruholdd --webtransport :5201`; the certificate must cover the public host. The client tries WebTransport at `/gateway-webtransport` on the configured HTTPS origin, then falls back to `/gateway` over WSS. `src/network/WorldConnector.js` verifies signed documents and content hashes and fetches prioritized chunks; `src/network/WorldPackage.js` builds the currently supported static GLB instances. Author a Blender source document, import its GLB assets, convert it to an unsigned runtime manifest, then sign it using the same persistent node identity:
 
 `tools/build-server.sh` is the single daemon build entry point. With no options it builds the ZeroTier-enabled `thruholdd` for the current Go target and writes it to the selected server tree's `bin/thruholdd`, alongside `libzt.so`. It discovers the sibling libzt source and matching build by default. ZeroTier is compiled in for `thruholdd`, which uses the ElseMesh network `e3918db4832a3056`; libzt itself must already be built for the requested target.
 
-Choose another world-daemon mode or target explicitly:
+Choose a target platform or build the complete service bundle:
 
 ```sh
 tools/build-server.sh --os android --arch arm64
-tools/build-server.sh --target worldd --os linux --arch amd64
 tools/build-server.sh --target all --os linux --arch amd64
 ```
 
-The default world-daemon target is `thruholdd`, which embeds libzt and joins the ElseMesh ZeroTier network. The optional `worldd` target is CGO-free and uses a ZeroTier interface provided by a system service already running on the host; it does not start or configure that service. The `all` target builds the default `thruholdd` plus `directoryd` and `accountd`, without producing both world-daemon variants. The embedded target needs matching libzt headers and library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. `--output` selects the artifact directory, and `--build-server` selects a prepared server source/build directory. For an Android `thruholdd` build, select `--os android --arch arm64` and set the NDK `CC` and `CXX`; the CGO-free `worldd` target does not need the NDK C compiler. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
+There is one world-server binary: `thruholdd`. It embeds libzt and joins the configured ZeroTier network when `--zerotier-network` is nonempty; the same server also works without joining ZeroTier when that option is empty. `--target all` builds `thruholdd`, `directoryd`, and `accountd`. The server package lives under `server/worldd` as an internal Go source path; that directory is not a second daemon. The world server will own the shared KTX2 encoding service so every world's content provider can use it. The bridge-specific importer remains responsible for reading its source format and submitting decoded pixels. The encoder implementation is in progress. The daemon build needs matching libzt headers and library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. For an Android `thruholdd` build, select `--os android --arch arm64` and set the NDK `CC` and `CXX`. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
 
 `accountd` is optional and exits without configuration. Configure the Google OAuth web client and browser origins before starting it, and put a local HTTPS reverse proxy in front of its loopback listener:
 

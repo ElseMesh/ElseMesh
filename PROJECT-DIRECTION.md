@@ -158,12 +158,13 @@ in `docs/`.
   [browser hosting](docs/browser-hosting.md),
   [direct WebRTC](docs/browser-direct-webrtc.md), and
   [relay deployment](docs/relay-deployment.md#publish-a-browser-gateway-with-tls).
-- **ZeroTier (60%):** keep ElseMesh network `e3918db4832a3056` separate from
-  `xellent` (`632ea2908569fc9e`), use embedded libzt by default, and retain an
-  optional CGO-free daemon that uses a host-managed ZeroTier interface. Neither
-  mode may expose Central credentials; treat physical path observations as
+- **ZeroTier (60%):** use the dedicated ElseMesh network
+  `e3918db4832a3056` with one `thruholdd` world daemon and
+  optional embedded libzt membership configured at runtime. The removed
+  CGO-free `worldd` build is not a separate supported daemon. The server may
+  not expose Central credentials; treat physical path observations as
   transient. Verify routing, ports, peer discovery, and operation without
-  Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
+  Central. See [ZeroTier thruholdd setup and evidence](docs/zerotier-thruholdd.md#dedicated-elsemesh-network).
 - **Publishing (90%):** host the current ElseMesh client at `elsemesh.github.io/`, retire
   `/elsemesh`, and show an eight-character source stamp matching the published
   ref. See

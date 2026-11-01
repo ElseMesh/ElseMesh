@@ -1,14 +1,11 @@
-# ZeroTier networking for ElseMesh
+# ZeroTier networking for thruholdd
 
-## Current test LAN
-
-The existing public test LAN is ZeroTier network `632ea2908569fc9e`, named
-`xellent` in ZeroTier Central. It has 6PLANE enabled and its IPv4 managed route
-is `10.205.192.0/24`. Keep this network and its rules unchanged; it is a test
-network, separate from the dedicated ElseMesh network. Each member receives its own
-network-scoped 6PLANE IPv6 address. Use the address reported for that member by
-Central or the local ZeroTier client; do not derive peer addresses from the node
-ID yourself.
+There is one supported world-server executable: `thruholdd`. It embeds libzt
+and can join ZeroTier when `--zerotier-network` is configured; pass an empty
+value to run the same daemon without joining ZeroTier. Historical references
+below to a separate CGO-free `worldd` executable describe a removed build
+variant, not a second supported daemon. See [ThruHolds](thruholds.md) for the
+current build and operating instructions.
 
 ## Dedicated ElseMesh network
 
@@ -33,10 +30,9 @@ to the controller through ([API schema](https://docs.rs/zerotier-central-api/lat
 
 The packaged daemon name is `thruholdd`. A ZeroTier-enabled build defaults to
 this network without a network-ID argument. `--zerotier-network` remains an
-operator override for testing; use the existing `xellent` network only when
-explicitly testing that separate `/24` LAN. The `/16` route can overlap with
-private networks on a user's device; inspect local routes before relying on
-managed IPv4. `thruholdd` reports an assigned managed IPv4 address in startup
+operator override for testing. The `/16` route can overlap with private
+networks on a user's device; inspect local routes before relying on managed
+IPv4. `thruholdd` reports an assigned managed IPv4 address in startup
 logs, advertises its managed IPv4 and 6PLANE IPv6 addresses, and routes managed
 IPv4 TCP peer traffic through libzt. IPv4 routing is restricted to the actual
 prefix reported by libzt for the joined network; other IPv4 traffic uses the
@@ -86,21 +82,6 @@ machine's public firewall.
 
 Public membership means anyone who knows this network ID may join; application
 identity signatures and world permissions must still be enforced by ElseMesh.
-
-## Joining a Linux host to the test LAN
-
-Install and start ZeroTier One using the package for the host, then join the
-existing `xellent` public test LAN only when explicitly testing that network:
-
-```sh
-sudo zerotier-cli join 632ea2908569fc9e
-sudo zerotier-cli listnetworks
-```
-
-Because the network is public, a new member does not need manual authorization.
-Confirm the network is `OK` and note the 6PLANE IPv6 address assigned to this
-host. Do not use a physical/public IP in place of the 6PLANE address for this
-path.
 
 `thruholdd` listens for libp2p TCP and QUIC on port `42901` by default (the port
 can be changed with `--p2p-port`). Permit TCP and UDP on the chosen peer port
@@ -196,30 +177,10 @@ starts without a separate `LD_LIBRARY_PATH` when both files remain together.
 The default network is compiled into the ZeroTier-enabled build, so neither
 the network ID nor a special transport flag is needed.
 
-For hosts that already run ZeroTier One, the build helper also has an optional
-CGO-free `worldd` target:
-
-```sh
-tools/build-server.sh --target worldd --os linux --arch amd64
-```
-
-This binary does not embed libzt, create a ZeroTier identity, or join a network.
-The host's ZeroTier service must already have joined and been authorized on
-the ElseMesh network, and the operating system must route its managed address
-to the daemon. Pass that managed address as an explicit libp2p announcement so
-peers can dial it, using the actual address assigned by the service:
-
-```sh
-worldd-linux-amd64 \
-  --announce-address "/ip4/$ZEROTIER_IPV4/tcp/42901" \
-  --announce-address "/ip4/$ZEROTIER_IPV4/udp/42901/quic-v1"
-```
-
-The system service owns the ZeroTier identity; `worldd` continues to use its
-separate persistent libp2p node identity. Do not set `--zerotier-network` for
-this build. The Android binary can be cross-compiled, but this host-managed
-service path still needs a device-level networking check before relying on it
-on Android.
+The former CGO-free `worldd` build used a host-managed ZeroTier interface.
+That separate build target was removed so identity, hosting, and optional
+ZeroTier joining belong to the same `thruholdd` daemon. This historical path is
+not a supported second server mode.
 
 ### Observed physical peer endpoints
 

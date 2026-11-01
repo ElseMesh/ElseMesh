@@ -40,7 +40,7 @@ chosen `--p2p-port`) from the edge firewall/router to the daemon. Allow those
 protocols on the host firewall as well. TCP and UDP enable their respective
 libp2p transports; circuit-relay streams use the peer connection carrying
 them. If ZeroTier is used as an additional transport, see
-[zerotier-worldd.md](zerotier-worldd.md) for its separate overlay rules.
+[zerotier-thruholdd.md](zerotier-thruholdd.md) for its overlay rules.
 
 Start one node with a persistent named profile:
 

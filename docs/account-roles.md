@@ -90,7 +90,7 @@ After reviewing the candidate source and its assets, publish it to the selected 
 
 ```sh
 node tools/publish-world-source.mjs \
-  --worldd ./worldd \
+  --thruholdd ./thruholdd \
   --data ~/.config/elsemesh/worlds/tidewater \
   --base-source ./island.world-source.json \
   --source ./candidate.world-source.json \

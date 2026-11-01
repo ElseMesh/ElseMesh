@@ -172,16 +172,15 @@ This verifies package coverage and triangle reduction; rendered transitions,
 material fidelity at distance, and matched-view desktop/Flip7 parity remain
 open. The check is part of `npm test`.
 
-## Optional host-managed ZeroTier build (2026-10-23)
+## Unified world daemon and KTX2 service direction (2026-11-01)
 
-`tools/build-server.sh` keeps embedded-libzt `thruholdd` as its default and
-offers `--target worldd` for a CGO-free binary. That mode relies on a separately
-running, authorized ZeroTier service and the host's virtual network interface;
-the daemon can advertise the managed address with `--announce-address`. The
-Android arm64 binary reports `CGO_ENABLED=0` in Go build metadata and its CLI
-runs. No live system-service peer connection has been verified yet. The `all`
-target builds the default world daemon plus the directory and account services,
-not both world-daemon variants.
+The supported world-server executable is `thruholdd`; the former separate
+CGO-free `worldd` build target has been removed. Optional ZeroTier joining is a
+runtime setting of the same daemon. `server/worldd` remains the internal Go
+package path. The single server is being extended with a generic, bounded KTX2
+encoding service so world-specific providers can submit decoded pixels and
+share cached results. The encoder service is not implemented yet; Hogwarts
+currently uses the separate `basisu` executable.
 
 The full `server/worldd` Go suite passes on Termux with
 `go test -ldflags=-checklinkname=0 ./worldd -count=1`. This followed a switch
@@ -228,7 +227,7 @@ The disposable current-build Android `thruholdd` also reports `status: ok` and
 advertises ZeroTier IPv4 `172.22.16.207/16` plus 6PLANE
 `fc60:bbbd:e23c:f872:276f::1`; its health endpoint reports `dhtPeers: 0`. This
 does not verify a peer connection. See the current retry details in
-[`zerotier-worldd.md`](zerotier-worldd.md).
+[`zerotier-thruholdd.md`](zerotier-thruholdd.md).
 
 ### Earlier 2026-10-10 build note (device availability later superseded)
 
@@ -292,7 +291,7 @@ has not been redeployed because the later SSH attempt returned
 read-only API still returns HTTP 403 using the owner-only mode-0600 token
 file. Host ADB lists no phone, but on-device ADB connects to localhost; the
 phone is dozing and the latest capture is black, so visual verification remains
-open. See [ZeroTier networking](zerotier-worldd.md) for addresses and the
+open. See [ZeroTier networking](zerotier-thruholdd.md) for addresses and the
 remaining gates.
 
 The same direct-source CMake path also built native Linux amd64 `libzt.so` and

@@ -69,6 +69,17 @@ The provider contract need not mandate GLB: a source-specific importer may
 construct ElseMesh runtime resources directly, provided it preserves content
 integrity, declared resource limits, collision readiness, and the same region
 lifecycle.
+
+The single `thruholdd` world server also owns reusable texture encoding. A
+world-specific importer decodes its source texture to a bounded RGBA payload
+and sends it to the server's KTX2 encoder with explicit transfer-function and
+normal-map options. The server applies one memory/CPU-bounded encoding queue,
+deduplicates identical in-flight work, and shares encoded output through its
+content cache so visitors do not each repeat conversion. Cache identity covers
+the source pixel digest and encoding options. Keep this encoder independent of
+Hogwarts, Unreal, and the renderer; the browser engine only transcodes and
+uploads KTX2 for its active WebGL or WebGPU backend. The encoder service is
+planned, not implemented; Hogwarts currently launches `basisu` separately.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.
 
