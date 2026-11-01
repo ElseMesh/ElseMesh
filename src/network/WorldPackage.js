@@ -12,7 +12,7 @@ import { BufferGeometry } from '../engine/geometry/BufferGeometry.js';
 import { parseGLB, decodeImage } from '../engine/loaders/GLTF.js';
 import { Texture, generateMipmaps } from '../engine/webgpu.js';
 import { Color } from '../engine/math/Color.js';
-import { SRGBColorSpace } from '../engine/constants.js';
+import { LinearSRGBColorSpace } from '../engine/constants.js';
 import { standard } from '../materials/Materials.js';
 import { Vector3 } from '../engine/math/Vector3.js';
 import { Matrix4 } from '../engine/math/Matrix4.js';
@@ -592,6 +592,22 @@ async function buildGLTF( gltf, packageState = null ) {
 
 	const root = new Group();
 	const textures = new Map();
+	const loadTexture = async ( textureInfo, label ) => {
+
+		if ( ! textureInfo ) return null;
+		const textureSource = gltf.textures[ textureInfo.index ]?.source;
+		const image = gltf.images[ textureSource ];
+		if ( ! image?.bytes ) throw new Error( `GLB ${label} texture requires an embedded image` );
+		if ( ! textures.has( textureSource ) ) {
+			const pixels = await decodeImage( image.bytes, image.mimeType );
+			const texture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format: 'rgba8unorm-srgb', data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
+			texture.getGPU();
+			generateMipmaps( texture );
+			textures.set( textureSource, texture );
+		}
+		return textures.get( textureSource );
+
+	};
 	const resolvedMaterials = [];
 	const materialHooks = [];
 	for ( let index = 0; index < gltf.materials.length; index ++ ) {
@@ -613,22 +629,8 @@ async function buildGLTF( gltf, packageState = null ) {
 			continue;
 		}
 		const textureInfo = pbr.baseColorTexture;
-		let albedo = null;
-		if ( textureInfo ) {
-
-			const textureSource = gltf.textures[ textureInfo.index ]?.source;
-			const image = gltf.images[ textureSource ];
-			if ( ! image?.bytes ) throw new Error( `GLB material ${source.name || index} requires an embedded image` );
-			if ( ! textures.has( textureSource ) ) {
-				const pixels = await decodeImage( image.bytes, image.mimeType );
-				const texture = new Texture( { label: `world-albedo-${textureSource}`, width: pixels.width, height: pixels.height, format: 'rgba8unorm-srgb', data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
-				texture.getGPU();
-				generateMipmaps( texture );
-				textures.set( textureSource, texture );
-			}
-			albedo = textures.get( textureSource );
-
-		}
+		const albedo = await loadTexture( textureInfo, 'albedo' );
+		const emissiveMap = await loadTexture( source.emissiveTexture, 'emissive' );
 		const base = pbr.baseColorFactor || [ 1, 1, 1, 1 ];
 		const emissive = source.emissiveFactor || [ 0, 0, 0 ];
 		const emissiveStrength = source.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1;
@@ -636,13 +638,13 @@ async function buildGLTF( gltf, packageState = null ) {
 		const vertexColors = gltf.meshes.some( ( primitives ) => primitives.some( ( primitive ) => primitive.material === index && primitive.attributes.COLOR_0 !== undefined ) );
 		resolvedMaterials.push( standard( {
 			name: source.name || `world-material-${index}`,
-			color: new Color().setRGB( base[ 0 ], base[ 1 ], base[ 2 ], SRGBColorSpace ), opacity: base[ 3 ], roughness: pbr.roughnessFactor ?? 1,
+			color: new Color().setRGB( base[ 0 ], base[ 1 ], base[ 2 ], LinearSRGBColorSpace ), opacity: base[ 3 ], roughness: pbr.roughnessFactor ?? 1,
 			metalness: pbr.metallicFactor ?? 1, side: source.doubleSided ? 'double' : 'front',
-			emissive: new Color().setRGB( emissive[ 0 ], emissive[ 1 ], emissive[ 2 ], SRGBColorSpace ), emissiveIntensity: emissiveStrength,
+			emissive: new Color().setRGB( emissive[ 0 ], emissive[ 1 ], emissive[ 2 ], LinearSRGBColorSpace ), emissiveIntensity: emissiveStrength,
 			transparent: alphaMode === 'BLEND', alphaTest: alphaMode === 'MASK' ? ( source.alphaCutoff ?? 0.5 ) : 0, vertexColors,
-			textures: albedo ? { worldAlbedo: albedo } : {},
-			defines: { WORLD_HAS_ALBEDO: albedo ? 1 : 0 },
-			surface: `#if WORLD_HAS_ALBEDO\n\tlet baseColor = textureSample( worldAlbedo, smpAnisoRepeat, in.uv );\n\ts.albedo *= baseColor.rgb;\n\ts.alpha *= baseColor.a;\n#endif\n`,
+			textures: { ...( albedo ? { worldAlbedo: albedo } : {} ), ...( emissiveMap ? { worldEmissive: emissiveMap } : {} ) },
+			defines: { WORLD_HAS_ALBEDO: albedo ? 1 : 0, WORLD_HAS_EMISSIVE: emissiveMap ? 1 : 0 },
+			surface: `#if WORLD_HAS_ALBEDO\n\tlet baseColor = textureSample( worldAlbedo, smpAnisoRepeat, in.uv );\n\ts.albedo *= baseColor.rgb;\n\ts.alpha *= baseColor.a;\n#endif\n#if WORLD_HAS_EMISSIVE\n\ts.emissive *= textureSample( worldEmissive, smpAnisoRepeat, in.uv ).rgb;\n#endif\n`,
 		} ) );
 		materialHooks.push( null );
 
