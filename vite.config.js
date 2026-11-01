@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync, readdirSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { appendFile, mkdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
@@ -11,6 +11,41 @@ const commonGitDir = execFileSync( 'git', [ 'rev-parse', '--git-common-dir' ], {
 const commitSha = execFileSync( 'git', [ '--git-dir', resolve( commonGitDir ), 'rev-parse', 'HEAD' ], { encoding: 'utf8' } ).trim();
 if ( ! /^[\da-f]{40}$/i.test( commitSha ) ) throw new Error( 'Git HEAD must be a full 40-character commit SHA' );
 const commitShort = commitSha.slice( 0, 8 ).toLowerCase();
+
+const basisDirectory = resolve( 'node_modules/three/examples/jsm/libs/basis' );
+const basisFiles = new Map( [
+	[ 'basis_transcoder.js', 'text/javascript; charset=utf-8' ],
+	[ 'basis_transcoder.wasm', 'application/wasm' ],
+].map( ( [ name, mimeType ] ) => [ name, { mimeType, bytes: readFileSync( resolve( basisDirectory, name ) ) } ] ) );
+
+function basisTranscoderAssets() {
+	return {
+		name: 'elsemesh-basis-transcoder-assets',
+		configureServer( server ) {
+			server.middlewares.use( ( request, response, next ) => {
+				let pathname;
+				try { pathname = new URL( request.url || '/', 'http://vite.local' ).pathname; }
+				catch { return next(); }
+				const entry = [ ...basisFiles ].find( ( [ name ] ) => pathname.endsWith( `/basis/${ name }` ) )?.[ 1 ];
+				if ( ! entry ) return next();
+				if ( request.method !== 'GET' && request.method !== 'HEAD' ) {
+					response.statusCode = 405;
+					response.end();
+					return;
+				}
+				response.statusCode = 200;
+				response.setHeader( 'Content-Type', entry.mimeType );
+				response.setHeader( 'Content-Length', entry.bytes.byteLength );
+				response.setHeader( 'Cache-Control', 'no-cache' );
+				response.end( request.method === 'HEAD' ? undefined : entry.bytes );
+			} );
+		},
+		generateBundle() {
+			for ( const [ name, entry ] of basisFiles )
+				this.emitFile( { type: 'asset', fileName: `basis/${ name }`, source: entry.bytes } );
+		},
+	};
+}
 
 const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
 const defaultWorldModule = resolve( process.env.ELSEMESH_DEFAULT_WORLD_MODULE || 'worlds/default.js' );
@@ -157,9 +192,10 @@ export default defineConfig( {
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), {
+	plugins: [ defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), basisTranscoderAssets(), {
 		name: 'elsemesh-build-commit',
-		transformIndexHtml( html ) {
+		transformIndexHtml( html, context ) {
+			if ( context.filename !== resolve( 'index.html' ) ) return;
 			if ( ! html.includes( '%ELSEMESH_COMMIT%' ) ) throw new Error( 'Build commit placeholder is missing from index.html' );
 			return html.replaceAll( '%ELSEMESH_COMMIT%', commitShort );
 		},

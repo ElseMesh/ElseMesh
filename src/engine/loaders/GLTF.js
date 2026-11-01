@@ -18,10 +18,12 @@
 //   globalThis.__assetFile( url ) -> ArrayBuffer, globalThis.__assetImage( bytes, mimeType ) -> { data, width, height }
 
 import { Matrix4, Quaternion, Vector3 } from '../math/index.js';
+import { decodeKTX2 } from './KTX2.js';
 
 const COMPONENTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 const ARRAYS = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array };
 const NORM = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 };
+const SUPPORTED_REQUIRED_EXTENSIONS = new Set( [ 'KHR_texture_basisu' ] );
 
 export async function loadGLB( url ) {
 
@@ -66,7 +68,8 @@ export function parseGLB( buffer ) {
 	}
 
 	if ( ! json ) throw new Error( 'GLB: no JSON chunk' );
-	if ( json.extensionsRequired && json.extensionsRequired.length ) throw new Error( 'GLB: unsupported extensions ' + json.extensionsRequired.join( ', ' ) );
+	const unsupportedExtensions = ( json.extensionsRequired || [] ).filter( extension => ! SUPPORTED_REQUIRED_EXTENSIONS.has( extension ) );
+	if ( unsupportedExtensions.length ) throw new Error( 'GLB: unsupported extensions ' + unsupportedExtensions.join( ', ' ) );
 
 	const viewBytes = ( i ) => {
 
@@ -192,6 +195,12 @@ export function parseGLB( buffer ) {
 	} );
 
 	const images = ( json.images || [] ).map( ( im ) => ( { bytes: im.bufferView !== undefined ? viewBytes( im.bufferView ) : null, mimeType: im.mimeType, uri: im.uri } ) );
+	for ( const [ index, texture ] of ( json.textures || [] ).entries() ) {
+		const basisSource = texture.extensions?.KHR_texture_basisu?.source;
+		const source = basisSource ?? texture.source;
+		if ( ! Number.isSafeInteger( source ) || source < 0 || source >= images.length ) throw new Error( `GLB: texture ${index} has no valid image source` );
+		if ( basisSource !== undefined && images[ basisSource ].mimeType !== 'image/ktx2' ) throw new Error( `GLB: texture ${index} KHR_texture_basisu source is not image/ktx2` );
+	}
 	const scene = json.scenes ? json.scenes[ json.scene || 0 ] : null;
 	const roots = scene ? scene.nodes : nodes.map( ( _, i ) => i ).filter( ( i ) => ! nodes.some( ( n ) => n.children.includes( i ) ) );
 
@@ -210,6 +219,7 @@ function identities( n ) {
 // Decoded RGBA8 pixels (top row first) of an embedded image.
 export async function decodeImage( bytes, mimeType ) {
 
+	if ( mimeType === 'image/ktx2' ) return decodeKTX2( bytes );
 	if ( globalThis.__assetImage ) return globalThis.__assetImage( bytes, mimeType );
 	const bmp = await createImageBitmap( new Blob( [ bytes ], { type: mimeType } ), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' } );
 	const cv = new OffscreenCanvas( bmp.width, bmp.height );

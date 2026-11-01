@@ -6,7 +6,7 @@ import { loadWorldPackage, disposeWorldPackage } from '../src/network/WorldPacka
 
 await import('./headless.mjs');
 
-function makeGLB( image ) {
+function makeGLB( image, mimeType = 'image/png' ) {
 	const positions = new Float32Array( [ 0, 0, 0, 1, 0, 0, 0, 1, 0 ] );
 	const binary = Buffer.alloc( Math.ceil( ( positions.byteLength + image.length ) / 4 ) * 4 );
 	Buffer.from( positions.buffer ).copy( binary );
@@ -19,8 +19,8 @@ function makeGLB( image ) {
 			{ buffer: 0, byteOffset: positions.byteLength, byteLength: image.length },
 		],
 		accessors: [ { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' } ],
-		images: [ { bufferView: 1, mimeType: 'image/png' } ],
-		textures: [ { source: 0 } ],
+		images: [ { bufferView: 1, mimeType } ],
+		textures: [ mimeType === 'image/ktx2' ? { extensions: { KHR_texture_basisu: { source: 0 } } } : { source: 0 } ],
 		materials: [ {
 			emissiveFactor: [ 1, 0.1, 0 ], emissiveTexture: { index: 0 }, normalTexture: { index: 0, scale: 0.75 },
 			pbrMetallicRoughness: { baseColorFactor: [ 0.5, 0.25, 0.1, 1 ], metallicFactor: 0, roughnessFactor: 1 },
@@ -28,6 +28,10 @@ function makeGLB( image ) {
 		meshes: [ { primitives: [ { attributes: { POSITION: 0 }, material: 0, mode: 4 } ] } ],
 		nodes: [ { mesh: 0 } ], scenes: [ { nodes: [ 0 ] } ], scene: 0,
 	};
+	if ( mimeType === 'image/ktx2' ) {
+		json.extensionsUsed = [ 'KHR_texture_basisu' ];
+		json.extensionsRequired = [ 'KHR_texture_basisu' ];
+	}
 	const jsonBytes = Buffer.from( JSON.stringify( json ) );
 	const jsonPadding = Buffer.alloc( ( 4 - jsonBytes.length % 4 ) % 4, 0x20 );
 	const jsonChunk = Buffer.concat( [ jsonBytes, jsonPadding ] );
@@ -43,7 +47,9 @@ function makeGLB( image ) {
 
 await GPU.init( { headless: true } );
 let root;
+let ktx2Root;
 const previousAssetImage = globalThis.__assetImage;
+const previousAssetKTX2 = globalThis.__assetKTX2;
 globalThis.__assetImage = async () => ( { width: 1, height: 1, data: new Uint8Array( [ 255, 255, 255, 255 ] ) } );
 try {
 	const connector = {
@@ -71,9 +77,23 @@ try {
 	const compilation = await shaderModule.getCompilationInfo();
 	const errors = compilation.messages.filter( message => message.type === 'error' );
 	assert.deepEqual( errors, [], errors.map( message => message.message ).join( '\n' ) );
+	let decodedKTX2Bytes;
+	globalThis.__assetKTX2 = async bytes => {
+		decodedKTX2Bytes = bytes;
+		return { width: 1, height: 1, data: new Uint8Array( [ 18, 52, 86, 255 ] ) };
+	};
+	ktx2Root = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', makeGLB( Buffer.from( [ 1, 2, 3, 4 ] ), 'image/ktx2' ) ] ] ) } );
+	let ktx2Material;
+	ktx2Root.traverse( node => { if ( node.isMesh ) ktx2Material = node.material; } );
+	assert.ok( ktx2Material?.bindings.worldNormal?.texture?.isTexture, 'KHR_texture_basisu source can bind a linear normal texture' );
+	assert.ok( ktx2Material.bindings.worldEmissive?.texture?.isTexture, 'KHR_texture_basisu source can bind an emissive texture' );
+	assert.ok( decodedKTX2Bytes instanceof Uint8Array, 'KTX2 extension routes embedded bytes through the KTX2 decoder' );
 	console.log( 'World package: normal/emissive textures, linear color factors, and material WGSL verified' );
 } finally {
 	if ( root ) disposeWorldPackage( root );
+	if ( ktx2Root ) disposeWorldPackage( ktx2Root );
 	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;
 	else globalThis.__assetImage = previousAssetImage;
+	if ( previousAssetKTX2 === undefined ) delete globalThis.__assetKTX2;
+	else globalThis.__assetKTX2 = previousAssetKTX2;
 }

@@ -611,7 +611,8 @@ async function buildGLTF( gltf, packageState = null ) {
 	const loadTexture = async ( textureInfo, label, format = 'rgba8unorm-srgb' ) => {
 
 		if ( ! textureInfo ) return null;
-		const textureSource = gltf.textures[ textureInfo.index ]?.source;
+		const texture = gltf.textures[ textureInfo.index ];
+		const textureSource = texture?.extensions?.KHR_texture_basisu?.source ?? texture?.source;
 		const image = gltf.images[ textureSource ];
 		if ( ! image?.bytes ) throw new Error( `GLB ${label} texture requires an embedded image` );
 		const textureKey = `${ textureSource }:${ format }`;

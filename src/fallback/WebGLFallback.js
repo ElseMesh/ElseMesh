@@ -1,4 +1,5 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createWebGLKTX2Loader } from '../engine/loaders/KTX2.js';
 import { ISLAND_DEFINITION as WORLD } from '../world/IslandDefinition.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
@@ -735,6 +736,7 @@ export class WebGLFallback {
 		this.blockers = [];
 		this.remotePlayers = new Map();
 		this.loader = new GLTFLoader();
+		this.ktx2Loader = null;
 		this.worldLink = worldLinkFromLocation();
 		this.debugNoWater = new URLSearchParams( location.search ).has( 'noWater' )
 			|| this.worldLink?.environment?.water?.enabled === false;
@@ -766,6 +768,8 @@ export class WebGLFallback {
 		this.reviewPose = cameraPoseFromSearch( location.search );
 		if ( this.reviewPose?.time !== undefined ) this.app.settings.timeOfDay = this.reviewPose.time;
 		this.renderer.toneMapping = T.ACESFilmicToneMapping;
+		this.ktx2Loader ||= createWebGLKTX2Loader( this.renderer );
+		this.loader.setKTX2Loader( this.ktx2Loader );
 		this.renderer.toneMappingExposure = 0.9;
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = T.PCFSoftShadowMap;
