@@ -70,27 +70,35 @@ construct ElseMesh runtime resources directly, provided it preserves content
 integrity, declared resource limits, collision readiness, and the same region
 lifecycle.
 
-The single `thruholdd` world server owns reusable texture encoding. A
-world-specific importer decodes source textures and streams bounded raw RGBA
-bytes to the server's KTX2 encoder with dimensions, transfer function, normal
-map intent, and output profile as metadata. Use a local streaming request, not
-base64 or per-texture temporary files. The server validates dimensions and
-byte counts before allocating, limits concurrent encodes by memory budget,
-deduplicates identical in-flight work, and stores encoded results in its shared
-content cache so visitors do not repeat conversion. Cache identity covers the
-source pixel digest and encoding options. The importer remains responsible
-for source decoding and selecting the right mip/sample level; the shared
-encoder only compresses the supplied pixels. Keep this service independent of
-Hogwarts, Unreal, and the renderer; the browser engine only transcodes and
-uploads KTX2 for its active WebGL or WebGPU backend.
+KTX2 encoding currently runs in the source provider through the reusable,
+format-neutral native library at `native/ktx2`. HogwartsBridge decodes one
+Unreal texture, passes its RGBA buffer to the library through a C ABI, and
+receives encoded output in bounded callback chunks directly into the GLB
+buffer. This avoids a second process boundary, per-texture PNG/KTX2 files, and
+an extra full-size encoded-output copy. The library serializes encodes and
+limits Basis Universal to one worker thread to keep peak resource use
+predictable. The native API is deliberately independent of Unreal, Hogwarts,
+Go, C#, and the renderer, so Thruholdd can link the same implementation if
+centralized encoding becomes useful to another world.
 
-Streaming is the initial transport because it avoids disk staging and keeps
-peak memory bounded to the active request and encoder. A shared-memory path may
-reduce process-to-process copies, but it adds platform-specific allocation,
-ownership, and cleanup rules. Compare both paths with representative texture
-sizes and concurrent visitor load before making shared memory the default. The
-encoder service and request path are planned, not implemented; Hogwarts
-currently launches `basisu` separately.
+This is not yet a Thruholdd encoding service or shared cross-visitor texture
+cache. The source provider remains responsible for decoding source formats,
+selecting mip/sample levels, and choosing metadata such as sRGB or normal-map
+handling. If another world needs centralized encoding, Thruholdd can reuse the
+same library and accept bounded raw pixel streams with dimensions and encoding
+options; it should validate sizes, limit concurrent work by memory budget,
+deduplicate identical in-flight requests, and cache results by source digest
+and encoding options. Keep the browser engine responsible for transcoding and
+uploading KTX2 on its active WebGL or WebGPU backend.
+
+The current C ABI streams encoded chunks to its caller in process; no
+inter-process transport is needed for the Hogwarts path. If encoding moves
+across a process boundary, begin with bounded streaming to avoid disk staging
+and measure representative texture sizes and concurrent visitor loads before
+adding shared memory. Shared memory may reduce copies but adds platform-specific
+allocation, ownership, and cleanup rules. Do not maintain a second encoder
+implementation in Thruholdd; link this library or deliberately move it to a
+central package when more than one world needs the service.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.
 

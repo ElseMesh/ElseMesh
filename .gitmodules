@@ -4,3 +4,6 @@
 [submodule "worlds/Hogwarts"]
 	path = worlds/Hogwarts
 	url = git@github.com:rebroad/Hogwarts-World.git
+[submodule "third_party/basis_universal"]
+	path = third_party/basis_universal
+	url = https://github.com/BinomialLLC/basis_universal.git
