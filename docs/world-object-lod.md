@@ -36,6 +36,33 @@ scheduler decides which regions and assets to request from world traversal
 reachability and expected arrival, then uses view size and proximity to choose
 the suitable variant. See [reachability-driven content scheduling](world-network-design.md#reachability-driven-content-scheduling).
 
+### Texture mip streaming and cache identity
+
+Geometry LODs must not require a separate copy of the same texture at each
+level. Give a texture a content identity independent of the mesh or region that
+references it, and make its filtered mip levels independently addressable.
+The engine should request a small mip first for a reachable, farther region,
+then fetch finer mips as arrival and projected size warrant. Region payloads,
+the host's shared RAM/disk caches, and each browser's RAM/persistent cache must
+reuse the same verified texture-mip content IDs across geometry LODs and
+regions. The browser should retain a usable coarse GPU level while finer levels
+arrive, then evict decoded or GPU-resident fine levels under memory pressure
+without deleting the reusable encoded cache entry.
+
+A mip pyramid contains filtered images at successively smaller resolutions;
+it is not made by simply skipping every second or fourth source pixel. A
+complete conventional pyramid adds about one third to the base-level texel
+count before compression, rather than requiring several independent full-size
+images. KTX2 provides independently indexed mip payloads and supports sending
+smaller levels first. The exact container or chunk format is an implementation
+choice, but it must permit content-addressed reuse and progressive level
+requests. The current engine path does not implement this contract: geometry
+LOD records reference separate GLBs, images are embedded in those GLBs, and
+runtime-generated GPU mipmaps are created only after the embedded base image is
+downloaded and decoded. Those runtime mipmaps improve sampling but do not
+reduce network, browser-disk, or encoded-cache size. Cross-GLB texture
+deduplication and independently streamed texture levels remain unimplemented.
+
 ## Camera selection
 
 Select by projected bounds and actual view resolution, with a sustained-load
