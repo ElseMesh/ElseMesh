@@ -210,6 +210,14 @@ distance and must still be ready before movement enters their cells. This
 prevents a wide initial camera view from making every visible region a blocking
 conversion while preserving the traversal safety gate.
 
+Within a visual priority tier, stream bounded region payloads in increasing
+distance from the active camera to each cell's bounds, preserving authored
+order for equal-distance or unbounded assets. This gives near opaque geometry
+an earlier chance to cover distant scenery during progressive arrival. It is
+an arrival-order heuristic, not occlusion culling: world connectivity and
+collision readiness still govern which regions are reachable, and the depth
+buffer determines the final visibility of fully loaded opaque geometry.
+
 This is a general engine evolution; bridge-specific milestones, source data,
 and acceptance evidence remain in the corresponding private world repository.
 

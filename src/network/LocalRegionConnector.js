@@ -481,14 +481,31 @@ export class LocalRegionConnector {
 		return true;
 	}
 
-	async preload( { assetIDs, signal, onProgress = () => {}, onAsset, retainAssets = true, retainAssetIDs = new Set() } = {} ) {
+	async preload( { assetIDs, position, signal, onProgress = () => {}, onAsset, retainAssets = true, retainAssetIDs = new Set() } = {} ) {
 		requireValue( this.manifest, 'Load the local world descriptor first' );
 		requireValue( typeof onProgress === 'function', 'Local region preload progress callback must be a function' );
 		requireValue( onAsset === undefined || typeof onAsset === 'function', 'Local region asset callback must be a function' );
 		requireValue( typeof retainAssets === 'boolean', 'Local region retention option must be a boolean' );
 		requireValue( retainAssetIDs instanceof Set, 'Local region retained asset IDs must be a Set' );
 		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...this.regionAssets.keys() ];
-		selected.sort( ( a, b ) => Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) ) );
+		const selectedSet = new Set( selected );
+		const originalOrder = new Map( selected.map( ( assetId, index ) => [ assetId, index ] ) );
+		const distanceByAsset = new Map();
+		if ( position !== undefined ) {
+			requireValue( Array.isArray( position ) && position.length === 3 && position.every( Number.isFinite ), 'Local region preload position is invalid' );
+			for ( const object of this.manifest.objects ) {
+				if ( ! object.regionCell || ! object.assetId || ! selectedSet.has( object.assetId ) || ! object.streamingBounds?.center ) continue;
+				const center = object.streamingBounds.center;
+				const dx = center[ 0 ] - position[ 0 ], dy = center[ 1 ] - position[ 1 ], dz = center[ 2 ] - position[ 2 ];
+				const distance = Math.max( 0, Math.hypot( dx, dy, dz ) - ( object.streamingBounds.radius || 0 ) );
+				distanceByAsset.set( object.assetId, Math.min( distanceByAsset.get( object.assetId ) ?? Infinity, distance ) );
+			}
+		}
+		selected.sort( ( a, b ) =>
+			Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) ) ||
+			( distanceByAsset.get( a ) ?? Infinity ) - ( distanceByAsset.get( b ) ?? Infinity ) ||
+			originalOrder.get( a ) - originalOrder.get( b ),
+		);
 		const loaded = new Map();
 		for ( const [ index, assetId ] of selected.entries() ) {
 			const bytes = await this.getAsset( assetId, { signal } );

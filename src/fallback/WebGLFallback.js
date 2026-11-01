@@ -1642,6 +1642,7 @@ export class WebGLFallback {
 			this.localLoadedObjectIDs = new Set( initialObjects.filter( object => ! object.assetId ).map( object => object.id ) );
 			assets = await this.connector.preload( {
 				assetIDs,
+				position: localSpawn.position,
 				retainAssets: false,
 				retainAssetIDs,
 				onAsset: async ( assetId, bytes ) => {
@@ -2152,7 +2153,7 @@ export class WebGLFallback {
 		}
 		const assetIDs = new Set( wanted.map( object => object.assetId ).filter( Boolean ) );
 		this.hostedWorldStreaming = true;
-		connector.preload( { assetIDs, concurrency: 1 } ).then( async assets => {
+		connector.preload( { assetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined, concurrency: 1 } ).then( async assets => {
 			for ( const object of wanted ) {
 				if ( loaded.has( object.id ) ) continue;
 				if ( object.assetId && ! assets.has( object.assetId ) ) continue;
