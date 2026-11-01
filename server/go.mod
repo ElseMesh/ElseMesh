@@ -1,4 +1,4 @@
-module github.com/elsemesh/elsemesh.github.io/server
+module github.com/elsemesh/elsemesh/server
 
 go 1.24.6
 
