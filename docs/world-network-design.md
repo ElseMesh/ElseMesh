@@ -70,16 +70,27 @@ construct ElseMesh runtime resources directly, provided it preserves content
 integrity, declared resource limits, collision readiness, and the same region
 lifecycle.
 
-The single `thruholdd` world server also owns reusable texture encoding. A
-world-specific importer decodes its source texture to a bounded RGBA payload
-and sends it to the server's KTX2 encoder with explicit transfer-function and
-normal-map options. The server applies one memory/CPU-bounded encoding queue,
-deduplicates identical in-flight work, and shares encoded output through its
-content cache so visitors do not each repeat conversion. Cache identity covers
-the source pixel digest and encoding options. Keep this encoder independent of
+The single `thruholdd` world server owns reusable texture encoding. A
+world-specific importer decodes source textures and streams bounded raw RGBA
+bytes to the server's KTX2 encoder with dimensions, transfer function, normal
+map intent, and output profile as metadata. Use a local streaming request, not
+base64 or per-texture temporary files. The server validates dimensions and
+byte counts before allocating, limits concurrent encodes by memory budget,
+deduplicates identical in-flight work, and stores encoded results in its shared
+content cache so visitors do not repeat conversion. Cache identity covers the
+source pixel digest and encoding options. The importer remains responsible
+for source decoding and selecting the right mip/sample level; the shared
+encoder only compresses the supplied pixels. Keep this service independent of
 Hogwarts, Unreal, and the renderer; the browser engine only transcodes and
-uploads KTX2 for its active WebGL or WebGPU backend. The encoder service is
-planned, not implemented; Hogwarts currently launches `basisu` separately.
+uploads KTX2 for its active WebGL or WebGPU backend.
+
+Streaming is the initial transport because it avoids disk staging and keeps
+peak memory bounded to the active request and encoder. A shared-memory path may
+reduce process-to-process copies, but it adds platform-specific allocation,
+ownership, and cleanup rules. Compare both paths with representative texture
+sizes and concurrent visitor load before making shared memory the default. The
+encoder service and request path are planned, not implemented; Hogwarts
+currently launches `basisu` separately.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.
 
