@@ -78,6 +78,7 @@ let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
 const payloadFetchOrder = [];
+const cellIndexRequests = [];
 let secondCellCollisionMissing = true;
 let knownEmptyCellCollisionMissing = true;
 let includeUnknownPrimitiveCell = false;
@@ -107,15 +108,18 @@ globalThis.fetch = async ( input, options = {} ) => {
 		},
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
-	if ( url.pathname === '/v1/regions/great-hall/cells' ) return Response.json( {
+	if ( url.pathname === '/v1/regions/great-hall/cells' ) {
+		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
+		return Response.json( {
 		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: { staticMeshComponents: 3, otherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), unclassifiedOtherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents, unindexedSpatialBoundsFailures: unindexedSpatialBoundsComponents ? [ { objectPath: '/test/oversized-volume', reason: 'bounds exceed index limit' } ] : [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell || includeSupportedPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ) } : {} }, cells: [
 			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] },
 			{ x: 1, y: 0, z: 0, collisionEvidence: { scope: 'incomplete-collision-source-index', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 1, staticMeshComponentsClassified: false, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [ { objectPath: '/test/unknown', instanceIndex: null, status: 'unknown', bounds: [ 8, 0, 0, 9, 1, 1 ] } ] },
 			{ x: 2, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 1, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] },
 			...( includeUnknownPrimitiveCell ? [ { x: 3, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 1, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 1 }, unknownCollisionSources: [ { objectPath: '/test/unknown-primitive', instanceIndex: null, status: 'unknown', bounds: [ 49, 0, 0, 50, 1, 1 ] } ] } ] : [] ),
 			...( includeSupportedPrimitiveCell ? [ { x: 4, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 1, supportedOtherPrimitiveComponents: 1, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] } ] : [] ),
-		],
-	} );
+		].filter( cell => url.searchParams.getAll( 'cell' ).includes( `${cell.x},${cell.y},${cell.z}` ) ),
+		} );
+	}
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
 		cellFetches++;
 		if ( abortNextCellFetch ) {
@@ -169,6 +173,10 @@ try {
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
+	assert.ok( cellIndexRequests.length > 0 && cellIndexRequests.every( cells => cells.length > 0 && cells.length <= 512 ), 'startup and view cells use bounded coordinate requests' );
+	await connector.ensureCellsForView( [ 1, 0, 1 ], [ 100, 0, 1 ] );
+	assert.ok( connector.knownCells.has( '6,0,0' ), 'the projected movement frontier is queried before its cell can be entered' );
+	assert.ok( cellIndexRequests.every( cells => cells.length <= 512 ), 'movement-frontier batches remain within the provider request limit' );
 	assert.equal( manifest.title, 'Hogwarts Legacy · Great Hall' );
 	assert.deepEqual( manifest.spawn.position, [ 1, 8.62, 9 ] );
 	assert.equal( manifest.entryPointActionLabel, 'Choose your house' );

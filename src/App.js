@@ -1454,6 +1454,9 @@ export class App {
 			const cellSize = connector.cellSizeMeters || 8;
 			const lookahead = collisionLookaheadDistance( speed, connector.collisionLoadLatencyMs || 2000, cellSize );
 			const destination = position.clone().addScaledVector( direction, lookahead );
+			connector.ensureCellsForView?.( position, destination ).catch( error => {
+				if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region cell query failed:', error );
+			} );
 			const objectByID = new Map( connector.manifest.objects.map( object => [ object.id, object ] ) );
 			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) {
 				const object = objectByID.get( objectID );

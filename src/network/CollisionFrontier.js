@@ -20,7 +20,7 @@ export function sweptCollisionCellKeys( from, to, { cellSizeMeters, radius = 0.3
 	return cells;
 }
 
-export function collisionPathReady( { from, to, cellSizeMeters, radius = 0.3, height = 1.75, objectIDsByCell, loadedObjectIDs, unknownObjectIDs, unknownSourcesByCell, unknownSourcesCompleteByCell, missingKnownShapeObjectIDs, missingCollisionPayloadObjectIDs, emptyCellsAreVerified = false } ) {
+export function collisionPathReady( { from, to, cellSizeMeters, radius = 0.3, height = 1.75, objectIDsByCell, loadedObjectIDs, unknownObjectIDs, unknownSourcesByCell, unknownSourcesCompleteByCell, missingKnownShapeObjectIDs, missingCollisionPayloadObjectIDs, knownCells, emptyCellsAreVerified = false } ) {
 	if ( ! objectIDsByCell || ! loadedObjectIDs ) return false;
 	const start = vectorValues( from ), end = vectorValues( to );
 	const sweepBounds = [
@@ -34,7 +34,7 @@ export function collisionPathReady( { from, to, cellSizeMeters, radius = 0.3, he
 	for ( const cellKey of sweptCollisionCellKeys( from, to, { cellSizeMeters, radius, height } ) ) {
 		const objectIDs = objectIDsByCell.get( cellKey );
 		if ( ! objectIDs?.size ) {
-			if ( emptyCellsAreVerified ) continue;
+			if ( emptyCellsAreVerified && knownCells?.has( cellKey ) ) continue;
 			return false;
 		}
 		for ( const objectID of objectIDs ) {

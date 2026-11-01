@@ -2125,6 +2125,9 @@ export class WebGLFallback {
 			const cellSize = connector.cellSizeMeters || 8;
 			const lookahead = collisionLookaheadDistance( speed, connector.collisionLoadLatencyMs || 2000, cellSize );
 			const destination = position.clone().addScaledVector( direction.normalize(), lookahead );
+			connector.ensureCellsForView?.( position, destination ).catch( error => {
+				if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region cell query failed:', error );
+			} );
 			const selected = new Set( objects.map( object => object.id ) );
 			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) selected.add( objectID );
 			const objectByID = new Map( manifest.objects.map( object => [ object.id, object ] ) );
