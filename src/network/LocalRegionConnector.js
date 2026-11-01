@@ -347,6 +347,7 @@ export class LocalRegionConnector {
 	}
 
 	#cacheAsset( assetId, bytes ) {
+		if ( bytes.byteLength > MAX_LOCAL_REGION_CACHE_BYTES ) return bytes;
 		this.assets.set( assetId, bytes );
 		this.assetBytes += bytes.byteLength;
 		while ( this.assetBytes > MAX_LOCAL_REGION_CACHE_BYTES && this.assets.size > 1 ) {
