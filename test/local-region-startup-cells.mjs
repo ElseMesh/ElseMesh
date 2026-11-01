@@ -22,6 +22,7 @@ globalThis.fetch = async url => {
 	if ( path !== '/v1/descriptor' && path !== '/v1/regions' ) {
 		payload.collisionSourceInventory = {
 			staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0,
+			unindexedSpatialBoundsComponents: 0, unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false,
 			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0,
 			audioOnlyPolicyExcludedOtherPrimitiveComponents: 0,
 			noSkeletalCollisionGeometryComponents: 0,
