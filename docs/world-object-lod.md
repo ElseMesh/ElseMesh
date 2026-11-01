@@ -53,15 +53,19 @@ A mip pyramid contains filtered images at successively smaller resolutions;
 it is not made by simply skipping every second or fourth source pixel. A
 complete conventional pyramid adds about one third to the base-level texel
 count before compression, rather than requiring several independent full-size
-images. KTX2 provides independently indexed mip payloads and supports sending
-smaller levels first. The exact container or chunk format is an implementation
-choice, but it must permit content-addressed reuse and progressive level
-requests. The current engine path does not implement this contract: geometry
-LOD records reference separate GLBs, images are embedded in those GLBs, and
-runtime-generated GPU mipmaps are created only after the embedded base image is
-downloaded and decoded. Those runtime mipmaps improve sampling but do not
-reduce network, browser-disk, or encoded-cache size. Cross-GLB texture
-deduplication and independently streamed texture levels remain unimplemented.
+images. KTX2 indexes its mip levels, which can support fetching a level's byte
+range, but that alone does not make a texture progressively transferable. The
+provider must expose stable content-addressed level ranges (or separate level
+assets), and the browser decoder must be verified to consume a partial pyramid
+and upgrade a live texture. The exact container or chunk format is an
+implementation choice, but it must permit content-addressed reuse and
+progressive level requests. The current engine path does not implement this
+contract: geometry LOD records reference separate GLBs, images are embedded in
+those GLBs, and runtime-generated GPU mipmaps are created only after the
+embedded base image is downloaded and decoded. Those runtime mipmaps improve
+sampling but do not reduce network, browser-disk, or encoded-cache size.
+Cross-GLB texture deduplication and independently streamed texture levels
+remain unimplemented.
 
 ## Camera selection
 
