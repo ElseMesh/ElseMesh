@@ -20,7 +20,7 @@ const tests = [
 	'worlds/tidewater/test/boat-lod-runtime.mjs', 'worlds/tidewater/test/webgl-pier-collision.mjs',
 	'test/world-collision.mjs', 'test/world-hosted-player.mjs', 'test/world-hosted-lifecycle.mjs', 'test/player-presence.mjs', 'test/world-presence-session.mjs',
 	'test/remote-avatar.mjs', 'test/avatar-lod-assets.mjs', 'test/account-client.mjs', 'test/serve-world-profile-options.mjs',
-	'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/local-region-connector.mjs', 'test/local-region-disk-cache.mjs', 'test/collision-frontier.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
+	'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/local-region-connector.mjs', 'test/local-region-disk-cache.mjs', 'test/local-region-disk-cache-browser.mjs', 'test/collision-frontier.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
 ];
 const dawnTests = new Set( [
 	'test/reef-placement-render.mjs', 'test/static-model-instance-set-webgpu-render.mjs', 'worlds/tidewater/test/village-materials.mjs', 'worlds/tidewater/test/world-export.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'worlds/tidewater/test/webgpu-fish-props-adapter-build.mjs', 'test/engine-smoke.mjs', 'test/ocean-spectrum-parity.mjs',
