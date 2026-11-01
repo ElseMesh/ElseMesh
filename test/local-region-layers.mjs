@@ -29,7 +29,7 @@ globalThis.fetch = async url => {
 	const regionId = request.pathname.split( '/' )[ 3 ];
 	return new Response( JSON.stringify( {
 		sourceRevision: 'test-revision', cellSizeMeters: 8,
-		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {} },
+		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {} },
 		cells: ( cellsByRegion[ regionId ] || [] ).map( cell => ( { ...cell, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] } ) ),
 	} ) );
 };
