@@ -43,7 +43,7 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 	const assets = preloadedAssets || await connector.preload();
 	const root = new Group();
 	root.name = `world:${connector.worldId}`;
-	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext, materialAdapterContexts: new Map() };
+	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map() };
 	try {
 		await appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } );
 		return root;
@@ -56,7 +56,8 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 
 export async function appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } = {} ) {
 
-	const state = root.userData.worldPackage || ( root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set() } );
+	const state = root.userData.worldPackage || ( root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), textureAssets: new Map() } );
+	state.textureAssets ||= new Map();
 	await prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs );
 	if ( ! state.portalFramesBuilt ) {
 		addPortalFrames( root, connector.manifest.portals || [] );
@@ -591,6 +592,9 @@ export function disposeWorldPackage( root ) {
 			}
 		}
 	} );
+	for ( const entry of state?.textureAssets?.values?.() || [] ) {
+		if ( entry.texture?.isTexture && entry.texture.destroy ) textures.add( entry.texture );
+	}
 	const release = () => {
 		for ( const geometry of geometries ) geometry.dispose();
 		for ( const material of materials ) material.dispose?.();
@@ -602,10 +606,12 @@ export function disposeWorldPackage( root ) {
 	else release();
 	state?.parsed?.clear();
 	state?.loadedObjects?.clear();
+	state?.textureAssets?.clear();
 }
 
 async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 
+	if ( packageState ) packageState.textureAssets ||= new Map();
 	const root = new Group();
 	const textures = new Map();
 	const loadTexture = async ( textureInfo, label, format = 'rgba8unorm-srgb' ) => {
@@ -614,19 +620,38 @@ async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 		const texture = gltf.textures[ textureInfo.index ];
 		const textureSource = texture?.extensions?.KHR_texture_basisu?.source ?? texture?.source;
 		const image = gltf.images[ textureSource ];
-		const bytes = image?.bytes || ( image?.assetId
-			? await packageState?.connector?.getAsset( image.assetId, { signal } )
-			: null );
-		if ( ! bytes ) throw new Error( `GLB ${label} texture requires embedded image bytes or a declared ElseMesh image asset` );
 		const textureKey = `${ image.assetId || textureSource }:${ format }`;
-		if ( ! textures.has( textureKey ) ) {
-			const pixels = await decodeImage( bytes, image.mimeType );
-			const texture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format, data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
-			texture.getGPU();
-			generateMipmaps( texture );
-			textures.set( textureKey, texture );
+		if ( textures.has( textureKey ) ) return textures.get( textureKey );
+
+		const shareAssetTexture = Boolean( image.assetId && packageState?.textureAssets );
+		let entry = shareAssetTexture ? packageState.textureAssets.get( textureKey ) : null;
+		if ( ! entry ) {
+			entry = { texture: null, promise: null };
+			entry.promise = ( async () => {
+				const bytes = image?.bytes || ( image?.assetId
+					? await packageState?.connector?.getAsset( image.assetId, { signal } )
+					: null );
+				if ( ! bytes ) throw new Error( `GLB ${label} texture requires embedded image bytes or a declared ElseMesh image asset` );
+				const pixels = await decodeImage( bytes, image.mimeType );
+				const decodedTexture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format, data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
+				decodedTexture.getGPU();
+				generateMipmaps( decodedTexture );
+				if ( packageState?.disposed ) {
+					decodedTexture.destroy();
+					throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
+				}
+				entry.texture = decodedTexture;
+				return decodedTexture;
+			} )();
+			if ( shareAssetTexture ) packageState.textureAssets.set( textureKey, entry );
+			entry.promise.catch( () => {
+				if ( packageState?.textureAssets?.get( textureKey ) === entry ) packageState.textureAssets.delete( textureKey );
+			} );
 		}
-		return textures.get( textureKey );
+
+		const decodedTexture = entry.texture || await entry.promise;
+		textures.set( textureKey, decodedTexture );
+		return decodedTexture;
 
 	};
 	const resolvedMaterials = [];

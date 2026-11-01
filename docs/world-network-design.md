@@ -133,16 +133,18 @@ must not discard persistent reusable source bytes. A cache hit at one layer
 does not imply that another layer has room for the corresponding decoded or
 GPU representation.
 
-Current Hogwarts implementation status: these variant-selection and
-content-addressed texture-sharing rules are targets, not implemented behavior.
-The bridge currently embeds one source mip per texture (the largest usable
-source mip at or below 512 pixels per dimension) into each region GLB. The
-server RAM/disk cache and browser RAM/OPFS cache retain whole region responses,
-not texture-specific mip variants. ElseMesh generates a GPU mip chain from
-that single embedded image for sampling. Since images are embedded per GLB,
-the same source texture can be repeated in different region responses. See the
-[Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md) for the
-measured cache limits and current implementation details.
+Current Hogwarts implementation status: ElseMesh supports manifest-declared
+content-addressed GLB image references and shares their decoded GPU textures
+across GLBs. A focused fixture covers that engine path, but Hogwarts does not
+yet emit or serve these image assets. The bridge currently embeds one source
+mip per texture (the largest usable source mip at or below 512 pixels per
+dimension) into each region GLB. The server RAM/disk cache and browser RAM/OPFS
+cache retain whole region responses, not texture-specific mip variants. The
+engine generates a GPU mip chain from that single embedded image for sampling.
+Since images are embedded per GLB, the same source texture can still be
+repeated in different region responses. Texture-tier selection and scheduling
+remain unimplemented. See the [Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md)
+for the measured cache limits and current implementation details.
 
 Traversal data may be derived from authored world geometry, collision,
 navigation data, and dynamic links, but the world/provider must expose a

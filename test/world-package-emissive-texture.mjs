@@ -105,15 +105,28 @@ try {
 	};
 	const referencedGLB = makeGLB( Buffer.alloc( 0 ), 'image/ktx2', externalImageId );
 	assert.equal( parseGLB( referencedGLB ).images[ 0 ].assetId, externalImageId, 'GLB parser preserves the immutable image asset reference' );
+	let externalDecodeCount = 0;
+	let externalAssetFetchCount = 0;
 	globalThis.__assetKTX2 = async bytes => {
+		externalDecodeCount++;
 		decodedKTX2Bytes = bytes;
 		return { width: 1, height: 1, data: new Uint8Array( [ 18, 52, 86, 255 ] ) };
 	};
-	referencedKtx2Root = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', referencedGLB ] ] ) } );
-	let referencedMaterial;
-	referencedKtx2Root.traverse( node => { if ( node.isMesh ) referencedMaterial = node.material; } );
-	assert.ok( referencedMaterial?.bindings.worldNormal?.texture?.isTexture, 'manifest-referenced KTX2 image binds as a normal texture' );
-	assert.strictEqual( referencedMaterial.bindings.worldAlbedo.texture, referencedMaterial.bindings.worldEmissive.texture, 'identical image asset IDs share the same decoded GPU texture within a GLB' );
+	connector.getAsset = async assetId => {
+		externalAssetFetchCount++;
+		assert.ok( connector.manifest.assets.some( asset => asset.id === assetId ), 'external image references resolve only declared manifest assets' );
+		return externalImageBytes;
+	};
+	connector.manifest.objects.push( { id: 'fixture-2', kind: 'asset-instance', assetId: 'asset-2', transform: { position: [ 2, 0, 0 ] }, scale: [ 1, 1, 1 ] } );
+	referencedKtx2Root = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', referencedGLB ], [ 'asset-2', referencedGLB ] ] ) } );
+	const referencedMaterials = [];
+	referencedKtx2Root.traverse( node => { if ( node.isMesh ) referencedMaterials.push( node.material ); } );
+	assert.equal( referencedMaterials.length, 2, 'two GLB region assets were loaded' );
+	assert.ok( referencedMaterials[ 0 ]?.bindings.worldNormal?.texture?.isTexture, 'manifest-referenced KTX2 image binds as a normal texture' );
+	assert.strictEqual( referencedMaterials[ 0 ].bindings.worldAlbedo.texture, referencedMaterials[ 0 ].bindings.worldEmissive.texture, 'identical image asset IDs share the same decoded GPU texture within a GLB' );
+	assert.strictEqual( referencedMaterials[ 0 ].bindings.worldAlbedo.texture, referencedMaterials[ 1 ].bindings.worldAlbedo.texture, 'identical image asset IDs share a decoded GPU texture across GLB region assets' );
+	assert.equal( externalDecodeCount, 2, 'shared sRGB and linear references each decode once across both GLBs' );
+	assert.equal( externalAssetFetchCount, 2, 'the connector fetches the content-addressed image once for each color-space variant' );
 	assert.deepEqual( decodedKTX2Bytes, externalImageBytes, 'WorldPackage obtains external image bytes through the connector before KTX2 decoding' );
 	assert.throws( () => parseGLB( makeGLB( Buffer.alloc( 0 ), 'image/ktx2', 'untrusted-path' ) ), /invalid ElseMesh asset reference/, 'asset references reject non-content-addressed IDs' );
 	console.log( 'World package: normal/emissive textures, linear color factors, and material WGSL verified' );
