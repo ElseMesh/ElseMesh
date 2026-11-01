@@ -207,7 +207,7 @@ export class LocalRegionConnector {
 			requireValue( values.length === 3 && values.every( Number.isSafeInteger ), 'Local provider cell coordinate is invalid' );
 			return values.join( ',' );
 		} ) ) ];
-		requireValue( requested.length > 0 && requested.length <= 512, 'Local provider cell request exceeds the 512-coordinate limit' );
+		requireValue( requested.length > 0, 'Local provider cell request is empty' );
 		const cellSize = this.previewRegion.cellSizeMeters;
 		for ( const sourceRegion of this.sourceRegions ) {
 			const queried = this.queriedCellsByRegion.get( sourceRegion.id );
@@ -215,15 +215,18 @@ export class LocalRegionConnector {
 			if ( pending.length === 0 ) continue;
 			const sourceURL = new URL( sourceRegion.asset, `${this.baseURL}/` );
 			requireValue( sourceURL.origin === this.localProvider && sourceURL.pathname.startsWith( '/v1/regions/' ), 'Local provider returned an unsafe region URL' );
-			const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
-			cellIndexURL.searchParams.set( 'size', String( cellSize ) );
-			for ( const cell of pending ) cellIndexURL.searchParams.append( 'cell', cell );
-			const cellIndex = await fetchJSON( cellIndexURL, signal );
-			requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === cellSize && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= pending.length, 'Local provider returned an invalid bounded cell response' );
-			const requestedSet = new Set( pending );
-			for ( const cell of cellIndex.cells ) requireValue( requestedSet.has( `${cell?.x},${cell?.y},${cell?.z}` ), 'Local provider returned an unrequested cell' );
-			this.#installCellIndex( sourceRegion, cellIndex );
-			for ( const cell of pending ) queried.add( cell );
+			for ( let offset = 0; offset < pending.length; offset += 512 ) {
+				const batch = pending.slice( offset, offset + 512 );
+				const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
+				cellIndexURL.searchParams.set( 'size', String( cellSize ) );
+				for ( const cell of batch ) cellIndexURL.searchParams.append( 'cell', cell );
+				const cellIndex = await fetchJSON( cellIndexURL, signal );
+				requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === cellSize && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= batch.length, 'Local provider returned an invalid cell response' );
+				const requestedSet = new Set( batch );
+				for ( const cell of cellIndex.cells ) requireValue( requestedSet.has( `${cell?.x},${cell?.y},${cell?.z}` ), 'Local provider returned an unrequested cell' );
+				this.#installCellIndex( sourceRegion, cellIndex );
+				for ( const cell of batch ) queried.add( cell );
+			}
 		}
 		for ( const key of requested ) this.knownCells.add( key );
 		if ( ! this.allCollisionSourcesIndexed ) this.unknownSourcesCompleteByCell.clear();
@@ -244,7 +247,7 @@ export class LocalRegionConnector {
 		const distanceSquared = cell => ( cell[ 0 ] - centerCell[ 0 ] ) ** 2 + ( cell[ 1 ] - centerCell[ 1 ] ) ** 2 + ( cell[ 2 ] - centerCell[ 2 ] ) ** 2;
 		candidates.sort( ( a, b ) => distanceSquared( a ) - distanceSquared( b ) );
 		const requested = new Set( [ ...frontier, ...candidates.map( cell => cell.join( ',' ) ) ] );
-		return this.ensureCells( [ ...requested ].slice( 0, 512 ).map( cell => cell.split( ',' ).map( Number ) ) );
+		return this.ensureCells( [ ...requested ].map( cell => cell.split( ',' ).map( Number ) ) );
 	}
 
 	#installCellIndex( sourceRegion, cellIndex ) {
