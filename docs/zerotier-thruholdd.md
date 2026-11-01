@@ -3,9 +3,9 @@
 There is one supported world-server executable: `thruholdd`. It embeds libzt
 and can join ZeroTier when `--zerotier-network` is configured; pass an empty
 value to run the same daemon without joining ZeroTier. Historical references
-below to a separate CGO-free `worldd` executable describe a removed build
-variant, not a second supported daemon. See [ThruHolds](thruholds.md) for the
-current build and operating instructions.
+below to a separate CGO-free build describe a removed variant, not a second
+supported server. See [ThruHolds](thruholds.md) for the current build and
+operating instructions.
 
 ## Dedicated ElseMesh network
 
@@ -108,7 +108,7 @@ ZeroTier interface.
 Ordinary browsers do not join the ZeroTier LAN. Publish the daemon's HTTPS/WSS
 gateway and configure the hosted client to use that gateway for signaling and
 fallback. The client can use a direct WebRTC data channel to a standalone
-`worldd`; this has passed a loopback Chromium check but not a cross-NAT or
+`thruholdd`; this has passed a loopback Chromium check but not a cross-NAT or
 public test. Browser-hosted owner sessions still need the reverse gateway path
 and do not yet support direct WebRTC; see [browser hosting](browser-hosting.md).
 Do not expose the Central API token to a browser.
@@ -122,7 +122,7 @@ authorization must continue to work without a Central API request.
 
 ### Host firewall for embedded libzt
 
-`worldd`'s libzt node runs ZeroTier in userspace; it does not create a native
+`thruholdd`'s libzt node runs ZeroTier in userspace; it does not create a native
 `zt...` network interface. The host firewall therefore sees the encrypted
 outer UDP packets, not the inner ElseMesh TCP connection. For ordinary hosts,
 allow UDP egress to ZeroTier roots on port 9993 and stateful reply traffic.
@@ -177,10 +177,10 @@ starts without a separate `LD_LIBRARY_PATH` when both files remain together.
 The default network is compiled into the ZeroTier-enabled build, so neither
 the network ID nor a special transport flag is needed.
 
-The former CGO-free `worldd` build used a host-managed ZeroTier interface.
-That separate build target was removed so identity, hosting, and optional
-ZeroTier joining belong to the same `thruholdd` daemon. This historical path is
-not a supported second server mode.
+The former CGO-free build used a host-managed ZeroTier interface. That
+separate build target was removed so identity, hosting, and optional ZeroTier
+joining belong to the same `thruholdd` daemon. It is not a supported second
+server mode.
 
 ### Observed physical peer endpoints
 

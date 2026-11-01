@@ -18,7 +18,7 @@ assert.throws( () => browserHostSocketURL( 'ws://gateway.example.test' ), /HTTPS
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const tempBase = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const tempRoot = await mkdtemp( path.join( tempBase, 'elsemesh-browser-host-' ) );
-const worldd = path.join( tempRoot, 'thruholdd-test' );
+const thruholdd = path.join( tempRoot, 'thruholdd-test' );
 const worldsDir = path.join( tempRoot, 'worlds' );
 const profile = 'browser-host-test';
 const profileDir = path.join( worldsDir, profile );
@@ -64,7 +64,7 @@ const waitFor = async ( predicate, message ) => {
 };
 
 const waitForHTTP = async ( url, child ) => waitFor( async () => {
-	if ( child.exitCode !== null ) assert.fail( `worldd exited before readiness:\n${child.output}` );
+	if ( child.exitCode !== null ) assert.fail( `thruholdd exited before readiness:\n${child.output}` );
 	try { return ( await fetch( url, { signal: AbortSignal.timeout( 1000 ) } ) ).ok; }
 	catch { return false; }
 }, `${url} readiness` );
@@ -106,8 +106,8 @@ const stopDaemon = async child => {
 };
 
 try {
-	const built = spawnSync( 'go', [ 'build', '-o', worldd, '.' ], { cwd: path.join( root, 'server/worldd' ), encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
-	assert.equal( built.status, 0, `worldd build failed:\n${built.stdout}\n${built.stderr}` );
+	const built = spawnSync( 'go', [ 'build', '-o', thruholdd, '.' ], { cwd: path.join( root, 'server/worldd' ), encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
+	assert.equal( built.status, 0, `thruholdd build failed:\n${built.stdout}\n${built.stderr}` );
 	await mkdir( path.join( profileDir, 'assets' ), { recursive: true } );
 	const assetPath = path.join( profileDir, 'assets', assetID.slice( 'sha256:'.length ) );
 	await writeFile( assetPath, assetBytes );
@@ -117,14 +117,14 @@ try {
 	const httpPort = await unusedPort();
 	const p2pPort = await unusedPort();
 	await writeFile( sourcePath, `${JSON.stringify( source, null, 2 )}\n` );
-	const ownerID = run( worldd, [ '--worlds-dir', worldsDir, '--world-profile', profile, '--print-node-id' ] );
+	const ownerID = run( thruholdd, [ '--worlds-dir', worldsDir, '--world-profile', profile, '--print-node-id' ] );
 	run( process.execPath, [ path.join( root, 'tools/world-source-to-manifest.mjs' ), '--source', sourcePath, '--owner', ownerID, '--assets', path.join( profileDir, 'assets' ), '--out', unsignedPath ] );
-	run( worldd, [ '--worlds-dir', worldsDir, '--world-profile', profile, '--sign-manifest', unsignedPath, '--manifest-out', manifestPath ] );
+	run( thruholdd, [ '--worlds-dir', worldsDir, '--world-profile', profile, '--sign-manifest', unsignedPath, '--manifest-out', manifestPath ] );
 	const document = JSON.parse( await readFile( manifestPath, 'utf8' ) );
 	const key = await readFile( path.join( profileDir, 'node.key' ) );
 	const cleanKey = Uint8Array.from( key );
 	const fileMap = new Map( [ [ assetID, new File( [ assetBytes ], assetID ) ] ] );
-	const daemon = startDaemon( worldd, [ '--worlds-dir', worldsDir, '--world-profile', profile, '--manifest', manifestPath, '--p2p-port', String( p2pPort ), '--http', `127.0.0.1:${httpPort}`, '--dht-mode', 'client' ] );
+	const daemon = startDaemon( thruholdd, [ '--worlds-dir', worldsDir, '--world-profile', profile, '--manifest', manifestPath, '--p2p-port', String( p2pPort ), '--http', `127.0.0.1:${httpPort}`, '--dht-mode', 'client' ] );
 	await waitForHTTP( `http://127.0.0.1:${httpPort}/healthz`, daemon );
 	const originalWebSocket = globalThis.WebSocket;
 	const originalSelf = globalThis.self;
@@ -151,7 +151,7 @@ try {
 		await waitFor( () => ObservedWebSocket.last, 'worker did not open its gateway socket' );
 		const socket = ObservedWebSocket.last;
 		assert.equal( socket.url, `ws://127.0.0.1:${httpPort}/browser-host` );
-		const challenge = await waitForFrame( socket, frame => frame.type === 'host.challenge', 'worldd did not issue its browser-host challenge' );
+		const challenge = await waitForFrame( socket, frame => frame.type === 'host.challenge', 'thruholdd did not issue its browser-host challenge' );
 		await waitFor( () => socket.sent.some( frame => frame.type === 'host.register' ), 'worker did not register after the gateway challenge' );
 		const registration = socket.sent.find( frame => frame.type === 'host.register' );
 		assert.deepEqual( registration.document, document, 'worker registration preserves all owner-signed document fields' );
@@ -161,8 +161,8 @@ try {
 		assert.equal( verify( null, proofMessage, publicKey, Buffer.from( registration.proof, 'base64' ) ), true, 'registration proof must verify with the signed world owner key' );
 		assert.equal( registration.document.signer, document.signer );
 		assert.equal( Object.hasOwn( registration, 'key' ), false, 'the gateway registration must not contain the owner private key' );
-		const registrationResult = await waitForFrame( socket, frame => frame.type === 'host.registered' || frame.type === 'error', 'worldd did not answer the worker registration' );
-		assert.equal( registrationResult.type, 'host.registered', `worldd rejected the worker registration: ${registrationResult.error}` );
+		const registrationResult = await waitForFrame( socket, frame => frame.type === 'host.registered' || frame.type === 'error', 'thruholdd did not answer the worker registration' );
+		assert.equal( registrationResult.type, 'host.registered', `thruholdd rejected the worker registration: ${registrationResult.error}` );
 		await waitFor( () => messages.some( message => message.status === `Hosting ${document.payload.title}` ), 'worker did not enter the hosting state' );
 		assert.equal( typeof heartbeatCallback, 'function', 'worker must start a heartbeat after registration' );
 		heartbeatCallback();
@@ -193,7 +193,7 @@ try {
 		if ( originalSelf === undefined ) delete globalThis.self;
 		else globalThis.self = originalSelf;
 	}
-	console.log( 'Browser-host worker registered with live worldd and served a signed manifest and verified asset through the visitor gateway' );
+	console.log( 'Browser-host worker registered with live thruholdd and served a signed manifest and verified asset through the visitor gateway' );
 } finally {
 	for ( const child of processes.reverse() ) await stopDaemon( child );
 	await rm( tempRoot, { recursive: true, force: true } );

@@ -35,7 +35,7 @@ async function main() {
 	if ( ! validTimestamp ) throw new Error( 'source updatedAt must be a valid ISO date-time' );
 	const assets = new Map();
 	for ( const object of source.objects ) {
-		if ( ! object.assetId ) throw new Error( `Object ${object.id} has no assetId; add/export its GLB and import it with worldd --import-asset` );
+		if ( ! object.assetId ) throw new Error( `Object ${object.id} has no assetId; add/export its GLB and import it with thruholdd --import-asset` );
 		for ( const id of [ object.assetId, ...( object.lods || [] ).map( ( level ) => level.assetId ) ] ) {
 			let ref = assets.get( id );
 			if ( ! ref ) {

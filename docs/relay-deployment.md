@@ -132,7 +132,7 @@ with `ELSEMESH_WEBRTC_STUN_ARGS`, for example
 `ELSEMESH_WEBRTC_STUN_ARGS="--webrtc-stun-server stun:<host>:<port>"`.
 The unit expands this variable into separate command-line arguments; repeat
 the `--webrtc-stun-server` option for additional endpoints. Configure the same
-STUN URLs on each target `worldd`. If no STUN endpoint is configured, the WSS
+STUN URLs on each target `thruholdd`. If no STUN endpoint is configured, the WSS
 gateway path remains available, while direct WebRTC may fail for peers behind
 NAT. STUN discovers candidate addresses; it is not a relay or a guarantee of
 direct connectivity.
@@ -176,7 +176,7 @@ retrieval and portal traversal.
 ## Current host deployment preflight (2026-10-11)
 
 A read-only check of the development host (`HP-ENVY-x360`) found no running
-`thruholdd`/`worldd` process, no active `elsemesh-gateway` or Caddy service,
+`thruholdd` process, no active `elsemesh-gateway` or Caddy service,
 and no listener on TCP 80, 443, 42901, or 5200. The Wi-Fi interface had private
 address `192.168.22.247/22` via `192.168.20.1`; the host's `spod` interface was
 down. This is not evidence that the router cannot forward public traffic, but
@@ -215,7 +215,7 @@ invite or production endpoint.
 ### Unlisted route recheck (2026-10-11)
 
 After the user authorized direct, unadvertised exposure for testing, a fresh
-`worldd` was built from `main` (`b0ff24e`, SHA-256
+`thruholdd` was built from `main` (`b0ff24e`, SHA-256
 `4b910bdef103a8f0fbf9dadef539e9c694cdeffa356f71d3a137a21d34e22293`). A
 temporary profile served the checked-in Example Island on loopback through a
 Cloudflare Quick Tunnel. The profile had `discoverable: false`, used DHT client
@@ -262,7 +262,7 @@ provide an alternate path for nodes behind restrictive NAT. These flags are
 independent and may point to the same or different community nodes:
 
 ```sh
-worldd --world-profile island \
+thruholdd --world-profile island \
   --bootstrap /ip4/<bootstrap-a-ip>/tcp/42901/p2p/<bootstrap-a-peer-id> \
   --bootstrap /ip4/<bootstrap-b-ip>/tcp/42901/p2p/<bootstrap-b-peer-id> \
   --relay /ip4/<relay-a-ip>/tcp/42901/p2p/<relay-a-peer-id> \
@@ -282,7 +282,7 @@ peers. Portals can then name the destination world ID without pinning one
 provider PeerID; a gateway connected to the mesh resolves providers and
 forwards the browser request. Browser players use an HTTPS/WSS gateway and do
 not join the native libp2p or ZeroTier network themselves. Direct WebRTC to a
-standalone `worldd` is implemented and verified in loopback Chromium tests; it
+standalone `thruholdd` is implemented and verified in loopback Chromium tests; it
 uses WSS signaling and falls back to the gateway when ICE or the data channel
 fails. Configure `--webrtc-stun-server` on the signaling gateway and target,
 then permit/forward the configured UDP ICE range (`42950-43049` by default)
@@ -299,7 +299,7 @@ Run the automated local check from `server`:
 go test ./worldd -run TestWorlddStaticRelayForwardsToPrivatePeer -count=1
 ```
 
-It starts a relay-enabled `worldd` option set, a private AutoRelay peer and a
+It starts a relay-enabled `thruholdd` option set, a private AutoRelay peer and a
 caller, then proves a ping travels on a connection whose multiaddress contains
 `/p2p-circuit`. This uses loopback addresses; it validates relay option wiring
 and circuit forwarding, not traversal across actual NATs or the public

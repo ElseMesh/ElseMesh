@@ -159,9 +159,9 @@ in `docs/`.
   [direct WebRTC](docs/browser-direct-webrtc.md), and
   [relay deployment](docs/relay-deployment.md#publish-a-browser-gateway-with-tls).
 - **ZeroTier (60%):** use the dedicated ElseMesh network
-  `e3918db4832a3056` with one `thruholdd` world daemon and
-  optional embedded libzt membership configured at runtime. The removed
-  CGO-free `worldd` build is not a separate supported daemon. The server may
+  `e3918db4832a3056` with the single `thruholdd` world server and
+  optional embedded libzt membership configured at runtime. The former
+  separate CGO-free server build is not a supported variant. The server may
   not expose Central credentials; treat physical path observations as
   transient. Verify routing, ports, peer discovery, and operation without
   Central. See [ZeroTier thruholdd setup and evidence](docs/zerotier-thruholdd.md#dedicated-elsemesh-network).

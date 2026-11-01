@@ -15,9 +15,9 @@ const tempRoot = await mkdtemp( path.join( tempDirectory, 'elsemesh-world-gatewa
 const processes = [];
 
 try {
-	const binary = path.join( tempRoot, 'worldd' );
+	const binary = path.join( tempRoot, 'thruholdd' );
 	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
-	assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
+	assert.equal( build.status, 0, `thruholdd build failed:\n${build.stdout}\n${build.stderr}` );
 
 	const ownerData = path.join( tempRoot, 'owner' );
 	const cacheData = path.join( tempRoot, 'cache' );
@@ -200,7 +200,7 @@ async function waitForHTTP( url, child ) {
 async function waitFor( condition, label, children = [] ) {
 	const deadline = Date.now() + 30000;
 	while ( Date.now() < deadline ) {
-		for ( const child of children ) assert.equal( child.exitCode, null, `worldd exited while waiting for ${label}:\n${child.output}` );
+		for ( const child of children ) assert.equal( child.exitCode, null, `thruholdd exited while waiting for ${label}:\n${child.output}` );
 		if ( await condition() ) return;
 		await new Promise( ( resolve ) => setTimeout( resolve, 150 ) );
 	}

@@ -118,7 +118,7 @@ traces are still outstanding.
 
 ## Current WebGPU/WebGL runtime check, 2026-10-29
 
-The signed Tidewater package was served by a temporary local `worldd` profile
+The signed Tidewater package was served by a temporary local `thruholdd` profile
 and loaded through the external build in Chromium 156 on a headless Weston
 display. The browser selected WebGPU for the visual captures. Both used the
 named beach pose (`p=[15,3,-58]`, `yaw=3.14`, `pitch=-0.08`, time `16.2`), a

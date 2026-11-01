@@ -80,7 +80,7 @@ built-in island state; this remains an engine/world separation gap.
 Earlier commits ElseMesh `69e8805` and Tidewater `4896050` moved WebGPU
 component installers into Tidewater and dispatched them through the registry.
 The current v3 cleanup removes obsolete local migration aliases in Blender and
-`worldd`. The Hogwarts submodule is reported dirty and is outside this work;
+Thruholdd profile handling. The Hogwarts submodule is reported dirty and is outside this work;
 preserve it without inspection beyond its pointer/status or staging.
 
 ### Fish-prop ownership boundary
@@ -218,7 +218,7 @@ finding changes them.
 - 2026-10-29: the WebGPU installer extraction and progress update were pushed
   as ElseMesh `69e8805` and Tidewater `4896050`; Hogwarts was not staged.
 - 2026-10-29: removed obsolete Blender metadata aliases and Tidewater-named
-  `worldd` data/ZeroTier profile migration paths. Blender identity checks,
+  data/ZeroTier profile migration aliases. Blender identity checks,
   `go test ./...`, the full client suite, and external build passed.
 - 2026-10-30: hosted package collisions are now allocated separately from
   `IslandWorldState`; WebGL hosted player, wildlife, and manifest blockers use

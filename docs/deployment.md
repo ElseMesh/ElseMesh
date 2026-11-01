@@ -44,7 +44,7 @@ arguments. For example (replace the placeholder with an actual world gateway):
 https://elsemesh.github.io/?worldId=elsemesh%3Aexample-island&gateway=https%3A%2F%2Fworld-host.example
 ```
 
-Pages hosts the renderer, not `worldd` or discovery. A hosted-world invite needs a
+Pages hosts the renderer, not `thruholdd` or discovery. A hosted-world invite needs a
 reachable HTTPS/WSS gateway with the appropriate browser origin configuration.
 The development backends on loopback port 5200 are not accessible from a phone
 or from an HTTPS Pages client. Use the local links in

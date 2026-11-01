@@ -9,9 +9,9 @@ select a standalone world profile directory containing `world.json`,
 manifest, confirms that `node.key` matches its owner key, and hashes every
 declared asset before connecting. It then opens the gateway's `/browser-host`
 WebSocket and answers bounded asset-range requests from those verified files.
-`WorldConnector` continues to serve visitors through a Go `worldd` gateway; the
+`WorldConnector` continues to serve visitors through a Go `thruholdd` gateway; the
 client still has no `RTCPeerConnection` transport. A browser cannot open the
-ordinary TCP or UDP listeners used by `worldd`.
+ordinary TCP or UDP listeners used by `thruholdd`.
 
 The owner key is read locally by the worker and used only to sign the
 gateway's fresh challenge. It is never sent to the gateway. The browser host
@@ -54,7 +54,7 @@ and a host with no heartbeat for 45 seconds is removed. A same-owner
 re-registration replaces that owner's session. Browser-host presence messages
 and deployed public gateway operation are not implemented; this reverse-host
 relay still supports signed manifest and asset retrieval only. Direct WebRTC is
-implemented for standalone `worldd` owners, not browser-hosted owner workers.
+implemented for standalone `thruholdd` owners, not browser-hosted owner workers.
 
 ## Browser-host workflow and limits
 
@@ -96,7 +96,7 @@ themselves provide a network route through NAT.
 
 ## Direct peer transport
 
-The client can signal a standalone `worldd` through the selected gateway and
+The client can signal a standalone `thruholdd` through the selected gateway and
 use a direct data channel for manifest, asset, and role-state reads. Loopback
 headless Chromium verifies the direct signed-manifest and hash-checked asset
 path plus fallback after channel closure. Cross-NAT and public reachability
@@ -144,11 +144,11 @@ and every declared asset, check that the selected `node.key` matches the world
 owner, register through the challenge protocol, maintain heartbeats, and serve
 bounded asset ranges. `npm test` includes `test/browser-host-client.mjs`, which
 builds a temporary `thruholdd` profile and drives the actual worker against a
-live loopback `worldd` gateway. It checks owner-key matching, declared asset
+live loopback `thruholdd` gateway. It checks owner-key matching, declared asset
 hashes, the nonce-bound signature accepted by the server, registration and
 heartbeat messages, and a visitor retrieving the signed manifest and exact
 asset bytes through the gateway. The separate `world-gateway-e2e.mjs` test
-covers the secure WSS proxy path. The full test suite and Go `worldd` tests pass,
+covers the secure WSS proxy path. The full test suite and Go `thruholdd` tests pass,
 including serving the Example Island and cave as separate portal-linked
 worlds. These checks do not yet exercise the owner worker in a real browser
 against a deployed public WSS gateway or test a second browser fetching from
