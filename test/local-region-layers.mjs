@@ -45,7 +45,7 @@ try {
 		'Lighting collision cell 1,0,0', 'Lighting visual cell 1,0,0',
 	], 'the manifest combines only occupied cells from each authored layer' );
 	assert.equal( connector.initialRegionCellObjectIDs.size, 2, 'primary startup collision cells are required before entry' );
-	assert.equal( connector.initialRegionVisualObjectIDs.size, 2, 'primary startup visuals are also required before entry' );
+	assert.equal( cellObjects.filter( object => object.priority === 'visible' && ! object.collisionPayload ).length, 2, 'indexed primary startup visuals receive visible priority' );
 	assert.equal( cellObjects.filter( object => object.priority === 'visible' ).length, 4, 'startup collision and visual payloads receive visible priority' );
 	assert.equal( manifest.assets.length, 8, 'only composed occupied collision and visual cells receive streamed assets' );
 	assert.equal( cellObjects.some( object => object.label === 'GreatHall_Int collision cell 0,0,0' ), false, 'an unindexed startup cell does not get a synthetic collision object' );

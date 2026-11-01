@@ -40,7 +40,7 @@ try {
 	const manifest = await connector.getManifest();
 	assert.equal( manifest.title, 'Great Hall', 'providers without an optional title use the selected region label' );
 	assert.equal( connector.initialRegionCellObjectIDs.size, 1, 'only an indexed startup collision cell is marked for preload' );
-	assert.equal( connector.initialRegionVisualObjectIDs.size, 1, 'only an indexed startup visual cell is required before entry' );
+	assert.equal( manifest.objects.filter( object => object.priority === 'visible' && object.regionCell && ! object.collisionPayload ).length, 1, 'only indexed visual cells inside the authored startup footprint receive visible priority' );
 	assert.equal( connector.emptyCollisionCellsAreVerified, true, 'complete per-layer inventories prove absent cells are empty' );
 	assert.equal( manifest.experience.genre, 'The Great Hall', 'the local world controls its loading copy' );
 	assert.equal( manifest.experience.theme.logo.src, 'http://127.0.0.1:4179/v1/presentation/logo.svg', 'world logo paths resolve against the local content provider' );

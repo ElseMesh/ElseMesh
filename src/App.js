@@ -1460,7 +1460,7 @@ export class App {
 		const componentRank = components.reduce( ( best, component ) => Math.min( best, rank[ component.priority || assetPriorities.get( component.placementAssetId ) || assetPriorities.get( component.modelAssetId ) || assetPriorities.get( component.beds?.[ 0 ]?.assetId ) ] ?? 1 ), Infinity );
 		const loadRank = Math.min( wantedRank, componentRank );
 		if ( state.loading ) {
-			const allStillNeeded = [ ...state.loadingObjectIDs ].every( ( objectID ) => wantedObjectIDs.has( objectID ) ) && [ ...state.loadingComponentIDs ].every( ( componentID ) => wantedComponentIDs.has( componentID ) );
+			const allStillNeeded = [ ...state.loadingObjectIDs ].every( ( objectID ) => wantedObjectIDs.has( objectID ) || loaded.has( objectID ) ) && [ ...state.loadingComponentIDs ].every( ( componentID ) => wantedComponentIDs.has( componentID ) || installedComponents.has( componentID ) );
 			if ( ! allStillNeeded || loadRank < state.loadingRank ) state.loadingController?.abort( new DOMException( 'View priority changed', 'AbortError' ) );
 			return;
 		}
@@ -1468,6 +1468,15 @@ export class App {
 		const objectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const componentIDs = new Set( components.map( ( component ) => component.id ) );
 		const assetIDs = new Set( [ ...objects.map( ( object ) => object.assetId ), ...components.flatMap( componentAssetIDs ) ] );
+		const objectIDsByAsset = new Map();
+		if ( connector.localOnly ) {
+			for ( const object of objects ) {
+				if ( ! object.assetId ) continue;
+				const assetObjectIDs = objectIDsByAsset.get( object.assetId ) || new Set();
+				assetObjectIDs.add( object.id );
+				objectIDsByAsset.set( object.assetId, assetObjectIDs );
+			}
+		}
 		const loadController = new AbortController();
 		const abortForWorldChange = () => loadController.abort( state.controller.signal.reason );
 		if ( state.controller.signal.aborted ) abortForWorldChange();
@@ -1477,9 +1486,20 @@ export class App {
 		state.loadingObjectIDs = objectIDs;
 		state.loadingComponentIDs = componentIDs;
 		state.loadingRank = loadRank;
-		connector.preload( { assetIDs, signal: loadController.signal, concurrency: 2 } ).then( async ( assets ) => {
+		const preloadOptions = { assetIDs, signal: loadController.signal, concurrency: 2 };
+		if ( connector.localOnly ) {
+			preloadOptions.retainAssets = false;
+			preloadOptions.retainAssetIDs = new Set( components.flatMap( componentAssetIDs ) );
+			preloadOptions.onAsset = async ( assetId, bytes ) => {
+				const assetObjectIDs = objectIDsByAsset.get( assetId );
+				if ( ! assetObjectIDs ) return;
+				await appendWorldPackageAssets( connector, root, new Map( [ [ assetId, bytes ] ] ), { signal: loadController.signal, objectIDs: assetObjectIDs } );
+				if ( connector.collisionAssetIDs.has( assetId ) ) registerWorldPackageCollisions( root, this.hostedColliders, assetObjectIDs );
+			};
+		}
+		connector.preload( preloadOptions ).then( async ( assets ) => {
 			if ( loadController.signal.aborted || state.controller.signal.aborted || this.linkedWorldRoot !== root ) return;
-			await appendWorldPackageAssets( connector, root, assets, { signal: loadController.signal, objectIDs } );
+			if ( ! connector.localOnly ) await appendWorldPackageAssets( connector, root, assets, { signal: loadController.signal, objectIDs } );
 			await this.installWorldComponents( root, connector, componentIDs );
 			return registerWorldPackageCollisions( root, this.hostedColliders );
 		} ).catch( ( error ) => {

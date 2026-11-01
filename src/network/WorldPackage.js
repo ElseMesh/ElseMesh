@@ -284,13 +284,14 @@ export function cloneWorldPackageAssets( root, connector, assetIDs ) {
 	return preview;
 }
 
-export function registerWorldPackageCollisions( root, colliders ) {
+export function registerWorldPackageCollisions( root, colliders, objectIDs = null ) {
 	if ( ! colliders ) return;
 	const state = root.userData.worldPackage;
 	if ( ! state ) return;
 	state.activeColliders ||= new Map();
 	state.embeddedColliders ||= new Map();
 	for ( const object of state.connector?.manifest?.objects || [] ) {
+		if ( objectIDs && ! objectIDs.has( object.id ) ) continue;
 		if ( ! state.loadedObjects.has( object.id ) ) continue;
 		const instance = root.children.find( ( child ) => child.userData.worldObjectId === object.id );
 		if ( ! instance ) continue;

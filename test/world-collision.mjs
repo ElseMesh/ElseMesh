@@ -35,6 +35,16 @@ assert.equal( colliders.boxes.length, 1, 'streaming registration is idempotent' 
 unregisterWorldPackageCollisions( root, colliders );
 assert.equal( colliders.boxes.length, 0, 'world handoff removes old-world colliders' );
 
+const filteredObject = { ...object, id: 'elsemesh-object:filtered-platform' };
+const filteredRoot = {
+	children: [ object, filteredObject ].map( item => ( { userData: { worldObjectId: item.id } } ) ),
+	userData: { worldPackage: { connector: { manifest: { objects: [ object, filteredObject ] } }, loadedObjects: new Set( [ object.id, filteredObject.id ] ) } },
+};
+const filteredColliders = new Colliders();
+registerWorldPackageCollisions( filteredRoot, filteredColliders, new Set( [ filteredObject.id ] ) );
+assert.equal( filteredColliders.boxes.length, 1, 'streaming can register collision only for the newly loaded objects' );
+assert.equal( filteredColliders.boxes[ 0 ].tag, `world:${filteredObject.id}`, 'targeted collision registration excludes unrelated loaded objects' );
+
 const compoundObject = {
 	...object,
 	id: 'elsemesh-object:compound-platform',

@@ -123,7 +123,7 @@ try {
 		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall',
 		href: 'http://127.0.0.1:5189/?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall',
 	} );
-	assert.deepEqual( link, { localProvider: 'http://127.0.0.1:4179', localMap: 'Great Hall', environment: null } );
+	assert.deepEqual( link, { localProvider: 'http://127.0.0.1:4179', localMap: 'Great Hall', environment: null, regionDiagnostics: false } );
 	const localPage = 'http://127.0.0.1:5189/?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall';
 	assert.equal( await discoverLocalWorldURL( { pageURL: localPage, fetchImpl: () => { throw new Error( 'must not query the default world for a local bridge link' ); } } ), null );
 	assert.equal( defaultHomeWorldURL( { pageURL: localPage, storage: { getItem: () => '{"worldId":"elsemesh:example-island"}' } } ), null );

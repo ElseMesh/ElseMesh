@@ -289,7 +289,10 @@ export class LocalRegionConnector {
 			}
 			return this.#cacheAsset( assetId, bytes );
 		} ).catch( error => {
-			if ( this.regionDiagnostics ) console.error( 'ElseMesh local-region fetch failed:', JSON.stringify( { assetId, elapsedMs: Math.round( performance.now() - startedAt ), error: error?.stack || String( error ) } ) );
+			if ( this.regionDiagnostics ) {
+				const log = error?.name === 'AbortError' ? console.debug : console.error;
+				log( error?.name === 'AbortError' ? 'ElseMesh local-region fetch cancelled:' : 'ElseMesh local-region fetch failed:', JSON.stringify( { assetId, elapsedMs: Math.round( performance.now() - startedAt ), error: error?.stack || String( error ) } ) );
+			}
 			throw error;
 		} );
 		if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region fetched:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - startedAt ) } ) );
@@ -381,7 +384,10 @@ export class LocalRegionConnector {
 				if ( retain ) loaded.set( assetId, bytes );
 				if ( this.regionDiagnostics && onAsset ) console.info( 'ElseMesh local-region installed:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - installStartedAt ) } ) );
 			} catch ( error ) {
-				if ( this.regionDiagnostics ) console.error( 'ElseMesh local-region install failed:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - installStartedAt ), error: error?.stack || String( error ) } ) );
+				if ( this.regionDiagnostics ) {
+					const log = error?.name === 'AbortError' ? console.debug : console.error;
+					log( error?.name === 'AbortError' ? 'ElseMesh local-region install cancelled:' : 'ElseMesh local-region install failed:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - installStartedAt ), error: error?.stack || String( error ) } ) );
+				}
 				throw error;
 			} finally {
 				if ( ! retain ) this.releaseAsset( assetId );
