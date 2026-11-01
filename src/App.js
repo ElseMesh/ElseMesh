@@ -72,6 +72,7 @@ import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.j
 import { Group } from './engine/scene/Group.js';
 import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.js';
 import { LocalRegionConnector } from './network/LocalRegionConnector.js';
+import { selectLocalRegionStartupObjects } from './network/LocalRegionStartup.js';
 import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { avatarPolicy, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
@@ -763,11 +764,14 @@ export class App {
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
 
 		await progress( 0.34, 'Loading the starting area…', 0.82, 'world' );
-		const initialObjects = selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } );
+		const initialObjects = connector.localOnly
+			? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
+			: selectWorldObjectsForView( connector.manifest, this.camera, { maxPriority: 'nearby', maxDistance: 500 } );
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 		for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
-		for ( const objectID of connector.initialRegionVisualObjectIDs || [] ) initialObjectIDs.add( objectID );
-		for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+		if ( ! connector.localOnly ) {
+			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+		}
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
 		const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } );
 		const initialComponentIDs = new Set( initialComponents.map( component => component.id ) );

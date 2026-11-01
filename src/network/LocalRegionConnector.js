@@ -142,7 +142,6 @@ export class LocalRegionConnector {
 		const explicitStartupCellKeys = new Set( startupCellOffsets.map( offset => spawnCell.map( ( value, axis ) => value + offset[ axis ] ).join( ',' ) ) );
 		this.emptyCollisionCellsAreVerified = true;
 		this.initialRegionCellObjectIDs = new Set();
-		this.initialRegionVisualObjectIDs = new Set();
 		this.explicitStartupCellVisualObjectIDs = new Set();
 		const spawn = selection.previewSpawn;
 		this.manifest = {
@@ -204,7 +203,6 @@ export class LocalRegionConnector {
 				cellObjectIDs.add( collisionObjectId );
 				this.collisionObjectIDsByCell.set( cellKey, cellObjectIDs );
 				if ( isStartupCell ) this.initialRegionCellObjectIDs.add( collisionObjectId );
-				if ( isStartupCell ) this.initialRegionVisualObjectIDs.add( visualObjectId );
 				if ( explicitStartupCellKeys.has( cellKey ) ) this.explicitStartupCellVisualObjectIDs.add( visualObjectId );
 				this.manifest.assets.push(
 					{ id: collisionAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
@@ -389,7 +387,6 @@ export class LocalRegionConnector {
 		this.assetBytes = 0;
 		this.regionAssets.clear();
 		this.initialRegionCellObjectIDs.clear();
-		this.initialRegionVisualObjectIDs.clear();
 		this.explicitStartupCellVisualObjectIDs.clear();
 		this.collisionAssetIDs.clear();
 		this.collisionObjectIDByAsset.clear();
