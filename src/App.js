@@ -789,6 +789,13 @@ export class App {
 			retainAssetIDs.add( extension.assetId );
 		}
 		if ( connector.localOnly ) {
+			if ( connector.regionDiagnostics ) console.info( 'ElseMesh local-region startup selection:', JSON.stringify( {
+				objects: initialObjectIDs.size,
+				assets: assetIDs.size,
+				collisionAssets: [ ...assetIDs ].filter( assetId => connector.collisionAssetIDs.has( assetId ) ).length,
+				visualAssets: [ ...assetIDs ].filter( assetId => ! connector.collisionAssetIDs.has( assetId ) && connector.regionAssets.has( assetId ) ).length,
+				components: initialComponentIDs.size,
+			} ) );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: new Map(), objectIDs: initialObjectIDs } );
 			const objectIDsByAsset = new Map();
 			for ( const object of initialObjects ) {

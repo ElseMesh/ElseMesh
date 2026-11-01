@@ -77,10 +77,11 @@ async function fetchJSON( url, signal ) {
 }
 
 export class LocalRegionConnector {
-	constructor( { localProvider, localMap } ) {
+	constructor( { localProvider, localMap, regionDiagnostics = false } ) {
 		this.localOnly = true;
 		this.localProvider = new URL( localProvider ).origin;
 		this.localMap = localMap;
+		this.regionDiagnostics = regionDiagnostics;
 		this.worldId = '';
 		this.nodeId = '';
 		this.gateway = this.localProvider;
@@ -287,7 +288,11 @@ export class LocalRegionConnector {
 				else this.unknownCollisionObjectIDs.add( collisionObjectID );
 			}
 			return this.#cacheAsset( assetId, bytes );
+		} ).catch( error => {
+			if ( this.regionDiagnostics ) console.error( 'ElseMesh local-region fetch failed:', JSON.stringify( { assetId, elapsedMs: Math.round( performance.now() - startedAt ), error: error?.stack || String( error ) } ) );
+			throw error;
 		} );
+		if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region fetched:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - startedAt ) } ) );
 		if ( this.collisionAssetIDs.has( assetId ) ) {
 			const elapsedMs = Math.min( 30000, Math.max( 100, performance.now() - startedAt ) );
 			this.collisionLoadLatencyMs = Math.round( this.collisionLoadLatencyMs * 0.75 + elapsedMs * 0.25 );
@@ -370,9 +375,14 @@ export class LocalRegionConnector {
 		for ( const [ index, assetId ] of selected.entries() ) {
 			const bytes = await this.getAsset( assetId, { signal } );
 			const retain = retainAssets || retainAssetIDs.has( assetId );
+			const installStartedAt = performance.now();
 			try {
 				if ( onAsset ) await onAsset( assetId, bytes );
 				if ( retain ) loaded.set( assetId, bytes );
+				if ( this.regionDiagnostics && onAsset ) console.info( 'ElseMesh local-region installed:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - installStartedAt ) } ) );
+			} catch ( error ) {
+				if ( this.regionDiagnostics ) console.error( 'ElseMesh local-region install failed:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - installStartedAt ), error: error?.stack || String( error ) } ) );
+				throw error;
 			} finally {
 				if ( ! retain ) this.releaseAsset( assetId );
 			}

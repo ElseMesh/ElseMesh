@@ -48,7 +48,12 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 		const page = new URL( location.href );
 		invariant( [ 'http:', 'https:' ].includes( page.protocol ) && loopback( page.hostname ), 'Local region preview is available only from a loopback browser page' );
 		invariant( localMap.length <= 256 && /^[\w .()/-]+$/.test( localMap ), 'Invalid local map selector' );
-		return { localProvider: provider.origin, localMap, environment: configuredLocalWorld?.environment || null };
+		return {
+			localProvider: provider.origin,
+			localMap,
+			environment: configuredLocalWorld?.environment || null,
+			regionDiagnostics: params.get( 'regionDiagnostics' ) === '1',
+		};
 	}
 	const worldId = params.get( 'worldId' );
 	const zeroTierNodeId = params.get( 'ztNodeId' ) || '';
