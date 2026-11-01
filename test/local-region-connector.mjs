@@ -44,11 +44,35 @@ function makeEmptyGlb() {
 	return bytes;
 }
 
+const opfsFiles = new Map();
+class TestOPFSFileHandle {
+	constructor( name ) { this.name = name; }
+	async getFile() {
+		if ( ! opfsFiles.has( this.name ) ) throw new DOMException( 'Not found', 'NotFoundError' );
+		return new Blob( [ opfsFiles.get( this.name ) ] );
+	}
+	async createWritable() {
+		let pending;
+		return {
+			write: async contents => { pending = typeof contents === 'string' ? new TextEncoder().encode( contents ) : new Uint8Array( contents ); },
+			close: async () => opfsFiles.set( this.name, pending ),
+			abort: async () => {},
+		};
+	}
+}
+class TestOPFSDirectoryHandle {
+	async getDirectoryHandle() { return this; }
+	async getFileHandle( name ) { return new TestOPFSFileHandle( name ); }
+	async removeEntry( name ) { opfsFiles.delete( name ); }
+	async * entries() { for ( const name of opfsFiles.keys() ) yield [ name, new TestOPFSFileHandle( name ) ]; }
+}
+
 const bytes = makeGlb();
 const hash = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' );
 const emptyBytes = makeEmptyGlb();
 const emptyHash = Buffer.from( await crypto.subtle.digest( 'SHA-256', emptyBytes ) ).toString( 'hex' );
 const originalFetch = globalThis.fetch;
+const originalNavigator = Object.getOwnPropertyDescriptor( globalThis, 'navigator' );
 let cellFetches = 0;
 let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
@@ -251,7 +275,26 @@ try {
 	assert.deepEqual( singleSpawnManifest.entryPoints, [], 'a world may temporarily disable optional entry-point choices' );
 	assert.equal( await chooseWorldEntryPoint( singleSpawnManifest, { documentRef: null } ), null, 'no choices means entry directly at the world spawn without opening a prompt' );
 	singleSpawnConnector.close();
+	Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { storage: {
+		getDirectory: async () => new TestOPFSDirectoryHandle(),
+		estimate: async () => ( { quota: 4 * 1024 ** 3, usage: [ ...opfsFiles.values() ].reduce( ( total, value ) => total + value.byteLength, 0 ) } ),
+	} } } );
+	const diskCacheConnector = new LocalRegionConnector( link );
+	const diskCacheManifest = await diskCacheConnector.getManifest();
+	const visualAssetID = diskCacheManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	const providerFetchesBeforeDiskCache = cellFetches;
+	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes );
+	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'first request gets bytes from the local provider' );
+	diskCacheConnector.close();
+	const diskCacheReloadedConnector = new LocalRegionConnector( link );
+	const diskCacheReloadedManifest = await diskCacheReloadedConnector.getManifest();
+	const reloadedVisualAssetID = diskCacheReloadedManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	assert.deepEqual( await diskCacheReloadedConnector.getAsset( reloadedVisualAssetID ), bytes );
+	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'a new connector reuses the persistent cache without a provider request' );
+	diskCacheReloadedConnector.close();
 	console.log( 'local region connector tests passed' );
 } finally {
 	globalThis.fetch = originalFetch;
+	if ( originalNavigator ) Object.defineProperty( globalThis, 'navigator', originalNavigator );
+	else delete globalThis.navigator;
 }

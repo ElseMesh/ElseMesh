@@ -2,6 +2,7 @@ import { validateWorldExperience } from './WorldExperience.js';
 import { collisionPathReady, sweptCollisionCellKeys } from './CollisionFrontier.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { isWorldID } from './WorldIdentity.js';
+import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
@@ -102,6 +103,7 @@ export class LocalRegionConnector {
 		this.maxViewDistanceMeters = 0;
 		this.manifest = null;
 		this.closed = false;
+		this.diskCache = null;
 	}
 
 	async getManifest( { signal } = {} ) {
@@ -138,6 +140,11 @@ export class LocalRegionConnector {
 		this.region = region;
 		this.worldId = descriptor.worldId;
 		this.sourceRevision = descriptor.sourceRevision;
+		this.diskCache = await LocalRegionDiskCache.open( {
+			worldId: this.worldId,
+			sourceRevision: this.sourceRevision,
+			onError: error => { if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache unavailable:', error ); },
+		} );
 		const startupCellKeys = new Set( startupCells.map( cell => cell.join( ',' ) ) );
 		const spawnCell = selection.previewSpawn.position.map( coordinate => cellCoordinate( coordinate, previewRegion.cellSizeMeters ) );
 		const explicitStartupCellKeys = new Set( startupCellOffsets.map( offset => spawnCell.map( ( value, axis ) => value + offset[ axis ] ).join( ',' ) ) );
@@ -261,6 +268,15 @@ export class LocalRegionConnector {
 		const assetURL = this.regionAssets.get( assetId );
 		requireValue( this.manifest && assetURL, 'Local region asset was not declared by the provider' );
 		const startedAt = performance.now();
+		let diskBytes = null;
+		try { diskBytes = await this.diskCache?.get( assetId ) || null; } catch ( error ) {
+			if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache read failed:', error );
+		}
+		if ( diskBytes ) {
+			this.#updateCollisionCoverage( assetId, diskBytes );
+			if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache hit:', JSON.stringify( { assetId, bytes: diskBytes.byteLength } ) );
+			return this.#cacheAsset( assetId, diskBytes );
+		}
 		const bytes = await this.#withRegionLease( assetURL, signal, async ( response, leaseSignal ) => {
 			if ( response.status === 404 ) {
 				const collisionObjectID = this.collisionObjectIDByAsset.get( assetId );
@@ -279,13 +295,9 @@ export class LocalRegionConnector {
 			const digest = await crypto.subtle.digest( 'SHA-256', bytes );
 			const digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
 			requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
-			const collisionObjectID = this.collisionObjectIDByAsset.get( assetId );
-			if ( collisionObjectID ) {
-				// A parsed empty GLB is coverage only when provider evidence proves every source is classified and non-blocking.
-				const hasCollisionShape = hasEmbeddedCollisionShape( bytes );
-				const verifiedEmpty = this.verifiedEmptyCollisionObjectIDs.has( collisionObjectID ) && ! hasCollisionShape;
-				if ( ( hasCollisionShape || verifiedEmpty ) && ! this.unverifiedCollisionSourceObjectIDs.has( collisionObjectID ) ) this.unknownCollisionObjectIDs.delete( collisionObjectID );
-				else this.unknownCollisionObjectIDs.add( collisionObjectID );
+			this.#updateCollisionCoverage( assetId, bytes );
+			try { await this.diskCache?.put( assetId, bytes, digestHex ); } catch ( error ) {
+				if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache write failed:', error );
 			}
 			return this.#cacheAsset( assetId, bytes );
 		} ).catch( error => {
@@ -301,6 +313,16 @@ export class LocalRegionConnector {
 			this.collisionLoadLatencyMs = Math.round( this.collisionLoadLatencyMs * 0.75 + elapsedMs * 0.25 );
 		}
 		return bytes;
+	}
+
+	#updateCollisionCoverage( assetId, bytes ) {
+		const collisionObjectID = this.collisionObjectIDByAsset.get( assetId );
+		if ( ! collisionObjectID ) return;
+		// A parsed empty GLB is coverage only when provider evidence proves every source is classified and non-blocking.
+		const hasCollisionShape = hasEmbeddedCollisionShape( bytes );
+		const verifiedEmpty = this.verifiedEmptyCollisionObjectIDs.has( collisionObjectID ) && ! hasCollisionShape;
+		if ( ( hasCollisionShape || verifiedEmpty ) && ! this.unverifiedCollisionSourceObjectIDs.has( collisionObjectID ) ) this.unknownCollisionObjectIDs.delete( collisionObjectID );
+		else this.unknownCollisionObjectIDs.add( collisionObjectID );
 	}
 
 	async #withRegionLease( assetURL, signal, consumeResponse ) {
