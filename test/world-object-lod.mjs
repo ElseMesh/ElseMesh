@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { LODLoadQueue, WorldObjectLOD, selectObjectLOD } from '../src/network/WorldObjectLOD.js';
-import { loadWorldPackage, updateWorldPackageLOD, disposeWorldPackage, registerWorldPackageCollisions } from '../src/network/WorldPackage.js';
+import { loadWorldPackage, updateWorldPackageLOD, disposeWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects } from '../src/network/WorldPackage.js';
 import { Colliders } from '../src/world/Colliders.js';
+import { Group } from '../src/engine/scene/Group.js';
 import { GPU } from '../src/engine/gpu/GPU.js';
 import { RenderTarget } from '../src/engine/gpu/Texture.js';
 import { G, setFrameCamera } from '../src/engine/render/Frame.js';
@@ -57,7 +58,8 @@ function meshGLB(triangles) {
 }
 const payloads = new Map([['full',meshGLB(8)],['medium',meshGLB(4)],['low',meshGLB(2)]]);
 const requests=[];
-const connector={worldId:'elsemesh:lod',manifest:{objects:[object],portals:[]},getAsset:async id => {requests.push(id);return payloads.get(id);}};
+const releasedAssets=[];
+const connector={worldId:'elsemesh:lod',manifest:{objects:[object],portals:[]},getAsset:async id => {requests.push(id);return payloads.get(id);},releaseAsset:id=>{releasedAssets.push(id);return true;}};
 const root = await loadWorldPackage(connector,{assets:new Map([['full',payloads.get('full')]])});
 const instance=root.children[0]; const colliders = new Colliders(); registerWorldPackageCollisions(root,colliders);
 const originalCollider=root.userData.worldPackage.activeColliders.get(object.id).collider;
@@ -134,8 +136,20 @@ if(process.env.ELSEMESH_WORLD_OBJECT_LOD_RENDER==='1') {
  console.log(`World-object LOD GPU smoke: ${renderer.stats.pipelines} pipelines, complementary masked GLB levels rendered`);
  await new Promise(resolve=>setTimeout(resolve,100));
 }
+const objectLODController=root.userData.worldPackage.lodControllers.get(object.id);
+const sharedLODObject={...object,id:'elsemesh-object:shared-lod',lods:[{assetId:'low',maxScreenFraction:.04}]};
+connector.manifest.objects.push(sharedLODObject);
+const sharedLODInstance=new Group();sharedLODInstance.userData.worldObjectId=sharedLODObject.id;root.add(sharedLODInstance);
+root.userData.worldPackage.loadedObjects.add(sharedLODObject.id);
+unloadWorldPackageObjects(root,connector,colliders,new Set([object.id]));
+assert.ok(objectLODController.controller.signal.aborted,'Evicting an object cancels its LOD controller');
+assert.deepEqual([...root.userData.worldPackage.parsed.keys()],['full','low'],'Shared base and LOD sources stay cached while another loaded object references them');
+assert.ok(releasedAssets.includes('medium'),'Unloading an object releases its unshared LOD asset');
+assert.ok(!releasedAssets.includes('full')&&!releasedAssets.includes('low'),'Shared base and LOD assets remain available');
+unloadWorldPackageObjects(root,connector,colliders,new Set([sharedLODObject.id]));
+assert.equal(root.userData.worldPackage.parsed.size,0,'Unloading the final referencing object disposes the shared base and LOD sources');
+assert.ok(releasedAssets.includes('full')&&releasedAssets.includes('low'),'Unloading the final referencing object releases its cached asset bytes');
 disposeWorldPackage(root);
-assert.ok(root.userData.worldPackage.lodControllers.get(object.id).controller.signal.aborted);
 console.log('Object LOD: projected selection, hysteresis, async races, real GLB triangle reductions, collision and per-camera restoration passed');
 
 const queue = new LODLoadQueue(1), release = [];

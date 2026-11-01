@@ -104,9 +104,13 @@ for the active blend to finish. Disposal aborts variant downloads.
 Heightfield collision always traverses the base visual, even if a lower level is
 currently displayed. Other collision descriptors remain unchanged.
 
-Current limits: the base mesh is still initially acquired; loaded levels are
-retained until package disposal, so LOD reduces draw geometry but does not yet
-reduce texture/mesh residency. Selection uses screen fraction rather than a fixed target
+Current limits: the base mesh is still initially acquired, and its loaded LOD
+levels stay resident while the object remains loaded. When a region unloads,
+the engine disposes parsed base/variant resources and releases encoded asset
+bytes that no other loaded object or component references; the persistent disk
+cache remains available for a later revisit. This reduces residency across
+explored regions but does not evict individual LOD levels while their object
+remains loaded. Selection uses screen fraction rather than a fixed target
 pixel size. RenderLoadLOD supplies a bounded sustained-load bias: two seconds
 above 110% of the frame-work budget increases it one level, and six seconds
 below 75% restores one level. Half-second smoothing and a neutral band avoid

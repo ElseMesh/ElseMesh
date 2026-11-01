@@ -380,8 +380,10 @@ export function unregisterWorldPackageCollisions( root, colliders ) {
 export function unloadWorldPackageObjects( root, connector, colliders, objectIDs ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! state || ! objectIDs?.size ) return;
-	const assetByObject = new Map( connector.manifest.objects.map( object => [ object.id, object.assetId ] ) );
+	const objectsByID = new Map( connector.manifest.objects.map( object => [ object.id, object ] ) );
+	const releaseAssetIDs = new Set();
 	for ( const objectID of objectIDs ) {
+		for ( const assetID of worldObjectAssetIDs( objectsByID.get( objectID ) ) ) releaseAssetIDs.add( assetID );
 		const active = state.activeColliders?.get( objectID );
 		if ( active && colliders ) {
 			if ( active.shape === 'heightfield' ) colliders.removeHeightfield( active.collider );
@@ -402,34 +404,48 @@ export function unloadWorldPackageObjects( root, connector, colliders, objectIDs
 		state.lodControllers?.get( objectID )?.dispose();
 		state.lodControllers?.delete( objectID );
 	}
-	const releaseAssetIDs = new Set( [ ...objectIDs ].map( id => assetByObject.get( id ) ).filter( Boolean ) );
+	const retainedAssetIDs = new Set();
+	for ( const object of connector.manifest.objects ) {
+		if ( state.loadedObjects.has( object.id ) ) for ( const assetID of worldObjectAssetIDs( object ) ) retainedAssetIDs.add( assetID );
+	}
+	for ( const component of connector.manifest.components || [] ) {
+		for ( const reference of component.assets || [] ) if ( reference.assetId ) retainedAssetIDs.add( reference.assetId );
+	}
 	for ( const assetID of releaseAssetIDs ) {
-		if ( connector.manifest.objects.some( object => object.assetId === assetID && state.loadedObjects.has( object.id ) ) ) continue;
-		const parsed = state.parsed?.get( assetID );
-		if ( parsed ) {
-			const geometries = new Set(), materials = new Set(), textures = new Set();
-			parsed.traverse( object => {
-				if ( object.geometry?.dispose ) geometries.add( object.geometry );
-				for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
-					if ( ! material || material.userData?.borrowedWorldMaterial ) continue;
-					materials.add( material );
-					for ( const binding of Object.values( material.bindings || {} ) ) {
-						const texture = binding?.texture || binding;
-						if ( texture?.isTexture && texture.destroy ) textures.add( texture );
-					}
-				}
-			} );
-			const release = () => {
-				for ( const geometry of geometries ) geometry.dispose();
-				for ( const material of materials ) material.dispose?.();
-				for ( const texture of textures ) texture.destroy();
-			};
-			if ( GPU.encoder ) GPU.onSubmit( null, release );
-			else release();
-			state.parsed.delete( assetID );
-		}
+		if ( retainedAssetIDs.has( assetID ) ) continue;
+		disposeParsedWorldAsset( state, assetID );
 		connector.releaseAsset?.( assetID );
 	}
+}
+
+function worldObjectAssetIDs( object ) {
+	if ( ! object ) return [];
+	return [ object.assetId, ...( object.lods || [] ).map( lod => lod.assetId ) ].filter( Boolean );
+}
+
+function disposeParsedWorldAsset( state, assetID ) {
+	const parsed = state.parsed?.get( assetID );
+	if ( ! parsed ) return;
+	const geometries = new Set(), materials = new Set(), textures = new Set();
+	parsed.traverse( object => {
+		if ( object.geometry?.dispose ) geometries.add( object.geometry );
+		for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
+			if ( ! material || material.userData?.borrowedWorldMaterial ) continue;
+			materials.add( material );
+			for ( const binding of Object.values( material.bindings || {} ) ) {
+				const texture = binding?.texture || binding;
+				if ( texture?.isTexture && texture.destroy ) textures.add( texture );
+			}
+		}
+	} );
+	const release = () => {
+		for ( const geometry of geometries ) geometry.dispose();
+		for ( const material of materials ) material.dispose?.();
+		for ( const texture of textures ) texture.destroy();
+	};
+	if ( GPU.encoder ) GPU.onSubmit( null, release );
+	else release();
+	state.parsed.delete( assetID );
 }
 
 const MAX_EMBEDDED_SHAPES_PER_OBJECT = 4096;
