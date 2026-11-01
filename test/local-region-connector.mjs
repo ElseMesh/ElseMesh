@@ -57,6 +57,7 @@ const payloadFetchOrder = [];
 let secondCellCollisionMissing = true;
 let knownEmptyCellCollisionMissing = true;
 let includeUnknownPrimitiveCell = false;
+let includeSupportedPrimitiveCell = false;
 let unresolvedInstancedMeshComponents = 0;
 let abortNextCellFetch = false;
 let abortableFetchStarted;
@@ -82,11 +83,12 @@ globalThis.fetch = async ( input, options = {} ) => {
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) return Response.json( {
-		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: { staticMeshComponents: 3, otherPrimitiveComponents: includeUnknownPrimitiveCell ? 1 : 0, unclassifiedOtherPrimitiveComponents: includeUnknownPrimitiveCell ? 1 : 0, explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': 1 } : {} }, cells: [
+		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: { staticMeshComponents: 3, otherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), unclassifiedOtherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell || includeSupportedPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ) } : {} }, cells: [
 			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 } },
 			{ x: 1, y: 0, z: 0, collisionEvidence: { scope: 'static-mesh-components-only', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 1, staticMeshComponentsClassified: false, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 } },
 			{ x: 2, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 1, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 } },
 			...( includeUnknownPrimitiveCell ? [ { x: 3, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 1, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 1 } } ] : [] ),
+			...( includeSupportedPrimitiveCell ? [ { x: 4, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 1, supportedOtherPrimitiveComponents: 1, unknownOtherPrimitiveComponents: 0 } } ] : [] ),
 		],
 	} );
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
@@ -227,6 +229,15 @@ try {
 	assert.equal( primitiveCoverageConnector.isCollisionPathReady( [ 65, 0, 1 ], [ 66, 0, 1 ], { loadedObjects: new Set() } ), true, 'a bounded unknown primitive does not block unrelated verified empty cells' );
 	primitiveCoverageConnector.close();
 	includeUnknownPrimitiveCell = false;
+	includeSupportedPrimitiveCell = true;
+	const supportedPrimitiveConnector = new LocalRegionConnector( link );
+	await supportedPrimitiveConnector.getManifest();
+	const supportedPrimitiveCollisionID = [ ...supportedPrimitiveConnector.collisionObjectIDsByCell.get( '4,0,0' ) ][ 0 ];
+	const supportedPrimitiveCollisionAsset = supportedPrimitiveConnector.manifest.assets.find( asset => asset.id === 'local-region:great-hall:16:4,0,0:collision' );
+	await supportedPrimitiveConnector.getAsset( supportedPrimitiveCollisionAsset.id );
+	assert.equal( supportedPrimitiveConnector.isCollisionPathReady( [ 65, 0, 1 ], [ 66, 0, 1 ], { loadedObjects: new Set( [ supportedPrimitiveCollisionID ] ) } ), true, 'a query-enabled Pawn-blocking primitive with converted geometry permits movement after its collision cell loads' );
+	supportedPrimitiveConnector.close();
+	includeSupportedPrimitiveCell = false;
 	unresolvedInstancedMeshComponents = 1;
 	const incompleteCoverageConnector = new LocalRegionConnector( link );
 	await incompleteCoverageConnector.getManifest();
