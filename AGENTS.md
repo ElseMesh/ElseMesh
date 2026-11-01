@@ -20,8 +20,9 @@
 
 ## Hogwarts bridge build output
 
-- Build the Hogwarts .NET bridge from the external ElseMesh build tree with `--artifacts-path HogwartsBridge.build`. The root `.gitignore` protects this persistent build directory from `cpto` cleanup; do not put generated bridge output under the Hogwarts source sub-repo.
+- Build the Hogwarts .NET bridge from the external ElseMesh build tree with `--artifacts-path HogwartsBridge.build`. The project has an initial MSBuild guard that rejects builds unless the project is under a repository root named `elsemesh.build`. The root `.gitignore` protects this persistent build directory from `cpto` cleanup; do not put generated bridge output under the Hogwarts source sub-repo.
 - Use `cpto -r SOURCE BUILD` to sync a Git repository and its initialized submodules recursively into the matching build tree. It does not fetch or initialize submodules, and it excludes Git metadata. This keeps `worlds/Hogwarts` and `worlds/tidewater` in the external ElseMesh build copy aligned with their source repos. `-r` supports ordinary forward Git-aware copies; specialized modes such as `--update-existing`, `--lngit`, `--delete`, and `-m` remain separate. Keep generated build output protected by the relevant `.gitignore` rules.
+- Keep source synchronization and compilation as separate commands. After `cpto -r /mnt/kingston/@home/rebroad/src/elsemesh /var/tmp/builds/rebroad/src/elsemesh.build` finishes, run `dotnet build` with `/var/tmp/builds/rebroad/src/elsemesh.build` as its working directory and the relative `--artifacts-path HogwartsBridge.build`. Do not chain the build after `cpto` while still in the source tree, and do not expand the artifacts path from the source tree's `$PWD`.
 
 ## Browser process cleanup
 
