@@ -334,6 +334,10 @@ try {
 	const providerFetchesBeforeDiskCache = cellFetches;
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'first request gets bytes from the local provider' );
+	assert.equal( diskCacheConnector.releaseAsset( visualAssetID ), true, 'unloading evicts the response from browser RAM' );
+	assert.equal( diskCacheConnector.assets.has( visualAssetID ), false, 'unloaded response is no longer held in the connector memory cache' );
+	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes, 'the unloaded response is promoted back from the persistent browser disk cache' );
+	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'demotion to disk avoids another provider request' );
 	diskCacheConnector.close();
 	const diskCacheReloadedConnector = new LocalRegionConnector( link );
 	const diskCacheReloadedManifest = await diskCacheReloadedConnector.getManifest();
