@@ -44,6 +44,23 @@ function makeEmptyGlb() {
 	return bytes;
 }
 
+function makeExternalTextureGlb( assetId ) {
+	const json = new TextEncoder().encode( JSON.stringify( { asset: { version: '2.0' }, images: [ {
+		mimeType: 'image/ktx2', extensions: { EXT_elsemesh_asset_reference: { assetId } },
+	} ] } ) );
+	const jsonLength = ( json.byteLength + 3 ) & ~3;
+	const bytes = new Uint8Array( 20 + jsonLength );
+	const view = new DataView( bytes.buffer );
+	view.setUint32( 0, 0x46546c67, true );
+	view.setUint32( 4, 2, true );
+	view.setUint32( 8, bytes.byteLength, true );
+	view.setUint32( 12, jsonLength, true );
+	view.setUint32( 16, 0x4e4f534a, true );
+	bytes.fill( 0x20, 20 );
+	bytes.set( json, 20 );
+	return bytes;
+}
+
 const opfsFiles = new Map();
 class TestOPFSFileHandle {
 	constructor( name ) { this.name = name; }
@@ -71,6 +88,13 @@ const bytes = makeGlb();
 const hash = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' );
 const emptyBytes = makeEmptyGlb();
 const emptyHash = Buffer.from( await crypto.subtle.digest( 'SHA-256', emptyBytes ) ).toString( 'hex' );
+const externalTextureBytes = Uint8Array.from( { length: 96 }, ( _, index ) => ( index * 7 ) & 0xff );
+const externalTextureHash = Buffer.from( await crypto.subtle.digest( 'SHA-256', externalTextureBytes ) ).toString( 'hex' );
+const externalTextureAssetID = `sha256:${externalTextureHash}`;
+const externalMeshBytes = makeExternalTextureGlb( externalTextureAssetID );
+const externalMeshHash = Buffer.from( await crypto.subtle.digest( 'SHA-256', externalMeshBytes ) ).toString( 'hex' );
+let serveExternalMesh = false;
+const externalTextureRangeRequests = [];
 const originalFetch = globalThis.fetch;
 const originalNavigator = Object.getOwnPropertyDescriptor( globalThis, 'navigator' );
 let cellFetches = 0;
@@ -149,6 +173,16 @@ globalThis.fetch = async ( input, options = {} ) => {
 		const rangeHeader = new Headers( options.headers ).get( 'Range' );
 		const ranges = rangeHeader.match( /^bytes=(\d+-\d+(?:,\d+-\d+)*)$/ )?.[ 1 ].split( ',' ).map( value => value.split( '-' ).map( Number ) );
 		assert.ok( ranges?.length, 'range requests use closed byte ranges' );
+		if ( url.searchParams.has( 'texture' ) ) {
+			assert.equal( url.searchParams.get( 'texture' ), externalTextureAssetID, 'external KTX2 range requests use the content hash declared by the mesh GLB' );
+			externalTextureRangeRequests.push( new URLSearchParams( url.searchParams ) );
+			const [ start, requestedEnd ] = ranges[ 0 ], end = Math.min( requestedEnd, externalTextureBytes.byteLength - 1 );
+			const body = externalTextureBytes.slice( start, end + 1 );
+			return new Response( body, { status: 206, headers: {
+				'Content-Length': String( body.byteLength ), 'Content-Range': `bytes ${start}-${end}/${externalTextureBytes.byteLength}`,
+				'Accept-Ranges': 'bytes', ETag: `"sha256-${externalTextureHash}"`,
+			} } );
+		}
 		rangeFetches++;
 		if ( ranges.length === 1 ) {
 			const [ start, requestedEnd ] = ranges[ 0 ], end = Math.min( requestedEnd, bytes.byteLength - 1 );
@@ -178,8 +212,10 @@ globalThis.fetch = async ( input, options = {} ) => {
 			abortableFetchStarted();
 			return new Promise( ( resolve, reject ) => options.signal.addEventListener( 'abort', () => reject( options.signal.reason ), { once: true } ) );
 		}
-		return new Response( bytes, { headers: {
-			'Content-Length': String( bytes.byteLength ), ETag: `"sha256-${hash}"`,
+		const body = serveExternalMesh && url.searchParams.has( 'mesh' ) ? externalMeshBytes : bytes;
+		const bodyHash = serveExternalMesh && url.searchParams.has( 'mesh' ) ? externalMeshHash : hash;
+		return new Response( body, { headers: {
+			'Content-Length': String( body.byteLength ), ETag: `"sha256-${bodyHash}"`,
 		} } );
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '1,0,0,16' && url.searchParams.get( 'payload' ) === 'collision' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
@@ -246,6 +282,20 @@ try {
 	assert.equal( requestedRegionMeshLodQuery?.get( 'lod' ), createdRegionLeaseQuery?.get( 'lod' ), 'the leased region request keeps the authored LOD from its lease key' );
 	assert.equal( leaseReleases, 1, 'a fetched standalone mesh LOD releases its temporary visitor lease' );
 	connector.releaseAsset( meshLodAssetID );
+	const externalTextureConnector = new LocalRegionConnector( link );
+	const externalTextureManifest = await externalTextureConnector.getManifest();
+	const externalMeshAssetID = externalTextureManifest.components[ 0 ].assets.find( reference => reference.kind === 'glb' ).assetId;
+	serveExternalMesh = true;
+	assert.deepEqual( await externalTextureConnector.getAsset( externalMeshAssetID ), externalMeshBytes, 'the mesh GLB is loaded before registering its external KTX2 asset' );
+	const externalTextureRange = await externalTextureConnector.getAssetRange( externalTextureAssetID, {
+		start: 0, end: 31, etag: `"sha256-${externalTextureHash}"`, totalLength: externalTextureBytes.byteLength,
+	} );
+	assert.deepEqual( externalTextureRange.bytes, externalTextureBytes.slice( 0, 32 ), 'an independently addressed texture range is fetched after the GLB declares it' );
+	assert.equal( externalTextureRangeRequests.length, 1, 'the connector sends the texture hash on a parent mesh and LOD lease URL' );
+	assert.equal( externalTextureRangeRequests[ 0 ].get( 'mesh' ), createdRegionLeaseQuery?.get( 'mesh' ), 'the texture byte-range request remains bounded by the declared mesh LOD lease' );
+	assert.equal( externalTextureRangeRequests[ 0 ].get( 'lod' ), createdRegionLeaseQuery?.get( 'lod' ), 'the texture byte-range request remains bounded by the declared LOD lease' );
+	serveExternalMesh = false;
+	externalTextureConnector.close();
 	leaseReleases = 0;
 	assert.ok( cellIndexRequests.length > 0 && cellIndexRequests.every( cells => cells.length > 0 && cells.length <= 512 ), 'startup and view cells use bounded coordinate requests' );
 	await connector.ensureCellsForView( [ 1, 0, 1 ], [ 100, 0, 1 ] );

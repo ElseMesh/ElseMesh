@@ -169,10 +169,12 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 	}
 	let externalBytesRequested = 0;
 	for ( const image of externalImages.values() ) {
+		connector.registerExternalTextureAsset?.( assetId, image.assetId );
 		const firstLevel = await connector.getAssetRange( image.assetId, { start: 0, end: KTX2_HEADER_BYTES - 1, signal } );
 		if ( firstLevel.start !== 0 || firstLevel.end !== KTX2_HEADER_BYTES - 1 || firstLevel.bytes.byteLength !== KTX2_HEADER_BYTES
 			|| ! Number.isSafeInteger( firstLevel.totalLength ) || firstLevel.totalLength < KTX2_HEADER_BYTES || ! firstLevel.etag )
 			throw new Error( 'External KTX2 header range is incomplete' );
+		if ( firstLevel.etag !== `"sha256-${image.assetId.slice( 7 )}"` ) throw new Error( 'External KTX2 ETag does not match its content-addressed asset id' );
 		const header = new DataView( firstLevel.bytes.buffer, firstLevel.bytes.byteOffset, firstLevel.bytes.byteLength );
 		const levelCount = header.getUint32( 40, true );
 		if ( levelCount < 1 || levelCount > MAX_KTX2_LEVELS ) throw new Error( 'External KTX2 level count is invalid' );

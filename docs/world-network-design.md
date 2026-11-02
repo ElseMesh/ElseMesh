@@ -190,6 +190,19 @@ Do not add an arbitrary image URL. `WorldPackage` resolves this ID through
 This supports shared image assets; it does not by itself implement mip-tier
 selection, partial KTX2 transfer, or live texture upgrades.
 
+A dynamic provider may discover a derived content-addressed image only after
+serving its parent mesh GLB, when enumerating every possible dependency in the
+initial world manifest is impractical. In that case, the client may register
+the hash from a parent GLB accepted by the connector's configured integrity
+checks, and the provider must require the same live
+parent region/mesh/LOD lease for the image request and confirm that the hash is
+referenced by that leased GLB. It must not accept arbitrary image IDs or URLs.
+For remote signed worlds, the dependency still needs an authenticated parent
+asset and a verifiable content identity; a claimed ETag alone does not prove
+the integrity of a partial response. Independently fetched mip payloads need
+signed or otherwise verifiable per-level digests before they are trusted from
+untrusted providers.
+
 KTX2 itself provides a level index containing byte offsets and lengths, and its
 format allows each mip level to be supercompressed independently. The format
 can therefore support fetching selected mip payloads without retransmitting
@@ -257,27 +270,26 @@ that conversion working memory fits. Keep conversion concurrency and service
 cgroup limits as separate controls. Unload releases decoded/GPU
 and RAM state while requested encoded bytes remain in OPFS until normal
 disk-LRU eviction.
-Current Hogwarts implementation status: ElseMesh supports manifest-declared
-content-addressed GLB image references and shares their decoded GPU textures
-across GLBs. A focused fixture covers that engine path, but Hogwarts does not
-yet emit or serve these image assets. The bridge currently embeds one source
-mip per texture (the largest usable source mip at or below 512 pixels per
-dimension) into each region GLB. The shared KTX2 C ABI now also supports
-encoding only the supplied source level, while retaining generated mip chains
-by default; HogwartsBridge does not yet select or publish these independent
-source-mip assets. A bounded bridge-worker LRU reuses encoded images by source
-path and variant across cell conversions, but it is neither content-addressed
-nor persistent. The server RAM/disk cache retains whole converted region
-responses and serves selected byte ranges from them without copying levels
-into separate host entries. The browser now has a bounded, independently keyed
-RAM LRU and persists requested ranges in its existing bounded OPFS LRU; both
-cache only requested ranges and can evict them separately. These are transport
-primitives, not yet KTX2 mip-indexed requests: the engine still consumes whole
-images and generates a GPU mip chain from the single embedded image. Since
-images are embedded per GLB, the same source texture can still be repeated in
-different region responses. Texture-tier selection and scheduling remain
-unimplemented. See the [Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md)
-for the measured cache limits and current implementation details.
+Current Hogwarts implementation status: ElseMesh supports content-addressed
+GLB image references and shares decoded GPU textures across GLBs. HogwartsBridge
+now postprocesses each standalone mesh LOD: it moves embedded KTX2 bytes into
+the provider's shared cache under a SHA-256 asset ID, then serves the mesh GLB
+with an `EXT_elsemesh_asset_reference`. The browser resolves the texture only
+after reading that declared reference and requests its byte ranges under the
+parent mesh-LOD lease. Loopback provider and connector fixtures cover that
+contract; a live installed-game capture measuring cross-region cache hits is
+still open. This is payload sharing, not independently selected Unreal source
+mips: the bridge still chooses one source mip per texture (the largest usable
+at or below 512 pixels per dimension) and Basis generates its smaller mip
+chain. The shared KTX2 C ABI supports encoding only the supplied source level,
+but HogwartsBridge does not yet publish those source-mip alternatives. The
+bounded bridge-worker LRU reuses encoded images by source path and variant
+across cell conversions, but remains separate from the content-addressed
+provider cache. The browser persists requested ranges in bounded RAM and OPFS
+LRUs; these entries are byte ranges, not explicitly identified mip tiers.
+Texture-tier selection, source-mip variants, measured live cache hits, and
+decoded/GPU-tier eviction remain open. See the [Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md)
+for provider-specific evidence and the measured cache limits.
 
 Traversal data may be derived from authored world geometry, collision,
 navigation data, and dynamic links, but the world/provider must expose a

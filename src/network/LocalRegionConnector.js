@@ -37,6 +37,18 @@ function requireValue( value, message ) {
 	if ( ! value ) throw new Error( message );
 }
 
+function externalTextureAssetIDs( bytes ) {
+	if ( ! ( bytes instanceof Uint8Array ) || bytes.byteLength < 20 ) return [];
+	const header = new DataView( bytes.buffer, bytes.byteOffset, bytes.byteLength );
+	if ( header.getUint32( 0, true ) !== 0x46546c67 || header.getUint32( 4, true ) !== 2 || header.getUint32( 16, true ) !== 0x4e4f534a ) return [];
+	const jsonLength = header.getUint32( 12, true );
+	if ( jsonLength < 2 || jsonLength > bytes.byteLength - 20 ) return [];
+	let document;
+	try { document = JSON.parse( new TextDecoder().decode( bytes.subarray( 20, 20 + jsonLength ) ) ); } catch { return []; }
+	return [ ...new Set( ( document.images || [] ).map( image => image.extensions?.EXT_elsemesh_asset_reference?.assetId )
+		.filter( assetId => typeof assetId === 'string' && /^sha256:[0-9a-f]{64}$/.test( assetId ) ) ) ];
+}
+
 function localRegionCacheBudgetBytes() {
 	// deviceMemory is a coarse, browser-bounded physical-memory hint, not a
 	// free-RAM measurement. Use a conservative ceiling when unavailable.
@@ -481,6 +493,7 @@ export class LocalRegionConnector {
 		phaseMs.browserDiskCacheRead = performance.now() - phaseStartedAt;
 		if ( diskBytes ) {
 			phaseStartedAt = performance.now();
+			this.#registerExternalTextureAssets( assetId, diskBytes );
 			this.#updateCollisionCoverage( assetId, diskBytes );
 			phaseMs.collisionCoverage = performance.now() - phaseStartedAt;
 			if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache hit:', JSON.stringify( { assetId, bytes: diskBytes.byteLength, elapsedMs: performance.now() - startedAt, phaseMs } ) );
@@ -520,6 +533,7 @@ export class LocalRegionConnector {
 			phaseMs.responseDigest = performance.now() - digestStartedAt;
 			const digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
 			requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
+			this.#registerExternalTextureAssets( assetId, bytes );
 			phaseStartedAt = performance.now();
 			this.#updateCollisionCoverage( assetId, bytes );
 			phaseMs.collisionCoverage = performance.now() - phaseStartedAt;
@@ -542,6 +556,20 @@ export class LocalRegionConnector {
 			this.collisionLoadLatencyMs = Math.round( this.collisionLoadLatencyMs * 0.75 + elapsedMs * 0.25 );
 		}
 		return bytes;
+	}
+
+	registerExternalTextureAsset( parentAssetId, textureAssetId ) {
+		requireValue( /^sha256:[0-9a-f]{64}$/.test( textureAssetId || '' ), 'External texture asset id is invalid' );
+		const parentAssetURL = this.regionAssets.get( parentAssetId );
+		requireValue( parentAssetURL, 'External texture source asset was not declared by the provider' );
+		const textureURL = new URL( parentAssetURL, this.localProvider );
+		textureURL.searchParams.set( 'texture', textureAssetId );
+		this.regionAssets.set( textureAssetId, textureURL.href );
+	}
+
+	#registerExternalTextureAssets( parentAssetId, bytes ) {
+		if ( ! this.regionAssets.has( parentAssetId ) ) return;
+		for ( const textureAssetId of externalTextureAssetIDs( bytes ) ) this.registerExternalTextureAsset( parentAssetId, textureAssetId );
 	}
 
 	async getAssetRange( assetId, { start, end, etag, sha256, totalLength, signal } = {} ) {
