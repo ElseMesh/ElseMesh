@@ -4,6 +4,8 @@ import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCodecRegistry.js';
 import { loadStaticModelInstanceSetAssets } from '../src/network/StaticModelInstanceSetAssets.js';
+import { worldComponentAssetIDs } from '../src/network/WorldComponentRegistry.js';
+import { WorldConnector } from '../src/network/WorldConnector.js';
 import { StaticModelInstanceSetRuntime } from '../src/engine/render/StaticModelInstanceSetRuntime.js';
 import { StaticModelInstanceSetPlanner, staticModelInstanceCamera } from '../src/engine/render/StaticModelInstanceSetPlanner.js';
 import {
@@ -22,11 +24,11 @@ const valid = {
 	models: [ {
 		id: 'market-table-fish',
 		bounds: { center: [ 0, 0.1, 0 ], radius: 0.6 },
-		lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ],
-		lodThresholds: [ 0.018, 0.004 ],
+		lods: [ { assetId: lowest }, { assetId: low }, { assetId: hi } ],
+		lodThresholds: [ 0.004, 0.018 ],
 		lodMetric: 'projected-radius',
 		lodFadeFraction: 0.1,
-		shadowLod: 1,
+		shadowLod: 0,
 		shadowMaxDistance: 22,
 		drawMaxDistance: 350,
 		drawFadeStartDistance: 350,
@@ -43,9 +45,9 @@ assert.throws( () => validateStaticModelInstanceSet( valid, { availableAssetIDs:
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, renderer: 'webgpu' } ), /format or fields/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], rotation: [ 0, 0, 0, 0 ] } ] } ), /normalized quaternion/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
-assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.004, 0.018 ] } ] } ), /overlapping LOD/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.018, 0.004 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawMaxDistance: 0 } ] } ), /draw distance/ );
-assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodMetric: 'scaled-distance', lodThresholds: [ 28, 24 ] } ] } ), /overlapping LOD/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodMetric: 'scaled-distance', lodThresholds: [ 28, 26 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawFadeStartDistance: 351 } ] } ), /draw fade distance/ );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, new Uint8Array( [ 0xff ] ) ), /UTF-8 JSON/ );
 
@@ -62,10 +64,30 @@ const assetConnector = {
 	getAsset: async assetId => { requestedAssets.push( assetId ); return loadedGLB; },
 };
 const componentAssets = [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: hi, kind: 'glb' }, { assetId: low, kind: 'glb' }, { assetId: lowest, kind: 'glb' } ];
+assert.deepEqual( worldComponentAssetIDs( { type: 'elsemesh.static-model-instance-set/1', assets: componentAssets } ), [ setAssetID ], 'component startup preload includes the compact instance-set descriptor, not every possible LOD' );
+const preloadConnector = new WorldConnector( { worldId: 'elsemesh:test-static-model-lod' } );
+preloadConnector.manifest = {
+	assets: [ setAssetID, hi, low, lowest ].map( id => ( { id, priority: 'visible' } ) ),
+	objects: [],
+	components: [ { type: 'elsemesh.static-model-instance-set/1', assets: componentAssets } ],
+};
+const preloadedIDs = [];
+preloadConnector.getAsset = async id => { preloadedIDs.push( id ); return new Uint8Array( [ 1 ] ); };
+await preloadConnector.preload( { through: 'visible' } );
+assert.deepEqual( preloadedIDs, [ setAssetID ], 'ordinary component preload skips every lazy static-model LOD' );
+await preloadConnector.preload( { through: 'visible', assetIDs: [ hi ] } );
+assert.deepEqual( preloadedIDs, [ setAssetID, hi ], 'explicit caller demand may still preload a declared LOD asset' );
 const resolved = await loadStaticModelInstanceSetAssets( assetConnector, { assets: componentAssets } );
 assert.equal( resolved.document.models[ 0 ].id, 'market-table-fish' );
-assert.deepEqual( [ ...resolved.modelAssets.keys() ], [ hi, low, lowest ], 'resolves the signed nested GLB assets referenced by all LODs' );
-assert.deepEqual( requestedAssets, [ hi, low, lowest ] );
+assert.deepEqual( requestedAssets, [], 'resolving the compact descriptor does not prefetch any model GLBs' );
+await resolved.loadModelLOD( 0, 0 );
+assert.deepEqual( requestedAssets, [ lowest ], 'the renderer explicitly requests the coarsest signed GLB to start rendering' );
+await resolved.loadModelLOD( 0, 1 );
+await resolved.loadModelLOD( 0, 2 );
+assert.deepEqual( requestedAssets, [ lowest, low, hi ], 'finer GLBs are fetched only when the runtime requests them' );
+for ( let lodIndex = 0; lodIndex < valid.models[ 0 ].lods.length; lodIndex ++ ) resolved.releaseModelLOD( 0, lodIndex );
+assert.equal( resolved.modelAssets.size, 0, 'the adapter can release its temporary encoded copies after decoding each level' );
+assert.equal( resolved.parsedModels.size, 0, 'the adapter can release temporary validated GLTF parses after decoding each level' );
 await assert.rejects( () => loadStaticModelInstanceSetAssets( { ...assetConnector, manifest: { assets: assetConnector.manifest.assets.map( asset => asset.id === lowest ? { ...asset, kind: 'image/1' } : asset ) } }, { assets: componentAssets } ), /missing/ );
 await assert.rejects( () => loadStaticModelInstanceSetAssets( assetConnector, { assets: [ componentAssets[ 0 ] ] } ), /component GLB/ );
 
@@ -82,28 +104,28 @@ const planner = new StaticModelInstanceSetPlanner( {
 	verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 2 ], [ -1, 0, 0, 2 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 500 ], [ 0, 0, -1, 500 ] ],
 } );
-const [ nearLod, middleLod, farLod ] = planner.groups;
-assert.deepEqual( Array.from( nearLod.indices.subarray( 0, nearLod.count ) ), [ 0, 1 ] );
+const [ coarseLod, middleLod, fineLod ] = planner.groups;
+assert.deepEqual( Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ), [ 3 ] );
 assert.deepEqual( Array.from( middleLod.indices.subarray( 0, middleLod.count ) ), [ 1, 2 ] );
-assert.ok( middleLod.fade[ 0 ] > 0.4 && middleLod.fade[ 0 ] < 0.6, 'shared LOD transition produces a fractional incoming fade' );
-const outgoingOffset = Array.from( nearLod.indices.subarray( 0, nearLod.count ) ).indexOf( 1 );
-const incomingOffset = Array.from( middleLod.indices.subarray( 0, middleLod.count ) ).indexOf( 1 );
-assert.equal( nearLod.fade[ outgoingOffset ], middleLod.fade[ incomingOffset ], 'both transition LODs use the same complementary screen-door threshold' );
-assert.equal( nearLod.incoming[ outgoingOffset ], 0 );
-assert.equal( middleLod.incoming[ incomingOffset ], 1 );
-assert.deepEqual( Array.from( farLod.indices.subarray( 0, farLod.count ) ), [ 3 ] );
+assert.deepEqual( Array.from( fineLod.indices.subarray( 0, fineLod.count ) ), [ 0, 1 ] );
+const outgoingOffset = Array.from( middleLod.indices.subarray( 0, middleLod.count ) ).indexOf( 1 );
+const incomingOffset = Array.from( fineLod.indices.subarray( 0, fineLod.count ) ).indexOf( 1 );
+assert.ok( fineLod.fade[ incomingOffset ] > 0.4 && fineLod.fade[ incomingOffset ] < 0.6, 'shared LOD transition produces a fractional incoming fade' );
+assert.equal( middleLod.fade[ outgoingOffset ], fineLod.fade[ incomingOffset ], 'both transition LODs use the same complementary screen-door threshold' );
+assert.equal( middleLod.incoming[ outgoingOffset ], 0 );
+assert.equal( fineLod.incoming[ incomingOffset ], 1 );
 assert.equal( planner.shadowGroups[ 0 ].count, 2, 'shadow candidates are distance-limited independently of the camera frustum' );
 assert.equal( planner.shadowGroups[ 0 ].indices[ 0 ], 0 );
 assert.equal( planner.shadowGroups[ 0 ].indices[ 1 ], 5 );
 assert.equal( planner.groups[ 3 ].indices.length, 1, 'per-model output buffers use that model\'s instance count' );
 assert.equal( planner.shadowGroups[ 1 ].indices.length, 1 );
 assert.equal( planner.groups[ 3 ].incoming[ 0 ], 2, 'a steady LOD is distinct from the outgoing transition side' );
-assert.ok( ! Array.from( farLod.indices.subarray( 0, farLod.count ) ).includes( 6 ), 'instances beyond drawMaxDistance are omitted from color draws' );
+assert.ok( ! Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ).includes( 6 ), 'instances beyond drawMaxDistance are omitted from color draws' );
 assert.equal( planner.groups[ 4 ].count, 0, 'color draw distance can hide a model independently of its shadow range' );
 assert.equal( planner.shadowGroups[ 2 ].indices[ 0 ], 8, 'shadow selection remains independent of color draw distance' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
-const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: hi }, { assetId: low } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 1, drawMaxDistance: 90, drawFadeStartDistance: 81 };
+const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };
 const distancePlanner = new StaticModelInstanceSetPlanner( {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ distanceModel ],
@@ -113,13 +135,13 @@ const distancePlanner = new StaticModelInstanceSetPlanner( {
 	verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
 } );
-const [ distanceNear, distanceFar ] = distancePlanner.groups;
-assert.deepEqual( Array.from( distanceNear.indices.subarray( 0, distanceNear.count ) ), [ 0, 1 ], 'scaled-distance LOD starts with the high-detail model and cross-fades by world distance divided by instance scale' );
-assert.deepEqual( Array.from( distanceFar.indices.subarray( 0, distanceFar.count ) ), [ 1, 2, 3 ] );
-assert.ok( distanceNear.fade[ 1 ] > 0.5 && distanceNear.fade[ 1 ] < 0.6, 'distance LOD fade fraction is author-configurable' );
-assert.equal( distanceNear.drawFadeEnabled[ 0 ], 1 );
-assert.equal( distanceNear.drawFade[ 0 ], 1 );
-assert.ok( distanceFar.drawFade[ 2 ] > 0 && distanceFar.drawFade[ 2 ] < 1, 'draw range fades over an authored distance band' );
+const [ distanceCoarse, distanceFine ] = distancePlanner.groups;
+assert.deepEqual( Array.from( distanceCoarse.indices.subarray( 0, distanceCoarse.count ) ), [ 2, 3 ], 'scaled-distance LOD starts coarse and keeps farther instances at lower detail' );
+assert.deepEqual( Array.from( distanceFine.indices.subarray( 0, distanceFine.count ) ), [ 0, 1, 2 ], 'closer instances refine as distance falls below the authored boundary' );
+assert.ok( distanceFine.fade[ 2 ] > 0.4 && distanceFine.fade[ 2 ] < 0.6, 'distance LOD fade fraction is author-configurable' );
+assert.equal( distanceFine.drawFadeEnabled[ 0 ], 1 );
+assert.equal( distanceFine.drawFade[ 0 ], 1 );
+assert.ok( distanceCoarse.drawFade[ 1 ] > 0 && distanceCoarse.drawFade[ 1 ] < 1, 'draw range fades over an authored distance band' );
 
 for ( const camera of [ new PerspectiveCamera( 60, 1, 0.1, 100 ), new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) ] ) {
 	camera.position.set( 0, 0, 0 );

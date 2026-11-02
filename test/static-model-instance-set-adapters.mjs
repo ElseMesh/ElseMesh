@@ -13,18 +13,25 @@ await import( '../src/network/WebGPUWorldComponentAdapters.js' );
 await import( '../src/fallback/WebGLComponentSupport.js' );
 
 const hash = bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`;
-const glbBytes = staticModelGLB(), modelAssetID = hash( glbBytes );
+const glbBytes = staticModelGLB(), modelAssetID = hash( glbBytes ), fineModelAssetID = `sha256:${'f'.repeat( 64 )}`;
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID }, { assetId: fineModelAssetID } ], lodThresholds: [ 0.001 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
 	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
-const component = { id: 'fixture-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' } ] };
+const component = { id: 'fixture-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: fineModelAssetID, kind: 'glb' } ] };
+const requestedAssets = [];
+let releaseFineAsset;
 const connector = {
-	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' } ] },
+	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: fineModelAssetID, kind: 'glb' } ] },
 	assets: new Map( [ [ setAssetID, setBytes ] ] ),
-	getAsset: async assetId => { assert.equal( assetId, modelAssetID ); return glbBytes; },
+	getAsset: async assetId => {
+		requestedAssets.push( assetId );
+		assert.ok( [ modelAssetID, fineModelAssetID ].includes( assetId ) );
+		if ( assetId === fineModelAssetID ) return new Promise( resolve => { releaseFineAsset = () => resolve( glbBytes ); } );
+		return glbBytes;
+	},
 };
 const camera = new PerspectiveCamera( 60, 1, 0.1, 100 );
 camera.lookAt( 0, 0, - 1 );
@@ -35,12 +42,20 @@ const webgpuInstall = worldComponentBackendAdapter( 'webgpu', component.type );
 assert.equal( typeof webgpuInstall, 'function' );
 const webgpuResult = await webgpuInstall( { root: webgpuRoot, connector }, component );
 assert.equal( webgpuResult.installed, true );
+assert.deepEqual( requestedAssets, [ modelAssetID ], 'installation fetches only coarse model assets' );
+webgpuResult.runtime.update( 1 / 60, camera );
+await new Promise( resolve => setTimeout( resolve, 0 ) );
+assert.equal( typeof releaseFineAsset, 'function', 'WebGPU starts the finer request asynchronously' );
+assert.ok( webgpuRoot.children.some( mesh => mesh.isInstancedMesh && ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the coarse WebGPU model stays visible while refinement is pending' );
+releaseFineAsset();
+await new Promise( resolve => setTimeout( resolve, 10 ) );
+assert.deepEqual( requestedAssets, [ modelAssetID, fineModelAssetID ], 'projected-size demand requests the finer model only after installation' );
 webgpuResult.runtime.update( 1 / 60, camera );
 const webgpuMeshes = [];
 webgpuRoot.traverse( object => { if ( object.isInstancedMesh ) webgpuMeshes.push( object ); } );
 const webgpuMain = webgpuMeshes.find( mesh => ! mesh.userData.shadowOnly );
 const webgpuShadow = webgpuMeshes.find( mesh => mesh.userData.shadowOnly );
-assert.equal( webgpuMain.count, 1 );
+assert.ok( webgpuMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the requested fine WebGPU model becomes active after it loads' );
 assert.equal( webgpuShadow.count, 1 );
 assert.equal( webgpuMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5, 'GLB node translation is baked into the cloned primitive geometry' );
 assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
@@ -55,11 +70,20 @@ const webglInstall = worldComponentBackendAdapter( 'webgl', component.type );
 assert.equal( typeof webglInstall, 'function' );
 const webglResult = await webglInstall( { fallback: webglFallback }, component );
 assert.equal( webglResult.installed, true );
+assert.equal( requestedAssets.filter( id => id === modelAssetID ).length, 2, 'the WebGL renderer begins by requesting its coarse model' );
+releaseFineAsset = undefined;
+webglResult.runtime.update( 1 / 60, new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) );
+await new Promise( resolve => setTimeout( resolve, 0 ) );
+assert.equal( typeof releaseFineAsset, 'function', 'WebGL starts the finer request asynchronously' );
+assert.ok( webglFallback.scene.children.some( mesh => mesh.isInstancedMesh && ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the coarse WebGL model stays visible while refinement is pending' );
+releaseFineAsset();
+await new Promise( resolve => setTimeout( resolve, 10 ) );
+assert.equal( requestedAssets.filter( id => id === fineModelAssetID ).length, 2, 'WebGL also requests finer models only after view demand' );
 webglResult.runtime.update( 1 / 60, new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) );
 const webglMeshes = webglFallback.scene.children.filter( object => object.isInstancedMesh );
 const webglMain = webglMeshes.find( mesh => ! mesh.userData.shadowOnly );
 const webglShadow = webglMeshes.find( mesh => mesh.userData.shadowOnly );
-assert.equal( webglMain.count, 1 );
+assert.ok( webglMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the requested fine WebGL model becomes active after it loads' );
 assert.equal( webglShadow.count, 1 );
 assert.ok( webglShadow.customDepthMaterial, 'shadow LOD uses its own screen-door aware depth material' );
 assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5 );

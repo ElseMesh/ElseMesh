@@ -5,6 +5,7 @@ import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
 import { verifySignedDocument } from './SignedDocument.js';
 import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
+import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
 
@@ -374,8 +375,17 @@ export class WorldConnector {
 		const startRank = after === null ? 0 : ranks.get( after ) + 1;
 		invariant( endRank !== undefined && startRank !== undefined && startRank <= endRank + 1, 'Invalid asset priority range' );
 		const selected = assetIDs ? new Set( assetIDs ) : null;
+		const lazyModelAssets = new Set( ( this.manifest.components || [] )
+			.filter( component => component.type === 'elsemesh.static-model-instance-set/1' )
+			.flatMap( component => ( component.assets || [] ).filter( reference => reference.kind === 'glb' ).map( reference => reference.assetId ) ) );
+		const eagerlyReferencedAssets = new Set( [
+			...( this.manifest.objects || [] ).map( object => object.assetId ).filter( Boolean ),
+			...( this.manifest.components || [] ).flatMap( worldComponentAssetIDs ),
+		] );
 		const queue = this.manifest.assets.map( ( asset, index ) => ( { asset, index, rank: ranks.get( asset.priority ) ?? 999 } ) )
-			.filter( ( entry ) => entry.rank >= startRank && entry.rank <= endRank && ( selected === null || selected.has( entry.asset.id ) ) )
+			.filter( ( entry ) => entry.rank >= startRank && entry.rank <= endRank
+				&& ( selected === null || selected.has( entry.asset.id ) )
+				&& ( ! lazyModelAssets.has( entry.asset.id ) || eagerlyReferencedAssets.has( entry.asset.id ) || selected?.has( entry.asset.id ) ) )
 			.sort( ( a, b ) => a.rank - b.rank || a.index - b.index );
 		const loaded = new Map();
 		const requestedConcurrency = concurrency;

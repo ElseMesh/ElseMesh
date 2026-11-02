@@ -122,19 +122,19 @@ export class StaticModelInstanceSetPlanner {
 			for ( let thresholdIndex = 0; thresholdIndex < model.lodThresholds.length; thresholdIndex ++ ) {
 				const threshold = model.lodThresholds[ thresholdIndex ];
 				const fadeStart = threshold * ( 1 - model.lodFadeFraction );
-				if ( model.lodMetric === 'projected-radius' ? lodMeasure < threshold && lodMeasure >= fadeStart : lodMeasure >= fadeStart && lodMeasure < threshold ) { transition = thresholdIndex; break; }
+				if ( model.lodMetric === 'projected-radius' ? lodMeasure < threshold && lodMeasure >= fadeStart : lodMeasure >= threshold && lodMeasure < threshold / ( 1 - model.lodFadeFraction ) ) { transition = thresholdIndex; break; }
 			}
 			if ( transition >= 0 ) {
 				const threshold = model.lodThresholds[ transition ];
-				const fadeStart = threshold * ( 1 - model.lodFadeFraction );
+				const fadeStart = model.lodMetric === 'projected-radius' ? threshold * ( 1 - model.lodFadeFraction ) : threshold / ( 1 - model.lodFadeFraction );
 				const incomingFade = model.lodMetric === 'projected-radius'
-					? ( threshold - lodMeasure ) / ( threshold - fadeStart )
-					: ( lodMeasure - fadeStart ) / ( threshold - fadeStart );
+					? ( lodMeasure - fadeStart ) / ( threshold - fadeStart )
+					: ( fadeStart - lodMeasure ) / ( fadeStart - threshold );
 				this._append( groups[ transition ], instanceIndex, incomingFade, 0, drawFade, drawFadeEnabled );
 				this._append( groups[ transition + 1 ], instanceIndex, incomingFade, 1, drawFade, drawFadeEnabled );
 			} else {
 				let lodIndex = 0;
-				while ( lodIndex < model.lodThresholds.length && ( model.lodMetric === 'projected-radius' ? lodMeasure < model.lodThresholds[ lodIndex ] : lodMeasure >= model.lodThresholds[ lodIndex ] ) ) lodIndex ++;
+				while ( lodIndex < model.lodThresholds.length && ( model.lodMetric === 'projected-radius' ? lodMeasure >= model.lodThresholds[ lodIndex ] : lodMeasure < model.lodThresholds[ lodIndex ] ) ) lodIndex ++;
 				this._append( groups[ lodIndex ], instanceIndex, 1, 2, drawFade, drawFadeEnabled ); // 2 = steady, 0/1 = outgoing/incoming transition sides
 			}
 		}

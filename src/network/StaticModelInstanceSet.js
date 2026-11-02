@@ -40,13 +40,15 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 		}
 		if ( ! [ 'projected-radius', 'scaled-distance' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );
 		if ( ! Array.isArray( model.lodThresholds ) || model.lodThresholds.length !== model.lods.length - 1 ) throw new Error( `Invalid LOD thresholds for static model ${model.id}` );
-		let previousThreshold = model.lodMetric === 'projected-radius' ? Infinity : 0;
+		let previousThreshold = model.lodMetric === 'projected-radius' ? 0 : Infinity;
 		for ( const threshold of model.lodThresholds ) {
-			const invalidOrder = model.lodMetric === 'projected-radius' ? threshold >= previousThreshold || threshold >= previousThreshold * ( 1 - model.lodFadeFraction ) : threshold <= previousThreshold || threshold * ( 1 - model.lodFadeFraction ) <= previousThreshold;
+			const invalidOrder = model.lodMetric === 'projected-radius'
+				? threshold <= previousThreshold || previousThreshold > 0 && threshold * ( 1 - model.lodFadeFraction ) <= previousThreshold
+				: threshold >= previousThreshold || previousThreshold < Infinity && threshold >= previousThreshold * ( 1 - model.lodFadeFraction );
 			if ( ! Number.isFinite( threshold ) || threshold <= 0 || invalidOrder ) throw new Error( `Invalid or overlapping LOD thresholds for static model ${model.id}` );
 			previousThreshold = threshold;
 		}
-		if ( ! Number.isInteger( model.shadowLod ) || model.shadowLod < 0 || model.shadowLod >= model.lods.length || ! Number.isFinite( model.shadowMaxDistance ) || model.shadowMaxDistance < 0 || model.shadowMaxDistance > 1e6 ) throw new Error( `Invalid shadow policy for static model ${model.id}` );
+		if ( model.shadowLod !== 0 || ! Number.isFinite( model.shadowMaxDistance ) || model.shadowMaxDistance < 0 || model.shadowMaxDistance > 1e6 ) throw new Error( `Invalid shadow policy for static model ${model.id}` );
 		if ( ! Number.isFinite( model.drawMaxDistance ) || model.drawMaxDistance <= 0 || model.drawMaxDistance > 1e6 ) throw new Error( `Invalid draw distance for static model ${model.id}` );
 		if ( ! Number.isFinite( model.drawFadeStartDistance ) || model.drawFadeStartDistance < 0 || model.drawFadeStartDistance > model.drawMaxDistance ) throw new Error( `Invalid draw fade distance for static model ${model.id}` );
 	}

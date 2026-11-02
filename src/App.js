@@ -63,7 +63,7 @@ import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
-import { worldComponentDescriptor } from './network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldComponentDescriptor } from './network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
 import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
@@ -2102,7 +2102,7 @@ export class App {
 }
 
 function componentAssetIDs( component ) {
-	return ( component.assets || [] ).map( reference => reference.assetId );
+	return worldComponentAssetIDs( component );
 }
 
 function componentsThroughPriority( connector, through, vegetationEnabled ) {

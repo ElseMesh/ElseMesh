@@ -1,3 +1,5 @@
+import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
+
 const components = new Map();
 
 export function registerWorldComponent( type, descriptor = {} ) {
@@ -9,6 +11,15 @@ export function registerWorldComponent( type, descriptor = {} ) {
 
 export function worldComponentDescriptor( type ) {
 	return components.get( type ) || null;
+}
+
+// Large static model sets declare every possible LOD, but only their compact
+// descriptor is a startup dependency. Backend adapters fetch coarse and finer
+// GLBs on demand after decoding the descriptor.
+export function worldComponentAssetIDs( component ) {
+	const references = component?.assets || [];
+	if ( component?.type === 'elsemesh.static-model-instance-set/1' ) return references.filter( reference => reference.kind === STATIC_MODEL_INSTANCE_SET_ASSET_KIND ).map( reference => reference.assetId );
+	return references.map( reference => reference.assetId );
 }
 
 export function registeredWorldComponents() {

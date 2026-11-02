@@ -31,11 +31,16 @@ export function writeStaticModelInstanceFades( group, target ) {
 
 /** Shared visibility/LOD update for backend-owned static model draw batches. */
 export class StaticModelInstanceSetRuntime {
-	constructor( document, { batches, shadowBatches = [], dispose = null } = {} ) {
+	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null } = {} ) {
 		this.document = document;
 		this.planner = new StaticModelInstanceSetPlanner( document );
 		this.batches = batches;
 		this.shadowBatches = shadowBatches;
+		this.loadLOD = loadLOD;
+		this.loadController = new AbortController();
+		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
+		this.pendingLods = new Map();
+		this.retryAfter = new Map();
 		this.disposeBatches = dispose;
 		this.disposed = false;
 		if ( ! Array.isArray( batches ) || batches.length !== this.planner.groups.length || ! Array.isArray( shadowBatches ) || shadowBatches.length !== this.planner.shadowGroups.length ) throw new Error( 'Static model instance batches do not match the declared models and LODs' );
@@ -44,8 +49,55 @@ export class StaticModelInstanceSetRuntime {
 	update( _dt, camera ) {
 		if ( this.disposed ) return;
 		this.planner.update( staticModelInstanceCamera( camera ) );
+		this.#requestVisibleLODs();
 		this._updateBatches( this.planner.groups, this.batches );
 		this._updateBatches( this.planner.shadowGroups, this.shadowBatches );
+	}
+
+	#requestVisibleLODs() {
+		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
+			const groups = this.planner._groupsByModel[ modelIndex ];
+			let desiredLevel = -1;
+			for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
+			const loaded = this.loadedLods[ modelIndex ];
+			const loadedMax = Math.max( ...loaded );
+			if ( desiredLevel > loadedMax && this.loadLOD ) {
+				const level = loadedMax + 1;
+				const key = `${ modelIndex }:${ level }`;
+				if ( ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
+					const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {
+						if ( ! this.disposed ) loaded.add( level );
+					} ).catch( error => {
+						if ( ! this.disposed ) {
+							this.retryAfter.set( key, performance.now() + 5000 );
+							console.warn( `Static model LOD ${ level } unavailable for ${ this.document.models[ modelIndex ].id }`, error );
+						}
+					} ).finally( () => this.pendingLods.delete( key ) );
+					this.pendingLods.set( key, pending );
+				}
+			}
+			for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
+		}
+	}
+
+	#moveToLoadedCoarseLevel( source, destination ) {
+		if ( source.count === 0 ) return;
+		const indexes = new Map();
+		for ( let index = 0; index < destination.count; index ++ ) indexes.set( destination.indices[ index ], index );
+		for ( let index = 0; index < source.count; index ++ ) {
+			const instanceIndex = source.indices[ index ];
+			let targetIndex = indexes.get( instanceIndex );
+			if ( targetIndex === undefined ) {
+				targetIndex = destination.count ++;
+				indexes.set( instanceIndex, targetIndex );
+				destination.indices[ targetIndex ] = instanceIndex;
+				destination.drawFade[ targetIndex ] = source.drawFade[ index ];
+				destination.drawFadeEnabled[ targetIndex ] = source.drawFadeEnabled[ index ];
+			}
+			destination.fade[ targetIndex ] = 1;
+			destination.incoming[ targetIndex ] = 2;
+		}
+		source.count = 0;
 	}
 
 	_updateBatches( groups, batches ) {
@@ -72,6 +124,8 @@ export class StaticModelInstanceSetRuntime {
 	dispose() {
 		if ( this.disposed ) return;
 		this.disposed = true;
+		this.loadController.abort( new DOMException( 'World unloaded', 'AbortError' ) );
+		this.pendingLods.clear();
 		this.disposeBatches?.();
 	}
 }

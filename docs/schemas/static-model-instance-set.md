@@ -1,12 +1,13 @@
 # Static model instance sets
 
-**Status: partial.** The engine validates and decodes the data shape, resolves
-the signed GLB assets, and shares camera conversion, frustum culling, LOD
-selection/fades, and shadow-distance selection. Engine-owned WebGPU and WebGL
-draw adapters build instanced batches from those records. Generated-GLB checks
-cover adapter construction and per-frame updates on both backends; isolated
-WebGPU and WebGL renders check visible pixels and shader compilation. Tidewater
-export and its visual parity against the pre-split baseline remain unverified.
+**Status: partial.** The engine validates and decodes the data shape, loads
+coarse model GLBs first, and requests finer signed variants when the shared
+projected-size/distance planner needs them. WebGPU and WebGL use the same lazy
+runtime and build instanced batches for each loaded level. Focused tests verify
+coarse-only installation and demand-triggered finer requests on both backends;
+single-level generated-GLB renders check visible pixels and shader compilation.
+Per-level GPU eviction, shared texture-tier delivery, a live Hogwarts instance
+set, and Tidewater parity against the pre-split baseline remain open.
 
 This generic package format is the intended replacement for content-specific
 static renderer components. A world describes models, LOD assets, materials,
@@ -15,19 +16,17 @@ visibility, LOD transitions, shadows, and GPU resources.
 
 ## Coarse-first lazy-loading evolution
 
-The current implementation orders `lods` highest-detail first and both
-renderer adapters load every referenced GLB before installing the component.
-That is not suitable for large streamed worlds. The target contract orders
-`lods` from coarsest to finest, requests the coarsest usable model first, and
-loads finer levels only when projected view demand crosses their thresholds.
-The current implementation's all-level preload must be replaced in the shared
-resolver, component preload gate, planner/runtime, and both renderer adapters;
-changing only the bridge would still fetch every level or select them in the
-wrong direction. Keep the coarse model visible while a finer level loads, and
-leave it in place if refinement fails or becomes stale. Texture bytes must be
-external shared assets so geometry refinement does not resend them. Collision
-remains on its independent, higher-priority path. This is a generic engine
-contract for static model sets, not a Hogwarts-specific mode.
+The implementation orders `lods` from coarsest to finest, requests the coarse
+model first, and lazily fetches finer levels as projected view demand crosses
+their thresholds. The shared component preload gate loads only the instance-set
+descriptor; both backend adapters use the same runtime and retain the coarse
+model while refinement is pending or unavailable. Refinement requests are
+limited to two concurrent loads per component. Texture bytes must be external
+shared assets so geometry refinement does not resend them. Fine GPU levels are
+currently retained until component eviction; per-level GPU LRU eviction remains
+to be implemented. Collision remains on its independent, higher-priority path.
+This is a generic engine contract for static model sets, not a Hogwarts-specific
+mode.
 
 ## Package shape
 
@@ -47,10 +46,10 @@ component asset list. The JSON asset has this shape:
         { "assetId": "sha256:..." },
         { "assetId": "sha256:..." }
       ],
-      "lodThresholds": [0.018, 0.004],
+      "lodThresholds": [0.004, 0.018],
       "lodMetric": "projected-radius",
       "lodFadeFraction": 0.1,
-      "shadowLod": 1,
+      "shadowLod": 0,
       "shadowMaxDistance": 22,
       "drawMaxDistance": 90,
       "drawFadeStartDistance": 81
@@ -70,15 +69,18 @@ component asset list. The JSON asset has this shape:
 Each model asset is a static GLB using the core glTF feature subset supported by
 both renderers and local-space geometry. Skins, animation, morph targets,
 non-triangle primitives, and unsupported vertex attributes are rejected.
-In the current implementation, LOD entries are ordered from highest to lowest
-detail. With `lodMetric` set to `projected-radius`, each `lodThresholds` entry
-is a normalized projected-radius boundary and values descend. With
-`scaled-distance`, each is a world distance divided by the instance's largest
-scale and values ascend. `lodFadeFraction`
+LOD entries are ordered from coarsest to finest detail. With `lodMetric` set to
+`projected-radius`, each `lodThresholds` entry is a normalized projected-radius
+boundary for the next finer level and values ascend. With `scaled-distance`,
+each is a world distance divided by the instance's largest scale and values
+descend. `lodFadeFraction`
 sets the transition-band width for either metric; overlapping bands are
 rejected. `drawMaxDistance` limits color rendering by world-space distance from
 the transformed bounds center, and `drawFadeStartDistance` sets where its
 screen-door fade begins. Shadows use the independent `shadowMaxDistance`.
+`shadowLod` is fixed at zero so coarse-first startup uses the same already-loaded
+coarse geometry for its shadow proxy; finer visual levels do not create extra
+startup asset requests.
 The renderer-neutral planner selects visible instances and complementary
 incoming/outgoing LOD fades; shadow candidates are selected by distance
 independently of the camera frustum. Both renderers consume these same

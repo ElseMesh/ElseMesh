@@ -1,14 +1,19 @@
 import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
+import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installStaticModelInstanceSet );
 
 async function installStaticModelInstanceSet( { fallback }, component ) {
-	const { document, modelAssets } = await loadStaticModelInstanceSetAssets( fallback.connector, component );
-	const T = fallback.THREE, sources = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
+	const connector = fallback.connector;
+	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
+	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [], lodQueue = new LODLoadQueue( 2 );
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
+	const modelOffsets = [];
+	let batchOffset = 0;
+	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const disposeOwned = () => {
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) {
 			mesh.parent?.remove( mesh );
@@ -30,11 +35,19 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 		for ( const texture of textures ) texture.dispose();
 	};
 	try {
-		for ( const assetId of new Set( document.models.flatMap( model => model.lods.map( lod => lod.assetId ) ) ) ) {
-			const bytes = modelAssets.get( assetId );
-			const buffer = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
-			sources.set( assetId, await fallback.loader.parseAsync( buffer, '' ) );
-		}
+		const parseModel = async ( assetId, bytes ) => {
+			if ( sources.has( assetId ) ) return sources.get( assetId );
+			if ( sourceFlights.has( assetId ) ) return sourceFlights.get( assetId );
+			const flight = ( async () => {
+				const buffer = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
+				const source = await fallback.loader.parseAsync( buffer, '' );
+				sources.set( assetId, source );
+				return source;
+			} )();
+			sourceFlights.set( assetId, flight );
+			try { return await flight; }
+			finally { if ( sourceFlights.get( assetId ) === flight ) sourceFlights.delete( assetId ); }
+		};
 		for ( let modelIndex = 0; modelIndex < document.models.length; modelIndex ++ ) {
 			const model = document.models[ modelIndex ];
 			if ( modelCapacity[ modelIndex ] === 0 ) {
@@ -42,12 +55,27 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				shadowBatches.push( [] );
 				continue;
 			}
-			for ( const lod of model.lods ) mainBatches.push( createModelDraws( T, sources.get( lod.assetId ).scene, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
-			shadowBatches.push( createModelDraws( T, sources.get( model.lods[ model.shadowLod ].assetId ).scene, modelCapacity[ modelIndex ], true, materialCache, ownedGeometry, ownedMaterials ) );
+			const coarse = await loadModelLOD( modelIndex, 0 );
+			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.bytes );
+			releaseModelLOD( modelIndex, 0 );
+			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
+			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
+			shadowBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], true, materialCache, ownedGeometry, ownedMaterials ) );
 		}
 		const runtime = new StaticModelInstanceSetRuntime( document, {
 			batches: mainBatches,
 			shadowBatches,
+			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
+				const { bytes } = await loadModelLOD( modelIndex, lodIndex, { signal } );
+				if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
+				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
+				const source = await parseModel( assetId, bytes );
+				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
+				releaseModelLOD( modelIndex, lodIndex );
+				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials );
+				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
+				for ( const draw of draws ) fallback.scene.add( draw.mesh );
+			} ),
 			dispose: disposeOwned,
 		} );
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );

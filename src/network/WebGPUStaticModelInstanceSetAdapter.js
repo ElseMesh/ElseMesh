@@ -5,20 +5,24 @@ import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets
 import { loadWorldPackageModelAsset } from './WorldPackage.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
+import { LODLoadQueue } from './WorldObjectLOD.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installStaticModelInstanceSet );
 
 async function installStaticModelInstanceSet( { root, connector }, component ) {
-	const { document, parsedModels } = await loadStaticModelInstanceSetAssets( connector, component );
+	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
-	const materialCache = new Map(), sceneCache = new Map();
+	const materialCache = new Map(), sceneCache = new Map(), lodQueue = new LODLoadQueue( 2 );
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
-	const getScene = async assetId => {
-		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { parsedGLTF: parsedModels.get( assetId ) } ) );
+	const getScene = async ( assetId, parsedGLTF ) => {
+		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { parsedGLTF } ) );
 		return sceneCache.get( assetId );
 	};
+	const modelOffsets = [];
+	let batchOffset = 0;
+	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const disposeOwned = () => {
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) mesh.parent?.remove( mesh );
 		for ( const geometry of ownedGeometry ) geometry.dispose();
@@ -32,17 +36,29 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				shadowBatches.push( [] );
 				continue;
 			}
-			for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) {
-				const source = await getScene( model.lods[ lodIndex ].assetId );
-				mainBatches.push( createModelDraws( source, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
-			}
-			const shadowSource = await getScene( model.lods[ model.shadowLod ].assetId );
+			const { gltf } = await loadModelLOD( modelIndex, 0 );
+			const coarseSource = await getScene( model.lods[ 0 ].assetId, gltf );
+			releaseModelLOD( modelIndex, 0 );
+			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
+			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
+			const shadowSource = coarseSource;
 			shadowBatches.push( createModelDraws( shadowSource, modelCapacity[ modelIndex ], true, materialCache, ownedGeometry, ownedMaterials ) );
 		}
 		if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 		const runtime = new StaticModelInstanceSetRuntime( document, {
 			batches: mainBatches,
 			shadowBatches,
+			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
+				const { gltf } = await loadModelLOD( modelIndex, lodIndex, { signal } );
+				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
+				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
+				const source = await getScene( assetId, gltf );
+				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
+				releaseModelLOD( modelIndex, lodIndex );
+				const draws = createModelDraws( source, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials );
+				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
+				for ( const draw of draws ) root.add( draw.mesh );
+			} ),
 			dispose: disposeOwned,
 		} );
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) root.add( mesh );

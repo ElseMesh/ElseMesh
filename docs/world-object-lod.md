@@ -19,14 +19,12 @@ visibility-prioritized loading in `WorldStreaming.js` does not reduce its mesh.
 ### Coarse-first instance streaming
 
 This object-level contract keeps a full-detail base asset and lower-detail
-variants. It remains useful for ordinary single-object LOD, but it is not the
-path for Hogwarts's per-mesh progressive startup: the bridge needs instanced
-models to load coarsest first, then request finer variants as projected view
-demand warrants. Evolve the generic
-[`static-model-instance-set` contract](schemas/static-model-instance-set.md)
-for that behavior, including lazy asset loading; do not add a Hogwarts-only LOD
-meaning or route all component assets through its current eager loader. Keep
-collision independent from every visual detail choice.
+variants. It remains useful for ordinary single-object LOD. For repeated static
+models that must stream coarsest first, use the generic
+[`static-model-instance-set` contract](schemas/static-model-instance-set.md):
+its shared planner and WebGL/WebGPU runtime load the coarse level first and
+fetch finer variants lazily. Keep collision independent from every visual
+detail choice.
 
 An asset instance may declare optional signed `lods`, ordered from medium to
 lowest detail, each referencing a distinct content-addressed GLB and a decreasing

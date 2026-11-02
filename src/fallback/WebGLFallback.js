@@ -31,7 +31,7 @@ import { WebGLSpray } from './WebGLSpray.js';
 import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGLVillageMaterials.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
-import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
@@ -1616,7 +1616,7 @@ export class WebGLFallback {
 			const initialComponents = selectWorldComponentsForView( manifest, this.camera, { maxPriority: 'nearby' } );
 			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
-			const retainAssetIDs = new Set( initialComponents.flatMap( component => ( component.assets || [] ).map( reference => reference.assetId ) ) );
+			const retainAssetIDs = new Set( initialComponents.flatMap( worldComponentAssetIDs ) );
 			for ( const assetId of retainAssetIDs ) assetIDs.add( assetId );
 			for ( const extension of manifest.experience?.extensions || [] ) {
 				assetIDs.add( extension.assetId );

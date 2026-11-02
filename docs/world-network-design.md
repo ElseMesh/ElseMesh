@@ -230,17 +230,23 @@ does not remove the OPFS copy. RAM and OPFS have independent budgets but use
 the same least-recently-requested eviction signal. A RAM hit refreshes OPFS
 recency at most once per entry per 30 seconds to limit metadata I/O. The
 current RAM budget uses `navigator.deviceMemory` only as a coarse physical-RAM
-hint: 64 MiB per reported GiB, split 80/20 between full responses and byte
-ranges, with a 64 MiB floor and 1 GiB ceiling. For example, a 2 GiB hint gets
-128 MiB, an 8 GiB hint gets 512 MiB, and a 16 GiB hint reaches the ceiling.
-When the browser does not expose that hint, it uses a 320 MiB total. The
-reported value is approximate, coarsened, browser-bounded, and not consistently
-available, so high-memory machines may not receive a correspondingly larger
-budget in every browser. This is a provisional heuristic, not a free-memory
-measurement; it cannot account for other tabs, decoded/GPU allocations, or OS
-memory pressure. Tune it from measured renderer memory and eviction/refetch
-behavior. Unload releases decoded/GPU and RAM state while requested encoded
-bytes remain in OPFS until normal disk-LRU eviction.
+hint: 64 MiB per reported GiB (one sixteenth of the hint), split 80/20 between
+full responses and byte ranges, with a 64 MiB floor and 1 GiB ceiling. For
+example, a 2 GiB hint gets 128 MiB, an 8 GiB hint gets 512 MiB, and a 16 GiB
+hint reaches the ceiling. When the browser does not expose that hint, it uses
+a 320 MiB total. The reported value is approximate, coarsened,
+browser-bounded, and not consistently available, so high-memory machines may
+not receive a correspondingly larger budget in every browser. This heuristic
+does not measure currently free RAM and cannot account for other tabs,
+decoded/GPU allocations, or OS memory pressure. It therefore sets a bounded
+starting ceiling, not a promise that this much RAM is always available; LRU
+eviction must keep actual retained bytes within it. Tune the fraction and
+ceiling using renderer-memory, eviction, and refetch measurements before
+raising them. The shared host cache is a separate budget for all visitors and
+must be sized against the host process's effective memory limit and conversion
+headroom; it must not reuse the per-browser budget. Unload releases decoded/GPU
+and RAM state while requested encoded bytes remain in OPFS until normal
+disk-LRU eviction.
 Current Hogwarts implementation status: ElseMesh supports manifest-declared
 content-addressed GLB image references and shares their decoded GPU textures
 across GLBs. A focused fixture covers that engine path, but Hogwarts does not
