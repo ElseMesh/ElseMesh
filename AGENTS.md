@@ -3,6 +3,7 @@
 ## Network and elevated commands
 
 - Always run network-related commands in an escalated shell, even when they only access localhost. This includes `curl`, HTTP clients, browser/CDP checks, SSH, and Git fetch/push. Use an escalated shell for other commands that require elevated permissions as well.
+- Always use an escalated shell when checking running processes or process ownership (for example, `ps`, `pgrep`, or inspecting `/proc`); an un-escalated process listing may be incomplete or misleading.
 - For system-level `systemd-run`, use the escalated shell and invoke `sudo -n /usr/bin/systemd-run`; plain `systemd-run` may trigger an interactive Polkit password prompt. Do not use `systemd-run --user` for system scopes. Confirm the exact scope options first; `--wait` cannot be combined with `--scope`.
 
 ## Design maturity and compatibility
