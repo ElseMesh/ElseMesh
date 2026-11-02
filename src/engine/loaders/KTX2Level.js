@@ -99,7 +99,10 @@ export function assembleKTX2LevelFromRanges( input, levelIndex, { sections = {},
 	}
 	const outputImageOffset = align( outputLength, 8 );
 	const result = new Uint8Array( outputImageOffset + payload.byteLength );
-	result.set( layout.bytes.subarray( 0, layout.indexEnd ) );
+	// The output has one level-index entry, even when the source has many.
+	// Copy only that entry; copying the source's full index can overrun a
+	// compact output when the selected mip payload is very small.
+	result.set( layout.bytes.subarray( 0, HEADER_BYTES + LEVEL_INDEX_BYTES ) );
 	const view = new DataView( result.buffer );
 	view.setUint32( 20, Math.max( 1, layout.width >> levelIndex ), true );
 	view.setUint32( 24, Math.max( 1, layout.height >> levelIndex ), true );

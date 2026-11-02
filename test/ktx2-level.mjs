@@ -38,6 +38,31 @@ for ( const index of [ 0, levelCount - 1 ] ) {
 	assert( extracted.byteLength < source.byteLength, 'single-level container is smaller than the full mip pyramid' );
 }
 
+// A real Great Hall texture has ten mip entries and a 16-byte coarsest
+// payload. Ensure reassembly allocates/copies only the one-entry output index.
+const manyLevelCount = 10;
+const manyLevelIndexEnd = 80 + manyLevelCount * 24;
+const manyLevelHeader = new Uint8Array( manyLevelIndexEnd );
+manyLevelHeader.set( [ 0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a ] );
+const manyLevelView = new DataView( manyLevelHeader.buffer );
+manyLevelView.setUint32( 20, 512, true );
+manyLevelView.setUint32( 24, 512, true );
+manyLevelView.setUint32( 40, manyLevelCount, true );
+for ( let index = 0; index < manyLevelCount; index ++ ) {
+	const entry = 80 + index * 24;
+	manyLevelView.setBigUint64( entry, BigInt( 400 + index * 4 ), true );
+	manyLevelView.setBigUint64( entry + 8, 4n, true );
+	manyLevelView.setBigUint64( entry + 16, 4n, true );
+}
+const tinyCoarseLevel = Uint8Array.of( 1, 2, 3, 4 );
+const compactCoarse = assembleKTX2LevelFromRanges( manyLevelHeader, manyLevelCount - 1, {
+	levelBytes: tinyCoarseLevel,
+	totalLength: 440,
+} );
+assert.equal( compactCoarse.byteLength, 108, 'a tiny coarsest payload produces a compact single-level container' );
+assert.equal( new DataView( compactCoarse.buffer ).getUint32( 40, true ), 1, 'the compact result has one level-index entry' );
+assert.deepEqual( compactCoarse.subarray( 104 ), tinyCoarseLevel, 'the compact result retains the selected payload' );
+
 assert.throws( () => extractKTX2Level( source, levelCount ), RangeError );
 assert.throws( () => extractKTX2Level( source.subarray( 0, 32 ), 0 ), /truncated/ );
 const glbImageOffset = 256;
