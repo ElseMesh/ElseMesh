@@ -7,6 +7,7 @@
 #include <cstring>
 #include <exception>
 #include <mutex>
+#include <thread>
 
 namespace {
 
@@ -16,6 +17,7 @@ constexpr uint32_t kNoMipGeneration = 1u << 2;
 constexpr uint32_t kKnownFlags = kSrgb | kNormalMap | kNoMipGeneration;
 constexpr size_t kMaxInputBytes = 256u * 1024u * 1024u;
 constexpr uint32_t kMaxDimension = 16384;
+constexpr uint32_t kMaxEncoderThreads = 4;
 
 std::once_flag encoderInitOnce;
 bool encoderInitSucceeded = false;
@@ -66,8 +68,8 @@ extern "C" int em_ktx2_encode_rgba8_stream(
     }
 
     try {
-        // Basis owns process-wide encoder state. Serialize calls and use a one-thread
-        // job pool so callers cannot multiply peak memory or worker counts.
+        // Basis owns process-wide encoder state. Serialize calls and bound each
+        // encode's worker pool so concurrent callers cannot multiply memory use.
         std::lock_guard<std::mutex> encodeLock(encodeMutex);
         std::call_once(encoderInitOnce, [] {
             encoderInitSucceeded = basisu::basisu_encoder_init(false, false);
@@ -78,7 +80,9 @@ extern "C" int em_ktx2_encode_rgba8_stream(
         }
 
         basisu::basis_compressor_params params;
-        basisu::job_pool jobPool(1);
+        const auto hardwareThreads = std::thread::hardware_concurrency();
+        const uint32_t threadCount = std::clamp(hardwareThreads == 0 ? 1u : hardwareThreads, 1u, kMaxEncoderThreads);
+        basisu::job_pool jobPool(threadCount);
         params.m_pJob_pool = &jobPool;
         params.set_format_mode(basist::basis_tex_format::cUASTC_LDR_4x4);
         params.set_srgb_options((flags & kSrgb) != 0);
@@ -89,8 +93,7 @@ extern "C" int em_ktx2_encode_rgba8_stream(
         params.m_read_source_images = false;
         params.m_status_output = false;
         params.m_print_stats = false;
-        // A single encode at a time keeps this shared library's peak CPU and memory predictable.
-        params.m_multithreading = false;
+        params.m_multithreading = threadCount > 1;
 
         params.m_source_images.resize(1);
         auto &image = params.m_source_images[0];
