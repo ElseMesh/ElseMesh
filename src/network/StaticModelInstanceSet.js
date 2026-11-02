@@ -35,7 +35,8 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 		if ( ! hasExactKeys( model.bounds, [ 'center', 'radius' ] ) || ! validVector( model.bounds.center, 3, 1e6 ) || ! Number.isFinite( model.bounds.radius ) || model.bounds.radius <= 0 || model.bounds.radius > 1e6 ) throw new Error( `Invalid bounds for static model ${model.id}` );
 		if ( ! Array.isArray( model.lods ) || model.lods.length === 0 || model.lods.length > MAX_STATIC_MODEL_INSTANCE_LODS ) throw new Error( `Invalid LOD list for static model ${model.id}` );
 		for ( const lod of model.lods ) {
-			if ( ! hasExactKeys( lod, [ 'assetId' ] ) || typeof lod.assetId !== 'string' || ! ASSET_ID.test( lod.assetId ) ) throw new Error( `Invalid LOD record for static model ${model.id}` );
+			if ( ! hasExactKeys( lod, [ 'assetId' ] ) || typeof lod.assetId !== 'string' || lod.assetId.length === 0 || lod.assetId.length > 8192
+				|| availableAssetIDs === null && ! ASSET_ID.test( lod.assetId ) ) throw new Error( `Invalid LOD record for static model ${model.id}` );
 			if ( availableAssetIDs && ! availableAssetIDs.has( lod.assetId ) ) throw new Error( `Static model LOD asset is missing: ${lod.assetId}` );
 		}
 		if ( ! [ 'projected-radius', 'scaled-distance' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );

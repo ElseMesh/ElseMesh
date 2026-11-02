@@ -2,8 +2,9 @@ import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 
-// Resolve a renderer-neutral instance set against the signed package inventory.
-// GLB downloads still pass through WorldConnector's content hash verification.
+// Resolve an instance set only against assets declared by its connector. Signed
+// package IDs are content hashes; the local dynamic provider uses source-scoped
+// IDs and verifies each response against the provider's SHA-256 ETag.
 export async function loadStaticModelInstanceSetAssets( connector, component, { signal } = {} ) {
 	if ( ! connector?.manifest || ! Array.isArray( connector.manifest.assets ) || ! Array.isArray( component?.assets ) ) throw new Error( 'Static model instance set requires a loaded world manifest and component asset references' );
 	const records = connector.manifest.assets;

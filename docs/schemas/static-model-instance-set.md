@@ -34,6 +34,15 @@ A signed component references one content-addressed JSON asset with kind
 `static-model-instance-set/1` and each referenced LOD GLB with kind `glb` in its
 component asset list. The JSON asset has this shape:
 
+Ordinary signed world packages use `sha256:<digest>` asset IDs and verify them
+against the signed manifest. A dynamic local-region connector may instead
+declare source-scoped lookup IDs in its bounded provider inventory, because the
+GLB bytes do not exist until requested. This exception is provider-owned: the
+component loader still requires every LOD ID to appear in both the connector's
+manifest and component asset list, and the connector verifies each returned
+GLB against its SHA-256 response ETag before storing it. Source-scoped IDs are
+not a replacement for content-addressed package assets.
+
 ```json
 {
   "format": "elsemesh.static-model-instance-set/1",

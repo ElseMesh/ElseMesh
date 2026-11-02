@@ -39,6 +39,11 @@ const valid = {
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
 assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set( [ hi, low, lowest ] ) } ).instances.length, 1 );
+const providerLocalID = 'local-mesh-lod:great-hall:component:0';
+const providerLocalDocument = structuredClone( valid );
+providerLocalDocument.models[ 0 ].lods[ 0 ].assetId = providerLocalID;
+assert.equal( validateStaticModelInstanceSet( providerLocalDocument, { availableAssetIDs: new Set( [ providerLocalID, low, hi ] ) } ).models[ 0 ].lods[ 0 ].assetId, providerLocalID, 'provider-scoped model IDs require declaration in the connector inventory' );
+assert.throws( () => validateStaticModelInstanceSet( providerLocalDocument, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
 assert.equal( decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes ).models[ 0 ].id, 'market-table-fish', 'the engine asset-codec registry applies the generic validator' );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
 assert.throws( () => validateStaticModelInstanceSet( valid, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );

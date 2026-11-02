@@ -90,6 +90,20 @@ let abortNextCellFetch = false;
 let abortableFetchStarted;
 let createdRegionLeaseQuery = null;
 let requestedRegionMeshLodQuery = null;
+const staticVisualInstance = {
+	componentPath: '/Game/GreatHall/SM_Table.Component0',
+	staticMeshPath: '/Game/GreatHall/SM_Table',
+	isSplineMesh: false,
+	instanceIndex: null,
+	instanceTransformCount: 1,
+	transform: { position: [ 8, 1, 8 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] },
+	boundsMeters: { min: [ 7, 0, 7 ], max: [ 9, 2, 9 ] },
+};
+const staticMeshLODs = [
+	{ index: 0, usable: true, screenSize: 0.1794, vertices: 2440, triangles: 2440 },
+	{ index: 1, usable: true, screenSize: 0.05985, vertices: 976, triangles: 610 },
+	{ index: 2, usable: true, screenSize: 0.02498, vertices: 120, triangles: 76 },
+];
 globalThis.fetch = async ( input, options = {} ) => {
 	const url = new URL( input );
 	if ( url.pathname === '/v1/regions/great-hall/leases' && options.method === 'POST' ) {
@@ -123,7 +137,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
 		return Response.json( {
 		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: { staticMeshComponents: 3, otherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), unclassifiedOtherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents, unindexedSpatialBoundsFailures: unindexedSpatialBoundsComponents ? [ { objectPath: '/test/oversized-volume', reason: 'bounds exceed index limit' } ] : [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell || includeSupportedPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ) } : {} }, cells: [
-			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] },
+			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [], visualInstances: [ staticVisualInstance ], meshLods: [ { staticMeshPath: '/Game/GreatHall/SM_Table', lods: staticMeshLODs } ] },
 			{ x: 1, y: 0, z: 0, collisionEvidence: { scope: 'incomplete-collision-source-index', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 1, staticMeshComponentsClassified: false, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [ { objectPath: '/test/unknown', instanceIndex: null, status: 'unknown', bounds: [ 8, 0, 0, 9, 1, 1 ] } ] },
 			{ x: 2, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 1, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] },
 			...( includeUnknownPrimitiveCell ? [ { x: 3, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 1, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 1 }, unknownCollisionSources: [ { objectPath: '/test/unknown-primitive', instanceIndex: null, status: 'unknown', bounds: [ 49, 0, 0, 50, 1, 1 ] } ] } ] : [] ),
@@ -211,17 +225,27 @@ try {
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
-	const meshLodAssetID = 'local-region-lod:test';
-	connector.regionAssets.set( meshLodAssetID, 'http://127.0.0.1:4179/v1/regions/great-hall?cell=0%2C0%2C0%2C16&payload=visual&mesh=%2FGame%2FTest%2FSM_Test.Component&lod=2' );
+	assert.equal( manifest.components.length, 1, 'complete provider placements and LOD profiles publish a static-model instance-set component' );
+	const staticSet = manifest.components[ 0 ];
+	assert.equal( staticSet.type, 'elsemesh.static-model-instance-set/1' );
+	assert.equal( staticSet.assets.length, 4, 'the component declares one descriptor and three independently addressable mesh LODs' );
+	assert.equal( manifest.rules.requiredFeatures.includes( 'elsemesh.static-model-instance-set/1' ), true );
+	const setDescriptorID = staticSet.assets[ 0 ].assetId;
+	const descriptorBytes = await connector.getAsset( setDescriptorID );
+	const descriptor = JSON.parse( new TextDecoder().decode( descriptorBytes ) );
+	assert.deepEqual( descriptor.models[ 0 ].lodThresholds, [ 0.05985, 0.1794 ], 'the provider descriptor retains authored coarse-to-fine thresholds' );
+	const meshLodAssetID = staticSet.assets[ 1 ].assetId;
+	const meshLodURL = new URL( connector.regionAssets.get( meshLodAssetID ) );
+	assert.equal( meshLodURL.searchParams.get( 'mesh' ), staticVisualInstance.componentPath );
+	assert.equal( meshLodURL.searchParams.get( 'lod' ), '2', 'the initial asset is the coarsest usable source LOD' );
 	createdRegionLeaseQuery = null;
 	assert.deepEqual( await connector.getAsset( meshLodAssetID ), bytes, 'a standalone mesh LOD is fetched as a provider asset' );
-	assert.equal( createdRegionLeaseQuery?.get( 'mesh' ), '/Game/Test/SM_Test.Component', 'the region lease is scoped to the requested static-mesh component' );
+	assert.equal( createdRegionLeaseQuery?.get( 'mesh' ), staticVisualInstance.componentPath, 'the region lease is scoped to the requested static-mesh component' );
 	assert.equal( createdRegionLeaseQuery?.get( 'lod' ), '2', 'the region lease is scoped to the requested authored LOD' );
 	assert.equal( requestedRegionMeshLodQuery?.get( 'mesh' ), createdRegionLeaseQuery?.get( 'mesh' ), 'the leased region request keeps the component path from its lease key' );
 	assert.equal( requestedRegionMeshLodQuery?.get( 'lod' ), createdRegionLeaseQuery?.get( 'lod' ), 'the leased region request keeps the authored LOD from its lease key' );
 	assert.equal( leaseReleases, 1, 'a fetched standalone mesh LOD releases its temporary visitor lease' );
 	connector.releaseAsset( meshLodAssetID );
-	connector.regionAssets.delete( meshLodAssetID );
 	leaseReleases = 0;
 	assert.ok( cellIndexRequests.length > 0 && cellIndexRequests.every( cells => cells.length > 0 && cells.length <= 512 ), 'startup and view cells use bounded coordinate requests' );
 	await connector.ensureCellsForView( [ 1, 0, 1 ], [ 100, 0, 1 ] );
@@ -239,8 +263,8 @@ try {
 	assert.deepEqual( manifest.entryPoints.map( entry => entry.id ), [ 'gryffindor', 'hufflepuff' ] );
 	assert.equal( manifest.rules.physicsProfile, 'default' );
 	assert.equal( 'seaLevel' in manifest.rules, false, 'local Hogwarts preview does not activate a default waterline' );
-	assert.equal( manifest.assets.length, 6, 'indexed collision and visual cells should have distinct assets' );
-	assert.equal( manifest.objects.length, 7, 'only indexed collision and visual cells plus the preview collider should be present' );
+	assert.equal( manifest.assets.length, 9, 'the complete Great Hall cell replaces its visual GLB with independently addressable mesh LOD assets' );
+	assert.equal( manifest.objects.length, 6, 'the instance-set cell has no duplicate whole-cell visual GLB object' );
 	assert.equal( manifest.assets[ 0 ].id, 'local-region:great-hall:16:0,0,0:collision' );
 	assert.equal( manifest.objects[ 0 ].assetId, manifest.assets[ 0 ].id );
 	assert.equal( manifest.objects[ 0 ].regionCell, true );
@@ -256,7 +280,9 @@ try {
 	const loaded = await connector.preload();
 	assert.equal( loaded.get( manifest.assets[ 0 ].id ).byteLength, bytes.byteLength );
 	assert.equal( parseGLB( loaded.get( manifest.assets[ 0 ].id ) ).nodes[ 0 ].extras.elsemeshCollision.coordinateSystem, 'elsemesh-y-up-meters/1', 'collision-only GLB metadata is readable by the ElseMesh loader' );
-	assert.deepEqual( parseGLB( loaded.get( manifest.assets[ 2 ].id ) ).nodes, [], 'missing collision bytes remain representable to the package loader' );
+	const emptyCollisionAssetID = manifest.objects.find( object => object.id.endsWith( '2,0,0:collision' ) ).assetId;
+	assert.deepEqual( parseGLB( loaded.get( emptyCollisionAssetID ) ).nodes, [], 'missing collision bytes remain representable to the package loader' );
+	assert.equal( loaded.has( meshLodAssetID ), false, 'component startup loads only its descriptor and leaves all geometry variants lazy' );
 	assert.deepEqual( payloadFetchOrder.slice( 0, 3 ), [ 'collision', 'collision', 'collision' ], 'collision requests must be fetched before visual requests' );
 	assert( payloadFetchOrder.slice( 3 ).every( payload => payload === 'visual' ), 'range-based visual requests follow collision priority' );
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unknown collision placeholders are not cached as provider data' );
@@ -268,7 +294,8 @@ try {
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), false, 'movement stops until collision data for every crossed cell has loaded' );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), false, 'a missing collision response remains unknown and blocks the swept path even if the loader has an empty placeholder' );
 	secondCellCollisionMissing = false;
-	await connector.getAsset( manifest.assets[ 2 ].id );
+	const secondCellCollisionAssetID = manifest.assets.find( asset => asset.id === 'local-region:great-hall:16:1,0,0:collision' ).id;
+	await connector.getAsset( secondCellCollisionAssetID );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), false, 'a shape-bearing response cannot clear source coverage that the provider marked unknown' );
 	const emptyCellCollisionAsset = manifest.assets.find( asset => asset.id === 'local-region:great-hall:16:2,0,0:collision' );
 	assert.ok( emptyCellCollisionAsset );
@@ -279,8 +306,9 @@ try {
 	assert.equal( connector.isCollisionPathReady( [ 33, 0, 1 ], [ 34, 0, 1 ], { loadedObjects: new Set( [ emptyCollisionID ] ) } ), true, 'a valid empty payload plus complete all-source evidence proves the cell has no blocking collision' );
 	assert.equal( connector.releaseAsset( manifest.assets[ 0 ].id ), true );
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unloaded cells should release cached browser bytes' );
+	const cellFetchesBeforeReleasedCellRefetch = cellFetches;
 	assert.equal( await connector.getAsset( manifest.assets[ 0 ].id ).then( value => value.byteLength ), bytes.byteLength );
-	assert.equal( cellFetches, 3, 'a released cell should be fetched again on demand' );
+	assert.equal( cellFetches, cellFetchesBeforeReleasedCellRefetch + 1, 'a released cell should be fetched again on demand' );
 	assert.equal( leaseReleases, payloadFetchOrder.length, 'collision retries and a refetched cell should release their leases' );
 	connector.releaseAsset( manifest.assets[ 0 ].id );
 	abortNextCellFetch = true;
@@ -354,7 +382,7 @@ try {
 	const diskCacheConnector = new LocalRegionConnector( link );
 	assert.equal( diskCacheConnector.assetCacheBudgetBytes + diskCacheConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'the encoded RAM cache scales down on a low-memory device hint' );
 	const diskCacheManifest = await diskCacheConnector.getManifest();
-	const visualAssetID = diskCacheManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	const visualAssetID = diskCacheManifest.assets.find( asset => asset.id === 'local-region:great-hall:16:0,0,0:collision' ).id;
 	const providerFetchesBeforeDiskCache = cellFetches;
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'first request gets bytes from the local provider' );
@@ -370,13 +398,13 @@ try {
 	diskCacheConnector.close();
 	const diskCacheReloadedConnector = new LocalRegionConnector( link );
 	const diskCacheReloadedManifest = await diskCacheReloadedConnector.getManifest();
-	const reloadedVisualAssetID = diskCacheReloadedManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	const reloadedVisualAssetID = diskCacheReloadedManifest.assets.find( asset => asset.id === visualAssetID ).id;
 	assert.deepEqual( await diskCacheReloadedConnector.getAsset( reloadedVisualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'a new connector reuses the persistent cache without a provider request' );
 	diskCacheReloadedConnector.close();
 	const rangeCacheConnector = new LocalRegionConnector( link );
 	const rangeCacheManifest = await rangeCacheConnector.getManifest();
-	const rangeAssetID = rangeCacheManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	const rangeAssetID = rangeCacheManifest.components[ 0 ].assets.find( reference => reference.kind === 'glb' ).assetId;
 	const rangeRequest = { start: 0, end: 31, etag: `"sha256-${hash}"`, totalLength: bytes.byteLength };
 	const rangeFetchesBefore = rangeFetches;
 	const firstRange = await rangeCacheConnector.getAssetRange( rangeAssetID, rangeRequest );
@@ -395,7 +423,7 @@ try {
 	rangeCacheConnector.close();
 	const rangeDiskReloadedConnector = new LocalRegionConnector( link );
 	const rangeDiskReloadedManifest = await rangeDiskReloadedConnector.getManifest();
-	const rangeDiskAssetID = rangeDiskReloadedManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	const rangeDiskAssetID = rangeDiskReloadedManifest.components[ 0 ].assets.find( reference => reference.kind === 'glb' ).assetId;
 	assert.deepEqual( ( await rangeDiskReloadedConnector.getAssetRange( rangeDiskAssetID, rangeRequest ) ).bytes, firstRange.bytes );
 	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'a requested level range is reused from OPFS after connector restart' );
 	assert.deepEqual( ( await rangeDiskReloadedConnector.getAssetRanges( rangeDiskAssetID, multiRanges, { etag: rangeRequest.etag, totalLength: bytes.byteLength } ) ).map( range => range.bytes ), multiRangeResult.map( range => range.bytes ) );

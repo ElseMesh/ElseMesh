@@ -4,6 +4,9 @@ import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
+import { localRegionStaticModelSets } from './LocalRegionStaticModels.js';
+import { MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
+import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const DEFAULT_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
@@ -156,6 +159,7 @@ export class LocalRegionConnector {
 		this.assetRangeBytes = 0;
 		this.assetRangeCacheBudgetBytes = memoryCacheBudgetBytes - this.assetCacheBudgetBytes;
 		this.regionAssets = new Map();
+		this.syntheticAssetLoaders = new Map();
 		this.collisionAssetIDs = new Set();
 		this.collisionObjectIDByAsset = new Map();
 		this.unknownCollisionObjectIDs = new Set();
@@ -315,6 +319,7 @@ export class LocalRegionConnector {
 
 	#installCellIndex( sourceRegion, cellIndex ) {
 		const { baseURL: base, previewRegion, explicitStartupCellKeys } = this;
+		const sourceURL = new URL( sourceRegion.asset, `${base}/` );
 		const startupCellKeys = new Set( this.initialStartupCellKeys );
 		const sourceInventory = cellIndex.collisionSourceInventory;
 		requireValue( Number.isSafeInteger( sourceInventory?.staticMeshComponents ) && sourceInventory.staticMeshComponents >= 0 && Number.isSafeInteger( sourceInventory.otherPrimitiveComponents ) && sourceInventory.otherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.unclassifiedOtherPrimitiveComponents ) && sourceInventory.unclassifiedOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.explicitlyNonQueryOtherPrimitiveComponents ) && sourceInventory.explicitlyNonQueryOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.explicitlyNonBlockingForPawnOtherPrimitiveComponents ) && sourceInventory.explicitlyNonBlockingForPawnOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.audioOnlyPolicyExcludedOtherPrimitiveComponents ) && sourceInventory.audioOnlyPolicyExcludedOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.noSkeletalCollisionGeometryComponents ) && sourceInventory.noSkeletalCollisionGeometryComponents >= 0 && sourceInventory.unclassifiedOtherPrimitiveComponents + sourceInventory.explicitlyNonQueryOtherPrimitiveComponents + sourceInventory.explicitlyNonBlockingForPawnOtherPrimitiveComponents + sourceInventory.audioOnlyPolicyExcludedOtherPrimitiveComponents + sourceInventory.noSkeletalCollisionGeometryComponents === sourceInventory.otherPrimitiveComponents && Number.isSafeInteger( sourceInventory.landscapeHeightfieldCollisionComponents ) && sourceInventory.landscapeHeightfieldCollisionComponents >= 0 && Number.isSafeInteger( sourceInventory.unresolvedInstancedMeshComponents ) && sourceInventory.unresolvedInstancedMeshComponents >= 0 && sourceInventory.otherPrimitiveStatuses && typeof sourceInventory.otherPrimitiveStatuses === 'object' && Object.values( sourceInventory.otherPrimitiveStatuses ).every( count => Number.isSafeInteger( count ) && count >= 0 ) && Object.values( sourceInventory.otherPrimitiveStatuses ).reduce( ( total, count ) => total + count, 0 ) === sourceInventory.otherPrimitiveComponents, 'Local provider returned invalid collision source inventory' );
@@ -336,7 +341,7 @@ export class LocalRegionConnector {
 			this.unknownSourcesByCell.set( cellKey, [ ...previousUnknownSources, ...cell.unknownCollisionSources ] );
 			const completeForLayer = allCollisionSourcesIndexed && evidence.scope === 'all-collision-sources' && cell.unknownCollisionSources.length === expectedUnknownSources;
 			this.unknownSourcesCompleteByCell.set( cellKey, ( this.unknownSourcesCompleteByCell.get( cellKey ) ?? true ) && completeForLayer );
-			cells.set( cellKey, { x: cell.x, y: cell.y, z: cell.z, evidence } );
+			cells.set( cellKey, { x: cell.x, y: cell.y, z: cell.z, evidence, source: cell } );
 		}
 		for ( const cell of cells.values() ) {
 			const cellKey = `${cell.x},${cell.y},${cell.z}`;
@@ -346,19 +351,28 @@ export class LocalRegionConnector {
 				( cell.y + 0.5 ) * previewRegion.cellSizeMeters,
 				( cell.z + 0.5 ) * previewRegion.cellSizeMeters,
 			];
-			const isStartupCell = startupCellKeys.has( cellKey );
 			const cellObjectIDs = this.collisionObjectIDsByCell.get( cellKey ) || new Set();
 			const collisionAssetId = `${assetId}:collision`;
 			const collisionObjectId = `elsemesh-object:region-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}:collision`;
 			const visualAssetId = `${assetId}:visual`;
 			const visualObjectId = `elsemesh-object:region-cell:${sourceRegion.id}:${previewRegion.cellSizeMeters}:${cellKey}:visual`;
+			const cellCoordinates = [ cell.x, cell.y, cell.z ];
+			const isStartupCell = startupCellKeys.has( cellKey );
+			const priority = isStartupCell ? 'visible' : 'background';
+			const staticModelSets = localRegionStaticModelSets( cell.source, {
+				regionID: sourceRegion.id,
+				cellSizeMeters: previewRegion.cellSizeMeters,
+				coordinates: cellCoordinates,
+				priority,
+				maxDistanceMeters: previewRegion.maxViewDistanceMeters,
+			} );
 			const collisionURL = new URL( sourceRegion.asset, `${base}/` );
 			collisionURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
 			collisionURL.searchParams.set( 'payload', 'collision' );
 			const visualURL = new URL( collisionURL );
 			visualURL.searchParams.set( 'payload', 'visual' );
 			this.regionAssets.set( collisionAssetId, collisionURL.href );
-			this.regionAssets.set( visualAssetId, visualURL.href );
+			if ( ! staticModelSets ) this.regionAssets.set( visualAssetId, visualURL.href );
 			this.collisionAssetIDs.add( collisionAssetId );
 			this.collisionObjectIDByAsset.set( collisionAssetId, collisionObjectId );
 			if ( cell.evidence.supportedSimpleShapeComponents > 0 || cell.evidence.supportedOtherPrimitiveComponents > 0 ) this.collisionObjectIDsExpectShape.add( collisionObjectId );
@@ -368,23 +382,61 @@ export class LocalRegionConnector {
 			cellObjectIDs.add( collisionObjectId );
 			this.collisionObjectIDsByCell.set( cellKey, cellObjectIDs );
 			if ( isStartupCell ) this.initialRegionCellObjectIDs.add( collisionObjectId );
-			if ( explicitStartupCellKeys.has( cellKey ) ) this.explicitStartupCellVisualObjectIDs.add( visualObjectId );
 			this.manifest.assets.push(
-				{ id: collisionAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
-				{ id: visualAssetId, bytes: 0, kind: 'model/gltf-binary', priority: isStartupCell ? 'visible' : 'background' },
+				{ id: collisionAssetId, bytes: 0, kind: 'model/gltf-binary', priority },
 			);
-			this.manifest.objects.push(
-				{
-					id: collisionObjectId, label: `${sourceRegion.label} collision cell ${cellKey}`, kind: 'asset-instance', assetId: collisionAssetId,
-					transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'background',
-					streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters }, regionCell: true, collisionPayload: true,
-				},
-				{
+			this.manifest.objects.push( {
+				id: collisionObjectId, label: `${sourceRegion.label} collision cell ${cellKey}`, kind: 'asset-instance', assetId: collisionAssetId,
+				transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority,
+				streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters }, regionCell: true, collisionPayload: true,
+			} );
+			if ( staticModelSets ) {
+				this.manifest.rules.requiredFeatures ||= [];
+				if ( ! this.manifest.rules.requiredFeatures.includes( 'elsemesh.static-model-instance-set/1' ) ) this.manifest.rules.requiredFeatures.push( 'elsemesh.static-model-instance-set/1' );
+				for ( const set of staticModelSets ) {
+					const component = set.component;
+					this.manifest.components.push( component );
+					this.manifest.assets.push( { id: set.descriptorAssetID, bytes: 0, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND, priority } );
+					this.syntheticAssetLoaders.set( set.descriptorAssetID, async signal => {
+						const descriptorURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
+						descriptorURL.searchParams.set( 'size', String( previewRegion.cellSizeMeters ) );
+						descriptorURL.searchParams.set( 'cell', cellKey );
+						const latest = await fetchJSON( descriptorURL, signal );
+						requireValue( latest.sourceRevision === this.sourceRevision && latest.cellSizeMeters === previewRegion.cellSizeMeters && Array.isArray( latest.cells ), 'Local provider returned stale static-mesh instance metadata' );
+						const sourceCell = latest.cells.find( item => item.x === cell.x && item.y === cell.y && item.z === cell.z );
+						const refreshedSets = localRegionStaticModelSets( sourceCell, {
+							regionID: sourceRegion.id,
+							cellSizeMeters: previewRegion.cellSizeMeters,
+							coordinates: cellCoordinates,
+							priority,
+							maxDistanceMeters: previewRegion.maxViewDistanceMeters,
+						} );
+						const refreshed = refreshedSets?.find( item => item.descriptorAssetID === set.descriptorAssetID );
+						requireValue( refreshed, 'Local provider no longer exposes the declared static-mesh instance set' );
+						return new TextEncoder().encode( JSON.stringify( refreshed.document ) );
+					} );
+					for ( const modelAsset of set.modelAssets ) {
+						if ( ! this.regionAssets.has( modelAsset.assetId ) ) {
+							const modelURL = new URL( sourceRegion.asset, `${base}/` );
+							modelURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
+							modelURL.searchParams.set( 'payload', 'visual' );
+							modelURL.searchParams.set( 'mesh', modelAsset.componentPath );
+							modelURL.searchParams.set( 'lod', String( modelAsset.lodIndex ) );
+							this.regionAssets.set( modelAsset.assetId, modelURL.href );
+						}
+						if ( ! this.manifest.assets.some( asset => asset.id === modelAsset.assetId ) ) this.manifest.assets.push( { id: modelAsset.assetId, bytes: 0, kind: 'glb', priority } );
+					}
+				}
+			} else {
+				if ( explicitStartupCellKeys.has( cellKey ) ) this.explicitStartupCellVisualObjectIDs.add( visualObjectId );
+				this.regionAssets.set( visualAssetId, visualURL.href );
+				this.manifest.assets.push( { id: visualAssetId, bytes: 0, kind: 'model/gltf-binary', priority } );
+				this.manifest.objects.push( {
 					id: visualObjectId, label: `${sourceRegion.label} visual cell ${cellKey}`, kind: 'asset-instance', assetId: visualAssetId,
-					transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority: isStartupCell ? 'visible' : 'background',
+					transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority,
 					streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters }, regionCell: true,
-				},
-			);
+				} );
+			}
 		}
 	}
 
@@ -417,7 +469,8 @@ export class LocalRegionConnector {
 			return bytes;
 		}
 		const assetURL = this.regionAssets.get( assetId );
-		requireValue( this.manifest && assetURL, 'Local region asset was not declared by the provider' );
+		const syntheticAssetLoader = this.syntheticAssetLoaders.get( assetId );
+		requireValue( this.manifest && ( assetURL || syntheticAssetLoader ), 'Local region asset was not declared by the provider' );
 		const startedAt = performance.now();
 		const phaseMs = {};
 		let phaseStartedAt = performance.now();
@@ -432,6 +485,16 @@ export class LocalRegionConnector {
 			phaseMs.collisionCoverage = performance.now() - phaseStartedAt;
 			if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache hit:', JSON.stringify( { assetId, bytes: diskBytes.byteLength, elapsedMs: performance.now() - startedAt, phaseMs } ) );
 			return this.#cacheAsset( assetId, diskBytes );
+		}
+		if ( syntheticAssetLoader ) {
+			const bytes = await syntheticAssetLoader( signal );
+			requireValue( bytes instanceof Uint8Array && bytes.byteLength > 0 && bytes.byteLength <= MAX_STATIC_MODEL_INSTANCE_SET_BYTES, 'Generated local static-model descriptor exceeds its size limit' );
+			const digest = await this.#digestSHA256( bytes );
+			try { await this.diskCache?.put( assetId, bytes, digest ); } catch ( error ) {
+				if ( this.regionDiagnostics ) console.warn( 'ElseMesh local static-model descriptor disk-cache write failed:', error );
+			}
+			if ( this.regionDiagnostics ) console.info( 'ElseMesh local static-model descriptor generated:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: performance.now() - startedAt } ) );
+			return this.#cacheAsset( assetId, bytes );
 		}
 		const bytes = await this.#withRegionLease( assetURL, signal, async ( response, leaseSignal ) => {
 			if ( response.status === 404 ) {
@@ -750,8 +813,12 @@ export class LocalRegionConnector {
 		requireValue( onAsset === undefined || typeof onAsset === 'function', 'Local region asset callback must be a function' );
 		requireValue( typeof retainAssets === 'boolean', 'Local region retention option must be a boolean' );
 		requireValue( retainAssetIDs instanceof Set, 'Local region retained asset IDs must be a Set' );
-		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...this.regionAssets.keys() ];
+		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...new Set( [
+			...( this.manifest.objects || [] ).map( object => object.assetId ).filter( Boolean ),
+			...( this.manifest.components || [] ).flatMap( worldComponentAssetIDs ),
+		] ) ];
 		const selectedSet = new Set( selected );
+		const assetKinds = new Map( this.manifest.assets.map( asset => [ asset.id, asset.kind ] ) );
 		const originalOrder = new Map( selected.map( ( assetId, index ) => [ assetId, index ] ) );
 		const distanceByAsset = new Map();
 		if ( position !== undefined ) {
@@ -771,7 +838,9 @@ export class LocalRegionConnector {
 		);
 		const loaded = new Map();
 		for ( const [ index, assetId ] of selected.entries() ) {
-			const progressive = this.collisionAssetIDs.has( assetId ) ? null : await fetchGLBWithCoarseKTX2( this, assetId, { signal } );
+			const kind = assetKinds.get( assetId );
+			const isGLB = kind === 'glb' || kind === 'model/gltf-binary';
+			const progressive = this.collisionAssetIDs.has( assetId ) || ! isGLB ? null : await fetchGLBWithCoarseKTX2( this, assetId, { signal } );
 			const bytes = progressive?.bytes || await this.getAsset( assetId, { signal } );
 			const retain = retainAssets || retainAssetIDs.has( assetId );
 			const installStartedAt = performance.now();
