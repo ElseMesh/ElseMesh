@@ -47,7 +47,6 @@ try {
 	assert.ok( cache, 'OPFS cache opens when storage APIs are available' );
 	assert.equal( await cache.put( 'cell-1:visual', bytes, digest ), true );
 	assert.deepEqual( await cache.get( 'cell-1:visual' ), bytes );
-
 	const changedRevision = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-2' } );
 	assert.equal( await changedRevision.get( 'cell-1:visual' ), null, 'source revisions do not share cached bytes' );
 
@@ -78,6 +77,14 @@ try {
 	assert.deepEqual( await cache.get( 'lru-a' ), smallAsset, 'the recently used entry remains in the cache' );
 	assert.equal( await cache.get( 'lru-b' ), null, 'the least recently used entry is evicted to meet the quota-derived budget' );
 	assert.deepEqual( await cache.get( 'lru-c' ), smallAsset );
+	quota = 4 * 1024 ** 3;
+	baseUsage = 0;
+	cache.nextEstimateAt = 0;
+	const sourceTexture = new TextEncoder().encode( 'source-identified texture bytes' );
+	assert.equal( await cache.put( 'source:fixture-texture', sourceTexture, null ), true );
+	assert.deepEqual( await cache.get( 'source:fixture-texture' ), sourceTexture, 'source-identified texture ranges can be cached without a payload digest' );
+	const sourceTextureID = Buffer.from( await crypto.subtle.digest( 'SHA-256', new TextEncoder().encode( 'elsemesh:hogwarts\0revision-1\0source:fixture-texture' ) ) ).toString( 'hex' );
+	assert.equal( JSON.parse( new TextDecoder().decode( files.get( `${sourceTextureID}.meta` ) ) ).digest, null, 'opaque texture cache entries omit payload digest metadata' );
 	console.log( 'local region disk cache tests passed' );
 } finally {
 	if ( originalNavigator ) Object.defineProperty( globalThis, 'navigator', originalNavigator );

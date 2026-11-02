@@ -80,7 +80,7 @@ export class LocalRegionDiskCache {
 			try {
 				const handle = await this.directory.getFileHandle( name );
 				const metadata = JSON.parse( await ( await handle.getFile() ).text() );
-				if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || ! DIGEST.test( metadata.digest || '' ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
+				if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
 				const data = await this.directory.getFileHandle( `${id}.bin` );
 				if ( ( await data.getFile() ).size !== metadata.bytes ) throw new Error( 'Local region cache entry length changed' );
 				this.entries.set( id, metadata );
@@ -119,7 +119,7 @@ export class LocalRegionDiskCache {
 		try {
 			const metaHandle = await this.directory.getFileHandle( `${id}.meta` );
 			metadata = JSON.parse( await ( await metaHandle.getFile() ).text() );
-			if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || ! DIGEST.test( metadata.digest || '' ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
+			if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
 		} catch ( error ) {
 			if ( error?.name !== 'NotFoundError' ) this.onError( error );
 			await this.#removeEntry( id );
@@ -128,7 +128,7 @@ export class LocalRegionDiskCache {
 		try {
 			const handle = await this.directory.getFileHandle( `${id}.bin` );
 			const bytes = new Uint8Array( await ( await handle.getFile() ).arrayBuffer() );
-			if ( bytes.byteLength !== metadata.bytes || await sha256Hex( bytes ) !== metadata.digest ) throw new Error( 'Local region cache digest mismatch' );
+			if ( bytes.byteLength !== metadata.bytes || metadata.digest !== null && await sha256Hex( bytes ) !== metadata.digest ) throw new Error( 'Local region cache digest mismatch' );
 			metadata.lastUsed = this.#nextLastUsed( metadata.lastUsed );
 			try { await this.#writeMetadata( metadata ); } catch ( error ) { this.onError( error ); }
 			const indexed = this.entries.get( id );
@@ -158,7 +158,7 @@ export class LocalRegionDiskCache {
 				try {
 					const handle = await this.directory.getFileHandle( `${id}.meta` );
 					metadata = JSON.parse( await ( await handle.getFile() ).text() );
-					if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || ! DIGEST.test( metadata.digest || '' ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
+					if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
 					metadata.lastUsed = this.#nextLastUsed( metadata.lastUsed );
 					await this.#writeMetadata( metadata );
 					this.entries.set( id, metadata );
@@ -176,7 +176,7 @@ export class LocalRegionDiskCache {
 	}
 
 	async put( assetId, bytes, digest ) {
-		if ( bytes.byteLength > MAX_CACHE_BYTES || ! DIGEST.test( digest || '' ) ) return false;
+		if ( bytes.byteLength > MAX_CACHE_BYTES || !( digest === null || DIGEST.test( digest || '' ) ) ) return false;
 		await this.ready;
 		return this.#exclusive( async () => {
 			const id = await this.#idFor( assetId );

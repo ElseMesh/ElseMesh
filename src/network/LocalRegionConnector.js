@@ -17,6 +17,16 @@ const REGION_LEASE_RENEW_MS = 10000;
 // Provisional render-prefetch radius; tune it from streamed-cell latency and cache telemetry.
 const LOCAL_REGION_PREFETCH_RADIUS_CELLS = 4;
 const EMPTY_GLB = createEmptyGlb();
+const EXTERNAL_TEXTURE_ID = /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/;
+const LOCAL_REGION_ETAG = /^\"(?:sha256-[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})\"$/;
+
+function isSourceTextureID( assetId ) {
+	return typeof assetId === 'string' && assetId.startsWith( 'source:' );
+}
+
+function textureAssetETag( assetId ) {
+	return isSourceTextureID( assetId ) ? `"${assetId}"` : null;
+}
 
 function createEmptyGlb() {
 	const json = new TextEncoder().encode( JSON.stringify( { asset: { version: '2.0' }, scene: 0, scenes: [ { nodes: [] } ], nodes: [] } ) );
@@ -46,7 +56,7 @@ function externalTextureAssetIDs( bytes ) {
 	let document;
 	try { document = JSON.parse( new TextDecoder().decode( bytes.subarray( 20, 20 + jsonLength ) ) ); } catch { return []; }
 	return [ ...new Set( ( document.images || [] ).map( image => image.extensions?.EXT_elsemesh_asset_reference?.assetId )
-		.filter( assetId => typeof assetId === 'string' && /^sha256:[0-9a-f]{64}$/.test( assetId ) ) ) ];
+		.filter( assetId => typeof assetId === 'string' && EXTERNAL_TEXTURE_ID.test( assetId ) ) ) ];
 }
 
 function localRegionCacheBudgetBytes() {
@@ -528,11 +538,17 @@ export class LocalRegionConnector {
 			phaseMs.responseBodyRead = performance.now() - bodyStartedAt;
 			abortIfNeeded( leaseSignal );
 			requireValue( bytes.byteLength === declaredLength && bytes.byteLength <= MAX_LOCAL_REGION_BYTES, 'Local region length is invalid' );
-			const digestStartedAt = performance.now();
-			const digest = await crypto.subtle.digest( 'SHA-256', bytes );
-			phaseMs.responseDigest = performance.now() - digestStartedAt;
-			const digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
-			requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
+			let digestHex = null;
+			const sourceETag = textureAssetETag( assetId );
+			if ( sourceETag ) {
+				requireValue( response.headers.get( 'ETag' ) === sourceETag, 'Local texture ETag does not match its source-derived asset id' );
+			} else {
+				const digestStartedAt = performance.now();
+				const digest = await crypto.subtle.digest( 'SHA-256', bytes );
+				phaseMs.responseDigest = performance.now() - digestStartedAt;
+				digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
+				requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
+			}
 			this.#registerExternalTextureAssets( assetId, bytes );
 			phaseStartedAt = performance.now();
 			this.#updateCollisionCoverage( assetId, bytes );
@@ -559,7 +575,7 @@ export class LocalRegionConnector {
 	}
 
 	registerExternalTextureAsset( parentAssetId, textureAssetId ) {
-		requireValue( /^sha256:[0-9a-f]{64}$/.test( textureAssetId || '' ), 'External texture asset id is invalid' );
+		requireValue( EXTERNAL_TEXTURE_ID.test( textureAssetId || '' ), 'External texture asset id is invalid' );
 		const parentAssetURL = this.regionAssets.get( parentAssetId );
 		requireValue( parentAssetURL, 'External texture source asset was not declared by the provider' );
 		const textureURL = new URL( parentAssetURL, this.localProvider );
@@ -576,7 +592,7 @@ export class LocalRegionConnector {
 		abortIfNeeded( signal );
 		requireValue( this.manifest && this.regionAssets.has( assetId ), 'Local region asset was not declared by the provider' );
 		requireValue( Number.isSafeInteger( start ) && start >= 0 && Number.isSafeInteger( end ) && end >= start && end - start + 1 <= MAX_LOCAL_REGION_BYTES, 'Local region byte range is invalid' );
-		if ( etag !== undefined ) requireValue( /^\"sha256-[0-9a-f]{64}\"$/.test( etag ), 'Local region range ETag is invalid' );
+		if ( etag !== undefined ) requireValue( LOCAL_REGION_ETAG.test( etag ), 'Local region range ETag is invalid' );
 		if ( sha256 !== undefined ) requireValue( /^[0-9a-f]{64}$/.test( sha256 ), 'Local region range digest is invalid' );
 		if ( totalLength !== undefined ) requireValue( Number.isSafeInteger( totalLength ) && totalLength > end, 'Local region range total length is invalid' );
 		const rangeKey = `${assetId}\n${etag || ''}\n${start}-${end}`;
@@ -607,8 +623,11 @@ export class LocalRegionConnector {
 			this.assets.delete( assetId );
 			this.assets.set( assetId, fullAsset );
 			void this.diskCache?.touch( assetId );
-			const digest = new Uint8Array( await crypto.subtle.digest( 'SHA-256', fullAsset ) );
-			const fullETag = `"sha256-${[ ...digest ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' )}"`;
+			let fullETag = textureAssetETag( assetId );
+			if ( ! fullETag ) {
+				const digest = new Uint8Array( await crypto.subtle.digest( 'SHA-256', fullAsset ) );
+				fullETag = `"sha256-${[ ...digest ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' )}"`;
+			}
 			requireValue( etag === undefined || etag === fullETag, 'Cached local region asset changed since its range metadata was read' );
 			requireValue( start < fullAsset.byteLength, 'Local region byte range starts beyond the cached asset' );
 			const rangeEnd = Math.min( end, fullAsset.byteLength - 1 );
@@ -616,7 +635,7 @@ export class LocalRegionConnector {
 			if ( sha256 ) requireValue( await this.#matchesSHA256( result.bytes, sha256 ), 'Cached local region range does not match its digest' );
 			this.#cacheAssetRange( rangeKey, result, assetId );
 			if ( diskKey && totalLength !== undefined && rangeEnd === end ) {
-				try { await this.diskCache?.put( diskKey, result.bytes, await this.#digestSHA256( result.bytes ) ); } catch ( error ) {
+				try { await this.diskCache?.put( diskKey, result.bytes, await this.#rangeCacheDigest( assetId, result.bytes ) ); } catch ( error ) {
 					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
 				}
 			}
@@ -626,7 +645,7 @@ export class LocalRegionConnector {
 		return this.#withRegionLease( assetURL, signal, async ( response, leaseSignal ) => {
 			if ( response.status !== 206 ) throw new Error( `Local region byte-range request returned HTTP ${response.status}; restart from fresh range metadata` );
 			const returnedETag = response.headers.get( 'ETag' );
-			requireValue( /^\"sha256-[0-9a-f]{64}\"$/.test( returnedETag || '' ) && ( etag === undefined || returnedETag === etag ), 'Local region byte-range ETag is missing or changed' );
+			requireValue( LOCAL_REGION_ETAG.test( returnedETag || '' ) && ( etag === undefined || returnedETag === etag ), 'Local region byte-range ETag is missing or changed' );
 			const contentRange = response.headers.get( 'Content-Range' )?.match( /^bytes (\d+)-(\d+)\/(\d+)$/ );
 			requireValue( contentRange, 'Local region byte-range response has no valid Content-Range' );
 			const rangeStart = Number( contentRange[ 1 ] ), rangeEnd = Number( contentRange[ 2 ] ), returnedTotalLength = Number( contentRange[ 3 ] );
@@ -641,7 +660,7 @@ export class LocalRegionConnector {
 			this.#cacheAssetRange( rangeKey, result, assetId );
 			if ( diskKey && rangeStart === start && rangeEnd === end ) {
 				try {
-					await this.diskCache?.put( diskKey, bytes, await this.#digestSHA256( bytes ) );
+					await this.diskCache?.put( diskKey, bytes, await this.#rangeCacheDigest( assetId, bytes ) );
 				} catch ( error ) {
 					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
 				}
@@ -654,7 +673,7 @@ export class LocalRegionConnector {
 		abortIfNeeded( signal );
 		requireValue( this.manifest && this.regionAssets.has( assetId ), 'Local region asset was not declared by the provider' );
 		requireValue( Array.isArray( ranges ) && ranges.length >= 1 && ranges.length <= 64 && ranges.every( range => Number.isSafeInteger( range?.start ) && range.start >= 0 && Number.isSafeInteger( range?.end ) && range.end >= range.start && range.end - range.start + 1 <= MAX_LOCAL_REGION_BYTES ), 'Local region byte-range set is invalid' );
-		if ( etag !== undefined ) requireValue( /^"sha256-[0-9a-f]{64}"$/.test( etag ), 'Local region range ETag is invalid' );
+		if ( etag !== undefined ) requireValue( LOCAL_REGION_ETAG.test( etag ), 'Local region range ETag is invalid' );
 		if ( totalLength !== undefined ) requireValue( Number.isSafeInteger( totalLength ) && ranges.every( range => range.end < totalLength ), 'Local region range total length is invalid' );
 		const requested = ranges.map( ( range, index ) => ( { ...range, index } ) ).sort( ( a, b ) => a.start - b.start || a.end - b.end );
 		for ( let index = 1; index < requested.length; index ++ ) requireValue( requested[ index ].start > requested[ index - 1 ].end, 'Local region byte ranges overlap' );
@@ -696,7 +715,7 @@ export class LocalRegionConnector {
 		return this.#withRegionLease( assetURL, signal, async response => {
 			if ( response.status !== 206 ) throw new Error( `Local region multi-range request returned HTTP ${response.status}; restart from fresh range metadata` );
 			const returnedETag = response.headers.get( 'ETag' );
-			requireValue( /^"sha256-[0-9a-f]{64}"$/.test( returnedETag || '' ) && ( etag === undefined || returnedETag === etag ), 'Local region multi-range ETag is missing or changed' );
+			requireValue( LOCAL_REGION_ETAG.test( returnedETag || '' ) && ( etag === undefined || returnedETag === etag ), 'Local region multi-range ETag is missing or changed' );
 			const parts = await parseByteRangeResponse( response );
 			for ( const part of parts ) requireValue( Number.isSafeInteger( part.totalLength ) && part.totalLength > part.end && part.bytes.byteLength === part.end - part.start + 1 && ( totalLength === undefined || totalLength === part.totalLength ), 'Local region multi-range part is invalid' );
 			for ( const range of missing ) {
@@ -707,7 +726,7 @@ export class LocalRegionConnector {
 				this.#cacheAssetRange( range.key, value, assetId );
 				results[ range.index ] = value;
 				if ( range.diskKey ) {
-					try { await this.diskCache?.put( range.diskKey, bytes, await this.#digestSHA256( bytes ) ); } catch ( error ) {
+					try { await this.diskCache?.put( range.diskKey, bytes, await this.#rangeCacheDigest( assetId, bytes ) ); } catch ( error ) {
 						if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
 					}
 				}
@@ -723,6 +742,10 @@ export class LocalRegionConnector {
 	async #digestSHA256( bytes ) {
 		const digest = new Uint8Array( await crypto.subtle.digest( 'SHA-256', bytes ) );
 		return [ ...digest ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
+	}
+
+	async #rangeCacheDigest( assetId, bytes ) {
+		return isSourceTextureID( assetId ) ? null : this.#digestSHA256( bytes );
 	}
 
 	#cacheAssetRange( key, value, assetId ) {

@@ -145,10 +145,13 @@ async function checkCache( base, mode ) {
 			const bytes = new TextEncoder().encode('Hogwarts local-region persistence check');
 			const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('');
 			if (${JSON.stringify( mode )} === 'write') {
-				return { ok: await cache.put('cell-3,4,5:visual', bytes, digest), mode: 'write' };
+				const hashed = await cache.put('cell-3,4,5:visual', bytes, digest);
+				const sourceDerived = await cache.put('source:fixture-texture', bytes, null);
+				return { ok: hashed && sourceDerived, mode: 'write' };
 			}
 			const actual = await cache.get('cell-3,4,5:visual');
-			return { ok: !!actual && actual.length === bytes.length && actual.every((value, index) => value === bytes[index]), mode: 'read' };
+			const sourceTexture = await cache.get('source:fixture-texture');
+			return { ok: !!actual && actual.length === bytes.length && actual.every((value, index) => value === bytes[index]) && !!sourceTexture && sourceTexture.length === bytes.length && sourceTexture.every((value, index) => value === bytes[index]), mode: 'read' };
 		})()` );
 	assert.equal( result.exceptionDetails, undefined, `browser ${mode} evaluation failed: ${JSON.stringify( result.exceptionDetails )}; requests=${requests.join( ',' )}` );
 	assert.deepEqual( result.result.value, { ok: true, mode }, `browser ${mode} check failed; requests=${requests.join( ',' )}` );

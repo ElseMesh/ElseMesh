@@ -7,6 +7,11 @@ const BIN_CHUNK = 0x004e4942;
 const KTX2_HEADER_BYTES = 80;
 const KTX2_LEVEL_INDEX_BYTES = 24;
 const MAX_KTX2_LEVELS = 32;
+const EXTERNAL_TEXTURE_ID = /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/;
+
+function textureAssetETag( assetId ) {
+	return assetId.startsWith( 'source:' ) ? `"${assetId}"` : `"sha256-${assetId.slice( 7 )}"`;
+}
 const MAX_RANGES_PER_REQUEST = 64;
 
 function align4( value ) { return ( value + 3 ) & ~3; }
@@ -85,7 +90,7 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		if ( image.mimeType !== 'image/ktx2' ) continue;
 		if ( ! Number.isSafeInteger( image.bufferView ) ) {
 			const assetId = image.extensions?.EXT_elsemesh_asset_reference?.assetId;
-			if ( typeof assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( assetId ) ) throw new Error( 'GLB external KTX2 image has no valid ElseMesh asset reference' );
+			if ( typeof assetId !== 'string' || ! EXTERNAL_TEXTURE_ID.test( assetId ) ) throw new Error( 'GLB external KTX2 image has no valid ElseMesh asset reference' );
 			let external = externalImages.get( assetId );
 			if ( ! external ) externalImages.set( assetId, external = { assetId, imageIndices: [] } );
 			external.imageIndices.push( imageIndex );
@@ -174,7 +179,7 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		if ( firstLevel.start !== 0 || firstLevel.end !== KTX2_HEADER_BYTES - 1 || firstLevel.bytes.byteLength !== KTX2_HEADER_BYTES
 			|| ! Number.isSafeInteger( firstLevel.totalLength ) || firstLevel.totalLength < KTX2_HEADER_BYTES || ! firstLevel.etag )
 			throw new Error( 'External KTX2 header range is incomplete' );
-		if ( firstLevel.etag !== `"sha256-${image.assetId.slice( 7 )}"` ) throw new Error( 'External KTX2 ETag does not match its content-addressed asset id' );
+		if ( firstLevel.etag !== textureAssetETag( image.assetId ) ) throw new Error( 'External KTX2 ETag does not match its asset id' );
 		const header = new DataView( firstLevel.bytes.buffer, firstLevel.bytes.byteOffset, firstLevel.bytes.byteLength );
 		const levelCount = header.getUint32( 40, true );
 		if ( levelCount < 1 || levelCount > MAX_KTX2_LEVELS ) throw new Error( 'External KTX2 level count is invalid' );

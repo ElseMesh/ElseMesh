@@ -197,7 +197,7 @@ export function parseGLB( buffer ) {
 	const images = ( json.images || [] ).map( ( im, index ) => {
 
 		const reference = im.extensions?.EXT_elsemesh_asset_reference;
-		if ( reference !== undefined && ( ! reference || typeof reference !== 'object' || Array.isArray( reference ) || Object.keys( reference ).length !== 1 || ! Object.hasOwn( reference, 'assetId' ) || ! /^sha256:[0-9a-f]{64}$/.test( reference.assetId || '' ) || im.bufferView !== undefined || im.uri !== undefined ) ) {
+		if ( reference !== undefined && ( ! reference || typeof reference !== 'object' || Array.isArray( reference ) || Object.keys( reference ).length !== 1 || ! Object.hasOwn( reference, 'assetId' ) || ! /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/.test( reference.assetId || '' ) || im.bufferView !== undefined || im.uri !== undefined ) ) {
 			throw new Error( `GLB: image ${index} has an invalid ElseMesh asset reference` );
 		}
 		if ( im.bufferView === undefined && im.uri === undefined && reference === undefined ) throw new Error( `GLB: image ${index} has no image data or asset reference` );
