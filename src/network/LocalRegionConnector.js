@@ -7,7 +7,7 @@ import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const DEFAULT_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
-const MAX_LOCAL_REGION_CACHE_BYTES = 512 * 1024 * 1024;
+const MAX_LOCAL_REGION_CACHE_BYTES = 1024 * 1024 * 1024;
 const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
 const LOCAL_REGION_CACHE_BYTES_PER_GIB = 64 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
@@ -35,9 +35,8 @@ function requireValue( value, message ) {
 }
 
 function localRegionCacheBudgetBytes() {
-	// deviceMemory is a coarse physical-memory hint, not a free-RAM measurement.
-	// deviceMemory is capped at a coarse 8 GiB bucket by browsers; cap the cache
-	// too, and preserve the current 320 MiB total when the hint is unavailable.
+	// deviceMemory is a coarse, browser-bounded physical-memory hint, not a
+	// free-RAM measurement. Preserve the current 320 MiB total when unavailable.
 	const deviceMemory = globalThis.navigator?.deviceMemory;
 	if ( ! Number.isFinite( deviceMemory ) || deviceMemory <= 0 ) return DEFAULT_LOCAL_REGION_CACHE_BYTES + DEFAULT_LOCAL_REGION_CACHE_BYTES / 4;
 	return Math.min( MAX_LOCAL_REGION_CACHE_BYTES, Math.max( MIN_LOCAL_REGION_CACHE_BYTES, Math.floor( deviceMemory * LOCAL_REGION_CACHE_BYTES_PER_GIB ) ) );
