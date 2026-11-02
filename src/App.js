@@ -617,8 +617,12 @@ export class App {
 			const initialAssetIDs = new Set( connector.manifest.objects.filter( ( object ) => initialObjectIDs.has( object.id ) && object.assetId ).map( ( object ) => object.assetId ) );
 			for ( const component of initialComponents ) for ( const id of componentAssetIDs( component ) ) initialAssetIDs.add( id );
 			for ( const extension of connector.manifest.experience?.extensions || [] ) initialAssetIDs.add( extension.assetId );
-			const visibleAssets = await connector.preload( { through: 'background', assetIDs: initialAssetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined } );
-			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext } );
+			const progressiveAssets = new Map();
+			const visibleAssets = await connector.preload( {
+				through: 'background', assetIDs: initialAssetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined,
+				onAsset: connector.localOnly ? ( assetId, _bytes, progressive ) => { if ( progressive ) progressiveAssets.set( assetId, progressive ); } : undefined,
+			} );
+			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext, progressiveAssets } );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
@@ -1514,10 +1518,10 @@ export class App {
 		if ( connector.localOnly ) {
 			preloadOptions.retainAssets = false;
 			preloadOptions.retainAssetIDs = new Set( components.flatMap( componentAssetIDs ) );
-			preloadOptions.onAsset = async ( assetId, bytes ) => {
+			preloadOptions.onAsset = async ( assetId, bytes, progressive ) => {
 				const assetObjectIDs = objectIDsByAsset.get( assetId );
 				if ( ! assetObjectIDs ) return;
-				await appendWorldPackageAssets( connector, root, new Map( [ [ assetId, bytes ] ] ), { signal: loadController.signal, objectIDs: assetObjectIDs } );
+				await appendWorldPackageAssets( connector, root, new Map( [ [ assetId, bytes ] ] ), { signal: loadController.signal, objectIDs: assetObjectIDs, progressiveAsset: progressive } );
 				if ( connector.collisionAssetIDs.has( assetId ) ) registerWorldPackageCollisions( root, this.hostedColliders, assetObjectIDs );
 			};
 		}

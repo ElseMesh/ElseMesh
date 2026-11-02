@@ -152,6 +152,8 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 			etag: first.etag,
 			headerAndIndex: image.headerAndIndex,
 			sections,
+			baseWidth: new DataView( image.headerAndIndex.buffer, image.headerAndIndex.byteOffset, image.headerAndIndex.byteLength ).getUint32( 20, true ),
+			baseHeight: new DataView( image.headerAndIndex.buffer, image.headerAndIndex.byteOffset, image.headerAndIndex.byteLength ).getUint32( 24, true ),
 			levelCount: image.plan.levelCount,
 			levelIndex: image.levelIndex - 1,
 		} );
@@ -168,8 +170,9 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 }
 
 /** Fetch the next finer indexed mip for every KTX2 image in a coarse GLB. */
-export async function fetchNextGLBTextureLevels( connector, assetId, progressive, { signal } = {} ) {
-	const images = ( progressive?.textures || [] ).filter( image => image.levelIndex >= 0 );
+export async function fetchNextGLBTextureLevels( connector, assetId, progressive, { signal, imageIndices = null } = {} ) {
+	const wanted = imageIndices && new Set( imageIndices );
+	const images = ( progressive?.textures || [] ).filter( image => image.levelIndex >= 0 && ( ! wanted || image.imageIndices.some( index => wanted.has( index ) ) ) );
 	if ( images.length === 0 ) return [];
 	const levels = await fetchKTX2LevelsFromIndex( connector, assetId, images, { signal } );
 	for ( const level of levels ) {

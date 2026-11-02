@@ -103,9 +103,15 @@ server-validated reachable traversal frontier constrain which assets may be
 requested; predicted arrival may raise priority for reachable assets outside the
 current view. Under a bandwidth or memory budget, defer lower-value refinements
 while preserving a usable coarse level. KTX2 supplies independently indexed mip
-payloads, but does not itself choose network request priorities. This selection
-policy is the engine target; post-entry Hogwarts mip upgrades and their live
-budgeted scheduler are not yet integrated.
+payloads, but does not itself choose network request priorities. The current
+engine scheduler estimates texture demand from projected object bounds and
+texture dimensions, then prioritizes the visible mip range by projected screen
+area per indexed payload byte. This is a proxy: it does not yet derive exact UV
+texel footprints or include measured network latency in its score. The loader
+fetches one next-finer mip at a time and keeps the coarse GPU texture usable
+while replacing its resident mip window. The live provider wire path,
+memory-pressure eviction, and latency-aware scheduling still need validation
+and refinement.
 
 ## Verification gates
 

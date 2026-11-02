@@ -226,9 +226,9 @@ function identities( n ) {
 }
 
 // Decoded RGBA8 pixels (top row first) of an embedded image.
-export async function decodeImage( bytes, mimeType ) {
+export async function decodeImage( bytes, mimeType, options = undefined ) {
 
-	if ( mimeType === 'image/ktx2' ) return decodeKTX2( bytes );
+	if ( mimeType === 'image/ktx2' ) return decodeKTX2( bytes, options );
 	if ( globalThis.__assetImage ) return globalThis.__assetImage( bytes, mimeType );
 	const bmp = await createImageBitmap( new Blob( [ bytes ], { type: mimeType } ), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' } );
 	const cv = new OffscreenCanvas( bmp.width, bmp.height );

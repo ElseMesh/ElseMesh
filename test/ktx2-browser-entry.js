@@ -2,7 +2,8 @@ import { canUploadBCTexture, decodeKTX2 } from '../src/engine/loaders/KTX2.js';
 import { fetchKTX2Level } from '../src/engine/loaders/KTX2Range.js';
 import { fetchGLBWithCoarseKTX2, fetchNextGLBTextureLevels } from '../src/engine/loaders/GLBRange.js';
 import { GPU } from '../src/engine/webgpu.js';
-import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
+import { disposeWorldPackage, loadWorldPackage, updateWorldPackageLOD } from '../src/network/WorldPackage.js';
+import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 
 const result = document.querySelector( '#result' );
 
@@ -75,6 +76,7 @@ try {
 	};
 	const coarseGLB = await fetchGLBWithCoarseKTX2( rangedGLBConnector, 'fixture-glb' );
 	if ( ! coarseGLB || coarseGLB.bytes.byteLength >= sourceGLB.byteLength ) throw new Error( 'coarse GLB range assembly did not reduce the texture payload' );
+	const coarseProgressiveState = structuredClone( coarseGLB );
 	const coarseJSONLength = new DataView( coarseGLB.bytes.buffer, coarseGLB.bytes.byteOffset, coarseGLB.bytes.byteLength ).getUint32( 12, true );
 	const coarseBinStart = 28 + coarseJSONLength;
 	const coarseJSON = JSON.parse( new TextDecoder().decode( coarseGLB.bytes.subarray( 20, 20 + coarseJSONLength ) ) );
@@ -109,6 +111,7 @@ try {
 		if ( ! image.mipmaps?.length ) throw new Error( 'compressed texture has no mip levels' );
 		const device = GPU.device;
 		device.pushErrorScope( 'validation' );
+		let validationError;
 		const connector = {
 			worldId: 'elsemesh:ktx2-webgpu-test',
 			manifest: { assets: [], portals: [], objects: [ { id: 'fixture', kind: 'asset-instance', assetId: 'fixture', transform: { position: [ 0, 0, 0 ] }, scale: [ 1, 1, 1 ] } ] },
@@ -118,14 +121,38 @@ try {
 		root.traverse( node => { if ( node.isMesh ) texture = node.material.bindings.worldAlbedo?.texture; } );
 		if ( texture?.format !== image.format ) throw new Error( `WorldPackage did not retain the decoded BC7 format (${texture?.format})` );
 		if ( texture?.mipLevelCount !== image.mipmaps.length ) throw new Error( `WorldPackage created ${texture?.mipLevelCount} mip levels; expected ${image.mipmaps.length}` );
-		const coarseRoot = await loadWorldPackage( connector, { assets: new Map( [ [ 'fixture', coarseGLB.bytes ] ] ) } );
+		const progressiveConnector = {
+			...rangedGLBConnector,
+			worldId: connector.worldId,
+			manifest: { ...connector.manifest, objects: [ { ...connector.manifest.objects[ 0 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } } ] },
+		};
+		const coarseRoot = await loadWorldPackage( progressiveConnector, {
+			assets: new Map( [ [ 'fixture', coarseGLB.bytes ] ] ),
+			progressiveAssets: new Map( [ [ 'fixture', coarseProgressiveState ] ] ),
+		} );
 		let coarseTexture;
 		coarseRoot.traverse( node => { if ( node.isMesh ) coarseTexture = node.material.bindings.worldAlbedo?.texture; } );
-		const coarseFormatMatches = coarseImage.format ? coarseTexture?.format === coarseImage.format : coarseTexture?.format?.startsWith( 'rgba8' );
+		const coarseFormatMatches = coarseTexture?.format?.startsWith( 'rgba8' );
 		if ( ! coarseFormatMatches || coarseTexture?.mipLevelCount !== 1 ) throw new Error( `WorldPackage did not install the coarse single-level texture (format ${coarseTexture?.format || 'missing'} vs ${coarseImage.format || 'rgba8'}, levels ${coarseTexture?.mipLevelCount})` );
+		const camera = new PerspectiveCamera( 62, 1, 0.1, 100 );
+		camera.position.set( 0, 0, 3 ); camera.updateProjectionMatrix(); camera.updateMatrixWorld( true );
+		const progressiveTarget = coarseRoot.userData.worldPackage.progressiveTextureTargets.get( 'fixture:0' );
+		if ( ! progressiveTarget ) throw new Error( 'WorldPackage did not retain the coarse image source for progressive upgrades' );
+		camera.position.set( 0, 0, 1000 ); camera.updateMatrixWorld( true );
+		for ( let attempt = 0; attempt < 100 && progressiveTarget.levels.size < 2; attempt ++ ) {
+			updateWorldPackageLOD( coarseRoot, camera );
+			await new Promise( resolve => setTimeout( resolve, 5 ) );
+		}
+		if ( progressiveTarget.levels.size !== 2 || progressiveTarget.nextLevelIndex !== 2 ) throw new Error( `distant screen-space demand should stop after two coarse levels (resident ${progressiveTarget.levels.size}, next ${progressiveTarget.nextLevelIndex})` );
+		camera.position.set( 0, 0, 3 ); camera.updateMatrixWorld( true );
+		for ( let attempt = 0; attempt < 100 && progressiveTarget.nextLevelIndex >= 0; attempt ++ ) {
+			updateWorldPackageLOD( coarseRoot, camera );
+			await new Promise( resolve => setTimeout( resolve, 5 ) );
+		}
+		if ( progressiveTarget.nextLevelIndex >= 0 || coarseTexture.width !== 16 || coarseTexture.height !== 16 || coarseTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `screen-space texture streaming did not install all required levels (${coarseTexture.width}x${coarseTexture.height}, ${coarseTexture.mipLevelCount} mips, next ${progressiveTarget.nextLevelIndex})` );
 		await GPU.queue.onSubmittedWorkDone();
-		let validationError = await device.popErrorScope();
-		if ( validationError ) throw new Error( `WebGPU rejected BC7 texture creation/upload: ${validationError.message}` );
+		validationError = await device.popErrorScope();
+		if ( validationError ) throw new Error( `WebGPU rejected texture creation/upload: ${validationError.message}` );
 		disposeWorldPackage( coarseRoot );
 		disposeWorldPackage( root );
 	} else {

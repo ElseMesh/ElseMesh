@@ -29,10 +29,10 @@ export function canUploadBCTexture( width, height ) {
 	return width >= 4 && height >= 4 && width % 4 === 0 && height % 4 === 0;
 }
 
-export async function decodeKTX2( bytes ) {
-	if ( globalThis.__assetKTX2 ) return globalThis.__assetKTX2( bytes );
+export async function decodeKTX2( bytes, { forceRGBA = false } = {} ) {
+	if ( globalThis.__assetKTX2 ) return globalThis.__assetKTX2( bytes, { forceRGBA } );
 
-	const supportsBC = GPU.features.has( 'texture-compression-bc' );
+	const supportsBC = GPU.features.has( 'texture-compression-bc' ) && ! forceRGBA;
 	if ( ! webGPUDecoder || webGPUDecoderSupportsBC !== supportsBC ) {
 
 		webGPUDecoderSupportsBC = supportsBC;

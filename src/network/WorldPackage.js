@@ -10,6 +10,7 @@ import { BoxGeometry } from '../engine/geometry/PrimitiveGeometries.js';
 import { BufferAttribute } from '../engine/geometry/BufferAttribute.js';
 import { BufferGeometry } from '../engine/geometry/BufferGeometry.js';
 import { parseGLB, decodeImage } from '../engine/loaders/GLTF.js';
+import { canUploadBCTexture } from '../engine/loaders/KTX2.js';
 import { Texture, generateMipmaps } from '../engine/webgpu.js';
 import { Color } from '../engine/math/Color.js';
 import { LinearSRGBColorSpace } from '../engine/constants.js';
@@ -22,6 +23,8 @@ import { Vector2 } from '../engine/math/Vector2.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { worldMaterialRole } from './WorldMaterialProfileRegistry.js';
 import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
+import { fetchNextGLBTextureLevels } from '../engine/loaders/GLBRange.js';
+import { transformBoundsCenter } from './WorldStreaming.js';
 
 const COMPONENTS = Object.freeze( {
 	POSITION: [ 'position', 3 ],
@@ -37,13 +40,13 @@ const PORTAL_FRAME_STYLES = Object.freeze( {
 	metal: { color: 0x56636a, roughness: 0.42, metalness: 0.72 },
 } );
 
-export async function loadWorldPackage( connector, { signal, assets: preloadedAssets, objectIDs, materialContext } = {} ) {
+export async function loadWorldPackage( connector, { signal, assets: preloadedAssets, objectIDs, materialContext, progressiveAssets } = {} ) {
 
 	if ( ! connector.manifest ) throw new Error( 'Load and verify a world manifest first' );
 	const assets = preloadedAssets || await connector.preload();
 	const root = new Group();
 	root.name = `world:${connector.worldId}`;
-	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map() };
+	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map(), progressiveAssets: new Map( progressiveAssets || [] ), progressiveTextureTargets: new Map(), progressiveTextureJobs: new Map(), progressiveController: new AbortController() };
 	try {
 		await appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } );
 		return root;
@@ -54,10 +57,14 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 
 }
 
-export async function appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } = {} ) {
+export async function appendWorldPackageAssets( connector, root, assets, { signal, objectIDs, progressiveAsset = null } = {} ) {
 
 	const state = root.userData.worldPackage || ( root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), textureAssets: new Map() } );
 	state.textureAssets ||= new Map();
+	state.progressiveAssets ||= new Map();
+	state.progressiveTextureTargets ||= new Map();
+	state.progressiveTextureJobs ||= new Map();
+	state.progressiveController ||= new AbortController();
 	await prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs );
 	if ( ! state.portalFramesBuilt ) {
 		addPortalFrames( root, connector.manifest.portals || [] );
@@ -87,14 +94,16 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 		}
 		const bytes = assets.get( object.assetId );
 		if ( ! bytes ) continue;
+		if ( progressiveAsset ) state.progressiveAssets.set( object.assetId, progressiveAsset );
 		let gltf = state.parsed.get( object.assetId );
 		if ( ! gltf ) {
-			gltf = await buildGLTF( parseGLB( bytes ), state, signal );
+			gltf = await buildGLTF( parseGLB( bytes ), state, signal, object.assetId );
 			state.parsed.set( object.assetId, gltf );
 		}
 		const instance = cloneScene( gltf );
 		instance.name = object.label || object.id;
 		instance.userData.worldObjectId = object.id;
+		instance.userData.worldAssetId = object.assetId;
 		if ( state.replacedByComponents?.has( object.id ) ) instance.visible = false;
 		const t = object.transform || {};
 		instance.position.set( ...( t.position || [ 0, 0, 0 ] ) );
@@ -160,6 +169,95 @@ async function prepareWorldPackageMaterialAdapters( connector, root, signal, obj
 
 export function updateWorldPackageLOD( root, camera, loadBias = 0, now = performance.now() ) {
 	for ( const controller of root?.userData?.worldPackage?.lodControllers?.values() || [] ) controller.update( camera, now, loadBias );
+	updateWorldPackageTextureLOD( root, camera );
+}
+
+function updateWorldPackageTextureLOD( root, camera ) {
+	const state = root?.userData?.worldPackage;
+	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
+	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
+	const requests = [];
+	for ( const [ assetId, progressive ] of state.progressiveAssets ) {
+		const targets = [ ...state.progressiveTextureTargets.values() ].filter( target => target.assetId === assetId && target.nextLevelIndex >= 0 );
+		if ( ! targets.length || state.progressiveTextureJobs.has( assetId ) ) continue;
+		const objects = state.connector.manifest.objects.filter( object => object.assetId === assetId && object.streamingBounds?.center );
+		let screenFraction = 0;
+		for ( const object of objects ) {
+			const fraction = projectedBoundsScreenFraction( object, camera );
+			if ( fraction !== null ) screenFraction = Math.max( screenFraction, fraction );
+		}
+		if ( ! screenFraction ) continue;
+		const eligible = targets.filter( target => {
+			const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 );
+			const textureDiameter = Math.max( target.baseWidth, target.baseHeight );
+			const desiredLevel = Math.min( target.levelCount - 1, Math.max( 0, Math.floor( Math.log2( textureDiameter / pixelDiameter ) ) ) );
+			return desiredLevel <= target.nextLevelIndex;
+		} );
+		const imageIndices = eligible.map( target => target.imageIndex );
+		const bytes = eligible.reduce( ( total, target ) => {
+			const offset = 80 + target.nextLevelIndex * 24;
+			return total + Number( new DataView( target.headerAndIndex.buffer, target.headerAndIndex.byteOffset, target.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
+		}, 0 );
+		if ( imageIndices.length ) requests.push( { assetId, progressive, imageIndices, priority: screenFraction * screenFraction / Math.max( 1, bytes ) } );
+	}
+	requests.sort( ( a, b ) => b.priority - a.priority );
+	if ( ! requests.length ) return;
+	state.textureLODQueue ||= new LODLoadQueue( 1 );
+	for ( const request of requests ) {
+		state.progressiveTextureJobs.set( request.assetId, true );
+		state.textureLODQueue.run( state.progressiveController.signal, async () => {
+			const levels = await fetchNextGLBTextureLevels( state.connector, request.assetId, request.progressive, { imageIndices: request.imageIndices, signal: state.progressiveController.signal } );
+			for ( const level of levels ) for ( const imageIndex of level.imageIndices ) {
+				if ( state.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
+				const target = state.progressiveTextureTargets.get( `${ request.assetId }:${ imageIndex }` );
+				if ( target ) await installProgressiveTextureLevel( target, level );
+			}
+		} ).catch( error => {
+			for ( const image of request.progressive.textures ) if ( image.imageIndices.some( index => request.imageIndices.includes( index ) ) ) {
+				const target = state.progressiveTextureTargets.get( `${ request.assetId }:${ image.imageIndices.find( index => request.imageIndices.includes( index ) ) }` );
+				if ( target ) image.levelIndex = target.nextLevelIndex;
+			}
+			if ( error?.name !== 'AbortError' && ! state.disposed ) console.warn( 'World texture mip upgrade failed', request.assetId, error );
+		} ).finally( () => state.progressiveTextureJobs.delete( request.assetId ) );
+	}
+}
+
+const _textureBoundsCenter = new Vector3();
+const _textureViewCenter = new Vector3();
+
+function projectedBoundsScreenFraction( object, camera ) {
+	if ( ! object.transform?.position ) return null;
+	transformBoundsCenter( object, object.streamingBounds.center, _textureBoundsCenter );
+	const radius = object.streamingBounds.radius * Math.max( ...( object.scale || [ 1, 1, 1 ] ) );
+	_textureViewCenter.copy( _textureBoundsCenter ).applyMatrix4( camera.matrixWorldInverse );
+	const depth = - _textureViewCenter.z;
+	if ( depth + radius <= 0 ) return null;
+	const projection = camera.projectionMatrix.elements;
+	const denominator = Math.sqrt( Math.max( 1e-6, depth * depth - radius * radius ) );
+	const fraction = radius * Math.abs( projection[ 5 ] ) / denominator;
+	const ndcX = _textureViewCenter.x * projection[ 0 ] / Math.max( depth, 1e-6 );
+	const ndcY = _textureViewCenter.y * projection[ 5 ] / Math.max( depth, 1e-6 );
+	const radiusX = fraction * Math.abs( projection[ 0 ] / projection[ 5 ] );
+	if ( Math.abs( ndcX ) > 1 + radiusX || Math.abs( ndcY ) > 1 + fraction ) return null;
+	return depth <= radius ? Infinity : fraction;
+}
+
+async function installProgressiveTextureLevel( target, level ) {
+	const pixels = await decodeImage( level.bytes, 'image/ktx2', { forceRGBA: target.forceRGBA } );
+	const mip = pixels.mipmaps?.[ 0 ];
+	const data = mip?.data || pixels.data;
+	const width = mip?.width || pixels.width, height = mip?.height || pixels.height;
+	if ( ! data || width !== level.width || height !== level.height || ( pixels.format || target.texture.format ) !== target.texture.format ) throw new Error( 'Decoded KTX2 mip is incompatible with its resident texture' );
+	target.levels.set( level.levelIndex, { data, width, height } );
+	target.nextLevelIndex = level.levelIndex - 1;
+	const residentIndices = [ ...target.levels.keys() ];
+	const firstLevel = Math.min( ...residentIndices ), lastLevel = Math.max( ...residentIndices );
+	const texture = target.texture;
+	texture.mipsOption = lastLevel - firstLevel + 1;
+	texture.resize( Math.max( 1, target.baseWidth >> firstLevel ), Math.max( 1, target.baseHeight >> firstLevel ) );
+	for ( const [ levelIndex, resident ] of target.levels ) texture.upload( resident.data, {
+		mip: levelIndex - firstLevel, width: resident.width, height: resident.height,
+	} );
 }
 
 function installObjectLOD( connector, root, instance, object ) {
@@ -577,6 +675,7 @@ export function disposeWorldPackage( root ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! root || state?.disposed ) return;
 	if ( state ) state.disposed = true;
+	state?.progressiveController?.abort( new DOMException( 'World unloaded', 'AbortError' ) );
 	for ( const controller of state?.lodControllers?.values() || [] ) controller.dispose();
 	const geometries = new Set(), materials = new Set(), textures = new Set();
 	const roots = [ root, ...( state?.parsed?.values?.() || [] ) ];
@@ -609,7 +708,7 @@ export function disposeWorldPackage( root ) {
 	state?.textureAssets?.clear();
 }
 
-async function buildGLTF( gltf, packageState = null, signal = undefined ) {
+async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null ) {
 
 	if ( packageState ) packageState.textureAssets ||= new Map();
 	const root = new Group();
@@ -620,6 +719,10 @@ async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 		const texture = gltf.textures[ textureInfo.index ];
 		const textureSource = texture?.extensions?.KHR_texture_basisu?.source ?? texture?.source;
 		const image = gltf.images[ textureSource ];
+		const progressiveImage = packageState?.progressiveAssets?.get( sourceAssetId )?.textures?.find( image => image.imageIndices.includes( textureSource ) );
+		const preserveBC = progressiveImage && GPU.features.has( 'texture-compression-bc' ) && Array.from( { length: progressiveImage.levelIndex + 2 }, ( _, level ) =>
+			canUploadBCTexture( Math.max( 1, progressiveImage.baseWidth >> level ), Math.max( 1, progressiveImage.baseHeight >> level ) )
+		).every( Boolean );
 		const textureKey = `${ image.assetId || textureSource }:${ format }`;
 		if ( textures.has( textureKey ) ) return textures.get( textureKey );
 
@@ -632,7 +735,7 @@ async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 					? await packageState?.connector?.getAsset( image.assetId, { signal } )
 					: null );
 				if ( ! bytes ) throw new Error( `GLB ${label} texture requires embedded image bytes or a declared ElseMesh image asset` );
-				const pixels = await decodeImage( bytes, image.mimeType );
+				const pixels = await decodeImage( bytes, image.mimeType, { forceRGBA: Boolean( progressiveImage && ! preserveBC ) } );
 				const textureFormat = pixels.format || format;
 				const decodedTexture = new Texture( {
 					label: `world-${label}-${textureSource}`,
@@ -648,6 +751,11 @@ async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 				if ( pixels.mipmaps ) {
 					for ( let mip = 1; mip < pixels.mipmaps.length; mip ++ ) decodedTexture.upload( pixels.mipmaps[ mip ].data, { mip, width: pixels.mipmaps[ mip ].width, height: pixels.mipmaps[ mip ].height } );
 				} else generateMipmaps( decodedTexture );
+				if ( progressiveImage ) entry.progressiveLevel = {
+					data: pixels.mipmaps?.[ 0 ]?.data || pixels.data,
+					width: pixels.mipmaps?.[ 0 ]?.width || pixels.width,
+					height: pixels.mipmaps?.[ 0 ]?.height || pixels.height,
+				};
 				if ( packageState?.disposed ) {
 					decodedTexture.destroy();
 					throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
@@ -662,6 +770,16 @@ async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 		}
 
 		const decodedTexture = entry.texture || await entry.promise;
+		if ( progressiveImage && ! packageState.progressiveTextureTargets.has( `${ sourceAssetId }:${ textureSource }` ) ) {
+			packageState.progressiveTextureTargets.set( `${ sourceAssetId }:${ textureSource }`, {
+				assetId: sourceAssetId, imageIndex: textureSource, texture: decodedTexture,
+				baseWidth: progressiveImage.baseWidth, baseHeight: progressiveImage.baseHeight,
+				levelCount: progressiveImage.levelCount, nextLevelIndex: progressiveImage.levelIndex,
+				headerAndIndex: progressiveImage.headerAndIndex,
+				forceRGBA: ! preserveBC,
+				levels: new Map( [ [ progressiveImage.levelIndex + 1, entry.progressiveLevel ] ] ),
+			} );
+		}
 		textures.set( textureKey, decodedTexture );
 		return decodedTexture;
 
