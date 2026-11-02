@@ -6,8 +6,10 @@ import { isWorldID } from './WorldIdentity.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
-const MAX_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
-const MAX_LOCAL_REGION_RANGE_CACHE_BYTES = 64 * 1024 * 1024;
+const DEFAULT_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
+const MAX_LOCAL_REGION_CACHE_BYTES = 512 * 1024 * 1024;
+const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
+const LOCAL_REGION_CACHE_BYTES_PER_GIB = 64 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
 // Provisional render-prefetch radius; tune it from streamed-cell latency and cache telemetry.
 const LOCAL_REGION_PREFETCH_RADIUS_CELLS = 4;
@@ -30,6 +32,15 @@ function createEmptyGlb() {
 
 function requireValue( value, message ) {
 	if ( ! value ) throw new Error( message );
+}
+
+function localRegionCacheBudgetBytes() {
+	// deviceMemory is a coarse physical-memory hint, not a free-RAM measurement.
+	// deviceMemory is capped at a coarse 8 GiB bucket by browsers; cap the cache
+	// too, and preserve the current 320 MiB total when the hint is unavailable.
+	const deviceMemory = globalThis.navigator?.deviceMemory;
+	if ( ! Number.isFinite( deviceMemory ) || deviceMemory <= 0 ) return DEFAULT_LOCAL_REGION_CACHE_BYTES + DEFAULT_LOCAL_REGION_CACHE_BYTES / 4;
+	return Math.min( MAX_LOCAL_REGION_CACHE_BYTES, Math.max( MIN_LOCAL_REGION_CACHE_BYTES, Math.floor( deviceMemory * LOCAL_REGION_CACHE_BYTES_PER_GIB ) ) );
 }
 
 function cellCoordinate( position, sizeMeters ) {
@@ -138,10 +149,13 @@ export class LocalRegionConnector {
 		this.gateway = this.localProvider;
 		this.directory = '';
 		this.providers = [];
+		const memoryCacheBudgetBytes = localRegionCacheBudgetBytes();
 		this.assets = new Map();
 		this.assetBytes = 0;
+		this.assetCacheBudgetBytes = Math.floor( memoryCacheBudgetBytes * 0.8 );
 		this.assetRanges = new Map();
 		this.assetRangeBytes = 0;
+		this.assetRangeCacheBudgetBytes = memoryCacheBudgetBytes - this.assetCacheBudgetBytes;
 		this.regionAssets = new Map();
 		this.collisionAssetIDs = new Set();
 		this.collisionObjectIDByAsset = new Map();
@@ -400,6 +414,7 @@ export class LocalRegionConnector {
 			const bytes = this.assets.get( assetId );
 			this.assets.delete( assetId );
 			this.assets.set( assetId, bytes );
+			void this.diskCache?.touch( assetId );
 			return bytes;
 		}
 		const assetURL = this.regionAssets.get( assetId );
@@ -479,6 +494,7 @@ export class LocalRegionConnector {
 		if ( cached ) {
 			this.assetRanges.delete( rangeKey );
 			this.assetRanges.set( rangeKey, cached );
+			if ( etag && totalLength !== undefined ) void this.diskCache?.touch( `${assetId}\0range\0${etag}\0${start}-${end}` );
 			if ( sha256 ) requireValue( await this.#matchesSHA256( cached.bytes, sha256 ), 'Cached local region range does not match its digest' );
 			return cached;
 		}
@@ -498,6 +514,9 @@ export class LocalRegionConnector {
 		}
 		const fullAsset = this.assets.get( assetId );
 		if ( fullAsset ) {
+			this.assets.delete( assetId );
+			this.assets.set( assetId, fullAsset );
+			void this.diskCache?.touch( assetId );
 			const digest = new Uint8Array( await crypto.subtle.digest( 'SHA-256', fullAsset ) );
 			const fullETag = `"sha256-${[ ...digest ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' )}"`;
 			requireValue( etag === undefined || etag === fullETag, 'Cached local region asset changed since its range metadata was read' );
@@ -557,6 +576,7 @@ export class LocalRegionConnector {
 			if ( cached ) {
 				this.assetRanges.delete( key );
 				this.assetRanges.set( key, cached );
+				if ( etag && totalLength !== undefined ) void this.diskCache?.touch( `${assetId}\0range\0${etag}\0${range.start}-${range.end}` );
 				results[ range.index ] = cached;
 				continue;
 			}
@@ -616,12 +636,12 @@ export class LocalRegionConnector {
 	}
 
 	#cacheAssetRange( key, value, assetId ) {
-		if ( value.bytes.byteLength > MAX_LOCAL_REGION_RANGE_CACHE_BYTES ) return;
+		if ( value.bytes.byteLength > this.assetRangeCacheBudgetBytes ) return;
 		const existing = this.assetRanges.get( key );
 		if ( existing ) this.assetRangeBytes -= existing.bytes.byteLength;
 		this.assetRanges.set( key, { ...value, assetId } );
 		this.assetRangeBytes += value.bytes.byteLength;
-		while ( this.assetRangeBytes > MAX_LOCAL_REGION_RANGE_CACHE_BYTES && this.assetRanges.size ) {
+		while ( this.assetRangeBytes > this.assetRangeCacheBudgetBytes && this.assetRanges.size ) {
 			const oldest = this.assetRanges.keys().next().value;
 			const evicted = this.assetRanges.get( oldest );
 			this.assetRanges.delete( oldest );
@@ -694,10 +714,10 @@ export class LocalRegionConnector {
 	}
 
 	#cacheAsset( assetId, bytes ) {
-		if ( bytes.byteLength > MAX_LOCAL_REGION_CACHE_BYTES ) return bytes;
+		if ( bytes.byteLength > this.assetCacheBudgetBytes ) return bytes;
 		this.assets.set( assetId, bytes );
 		this.assetBytes += bytes.byteLength;
-		while ( this.assetBytes > MAX_LOCAL_REGION_CACHE_BYTES && this.assets.size > 1 ) {
+		while ( this.assetBytes > this.assetCacheBudgetBytes && this.assets.size > 1 ) {
 			const oldest = this.assets.keys().next().value;
 			const evicted = this.assets.get( oldest );
 			this.assets.delete( oldest );

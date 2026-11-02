@@ -65,6 +65,15 @@ try {
 	await new Promise( resolve => setTimeout( resolve, 2 ) );
 	assert.equal( await cache.put( 'lru-b', smallAsset, smallDigest ), true );
 	assert.deepEqual( await cache.get( 'lru-a' ), smallAsset, 'cache reads refresh least-recently-used order' );
+	const lruAId = Buffer.from( await crypto.subtle.digest( 'SHA-256', new TextEncoder().encode( 'elsemesh:hogwarts\0revision-1\0lru-a' ) ) ).toString( 'hex' );
+	const lruAMetadataName = `${lruAId}.meta`;
+	const oldLastUsed = Date.now() - 60000;
+	const oldMetadata = JSON.parse( new TextDecoder().decode( files.get( lruAMetadataName ) ) );
+	oldMetadata.lastUsed = oldLastUsed;
+	files.set( lruAMetadataName, new TextEncoder().encode( JSON.stringify( oldMetadata ) ) );
+	cache.entries.get( lruAId ).lastUsed = oldLastUsed;
+	assert.equal( await cache.touch( 'lru-a' ), true, 'a RAM hit can refresh disk-cache recency without reading the payload' );
+	assert.ok( JSON.parse( new TextDecoder().decode( files.get( lruAMetadataName ) ) ).lastUsed > oldLastUsed + 30000, 'a stale disk LRU timestamp is persisted when its entry is reused from RAM' );
 	assert.equal( await cache.put( 'lru-c', smallAsset, smallDigest ), true );
 	assert.deepEqual( await cache.get( 'lru-a' ), smallAsset, 'the recently used entry remains in the cache' );
 	assert.equal( await cache.get( 'lru-b' ), null, 'the least recently used entry is evicted to meet the quota-derived budget' );

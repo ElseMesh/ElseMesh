@@ -145,6 +145,36 @@ export class LocalRegionDiskCache {
 		}
 	}
 
+	async touch( assetId ) {
+		try {
+			await this.ready;
+			return await this.#exclusive( async () => {
+				const id = await this.#idFor( assetId );
+				let metadata = this.entries.get( id );
+				if ( ! metadata ) return false;
+				// RAM hits also count as demand for the disk LRU. Persist at most once
+				// per 30 seconds per entry to avoid turning hot reads into OPFS writes.
+				if ( Date.now() - metadata.lastUsed < 30000 ) return true;
+				try {
+					const handle = await this.directory.getFileHandle( `${id}.meta` );
+					metadata = JSON.parse( await ( await handle.getFile() ).text() );
+					if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || ! DIGEST.test( metadata.digest || '' ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
+					metadata.lastUsed = this.#nextLastUsed( metadata.lastUsed );
+					await this.#writeMetadata( metadata );
+					this.entries.set( id, metadata );
+					return true;
+				} catch ( error ) {
+					this.onError( error );
+					await this.#removeEntry( id );
+					return false;
+				}
+			} );
+		} catch ( error ) {
+			this.onError( error );
+			return false;
+		}
+	}
+
 	async put( assetId, bytes, digest ) {
 		if ( bytes.byteLength > MAX_CACHE_BYTES || ! DIGEST.test( digest || '' ) ) return false;
 		await this.ready;

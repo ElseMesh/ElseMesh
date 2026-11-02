@@ -192,6 +192,7 @@ try {
 		href: 'http://127.0.0.1:5189/',
 	} ), /cannot be combined/ );
 	const invalidIDConnector = new LocalRegionConnector( link );
+	assert.equal( invalidIDConnector.assetCacheBudgetBytes + invalidIDConnector.assetRangeCacheBudgetBytes, 320 * 1024 * 1024, 'browsers without a reported RAM hint retain the conservative default cache budget' );
 	for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) {
 		descriptorWorldId = worldId;
 		await assert.rejects( invalidIDConnector.getManifest(), /unsupported descriptor/, `dynamic world providers must reject ${worldId}` );
@@ -324,11 +325,12 @@ try {
 	assert.deepEqual( singleSpawnManifest.entryPoints, [], 'a world may temporarily disable optional entry-point choices' );
 	assert.equal( await chooseWorldEntryPoint( singleSpawnManifest, { documentRef: null } ), null, 'no choices means entry directly at the world spawn without opening a prompt' );
 	singleSpawnConnector.close();
-	Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { storage: {
+	Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { deviceMemory: 2, storage: {
 		getDirectory: async () => new TestOPFSDirectoryHandle(),
 		estimate: async () => ( { quota: 4 * 1024 ** 3, usage: [ ...opfsFiles.values() ].reduce( ( total, value ) => total + value.byteLength, 0 ) } ),
 	} } } );
 	const diskCacheConnector = new LocalRegionConnector( link );
+	assert.equal( diskCacheConnector.assetCacheBudgetBytes + diskCacheConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'the encoded RAM cache scales down on a low-memory device hint' );
 	const diskCacheManifest = await diskCacheConnector.getManifest();
 	const visualAssetID = diskCacheManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
 	const providerFetchesBeforeDiskCache = cellFetches;
@@ -338,6 +340,11 @@ try {
 	assert.equal( diskCacheConnector.assets.has( visualAssetID ), false, 'unloaded response is no longer held in the connector memory cache' );
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes, 'the unloaded response is promoted back from the persistent browser disk cache' );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'demotion to disk avoids another provider request' );
+	let memoryHitDiskTouches = 0;
+	const touchDiskCache = diskCacheConnector.diskCache.touch.bind( diskCacheConnector.diskCache );
+	diskCacheConnector.diskCache.touch = async assetID => { memoryHitDiskTouches ++; return touchDiskCache( assetID ); };
+	await diskCacheConnector.getAsset( visualAssetID );
+	assert.equal( memoryHitDiskTouches, 1, 'a browser RAM hit refreshes the matching disk LRU recency' );
 	diskCacheConnector.close();
 	const diskCacheReloadedConnector = new LocalRegionConnector( link );
 	const diskCacheReloadedManifest = await diskCacheReloadedConnector.getManifest();

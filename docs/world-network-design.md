@@ -225,6 +225,20 @@ Avoid pre-splitting every level into duplicate host files when serving selected
 ranges from one shared response is cheaper; profile the index/storage overhead
 before adding that representation.
 
+For browser encoded bytes, RAM promotion is an additional working copy and
+does not remove the OPFS copy. RAM and OPFS have independent budgets but use
+the same least-recently-requested eviction signal. A RAM hit refreshes OPFS
+recency at most once per entry per 30 seconds to limit metadata I/O. The
+current RAM budget uses `navigator.deviceMemory` only as a coarse physical-RAM
+hint: 64 MiB per reported GiB, split 80/20 between full responses and byte
+ranges, with a 64 MiB floor and 512 MiB ceiling. For example, a 2 GiB hint
+gets 128 MiB total and an 8 GiB hint reaches the 512 MiB cap. When the browser
+does not expose that hint, it retains the existing 320 MiB total. This is a
+provisional starting heuristic, not a free-memory measurement; it cannot account
+for other tabs, decoded/GPU allocations, or OS memory pressure. Tune it from
+measured renderer memory and eviction/refetch behavior. Unload releases
+decoded/GPU and RAM state while requested encoded bytes remain in OPFS until
+normal disk-LRU eviction.
 Current Hogwarts implementation status: ElseMesh supports manifest-declared
 content-addressed GLB image references and shares their decoded GPU textures
 across GLBs. A focused fixture covers that engine path, but Hogwarts does not
