@@ -234,9 +234,10 @@ try {
 	assert.equal( loaded.get( manifest.assets[ 0 ].id ).byteLength, bytes.byteLength );
 	assert.equal( parseGLB( loaded.get( manifest.assets[ 0 ].id ) ).nodes[ 0 ].extras.elsemeshCollision.coordinateSystem, 'elsemesh-y-up-meters/1', 'collision-only GLB metadata is readable by the ElseMesh loader' );
 	assert.deepEqual( parseGLB( loaded.get( manifest.assets[ 2 ].id ) ).nodes, [], 'missing collision bytes remain representable to the package loader' );
-	assert.deepEqual( payloadFetchOrder, [ 'collision', 'collision', 'collision', 'visual', 'visual', 'visual' ], 'collision requests must be fetched before visual requests' );
+	assert.deepEqual( payloadFetchOrder.slice( 0, 3 ), [ 'collision', 'collision', 'collision' ], 'collision requests must be fetched before visual requests' );
+	assert( payloadFetchOrder.slice( 3 ).every( payload => payload === 'visual' ), 'range-based visual requests follow collision priority' );
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unknown collision placeholders are not cached as provider data' );
-	assert.equal( leaseReleases, 6, 'each region fetch should release its temporary visitor lease' );
+	assert.equal( leaseReleases, payloadFetchOrder.length, 'each full or ranged fetch should release its temporary visitor lease' );
 	const collisionIDs = [ ...connector.collisionObjectIDsByCell.get( '0,0,0' ), ...connector.collisionObjectIDsByCell.get( '1,0,0' ) ];
 	const emptyCollisionID = [ ...connector.collisionObjectIDsByCell.get( '2,0,0' ) ][ 0 ];
 	assert.equal( connector.isCollisionPathReady( [ 1, 0, 1 ], [ 2, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), true, 'loaded collision with complete source coverage permits a local path' );
@@ -257,7 +258,7 @@ try {
 	assert.equal( connector.assetBytes, [ ...connector.assets.values() ].reduce( ( sum, value ) => sum + value.byteLength, 0 ), 'unloaded cells should release cached browser bytes' );
 	assert.equal( await connector.getAsset( manifest.assets[ 0 ].id ).then( value => value.byteLength ), bytes.byteLength );
 	assert.equal( cellFetches, 3, 'a released cell should be fetched again on demand' );
-	assert.equal( leaseReleases, 9, 'collision retries and a refetched cell should release their leases' );
+	assert.equal( leaseReleases, payloadFetchOrder.length, 'collision retries and a refetched cell should release their leases' );
 	connector.releaseAsset( manifest.assets[ 0 ].id );
 	abortNextCellFetch = true;
 	const requestStarted = new Promise( resolve => { abortableFetchStarted = resolve; } );
@@ -266,7 +267,7 @@ try {
 	await requestStarted;
 	abortController.abort();
 	await assert.rejects( abortedRequest, { name: 'AbortError' } );
-	assert.equal( leaseReleases, 10, 'aborting a visitor fetch should release its server lease' );
+	assert.equal( leaseReleases, payloadFetchOrder.length, 'aborting a visitor fetch should release its server lease' );
 	const retainedAssetId = manifest.assets[ 0 ].id;
 	const streamedAssetId = manifest.assets[ 1 ].id;
 	connector.releaseAsset( retainedAssetId );

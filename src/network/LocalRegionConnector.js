@@ -1,6 +1,7 @@
 import { validateWorldExperience } from './WorldExperience.js';
 import { collisionPathReady, sweptCollisionCellKeys } from './CollisionFrontier.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
+import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 
@@ -748,7 +749,8 @@ export class LocalRegionConnector {
 		);
 		const loaded = new Map();
 		for ( const [ index, assetId ] of selected.entries() ) {
-			const bytes = await this.getAsset( assetId, { signal } );
+			const progressive = this.collisionAssetIDs.has( assetId ) ? null : await fetchGLBWithCoarseKTX2( this, assetId, { signal } );
+			const bytes = progressive?.bytes || await this.getAsset( assetId, { signal } );
 			const retain = retainAssets || retainAssetIDs.has( assetId );
 			const installStartedAt = performance.now();
 			try {

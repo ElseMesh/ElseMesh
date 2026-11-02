@@ -1,5 +1,6 @@
 import { canUploadBCTexture, decodeKTX2 } from '../src/engine/loaders/KTX2.js';
 import { fetchKTX2Level } from '../src/engine/loaders/KTX2Range.js';
+import { fetchGLBWithCoarseKTX2 } from '../src/engine/loaders/GLBRange.js';
 import { GPU } from '../src/engine/webgpu.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
@@ -59,10 +60,31 @@ try {
 	const image = await decodeKTX2( ktx2Bytes );
 	if ( image.width !== 16 || image.height !== 16 ) throw new Error( `unexpected dimensions ${image.width}x${image.height}` );
 	const sourceLevelCount = new DataView( ktx2Bytes.buffer, ktx2Bytes.byteOffset, ktx2Bytes.byteLength ).getUint32( 40, true );
+	const rangeETag = `"sha256-${'0'.repeat( 64 )}"`;
+	const sourceGLB = makeGLB( ktx2Bytes );
+	const requestedGLBRanges = [];
+	const rangedGLBConnector = {
+		getAssetRange: async ( _assetId, { start, end } ) => {
+			requestedGLBRanges.push( { start, end } );
+			return { bytes: sourceGLB.slice( start, end + 1 ), etag: rangeETag, start, end, totalLength: sourceGLB.byteLength };
+		},
+		getAssetRanges: async ( _assetId, ranges ) => {
+			for ( const range of ranges ) requestedGLBRanges.push( { ...range } );
+			return ranges.map( range => ( { bytes: sourceGLB.slice( range.start, range.end + 1 ), etag: rangeETag, ...range, totalLength: sourceGLB.byteLength } ) );
+		},
+	};
+	const coarseGLB = await fetchGLBWithCoarseKTX2( rangedGLBConnector, 'fixture-glb' );
+	if ( ! coarseGLB || coarseGLB.bytes.byteLength >= sourceGLB.byteLength ) throw new Error( 'coarse GLB range assembly did not reduce the texture payload' );
+	const coarseJSONLength = new DataView( coarseGLB.bytes.buffer, coarseGLB.bytes.byteOffset, coarseGLB.bytes.byteLength ).getUint32( 12, true );
+	const coarseBinStart = 28 + coarseJSONLength;
+	const coarseJSON = JSON.parse( new TextDecoder().decode( coarseGLB.bytes.subarray( 20, 20 + coarseJSONLength ) ) );
+	const coarseView = coarseJSON.bufferViews[ coarseJSON.images[ 0 ].bufferView ];
+	const coarseKTX2 = coarseGLB.bytes.subarray( coarseBinStart + coarseView.byteOffset, coarseBinStart + coarseView.byteOffset + coarseView.byteLength );
+	const coarseImage = await decodeKTX2( coarseKTX2 );
+	if ( coarseImage.width !== 1 || coarseImage.height !== 1 || coarseImage.mipmaps?.length > 1 ) throw new Error( 'coarse GLB did not decode as one coarsest texture level' );
 	const rangeBase = 96;
 	const rangeAsset = new Uint8Array( rangeBase + ktx2Bytes.byteLength + 32 );
 	rangeAsset.set( ktx2Bytes, rangeBase );
-	const rangeETag = `"sha256-${'0'.repeat( 64 )}"`;
 	const rangeConnector = { getAssetRange: async ( _assetId, { start, end } ) => ( {
 		bytes: rangeAsset.slice( start, end + 1 ), etag: rangeETag, start, end, totalLength: rangeAsset.byteLength,
 	} ) };
@@ -92,9 +114,15 @@ try {
 		root.traverse( node => { if ( node.isMesh ) texture = node.material.bindings.worldAlbedo?.texture; } );
 		if ( texture?.format !== image.format ) throw new Error( `WorldPackage did not retain the decoded BC7 format (${texture?.format})` );
 		if ( texture?.mipLevelCount !== image.mipmaps.length ) throw new Error( `WorldPackage created ${texture?.mipLevelCount} mip levels; expected ${image.mipmaps.length}` );
+		const coarseRoot = await loadWorldPackage( connector, { assets: new Map( [ [ 'fixture', coarseGLB.bytes ] ] ) } );
+		let coarseTexture;
+		coarseRoot.traverse( node => { if ( node.isMesh ) coarseTexture = node.material.bindings.worldAlbedo?.texture; } );
+		const coarseFormatMatches = coarseImage.format ? coarseTexture?.format === coarseImage.format : coarseTexture?.format?.startsWith( 'rgba8' );
+		if ( ! coarseFormatMatches || coarseTexture?.mipLevelCount !== 1 ) throw new Error( `WorldPackage did not install the coarse single-level texture (format ${coarseTexture?.format || 'missing'} vs ${coarseImage.format || 'rgba8'}, levels ${coarseTexture?.mipLevelCount})` );
 		await GPU.queue.onSubmittedWorkDone();
 		let validationError = await device.popErrorScope();
 		if ( validationError ) throw new Error( `WebGPU rejected BC7 texture creation/upload: ${validationError.message}` );
+		disposeWorldPackage( coarseRoot );
 		disposeWorldPackage( root );
 	} else {
 		if ( image.data.length !== 16 * 16 * 4 ) throw new Error( `unexpected RGBA byte count ${image.data.length}` );
@@ -105,6 +133,7 @@ try {
 			throw new Error( `transcoded checker colors are wrong: ${JSON.stringify( { green, red } )}` );
 		if ( green[ 3 ] < 240 || red[ 3 ] < 240 ) throw new Error( `transcoded alpha is wrong: ${JSON.stringify( { green, red } )}` );
 		colors = { green, red };
+		if ( coarseImage.data.length !== 4 ) throw new Error( 'coarse RGBA texture does not contain one pixel' );
 	}
 	result.dataset.status = 'passed';
 	result.textContent = JSON.stringify( {
@@ -112,6 +141,7 @@ try {
 		height: image.height,
 		format: image.format || 'rgba8',
 		mipLevels: image.mipmaps?.length || 1,
+		coarseMipLevels: coarseImage.mipmaps?.length || 1,
 		webgpuBC: hasBC,
 		colors,
 	} );
