@@ -13,6 +13,22 @@ static renderer components. A world describes models, LOD assets, materials,
 and transforms. ElseMesh selects WebGPU or WebGL and owns instance batching,
 visibility, LOD transitions, shadows, and GPU resources.
 
+## Coarse-first lazy-loading evolution
+
+The current implementation orders `lods` highest-detail first and both
+renderer adapters load every referenced GLB before installing the component.
+That is not suitable for large streamed worlds. The target contract orders
+`lods` from coarsest to finest, requests the coarsest usable model first, and
+loads finer levels only when projected view demand crosses their thresholds.
+The current implementation's all-level preload must be replaced in the shared
+resolver, component preload gate, planner/runtime, and both renderer adapters;
+changing only the bridge would still fetch every level or select them in the
+wrong direction. Keep the coarse model visible while a finer level loads, and
+leave it in place if refinement fails or becomes stale. Texture bytes must be
+external shared assets so geometry refinement does not resend them. Collision
+remains on its independent, higher-priority path. This is a generic engine
+contract for static model sets, not a Hogwarts-specific mode.
+
 ## Package shape
 
 A signed component references one content-addressed JSON asset with kind
@@ -54,10 +70,11 @@ component asset list. The JSON asset has this shape:
 Each model asset is a static GLB using the core glTF feature subset supported by
 both renderers and local-space geometry. Skins, animation, morph targets,
 non-triangle primitives, and unsupported vertex attributes are rejected.
-LOD entries are ordered from highest to lowest detail. With `lodMetric` set to
-`projected-radius`, each `lodThresholds` entry is a normalized projected-radius
-boundary and values descend. With `scaled-distance`, each is a world distance
-divided by the instance's largest scale and values ascend. `lodFadeFraction`
+In the current implementation, LOD entries are ordered from highest to lowest
+detail. With `lodMetric` set to `projected-radius`, each `lodThresholds` entry
+is a normalized projected-radius boundary and values descend. With
+`scaled-distance`, each is a world distance divided by the instance's largest
+scale and values ascend. `lodFadeFraction`
 sets the transition-band width for either metric; overlapping bands are
 rejected. `drawMaxDistance` limits color rendering by world-space distance from
 the transformed bounds center, and `drawFadeStartDistance` sets where its
