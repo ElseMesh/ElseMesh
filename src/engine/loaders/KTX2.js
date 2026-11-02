@@ -46,6 +46,10 @@ export async function decodeKTX2( bytes ) {
 	}
 
 	const data = bytes instanceof Uint8Array ? bytes : new Uint8Array( bytes );
+	const sourceHeader = data.byteLength >= 80 ? new DataView( data.buffer, data.byteOffset, data.byteLength ) : null;
+	const singleLevelDimensions = sourceHeader?.getUint32( 40, true ) === 1
+		? { width: sourceHeader.getUint32( 20, true ), height: sourceHeader.getUint32( 24, true ) }
+		: null;
 	const start = data.byteOffset;
 	const input = data.buffer.slice( start, start + data.byteLength );
 	let texture = await new Promise( ( resolve, reject ) => {
@@ -92,19 +96,28 @@ export async function decodeKTX2( bytes ) {
 		const image = mip || texture.image;
 		if ( ! image?.data || ! Number.isSafeInteger( image.width ) || ! Number.isSafeInteger( image.height ) )
 			throw new Error( 'KTX2 decoder returned no base-level image data' );
+		let width = image.width, height = image.height;
 		if ( texture.format === RGBAFormat && texture.type === HalfFloatType ) {
 			const source = image.data;
 			const buffer = source instanceof ArrayBuffer ? source : source.buffer;
 			const byteOffset = source instanceof ArrayBuffer ? 0 : source.byteOffset;
 			const byteLength = source.byteLength;
 			const halfPixels = new Uint16Array( buffer, byteOffset, byteLength / 2 );
-			if ( halfPixels.byteLength !== image.width * image.height * 8 ) throw new Error( `KTX2 decoder returned an unexpected RGBA16F byte size (${halfPixels.byteLength} bytes)` );
-			return { data: halfPixels, width: image.width, height: image.height, format: 'rgba16float' };
+			if ( halfPixels.byteLength !== width * height * 8 && singleLevelDimensions && halfPixels.byteLength === singleLevelDimensions.width * singleLevelDimensions.height * 8 ) {
+				width = singleLevelDimensions.width;
+				height = singleLevelDimensions.height;
+			}
+			if ( halfPixels.byteLength !== width * height * 8 ) throw new Error( `KTX2 decoder returned an unexpected RGBA16F byte size (${halfPixels.byteLength} bytes)` );
+			return { data: halfPixels, width, height, format: 'rgba16float' };
 		}
 		const pixels = image.data instanceof Uint8Array ? image.data : new Uint8Array( image.data );
-		if ( pixels.byteLength !== image.width * image.height * 4 )
-			throw new Error( `KTX2 decoder returned an unexpected base-level pixel size (${pixels.byteLength} bytes)` );
-		return { data: pixels, width: image.width, height: image.height };
+		if ( pixels.byteLength !== width * height * 4 && singleLevelDimensions && pixels.byteLength === singleLevelDimensions.width * singleLevelDimensions.height * 4 ) {
+			width = singleLevelDimensions.width;
+			height = singleLevelDimensions.height;
+		}
+		if ( pixels.byteLength !== width * height * 4 )
+			throw new Error( `KTX2 decoder returned an unexpected base-level pixel size (${pixels.byteLength} bytes for ${width}x${height})` );
+		return { data: pixels, width, height };
 	} finally {
 		texture.dispose?.();
 	}

@@ -1,4 +1,5 @@
 import { canUploadBCTexture, decodeKTX2 } from '../src/engine/loaders/KTX2.js';
+import { extractKTX2Level } from '../src/engine/loaders/KTX2Level.js';
 import { GPU } from '../src/engine/webgpu.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
@@ -57,6 +58,13 @@ try {
 	const ktx2Bytes = new Uint8Array( await response.arrayBuffer() );
 	const image = await decodeKTX2( ktx2Bytes );
 	if ( image.width !== 16 || image.height !== 16 ) throw new Error( `unexpected dimensions ${image.width}x${image.height}` );
+	const sourceLevelCount = new DataView( ktx2Bytes.buffer, ktx2Bytes.byteOffset, ktx2Bytes.byteLength ).getUint32( 40, true );
+	for ( const level of [ 0, sourceLevelCount - 1 ] ) {
+		const singleLevel = await decodeKTX2( extractKTX2Level( ktx2Bytes, level ) );
+		const expectedWidth = Math.max( 1, 16 >> level ), expectedHeight = Math.max( 1, 16 >> level );
+		if ( singleLevel.width !== expectedWidth || singleLevel.height !== expectedHeight ) throw new Error( `single KTX2 mip ${level} decoded as ${singleLevel.width}x${singleLevel.height}, expected ${expectedWidth}x${expectedHeight}` );
+		if ( singleLevel.mipmaps?.length > 1 ) throw new Error( `single KTX2 mip ${level} unexpectedly decoded ${singleLevel.mipmaps.length} levels` );
+	}
 	if ( ! canUploadBCTexture( 16, 16 ) || canUploadBCTexture( 15, 13 ) || canUploadBCTexture( 2, 2 ) ) throw new Error( 'BC texture block-alignment selection is invalid' );
 	let colors = null;
 	if ( image.format ) {
