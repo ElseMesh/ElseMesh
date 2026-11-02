@@ -1,5 +1,5 @@
 import { validateWorldExperience } from './WorldExperience.js';
-import { collisionPathReady, sweptCollisionCellKeys } from './CollisionFrontier.js';
+import { collisionPathStatus, sweptCollisionCellKeys } from './CollisionFrontier.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
@@ -194,6 +194,7 @@ export class LocalRegionConnector {
 		this.unknownSourcesByCell = new Map();
 		this.unknownSourcesCompleteByCell = new Map();
 		this.emptyCollisionCellsAreVerified = false;
+		this.lastCollisionPathStatus = null;
 		this.collisionLoadLatencyMs = 2000;
 		this.cellSizeMeters = 0;
 		this.maxViewDistanceMeters = 0;
@@ -463,7 +464,7 @@ export class LocalRegionConnector {
 	}
 
 	isCollisionPathReady( from, to, { loadedObjects } = {} ) {
-		return collisionPathReady( {
+		this.lastCollisionPathStatus = collisionPathStatus( {
 			from, to, cellSizeMeters: this.cellSizeMeters,
 			objectIDsByCell: this.collisionObjectIDsByCell, loadedObjectIDs: loadedObjects,
 			unknownObjectIDs: this.unknownCollisionObjectIDs, unknownSourcesByCell: this.unknownSourcesByCell,
@@ -471,6 +472,7 @@ export class LocalRegionConnector {
 			missingCollisionPayloadObjectIDs: this.missingCollisionPayloadObjectIDs,
 			missingKnownShapeObjectIDs: this.collisionObjectIDsMissingKnownShape,
 		} );
+		return this.lastCollisionPathStatus.ready;
 	}
 
 	collisionObjectIDsAlongPath( from, to ) {

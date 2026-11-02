@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { collisionLookaheadDistance, collisionPathReady, sweptCollisionCellKeys } from '../src/network/CollisionFrontier.js';
+import { collisionLookaheadDistance, collisionPathReady, collisionPathStatus, sweptCollisionCellKeys } from '../src/network/CollisionFrontier.js';
 
 const from = [ 7.5, 0, 1 ];
 const to = [ 8.5, 0, 1 ];
@@ -18,6 +18,17 @@ assert.equal( collisionPathReady( emptyCellPath ), false, 'an absent cell remain
 assert.equal( collisionPathReady( { ...emptyCellPath, emptyCellsAreVerified: true, knownCells: new Set( [ '0,0,0' ] ) } ), true, 'a complete spatial index proves a queried absent cell is empty' );
 assert.equal( collisionPathReady( { ...emptyCellPath, emptyCellsAreVerified: true, objectIDsByCell: new Map( [ [ '0,0,0', new Set( [ 'unknown' ] ) ] ] ), unknownObjectIDs: new Set( [ 'unknown' ] ) } ), false, 'complete index coverage does not clear an occupied cell with unknown collision' );
 assert.equal( collisionPathReady( { ...emptyCellPath, emptyCellsAreVerified: true, objectIDsByCell: new Map( [ [ '0,0,0', new Set( [ 'unloaded' ] ) ] ] ) } ), false, 'complete index coverage does not clear an occupied cell with unloaded collision' );
+assert.deepEqual( collisionPathStatus( emptyCellPath ), { ready: false, reason: 'cell-not-verified-empty', cellKey: '0,0,0' }, 'an unknown gap reports the cell that cannot yet be proven clear' );
+assert.deepEqual( collisionPathStatus( { ...emptyCellPath, objectIDsByCell: new Map( [ [ '0,0,0', new Set( [ 'missing' ] ) ] ] ), loadedObjectIDs: new Set(), missingCollisionPayloadObjectIDs: new Set( [ 'missing' ] ) } ), { ready: false, reason: 'collision-payload-missing', cellKey: '0,0,0', objectID: 'missing' }, 'a missing collision response identifies the blocking object' );
+const unknownOverlap = {
+	...emptyCellPath,
+	objectIDsByCell: new Map( [ [ '0,0,0', new Set( [ 'unknown' ] ) ] ] ),
+	loadedObjectIDs: new Set( [ 'unknown' ] ),
+	unknownObjectIDs: new Set( [ 'unknown' ] ),
+	unknownSourcesCompleteByCell: new Map( [ [ '0,0,0', true ] ] ),
+	unknownSourcesByCell: new Map( [ [ '0,0,0', [ { assetPath: '/Game/Hall', componentPath: 'Wall_1', collisionType: 'unknown', bounds: [ 0, 0, 0, 3, 3, 3 ] } ] ] ] ),
+};
+assert.deepEqual( collisionPathStatus( unknownOverlap ), { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey: '0,0,0', objectID: 'unknown', source: { assetPath: '/Game/Hall', componentPath: 'Wall_1', collisionType: 'unknown', bounds: [ 0, 0, 0, 3, 3, 3 ] } }, 'an unknown source overlapping the swept capsule reports its source and bounds' );
 assert.throws( () => sweptCollisionCellKeys( [ 0, 0 ], to, { cellSizeMeters: 8 } ), /three finite coordinates/ );
 
 const walkLookahead = collisionLookaheadDistance( 3, 2000, 8 );

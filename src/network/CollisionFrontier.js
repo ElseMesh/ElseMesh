@@ -20,8 +20,8 @@ export function sweptCollisionCellKeys( from, to, { cellSizeMeters, radius = 0.3
 	return cells;
 }
 
-export function collisionPathReady( { from, to, cellSizeMeters, radius = 0.3, height = 1.75, objectIDsByCell, loadedObjectIDs, unknownObjectIDs, unknownSourcesByCell, unknownSourcesCompleteByCell, missingKnownShapeObjectIDs, missingCollisionPayloadObjectIDs, knownCells, emptyCellsAreVerified = false } ) {
-	if ( ! objectIDsByCell || ! loadedObjectIDs ) return false;
+export function collisionPathStatus( { from, to, cellSizeMeters, radius = 0.3, height = 1.75, objectIDsByCell, loadedObjectIDs, unknownObjectIDs, unknownSourcesByCell, unknownSourcesCompleteByCell, missingKnownShapeObjectIDs, missingCollisionPayloadObjectIDs, knownCells, emptyCellsAreVerified = false } ) {
+	if ( ! objectIDsByCell || ! loadedObjectIDs ) return { ready: false, reason: 'collision-index-unavailable' };
 	const start = vectorValues( from ), end = vectorValues( to );
 	const sweepBounds = [
 		Math.min( start[ 0 ], end[ 0 ] ) - radius,
@@ -35,24 +35,28 @@ export function collisionPathReady( { from, to, cellSizeMeters, radius = 0.3, he
 		const objectIDs = objectIDsByCell.get( cellKey );
 		if ( ! objectIDs?.size ) {
 			if ( emptyCellsAreVerified && knownCells?.has( cellKey ) ) continue;
-			return false;
+			return { ready: false, reason: 'cell-not-verified-empty', cellKey };
 		}
 		for ( const objectID of objectIDs ) {
-			if ( missingCollisionPayloadObjectIDs?.has( objectID ) ) return false;
-			if ( missingKnownShapeObjectIDs?.has( objectID ) ) return false;
+			if ( missingCollisionPayloadObjectIDs?.has( objectID ) ) return { ready: false, reason: 'collision-payload-missing', cellKey, objectID };
+			if ( missingKnownShapeObjectIDs?.has( objectID ) ) return { ready: false, reason: 'expected-collision-shape-missing', cellKey, objectID };
 			if ( unknownObjectIDs?.has( objectID ) ) {
-				if ( unknownSourcesCompleteByCell?.get( cellKey ) !== true ) return false;
+				if ( unknownSourcesCompleteByCell?.get( cellKey ) !== true ) return { ready: false, reason: 'unknown-collision-sources-incomplete', cellKey, objectID };
 				for ( const source of unknownSourcesByCell?.get( cellKey ) || [] ) {
 					const bounds = source.bounds;
 					if ( bounds[ 0 ] <= sweepBounds[ 3 ] && bounds[ 3 ] >= sweepBounds[ 0 ]
 						&& bounds[ 1 ] <= sweepBounds[ 4 ] && bounds[ 4 ] >= sweepBounds[ 1 ]
-						&& bounds[ 2 ] <= sweepBounds[ 5 ] && bounds[ 5 ] >= sweepBounds[ 2 ] ) return false;
+						&& bounds[ 2 ] <= sweepBounds[ 5 ] && bounds[ 5 ] >= sweepBounds[ 2 ] ) return { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey, objectID, source: { assetPath: source.assetPath ?? null, componentPath: source.componentPath ?? null, collisionType: source.collisionType ?? null, bounds: [ ...bounds ] } };
 				}
 			}
-			if ( ! loadedObjectIDs.has( objectID ) ) return false;
+			if ( ! loadedObjectIDs.has( objectID ) ) return { ready: false, reason: 'collision-object-not-loaded', cellKey, objectID };
 		}
 	}
-	return true;
+	return { ready: true, reason: null };
+}
+
+export function collisionPathReady( options ) {
+	return collisionPathStatus( options ).ready;
 }
 
 export function collisionLookaheadDistance( speedMetersPerSecond, latencyMs, cellSizeMeters, maxDistance = 512 ) {
