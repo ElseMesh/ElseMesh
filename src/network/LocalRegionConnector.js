@@ -80,6 +80,52 @@ async function fetchJSON( url, signal ) {
 	return response.json();
 }
 
+function findBytes( haystack, needle, start = 0 ) {
+	for ( let index = start; index <= haystack.byteLength - needle.byteLength; index ++ ) {
+		let match = true;
+		for ( let offset = 0; offset < needle.byteLength; offset ++ ) if ( haystack[ index + offset ] !== needle[ offset ] ) { match = false; break; }
+		if ( match ) return index;
+	}
+	return - 1;
+}
+
+async function parseByteRangeResponse( response ) {
+	const contentType = response.headers.get( 'Content-Type' ) || '';
+	const multipart = contentType.match( /^multipart\/byteranges\s*;\s*boundary=(?:"([^"]+)"|([^;\s]+))/i );
+	if ( ! multipart ) {
+		const contentRange = response.headers.get( 'Content-Range' )?.match( /^bytes (\d+)-(\d+)\/(\d+)$/ );
+		requireValue( contentRange, 'Local region byte-range response has no valid Content-Range' );
+		return [ { start: Number( contentRange[ 1 ] ), end: Number( contentRange[ 2 ] ), totalLength: Number( contentRange[ 3 ] ), bytes: new Uint8Array( await response.arrayBuffer() ) } ];
+	}
+	const boundary = multipart[ 1 ] || multipart[ 2 ];
+	const body = new Uint8Array( await response.arrayBuffer() );
+	const marker = new TextEncoder().encode( `--${boundary}` );
+	const separator = new TextEncoder().encode( '\r\n--' );
+	const headerSeparator = new TextEncoder().encode( '\r\n\r\n' );
+	const decoder = new TextDecoder( 'ascii' );
+	const parts = [];
+	let cursor = 0;
+	while ( cursor < body.byteLength ) {
+		requireValue( findBytes( body, marker, cursor ) === cursor, 'Local region multipart byte-range boundary is invalid' );
+		cursor += marker.byteLength;
+		if ( body[ cursor ] === 0x2d && body[ cursor + 1 ] === 0x2d ) break;
+		requireValue( body[ cursor ] === 0x0d && body[ cursor + 1 ] === 0x0a, 'Local region multipart byte-range part has no header separator' );
+		cursor += 2;
+		const headerEnd = findBytes( body, headerSeparator, cursor );
+		requireValue( headerEnd >= 0, 'Local region multipart byte-range headers are truncated' );
+		const headers = decoder.decode( body.subarray( cursor, headerEnd ) );
+		const contentRange = headers.match( /(?:^|\r\n)Content-Range:\s*bytes (\d+)-(\d+)\/(\d+)(?:\r\n|$)/i );
+		requireValue( contentRange, 'Local region multipart part has no valid Content-Range' );
+		const start = Number( contentRange[ 1 ] ), end = Number( contentRange[ 2 ] ), totalLength = Number( contentRange[ 3 ] );
+		cursor = headerEnd + headerSeparator.byteLength;
+		const delimiter = findBytes( body, separator, cursor );
+		requireValue( delimiter >= 0 && delimiter - cursor === end - start + 1, 'Local region multipart byte-range body length is invalid' );
+		parts.push( { start, end, totalLength, bytes: body.slice( cursor, delimiter ) } );
+		cursor = delimiter + 2;
+	}
+	return parts;
+}
+
 export class LocalRegionConnector {
 	constructor( { localProvider, localMap, regionDiagnostics = false } ) {
 		this.localOnly = true;
@@ -492,6 +538,71 @@ export class LocalRegionConnector {
 			}
 			return result;
 		}, {}, { Range: `bytes=${start}-${end}`, ...( etag ? { 'If-Range': etag } : {} ) } );
+	}
+
+	async getAssetRanges( assetId, ranges, { etag, totalLength, signal } = {} ) {
+		abortIfNeeded( signal );
+		requireValue( this.manifest && this.regionAssets.has( assetId ), 'Local region asset was not declared by the provider' );
+		requireValue( Array.isArray( ranges ) && ranges.length >= 1 && ranges.length <= 64 && ranges.every( range => Number.isSafeInteger( range?.start ) && range.start >= 0 && Number.isSafeInteger( range?.end ) && range.end >= range.start && range.end - range.start + 1 <= MAX_LOCAL_REGION_BYTES ), 'Local region byte-range set is invalid' );
+		if ( etag !== undefined ) requireValue( /^"sha256-[0-9a-f]{64}"$/.test( etag ), 'Local region range ETag is invalid' );
+		if ( totalLength !== undefined ) requireValue( Number.isSafeInteger( totalLength ) && ranges.every( range => range.end < totalLength ), 'Local region range total length is invalid' );
+		const requested = ranges.map( ( range, index ) => ( { ...range, index } ) ).sort( ( a, b ) => a.start - b.start || a.end - b.end );
+		for ( let index = 1; index < requested.length; index ++ ) requireValue( requested[ index ].start > requested[ index - 1 ].end, 'Local region byte ranges overlap' );
+		const results = new Array( ranges.length );
+		const missing = [];
+		for ( const range of requested ) {
+			const key = `${assetId}\n${etag || ''}\n${range.start}-${range.end}`;
+			const cached = this.assetRanges.get( key );
+			if ( cached ) {
+				this.assetRanges.delete( key );
+				this.assetRanges.set( key, cached );
+				results[ range.index ] = cached;
+				continue;
+			}
+			const diskKey = etag && totalLength !== undefined ? `${assetId}\0range\0${etag}\0${range.start}-${range.end}` : null;
+			if ( diskKey && this.diskCache ) {
+				try {
+					const bytes = await this.diskCache.get( diskKey );
+					if ( bytes?.byteLength === range.end - range.start + 1 ) {
+						const value = { bytes, etag, start: range.start, end: range.end, totalLength };
+						this.#cacheAssetRange( key, value, assetId );
+						results[ range.index ] = value;
+						continue;
+					}
+				} catch ( error ) {
+					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache read failed:', error );
+				}
+			}
+			missing.push( { ...range, key, diskKey } );
+		}
+		if ( missing.length === 0 ) return results;
+		if ( missing.length === 1 ) {
+			const range = missing[ 0 ];
+			results[ range.index ] = await this.getAssetRange( assetId, { ...range, etag, totalLength, signal } );
+			return results;
+		}
+		const assetURL = this.regionAssets.get( assetId );
+		return this.#withRegionLease( assetURL, signal, async response => {
+			if ( response.status !== 206 ) throw new Error( `Local region multi-range request returned HTTP ${response.status}; restart from fresh range metadata` );
+			const returnedETag = response.headers.get( 'ETag' );
+			requireValue( /^"sha256-[0-9a-f]{64}"$/.test( returnedETag || '' ) && ( etag === undefined || returnedETag === etag ), 'Local region multi-range ETag is missing or changed' );
+			const parts = await parseByteRangeResponse( response );
+			for ( const part of parts ) requireValue( Number.isSafeInteger( part.totalLength ) && part.totalLength > part.end && part.bytes.byteLength === part.end - part.start + 1 && ( totalLength === undefined || totalLength === part.totalLength ), 'Local region multi-range part is invalid' );
+			for ( const range of missing ) {
+				const part = parts.find( candidate => candidate.start <= range.start && candidate.end >= range.end );
+				requireValue( part, 'Local region multi-range response omitted a requested interval' );
+				const bytes = part.bytes.slice( range.start - part.start, range.end - part.start + 1 );
+				const value = { bytes, etag: returnedETag, start: range.start, end: range.end, totalLength: part.totalLength };
+				this.#cacheAssetRange( range.key, value, assetId );
+				results[ range.index ] = value;
+				if ( range.diskKey ) {
+					try { await this.diskCache?.put( range.diskKey, bytes, await this.#digestSHA256( bytes ) ); } catch ( error ) {
+						if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
+					}
+				}
+			}
+			return results;
+		}, {}, { Range: `bytes=${missing.map( range => `${range.start}-${range.end}` ).join( ',' )}`, ...( etag ? { 'If-Range': etag } : {} ) } );
 	}
 
 	async #matchesSHA256( bytes, expected ) {

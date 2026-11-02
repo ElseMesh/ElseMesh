@@ -60,6 +60,31 @@ result and release on completion or abort; lease expiry handles abrupt client
 loss. Coalesced work remains active while any subscriber lease remains and is
 canceled when the final lease is released or expires.
 
+### Server-authoritative movement and content scope
+
+Treat the browser as an untrusted requester. It must not choose arbitrary
+world-region IDs or claim a player position to unlock content. The active world
+authority (thruholdd) tracks the accepted player pose and movement mode,
+validates input against the world's collision and movement rules, and enforces
+the configured speed/acceleration limits. A client sends input intent and
+camera/view information; it does not authoritatively set position. World data
+defines permitted movement profiles, while the engine/server validates them;
+unknown speeds or collision do not grant extra movement.
+
+Authorize visual-region leases from the server's current accepted pose and
+bounded view, then include only visible regions and the minimal content
+dependencies needed to render them. Collision and safety-prefetch may cover
+the connected traversal frontier needed to avoid blocking a legal imminent
+move, but must not become an unrestricted world scan. Validate every lease
+against the same world, player/session, source revision, reachability policy,
+and byte/concurrency limits. Ignore or reject client-supplied coordinates,
+region IDs, movement modes, or view bounds that exceed the accepted state.
+Shared cache hits still require authorization before bytes are served. This
+limits denial-of-service amplification and prevents browser-side movement or
+position spoofing from exposing arbitrary regions. Apply provider-specific
+arrival and visibility rules in the world provider without weakening these
+engine invariants.
+
 Keep the provider interface independent of the renderer backend and source
 format. The current GLB loader, WebGPU renderer, and WebGL fallback remain the
 first supported render path; add streamed region lifecycle to these interfaces
@@ -188,6 +213,14 @@ does not imply that another layer has room for the corresponding decoded or
 GPU representation. Each byte cache stores only requested levels, updates
 recency on access, and expires levels independently while preserving the same
 immutable source/variant identity across host RAM/disk and browser RAM/OPFS.
+Apply that rule at every cache boundary: do not populate a neighboring mip,
+range, or quality variant merely because it shares a container with requested
+bytes. Coalesce disjoint requests only when measured request/lease overhead is
+greater than the cost of transferring the intervening unrequested bytes; keep
+the resulting cached entries addressable and evictable at their requested
+range or level granularity. If splitting or independently storing a tier costs
+more CPU, metadata, or I/O than it saves, measure and retain the coarser cache
+unit for that case rather than silently over-fetching at every layer.
 Avoid pre-splitting every level into duplicate host files when serving selected
 ranges from one shared response is cheaper; profile the index/storage overhead
 before adding that representation.

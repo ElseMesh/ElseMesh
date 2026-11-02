@@ -122,14 +122,29 @@ globalThis.fetch = async ( input, options = {} ) => {
 		} );
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.has( 'lease' ) && options.headers?.Range ) {
-		const range = options.headers.Range.match( /^bytes=(\d+)-(\d+)$/ );
-		assert.ok( range, 'range requests use one closed byte range' );
+		const rangeHeader = new Headers( options.headers ).get( 'Range' );
+		const ranges = rangeHeader.match( /^bytes=(\d+-\d+(?:,\d+-\d+)*)$/ )?.[ 1 ].split( ',' ).map( value => value.split( '-' ).map( Number ) );
+		assert.ok( ranges?.length, 'range requests use closed byte ranges' );
 		rangeFetches++;
-		const start = Number( range[ 1 ] ), end = Math.min( Number( range[ 2 ] ), bytes.byteLength - 1 );
-		const body = bytes.slice( start, end + 1 );
-		return new Response( body, { status: 206, headers: {
-			'Content-Length': String( body.byteLength ), 'Content-Range': `bytes ${start}-${end}/${bytes.byteLength}`,
-			'Accept-Ranges': 'bytes', ETag: `"sha256-${hash}"`,
+		if ( ranges.length === 1 ) {
+			const [ start, requestedEnd ] = ranges[ 0 ], end = Math.min( requestedEnd, bytes.byteLength - 1 );
+			const body = bytes.slice( start, end + 1 );
+			return new Response( body, { status: 206, headers: {
+				'Content-Length': String( body.byteLength ), 'Content-Range': `bytes ${start}-${end}/${bytes.byteLength}`,
+				'Accept-Ranges': 'bytes', ETag: `"sha256-${hash}"`,
+			} } );
+		}
+		const boundary = 'elsemesh-test-range';
+		const parts = [];
+		for ( const [ start, requestedEnd ] of ranges ) {
+			const end = Math.min( requestedEnd, bytes.byteLength - 1 );
+			parts.push( `--${boundary}\r\nContent-Type: application/octet-stream\r\nContent-Range: bytes ${start}-${end}/${bytes.byteLength}\r\n\r\n` );
+			parts.push( bytes.slice( start, end + 1 ) );
+			parts.push( '\r\n' );
+		}
+		parts.push( `--${boundary}--\r\n` );
+		return new Response( new Blob( parts ), { status: 206, headers: {
+			'Content-Type': `multipart/byteranges; boundary=${boundary}`, 'Accept-Ranges': 'bytes', ETag: `"sha256-${hash}"`,
 		} } );
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
@@ -336,12 +351,21 @@ try {
 	assert.equal( rangeFetches, rangeFetchesBefore + 1, 'an uncached level range is fetched on demand' );
 	assert.deepEqual( ( await rangeCacheConnector.getAssetRange( rangeAssetID, rangeRequest ) ).bytes, firstRange.bytes );
 	assert.equal( rangeFetches, rangeFetchesBefore + 1, 'a requested level range is reused from the browser RAM LRU' );
+	const multiRanges = [ { start: 0, end: 11 }, { start: 20, end: 27 } ];
+	const multiRangeFetchesBefore = rangeFetches;
+	const multiRangeResult = await rangeCacheConnector.getAssetRanges( rangeAssetID, multiRanges, { etag: rangeRequest.etag, totalLength: bytes.byteLength } );
+	assert.deepEqual( multiRangeResult.map( range => range.bytes ), multiRanges.map( range => bytes.slice( range.start, range.end + 1 ) ) );
+	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'disjoint ranges share one leased multipart request' );
+	await rangeCacheConnector.getAssetRanges( rangeAssetID, multiRanges, { etag: rangeRequest.etag, totalLength: bytes.byteLength } );
+	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'multipart ranges are independently reused from browser RAM' );
 	rangeCacheConnector.close();
 	const rangeDiskReloadedConnector = new LocalRegionConnector( link );
 	const rangeDiskReloadedManifest = await rangeDiskReloadedConnector.getManifest();
 	const rangeDiskAssetID = rangeDiskReloadedManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
 	assert.deepEqual( ( await rangeDiskReloadedConnector.getAssetRange( rangeDiskAssetID, rangeRequest ) ).bytes, firstRange.bytes );
-	assert.equal( rangeFetches, rangeFetchesBefore + 1, 'a requested level range is reused from OPFS after connector restart' );
+	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'a requested level range is reused from OPFS after connector restart' );
+	assert.deepEqual( ( await rangeDiskReloadedConnector.getAssetRanges( rangeDiskAssetID, multiRanges, { etag: rangeRequest.etag, totalLength: bytes.byteLength } ) ).map( range => range.bytes ), multiRangeResult.map( range => range.bytes ) );
+	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'multipart level ranges are independently reused from OPFS after connector restart' );
 	rangeDiskReloadedConnector.close();
 	console.log( 'local region connector tests passed' );
 } finally {
