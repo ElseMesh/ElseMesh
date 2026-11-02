@@ -587,11 +587,25 @@ body {
 	transition: opacity 700ms var(--em-ease), visibility 0s;
 }
 
-.em-root.is-photo .em-hud,
-.em-root.is-starting .em-hud {
+.em-root.is-photo .em-hud {
 	opacity: 0;
 	visibility: hidden;
 	transition: opacity var(--em-med) var(--em-ease), visibility 0s linear var(--em-med);
+}
+
+/* Keep the performance readout visible over the start screen. */
+.em-root.is-starting .em-hud {
+	opacity: 1;
+	visibility: visible;
+}
+
+.em-root.is-starting .em-tl {
+	z-index: 26;
+}
+
+.em-root.is-starting .em-tl > :not(.em-stats),
+.em-root.is-starting .em-hud > :not(.em-tl) {
+	visibility: hidden;
 }
 
 /* top-left: frame rate, brand, traversal mode */
