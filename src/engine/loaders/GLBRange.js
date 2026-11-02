@@ -1,5 +1,5 @@
 import { assembleKTX2LevelFromRanges, planKTX2LevelRanges } from './KTX2Level.js';
-import { fetchKTX2LevelsFromIndex } from './KTX2Range.js';
+import { fetchKTX2Level, fetchKTX2LevelsFromIndex } from './KTX2Range.js';
 
 const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
@@ -79,16 +79,25 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 	if ( jsonAndBinHeader.bytes.byteLength !== jsonLength + 8 ) throw new Error( 'GLB JSON/BIN header range is incomplete' );
 	const json = JSON.parse( new TextDecoder().decode( jsonAndBinHeader.bytes.subarray( 0, jsonLength ) ) );
 	const imageViews = new Map();
+	const externalImages = new Map();
 	for ( const [ imageIndex, image ] of ( json.images || [] ).entries() ) {
 		if ( image.uri ) return null;
-		if ( image.mimeType !== 'image/ktx2' || ! Number.isSafeInteger( image.bufferView ) ) continue;
+		if ( image.mimeType !== 'image/ktx2' ) continue;
+		if ( ! Number.isSafeInteger( image.bufferView ) ) {
+			const assetId = image.extensions?.EXT_elsemesh_asset_reference?.assetId;
+			if ( typeof assetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( assetId ) ) throw new Error( 'GLB external KTX2 image has no valid ElseMesh asset reference' );
+			let external = externalImages.get( assetId );
+			if ( ! external ) externalImages.set( assetId, external = { assetId, imageIndices: [] } );
+			external.imageIndices.push( imageIndex );
+			continue;
+		}
 		const bufferView = json.bufferViews?.[ image.bufferView ];
 		if ( ! bufferView || bufferView.buffer !== 0 || ! Number.isSafeInteger( bufferView.byteOffset ) || ! Number.isSafeInteger( bufferView.byteLength ) ) throw new Error( 'GLB KTX2 image buffer view is invalid' );
 		let imageView = imageViews.get( image.bufferView );
 		if ( ! imageView ) imageViews.set( image.bufferView, imageView = { view: bufferView, imageIndices: [] } );
 		imageView.imageIndices.push( imageIndex );
 	}
-	if ( imageViews.size === 0 ) return null;
+	if ( imageViews.size === 0 && externalImages.size === 0 ) return null;
 	const binHeader = new DataView( jsonAndBinHeader.bytes.buffer, jsonAndBinHeader.bytes.byteOffset + jsonLength, 8 );
 	const binLength = binHeader.getUint32( 0, true );
 	const binOffset = 28 + jsonLength;
@@ -158,6 +167,37 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 			levelIndex: image.levelIndex - 1,
 		} );
 	}
+	let externalBytesRequested = 0;
+	for ( const image of externalImages.values() ) {
+		const firstLevel = await connector.getAssetRange( image.assetId, { start: 0, end: KTX2_HEADER_BYTES - 1, signal } );
+		if ( firstLevel.start !== 0 || firstLevel.end !== KTX2_HEADER_BYTES - 1 || firstLevel.bytes.byteLength !== KTX2_HEADER_BYTES
+			|| ! Number.isSafeInteger( firstLevel.totalLength ) || firstLevel.totalLength < KTX2_HEADER_BYTES || ! firstLevel.etag )
+			throw new Error( 'External KTX2 header range is incomplete' );
+		const header = new DataView( firstLevel.bytes.buffer, firstLevel.bytes.byteOffset, firstLevel.bytes.byteLength );
+		const levelCount = header.getUint32( 40, true );
+		if ( levelCount < 1 || levelCount > MAX_KTX2_LEVELS ) throw new Error( 'External KTX2 level count is invalid' );
+		const selected = await fetchKTX2Level( connector, image.assetId, {
+			imageOffset: 0, imageLength: firstLevel.totalLength, levelIndex: levelCount - 1,
+			assetLength: firstLevel.totalLength, etag: firstLevel.etag, signal,
+		} );
+		progressiveImages.push( {
+			imageIndices: image.imageIndices,
+			assetId: image.assetId,
+			imageOffset: 0,
+			imageLength: firstLevel.totalLength,
+			assetLength: firstLevel.totalLength,
+			etag: selected.etag,
+			headerAndIndex: selected.headerAndIndex,
+			sections: selected.sections,
+			baseWidth: header.getUint32( 20, true ),
+			baseHeight: header.getUint32( 24, true ),
+			levelCount,
+			levelIndex: levelCount - 2,
+			textureAssetId: image.assetId,
+			initialLevelBytes: selected.bytes,
+		} );
+		externalBytesRequested += firstLevel.bytes.byteLength + selected.requestedBytes;
+	}
 	const glb = buildGLB( json, geometry, coarseImages );
 	return {
 		bytes: glb,
@@ -165,7 +205,7 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		totalLength: assetLength,
 		selectedLevel: 'coarsest',
 		textures: progressiveImages,
-		sourceBytesRequested: 20 + jsonAndBinHeader.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ),
+		sourceBytesRequested: 20 + jsonAndBinHeader.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + externalBytesRequested,
 	};
 }
 
@@ -174,10 +214,21 @@ export async function fetchNextGLBTextureLevels( connector, assetId, progressive
 	const wanted = imageIndices && new Set( imageIndices );
 	const images = ( progressive?.textures || [] ).filter( image => image.levelIndex >= 0 && ( ! wanted || image.imageIndices.some( index => wanted.has( index ) ) ) );
 	if ( images.length === 0 ) return [];
-	const levels = await fetchKTX2LevelsFromIndex( connector, assetId, images, { signal } );
-	for ( const level of levels ) {
-		const image = images.find( candidate => candidate.imageIndices.some( index => level.imageIndices.includes( index ) ) );
-		if ( image ) image.levelIndex = level.levelIndex - 1;
+	const groups = new Map();
+	for ( const image of images ) {
+		const sourceAssetId = image.assetId || assetId;
+		let group = groups.get( sourceAssetId );
+		if ( ! group ) groups.set( sourceAssetId, group = [] );
+		group.push( image );
+	}
+	const levels = [];
+	for ( const [ sourceAssetId, group ] of groups ) {
+		const selectedLevels = await fetchKTX2LevelsFromIndex( connector, sourceAssetId, group, { signal } );
+		for ( const level of selectedLevels ) {
+			const image = group.find( candidate => candidate.imageIndices.some( index => level.imageIndices.includes( index ) ) );
+			if ( image ) image.levelIndex = level.levelIndex - 1;
+		}
+		levels.push( ...selectedLevels );
 	}
 	return levels;
 }

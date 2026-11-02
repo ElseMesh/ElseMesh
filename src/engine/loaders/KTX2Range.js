@@ -67,7 +67,8 @@ export async function fetchKTX2Level( connector, assetId, {
 		bytes: assembleKTX2LevelFromRanges( headerAndIndex, levelIndex, { sections, levelBytes, totalLength: imageLength } ),
 		etag: containerETag, totalLength: first.totalLength, levelIndex,
 		width: plan.width, height: plan.height,
-		requestedBytes: first.bytes.byteLength + fetched.reduce( ( total, result ) => total + result.bytes.byteLength, 0 ),
+		headerAndIndex: headerAndIndex, sections,
+		requestedBytes: first.bytes.byteLength + ( index === first ? 0 : index.bytes.byteLength ) + fetched.reduce( ( total, result ) => total + result.bytes.byteLength, 0 ),
 	};
 }
 

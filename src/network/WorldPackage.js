@@ -193,7 +193,7 @@ function updateWorldPackageTextureLOD( root, camera ) {
 			const desiredLevel = Math.min( target.levelCount - 1, Math.max( 0, Math.floor( Math.log2( textureDiameter / pixelDiameter ) ) ) );
 			return desiredLevel <= target.nextLevelIndex;
 		} );
-		const imageIndices = eligible.map( target => target.imageIndex );
+		const imageIndices = [ ...new Set( eligible.flatMap( target => target.imageIndices || [ target.imageIndex ] ) ) ];
 		const bytes = eligible.reduce( ( total, target ) => {
 			const offset = 80 + target.nextLevelIndex * 24;
 			return total + Number( new DataView( target.headerAndIndex.buffer, target.headerAndIndex.byteOffset, target.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
@@ -207,14 +207,14 @@ function updateWorldPackageTextureLOD( root, camera ) {
 		state.progressiveTextureJobs.set( request.assetId, true );
 		state.textureLODQueue.run( state.progressiveController.signal, async () => {
 			const levels = await fetchNextGLBTextureLevels( state.connector, request.assetId, request.progressive, { imageIndices: request.imageIndices, signal: state.progressiveController.signal } );
-			for ( const level of levels ) for ( const imageIndex of level.imageIndices ) {
+			for ( const level of levels ) for ( const target of state.progressiveTextureTargets.values() ) {
+				if ( target.assetId !== request.assetId || ! ( target.imageIndices || [ target.imageIndex ] ).some( index => level.imageIndices.includes( index ) ) ) continue;
 				if ( state.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
-				const target = state.progressiveTextureTargets.get( `${ request.assetId }:${ imageIndex }` );
-				if ( target ) await installProgressiveTextureLevel( target, level );
+				await installProgressiveTextureLevel( target, level );
 			}
 		} ).catch( error => {
 			for ( const image of request.progressive.textures ) if ( image.imageIndices.some( index => request.imageIndices.includes( index ) ) ) {
-				const target = state.progressiveTextureTargets.get( `${ request.assetId }:${ image.imageIndices.find( index => request.imageIndices.includes( index ) ) }` );
+				const target = [ ...state.progressiveTextureTargets.values() ].find( candidate => candidate.assetId === request.assetId && ( candidate.imageIndices || [ candidate.imageIndex ] ).some( index => image.imageIndices.includes( index ) ) );
 				if ( target ) image.levelIndex = target.nextLevelIndex;
 			}
 			if ( error?.name !== 'AbortError' && ! state.disposed ) console.warn( 'World texture mip upgrade failed', request.assetId, error );
@@ -723,16 +723,17 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		const preserveBC = progressiveImage && GPU.features.has( 'texture-compression-bc' ) && Array.from( { length: progressiveImage.levelIndex + 2 }, ( _, level ) =>
 			canUploadBCTexture( Math.max( 1, progressiveImage.baseWidth >> level ), Math.max( 1, progressiveImage.baseHeight >> level ) )
 		).every( Boolean );
-		const textureKey = `${ image.assetId || textureSource }:${ format }`;
+		const sharedTextureAssetId = image.assetId || progressiveImage?.textureAssetId || null;
+		const textureKey = `${ sharedTextureAssetId || textureSource }:${ format }`;
 		if ( textures.has( textureKey ) ) return textures.get( textureKey );
 
-		const shareAssetTexture = Boolean( image.assetId && packageState?.textureAssets );
+		const shareAssetTexture = Boolean( sharedTextureAssetId && packageState?.textureAssets );
 		let entry = shareAssetTexture ? packageState.textureAssets.get( textureKey ) : null;
 		if ( ! entry ) {
 			entry = { texture: null, promise: null };
 			entry.promise = ( async () => {
-				const bytes = image?.bytes || ( image?.assetId
-					? await packageState?.connector?.getAsset( image.assetId, { signal } )
+				const bytes = progressiveImage?.initialLevelBytes || image?.bytes || ( sharedTextureAssetId
+					? await packageState?.connector?.getAsset( sharedTextureAssetId, { signal } )
 					: null );
 				if ( ! bytes ) throw new Error( `GLB ${label} texture requires embedded image bytes or a declared ElseMesh image asset` );
 				const pixels = await decodeImage( bytes, image.mimeType, { forceRGBA: Boolean( progressiveImage && ! preserveBC ) } );
@@ -770,9 +771,12 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		}
 
 		const decodedTexture = entry.texture || await entry.promise;
-		if ( progressiveImage && ! packageState.progressiveTextureTargets.has( `${ sourceAssetId }:${ textureSource }` ) ) {
-			packageState.progressiveTextureTargets.set( `${ sourceAssetId }:${ textureSource }`, {
-				assetId: sourceAssetId, imageIndex: textureSource, texture: decodedTexture,
+		const progressiveTargetID = progressiveImage?.textureAssetId
+			? `${ sourceAssetId }:asset:${ progressiveImage.textureAssetId }:${ format }`
+			: `${ sourceAssetId }:${ textureSource }`;
+		if ( progressiveImage && ! packageState.progressiveTextureTargets.has( progressiveTargetID ) ) {
+			packageState.progressiveTextureTargets.set( progressiveTargetID, {
+				assetId: sourceAssetId, imageIndex: textureSource, imageIndices: progressiveImage.imageIndices, texture: decodedTexture,
 				baseWidth: progressiveImage.baseWidth, baseHeight: progressiveImage.baseHeight,
 				levelCount: progressiveImage.levelCount, nextLevelIndex: progressiveImage.levelIndex,
 				headerAndIndex: progressiveImage.headerAndIndex,

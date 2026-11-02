@@ -87,4 +87,61 @@ const secondFineOffset = Number( sourceView.getBigUint64( 80 + secondFineLevelIn
 const secondFineLength = Number( sourceView.getBigUint64( 80 + secondFineLevelIndex * 24 + 8, true ) );
 const secondFineRequests = requested.slice( beforeSecondFineLevel );
 assert( secondFineRequests.length === 1 && secondFineRequests[ 0 ].start === secondFineOffset && secondFineRequests[ 0 ].end === secondFineOffset + secondFineLength - 1, 'each successive upgrade transfers only its newly requested mip payload' );
+
+const textureAssetId = `sha256:${'b'.repeat( 64 )}`;
+const externalDocument = {
+	asset: { version: '2.0' },
+	buffers: [ { byteLength: geometry.byteLength } ],
+	bufferViews: [ { buffer: 0, byteOffset: 0, byteLength: geometry.byteLength } ],
+	images: [ { mimeType: 'image/ktx2', extensions: { EXT_elsemesh_asset_reference: { assetId: textureAssetId } } } ],
+	nodes: [], scenes: [ { nodes: [] } ], scene: 0,
+	extensionsUsed: [ 'EXT_elsemesh_asset_reference' ], extensionsRequired: [ 'EXT_elsemesh_asset_reference' ],
+};
+const externalJSON = new TextEncoder().encode( JSON.stringify( externalDocument ) );
+const externalJSONLength = ( externalJSON.byteLength + 3 ) & ~3;
+const externalGLB = new Uint8Array( 28 + externalJSONLength + geometry.byteLength );
+const externalView = new DataView( externalGLB.buffer );
+externalView.setUint32( 0, 0x46546c67, true );
+externalView.setUint32( 4, 2, true );
+externalView.setUint32( 8, externalGLB.byteLength, true );
+externalView.setUint32( 12, externalJSONLength, true );
+externalView.setUint32( 16, 0x4e4f534a, true );
+externalGLB.fill( 0x20, 20, 20 + externalJSONLength );
+externalGLB.set( externalJSON, 20 );
+externalView.setUint32( 20 + externalJSONLength, geometry.byteLength, true );
+externalView.setUint32( 24 + externalJSONLength, 0x004e4942, true );
+externalGLB.set( geometry, 28 + externalJSONLength );
+const externalAssets = new Map( [ [ 'external-glb', externalGLB ], [ textureAssetId, ktx2 ] ] );
+const externalETags = new Map( [ [ 'external-glb', '"external-glb-etag"' ], [ textureAssetId, '"external-texture-etag"' ] ] );
+const externalRequests = [];
+const externalConnector = {
+	async getAssetRange( assetId, { start, end } ) {
+		const bytes = externalAssets.get( assetId );
+		assert( bytes, `external range requested for declared asset ${assetId}` );
+		externalRequests.push( { assetId, start, end } );
+		return { start, end, bytes: bytes.slice( start, end + 1 ), etag: externalETags.get( assetId ), totalLength: bytes.byteLength };
+	},
+	async getAssetRanges( assetId, ranges ) {
+		const bytes = externalAssets.get( assetId );
+		assert( bytes, `external range batch requested for declared asset ${assetId}` );
+		for ( const range of ranges ) externalRequests.push( { assetId, ...range } );
+		return ranges.map( range => ( { ...range, bytes: bytes.slice( range.start, range.end + 1 ), etag: externalETags.get( assetId ), totalLength: bytes.byteLength } ) );
+	},
+};
+const externalResult = await fetchGLBWithCoarseKTX2( externalConnector, 'external-glb' );
+assert( externalResult?.bytes instanceof Uint8Array, 'external KTX2 references use the progressive range path' );
+const externalParsed = parseGLB( externalResult.bytes );
+assert.equal( externalParsed.images[ 0 ].assetId, textureAssetId, 'the coarse GLB retains the content-addressed shared texture identity' );
+assert.equal( externalParsed.images[ 0 ].bytes, null, 'the coarse GLB does not inline duplicate texture bytes' );
+assert.deepEqual( externalResult.textures[ 0 ].initialLevelBytes, extractKTX2Level( ktx2, levelCount - 1 ), 'the initial shared texture is the coarsest independently fetched mip' );
+const externalInitialRequests = externalRequests.slice();
+assert.equal( externalResult.sourceBytesRequested, externalInitialRequests.reduce( ( total, range ) => total + range.end - range.start + 1, 0 ), 'the reported initial transfer includes ranges for separate texture assets' );
+const externalMipStart = externalRequests.length;
+const externalFine = await fetchNextGLBTextureLevels( externalConnector, 'external-glb', externalResult );
+const externalFineIndex = levelCount - 2;
+assert.deepEqual( externalFine[ 0 ].bytes, extractKTX2Level( ktx2, externalFineIndex ), 'a shared texture upgrades from its standalone KTX2 asset' );
+const externalFineRequests = externalRequests.slice( externalMipStart );
+const externalFineOffset = Number( sourceView.getBigUint64( 80 + externalFineIndex * 24, true ) );
+const externalFineLength = Number( sourceView.getBigUint64( 80 + externalFineIndex * 24 + 8, true ) );
+assert.deepEqual( externalFineRequests, [ { assetId: textureAssetId, start: externalFineOffset, end: externalFineOffset + externalFineLength - 1 } ], 'a shared-texture upgrade requests only its new mip bytes, not geometry or earlier mips' );
 console.log( 'Ranged GLB coarse-texture checks passed' );

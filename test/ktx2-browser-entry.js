@@ -6,33 +6,42 @@ import { disposeWorldPackage, loadWorldPackage, updateWorldPackageLOD } from '..
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 
 const result = document.querySelector( '#result' );
+const testWarnings = [];
+const originalWarn = console.warn.bind( console );
+console.warn = ( ...args ) => { testWarnings.push( args.map( value => value instanceof Error ? value.stack || value.message : String( value ) ).join( ' ' ) ); originalWarn( ...args ); };
 
-function makeGLB( imageBytes ) {
+function makeGLB( imageBytes, externalTextureAssetId = null ) {
 	const positions = new Float32Array( [ -1, -1, 0, 1, -1, 0, 0, 1, 0 ] );
 	const uvs = new Float32Array( [ 0, 0, 1, 0, 0.5, 1 ] );
 	const imageOffset = ( positions.byteLength + uvs.byteLength + 3 ) & ~3;
-	const binary = new Uint8Array( ( imageOffset + imageBytes.byteLength + 3 ) & ~3 );
+	const storedImageBytes = externalTextureAssetId ? new Uint8Array() : imageBytes;
+	const binary = new Uint8Array( ( imageOffset + storedImageBytes.byteLength + 3 ) & ~3 );
 	binary.set( new Uint8Array( positions.buffer ), 0 );
 	binary.set( new Uint8Array( uvs.buffer ), positions.byteLength );
-	binary.set( imageBytes, imageOffset );
+	binary.set( storedImageBytes, imageOffset );
+	const bufferViews = [
+		{ buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+		{ buffer: 0, byteOffset: positions.byteLength, byteLength: uvs.byteLength },
+	];
+	const image = externalTextureAssetId
+		? { mimeType: 'image/ktx2', extensions: { EXT_elsemesh_asset_reference: { assetId: externalTextureAssetId } } }
+		: { bufferView: 2, mimeType: 'image/ktx2' };
+	if ( ! externalTextureAssetId ) bufferViews.push( { buffer: 0, byteOffset: imageOffset, byteLength: imageBytes.byteLength } );
 	const json = {
 		asset: { version: '2.0' },
 		buffers: [ { byteLength: binary.byteLength } ],
-		bufferViews: [
-			{ buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
-			{ buffer: 0, byteOffset: positions.byteLength, byteLength: uvs.byteLength },
-			{ buffer: 0, byteOffset: imageOffset, byteLength: imageBytes.byteLength },
-		],
+		bufferViews,
 		accessors: [
 			{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' },
 			{ bufferView: 1, componentType: 5126, count: 3, type: 'VEC2' },
 		],
-		images: [ { bufferView: 2, mimeType: 'image/ktx2' } ],
+		images: [ image ],
 		textures: [ { extensions: { KHR_texture_basisu: { source: 0 } } } ],
 		materials: [ { pbrMetallicRoughness: { baseColorTexture: { index: 0 } } } ],
 		meshes: [ { primitives: [ { attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 0 } ] } ],
 		nodes: [ { mesh: 0 } ], scenes: [ { nodes: [ 0 ] } ], scene: 0,
-		extensionsUsed: [ 'KHR_texture_basisu' ], extensionsRequired: [ 'KHR_texture_basisu' ],
+		extensionsUsed: [ 'KHR_texture_basisu', ...( externalTextureAssetId ? [ 'EXT_elsemesh_asset_reference' ] : [] ) ],
+		extensionsRequired: [ 'KHR_texture_basisu', ...( externalTextureAssetId ? [ 'EXT_elsemesh_asset_reference' ] : [] ) ],
 	};
 	const jsonBytes = new TextEncoder().encode( JSON.stringify( json ) );
 	const jsonLength = ( jsonBytes.byteLength + 3 ) & ~3;
@@ -88,6 +97,32 @@ try {
 	if ( finerLevels.length !== 1 ) throw new Error( 'coarse GLB did not expose one next-finer mip' );
 	const finerImage = await decodeKTX2( finerLevels[ 0 ].bytes );
 	if ( finerImage.width <= coarseImage.width || finerImage.height <= coarseImage.height || finerImage.mipmaps?.length > 1 ) throw new Error( 'next-finer KTX2 range did not decode as a larger one-level image' );
+	const externalTextureAssetId = `sha256:${'1'.repeat( 64 )}`;
+	const externalSourceGLB = makeGLB( ktx2Bytes, externalTextureAssetId );
+	const externalRangeRequests = [];
+	const externalConnector = {
+		getAssetRange: async ( assetId, { start, end, signal } ) => {
+			const bytes = assetId === 'external-glb' ? externalSourceGLB : assetId === externalTextureAssetId ? ktx2Bytes : null;
+			if ( ! bytes ) throw new Error( `unexpected external asset ${assetId}` );
+			externalRangeRequests.push( { assetId, start, end } );
+			return { bytes: bytes.slice( start, end + 1 ), etag: assetId === 'external-glb' ? '"external-glb"' : '"external-texture"', start, end, totalLength: bytes.byteLength };
+		},
+		getAssetRanges: async ( assetId, ranges ) => {
+			const bytes = assetId === 'external-glb' ? externalSourceGLB : assetId === externalTextureAssetId ? ktx2Bytes : null;
+			if ( ! bytes ) throw new Error( `unexpected external asset ${assetId}` );
+			for ( const range of ranges ) externalRangeRequests.push( { assetId, ...range } );
+			return ranges.map( range => ( { bytes: bytes.slice( range.start, range.end + 1 ), etag: assetId === 'external-glb' ? '"external-glb"' : '"external-texture"', ...range, totalLength: bytes.byteLength } ) );
+		},
+	};
+	const externalCoarseGLB = await fetchGLBWithCoarseKTX2( externalConnector, 'external-glb' );
+	if ( ! externalCoarseGLB ) throw new Error( 'external content-addressed KTX2 image was not processed progressively' );
+	const externalProgressiveForPackage = structuredClone( externalCoarseGLB );
+	const externalProgressive = structuredClone( externalCoarseGLB );
+	const externalCoarseTexture = await decodeKTX2( externalProgressive.textures[ 0 ].initialLevelBytes );
+	if ( externalCoarseTexture.width !== 1 || externalCoarseTexture.height !== 1 ) throw new Error( 'external KTX2 did not start from its coarsest standalone mip' );
+	const externalNextLevels = await fetchNextGLBTextureLevels( externalConnector, 'external-glb', externalCoarseGLB );
+	const externalNextTexture = await decodeKTX2( externalNextLevels[ 0 ].bytes );
+	if ( externalNextTexture.width <= externalCoarseTexture.width || externalNextTexture.height <= externalCoarseTexture.height ) throw new Error( 'external KTX2 mip upgrade did not advance to a larger image' );
 	const rangeBase = 96;
 	const rangeAsset = new Uint8Array( rangeBase + ktx2Bytes.byteLength + 32 );
 	rangeAsset.set( ktx2Bytes, rangeBase );
@@ -150,9 +185,30 @@ try {
 			await new Promise( resolve => setTimeout( resolve, 5 ) );
 		}
 		if ( progressiveTarget.nextLevelIndex >= 0 || coarseTexture.width !== 16 || coarseTexture.height !== 16 || coarseTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `screen-space texture streaming did not install all required levels (${coarseTexture.width}x${coarseTexture.height}, ${coarseTexture.mipLevelCount} mips, next ${progressiveTarget.nextLevelIndex})` );
+		const externalProgressiveConnector = {
+			...externalConnector,
+			worldId: 'elsemesh:ktx2-external-webgpu-test',
+			manifest: { ...connector.manifest, objects: [ { ...connector.manifest.objects[ 0 ], assetId: 'external-fixture', streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } } ] },
+		};
+		const externalRoot = await loadWorldPackage( externalProgressiveConnector, {
+			assets: new Map( [ [ 'external-fixture', externalCoarseGLB.bytes ] ] ),
+			progressiveAssets: new Map( [ [ 'external-fixture', externalProgressiveForPackage ] ] ),
+		} );
+		let externalTexture;
+		externalRoot.traverse( node => { if ( node.isMesh ) externalTexture = node.material.bindings.worldAlbedo?.texture; } );
+		if ( externalTexture?.width !== 1 || ! [ ...externalRoot.userData.worldPackage.textureAssets.keys() ].some( key => key.startsWith( externalTextureAssetId ) ) ) throw new Error( 'WorldPackage did not seed and share the coarse external texture asset' );
+		const externalTarget = [ ...externalRoot.userData.worldPackage.progressiveTextureTargets.values() ].find( target => target.texture === externalTexture );
+		if ( ! externalTarget ) throw new Error( 'WorldPackage did not retain the external texture mip range target' );
+		camera.position.set( 0, 0, 3 ); camera.updateMatrixWorld( true );
+		for ( let attempt = 0; attempt < 100 && externalTarget.nextLevelIndex >= 0; attempt ++ ) {
+			updateWorldPackageLOD( externalRoot, camera );
+			await new Promise( resolve => setTimeout( resolve, 5 ) );
+		}
+		if ( externalTarget.nextLevelIndex >= 0 || externalTexture.width !== 16 || externalTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `WorldPackage did not install all external KTX2 mips (${externalTexture.width}x${externalTexture.height}, ${externalTexture.mipLevelCount} mips, next ${externalTarget.nextLevelIndex})` );
 		await GPU.queue.onSubmittedWorkDone();
 		validationError = await device.popErrorScope();
 		if ( validationError ) throw new Error( `WebGPU rejected texture creation/upload: ${validationError.message}` );
+		disposeWorldPackage( externalRoot );
 		disposeWorldPackage( coarseRoot );
 		disposeWorldPackage( root );
 	} else {
@@ -179,5 +235,5 @@ try {
 	} );
 } catch ( error ) {
 	result.dataset.status = 'failed';
-	result.textContent = error.stack || String( error );
+	result.textContent = [ error.stack || String( error ), ...testWarnings ].join( '\n' );
 }
