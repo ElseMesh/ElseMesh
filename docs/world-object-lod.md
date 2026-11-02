@@ -65,18 +65,19 @@ complete conventional pyramid adds about one third to the base-level texel
 count before compression, rather than requiring several independent full-size
 images. KTX2 indexes its mip levels, which can support fetching a level's byte
 range, but that alone does not make a texture progressively transferable. The
-provider must expose stable content-addressed level ranges (or separate level
-assets), and the browser decoder must be verified to consume a partial pyramid
-and upgrade a live texture. The exact container or chunk format is an
-implementation choice, but it must permit content-addressed reuse and
-progressive level requests. The current engine path does not implement this
-contract: geometry LOD records reference separate GLBs and images remain
-embedded in those GLBs. WebGPU can retain block-aligned BC-compressed KTX2 data
-when the adapter supports it; otherwise it decodes RGBA and generates GPU
-mipmaps. This affects GPU storage and upload only. It does not reduce network, browser-disk,
-or encoded-cache size. The provider still selects one Unreal source mip per
-texture, so cross-GLB texture deduplication and independently streamed texture
-levels remain unimplemented.
+progressive GLB loader supports embedded KTX2 images and content-addressed
+image assets referenced with `EXT_elsemesh_asset_reference`. For an external
+image it can assemble geometry with the coarsest KTX2 level, retain the shared
+texture identity, then range-fetch finer levels from the standalone asset
+without retransmitting geometry or earlier levels. Synthetic range and
+isolated Chromium WebGPU tests cover that path. This gives separate geometry
+variants a way to share one encoded texture asset; it does not make a provider
+emit or deduplicate those assets automatically. The Hogwarts provider still
+embeds textures and selects one Unreal source mip per texture, so Hogwarts
+cross-GLB reuse and independent source-mip tiers remain unimplemented. WebGPU
+can retain block-aligned BC-compressed KTX2 data when the adapter supports it;
+otherwise it decodes RGBA. That affects GPU storage and upload, not encoded
+network or disk-cache size.
 
 ## Camera selection
 
