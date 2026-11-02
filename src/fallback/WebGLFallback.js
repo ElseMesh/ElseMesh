@@ -1977,8 +1977,8 @@ export class WebGLFallback {
 	_frame() {
 
 		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
-		this.app.updateFPS( dt );
-		this.app.hud?.setStats( { fps: this.app.fps, frameMs: dt * 1000 } );
+		this.app.updateFPS();
+		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs } );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );

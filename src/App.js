@@ -880,8 +880,8 @@ export class App {
 	hostedPackageFrame( dt ) {
 
 		GPU.beginFrame();
-		this.updateFPS( dt );
-		this.hud?.setStats( { fps: this.fps, frameMs: dt * 1000 } );
+		this.updateFPS();
+		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs } );
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		FrameUniforms.fields.dt.value = dt;
 		FrameUniforms.fields.time.value += dt;
@@ -1101,12 +1101,23 @@ export class App {
 		this.engine.start( ( dt, t ) => this.frame( dt, t ), this.desktopFrameRateLimit );
 	}
 
-	updateFPS( dt ) {
+	updateFPS() {
 
-		const f = this._fps || ( this._fps = { el: document.getElementById( 'fps' ), acc: 0, n: 0, worst: 0 } );
-		f.acc += dt;
+		const now = performance.now();
+		const f = this._fps || ( this._fps = { el: document.getElementById( 'fps' ), acc: 0, n: 0, worst: 0, last: null } );
+		if ( f.last === null ) {
+
+			f.last = now;
+			this.frameMs = 0;
+			return;
+
+		}
+		const elapsed = Math.max( 0, ( now - f.last ) / 1000 );
+		f.last = now;
+		this.frameMs = elapsed * 1000;
+		f.acc += elapsed;
 		f.n ++;
-		f.worst = Math.max( f.worst, dt );
+		f.worst = Math.max( f.worst, elapsed );
 		if ( f.acc >= 0.5 ) {
 
 			const fps = f.n / f.acc;
@@ -1840,7 +1851,7 @@ export class App {
 		GPU.beginFrame();
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		const s = this.settings;
-		this.updateFPS( dt );
+		this.updateFPS();
 		G.dt.value = dt;
 		G.time.value += dt;
 		if ( s.timeSpeed !== 0 ) s.timeOfDay = ( s.timeOfDay + dt * s.timeSpeed + 24 ) % 24;
