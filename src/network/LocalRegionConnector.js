@@ -195,6 +195,7 @@ export class LocalRegionConnector {
 		this.unknownSourcesCompleteByCell = new Map();
 		this.emptyCollisionCellsAreVerified = false;
 		this.lastCollisionPathStatus = null;
+		this.lastCollisionPathDiagnostic = null;
 		this.collisionLoadLatencyMs = 2000;
 		this.cellSizeMeters = 0;
 		this.maxViewDistanceMeters = 0;
@@ -472,6 +473,15 @@ export class LocalRegionConnector {
 			missingCollisionPayloadObjectIDs: this.missingCollisionPayloadObjectIDs,
 			missingKnownShapeObjectIDs: this.collisionObjectIDsMissingKnownShape,
 		} );
+		if ( this.regionDiagnostics ) {
+			const signature = this.lastCollisionPathStatus.ready ? 'ready' : JSON.stringify( this.lastCollisionPathStatus );
+			if ( signature !== this.lastCollisionPathDiagnostic ) {
+				console.info( 'ElseMesh local-region movement gate:', JSON.stringify( {
+					from: vectorValues( from ), to: vectorValues( to ), ...this.lastCollisionPathStatus,
+				} ) );
+				this.lastCollisionPathDiagnostic = signature;
+			}
+		}
 		return this.lastCollisionPathStatus.ready;
 	}
 
