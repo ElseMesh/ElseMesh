@@ -75,14 +75,14 @@ format-neutral native library at `native/ktx2`. HogwartsBridge decodes one
 Unreal texture, passes its RGBA buffer to the library through a C ABI, and
 receives encoded output in bounded callback chunks directly into the GLB
 buffer. This avoids a second process boundary, per-texture PNG/KTX2 files, and
-an extra full-size encoded-output copy. The library serializes encodes and
-limits Basis Universal to one worker thread to keep peak resource use
-predictable. The native API is deliberately independent of Unreal, Hogwarts,
+an extra full-size encoded-output copy. The library serializes encode calls
+and caps each Basis job pool at four threads, the measured setting for the
+current Hogwarts workload. The native API is deliberately independent of Unreal, Hogwarts,
 Go, C#, and the renderer, so Thruholdd can link the same implementation if
 centralized encoding becomes useful to another world.
 
-This is not yet a Thruholdd encoding service or shared cross-visitor texture
-cache. The source provider remains responsible for decoding source formats,
+This is not yet a Thruholdd encoding service or content-addressed cross-visitor
+texture cache. The source provider remains responsible for decoding source formats,
 selecting mip/sample levels, and choosing metadata such as sRGB or normal-map
 handling. If another world needs centralized encoding, Thruholdd can reuse the
 same library and accept bounded raw pixel streams with dimensions and encoding
@@ -171,7 +171,9 @@ mip per texture (the largest usable source mip at or below 512 pixels per
 dimension) into each region GLB. The shared KTX2 C ABI now also supports
 encoding only the supplied source level, while retaining generated mip chains
 by default; HogwartsBridge does not yet select or publish these independent
-source-mip assets. The server RAM/disk cache and browser RAM/OPFS cache retain
+source-mip assets. A bounded bridge-worker LRU reuses encoded images by source
+path and variant across cell conversions, but it is neither content-addressed
+nor persistent. The server RAM/disk cache and browser RAM/OPFS cache retain
 whole region responses, not texture-specific mip variants. The engine
 generates a GPU mip chain from the single embedded image for sampling. Since
 images are embedded per GLB, the same source texture can still be repeated in
