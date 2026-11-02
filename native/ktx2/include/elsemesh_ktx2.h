@@ -19,7 +19,8 @@ extern "C" {
 // callback to stop the encode. No output-file staging or caller-owned output
 // allocation is required.
 // Each chunk pointer is valid only for the duration of that callback.
-// flags: bit 0 = sRGB transfer; bit 1 = renormalize generated normal-map mips.
+// flags: bit 0 = sRGB transfer; bit 1 = renormalize generated normal-map mips;
+// bit 2 = do not generate a mip chain (encode only the supplied source level).
 typedef int (*em_ktx2_write_callback)(const uint8_t *chunk, size_t chunk_bytes, void *user_data);
 
 ELSEMESH_KTX2_API int em_ktx2_encode_rgba8_stream(

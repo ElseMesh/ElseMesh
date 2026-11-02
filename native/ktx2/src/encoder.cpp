@@ -12,7 +12,8 @@ namespace {
 
 constexpr uint32_t kSrgb = 1u << 0;
 constexpr uint32_t kNormalMap = 1u << 1;
-constexpr uint32_t kKnownFlags = kSrgb | kNormalMap;
+constexpr uint32_t kNoMipGeneration = 1u << 2;
+constexpr uint32_t kKnownFlags = kSrgb | kNormalMap | kNoMipGeneration;
 constexpr size_t kMaxInputBytes = 256u * 1024u * 1024u;
 constexpr uint32_t kMaxDimension = 16384;
 
@@ -81,7 +82,7 @@ extern "C" int em_ktx2_encode_rgba8_stream(
         params.m_pJob_pool = &jobPool;
         params.set_format_mode(basist::basis_tex_format::cUASTC_LDR_4x4);
         params.set_srgb_options((flags & kSrgb) != 0);
-        params.m_mip_gen = true;
+        params.m_mip_gen = (flags & kNoMipGeneration) == 0;
         params.m_mip_renormalize = (flags & kNormalMap) != 0;
         params.m_create_ktx2_file = true;
         params.m_write_output_basis_or_ktx2_files = false;
