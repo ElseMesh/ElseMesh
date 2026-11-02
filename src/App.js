@@ -80,7 +80,7 @@ import { avatarProfileId, loadAppearance } from './player/AvatarAppearance.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -1218,6 +1218,7 @@ export class App {
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
+		const runtimesByID = root.userData.worldComponentRuntimes ||= new Map();
 		const components = [ ...( connector.manifest.components || [] ) ].sort( ( a, b ) => ( worldComponentDescriptor( a.type )?.installRank ?? 1 ) - ( worldComponentDescriptor( b.type )?.installRank ?? 1 ) );
 		for ( const component of components ) {
 			if ( installedIDs.has( component.id ) || componentIDs && ! componentIDs.has( component.id ) || componentAssetIDs( component ).some( id => ! connector.assets.has( id ) ) ) continue;
@@ -1227,13 +1228,13 @@ export class App {
 			const backendAdapter = worldComponentBackendAdapter( this.backend, component.type );
 			if ( backendAdapter ) {
 				const result = await backendAdapter( { app: this, root, connector, installed }, component );
-				if ( result?.runtime ) installed.push( result.runtime );
+				if ( result?.runtime ) { installed.push( result.runtime ); runtimesByID.set( component.id, result.runtime ); }
 				if ( result === true || result?.installed || installed.length > count ) installedIDs.add( component.id );
 				continue;
 			}
 			if ( descriptor?.install ) {
 				const result = await descriptor.install( { app: this, root, connector, installed }, component );
-				if ( result?.runtime ) installed.push( result.runtime );
+				if ( result?.runtime ) { installed.push( result.runtime ); runtimesByID.set( component.id, result.runtime ); }
 				if ( result === true || result?.installed || installed.length > count ) installedIDs.add( component.id );
 				continue;
 			}
@@ -1445,6 +1446,16 @@ export class App {
 			}
 			if ( releaseObjectIDs.size ) unloadWorldPackageObjects( root, connector, this.hostedColliders, releaseObjectIDs );
 		}
+		const installedComponentIDs = root.userData.installedWorldComponentIDs || new Set();
+		const releaseComponentIDs = new Set();
+		for ( const component of connector.manifest.components || [] ) {
+			if ( ! installedComponentIDs.has( component.id ) || ! component.streamingBounds ) continue;
+			const bounds = component.streamingBounds;
+			const maxDistance = Math.min( connector.localOnly ? connector.maxViewDistanceMeters : 500, bounds.maxDistanceMeters ?? Infinity );
+			const dx = this.camera.position.x - bounds.center[ 0 ], dy = this.camera.position.y - bounds.center[ 1 ], dz = this.camera.position.z - bounds.center[ 2 ];
+			if ( dx * dx + dy * dy + dz * dz > ( maxDistance * 1.1 ) ** 2 ) releaseComponentIDs.add( component.id );
+		}
+		if ( releaseComponentIDs.size ) unloadWorldPackageComponents( root, connector, releaseComponentIDs );
 		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath ) {
 			const flying = this.freeCam;

@@ -508,7 +508,41 @@ export function unloadWorldPackageObjects( root, connector, colliders, objectIDs
 		if ( state.loadedObjects.has( object.id ) ) for ( const assetID of worldObjectAssetIDs( object ) ) retainedAssetIDs.add( assetID );
 	}
 	for ( const component of connector.manifest.components || [] ) {
-		for ( const reference of component.assets || [] ) if ( reference.assetId ) retainedAssetIDs.add( reference.assetId );
+		if ( root.userData.installedWorldComponentIDs?.has( component.id ) ) for ( const reference of component.assets || [] ) if ( reference.assetId ) retainedAssetIDs.add( reference.assetId );
+	}
+	for ( const assetID of releaseAssetIDs ) {
+		if ( retainedAssetIDs.has( assetID ) ) continue;
+		disposeParsedWorldAsset( state, assetID );
+		connector.releaseAsset?.( assetID );
+	}
+}
+
+export function unloadWorldPackageComponents( root, connector, componentIDs ) {
+	const installedIDs = root?.userData?.installedWorldComponentIDs;
+	const runtimes = root?.userData?.worldComponentRuntimes;
+	const components = new Map( ( connector.manifest.components || [] ).map( component => [ component.id, component ] ) );
+	const releaseAssetIDs = new Set();
+	for ( const componentID of componentIDs || [] ) {
+		const component = components.get( componentID );
+		if ( ! component || ! installedIDs?.has( componentID ) ) continue;
+		for ( const reference of component.assets || [] ) if ( reference.assetId ) releaseAssetIDs.add( reference.assetId );
+		const runtime = runtimes?.get( componentID );
+		try { runtime?.dispose?.(); }
+		finally {
+			runtimes?.delete( componentID );
+			installedIDs.delete( componentID );
+			const worldComponents = root.userData.worldComponents || [];
+			if ( runtime ) root.userData.worldComponents = worldComponents.filter( entry => entry !== runtime );
+		}
+	}
+	if ( releaseAssetIDs.size === 0 ) return;
+	const retainedAssetIDs = new Set();
+	const state = root.userData.worldPackage;
+	for ( const object of connector.manifest.objects || [] ) {
+		if ( state?.loadedObjects?.has( object.id ) ) for ( const assetID of worldObjectAssetIDs( object ) ) retainedAssetIDs.add( assetID );
+	}
+	for ( const component of connector.manifest.components || [] ) {
+		if ( installedIDs?.has( component.id ) ) for ( const reference of component.assets || [] ) if ( reference.assetId ) retainedAssetIDs.add( reference.assetId );
 	}
 	for ( const assetID of releaseAssetIDs ) {
 		if ( retainedAssetIDs.has( assetID ) ) continue;
@@ -523,7 +557,7 @@ function worldObjectAssetIDs( object ) {
 }
 
 function disposeParsedWorldAsset( state, assetID ) {
-	const parsed = state.parsed?.get( assetID );
+	const parsed = state?.parsed?.get( assetID );
 	if ( ! parsed ) return;
 	const geometries = new Set(), materials = new Set(), textures = new Set();
 	parsed.traverse( object => {

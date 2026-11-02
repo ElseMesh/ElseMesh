@@ -70,7 +70,16 @@ streaming. Instance transforms use a normalized quaternion and positive scale.
 The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 
-The component's streaming bounds enclose the transformed model bounds. Asset
+The component's streaming bounds enclose the transformed model bounds. A
+bounded component is an engine-owned streaming unit: it is installed when
+selected for the view, retained while within its authored maximum distance,
+and disposed after leaving that distance with a small hysteresis margin. Its
+GPU runtime and component-only asset references are released when no remaining
+loaded object or installed component uses them. This releases the connector's
+RAM copy; it does not delete the browser's persistent disk-cache entry. A later
+request can reload those bytes from the shared, quota-bounded LRU disk cache.
+Components without bounds are world-lifetime systems and are not
+distance-evicted. Asset
 references are content-addressed and verified by the signed manifest before
 loading. The contract validator rejects unknown format versions, invalid
 transforms, duplicate model IDs, invalid or overlapping LOD thresholds, and
