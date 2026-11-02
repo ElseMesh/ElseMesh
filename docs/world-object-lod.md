@@ -16,6 +16,26 @@ visibility-prioritized loading in `WorldStreaming.js` does not reduce its mesh.
 
 ## Content and streaming contract
 
+### Coarse-first streaming evolution
+
+The current signed object-LOD contract below starts with `assetId` at full
+detail and requests cheaper variants for smaller projected bounds. That is
+useful for ordinary distance LOD, but it cannot meet the bridge's progressive
+startup requirement: visitors must receive a usable coarse mesh first and
+refine it only when view demand justifies the transfer. Evolve the engine
+contract before connecting a provider that has this requirement. The target
+contract makes `assetId` the coarsest usable representation and orders optional
+variants from coarser to finer, each with a minimum projected-size threshold.
+The selector begins at the coarse base and requests the next finer variant only
+as projected size crosses its threshold. Keep the currently visible level while
+the request is pending; failed or stale refinements must leave it usable.
+
+This is an intentional redesign of the unpublished interface. Update schema
+validation, asset selection/preload, runtime selection, authoring, and existing
+world data together. Preserve collision as an independent source; changing
+visual detail must never change collision or traversal authority. Avoid adding a
+per-world switch that leaves two competing meanings for the same LOD contract.
+
 An asset instance may declare optional signed `lods`, ordered from medium to
 lowest detail, each referencing a distinct content-addressed GLB and a decreasing
 `maxScreenFraction` threshold. Keep the existing `assetId` as full detail and the
