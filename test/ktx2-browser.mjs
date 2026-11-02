@@ -18,8 +18,9 @@ function chromiumPath() {
 const sleep = ms => new Promise( resolve => setTimeout( resolve, ms ) );
 
 async function launchChromium( executable, profile ) {
+	const webgpu = process.env.ELSEMESH_TEST_WEBGPU === '1';
 	const child = spawn( executable, [
-		'--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--disable-extensions',
+		'--headless=new', '--no-sandbox', ...( webgpu ? [ '--enable-gpu', '--enable-features=Vulkan,WebGPU', '--use-angle=vulkan', '--enable-unsafe-webgpu' ] : [ '--disable-gpu' ] ), '--disable-dev-shm-usage', '--disable-extensions',
 		'--no-first-run', '--no-default-browser-check', '--remote-debugging-address=127.0.0.1',
 		'--remote-debugging-port=0', '--remote-allow-origins=*', `--user-data-dir=${profile}`, 'about:blank',
 	], { detached: true, stdio: 'ignore' } );
@@ -100,9 +101,9 @@ try {
 	assert( address && typeof address === 'object' && address.port > 0, 'Vite exposes an ephemeral localhost port' );
 	const { child, page } = await launchChromium( chromiumPath(), profile );
 	browser = child;
-	const result = await inspectPage( page, `http://127.0.0.1:${address.port}/test/ktx2-browser.html` );
+	const result = await inspectPage( page, `http://127.0.0.1:${address.port}/test/ktx2-browser.html${process.env.ELSEMESH_TEST_WEBGPU === '1' ? '?webgpu=1' : ''}` );
 	assert.equal( result.status, 'passed', `actual browser KTX2 transcode passes: ${result.text}` );
-	console.log( `KTX2 browser Basis transcode passed: ${result.text}` );
+	console.log( `KTX2 browser check passed: ${result.text}` );
 } finally {
 	if ( browser ) await stopChromium( browser );
 	await vite.close();

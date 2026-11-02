@@ -633,9 +633,21 @@ async function buildGLTF( gltf, packageState = null, signal = undefined ) {
 					: null );
 				if ( ! bytes ) throw new Error( `GLB ${label} texture requires embedded image bytes or a declared ElseMesh image asset` );
 				const pixels = await decodeImage( bytes, image.mimeType );
-				const decodedTexture = new Texture( { label: `world-${label}-${textureSource}`, width: pixels.width, height: pixels.height, format, data: pixels.data, mips: true, usage: [ 'sample', 'copyDst' ], sampler: 'anisoRepeat' } );
+				const textureFormat = pixels.format || format;
+				const decodedTexture = new Texture( {
+					label: `world-${label}-${textureSource}`,
+					width: pixels.width,
+					height: pixels.height,
+					format: textureFormat,
+					data: pixels.mipmaps?.[ 0 ]?.data || pixels.data,
+					mips: pixels.mipmaps ? pixels.mipmaps.length : true,
+					usage: [ 'sample', 'copyDst' ],
+					sampler: 'anisoRepeat',
+				} );
 				decodedTexture.getGPU();
-				generateMipmaps( decodedTexture );
+				if ( pixels.mipmaps ) {
+					for ( let mip = 1; mip < pixels.mipmaps.length; mip ++ ) decodedTexture.upload( pixels.mipmaps[ mip ].data, { mip, width: pixels.mipmaps[ mip ].width, height: pixels.mipmaps[ mip ].height } );
+				} else generateMipmaps( decodedTexture );
 				if ( packageState?.disposed ) {
 					decodedTexture.destroy();
 					throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );

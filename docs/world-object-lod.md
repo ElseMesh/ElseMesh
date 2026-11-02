@@ -60,12 +60,13 @@ assets), and the browser decoder must be verified to consume a partial pyramid
 and upgrade a live texture. The exact container or chunk format is an
 implementation choice, but it must permit content-addressed reuse and
 progressive level requests. The current engine path does not implement this
-contract: geometry LOD records reference separate GLBs, images are embedded in
-those GLBs, and runtime-generated GPU mipmaps are created only after the
-embedded base image is downloaded and decoded. Those runtime mipmaps improve
-sampling but do not reduce network, browser-disk, or encoded-cache size.
-Cross-GLB texture deduplication and independently streamed texture levels
-remain unimplemented.
+contract: geometry LOD records reference separate GLBs and images remain
+embedded in those GLBs. WebGPU can retain block-aligned BC-compressed KTX2 data
+when the adapter supports it; otherwise it decodes RGBA and generates GPU
+mipmaps. This affects GPU storage and upload only. It does not reduce network, browser-disk,
+or encoded-cache size. The provider still selects one Unreal source mip per
+texture, so cross-GLB texture deduplication and independently streamed texture
+levels remain unimplemented.
 
 ## Camera selection
 

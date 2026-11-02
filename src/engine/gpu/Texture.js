@@ -7,7 +7,7 @@ import { GPU, formatInfo, sampleTypeOf } from './GPU.js';
 //                  format: 'rgba16float', mips: false | true | n, usage: [ 'sample', 'render', 'storage', 'copySrc', 'copyDst' ],
 //                  sampler: 'linearRepeat' | ... (default sampler name, informative for ports) } )
 //
-// `data` uploads level 0 (TypedArray, tightly packed rows; 2d-array / 3d / cube: all layers).
+// `data` uploads level 0 (texel rows or compressed blocks; 2d-array / 3d / cube: all layers).
 
 let _texId = 0;
 
@@ -54,7 +54,12 @@ export class Texture {
 			copyDst: GPUTextureUsage.COPY_DST,
 		}[ k ];
 		// mip generation renders into each level
-		if ( this.mipLevelCount > 1 ) u |= GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
+		if ( this.mipLevelCount > 1 ) {
+
+			u |= GPUTextureUsage.TEXTURE_BINDING;
+			if ( ! formatInfo( this.format ).compressed ) u |= GPUTextureUsage.RENDER_ATTACHMENT;
+
+		}
 		return u;
 
 	}
@@ -174,16 +179,18 @@ export class Texture {
 
 		}
 
-		const bpp = formatInfo( this.format ).bytes;
+		const info = formatInfo( this.format );
 		const w = width || Math.max( 1, this.width >> mip );
 		const h = height || Math.max( 1, this.height >> mip );
 		const d = layers || ( this.dimension === '3d' ? Math.max( 1, this.depth >> mip ) : this.depth - layer );
 		const bytes = data instanceof ArrayBuffer ? data : data.buffer;
 		const byteOffset = data instanceof ArrayBuffer ? 0 : data.byteOffset;
+		const blockWidth = info.blockWidth || 1;
+		const blockHeight = info.blockHeight || 1;
 		GPU.queue.writeTexture(
 			{ texture: this.gpu, mipLevel: mip, origin: { x, y, z: layer } },
 			bytes,
-			{ offset: byteOffset, bytesPerRow: w * bpp, rowsPerImage: h },
+			{ offset: byteOffset, bytesPerRow: Math.ceil( w / blockWidth ) * info.bytes, rowsPerImage: Math.ceil( h / blockHeight ) },
 			{ width: w, height: h, depthOrArrayLayers: d },
 		);
 

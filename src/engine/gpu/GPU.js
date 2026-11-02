@@ -66,7 +66,7 @@ export const GPU = {
 		const limits = {};
 		for ( const k in want ) if ( L[ k ] !== undefined ) limits[ k ] = Math.min( want[ k ], L[ k ] );
 
-		const optional = [ 'float32-filterable', 'timestamp-query', 'rg11b10ufloat-renderable', 'float32-blendable', 'shader-f16', 'clip-distances' ];
+		const optional = [ 'float32-filterable', 'timestamp-query', 'rg11b10ufloat-renderable', 'float32-blendable', 'shader-f16', 'clip-distances', 'texture-compression-bc' ];
 		const requiredFeatures = optional.filter( ( f ) => adapter.features.has( f ) );
 		this.features = new Set( requiredFeatures );
 		this.hasTimestamp = this.features.has( 'timestamp-query' );
@@ -230,6 +230,10 @@ const FORMAT_INFO = {
 	rg8unorm: { bytes: 2, sample: 'float' },
 	rgba8unorm: { bytes: 4, sample: 'float' },
 	'rgba8unorm-srgb': { bytes: 4, sample: 'float' },
+	'bc7-rgba-unorm': { bytes: 16, blockWidth: 4, blockHeight: 4, compressed: true, sample: 'float' },
+	'bc7-rgba-unorm-srgb': { bytes: 16, blockWidth: 4, blockHeight: 4, compressed: true, sample: 'float' },
+	'bc6h-rgb-ufloat': { bytes: 16, blockWidth: 4, blockHeight: 4, compressed: true, sample: 'float' },
+	'bc6h-rgb-float': { bytes: 16, blockWidth: 4, blockHeight: 4, compressed: true, sample: 'float' },
 	bgra8unorm: { bytes: 4, sample: 'float' },
 	r16float: { bytes: 2, sample: 'float' },
 	rg16float: { bytes: 4, sample: 'float' },
