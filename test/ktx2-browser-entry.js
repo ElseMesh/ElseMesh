@@ -1,5 +1,5 @@
 import { canUploadBCTexture, decodeKTX2 } from '../src/engine/loaders/KTX2.js';
-import { extractKTX2Level } from '../src/engine/loaders/KTX2Level.js';
+import { fetchKTX2Level } from '../src/engine/loaders/KTX2Range.js';
 import { GPU } from '../src/engine/webgpu.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
@@ -59,8 +59,19 @@ try {
 	const image = await decodeKTX2( ktx2Bytes );
 	if ( image.width !== 16 || image.height !== 16 ) throw new Error( `unexpected dimensions ${image.width}x${image.height}` );
 	const sourceLevelCount = new DataView( ktx2Bytes.buffer, ktx2Bytes.byteOffset, ktx2Bytes.byteLength ).getUint32( 40, true );
+	const rangeBase = 96;
+	const rangeAsset = new Uint8Array( rangeBase + ktx2Bytes.byteLength + 32 );
+	rangeAsset.set( ktx2Bytes, rangeBase );
+	const rangeETag = `"sha256-${'0'.repeat( 64 )}"`;
+	const rangeConnector = { getAssetRange: async ( _assetId, { start, end } ) => ( {
+		bytes: rangeAsset.slice( start, end + 1 ), etag: rangeETag, start, end, totalLength: rangeAsset.byteLength,
+	} ) };
 	for ( const level of [ 0, sourceLevelCount - 1 ] ) {
-		const singleLevel = await decodeKTX2( extractKTX2Level( ktx2Bytes, level ) );
+		const ranged = await fetchKTX2Level( rangeConnector, 'fixture-glb', {
+			imageOffset: rangeBase, imageLength: ktx2Bytes.byteLength, assetLength: rangeAsset.byteLength, levelIndex: level, etag: rangeETag,
+		} );
+		if ( ranged.requestedBytes >= ktx2Bytes.byteLength ) throw new Error( 'selected mip range plan did not reduce the fixture payload bytes' );
+		const singleLevel = await decodeKTX2( ranged.bytes );
 		const expectedWidth = Math.max( 1, 16 >> level ), expectedHeight = Math.max( 1, 16 >> level );
 		if ( singleLevel.width !== expectedWidth || singleLevel.height !== expectedHeight ) throw new Error( `single KTX2 mip ${level} decoded as ${singleLevel.width}x${singleLevel.height}, expected ${expectedWidth}x${expectedHeight}` );
 		if ( singleLevel.mipmaps?.length > 1 ) throw new Error( `single KTX2 mip ${level} unexpectedly decoded ${singleLevel.mipmaps.length} levels` );

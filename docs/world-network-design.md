@@ -168,12 +168,13 @@ selection, partial KTX2 transfer, or live texture upgrades.
 KTX2 itself provides a level index containing byte offsets and lengths, and its
 format allows each mip level to be supercompressed independently. The format
 can therefore support fetching selected mip payloads without retransmitting
-previously delivered levels. ElseMesh can now turn a complete in-memory KTX2
-container into a standalone one-level container and transcode that level on
-both the RGBA fallback and WebGPU BC7 path. It still fetches complete GLB image
-data and has no range/level endpoint or progressive GPU texture upgrade, so
-this does not yet save network bytes. Hogwarts' concrete acceptance criteria and
-current gap are tracked in its
+previously delivered levels. ElseMesh can plan metadata and selected-mip byte
+ranges inside a range-capable asset, fetch only those intervals, rebuild a
+standalone one-level container, and decode it on both the RGBA fallback and
+WebGPU BC7 path. The current world loader still fetches complete GLBs and does
+not yet supply image offsets to this helper or progressively update live
+textures, so world startup does not yet save network bytes. Hogwarts' concrete
+acceptance criteria and current gap are tracked in its
 [bridge design](../worlds/Hogwarts/docs/bridge-design.md#progressive-ktx2-transfer-contract).
 
 Cache layers retain different representations and have separate budgets:
