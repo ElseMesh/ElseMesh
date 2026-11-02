@@ -9,7 +9,7 @@ import { MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KI
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
-const DEFAULT_LOCAL_REGION_CACHE_BYTES = 256 * 1024 * 1024;
+const DEFAULT_LOCAL_REGION_CACHE_BYTES = 128 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 1024 * 1024 * 1024;
 const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
 const LOCAL_REGION_CACHE_BYTES_PER_GIB = 64 * 1024 * 1024;
@@ -39,9 +39,9 @@ function requireValue( value, message ) {
 
 function localRegionCacheBudgetBytes() {
 	// deviceMemory is a coarse, browser-bounded physical-memory hint, not a
-	// free-RAM measurement. Preserve the current 320 MiB total when unavailable.
+	// free-RAM measurement. Use a conservative ceiling when unavailable.
 	const deviceMemory = globalThis.navigator?.deviceMemory;
-	if ( ! Number.isFinite( deviceMemory ) || deviceMemory <= 0 ) return DEFAULT_LOCAL_REGION_CACHE_BYTES + DEFAULT_LOCAL_REGION_CACHE_BYTES / 4;
+	if ( ! Number.isFinite( deviceMemory ) || deviceMemory <= 0 ) return DEFAULT_LOCAL_REGION_CACHE_BYTES;
 	return Math.min( MAX_LOCAL_REGION_CACHE_BYTES, Math.max( MIN_LOCAL_REGION_CACHE_BYTES, Math.floor( deviceMemory * LOCAL_REGION_CACHE_BYTES_PER_GIB ) ) );
 }
 

@@ -216,7 +216,7 @@ try {
 		href: 'http://127.0.0.1:5189/',
 	} ), /cannot be combined/ );
 	const invalidIDConnector = new LocalRegionConnector( link );
-	assert.equal( invalidIDConnector.assetCacheBudgetBytes + invalidIDConnector.assetRangeCacheBudgetBytes, 320 * 1024 * 1024, 'browsers without a reported RAM hint retain the conservative default cache budget' );
+	assert.equal( invalidIDConnector.assetCacheBudgetBytes + invalidIDConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'browsers without a reported RAM hint use the conservative default cache budget' );
 	for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) {
 		descriptorWorldId = worldId;
 		await assert.rejects( invalidIDConnector.getManifest(), /unsupported descriptor/, `dynamic world providers must reject ${worldId}` );

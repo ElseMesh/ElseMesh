@@ -234,7 +234,8 @@ hint: 64 MiB per reported GiB (one sixteenth of the hint), split 80/20 between
 full responses and byte ranges, with a 64 MiB floor and 1 GiB ceiling. For
 example, a 2 GiB hint gets 128 MiB, an 8 GiB hint gets 512 MiB, and a 16 GiB
 hint reaches the ceiling. When the browser does not expose that hint, it uses
-a 320 MiB total. The reported value is approximate, coarsened,
+a conservative 128 MiB total because available RAM cannot be inferred safely.
+The reported value is approximate, coarsened,
 browser-bounded, and not consistently available, so high-memory machines may
 not receive a correspondingly larger budget in every browser. This heuristic
 does not measure currently free RAM and cannot account for other tabs,
@@ -243,8 +244,17 @@ starting ceiling, not a promise that this much RAM is always available; LRU
 eviction must keep actual retained bytes within it. Tune the fraction and
 ceiling using renderer-memory, eviction, and refetch measurements before
 raising them. The shared host cache is a separate budget for all visitors and
-must be sized against the host process's effective memory limit and conversion
-headroom; it must not reuse the per-browser budget. Unload releases decoded/GPU
+must use the smaller of host and process/container headroom; it must not reuse
+the per-browser budget. The Hogwarts provider currently targets one sixteenth
+of effective RAM, capped at 1 GiB, after reserving at least one eighth of host
+RAM (and at least 1 GiB) for other work. For cgroups it also reserves at least
+512 MiB or one quarter of the cgroup limit, whichever is larger. It recomputes
+the budget on requests and every five seconds, evicting least-recently-used
+entries when the safe budget falls. If reliable host memory data is unavailable,
+the provider keeps no response bytes in RAM; the disk cache remains available.
+This cache is reclaimable storage, not a process memory limit or a guarantee
+that conversion working memory fits. Keep conversion concurrency and service
+cgroup limits as separate controls. Unload releases decoded/GPU
 and RAM state while requested encoded bytes remain in OPFS until normal
 disk-LRU eviction.
 Current Hogwarts implementation status: ElseMesh supports manifest-declared
