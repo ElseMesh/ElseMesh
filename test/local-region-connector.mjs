@@ -74,6 +74,7 @@ const emptyHash = Buffer.from( await crypto.subtle.digest( 'SHA-256', emptyBytes
 const originalFetch = globalThis.fetch;
 const originalNavigator = Object.getOwnPropertyDescriptor( globalThis, 'navigator' );
 let cellFetches = 0;
+let rangeFetches = 0;
 let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
@@ -119,6 +120,17 @@ globalThis.fetch = async ( input, options = {} ) => {
 			...( includeSupportedPrimitiveCell ? [ { x: 4, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 1, supportedOtherPrimitiveComponents: 1, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] } ] : [] ),
 		].filter( cell => url.searchParams.getAll( 'cell' ).includes( `${cell.x},${cell.y},${cell.z}` ) ),
 		} );
+	}
+	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.has( 'lease' ) && options.headers?.Range ) {
+		const range = options.headers.Range.match( /^bytes=(\d+)-(\d+)$/ );
+		assert.ok( range, 'range requests use one closed byte range' );
+		rangeFetches++;
+		const start = Number( range[ 1 ] ), end = Math.min( Number( range[ 2 ] ), bytes.byteLength - 1 );
+		const body = bytes.slice( start, end + 1 );
+		return new Response( body, { status: 206, headers: {
+			'Content-Length': String( body.byteLength ), 'Content-Range': `bytes ${start}-${end}/${bytes.byteLength}`,
+			'Accept-Ranges': 'bytes', ETag: `"sha256-${hash}"`,
+		} } );
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
 		cellFetches++;
@@ -313,6 +325,24 @@ try {
 	assert.deepEqual( await diskCacheReloadedConnector.getAsset( reloadedVisualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'a new connector reuses the persistent cache without a provider request' );
 	diskCacheReloadedConnector.close();
+	const rangeCacheConnector = new LocalRegionConnector( link );
+	const rangeCacheManifest = await rangeCacheConnector.getManifest();
+	const rangeAssetID = rangeCacheManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	const rangeRequest = { start: 0, end: 31, etag: `"sha256-${hash}"`, totalLength: bytes.byteLength };
+	const rangeFetchesBefore = rangeFetches;
+	const firstRange = await rangeCacheConnector.getAssetRange( rangeAssetID, rangeRequest );
+	assert.deepEqual( firstRange.bytes, bytes.slice( 0, 32 ) );
+	assert.equal( firstRange.totalLength, bytes.byteLength );
+	assert.equal( rangeFetches, rangeFetchesBefore + 1, 'an uncached level range is fetched on demand' );
+	assert.deepEqual( ( await rangeCacheConnector.getAssetRange( rangeAssetID, rangeRequest ) ).bytes, firstRange.bytes );
+	assert.equal( rangeFetches, rangeFetchesBefore + 1, 'a requested level range is reused from the browser RAM LRU' );
+	rangeCacheConnector.close();
+	const rangeDiskReloadedConnector = new LocalRegionConnector( link );
+	const rangeDiskReloadedManifest = await rangeDiskReloadedConnector.getManifest();
+	const rangeDiskAssetID = rangeDiskReloadedManifest.assets.find( asset => asset.id.endsWith( ':visual' ) ).id;
+	assert.deepEqual( ( await rangeDiskReloadedConnector.getAssetRange( rangeDiskAssetID, rangeRequest ) ).bytes, firstRange.bytes );
+	assert.equal( rangeFetches, rangeFetchesBefore + 1, 'a requested level range is reused from OPFS after connector restart' );
+	rangeDiskReloadedConnector.close();
 	console.log( 'local region connector tests passed' );
 } finally {
 	globalThis.fetch = originalFetch;

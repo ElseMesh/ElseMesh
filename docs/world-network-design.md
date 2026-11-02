@@ -184,7 +184,12 @@ textures including their generated mip levels. Cache keys must include the
 variant (or mip/tile identity), and eviction of inactive runtime resources
 must not discard persistent reusable source bytes. A cache hit at one layer
 does not imply that another layer has room for the corresponding decoded or
-GPU representation.
+GPU representation. Each byte cache stores only requested levels, updates
+recency on access, and expires levels independently while preserving the same
+immutable source/variant identity across host RAM/disk and browser RAM/OPFS.
+Avoid pre-splitting every level into duplicate host files when serving selected
+ranges from one shared response is cheaper; profile the index/storage overhead
+before adding that representation.
 
 Current Hogwarts implementation status: ElseMesh supports manifest-declared
 content-addressed GLB image references and shares their decoded GPU textures
@@ -196,9 +201,13 @@ encoding only the supplied source level, while retaining generated mip chains
 by default; HogwartsBridge does not yet select or publish these independent
 source-mip assets. A bounded bridge-worker LRU reuses encoded images by source
 path and variant across cell conversions, but it is neither content-addressed
-nor persistent. The server RAM/disk cache and browser RAM/OPFS cache retain
-whole region responses, not texture-specific mip variants. The engine
-generates a GPU mip chain from the single embedded image for sampling. Since
+nor persistent. The server RAM/disk cache retains whole converted region
+responses and serves selected byte ranges from them without copying levels
+into separate host entries. The browser now has a bounded, independently keyed
+RAM LRU and persists requested ranges in its existing bounded OPFS LRU; both
+cache only requested ranges and can evict them separately. These are transport
+primitives, not yet KTX2 mip-indexed requests: the engine still consumes whole
+images and generates a GPU mip chain from the single embedded image. Since
 images are embedded per GLB, the same source texture can still be repeated in
 different region responses. Texture-tier selection and scheduling remain
 unimplemented. See the [Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md)

@@ -49,6 +49,16 @@ regions. The browser should retain a usable coarse GPU level while finer levels
 arrive, then evict decoded or GPU-resident fine levels under memory pressure
 without deleting the reusable encoded cache entry.
 
+Every byte-cache layer follows demand: store a level or range only after a
+player's current view/traversal schedule requests it, key it by immutable
+source identity plus level/range and digest, and update recency on use. Apply
+the same identity and LRU semantics in the shared host RAM/disk caches and the
+browser RAM/OPFS caches. Do not eagerly split/copy every level into every
+cache. The provider may keep its existing whole response when range serving
+from that representation is cheaper; the network response and browser caches
+must still contain only requested ranges. Measure splitting/index overhead
+before adding a separate host fragment cache.
+
 A mip pyramid contains filtered images at successively smaller resolutions;
 it is not made by simply skipping every second or fourth source pixel. A
 complete conventional pyramid adds about one third to the base-level texel
