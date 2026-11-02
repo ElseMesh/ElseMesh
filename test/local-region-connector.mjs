@@ -88,14 +88,24 @@ let unresolvedInstancedMeshComponents = 0;
 let unindexedSpatialBoundsComponents = 0;
 let abortNextCellFetch = false;
 let abortableFetchStarted;
+let createdRegionLeaseQuery = null;
+let requestedRegionMeshLodQuery = null;
 globalThis.fetch = async ( input, options = {} ) => {
 	const url = new URL( input );
-	if ( url.pathname === '/v1/regions/great-hall/leases' && options.method === 'POST' ) return Response.json( { leaseId: 'a'.repeat( 32 ), expiresInSeconds: 30 } );
+	if ( url.pathname === '/v1/regions/great-hall/leases' && options.method === 'POST' ) {
+		createdRegionLeaseQuery = new URLSearchParams( url.searchParams );
+		return Response.json( { leaseId: 'a'.repeat( 32 ), expiresInSeconds: 30 } );
+	}
 	if ( url.pathname === `/v1/leases/${ 'a'.repeat( 32 ) }` && options.method === 'DELETE' ) {
 		leaseReleases++;
 		return new Response( null, { status: 204 } );
 	}
-	if ( url.pathname === '/v1/regions/great-hall' && ( options.method === undefined || options.method === 'GET' ) && url.searchParams.has( 'lease' ) ) payloadFetchOrder.push( url.searchParams.get( 'payload' ) );
+	if ( url.pathname === '/v1/regions/great-hall' && ( options.method === undefined || options.method === 'GET' ) && url.searchParams.has( 'lease' ) ) {
+		if ( url.searchParams.has( 'mesh' ) ) {
+			requestedRegionMeshLodQuery = new URLSearchParams( url.searchParams );
+		}
+		else payloadFetchOrder.push( url.searchParams.get( 'payload' ) );
+	}
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
 		schema: 'elsemesh.dynamic-region-provider/1', worldId: descriptorWorldId, title: 'Hogwarts Legacy',
 		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
@@ -148,7 +158,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		} } );
 	}
 	if ( url.pathname === '/v1/regions/great-hall' && url.searchParams.get( 'cell' ) === '0,0,0,16' && url.searchParams.get( 'lease' ) === 'a'.repeat( 32 ) ) {
-		cellFetches++;
+		if ( ! url.searchParams.has( 'mesh' ) ) cellFetches++;
 		if ( abortNextCellFetch ) {
 			abortNextCellFetch = false;
 			abortableFetchStarted();
@@ -201,6 +211,18 @@ try {
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
+	const meshLodAssetID = 'local-region-lod:test';
+	connector.regionAssets.set( meshLodAssetID, 'http://127.0.0.1:4179/v1/regions/great-hall?cell=0%2C0%2C0%2C16&payload=visual&mesh=%2FGame%2FTest%2FSM_Test.Component&lod=2' );
+	createdRegionLeaseQuery = null;
+	assert.deepEqual( await connector.getAsset( meshLodAssetID ), bytes, 'a standalone mesh LOD is fetched as a provider asset' );
+	assert.equal( createdRegionLeaseQuery?.get( 'mesh' ), '/Game/Test/SM_Test.Component', 'the region lease is scoped to the requested static-mesh component' );
+	assert.equal( createdRegionLeaseQuery?.get( 'lod' ), '2', 'the region lease is scoped to the requested authored LOD' );
+	assert.equal( requestedRegionMeshLodQuery?.get( 'mesh' ), createdRegionLeaseQuery?.get( 'mesh' ), 'the leased region request keeps the component path from its lease key' );
+	assert.equal( requestedRegionMeshLodQuery?.get( 'lod' ), createdRegionLeaseQuery?.get( 'lod' ), 'the leased region request keeps the authored LOD from its lease key' );
+	assert.equal( leaseReleases, 1, 'a fetched standalone mesh LOD releases its temporary visitor lease' );
+	connector.releaseAsset( meshLodAssetID );
+	connector.regionAssets.delete( meshLodAssetID );
+	leaseReleases = 0;
 	assert.ok( cellIndexRequests.length > 0 && cellIndexRequests.every( cells => cells.length > 0 && cells.length <= 512 ), 'startup and view cells use bounded coordinate requests' );
 	await connector.ensureCellsForView( [ 1, 0, 1 ], [ 100, 0, 1 ] );
 	assert.ok( connector.knownCells.has( '6,0,0' ), 'the projected movement frontier is queried before its cell can be entered' );

@@ -667,6 +667,9 @@ export class LocalRegionConnector {
 		const leaseURL = new URL( `${regionURL.pathname}/leases`, this.localProvider );
 		leaseURL.searchParams.set( 'cell', regionURL.searchParams.get( 'cell' ) || '' );
 		leaseURL.searchParams.set( 'payload', regionURL.searchParams.get( 'payload' ) || 'visual' );
+		for ( const parameter of [ 'mesh', 'lod' ] ) {
+			if ( regionURL.searchParams.has( parameter ) ) leaseURL.searchParams.set( parameter, regionURL.searchParams.get( parameter ) );
+		}
 		let phaseStartedAt = performance.now();
 		const leaseResponse = await fetch( leaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal } );
 		phaseMs.providerLeaseRequest = performance.now() - phaseStartedAt;
