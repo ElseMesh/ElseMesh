@@ -754,7 +754,7 @@ export class LocalRegionConnector {
 			const retain = retainAssets || retainAssetIDs.has( assetId );
 			const installStartedAt = performance.now();
 			try {
-				if ( onAsset ) await onAsset( assetId, bytes );
+				if ( onAsset ) await onAsset( assetId, bytes, progressive );
 				if ( retain ) loaded.set( assetId, bytes );
 				if ( this.regionDiagnostics && onAsset ) console.info( 'ElseMesh local-region installed:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - installStartedAt ) } ) );
 			} catch ( error ) {

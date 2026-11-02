@@ -1,6 +1,6 @@
 import { canUploadBCTexture, decodeKTX2 } from '../src/engine/loaders/KTX2.js';
 import { fetchKTX2Level } from '../src/engine/loaders/KTX2Range.js';
-import { fetchGLBWithCoarseKTX2 } from '../src/engine/loaders/GLBRange.js';
+import { fetchGLBWithCoarseKTX2, fetchNextGLBTextureLevels } from '../src/engine/loaders/GLBRange.js';
 import { GPU } from '../src/engine/webgpu.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
@@ -82,6 +82,10 @@ try {
 	const coarseKTX2 = coarseGLB.bytes.subarray( coarseBinStart + coarseView.byteOffset, coarseBinStart + coarseView.byteOffset + coarseView.byteLength );
 	const coarseImage = await decodeKTX2( coarseKTX2 );
 	if ( coarseImage.width !== 1 || coarseImage.height !== 1 || coarseImage.mipmaps?.length > 1 ) throw new Error( 'coarse GLB did not decode as one coarsest texture level' );
+	const finerLevels = await fetchNextGLBTextureLevels( rangedGLBConnector, 'fixture-glb', coarseGLB );
+	if ( finerLevels.length !== 1 ) throw new Error( 'coarse GLB did not expose one next-finer mip' );
+	const finerImage = await decodeKTX2( finerLevels[ 0 ].bytes );
+	if ( finerImage.width <= coarseImage.width || finerImage.height <= coarseImage.height || finerImage.mipmaps?.length > 1 ) throw new Error( 'next-finer KTX2 range did not decode as a larger one-level image' );
 	const rangeBase = 96;
 	const rangeAsset = new Uint8Array( rangeBase + ktx2Bytes.byteLength + 32 );
 	rangeAsset.set( ktx2Bytes, rangeBase );
@@ -142,6 +146,7 @@ try {
 		format: image.format || 'rgba8',
 		mipLevels: image.mipmaps?.length || 1,
 		coarseMipLevels: coarseImage.mipmaps?.length || 1,
+		nextMipDimensions: [ finerImage.width, finerImage.height ],
 		webgpuBC: hasBC,
 		colors,
 	} );

@@ -70,3 +70,57 @@ export async function fetchKTX2Level( connector, assetId, {
 		requestedBytes: first.bytes.byteLength + fetched.reduce( ( total, result ) => total + result.bytes.byteLength, 0 ),
 	};
 }
+
+/** Fetch selected levels using metadata already obtained with a coarse GLB mip. */
+export async function fetchKTX2LevelsFromIndex( connector, assetId, images, { signal } = {} ) {
+	if ( ! Array.isArray( images ) || images.length < 1 ) throw new TypeError( 'KTX2 indexed-level fetch requires at least one image' );
+	const source = images[ 0 ];
+	const selected = images.map( image => {
+		if ( ! image || ! Number.isSafeInteger( image.imageOffset ) || image.imageOffset < 0 || ! Number.isSafeInteger( image.imageLength ) || image.imageLength < KTX2_HEADER_BYTES || ! Number.isSafeInteger( image.levelIndex ) || image.levelIndex < 0 || ! image.etag || ! Number.isSafeInteger( image.assetLength ) ) throw new RangeError( 'KTX2 indexed-level metadata is invalid' );
+		if ( image.etag !== source.etag || image.assetLength !== source.assetLength ) throw new Error( 'KTX2 indexed-level images do not share the same source asset revision' );
+		const plan = planKTX2LevelRanges( image.headerAndIndex, image.levelIndex, {
+			baseOffset: image.imageOffset, totalLength: image.imageLength,
+		} );
+		const level = plan.parts.find( part => part.kind === 'level' );
+		return { image, plan, level };
+	} );
+	const ranges = selected.map( item => ( { start: item.level.start, end: item.level.end } ) );
+	const fetched = [];
+	for ( let offset = 0; offset < ranges.length; offset += 64 ) {
+		const batch = ranges.slice( offset, offset + 64 );
+		if ( typeof connector?.getAssetRanges === 'function' ) {
+			fetched.push( ...await connector.getAssetRanges( assetId, batch, {
+				etag: selected[ offset ].image.etag,
+				totalLength: selected[ offset ].image.assetLength,
+				signal,
+			} ) );
+		} else if ( typeof connector?.getAssetRange === 'function' ) {
+			fetched.push( ...await Promise.all( batch.map( range => connector.getAssetRange( assetId, {
+				...range,
+				etag: selected[ offset ].image.etag,
+				totalLength: selected[ offset ].image.assetLength,
+				signal,
+			} ) ) ) );
+		} else {
+			throw new TypeError( 'KTX2 indexed-level fetch requires a range-capable connector' );
+		}
+	}
+	if ( fetched.length !== selected.length ) throw new Error( 'KTX2 indexed-level response count is incomplete' );
+	return selected.map( ( item, index ) => {
+		const result = fetched[ index ];
+		if ( result.start !== item.level.start || result.end !== item.level.end || result.bytes.byteLength !== item.level.end - item.level.start + 1 || result.etag !== item.image.etag || result.totalLength !== item.image.assetLength ) throw new Error( 'KTX2 indexed-level response does not match its source asset' );
+		const bytes = assembleKTX2LevelFromRanges( item.image.headerAndIndex, item.image.levelIndex, {
+			sections: item.image.sections,
+			levelBytes: result.bytes,
+			totalLength: item.image.imageLength,
+		} );
+		return {
+			imageIndices: item.image.imageIndices,
+			levelIndex: item.image.levelIndex,
+			width: item.plan.width,
+			height: item.plan.height,
+			bytes,
+			requestedBytes: result.bytes.byteLength,
+		};
+	} );
+}

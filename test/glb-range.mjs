@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
 import { extractKTX2Level } from '../src/engine/loaders/KTX2Level.js';
-import { fetchGLBWithCoarseKTX2 } from '../src/engine/loaders/GLBRange.js';
+import { fetchGLBWithCoarseKTX2, fetchNextGLBTextureLevels } from '../src/engine/loaders/GLBRange.js';
 
 const ktx2 = new Uint8Array( await readFile( new URL( './fixtures/ktx2-checker.ktx2', import.meta.url ) ) );
 const sourceView = new DataView( ktx2.buffer, ktx2.byteOffset, ktx2.byteLength );
@@ -70,4 +70,21 @@ for ( let level = 0; level < levelCount - 1; level ++ ) {
 	assert( requested.every( range => range.end < offset || range.start >= offset + length ), `finer mip ${level} bytes are not requested` );
 }
 assert( result.sourceBytesRequested < asset.byteLength, 'range transfer requests fewer bytes than the complete GLB' );
+const beforeFineLevel = requested.length;
+const fineLevelIndex = levelCount - 2;
+const fineLevel = await fetchNextGLBTextureLevels( connector, 'synthetic-glb', result );
+assert.equal( fineLevel.length, 1, 'the image exposes one next-finer level' );
+assert.deepEqual( fineLevel[ 0 ].bytes, extractKTX2Level( ktx2, fineLevelIndex ), 'the next-finer mip is rebuilt from its indexed payload' );
+const fineLevelOffset = Number( sourceView.getBigUint64( 80 + fineLevelIndex * 24, true ) ) + 28 + jsonLength + geometry.byteLength;
+const fineLevelLength = Number( sourceView.getBigUint64( 80 + fineLevelIndex * 24 + 8, true ) );
+const fineLevelRequests = requested.slice( beforeFineLevel );
+assert( fineLevelRequests.length === 1 && fineLevelRequests[ 0 ].start === fineLevelOffset && fineLevelRequests[ 0 ].end === fineLevelOffset + fineLevelLength - 1, 'a finer-level upgrade requests only that mip payload, without geometry, coarse mip, or metadata' );
+const beforeSecondFineLevel = requested.length;
+const secondFineLevelIndex = levelCount - 3;
+const secondFineLevel = await fetchNextGLBTextureLevels( connector, 'synthetic-glb', result );
+assert.deepEqual( secondFineLevel[ 0 ].bytes, extractKTX2Level( ktx2, secondFineLevelIndex ), 'successive upgrades advance toward higher resolution' );
+const secondFineOffset = Number( sourceView.getBigUint64( 80 + secondFineLevelIndex * 24, true ) ) + 28 + jsonLength + geometry.byteLength;
+const secondFineLength = Number( sourceView.getBigUint64( 80 + secondFineLevelIndex * 24 + 8, true ) );
+const secondFineRequests = requested.slice( beforeSecondFineLevel );
+assert( secondFineRequests.length === 1 && secondFineRequests[ 0 ].start === secondFineOffset && secondFineRequests[ 0 ].end === secondFineOffset + secondFineLength - 1, 'each successive upgrade transfers only its newly requested mip payload' );
 console.log( 'Ranged GLB coarse-texture checks passed' );

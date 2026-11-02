@@ -88,6 +88,25 @@ hidden child cannot use it to reactivate itself and groups cannot select levels
 there. Portal previews must use `WorldPortalView`'s mapped destination camera and
 256 by 512 target, rather than the main camera or player position.
 
+### Detail selection rule
+
+Do not define LOD as a universal distance in metres. Use screen-space demand,
+which already incorporates distance, object or texture size, camera projection,
+and viewport resolution. For geometry, the engine's projected-bounds fraction
+and authored `maxScreenFraction` thresholds select variants; use hysteresis so
+small camera movements do not repeatedly switch levels. For textures, the
+renderer samples mip levels from screen-space UV derivatives. A streaming
+scheduler should use the same projected texel footprint to request the coarsest
+level that can satisfy visible demand, then prioritize finer levels by expected
+visible quality improvement per byte. Frustum/occlusion visibility and the
+server-validated reachable traversal frontier constrain which assets may be
+requested; predicted arrival may raise priority for reachable assets outside the
+current view. Under a bandwidth or memory budget, defer lower-value refinements
+while preserving a usable coarse level. KTX2 supplies independently indexed mip
+payloads, but does not itself choose network request priorities. This selection
+policy is the engine target; post-entry Hogwarts mip upgrades and their live
+budgeted scheduler are not yet integrated.
+
 ## Verification gates
 
 Check near/far/near selection, hysteresis, actual submitted triangle reductions,

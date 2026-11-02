@@ -1,4 +1,5 @@
 import { assembleKTX2LevelFromRanges, planKTX2LevelRanges } from './KTX2Level.js';
+import { fetchKTX2LevelsFromIndex } from './KTX2Range.js';
 
 const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
@@ -78,21 +79,23 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 	if ( jsonAndBinHeader.bytes.byteLength !== jsonLength + 8 ) throw new Error( 'GLB JSON/BIN header range is incomplete' );
 	const json = JSON.parse( new TextDecoder().decode( jsonAndBinHeader.bytes.subarray( 0, jsonLength ) ) );
 	const imageViews = new Map();
-	for ( const image of json.images || [] ) {
+	for ( const [ imageIndex, image ] of ( json.images || [] ).entries() ) {
 		if ( image.uri ) return null;
 		if ( image.mimeType !== 'image/ktx2' || ! Number.isSafeInteger( image.bufferView ) ) continue;
 		const bufferView = json.bufferViews?.[ image.bufferView ];
 		if ( ! bufferView || bufferView.buffer !== 0 || ! Number.isSafeInteger( bufferView.byteOffset ) || ! Number.isSafeInteger( bufferView.byteLength ) ) throw new Error( 'GLB KTX2 image buffer view is invalid' );
-		imageViews.set( image.bufferView, bufferView );
+		let imageView = imageViews.get( image.bufferView );
+		if ( ! imageView ) imageViews.set( image.bufferView, imageView = { view: bufferView, imageIndices: [] } );
+		imageView.imageIndices.push( imageIndex );
 	}
 	if ( imageViews.size === 0 ) return null;
 	const binHeader = new DataView( jsonAndBinHeader.bytes.buffer, jsonAndBinHeader.bytes.byteOffset + jsonLength, 8 );
 	const binLength = binHeader.getUint32( 0, true );
 	const binOffset = 28 + jsonLength;
 	if ( binHeader.getUint32( 4, true ) !== BIN_CHUNK || binOffset + binLength > assetLength || json.buffers?.length !== 1 || json.buffers[ 0 ].byteLength > binLength ) throw new Error( 'GLB BIN chunk is invalid or unsupported' );
-	const imageRanges = [ ...imageViews.entries() ].map( ( [ viewID, view ] ) => {
+	const imageRanges = [ ...imageViews.entries() ].map( ( [ viewID, { view, imageIndices } ] ) => {
 		if ( view.byteLength < KTX2_HEADER_BYTES || view.byteOffset + view.byteLength > binLength ) throw new Error( 'GLB KTX2 image is outside the BIN chunk' );
-		return { viewID, view, start: binOffset + view.byteOffset, end: binOffset + view.byteOffset + view.byteLength - 1 };
+		return { viewID, view, imageIndices, start: binOffset + view.byteOffset, end: binOffset + view.byteOffset + view.byteLength - 1 };
 	} );
 	const imageViewIDs = new Set( imageViews.keys() );
 	const geometryLength = ( json.bufferViews || [] ).reduce( ( length, view, index ) => {
@@ -132,6 +135,7 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 	}
 	const payloadBytes = payloadRanges.length ? await requestRanges( connector, assetId, payloadRanges, metadata, signal ) : [];
 	const coarseImages = [];
+	const progressiveImages = [];
 	for ( const image of imageRanges ) {
 		const bytesForImage = ( start, end ) => bytesForRange( [ { start: image.start, end: image.start + image.indexLength - 1, bytes: image.headerAndIndex }, ...payloadBytes ], start, end );
 		const sections = Object.fromEntries( image.plan.parts.filter( part => ! [ 'header-index', 'level' ].includes( part.kind ) ).map( part => [
@@ -140,7 +144,37 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		const level = image.plan.parts.find( part => part.kind === 'level' );
 		const levelBytes = bytesForImage( level.start, level.end );
 		coarseImages.push( { view: image.view, bytes: assembleKTX2LevelFromRanges( image.headerAndIndex, image.levelIndex, { sections, levelBytes, totalLength: image.view.byteLength } ) } );
+		progressiveImages.push( {
+			imageIndices: image.imageIndices,
+			imageOffset: image.start,
+			imageLength: image.view.byteLength,
+			assetLength,
+			etag: first.etag,
+			headerAndIndex: image.headerAndIndex,
+			sections,
+			levelCount: image.plan.levelCount,
+			levelIndex: image.levelIndex - 1,
+		} );
 	}
 	const glb = buildGLB( json, geometry, coarseImages );
-	return { bytes: glb, etag: first.etag, totalLength: assetLength, selectedLevel: 'coarsest', sourceBytesRequested: 20 + jsonAndBinHeader.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) };
+	return {
+		bytes: glb,
+		etag: first.etag,
+		totalLength: assetLength,
+		selectedLevel: 'coarsest',
+		textures: progressiveImages,
+		sourceBytesRequested: 20 + jsonAndBinHeader.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ),
+	};
+}
+
+/** Fetch the next finer indexed mip for every KTX2 image in a coarse GLB. */
+export async function fetchNextGLBTextureLevels( connector, assetId, progressive, { signal } = {} ) {
+	const images = ( progressive?.textures || [] ).filter( image => image.levelIndex >= 0 );
+	if ( images.length === 0 ) return [];
+	const levels = await fetchKTX2LevelsFromIndex( connector, assetId, images, { signal } );
+	for ( const level of levels ) {
+		const image = images.find( candidate => candidate.imageIndices.some( index => level.imageIndices.includes( index ) ) );
+		if ( image ) image.levelIndex = level.levelIndex - 1;
+	}
+	return levels;
 }
