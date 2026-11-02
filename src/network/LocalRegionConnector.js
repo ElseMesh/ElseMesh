@@ -355,13 +355,18 @@ export class LocalRegionConnector {
 		const assetURL = this.regionAssets.get( assetId );
 		requireValue( this.manifest && assetURL, 'Local region asset was not declared by the provider' );
 		const startedAt = performance.now();
+		const phaseMs = {};
+		let phaseStartedAt = performance.now();
 		let diskBytes = null;
 		try { diskBytes = await this.diskCache?.get( assetId ) || null; } catch ( error ) {
 			if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache read failed:', error );
 		}
+		phaseMs.browserDiskCacheRead = performance.now() - phaseStartedAt;
 		if ( diskBytes ) {
+			phaseStartedAt = performance.now();
 			this.#updateCollisionCoverage( assetId, diskBytes );
-			if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache hit:', JSON.stringify( { assetId, bytes: diskBytes.byteLength } ) );
+			phaseMs.collisionCoverage = performance.now() - phaseStartedAt;
+			if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache hit:', JSON.stringify( { assetId, bytes: diskBytes.byteLength, elapsedMs: performance.now() - startedAt, phaseMs } ) );
 			return this.#cacheAsset( assetId, diskBytes );
 		}
 		const bytes = await this.#withRegionLease( assetURL, signal, async ( response, leaseSignal ) => {
@@ -378,25 +383,33 @@ export class LocalRegionConnector {
 			if ( ! response.ok ) throw new Error( `Local region request failed (${response.status})` );
 			const declaredLength = Number( response.headers.get( 'Content-Length' ) );
 			requireValue( Number.isSafeInteger( declaredLength ) && declaredLength > 0 && declaredLength <= MAX_LOCAL_REGION_BYTES, 'Local region exceeds the browser memory limit' );
+			const bodyStartedAt = performance.now();
 			const bytes = new Uint8Array( await response.arrayBuffer() );
+			phaseMs.responseBodyRead = performance.now() - bodyStartedAt;
 			abortIfNeeded( leaseSignal );
 			requireValue( bytes.byteLength === declaredLength && bytes.byteLength <= MAX_LOCAL_REGION_BYTES, 'Local region length is invalid' );
+			const digestStartedAt = performance.now();
 			const digest = await crypto.subtle.digest( 'SHA-256', bytes );
+			phaseMs.responseDigest = performance.now() - digestStartedAt;
 			const digestHex = [ ...new Uint8Array( digest ) ].map( value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
 			requireValue( response.headers.get( 'ETag' ) === `"sha256-${digestHex}"`, 'Local region ETag does not match its content digest' );
+			phaseStartedAt = performance.now();
 			this.#updateCollisionCoverage( assetId, bytes );
+			phaseMs.collisionCoverage = performance.now() - phaseStartedAt;
+			phaseStartedAt = performance.now();
 			try { await this.diskCache?.put( assetId, bytes, digestHex ); } catch ( error ) {
 				if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache write failed:', error );
 			}
+			phaseMs.browserDiskCacheWrite = performance.now() - phaseStartedAt;
 			return this.#cacheAsset( assetId, bytes );
-		} ).catch( error => {
+		}, phaseMs ).catch( error => {
 			if ( this.regionDiagnostics ) {
 				const log = error?.name === 'AbortError' ? console.debug : console.error;
 				log( error?.name === 'AbortError' ? 'ElseMesh local-region fetch cancelled:' : 'ElseMesh local-region fetch failed:', JSON.stringify( { assetId, elapsedMs: Math.round( performance.now() - startedAt ), error: error?.stack || String( error ) } ) );
 			}
 			throw error;
 		} );
-		if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region fetched:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: Math.round( performance.now() - startedAt ) } ) );
+		if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region fetched:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: performance.now() - startedAt, phaseMs } ) );
 		if ( this.collisionAssetIDs.has( assetId ) ) {
 			const elapsedMs = Math.min( 30000, Math.max( 100, performance.now() - startedAt ) );
 			this.collisionLoadLatencyMs = Math.round( this.collisionLoadLatencyMs * 0.75 + elapsedMs * 0.25 );
@@ -417,15 +430,19 @@ export class LocalRegionConnector {
 		else this.unknownCollisionObjectIDs.add( collisionObjectID );
 	}
 
-	async #withRegionLease( assetURL, signal, consumeResponse ) {
+	async #withRegionLease( assetURL, signal, consumeResponse, phaseMs = {} ) {
 		abortIfNeeded( signal );
 		const regionURL = new URL( assetURL, this.localProvider );
 		const leaseURL = new URL( `${regionURL.pathname}/leases`, this.localProvider );
 		leaseURL.searchParams.set( 'cell', regionURL.searchParams.get( 'cell' ) || '' );
 		leaseURL.searchParams.set( 'payload', regionURL.searchParams.get( 'payload' ) || 'visual' );
+		let phaseStartedAt = performance.now();
 		const leaseResponse = await fetch( leaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal } );
+		phaseMs.providerLeaseRequest = performance.now() - phaseStartedAt;
 		if ( ! leaseResponse.ok ) throw new Error( `Local region lease request failed (${leaseResponse.status})` );
+		phaseStartedAt = performance.now();
 		const lease = await leaseResponse.json();
+		phaseMs.providerLeaseResponseParse = performance.now() - phaseStartedAt;
 		requireValue( /^[a-f0-9]{32}$/.test( lease?.leaseId || '' ) && lease.expiresInSeconds === 30, 'Local region provider returned an invalid lease' );
 		const controller = new AbortController();
 		const abort = () => controller.abort( signal?.reason || new DOMException( 'Aborted', 'AbortError' ) );
@@ -448,15 +465,19 @@ export class LocalRegionConnector {
 		const leasedURL = new URL( regionURL );
 		leasedURL.searchParams.set( 'lease', lease.leaseId );
 		try {
+			phaseStartedAt = performance.now();
 			const response = await fetch( leasedURL, { credentials: 'omit', cache: 'no-store', signal: controller.signal } );
+			phaseMs.providerRegionResponse = performance.now() - phaseStartedAt;
 			return await consumeResponse( response, controller.signal );
 		} finally {
 			released = true;
 			clearTimeout( renewalTimer );
 			signal?.removeEventListener( 'abort', abort );
+			phaseStartedAt = performance.now();
 			try {
 				await fetch( controlURL, { method: 'DELETE', credentials: 'omit', cache: 'no-store', keepalive: true } );
 			} catch { /* Lease expiry reclaims interest if the browser has gone away. */ }
+			phaseMs.providerLeaseRelease = performance.now() - phaseStartedAt;
 		}
 	}
 
