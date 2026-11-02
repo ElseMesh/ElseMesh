@@ -145,6 +145,18 @@ each level/tile independently so caches can reuse common data without
 duplicating complete image payloads. The engine chooses and upgrades tiers;
 the world describes the variants and dependencies.
 
+**No retransmission of delivered texture levels is a hard requirement.** The
+initial visual package may carry geometry plus the coarse mip tail needed to
+show it. A later quality upgrade for that same texture must request and transfer
+only finer mip-level payloads that the client does not already have; it must
+not resend geometry, coarse levels, or previously received level bytes. Fetch
+and cache the KTX2 header/index/format metadata once, then address level data
+independently by stable texture identity, level index, and digest. The provider
+may expose KTX2 byte ranges or an equivalent per-level endpoint. This contract
+must be measured at the wire/cache boundary, not inferred from GPU mip uploads.
+If a chosen encoder/decoder path cannot meet it, change or patch that path
+before adopting it for production streaming.
+
 For GLB images shared across regions, reference a separately declared asset
 with `image.extensions.EXT_elsemesh_asset_reference = { assetId }`, where
 `assetId` is the immutable SHA-256 ID declared in the signed world manifest.
@@ -152,6 +164,15 @@ Do not add an arbitrary image URL. `WorldPackage` resolves this ID through
 `connector.getAsset`, so normal provider verification and cache paths apply.
 This supports shared image assets; it does not by itself implement mip-tier
 selection, partial KTX2 transfer, or live texture upgrades.
+
+KTX2 itself provides a level index containing byte offsets and lengths, and its
+format allows each mip level to be supercompressed independently. The format
+can therefore support fetching selected mip payloads without retransmitting
+previously delivered levels. The current ElseMesh browser loader still fetches
+and transcodes a complete KTX2 image, so this is a format capability, not an
+implemented engine capability. Hogwarts' concrete acceptance criteria and
+current gap are tracked in its
+[bridge design](../worlds/Hogwarts/docs/bridge-design.md#progressive-ktx2-transfer-contract).
 
 Cache layers retain different representations and have separate budgets:
 shared host RAM/disk caches retain provider response variants for all visitors;
