@@ -10,7 +10,7 @@ Use the page's standard WebGPU API to distinguish browser exposure, adapter sele
 ## Workflow
 
 1. Confirm the affected browser, OS/device, exact site URL, and whether the page is on HTTPS or localhost. WebGPU requires a secure context.
-2. Open `/gpu-diagnostic/` on the affected site. For local Vite, start `npm run dev` and visit `http://localhost:5189/gpu-diagnostic/`.
+2. Open `/gpu-diagnostic/` on the affected site. For local Vite, start `npm run dev`, use the URL it prints (the server requests an available port), and append `/gpu-diagnostic/`.
 3. Save the page's JSON with **Copy report** or ask the user to share the displayed report. Record the stage and exact exception:
    - `navigator.gpu`: WebGPU is not exposed to this document.
    - `requestAdapter`: API exists, but no eligible adapter was returned.
