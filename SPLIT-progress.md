@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-03. Percentages are rough completion estimates for the
+Last assessed: 2026-11-04. Percentages are rough completion estimates for the
 active engine/world-separation and Tidewater parity goal. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -165,6 +165,15 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-04: reran `node test/world-behavior-registry.mjs` and
+  `node test/world-javascript-extension.mjs`; both passed. The isolated
+  Chromium Worker check also passed owner-signature verification, package
+  loading, and stateful execution in a real module Worker. Its fixture supplies
+  the package in memory, so it still does not verify a live gateway download or
+  `App.activateHostedWorld`. Vite printed a dependency-scan warning because
+  this standalone test server does not load ElseMesh's virtual-module plugin;
+  the browser test completed successfully. The test removed its isolated
+  profile and its Chromium process exited.
 - 2026-11-03: source review found the progress description lagged behind commit
   `1682b1f7` (2026-10-31). Linked WebGPU startup now branches to
   `initHostedPackageWorld()` before `initializeIslandWorldState()`; the
