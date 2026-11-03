@@ -10,6 +10,18 @@ This document specifies the account boundary for ElseMesh. `server/accountd` imp
 - Role grants target an account public key, not an email address or raw Google subject. A browser creates the key and proves possession. The broker privately maps the verified Google `sub` to that key so the same account can recover its account association on another device.
 - Account and role endpoints are separate from `worldd`'s public manifest, asset, and lookup endpoints and from `directoryd`. CORS is never authorization. Account endpoints require explicit allowed origins and do not accept credentialed wildcard CORS.
 
+## Returning visitor recognition is separate
+
+A future verifiable visitor identifier should let a world reconnect a
+returning visitor to **that world's** own saved scores, inventory and
+progression. It is separate from ephemeral presence sessions, invitation
+grants, world ownership and the optional Google-backed role service
+documented here. Owners should demand proof of visitor identity before
+restoring saved private data; ordinary guest visits need not require
+Google sign-in. Stable visitor-key binding to persistent world-local
+records is not yet implemented. See
+[visitor identity and world-local state](visitor-identity-and-world-state.md).
+
 ## Sign-in and consent
 
 The optional browser UI appears only when both `accountd` and `googleClientId` are set in `public/elsemesh-config.js`. The client loads Google Identity Services only after the user selects **Sign in with Google**. It obtains a fresh broker challenge, supplies its nonce to GIS, and sends the returned ID token only over HTTPS to the configured account broker. The broker verifies the token signature using Google's rotating public keys and checks issuer, audience, expiration, issued-at time, and the one-time nonce bound to the login attempt. Unknown signing keys trigger a bounded key refresh; token fields are not trusted before verification. The stable Google `sub` is the account key. Email, display name, and profile image are not account identifiers and are not stored unless a later feature asks for each item with separate consent. See Google's [GIS JavaScript API reference](https://developers.google.com/identity/gsi/web/reference/js-reference) for the nonce option and [ID-token verification guidance](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token) for the server trust boundary.
