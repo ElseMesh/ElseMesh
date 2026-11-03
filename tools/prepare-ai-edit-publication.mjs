@@ -124,7 +124,7 @@ export async function prepareAIEditPublication({ baseSourcePath, baseAssetsPath,
 	const baseAssetIds = sourceAssetIDs( baseSource.source );
 	const candidateAssetIds = sourceAssetIDs( candidateSource.source );
 	const referencedIds = [ ...candidateAssetIds ].sort();
-	if ( referencedIds.length > 10000 ) throw new Error( 'candidate references more assets than thruholdd can publish' );
+	if ( referencedIds.length > 10000 ) throw new Error( 'candidate references more assets than worldd can publish' );
 	const candidateAssetRoot = path.join( candidateRoot, 'assets' );
 	const hasCandidateAssets = candidateEntries.some( ( entry ) => entry.name === 'assets' );
 	let candidateAssetNames = [];
@@ -229,7 +229,7 @@ export async function prepareAIEditPublication({ baseSourcePath, baseAssetsPath,
 			'Publish only after review using the owner-only command:', '',
 			'```sh',
 			'node tools/publish-world-source.mjs \\',
-			'  --thruholdd /path/to/thruholdd \\',
+			'  --worldd /path/to/worldd \\',
 			'  --data /path/to/owner/world-profile \\',
 			'  --base-source ./base.world-source.json \\',
 			'  --source ./candidate.world-source.json \\',
