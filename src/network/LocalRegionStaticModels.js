@@ -4,6 +4,31 @@ const MODELS_PER_COMPONENT = 24;
 const ID_PART_LIMIT = 2048;
 const finiteVector = ( value, length ) => Array.isArray( value ) && value.length === length && value.every( Number.isFinite );
 
+function includeBounds( target, bounds ) {
+	for ( let axis = 0; axis < 3; axis ++ ) {
+		target.min[ axis ] = Math.min( target.min[ axis ], bounds.min[ axis ] );
+		target.max[ axis ] = Math.max( target.max[ axis ], bounds.max[ axis ] );
+	}
+}
+
+function boundsSphere( bounds, maxDistanceMeters ) {
+	const center = bounds.min.map( ( value, axis ) => ( value + bounds.max[ axis ] ) / 2 );
+	const radius = Math.hypot( ...bounds.max.map( ( value, axis ) => value - center[ axis ] ) );
+	if ( ! finiteVector( center, 3 ) || ! Number.isFinite( radius ) || radius <= 0 ) return null;
+	return { center, radius, maxDistanceMeters };
+}
+
+export function localRegionVisualStreamingBounds( instances, fallback ) {
+	if ( ! Array.isArray( instances ) || instances.length === 0 ) return fallback;
+	const bounds = { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] };
+	for ( const instance of instances ) {
+		if ( ! finiteVector( instance?.boundsMeters?.min, 3 ) || ! finiteVector( instance?.boundsMeters?.max, 3 )
+			|| instance.boundsMeters.min.some( ( value, axis ) => value > instance.boundsMeters.max[ axis ] ) ) return fallback;
+		includeBounds( bounds, instance.boundsMeters );
+	}
+	return boundsSphere( bounds, fallback?.maxDistanceMeters ) || fallback;
+}
+
 /**
  * Convert the provider's bounded source-cell index into engine-owned per-mesh
  * instance sets. Return null unless every reported visual placement can be
@@ -39,7 +64,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				// Keep adjacent cross-fades inside the game-authored screen-size gap.
 				lodFadeFraction = Math.min( lodFadeFraction, ( thresholds[ index ] - thresholds[ index - 1 ] ) / thresholds[ index ] * 0.5 );
 			}
-			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, sourceLods: usable, lodFadeFraction, radius: 0, instances: [] };
+			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, sourceLods: usable, lodFadeFraction, radius: 0, instances: [], bounds: { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] } };
 			groups.set( source.componentPath, model );
 		} else if ( model.staticMeshPath !== source.staticMeshPath ) return null;
 		const scaleFloor = Math.min( ...source.transform.scale );
@@ -51,6 +76,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		}
 		if ( ! Number.isFinite( instanceRadius ) || instanceRadius <= 0 || instanceRadius > 1e6 ) return null;
 		model.radius = Math.max( model.radius, instanceRadius );
+		includeBounds( model.bounds, source.boundsMeters );
 		model.instances.push( {
 			model: '',
 			position: source.transform.position,
@@ -64,6 +90,10 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 	const result = [];
 	for ( let offset = 0, chunk = 0; offset < models.length; offset += MODELS_PER_COMPONENT, chunk ++ ) {
 		const modelChunk = models.slice( offset, offset + MODELS_PER_COMPONENT );
+		const chunkBounds = { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] };
+		for ( const model of modelChunk ) includeBounds( chunkBounds, model.bounds );
+		const cellCenter = [ 0, 1, 2 ].map( axis => ( coordinates[ axis ] + 0.5 ) * cellSizeMeters );
+		const streamingBounds = boundsSphere( chunkBounds, maxDistanceMeters ) || { center: cellCenter, radius: cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters };
 		const ids = new Map( modelChunk.map( ( model, index ) => [ model.componentPath, `m${index}` ] ) );
 		const document = {
 			format: STATIC_MODEL_INSTANCE_SET_FORMAT,
@@ -95,13 +125,12 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 			if ( ! assetReferences.some( reference => reference.assetId === assetId ) ) assetReferences.push( { assetId, kind: 'glb' } );
 		}
 		if ( assetReferences.length > 256 ) return null;
-		const center = [ 0, 1, 2 ].map( axis => ( coordinates[ axis ] + 0.5 ) * cellSizeMeters );
 		result.push( {
 			component: {
 				id: `elsemesh-component:local-region-${regionID}-${cellSizeMeters}-${coordinates.join( '-')}-${chunk}`,
 				type: 'elsemesh.static-model-instance-set/1',
 				priority,
-				streamingBounds: { center, radius: cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters },
+				streamingBounds,
 				assets: assetReferences,
 				data: {},
 			},

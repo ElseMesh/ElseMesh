@@ -92,9 +92,16 @@ coarse geometry for its shadow proxy; finer visual levels do not create extra
 startup asset requests.
 The renderer-neutral planner selects visible instances and complementary
 incoming/outgoing LOD fades; shadow candidates are selected by distance
-independently of the camera frustum. Both renderers consume these same
-selections. Model bounds are in local space and drive frustum culling and
-streaming. Instance transforms use a normalized quaternion and positive scale.
+independently of the camera frustum. WebGPU consumes those independent shadow
+selections. The Three.js WebGL fallback instead lets the currently selected
+visible LOD cast through its fade-aware depth material and skips separate
+shadow-instance batches: Three.js also submits scene-visible meshes to the
+color pass when their materials only disable color writes, so duplicate shadow
+meshes substantially increase WebGL draw calls. This WebGL policy is an
+approximation: off-frustum shadow casters and independently selected shadow
+LODs are not represented there yet. Model bounds are in local space and drive
+frustum culling and streaming. Instance transforms use a normalized quaternion
+and positive scale.
 The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 
@@ -121,12 +128,12 @@ subset before either backend installs it.
 This contract is generic: no fish, Tidewater, WebGPU, or WebGL concepts appear
 in its fields. Tidewater can use it for hosted market contents by exporting its
 authored models and placements as ordinary assets. Its fish placement codec,
-species data, and game rules remain world-owned. The engine implements the same
-instance visibility, LOD selection/fades, and shadow-distance policy for WebGPU
-and WebGL. Both adapters consume the shared planner and use the same generated
-GLB fixture and transform records. Isolated browser checks prove each backend
-renders the fixture and compiles its color and shadow programs; they do not prove
-Tidewater appearance or parity against its original WebGPU presentation.
+species data, and game rules remain world-owned. Both adapters share instance
+visibility, visual LOD selection/fades, and transform records; their shadow
+selection strategies currently differ as described above. Isolated browser
+checks prove each backend renders the fixture and compiles its supported color
+and shadow programs; they do not prove Tidewater appearance or parity against
+its original WebGPU presentation.
 
 The current WebGL fish-prop mesh expansion is not a valid implementation of
 this target: it loses the WebGPU skin appearance, per-instance culling, LOD

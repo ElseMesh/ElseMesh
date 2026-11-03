@@ -56,13 +56,14 @@ export class StaticModelInstanceSetPlanner {
 			this._shadowsByModel.push( shadowGroup );
 		}
 		this._normalizedPlanes = new Float64Array( 24 );
+		this._shadowGroupsActive = false;
 	}
 
 	/**
 	 * Updates stable output buffers. Camera planes use inward-facing [nx, ny, nz, constant]
 	 * coefficients; they are normalized here so sphere radii are in world units.
 	 */
-	update( camera ) {
+	update( camera, { includeShadows = true } = {} ) {
 		if ( ! camera || ! finiteVector3( camera.position ) || ! Number.isFinite( camera.verticalFovRadians ) || camera.verticalFovRadians <= 0 || camera.verticalFovRadians >= Math.PI || ! Array.isArray( camera.frustumPlanes ) || camera.frustumPlanes.length !== 6 ) throw new Error( 'Invalid static model planner camera' );
 		const tanHalfFov = Math.tan( camera.verticalFovRadians * 0.5 );
 		for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
@@ -82,7 +83,8 @@ export class StaticModelInstanceSetPlanner {
 			for ( let axis = 0; axis < 4; axis ++ ) this._normalizedPlanes[ offset + axis ] = plane[ axis ] / length;
 		}
 		for ( const group of this.groups ) group.count = 0;
-		for ( const group of this.shadowGroups ) group.count = 0;
+		if ( includeShadows || this._shadowGroupsActive ) for ( const group of this.shadowGroups ) group.count = 0;
+		this._shadowGroupsActive = includeShadows;
 
 		for ( let instanceIndex = 0; instanceIndex < this.document.instances.length; instanceIndex ++ ) {
 			const instance = this.document.instances[ instanceIndex ];
@@ -98,7 +100,7 @@ export class StaticModelInstanceSetPlanner {
 			const radius = model.bounds.radius * Math.max( sx, sy, sz );
 			const dx = centerX - camera.position[ 0 ], dy = centerY - camera.position[ 1 ], dz = centerZ - camera.position[ 2 ];
 			const distance = Math.hypot( dx, dy, dz );
-			if ( distance <= model.shadowMaxDistance ) {
+			if ( includeShadows && distance <= model.shadowMaxDistance ) {
 				const shadowGroup = this._shadowsByModel[ modelIndex ];
 				this._append( shadowGroup, instanceIndex, 1, 2, 1, 0 );
 			}

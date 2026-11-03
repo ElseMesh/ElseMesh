@@ -71,7 +71,7 @@ export class Player {
 		this.camOffV = 0;
 		this._camY = null;
 		this.floating = true; // swimming at the surface (riding the waves) vs. free under water
-		this.slot = query.allocate( 'player', 1 );
+		this.slot = query ? query.allocate( 'player', 1 ) : null;
 		this.prompt = null;
 		this.surface = 'sand';
 		this.gravity = 9.81;
@@ -196,7 +196,7 @@ export class Player {
 	waterHeight() {
 
 		const q = this.query;
-		if ( ! q.cpuValid ) return 0;
+		if ( ! q?.cpuValid ) return 0;
 		const h = q.cpu[ this.slot * 4 ];
 		return Number.isFinite( h ) ? h : this.waterH || 0;
 
@@ -217,7 +217,7 @@ export class Player {
 	update( dt ) {
 
 		const inp = this.input;
-		this.query.setPoint( this.slot, this.position.x, this.position.z );
+		this.query?.setPoint( this.slot, this.position.x, this.position.z );
 		this.waterH = this.waterHeight();
 		this.waterMean = this.waterMean === null ? this.waterH : this.waterMean + ( this.waterH - this.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
 		this.prompt = null;
@@ -667,7 +667,7 @@ export class Player {
 	ashoreTarget() {
 
 		const b = this.boat;
-		const water = this.query.cpuValid ? this.query.cpu[ 0 ] : 0;
+		const water = this.query?.cpuValid ? this.query.cpu[ 0 ] : 0;
 		// the boat's starboard (local +x) direction in the world, level
 		const sx = _v2.set( 1, 0, 0 ).applyQuaternion( b.quaternion ).setY( 0 ).normalize();
 		const rx = sx.x, rz = sx.z;

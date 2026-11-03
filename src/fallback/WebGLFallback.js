@@ -819,8 +819,11 @@ export class WebGLFallback {
 		} else {
 			const hostedColliders = this.app.hostedColliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
-			this.waterQuery = new WebGLWaterQuery( T, this.renderer, hostedTerrain, this.hostedSeaLevel ?? 0 );
-			this._bindOceanFFTToWater();
+			// Water simulation includes a GPU render and asynchronous readback every
+			// frame. Hosted worlds opt into it through their water component and sea
+			// level; a flat fallback query would waste work in worlds with no water.
+			this.waterQuery = this.hostedSeaLevel === null ? null : new WebGLWaterQuery( T, this.renderer, hostedTerrain, this.hostedSeaLevel );
+			if ( this.waterQuery ) this._bindOceanFFTToWater();
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );
@@ -1961,12 +1964,18 @@ export class WebGLFallback {
 			const w = window.innerWidth, h = window.innerHeight;
 			this.camera.aspect = w / Math.max( 1, h );
 			this.camera.updateProjectionMatrix();
+			const scale = Math.max( 0.35, Math.min( 1, Number( this.renderScale ?? this.app.settings?.renderScale ) || 1 ) );
+			this.renderer.setPixelRatio( Math.min( window.devicePixelRatio || 1, 1.5 ) * scale );
 			this.renderer.setSize( w, h );
 			const size = this.renderer.getDrawingBufferSize( new this.THREE.Vector2() );
 			this.sceneColorTexture.image.width = size.x;
 			this.sceneColorTexture.image.height = size.y;
 			this.sceneColorTexture.needsUpdate = true;
 			for ( const water of this.waterScene.children ) water.material.uniforms.uViewport?.value.copy( size );
+		};
+		this.setRenderScale = scale => {
+			this.renderScale = Math.max( 0.35, Math.min( 1, Number( scale ) || 1 ) );
+			this._resize();
 		};
 		// Capture key events before UI descendants can stop them from reaching the fallback.
 		window.addEventListener( 'keydown', this._keyDown, true );

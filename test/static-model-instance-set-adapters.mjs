@@ -82,14 +82,14 @@ assert.equal( requestedAssets.filter( id => id === fineModelAssetID ).length, 2,
 webglResult.runtime.update( 1 / 60, new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) );
 const webglMeshes = webglFallback.scene.children.filter( object => object.isInstancedMesh );
 const webglMain = webglMeshes.find( mesh => ! mesh.userData.shadowOnly );
-const webglShadow = webglMeshes.find( mesh => mesh.userData.shadowOnly );
 assert.ok( webglMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the requested fine WebGL model becomes active after it loads' );
-assert.equal( webglShadow.count, 1 );
-assert.ok( webglShadow.customDepthMaterial, 'shadow LOD uses its own screen-door aware depth material' );
+assert.equal( webglMeshes.some( mesh => mesh.userData.shadowOnly ), false, 'WebGL does not submit duplicate shadow-only meshes in its color pass' );
+assert.equal( webglMain.castShadow, true, 'the selected WebGL color LOD casts shadows without a duplicate mesh' );
+assert.ok( webglMain.customDepthMaterial, 'the selected color LOD uses a screen-door aware depth material' );
+assert.equal( webglResult.runtime.planner.shadowGroups[ 0 ].count, 0, 'WebGL skips its unused separate shadow-instance selection' );
 assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5 );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'WebGL uses the shared four-channel fade policy' );
-assert.equal( webglShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0 );
 webglResult.runtime.dispose();
 assert.equal( webglFallback.scene.children.length, 0 );
 

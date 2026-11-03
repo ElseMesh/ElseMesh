@@ -1154,8 +1154,7 @@ export class App {
 	// so resolution changes do not flap. Android keeps the existing full-quality path.
 	adaptRenderScale( fps ) {
 
-		// Hosted package worlds do not use this PostFX-backed render-scale path.
-		if ( ! this.autoScale || ! this.post ) return;
+		if ( ! this.autoScale ) return;
 		if ( fps < 24 ) {
 
 			this._scaleAboveTarget = 0;
@@ -2039,6 +2038,11 @@ export class App {
 	setRenderScale( v ) {
 
 		const scale = MathUtils.clamp( Math.round( v * 20 ) / 20, 0.35, 1 );
+		if ( this.backend === 'webgl' ) {
+			this.settings.renderScale = scale;
+			this.webglFallback?.setRenderScale( scale );
+			return;
+		}
 		const canvasScale = Math.max( this.desktopCanvasScale, scale );
 		const postScale = scale / canvasScale;
 		if ( scale === this.settings.renderScale && this.engine.renderScale === canvasScale && this.post.scale === postScale ) return;

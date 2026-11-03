@@ -3478,12 +3478,17 @@ export class UI {
 	}
 
 	// Fades the loader out; the returned promise resolves once it is gone.
-	hideLoader() {
+	async hideLoader() {
 
 		const L = document.getElementById( 'loader' );
 		if ( ! L ) return Promise.resolve();
 		if ( this._loaderGone ) return this._loaderGone;
 		this.setLoading( 1, 'Ready' );
+		// Let the completed percentage reach a rendered frame before hiding the
+		// loading screen. Otherwise long hosted-world preparation can appear to
+		// jump from its last slowly advancing stage (for example 17%) straight
+		// into the world without ever painting the final 100% state.
+		await new Promise( resolve => requestAnimationFrame( () => setTimeout( resolve, 300 ) ) );
 		L.classList.remove( 'is-compiling' );
 		L.classList.add( 'em-hidden' );
 		this._loaderGone = new Promise( ( resolve ) => setTimeout( () => {

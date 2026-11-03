@@ -4,7 +4,7 @@ import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
-import { localRegionStaticModelSets } from './LocalRegionStaticModels.js';
+import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './LocalRegionStaticModels.js';
 import { MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 
@@ -458,7 +458,7 @@ export class LocalRegionConnector {
 				this.manifest.objects.push( {
 					id: visualObjectId, label: `${sourceRegion.label} visual cell ${cellKey}`, kind: 'asset-instance', assetId: visualAssetId,
 					transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority,
-					streamingBounds: { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters }, regionCell: true,
+					streamingBounds: localRegionVisualStreamingBounds( cell.source.visualInstances, { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters } ), regionCell: true,
 				} );
 			}
 		}

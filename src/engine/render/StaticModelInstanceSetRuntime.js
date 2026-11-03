@@ -35,7 +35,8 @@ export class StaticModelInstanceSetRuntime {
 		this.document = document;
 		this.planner = new StaticModelInstanceSetPlanner( document );
 		this.batches = batches;
-		this.shadowBatches = shadowBatches;
+		this.usesShadowBatches = shadowBatches !== null;
+		this.shadowBatches = shadowBatches || [];
 		this.loadLOD = loadLOD;
 		this.loadController = new AbortController();
 		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
@@ -43,15 +44,15 @@ export class StaticModelInstanceSetRuntime {
 		this.retryAfter = new Map();
 		this.disposeBatches = dispose;
 		this.disposed = false;
-		if ( ! Array.isArray( batches ) || batches.length !== this.planner.groups.length || ! Array.isArray( shadowBatches ) || shadowBatches.length !== this.planner.shadowGroups.length ) throw new Error( 'Static model instance batches do not match the declared models and LODs' );
+		if ( ! Array.isArray( batches ) || batches.length !== this.planner.groups.length || ( this.usesShadowBatches && ( ! Array.isArray( shadowBatches ) || shadowBatches.length !== this.planner.shadowGroups.length ) ) ) throw new Error( 'Static model instance batches do not match the declared models and LODs' );
 	}
 
 	update( _dt, camera ) {
 		if ( this.disposed ) return;
-		this.planner.update( staticModelInstanceCamera( camera ) );
+		this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches } );
 		this.#requestVisibleLODs();
 		this._updateBatches( this.planner.groups, this.batches );
-		this._updateBatches( this.planner.shadowGroups, this.shadowBatches );
+		if ( this.usesShadowBatches ) this._updateBatches( this.planner.shadowGroups, this.shadowBatches );
 	}
 
 	#requestVisibleLODs() {
