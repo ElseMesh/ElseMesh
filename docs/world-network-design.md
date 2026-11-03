@@ -452,6 +452,20 @@ destinations are available. They do not publish presence or commit gameplay
 changes in that read-only world. A destination with an active authority may
 accept normal play; otherwise the visitor continues in read-only mode.
 
+## Simulation authority and presence lifecycle
+
+The basic current presence channel accepts and relays client-reported
+pose; that does not restrict the choices of independently owned
+ThruHolds. The `worldd` daemon must support future owner-defined
+physics/simulation, movement and collision validation and anti-cheat,
+including authoritative corrections, as opt-in world capabilities.
+
+Silence for 10 seconds makes a visitor transparent and non-collidable,
+but retains their presence for reconnection. Ghosts do not block
+other visitors or spawn placement. At 120 seconds, presence expires;
+an explicit departure removes it immediately. Transport failure by
+itself is not an intentional departure.
+
 ## World and portal lifecycle
 
 World content is authored as editable source, converted to a deterministic
