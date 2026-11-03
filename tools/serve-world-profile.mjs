@@ -14,7 +14,7 @@ function temporaryRoot() {
 
 export function parseArguments( argv ) {
 	const options = {};
-	const valueOptions = new Set( [ '--thruholdd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
+	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
 		if ( key === '--autoport' ) {
@@ -29,7 +29,7 @@ export function parseArguments( argv ) {
 			options[ key ] = argv[ ++ i ];
 		}
 	}
-	for ( const key of [ '--thruholdd', '--profile', '--worlds-dir' ] ) if ( ! options[ key ] ) throw new Error( `Missing ${key}` );
+	for ( const key of [ '--worldd', '--profile', '--worlds-dir' ] ) if ( ! options[ key ] ) throw new Error( `Missing ${key}` );
 	if ( Boolean( options[ '--source' ] ) !== Boolean( options[ '--assets' ] ) ) throw new Error( '--source and --assets must be supplied together' );
 	if ( options[ '--autoport' ] && options[ '--http' ] ) throw new Error( '--autoport cannot be combined with --http' );
 	if ( ! /^[a-z0-9][a-z0-9_-]{0,63}$/.test( options[ '--profile' ] ) ) throw new Error( '--profile must be 1 to 64 lowercase letters, digits, hyphens, or underscores and start with a letter or digit' );
@@ -49,7 +49,7 @@ function run( command, args, options = {} ) {
 	return result.stdout.trim();
 }
 
-function thruholddArgs( options, args ) {
+function worlddArgs( options, args ) {
 	return [ '--worlds-dir', path.resolve( options[ '--worlds-dir' ] ), '--world-profile', options[ '--profile' ], ...args ];
 }
 
@@ -69,10 +69,10 @@ async function serve( options ) {
 		if ( ! options[ '--source' ] ) throw new Error( `Profile has no signed world manifest yet: ${worldManifestPath}; provide --source and --assets to create it` );
 		const tempDir = await mkdtemp( path.join( temporaryRoot(), 'elsemesh-profile-' ) );
 		try {
-			const thruholdd = path.resolve( options[ '--thruholdd' ] );
+			const worldd = path.resolve( options[ '--worldd' ] );
 			const sourcePath = path.resolve( options[ '--source' ] );
 			const assetsPath = path.resolve( options[ '--assets' ] );
-			const peerId = run( thruholdd, thruholddArgs( options, [ '--print-node-id' ] ) );
+			const peerId = run( worldd, worlddArgs( options, [ '--print-node-id' ] ) );
 			const unsignedPath = path.join( tempDir, 'world.unsigned.json' );
 			const signedPath = path.join( tempDir, 'world.signed.json' );
 			const source = JSON.parse( await readFile( sourcePath, 'utf8' ) );
@@ -80,8 +80,8 @@ async function serve( options ) {
 			const discoverable = options[ '--directory-url' ] ? 'true' : options[ '--discoverable' ];
 			if ( discoverable ) converterArgs.push( '--discoverable', discoverable );
 			run( process.execPath, converterArgs );
-			run( thruholdd, thruholddArgs( options, [ '--sign-manifest', unsignedPath, '--manifest-out', signedPath ] ) );
-			run( thruholdd, thruholddArgs( options, [ '--manifest', signedPath, '--import-package', assetsPath, '--world-name', source.title ] ) );
+			run( worldd, worlddArgs( options, [ '--sign-manifest', unsignedPath, '--manifest-out', signedPath ] ) );
+			run( worldd, worlddArgs( options, [ '--manifest', signedPath, '--import-package', assetsPath, '--world-name', source.title ] ) );
 			await copyFile( signedPath, worldManifestPath, constants.COPYFILE_EXCL );
 			await chmod( worldManifestPath, 0o600 );
 			console.log( `Prepared ${source.title} (${source.worldId}) in profile ${options[ '--profile' ]} using owner ${peerId}` );
@@ -90,7 +90,7 @@ async function serve( options ) {
 		}
 	}
 
-	const args = thruholddArgs( options, [] );
+	const args = worlddArgs( options, [] );
 	if ( options[ '--autoport' ] ) args.push( '--http', '127.0.0.1:0' );
 	else if ( options[ '--http' ] ) args.push( '--http', options[ '--http' ] );
 	if ( options[ '--p2p-port' ] ) args.push( '--p2p-port', options[ '--p2p-port' ] );
@@ -98,7 +98,7 @@ async function serve( options ) {
 	if ( options[ '--public-gateway' ] ) args.push( '--public-gateway', options[ '--public-gateway' ] );
 	if ( options[ '--directory-url' ] ) args.push( '--directory-url', options[ '--directory-url' ] );
 	for ( const key of [ 'bootstrap', 'relay', 'announce-address', 'allow-browser-origin' ] ) for ( const value of options[ key ] || [] ) args.push( `--${key}`, value );
-	const child = spawn( path.resolve( options[ '--thruholdd' ] ), args, { stdio: 'inherit' } );
+	const child = spawn( path.resolve( options[ '--worldd' ] ), args, { stdio: 'inherit' } );
 	const forwardSignal = signal => child.kill( signal );
 	process.on( 'SIGINT', forwardSignal );
 	process.on( 'SIGTERM', forwardSignal );

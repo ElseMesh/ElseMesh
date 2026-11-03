@@ -12,7 +12,7 @@ See [browser hosting](browser-hosting.md) for details.
 
 The daemon is a transport and content service. The world owner controls the manifest, world rules, and grants. A grant independently enables `content-cache` and/or bounded `failover-authority`; caching never grants write or authority rights. Failover windows for different delegates must not overlap, preventing two owner-authorized delegates from issuing the same next epoch at once. An owner-signed failover window permits a delegate to issue a temporary higher-epoch authority lease when its window opens; the signed lease is bound to the exact host-grant epoch, and the daemon schedules activation even when it started before the window and stops serving the lease when it expires. During a valid lease, a failover-only node can be discovered through DHT or the optional directory and serve the owner-signed manifest; the browser verifies the lease and uses that node as the current authority. Asset bytes still require a separate `content-cache` grant and are retried through other providers. Manifest versions and authority epochs must fit JavaScript's safe-integer range, and each delegated lease must advance exactly one epoch. The lease does not authorize edits, produce a delegate-signed replacement world manifest, or transfer simulation state; runtime conflict recovery and shared simulation authority still need implementation before this is suitable for concurrent writes.
 
-Run `npm run test:world-gateway` for a local owner/cache integration check. It builds temporary `thruholdd` nodes, signs a world manifest, syncs an owner-authorized cache over libp2p, connects the production `WorldConnector` through a trusted temporary HTTPS/WSS proxy, and verifies content-hash recovery after the owner is stopped. The test exercises Node's native WebSocket implementation with a test-scoped trusted certificate; it does not replace browser-engine or WebTransport testing.
+Run `npm run test:world-gateway` for a local owner/cache integration check. It builds temporary `worldd` nodes, signs a world manifest, syncs an owner-authorized cache over libp2p, connects the production `WorldConnector` through a trusted temporary HTTPS/WSS proxy, and verifies content-hash recovery after the owner is stopped. The test exercises Node's native WebSocket implementation with a test-scoped trusted certificate; it does not replace browser-engine or WebTransport testing.
 
 For the two current development-world links, build commands and restart instructions, see [testing two worlds](testing-two-worlds.md).
 
@@ -22,11 +22,11 @@ For the normal case, pass the world repository directory directly to the
 server:
 
 ```sh
-thruholdd /path/to/world-content
+worldd /path/to/world-content
 ```
 
 The directory must contain the exported `world-source.json` and hash-named
-`assets/` directory. On first start, `thruholdd` validates and imports the
+`assets/` directory. On first start, `worldd` validates and imports the
 package, signs its manifest with a persistent local identity, and stores that
 identity and package under the standard ElseMesh config directory, keyed by
 the source's `worldId`. If a matching saved profile already exists, its owner
@@ -38,14 +38,14 @@ world content.
 For local browser development, run `npm run dev` and open
 `http://localhost:5189/`. The Vite server proxies the local daemon's manifest
 and WebSocket gateway. On a loopback URL with no explicit world route, the
-client selects the world currently served by `thruholdd`; changing the
+client selects the world currently served by `worldd`; changing the
 directory argument changes the world opened at that same URL. `?example=1`
 continues to open the built-in Example Island, and an explicit world invite
 continues to select its named world. The daemon port is an API gateway, not a
 web page; the browser client remains on port 5189.
 
 Optional networking and storage settings remain flags. Put flags before the
-directory, for example `thruholdd --http 127.0.0.1:5202 --p2p-port 42903
+directory, for example `worldd --http 127.0.0.1:5202 --p2p-port 42903
 /path/to/world-content`. Use `--worlds-dir` to choose the config root or
 `--data` to select one explicit persistent data directory.
 
@@ -56,19 +56,19 @@ specialized setups.
 
 For temporary local hosting, replace `--http` with `--autoport`. The daemon
 binds an OS-assigned loopback port and prints the selected address in its
-`thruholdd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
+`worldd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
 mutually exclusive; it only selects the HTTP gateway port, so give concurrent
 profiles distinct `--p2p-port` values as usual. For temporary local hosting,
-`--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; thruholdd
+`--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; worldd
 prints both actual peer addresses at startup. Do not use ephemeral peer ports
 when a deployment depends on fixed firewall forwarding or ZeroTier's shared
 bridge port.
 
-Build `thruholdd` for the host first, then run (from the repository root):
+Build `worldd` for the host first, then run (from the repository root):
 
 ```sh
 node tools/serve-world-profile.mjs \
-  --thruholdd /path/to/thruholdd \
+  --worldd /path/to/worldd \
   --worlds-dir "$HOME/.config/elsemesh/worlds" \
   --profile island-example \
   --source worlds/tidewater/world-source.json \
@@ -76,7 +76,7 @@ node tools/serve-world-profile.mjs \
   --http 127.0.0.1:5200 --p2p-port 42901
 ```
 
-To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `thruholdd` as a DHT server. `thruholdd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.
+To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `worldd` as a DHT server. `worldd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.
 
 On Android/Termux, the helper places temporary manifest files under `$PREFIX/tmp`; on Linux it uses `/var/tmp`. The persistent identity, signed `world.json`, and installed content-addressed assets stay under `<worlds-dir>/<profile>`. For public browser invites, configure a reachable HTTPS/WSS gateway with `--public-gateway`; add `--directory-url` to publish a discoverable world. A directory URL requires a public gateway. The WebSocket gateway accepts same-origin clients by default; for the separately hosted ElseMesh client, explicitly allow its exact HTTPS origin with repeatable `--allow-browser-origin https://elsemesh.org` (for local development, loopback HTTP origins such as `http://127.0.0.1:5189` are also accepted). It does not allow arbitrary cross-origin browser connections. Android hosting may need explicit reachable addresses; pass each as `--announce-address /ip4/.../tcp/...` (or the documented QUIC form). Repeat `--bootstrap`, `--relay`, `--announce-address`, and `--allow-browser-origin` for additional values.
 
@@ -110,9 +110,9 @@ Account login is optional and distinct from world identity. The Google-to-world-
 
 ## Current implementation and operation
 
-The sole world server, `thruholdd`, persists a node identity, serves a signed local starter manifest, accepts an owner-signed manifest, exposes browser gateways and content-addressed assets, and supports optional discovery/relay configuration. Its implementation is organized under the internal Go source path `server/worldd`; that path does not name another executable. The server does not host the static ElseMesh browser client; host that separately. The default browser gateway is WebSocket. To enable WebTransport, provide a separate HTTP/3 UDP listener and certificate/key; make the browser's HTTPS host/port route to that listener over UDP while TCP HTTPS/WSS continues to route to the gateway or reverse proxy. For example, a public `:443/udp` forwarding rule can target `thruholdd --webtransport :5201`; the certificate must cover the public host. The client tries WebTransport at `/gateway-webtransport` on the configured HTTPS origin, then falls back to `/gateway` over WSS. `src/network/WorldConnector.js` verifies signed documents and content hashes and fetches prioritized chunks; `src/network/WorldPackage.js` builds the currently supported static GLB instances. Author a Blender source document, import its GLB assets, convert it to an unsigned runtime manifest, then sign it using the same persistent node identity:
+The sole world server, `worldd`, persists a node identity, serves a signed local starter manifest, accepts an owner-signed manifest, exposes browser gateways and content-addressed assets, and supports optional discovery/relay configuration. Its implementation is organized under the internal Go source path `server/worldd`; that path does not name another executable. The server does not host the static ElseMesh browser client; host that separately. The default browser gateway is WebSocket. To enable WebTransport, provide a separate HTTP/3 UDP listener and certificate/key; make the browser's HTTPS host/port route to that listener over UDP while TCP HTTPS/WSS continues to route to the gateway or reverse proxy. For example, a public `:443/udp` forwarding rule can target `worldd --webtransport :5201`; the certificate must cover the public host. The client tries WebTransport at `/gateway-webtransport` on the configured HTTPS origin, then falls back to `/gateway` over WSS. `src/network/WorldConnector.js` verifies signed documents and content hashes and fetches prioritized chunks; `src/network/WorldPackage.js` builds the currently supported static GLB instances. Author a Blender source document, import its GLB assets, convert it to an unsigned runtime manifest, then sign it using the same persistent node identity:
 
-`tools/build-server.sh` is the single daemon build entry point. With no options it builds the ZeroTier-enabled `thruholdd` for the current Go target and writes it to the selected server tree's `bin/thruholdd`, alongside `libzt.so`. It discovers the sibling libzt source and matching build by default. ZeroTier is compiled in for `thruholdd`, which uses the ElseMesh network `e3918db4832a3056`; libzt itself must already be built for the requested target.
+`tools/build-server.sh` is the single daemon build entry point. With no options it builds the ZeroTier-enabled `worldd` for the current Go target and writes it to the selected server tree's `bin/worldd`, alongside `libzt.so`. It discovers the sibling libzt source and matching build by default. ZeroTier is compiled in for `worldd`, which uses the ElseMesh network `e3918db4832a3056`; libzt itself must already be built for the requested target.
 
 Choose a target platform or build the complete service bundle:
 
@@ -121,7 +121,7 @@ tools/build-server.sh --os android --arch arm64
 tools/build-server.sh --target all --os linux --arch amd64
 ```
 
-`thruholdd` is the only world-server binary. It embeds libzt and joins the configured ZeroTier network when `--zerotier-network` is nonempty; it also runs without ZeroTier when that option is empty. `--target all` builds `thruholdd`, `directoryd`, and `accountd`. KTX2 encoding currently runs in the source provider through the reusable native C ABI library in `native/ktx2`; HogwartsBridge streams encoded chunks directly into its GLB buffer. A Thruholdd KTX2 service and shared content cache are deferred until another world needs centralized encoding. Thruholdd should link the same library rather than implement a second encoder; transport and cache design are in [world-network-design.md](world-network-design.md). The daemon build needs matching libzt headers and library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. For an Android `thruholdd` build, select `--os android --arch arm64` and set the NDK `CC` and `CXX`. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
+`worldd` is the only world-server binary. It embeds libzt and joins the configured ZeroTier network when `--zerotier-network` is nonempty; it also runs without ZeroTier when that option is empty. `--target all` builds `worldd`, `directoryd`, and `accountd`. KTX2 encoding currently runs in the source provider through the reusable native C ABI library in `native/ktx2`; HogwartsBridge streams encoded chunks directly into its GLB buffer. A Worldd KTX2 service and shared content cache are deferred until another world needs centralized encoding. Worldd should link the same library rather than implement a second encoder; transport and cache design are in [world-network-design.md](world-network-design.md). The daemon build needs matching libzt headers and library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. For an Android `worldd` build, select `--os android --arch arm64` and set the NDK `CC` and `CXX`. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
 
 `accountd` is optional and exits without configuration. Configure the Google OAuth web client and browser origins before starting it, and put a local HTTPS reverse proxy in front of its loopback listener:
 
@@ -132,26 +132,26 @@ accountd --http 127.0.0.1:5203 --data "$HOME/.local/share/elsemesh/accountd"
 ```
 
 ```sh
-thruholdd --data ./world-data --print-node-id
-thruholdd --data ./world-data --import-asset ./assets/boat.glb
+worldd --data ./world-data --print-node-id
+worldd --data ./world-data --import-asset ./assets/boat.glb
 node tools/world-source-to-manifest.mjs --source ./island.world-source.json --owner <PeerID> --assets ./world-data/assets --out ./world-data/unsigned.json
-thruholdd --data ./world-data --sign-manifest ./world-data/unsigned.json --manifest-out ./world-data/world.signed.json
-thruholdd --data ./world-data --manifest ./world-data/world.signed.json --webtransport :5201 --webtransport-tls-cert fullchain.pem --webtransport-tls-key privkey.pem
+worldd --data ./world-data --sign-manifest ./world-data/unsigned.json --manifest-out ./world-data/world.signed.json
+worldd --data ./world-data --manifest ./world-data/world.signed.json --webtransport :5201 --webtransport-tls-cert fullchain.pem --webtransport-tls-key privkey.pem
 ```
 
 ### Multiple local ThruHolds
 
-`thruholdd` normally keeps one node identity, signed manifest, and content store in its selected data directory. Named profiles create separate directories under `--worlds-dir` (default: `$XDG_CONFIG_HOME/elsemesh/worlds`, or the platform's Go user config directory), including independent node keys. Profile names are lowercase slugs containing letters, digits, hyphens, and underscores. List and initialize profiles with:
+`worldd` normally keeps one node identity, signed manifest, and content store in its selected data directory. Named profiles create separate directories under `--worlds-dir` (default: `$XDG_CONFIG_HOME/elsemesh/worlds`, or the platform's Go user config directory), including independent node keys. Profile names are lowercase slugs containing letters, digits, hyphens, and underscores. List and initialize profiles with:
 
 ```sh
-thruholdd --list-world-profiles
-thruholdd --world-profile example-island --world-name "Example Island" --print-node-id
+worldd --list-world-profiles
+worldd --world-profile example-island --world-name "Example Island" --print-node-id
 ```
 
 Start either profile by selecting its name. To run both on one machine, start separate processes and assign distinct P2P, HTTP, and (if enabled) WebTransport listener ports. Each process has its own PeerID; do not copy one `node.key` into simultaneous processes. `--data` remains available for an explicit single-profile path and cannot be combined with `--world-profile`.
 
 ```sh
-thruholdd --world-profile example-island --p2p-port 42901 --http 127.0.0.1:5200
+worldd --world-profile example-island --p2p-port 42901 --http 127.0.0.1:5200
 ```
 
 These profiles provide isolated runtime storage and two independently served ThruHolds; they do not merge the identities into one multi-world daemon. Canonical Blender sources and exported packages remain in the repository's `worlds/` tree.
@@ -159,9 +159,9 @@ These profiles provide isolated runtime storage and two independently served Thr
 Back up a node identity before migrating its world data. Export creates a new file with mode `0600` and refuses to overwrite an existing file; store that key offline in a protected location, never in shared Android storage or Git. Restore accepts only a `0600` backup and refuses to replace an existing `node.key`. Both commands print the PeerID so you can confirm the restored identity matches:
 
 ```sh
-thruholdd --data ./world-data --export-node-key ./offline-backup/node.key
-thruholdd --data ./new-world-data --import-node-key ./offline-backup/node.key
-thruholdd --data ./new-world-data --print-node-id
+worldd --data ./world-data --export-node-key ./offline-backup/node.key
+worldd --data ./new-world-data --import-node-key ./offline-backup/node.key
+worldd --data ./new-world-data --print-node-id
 ```
 
 These commands copy the raw libp2p private-key encoding; protect the backup as a signing credential. Identity rotation is distinct from recovery and still needs a signed ownership-transfer protocol before old PeerIDs can be safely retired.
@@ -169,41 +169,41 @@ These commands copy the raw libp2p private-key encoding; protect the backup as a
 To publish a discoverable node in an optional directory such as `https://thruhold.org`, create its runtime manifest with `tools/world-source-to-manifest.mjs --discoverable true`, then sign it. Public discovery is off by default. Set the node's externally reachable browser gateway and directory URL:
 
 ```sh
-thruholdd --data ./world-data --manifest ./world-data/world.signed.json \
+worldd --data ./world-data --manifest ./world-data/world.signed.json \
   --public-gateway https://world-host.example --directory-url https://thruhold.org
 directoryd --http 127.0.0.1:5202 --data ./directory-data
 ```
 
 On Android/Termux, add explicit reachable libp2p addresses when interface discovery is restricted, for example `--announce-address /ip4/192.168.1.42/tcp/42901 --announce-address /ip4/192.168.1.42/udp/42901/quic-v1` for a LAN peer.
 
-Transfer the Android arm64 `thruholdd` binary and its matching `libzt.so` to the device, then inside Termux install both (keep identity keys and world data in Termux-private storage, not shared storage):
+Transfer the Android arm64 `worldd` binary and its matching `libzt.so` to the device, then inside Termux install both (keep identity keys and world data in Termux-private storage, not shared storage):
 
 ```sh
-cp "$HOME/thruholdd" "$PREFIX/bin/thruholdd"
+cp "$HOME/worldd" "$PREFIX/bin/worldd"
 cp "$HOME/libzt.so" "$PREFIX/bin/libzt.so"
-chmod 700 "$PREFIX/bin/thruholdd"
+chmod 700 "$PREFIX/bin/worldd"
 mkdir -p "$HOME/.local/share/elsemesh/world"
-thruholdd --data "$HOME/.local/share/elsemesh/world" --print-node-id
+worldd --data "$HOME/.local/share/elsemesh/world" --print-node-id
 ```
 
 Then start it with the signed manifest and reachable announce addresses shown above. Termux background execution and network reachability remain device/operator responsibilities; Android may suspend processes that are not kept alive by the user's service setup.
 
-Run `directoryd` behind HTTPS and rate limiting; its default listener is loopback. Or deploy the optional Worker resolver described in `cloudflare/world-resolver/README.md`. Signed provider announcements expire after 15 minutes and `thruholdd` refreshes them every 5 minutes, so an offline gateway is removed from lookup shortly after its last refresh. The node must be owner-authorized, and the world manifest must set `discoverable: true`. Browser links can select a directory without relying on the page's own host: `https://elsemesh.github.io/?worldId=elsemesh:...&directory=https%3A%2F%2Fresolver.example`. The public client and its resolver/gateway services are separate deployments.
+Run `directoryd` behind HTTPS and rate limiting; its default listener is loopback. Or deploy the optional Worker resolver described in `cloudflare/world-resolver/README.md`. Signed provider announcements expire after 15 minutes and `worldd` refreshes them every 5 minutes, so an offline gateway is removed from lookup shortly after its last refresh. The node must be owner-authorized, and the world manifest must set `discoverable: true`. Browser links can select a directory without relying on the page's own host: `https://elsemesh.github.io/?worldId=elsemesh:...&directory=https%3A%2F%2Fresolver.example`. The public client and its resolver/gateway services are separate deployments.
 
 `--import-asset` prints the content hash to assign to a source object. Add owner grants in the source document's `hosts` list before conversion; signing validates the runtime document and never overwrites an existing signature file. A manifest must be signed by the owning identity before other nodes can host it. The grant format has source validation and converter support, while a dedicated grant-management UI is still pending.
 
-To seed an owner-authorized neighbor cache, first get that node's PeerID with `thruholdd --data ./neighbor-cache --print-node-id`, add an unexpired grant for that PeerID to the canonical source document's `hosts` list, convert and sign the manifest, then provide the signed manifest to the neighbor. A cache-only entry looks like `{ "peerId": "<peer-id>", "scopes": ["content-cache"], "expiresAt": 1900000000, "epoch": 1 }`. Add `failover-authority` only with an explicit `failoverAfter` and `failoverSeconds` window. Start the neighbor with `--cache-from <owner-peer-id>` and a `--bootstrap` multiaddr for that source if it is not discoverable through DHT. The cache node fetches missing assets over libp2p, verifies the complete SHA-256 before an atomic install, and only advertises a discoverable world after all its manifest assets are verified locally. A live gateway's `/api/lookup` returns the local provider plus other DHT advertisers, including authorized caches. Use `--cache-sync-interval` to adjust retry cadence. Only the owner or a node with an active `content-cache` grant can serve asset bytes; a `failover-authority` grant alone never permits content serving.
+To seed an owner-authorized neighbor cache, first get that node's PeerID with `worldd --data ./neighbor-cache --print-node-id`, add an unexpired grant for that PeerID to the canonical source document's `hosts` list, convert and sign the manifest, then provide the signed manifest to the neighbor. A cache-only entry looks like `{ "peerId": "<peer-id>", "scopes": ["content-cache"], "expiresAt": 1900000000, "epoch": 1 }`. Add `failover-authority` only with an explicit `failoverAfter` and `failoverSeconds` window. Start the neighbor with `--cache-from <owner-peer-id>` and a `--bootstrap` multiaddr for that source if it is not discoverable through DHT. The cache node fetches missing assets over libp2p, verifies the complete SHA-256 before an atomic install, and only advertises a discoverable world after all its manifest assets are verified locally. A live gateway's `/api/lookup` returns the local provider plus other DHT advertisers, including authorized caches. Use `--cache-sync-interval` to adjust retry cadence. Only the owner or a node with an active `content-cache` grant can serve asset bytes; a `failover-authority` grant alone never permits content serving.
 
 Role revocation state is separately replicated because role enforcement must not require asset-cache permission. On each replica that needs fresh role state, pass `--role-state-from <owner-peer-id>` and a `--bootstrap` multiaddr if the owner is not discoverable. Each replica then checks the owner's signed world-role revocation document over libp2p at startup and every minute by default; use `--role-state-sync-interval` to set a cadence from one second to ten minutes. It verifies the owner signature, world ID, schema, and serial before storing state. Nodes can also sync from another same-world peer that already has the owner state. The signed state remains public data and does not grant edit rights by itself.
 
 ```sh
-thruholdd --data ./neighbor-cache --manifest ./world.signed.json \
+worldd --data ./neighbor-cache --manifest ./world.signed.json \
   --bootstrap /ip4/<owner-ip>/tcp/42901/p2p/<owner-peer-id> \
   --cache-from <owner-peer-id>
 ```
 
 Build/test with Go 1.24.6 or newer. Use `tools/build-server.sh` for daemon builds; it applies the Android linker compatibility flag when needed. For public browsers, serve the web app, directory and gateway through HTTPS/WSS. The daemons' default HTTP binds are loopback. Bootstrap peers must speak the legacy Tidewater DHT protocol prefix; generic public IPFS bootstrap peers are not compatible.
 
-See the `server/worldd` Go package for Thruholdd, alongside `server/directoryd` and `server/accountd`. These are evolving prototypes. The repository does not deploy a public directory or account service, complete the owner policy engine, simulate dynamic destinations in portal views, or provide robust multi-writer simulation. It implements optional Google ID-token verification in `accountd`; operators must configure its OAuth client and exact browser origins. Portal views use oblique reversed-depth clipping with fragment clipping as a fallback. Desktop Chrome loaded the published game and the secure-origin WebGPU diagnostic passed adapter, device, and buffer creation. The current Flip7 build was delivered over SSH and its URL opened, but Android denied screen capture, so device rendering, appearance, and WebGPU initialization remain unverified.
+See the `server/worldd` Go package for Worldd, alongside `server/directoryd` and `server/accountd`. These are evolving prototypes. The repository does not deploy a public directory or account service, complete the owner policy engine, simulate dynamic destinations in portal views, or provide robust multi-writer simulation. It implements optional Google ID-token verification in `accountd`; operators must configure its OAuth client and exact browser origins. Portal views use oblique reversed-depth clipping with fragment clipping as a fallback. Desktop Chrome loaded the published game and the secure-origin WebGPU diagnostic passed adapter, device, and buffer creation. The current Flip7 build was delivered over SSH and its URL opened, but Android denied screen capture, so device rendering, appearance, and WebGPU initialization remain unverified.
 
 The Go test suite includes a local two-node cache integration test. It starts owner and neighbor libp2p hosts, transfers the owner-signed manifest and a multi-chunk asset over the world protocol, then verifies that the neighbor installed bytes matching the declared size and SHA-256. Run it with `cd server && go test ./worldd -run TestAuthorizedNeighborFetchesSignedManifestAndAssetOverLibp2p -count=1`. This exercises the transfer and integrity path on loopback; it does not prove public Internet reachability, NAT traversal, or directory deployment.

@@ -35,12 +35,6 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   session. Browser-supplied player/session identity is overwritten.
 - Presence pose and appearance are self-reported, ephemeral presentation data;
   they are not authenticated account identity or authoritative simulation.
-- The desired stable visitor identity for restoring a world's saved records
-  is distinct from current session-derived IDs, owner/node identities,
-  invitation grants and optional accounts. It is not implemented by
-  existing presence sessions.
-- Worlds own their visitor presence independently. No globally exclusive
-  player membership or atomic two-owner portal transaction is required.
 - Existing request paths serve signed manifests, asset bytes, and data-channel
   messages. They do not discover or dynamically decode game-backed world
   regions. A game-backed provider needs a signed region descriptor, bounded
@@ -64,9 +58,6 @@ provider identity checks. An owner-authorized invitation names a world and may
 bind admission to a stable identity. ZeroTier node ID is the first supported
 reusable identity; the contract is extensible to other static identities. An
 invitation with no identity that can be proven by the client is single-use.
-Portals and invitation codes are alternative arrival routes: both are
-subject to destination admission. A portal may admit visitors without codes
-where permitted, but cannot bypass a destination's invitation requirement.
 
 The public entry point is an ElseMesh invitation URL such as
 `https://elsemesh.org/invite/<code>`. The main ElseMesh service validates the
@@ -283,17 +274,9 @@ incomplete, use provisional or neutral lighting rather than presenting it as
 final. Full cross-world shadow maps and global-illumination transfer are
 deferred.
 
-The handover is intentionally client-coordinated rather than an atomic
-two-owner transaction. The client starts destination presence and sends a
-best-effort source leave; the source expires silent sessions with its own
-timeout. A shorter portal-adjacent timeout could improve cleanup, but merely
-standing near a portal is not proof of departure. Neither a signed
-source/destination commit receipt nor a frozen source pending remote
-acknowledgement is required. Persistent inventories, scores, ownership and
-gameplay state do not travel through portals: they are **world-local**.
-A stable visitor identity is separately desired to restore a given world's
-own saved records on return. See
-[visitor identity and world-local state](visitor-identity-and-world-state.md).
+The sequence is currently coordinated in the browser. It is not an atomic
+server transaction. Account identity, inventory, arbitrary carried objects,
+and authoritative simulation continuity are outside the current handover.
 
 The desired read-only failover path uses the last verified, fully acknowledged
 world state as a static baseline. The visitor's avatar may move locally and
