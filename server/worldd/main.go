@@ -1476,7 +1476,8 @@ func (d *daemon) handleBrowserGateway(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer d.leaveBrowserPresence(first.WorldID, first.TargetPeerID, sessionID)
+	// Unexpected transport loss must not act as an explicit leave.
+	// The owner ghosts a silent session after 10s and expires it after 120s.
 	requestCtx, cancelRequests := context.WithCancel(r.Context())
 	var requestGroup sync.WaitGroup
 	var writeMu sync.Mutex
