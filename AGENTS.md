@@ -28,6 +28,7 @@
 ## Browser process cleanup
 
 - Stop every browser process I own as soon as it is no longer needed for the task, including after a visual check. Identify owned browsers by their dedicated systemd unit, process group, or isolated profile; never kill unrelated user browsers or another agent's browser.
+- For project review displays, use the `weston-game-review` skill and its checked-in config/launcher. Do not start Weston with `--no-config` or silently inherit the machine-wide config.
 
 ## Transfers to the Flip7
 
