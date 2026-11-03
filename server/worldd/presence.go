@@ -213,16 +213,15 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		if exists && request.Pose.Sequence <= old.Sequence {
 			return peerResponse{}, errors.New("stale_presence_sequence")
 		}
-		if !exists {
-			active := 0
-			for _, visitor := range d.players {
-				if now.Sub(visitor.updated) < presenceGhostAfter { active++ }
-			}
-			// Ghosts do not count toward the world's active visitor limit.
-			// Total retained records remain bounded by maxPresencePlayers.
-			if len(d.players) >= maxPresencePlayers || active >= int(d.world.Rules.MaxVisitors) {
-				return peerResponse{}, errors.New("presence_full")
-			}
+		active := 0
+		for _, visitor := range d.players {
+			if now.Sub(visitor.updated) < presenceGhostAfter { active++ }
+		}
+		// A returning ghost is an active admission again. It cannot exceed
+		// the owner's live visitor cap if its former slot was reused.
+		if ( !exists && len(d.players) >= maxPresencePlayers ) ||
+			( (!exists || now.Sub(old.updated) >= presenceGhostAfter) && active >= int(d.world.Rules.MaxVisitors) ) {
+			return peerResponse{}, errors.New("presence_full")
 		}
 		if exists && len(request.SpawnCandidates) > 0 {
 			return peerResponse{}, errors.New("unexpected_spawn_candidates")
