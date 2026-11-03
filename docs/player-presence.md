@@ -1,6 +1,12 @@
 # Shared player presence
 
-Each visitor's browser runs local gameplay and physics wherever practical. Presence is the transient, self-reported avatar state that the world server validates, stores, and relays so other visitors can render that player; it does not move ordinary gameplay simulation onto the server. Guest presence does not require a Google account. The production `WorldConnector` exposes update/leave requests and validates outgoing poses. `PlayerPresence` validates snapshots, binds world/session/request IDs, removes departed peers and interpolates remote poses with shortest-path heading rotation. The active-world frame publisher and animated remote avatar renderer are integrated. Only entered worlds publish presence; handoff disposes the previous session and its avatar resources.
+Today the default browser runs gameplay and physics locally wherever
+practical; presence is client-reported pose and appearance that the owner
+validates and relays. This is **not an architectural prohibition on owner
+simulation**. Worlds can require authoritative physics, collision and
+movement validation or anti-cheat, and `worldd` must support those optional
+world-defined policies and accepted-state corrections. These capabilities
+go beyond the current basic presence protocol. Guest presence does not require a Google account. The production `WorldConnector` exposes update/leave requests and validates outgoing poses. `PlayerPresence` validates snapshots, binds world/session/request IDs, removes departed peers and interpolates remote poses with shortest-path heading rotation. The active-world frame publisher and animated remote avatar renderer are integrated. Only entered worlds publish presence; handoff disposes the previous session and its avatar resources.
 
 ## Product boundary: presence is not persistent identity
 
@@ -21,7 +27,12 @@ Both the existing WebSocket gateway and WebTransport gateway accept `presence.up
 
 A gateway can forward these requests to the world owner over the existing authenticated libp2p stream. The owner namespaces the forwarded session by the actual remote peer ID, not a claimed JSON identity. Clients arriving through different gateways share the owner's presence set. A cache or failover manifest provider rejects live presence authority with `presence_owner_required`; replica permission does not grant simulation or presence authority. The browser integration must use an owner connection for presence when content comes from a cache. Delegated live authority and continuity across owner failure remain outstanding.
 
-A successful update returns `type: "presence"`, matching `worldId`/`requestId`, `playerId` for that connection and a sorted `players` snapshot. Each entry has `id`, the pose fields below, and an owner-generated Unix-millisecond `updatedAt`. The server holds at most 128 players per world, accepts at most 20 updates per second per active player, rejects repeated/decreasing sequences, and removes entries after ten seconds without an accepted update. Closing a connection sends a leave through the same route; TTL handles interrupted or unreachable teardown. A new transport session gets a new player identity. Account identity is not implied by that ephemeral ID. A source world expires abandoned presence without relying on destination acknowledgement. A shorter timeout near a portal is a possible future heuristic, not implemented behavior or proof that the visitor departed.
+A successful update returns `type: "presence"`, matching `worldId`/`requestId`, `playerId` for that connection and a sorted `players` snapshot. Each entry has `id`, the pose fields below, and an owner-generated Unix-millisecond `updatedAt`. The server holds at most 128 players per world, accepts at most 20 updates per second per active player, rejects repeated/decreasing sequences, and marks entries as ghosts after 10 seconds without an accepted update.
+Ghosts remain in snapshots with `ghost: true`, are rendered at reduced
+opacity, and are excluded from spawn/player collision. They are removed
+after 120 seconds of silence. An explicit `presence.leave` removes a
+visitor immediately; an unexpected transport disconnect leaves the record
+for the normal ghost-and-expiry grace period. A new transport session gets a new player identity. Account identity is not implied by that ephemeral ID. A source world expires abandoned presence without relying on destination acknowledgement. A shorter timeout near a portal is a possible future heuristic, not implemented behavior or proof that the visitor departed.
 
 ## Pose and appearance contract
 
@@ -49,11 +60,17 @@ An update request contains `type: "presence.update"` and `pose`:
 
 Position is the avatar's feet in signed world coordinates: right-handed, Y-up, meters. Exactly three finite coordinates are required, each within ±100,000 m. Sequence is a JavaScript-safe nonnegative integer and increases within an active session. Yaw is finite and bounded to ±1,000 radians; the client should normalize its accumulated heading. Pitch is finite within ±1.5 radians. Supported modes are `walk`, `swim`, `deck` and `boat`. Every pose includes `avatarProfileId`, which must match the profile selected by the validated appearance style. A `deck` or `boat` pose also includes a stable `vehicleType` and finite, nonnegative `vehicleSpeed` in metres per second. The owner applies signed avatar allowlists to every admission. Vehicle presence additionally requires destination vehicle acceptance, a compatible berth, an allowed avatar/vehicle pair when configured, avatar-plus-vehicle complexity within budget, and reported speed within the signed cap. Portal handoff applies those same profile and pair rules before crossing. The current runtime supports the two stock avatar profiles and the bundled Downeast boat. Presence remains self-reported presentation state; it does not make vehicle physics authoritative or prevent a modified client from lying about its speed. It does not authorize ownership, driving or teleportation. Appearance styles are the allowlisted `male`/`female` values; all four colors are lowercase six-digit `#rrggbb` strings. Peers cannot supply model paths or materials. Server timestamps avoid relying on synchronized client clocks.
 
-The browser should publish at 10 Hz with at most one request in flight, interpolate remote snapshots over approximately 100 ms, hide stalled avatars promptly, remove absent players, and release avatar GPU resources on departure/handoff. Only the active world publishes; preparing a portal destination must not create a player there. On handoff, leave the source, join the destination with the mapped pose, and clear source avatar instances. Open-doorway remote-avatar previews need a separate read-only subscription; publishing the visitor's own state during preview is incorrect.
+The browser should publish at 10 Hz with at most one request in flight,
+interpolate remote snapshots over approximately 100 ms, and retain silent
+visitors as translucent nonblocking ghosts after 10 seconds. A client that
+receives no fresh snapshots also ghosts its last observed remote avatars
+at 10 seconds and drops them at 120 seconds; a valid owner snapshot with
+a missing player removes that avatar immediately. Release GPU resources
+on explicit departure/handoff or final expiry. Only the active world publishes; preparing a portal destination must not create a player there. On handoff, leave the source, join the destination with the mapped pose, and clear source avatar instances. Open-doorway remote-avatar previews need a separate read-only subscription; publishing the visitor's own state during preview is incorrect.
 
 ## Evidence and remaining work
 
-`presence_test.go` exercises two real WebSocket clients through a separate libp2p gateway to an owner, including attempted shared-session spoofing, separate IDs, shared snapshots, explicit leave and disconnect cleanup. It also checks capacity, expiry, rate limits, stale sequences, invalid coordinates and non-owner rejection. `webtransport_integration_test.go` joins over real HTTP/3 WebTransport and then WebSocket, checks that both transports see the same players with separate identities, and checks WebTransport leave.
+`presence_test.go` exercises two real WebSocket clients through a separate libp2p gateway to an owner, including attempted shared-session spoofing, separate IDs, shared snapshots, explicit leave and disconnect grace periods. It also checks capacity, expiry, rate limits, stale sequences, invalid coordinates and non-owner rejection. `webtransport_integration_test.go` joins over real HTTP/3 WebTransport and then WebSocket, checks that both transports see the same players with separate identities, and checks WebTransport leave.
 
 Live two-browser visual proof, Flip7 rendering, read-only portal presence and owner-failure session recovery remain outstanding. Frame publication, stock avatar rendering and GPU cleanup have targeted automated coverage. The production-connector HTTPS/WSS integration test also joins two sessions, verifies peer poses and departure, then confirms that owner loss and cache recovery do not grant the cache live presence authority. The complete Go suite and focused race checks pass. Client tests cover snapshot isolation, invalid appearances, reordered updates, departures, stale visibility and interpolation. These tests establish publisher and renderer lifecycle behavior; actual connected visual presentation still requires live verification.
 
