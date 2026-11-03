@@ -596,6 +596,7 @@ func run() error {
 		return err
 	}
 	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	go d.maintainPresenceExpiry(ctx)
 	if regionProvider != nil {
 		log.Printf("local region provider proxy enabled for world %s", world.WorldID)
 	}
@@ -1476,7 +1477,8 @@ func (d *daemon) handleBrowserGateway(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer d.leaveBrowserPresence(first.WorldID, first.TargetPeerID, sessionID)
+	// Unexpected transport loss must not act as an explicit leave.
+	// The owner ghosts a silent session after 10s and expires it after 120s.
 	requestCtx, cancelRequests := context.WithCancel(r.Context())
 	var requestGroup sync.WaitGroup
 	var writeMu sync.Mutex

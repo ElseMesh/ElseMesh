@@ -78,6 +78,7 @@ export class WorldPresenceSession {
    }
    avatar.setViewDistance?.(Math.hypot(pose.position[0] - player.position.x, pose.position[1] - player.position.y, pose.position[2] - player.position.z), loadBias);
    avatar.setAppearance(pose.appearance);
+   avatar.setGhost?.(pose.ghost === true);
    avatar.update(dt,pose);
   }
   if (this.pending || now < this.nextSend) return;
@@ -99,7 +100,11 @@ export class WorldPresenceSession {
   if (this.disposed) return;
   this.disposed = true;
   this.controller.abort(new DOMException('Left ThruHold', 'AbortError'));
-  this.connector.close();
+  // Explicit portal/exit departure removes presence immediately. Unexpected
+  // transport loss has a separate 10s ghost / 120s expiry grace period.
+  if (this.admitted && typeof this.connector.leavePresence === 'function') {
+   Promise.resolve().then(() => this.connector.leavePresence()).catch(() => {}).finally(() => this.connector.close());
+  } else this.connector.close();
   for (const avatar of this.avatars.values()) avatar.dispose();
   this.avatars.clear(); this.state.reset();
  }

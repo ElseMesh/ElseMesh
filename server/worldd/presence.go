@@ -16,7 +16,8 @@ import (
 const playerPresenceProtocol = "elsemesh.player-presence/3"
 const maxPresencePlayers = 128
 const maxSpawnCandidates = 1024
-const presenceTTL = 10 * time.Second
+const presenceGhostAfter = 10 * time.Second
+const presenceTTL = 120 * time.Second
 const presencePlayerRadius = 0.3
 const presencePlayerHeight = 1.75
 const playerEyeHeight = 1.62
@@ -51,6 +52,8 @@ type playerPresence struct {
 	ID string `json:"id"`
 	playerPose
 	UpdatedAt int64 `json:"updatedAt"`
+	// Ghost is computed by the owner, never taken from a client pose.
+	Ghost     bool `json:"ghost,omitempty"`
 	updated   time.Time
 }
 
@@ -210,7 +213,14 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		if exists && request.Pose.Sequence <= old.Sequence {
 			return peerResponse{}, errors.New("stale_presence_sequence")
 		}
-		if !exists && (len(d.players) >= maxPresencePlayers || len(d.players) >= int(d.world.Rules.MaxVisitors)) {
+		active := 0
+		for _, visitor := range d.players {
+			if now.Sub(visitor.updated) < presenceGhostAfter { active++ }
+		}
+		// A returning ghost is an active admission again. It cannot exceed
+		// the owner's live visitor cap if its former slot was reused.
+		if ( !exists && len(d.players) >= maxPresencePlayers ) ||
+			( (!exists || now.Sub(old.updated) >= presenceGhostAfter) && active >= int(d.world.Rules.MaxVisitors) ) {
 			return peerResponse{}, errors.New("presence_full")
 		}
 		if exists && len(request.SpawnCandidates) > 0 {
@@ -234,7 +244,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				lastDistanceSq = distanceSq
 				occupied := false
 				for _, visitor := range d.players {
-					if presenceCapsulesOverlap(candidate, visitor.Position) {
+					if now.Sub(visitor.updated) < presenceGhostAfter && presenceCapsulesOverlap(candidate, visitor.Position) {
 						occupied = true
 						break
 					}
@@ -257,10 +267,36 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 	}
 	players := make([]playerPresence, 0, len(d.players))
 	for _, p := range d.players {
+		p.Ghost = now.Sub(p.updated) >= presenceGhostAfter
 		players = append(players, p)
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].ID < players[j].ID })
 	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players}, nil
+}
+
+// Expire silent records even if there are no other connected visitors
+// generating presence requests. The request path also sweeps before admission.
+func (d *daemon) pruneExpiredPresence(now time.Time) {
+	d.presenceMu.Lock()
+	defer d.presenceMu.Unlock()
+	for id, visitor := range d.players {
+		if now.Sub(visitor.updated) >= presenceTTL {
+			delete(d.players, id)
+		}
+	}
+}
+
+func (d *daemon) maintainPresenceExpiry(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			d.pruneExpiredPresence(now)
+		}
+	}
 }
 
 func presenceCapsulesOverlap(a, b []float64) bool {

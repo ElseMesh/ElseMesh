@@ -17,9 +17,9 @@ export function validatePresencePose(pose) {
 
 // One instance belongs to one transport session. Reset it on reconnect or handoff.
 export class PlayerPresence {
-	constructor(worldId, { interpolationMs = 100, staleMs = 1500 } = {}) {
-		if (!isWorldID(worldId) || !Number.isFinite(interpolationMs) || interpolationMs <= 0 || !Number.isFinite(staleMs) || staleMs <= 0) throw new Error('Invalid presence configuration');
-		this.worldId = worldId; this.interpolationMs = interpolationMs; this.staleMs = staleMs;
+	constructor(worldId, { interpolationMs = 100, ghostMs = 10000, staleMs = 120000 } = {}) {
+		if (!isWorldID(worldId) || !Number.isFinite(interpolationMs) || interpolationMs <= 0 || !Number.isFinite(ghostMs) || ghostMs <= 0 || !Number.isFinite(staleMs) || staleMs <= ghostMs) throw new Error('Invalid presence configuration');
+		this.worldId = worldId; this.interpolationMs = interpolationMs; this.ghostMs = ghostMs; this.staleMs = staleMs;
 		this.reset();
 	}
 	reset() { this.playerId = null; this.players = new Map(); this.lastRequestId = null; }
@@ -30,7 +30,7 @@ export class PlayerPresence {
 		const ids = new Set();
 		for (const pose of snapshot.players) {
 			validatePresencePose(pose);
-			if (!playerID.test(pose.id || '') || ids.has(pose.id) || !Number.isSafeInteger(pose.updatedAt) || pose.updatedAt < 0) throw new Error('Invalid presence player');
+			if (!playerID.test(pose.id || '') || ids.has(pose.id) || !Number.isSafeInteger(pose.updatedAt) || pose.updatedAt < 0 || (pose.ghost !== undefined && typeof pose.ghost !== 'boolean')) throw new Error('Invalid presence player');
 			ids.add(pose.id);
 		}
 		this.playerId = snapshot.playerId; this.lastRequestId = requestId;
@@ -38,8 +38,14 @@ export class PlayerPresence {
 		for (const pose of snapshot.players) {
 			if (pose.id === this.playerId) continue;
 			const old = this.players.get(pose.id);
-			if (old && (pose.sequence <= old.pose.sequence || pose.updatedAt < old.pose.updatedAt)) continue;
-			const copy = { ...pose, position: [...pose.position], appearance: { ...pose.appearance } };
+			if (old && (pose.sequence < old.pose.sequence || pose.updatedAt < old.pose.updatedAt)) continue;
+			if (old && pose.sequence === old.pose.sequence && pose.updatedAt === old.pose.updatedAt) {
+				// The owner can change ghost status without a new pose sequence.
+				old.pose.ghost = pose.ghost === true;
+				old.receivedAt = now;
+				continue;
+			}
+			const copy = { ...pose, ghost: pose.ghost === true, position: [...pose.position], appearance: { ...pose.appearance } };
 			this.players.set(pose.id, { pose: copy, previous: old?.pose || copy, receivedAt: now });
 		}
 		return true;
@@ -50,7 +56,7 @@ export class PlayerPresence {
 			if (now - receivedAt >= this.staleMs) continue;
 			const t = Math.max(0, Math.min(1, (now - receivedAt) / this.interpolationMs));
 			const yawDelta = Math.atan2(Math.sin(pose.yaw - previous.yaw), Math.cos(pose.yaw - previous.yaw));
-			result.push({ ...pose, appearance: { ...pose.appearance }, position: pose.position.map((v, i) => previous.position[i] + (v - previous.position[i]) * t), yaw: previous.yaw + yawDelta * t, pitch: previous.pitch + (pose.pitch - previous.pitch) * t });
+			result.push({ ...pose, ghost: pose.ghost === true || now - receivedAt >= this.ghostMs, appearance: { ...pose.appearance }, position: pose.position.map((v, i) => previous.position[i] + (v - previous.position[i]) * t), yaw: previous.yaw + yawDelta * t, pitch: previous.pitch + (pose.pitch - previous.pitch) * t });
 		}
 		return result;
 	}

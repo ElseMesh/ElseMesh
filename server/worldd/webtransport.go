@@ -51,7 +51,8 @@ func (d *daemon) handleBrowserWebTransport(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		return
 	}
-	defer d.leaveBrowserPresence(first.WorldID, first.TargetPeerID, presenceSession)
+	// An unexpected transport closure retains the visitor for 10s/120s
+	// ghost and expiry processing; explicit presence.leave still removes it.
 	var requests sync.WaitGroup
 	defer requests.Wait()
 	for {

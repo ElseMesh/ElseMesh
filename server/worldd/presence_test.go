@@ -99,6 +99,74 @@ func TestPresenceLimitsExpiryAndIdentity(t *testing.T) {
 	}
 }
 
+func TestPresenceGhostLifecycle(t *testing.T) {
+	d := presenceTestDaemon(t)
+	now := time.Now()
+	session, err := newPresenceSession()
+	if err != nil { t.Fatal(err) }
+	update := gatewayMessage{Type: "presence.update", Pose: presenceTestPose()}
+	bindPresenceRequest(&update, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(update, now); err != nil { t.Fatal(err) }
+	// A separate, never-admitted session can request a snapshot with a leave.
+	observer := gatewayMessage{Type: "presence.leave"}
+	bindPresenceRequest(&observer, "observer", session)
+	check := func(at time.Time, expectedCount int, ghost bool) {
+		t.Helper()
+		reply, err := d.presenceRequest(observer, at)
+		if err != nil { t.Fatal(err) }
+		if len(reply.Players) != expectedCount { t.Fatalf("at %s got %d players; expected %d", at.Sub(now), len(reply.Players), expectedCount) }
+		if expectedCount == 1 && reply.Players[0].Ghost != ghost {
+			t.Fatalf("at %s ghost = %v; expected %v", at.Sub(now), reply.Players[0].Ghost, ghost)
+		}
+	}
+	check(now.Add(9999 * time.Millisecond), 1, false)
+	check(now.Add(presenceGhostAfter), 1, true)
+	check(now.Add(119 * time.Second), 1, true)
+	check(now.Add(presenceTTL), 0, false)
+}
+
+func TestPresenceGhostRevivalAndNonblockingAdmission(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.MaxVisitors = 1
+	d.world.Rules.SpawnRadius = 1
+	now := time.Now()
+	join := func(gateway string, sequence uint64, at time.Time) (gatewayMessage, peerResponse) {
+		t.Helper()
+		session, err := newPresenceSession()
+		if err != nil { t.Fatal(err) }
+		p := presenceTestPose()
+		p.Sequence = sequence
+		p.Position = []float64{0, 1.38, 8}
+		request := gatewayMessage{Type: "presence.update", Pose: p, SpawnCandidates: [][]float64{{0, 1.38, 8}}}
+		bindPresenceRequest(&request, gateway, session)
+		reply, err := d.presenceRequest(request, at)
+		if err != nil { t.Fatal(err) }
+		return request, reply
+	}
+	first, one := join("one", 0, now)
+	secondRequest, two := join("two", 0, now.Add(presenceGhostAfter))
+	if len(two.Players) != 2 || !presenceForPlayer(two.Players, one.PlayerID).Ghost {
+		t.Fatalf("old ghost must remain in snapshot but not count toward active visitor capacity: %+v", two)
+	}
+	if got := presenceForPlayer(two.Players, two.PlayerID).Position; len(got) != 3 || got[0] != 0 || got[2] != 8 {
+		t.Fatalf("ghost must not block spawn location: %v", got)
+	}
+	// A ghost cannot steal capacity from an active visitor if its slot was reused.
+	first.Pose.Sequence = 1
+	first.SpawnCandidates = nil
+	if _, err := d.presenceRequest(first, now.Add(11 * time.Second)); err == nil || err.Error() != "presence_full" {
+		t.Fatalf("ghost revival must respect active visitor limit: %v", err)
+	}
+	// Once the active visitor intentionally leaves, the ghost can resume.
+	secondRequest.Type = "presence.leave"
+	if _, err := d.presenceRequest(secondRequest, now.Add(11*time.Second)); err != nil { t.Fatal(err) }
+	recovered, err := d.presenceRequest(first, now.Add(11 * time.Second))
+	if err != nil { t.Fatalf("ghost revival rejected: %v", err) }
+	if presenceForPlayer(recovered.Players, one.PlayerID).Ghost {
+		t.Fatal("accepted update should restore opaque active presence")
+	}
+}
+
 func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
@@ -310,15 +378,20 @@ func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 		t.Fatal("leave removed another player")
 	}
 	b.Close()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		owner.presenceMu.Lock()
-		count := len(owner.players)
-		owner.presenceMu.Unlock()
-		if count == 0 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatal("disconnect did not remove player at owner")
+	// Unexpected disconnect does not immediately erase presence. The source
+	// retains it as a nonblocking ghost and expires it after 120 seconds.
+	time.Sleep(50 * time.Millisecond)
+	owner.presenceMu.Lock()
+	count := len(owner.players)
+	seen := owner.players[two.PlayerID]
+	owner.presenceMu.Unlock()
+	if count != 1 { t.Fatalf("disconnection should preserve one session, got %d", count) }
+	observer := gatewayMessage{Type:"presence.leave"}
+	observerSession, err := newPresenceSession()
+	if err != nil { t.Fatal(err) }
+	bindPresenceRequest(&observer,"observer",observerSession)
+	ghost, err := owner.presenceRequest(observer, seen.updated.Add(presenceGhostAfter))
+	if err != nil || len(ghost.Players)!=1 || !ghost.Players[0].Ghost {t.Fatalf("missing disconnected ghost: %+v %v",ghost,err)}
+	expired, err := owner.presenceRequest(observer, seen.updated.Add(presenceTTL))
+	if err != nil || len(expired.Players)!=0 {t.Fatalf("disconnected presence not expired: %+v %v",expired,err)}
 }
