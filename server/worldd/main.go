@@ -151,7 +151,7 @@ func run() error {
 	flag.Var(&roleStateFrom, "role-state-from", "world neighbor PeerID to sync owner-signed role revocations from (repeatable)")
 	flag.Var(&announceAddresses, "announce-address", "externally reachable IP multiaddr to advertise (repeatable; useful when Android blocks interface discovery)")
 	flag.Var(&allowedBrowserOriginsFlags, "allow-browser-origin", "allow this exact HTTP(S) browser origin to connect to the WebSocket gateway (repeatable)")
-	flag.Var(&webrtcSTUNServers, "webrtc-stun-server", "STUN server URL advertised to browsers and used by thruholdd for direct WebRTC (repeatable)")
+	flag.Var(&webrtcSTUNServers, "webrtc-stun-server", "STUN server URL advertised to browsers and used by worldd for direct WebRTC (repeatable)")
 	flag.Var(&zeroTierBlacklistInterfaces, "zerotier-blacklist-interface", "interface name prefix that libzt must not use for physical paths (repeatable)")
 	cacheSyncInterval := flag.Duration("cache-sync-interval", 5*time.Minute, "how often to retry missing owner-authorized cached assets")
 	roleStateSyncInterval := flag.Duration("role-state-sync-interval", time.Minute, "how often to sync owner-signed role revocations")
@@ -413,7 +413,7 @@ func run() error {
 		if publishErr != nil {
 			return publishErr
 		}
-		fmt.Printf("Published world version after importing %d verified package assets (%d bytes); restart thruholdd to load the new manifest.\n", count, totalBytes)
+		fmt.Printf("Published world version after importing %d verified package assets (%d bytes); restart worldd to load the new manifest.\n", count, totalBytes)
 		return nil
 	}
 	if *importAssetPath != "" {
@@ -684,9 +684,9 @@ func run() error {
 	if wtServer != nil {
 		webTransportErr = make(chan error, 1)
 		go func() { webTransportErr <- wtServer.ListenAndServeTLS(*webTransportCert, *webTransportKey) }()
-		log.Printf("thruholdd WebTransport HTTP/3 UDP listen=%s", *webTransportAddress)
+		log.Printf("worldd WebTransport HTTP/3 UDP listen=%s", *webTransportAddress)
 	}
-	log.Printf("thruholdd node=%s world=%s http=%s", localID, world.WorldID, httpListener.Addr())
+	log.Printf("worldd node=%s world=%s http=%s", localID, world.WorldID, httpListener.Addr())
 	for _, addr := range p2pHost.Addrs() {
 		log.Printf("p2p address %s/p2p/%s", addr, p2pHost.ID())
 	}
