@@ -7,11 +7,11 @@ ElseMesh separates a world's identity from the machines that can serve it. This 
 | Value | Identifies | Browser can connect directly? |
 | --- | --- | --- |
 | `elsemesh:<name>` ThruHold ID | The signed world and its content | No; it needs a provider route |
-| ZeroTier node ID (10 hex characters) | A persistent `thruholdd` overlay identity | No; a browser is not on the ZeroTier network |
+| ZeroTier node ID (10 hex characters) | A persistent `worldd` overlay identity | No; a browser is not on the ZeroTier network |
 | libp2p PeerID | One daemon/provider identity | No; it is not a network address |
 | HTTPS/WSS gateway origin | A public endpoint for that provider | Yes, subject to TLS, availability, and world authorization |
 
-The ZeroTier ID is useful to identify which persistent daemon the owner means. `thruholdd` now adds its local ZeroTier node ID and network ID to its signed `elsemesh.node/1` advertisement. `directoryd` accepts those optional signed fields and exposes `GET /v1/zerotier/{networkId}/{nodeId}`; the response includes current provider records and the ThruHold IDs they advertise. The browser verifies each provider signature, resolves a single-world node to its canonical ThruHold ID, then verifies the signed world manifest through HTTPS/WSS. The existing `/v1/worlds/{worldId}` lookup remains unchanged.
+The ZeroTier ID is useful to identify which persistent daemon the owner means. `worldd` now adds its local ZeroTier node ID and network ID to its signed `elsemesh.node/1` advertisement. `directoryd` accepts those optional signed fields and exposes `GET /v1/zerotier/{networkId}/{nodeId}`; the response includes current provider records and the ThruHold IDs they advertise. The browser verifies each provider signature, resolves a single-world node to its canonical ThruHold ID, then verifies the signed world manifest through HTTPS/WSS. The existing `/v1/worlds/{worldId}` lookup remains unchanged.
 
 The association is signed by the provider's libp2p identity, using the node ID read from that daemon's local libzt runtime. It is a locator assertion, not a ZeroTier cryptographic proof or authorization credential. The directory and browser must never use it to grant access: world signatures and owner grants remain authoritative, and another signed world cannot impersonate the owner's manifest. Do not substitute a discovered physical IP/UDP port for the gateway: libzt path observations are transient and are not browser-routable addresses.
 
@@ -32,7 +32,7 @@ When sharing a URL, include only providers that already serve the same world and
 
 ## Intended deployment
 
-1. Run `thruholdd` independently on the owner's desktop and Flip7, each with a persistent libzt state directory and the same authorized world package. Give each daemon a public HTTPS/WSS gateway route. A browser reaches the gateway; it never joins ZeroTier.
+1. Run `worldd` independently on the owner's desktop and Flip7, each with a persistent libzt state directory and the same authorized world package. Give each daemon a public HTTPS/WSS gateway route. A browser reaches the gateway; it never joins ZeroTier.
 2. Grant a separately operated daemon the narrow `content-cache` scope and required world access. Grant `failover-authority` only if the owner wants that node to publish bounded temporary authority after an explicit delay. Owner recovery must supersede temporary authority under the signed epoch rules.
 3. Share a multi-provider invite as above. Stop one provider at a time and check that the client selects the next permitted provider and verifies identical asset hashes.
 4. Set the successful invite as the browser's local home ThruHold. The preference is stored in that browser only; it does not keep any daemon alive.

@@ -1,6 +1,6 @@
 # Optional account and world roles
 
-This document specifies the account boundary for ElseMesh. `server/accountd` implements opt-in Google ID-token verification, nonce-bound Ed25519 proof of possession, exact-origin CORS, short-lived in-memory sessions, and a private account-key mapping file. The browser includes an opt-in sign-in and account-key UI. `thruholdd` now consumes owner-signed `world.content.edit` grants at the proposal-inbox write path; this queues unsigned, reviewable proposals and does not publish or sign world content.
+This document specifies the account boundary for ElseMesh. `server/accountd` implements opt-in Google ID-token verification, nonce-bound Ed25519 proof of possession, exact-origin CORS, short-lived in-memory sessions, and a private account-key mapping file. The browser includes an opt-in sign-in and account-key UI. `worldd` now consumes owner-signed `world.content.edit` grants at the proposal-inbox write path; this queues unsigned, reviewable proposals and does not publish or sign world content.
 
 ## Trust boundaries
 
@@ -8,7 +8,7 @@ This document specifies the account boundary for ElseMesh. `server/accountd` imp
 - A world remains readable and playable as a guest when its visitor is signed out, offline, or unable to contact the account service. Accounts add optional per-world roles; they do not become a global login gate.
 - Google proves control of a Google account to an optional account broker. It does not issue world roles. Only the key that owns a ThruHold can issue or revoke that world's role grants.
 - Role grants target an account public key, not an email address or raw Google subject. A browser creates the key and proves possession. The broker privately maps the verified Google `sub` to that key so the same account can recover its account association on another device.
-- Account and role endpoints are separate from `thruholdd`'s public manifest, asset, and lookup endpoints and from `directoryd`. CORS is never authorization. Account endpoints require explicit allowed origins and do not accept credentialed wildcard CORS.
+- Account and role endpoints are separate from `worldd`'s public manifest, asset, and lookup endpoints and from `directoryd`. CORS is never authorization. Account endpoints require explicit allowed origins and do not accept credentialed wildcard CORS.
 
 ## Sign-in and consent
 
@@ -16,7 +16,7 @@ The optional browser UI appears only when both `accountd` and `googleClientId` a
 
 The Google client ID and allowed web origins are explicit deployment configuration. Leave both values blank in `public/elsemesh-config.js` to hide the sign-in UI; world hosting, invites, guest viewing, and portal travel continue normally. Configure the Google OAuth web client for the exact game-site origin and configure `accountd` to allow that exact HTTPS origin. The account broker URL must itself use HTTPS. ID tokens are short-lived credentials: never place them in a URL, log them, or persist them in local storage. The client holds the credential in memory only long enough to complete the broker exchange. Account-broker session tokens are short-lived bearer tokens kept in memory and sent without cookies.
 
-`accountd` is not part of the browser build and is not started by `thruholdd`. Run it only when account sign-in is wanted. Configure `ELSEMESH_GOOGLE_CLIENT_ID` and `ELSEMESH_ACCOUNT_ALLOWED_ORIGINS`, or pass `--google-client-id` and `--allowed-origins`. The origin list must contain exact canonical HTTPS origins, without paths or wildcards. The listener accepts only loopback addresses so the browser-facing endpoint must pass through a local HTTPS reverse proxy. The server verifies Google ID tokens with Google's maintained Go verifier, then separately checks the accepted Google issuer, issue time, and the challenge nonce. It ignores email and derives a private account lookup ID from Google `sub`; the on-disk `accounts.json` contains only that opaque ID and public-key fingerprints, with mode `0600`. Sign-in challenges expire after five minutes and are single-use. Bearer sessions expire after 15 minutes, exist only in process memory, and are invalidated by logout, key unlink, account deletion, or process restart. The routes are `GET /api/challenge`, `POST /api/session`, `GET /api/me`, `DELETE /api/me/key`, `POST /api/logout`, and `DELETE /api/account`. The browser key signs the UTF-8 message `elsemesh.account-proof/1\n<challengeId>\n<nonce>\n<origin>`; send the signature and Google ID token only over HTTPS.
+`accountd` is not part of the browser build and is not started by `worldd`. Run it only when account sign-in is wanted. Configure `ELSEMESH_GOOGLE_CLIENT_ID` and `ELSEMESH_ACCOUNT_ALLOWED_ORIGINS`, or pass `--google-client-id` and `--allowed-origins`. The origin list must contain exact canonical HTTPS origins, without paths or wildcards. The listener accepts only loopback addresses so the browser-facing endpoint must pass through a local HTTPS reverse proxy. The server verifies Google ID tokens with Google's maintained Go verifier, then separately checks the accepted Google issuer, issue time, and the challenge nonce. It ignores email and derives a private account lookup ID from Google `sub`; the on-disk `accounts.json` contains only that opaque ID and public-key fingerprints, with mode `0600`. Sign-in challenges expire after five minutes and are single-use. Bearer sessions expire after 15 minutes, exist only in process memory, and are invalidated by logout, key unlink, account deletion, or process restart. The routes are `GET /api/challenge`, `POST /api/session`, `GET /api/me`, `DELETE /api/me/key`, `POST /api/logout`, and `DELETE /api/account`. The browser key signs the UTF-8 message `elsemesh.account-proof/1\n<challengeId>\n<nonce>\n<origin>`; send the signature and Google ID token only over HTTPS.
 
 ## Account key and role grants
 
@@ -34,7 +34,7 @@ The owner issues a versioned, owner-signed `elsemesh.world-role/1` grant that bi
 
 Role grants cannot change the manifest, alter host grants, or grant ownership. `visitor` and read-only access require no role grant. `builder` and other future roles authorize only explicit actions defined by a versioned world capability; clients and nodes reject unknown scopes. The grant is not authority for concurrent simulation writes.
 
-The owner publishes signed revocation state with a monotonically increasing serial and an expiry. A `thruholdd` gateway accepts an owner-signed state at `PUT /api/world/roles/revocations`, persists the complete signed document with mode `0600`, and rejects serial rollback. `GET /api/world/roles/revocations` returns the node's current document. Nodes can sync over libp2p from configured peers using `--role-state-from <peer-id>`; source documents are checked against the exact world and owner signatures, and old serials never replace newer local state. This may be pointed directly at the owner or at another already-synced world node. A persisted document remains a rollback floor after its 15-minute freshness window expires, but consumers must reject it for authorization until a fresh document arrives. Guest reads do not depend on role-state availability. A new owner key must explicitly transfer world ownership and reissue or revoke roles; a Google account cannot transfer a world.
+The owner publishes signed revocation state with a monotonically increasing serial and an expiry. A `worldd` gateway accepts an owner-signed state at `PUT /api/world/roles/revocations`, persists the complete signed document with mode `0600`, and rejects serial rollback. `GET /api/world/roles/revocations` returns the node's current document. Nodes can sync over libp2p from configured peers using `--role-state-from <peer-id>`; source documents are checked against the exact world and owner signatures, and old serials never replace newer local state. This may be pointed directly at the owner or at another already-synced world node. A persisted document remains a rollback floor after its 15-minute freshness window expires, but consumers must reject it for authorization until a fresh document arrives. Guest reads do not depend on role-state availability. A new owner key must explicitly transfer world ownership and reissue or revoke roles; a Google account cannot transfer a world.
 
 ## Delegated proposal intake
 
@@ -42,13 +42,13 @@ The owner publishes signed revocation state with a monotonically increasing seri
 
 The node checks the account-key fingerprint, grant signature and lifetime, fresh owner revocation state, grant/key revocation, proposal world ID, source-hash syntax, allowlisted operation names, and the scopes required by every operation before storing anything. Object and world edits require `world.content.edit`; portal add, update, and remove operations require `world.portals.manage`. A proposal containing both operation types requires both scopes. Missing or expired revocation state fails closed for this write; guest reads and portal travel remain available. Identical submissions are idempotent. The owner node stores accepted envelopes under its private `--data` directory at `proposals/`, with mode `0700` for the inbox and `0600` for each file. The inbox is bounded to 4096 entries and 256 MiB, with a 16 MiB request limit.
 
-Owners can create the signed role documents with `thruholdd`; the input JSON is the unsigned payload only. Both commands require the selected profile's `node.key` and exact signed `--manifest`, validate the world and time bounds, write a new `0600` file, and refuse to overwrite an existing output. A role grant input contains `protocol`, `worldId`, `ownerPeerId`, `grantId`, `version`, `accountKeyFingerprint`, `scopes`, `issuedAt`, and `expiresAt`. Revocation input contains `protocol`, `worldId`, `ownerPeerId`, `serial`, `issuedAt`, `expiresAt`, `grantIds`, and `accountKeyFingerprints`; its serial must exceed the persisted rollback floor.
+Owners can create the signed role documents with `worldd`; the input JSON is the unsigned payload only. Both commands require the selected profile's `node.key` and exact signed `--manifest`, validate the world and time bounds, write a new `0600` file, and refuse to overwrite an existing output. A role grant input contains `protocol`, `worldId`, `ownerPeerId`, `grantId`, `version`, `accountKeyFingerprint`, `scopes`, `issuedAt`, and `expiresAt`. Revocation input contains `protocol`, `worldId`, `ownerPeerId`, `serial`, `issuedAt`, `expiresAt`, `grantIds`, and `accountKeyFingerprints`; its serial must exceed the persisted rollback floor.
 
 ```sh
-thruholdd --world-profile island --manifest ./island.world.signed.json \
+worldd --world-profile island --manifest ./island.world.signed.json \
   --sign-role-grant ./grant.json --role-document-out ./grant.signed.json
 
-thruholdd --world-profile island --manifest ./island.world.signed.json \
+worldd --world-profile island --manifest ./island.world.signed.json \
   --sign-role-revocations ./revocations.json --role-document-out ./revocations.signed.json
 
 curl --fail --request PUT --header 'Content-Type: application/json' \
@@ -62,10 +62,10 @@ Queueing is not acceptance: proposals remain unsigned and are not visible in the
 ```sh
 # List IDs, account fingerprints, grant IDs, base-source hashes, and operation counts.
 # Point --manifest at the signed world.json in the selected profile directory.
-thruholdd --world-profile island --manifest /path/to/island/world.json --list-proposals
+worldd --world-profile island --manifest /path/to/island/world.json --list-proposals
 
 # Export only the unsigned patch; the destination must not already exist.
-thruholdd --world-profile island --manifest /path/to/island/world.json \
+worldd --world-profile island --manifest /path/to/island/world.json \
   --export-proposal sha256:<proposal-id> --proposal-out ./proposal.json
 
 # Apply it to the exact source snapshot named by its sourceHash, then review the diff.
@@ -76,7 +76,7 @@ node tools/apply-world-proposal.mjs --source ./island.world-source.json \
 After rejecting a proposal or completing its publication, remove that exact queued submission:
 
 ```sh
-thruholdd --world-profile island --manifest /path/to/island/world.json \
+worldd --world-profile island --manifest /path/to/island/world.json \
   --remove-proposal sha256:<proposal-id>
 ```
 
@@ -90,14 +90,14 @@ After reviewing the candidate source and its assets, publish it to the selected 
 
 ```sh
 node tools/publish-world-source.mjs \
-  --thruholdd ./thruholdd \
+  --worldd ./worldd \
   --data ~/.config/elsemesh/worlds/tidewater \
   --base-source ./island.world-source.json \
   --source ./candidate.world-source.json \
   --assets ./worlds/tidewater/assets
 ```
 
-The command first asks `thruholdd` to verify the active signed manifest and confirm that the local node key is its owner. Runtime manifests record the SHA-256 of the exact source file used to produce them. The supplied `--base-source` must match that active signed hash, so a candidate based on an older source snapshot cannot be published. Existing manifests without a source hash require an explicit reviewed base file once; that publish records the baseline hash. The candidate must name the same world, and `thruholdd` independently hashes both source files (each must be a regular file no larger than 16 MiB) before signing. Publication preserves the current discoverability setting and authority epoch, constructs exactly the next manifest version, verifies and imports every referenced content-addressed asset, archives the previous signed manifest under `manifest-history/`, then atomically activates the new signed `world.json`. A failed validation or package import leaves the active manifest untouched. A publication lock prevents concurrent publishers; after a process crash, remove `.publish.lock` only after confirming no publisher is running. Restart the running `thruholdd` process after successful publication so it loads the new manifest. The owner profile and private proposal inbox must remain outside any static web root.
+The command first asks `worldd` to verify the active signed manifest and confirm that the local node key is its owner. Runtime manifests record the SHA-256 of the exact source file used to produce them. The supplied `--base-source` must match that active signed hash, so a candidate based on an older source snapshot cannot be published. Existing manifests without a source hash require an explicit reviewed base file once; that publish records the baseline hash. The candidate must name the same world, and `worldd` independently hashes both source files (each must be a regular file no larger than 16 MiB) before signing. Publication preserves the current discoverability setting and authority epoch, constructs exactly the next manifest version, verifies and imports every referenced content-addressed asset, archives the previous signed manifest under `manifest-history/`, then atomically activates the new signed `world.json`. A failed validation or package import leaves the active manifest untouched. A publication lock prevents concurrent publishers; after a process crash, remove `.publish.lock` only after confirming no publisher is running. Restart the running `worldd` process after successful publication so it loads the new manifest. The owner profile and private proposal inbox must remain outside any static web root.
 
 ## Revocation, deletion, and recovery
 
