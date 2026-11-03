@@ -88,6 +88,24 @@ They must not contain private keys or reusable account session tokens. Enforce
 bounded clock skew, replay protection, rate limits, durable redemption state,
 and revocation checks at the admission service and world authority.
 
+## Presence ghosting and world-defined simulation authority
+
+After 10 seconds without an accepted client update, the owner includes
+`ghost: true` for that visitor in presence snapshots. The avatar remains
+visible but translucent and cannot obstruct movement or spawn occupancy.
+The owner removes it after 120 seconds of silence. A valid update before
+expiry restores opaque collidable presence; explicit `presence.leave`
+removes it immediately. Unexpected connection loss is not an explicit
+leave. The ghost flag comes from the authority, not a client pose.
+
+The present basic protocol reports client-calculated pose/appearance.
+This is a baseline, not the world-authority ceiling: the `worldd`
+daemon must be extensible for independently authored world rules,
+server-authoritative physics, movement/collision validation, gameplay
+simulation, anti-cheat and owner-issued state corrections. Those richer
+protocols need specific implementation and tests and are not implied by
+the existing presence messages.
+
 ## Current request paths
 
 1. Browser connects to the configured gateway and selects a world/target node.
