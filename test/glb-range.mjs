@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
 import { extractKTX2Level } from '../src/engine/loaders/KTX2Level.js';
-import { fetchGLBWithCoarseKTX2, fetchNextGLBTextureLevels } from '../src/engine/loaders/GLBRange.js';
+import { fetchGLBWithCoarseKTX2, fetchGLBTextureLevel, fetchNextGLBTextureLevels } from '../src/engine/loaders/GLBRange.js';
 
 const ktx2 = new Uint8Array( await readFile( new URL( './fixtures/ktx2-checker.ktx2', import.meta.url ) ) );
 const sourceView = new DataView( ktx2.buffer, ktx2.byteOffset, ktx2.byteLength );
@@ -87,6 +87,11 @@ const secondFineOffset = Number( sourceView.getBigUint64( 80 + secondFineLevelIn
 const secondFineLength = Number( sourceView.getBigUint64( 80 + secondFineLevelIndex * 24 + 8, true ) );
 const secondFineRequests = requested.slice( beforeSecondFineLevel );
 assert( secondFineRequests.length === 1 && secondFineRequests[ 0 ].start === secondFineOffset && secondFineRequests[ 0 ].end === secondFineOffset + secondFineLength - 1, 'each successive upgrade transfers only its newly requested mip payload' );
+const beforeRevisit = requested.length;
+const revisitedLevel = await fetchGLBTextureLevel( connector, 'synthetic-glb', result, { imageIndices: [ 0 ], levelIndex: fineLevelIndex } );
+assert.deepEqual( revisitedLevel[ 0 ].bytes, extractKTX2Level( ktx2, fineLevelIndex ), 'an evicted mip can be fetched again by exact level index' );
+const revisitRequests = requested.slice( beforeRevisit );
+assert.deepEqual( revisitRequests, [ { start: fineLevelOffset, end: fineLevelOffset + fineLevelLength - 1 } ], 'revisiting an evicted mip requests only its payload range' );
 
 const textureAssetId = 'source:dGVzdC10ZXh0dXJl';
 const externalDocument = {
@@ -159,4 +164,8 @@ const externalFineRequests = externalRequests.slice( externalMipStart );
 const externalFineOffset = Number( sourceView.getBigUint64( 80 + externalFineIndex * 24, true ) );
 const externalFineLength = Number( sourceView.getBigUint64( 80 + externalFineIndex * 24 + 8, true ) );
 assert.deepEqual( externalFineRequests, [ { assetId: textureAssetId, start: externalFineOffset, end: externalFineOffset + externalFineLength - 1 } ], 'a shared-texture upgrade requests only its new mip bytes, not geometry or earlier mips' );
+const beforeExternalRevisit = externalRequests.length;
+const externalRevisited = await fetchGLBTextureLevel( externalConnector, 'external-glb', externalResult, { imageIndices: [ 0 ], levelIndex: externalFineIndex } );
+assert.deepEqual( externalRevisited[ 0 ].bytes, extractKTX2Level( ktx2, externalFineIndex ), 'an evicted standalone texture mip can be fetched again by exact level index' );
+assert.deepEqual( externalRequests.slice( beforeExternalRevisit ), [ { assetId: textureAssetId, start: externalFineOffset, end: externalFineOffset + externalFineLength - 1 } ], 'revisiting an evicted external mip requests only its payload range' );
 console.log( 'Ranged GLB coarse-texture checks passed' );

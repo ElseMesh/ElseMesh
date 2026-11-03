@@ -274,3 +274,20 @@ export async function fetchNextGLBTextureLevels( connector, assetId, progressive
 	}
 	return levels;
 }
+
+/** Fetch one exact indexed level from a progressive GLB, including levels previously evicted from RAM. */
+export async function fetchGLBTextureLevel( connector, assetId, progressive, { signal, imageIndices, levelIndex } = {} ) {
+	if ( ! Number.isSafeInteger( levelIndex ) || levelIndex < 0 || ! Array.isArray( imageIndices ) || imageIndices.length === 0 ) throw new RangeError( 'Progressive texture level selection is invalid' );
+	const wanted = new Set( imageIndices );
+	const images = ( progressive?.textures || [] ).filter( image => image.levelCount > levelIndex && image.imageIndices.some( index => wanted.has( index ) ) );
+	const groups = new Map();
+	for ( const image of images ) {
+		const sourceAssetId = image.assetId || assetId;
+		let group = groups.get( sourceAssetId );
+		if ( ! group ) groups.set( sourceAssetId, group = [] );
+		group.push( { ...image, levelIndex } );
+	}
+	const levels = [];
+	for ( const [ sourceAssetId, group ] of groups ) levels.push( ...await fetchKTX2LevelsFromIndex( connector, sourceAssetId, group, { signal } ) );
+	return levels;
+}

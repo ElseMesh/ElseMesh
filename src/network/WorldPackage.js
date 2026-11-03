@@ -23,7 +23,7 @@ import { Vector2 } from '../engine/math/Vector2.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { worldMaterialRole } from './WorldMaterialProfileRegistry.js';
 import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
-import { fetchNextGLBTextureLevels } from '../engine/loaders/GLBRange.js';
+import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
 import { transformBoundsCenter } from './WorldStreaming.js';
 
 const COMPONENTS = Object.freeze( {
@@ -183,49 +183,54 @@ function updateWorldPackageTextureLOD( root, camera ) {
 	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
 	const requests = [];
-	for ( const [ assetId, progressive ] of state.progressiveAssets ) {
-		const targetsByAsset = state.progressiveTextureTargetsByAsset.get( assetId );
-		const targets = targetsByAsset ? [ ...targetsByAsset.values() ].filter( target => target.nextLevelIndex >= 0 ) : [];
-		if ( ! targets.length || state.progressiveTextureJobs.has( assetId ) ) continue;
-		const objects = state.objectsByAsset.get( assetId ) || [];
+	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
+		if ( state.progressiveTextureJobs.has( targetID ) ) continue;
 		let screenFraction = 0;
-		for ( const object of objects ) {
-			const fraction = projectedBoundsScreenFraction( object, camera );
-			if ( fraction !== null ) screenFraction = Math.max( screenFraction, fraction );
+		for ( const assetId of target.sourceAssets.keys() ) {
+			for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
+				const fraction = projectedBoundsScreenFraction( object, camera );
+				if ( fraction !== null ) screenFraction = Math.max( screenFraction, fraction );
+			}
 		}
 		if ( ! screenFraction ) continue;
-		const eligible = targets.filter( target => {
-			const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 );
-			const textureDiameter = Math.max( target.baseWidth, target.baseHeight );
-			const desiredLevel = Math.min( target.levelCount - 1, Math.max( 0, Math.floor( Math.log2( textureDiameter / pixelDiameter ) ) ) );
-			return desiredLevel <= target.nextLevelIndex;
-		} );
-		const imageIndices = [ ...new Set( eligible.flatMap( target => target.imageIndices || [ target.imageIndex ] ) ) ];
-		const bytes = eligible.reduce( ( total, target ) => {
-			const offset = 80 + target.nextLevelIndex * 24;
-			return total + Number( new DataView( target.headerAndIndex.buffer, target.headerAndIndex.byteOffset, target.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
-		}, 0 );
-		if ( imageIndices.length ) requests.push( { assetId, progressive, imageIndices, priority: screenFraction * screenFraction / Math.max( 1, bytes ) } );
+		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 );
+		const textureDiameter = Math.max( target.baseWidth, target.baseHeight );
+		const texelRatio = textureDiameter / pixelDiameter;
+		let desiredLevel = Math.min( target.levelCount - 1, Math.max( 0, Math.floor( Math.log2( texelRatio ) ) ) );
+		// Reuse model-LOD hysteresis thresholds so tiny camera changes do not thrash mip residency.
+		if ( target.desiredLevel !== undefined ) {
+			if ( desiredLevel > target.desiredLevel && texelRatio < 2 ** ( target.desiredLevel + 1 ) * 1.12 ) desiredLevel = target.desiredLevel;
+			else if ( desiredLevel < target.desiredLevel && texelRatio > 2 ** target.desiredLevel * 0.88 ) desiredLevel = target.desiredLevel;
+		}
+		target.desiredLevel = desiredLevel;
+		const finestResidentLevel = Math.min( ...target.levels.keys() );
+		if ( desiredLevel > finestResidentLevel ) {
+			for ( const levelIndex of target.levels.keys() ) if ( levelIndex < desiredLevel ) target.levels.delete( levelIndex );
+			rebuildProgressiveTexture( target );
+		}
+		const nextLevelIndex = Math.min( ...target.levels.keys() ) - 1;
+		if ( nextLevelIndex < 0 || nextLevelIndex < desiredLevel ) continue;
+		const source = [ ...target.sourceAssets ].map( ( [ assetId, imageIndices ] ) => ( { assetId, progressive: state.progressiveAssets.get( assetId ), imageIndices } ) )
+			.find( candidate => candidate.progressive?.textures?.some( image => image.levelCount > nextLevelIndex && image.imageIndices.some( index => candidate.imageIndices.includes( index ) ) ) );
+		if ( ! source ) continue;
+		const offset = 80 + nextLevelIndex * 24;
+		const bytes = Number( new DataView( target.headerAndIndex.buffer, target.headerAndIndex.byteOffset, target.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
+		requests.push( { targetID, target, ...source, levelIndex: nextLevelIndex, priority: screenFraction * screenFraction / Math.max( 1, bytes ) } );
 	}
 	requests.sort( ( a, b ) => b.priority - a.priority );
 	if ( ! requests.length ) return;
 	state.textureLODQueue ||= new LODLoadQueue( 1 );
 	for ( const request of requests ) {
-		state.progressiveTextureJobs.set( request.assetId, true );
+		state.progressiveTextureJobs.set( request.targetID, true );
 		state.textureLODQueue.run( state.progressiveController.signal, async () => {
-			const levels = await fetchNextGLBTextureLevels( state.connector, request.assetId, request.progressive, { imageIndices: request.imageIndices, signal: state.progressiveController.signal } );
-			for ( const level of levels ) for ( const target of state.progressiveTextureTargetsByAsset.get( request.assetId )?.values() || [] ) {
-				if ( ! ( target.imageIndices || [ target.imageIndex ] ).some( index => level.imageIndices.includes( index ) ) ) continue;
-				if ( state.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
-				await installProgressiveTextureLevel( target, level );
+			const levels = await fetchGLBTextureLevel( state.connector, request.assetId, request.progressive, { imageIndices: request.imageIndices, levelIndex: request.levelIndex, signal: state.progressiveController.signal } );
+			for ( const level of levels ) {
+				if ( state.disposed || state.progressiveTextureTargets.get( request.targetID ) !== request.target ) throw new DOMException( 'World texture target unloaded', 'AbortError' );
+				await installProgressiveTextureLevel( request.target, level );
 			}
 		} ).catch( error => {
-			for ( const image of request.progressive.textures ) if ( image.imageIndices.some( index => request.imageIndices.includes( index ) ) ) {
-				const target = [ ...state.progressiveTextureTargetsByAsset.get( request.assetId )?.values() || [] ].find( candidate => ( candidate.imageIndices || [ candidate.imageIndex ] ).some( index => image.imageIndices.includes( index ) ) );
-				if ( target ) image.levelIndex = target.nextLevelIndex;
-			}
 			if ( error?.name !== 'AbortError' && ! state.disposed ) console.warn( 'World texture mip upgrade failed', request.assetId, error );
-		} ).finally( () => state.progressiveTextureJobs.delete( request.assetId ) );
+		} ).finally( () => state.progressiveTextureJobs.delete( request.targetID ) );
 	}
 }
 
@@ -265,7 +270,10 @@ async function installProgressiveTextureLevel( target, level ) {
 	const width = mip?.width || pixels.width, height = mip?.height || pixels.height;
 	if ( ! data || width !== level.width || height !== level.height || ( pixels.format || target.texture.format ) !== target.texture.format ) throw new Error( 'Decoded KTX2 mip is incompatible with its resident texture' );
 	target.levels.set( level.levelIndex, { data, width, height } );
-	target.nextLevelIndex = level.levelIndex - 1;
+	rebuildProgressiveTexture( target );
+}
+
+function rebuildProgressiveTexture( target ) {
 	const residentIndices = [ ...target.levels.keys() ];
 	const firstLevel = Math.min( ...residentIndices ), lastLevel = Math.max( ...residentIndices );
 	const texture = target.texture;
@@ -613,7 +621,11 @@ function disposeParsedWorldAsset( state, assetID ) {
 	state?.parsed?.delete( assetID );
 	state?.progressiveAssets?.delete( assetID );
 	const targets = state?.progressiveTextureTargetsByAsset?.get( assetID );
-	for ( const targetID of targets?.keys() || [] ) state?.progressiveTextureTargets?.delete( targetID );
+	for ( const targetID of targets?.keys() || [] ) {
+		const target = state?.progressiveTextureTargets?.get( targetID );
+		target?.sourceAssets?.delete( assetID );
+		if ( ! target?.sourceAssets?.size ) state?.progressiveTextureTargets?.delete( targetID );
+	}
 	state?.progressiveTextureTargetsByAsset?.delete( assetID );
 }
 
@@ -859,18 +871,23 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		const decodedTexture = entry.texture || await entry.promise;
 		if ( shareAssetTexture ) packageState.textureEntryByTexture?.set( decodedTexture, entry );
 		const progressiveTargetID = progressiveImage?.textureAssetId
-			? `${ sourceAssetId }:asset:${ progressiveImage.textureAssetId }:${ format }`
-			: `${ sourceAssetId }:${ textureSource }`;
-		if ( progressiveImage && ! packageState.progressiveTextureTargets.has( progressiveTargetID ) ) {
-			const target = {
-				assetId: sourceAssetId, imageIndex: textureSource, imageIndices: progressiveImage.imageIndices, texture: decodedTexture,
-				baseWidth: progressiveImage.baseWidth, baseHeight: progressiveImage.baseHeight,
-				levelCount: progressiveImage.levelCount, nextLevelIndex: progressiveImage.levelIndex,
-				headerAndIndex: progressiveImage.headerAndIndex,
-				forceRGBA: ! preserveBC,
-				levels: new Map( [ [ progressiveImage.levelIndex + 1, entry.progressiveLevel ] ] ),
-			};
-			packageState.progressiveTextureTargets.set( progressiveTargetID, target );
+			? `asset:${ progressiveImage.textureAssetId }:${ format }`
+			: `${ sourceAssetId }:${ textureSource }:${ format }`;
+		if ( progressiveImage ) {
+			let target = packageState.progressiveTextureTargets.get( progressiveTargetID );
+			if ( ! target ) {
+				target = {
+					texture: decodedTexture,
+					baseWidth: progressiveImage.baseWidth, baseHeight: progressiveImage.baseHeight,
+					levelCount: progressiveImage.levelCount,
+					headerAndIndex: progressiveImage.headerAndIndex,
+					forceRGBA: ! preserveBC,
+					levels: new Map( [ [ progressiveImage.levelIndex + 1, entry.progressiveLevel ] ] ),
+					sourceAssets: new Map(),
+				};
+				packageState.progressiveTextureTargets.set( progressiveTargetID, target );
+			}
+			target.sourceAssets.set( sourceAssetId, progressiveImage.imageIndices );
 			let targets = packageState.progressiveTextureTargetsByAsset.get( sourceAssetId );
 			if ( ! targets ) packageState.progressiveTextureTargetsByAsset.set( sourceAssetId, targets = new Map() );
 			targets.set( progressiveTargetID, target );

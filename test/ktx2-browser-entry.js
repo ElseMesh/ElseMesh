@@ -98,6 +98,7 @@ try {
 	const finerImage = await decodeKTX2( finerLevels[ 0 ].bytes );
 	if ( finerImage.width <= coarseImage.width || finerImage.height <= coarseImage.height || finerImage.mipmaps?.length > 1 ) throw new Error( 'next-finer KTX2 range did not decode as a larger one-level image' );
 	const externalTextureAssetId = `sha256:${'1'.repeat( 64 )}`;
+	const externalTextureETag = `"sha256-${externalTextureAssetId.slice( 7 )}"`;
 	const externalSourceGLB = makeGLB( ktx2Bytes, externalTextureAssetId );
 	const externalRangeRequests = [];
 	const externalConnector = {
@@ -105,13 +106,13 @@ try {
 			const bytes = assetId === 'external-glb' ? externalSourceGLB : assetId === externalTextureAssetId ? ktx2Bytes : null;
 			if ( ! bytes ) throw new Error( `unexpected external asset ${assetId}` );
 			externalRangeRequests.push( { assetId, start, end } );
-			return { bytes: bytes.slice( start, end + 1 ), etag: assetId === 'external-glb' ? '"external-glb"' : '"external-texture"', start, end, totalLength: bytes.byteLength };
+			return { bytes: bytes.slice( start, end + 1 ), etag: assetId === 'external-glb' ? '"external-glb"' : externalTextureETag, start, end, totalLength: bytes.byteLength };
 		},
 		getAssetRanges: async ( assetId, ranges ) => {
 			const bytes = assetId === 'external-glb' ? externalSourceGLB : assetId === externalTextureAssetId ? ktx2Bytes : null;
 			if ( ! bytes ) throw new Error( `unexpected external asset ${assetId}` );
 			for ( const range of ranges ) externalRangeRequests.push( { assetId, ...range } );
-			return ranges.map( range => ( { bytes: bytes.slice( range.start, range.end + 1 ), etag: assetId === 'external-glb' ? '"external-glb"' : '"external-texture"', ...range, totalLength: bytes.byteLength } ) );
+			return ranges.map( range => ( { bytes: bytes.slice( range.start, range.end + 1 ), etag: assetId === 'external-glb' ? '"external-glb"' : externalTextureETag, ...range, totalLength: bytes.byteLength } ) );
 		},
 	};
 	const externalCoarseGLB = await fetchGLBWithCoarseKTX2( externalConnector, 'external-glb' );
@@ -171,40 +172,55 @@ try {
 		if ( ! coarseFormatMatches || coarseTexture?.mipLevelCount !== 1 ) throw new Error( `WorldPackage did not install the coarse single-level texture (format ${coarseTexture?.format || 'missing'} vs ${coarseImage.format || 'rgba8'}, levels ${coarseTexture?.mipLevelCount})` );
 		const camera = new PerspectiveCamera( 62, 1, 0.1, 100 );
 		camera.position.set( 0, 0, 3 ); camera.updateProjectionMatrix(); camera.updateMatrixWorld( true );
-		const progressiveTarget = coarseRoot.userData.worldPackage.progressiveTextureTargets.get( 'fixture:0' );
+		const progressiveTarget = [ ...coarseRoot.userData.worldPackage.progressiveTextureTargets.values() ].find( target => target.sourceAssets.has( 'fixture' ) );
 		if ( ! progressiveTarget ) throw new Error( 'WorldPackage did not retain the coarse image source for progressive upgrades' );
 		camera.position.set( 0, 0, 1000 ); camera.updateMatrixWorld( true );
-		for ( let attempt = 0; attempt < 100 && progressiveTarget.levels.size < 2; attempt ++ ) {
+		for ( let attempt = 0; attempt < 100 && Math.min( ...progressiveTarget.levels.keys() ) > 3; attempt ++ ) {
 			updateWorldPackageLOD( coarseRoot, camera );
 			await new Promise( resolve => setTimeout( resolve, 5 ) );
 		}
-		if ( progressiveTarget.levels.size !== 2 || progressiveTarget.nextLevelIndex !== 2 ) throw new Error( `distant screen-space demand should stop after two coarse levels (resident ${progressiveTarget.levels.size}, next ${progressiveTarget.nextLevelIndex})` );
+		if ( progressiveTarget.levels.size !== 2 || Math.min( ...progressiveTarget.levels.keys() ) !== 3 ) throw new Error( `distant screen-space demand should retain only the required coarse levels (resident ${[ ...progressiveTarget.levels.keys() ]})` );
 		camera.position.set( 0, 0, 3 ); camera.updateMatrixWorld( true );
-		for ( let attempt = 0; attempt < 100 && progressiveTarget.nextLevelIndex >= 0; attempt ++ ) {
+		for ( let attempt = 0; attempt < 100 && Math.min( ...progressiveTarget.levels.keys() ) > 0; attempt ++ ) {
 			updateWorldPackageLOD( coarseRoot, camera );
 			await new Promise( resolve => setTimeout( resolve, 5 ) );
 		}
-		if ( progressiveTarget.nextLevelIndex >= 0 || coarseTexture.width !== 16 || coarseTexture.height !== 16 || coarseTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `screen-space texture streaming did not install all required levels (${coarseTexture.width}x${coarseTexture.height}, ${coarseTexture.mipLevelCount} mips, next ${progressiveTarget.nextLevelIndex})` );
+		if ( Math.min( ...progressiveTarget.levels.keys() ) !== 0 || coarseTexture.width !== 16 || coarseTexture.height !== 16 || coarseTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `screen-space texture streaming did not install all required levels (${coarseTexture.width}x${coarseTexture.height}, ${coarseTexture.mipLevelCount} mips)` );
+		camera.position.set( 0, 0, 1000 ); camera.updateMatrixWorld( true );
+		updateWorldPackageLOD( coarseRoot, camera );
+		if ( progressiveTarget.levels.size !== 2 || Math.min( ...progressiveTarget.levels.keys() ) !== 3 || coarseTexture.width !== 2 || coarseTexture.height !== 2 || coarseTexture.mipLevelCount !== 2 ) throw new Error( `distant view did not demote decoded and GPU texture tiers (${[ ...progressiveTarget.levels.keys() ]}, ${coarseTexture.width}x${coarseTexture.height}, ${coarseTexture.mipLevelCount} mips)` );
+		camera.position.set( 0, 0, 3 ); camera.updateMatrixWorld( true );
+		for ( let attempt = 0; attempt < 100 && Math.min( ...progressiveTarget.levels.keys() ) > 0; attempt ++ ) {
+			updateWorldPackageLOD( coarseRoot, camera );
+			await new Promise( resolve => setTimeout( resolve, 5 ) );
+		}
+		if ( Math.min( ...progressiveTarget.levels.keys() ) !== 0 || coarseTexture.width !== 16 || coarseTexture.mipLevelCount !== sourceLevelCount ) throw new Error( 'near view did not restore evicted mip tiers from connector ranges' );
 		const externalProgressiveConnector = {
 			...externalConnector,
 			worldId: 'elsemesh:ktx2-external-webgpu-test',
-			manifest: { ...connector.manifest, objects: [ { ...connector.manifest.objects[ 0 ], assetId: 'external-fixture', streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } } ] },
+			manifest: { ...connector.manifest, objects: [
+				{ ...connector.manifest.objects[ 0 ], id: 'external-fixture-a', assetId: 'external-fixture', streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } },
+				{ ...connector.manifest.objects[ 0 ], id: 'external-fixture-b', assetId: 'external-fixture-b', transform: { position: [ 5, 0, 0 ] }, streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } },
+			] },
 		};
 		const externalRoot = await loadWorldPackage( externalProgressiveConnector, {
-			assets: new Map( [ [ 'external-fixture', externalCoarseGLB.bytes ] ] ),
-			progressiveAssets: new Map( [ [ 'external-fixture', externalProgressiveForPackage ] ] ),
+			assets: new Map( [ [ 'external-fixture', externalCoarseGLB.bytes ], [ 'external-fixture-b', externalCoarseGLB.bytes ] ] ),
+			progressiveAssets: new Map( [ [ 'external-fixture', externalProgressiveForPackage ], [ 'external-fixture-b', externalProgressiveForPackage ] ] ),
 		} );
-		let externalTexture;
-		externalRoot.traverse( node => { if ( node.isMesh ) externalTexture = node.material.bindings.worldAlbedo?.texture; } );
+		const externalTextures = new Set();
+		externalRoot.traverse( node => { if ( node.isMesh ) externalTextures.add( node.material.bindings.worldAlbedo?.texture ); } );
+		const externalTexture = [ ...externalTextures ][ 0 ];
+		if ( externalTextures.size !== 1 ) throw new Error( 'mesh LODs that share an external KTX2 identity did not share one GPU texture' );
 		if ( externalTexture?.width !== 1 || ! [ ...externalRoot.userData.worldPackage.textureAssets.keys() ].some( key => key.startsWith( externalTextureAssetId ) ) ) throw new Error( 'WorldPackage did not seed and share the coarse external texture asset' );
 		const externalTarget = [ ...externalRoot.userData.worldPackage.progressiveTextureTargets.values() ].find( target => target.texture === externalTexture );
 		if ( ! externalTarget ) throw new Error( 'WorldPackage did not retain the external texture mip range target' );
+		if ( externalTarget.sourceAssets.size !== 2 ) throw new Error( 'shared texture residency did not register both mesh LOD owners' );
 		camera.position.set( 0, 0, 3 ); camera.updateMatrixWorld( true );
-		for ( let attempt = 0; attempt < 100 && externalTarget.nextLevelIndex >= 0; attempt ++ ) {
+		for ( let attempt = 0; attempt < 100 && Math.min( ...externalTarget.levels.keys() ) > 0; attempt ++ ) {
 			updateWorldPackageLOD( externalRoot, camera );
 			await new Promise( resolve => setTimeout( resolve, 5 ) );
 		}
-		if ( externalTarget.nextLevelIndex >= 0 || externalTexture.width !== 16 || externalTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `WorldPackage did not install all external KTX2 mips (${externalTexture.width}x${externalTexture.height}, ${externalTexture.mipLevelCount} mips, next ${externalTarget.nextLevelIndex})` );
+		if ( Math.min( ...externalTarget.levels.keys() ) !== 0 || externalTexture.width !== 16 || externalTexture.mipLevelCount !== sourceLevelCount ) throw new Error( `WorldPackage did not install all external KTX2 mips (${externalTexture.width}x${externalTexture.height}, ${externalTexture.mipLevelCount} mips)` );
 		await GPU.queue.onSubmittedWorkDone();
 		validationError = await device.popErrorScope();
 		if ( validationError ) throw new Error( `WebGPU rejected texture creation/upload: ${validationError.message}` );
