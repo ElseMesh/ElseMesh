@@ -45,6 +45,7 @@ import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '
 import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
+import { worldHasWater } from '../network/WorldRules.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
 
@@ -738,8 +739,7 @@ export class WebGLFallback {
 		this.loader = new GLTFLoader();
 		this.ktx2Loader = null;
 		this.worldLink = worldLinkFromLocation();
-		this.debugNoWater = new URLSearchParams( location.search ).has( 'noWater' )
-			|| this.worldLink?.environment?.water?.enabled === false;
+		this.debugNoWater = new URLSearchParams( location.search ).has( 'noWater' );
 		this.waterQuery = null;
 		this.input = null;
 		this.player = null;
@@ -1598,6 +1598,8 @@ export class WebGLFallback {
 			if ( result.error ) throw result.error;
 			manifest = result.manifest;
 		} else manifest = await this.connector.getManifest();
+		const hostedWaterEnabled = worldHasWater( manifest );
+		if ( ! hostedWaterEnabled ) this.debugNoWater = true;
 		let localSpawn = null;
 		let assets;
 		const components = manifest.components || [];
@@ -1830,8 +1832,7 @@ export class WebGLFallback {
 		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
 			this.spawn = { position: transfer.slice( 0, 3 ), yaw: transfer[ 3 ], pitch: transfer[ 4 ] };
 		}
-		this.hostedSeaLevel = ( manifest.components || [] ).some( component => worldComponentDescriptor( component.type )?.waterSurface )
-			? ( Number.isFinite( manifest.rules?.seaLevel ) ? manifest.rules.seaLevel : 0 ) : null;
+		this.hostedSeaLevel = hostedWaterEnabled ? manifest.rules.seaLevel : null;
 		this.worldSeaLevel = this.hostedSeaLevel ?? 0;
 		this.hostedComponents = components;
 		this.hostedTitle = manifest.title || 'Hosted world';

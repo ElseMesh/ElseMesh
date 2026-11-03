@@ -52,7 +52,6 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 		return {
 			localProvider: provider.origin,
 			localMap,
-			environment: configuredLocalWorld?.environment || null,
 			regionDiagnostics: params.get( 'regionDiagnostics' ) === '1',
 		};
 	}

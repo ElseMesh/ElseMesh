@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { worldWaterSurfaceFor } from '../src/network/WorldWaterSurface.js';
+import { worldHasWater } from '../src/network/WorldRules.js';
 
 const ocean = { label: 'ocean' };
 const harbor = { label: 'harbor' };
@@ -16,4 +17,11 @@ assert.equal( worldWaterSurfaceFor( components, [ 500, 0, 500 ], fallback ), oce
 assert.equal( worldWaterSurfaceFor( [], [ 0, 0, 0 ], fallback ), fallback,
 	'worlds without water components retain the flat fallback query surface' );
 
-console.log( 'World water surface routing passed.' );
+assert.equal( worldHasWater( { rules: { seaLevel: 0 }, components: [] } ), false,
+	'a sea level alone does not activate water in a hosted world' );
+assert.equal( worldHasWater( { rules: { seaLevel: 0 }, components: [ { type: 'elsemesh.water-body/1' } ] } ), true,
+	'a hosted world activates water only when it declares a water component and sea level' );
+assert.equal( worldHasWater( { rules: {}, components: [ { type: 'elsemesh.water-body/1' } ] } ), false,
+	'a water component without a finite sea level stays inactive' );
+
+console.log( 'World water surface routing and opt-in rules passed.' );
