@@ -47,7 +47,7 @@ continues to select its named world. The daemon port is an API gateway, not a
 web page; open the URL printed by Vite.
 
 Optional networking and storage settings remain flags. Put flags before the
-directory, for example `worldd --http 127.0.0.1:0 --p2p-port 42903
+directory, for example `worldd --http 127.0.0.1:0 --p2p-port 0
 /path/to/world-content`; port `0` asks the operating system to choose an
 available gateway port. Use `--worlds-dir` to choose the config root or
 `--data` to select one explicit persistent data directory.
@@ -65,7 +65,9 @@ profiles distinct `--p2p-port` values as usual. For temporary local hosting,
 `--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; worldd
 prints both actual peer addresses at startup. Do not use ephemeral peer ports
 when a deployment depends on fixed firewall forwarding or ZeroTier's shared
-bridge port.
+bridge port. Without embedded ZeroTier, worldd defaults to ephemeral HTTP and
+P2P ports. With embedded ZeroTier enabled, it keeps the bridge-compatible P2P
+port unless `--p2p-port` is explicitly supplied.
 
 Build `worldd` for the host first, then run (from the repository root):
 
@@ -76,7 +78,7 @@ node tools/serve-world-profile.mjs \
   --profile island-example \
   --source worlds/tidewater/world-source.json \
   --assets worlds/tidewater/assets \
-  --autoport --p2p-port 42901
+  --autoport --p2p-port 0
 ```
 
 To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `worldd` as a DHT server. `worldd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.
@@ -151,10 +153,10 @@ worldd --list-world-profiles
 worldd --world-profile example-island --world-name "Example Island" --print-node-id
 ```
 
-Start either profile by selecting its name. To run both on one machine, start separate processes and assign distinct P2P, HTTP, and (if enabled) WebTransport listener ports. Each process has its own PeerID; do not copy one `node.key` into simultaneous processes. `--data` remains available for an explicit single-profile path and cannot be combined with `--world-profile`.
+Start either profile by selecting its name. For local processes, use ephemeral P2P and HTTP ports; for public deployments, choose reachable ports and configure forwarding explicitly. Each process has its own PeerID; do not copy one `node.key` into simultaneous processes. `--data` remains available for an explicit single-profile path and cannot be combined with `--world-profile`.
 
 ```sh
-worldd --world-profile example-island --p2p-port 42901 --http 127.0.0.1:0
+worldd --world-profile example-island --p2p-port 0 --http 127.0.0.1:0
 ```
 
 These profiles provide isolated runtime storage and two independently served ThruHolds; they do not merge the identities into one multi-world daemon. Canonical Blender sources and exported packages remain in the repository's `worlds/` tree.

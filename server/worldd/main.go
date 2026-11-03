@@ -124,7 +124,7 @@ func run() error {
 	importNodeKey := flag.String("import-node-key", "", "install a 0600 private identity key if node.key does not exist, then exit")
 	worldName := flag.String("world-name", "My ThruHold", "create a local starter world when none is supplied")
 	regionProviderURL := flag.String("region-provider", "", "loopback dynamic region provider URL (requires --world-profile; local preview only)")
-	listenPort := flag.Int("p2p-port", 42901, "libp2p TCP and QUIC listen port (0 selects ephemeral ports)")
+	listenPort := flag.Int("p2p-port", 0, "libp2p TCP and QUIC listen port (default selects ephemeral ports; embedded ZeroTier uses its shared bridge port)")
 	zeroTierNetwork := flag.String("zerotier-network", defaultZeroTierNetworkID, "ZeroTier network ID to join through embedded libzt (requires a zerotier build)")
 	zeroTierPathDiagnostics := flag.Bool("zerotier-path-diagnostics", false, "enable a loopback-only endpoint for querying observed embedded ZeroTier peer IP/UDP-port paths")
 	httpAddress := flag.String("http", "127.0.0.1:0", "HTTP/WebSocket gateway listen address (default selects an ephemeral loopback port); place behind TLS for public browser access")
@@ -164,6 +164,15 @@ func run() error {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	p2pPortExplicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "p2p-port" {
+			p2pPortExplicit = true
+		}
+	})
+	if !p2pPortExplicit && *zeroTierNetwork != "" {
+		*listenPort = 42901
+	}
 	if *version {
 		fmt.Printf("%s %s\n", daemonName, buildRevision)
 		return nil
