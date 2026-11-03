@@ -135,7 +135,7 @@ export function parseGLB( buffer ) {
 
 		}
 
-		return { name: n.name || '', children: n.children || [], t: T.slice(), r: R.slice(), s: S.slice(), mesh: n.mesh, skin: n.skin, extras: n.extras || null };
+		return { name: n.name || '', children: n.children || [], t: T.slice(), r: R.slice(), s: S.slice(), mesh: n.mesh, skin: n.skin, extras: n.extras || null, light: n.extensions?.KHR_lights_punctual?.light };
 
 	} );
 
@@ -213,7 +213,8 @@ export function parseGLB( buffer ) {
 	const scene = json.scenes ? json.scenes[ json.scene || 0 ] : null;
 	const roots = scene ? scene.nodes : nodes.map( ( _, i ) => i ).filter( ( i ) => ! nodes.some( ( n ) => n.children.includes( i ) ) );
 
-	return { json, nodes, roots, meshes, skins, animations, materials: json.materials || [], textures: json.textures || [], images };
+	return { json, nodes, roots, meshes, skins, animations, materials: json.materials || [], textures: json.textures || [], images,
+		punctualLights: json.extensions?.KHR_lights_punctual?.lights || [] };
 
 }
 

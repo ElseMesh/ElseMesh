@@ -123,6 +123,8 @@ export class LocalLights {
 	constructor() {
 
 		this.sources = [];
+		this.worldPackage = null;
+		this.worldSourceCache = new Map();
 		this.enabled = true;
 		this.strength = 1; // UI multiplier for the lamps (not the flashlight)
 		this.flashlight = {
@@ -145,6 +147,11 @@ export class LocalLights {
 
 	}
 
+	setWorldPackage( worldPackage ) {
+		this.worldPackage = worldPackage || null;
+		this.worldSourceCache.clear();
+	}
+
 	toggleFlashlight( on = ! this.flashlight.on ) {
 
 		this.flashlight.on = on;
@@ -153,7 +160,7 @@ export class LocalLights {
 
 	}
 
-	update( camera, dt ) {
+	update( camera, dt, { includeDefaultSources = true } = {} ) {
 
 		this.time += dt;
 		let n = 0;
@@ -192,14 +199,47 @@ export class LocalLights {
 
 		// lamps: on from dusk (same ramp as the lantern glass), nearest first
 		const on = smooth( G.night.value, 0.15, 0.75 ) * this.strength;
-		if ( on > 0.002 && this.enabled ) {
+		if ( this.enabled ) {
 
 			const cp = camera.position;
 			const list = this._list;
 			list.length = 0;
-			for ( const s of this.sources ) {
+			const worldLightNodes = this.worldPackage?.lightNodes;
+			for ( const [ node ] of this.worldSourceCache ) if ( ! worldLightNodes?.has( node ) ) this.worldSourceCache.delete( node );
+			for ( const node of worldLightNodes || [] ) {
+
+				let source = this.worldSourceCache.get( node );
+				if ( ! source ) {
+					const light = node.userData.elsemeshPunctualLight;
+					if ( ! light ) continue;
+					source = {
+						position: new THREE.Vector3(), color: new THREE.Color( ...light.color ), intensity: light.intensity,
+						range: light.range, kind: `world-${light.type}`, alwaysOn: true,
+						dir: light.type === 'spot' ? new THREE.Vector3() : null,
+						cosInner: light.type === 'spot' ? Math.cos( light.innerConeAngle ) : undefined,
+						cosOuter: light.type === 'spot' ? Math.cos( light.outerConeAngle ) : undefined,
+						update: () => {
+							node.updateWorldMatrix( true, false );
+							const e = node.matrixWorld.elements;
+							source.position.set( e[ 12 ], e[ 13 ], e[ 14 ] );
+							if ( source.dir ) source.dir.set( - e[ 8 ], - e[ 9 ], - e[ 10 ] ).normalize();
+						},
+					};
+					this.worldSourceCache.set( node, source );
+				}
+				let visible = true;
+				for ( let ancestor = node; ancestor; ancestor = ancestor.parent ) if ( ! ancestor.visible ) { visible = false; break; }
+				if ( visible ) {
+					source.update();
+					source.d2 = source.position.distanceToSquared( cp );
+					list.push( source );
+				}
+
+			}
+		for ( const s of includeDefaultSources ? this.sources : [] ) {
 
 				if ( s.enabled === false ) continue;
+				if ( on <= 0.002 && ! s.alwaysOn ) continue;
 				if ( s.update ) s.update();
 				s.d2 = s.position.distanceToSquared( cp );
 				list.push( s );
@@ -215,7 +255,7 @@ export class LocalLights {
 				const s = list[ i ];
 				const fade = Number.isFinite( dCut ) ? smooth( Math.sqrt( s.d2 ), dCut, dCut * 0.8 ) : 1;
 				const fl2 = s.flicker ? 1 + s.flicker * Math.sin( this.time * 9 + s.phase ) * Math.sin( this.time * 5.3 + s.phase * 0.37 ) : 1;
-				const k = s.intensity * on * fade * fl2 * ( s.scale ?? 1 );
+				const k = s.intensity * ( s.alwaysOn ? 1 : on ) * fade * fl2 * ( s.scale ?? 1 );
 				if ( k <= 1e-4 ) continue;
 				const r = s.range;
 				pos[ n ].set( s.position.x, s.position.y, s.position.z, r * r );

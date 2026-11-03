@@ -46,7 +46,7 @@ export async function loadWorldPackage( connector, { signal, assets: preloadedAs
 	const assets = preloadedAssets || await connector.preload();
 	const root = new Group();
 	root.name = `world:${connector.worldId}`;
-	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map(), progressiveAssets: new Map( progressiveAssets || [] ), progressiveTextureTargets: new Map(), progressiveTextureJobs: new Map(), progressiveController: new AbortController() };
+	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), lightNodes: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map(), textureEntryByTexture: new Map(), progressiveAssets: new Map( progressiveAssets || [] ), progressiveTextureTargets: new Map(), progressiveTextureTargetsByAsset: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
 	try {
 		await appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } );
 		return root;
@@ -61,9 +61,13 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 
 	const state = root.userData.worldPackage || ( root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), textureAssets: new Map() } );
 	state.textureAssets ||= new Map();
+	state.textureEntryByTexture ||= new Map();
+	state.lightNodes ||= new Set();
 	state.progressiveAssets ||= new Map();
 	state.progressiveTextureTargets ||= new Map();
+	state.progressiveTextureTargetsByAsset ||= new Map();
 	state.progressiveTextureJobs ||= new Map();
+	state.objectsByAsset ||= new Map();
 	state.progressiveController ||= new AbortController();
 	await prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs );
 	if ( ! state.portalFramesBuilt ) {
@@ -101,6 +105,7 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 			state.parsed.set( object.assetId, gltf );
 		}
 		const instance = cloneScene( gltf );
+		instance.traverse( object => { if ( object.userData.elsemeshPunctualLight ) state.lightNodes.add( object ); } );
 		instance.name = object.label || object.id;
 		instance.userData.worldObjectId = object.id;
 		instance.userData.worldAssetId = object.assetId;
@@ -113,6 +118,7 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 		root.add( instance );
 		if ( object.lods?.length ) installObjectLOD( connector, root, instance, object );
 		state.loadedObjects.add( object.id );
+		indexPackageObjectByAsset( state, object );
 		if ( object.replacesObjectId ) {
 			const replaced = root.children.find( ( child ) => child.userData.worldObjectId === object.replacesObjectId );
 			if ( replaced ) replaced.visible = false;
@@ -134,7 +140,7 @@ export async function loadWorldPackageModelAsset( connector, root, assetId, { si
 	if ( cached ) return cached;
 	const bytes = parsedGLTF ? null : await connector.getAsset( assetId, { signal } );
 	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const decoded = await buildGLTF( parsedGLTF || parseGLB( bytes ), state, signal );
+	const decoded = await buildGLTF( parsedGLTF || parseGLB( bytes ), state, signal, assetId );
 	if ( signal?.aborted || state.disposed ) {
 		disposeWorldPackage( decoded );
 		throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
@@ -178,9 +184,10 @@ function updateWorldPackageTextureLOD( root, camera ) {
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
 	const requests = [];
 	for ( const [ assetId, progressive ] of state.progressiveAssets ) {
-		const targets = [ ...state.progressiveTextureTargets.values() ].filter( target => target.assetId === assetId && target.nextLevelIndex >= 0 );
+		const targetsByAsset = state.progressiveTextureTargetsByAsset.get( assetId );
+		const targets = targetsByAsset ? [ ...targetsByAsset.values() ].filter( target => target.nextLevelIndex >= 0 ) : [];
 		if ( ! targets.length || state.progressiveTextureJobs.has( assetId ) ) continue;
-		const objects = state.connector.manifest.objects.filter( object => object.assetId === assetId && object.streamingBounds?.center );
+		const objects = state.objectsByAsset.get( assetId ) || [];
 		let screenFraction = 0;
 		for ( const object of objects ) {
 			const fraction = projectedBoundsScreenFraction( object, camera );
@@ -207,18 +214,27 @@ function updateWorldPackageTextureLOD( root, camera ) {
 		state.progressiveTextureJobs.set( request.assetId, true );
 		state.textureLODQueue.run( state.progressiveController.signal, async () => {
 			const levels = await fetchNextGLBTextureLevels( state.connector, request.assetId, request.progressive, { imageIndices: request.imageIndices, signal: state.progressiveController.signal } );
-			for ( const level of levels ) for ( const target of state.progressiveTextureTargets.values() ) {
-				if ( target.assetId !== request.assetId || ! ( target.imageIndices || [ target.imageIndex ] ).some( index => level.imageIndices.includes( index ) ) ) continue;
+			for ( const level of levels ) for ( const target of state.progressiveTextureTargetsByAsset.get( request.assetId )?.values() || [] ) {
+				if ( ! ( target.imageIndices || [ target.imageIndex ] ).some( index => level.imageIndices.includes( index ) ) ) continue;
 				if ( state.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 				await installProgressiveTextureLevel( target, level );
 			}
 		} ).catch( error => {
 			for ( const image of request.progressive.textures ) if ( image.imageIndices.some( index => request.imageIndices.includes( index ) ) ) {
-				const target = [ ...state.progressiveTextureTargets.values() ].find( candidate => candidate.assetId === request.assetId && ( candidate.imageIndices || [ candidate.imageIndex ] ).some( index => image.imageIndices.includes( index ) ) );
+				const target = [ ...state.progressiveTextureTargetsByAsset.get( request.assetId )?.values() || [] ].find( candidate => ( candidate.imageIndices || [ candidate.imageIndex ] ).some( index => image.imageIndices.includes( index ) ) );
 				if ( target ) image.levelIndex = target.nextLevelIndex;
 			}
 			if ( error?.name !== 'AbortError' && ! state.disposed ) console.warn( 'World texture mip upgrade failed', request.assetId, error );
 		} ).finally( () => state.progressiveTextureJobs.delete( request.assetId ) );
+	}
+}
+
+function indexPackageObjectByAsset( state, object ) {
+	if ( ! object.streamingBounds?.center ) return;
+	for ( const assetID of worldObjectAssetIDs( object ) ) {
+		let byAsset = state.objectsByAsset.get( assetID );
+		if ( ! byAsset ) state.objectsByAsset.set( assetID, byAsset = new Set() );
+		byAsset.add( object );
 	}
 }
 
@@ -482,7 +498,8 @@ export function unloadWorldPackageObjects( root, connector, colliders, objectIDs
 	const objectsByID = new Map( connector.manifest.objects.map( object => [ object.id, object ] ) );
 	const releaseAssetIDs = new Set();
 	for ( const objectID of objectIDs ) {
-		for ( const assetID of worldObjectAssetIDs( objectsByID.get( objectID ) ) ) releaseAssetIDs.add( assetID );
+		const object = objectsByID.get( objectID );
+		for ( const assetID of worldObjectAssetIDs( object ) ) releaseAssetIDs.add( assetID );
 		const active = state.activeColliders?.get( objectID );
 		if ( active && colliders ) {
 			if ( active.shape === 'heightfield' ) colliders.removeHeightfield( active.collider );
@@ -498,8 +515,13 @@ export function unloadWorldPackageObjects( root, connector, colliders, objectIDs
 		}
 		state.embeddedColliders?.delete( objectID );
 		const instance = root.children.find( child => child.userData.worldObjectId === objectID );
-		if ( instance ) root.remove( instance );
+		if ( instance ) { unregisterPackageLightNodes( state, instance ); root.remove( instance ); }
 		state.loadedObjects.delete( objectID );
+		for ( const assetID of worldObjectAssetIDs( object ) ) {
+			const byAsset = state.objectsByAsset?.get( assetID );
+			byAsset?.delete( object );
+			if ( byAsset?.size === 0 ) state.objectsByAsset.delete( assetID );
+		}
 		state.lodControllers?.get( objectID )?.dispose();
 		state.lodControllers?.delete( objectID );
 	}
@@ -558,9 +580,8 @@ function worldObjectAssetIDs( object ) {
 
 function disposeParsedWorldAsset( state, assetID ) {
 	const parsed = state?.parsed?.get( assetID );
-	if ( ! parsed ) return;
 	const geometries = new Set(), materials = new Set(), textures = new Set();
-	parsed.traverse( object => {
+	parsed?.traverse( object => {
 		if ( object.geometry?.dispose ) geometries.add( object.geometry );
 		for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
 			if ( ! material || material.userData?.borrowedWorldMaterial ) continue;
@@ -571,6 +592,17 @@ function disposeParsedWorldAsset( state, assetID ) {
 			}
 		}
 	} );
+	for ( const texture of textures ) {
+		const entry = state?.textureEntryByTexture?.get( texture );
+		if ( ! entry ) continue;
+		entry.sourceAssetIDs?.delete( assetID );
+		if ( entry.sourceAssetIDs?.size ) {
+			textures.delete( texture );
+			continue;
+		}
+		state.textureAssets?.delete( entry.key );
+		state.textureEntryByTexture?.delete( texture );
+	}
 	const release = () => {
 		for ( const geometry of geometries ) geometry.dispose();
 		for ( const material of materials ) material.dispose?.();
@@ -578,7 +610,11 @@ function disposeParsedWorldAsset( state, assetID ) {
 	};
 	if ( GPU.encoder ) GPU.onSubmit( null, release );
 	else release();
-	state.parsed.delete( assetID );
+	state?.parsed?.delete( assetID );
+	state?.progressiveAssets?.delete( assetID );
+	const targets = state?.progressiveTextureTargetsByAsset?.get( assetID );
+	for ( const targetID of targets?.keys() || [] ) state?.progressiveTextureTargets?.delete( targetID );
+	state?.progressiveTextureTargetsByAsset?.delete( assetID );
 }
 
 const MAX_EMBEDDED_SHAPES_PER_OBJECT = 4096;
@@ -739,7 +775,19 @@ export function disposeWorldPackage( root ) {
 	else release();
 	state?.parsed?.clear();
 	state?.loadedObjects?.clear();
+	state?.lightNodes?.clear();
 	state?.textureAssets?.clear();
+	state?.textureEntryByTexture?.clear();
+	state?.progressiveAssets?.clear();
+	state?.progressiveTextureTargets?.clear();
+	state?.progressiveTextureTargetsByAsset?.clear();
+	state?.progressiveTextureJobs?.clear();
+	state?.objectsByAsset?.clear();
+}
+
+function unregisterPackageLightNodes( state, root ) {
+	if ( ! state?.lightNodes ) return;
+	root.traverse( object => state.lightNodes.delete( object ) );
 }
 
 async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null ) {
@@ -764,7 +812,7 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		const shareAssetTexture = Boolean( sharedTextureAssetId && packageState?.textureAssets );
 		let entry = shareAssetTexture ? packageState.textureAssets.get( textureKey ) : null;
 		if ( ! entry ) {
-			entry = { texture: null, promise: null };
+			entry = { key: textureKey, texture: null, promise: null, sourceAssetIDs: shareAssetTexture ? new Set() : null };
 			entry.promise = ( async () => {
 				const bytes = progressiveImage?.initialLevelBytes || image?.bytes || ( sharedTextureAssetId
 					? await packageState?.connector?.getAsset( sharedTextureAssetId, { signal } )
@@ -803,20 +851,29 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 				if ( packageState?.textureAssets?.get( textureKey ) === entry ) packageState.textureAssets.delete( textureKey );
 			} );
 		}
+		if ( shareAssetTexture && sourceAssetId ) {
+			entry.sourceAssetIDs ||= new Set();
+			entry.sourceAssetIDs.add( sourceAssetId );
+		}
 
 		const decodedTexture = entry.texture || await entry.promise;
+		if ( shareAssetTexture ) packageState.textureEntryByTexture?.set( decodedTexture, entry );
 		const progressiveTargetID = progressiveImage?.textureAssetId
 			? `${ sourceAssetId }:asset:${ progressiveImage.textureAssetId }:${ format }`
 			: `${ sourceAssetId }:${ textureSource }`;
 		if ( progressiveImage && ! packageState.progressiveTextureTargets.has( progressiveTargetID ) ) {
-			packageState.progressiveTextureTargets.set( progressiveTargetID, {
+			const target = {
 				assetId: sourceAssetId, imageIndex: textureSource, imageIndices: progressiveImage.imageIndices, texture: decodedTexture,
 				baseWidth: progressiveImage.baseWidth, baseHeight: progressiveImage.baseHeight,
 				levelCount: progressiveImage.levelCount, nextLevelIndex: progressiveImage.levelIndex,
 				headerAndIndex: progressiveImage.headerAndIndex,
 				forceRGBA: ! preserveBC,
 				levels: new Map( [ [ progressiveImage.levelIndex + 1, entry.progressiveLevel ] ] ),
-			} );
+			};
+			packageState.progressiveTextureTargets.set( progressiveTargetID, target );
+			let targets = packageState.progressiveTextureTargetsByAsset.get( sourceAssetId );
+			if ( ! targets ) packageState.progressiveTextureTargetsByAsset.set( sourceAssetId, targets = new Map() );
+			targets.set( progressiveTargetID, target );
 		}
 		textures.set( textureKey, decodedTexture );
 		return decodedTexture;
@@ -893,6 +950,20 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		object.quaternion.set( ...node.r );
 		object.scale.set( ...node.s );
 		if ( node.extras ) Object.assign( object.userData, node.extras );
+		if ( node.light !== undefined ) {
+			const light = gltf.punctualLights[ node.light ];
+			if ( ! light || ! [ 'point', 'spot' ].includes( light.type ) || ! Number.isFinite( light.intensity ) || light.intensity < 0
+				|| ! Array.isArray( light.color ) || light.color.length !== 3 || light.color.some( value => ! Number.isFinite( value ) || value < 0 || value > 1 )
+				|| ! Number.isFinite( light.range ) || light.range <= 0
+				|| light.type === 'spot' && ( ! Number.isFinite( light.spot?.innerConeAngle ) || ! Number.isFinite( light.spot?.outerConeAngle )
+					|| light.spot.innerConeAngle < 0 || light.spot.innerConeAngle > light.spot.outerConeAngle || light.spot.outerConeAngle > Math.PI / 2 ) ) {
+				throw new Error( `GLB node ${node.name} has an invalid KHR_lights_punctual record` );
+			}
+			object.userData.elsemeshPunctualLight = {
+				type: light.type, color: light.color.slice(), intensity: light.intensity, range: light.range,
+				innerConeAngle: light.spot?.innerConeAngle ?? null, outerConeAngle: light.spot?.outerConeAngle ?? null,
+			};
+		}
 		if ( node.mesh !== undefined ) for ( const mesh of builtMeshes[ node.mesh ] || [] ) object.add( mesh );
 		return object;
 

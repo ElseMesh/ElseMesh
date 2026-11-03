@@ -34,7 +34,12 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 			if ( usable.length === 0 || usable.length > MAX_STATIC_MODEL_INSTANCE_LODS ) return null;
 			const thresholds = usable.slice( 1 ).map( lod => lod.screenSize );
 			if ( thresholds.some( ( value, index ) => index > 0 && value <= thresholds[ index - 1 ] ) ) return null;
-			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, sourceLods: usable, radius: 0, instances: [] };
+			let lodFadeFraction = 0.1;
+			for ( let index = 1; index < thresholds.length; index ++ ) {
+				// Keep adjacent cross-fades inside the game-authored screen-size gap.
+				lodFadeFraction = Math.min( lodFadeFraction, ( thresholds[ index ] - thresholds[ index - 1 ] ) / thresholds[ index ] * 0.5 );
+			}
+			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, sourceLods: usable, lodFadeFraction, radius: 0, instances: [] };
 			groups.set( source.componentPath, model );
 		} else if ( model.staticMeshPath !== source.staticMeshPath ) return null;
 		const scaleFloor = Math.min( ...source.transform.scale );
@@ -69,7 +74,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				lodThresholds: model.sourceLods.slice( 1 ).map( lod => lod.screenSize ),
 				lodMetric: 'projected-radius',
 				// Provisional cross-fade width; it is a rendering choice, not game-authored data.
-				lodFadeFraction: 0.1,
+				lodFadeFraction: model.lodFadeFraction,
 				shadowLod: 0,
 				shadowMaxDistance: maxDistanceMeters,
 				drawMaxDistance: maxDistanceMeters,

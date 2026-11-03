@@ -734,6 +734,7 @@ export class App {
 		this.sceneRenderer.setSize( engine.width, engine.height );
 		engine.onResize.push( () => this.sceneRenderer.setSize( engine.width, engine.height ) );
 		this.portalView = new WorldPortalView( { scene, meshRenderer: engine.meshRenderer, sceneRenderer: this.sceneRenderer, camera } );
+		this.localLights = new LocalLights();
 		this.fft = new OceanFFT( engine );
 		this.foamTexture = createFoamTexture( engine );
 		this.oceanLOD = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
@@ -897,18 +898,20 @@ export class App {
 		this.applyAtmosphereReadback();
 		if ( this.clouds ) this.clouds.update( dt, this.camera );
 		this.environment.update( dt );
-		this.fft.update( dt );
-		this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
-		this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
-		const hostedBoat = this.activeHostedBoat?.boat?.controller;
-		if ( this.player.hostedSeaLevel !== null ) hostedBoat?.queueQueries?.();
-		this.hostedQuery.update();
 		if ( this.player.hostedSeaLevel !== null ) {
-			hostedBoat?.update( dt );
-			this.player.waterH = this.player.waterHeight();
-			this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
+			this.fft.update( dt );
+			this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
+			this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
+			const hostedBoat = this.activeHostedBoat?.boat?.controller;
+			if ( this.player.hostedSeaLevel !== null ) hostedBoat?.queueQueries?.();
+			this.hostedQuery.update();
+			if ( this.player.hostedSeaLevel !== null ) {
+				hostedBoat?.update( dt );
+				this.player.waterH = this.player.waterHeight();
+				this.player.waterMean = this.player.waterMean === null ? this.player.waterH : this.player.waterMean + ( this.player.waterH - this.player.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
+			}
 		}
-		this.cameraWaterHeight = this.player.hostedSeaLevel === null ? null : this.hostedQuery.cpuValid && Number.isFinite( this.hostedQuery.cpu[ 0 ] ) ? this.hostedQuery.cpu[ 0 ] : this.player.hostedSeaLevel;
+		this.cameraWaterHeight = this.player.hostedSeaLevel === null ? null : this.hostedQuery?.cpuValid && Number.isFinite( this.hostedQuery.cpu[ 0 ] ) ? this.hostedQuery.cpu[ 0 ] : this.player.hostedSeaLevel;
 		G.cameraUnderwater.value = this.cameraWaterHeight !== null && this.camera.position.y < this.cameraWaterHeight - LENS_REACH ? 1 : 0;
 		G.cameraWaterHeight.value = this.cameraWaterHeight ?? G.seaLevel.value;
 		this.player.updateHostedWorld( dt );
@@ -1251,6 +1254,7 @@ export class App {
 	activateHostedWorld( root, connector, presenceSession = null ) {
 
 		this.prepareHostedWorld( connector );
+		this.localLights.setWorldPackage( root.userData.worldPackage );
 		const experience = connector.manifest.experience;
 		// The built-in ocean belongs to the default world. Hosted worlds
 		// render water only through their own declared world components.
@@ -1366,6 +1370,7 @@ export class App {
 
 	deactivateHostedWorld() {
 
+		this.localLights?.setWorldPackage( null );
 		if ( this.ocean ) this.ocean.visible = true;
 		this.worldPresence?.dispose();
 		this.worldPresence = null;
@@ -1990,9 +1995,10 @@ export class App {
 		this.boat.sync( this.boatCtl );
 		this.boat.update( dt );
 		this.wildlife.update( dt, this.camera, this.freeCam ? null : this.player );
-		this.localLights.update( this.camera, dt );
 
 		}
+
+		this.localLights.update( this.camera, dt, { includeDefaultSources: ! this.remoteWorldActive } );
 
 		// ---- render
 		G.exposure.value = s.exposure;

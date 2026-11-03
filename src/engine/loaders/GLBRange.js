@@ -78,11 +78,11 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 	if ( header.getUint32( 0, true ) !== GLB_MAGIC || header.getUint32( 4, true ) !== 2 ) return null;
 	const assetLength = header.getUint32( 8, true );
 	const jsonLength = header.getUint32( 12, true );
-	if ( first.totalLength !== assetLength || header.getUint32( 16, true ) !== JSON_CHUNK || jsonLength < 2 || jsonLength > assetLength - 28 ) throw new Error( 'GLB header lengths are invalid' );
+	if ( first.totalLength !== assetLength || header.getUint32( 16, true ) !== JSON_CHUNK || jsonLength < 2 || jsonLength > assetLength - 20 ) throw new Error( 'GLB header lengths are invalid' );
 	const metadata = { etag: first.etag, totalLength: assetLength };
-	const jsonAndBinHeader = await connector.getAssetRange( assetId, { start: 20, end: 27 + jsonLength, ...metadata, signal } );
-	if ( jsonAndBinHeader.bytes.byteLength !== jsonLength + 8 ) throw new Error( 'GLB JSON/BIN header range is incomplete' );
-	const json = JSON.parse( new TextDecoder().decode( jsonAndBinHeader.bytes.subarray( 0, jsonLength ) ) );
+	const jsonRange = await connector.getAssetRange( assetId, { start: 20, end: 19 + jsonLength, ...metadata, signal } );
+	if ( jsonRange.bytes.byteLength !== jsonLength ) throw new Error( 'GLB JSON chunk range is incomplete' );
+	const json = JSON.parse( new TextDecoder().decode( jsonRange.bytes ) );
 	const imageViews = new Map();
 	const externalImages = new Map();
 	for ( const [ imageIndex, image ] of ( json.images || [] ).entries() ) {
@@ -103,13 +103,18 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		imageView.imageIndices.push( imageIndex );
 	}
 	if ( imageViews.size === 0 && externalImages.size === 0 ) return null;
-	const binHeader = new DataView( jsonAndBinHeader.bytes.buffer, jsonAndBinHeader.bytes.byteOffset + jsonLength, 8 );
+	const binOffset = 20 + jsonLength;
+	if ( assetLength === binOffset ) return null;
+	if ( assetLength < binOffset + 8 ) throw new Error( 'GLB BIN chunk header is incomplete' );
+	const binHeaderRange = await connector.getAssetRange( assetId, { start: binOffset, end: binOffset + 7, ...metadata, signal } );
+	if ( binHeaderRange.bytes.byteLength !== 8 ) throw new Error( 'GLB BIN chunk header range is incomplete' );
+	const binHeader = new DataView( binHeaderRange.bytes.buffer, binHeaderRange.bytes.byteOffset, 8 );
 	const binLength = binHeader.getUint32( 0, true );
-	const binOffset = 28 + jsonLength;
-	if ( binHeader.getUint32( 4, true ) !== BIN_CHUNK || binOffset + binLength > assetLength || json.buffers?.length !== 1 || json.buffers[ 0 ].byteLength > binLength ) throw new Error( 'GLB BIN chunk is invalid or unsupported' );
+	const binaryChunkOffset = binOffset + 8;
+	if ( binHeader.getUint32( 4, true ) !== BIN_CHUNK || binaryChunkOffset + binLength > assetLength || json.buffers?.length !== 1 || json.buffers[ 0 ].byteLength > binLength ) throw new Error( 'GLB BIN chunk is invalid or unsupported' );
 	const imageRanges = [ ...imageViews.entries() ].map( ( [ viewID, { view, imageIndices } ] ) => {
 		if ( view.byteLength < KTX2_HEADER_BYTES || view.byteOffset + view.byteLength > binLength ) throw new Error( 'GLB KTX2 image is outside the BIN chunk' );
-		return { viewID, view, imageIndices, start: binOffset + view.byteOffset, end: binOffset + view.byteOffset + view.byteLength - 1 };
+		return { viewID, view, imageIndices, start: binaryChunkOffset + view.byteOffset, end: binaryChunkOffset + view.byteOffset + view.byteLength - 1 };
 	} );
 	const imageViewIDs = new Set( imageViews.keys() );
 	const geometryLength = ( json.bufferViews || [] ).reduce( ( length, view, index ) => {
@@ -119,9 +124,9 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 	}, 0 );
 	if ( geometryLength > binLength || geometryLength > 0 && imageRanges.some( range => range.view.byteOffset < geometryLength ) ) throw new Error( 'GLB geometry and texture ranges overlap' );
 	const initialRanges = [ ...imageRanges.map( range => ( { start: range.start, end: range.start + KTX2_HEADER_BYTES - 1 } ) ) ];
-	if ( geometryLength ) initialRanges.push( { start: binOffset, end: binOffset + geometryLength - 1 } );
+	if ( geometryLength ) initialRanges.push( { start: binaryChunkOffset, end: binaryChunkOffset + geometryLength - 1 } );
 	const initialBytes = await requestRanges( connector, assetId, initialRanges, metadata, signal );
-	const geometry = geometryLength ? bytesForRange( initialBytes, binOffset, binOffset + geometryLength - 1 ) : new Uint8Array();
+	const geometry = geometryLength ? bytesForRange( initialBytes, binaryChunkOffset, binaryChunkOffset + geometryLength - 1 ) : new Uint8Array();
 	for ( const image of imageRanges ) {
 		image.header = bytesForRange( initialBytes, image.start, image.start + KTX2_HEADER_BYTES - 1 );
 		const levels = new DataView( image.header.buffer, image.header.byteOffset, image.header.byteLength ).getUint32( 40, true );
@@ -212,7 +217,7 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		totalLength: assetLength,
 		selectedLevel: 'coarsest',
 		textures: progressiveImages,
-		sourceBytesRequested: 20 + jsonAndBinHeader.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + externalBytesRequested,
+		sourceBytesRequested: 20 + jsonRange.bytes.byteLength + binHeaderRange.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + externalBytesRequested,
 	};
 }
 
