@@ -340,6 +340,17 @@ try {
 	const collisionIDs = [ ...connector.collisionObjectIDsByCell.get( '0,0,0' ), ...connector.collisionObjectIDsByCell.get( '1,0,0' ) ];
 	const emptyCollisionID = [ ...connector.collisionObjectIDsByCell.get( '2,0,0' ) ][ 0 ];
 	assert.equal( connector.isCollisionPathReady( [ 1, 0, 1 ], [ 2, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), true, 'loaded collision with complete source coverage permits a local path' );
+	const originalConsoleInfo = console.info;
+	let movementDiagnostic;
+	connector.regionDiagnostics = true;
+	console.info = ( ...args ) => { if ( args[ 0 ] === 'ElseMesh local-region movement gate:' ) movementDiagnostic = args; };
+	try {
+		assert.equal( connector.isCollisionPathReady( [ 1, 0, 1 ], [ 2, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), true, 'collision diagnostics preserve a ready path' );
+	} finally {
+		console.info = originalConsoleInfo;
+		connector.regionDiagnostics = false;
+	}
+	assert.deepEqual( JSON.parse( movementDiagnostic[ 1 ] ).from, [ 1, 0, 1 ], 'movement diagnostics serialize array positions without requiring private helpers' );
 	assert.equal( connector.isCollisionPathReady( [ 49, 0, 1 ], [ 50, 0, 1 ], { loadedObjects: new Set() } ), true, 'a path through a cell absent from every complete layer remains open' );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), false, 'movement stops until collision data for every crossed cell has loaded' );
 	assert.equal( connector.isCollisionPathReady( [ 15, 0, 1 ], [ 17, 0, 1 ], { loadedObjects: new Set( collisionIDs ) } ), false, 'a missing collision response remains unknown and blocks the swept path even if the loader has an empty placeholder' );

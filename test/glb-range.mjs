@@ -137,6 +137,10 @@ const externalParsed = parseGLB( externalResult.bytes );
 assert.equal( externalParsed.images[ 0 ].assetId, textureAssetId, 'the coarse GLB retains the opaque shared texture identity' );
 assert.equal( externalParsed.images[ 0 ].bytes, null, 'the coarse GLB does not inline duplicate texture bytes' );
 assert.deepEqual( externalResult.textures[ 0 ].initialLevelBytes, extractKTX2Level( ktx2, levelCount - 1 ), 'the initial shared texture is the coarsest independently fetched mip' );
+const webGLParsed = parseGLB( externalResult.webGLBytes );
+assert.equal( webGLParsed.images[ 0 ].assetId, null, 'the WebGL GLB removes the engine-only external image reference' );
+assert.deepEqual( webGLParsed.images[ 0 ].bytes, extractKTX2Level( ktx2, levelCount - 1 ), 'the WebGL GLB embeds only the selected coarse external KTX2 level' );
+assert( ! webGLParsed.json.extensionsRequired?.includes( 'EXT_elsemesh_asset_reference' ), 'the WebGL GLB does not require the engine-only external image extension' );
 const externalInitialRequests = externalRequests.slice();
 assert.equal( externalResult.sourceBytesRequested, externalInitialRequests.reduce( ( total, range ) => total + range.end - range.start + 1, 0 ), 'the reported initial transfer includes ranges for separate texture assets' );
 const wrongTextureETagConnector = {

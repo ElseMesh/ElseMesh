@@ -16,7 +16,8 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
 	const materialCache = new Map(), sceneCache = new Map(), lodQueue = new LODLoadQueue( 2 );
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
-	const getScene = async ( assetId, parsedGLTF ) => {
+	const getScene = async ( assetId, parsedGLTF, progressive ) => {
+		if ( progressive?.textures ) root.userData.worldPackage?.progressiveAssets?.set( assetId, { textures: progressive.textures } );
 		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { parsedGLTF } ) );
 		return sceneCache.get( assetId );
 	};
@@ -36,8 +37,8 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				shadowBatches.push( [] );
 				continue;
 			}
-			const { gltf } = await loadModelLOD( modelIndex, 0 );
-			const coarseSource = await getScene( model.lods[ 0 ].assetId, gltf );
+			const { gltf, progressive } = await loadModelLOD( modelIndex, 0 );
+			const coarseSource = await getScene( model.lods[ 0 ].assetId, gltf, progressive );
 			releaseModelLOD( modelIndex, 0 );
 			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
@@ -49,10 +50,10 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 			batches: mainBatches,
 			shadowBatches,
 			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
-				const { gltf } = await loadModelLOD( modelIndex, lodIndex, { signal } );
+				const { gltf, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
-				const source = await getScene( assetId, gltf );
+				const source = await getScene( assetId, gltf, progressive );
 				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 				releaseModelLOD( modelIndex, lodIndex );
 				const draws = createModelDraws( source, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials );

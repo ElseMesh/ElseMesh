@@ -477,7 +477,7 @@ export class LocalRegionConnector {
 			const signature = this.lastCollisionPathStatus.ready ? 'ready' : JSON.stringify( this.lastCollisionPathStatus );
 			if ( signature !== this.lastCollisionPathDiagnostic ) {
 				console.info( 'ElseMesh local-region movement gate:', JSON.stringify( {
-					from: vectorValues( from ), to: vectorValues( to ), ...this.lastCollisionPathStatus,
+					from: from?.toArray?.() || from, to: to?.toArray?.() || to, ...this.lastCollisionPathStatus,
 				} ) );
 				this.lastCollisionPathDiagnostic = signature;
 			}

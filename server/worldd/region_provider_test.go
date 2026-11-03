@@ -72,6 +72,11 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 			w.Header().Set("ETag", `"catalog"`)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"regions":[{"id":"SUB_GreatHall_Int"}]}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/regions/SUB_GreatHall_Int":
+			w.Header().Set("ETag", `"asset"`)
+			w.Header().Set("Content-Range", "bytes 0-0/1")
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write([]byte("x"))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/regions/SUB_GreatHall_Int/leases":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"leaseId":"0123456789abcdef0123456789abcdef","expiresInSeconds":30}`))
@@ -138,10 +143,29 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		request := httptest.NewRequest(http.MethodOptions, "/v1/regions", nil)
 		request.Host = "gateway.example"
 		request.Header.Set("Origin", "https://client.example")
+		request.Header.Set("Access-Control-Request-Headers", "range,if-range")
 		response := httptest.NewRecorder()
 		gateway.ServeHTTP(response, request)
 		if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Methods") == "" {
 			t.Fatalf("preflight = %d %v", response.Code, response.Header())
+		}
+		allowedHeaders := strings.ToLower(response.Header().Get("Access-Control-Allow-Headers"))
+		if !strings.Contains(allowedHeaders, "range") || !strings.Contains(allowedHeaders, "if-range") {
+			t.Fatalf("range preflight headers = %q", allowedHeaders)
+		}
+
+		request = httptest.NewRequest(http.MethodGet, "/v1/regions/SUB_GreatHall_Int", nil)
+		request.Host = "gateway.example"
+		request.Header.Set("Origin", "https://client.example")
+		request.Header.Set("Range", "bytes=0-0")
+		request.Header.Set("If-Range", `"asset"`)
+		response = httptest.NewRecorder()
+		gateway.ServeHTTP(response, request)
+		if response.Code != http.StatusPartialContent || response.Header().Get("Content-Range") != "bytes 0-0/1" {
+			t.Fatalf("range response = %d %v", response.Code, response.Header())
+		}
+		if !strings.Contains(strings.ToLower(response.Header().Get("Access-Control-Expose-Headers")), "content-range") {
+			t.Fatalf("range response does not expose Content-Range: %v", response.Header())
 		}
 
 		request = httptest.NewRequest(http.MethodGet, "/v1/regions", nil)

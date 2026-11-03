@@ -56,7 +56,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				continue;
 			}
 			const coarse = await loadModelLOD( modelIndex, 0 );
-			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.bytes );
+			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
 			releaseModelLOD( modelIndex, 0 );
 			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
@@ -66,10 +66,10 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			batches: mainBatches,
 			shadowBatches,
 			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
-				const { bytes } = await loadModelLOD( modelIndex, lodIndex, { signal } );
+				const { bytes, webGLBytes } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
 				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
-				const source = await parseModel( assetId, bytes );
+				const source = await parseModel( assetId, webGLBytes || bytes );
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				releaseModelLOD( modelIndex, lodIndex );
 				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials );

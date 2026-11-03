@@ -822,9 +822,11 @@ export class App {
 			await connector.preload( {
 				through: 'background', assetIDs, position: spawn.position, concurrency: 1, retainAssets: false, retainAssetIDs,
 				onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
-				onAsset: async ( assetId, bytes ) => {
+				onAsset: async ( assetId, bytes, progressive ) => {
+					const progressiveTextures = progressive?.textures ? { textures: progressive.textures } : null;
+					if ( progressiveTextures ) this.linkedWorldRoot.userData.worldPackage.progressiveAssets.set( assetId, progressiveTextures );
 					const objectIDs = objectIDsByAsset.get( assetId );
-					if ( objectIDs ) await appendWorldPackageAssets( connector, this.linkedWorldRoot, new Map( [ [ assetId, bytes ] ] ), { objectIDs } );
+					if ( objectIDs ) await appendWorldPackageAssets( connector, this.linkedWorldRoot, new Map( [ [ assetId, bytes ] ] ), { objectIDs, progressiveAsset: progressiveTextures } );
 				},
 			} );
 		} else {

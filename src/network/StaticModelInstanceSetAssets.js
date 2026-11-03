@@ -1,5 +1,6 @@
 import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
+import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 
 // Resolve an instance set only against assets declared by its connector. Signed
@@ -22,17 +23,21 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 		const asset = assetsByID.get( assetId );
 		if ( ! asset || asset.kind !== 'glb' || componentAssetsByID.get( assetId ) !== 'glb' ) throw new Error( `Static model LOD asset is not declared as a component GLB: ${assetId}` );
 	}
-	const modelAssets = new Map(), parsedModels = new Map(), modelFlights = new Map();
+	const modelAssets = new Map(), modelWebGLAssets = new Map(), modelProgressiveAssets = new Map(), parsedModels = new Map(), modelFlights = new Map();
 	const loadModelLOD = async ( modelIndex, lodIndex, { signal: requestSignal = signal } = {} ) => {
 		const model = document.models[ modelIndex ];
 		const lod = model?.lods?.[ lodIndex ];
 		if ( ! lod ) throw new Error( 'Static model LOD index is invalid' );
 		const assetId = lod.assetId;
-		if ( parsedModels.has( assetId ) ) return { bytes: modelAssets.get( assetId ), gltf: parsedModels.get( assetId ) };
+		if ( parsedModels.has( assetId ) ) return { bytes: modelAssets.get( assetId ), gltf: parsedModels.get( assetId ), webGLBytes: modelWebGLAssets.get( assetId ) || null, progressive: modelProgressiveAssets.get( assetId ) || null };
 		if ( modelFlights.has( assetId ) ) return modelFlights.get( assetId );
 		const flight = ( async () => {
 			if ( requestSignal?.aborted ) throw requestSignal.reason || new DOMException( 'Aborted', 'AbortError' );
-			const bytes = connector.assets.get( assetId ) || await connector.getAsset( assetId, { signal: requestSignal } );
+			const progressive = typeof connector.getAssetRange === 'function' && typeof connector.getAssetRanges === 'function'
+				? await fetchGLBWithCoarseKTX2( connector, assetId, { signal: requestSignal } )
+				: null;
+			const bytes = progressive?.bytes || connector.assets.get( assetId ) || await connector.getAsset( assetId, { signal: requestSignal } );
+			const webGLBytes = progressive?.webGLBytes || null;
 			const gltf = parseGLB( bytes );
 			if ( gltf.skins.length || gltf.animations.length || gltf.nodes.some( node => node.skin !== undefined ) || ( gltf.json.meshes || [] ).some( mesh => mesh.primitives.some( primitive => primitive.targets?.length ) ) ) throw new Error( `Static model GLB cannot contain skins, animation, or morph targets: ${assetId}` );
 			for ( const primitives of gltf.meshes ) for ( const primitive of primitives ) {
@@ -40,8 +45,10 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 				if ( Object.keys( primitive.attributes ).some( name => ! [ 'POSITION', 'NORMAL', 'TEXCOORD_0', 'COLOR_0', '_ELSEMESH_VDATA' ].includes( name ) ) ) throw new Error( `Static model GLB has unsupported vertex attributes: ${assetId}` );
 			}
 			modelAssets.set( assetId, bytes );
+			if ( webGLBytes ) modelWebGLAssets.set( assetId, webGLBytes );
+			if ( progressive ) modelProgressiveAssets.set( assetId, progressive );
 			parsedModels.set( assetId, gltf );
-			return { bytes, gltf };
+			return { bytes, gltf, webGLBytes, progressive };
 		} )();
 		modelFlights.set( assetId, flight );
 		try { return await flight; }
@@ -49,7 +56,7 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 	};
 	const releaseModelLOD = ( modelIndex, lodIndex ) => {
 		const assetId = document.models[ modelIndex ]?.lods?.[ lodIndex ]?.assetId;
-		if ( assetId ) { modelAssets.delete( assetId ); parsedModels.delete( assetId ); }
+		if ( assetId ) { modelAssets.delete( assetId ); modelWebGLAssets.delete( assetId ); modelProgressiveAssets.delete( assetId ); parsedModels.delete( assetId ); }
 	};
 	return { document, modelAssets, parsedModels, loadModelLOD, releaseModelLOD };
 }

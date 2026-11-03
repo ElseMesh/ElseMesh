@@ -172,12 +172,12 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	if origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Expose-Headers", "ETag, Cache-Control")
+		w.Header().Set("Access-Control-Expose-Headers", "ETag, Cache-Control, Content-Range")
 		w.Header().Add("Vary", "Origin")
 	}
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-None-Match")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-None-Match, Range, If-Range")
 		w.Header().Set("Access-Control-Max-Age", "600")
 		w.WriteHeader(http.StatusNoContent)
 		return

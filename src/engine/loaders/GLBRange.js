@@ -211,14 +211,44 @@ export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {
 		externalBytesRequested += firstLevel.bytes.byteLength + selected.requestedBytes;
 	}
 	const glb = buildGLB( json, geometry, coarseImages );
+	const webGLBytes = progressiveImages.some( image => image.textureAssetId )
+		? buildGLBWithExternalKTX2( json, geometry, coarseImages, progressiveImages )
+		: null;
 	return {
 		bytes: glb,
+		webGLBytes,
 		etag: first.etag,
 		totalLength: assetLength,
 		selectedLevel: 'coarsest',
 		textures: progressiveImages,
 		sourceBytesRequested: 20 + jsonRange.bytes.byteLength + binHeaderRange.bytes.byteLength + initialBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + indexBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + payloadBytes.reduce( ( sum, range ) => sum + range.bytes.byteLength, 0 ) + externalBytesRequested,
 	};
+}
+
+function buildGLBWithExternalKTX2( json, geometry, embeddedImages, progressiveImages ) {
+	const images = [ ...embeddedImages ];
+	for ( const progressive of progressiveImages ) {
+		if ( ! progressive.textureAssetId || ! progressive.initialLevelBytes ) continue;
+		for ( const imageIndex of progressive.imageIndices ) {
+			const image = json.images[ imageIndex ];
+			if ( ! image?.extensions?.EXT_elsemesh_asset_reference ) continue;
+			const view = { buffer: 0, byteOffset: 0, byteLength: progressive.initialLevelBytes.byteLength };
+			image.bufferView = json.bufferViews.push( view ) - 1;
+			delete image.extensions.EXT_elsemesh_asset_reference;
+			if ( Object.keys( image.extensions ).length === 0 ) delete image.extensions;
+			images.push( { view, bytes: progressive.initialLevelBytes } );
+		}
+	}
+	if ( ! json.images.some( image => image.extensions?.EXT_elsemesh_asset_reference ) ) {
+		for ( const key of [ 'extensionsUsed', 'extensionsRequired' ] ) {
+			const extensions = json[ key ]?.filter( extension => extension !== 'EXT_elsemesh_asset_reference' );
+			if ( extensions ) {
+				if ( extensions.length ) json[ key ] = extensions;
+				else delete json[ key ];
+			}
+		}
+	}
+	return buildGLB( json, geometry, images );
 }
 
 /** Fetch the next finer indexed mip for every KTX2 image in a coarse GLB. */
