@@ -387,7 +387,13 @@ implement the same provider contract subject to their different durability
 limits.
 
 A ThruHold is an independently owned, signed world. Its owner publishes the
-world's content, portals, and default participation policy. Clients discover a
+world's content, portals, and default participation policy. The owner also
+governs local visitor presence, avatar/vehicle moderation and any scores,
+inventory or progression. A future stable, verifiable visitor identity
+should let returning visitors reclaim **that world's** records; the current
+session-derived player ID does not. There is no required exclusive
+cross-world membership. See
+[visitor identity and world-local state](visitor-identity-and-world-state.md). Clients discover a
 world by stable world ID, verify the owner's signed manifest and content hashes,
 then connect to the owner or an owner-authorized content provider. A provider
 address is a route, not proof of ownership or permission.
@@ -467,8 +473,11 @@ until required content is ready. On crossing, the client maps position,
 orientation, and velocity through the two portal frames, switches active world
 and transport session, and releases the source world resources. If the
 destination accepts the current bundled boat and its declared limits are met,
-boat state is mapped and transferred with a destination speed cap. Otherwise
-the visitor remains on the source side.
+boat pose and movement are mapped into the destination session with its
+speed cap. Otherwise the visitor remains on the source side. Destination
+admission does not require source departure confirmation: the client
+leaves the source when possible and the source expires silent sessions
+using its own timeout. No atomic inter-owner membership commit is required.
 
 ### Invitation-gated entry
 
@@ -525,33 +534,24 @@ Apply the contribution only around the doorway and cap its cost and intensity.
 Incomplete destination data must not be represented as final lighting. Full
 cross-world global illumination and shadow transport are deferred.
 
-### Carried and detached objects
+### World-local gameplay state and objects
 
-Objects an avatar carries are owned by that user. The world owner defines
-policies per object type: whether it can be put down or thrown, what happens
-when its user leaves, whether detached objects persist, how long an unclaimed
-object remains available, and whether users may transfer objects to each
-other. A drop can preserve the current owner's claim, release the object for
-others to claim, or remove it, according to that policy. The world server
-authoritatively assigns ownership and simulates any permitted throwing; a
-client cannot create ownership by assertion.
+A world may independently assign visitor scores, inventory, quests,
+progression, local permissions and gameplay objects. Each world chooses
+its own schema and persistence policy. A stable, authenticated visitor ID
+should eventually let it restore **its own records** when that visitor
+returns; today's session IDs are not sufficient.
 
-Ownership may be session-bound or persistent, as selected by each world.
-Persistent ownership requires a stable user identity across reconnection. A
-world may release an object as claimable when its user leaves; if no one claims
-it before the owner-defined claim window expires, the world prunes it. Worlds
-may instead remove it or retain it under their configured persistence rules.
-Enabled user-to-user transfers require both users' consent and an atomic,
-server-validated item-for-item exchange.
+A world may implement local item ownership, dropping, trading, claims,
+throwing or object persistence according to its own rules. These are
+optional world-local mechanics; they are not portable entitlements.
+Crossing a portal does not transfer inventory, currencies, scores, quests
+or ownership of objects. A destination can accept mapped avatar/vehicle
+presentation and pose without importing gameplay state. Atomic inter-owner
+item exchange and cross-world membership recovery are not baseline
+requirements. The current presence protocol does not include a general
+world-local inventory or owned-object implementation.
 
-At a portal, carried objects transfer only if the destination permits them and
-has capacity. If it rejects an object, the visitor waits at the threshold and
-can drop or trade the object before trying again. The handoff must not leave a
-duplicate or lose ownership when either world disconnects during the transfer.
-
-These policies are design requirements. ElseMesh currently has static,
-owner-authored world objects, not a general runtime object inventory, loose
-object, ownership, or transfer protocol.
 
 ## Security and denial-of-service model
 
@@ -636,26 +636,24 @@ avatar-plus-boat budget are the limits the engine can measure consistently.
    triangle cost; clients can ignore viewer-side caps.
 3. **Vehicle support and combinations are narrow.** Only the bundled Downeast
    boat has a declared 46,845-triangle contract. Signed avatar/vehicle pair
-   allowlists work for supported runtime types. Carried objects, arbitrary
-   vehicles, inventory, object ownership, and
+   allowlists work for supported runtime types. Arbitrary vehicles, world-local inventory, object ownership, and
    server-authoritative object simulation are not represented by the presence
-   protocol. World-owner policies for dropping, throwing, persistence, claims,
-   disconnect handling, and transfers are design requirements, not runtime
-   features.
+   protocol. Local dropping, trading, persistence, claims and disconnect
+   handling are optional world-specific mechanics, not cross-world transfer
+   requirements.
 4. **No owner moderation catalog or personal override exists yet.** Presence
    snapshots currently go to all participants of that world connection, and
    there is no policy for selective avatar/object visibility or direct
    client-to-client content sharing. Thus the requested presentation override
    cannot currently be implemented as a preference toggle. It must not be
    confused with bypassing access control.
-5. **Handover is client-coordinated, not transactional.** The client prepares
-   and verifies the destination before switching, but persistent account
-   identity, inventory, arbitrary carried objects, authoritative simulation
-   continuity, and an atomic source-leave/destination-join protocol do not
-   transfer today. The design requires destination policy and capacity checks,
-   a wait-at-threshold path for rejected objects, and duplicate-safe ownership
-   transfer. A disconnect during the current transition can leave only TTL
-   cleanup at the source.
+5. **Handover is intentionally client-coordinated.** The destination
+   independently admits the visitor; a missed source leave is handled by
+   source presence expiry. Atomic inter-owner commits and cross-world
+   ownership transfer are not requirements. Outstanding work includes a
+   stable, authenticated visitor identifier to restore **world-local**
+   saved data and more comprehensive avatar/vehicle moderation.
+
 6. **Neighbor preference order is not owner-configurable yet.** The code has
    ordered provider pairs in invite URLs and tiered directory selection, but
    the signed hosting grants do not record an owner-selected ranking among

@@ -27,6 +27,22 @@ world connection. The visitor must separately present a valid launch grant and
 admission assertion issued by the ElseMesh invitation service. A portal link,
 provider pin, or destination gateway never grants invitation access.
 
+### Admission and presence across portals
+
+Portal and invitation-code entry are alternative arrival routes, each
+subject to the destination owner's capacity, access, avatar/vehicle
+complexity and moderation rules. A public portal can admit without an
+invitation, but a portal link cannot bypass an invitation-gated world.
+A portal preview is read-only and never creates destination presence.
+
+After a successful crossing, the client opens new destination presence
+and attempts to leave the source. If leave is lost, source presence
+expires on its own timeout. No globally exclusive membership, atomic
+inter-owner handoff or cross-world inventory transfer is required.
+Mapped pose and compatible avatar/vehicle representation are
+presentation/navigation context, not persistent gameplay ownership.
+See [visitor identity and world-local state](visitor-identity-and-world-state.md).
+
 ### Portal view readiness and lighting
 
 The destination world may declare the assets/components required for its first
