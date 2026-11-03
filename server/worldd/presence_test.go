@@ -144,16 +144,22 @@ func TestPresenceGhostRevivalAndNonblockingAdmission(t *testing.T) {
 		return request, reply
 	}
 	first, one := join("one", 0, now)
-	_, two := join("two", 0, now.Add(presenceGhostAfter))
+	secondRequest, two := join("two", 0, now.Add(presenceGhostAfter))
 	if len(two.Players) != 2 || !presenceForPlayer(two.Players, one.PlayerID).Ghost {
 		t.Fatalf("old ghost must remain in snapshot but not count toward active visitor capacity: %+v", two)
 	}
 	if got := presenceForPlayer(two.Players, two.PlayerID).Position; len(got) != 3 || got[0] != 0 || got[2] != 8 {
 		t.Fatalf("ghost must not block spawn location: %v", got)
 	}
-	// The original session can resume before 120 seconds, with a newer pose.
+	// A ghost cannot steal capacity from an active visitor if its slot was reused.
 	first.Pose.Sequence = 1
 	first.SpawnCandidates = nil
+	if _, err := d.presenceRequest(first, now.Add(11 * time.Second)); err == nil || err.Error() != "presence_full" {
+		t.Fatalf("ghost revival must respect active visitor limit: %v", err)
+	}
+	// Once the active visitor intentionally leaves, the ghost can resume.
+	secondRequest.Type = "presence.leave"
+	if _, err := d.presenceRequest(secondRequest, now.Add(11*time.Second)); err != nil { t.Fatal(err) }
 	recovered, err := d.presenceRequest(first, now.Add(11 * time.Second))
 	if err != nil { t.Fatalf("ghost revival rejected: %v", err) }
 	if presenceForPlayer(recovered.Players, one.PlayerID).Ghost {
