@@ -118,7 +118,7 @@ traces are still outstanding.
 
 ## Current WebGPU/WebGL runtime check, 2026-10-29
 
-The signed Tidewater package was served by a temporary local `thruholdd` profile
+The signed Tidewater package was served by a temporary local `worldd` profile
 and loaded through the external build in Chromium 156 on a headless Weston
 display. The browser selected WebGPU for the visual captures. Both used the
 named beach pose (`p=[15,3,-58]`, `yaw=3.14`, `pitch=-0.08`, time `16.2`), a
@@ -468,7 +468,7 @@ Neither physical Flip7 display was targeted.
 ## Direct unlisted gateway on Flip7, 2026-10-11
 
 The current hosted client was opened with a direct Example Island invite through
-an unlisted Cloudflare Quick Tunnel to the local `thruholdd` gateway. The public
+an unlisted Cloudflare Quick Tunnel to the local `worldd` gateway. The public
 `/healthz` endpoint returned HTTP 200. No gateway was published to the Worker
 directory or DHT; the random Quick Tunnel URL was shared directly for this
 test and was not added to project documentation or discovery. The tunnel is

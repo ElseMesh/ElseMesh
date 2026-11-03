@@ -11,11 +11,11 @@ ownership or portal-editing authority.
 ## Run a public bootstrap and relay node
 
 Build the ZeroTier-enabled world daemon with the unified script and install it
-at a stable path such as `/usr/local/bin/thruholdd`:
+at a stable path such as `/usr/local/bin/worldd`:
 
 ```sh
 tools/build-server.sh --os linux --arch amd64
-sudo install -o root -g root -m 0755 /path/to/build-output/thruholdd /usr/local/bin/thruholdd
+sudo install -o root -g root -m 0755 /path/to/build-output/worldd /usr/local/bin/worldd
 ```
 
 The build script prints the artifact directory on success. Replace
@@ -40,12 +40,12 @@ chosen `--p2p-port`) from the edge firewall/router to the daemon. Allow those
 protocols on the host firewall as well. TCP and UDP enable their respective
 libp2p transports; circuit-relay streams use the peer connection carrying
 them. If ZeroTier is used as an additional transport, see
-[zerotier-thruholdd.md](zerotier-thruholdd.md) for its overlay rules.
+[zerotier-worldd.md](zerotier-worldd.md) for its overlay rules.
 
 Start one node with a persistent named profile:
 
 ```sh
-thruholdd \
+worldd \
   --worlds-dir /var/lib/elsemesh/worlds \
   --world-profile community-relay \
   --p2p-port 42901 \
@@ -73,7 +73,7 @@ User=elsemesh
 Group=elsemesh
 StateDirectory=elsemesh
 StateDirectoryMode=0700
-ExecStart=/usr/local/bin/thruholdd --worlds-dir /var/lib/elsemesh/worlds --world-profile community-relay --p2p-port 42901 --dht-mode server --relay-service --http 127.0.0.1:5200
+ExecStart=/usr/local/bin/worldd --worlds-dir /var/lib/elsemesh/worlds --world-profile community-relay --p2p-port 42901 --dht-mode server --relay-service --http 127.0.0.1:5200
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
@@ -91,7 +91,7 @@ Inspect logs with `journalctl -u elsemesh-relay`.
 Read the node's PeerID without starting a second daemon:
 
 ```sh
-thruholdd --worlds-dir /var/lib/elsemesh/worlds \
+worldd --worlds-dir /var/lib/elsemesh/worlds \
   --world-profile community-relay --print-node-id
 ```
 
@@ -132,7 +132,7 @@ with `ELSEMESH_WEBRTC_STUN_ARGS`, for example
 `ELSEMESH_WEBRTC_STUN_ARGS="--webrtc-stun-server stun:<host>:<port>"`.
 The unit expands this variable into separate command-line arguments; repeat
 the `--webrtc-stun-server` option for additional endpoints. Configure the same
-STUN URLs on each target `thruholdd`. If no STUN endpoint is configured, the WSS
+STUN URLs on each target `worldd`. If no STUN endpoint is configured, the WSS
 gateway path remains available, while direct WebRTC may fail for peers behind
 NAT. STUN discovers candidate addresses; it is not a relay or a guarantee of
 direct connectivity.
@@ -152,7 +152,7 @@ default reverse proxy does this. See the [Caddy reverse proxy
 reference](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
 
 Allow TCP 80/443 to Caddy for HTTP/TLS and certificate renewal. Allow TCP and
-UDP 42901 to `thruholdd` for native libp2p TCP and QUIC, plus outbound
+UDP 42901 to `worldd` for native libp2p TCP and QUIC, plus outbound
 connections needed for DHT bootstrap and peer discovery. Do not open TCP 5200
 to the Internet. The example deliberately omits the optional WebTransport
 listener: the WSS fallback works through this proxy, while direct HTTP/3
@@ -176,7 +176,7 @@ retrieval and portal traversal.
 ## Current host deployment preflight (2026-10-11)
 
 A read-only check of the development host (`HP-ENVY-x360`) found no running
-`thruholdd` process, no active `elsemesh-gateway` or Caddy service,
+`worldd` process, no active `elsemesh-gateway` or Caddy service,
 and no listener on TCP 80, 443, 42901, or 5200. The Wi-Fi interface had private
 address `192.168.22.247/22` via `192.168.20.1`; the host's `spod` interface was
 down. This is not evidence that the router cannot forward public traffic, but
@@ -215,7 +215,7 @@ invite or production endpoint.
 ### Unlisted route recheck (2026-10-11)
 
 After the user authorized direct, unadvertised exposure for testing, a fresh
-`thruholdd` was built from `main` (`b0ff24e`, SHA-256
+`worldd` was built from `main` (`b0ff24e`, SHA-256
 `4b910bdef103a8f0fbf9dadef539e9c694cdeffa356f71d3a137a21d34e22293`). A
 temporary profile served the checked-in Example Island on loopback through a
 Cloudflare Quick Tunnel. The profile had `discoverable: false`, used DHT client
@@ -236,13 +236,13 @@ The host ZeroTier One service reported active, but `/usr/sbin/zerotier-cli`
 could not read its authentication token in the current execution environment.
 Do not infer that the dedicated ElseMesh network is joined from the interface
 list alone. Refresh membership and assigned addresses from a shell with access
-to the service token before using this host in a live `thruholdd` test. No
+to the service token before using this host in a live `worldd` test. No
 service, firewall, route, or ZeroTier membership was changed during the
 preflight.
 
 ### User-authorized unlisted route attempt (2026-10-12)
 
-A fresh no-ZeroTier `thruholdd` built from current `main` served the signed
+A fresh no-ZeroTier `worldd` built from current `main` served the signed
 Example Island on `127.0.0.1:18789`; `/healthz` returned HTTP 200 and the
 temporary profile used `discoverable: false`. A Cloudflare Quick Tunnel
 registered successfully, but the host's client request could not resolve its
@@ -262,7 +262,7 @@ provide an alternate path for nodes behind restrictive NAT. These flags are
 independent and may point to the same or different community nodes:
 
 ```sh
-thruholdd --world-profile island \
+worldd --world-profile island \
   --bootstrap /ip4/<bootstrap-a-ip>/tcp/42901/p2p/<bootstrap-a-peer-id> \
   --bootstrap /ip4/<bootstrap-b-ip>/tcp/42901/p2p/<bootstrap-b-peer-id> \
   --relay /ip4/<relay-a-ip>/tcp/42901/p2p/<relay-a-peer-id> \
@@ -282,7 +282,7 @@ peers. Portals can then name the destination world ID without pinning one
 provider PeerID; a gateway connected to the mesh resolves providers and
 forwards the browser request. Browser players use an HTTPS/WSS gateway and do
 not join the native libp2p or ZeroTier network themselves. Direct WebRTC to a
-standalone `thruholdd` is implemented and verified in loopback Chromium tests; it
+standalone `worldd` is implemented and verified in loopback Chromium tests; it
 uses WSS signaling and falls back to the gateway when ICE or the data channel
 fails. Configure `--webrtc-stun-server` on the signaling gateway and target,
 then permit/forward the configured UDP ICE range (`42950-43049` by default)
@@ -299,7 +299,7 @@ Run the automated local check from `server`:
 go test ./worldd -run TestWorlddStaticRelayForwardsToPrivatePeer -count=1
 ```
 
-It starts a relay-enabled `thruholdd` option set, a private AutoRelay peer and a
+It starts a relay-enabled `worldd` option set, a private AutoRelay peer and a
 caller, then proves a ping travels on a connection whose multiaddress contains
 `/p2p-circuit`. This uses loopback addresses; it validates relay option wiring
 and circuit forwarding, not traversal across actual NATs or the public
