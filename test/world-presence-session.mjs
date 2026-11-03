@@ -4,13 +4,13 @@ import { DEFAULT_APPEARANCE } from '../src/player/AvatarAppearance.js';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 
 const own = 'player:' + 'a'.repeat(64), remote = 'player:' + 'b'.repeat(64);
-let now = 0, options, sent = [], pending, closed = 0, disposed = 0;
+let now = 0, options, sent = [], pending, closed = 0, disposed = 0, ghostStates = [];
 const created = [];
 const player = { position: new Vector3(1,2,3), velocity: new Vector3(0,0,-3), mode: 'walk', yaw: 10000, pitch: .1 };
 const connector = { worldId: 'elsemesh:test', gateway: 'http://127.0.0.1:5193', manifest: { ownerPeerId: 'owner', rules: { avatarComplexity: 20000 } } };
 const session = new WorldPresenceSession({connector, parent: {add(group){created.push(group)}}, clock: () => now,
  createConnector(value){ options=value; return {updatePresence(pose,{signal}){ sent.push({pose,signal}); return new Promise((resolve,reject)=>{pending={resolve,reject}})},close(){closed++}} },
- createAvatar({appearance,maxComplexity}){ assert.equal(maxComplexity,20000); return {group:{},setAppearance(){},update(dt,pose){this.pose=pose},dispose(){disposed++}} },
+ createAvatar({appearance,maxComplexity}){ assert.equal(maxComplexity,20000); return {group:{},setAppearance(){},setGhost(value){ghostStates.push(value)},update(dt,pose){this.pose=pose},dispose(){disposed++}} },
 });
 assert.equal(options.nodeId,'owner','presence targets signed owner even when content gateway belongs to a replica');
 session.update(.016,player); assert.equal(sent.length,1);
@@ -20,6 +20,7 @@ const pose = {...sent[0].pose,id:remote,position:[4,2,3],updatedAt:1000};
 pending.resolve({type:'presence',worldId:connector.worldId,requestId:'one',playerId:own,players:[pose]});
 await session.pending;
 session.update(.016,player); assert.equal(created.length,1,'validated remote snapshot creates an avatar');
+assert.equal(ghostStates.at(-1),false,'Live remote avatar is rendered as opaque');
 assert.equal(sent.length,2,'publication resumes after the request completes');
 now=550; session.update(.016,player); assert.equal(sent.length,2,'10Hz cadence remains bounded');
 pending.resolve({type:'presence',worldId:connector.worldId,requestId:'two',playerId:own,players:[]}); await session.pending;
