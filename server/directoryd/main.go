@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -127,7 +128,7 @@ func run() error {
 		return err
 	}
 	dataDir := flag.String("data", filepath.Join(configDir, "elsemesh", "directory"), "directory registry storage")
-	listen := flag.String("http", "127.0.0.1:5202", "HTTP listen address; place behind TLS for public browser access")
+	listen := flag.String("http", "127.0.0.1:0", "HTTP listen address (default selects an ephemeral loopback port); place behind TLS for public browser access")
 	flag.Parse()
 	if *version {
 		fmt.Printf("directoryd %s\n", buildRevision)
@@ -147,10 +148,14 @@ func run() error {
 	mux.HandleFunc("/v1/worlds/", d.handleWorld)
 	mux.HandleFunc("/v1/zerotier/", d.handleZeroTier)
 	mux.HandleFunc("/v1/nodes", d.handleNodes)
-	server := &http.Server{Addr: *listen, Handler: cors(mux), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	listener, err := net.Listen("tcp", *listen)
+	if err != nil {
+		return fmt.Errorf("listen for directory HTTP: %w", err)
+	}
+	server := &http.Server{Handler: cors(mux), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	errCh := make(chan error, 1)
-	go func() { errCh <- server.ListenAndServe() }()
-	log.Printf("directoryd listening on %s with %d registered nodes", *listen, len(d.entries))
+	go func() { errCh <- server.Serve(listener) }()
+	log.Printf("directoryd listening on %s with %d registered nodes", listener.Addr(), len(d.entries))
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	select {

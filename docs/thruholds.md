@@ -128,12 +128,12 @@ tools/build-server.sh --target all --os linux --arch amd64
 
 `worldd` is the only world-server binary. It embeds libzt and joins the configured ZeroTier network when `--zerotier-network` is nonempty; it also runs without ZeroTier when that option is empty. `--target all` builds `worldd`, `directoryd`, and `accountd`. KTX2 encoding currently runs in the source provider through the reusable native C ABI library in `native/ktx2`; HogwartsBridge streams encoded chunks directly into its GLB buffer. A Worldd KTX2 service and shared content cache are deferred until another world needs centralized encoding. Worldd should link the same library rather than implement a second encoder; transport and cache design are in [world-network-design.md](world-network-design.md). The daemon build needs matching libzt headers and library; use `--libzt-source`, `--libzt-build`, `--libzt-include`, and `--libzt-lib` for a nonstandard layout. For an Android `worldd` build, select `--os android --arch arm64` and set the NDK `CC` and `CXX`. Every binary embeds the source revision; Android adds `-checklinkname=0` for its network-interface dependency, while Linux keeps normal linker checks.
 
-`accountd` is optional and exits without configuration. Configure the Google OAuth web client and browser origins before starting it, and put a local HTTPS reverse proxy in front of its loopback listener:
+`accountd` is optional and exits without configuration. Configure the Google OAuth web client and browser origins before starting it, and put a local HTTPS reverse proxy in front of its loopback listener. By default it asks the OS for an available loopback port and prints the selected address. Pass `--http 127.0.0.1:<port>` when the proxy needs a stable upstream:
 
 ```sh
 export ELSEMESH_GOOGLE_CLIENT_ID='<your OAuth web client ID>'
 export ELSEMESH_ACCOUNT_ALLOWED_ORIGINS='https://rebroad.github.io,https://thruhold.org'
-accountd --http 127.0.0.1:5203 --data "$HOME/.local/share/elsemesh/accountd"
+accountd --data "$HOME/.local/share/elsemesh/accountd"
 ```
 
 ```sh
@@ -176,8 +176,10 @@ To publish a discoverable node in an optional directory such as `https://thruhol
 ```sh
 worldd --data ./world-data --manifest ./world-data/world.signed.json \
   --public-gateway https://world-host.example --directory-url https://thruhold.org
-directoryd --http 127.0.0.1:5202 --data ./directory-data
+directoryd --http 127.0.0.1:<directoryd-port> --data ./directory-data
 ```
+
+For local use, `directoryd` asks the OS for an available loopback port and prints the selected address. A public reverse proxy or service manager needs a stable upstream, so configure an available loopback port explicitly as shown above.
 
 On Android/Termux, add explicit reachable libp2p addresses when interface discovery is restricted, for example `--announce-address /ip4/192.168.1.42/tcp/42901 --announce-address /ip4/192.168.1.42/udp/42901/quic-v1` for a LAN peer.
 

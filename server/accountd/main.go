@@ -132,7 +132,7 @@ func run() error {
 	clientID := flag.String("google-client-id", clientIDDefault, "Google OAuth web client ID (enables account sign-in)")
 	originsArg := flag.String("allowed-origins", originDefault, "comma-separated exact HTTPS browser origins allowed to sign in")
 	dataDir := flag.String("data", filepath.Join(configDir, "elsemesh", "accountd"), "private account-key mapping storage")
-	listen := flag.String("http", "127.0.0.1:5203", "HTTP listen address; use behind an HTTPS reverse proxy")
+	listen := flag.String("http", "127.0.0.1:0", "HTTP listen address (default selects an ephemeral loopback port); use behind an HTTPS reverse proxy")
 	flag.Parse()
 	if *version {
 		fmt.Printf("accountd %s\n", buildRevision)
@@ -170,10 +170,14 @@ func run() error {
 	mux.HandleFunc("DELETE /api/me/key", b.handleRemoveKey)
 	mux.HandleFunc("POST /api/logout", b.handleLogout)
 	mux.HandleFunc("DELETE /api/account", b.handleDeleteAccount)
-	server := &http.Server{Addr: *listen, Handler: b.cors(mux), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
-	log.Printf("accountd listening on %s for %d exact browser origins", *listen, len(origins))
+	listener, err := net.Listen("tcp", *listen)
+	if err != nil {
+		return fmt.Errorf("listen for account HTTP: %w", err)
+	}
+	server := &http.Server{Handler: b.cors(mux), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	log.Printf("accountd listening on %s for %d exact browser origins", listener.Addr(), len(origins))
 	errCh := make(chan error, 1)
-	go func() { errCh <- server.ListenAndServe() }()
+	go func() { errCh <- server.Serve(listener) }()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	select {
