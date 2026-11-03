@@ -3,16 +3,16 @@
 ## Purpose and boundary
 
 The browser should be able to send world requests directly to the selected
-`thruholdd` after the HTTPS/WSS gateway has introduced the peers. The gateway
+`worldd` after the HTTPS/WSS gateway has introduced the peers. The gateway
 remains the signaling path and the compatibility transport. A direct data
 channel is an optimization and a path for peers whose gateway is not a content
 relay; it is not a new identity system or an authorization grant. The client
 continues to verify the owner-signed manifest and content hashes, and
-`thruholdd` continues to enforce its world and host rules.
+`worldd` continues to enforce its world and host rules.
 
 The browser client and daemon now implement this initial path. A real headless
 Chromium test uses a loopback signaling gateway separate from the target
-`thruholdd`, retrieves the target's signed manifest and a hash-verified asset over
+`worldd`, retrieves the target's signed manifest and a hash-verified asset over
 the data channel, then closes the channel and confirms manifest retrieval falls
 back through the gateway. This proves browser API and local peer-routing
 interoperability; it does not prove connectivity across NATs or a public
@@ -60,7 +60,7 @@ trust a browser-selected presence key.
 
 ICE configuration is deployment configuration, not world metadata. Add one or
 more `--webrtc-stun-server stun:<host>:<port>` options to the gateway and target
-`thruholdd` processes. STUN can improve direct-path discovery, but cannot relay
+`worldd` processes. STUN can improve direct-path discovery, but cannot relay
 traffic or guarantee connectivity through symmetric NATs and restrictive
 firewalls. TURN credentials are not currently configurable; the existing
 HTTPS/WSS gateway is the fallback relay. Never put relay credentials in a world

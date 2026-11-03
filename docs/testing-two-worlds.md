@@ -10,7 +10,7 @@ npm run dev
 ```
 
 Open the URL printed by Vite. The dev server asks the operating system for a
-free local port. `thruholdd` does not serve the static ElseMesh client; it
+free local port. `worldd` does not serve the static ElseMesh client; it
 serves world and gateway APIs only.
 
 ## Hosted world

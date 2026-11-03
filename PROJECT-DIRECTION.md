@@ -94,7 +94,7 @@ in `docs/`.
 
 ## Product requirements
 
-- **World daemon and identity (75%):** provide the Go/libp2p `thruholdd` for Linux
+- **World daemon and identity (75%):** provide the Go/libp2p `worldd` for Linux
   and Android/Termux, signed node/world manifests, content-addressed assets,
   distinct host/gateway/bootstrap/relay/cache roles, and no static client
   serving from the daemon, with owner-scoped neighbor caching and optional
@@ -159,12 +159,12 @@ in `docs/`.
   [direct WebRTC](docs/browser-direct-webrtc.md), and
   [relay deployment](docs/relay-deployment.md#publish-a-browser-gateway-with-tls).
 - **ZeroTier (60%):** use the dedicated ElseMesh network
-  `e3918db4832a3056` with the single `thruholdd` world server and
+  `e3918db4832a3056` with the single `worldd` world server and
   optional embedded libzt membership configured at runtime. The former
   separate CGO-free server build is not a supported variant. The server may
   not expose Central credentials; treat physical path observations as
   transient. Verify routing, ports, peer discovery, and operation without
-  Central. See [ZeroTier thruholdd setup and evidence](docs/zerotier-thruholdd.md#dedicated-elsemesh-network).
+  Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
 - **Publishing (90%):** host the current ElseMesh client at `elsemesh.github.io/`, retire
   `/elsemesh`, and show an eight-character source stamp matching the published
   ref. See

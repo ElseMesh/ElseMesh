@@ -23,7 +23,7 @@ The configured limit is a best-effort 20 announcements per provider per minute, 
 
 ## Daemon setup
 
-Set `thruholdd`'s `--directory-url` to the Worker HTTPS origin while also setting the daemon's secure public gateway. The daemon refreshes its short-lived signed record periodically. Existing standalone `directoryd` remains supported for self-hosting. Do not put account API tokens, ZeroTier Central credentials, or private keys into Worker variables, browser configuration, logs, or this repository.
+Set `worldd`'s `--directory-url` to the Worker HTTPS origin while also setting the daemon's secure public gateway. The daemon refreshes its short-lived signed record periodically. Existing standalone `directoryd` remains supported for self-hosting. Do not put account API tokens, ZeroTier Central credentials, or private keys into Worker variables, browser configuration, logs, or this repository.
 
 The ZeroTier node ID is a locator only. The Worker returns a signed node advertisement that the browser verifies, then the browser verifies the world manifest from that gateway. A node ID does not authorize access or provide an IP route. A multi-world result still requires the user to select the canonical ThruHold ID.
 

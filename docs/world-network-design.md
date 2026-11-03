@@ -22,7 +22,7 @@ route hint, not identity or membership proof.
 When one machine hosts multiple worlds that need distinct HostIDs, give each
 world a persistent node profile and `node.key`. Its signed node record binds
 that profile's PeerID to one `worldId`, and restarting the profile preserves
-the HostID. `thruholdd --world-profile` provides separate identities and data
+the HostID. `worldd --world-profile` provides separate identities and data
 directories for this model.
 
 The ordinary package provider serves declared, hash-verified assets. A dynamic
@@ -64,7 +64,7 @@ canceled when the final lease is released or expires.
 
 Treat the browser as an untrusted requester. It must not choose arbitrary
 world-region IDs or claim a player position to unlock content. The active world
-authority (thruholdd) tracks the accepted player pose and movement mode,
+authority (worldd) tracks the accepted player pose and movement mode,
 validates input against the world's collision and movement rules, and enforces
 the configured speed/acceleration limits. A client sends input intent and
 camera/view information; it does not authoritatively set position. World data
@@ -103,13 +103,13 @@ buffer. This avoids a second process boundary, per-texture PNG/KTX2 files, and
 an extra full-size encoded-output copy. The library serializes encode calls
 and caps each Basis job pool at four threads, the measured setting for the
 current Hogwarts workload. The native API is deliberately independent of Unreal, Hogwarts,
-Go, C#, and the renderer, so Thruholdd can link the same implementation if
+Go, C#, and the renderer, so Worldd can link the same implementation if
 centralized encoding becomes useful to another world.
 
-This is not yet a Thruholdd encoding service or content-addressed cross-visitor
+This is not yet a Worldd encoding service or content-addressed cross-visitor
 texture cache. The source provider remains responsible for decoding source formats,
 selecting mip/sample levels, and choosing metadata such as sRGB or normal-map
-handling. If another world needs centralized encoding, Thruholdd can reuse the
+handling. If another world needs centralized encoding, Worldd can reuse the
 same library and accept bounded raw pixel streams with dimensions and encoding
 options; it should validate sizes, limit concurrent work by memory budget,
 deduplicate identical in-flight requests, and cache results by source digest
@@ -122,7 +122,7 @@ across a process boundary, begin with bounded streaming to avoid disk staging
 and measure representative texture sizes and concurrent visitor loads before
 adding shared memory. Shared memory may reduce copies but adds platform-specific
 allocation, ownership, and cleanup rules. Do not maintain a second encoder
-implementation in Thruholdd; link this library or deliberately move it to a
+implementation in Worldd; link this library or deliberately move it to a
 central package when more than one world needs the service.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.

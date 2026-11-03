@@ -1,6 +1,6 @@
-# ZeroTier networking for thruholdd
+# ZeroTier networking for worldd
 
-There is one supported world-server executable: `thruholdd`. It embeds libzt
+There is one supported world-server executable: `worldd`. It embeds libzt
 and can join ZeroTier when `--zerotier-network` is configured; pass an empty
 value to run the same daemon without joining ZeroTier. Historical references
 below to a separate CGO-free build describe a removed variant, not a second
@@ -13,7 +13,7 @@ The owner created ZeroTier network `e3918db4832a3056` in Central for ElseMesh.
 An authenticated Central UI inspection on 2026-10-10 confirmed that it is
 public, has 6PLANE enabled, and uses the managed IPv4 route `172.22.0.0/16`.
 A native client previously received `172.22.194.239/16`, consistent with that
-range. On 2026-10-10, a disposable libzt `thruholdd` identity (`56497525c1`)
+range. On 2026-10-10, a disposable libzt `worldd` identity (`56497525c1`)
 also joined and received `172.22.2.36`, within the configured `/16`, plus its
 expected 6PLANE address. The host kernel's route lookup for `172.22.2.36`
 selected the ordinary `wlo1` default gateway (`192.168.20.1`), confirming that
@@ -28,11 +28,11 @@ checking the settings in Central's web UI.
 The Legacy API's `physicalAddress` is the IP address the member last spoke
 to the controller through ([API schema](https://docs.rs/zerotier-central-api/latest/zerotier_central_api/types/struct.Member.html)); it is not a list of all peer paths or a hole-punching guarantee. A blank Central field means no such address is currently recorded for that member. A successful local join and 6PLANE assignment do not by themselves prove that Central's member record has a physical address.
 
-The packaged daemon name is `thruholdd`. A ZeroTier-enabled build defaults to
+The packaged daemon name is `worldd`. A ZeroTier-enabled build defaults to
 this network without a network-ID argument. `--zerotier-network` remains an
 operator override for testing. The `/16` route can overlap with private
 networks on a user's device; inspect local routes before relying on managed
-IPv4. `thruholdd` reports an assigned managed IPv4 address in startup
+IPv4. `worldd` reports an assigned managed IPv4 address in startup
 logs, advertises its managed IPv4 and 6PLANE IPv6 addresses, and routes managed
 IPv4 TCP peer traffic through libzt. IPv4 routing is restricted to the actual
 prefix reported by libzt for the joined network; other IPv4 traffic uses the
@@ -83,14 +83,14 @@ machine's public firewall.
 Public membership means anyone who knows this network ID may join; application
 identity signatures and world permissions must still be enforced by ElseMesh.
 
-`thruholdd` listens for libp2p TCP and QUIC on port `42901` by default (the port
+`worldd` listens for libp2p TCP and QUIC on port `42901` by default (the port
 can be changed with `--p2p-port`). Permit TCP and UDP on the chosen peer port
 in the network flow rules and the host firewall. TCP carries the TCP transport;
 QUIC carries UDP. If using the default, announce the assigned 6PLANE address
 when starting it so peers can dial the overlay address:
 
 ```sh
-thruholdd --announce-address /ip6/<this-host-6plane-address>/tcp/42901 \
+worldd --announce-address /ip6/<this-host-6plane-address>/tcp/42901 \
   --announce-address /ip6/<this-host-6plane-address>/udp/42901/quic-v1
 ```
 
@@ -108,7 +108,7 @@ ZeroTier interface.
 Ordinary browsers do not join the ZeroTier LAN. Publish the daemon's HTTPS/WSS
 gateway and configure the hosted client to use that gateway for signaling and
 fallback. The client can use a direct WebRTC data channel to a standalone
-`thruholdd`; this has passed a loopback Chromium check but not a cross-NAT or
+`worldd`; this has passed a loopback Chromium check but not a cross-NAT or
 public test. Browser-hosted owner sessions still need the reverse gateway path
 and do not yet support direct WebRTC; see [browser hosting](browser-hosting.md).
 Do not expose the Central API token to a browser.
@@ -122,7 +122,7 @@ authorization must continue to work without a Central API request.
 
 ### Host firewall for embedded libzt
 
-`thruholdd`'s libzt node runs ZeroTier in userspace; it does not create a native
+`worldd`'s libzt node runs ZeroTier in userspace; it does not create a native
 `zt...` network interface. The host firewall therefore sees the encrypted
 outer UDP packets, not the inner ElseMesh TCP connection. For ordinary hosts,
 allow UDP egress to ZeroTier roots on port 9993 and stateful reply traffic.
@@ -132,7 +132,7 @@ can force relay paths or prevent connectivity. Do not open the world's TCP or
 UDP peer port on the physical WAN just for libzt. The TCP peer stream is carried
 inside ZeroTier. The same `42901` TCP allowance still belongs in ZeroTier
 Central's *inner network flow rules* when other overlay members need to reach a
-thruholdd listener. See ZeroTier's [corporate firewall guidance](https://docs.zerotier.com/corporate-firewalls/)
+worldd listener. See ZeroTier's [corporate firewall guidance](https://docs.zerotier.com/corporate-firewalls/)
 and [root server whitelist](https://docs.zerotier.com/whitelist/) for the
 outer-path requirements. Native ZeroTier One deployments are different: their
 host firewall may need rules on the kernel `zt...` interface for inner peer
@@ -146,11 +146,11 @@ firewalls. The host's `/etc/nftables.conf` contains the catch-all `spod`
 output drop, and `/var/log/fw.log` records UDP packets from `137.205.192.1` to
 ZeroTier root port 9993 as `SDROP` on 2026-10-10/11. Those log entries do not
 identify the originating process, so they cannot be attributed specifically to
-`thruholdd`. The system's ordinary physical route to ZeroTier roots uses
+`worldd`. The system's ordinary physical route to ZeroTier roots uses
 `wlo1`; a route lookup alone does not prove which interface libzt's socket
 used.
 
-`thruholdd` includes libzt and joins the dedicated network by default, without
+`worldd` includes libzt and joins the dedicated network by default, without
 installing the separate ZeroTier One service or passing `--zerotier-network`.
 Edit the source checkout. The unified build helper uses an existing independent
 build sibling when `cpto` is installed; if that sibling resolves to the source
@@ -168,7 +168,7 @@ cd "$HOME/src/elsemesh"
 tools/build-server.sh --os linux --arch amd64
 ```
 
-This creates `thruholdd` under the selected server tree's `bin/` directory.
+This creates `worldd` under the selected server tree's `bin/` directory.
 The script prints the artifact path after a successful build and embeds the
 source checkout's current commit; set `BUILD_REVISION` explicitly when building
 from a source snapshot without Git metadata. It places the matching `libzt.so`
@@ -179,7 +179,7 @@ the network ID nor a special transport flag is needed.
 
 The former CGO-free build used a host-managed ZeroTier interface. That
 separate build target was removed so identity, hosting, and optional ZeroTier
-joining belong to the same `thruholdd` daemon. It is not a supported second
+joining belong to the same `worldd` daemon. It is not a supported second
 server mode.
 
 ### Observed physical peer endpoints
@@ -195,7 +195,7 @@ count of zero when it has no queryable direct path. The query filters out
 expired paths, non-IP address families, and endpoints with UDP port zero. A
 zero count does not distinguish a relay-only peer from a peer with no recently
 observed direct path. The address and port can change and only describe a
-currently observed ZeroTier path. `thruholdd` queries them only through the
+currently observed ZeroTier path. `worldd` queries them only through the
 opt-in loopback diagnostic; normal peer traffic continues over the managed
 ZeroTier overlay.
 
@@ -209,7 +209,7 @@ packet demultiplexing (or its own socket/mapping); it must keep the managed
 overlay as fallback. Do not treat a path query result as a routable stable
 address or permission to bypass overlay identity and world authorization.
 
-For an opt-in local diagnostic, start `thruholdd` with
+For an opt-in local diagnostic, start `worldd` with
 `--zerotier-path-diagnostics`; keep its `--http` listener bound to a numeric
 loopback address such as the default `127.0.0.1:5200`. Then query a known
 10-digit ZeroTier peer ID:
@@ -256,7 +256,7 @@ device-wide path is independent of a ThruHold profile or `--data`, so changing
 world profiles does not create another ZeroTier node. The private secret file
 and its directory are owner-only. `elsemesh-node-id` records the first
 successful node ID; if the identity files are lost, incomplete, or produce a
-different ID, `thruholdd` now stops instead of silently accepting a new node.
+different ID, `worldd` now stops instead of silently accepting a new node.
 At first startup, existing state at the former default
 `~/.config/tidewater/worldd/zerotier/` path is moved into this location so its
 node identity is preserved.
@@ -272,11 +272,11 @@ legacy ZeroTier state directory, and returned the same world PeerID before
 and after migration. This one-shot check did not start libzt or join the
 network; ZeroTier key reuse is separately covered by the identity tests.
 Back up the complete `zerotier` directory and restore it with the daemon on a
-new installation. Run one libzt-enabled `thruholdd` process per OS user at a
+new installation. Run one libzt-enabled `worldd` process per OS user at a
 time because they share this device identity and libzt state. A separate
 `--zerotier-data` path is available for an explicit second node or isolated
 test; using it intentionally creates a different ZeroTier identity.
-`thruholdd` waits up to 60 seconds for network membership/configuration, computes its
+`worldd` waits up to 60 seconds for network membership/configuration, computes its
 network-scoped 6PLANE address from its stable ZeroTier node ID, and announces
 that address on TCP port 42901. TCP dials to that network's 6PLANE `/40` prefix
 go through libzt; inbound connections are bridged to the ordinary libp2p TCP
@@ -284,7 +284,7 @@ listener. Other TCP addresses and QUIC/WebSocket/WebTransport/WebRTC keep their
 normal paths. The address is a transport locator only; signed identity and
 world authorization remain authoritative.
 
-On Linux and Android, `thruholdd` first inspects host interfaces and selects
+On Linux and Android, `worldd` first inspects host interfaces and selects
 active hardware-backed links (or links with a default route) that have a global
 unicast address. It asks libzt to exclude the other interface-name prefixes
 before startup. This avoids ZeroTier discovery traffic over loopback,
@@ -296,7 +296,7 @@ selected interfaces and excluded prefixes.
 An explicit exclusion remains available for a known problematic interface:
 
 ```sh
-thruholdd --zerotier-blacklist-interface example0
+worldd --zerotier-blacklist-interface example0
 ```
 
 The argument is an interface-name prefix (maximum 15 bytes) and calls libzt's
@@ -306,7 +306,7 @@ routes or firewall policy.
 
 This path requires a libzt build for each target architecture and its native
 dependencies. For Android arm64, build `libzt.so` with the Android NDK for
-`arm64-v8a` and API 26 or newer, then cross-build `thruholdd` with the matching
+`arm64-v8a` and API 26 or newer, then cross-build `worldd` with the matching
 NDK compiler. The Android arm64 build and Flip7 daemon validation are recorded
 below; this repository does not yet distribute prebuilt libzt libraries.
 The build also depends on the licensing terms and notices shipped with the
@@ -360,14 +360,14 @@ skips unsupported CPU-affinity pinning on Android (ZeroTierOne commit
 `be0d1923d`).
 
 The resulting `libzt.so` is an AArch64 Android shared library and depends
-only on Android system libraries. Build `thruholdd` against that library and
+only on Android system libraries. Build `worldd` against that library and
 the matching NDK compiler with:
 
 ```sh
 CC=/path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang \
 CXX=/path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++ \
 tools/build-server.sh \
-  --target thruholdd --os android --arch arm64 \
+  --target worldd --os android --arch arm64 \
   --build-server /path/to/prepared/external/server-build \
   --output /path/to/prepared/external/server-build/bin/android-arm64
 ```
@@ -375,9 +375,9 @@ tools/build-server.sh \
 The build helper omits the Linux `libstdc++` linker flag on Android and applies
 the Go linker compatibility option needed by the Android network-interface
 dependency. The helper automatically bundles the matching Android `libzt.so`
-beside `thruholdd`; keep both files together when installing it.
+beside `worldd`; keep both files together when installing it.
 
-On the Flip7, two temporary `thruholdd` processes with separate libzt state
+On the Flip7, two temporary `worldd` processes with separate libzt state
 directories joined network `e3918db4832a3056`. They received distinct 6PLANE
 addresses, dialed each other over the 6PLANE TCP path, and each reported one
 DHT peer. This verifies Android arm64 loading and a successful libzt-backed
@@ -386,7 +386,7 @@ different devices or different NATs, and it did not exercise the game
 renderer. Test identities and files were kept under Termux `$PREFIX/tmp`; no
 permanent phone identity was created or changed.
 
-On 2026-10-10, a fresh Flip7 node and a Linux `thruholdd` node on this
+On 2026-10-10, a fresh Flip7 node and a Linux `worldd` node on this
 development host joined `e3918db4832a3056` with distinct ZeroTier IDs and
 6PLANE addresses. While the Linux process was running, the Flip7 health
 endpoint briefly reported one DHT peer; a later sample returned zero. This is
@@ -408,7 +408,7 @@ it did not verify rendering or visual quality. The renderer check still needs
 an awake, unlocked phone. The temporary daemon was stopped; the persistent
 phone ZeroTier identity was not touched.
 
-On 2026-10-10, `tools/build-thruholdd.sh` was run with no `LIBZT_*` overrides.
+On 2026-10-10, `tools/build-worldd.sh` was run with no `LIBZT_*` overrides.
 It discovered the sibling libzt source and external build, produced the Linux
 binary and colocated `libzt.so`, and `ldd` resolved that library through the
 binary's `$ORIGIN` path with no `LD_LIBRARY_PATH`. A separate Android arm64
@@ -422,13 +422,13 @@ After the fork-compatibility changes, a clean 128-step `zt-shared` rebuild
 passed with `ZTS_ZEROTIERONE_SOURCE_DIR` pointing directly to the `exp3`
 checkout. The generated Ninja rules name source files under that checkout;
 all object files and libraries are written under the external libzt build
-tree. `thruholdd` was rebuilt against the resulting artifact. `llvm-readelf`
-confirmed both outputs are Android AArch64/API 26 binaries; `thruholdd`
+tree. `worldd` was rebuilt against the resulting artifact. `llvm-readelf`
+confirmed both outputs are Android AArch64/API 26 binaries; `worldd`
 depends on `libzt.so` plus Android system libraries.
 
 The rebuilt binaries were then copied to a disposable Termux directory on the
 Flip7. Their SHA-256 hashes matched the external build artifacts, and
-`thruholdd --version` printed `d8f2eb2017c7892a6b094fe1cab06250f622a0a8`. A
+`worldd --version` printed `d8f2eb2017c7892a6b094fe1cab06250f622a0a8`. A
 fresh temporary libzt identity (`fb164545f7`) joined network
 `e3918db4832a3056` at `fc60:bbbd:e2fb:1645:45f7::1`; `/healthz` returned
 `status: ok` with `dhtPeers: 0`. Android still denied libp2p's interface
@@ -437,7 +437,7 @@ loopback health endpoint succeeded. The process was stopped and its temporary
 identity and files were removed. This validates the new binary on-device, not
 peer connectivity, portal transfer, or renderer appearance.
 
-A native Linux amd64 `zt-shared` build and `thruholdd` link also passed with
+A native Linux amd64 `zt-shared` build and `worldd` link also passed with
 `ZTS_ZEROTIERONE_SOURCE_DIR` set to the same fork checkout. A disposable Linux
 daemon joined the dedicated network as node `17bef5bb87` at
 `fc60:bbbd:e217:bef5:bb87::1`; its loopback `/healthz` returned HTTP 200 and
@@ -453,9 +453,9 @@ not received a second device runtime check.
 
 ## Remaining validation
 
-An earlier Linux amd64 `thruholdd` build joined the dedicated ElseMesh network;
+An earlier Linux amd64 `worldd` build joined the dedicated ElseMesh network;
 its disposable node ID was `3af4fd5d50` and it announced 6PLANE address
-`fc60:bbbd:e23a:f4fd:5d50::1`. On 2026-10-04, two separate Linux `thruholdd`
+`fc60:bbbd:e23a:f4fd:5d50::1`. On 2026-10-04, two separate Linux `worldd`
 processes, each with its
 own libzt state directory and ZeroTier identity, both joined public network
 `e3918db4832a3056` and received distinct 6PLANE addresses
@@ -464,13 +464,13 @@ explicit separate storage paths; normal installations now reuse the single
 device-wide identity described above. That earlier Linux pair test failed
 before the custom connection adapter was fixed. The later Flip7 test above
 confirms that the adapter can establish a peer connection. The managed IPv4
-address was not queried through libzt; current `thruholdd` code only uses and
+address was not queried through libzt; current `worldd` code only uses and
 announces the 6PLANE IPv6 address.
 
 During that attempt, `/var/log/fw.log` recorded outbound UDP drops on
 `OUT=spod`, including packets to ZeroTier root `103.195.103.66`. The local
 nftables output chain intentionally drops traffic on `spod`. A later process
-inspection showed that libzt had opened sockets for `thruholdd` on several
+inspection showed that libzt had opened sockets for `worldd` on several
 interfaces, including both `spod` and the active `wlo1`; the log entries
 therefore prove that the `spod`-bound attempts were dropped, but do not prove
 that this caused the peer dial to fail. No exception was added to `spod`.
@@ -519,7 +519,7 @@ incomplete. A Linux-only network-enabled smoke test did join the network as
 `077e7872b2` (`fc60:bbbd:e207:7e78:72b2::1`) and returned healthy local status,
 but had no bootstrap peer and therefore showed `dhtPeers: 0`.
 
-After that retry, two Linux `thruholdd` processes with fresh, isolated
+After that retry, two Linux `worldd` processes with fresh, isolated
 identities were run on the same host using the final `c303ce6` build-tree
 artifact. Both joined the dedicated network as `59eb492c1f`
 (`fc60:bbbd:e259:eb49:2c1f::1`) and `a88184b5e8`
@@ -540,7 +540,7 @@ tree; the trees are copied/synchronized with `cpto`, not linked together.
 
 ### Managed IPv4 implementation and live check (2026-10-10)
 
-`thruholdd` now reads the assigned IPv4 address and prefix from libzt, binds a
+`worldd` now reads the assigned IPv4 address and prefix from libzt, binds a
 libzt IPv4 TCP listener on the configured daemon port, advertises the resulting
 `/ip4/.../tcp/...` address, and uses libzt for TCP dials only when the IPv4
 destination lies inside that assigned prefix. The 6PLANE IPv6 listener and
@@ -561,7 +561,7 @@ required an unavailable password, so the cause of the timeout is unresolved.
 
 ### Managed IPv4 Linux peer check (2026-10-10)
 
-Two Linux `thruholdd` processes using separate temporary world data and libzt
+Two Linux `worldd` processes using separate temporary world data and libzt
 identities joined the same public network. They received
 `172.22.248.107/16` and `172.22.159.170/16`; the first node listened on the
 flow-rule-allowed TCP port `42901`. The second bootstrapped to the first using
@@ -575,7 +575,7 @@ processes were stopped and their temporary state removed.
 
 ### Later Flip7 runtime retry (2026-10-10)
 
-A current Android arm64 `thruholdd` and matching `libzt.so` were run from a
+A current Android arm64 `worldd` and matching `libzt.so` were run from a
 separate Termux temporary directory, leaving the installed daemon and its
 persistent identity untouched. The node record reports PeerID
 `12D3KooWEjt3MG2M9CCSjHirJtEUNZrgoNLqH15XG8AL1DbmDBdg`, IPv4
@@ -643,7 +643,7 @@ Its listener accept loop is nonblocking and joined before teardown. This keeps
 the library's existing socket configuration and avoids concurrent C calls on
 the same socket.
 
-Verification used two disposable Linux `thruholdd` processes with fresh world
+Verification used two disposable Linux `worldd` processes with fresh world
 and ZeroTier state directories. Both joined network `e3918db4832a3056`. The
 second bootstrapped to the first at its ZeroTier managed IPv4 address
 `172.22.161.174`, on the Central-allowed TCP port `42901`; its own local
@@ -710,7 +710,7 @@ Flip7 address `172.22.216.247`. The current route is via the normal Wi-Fi
 gateway (`192.168.20.1`, interface `wlo1`, source `192.168.22.247`), not a
 ZeroTier interface. The host currently exposes ZeroTier interfaces for
 `10.205.192.0/24`, `192.168.192.0/24`, and `192.168.193.0/24`; no route for the
-dedicated network's `172.22.0.0/16` was present. No `thruholdd` process was
+dedicated network's `172.22.0.0/16` was present. No `worldd` process was
 running during this snapshot, so it was not an active libzt peer test. This
 means the earlier Flip7 address is stale for the current host state and cannot
 be used as evidence of present reachability.
@@ -734,9 +734,9 @@ firewall rule label alone.
 
 ### Local persistent identity checks (2026-10-11)
 
-The current Linux `thruholdd` was rebuilt from this checkout into the external
+The current Linux `worldd` was rebuilt from this checkout into the external
 ElseMesh build tree. With a fresh isolated Linux data directory, two separate
-`thruholdd --print-node-id` invocations returned the same libp2p PeerID
+`worldd --print-node-id` invocations returned the same libp2p PeerID
 (`12D3KooWM9EHdYFRp1u3smaC2SmJZ8UhiMxv9AgYGteZ8JEmvM7j`); its `node.key` was
 mode `0600`. Focused `go test -count=1 ./worldd -run 'TestZeroTierIdentity|TestMigrateLegacyZeroTierStorage'` also passed, covering the persistent ZeroTier node-ID marker, replacement/loss rejection, and legacy state migration.
 
@@ -752,7 +752,7 @@ or SSH.
 
 ### Disposable Linux libzt join and restart (2026-10-11)
 
-The latest Linux `thruholdd` build was run with fresh world and libzt state
+The latest Linux `worldd` build was run with fresh world and libzt state
 under `/var/tmp/elsemesh-libzt-smoke.xL23KM`, loopback HTTP `127.0.0.1:55200`,
 and P2P port `42911`. Without an interface blacklist, it joined the default
 network `e3918db4832a3056` as ZeroTier node `bc49b737b2`, receiving
@@ -767,7 +767,7 @@ persistent identity, route, or firewall rule was changed.
 The firewall log during this interval contained outgoing `SDROP` records on
 `spod` from `137.205.192.1` to ZeroTier root IPs, including UDP destination
 ports 9993 and 21045. A process-level check then matched the logged source
-ports to UDP sockets owned by this exact `thruholdd` PID. `ss` showed libzt had
+ports to UDP sockets owned by this exact `worldd` PID. `ss` showed libzt had
 opened same-port sockets bound to `wlo1`, `spod`, `docker0`, and
 `br-winproxy`; so the `spod` packets were libzt's own multi-interface
 ZeroTier discovery/path traffic, not traffic routed through ElseMesh's
@@ -819,7 +819,7 @@ removed; persistent identities and Central policy were untouched.
 ### Android arm64 rebuild with automatic interface selection (2026-10-11)
 
 After adding automatic Linux/Android interface selection,
-`tools/build-thruholdd.sh` rebuilt the Android target from commit
+`tools/build-worldd.sh` rebuilt the Android target from commit
 `a59453c0a3b934aa60789e4c33aad169a70b9318` using NDK r29 (14206865) and
 Android API 26. `file` and `readelf` confirmed an AArch64 Android PIE with
 `/system/bin/linker64`; the bundled `libzt.so` SHA-256 matched the external
@@ -833,10 +833,10 @@ on the phone.
 ZeroTierOne `bf5dfff60` changes only threat accounting for ECHOs rejected by
 the existing six-per-second per-path reply gate. The Linux CMake build and
 Android NDK r29/API 26 CMake build both recompiled
-`node/SecurityMonitor.cpp`; both resulting `thruholdd` packages include the
+`node/SecurityMonitor.cpp`; both resulting `worldd` packages include the
 matching `libzt.so`. Linux library SHA-256: `f40aad27b0e056365a55b1695b4d724592b733ba6170559ebcdbd2a1e0da6a7a`;
 Android library SHA-256: `e594d8c8c5c433e9d585fa58ee57d5a2b202751ef5c6443be3d6874dee8794dd`.
-The Linux `thruholdd --help` smoke check passed and `ldd` resolved its bundled
+The Linux `worldd --help` smoke check passed and `ldd` resolved its bundled
 library. The Android binary is an AArch64 PIE using `/system/bin/linker64`;
 its SHA-256 is `27de51fd0e509991ddbc3d59f5de344cca8ffac7eed6c19e07d0769a8ccf55b4`.
 No Android device is currently connected through ADB, so installation, normal
@@ -853,7 +853,7 @@ suppressed `SEC_EXCESSIVE_ECHO` as a rate-limit hit rather than a protocol
 violation.
 
 The current Linux `libzt.so` was rebuilt from that checkout and bundled beside
-`thruholdd`; both copies have SHA-256
+`worldd`; both copies have SHA-256
 `26f663cb601b0882649a2a4f824ef53a858f83c177139988f87f436f70304454`. Two
 disposable Linux daemons using this build joined the dedicated network and
 held a libp2p/DHT peer connection for 75 seconds. Both health responses
@@ -868,7 +868,7 @@ resulting production threat score.
 The Android arm64 library was also rebuilt against the same ZeroTierOne
 checkout with NDK r29/API 26. Its SHA-256 is
 `b366353d832c8a8d3b0df8d7860c3ebf9687aea72ce55bfa1d55e3732438126d`. A new
-Android `thruholdd` was built from ElseMesh revision
+Android `worldd` was built from ElseMesh revision
 `041ecb8cae3972179dfb427c808a02822fbe36a2`; the bundled library hash matches
 the CMake output. `file` and `llvm-readelf` confirm an Android AArch64/API 26
 binary, `/system/bin/linker64`, `$ORIGIN` runpath, and the bundled `libzt.so`
@@ -891,7 +891,7 @@ minutes one new ECHO event scored LOW. The Linux selftest was built with
 failure in the default host build. This is unit-level evidence only: a live
 over-limit packet burst and its production event score remain unverified.
 
-### Default Android `thruholdd` cgo build (2026-10-11)
+### Default Android `worldd` cgo build (2026-10-11)
 
 A fresh build from ElseMesh `8d23b2964cece02ed3fc7d24810afd3a6ac87f72` now
 passes with NDK r29/API 26 when the Android compiler is selected explicitly
@@ -902,7 +902,7 @@ BUILD=/mnt/kingston/builds/rebroad/src/elsemesh.build/android-sso-check
 NDK=/home/rebroad/Android/Sdk/ndk/29.0.14206865
 CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" \
 tools/build-server.sh \
-  --target thruholdd --os android --arch arm64 \
+  --target worldd --os android --arch arm64 \
   --build-server "$BUILD/server" --output "$BUILD/out-default"
 ```
 
@@ -927,7 +927,7 @@ lists no device and SSH to the Flip7 reports `Network is unreachable`.
 
 ### Linux libzt identity survives daemon restart (2026-10-11)
 
-The current Linux `thruholdd` build (`6c31bc89`) started twice with the default
+The current Linux `worldd` build (`6c31bc89`) started twice with the default
 network `e3918db4832a3056` and the same isolated `--zerotier-data` directory.
 Both starts joined as ZeroTier node `a5a50a281d` and received IPv4
 `172.22.23.66` plus 6PLANE `fc60:bbbd:e2a5:a50a:281d::1`. The private
@@ -937,7 +937,7 @@ This verifies persistence across a daemon restart with the current Linux build,
 not across a software upgrade, a device reboot, or on Android.
 
 The actual upgrade path was also exercised using an external build of the
-pre-migration parent revision `2cb4840` followed by the current `thruholdd`
+pre-migration parent revision `2cb4840` followed by the current `worldd`
 build. The older daemon created its libzt state at
 `$XDG_CONFIG_HOME/tidewater/worldd/zerotier`; the current daemon migrated it to
 `$XDG_CONFIG_HOME/elsemesh/zerotier` without an explicit network-ID argument.

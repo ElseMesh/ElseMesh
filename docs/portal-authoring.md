@@ -118,7 +118,7 @@ Alice reviews and publishes her authored source through her own persistent owner
 
 ```sh
 node tools/publish-world-source.mjs \
-  --thruholdd ./thruholdd --data ~/.config/elsemesh/worlds/bob \
+  --worldd ./worldd --data ~/.config/elsemesh/worlds/bob \
   --base-source bob.world-source.json \
   --source bob.candidate.world-source.json --assets bob-assets
 ```
