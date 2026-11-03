@@ -6,10 +6,62 @@ import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installStaticModelInstanceSet );
 
+function disposeParsedModelSource( source ) {
+	const geometries = new Set(), materials = new Set(), textures = new Set();
+	source.scene.traverse( object => {
+		if ( object.geometry ) geometries.add( object.geometry );
+		for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
+			if ( ! material ) continue;
+			materials.add( material );
+			for ( const value of Object.values( material ) ) if ( value?.isTexture ) textures.add( value );
+		}
+	} );
+	for ( const geometry of geometries ) geometry.dispose();
+	for ( const material of materials ) material.dispose();
+	for ( const texture of textures ) texture.dispose();
+}
+
+async function acquireParsedModelSource( fallback, assetId, bytes ) {
+	const cache = fallback.hostedStaticModelSourceCache ||= new Map();
+	const flights = fallback.hostedStaticModelSourceFlights ||= new Map();
+	const stats = fallback.hostedStaticModelSourceStats ||= { parsed: 0, reused: 0 };
+	let entry = cache.get( assetId );
+	if ( entry ) stats.reused ++;
+	if ( ! entry ) {
+		let flight = flights.get( assetId );
+		if ( ! flight ) {
+			flight = ( async () => {
+				const buffer = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
+				const source = await fallback.loader.parseAsync( buffer, '' );
+				const parsed = { source, references: 0 };
+				stats.parsed ++;
+				cache.set( assetId, parsed );
+				return parsed;
+			} )();
+			flights.set( assetId, flight );
+		} else stats.reused ++;
+		try { entry = await flight; }
+		finally { if ( flights.get( assetId ) === flight ) flights.delete( assetId ); }
+	}
+	entry.references ++;
+	return entry.source;
+}
+
+function releaseParsedModelSource( fallback, assetId ) {
+	const cache = fallback.hostedStaticModelSourceCache;
+	const entry = cache?.get( assetId );
+	if ( ! entry ) return;
+	entry.references --;
+	if ( entry.references > 0 ) return;
+	cache.delete( assetId );
+	disposeParsedModelSource( entry.source );
+}
+
 async function installStaticModelInstanceSet( { fallback }, component ) {
 	const connector = fallback.connector;
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
 	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
+	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const modelOffsets = [];
 	let batchOffset = 0;
@@ -21,27 +73,16 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 		}
 		for ( const geometry of ownedGeometry ) geometry.dispose();
 		for ( const material of ownedMaterials ) material.dispose();
-		const geometries = new Set(), materials = new Set(), textures = new Set();
-		for ( const gltf of sources.values() ) gltf.scene.traverse( object => {
-			if ( object.geometry ) geometries.add( object.geometry );
-			for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
-				if ( ! material ) continue;
-				materials.add( material );
-				for ( const value of Object.values( material ) ) if ( value?.isTexture ) textures.add( value );
-			}
-		} );
-		for ( const geometry of geometries ) geometry.dispose();
-		for ( const material of materials ) material.dispose();
-		for ( const texture of textures ) texture.dispose();
+		for ( const assetId of retainedSourceIDs ) releaseParsedModelSource( fallback, assetId );
 	};
 	try {
 		const parseModel = async ( assetId, bytes ) => {
 			if ( sources.has( assetId ) ) return sources.get( assetId );
 			if ( sourceFlights.has( assetId ) ) return sourceFlights.get( assetId );
 			const flight = ( async () => {
-				const buffer = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
-				const source = await fallback.loader.parseAsync( buffer, '' );
+				const source = await acquireParsedModelSource( fallback, assetId, bytes );
 				sources.set( assetId, source );
+				retainedSourceIDs.add( assetId );
 				return source;
 			} )();
 			sourceFlights.set( assetId, flight );

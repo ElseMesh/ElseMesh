@@ -1796,7 +1796,15 @@ export class WebGLFallback {
 		this.portals = ( manifest.portals || [] ).filter( portal => portal.enabled || portal.back?.enabled );
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
-		const backendComponentIDs = await this._installHostedBackendComponents( components, manifest, assets );
+		const backendInstallStarted = performance.now();
+		await progress( 0.18, 'Preparing visible models…', 0.9 );
+		const backendComponentIDs = await this._installHostedBackendComponents( components, manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
+		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
+			components: backendComponentIDs.size,
+			elapsedMs: Math.round( performance.now() - backendInstallStarted ),
+			modelSourcesParsed: this.hostedStaticModelSourceStats?.parsed || 0,
+			modelSourcesReused: this.hostedStaticModelSourceStats?.reused || 0,
+		} ) );
 		this.hostedVehicleSpec = resolveHostedWebGLVehicleSpec( components, manifest.objects || [], this.hostedObjectRoots );
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			terrainReady: !! this.hostedTerrainData, vehicleComponentId: this.hostedVehicleSpec?.component.id,
@@ -1898,19 +1906,19 @@ export class WebGLFallback {
 
 	}
 
-	async _installHostedBackendComponents( components, manifest, assets ) {
+	async _installHostedBackendComponents( components, manifest, assets, onProgress = () => {} ) {
 
 		const T = this.THREE;
 		const terrain = this.hostedTerrainData;
 		const terrainWater = terrain ? webglTerrainWaterTexture( T, terrain ) : null;
 		if ( terrainWater && this.hostedTerrainSurface?.shoreField ) terrainWater.shore = encodeWebGLShoreField( T, this.hostedTerrainSurface.shoreField );
 		const installed = new Set();
-		for ( const component of components ) {
-			const adapter = worldComponentBackendAdapter( this.engine.backend, component.type );
-			if ( ! adapter ) continue;
+		const applicable = components.map( component => ( { component, adapter: worldComponentBackendAdapter( this.engine.backend, component.type ) } ) ).filter( item => item.adapter );
+		for ( const [ index, { component, adapter } ] of applicable.entries() ) {
 			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component );
 			if ( result === true || result?.installed ) installed.add( component.id );
 			if ( result?.runtime ) this.hostedComponentRuntimes.push( result.runtime );
+			onProgress( index + 1, applicable.length );
 		}
 		return installed;
 
