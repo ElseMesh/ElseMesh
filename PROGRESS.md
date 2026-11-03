@@ -44,7 +44,7 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   calculations remain client-side; species selection and bite/fight mechanics
   execute in Tidewater's signed module. Fishing casting and fish model
   implementations still remain partly engine-owned.
-- The focused Worker, registry, experience, manifest, and Go thruholdd tests pass;
+- The focused Worker, registry, experience, manifest, and Go worldd tests pass;
   `npm run build` passes in the external build tree. The full `npm test` run
   passed through the engine smoke checks, then its gateway E2E could not find
   the required Go toolchain in its isolated module cache. Re-running that E2E
@@ -180,7 +180,7 @@ after entry.
   now confirms hosted beach grass renders; broader density and LOD parity
   remain open.
 - Consolidated daemon builds into `tools/build-server.sh`. It builds the
-  single `thruholdd` world server, with optional ZeroTier membership selected
+  single `worldd` world server, with optional ZeroTier membership selected
   at runtime. The `all` target also builds `directoryd` and `accountd`; the
   former separate CGO-free world-server variant and old positional matrix
   aliases have been removed.
@@ -195,7 +195,7 @@ after entry.
   rename after Termux denied hard links. The permission test now sets its mode
   explicitly despite Termux's restrictive umask. Upgraded go-libp2p to 0.46.0
   (quic-go 0.57.1) to fix the Go 1.26+ QUIC session-ticket panic. The full
-  thruholdd Go suite passes on Termux with `-checklinkname=0`; its desktop Chromium
+  worldd Go suite passes on Termux with `-checklinkname=0`; its desktop Chromium
   integration is skipped on Android and remains a Linux check.
 
 - Clarified the invitation-entry contract: start at the world's authored pose;
@@ -228,13 +228,13 @@ after entry.
   engine protocol. Tidewater's source submodule and the package exporters now
   emit the new format and explicit rules.
 - Focused spawn, presence-session, source-manifest, portal, proposal, directory,
-  resolver, and syntax checks passed. The complete thruholdd Go suite passed with
+  resolver, and syntax checks passed. The complete worldd Go suite passed with
   `go test -ldflags='-checklinkname=0' ./... -count=1`; secure WSS gateway/cache
   and browser-host worker end-to-end tests passed. The live WSS path verifies
   two distinct nearest-first spawn positions and rejects a third visitor at
   the signed cap. Go-backed Node tests now add the Android linker flag
   automatically; without it, Go 1.27.3 rejects anet's `net.zoneCache` linkname
-  before tests run. Full `thruholdd` regression tests now cover the same admission
+  before tests run. Full `worldd` regression tests now cover the same admission
   behavior over authenticated peer forwarding, WebTransport, WebSocket, and
   WebRTC data channels. The normative network design and protocol docs now
   match the required version-2 world rules, fail-closed admission, and client
