@@ -274,6 +274,31 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players}, nil
 }
 
+// Expire silent records even if there are no other connected visitors
+// generating presence requests. The request path also sweeps before admission.
+func (d *daemon) pruneExpiredPresence(now time.Time) {
+	d.presenceMu.Lock()
+	defer d.presenceMu.Unlock()
+	for id, visitor := range d.players {
+		if now.Sub(visitor.updated) >= presenceTTL {
+			delete(d.players, id)
+		}
+	}
+}
+
+func (d *daemon) maintainPresenceExpiry(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			d.pruneExpiredPresence(now)
+		}
+	}
+}
+
 func presenceCapsulesOverlap(a, b []float64) bool {
 	if len(a) != 3 || len(b) != 3 || math.Abs(a[1]-b[1]) >= presencePlayerHeight {
 		return false
