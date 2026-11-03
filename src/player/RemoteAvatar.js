@@ -43,6 +43,7 @@ export class RemoteAvatar {
 		this.group = new Group(); this.group.name = 'Remote_player_avatar';
 		this.maxComplexity = maxComplexity; this.loadSource = loadSource; this.createModel = createModel;
 		this.version = 0; this.disposed = false; this.lod = 0; this.model = null; this.transition = null;
+		this.ghost = false; this.ghostMaterialDefaults = new WeakMap();
 		this.fallbackMaterial = standard({ name: 'Remote_avatar_fallback', color: 0x7194aa, roughness: .9 });
 		this.fallback = new Mesh(new BoxGeometry(.45, 1.7, .3), this.fallbackMaterial);
 		this.fallback.position.y = .85; this.fallback.visible = maxComplexity >= 12;
@@ -69,6 +70,37 @@ export class RemoteAvatar {
 			return false;
 		});
 		return this.ready;
+	}
+	// Ghosts are retained but rendered with alpha blending and no depth writes.
+	// Physical spawn/occupancy checks exclude ghost records at the owner.
+	setGhost(ghost) {
+		if (this.disposed || this.ghost === !!ghost) return;
+		this.ghost = !!ghost;
+		this.applyGhostMaterial(this.fallbackMaterial);
+		for (const model of [this.model, this.transition?.outgoing]) {
+			for (const material of model?.materials || []) this.applyGhostMaterial(material);
+		}
+	}
+	applyGhostMaterial(material) {
+		if (!material) return;
+		let original = this.ghostMaterialDefaults.get(material);
+		if (this.ghost) {
+			if (!original) {
+				original = { opacity: material.opacity, transparent: material.transparent, depthWrite: material.depthWrite, blending: material.blending };
+				this.ghostMaterialDefaults.set(material, original);
+			}
+			material.opacity = .35;
+			material.transparent = true;
+			material.depthWrite = false;
+			material.blending = 'normal';
+		} else if (original) {
+			material.opacity = original.opacity;
+			material.transparent = original.transparent;
+			material.depthWrite = original.depthWrite;
+			material.blending = original.blending;
+			this.ghostMaterialDefaults.delete(material);
+		} else return;
+		material.needsUpdate = true;
 	}
 	// Hysteresis keeps small camera movements from repeatedly rebuilding meshes.
 	setViewDistance(distance, loadBias = 0) {
@@ -110,6 +142,7 @@ export class RemoteAvatar {
 		}
 		const model = await this.createModel(source, { materials: avatarMaterialOptions });
 		if (this.disposed || version !== this.version) { model.dispose(); return false; }
+		if (this.ghost) for (const material of model.materials) this.applyGhostMaterial(material);
 		try {
 			for (const clip of ['idle', 'walk', 'run', 'helm']) if (!model.clipNames().includes(clip)) throw new Error(`Missing character clip: ${clip}`);
 			tintAvatar(model, this.appearance);
