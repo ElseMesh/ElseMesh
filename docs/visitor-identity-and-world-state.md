@@ -17,9 +17,14 @@ of any other world.
 A world does not need to agree with another world about which world a player
 is currently "in". ElseMesh does not require globally exclusive membership,
 a distributed source/destination portal commit, signed departure receipts or
-a durable cross-world membership ledger. Accepting presence means that the
-owner validates and relays a visitor's pose and appearance under local rules;
-it does not mean the owner runs all player physics or provides anti-cheat.
+a durable cross-world membership ledger. The current basic presence protocol accepts client-reported pose and
+appearance; this is **not a constraint on world authority**. Each owner may
+choose client-predicted physics, server-authoritative simulation, movement
+and collision verification, anti-cheat, or a hybrid appropriate to its
+gameplay. The `worldd` daemon must support extensible owner-controlled
+simulation, state validation and correction contracts. These richer
+capabilities are architectural requirements, not claims that today's
+basic presence messages implement them.
 
 ## Portal and invitation arrivals
 
@@ -48,12 +53,21 @@ session after a period without accepted presence updates; it need not ask the
 destination whether the visitor arrived. A brief stale avatar or overlapping
 connections can be acceptable, according to each world's own session rules.
 
-The current owner presence service expires inactive records after **ten
-seconds**. A future policy could use a shorter timeout when the last accepted
-position was close to an active portal, but proximity is only a hint, not
-proof of departure. It must not immediately eject a visitor who simply
-stands next to a portal or experiences network delay. Dynamic
-portal-proximity timeouts are not implemented today.
+**Two-stage inactivity lifecycle:** After **10 seconds** without an
+accepted client presence update, an avatar becomes a transparent,
+non-collidable **ghost**; other visitors can walk through it and it cannot
+block admission/spawn occupancy. The owner retains its presence record until
+**120 seconds** of silence, when it is removed. An accepted update from
+the same session before expiry restores ordinary visible presence; an
+explicit `presence.leave` removes it immediately. An unexpected connection
+drop must not count as an intentional leave.
+
+The authority measures time since the last accepted update; ghost state is
+authoritative presentation/collision metadata, not a client-supplied claim.
+A shorter timeout based on proximity to a portal is not part of this
+baseline and mere proximity never proves departure. World-specific physics
+may be stronger than the basic client-reported pose model, but ghosts must
+remain nonblocking under those rules.
 
 A failed destination admission may leave the visitor in the source or cause
 the client to reconnect and retry. Freezing the source membership while
