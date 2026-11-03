@@ -59,11 +59,18 @@ const worldProviderModules = configuredWorldProviderModules === undefined
 	: configuredWorldProviderModules.split( ',' ).map( module => resolve( module.trim() ) ).filter( Boolean );
 const localWorldProvider = process.env.ELSEMESH_LOCAL_WORLD_PROVIDER || '';
 const localWorldMap = process.env.ELSEMESH_LOCAL_WORLD_MAP || '';
+const localWorldGatewayValue = process.env.ELSEMESH_LOCAL_WORLD_GATEWAY || '';
+let localWorldGateway = null;
 if ( Boolean( localWorldProvider ) !== Boolean( localWorldMap ) ) throw new Error( 'ELSEMESH_LOCAL_WORLD_PROVIDER and ELSEMESH_LOCAL_WORLD_MAP must be configured together' );
 if ( localWorldProvider ) {
 	const provider = new URL( localWorldProvider );
 	if ( ! [ 'http:', 'https:' ].includes( provider.protocol ) || ! [ 'localhost', '127.0.0.1', '[::1]' ].includes( provider.hostname ) || provider.username || provider.password || ! [ '', '/' ].includes( provider.pathname ) || provider.search || provider.hash ) throw new Error( 'ELSEMESH_LOCAL_WORLD_PROVIDER must be a loopback HTTP(S) origin' );
 	if ( localWorldMap.length > 256 || ! /^[\w .()/-]+$/.test( localWorldMap ) ) throw new Error( 'ELSEMESH_LOCAL_WORLD_MAP is invalid' );
+}
+if ( localWorldGatewayValue ) {
+	const gateway = new URL( localWorldGatewayValue );
+	if ( ! [ 'http:', 'https:' ].includes( gateway.protocol ) || ! [ 'localhost', '127.0.0.1', '[::1]' ].includes( gateway.hostname ) || gateway.username || gateway.password || ! [ '', '/' ].includes( gateway.pathname ) || gateway.search || gateway.hash ) throw new Error( 'ELSEMESH_LOCAL_WORLD_GATEWAY must be a loopback HTTP(S) origin' );
+	localWorldGateway = gateway.origin;
 }
 
 function defaultWorldBinding() {
@@ -203,10 +210,12 @@ export default defineConfig( {
 		port: 0,
 		strictPort: true,
 		host: '127.0.0.1',
-		proxy: {
-			'/api/world/manifest': 'http://127.0.0.1:5200',
-			'/gateway': { target: 'ws://127.0.0.1:5200', ws: true },
-		},
+		...( localWorldGateway ? {
+			proxy: {
+				'/api/world/manifest': localWorldGateway,
+				'/gateway': { target: localWorldGateway.replace( /^http/, 'ws' ), ws: true },
+			},
+		} : {} ),
 	},
 	preview: {
 		port: 0,

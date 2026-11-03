@@ -35,18 +35,21 @@ content is refused until the owner publishes a reviewed source update. This
 keeps ordinary startup to one path argument without silently replacing signed
 world content.
 
-For local browser development, run `npm run dev` and open
-`http://localhost:5189/`. The Vite server proxies the local daemon's manifest
-and WebSocket gateway. On a loopback URL with no explicit world route, the
-client selects the world currently served by `worldd`; changing the
+For local browser development, start the world daemon with `--autoport`, note
+the selected `http://127.0.0.1:<port>` from its startup line, then run
+`ELSEMESH_LOCAL_WORLD_GATEWAY=http://127.0.0.1:<port> npm run dev`. The Vite
+server prints its own selected URL and proxies the daemon's manifest and
+WebSocket gateway through that origin. On a loopback URL with no explicit world
+route, the client selects the world currently served by `worldd`; changing the
 directory argument changes the world opened at that same URL. `?example=1`
 continues to open the built-in Example Island, and an explicit world invite
 continues to select its named world. The daemon port is an API gateway, not a
-web page; the browser client remains on port 5189.
+web page; open the URL printed by Vite.
 
 Optional networking and storage settings remain flags. Put flags before the
-directory, for example `worldd --http 127.0.0.1:5202 --p2p-port 42903
-/path/to/world-content`. Use `--worlds-dir` to choose the config root or
+directory, for example `worldd --http 127.0.0.1:0 --p2p-port 42903
+/path/to/world-content`; port `0` asks the operating system to choose an
+available gateway port. Use `--worlds-dir` to choose the config root or
 `--data` to select one explicit persistent data directory.
 
 The longer profile helper below remains available for provisioning and
@@ -73,12 +76,12 @@ node tools/serve-world-profile.mjs \
   --profile island-example \
   --source worlds/tidewater/world-source.json \
   --assets worlds/tidewater/assets \
-  --http 127.0.0.1:5200 --p2p-port 42901
+  --autoport --p2p-port 42901
 ```
 
 To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `worldd` as a DHT server. `worldd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.
 
-On Android/Termux, the helper places temporary manifest files under `$PREFIX/tmp`; on Linux it uses `/var/tmp`. The persistent identity, signed `world.json`, and installed content-addressed assets stay under `<worlds-dir>/<profile>`. For public browser invites, configure a reachable HTTPS/WSS gateway with `--public-gateway`; add `--directory-url` to publish a discoverable world. A directory URL requires a public gateway. The WebSocket gateway accepts same-origin clients by default; for the separately hosted ElseMesh client, explicitly allow its exact HTTPS origin with repeatable `--allow-browser-origin https://elsemesh.org` (for local development, loopback HTTP origins such as `http://127.0.0.1:5189` are also accepted). It does not allow arbitrary cross-origin browser connections. Android hosting may need explicit reachable addresses; pass each as `--announce-address /ip4/.../tcp/...` (or the documented QUIC form). Repeat `--bootstrap`, `--relay`, `--announce-address`, and `--allow-browser-origin` for additional values.
+On Android/Termux, the helper places temporary manifest files under `$PREFIX/tmp`; on Linux it uses `/var/tmp`. The persistent identity, signed `world.json`, and installed content-addressed assets stay under `<worlds-dir>/<profile>`. For public browser invites, configure a reachable HTTPS/WSS gateway with `--public-gateway`; add `--directory-url` to publish a discoverable world. A directory URL requires a public gateway. The WebSocket gateway accepts same-origin clients by default; for the separately hosted ElseMesh client, explicitly allow its exact HTTPS origin with repeatable `--allow-browser-origin https://elsemesh.org`. For direct loopback browser access, allow the exact local origin printed by Vite. It does not allow arbitrary cross-origin browser connections. Android hosting may need explicit reachable addresses; pass each as `--announce-address /ip4/.../tcp/...` (or the documented QUIC form). Repeat `--bootstrap`, `--relay`, `--announce-address`, and `--allow-browser-origin` for additional values.
 
 ## Connectivity and links
 
@@ -151,7 +154,7 @@ worldd --world-profile example-island --world-name "Example Island" --print-node
 Start either profile by selecting its name. To run both on one machine, start separate processes and assign distinct P2P, HTTP, and (if enabled) WebTransport listener ports. Each process has its own PeerID; do not copy one `node.key` into simultaneous processes. `--data` remains available for an explicit single-profile path and cannot be combined with `--world-profile`.
 
 ```sh
-worldd --world-profile example-island --p2p-port 42901 --http 127.0.0.1:5200
+worldd --world-profile example-island --p2p-port 42901 --http 127.0.0.1:0
 ```
 
 These profiles provide isolated runtime storage and two independently served ThruHolds; they do not merge the identities into one multi-world daemon. Canonical Blender sources and exported packages remain in the repository's `worlds/` tree.

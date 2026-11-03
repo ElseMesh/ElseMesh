@@ -127,7 +127,7 @@ func run() error {
 	listenPort := flag.Int("p2p-port", 42901, "libp2p TCP and QUIC listen port (0 selects ephemeral ports)")
 	zeroTierNetwork := flag.String("zerotier-network", defaultZeroTierNetworkID, "ZeroTier network ID to join through embedded libzt (requires a zerotier build)")
 	zeroTierPathDiagnostics := flag.Bool("zerotier-path-diagnostics", false, "enable a loopback-only endpoint for querying observed embedded ZeroTier peer IP/UDP-port paths")
-	httpAddress := flag.String("http", "127.0.0.1:5200", "HTTP/WebSocket gateway listen address; place behind TLS for public browser access")
+	httpAddress := flag.String("http", "127.0.0.1:0", "HTTP/WebSocket gateway listen address (default selects an ephemeral loopback port); place behind TLS for public browser access")
 	webTransportAddress := flag.String("webtransport", "", "optional WebTransport HTTP/3 UDP listen address, for example :5201")
 	webTransportCert := flag.String("webtransport-tls-cert", "", "TLS certificate for the optional WebTransport listener")
 	webTransportKey := flag.String("webtransport-tls-key", "", "TLS private key for the optional WebTransport listener")

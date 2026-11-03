@@ -46,8 +46,8 @@ https://elsemesh.github.io/?worldId=elsemesh%3Aexample-island&gateway=https%3A%2
 
 Pages hosts the renderer, not `worldd` or discovery. A hosted-world invite needs a
 reachable HTTPS/WSS gateway with the appropriate browser origin configuration.
-The development backends on loopback port 5200 are not accessible from a phone
-or from an HTTPS Pages client. Use the local links in
+The development backend binds to a dynamically assigned loopback port and is
+not accessible from a phone or from an HTTPS Pages client. Use the local links in
 [Testing two worlds](testing-two-worlds.md) for development.
 `?example=1` explicitly selects the complete offline procedural island.
 Use **Share world invite** in the World panel to construct a hosted invite.

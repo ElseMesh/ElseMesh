@@ -133,7 +133,7 @@ Add these to the URL, for example `?fly&noAudio`:
 ```sh
 npm start       # install dependencies if needed, build, and serve the site
 npm ci          # optional: install dependencies ahead of time
-npm run dev      # http://127.0.0.1:5189
+npm run dev      # prints the selected local URL
 npm run build    # static build in dist/
 npm run build -- --run # build, then serve the result locally
 ```
