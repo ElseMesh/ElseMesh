@@ -24,6 +24,8 @@ const entrySource = await readFile( new URL( '../src/main.js', import.meta.url )
 const connectorSource = await readFile( new URL( '../src/network/WorldConnector.js', import.meta.url ), 'utf8' );
 assert.doesNotMatch( appSource, /from ['"]\.\.\/worlds\/default\.js['"]/, 'the engine App receives the default world package from its entry point' );
 assert.doesNotMatch( fallbackSource, /from ['"]\.\.\/\.\.\/worlds\/default\.js['"]/, 'the renderer fallback consumes the App-provided world package' );
+assert.doesNotMatch( fallbackSource, /from ['"]\.\.\/world\/IslandDefinition\.js['"]/, 'hosted WebGL does not eagerly import the built-in island definition' );
+assert.match( fallbackSource, /async _loadIsland\( progress \)[\s\S]*?await import\( '\.\.\/world\/IslandDefinition\.js' \)/, 'WebGL loads the built-in island definition only when starting its built-in scene' );
 assert.doesNotMatch( entrySource, /from ['"]virtual:elsemesh-default-world['"]/, 'the application entry point does not eagerly import the built-in world' );
 assert.match( entrySource, /loadDefaultWorldPackage: async \(\) => \( await import\( 'virtual:elsemesh-default-world' \) \)\.defaultWorldPackage/, 'the entry point provides a lazy default-world loader' );
 assert.match( entrySource, /loadWorldProviders: async \( manifest \) => \( await import\( 'virtual:elsemesh-world-providers' \) \)\.loadWorldProviders\( manifest \)/, 'the entry point provides manifest-selected world runtime providers' );

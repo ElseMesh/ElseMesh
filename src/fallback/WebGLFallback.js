@@ -1,6 +1,5 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createWebGLKTX2Loader } from '../engine/loaders/KTX2.js';
-import { ISLAND_DEFINITION as WORLD } from '../world/IslandDefinition.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { makePresencePose } from '../network/WorldPresenceSession.js';
@@ -387,19 +386,19 @@ function webglTerrainWaterTexture( T, terrain ) {
 
 }
 
-function webglShoreFieldTexture( T, terrain, seaLevel ) {
+function webglShoreFieldTexture( T, terrain, seaLevel, worldDefinition ) {
 
-	const swellLength = Math.hypot( ...WORLD.swellDir ), swell = WORLD.swellDir.map( value => value / swellLength );
+	const swellLength = Math.hypot( ...worldDefinition.swellDir ), swell = worldDefinition.swellDir.map( value => value / swellLength );
 	const field = computeShoreField( terrain, { res: 512, swellDir: swell, seaLevel } );
 	const encoded = encodeWebGLShoreField( T, field, swell );
 	return encoded ? { ...encoded, field } : null;
 
 }
 
-function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
+function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition ) {
 
 	const positions = [], seeds = [], depths = [];
-	for ( let x = WORLD.beach.xMin - 25; x <= WORLD.beach.xMax + 25; x += 0.75 ) for ( let z = - 64; z <= 28; z += 0.75 ) {
+	for ( let x = worldDefinition.beach.xMin - 25; x <= worldDefinition.beach.xMax + 25; x += 0.75 ) for ( let z = - 64; z <= 28; z += 0.75 ) {
 		const seed = ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1;
 		const jitter = salt => ( ( Math.sin( x * 39.346 + z * 11.135 + salt ) * 24634.6345 ) % 1 + 1 ) % 1;
 		const px = x + ( jitter( 1.7 ) - 0.5 ) * 0.7, pz = z + ( jitter( 8.3 ) - 0.5 ) * 0.7;
@@ -804,7 +803,8 @@ export class WebGLFallback {
 		if ( ! this.worldLink ) {
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
 			this._bindOceanFFTToWater();
-			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...WORLD.boatDock.position ), initialHeading: WORLD.boatDock.heading } );
+			const worldDefinition = this.islandDefinition;
+			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldDefinition.boatDock.position ), initialHeading: worldDefinition.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
 			this._addIslandGameplayColliders();
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio } );
@@ -1400,6 +1400,8 @@ export class WebGLFallback {
 
 	async _loadIsland( progress ) {
 
+		const { ISLAND_DEFINITION: WORLD } = await import( '../world/IslandDefinition.js' );
+		this.islandDefinition = WORLD;
 		progress( 0.15, 'Building a WebGL terrain…' );
 		this.terrain = this.app.worldState.terrain;
 		const T = this.THREE;
@@ -1433,7 +1435,7 @@ export class WebGLFallback {
 		}
 		progress( 0.52, 'Mapping the coastal swell…' );
 		const waterTerrain = webglTerrainWaterTexture( T, this.terrain );
-		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, this.worldSeaLevel );
+		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, this.worldSeaLevel, WORLD );
 		this.shoreField = waterTerrain.shore?.field || null;
 		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), this.worldSeaLevel, waterTerrain, 1 ) );
 		const beachBounds = { xMin: WORLD.beach.xMin - 50, xMax: WORLD.beach.xMax + 50, zMin: - 120, zMax: 40 };
@@ -1441,7 +1443,7 @@ export class WebGLFallback {
 		beachPatch.position.x = ( WORLD.beach.xMin + WORLD.beach.xMax ) * 0.5;
 		beachPatch.position.z = - 40;
 		this.waterScene.add( beachPatch );
-		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel ) );
+		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel, WORLD ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( this.defaultWorldAssets.villageLOD );
@@ -1471,7 +1473,7 @@ export class WebGLFallback {
 
 	_addIslandGameplayColliders() {
 
-		const C = this.app.worldState.colliders, P = WORLD.pier, y = P.deckHeight;
+		const C = this.app.worldState.colliders, P = this.islandDefinition.pier, y = P.deckHeight;
 		const box = ( x, cy, z, hx, hy, hz, tag, options = {} ) => C.addBox( new EngineVector3( x, cy, z ), new EngineVector3( hx, hy, hz ), 0, { tag, ...options } );
 		const stepGround = this.terrain.heightAt( P.x, P.zStart - 0.7 ), nSteps = Math.max( 2, Math.ceil( Math.max( 0, y - stepGround ) / 0.22 ) ), tread = 0.32;
 		for ( let k = 1; k < nSteps; k ++ ) {
@@ -1509,8 +1511,8 @@ export class WebGLFallback {
 			const records = decodeVegetationPlacements( asBytes( placementBytes ), expectedSeed );
 			this.vegetationRecords ||= {};
 			appendVegetationPlacements( this.vegetationRecords, records );
-			const start = WORLD.start || WORLD.spawn;
-			const center = centerPosition || [ start.position[ 0 ], start.position[ 2 ] ];
+			const start = this.islandDefinition?.start || this.islandDefinition?.spawn;
+			const center = centerPosition || ( start ? [ start.position[ 0 ], start.position[ 2 ] ] : [ 0, 0 ] );
 			const T = this.THREE, group = new T.Group();
 			const material = webglPlantMaterial( T ), anchoredMaterial = webglPlantMaterial( T, true );
 			const distance = record => Math.hypot( record.x - center[ 0 ], record.z - center[ 1 ] );
@@ -2234,7 +2236,7 @@ export class WebGLFallback {
 			underwater: p.y < this.worldSeaLevel ? 1 : 0,
 			depthBelowSurface: Math.max( 0, this.worldSeaLevel - p.y ),
 			distanceToShore: Math.abs( coast ), coastDistance: coast,
-			nearPier: Math.abs( p.x - WORLD.pier.x ) < 12 && p.z > WORLD.pier.zStart - 5 && p.z < WORLD.pier.zEnd + 8,
+			nearPier: !! this.islandDefinition && Math.abs( p.x - this.islandDefinition.pier.x ) < 12 && p.z > this.islandDefinition.pier.zStart - 5 && p.z < this.islandDefinition.pier.zEnd + 8,
 			boat: { active: !! boat?.driven, rpm: boat?.rpm || 0, speed: boat?.velocity?.length?.() || 0, position: this.boat?.model?.group?.position, listenerInside: false },
 		} );
 
