@@ -2,12 +2,12 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-SOURCE_ROOT=${THRUHOLDD_SOURCE_ROOT:-$ROOT}
-SERVER=${THRUHOLDD_BUILD_SERVER:-}
-TARGET=thruholdd
+SOURCE_ROOT=${WORLDD_SOURCE_ROOT:-$ROOT}
+SERVER=${WORLDD_BUILD_SERVER:-}
+TARGET=worldd
 TARGET_OS=${GOOS:-$(go env GOOS)}
 TARGET_ARCH=${GOARCH:-$(go env GOARCH)}
-OUT=${THRUHOLDD_OUT:-}
+OUT=${WORLDD_OUT:-}
 LIBZT_SOURCE_ROOT=${LIBZT_SOURCE_ROOT:-}
 LIBZT_BUILD_ROOT=${LIBZT_BUILD_ROOT:-}
 LIBZT_INCLUDE_DIR=${LIBZT_INCLUDE_DIR:-}
@@ -19,10 +19,10 @@ usage() {
 	cat <<'EOF'
 Usage: tools/build-server.sh [options]
 
-Default: build ZeroTier-enabled thruholdd for the current GOOS/GOARCH.
+Default: build ZeroTier-enabled worldd for the current GOOS/GOARCH.
 
 Options:
-  --target NAME          thruholdd, directoryd, accountd, or all
+  --target NAME          worldd, directoryd, accountd, or all
   --os GOOS              target OS (default: GOOS or go env GOOS)
   --arch GOARCH          target architecture (default: GOARCH or go env GOARCH)
   --output DIR           binary output directory (default: <build-server>/bin)
@@ -34,8 +34,8 @@ Options:
   --libzt-lib DIR        directory containing libzt.so
   --help                 show this help
 
-The single world-daemon build is thruholdd, which embeds libzt and can join
-ZeroTier when configured. Target all builds thruholdd, directoryd, and
+The single world-daemon build is worldd, which embeds libzt and can join
+ZeroTier when configured. Target all builds worldd, directoryd, and
 accountd.
 With cpto installed, a real adjacent build sibling is used when present; a
 sibling that resolves to the source tree is ignored. Otherwise the source tree
@@ -55,7 +55,7 @@ build_plain() {
 	)
 }
 
-build_thruholdd() {
+build_worldd() {
 	local os=$1 arch=$2 libzt_cxx_lib=$LIBZT_CXX_LIB default_libzt_lib libzt_lib ldflags
 	case "$os/$arch" in
 		linux/amd64) default_libzt_lib="$LIBZT_BUILD_ROOT/linux-amd64/lib" ;;
@@ -71,17 +71,17 @@ build_thruholdd() {
 	if [[ -z "$libzt_cxx_lib" && "$os" != android ]]; then libzt_cxx_lib=-lstdc++; fi
 	ldflags="-s -w -X main.buildRevision=$BUILD_REVISION -extldflags=-Wl,-rpath,\$ORIGIN"
 	if [[ "$os" == android ]]; then ldflags+=' -checklinkname=0'; fi
-	printf 'Building thruholdd for %s/%s with ZeroTier\n' "$os" "$arch"
+	printf 'Building worldd for %s/%s with ZeroTier\n' "$os" "$arch"
 	(
 		cd "$SERVER"
 		CGO_ENABLED=1 GOOS="$os" GOARCH="$arch" \
 			CGO_CFLAGS="-I$LIBZT_INCLUDE_DIR ${CGO_CFLAGS:-}" \
 			CGO_LDFLAGS="-L$libzt_lib -lzt $libzt_cxx_lib -Wl,-rpath,\$ORIGIN ${CGO_LDFLAGS:-}" \
 			go build -buildvcs=false -trimpath -tags zerotier \
-			-ldflags="$ldflags" -o "$OUT/thruholdd" ./worldd
+			-ldflags="$ldflags" -o "$OUT/worldd" ./worldd
 	)
 	cp -p "$libzt_lib/libzt.so" "$OUT/libzt.so"
-	printf 'Built %s/thruholdd with bundled libzt.so.\n' "$OUT"
+	printf 'Built %s/worldd with bundled libzt.so.\n' "$OUT"
 }
 
 while (($#)); do
@@ -153,14 +153,14 @@ mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd -P)
 
 case "$TARGET" in
-	thruholdd|directoryd|accountd) TARGETS=("$TARGET") ;;
-	all) TARGETS=(thruholdd directoryd accountd) ;;
+	worldd|directoryd|accountd) TARGETS=("$TARGET") ;;
+	all) TARGETS=(worldd directoryd accountd) ;;
 	*) printf 'Invalid --target: %s\n' "$TARGET" >&2; usage >&2; exit 2 ;;
 esac
 
 for program in "${TARGETS[@]}"; do
-	if [[ "$program" == thruholdd ]]; then
-		build_thruholdd "$TARGET_OS" "$TARGET_ARCH"
+	if [[ "$program" == worldd ]]; then
+		build_worldd "$TARGET_OS" "$TARGET_ARCH"
 	else
 		build_plain "$program" "$TARGET_OS" "$TARGET_ARCH"
 	fi

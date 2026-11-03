@@ -9,10 +9,10 @@ function parseArgs(argv) {
 	const args = {};
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
-		if ( ! [ '--thruholdd', '--data', '--source', '--base-source', '--assets' ].includes( key ) || ! argv[ i + 1 ] ) throw new Error( `Invalid or incomplete option: ${key}` );
+		if ( ! [ '--worldd', '--data', '--source', '--base-source', '--assets' ].includes( key ) || ! argv[ i + 1 ] ) throw new Error( `Invalid or incomplete option: ${key}` );
 		args[ key.slice( 2 ) ] = argv[ ++ i ];
 	}
-	for ( const key of [ 'thruholdd', 'data', 'source', 'base-source', 'assets' ] ) if ( ! args[ key ] ) throw new Error( `Missing --${key}` );
+	for ( const key of [ 'worldd', 'data', 'source', 'base-source', 'assets' ] ) if ( ! args[ key ] ) throw new Error( `Missing --${key}` );
 	return Object.fromEntries( Object.entries( args ).map( ( [ key, value ] ) => [ key, path.resolve( value ) ] ) );
 }
 
@@ -33,7 +33,7 @@ async function main() {
 	const activeManifest = path.join( args.data, 'world.json' );
 	await requirePrivateRegularFile( path.join( args.data, 'node.key' ) );
 	await requirePrivateRegularFile( activeManifest );
-	const inspectJSON = run( args.thruholdd, [ '--data', args.data, '--manifest', activeManifest, '--inspect-manifest' ] );
+	const inspectJSON = run( args.worldd, [ '--data', args.data, '--manifest', activeManifest, '--inspect-manifest' ] );
 	const current = JSON.parse( inspectJSON );
 	const baseSourceBytes = await readFile( args[ 'base-source' ] );
 	const baseSourceHash = `sha256:${createHash( 'sha256' ).update( baseSourceBytes ).digest( 'hex' )}`;
@@ -59,7 +59,7 @@ async function main() {
 			'--authority-epoch', String( current.authorityEpoch ),
 			'--discoverable', String( current.discoverable ),
 		] );
-		run( args.thruholdd, [
+		run( args.worldd, [
 			'--data', args.data,
 			'--manifest', activeManifest,
 			'--publish-manifest', unsignedManifest,
@@ -67,7 +67,7 @@ async function main() {
 			'--base-source', args[ 'base-source' ],
 			'--source', args.source,
 		] );
-		console.log( `Published ${source.worldId} as version ${current.version + 1}. Restart the running thruholdd process to load it.` );
+		console.log( `Published ${source.worldId} as version ${current.version + 1}. Restart the running worldd process to load it.` );
 	} finally {
 		await rm( temporaryDirectory, { recursive: true, force: true } );
 	}
