@@ -16,7 +16,8 @@ import (
 const playerPresenceProtocol = "elsemesh.player-presence/3"
 const maxPresencePlayers = 128
 const maxSpawnCandidates = 1024
-const presenceTTL = 10 * time.Second
+const presenceGhostAfter = 10 * time.Second
+const presenceTTL = 120 * time.Second
 const presencePlayerRadius = 0.3
 const presencePlayerHeight = 1.75
 const playerEyeHeight = 1.62
@@ -51,6 +52,8 @@ type playerPresence struct {
 	ID string `json:"id"`
 	playerPose
 	UpdatedAt int64 `json:"updatedAt"`
+	// Ghost is computed by the owner, never taken from a client pose.
+	Ghost     bool `json:"ghost,omitempty"`
 	updated   time.Time
 }
 
@@ -210,8 +213,16 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		if exists && request.Pose.Sequence <= old.Sequence {
 			return peerResponse{}, errors.New("stale_presence_sequence")
 		}
-		if !exists && (len(d.players) >= maxPresencePlayers || len(d.players) >= int(d.world.Rules.MaxVisitors)) {
-			return peerResponse{}, errors.New("presence_full")
+		if !exists {
+			active := 0
+			for _, visitor := range d.players {
+				if now.Sub(visitor.updated) < presenceGhostAfter { active++ }
+			}
+			// Ghosts do not count toward the world's active visitor limit.
+			// Total retained records remain bounded by maxPresencePlayers.
+			if len(d.players) >= maxPresencePlayers || active >= int(d.world.Rules.MaxVisitors) {
+				return peerResponse{}, errors.New("presence_full")
+			}
 		}
 		if exists && len(request.SpawnCandidates) > 0 {
 			return peerResponse{}, errors.New("unexpected_spawn_candidates")
@@ -234,7 +245,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				lastDistanceSq = distanceSq
 				occupied := false
 				for _, visitor := range d.players {
-					if presenceCapsulesOverlap(candidate, visitor.Position) {
+					if now.Sub(visitor.updated) < presenceGhostAfter && presenceCapsulesOverlap(candidate, visitor.Position) {
 						occupied = true
 						break
 					}
@@ -257,6 +268,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 	}
 	players := make([]playerPresence, 0, len(d.players))
 	for _, p := range d.players {
+		p.Ghost = now.Sub(p.updated) >= presenceGhostAfter
 		players = append(players, p)
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].ID < players[j].ID })
