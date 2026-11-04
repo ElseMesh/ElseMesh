@@ -26,7 +26,6 @@ import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLReefAdapter } from './WebGLReefAdapter.js';
 import { WebGLSpray } from './WebGLSpray.js';
-import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGLVillageMaterials.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
@@ -1651,19 +1650,6 @@ export class WebGLFallback {
 		this.hostedWildlifeComponent = components.find( component => worldComponentDescriptor( component.type )?.wildlifeSimulation ) || null;
 		const terrainComponent = components.find( component => component.type === 'elsemesh.terrain-surface/1' );
 		this.hostedTerrainComponent = terrainComponent;
-		const villageMaterialComponent = components.find( component => component.type === 'elsemesh.village-materials/2' );
-		let villageMaterials = null, villageMaterialApplied = 0;
-		if ( villageMaterialComponent && assets.has( villageMaterialComponent.dataAssetId ) ) {
-			try {
-				const decoded = await decodeWorldComponentAsset( 'village-materials/1', asBytes( assets.get( villageMaterialComponent.dataAssetId ) ) );
-				villageMaterials = createWebGLVillageMaterials( T, decoded, { anisotropy: this.renderer.capabilities.getMaxAnisotropy() } );
-			} catch ( error ) {
-				console.warn( 'WebGL fallback village materials unavailable:', error );
-			}
-		}
-		this.hostedVillageMaterialComponent = villageMaterialComponent;
-		this.hostedVillageMaterials = villageMaterials;
-		this.hostedSharedMaterials = new Set( Object.values( villageMaterials || {} ) );
 		let terrainSurface = null, hostedTerrainMaterial = null, hostedTerrainVisualReady = false;
 		if ( terrainComponent && assets.has( terrainComponent.dataAssetId ) ) {
 			const terrainBytes = assets.get( terrainComponent.dataAssetId );
@@ -1685,7 +1671,6 @@ export class WebGLFallback {
 			const root = new T.Group();
 			const base = model.scene.clone( true );
 			prepareHostedWebGLModel( base );
-			if ( object.id === villageMaterialComponent?.objectId && villageMaterials ) villageMaterialApplied += applyWebGLVillageMaterials( base, villageMaterials );
 			if ( object.id === terrainComponent?.objectId && terrainSurface ) {
 				hostedTerrainMaterial ||= webglTerrainMaterial( T, this.hostedTerrainData, terrainSurface, { seaLevel: manifest.rules.seaLevel ?? 0 } );
 				this.hostedTerrainMaterial = hostedTerrainMaterial;
@@ -1721,8 +1706,8 @@ export class WebGLFallback {
 						if ( signal.aborted ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 						const visual = variant.scene.clone( true );
 						prepareHostedWebGLModel( visual );
-						if ( object.id === villageMaterialComponent?.objectId && villageMaterials ) villageMaterialApplied += applyWebGLVillageMaterials( visual, villageMaterials );
 						if ( object.id === terrainComponent?.objectId && hostedTerrainMaterial ) applyHostedTerrainMaterial( visual, hostedTerrainMaterial );
+						this._applyHostedWorldObjectPresentations( object, visual );
 						prepareWebGLLODFade( visual );
 						visual.name = `${ object.label || object.id } · LOD ${ level }`;
 						visual.visible = false;
@@ -1770,7 +1755,6 @@ export class WebGLFallback {
 		} );
 		for ( const id of backendComponentIDs ) supportedComponents.add( id );
 		this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
-		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
@@ -1867,7 +1851,13 @@ export class WebGLFallback {
 			if ( this.hostedInstalledComponentIDs?.has( component.id ) ) continue;
 			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component );
 			if ( result === true || result?.installed ) installed.add( component.id );
-			if ( result?.runtime ) this.hostedComponentRuntimes.set( component.id, result.runtime );
+			if ( result?.runtime ) {
+				this.hostedComponentRuntimes.set( component.id, result.runtime );
+				for ( const object of manifest.objects || [] ) {
+					const root = this.hostedObjectRoots?.get( object.id );
+					if ( root ) result.runtime.applyObject?.( object, root.children?.[ 0 ] || root );
+				}
+			}
 			if ( result === true || result?.installed ) this.hostedInstalledComponentIDs?.add( component.id );
 			completed ++;
 			onProgress( completed, total );
@@ -1887,6 +1877,12 @@ export class WebGLFallback {
 			onProgress( completed, total );
 		}
 		return installed;
+
+	}
+
+	_applyHostedWorldObjectPresentations( object, visual ) {
+
+		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.applyObject?.( object, visual );
 
 	}
 
@@ -2066,9 +2062,10 @@ export class WebGLFallback {
 				this.hostedCollisionPayloads.delete( object.id );
 				const root = this.hostedObjectRoots?.get( object.id );
 				if ( root ) {
+					const sharedMaterials = new Set( [ ...( this.hostedComponentRuntimes?.values?.() || [] ) ].flatMap( runtime => runtime.sharedMaterials || [] ) );
 					root.traverse( node => {
 						for ( const material of Array.isArray( node.material ) ? node.material : [ node.material ] ) {
-							if ( material && ! this.hostedSharedMaterials?.has( material ) ) material.dispose?.();
+							if ( material && ! sharedMaterials.has( material ) ) material.dispose?.();
 						}
 					} );
 					root.parent?.remove( root );
@@ -2169,8 +2166,8 @@ export class WebGLFallback {
 					}
 					const root = new this.THREE.Group(), base = model.scene.clone( true );
 					prepareHostedWebGLModel( base );
-					if ( object.id === this.hostedVillageMaterialComponent?.objectId && this.hostedVillageMaterials ) applyWebGLVillageMaterials( base, this.hostedVillageMaterials );
 					if ( object.id === this.hostedTerrainComponent?.objectId && this.hostedTerrainMaterial ) applyHostedTerrainMaterial( base, this.hostedTerrainMaterial );
+					this._applyHostedWorldObjectPresentations( object, base );
 					prepareWebGLLODFade( base );
 					base.name = `${ object.label || object.id } · LOD 0`;
 					root.add( base );
