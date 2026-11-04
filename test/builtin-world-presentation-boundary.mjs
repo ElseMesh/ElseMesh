@@ -10,7 +10,7 @@ assert( hostedReturn >= 0 && dynamicLoad > hostedReturn, 'hosted WebGPU returns 
 for ( const [ appPath, presentationPath ] of [
 	[ './world/Village.js', './Village.js' ], [ './world/Reef.js', './Reef.js' ], [ './world/BoatModel.js', './BoatModel.js' ],
 	[ './world/Rocks.js', './Rocks.js' ], [ './world/Debris.js', './Debris.js' ],
-	[ './world/wildlife/Wildlife.js', './wildlife/Wildlife.js' ], [ './world/marine/Whale.js', './marine/Whale.js' ],
+	[ './world/wildlife/Wildlife.js', '../../worlds/tidewater/wildlife/Wildlife.js' ], [ './world/marine/Whale.js', './marine/Whale.js' ],
 ] ) {
 	assert.doesNotMatch( app, new RegExp( `from ['"]${appPath.replaceAll( '.', '\\.' )}['"]` ), `App has no static default-world import for ${appPath}` );
 	assert( presentation.includes( `from '${presentationPath}'` ), `built-in presentation module owns ${presentationPath}` );

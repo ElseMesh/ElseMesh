@@ -93,34 +93,36 @@ later changes.
 This completes only the boat's first ownership split. The WebGL fallback still
 builds a separate reduced world, but its hosted boat adapter now converts the
 canonical model into Three.js, replaces a signed berth preview, and connects
-the shared controller to the WebGL player and water query. Wildlife, village
-props, vendors, and backend-specific effects still need shared content/runtime
-adapters. Matched Flip7 views and comparisons under both graphics backends
-remain open.
+the shared controller to the WebGL player and water query. Wildlife now has a
+shared simulation and registered backend presentations; village props, vendors,
+and other backend-specific effects still need shared content/runtime adapters.
+Matched Flip7 views and comparisons under both graphics backends remain open.
 
-## Wildlife extraction milestone (partial)
+## Wildlife package ownership milestone (partial)
 
-The island constants now live in plain data in `IslandDefinition`; renderer
-math and wildlife-specific math/species data have separate modules. Bird and
-shorebird behavior consume explicit environment samples, while crab behavior
-is separated from `CrabPresentation`, which creates renderer-facing records.
-`WildlifeSimulation` now owns bird, shorebird, crab, viewer, and water-query
-state without constructing meshes or GPU resources. The WebGPU `Wildlife`
-adapter owns the instance batches, contact shadows, and optional GPU swash
-probe. WebGL now constructs the same simulation for the built-in island and
-hosted wildlife packages, and its Three.js adapter consumes the shared bird and
-shorebird poses, species rest shapes, and frame visibility policy. The fallback
-also consumes the shared `CrabPresentation` records for instanced ghost-crab,
-hermit-crab, and burrow meshes. The built-in WebGL island now evaluates
-shorebird swash from the same shoreline field and shared math as WebGPU. The
-fallback still lacks the WebGPU species materials and contact shadows, and
-hosted animal authority remains unimplemented. This is partial runtime and
-presentation reuse, not cross-backend wildlife parity.
+The Tidewater wildlife simulation, species data, and WebGPU presentation now
+live under `worlds/tidewater/wildlife`. Bird and shorebird behavior consume
+explicit environment samples, while crab behavior is separated from
+`CrabPresentation`, which creates renderer-facing records. `WildlifeSimulation`
+owns bird, shorebird, crab, viewer, and water-query state without constructing
+meshes or GPU resources. The WebGPU `Wildlife` adapter owns the instance
+batches, contact shadows, and optional GPU swash probe. Tidewater registers its
+WebGL presentation adapter through the component backend registry; it consumes
+the same simulation, bird and shorebird poses, species rest shapes, frame
+visibility policy, and crab presentation records. The WebGL island evaluates
+shorebird swash from the same shoreline field and shared math as WebGPU. These
+modules still import engine rendering/math APIs and `IslandDefinition`, so the
+world package is not yet fully independent of engine internals. The WebGL
+fallback also lacks the WebGPU species materials and contact shadows, and
+hosted animal authority remains unimplemented. This is package ownership and
+runtime reuse, not cross-backend wildlife parity.
 
-`test/wildlife-runtime.mjs` constructs and advances the shared simulation
-without a renderer; `test/webgl-wildlife-adapter.mjs` checks the Three.js
-adapter's shared rest shapes and pose consumption; and `test/life-wildlife.mjs`
-is the headless rendered smoke for WebGPU birds, ghost crabs, and hermit crabs.
+The wildlife unit and renderer tests now live under
+`worlds/tidewater/test`; small root test entry points preserve the existing
+ElseMesh test commands. `wildlife-runtime.mjs` advances the simulation without
+a renderer; `webgl-wildlife-adapter.mjs` checks shared rest shapes and pose
+consumption; and `life-wildlife.mjs` is the headless rendered smoke for WebGPU
+birds, ghost crabs, and hermit crabs.
 The Android test runner skips only the five Node Dawn-dependent checks on
 Android; the remaining client suite passes there. Do not claim cross-backend or
 Flip7 parity until both wildlife adapters, matched device views, and the

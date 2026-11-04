@@ -724,7 +724,6 @@ export class WebGLFallback {
 			components: ( bundledSource.components || [] ).map( worldComponentRuntimeRecord ),
 		} : null;
 		this.defaultWorldAssets = this.defaultWorldPackage?.assets || null;
-		this.islandWildlifeComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.example-island-wildlife/1' ) || null;
 		this.islandWhaleComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.humpback-whale/1' ) || null;
 		this.engine = engine;
 		this.THREE = engine.THREE;
