@@ -1241,7 +1241,7 @@ export class App {
 	updateRenderLoadBias( dt, startedAt ) {
 
 		const ms = performance.now() - startedAt;
-		this.cpuMs = this.cpuMs === undefined ? ms : this.cpuMs * 0.95 + ms * 0.05;
+		this.cpuMs = ms;
 		this.renderLoadWarmup += Math.min( dt, 0.1 );
 		const gpuSample = this.frameWorkMeter?.takeGPUSample();
 		this.renderLoadBias = ! this.isLinuxDesktop || this.graphicsPriority === 'fps' ? ( this.renderLoadWarmup < 8 ? 0 : this.renderLoadLOD.sample( { cpuMs: ms, gpuMs: gpuSample?.gpuMs ?? null, gpuElapsedSeconds: gpuSample?.elapsedSeconds, budgetMs: 1000 / ( this.desktopFrameRateLimit || 60 ), elapsedSeconds: dt } ) ) : 0;

@@ -7,6 +7,7 @@ const app = Object.assign( Object.create( App.prototype ), {
 	graphicsPriority: 'fps',
 	desktopFrameRateLimit: 24,
 	renderLoadWarmup: 7.95,
+	cpuMs: 1000,
 	renderLoadLOD: { sample: ( input ) => ( sampled.push( input ), 1 ) },
 	frameWorkMeter: { takeGPUSample: () => ( { gpuMs: 45, elapsedSeconds: 0.25 } ) },
 	player: {},
@@ -16,6 +17,7 @@ const app = Object.assign( Object.create( App.prototype ), {
 const startedAt = performance.now() - 50;
 app.updateRenderLoadBias( 0.1, startedAt );
 assert.ok( Math.abs( app.renderLoadWarmup - 8.05 ) < 1e-9, 'render-load warmup advances with bounded frame time' );
+assert.ok( app.cpuMs < 100, 'HUD CPU time reports the latest frame instead of smoothing away a spike' );
 assert.equal( app.renderLoadBias, 1, 'FPS priority applies the measured sustained-load bias' );
 assert.equal( sampled.length, 1, 'GPU and CPU samples reach the shared load policy' );
 assert.equal( sampled[ 0 ].gpuMs, 45 );
