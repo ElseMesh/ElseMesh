@@ -10,7 +10,7 @@
 
 - ElseMesh is not published yet. Do not optimize for backwards compatibility by default or preserve current behavior solely because it already exists.
 - Whenever changing an existing implementation or API, always consider whether it should be redesigned. Prefer the clearest architecture for the intended product, and update callers, tests, and documentation together when changing an unstable interface.
-- The sole world-server daemon and executable is `worldd`. A ThruHold is a hosted world, not a daemon; do not call the server `thruholdd` or use `ThruHold` as its executable name. `server/worldd` is an internal source/package path.
+- Refer to the sole world-server daemon and executable as `worldd`. A ThruHold is a hosted world, not a daemon. `server/worldd` is an internal source/package path.
 
 ## Evidence and assumptions
 
