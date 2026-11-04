@@ -6,6 +6,7 @@ export const SHORE_SWASH_DOWN = 0.55;
 export const SHORE_DEFAULT_PERIOD = 9;
 export const SHORE_DEFAULT_AMPLITUDE = 0.34;
 export const SHORE_DEFAULT_VARIATION = 0.55;
+export const SHORE_DEFAULT_RUNUP = 0.65;
 
 const sat = x => Math.max( 0, Math.min( 1, x ) );
 const smoothstep = ( a, b, x ) => {
@@ -61,7 +62,7 @@ export function sampleShoreField( field, x, z, out = {} ) {
 	return out;
 }
 
-export function evaluateShoreSwash( { field, terrain, x, z, time, seaLevel = 0, period = SHORE_DEFAULT_PERIOD, amplitude = SHORE_DEFAULT_AMPLITUDE, variation = SHORE_DEFAULT_VARIATION, runup = 1 }, out = {} ) {
+export function evaluateShoreSwash( { field, terrain, x, z, time, seaLevel = 0, period = SHORE_DEFAULT_PERIOD, amplitude = SHORE_DEFAULT_AMPLITUDE, variation = SHORE_DEFAULT_VARIATION, runup = SHORE_DEFAULT_RUNUP }, out = {} ) {
 	const sh = sampleShoreField( field, x, z, out.shore || ( out.shore = new Float32Array( 4 ) ) );
 	const exposure = Math.hypot( sh[ 1 ], sh[ 2 ] );
 	const directionX = sh[ 1 ] / Math.max( exposure, 1e-4 ), directionZ = sh[ 2 ] / Math.max( exposure, 1e-4 );

@@ -27,7 +27,7 @@ import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
-import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
+import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
@@ -82,11 +82,11 @@ function disposeHostedWebGLModel( model ) {
 	for ( const texture of textures ) texture.dispose();
 }
 
-function applyHostedTerrainMaterial( root, material ) {
+export function applyHostedTerrainMaterial( root, material ) {
 	root.traverse( object => {
 		if ( ! object.isMesh ) return;
 		object.receiveShadow = true;
-		object.material = Array.isArray( object.material ) ? object.material.map( () => material.clone() ) : material.clone();
+		object.material = Array.isArray( object.material ) ? object.material.map( () => material ) : material;
 	} );
 }
 
@@ -213,7 +213,7 @@ function webglCloudVolumeTexture( T, size = 64 ) {
 
 }
 
-function prepareWebGLLODFade( root ) {
+export function prepareWebGLLODFade( root ) {
 
 	const clones = new Map();
 	root.traverse( object => {
@@ -222,15 +222,19 @@ function prepareWebGLLODFade( root ) {
 			let material = clones.get( source );
 			if ( material ) return material;
 			material = source.clone();
+			material.userData = { ...source.userData };
 			material.alphaHash = true;
 			material.userData.elsemeshLODFade = { value: 1 };
-			material.onBeforeCompile = shader => {
+			const sourceOnBeforeCompile = source.onBeforeCompile;
+			const sourceProgramCacheKey = source.customProgramCacheKey;
+			material.onBeforeCompile = ( shader, renderer ) => {
+				sourceOnBeforeCompile.call( material, shader, renderer );
 				shader.uniforms.elsemeshLODFade = material.userData.elsemeshLODFade;
 				shader.fragmentShader = shader.fragmentShader
 					.replace( 'void main() {', 'uniform float elsemeshLODFade;\nvoid main() {' )
 					.replace( '#include <alphahash_fragment>', 'diffuseColor.a *= elsemeshLODFade;\n#include <alphahash_fragment>' );
 			};
-			material.customProgramCacheKey = () => 'elsemesh-authored-lod-fade-v1';
+			material.customProgramCacheKey = () => `${sourceProgramCacheKey.call( source )}|elsemesh-authored-lod-fade-v1`;
 			clones.set( source, material );
 			return material;
 		};
@@ -291,7 +295,7 @@ uniform float uTerrainShoreSize;
 				float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
 				float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
 				float amp = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + variation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
-				float runupMax = amp * 2.1 * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
+				float runupMax = amp * 2.1 * ${SHORE_DEFAULT_RUNUP.toFixed( 2 )} * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
 				float su = clamp( tau / ${SHORE_SWASH_UP}, 0.0, 1.0 ), sb = clamp( ( tau - ${SHORE_SWASH_UP} ) / ${SHORE_SWASH_DOWN}, 0.0, 1.0 );
 				float runup = ( tau < ${SHORE_SWASH_UP} ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
 				float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
@@ -402,6 +406,12 @@ varying vec3 vTerrainWorldPosition;
 			vec4 terrainNear = texture2D( uTerrainDetail, terrainXZ / 1.9 );
 			vec4 terrainMid = texture2D( uTerrainDetail, mat2( 0.2675, 0.9636, -0.9636, 0.2675 ) * terrainXZ / 6.7 + 0.21 );
 			vec4 terrainFine = texture2D( uTerrainDetail, mat2( -0.7374, 0.6755, -0.6755, -0.7374 ) * terrainXZ / 0.63 + 0.53 );
+			float terrainPixelWorld = max( length( dFdx( terrainXZ ) ), length( dFdy( terrainXZ ) ) );
+			float terrainFineFade = 1.0 - smoothstep( 0.006, 0.02, terrainPixelWorld );
+			float terrainMidFade = 1.0 - smoothstep( 0.03, 0.1, terrainPixelWorld );
+			terrainNear = mix( vec4( 0.5 ), terrainNear, terrainFineFade );
+			terrainMid = mix( vec4( 0.5 ), terrainMid, terrainMidFade );
+			terrainFine = mix( vec4( 0.5 ), terrainFine, terrainFineFade );
 			float terrainClump = terrainMid.a * 0.6 + terrainNear.g * 0.4;
 			float sandCoverage = smoothstep( 0.25, 0.8, terrainSample.a );
 			float terrainDetail = mix( terrainClump, terrainNear.b * 0.55 + terrainMid.b * 0.45, sandCoverage );
@@ -673,7 +683,7 @@ function webglGrassMesh( T, terrain, camera, previous, grassMask = null ) {
 
 }
 
-function webglBeachDebris( T, terrain, camera, previous ) {
+export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0 ) {
 
 	const radius = 25, spacing = 0.62, firstX = Math.floor( ( camera.position.x - radius ) / spacing ), firstZ = Math.floor( ( camera.position.z - radius ) / spacing );
 	const hash = ( x, z, salt ) => {
@@ -689,12 +699,19 @@ function webglBeachDebris( T, terrain, camera, previous ) {
 		if ( d > radius || random( 3 ) > 0.36 + ( 1 - T.MathUtils.smoothstep( d, 12, 23 ) ) * 0.5 ) continue;
 		const ix = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
 		const iz = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) );
-		const index = iz * terrain.res + ix, height = terrain.heightAt( x, z ), sand = terrain.sand[ index ] / 255;
-		if ( height < 0.35 || height > 4.6 || sand < 0.36 || terrain.rock[ index ] > 0.24 || terrain.path[ index ] > 90 ) continue;
+		const index = iz * terrain.res + ix, height = terrain.heightAt( x, z );
+		const sand = terrain.sand ? terrain.sand[ index ] / 255 : terrain.sandAt?.( x, z ) ?? ( terrain.splat ? terrain.splat[ index * 4 ] / 255 : 0 );
+		const packagedSurface = ! terrain.sand || ! terrain.rock || ! terrain.path || ! terrain.noise2;
+		const path = terrain.path ? terrain.path[ index ] / 255 : terrain.splat ? terrain.splat[ index * 4 + 1 ] / 255 : 0;
+		if ( packagedSurface ) {
+			const relativeHeight = height - seaLevel;
+			if ( relativeHeight < 0.35 || relativeHeight > 4.6 || sand < 0.36 || path > 0.35 ) continue;
+		} else if ( height < 0.35 || height > 4.6 || sand < 0.36 || terrain.rock[ index ] > 0.24 || terrain.path[ index ] > 90 ) continue;
 		const slope = Math.hypot( terrain.heightAt( x + 1, z ) - terrain.heightAt( x - 1, z ), terrain.heightAt( x, z + 1 ) - terrain.heightAt( x, z - 1 ) );
 		if ( slope > 0.72 ) continue;
-		const shore = 1 - T.MathUtils.smoothstep( Math.abs( height - 1.25 ), 0.18, 1.55 );
-		const patch = T.MathUtils.smoothstep( terrain.noise2.noise( x / 4.2 + 5.5, z / 4.2 - 3.3 ), - 0.45, 0.25 );
+		const shoreHeight = packagedSurface ? height - seaLevel : height;
+		const shore = 1 - T.MathUtils.smoothstep( Math.abs( shoreHeight - 1.25 ), 0.18, 1.55 );
+		const patch = packagedSurface ? 0.5 + random( 8 ) * 0.5 : T.MathUtils.smoothstep( terrain.noise2.noise( x / 4.2 + 5.5, z / 4.2 - 3.3 ), - 0.45, 0.25 );
 		const density = ( 0.06 + shore * 0.34 ) * ( 0.5 + patch * 0.9 ) * ( 0.55 + ( 1 - T.MathUtils.smoothstep( d, 12, 23 ) ) * 0.45 );
 		if ( random( 4 ) > density ) continue;
 		samples.push( { x, z, height, random: [ random( 5 ), random( 6 ), random( 7 ) ] } );
@@ -882,8 +899,10 @@ export class WebGLFallback {
 			}
 			this._updateHostedWebGLStatus();
 		} else await this._loadIslandWhale();
-		if ( this.terrain ) {
-			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
+		this.beachDebrisTerrain = this.terrain || this.hostedTerrainData;
+		this.beachDebrisSeaLevel = this.worldLink ? this.hostedSeaLevel ?? 0 : this.worldSeaLevel;
+		if ( this.beachDebrisTerrain ) {
+			this.beachDebris = webglBeachDebris( T, this.beachDebrisTerrain, this.camera, null, this.beachDebrisSeaLevel );
 			this.scene.add( this.beachDebris );
 			this.debrisCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 		}
@@ -1101,7 +1120,7 @@ export class WebGLFallback {
 						float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
 						float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
 						float amp = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + variation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
-						float runupMax = amp * 2.1 * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
+						float runupMax = amp * 2.1 * ${SHORE_DEFAULT_RUNUP.toFixed( 2 )} * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
 						float su = clamp( tau / ${SHORE_SWASH_UP}, 0.0, 1.0 ), sb = clamp( ( tau - ${SHORE_SWASH_UP} ) / ${SHORE_SWASH_DOWN}, 0.0, 1.0 );
 						float runup = ( tau < ${SHORE_SWASH_UP} ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
 						float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
@@ -1977,10 +1996,10 @@ export class WebGLFallback {
 			this.scene.add( this.grass );
 			this.grassCenter.set( this.camera.position.x, this.camera.position.z );
 		}
-		if ( this.beachDebris ) {
+		if ( this.beachDebris && this.beachDebrisTerrain ) {
 			const dx = this.camera.position.x - this.debrisCenter.x, dz = this.camera.position.z - this.debrisCenter.y;
 			if ( dx * dx + dz * dz > 36 ) {
-				webglBeachDebris( T, this.terrain, this.camera, this.beachDebris );
+				webglBeachDebris( T, this.beachDebrisTerrain, this.camera, this.beachDebris, this.beachDebrisSeaLevel );
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}

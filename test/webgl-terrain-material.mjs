@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { webglTerrainMaterial } from '../src/fallback/WebGLFallback.js';
+import { applyHostedTerrainMaterial, prepareWebGLLODFade, webglTerrainMaterial } from '../src/fallback/WebGLFallback.js';
 
 const terrain = {
 	res: 2, size: 2, origin: 0, texel: 1,
@@ -26,9 +26,32 @@ assert.match( shader.fragmentShader, /mix\( 1\.0, uTerrainWetDarken, terrainWetn
 assert.match( shader.fragmentShader, /uTerrainSwashField/ );
 assert.match( shader.fragmentShader, /float swashArrival = mix\( uTerrainSwashTimeRange/ );
 assert.match( shader.fragmentShader, /float runupFront =/ );
+assert.match( shader.fragmentShader, /runupMax = amp \* 2\.1 \* 0\.65 \*/, 'WebGL uses the reduced shared run-up scale for a tighter wet-sand front' );
+assert.match( shader.fragmentShader, /terrainPixelWorld = max\( length\( dFdx\( terrainXZ \) \), length\( dFdy\( terrainXZ \) \) \)/, 'high-frequency sand detail fades with the projected pixel footprint instead of forming distant bands' );
 assert.match( shader.fragmentShader, /roughnessFactor = mix\( roughnessFactor, mix\( 0\.42, 0\.16, wetSand \), terrainWetness \)/ );
 material.userData.updateTerrainTime( 5.25 );
 assert.equal( shader.uniforms.uTerrainTime.value, 5.25, 'terrain swash animation follows the shared frame time' );
+
+const root = new THREE.Group();
+const terrainMesh = new THREE.Mesh( new THREE.BufferGeometry(), new THREE.MeshStandardMaterial() );
+const replacedMaterial = terrainMesh.material;
+root.add( terrainMesh );
+applyHostedTerrainMaterial( root, material );
+assert.equal( terrainMesh.material, material, 'hosted terrain assignment preserves the custom terrain shader instead of cloning it away' );
+prepareWebGLLODFade( root );
+const fadedMaterial = root.children[ 0 ].material;
+const fadedShader = {
+	uniforms: {},
+	vertexShader: '#include <common>\n#include <begin_vertex>',
+	fragmentShader: '#include <common>\n#include <color_fragment>\n#include <roughnessmap_fragment>\n#include <alphahash_fragment>',
+};
+fadedMaterial.onBeforeCompile( fadedShader );
+assert.match( fadedShader.fragmentShader, /uniform sampler2D uTerrainColor/, 'authored LOD fading preserves the terrain material shader hook' );
+assert.match( fadedShader.fragmentShader, /diffuseColor\.a \*= elsemeshLODFade/, 'terrain material keeps the authored LOD fade hook' );
+assert.equal( fadedMaterial.customProgramCacheKey(), `${material.customProgramCacheKey()}|elsemesh-authored-lod-fade-v1`, 'the shader cache key includes both terrain shading and LOD fading' );
+root.children[ 0 ].geometry.dispose();
+replacedMaterial.dispose();
+fadedMaterial.dispose();
 
 material.dispose();
 for ( const texture of material.userData.terrainTextures ) texture.dispose();
