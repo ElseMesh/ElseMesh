@@ -115,12 +115,16 @@ func (d *daemon) handleBrowserHost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session := &browserHostSession{world: world, document: *registration.Document, conn: conn, pending: make(map[string]browserHostPending), closed: make(chan struct{})}
+	session.writeMu.Lock()
 	if err := d.installBrowserHost(session); err != nil {
+		session.writeMu.Unlock()
 		_ = conn.WriteJSON(browserHostFrame{Type: "error", Error: err.Error()})
 		return
 	}
 	defer d.removeBrowserHost(session)
-	if err := conn.WriteJSON(browserHostFrame{Type: "host.registered", WorldID: world.WorldID}); err != nil {
+	err = conn.WriteJSON(browserHostFrame{Type: "host.registered", WorldID: world.WorldID})
+	session.writeMu.Unlock()
+	if err != nil {
 		return
 	}
 	conn.SetReadLimit(512 << 10)
