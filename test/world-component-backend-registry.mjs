@@ -1,19 +1,25 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { registerWorldComponentBackendAdapter, worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
+import { registerWorldComponentBackendAdapter, registerWorldComponentBackendBatchAdapter, worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 
 const webgpu = ( context, component ) => ( { backend: 'webgpu', context, component } );
 const webgl = ( context, component ) => ( { backend: 'webgl', context, component } );
 const type = 'elsemesh.backend-fixture/1';
+const batchType = 'elsemesh.backend-batch-fixture/1';
 
 registerWorldComponentBackendAdapter( 'webgpu', type, webgpu );
 registerWorldComponentBackendAdapter( 'webgl', type, webgl );
+registerWorldComponentBackendBatchAdapter( 'webgl', batchType, ( context, components ) => ( { context, componentIDs: components.map( component => component.id ) } ) );
 
 const context = Object.freeze( {} ), component = Object.freeze( { id: 'fixture', type } );
 assert.deepEqual( worldComponentBackendAdapter( 'webgpu', type )( context, component ), { backend: 'webgpu', context, component } );
 assert.deepEqual( worldComponentBackendAdapter( 'webgl', type )( context, component ), { backend: 'webgl', context, component } );
+assert.deepEqual( worldComponentBackendBatchAdapter( 'webgl', batchType )( context, [ component ] ), { context, componentIDs: [ 'fixture' ] } );
+assert.equal( worldComponentBackendBatchAdapter( 'webgpu', batchType ), null, 'batch adapters are selected by backend and component type' );
 assert.equal( worldComponentBackendAdapter( 'webgpu', 'elsemesh.unhandled/1' ), null, 'missing backend adapter is explicit' );
 assert.throws( () => registerWorldComponentBackendAdapter( 'webgpu', type, webgpu ), /Duplicate/ );
+assert.throws( () => registerWorldComponentBackendAdapter( 'webgl', batchType, webgl ), /Duplicate/, 'batch and single adapters cannot claim the same backend/type pair' );
+assert.throws( () => registerWorldComponentBackendBatchAdapter( 'webgl', type, () => true ), /Duplicate/, 'single and batch adapters cannot claim the same backend/type pair' );
 assert.throws( () => registerWorldComponentBackendAdapter( 'canvas', 'elsemesh.invalid/1', webgpu ), /Invalid/ );
 
 await import( '../src/App.js' );
@@ -51,4 +57,5 @@ assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGPU static-model adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGL static-model adapter' );
+assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', 'elsemesh.static-reef/1' ), 'function', 'ElseMesh batches static reef tiles into one WebGL renderer' );
 console.log( 'World component backend registry selects engine adapters by backend and component type' );

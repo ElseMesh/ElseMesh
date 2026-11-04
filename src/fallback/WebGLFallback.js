@@ -32,7 +32,7 @@ import { applyWebGLVillageMaterials, createWebGLVillageMaterials } from './WebGL
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
-import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
+import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
@@ -1828,18 +1828,6 @@ export class WebGLFallback {
 		this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
 		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
-		const hostedReefRecords = [], hostedReefIds = [];
-		for ( const reef of components.filter( component => component.type === 'elsemesh.static-reef/1' ) ) {
-			const placementBytes = assets.get( reef.placementAssetId );
-			if ( ! placementBytes ) continue;
-			const decoded = decodeReefPlacements( asBytes( placementBytes ) );
-			hostedReefRecords.push( ...decoded.records );
-			hostedReefIds.push( reef.id );
-		}
-		if ( hostedReefIds.length ) {
-			this.hostedReefAdapter = new WebGLReefAdapter( T, this.scene, hostedReefRecords );
-			for ( const id of hostedReefIds ) supportedComponents.add( id );
-		}
 		for ( const vegetation of components.filter( component => component.type === 'elsemesh.static-vegetation/1' ) ) {
 			const placementBytes = assets.get( vegetation.placementAssetId );
 			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
@@ -1929,14 +1917,42 @@ export class WebGLFallback {
 		const terrainWater = terrain ? webglTerrainWaterTexture( T, terrain ) : null;
 		if ( terrainWater && this.hostedTerrainSurface?.shoreField ) terrainWater.shore = encodeWebGLShoreField( T, this.hostedTerrainSurface.shoreField );
 		const installed = new Set();
-		const applicable = components.map( component => ( { component, adapter: worldComponentBackendAdapter( this.engine.backend, component.type ) } ) ).filter( item => item.adapter );
-		for ( const [ index, { component, adapter } ] of applicable.entries() ) {
+		const singles = [], batches = new Map();
+		for ( const component of components ) {
+			const batchAdapter = worldComponentBackendBatchAdapter( this.engine.backend, component.type );
+			if ( batchAdapter ) {
+				const group = batches.get( component.type ) || { adapter: batchAdapter, components: [] };
+				group.components.push( component );
+				batches.set( component.type, group );
+			} else {
+				const adapter = worldComponentBackendAdapter( this.engine.backend, component.type );
+				if ( adapter ) singles.push( { component, adapter } );
+			}
+		}
+		const total = singles.length + [ ...batches.values() ].reduce( ( sum, group ) => sum + group.length, 0 );
+		let completed = 0;
+		for ( const { component, adapter } of singles ) {
 			if ( this.hostedInstalledComponentIDs?.has( component.id ) ) continue;
 			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component );
 			if ( result === true || result?.installed ) installed.add( component.id );
 			if ( result?.runtime ) this.hostedComponentRuntimes.set( component.id, result.runtime );
 			if ( result === true || result?.installed ) this.hostedInstalledComponentIDs?.add( component.id );
-			onProgress( index + 1, applicable.length );
+			completed ++;
+			onProgress( completed, total );
+		}
+		for ( const { adapter, components: group } of batches.values() ) {
+			const pending = group.filter( component => ! this.hostedInstalledComponentIDs?.has( component.id ) );
+			if ( pending.length ) {
+				const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, pending );
+				const installedIDs = result?.componentIDs || ( result === true || result?.installed ? pending.map( component => component.id ) : [] );
+				for ( const id of installedIDs ) {
+					installed.add( id );
+					this.hostedInstalledComponentIDs?.add( id );
+				}
+				if ( result?.runtime ) this.hostedComponentRuntimes.set( result.runtimeComponentId || installedIDs[ 0 ] || pending[ 0 ].id, result.runtime );
+			}
+			completed += group.length;
+			onProgress( completed, total );
 		}
 		return installed;
 
@@ -2061,7 +2077,6 @@ export class WebGLFallback {
 			}
 		}
 		this.reefAdapter?.update( this.camera, simulationTime, this.defaultWorldSource.rules.seaLevel ?? 0 );
-		this.hostedReefAdapter?.update( this.camera, simulationTime, this.hostedSeaLevel ?? 0 );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;
