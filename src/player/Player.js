@@ -629,8 +629,8 @@ export class Player {
 		// the exit point closest to something walkable (pier deck / sand)
 		let best = side ? null : this.ashoreTarget();
 
-		const dock = b.homePosition || this.worldLayout?.boatDock?.position || b.position;
-		if ( b.position.distanceTo( dock ) < 14 && b.speed < 1.5 ) {
+		const dock = b.homePosition || this.worldLayout?.boatDock?.position;
+		if ( dock && b.position.distanceTo( dock ) < 14 && b.speed < 1.5 ) {
 
 			b.moored = true;
 			b.mooring.anchor.set( b.position.x, 0, b.position.z );
