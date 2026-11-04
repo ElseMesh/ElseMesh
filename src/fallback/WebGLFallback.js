@@ -1037,6 +1037,8 @@ export class WebGLFallback {
 					float vertexGroundHeight = uHeightRange.x;
 					float vertexSandCoverage = 0.0;
 					float shoreWaveHeight = 0.0;
+					vec2 shoreWaveDirection = vec2( 0.0 );
+					float shoreWaveLambda = 1.0;
 					float a = dot( p, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
 					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
 					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.7;
@@ -1060,6 +1062,7 @@ export class WebGLFallback {
 								vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 								vec4 shore = texture2D( uShoreField, shoreUv );
 								vec2 shoreDirection = normalize( shore.rg * 2.0 - 1.0 );
+								shoreWaveDirection = shoreDirection;
 								float exposure = shore.b;
 								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
 								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
@@ -1075,6 +1078,7 @@ export class WebGLFallback {
 								float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
 								float amplitude = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + alongVariation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
 								float lam = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0;
+								shoreWaveLambda = lam;
 								vec2 crestPosition = p + shoreDirection * ( u * lam );
 								vec2 crestTerrainUv = ( crestPosition - vec2( uTerrainOrigin ) ) / uTerrainSize;
 								vec4 crestTerrain = texture2D( uTerrainHeight, crestTerrainUv );
@@ -1103,7 +1107,9 @@ export class WebGLFallback {
 								float lipHeight = min( waveHeight * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
 								float lip = smoothstep( -0.17, -0.12, u ) * ( 1.0 - smoothstep( -0.025, 0.015, u ) );
 								float crestHeight = preHeight + lipHeight * bore * curl * lip;
-								world.xz += shoreDirection * ( sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 + lipHeight * 0.55 * bore * curl * lip ) * env;
+								float shoreDisplacement = ( sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 + lipHeight * 0.55 * bore * curl * lip ) * env;
+								world.xz += shoreDirection * shoreDisplacement;
+								vShoreU = u - shoreDisplacement / max( lam, 0.001 );
 								shoreWaveHeight += ( crestHeight - preHeight ) * env;
 							}
 						}
@@ -1114,6 +1120,7 @@ export class WebGLFallback {
 						for ( int iteration = 0; iteration < 2; iteration ++ ) displaced = rest - oceanDisplacementAt( displaced, oceanDepth ).xz;
 						vec3 ocean = oceanDisplacementAt( displaced, oceanDepth );
 						world.xz += ocean.xz;
+						if ( vShoreEnv > 0.0 ) vShoreU -= dot( ocean.xz, shoreWaveDirection ) / max( shoreWaveLambda, 0.001 );
 						vWaveHeight = ocean.y + shoreWaveHeight;
 					}
 					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vertexSandCoverage > 0.05 ) {
