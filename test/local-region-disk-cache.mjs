@@ -4,10 +4,12 @@ import { LocalRegionDiskCache } from '../src/network/LocalRegionDiskCache.js';
 const files = new Map();
 let quota = 4 * 1024 ** 3;
 let baseUsage = 0;
+let metadataFileReads = 0;
 
 class MemoryFileHandle {
 	constructor( name ) { this.name = name; }
 	async getFile() {
+		if ( this.name.endsWith( '.meta' ) ) metadataFileReads ++;
 		if ( ! files.has( this.name ) ) throw new DOMException( 'Not found', 'NotFoundError' );
 		const contents = files.get( this.name );
 		return new Blob( [ contents ] );
@@ -47,13 +49,33 @@ try {
 	assert.ok( cache, 'OPFS cache opens when storage APIs are available' );
 	assert.equal( await cache.put( 'cell-1:visual', bytes, digest ), true );
 	assert.deepEqual( await cache.get( 'cell-1:visual' ), bytes );
+	await new Promise( resolve => setTimeout( resolve, 1100 ) );
+	assert.ok( files.has( 'index.json' ), 'cache writes a compact metadata index after content is stored' );
+	const readsBeforeIndexedOpen = metadataFileReads;
+	const indexedCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-3' } );
+	await indexedCache.ready;
+	assert.equal( metadataFileReads, readsBeforeIndexedOpen, 'a valid cache index avoids reading every per-entry metadata file on startup' );
+
+	const deltaBytes = new TextEncoder().encode( 'recovered from a write after the last index snapshot' );
+	const deltaId = Buffer.from( await crypto.subtle.digest( 'SHA-256', new TextEncoder().encode( 'elsemesh:hogwarts\0revision-1\0interrupted-write' ) ) ).toString( 'hex' );
+	files.set( `${deltaId}.bin`, deltaBytes );
+	files.set( `${deltaId}.meta`, new TextEncoder().encode( JSON.stringify( { schema: 1, id: deltaId, bytes: deltaBytes.byteLength, digest: null, lastUsed: Date.now() } ) ) );
+	const readsBeforeDeltaOpen = metadataFileReads;
+	const recoveredCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-1' } );
+	await recoveredCache.ready;
+	assert.equal( metadataFileReads, readsBeforeDeltaOpen + 1, 'startup reads only metadata that was added after the saved index' );
+	assert.deepEqual( await recoveredCache.get( 'interrupted-write' ), deltaBytes, 'a valid entry written after the last index snapshot is recovered' );
+	files.delete( `${deltaId}.bin` );
+	files.delete( `${deltaId}.meta` );
+
 	const changedRevision = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-2' } );
 	assert.equal( await changedRevision.get( 'cell-1:visual' ), null, 'source revisions do not share cached bytes' );
 
 	const dataName = [ ...files.keys() ].find( name => name.endsWith( '.bin' ) );
 	files.set( dataName, new TextEncoder().encode( 'corrupt data' ) );
 	assert.equal( await cache.get( 'cell-1:visual' ), null, 'corrupt disk entries are rejected and evicted' );
-	assert.equal( files.size, 0 );
+	const corruptId = dataName.slice( 0, - 4 );
+	assert.equal( files.has( `${corruptId}.bin` ) || files.has( `${corruptId}.meta` ), false, 'corrupt payload and metadata files are removed while unrelated cache entries remain' );
 
 	quota = 1024 ** 3;
 	baseUsage = quota - 512 * 1024 ** 2 - 8;

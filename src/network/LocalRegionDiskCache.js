@@ -3,9 +3,19 @@ const MAX_CACHE_BYTES = 42 * 1024 * 1024 * 1024;
 const MIN_STORAGE_RESERVE_BYTES = 512 * 1024 * 1024;
 const MAX_PENDING_WRITE_BYTES = 768 * 1024 * 1024;
 const INDEX_RECONCILE_MS = 5 * 60 * 1000;
+const INDEX_WRITE_DELAY_MS = 1000;
+const MAX_INDEX_BYTES = 64 * 1024 * 1024;
+const MAX_INDEX_ENTRIES = 1_000_000;
 const RECENCY_WRITE_INTERVAL_MS = 30 * 1000;
 const CACHE_SCHEMA = 1;
+const INDEX_FILE_NAME = 'index.json';
+const INDEX_SCHEMA = 1;
 const DIGEST = /^[0-9a-f]{64}$/;
+const CACHE_ID = /^[0-9a-f]{64}$/;
+
+function validMetadata( metadata, id ) {
+	return metadata?.schema === CACHE_SCHEMA && metadata.id === id && CACHE_ID.test( id || '' ) && Number.isSafeInteger( metadata.bytes ) && metadata.bytes >= 0 && ( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) && Number.isFinite( metadata.lastUsed );
+}
 
 async function sha256Hex( value ) {
 	const digest = await globalThis.crypto.subtle.digest( 'SHA-256', value );
@@ -57,6 +67,8 @@ export class LocalRegionDiskCache {
 		this.lastUsed = 0;
 		this.queue = Promise.resolve();
 		this.pendingWriteBytes = 0;
+		this.indexDirty = false;
+		this.indexWriteTimer = null;
 		this.lockName = 'elsemesh-local-region-cache-v1';
 		this.ready = Promise.resolve();
 	}
@@ -76,27 +88,96 @@ export class LocalRegionDiskCache {
 		this.entries.clear();
 		this.cachedBytes = 0;
 		const dataFiles = new Set();
+		const metadataFiles = new Set();
 		for await ( const [ name ] of this.directory.entries() ) {
 			if ( name.endsWith( '.bin' ) ) {
 				dataFiles.add( name.slice( 0, - 4 ) );
 				continue;
 			}
-			if ( ! name.endsWith( '.meta' ) ) continue;
-			const id = name.slice( 0, - 5 );
-			try {
-				const handle = await this.directory.getFileHandle( name );
-				const metadata = JSON.parse( await ( await handle.getFile() ).text() );
-				if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
-				if ( ! dataFiles.has( id ) ) throw new Error( 'Local region cache data file is missing' );
-				this.entries.set( id, metadata );
-				this.cachedBytes += metadata.bytes;
-				this.lastUsed = Math.max( this.lastUsed, metadata.lastUsed );
-			} catch {
-				await this.#removeFiles( id );
+			if ( name.endsWith( '.meta' ) ) metadataFiles.add( name.slice( 0, - 5 ) );
+		}
+
+		let indexIsValid = false;
+		let indexChanged = false;
+		try {
+			const handle = await this.directory.getFileHandle( INDEX_FILE_NAME );
+			const file = await handle.getFile();
+			if ( file.size <= MAX_INDEX_BYTES ) {
+				const index = JSON.parse( await file.text() );
+				if ( index?.schema === INDEX_SCHEMA && Array.isArray( index.entries ) && index.entries.length <= MAX_INDEX_ENTRIES ) {
+					const indexed = new Map();
+					for ( const metadata of index.entries ) {
+						if ( ! validMetadata( metadata, metadata?.id ) || indexed.has( metadata.id ) ) throw new Error( 'Invalid local region cache index entry' );
+						indexed.set( metadata.id, metadata );
+					}
+					for ( const [ id, metadata ] of indexed ) {
+						if ( ! dataFiles.has( id ) || ! metadataFiles.has( id ) ) {
+							await this.#removeFiles( id );
+							dataFiles.delete( id );
+							metadataFiles.delete( id );
+							indexChanged = true;
+							continue;
+						}
+						this.entries.set( id, metadata );
+						this.cachedBytes += metadata.bytes;
+						this.lastUsed = Math.max( this.lastUsed, metadata.lastUsed );
+					}
+					indexIsValid = true;
+				}
+			}
+		} catch {
+			// A missing or interrupted snapshot is rebuilt from entry metadata below.
+		}
+
+		if ( ! indexIsValid ) {
+			this.entries.clear();
+			this.cachedBytes = 0;
+			this.lastUsed = 0;
+			indexChanged = true;
+			for ( const id of metadataFiles ) {
+				try {
+					const handle = await this.directory.getFileHandle( `${id}.meta` );
+					const metadata = JSON.parse( await ( await handle.getFile() ).text() );
+					if ( ! validMetadata( metadata, id ) || ! dataFiles.has( id ) ) throw new Error( 'Invalid or incomplete local region cache entry' );
+					this.entries.set( id, metadata );
+					this.cachedBytes += metadata.bytes;
+					this.lastUsed = Math.max( this.lastUsed, metadata.lastUsed );
+				} catch {
+					await this.#removeFiles( id );
+					dataFiles.delete( id );
+					metadataFiles.delete( id );
+				}
+			}
+		} else {
+			for ( const id of metadataFiles ) {
+				if ( this.entries.has( id ) ) continue;
+				try {
+					const handle = await this.directory.getFileHandle( `${id}.meta` );
+					const metadata = JSON.parse( await ( await handle.getFile() ).text() );
+					if ( ! validMetadata( metadata, id ) || ! dataFiles.has( id ) ) throw new Error( 'Invalid or incomplete local region cache entry' );
+					this.entries.set( id, metadata );
+					this.cachedBytes += metadata.bytes;
+					this.lastUsed = Math.max( this.lastUsed, metadata.lastUsed );
+					indexChanged = true;
+				} catch {
+					await this.#removeFiles( id );
+					dataFiles.delete( id );
+					metadataFiles.delete( id );
+					indexChanged = true;
+				}
 			}
 		}
-		for ( const id of dataFiles ) if ( ! this.entries.has( id ) ) await this.#removeFiles( id );
+
+		for ( const id of dataFiles ) if ( ! this.entries.has( id ) ) {
+			await this.#removeFiles( id );
+			indexChanged = true;
+		}
+		for ( const id of metadataFiles ) if ( ! this.entries.has( id ) ) {
+			await this.#removeFiles( id );
+			indexChanged = true;
+		}
 		this.nextIndexAt = Date.now() + INDEX_RECONCILE_MS;
+		if ( indexChanged || ! indexIsValid ) await this.#writeIndex();
 		this.onMetric( { operation: 'index', entries: this.entries.size, bytes: this.cachedBytes, elapsedMs: performance.now() - startedAt } );
 	}
 
@@ -125,10 +206,11 @@ export class LocalRegionDiskCache {
 		try {
 			const metaHandle = await this.directory.getFileHandle( `${id}.meta` );
 			metadata = JSON.parse( await ( await metaHandle.getFile() ).text() );
-			if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
+			if ( ! validMetadata( metadata, id ) ) throw new Error( 'Invalid local region cache metadata' );
 		} catch ( error ) {
 			if ( error?.name !== 'NotFoundError' ) this.onError( error );
 			await this.#removeEntry( id );
+			if ( this.indexDirty ) this.#scheduleIndexWrite();
 			return null;
 		}
 		try {
@@ -140,16 +222,25 @@ export class LocalRegionDiskCache {
 			const previousLastUsed = Math.max( metadata.lastUsed, indexedLastUsed );
 			const persistRecency = Date.now() - previousLastUsed >= RECENCY_WRITE_INTERVAL_MS;
 			metadata.lastUsed = persistRecency ? this.#nextLastUsed( previousLastUsed ) : previousLastUsed;
-			if ( indexed ) indexed.lastUsed = metadata.lastUsed;
-			else {
+			if ( indexed ) {
+				if ( indexed.lastUsed !== metadata.lastUsed ) {
+					indexed.lastUsed = metadata.lastUsed;
+					this.indexDirty = true;
+				}
+			} else {
 				this.entries.set( id, metadata );
 				this.cachedBytes += metadata.bytes;
+				this.indexDirty = true;
 			}
-			if ( persistRecency ) void this.#exclusive( () => this.#writeMetadata( metadata ) ).catch( error => this.onError( error ) );
+			if ( persistRecency || this.indexDirty ) void this.#exclusive( async () => {
+				if ( persistRecency ) await this.#writeMetadata( metadata );
+				this.#scheduleIndexWrite();
+			} ).catch( error => this.onError( error ) );
 			return bytes;
 		} catch ( error ) {
 			this.onError( error );
 			await this.#removeEntry( id );
+			if ( this.indexDirty ) this.#scheduleIndexWrite();
 			return null;
 		}
 	}
@@ -167,14 +258,17 @@ export class LocalRegionDiskCache {
 				try {
 					const handle = await this.directory.getFileHandle( `${id}.meta` );
 					metadata = JSON.parse( await ( await handle.getFile() ).text() );
-					if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
+					if ( ! validMetadata( metadata, id ) ) throw new Error( 'Invalid local region cache metadata' );
 					metadata.lastUsed = this.#nextLastUsed( metadata.lastUsed );
 					await this.#writeMetadata( metadata );
 					this.entries.set( id, metadata );
+					this.indexDirty = true;
+					this.#scheduleIndexWrite();
 					return true;
 				} catch ( error ) {
 					this.onError( error );
 					await this.#removeEntry( id );
+					if ( this.indexDirty ) this.#scheduleIndexWrite();
 					return false;
 				}
 			} );
@@ -216,6 +310,7 @@ export class LocalRegionDiskCache {
 							await this.#writeMetadata( metadata );
 							this.entries.set( id, metadata );
 							this.cachedBytes = this.cachedBytes - ( existing?.bytes || 0 ) + bytes.byteLength;
+							this.indexDirty = true;
 							stored = true;
 						} catch ( error ) {
 							this.onError( error );
@@ -226,6 +321,7 @@ export class LocalRegionDiskCache {
 					}
 					storedAll &&= stored;
 				}
+				if ( this.indexDirty ) this.#scheduleIndexWrite();
 				return storedAll;
 			} );
 		} finally {
@@ -235,6 +331,58 @@ export class LocalRegionDiskCache {
 
 	async #writeMetadata( metadata ) {
 		await writeFile( this.directory, `${metadata.id}.meta`, JSON.stringify( metadata ) );
+	}
+
+	async #writeIndex() {
+		const entries = [ ...this.entries.values() ];
+		const dataFiles = new Set();
+		const metadataFiles = new Set();
+		for await ( const [ name ] of this.directory.entries() ) {
+			if ( name.endsWith( '.bin' ) ) dataFiles.add( name.slice( 0, - 4 ) );
+			else if ( name.endsWith( '.meta' ) ) metadataFiles.add( name.slice( 0, - 5 ) );
+		}
+		const merged = new Map();
+		for ( const metadata of entries ) if ( dataFiles.has( metadata.id ) && metadataFiles.has( metadata.id ) ) merged.set( metadata.id, metadata );
+		for ( const id of metadataFiles ) {
+			if ( merged.has( id ) || ! dataFiles.has( id ) ) continue;
+			try {
+				const handle = await this.directory.getFileHandle( `${id}.meta` );
+				const metadata = JSON.parse( await ( await handle.getFile() ).text() );
+				if ( ! validMetadata( metadata, id ) ) throw new Error( 'Invalid local region cache metadata' );
+				merged.set( id, metadata );
+			} catch {
+				await this.#removeFiles( id );
+			}
+		}
+		for ( const id of dataFiles ) if ( ! merged.has( id ) ) await this.#removeFiles( id );
+		for ( const id of metadataFiles ) if ( ! merged.has( id ) ) await this.#removeFiles( id );
+		this.entries = merged;
+		this.cachedBytes = [ ...merged.values() ].reduce( ( total, metadata ) => total + metadata.bytes, 0 );
+		this.lastUsed = [ ...merged.values() ].reduce( ( latest, metadata ) => Math.max( latest, metadata.lastUsed ), this.lastUsed );
+		if ( merged.size > MAX_INDEX_ENTRIES ) {
+			try { await this.directory.removeEntry( INDEX_FILE_NAME ); } catch { /* An absent snapshot is rebuilt from entry metadata. */ }
+			this.indexDirty = false;
+			return;
+		}
+		const contents = JSON.stringify( { schema: INDEX_SCHEMA, entries: [ ...merged.values() ] } );
+		if ( contents.length > MAX_INDEX_BYTES ) {
+			try { await this.directory.removeEntry( INDEX_FILE_NAME ); } catch { /* An absent snapshot is rebuilt from entry metadata. */ }
+			this.indexDirty = false;
+			return;
+		}
+		await writeFile( this.directory, INDEX_FILE_NAME, contents );
+		this.indexDirty = false;
+	}
+
+	#scheduleIndexWrite() {
+		this.indexDirty = true;
+		if ( this.indexWriteTimer !== null ) return;
+		this.indexWriteTimer = setTimeout( () => {
+			this.indexWriteTimer = null;
+			void this.#exclusive( async () => {
+				if ( this.indexDirty ) await this.#writeIndex();
+			} ).catch( error => this.onError( error ) );
+		}, INDEX_WRITE_DELAY_MS );
 	}
 
 	#nextLastUsed( previous ) {
@@ -269,6 +417,7 @@ export class LocalRegionDiskCache {
 		if ( metadata ) {
 			this.entries.delete( id );
 			this.cachedBytes = Math.max( 0, this.cachedBytes - metadata.bytes );
+			this.indexDirty = true;
 		}
 	}
 }
