@@ -37,6 +37,8 @@ var (
 	worldFeaturePattern      = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
 	worldBehaviorPattern     = regexp.MustCompile(`^elsemesh\.[a-z0-9.-]+/\d+$`)
 	entryPointIDPattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,63}$`)
+	loadingStagePattern      = regexp.MustCompile(`^[a-z][a-z0-9.-]{0,63}$`)
+	collisionTagPattern      = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._:-]{0,63}$`)
 )
 
 type vector3 [3]float64
@@ -510,9 +512,8 @@ func validateWorldExperience(experience *worldExperience) error {
 	if len(experience.Stages) > 12 {
 		return errors.New("world experience has too many loading stages")
 	}
-	allowedStages := map[string]bool{"gpu": true, "atmosphere": true, "terrain": true, "village": true, "vegetation": true, "ocean": true, "reef": true, "simulation": true, "shaders": true, "world": true, "compile": true, "warmup": true}
 	for stage, text := range experience.Stages {
-		if !allowedStages[stage] || strings.TrimSpace(text) == "" || len(text) > 120 {
+		if !loadingStagePattern.MatchString(stage) || strings.TrimSpace(text) == "" || len(text) > 120 {
 			return fmt.Errorf("world experience loading stage %q is invalid", stage)
 		}
 	}
@@ -854,7 +855,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 					return errors.New("invalid compound collision box count")
 				}
 				for _, box := range object.Collision.Boxes {
-					if box.Tag != "" && box.Tag != "pierRail" {
+					if box.Tag != "" && !collisionTagPattern.MatchString(box.Tag) {
 						return errors.New("unsupported compound collision tag")
 					}
 					for _, extent := range box.HalfExtents {

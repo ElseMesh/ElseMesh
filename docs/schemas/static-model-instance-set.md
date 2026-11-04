@@ -6,8 +6,8 @@ projected-size/distance planner needs them. WebGPU and WebGL use the same lazy
 runtime and build instanced batches for each loaded level. Focused tests verify
 coarse-only installation and demand-triggered finer requests on both backends;
 single-level generated-GLB renders check visible pixels and shader compilation.
-Per-level GPU eviction, shared texture-tier delivery, a live Hogwarts instance
-set, and Tidewater parity against the pre-split baseline remain open.
+Per-level GPU eviction, shared texture-tier delivery, and validation against
+world-specific renderer baselines remain open.
 
 This generic package format is the intended replacement for content-specific
 static renderer components. A world describes models, LOD assets, materials,
@@ -25,8 +25,7 @@ limited to two concurrent loads per component. Texture bytes must be external
 shared assets so geometry refinement does not resend them. Fine GPU levels are
 currently retained until component eviction; per-level GPU LRU eviction remains
 to be implemented. Collision remains on its independent, higher-priority path.
-This is a generic engine contract for static model sets, not a Hogwarts-specific
-mode.
+This is the engine's generic contract for static model sets.
 
 ## Package shape
 
@@ -48,7 +47,7 @@ not a replacement for content-addressed package assets.
   "format": "elsemesh.static-model-instance-set/1",
   "models": [
     {
-      "id": "market-table-fish",
+      "id": "market-table",
       "bounds": { "center": [0, 0.1, 0], "radius": 0.6 },
       "lods": [
         { "assetId": "sha256:..." },
@@ -66,7 +65,7 @@ not a replacement for content-addressed package assets.
   ],
   "instances": [
     {
-      "model": "market-table-fish",
+      "model": "market-table",
       "position": [1, 2, 3],
       "rotation": [0, 0, 0, 1],
       "scale": [1, 1, 1]
@@ -125,20 +124,19 @@ subset before either backend installs it.
 
 ## Separation and parity gates
 
-This contract is generic: no fish, Tidewater, WebGPU, or WebGL concepts appear
-in its fields. Tidewater can use it for hosted market contents by exporting its
-authored models and placements as ordinary assets. Its fish placement codec,
-species data, and game rules remain world-owned. Both adapters share instance
-visibility, visual LOD selection/fades, and transform records; their shadow
-selection strategies currently differ as described above. Isolated browser
-checks prove each backend renders the fixture and compiles its supported color
-and shadow programs; they do not prove Tidewater appearance or parity against
-its original WebGPU presentation.
+This contract defines only static models, transforms, LOD, visibility, and
+shadow inputs. It contains no world behavior or renderer selector. Each world
+repository owns the export mapping from authored content to this package and
+the acceptance checks for its original appearance. The two engine adapters
+share instance visibility, visual LOD selection/fades, and transform records;
+their shadow selection strategies currently differ as described above.
+Isolated browser checks prove each backend renders a generated fixture and
+compiles its supported color and shadow programs, not that any world's full
+presentation has been migrated.
 
-The current WebGL fish-prop mesh expansion is not a valid implementation of
-this target: it loses the WebGPU skin appearance, per-instance culling, LOD
-cross-fade, and near shadow proxy. Migration is complete only after both
-renderers consume the same signed package data and rendered results are checked
-against the pre-split WebGPU fish-stand baseline, including distance transitions,
-culling, and shadows. Live fish-stand, catch-display, and portrait rendering
-need a dynamic instance-set form after this static package contract is proven.
+A world migration must preserve behavior and visual features that its existing
+content-specific renderer supplied, including material appearance, per-instance
+culling, LOD transitions, and shadow proxies. Both backends must consume the
+same signed package data and be compared with that world's declared baseline.
+Dynamic objects need a separate versioned behavior contract rather than being
+encoded as static instances.

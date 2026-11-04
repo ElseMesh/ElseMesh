@@ -639,3 +639,12 @@ finding changes them.
   proves package binding only, not a Tidewater-independent runtime. Corrected
   the behavior-separation estimate from 64% to 55%; the next boundary task is
   removing those unconditional Tidewater runtime dependencies.
+- 2026-11-04: removed the Tidewater-only `pierRail` allowlist from generic
+  source, client, package, and Go collision validation; collision tags now use
+  a shared bounded token contract that world behaviors interpret. Loading
+  stage keys are likewise bounded owner-defined tokens. Moved the tropical
+  vegetation binary-format document into Tidewater and made the engine schema
+  docs world-neutral. Focused source/experience/collision checks, Tidewater
+  source conversion, and Go manifest tests pass. The estimate remains 62%
+  because Tidewater-specific renderers and installers are still in engine
+  runtime paths.

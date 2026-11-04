@@ -1,11 +1,10 @@
 # ElseMesh schemas
 
 This directory contains engine-level document schemas and portable component
-contracts. Some component records currently supported by the source schema are
-still specific to the built-in example world; extracting those validators into
-world-owned contracts remains part of the separation work. Renderer or
-behavior documentation authored for one world belongs in that world's content
-repository, alongside its source and package assets.
+contracts. The world-source schema validates shared identity, rules, object,
+portal, and component envelopes; component payloads remain opaque to the engine.
+World-specific component formats and behavior contracts belong in each world's
+repository, alongside the source and package assets that use them.
 
 - [`world-source.schema.json`](world-source.schema.json): unsigned authoring
   document structure.
@@ -14,6 +13,4 @@ repository, alongside its source and package assets.
 - [`ai-edit-decision.schema.json`](ai-edit-decision.schema.json): local review
   decisions for AI-generated candidates.
 - [`ambient-audio.md`](ambient-audio.md): signed ambience data.
-- [`vegetation-placement.md`](vegetation-placement.md): portable placement
-  records.
 - [`water-body.md`](water-body.md): bounded terrain-independent water.

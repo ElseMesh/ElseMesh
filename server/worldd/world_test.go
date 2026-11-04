@@ -121,19 +121,20 @@ func TestWorldManifestRequiresObjectArray(t *testing.T) {
 	}
 }
 
-func TestWorldManifestAcceptsDeclarativeFishingRules(t *testing.T) {
+func TestWorldManifestAcceptsGenericBehaviorData(t *testing.T) {
 	owner := testKey(t)
 	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest := newStarterManifest("Declarative fishing rules", ownerID.String())
+	manifest := newStarterManifest("Generic behavior data", ownerID.String())
 	manifest.Experience = &worldExperience{
 		Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{},
 		Behaviors: map[string]json.RawMessage{
-			"elsemesh.fishing-game/1": json.RawMessage(`{"biteRateSchedule":{"defaultMultiplier":1,"windows":[{"startHour":5,"endHour":8.1,"multiplier":1.4}]}}`),
+			"elsemesh.example-world/1": json.RawMessage(`{"seed":7}`),
 		},
 	}
+	manifest.Experience.Stages["world-assets"] = "Loading authored assets"
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
 		t.Fatalf("valid declarative fishing behavior rejected: %v", err)
 	}
@@ -663,15 +664,15 @@ func TestWorldManifestValidatesEnabledObjectCollisionBounds(t *testing.T) {
 		t.Fatal("oversized heightfield collision accepted")
 	}
 	manifest.Objects[0].Collision.Shape = "compound"
-	manifest.Objects[0].Collision.Boxes = []collisionBox{{Center: vector3{1, 2, 3}, HalfExtents: vector3{1, 0.5, 2}, Yaw: 0.4, Walkable: true, Solid: true, Tag: "pierRail"}}
+	manifest.Objects[0].Collision.Boxes = []collisionBox{{Center: vector3{1, 2, 3}, HalfExtents: vector3{1, 0.5, 2}, Yaw: 0.4, Walkable: true, Solid: true, Tag: "elsemesh.vendor.counter"}}
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
 		t.Fatalf("valid compound collision rejected: %v", err)
 	}
-	manifest.Objects[0].Collision.Boxes[0].Tag = "arbitrary"
+	manifest.Objects[0].Collision.Boxes[0].Tag = "invalid tag"
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("unsupported compound collision tag accepted")
+		t.Fatal("malformed compound collision tag accepted")
 	}
-	manifest.Objects[0].Collision.Boxes[0].Tag = "pierRail"
+	manifest.Objects[0].Collision.Boxes[0].Tag = "elsemesh.vendor.counter"
 	manifest.Objects[0].Collision.Boxes[0].Yaw = 361
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("out-of-range compound collider yaw accepted")

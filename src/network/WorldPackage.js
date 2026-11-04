@@ -25,6 +25,7 @@ import { worldMaterialRole } from './WorldMaterialProfileRegistry.js';
 import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
 import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
 import { transformBoundsCenter } from './WorldStreaming.js';
+import { isValidWorldCollisionTag } from './WorldSource.js';
 
 const COMPONENTS = Object.freeze( {
 	POSITION: [ 'position', 3 ],
@@ -448,7 +449,7 @@ export function registerWorldPackageCollisions( root, colliders, objectIDs = nul
 			continue;
 		}
 		if ( collision.shape === 'compound' ) {
-			if ( ! Array.isArray( collision.boxes ) || collision.boxes.length === 0 || collision.boxes.length > 2048 || ! collision.boxes.every( ( item ) => item && ( item.tag === undefined || item.tag === 'pierRail' ) && Array.isArray( item.center ) && item.center.length === 3 && item.center.every( ( value ) => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( item.halfExtents ) && item.halfExtents.length === 3 && item.halfExtents.every( ( value ) => Number.isFinite( value ) && value > 0 && value <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' ) ) throw new Error( `World object ${object.id} has invalid compound collision boxes` );
+			if ( ! Array.isArray( collision.boxes ) || collision.boxes.length === 0 || collision.boxes.length > 2048 || ! collision.boxes.every( ( item ) => item && ( item.tag === undefined || isValidWorldCollisionTag( item.tag ) ) && Array.isArray( item.center ) && item.center.length === 3 && item.center.every( ( value ) => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( item.halfExtents ) && item.halfExtents.length === 3 && item.halfExtents.every( ( value ) => Number.isFinite( value ) && value > 0 && value <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' ) ) throw new Error( `World object ${object.id} has invalid compound collision boxes` );
 			const scale = object.scale || [ 1, 1, 1 ];
 			const yaw = object.transform?.yaw || 0;
 			const cos = Math.cos( yaw ), sin = Math.sin( yaw );

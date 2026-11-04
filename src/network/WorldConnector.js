@@ -1,5 +1,5 @@
 import { validatePortalBack } from './PortalSideContract.js';
-import { validateObjectLODs, validateWorldEntryPoints, validateWorldSpawn, worldComponentRuntimeRecord } from './WorldSource.js';
+import { isValidWorldCollisionTag, validateObjectLODs, validateWorldEntryPoints, validateWorldSpawn, worldComponentRuntimeRecord } from './WorldSource.js';
 import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
@@ -724,7 +724,7 @@ export function validateWorldObjects( objects, assets ) {
 		if ( collision?.enabled !== true ) continue;
 		const box = collision.shape === 'box' && validVector( collision.center ) && validVector( collision.halfExtents ) && collision.halfExtents.every( ( value ) => value > 0 && value <= 1000 ) && typeof collision.walkable === 'boolean' && typeof collision.solid === 'boolean';
 		const heightfield = collision.shape === 'heightfield' && Number.isInteger( collision.columns ) && Number.isInteger( collision.rows ) && collision.columns >= 2 && collision.rows >= 2 && collision.columns <= 4097 && collision.rows <= 4097 && collision.columns * collision.rows <= 4194304 && collision.walkable === true && collision.solid === true;
-		const compound = collision.shape === 'compound' && Array.isArray( collision.boxes ) && collision.boxes.length > 0 && collision.boxes.length <= 2048 && collision.boxes.every( ( item ) => item && ( item.tag === undefined || item.tag === 'pierRail' ) && validVector( item.center ) && item.center.every( ( value ) => Math.abs( value ) <= 1e6 ) && validVector( item.halfExtents ) && item.halfExtents.every( ( value ) => value > 0 && value <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' );
+		const compound = collision.shape === 'compound' && Array.isArray( collision.boxes ) && collision.boxes.length > 0 && collision.boxes.length <= 2048 && collision.boxes.every( ( item ) => item && ( item.tag === undefined || isValidWorldCollisionTag( item.tag ) ) && validVector( item.center ) && item.center.every( ( value ) => Math.abs( value ) <= 1e6 ) && validVector( item.halfExtents ) && item.halfExtents.every( ( value ) => value > 0 && value <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' );
 		invariant( box || heightfield || compound, `World object ${object.id || '(unknown)'} has invalid collision bounds` );
 	}
 	const objectByID = new Map( objects.map( ( object ) => [ object.id, object ] ) );

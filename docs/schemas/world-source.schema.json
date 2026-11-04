@@ -68,20 +68,7 @@
           "type": "object",
           "maxProperties": 12,
           "propertyNames": {
-            "enum": [
-              "gpu",
-              "atmosphere",
-              "terrain",
-              "village",
-              "vegetation",
-              "ocean",
-              "reef",
-              "simulation",
-              "shaders",
-              "world",
-              "compile",
-              "warmup"
-            ]
+            "pattern": "^[a-z][a-z0-9.-]{0,63}$"
           },
           "additionalProperties": {
             "type": "string",
@@ -457,7 +444,7 @@
             }
           ],
           "additionalProperties": false,
-          "description": "Optional destination vehicle acceptance. The current client implements the Downeast boat type. Accepted transfers apply maxSpeed and require configured avatar complexity plus vehicle complexity to fit maxCombinedComplexity. allowedCombinations can moderate exact avatar and vehicle types. Omission or enabled=false denies vehicle transfer."
+          "description": "Optional destination vehicle acceptance. Accepted transfers apply maxSpeed and require configured avatar complexity plus vehicle complexity to fit maxCombinedComplexity. allowedCombinations can moderate exact avatar profile and vehicle type pairs. Omission or enabled=false denies vehicle transfer."
         },
         "maxPackageBytes": {
           "type": "integer",
@@ -831,8 +818,9 @@
                     "type": "boolean"
                   },
                   "tag": {
-                    "const": "pierRail",
-                    "description": "Optional semantic tag retained for bird perching on the Example Island pier rails."
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,63}$",
+                    "description": "Optional bounded semantic tag. The owning world's behavior defines its meaning."
                   }
                 },
                 "additionalProperties": false
