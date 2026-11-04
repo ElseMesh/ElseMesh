@@ -28,6 +28,7 @@ assert.doesNotMatch( appSource, /from ['"]\.\.\/worlds\/default\.js['"]/, 'the e
 assert.doesNotMatch( appSource, /from ['"]\.\/world\/WorldLayout\.js['"]/, 'App has no direct static import of built-in world layout' );
 assert.match( appSource, /if \( ! worldLink \) \{\s+const \{ WORLD \} = await import\( '\.\/world\/WorldLayout\.js' \)/, 'App loads built-in world layout only for built-in launches' );
 assert.doesNotMatch( playerSource, /from ['"]\.\.\/world\/WorldLayout\.js['"]/, 'the generic player receives world layout data from its caller' );
+assert.doesNotMatch( playerSource, /from ['"]\.\.\/world\/boat\/BoatSpecs\.js['"]/, 'vehicle control geometry comes from the supplied design rather than Tidewater specifications' );
 assert.doesNotMatch( soundScapeSource, /from ['"]\.\.\/world\/WorldLayout\.js['"]/, 'the audio engine receives optional world acoustic layout from its caller' );
 assert.match( appSource, /new Player\( \{[^\n]*worldLayout: this\.worldLayout/, 'the built-in WebGPU player receives its world layout from App' );
 assert.match( fallbackSource, /new Player\( \{[^\n]*worldLayout: this\.islandDefinition/, 'the built-in WebGL player receives its world layout from the fallback' );

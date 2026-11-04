@@ -1,9 +1,8 @@
 import * as THREE from '../engine/math/index.js';
-import { HOUSE } from '../world/boat/BoatSpecs.js';
 import { gravityAcceleration, movementParameters } from '../network/WorldRules.js';
 import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
 
-const HOUSE_HELM = { x: HOUSE.helmX, z: HOUSE.seatZ };
+const DEFAULT_HELM = { x: 0, z: 0 };
 
 const EYE = PLAYER_EYE_HEIGHT;
 const SWIM_EYE = EYE * 0.1; // eyes above the body's float point while swimming
@@ -599,7 +598,7 @@ export class Player {
 		b.driven = false;
 		b.throttle = 0;
 		this.mode = 'deck';
-		const helm = b.design.helmPosition || new THREE.Vector3( HOUSE_HELM.x, b.design.lines.deckY, HOUSE_HELM.z );
+		const helm = b.design.helmPosition || new THREE.Vector3( DEFAULT_HELM.x, b.design.lines.deckY, DEFAULT_HELM.z );
 		this.deckPos.set( helm.x + 0.45, b.design.lines.deckY, helm.z - 0.1 );
 		this.deckVel.set( 0, 0, 0 );
 		this.deckYaw = this.helmYaw;
@@ -816,7 +815,7 @@ export class Player {
 		this.deckToWorld();
 
 		// prompts: take the helm, or step ashore
-		const helm = b.design.helmPosition || HOUSE_HELM;
+		const helm = b.design.helmPosition || DEFAULT_HELM;
 		const hx = helm.x, hz = helm.z;
 		const nearHelm = Math.hypot( p.x - hx, p.z - hz ) < HELM_REACH && ! this.busy;
 		this._ashoreT -= dt;
