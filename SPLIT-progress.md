@@ -183,6 +183,17 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-04: captured the hosted Tidewater world in the same isolated Weston
+  session at the same camera pose, time of day, and native 1588×780 viewport in
+  WebGPU and WebGL. The WebGPU view retains detailed terrain/foliage, blue water,
+  and visible wet-sand reflections. WebGL shows broad pale/white beach areas,
+  simpler foliage, and brighter, more jagged shoreline foam. This confirms a
+  substantial live visual gap between the current backends; neither screenshot
+  is the pre-split baseline. The displayed 13 FPS and 6 FPS are brief overlay
+  samples, not controlled performance measurements. Hosted WebGPU now honors the
+  same debug camera pose as WebGL, with focused camera/routing tests passing.
+  No parity percentage changes: the visual acceptance gate remains open.
+
 - 2026-11-04: Corrected the prior tone-mapping change after source review showed
   WebGPU uses ACES filmic, not Reinhard. WebGL is back on ACES filmic with the
   live app exposure. The saved Reinhard capture is explicitly invalid as parity

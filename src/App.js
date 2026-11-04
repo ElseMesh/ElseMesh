@@ -880,6 +880,7 @@ export class App {
 		}, { passive: true } );
 		this.gpu = GPU;
 		window.__app = this;
+		installDebugViews( this );
 
 		// Build only the pipeline variants touched by the starting view before handing
 		// control to the player. Later streamed cells compile asynchronously in the
@@ -931,7 +932,8 @@ export class App {
 		this.cameraWaterHeight = this.player.hostedSeaLevel === null ? null : this.hostedQuery?.cpuValid && Number.isFinite( this.hostedQuery.cpu[ 0 ] ) ? this.hostedQuery.cpu[ 0 ] : this.player.hostedSeaLevel;
 		G.cameraUnderwater.value = this.cameraWaterHeight !== null && this.camera.position.y < this.cameraWaterHeight - LENS_REACH ? 1 : 0;
 		G.cameraWaterHeight.value = this.cameraWaterHeight ?? G.seaLevel.value;
-		this.player.updateHostedWorld( dt );
+		if ( this.freeCam ) this.updateFreeCamera( dt );
+		else this.player.updateHostedWorld( dt );
 		dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
 		this.updateWorldPortals();
 		this.updateWorldStreaming();
