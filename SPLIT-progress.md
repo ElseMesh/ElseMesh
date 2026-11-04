@@ -41,7 +41,10 @@ constructs WebGL-only fish-stand, chandlery, and game presentation, and
 `register-behavior.js` exposes WebGL-named hooks. The target is for a world to
 provide backend-neutral content, placements, material inputs, and behavior data
 while ElseMesh owns renderer selection and both backend implementations. The
-static model instance-set format now has a signed asset resolver, shared
+fishing rod input transitions are now handled by Tidewater's shared
+`FishingInputController` from both renderer adapters; frame simulation, vendor
+interactions, and fishing presentation are still maintained in separate paths.
+The static model instance-set format now has a signed asset resolver, shared
 visibility/LOD runtime, and engine-owned WebGPU and WebGL adapters. A generated
 GLB fixture checks installation, transformed geometry, instance updates,
 separate shadow batches, and rendered pixels on both backends. Tidewater's
