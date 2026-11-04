@@ -233,7 +233,9 @@ finding changes them.
   rock exclusion, and jungle suppression inputs. The CPU-built terrain mask now
   supplies rock and jungle weights to the shader; dynamic wetness still comes
   from the analytic shore estimate rather than WebGPU's persistent ShoreSim
-  channel. The focused terrain material test and external production build pass;
+  channel. The focused terrain material test and external production build pass.
+  An isolated Chromium WebGL render of synthetic sand and rock confirms that
+  wet darkening changes the sand and leaves the rock unchanged. Tidewater
   visual parity remains unverified and the estimate stays 82%.
 
 - 2026-11-04: isolated the WebGL terrain patch by capturing the hosted world
