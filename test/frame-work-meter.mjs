@@ -38,4 +38,47 @@ clock = 2000;
 assert.equal( meter.gpuMilliseconds(), null, 'stale GPU samples are excluded' );
 meter.dispose();
 assert.ok( readBuffers.length >= 3 );
-console.log( 'Whole-frame GPU timestamp meter bounds readback and rejects stale samples' );
+
+let webglClock = 0, disjoint = false, activeQuery = null, resultReads = 0, deletedQueries = 0;
+let nextQuery = 0;
+const webglExtension = { TIME_ELAPSED_EXT: 11, GPU_DISJOINT_EXT: 12 };
+const gl = {
+	QUERY_RESULT_AVAILABLE: 13,
+	QUERY_RESULT: 14,
+	getExtension: name => name === 'EXT_disjoint_timer_query_webgl2' ? webglExtension : null,
+	createQuery: () => ( { id: ++ nextQuery, available: false } ),
+	deleteQuery: () => { deletedQueries ++; },
+	getParameter: name => name === webglExtension.GPU_DISJOINT_EXT ? disjoint : null,
+	beginQuery: ( target, query ) => { assert.equal( target, webglExtension.TIME_ELAPSED_EXT ); activeQuery = query; },
+	endQuery: target => { assert.equal( target, webglExtension.TIME_ELAPSED_EXT ); activeQuery = null; },
+	getQueryParameter: ( query, name ) => {
+		if ( name === gl.QUERY_RESULT_AVAILABLE ) return query.available;
+		assert.equal( name, gl.QUERY_RESULT );
+		resultReads ++;
+		return 3_500_000;
+	},
+};
+const webglMeter = new FrameWorkMeter( { webglRenderer: { getContext: () => gl }, clock: () => webglClock, intervalMs: 0 } );
+assert.equal( webglMeter.enabled, true, 'WebGL2 timer-query support enables GPU timing' );
+assert.equal( webglMeter.begin(), true );
+webglMeter.end();
+assert.equal( webglMeter.gpuMilliseconds(), null, 'WebGL query results are not read before availability' );
+assert.equal( resultReads, 0, 'pending WebGL queries do not synchronously request the result' );
+webglMeter.slots.find( slot => slot.pending ).query.available = true;
+assert.equal( webglMeter.gpuMilliseconds(), 3.5, 'WebGL elapsed nanoseconds are reported in milliseconds' );
+assert.equal( resultReads, 1 );
+
+webglClock = 2000;
+assert.equal( webglMeter.gpuMilliseconds(), null, 'stale WebGL measurements are excluded' );
+assert.equal( webglMeter.begin(), true );
+webglMeter.end();
+disjoint = true;
+assert.equal( webglMeter.gpuMilliseconds(), null, 'disjoint WebGL timer queries are discarded' );
+disjoint = false;
+webglMeter.dispose();
+assert.equal( deletedQueries, 3, 'WebGL query objects are released on dispose' );
+
+const unsupportedMeter = new FrameWorkMeter( { webglRenderer: { getContext: () => ( { getExtension: () => null } ) } } );
+assert.equal( unsupportedMeter.begin(), false, 'missing WebGL timer-query support leaves timing unavailable' );
+unsupportedMeter.dispose();
+console.log( 'WebGPU timestamps and non-blocking WebGL timer queries report bounded GPU samples' );

@@ -39,6 +39,7 @@ try {
 	assert.equal( app.hostedPackageWorld, undefined, 'the bootstrap is the only method that marks hosted package runtime state' );
 	assert.match( App.prototype.initHostedPackageWorld.toString(), /installDebugViews\( this \)/, 'hosted WebGPU worlds install the shared camera review controls' );
 	assert.match( App.prototype.hostedPackageFrame.toString(), /if \( this\.freeCam \) this\.updateFreeCamera\( dt \);\s*else this\.player\.updateHostedWorld\( dt \);/, 'hosted WebGPU frames preserve the inspection camera when free camera is enabled' );
+	assert.match( App.prototype.hostedPackageFrame.toString(), /this\.localLights\.update\( this\.camera, dt, \{ includeDefaultSources: ! this\.remoteWorldActive \} \)/, 'hosted WebGPU frames update punctual lights parsed from world GLBs' );
 	console.log( 'hosted WebGPU launches bypass built-in island initialization' );
 } finally {
 	Engine.prototype.init = originalEngineInit;

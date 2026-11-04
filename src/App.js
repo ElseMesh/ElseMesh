@@ -953,6 +953,7 @@ export class App {
 		this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
 		this.updateWorldComponents( this.linkedWorldRoot, dt, this.camera, this.renderLoadBias );
 		updateWorldPackageLOD( this.linkedWorldRoot, this.camera, this.renderLoadBias );
+		this.localLights.update( this.camera, dt, { includeDefaultSources: ! this.remoteWorldActive } );
 		setFrameCamera( this.camera, this.engine.width, this.engine.height );
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
 		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera, this.renderLoadBias );
