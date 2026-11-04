@@ -5,6 +5,20 @@ import { StaticModelInstanceSetPlanner, staticModelInstanceCamera } from './Stat
 
 const _position = new Vector3(), _rotation = new Quaternion(), _scale = new Vector3(), _matrix = new Matrix4();
 
+/** Freeze backend draw-batch transforms after their world matrices are calculated. */
+export function freezeStaticModelInstanceBatchTransforms( root, groups ) {
+	root.updateWorldMatrix( true, false );
+	for ( const group of groups ) for ( const batch of group ) {
+		const mesh = batch.mesh;
+		if ( ! mesh || mesh.parent !== root ) throw new Error( 'Static model instance batches must be direct children of their world root' );
+		mesh.updateMatrix();
+		mesh.matrixWorld.multiplyMatrices( root.matrixWorld, mesh.matrix );
+		mesh.matrixAutoUpdate = false;
+		mesh.matrixWorldAutoUpdate = false;
+		mesh.matrixWorldNeedsUpdate = false;
+	}
+}
+
 // Write compacted transforms into a caller-owned instance-matrix array. The source
 // records and selection policy remain shared by both renderer implementations.
 export function writeStaticModelInstanceMatrices( document, group, target ) {

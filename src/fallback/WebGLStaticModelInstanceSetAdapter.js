@@ -1,6 +1,6 @@
 import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
-import { StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
+import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
@@ -118,10 +118,12 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ] );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
+				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
 			} ),
 			dispose: disposeOwned,
 		} );
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
+		freezeStaticModelInstanceBatchTransforms( fallback.scene, mainBatches );
 		return { installed: true, runtime };
 	} catch ( error ) {
 		disposeOwned();

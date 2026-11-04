@@ -4,7 +4,7 @@ import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
 import { loadWorldPackageModelAsset } from './WorldPackage.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
-import { StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
+import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from './WorldObjectLOD.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
@@ -59,10 +59,12 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				const draws = createModelDraws( source, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
+				freezeStaticModelInstanceBatchTransforms( root, [ draws ] );
 			} ),
 			dispose: disposeOwned,
 		} );
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) root.add( mesh );
+		freezeStaticModelInstanceBatchTransforms( root, [ ...mainBatches, ...shadowBatches ] );
 		return { installed: true, runtime };
 	} catch ( error ) {
 		disposeOwned();
