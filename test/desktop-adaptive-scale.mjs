@@ -118,6 +118,6 @@ app.settings.renderScale = 0.5;
 app._scaleBelowTarget = 0;
 changes.length = 0;
 for ( let i = 0; i < 20; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );
-if ( changes.length !== 0 ) throw new Error( 'automatic scaling must stop at 50% resolution' );
+if ( changes.length !== 3 || changes.at( - 1 ) !== 0.35 || changes.some( scale => scale < 0.35 ) ) throw new Error( 'automatic scaling must stop at 35% resolution' );
 
 console.log( 'ok   Linux graphics priority defaults, persistence, live switching and adaptive render scale' );

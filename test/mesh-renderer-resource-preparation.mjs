@@ -60,11 +60,28 @@ renderer.render( scene, {
 	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,
 	depthView: target.depthTexture.view(), depthFormat: 'depth32float', clearDepth: 0,
 } );
+const scratch = renderer.renderScratch[ 0 ];
+const firstItem = scratch.lists.opaque[ 0 ];
+const firstDistance = firstItem.z;
 GPU.submit();
 await GPU.queue.onSubmittedWorkDone();
 await new Promise( resolve => setTimeout( resolve, 50 ) );
 
 assert.ok( detailTexture, 'the material resolves its lazy detail texture' );
 assert.deepEqual( errors, [], `lazy texture mip generation stays outside the render pass: ${errors.join( '; ' )}` );
-console.log( 'MeshRenderer prepares lazy GPU resources before opening a render pass' );
+
+camera.position.z = 4;
+GPU.beginFrame();
+setFrameCamera( camera, W, H );
+renderer.render( scene, {
+	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,
+	depthView: target.depthTexture.view(), depthFormat: 'depth32float', clearDepth: 0,
+} );
+GPU.submit();
+await GPU.queue.onSubmittedWorkDone();
+assert.equal( renderer.renderScratch[ 0 ], scratch, 'frame scratch storage is reused' );
+assert.equal( scratch.lists.opaque[ 0 ], firstItem, 'collected draw-item records are reused' );
+assert.notEqual( firstItem.z, firstDistance, 'reused draw-item records refresh camera-dependent distance' );
+assert.deepEqual( errors, [], `reused renderer scratch stays valid: ${errors.join( '; ' )}` );
+console.log( 'MeshRenderer prepares lazy resources and reuses frame draw-list scratch' );
 GPU.device.destroy();

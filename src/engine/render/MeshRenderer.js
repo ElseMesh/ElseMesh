@@ -30,6 +30,18 @@ const _camPos = new Vector3();
 const _layouts = new WeakMap();
 let _listToken = 0; // one per drawItems call (see BindingSet.getBindGroup)
 
+const sortOpaqueItems = ( a, b ) => a.renderOrder - b.renderOrder || a.pipeKey - b.pipeKey || a.z - b.z;
+const sortTransparentItems = ( a, b ) => a.renderOrder - b.renderOrder || b.z - a.z;
+
+function createRenderScratch() {
+	return {
+		lists: { opaque: [], transparent: [] },
+		itemRecords: new WeakMap(),
+		preparedOpaque: [],
+		preparedTransparent: [],
+	};
+}
+
 const DRAW_STRIDE = 256; // minUniformBufferOffsetAlignment
 const DRAW_FLOATS = 40;
 
@@ -47,6 +59,8 @@ export class MeshRenderer {
 		this.stats = { draws: 0, triangles: 0, pipelines: 0 };
 		this.drawLayout = null;
 		this.drawBindGroup = null;
+		this.renderScratch = [];
+		this.renderDepth = 0;
 		// true: a draw compiles its pipeline on the spot (one-off bakes, portraits, tests); the engine's
 		// scene renderer sets false: pipelines compile in the background and a draw is skipped until
 		// its pipeline is ready (no first-use stalls)
@@ -387,10 +401,19 @@ export class MeshRenderer {
 
 	// ------------------------------------------------------------------------------ draw lists
 
-	collect( scene, { camera, layerMask = 0xffffffff, filter = null, kind = 'main', cull = true } ) {
+	collect( scene, options = {} ) {
 
-		const opaque = [];
-		const transparent = [];
+		const lists = { opaque: [], transparent: [] };
+		this._collectInto( scene, options, lists, new WeakMap() );
+		return lists;
+
+	}
+
+	_collectInto( scene, { camera, layerMask = 0xffffffff, filter = null, kind = 'main', cull = true }, lists, itemRecords ) {
+
+		const { opaque, transparent } = lists;
+		opaque.length = 0;
+		transparent.length = 0;
 		if ( camera ) {
 
 			camera.updateMatrixWorld();
@@ -411,7 +434,7 @@ export class MeshRenderer {
 
 					// ported systems use this for their own LOD / culling (called per pass, as three does)
 					if ( o.onBeforeRender ) o.onBeforeRender( null, null, camera, o.geometry, o.material, null );
-					if ( o.visible || all ) this._addItems( o, opaque, transparent );
+					if ( o.visible || all ) this._addItems( o, opaque, transparent, itemRecords );
 
 				}
 
@@ -423,9 +446,9 @@ export class MeshRenderer {
 
 		scene.updateMatrixWorld();
 		visit( scene );
-		opaque.sort( ( a, b ) => a.renderOrder - b.renderOrder || a.pipeKey - b.pipeKey || a.z - b.z );
-		transparent.sort( ( a, b ) => a.renderOrder - b.renderOrder || b.z - a.z );
-		return { opaque, transparent };
+		opaque.sort( sortOpaqueItems );
+		transparent.sort( sortTransparentItems );
+		return lists;
 
 	}
 
@@ -450,35 +473,48 @@ export class MeshRenderer {
 
 	}
 
-	_addItems( o, opaque, transparent ) {
+	_addItems( o, opaque, transparent, itemRecords ) {
 
 		const geo = o.geometry;
 		const mats = Array.isArray( o.material ) ? o.material : null;
 		const z = _v.setFromMatrixPosition( o.matrixWorld ).distanceToSquared( _camPos );
-		const push = ( material, start, count ) => {
-
-			if ( ! material || ( ! material.visible && ! this.precompiling ) ) return;
-			const item = { object: o, geometry: geo, material, start, count, z, renderOrder: o.renderOrder || 0, pipeKey: material.id };
-			( material.transparent ? transparent : opaque ).push( item );
-
-		};
+		let records = itemRecords.get( o );
+		if ( ! records ) itemRecords.set( o, records = [] );
 
 		const range = geo.drawRange || { start: 0, count: Infinity };
 		if ( mats && geo.groups && geo.groups.length ) {
 
-			for ( const g of geo.groups ) {
+			for ( let i = 0; i < geo.groups.length; i ++ ) {
+
+				const g = geo.groups[ i ];
 
 				const start = Math.max( g.start, range.start );
 				const end = Math.min( g.start + g.count, range.start + range.count );
-				if ( end > start ) push( mats[ g.materialIndex ], start, end - start );
+				if ( end > start ) this._pushItem( o, geo, mats[ g.materialIndex ], start, end - start, z, opaque, transparent, records, i );
 
 			}
 
 		} else {
 
-			push( mats ? mats[ 0 ] : o.material, range.start, range.count );
+			this._pushItem( o, geo, mats ? mats[ 0 ] : o.material, range.start, range.count, z, opaque, transparent, records, 0 );
 
 		}
+
+	}
+
+	_pushItem( o, geo, material, start, count, z, opaque, transparent, records, slot ) {
+
+		if ( ! material || ( ! material.visible && ! this.precompiling ) ) return;
+		const item = records[ slot ] || ( records[ slot ] = {} );
+		item.object = o;
+		item.geometry = geo;
+		item.material = material;
+		item.start = start;
+		item.count = count;
+		item.z = z;
+		item.renderOrder = o.renderOrder || 0;
+		item.pipeKey = material.id;
+		( material.transparent ? transparent : opaque ).push( item );
 
 	}
 
@@ -486,52 +522,72 @@ export class MeshRenderer {
 
 	render( scene, pass ) {
 
-		this._beginFrame();
-		pass = {
-			kind: 'main', late: false, colorFormats: [], depthFormat: null, depthCompare: 'greater-equal',
-			frameBlock: FrameUniforms, layerMask: 0xffffffff, ...pass,
-		};
-		pass.passKey = `${ pass.kind }.${ pass.late ? 1 : 0 }.${ pass.colorFormats.join( ',' ) }.${ pass.depthFormat }.${ pass.depthCompare }.${ pass.cullOverride || '' }.${ pass.defines ? JSON.stringify( pass.defines ) : '' }`;
-		const lists = pass.items || this.collect( scene, pass );
-		const enc = GPU.getEncoder();
-		const opaque = this._prepareItems( lists.opaque, pass );
-		const transparent = this._prepareItems( lists.transparent, pass );
-		const colorAttachments = ( pass.colorViews || [] ).map( ( view, i ) => {
+		const depth = this.renderDepth ++;
+		const scratch = this.renderScratch[ depth ] || ( this.renderScratch[ depth ] = createRenderScratch() );
+		try {
+			this._beginFrame();
+			pass = {
+				kind: 'main', late: false, colorFormats: [], depthFormat: null, depthCompare: 'greater-equal',
+				frameBlock: FrameUniforms, layerMask: 0xffffffff, ...pass,
+			};
+			pass.passKey = `${ pass.kind }.${ pass.late ? 1 : 0 }.${ pass.colorFormats.join( ',' ) }.${ pass.depthFormat }.${ pass.depthCompare }.${ pass.cullOverride || '' }.${ pass.defines ? JSON.stringify( pass.defines ) : '' }`;
+			const lists = pass.items || this._collectInto( scene, pass, scratch.lists, scratch.itemRecords );
+			const enc = GPU.getEncoder();
+			const opaque = this._prepareItems( lists.opaque, pass, scratch.preparedOpaque );
+			const transparent = this._prepareItems( lists.transparent, pass, scratch.preparedTransparent );
+			const colorAttachments = ( pass.colorViews || [] ).map( ( view, i ) => {
 
-			const clear = pass.clearColors ? pass.clearColors[ i ] : null;
-			return { view, loadOp: clear ? 'clear' : 'load', storeOp: 'store', clearValue: clear || [ 0, 0, 0, 0 ] };
+				const clear = pass.clearColors ? pass.clearColors[ i ] : null;
+				return { view, loadOp: clear ? 'clear' : 'load', storeOp: 'store', clearValue: clear || [ 0, 0, 0, 0 ] };
 
-		} );
-		const desc = { label: pass.label || pass.kind, colorAttachments };
-		if ( pass.depthView ) desc.depthStencilAttachment = {
-			view: pass.depthView,
-			depthLoadOp: pass.clearDepth === null || pass.clearDepth === undefined ? 'load' : 'clear',
-			depthStoreOp: 'store',
-			depthClearValue: pass.clearDepth ?? 0,
-		};
-		if ( pass.timestampWrites ) desc.timestampWrites = pass.timestampWrites;
-		withRenderPass( enc, desc, ( rp ) => {
+			} );
+			const desc = { label: pass.label || pass.kind, colorAttachments };
+			if ( pass.depthView ) desc.depthStencilAttachment = {
+				view: pass.depthView,
+				depthLoadOp: pass.clearDepth === null || pass.clearDepth === undefined ? 'load' : 'clear',
+				depthStoreOp: 'store',
+				depthClearValue: pass.clearDepth ?? 0,
+			};
+			if ( pass.timestampWrites ) desc.timestampWrites = pass.timestampWrites;
+			withRenderPass( enc, desc, ( rp ) => {
 
-			if ( pass.viewport ) rp.setViewport( ...pass.viewport );
-			rp.setBindGroup( 0, group0ForBlock( pass.frameBlock, 'render' ).getBindGroup() );
-			this.drawItems( rp, lists.opaque, opaque );
-			if ( pass.betweenLists ) pass.betweenLists( rp );
-			this.drawItems( rp, lists.transparent, transparent );
-			if ( pass.after ) pass.after( rp );
+				if ( pass.viewport ) rp.setViewport( ...pass.viewport );
+				rp.setBindGroup( 0, group0ForBlock( pass.frameBlock, 'render' ).getBindGroup() );
+				this.drawItems( rp, lists.opaque, opaque );
+				if ( pass.betweenLists ) pass.betweenLists( rp );
+				this.drawItems( rp, lists.transparent, transparent );
+				if ( pass.after ) pass.after( rp );
 
-		} );
+			} );
+		} finally {
+			this.renderDepth = depth;
+		}
 
 	}
 
-	_prepareItems( items, pass ) {
+	_prepareItems( items, pass, prepared ) {
 
 		const token = ++ _listToken;
-		const prepared = new Map();
+		const previousLength = prepared.length;
+		let index = 0;
 		for ( const it of items ) {
 
+			prepared[ index ] = null;
+
 			const { object: o, geometry: geo, material } = it;
-			if ( ! geo.attributes.position && ! geo.vertexCount && ! geo.indirect ) continue;
-			if ( ( o.isInstancedMesh ? o.count : geo.instanceCount ?? 1 ) === 0 ) continue;
+			if ( ! geo.attributes.position && ! geo.vertexCount && ! geo.indirect ) {
+
+				index ++;
+				continue;
+
+			}
+
+			if ( ( o.isInstancedMesh ? o.count : geo.instanceCount ?? 1 ) === 0 ) {
+
+				index ++;
+				continue;
+
+			}
 			let vl, p;
 			if ( this.precompiling ) {
 
@@ -543,10 +599,12 @@ export class MeshRenderer {
 
 				} catch ( e ) {
 
+					index ++;
 					continue;
 
 				}
 
+				index ++;
 				continue; // only the pipelines are wanted
 
 			}
@@ -554,11 +612,23 @@ export class MeshRenderer {
 			vl = this._cachedLayout( o, geo, material );
 			p = this._pipeline( material, vl, pass );
 			const pipeline = p.handle.pipeline || ( this.syncPipelines ? GPU.ready( p.handle ) : null );
-			if ( ! pipeline ) continue; // still compiling
+			if ( ! pipeline ) {
+
+				index ++;
+				continue; // still compiling
+
+			}
 			const group = p.bindings.getBindGroup( token );
-			prepared.set( it, { vl, p, pipeline, group } );
+			const draw = prepared[ index ] || ( prepared[ index ] = {} );
+			draw.vl = vl;
+			draw.p = p;
+			draw.pipeline = pipeline;
+			draw.group = group;
+			index ++;
 
 		}
+		for ( ; index < previousLength; index ++ ) prepared[ index ] = null;
+		prepared.length = Math.max( previousLength, items.length );
 
 		return prepared;
 
@@ -567,9 +637,11 @@ export class MeshRenderer {
 	drawItems( rp, items, prepared ) {
 
 		let lastPipeline = null, lastGroup = null;
-		for ( const it of items ) {
+		for ( let i = 0; i < items.length; i ++ ) {
 
-			const draw = prepared.get( it );
+			const it = items[ i ];
+
+			const draw = prepared[ i ];
 			if ( ! draw ) continue;
 			const { object: o, geometry: geo } = it;
 			const { vl, p, pipeline, group } = draw;

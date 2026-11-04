@@ -1193,7 +1193,8 @@ export class App {
 			this._scaleBelowTarget += 0.5;
 			if ( this._scaleBelowTarget >= 1 ) {
 				this._scaleBelowTarget = 0;
-				if ( this.settings.renderScale > 0.35 ) this.setRenderScale( Math.max( 0.35, this.settings.renderScale - 0.05 ) );
+				const nextScale = Math.max( 0.35, Math.round( ( this.settings.renderScale - 0.05 ) * 100 ) / 100 );
+				if ( nextScale < this.settings.renderScale ) this.setRenderScale( nextScale );
 			}
 			return;
 
