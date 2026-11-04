@@ -767,7 +767,7 @@ export class WebGLFallback {
 		this.cloudsEnabled = this.worldEnvironment.clouds && ! this.app.qs.has( 'noClouds' );
 		this.reviewPose = cameraPoseFromSearch( location.search );
 		if ( this.reviewPose?.time !== undefined ) this.app.settings.timeOfDay = this.reviewPose.time;
-		this.renderer.toneMapping = T.ReinhardToneMapping;
+		this.renderer.toneMapping = T.ACESFilmicToneMapping;
 		this.ktx2Loader ||= createWebGLKTX2Loader( this.renderer );
 		this.loader.setKTX2Loader( this.ktx2Loader );
 		this.renderer.toneMappingExposure = this.app.settings.exposure;
