@@ -70,9 +70,11 @@ parity is complete.
   This lets the existing wetness-dependent terrain roughness produce the same
   class of sky specular response as WebGPU, without world-specific reflection
   code. A synthetic WebGL2 render confirms that the environment changes terrain
-  shading. A hosted Tidewater capture at the authored beach view also confirms
-  the terrain has an environment response; a frozen with/without comparison
-  shows a clear beach-pixel change. See
+  shading and that lowering roughness sharpens reflected sky; the test exercises
+  sun and cloud refreshes. A glossy-versus-rough render fixture reports a sum of
+  absolute RGB-channel differences of 11,374. A hosted Tidewater capture at the
+  authored beach view confirms the terrain has an environment response; a
+  frozen with/without comparison shows a clear beach-pixel change. See
   [hosted WebGL sky IBL capture](docs/images/hosted-tidewater-webgl-sky-ibl-2026-11-05.png).
   The capture is not synchronized against the pre-split WebGPU image, and WebGL
   still differs in water, beach materials, and post-processing. The renderer

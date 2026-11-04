@@ -79,7 +79,7 @@ try {
 	const [ low, high ] = [ ...metrics.changes ].sort( ( a, b ) => a - b );
 	assert( high > 10000, `wet sand responds to darkening (${high})` );
 	assert( low < high * 0.02, `the rock side excludes wet darkening (${low} vs ${high})` );
-	console.log( `WebGL terrain render passed (sand change ${high}, rock change ${low})` );
+	console.log( `WebGL terrain render passed (${JSON.stringify( metrics )})` );
 } finally {
 	socket?.close();
 	if ( browser ) await stopBrowser( browser );
