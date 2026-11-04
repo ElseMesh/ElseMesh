@@ -309,12 +309,13 @@ function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 			const splatOffset = source * 4;
 			const path = packagedSurface ? packagedSurface.splat[ splatOffset + 1 ] / 255 : terrain.path[ source ] / 255;
 			const gully = packagedSurface ? packagedSurface.splat[ splatOffset + 2 ] / 255 : terrain.gully[ source ] / 255;
-			const sand = packagedSurface ? packagedSurface.splat[ splatOffset ] / 255 : terrain.sand[ source ] / 255, seabed = 1 - smooth( - 22, - 3, h );
+			const sand = packagedSurface ? packagedSurface.splat[ splatOffset ] / 255 : terrain.sand[ source ] / 255;
+			const sandWeight = smooth( 0.3, 0.72, sand ), seabed = 1 - smooth( - 0.6, 0.12, h );
 			const rock = Math.max( packagedSurface ? packagedSurface.normal[ splatOffset + 2 ] / 255 : terrain.rock[ source ], smooth( 0.34, 0.62, slope ) * smooth( 2, 30, h ) );
 			color = mix( color, palette.soil, Math.max( path * 0.92, gully * ( 1 - rock ) * 0.5 ) );
 			color = mix( color, palette.rock, rock );
-			color = mix( color, palette.sand, sand * ( 1 - seabed ) );
-			color = mix( color, palette.seabed, seabed * ( 1 - sand * 0.3 ) );
+			color = mix( color, palette.sand, sandWeight * ( 1 - seabed ) );
+			color = mix( color, palette.seabed, seabed * ( 1 - sandWeight * 0.3 ) );
 			const seabedDetail = packagedSurface ? packagedSurface.splat[ splatOffset + 2 ] / 255 : terrain.seagrass[ source ] / 255;
 			const seabedRock = packagedSurface ? packagedSurface.splat[ splatOffset + 3 ] / 255 : terrain.rubble[ source ] / 255;
 			color = mix( color, palette.green, seabedDetail * seabed );
