@@ -149,7 +149,7 @@ const app = Object.assign( Object.create( App.prototype ), {
 	linkedWorldRoot: { userData: {} }, hostedColliders: new Colliders(), hostedWaterSurface,
 	hostedQueries: new WeakMap( [ [ hostedWaterSurface, hostedQuery ] ] ), hostedQuery, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(),
-	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
+	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} }, localLights: { setWorldPackage() {} },
 	portalPreviousPosition: new Vector3(), portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
 } );
 await app.enterWorldPortal( handoffPortal, { connector: destination, root: { userData: { worldComponents: [] } } }, camera.position.clone() );
@@ -216,7 +216,7 @@ const vehiclePortalApp = Object.assign( Object.create( App.prototype ), {
 	linkedWorldRoot: { userData: {} }, hostedColliders: colliders, hostedWaterSurface,
 	hostedQueries: new WeakMap( [ [ hostedWaterSurface, hostedQuery ] ] ), hostedQuery, hostedPlayerSlot: 0,
 	scene: { remove() {}, add() {} }, ocean: { visible: true }, worldBackgroundLoads: new Map(), remoteWorlds: new Map(), portalPreviousPosition: new Vector3(),
-	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} },
+	baseUnderwaterLighting: { activate() {} }, baseGroundBounce: { activate() {} }, localLights: { setWorldPackage() {} },
 	portalPreparations: new Map(), streamWorldRemainder() {}, startWorldPresence() {},
 } );
 const vehicleDestinationRoot = { userData: { worldComponents: [ destinationBoatRuntime ] } };

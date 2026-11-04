@@ -23,7 +23,6 @@ import { HeightfieldTerrainData } from './world/HeightfieldTerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
-import { WORLD } from './world/WorldLayout.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
 import { BoatModel } from './world/BoatModel.js';
@@ -295,13 +294,17 @@ export class App {
 		if ( engine.backend === 'webgpu' && worldLink ) return this.initHostedPackageWorld( progress );
 		// The WebGL hosted path builds its player and collision state from the
 		// active package. Do not instantiate the built-in island for that launch.
+		if ( ! worldLink ) {
+			const { WORLD } = await import( './world/WorldLayout.js' );
+			this.worldLayout = WORLD;
+		}
 		if ( engine.backend !== 'webgl' || ! worldLink ) await this.initializeIslandWorldState();
 		if ( engine.backend === 'webgl' ) {
 
 			// WebGL uses the fallback game loop, so it must own the same audio
 			// lifecycle as the WebGPU loop. AudioContext creation still waits for
 			// the first canvas gesture because of browser autoplay policy.
-			this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
+			this.audio = qs.has( 'noAudio' ) ? null : new SoundScape( { worldLayout: this.worldLayout } );
 			const { WebGLFallback } = await import( './fallback/WebGLFallback.js' );
 			this.webglFallback = new WebGLFallback( this, engine );
 			await this.webglFallback.init( onProgress );
@@ -368,7 +371,7 @@ export class App {
 		}
 
 		await progress( 0.19, 'Rolling in the swell…', undefined, 'ocean' );
-		this.shoreField = computeShoreField( this.terrainData, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ] } );
+		this.shoreField = computeShoreField( this.terrainData, { res: 512, swellDir: [ this.worldLayout.swellDir.x, this.worldLayout.swellDir.y ] } );
 		this.terrainGPU = new TerrainGPU( this.terrainData, this.shoreField );
 		// terrain and rocks apply the heightfield sun shadow (long hill shadows) in their own lighting
 		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, renderer } );
@@ -384,8 +387,8 @@ export class App {
 
 		this.boat = new BoatModel();
 		scene.add( this.boat.group );
-		this.boat.group.position.copy( WORLD.boatDock.position );
-		this.boat.group.rotation.y = WORLD.boatDock.heading;
+		this.boat.group.position.copy( this.worldLayout.boatDock.position );
+		this.boat.group.rotation.y = this.worldLayout.boatDock.heading;
 
 		// ---------------------------------------------------------------- ocean
 		await progress( 0.3, 'Simulating the ocean…', undefined, 'simulation' );
@@ -503,7 +506,7 @@ export class App {
 		// dust, pollen, salt aerosol, seed fluff and gnats drifting around the camera
 		this.airMotes = new AirMotes( { terrain: this.terrainGPU, clouds: this.clouds, csm: this.csm, reversedDepth: true } );
 		scene.add( this.airMotes.mesh );
-		this.boatCtl = new BoatController( { design: this.boat.design, query: this.query, terrain: this.terrainData, colliders: this.colliders, initialPosition: WORLD.boatDock.position, initialHeading: WORLD.boatDock.heading } );
+		this.boatCtl = new BoatController( { design: this.boat.design, query: this.query, terrain: this.terrainData, colliders: this.colliders, initialPosition: this.worldLayout.boatDock.position, initialHeading: this.worldLayout.boatDock.heading } );
 		// Player interaction uses the controller for physics and this presentation model for
 		// boarding, helm, and exit anchors.
 		this.boatCtl.model = this.boat;
@@ -525,7 +528,7 @@ export class App {
 		// interactive wake around the boat (Kelvin pattern, bow/stern waves, prop wash foam)
 		this.wake = new WakeSim( renderer, { terrainGPU: this.terrainGPU, boat: this.boatCtl, colliders: this.colliders } );
 		this.surface.wake = this.wake;
-		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, query: this.query, boat: this.boatCtl, reef: this.reef } );
+		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, query: this.query, boat: this.boatCtl, reef: this.reef, worldLayout: this.worldLayout } );
 		this.localPlayerEnvironment = { terrain: this.player.terrain, colliders: this.player.colliders, query: this.player.query, slot: this.player.slot, reef: this.player.reef, boat: this.player.boat, hostedSeaLevel: null };
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
 		this.wildlife = new Wildlife( {
@@ -557,7 +560,7 @@ export class App {
 
 		// ---------------------------------------------------------------- audio
 		// recorded field recordings (public/audio, credits in public/audio/CREDITS.md); ?noAudio turns it off
-		this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
+		this.audio = qs.has( 'noAudio' ) ? null : new SoundScape( { worldLayout: this.worldLayout } );
 		this.player.audio = this.audio;
 		// World gameplay is installed from the active world's declared behaviors.
 		this.worldGames = new Map();
@@ -2102,7 +2105,7 @@ export class App {
 			windSpeed: G.windSpeed.value,
 			windDir: G.windDir.value,
 			daylight: 1 - G.night.value,
-			nearPier: Math.abs( p.x - WORLD.pier.x ) < 12 && p.z > WORLD.pier.zStart - 5 && p.z < WORLD.pier.zEnd + 8,
+			nearPier: !! this.worldLayout && Math.abs( p.x - this.worldLayout.pier.x ) < 12 && p.z > this.worldLayout.pier.zStart - 5 && p.z < this.worldLayout.pier.zEnd + 8,
 			boat: {
 				active: this.boatCtl.driven, rpm: this.boatCtl.rpm, throttle: this.boatCtl.throttle, speed: this.boatCtl.velocity.length(),
 				position: this.boat.group.position, listenerInside: this.player.mode === 'boat' && this.player.camMode === 'first',

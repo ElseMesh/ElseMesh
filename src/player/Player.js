@@ -1,5 +1,4 @@
 import * as THREE from '../engine/math/index.js';
-import { WORLD } from '../world/WorldLayout.js';
 import { HOUSE } from '../world/boat/BoatSpecs.js';
 import { gravityAcceleration, movementParameters } from '../network/WorldRules.js';
 import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
@@ -40,7 +39,7 @@ const HELM_REACH = 0.75; // m from the helm seat to take the wheel
 //   boat : at the helm, driving; V toggles helm (1st person) / chase (3rd person) camera, E stands up
 export class Player {
 
-	constructor( { camera, input, terrain, colliders, query, boat, reef = null, audio = null } ) {
+	constructor( { camera, input, terrain, colliders, query, boat, reef = null, audio = null, worldLayout = null } ) {
 
 		this.camera = camera;
 		this.input = input;
@@ -50,10 +49,11 @@ export class Player {
 		this.boat = boat;
 		this.reef = reef;
 		this.audio = audio;
+		this.worldLayout = worldLayout;
 
 		this.mode = 'walk';
 		this.camMode = 'third';
-		const start = WORLD.start || WORLD.spawn;
+		const start = worldLayout?.start || worldLayout?.spawn || { position: [ 0, 0, 0 ], yaw: 0 };
 		this.position = new THREE.Vector3().copy( start.position );
 		// standing on whatever is there (the boardwalk planks), not in it
 		this.position.y = Math.max( terrain.heightAt( this.position.x, this.position.z ), colliders ? colliders.groundHeightAt( this.position.x, this.position.z, 50 ) : - Infinity );
@@ -536,8 +536,9 @@ export class Player {
 							if ( p.y > top - 1.0 ) {
 
 								// step onto the deck
-								const deck = WORLD.pier.deckHeight;
-								p.set( b.center.x - Math.sign( b.center.x - WORLD.pier.x ) * 1.2, deck, b.center.z );
+								const pier = this.worldLayout?.pier;
+								if ( ! pier ) break;
+								p.set( b.center.x - Math.sign( b.center.x - pier.x ) * 1.2, pier.deckHeight, b.center.z );
 								this.mode = 'walk';
 								this.velocity.set( 0, 0, 0 );
 
@@ -628,7 +629,7 @@ export class Player {
 		// the exit point closest to something walkable (pier deck / sand)
 		let best = side ? null : this.ashoreTarget();
 
-		const dock = b.homePosition || WORLD.boatDock.position;
+		const dock = b.homePosition || this.worldLayout?.boatDock?.position || b.position;
 		if ( b.position.distanceTo( dock ) < 14 && b.speed < 1.5 ) {
 
 			b.moored = true;

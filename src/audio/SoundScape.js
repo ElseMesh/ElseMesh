@@ -32,7 +32,6 @@
 // Levels: every sound has a target loudness (LUFS, momentary) for its reference situation in MIX below;
 // the gain is target minus the file's measured loudness (soundBank.js).
 
-import { WORLD } from '../world/WorldLayout.js';
 import { BANK } from './soundBank.js';
 
 const clamp = ( v, a, b ) => ( v < a ? a : v > b ? b : v );
@@ -129,7 +128,7 @@ export class SoundScape {
 	// Does not touch Web Audio: the context is created on the first resume() (autoplay policy).
 	// shore (optional): { shore: ShoreWaves, field: shore field { res, data }, terrain: TerrainData }; found
 	// on window.__app when not given (see attachShore()).
-	constructor( { baseUrl = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'audio/', shore = null } = {} ) {
+	constructor( { baseUrl = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'audio/', shore = null, worldLayout = null } = {} ) {
 
 		this.baseUrl = baseUrl;
 		this.ctx = null;
@@ -168,7 +167,8 @@ export class SoundScape {
 			shoreX: 0, shoreZ: 1,
 			boat: { active: false, rpm: 0, speed: 0, x: 0, y: 0, z: 0, inside: false },
 		};
-		const sw = WORLD.swellDir || { x: - 0.12, y: - 1 };
+		this.pierLayout = worldLayout?.pier || null;
+		const sw = worldLayout?.swellDir || { x: - 0.12, y: - 1 };
 		const l = Math.hypot( sw.x, sw.y ) || 1;
 		this._swell = { x: sw.x / l, z: sw.y / l }; // travel direction of the swell = towards the beach
 
@@ -1154,8 +1154,8 @@ export class SoundScape {
 		this._pos( this.boatPan, e.boat.x, e.boat.y + 0.3, e.boat.z );
 		this._ramp( this.boatIn.gain, e.boat.inside ? 1 : 0, 0.1 );
 		this._ramp( this.boatOut.gain, e.boat.inside ? 0 : 1, 0.1 );
-		const pier = WORLD.pier;
-		this._pos( this.pierPan, pier.x, 0, clamp( e.lz, Math.max( pier.zStart, - 40 ), pier.zEnd ) );
+		const pier = this.pierLayout;
+		this._pos( this.pierPan, pier?.x ?? e.lx, 0, pier ? clamp( e.lz, Math.max( pier.zStart, - 40 ), pier.zEnd ) : e.lz );
 
 	}
 

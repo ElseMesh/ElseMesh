@@ -807,7 +807,7 @@ export class WebGLFallback {
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldDefinition.boatDock.position ), initialHeading: worldDefinition.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
 			this._addIslandGameplayColliders();
-			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio } );
+			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout: this.islandDefinition } );
 			this.player.yaw = this.spawn.yaw || 0;
 			this.player.pitch = this.spawn.pitch || 0;
 			this.player.position.set( this.spawn.position[ 0 ], this.spawn.position[ 1 ] - 1.62, this.spawn.position[ 2 ] );
