@@ -6,6 +6,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-11-04
 
+- The paired 171-frame cast trace now also matches a golden executed from the
+  pre-split WebGPU `FishingRod.js` at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`.
+  This covers rod equip, charging, cast flight, landing, and retrieval; the
+  same trace matches WebGL. The Tidewater gameplay parity estimate moves from
+  78% to 79%. A full cast-to-sale run through the actual worker-triggered bite
+  and fight, production boat wake/collision behavior, and hardware visual/FPS
+  comparisons remain open.
 - Added Tidewater-owned `renderer-cast-parity.mjs` and registered it in the
   engine test runner. It drives the retained WebGPU `Game.update()` path and
   Tidewater's WebGL adapter through rod equip, charged cast, water landing,
