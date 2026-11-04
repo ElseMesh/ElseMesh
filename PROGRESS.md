@@ -6,6 +6,14 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-11-04
 
+- The headless parity scenario now runs each renderer's actual game update path
+  from a charged cast through the authored bite schedule, input strike, caught
+  fish, and vendor sale. WebGPU and WebGL traces match for 519 bite frames and
+  1,199 fight frames; the pre-split cast golden, fight/bite goldens, boat trace,
+  and WebGL game adapter checks pass. The gameplay parity estimate moves from
+  79% to 80%. This uses an in-process extension fixture and synthetic water
+  query; live browser Worker/query integration, boat wake/collision behavior,
+  visuals, and hardware FPS remain open.
 - The paired 171-frame cast trace now also matches a golden executed from the
   pre-split WebGPU `FishingRod.js` at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`.
   This covers rod equip, charging, cast flight, landing, and retrieval; the
