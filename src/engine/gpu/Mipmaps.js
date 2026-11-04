@@ -1,4 +1,5 @@
 import { GPU } from './GPU.js';
+import { withRenderPass } from './RenderPass.js';
 
 // Box-filtered mip chain generation for 2d / 2d-array / cube textures with a filterable,
 // renderable format (render pass per level and layer). Storage-written textures that need a
@@ -77,11 +78,13 @@ export function generateMipmaps( texture, encoder = GPU.getEncoder() ) {
 	const { steps } = chainFor( texture, g, pipeline );
 	for ( let i = 0; i < steps.length; i ++ ) {
 
-		const pass = encoder.beginRenderPass( steps[ i ].desc );
-		pass.setPipeline( pipeline );
-		pass.setBindGroup( 0, steps[ i ].bg );
-		pass.draw( 3 );
-		pass.end();
+		withRenderPass( encoder, steps[ i ].desc, ( pass ) => {
+
+			pass.setPipeline( pipeline );
+			pass.setBindGroup( 0, steps[ i ].bg );
+			pass.draw( 3 );
+
+		} );
 
 	}
 
