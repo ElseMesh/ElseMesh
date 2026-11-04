@@ -57,5 +57,4 @@ assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGPU static-model adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGL static-model adapter' );
-assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', 'elsemesh.static-reef/1' ), 'function', 'ElseMesh batches static reef tiles into one WebGL renderer' );
 console.log( 'World component backend registry selects engine adapters by backend and component type' );

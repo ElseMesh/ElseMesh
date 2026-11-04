@@ -12,7 +12,6 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
-import { decodeReefPlacements } from '../network/ReefPlacements.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
@@ -24,7 +23,6 @@ import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../ne
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
 import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
-import { WebGLReefAdapter } from './WebGLReefAdapter.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
@@ -763,6 +761,7 @@ export class WebGLFallback {
 		this.worldSeaLevel = this.defaultWorldSource?.rules.seaLevel ?? 0;
 		this.hostedWildlifeComponent = null;
 		this.hostedComponentRuntimes = new Map();
+		this.builtinComponentRuntimes = new Map();
 		this.hostedInstalledComponentIDs = new Set();
 		this.hostedCollisionPayloads = new Map();
 		this.vegetationRecords = null;
@@ -1479,8 +1478,7 @@ export class WebGLFallback {
 		} catch ( error ) {
 			console.warn( 'WebGL fallback village model unavailable:', error );
 		}
-		await this._loadPackagedReef();
-		await this._loadBuiltinVegetationComponent();
+		await this._loadBuiltinBatchComponents();
 		const start = WORLD.start || WORLD.spawn;
 		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
 		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
@@ -1490,24 +1488,32 @@ export class WebGLFallback {
 
 	}
 
-	async _loadBuiltinVegetationComponent() {
+	async _loadBuiltinBatchComponents() {
 
-		const component = this.defaultWorldSource?.components.find( candidate => candidate.type === 'elsemesh.static-vegetation/1' );
-		const placementAssetId = component?.placementAssetId;
-		const placementAsset = component?.assets?.find( asset => asset.assetId === placementAssetId );
-		const assetURL = placementAssetId ? this.defaultWorldAssets?.assetURLs?.[ placementAssetId ] : null;
-		if ( ! component || ! placementAsset || ! assetURL ) return;
-		const adapter = worldComponentBackendBatchAdapter( 'webgl', component.type );
-		if ( ! adapter ) return;
-		try {
-			const response = await fetch( assetURL );
-			if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
-			const assets = new Map( [ [ placementAssetId, new Uint8Array( await response.arrayBuffer() ) ] ] );
-			const componentWithoutGrassMask = { ...component, grassMaskAssetId: null };
-			const result = await adapter( { fallback: this, manifest: this.defaultWorldSource, assets }, [ componentWithoutGrassMask ] );
-			if ( ! result.componentIDs.includes( component.id ) ) throw new Error( `Default vegetation component ${component.id} did not install` );
-		} catch ( error ) {
-			console.warn( 'WebGL fallback vegetation unavailable:', error );
+		const groups = new Map();
+		for ( const component of this.defaultWorldSource?.components || [] ) {
+			const adapter = worldComponentBackendBatchAdapter( 'webgl', component.type );
+			if ( ! adapter ) continue;
+			const group = groups.get( component.type ) || { adapter, components: [] };
+			group.components.push( component );
+			groups.set( component.type, group );
+		}
+		for ( const [ type, { adapter, components } ] of groups ) {
+			try {
+				const assets = new Map();
+				for ( const component of components ) for ( const assetID of worldComponentAssetIDs( component ) ) {
+					if ( assets.has( assetID ) ) continue;
+					const url = this.defaultWorldAssets?.assetURLs?.[ assetID ];
+					if ( ! url ) continue;
+					const response = await fetch( url );
+					if ( ! response.ok ) throw new Error( `Component asset ${assetID} returned ${response.status}` );
+					assets.set( assetID, new Uint8Array( await response.arrayBuffer() ) );
+				}
+				const result = await adapter( { fallback: this, manifest: this.defaultWorldSource, assets }, components );
+				if ( result?.runtime ) this.builtinComponentRuntimes.set( result.runtimeComponentId || components[ 0 ].id, result.runtime );
+			} catch ( error ) {
+				console.warn( `WebGL fallback component batch ${type} unavailable:`, error );
+			}
 		}
 
 	}
@@ -1780,21 +1786,6 @@ export class WebGLFallback {
 
 	}
 
-	async _loadPackagedReef() {
-
-		const components = this.defaultWorldSource.components.filter( item => item.type === 'elsemesh.static-reef/1' );
-		const recordsByTile = await Promise.all( components.map( async component => {
-			const url = this.defaultWorldAssets.reefPlacements[ component.placementAssetId ];
-			if ( ! url ) throw new Error( `Default world reef asset ${component.placementAssetId} is missing from its package` );
-			const response = await fetch( url );
-			if ( ! response.ok ) throw new Error( `Default world reef asset ${component.placementAssetId} returned ${response.status}` );
-			return decodeReefPlacements( new Uint8Array( await response.arrayBuffer() ) ).records;
-		} ) );
-		const records = recordsByTile.flat();
-		if ( records.length ) this.reefAdapter = new WebGLReefAdapter( this.THREE, this.scene, records );
-
-	}
-
 	_collectBlockers( root ) {
 
 		const T = this.THREE;
@@ -1967,6 +1958,7 @@ export class WebGLFallback {
 		this.hostedTerrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update( dt, this.camera, this.player );
+		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player );
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();
@@ -2006,7 +1998,6 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		this.reefAdapter?.update( this.camera, simulationTime, this.defaultWorldSource.rules.seaLevel ?? 0 );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
 		if ( this.wildlifeRuntime ) {
 			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;

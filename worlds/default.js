@@ -9,6 +9,10 @@ import { DEFAULT_REEF_PLACEMENT_ASSETS as reefPlacementAssets } from './tidewate
 const vegetation = source.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
 const vegetationPlacementAssetId = vegetation?.data?.placementAssetId;
 const vegetationAsset = vegetation?.assets.find( asset => asset.assetId === vegetationPlacementAssetId );
+const assetURLs = {
+	...reefPlacementAssets,
+	...( vegetationAsset ? { [ vegetationAsset.assetId ]: vegetationPlacements } : {} ),
+};
 
 // Deployment binding for the built-in world. The renderer consumes this
 // package interface and does not select or name an authored world.
@@ -17,8 +21,7 @@ export const defaultWorldPackage = Object.freeze( {
 	assets: Object.freeze( {
 		terrainLOD,
 		villageLOD,
-		assetURLs: Object.freeze( vegetationAsset ? { [ vegetationAsset.assetId ]: vegetationPlacements } : {} ),
-		reefPlacements: reefPlacementAssets,
+		assetURLs: Object.freeze( assetURLs ),
 		extensionModules: Object.freeze( Object.fromEntries( ( source.experience.extensions || [] ).filter( extension => extension.behaviorId === 'elsemesh.fishing-game/1' ).map( extension => [ extension.assetId, fishingRulesExtension ] ) ) ),
 	} ),
 } );
