@@ -10,7 +10,6 @@ import { validateWorldSource } from '../src/network/WorldSource.js';
 import { validateWorldComponents, validateWorldHosts, validateWorldObjects, validateWorldPortals } from '../src/network/WorldConnector.js';
 import { createWorldInviteURL, worldLinkFromLocation, WorldConnector } from '../src/network/WorldConnector.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
-import { VEGETATION_PLACEMENT_KINDS, decodeVegetationPlacements, encodeVegetationPlacements } from '../src/network/VegetationPlacements.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
 const portal = { entry: { position: [ 0, 1, 0 ], yaw: 0 } };

@@ -648,3 +648,10 @@ finding changes them.
   source conversion, and Go manifest tests pass. The estimate remains 62%
   because Tidewater-specific renderers and installers are still in engine
   runtime paths.
+- 2026-11-04: moved the tropical vegetation placement codec into the Tidewater
+  repository and registered its decoder through the generic component asset
+  codec registry. The Tidewater installer and WebGL fallback both use that
+  registration; the fallback no longer imports the Tidewater codec. Codec,
+  vegetation parity, source-manifest, export, WebGL adapter, and portal checks
+  pass. The estimate remains 62% because WebGLFallback still owns the species-
+  specific plant geometry, materials, and LOD behavior.

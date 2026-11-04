@@ -9,7 +9,6 @@ import { Player } from '../player/Player.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
-import { appendVegetationPlacements, decodeVegetationPlacements } from '../network/VegetationPlacements.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
@@ -1578,9 +1577,9 @@ export class WebGLFallback {
 				placementBytes = new Uint8Array( await response.arrayBuffer() );
 				expectedSeed = 7;
 			}
-			const records = decodeVegetationPlacements( asBytes( placementBytes ), expectedSeed );
+			const records = decodeWorldComponentAsset( 'vegetation-placement/1', asBytes( placementBytes ), expectedSeed );
 			this.vegetationRecords ||= {};
-			appendVegetationPlacements( this.vegetationRecords, records );
+			for ( const [ kind, placements ] of Object.entries( records ) ) if ( Array.isArray( placements ) ) this.vegetationRecords[ kind ] = [ ...( this.vegetationRecords[ kind ] || [] ), ...placements ];
 			const start = this.islandDefinition?.start || this.islandDefinition?.spawn;
 			const center = centerPosition || ( start ? [ start.position[ 0 ], start.position[ 2 ] ] : [ 0, 0 ] );
 			const T = this.THREE, group = new T.Group();
