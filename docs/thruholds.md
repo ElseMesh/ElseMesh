@@ -57,17 +57,15 @@ specialized setups.
 
 `tools/serve-world-profile.mjs` provisions an immutable world package into one named owner profile, signs its runtime manifest with that profile's persistent node key, verifies and installs all package assets, then starts the supplied daemon binary. Give every simultaneously running profile its own P2P and HTTP ports. The helper refuses to overwrite an existing profile manifest; once provisioned, the same command can restart it without `--source` or `--assets`.
 
-For temporary local hosting, replace `--http` with `--autoport`. The daemon
-binds an OS-assigned loopback port and prints the selected address in its
-`worldd ... http=127.0.0.1:<port>` startup line. `--autoport` and `--http` are
-mutually exclusive; it only selects the HTTP gateway port, so give concurrent
-profiles distinct `--p2p-port` values as usual. For temporary local hosting,
-`--p2p-port 0` also asks libp2p to allocate ephemeral TCP and QUIC ports; worldd
-prints both actual peer addresses at startup. Do not use ephemeral peer ports
-when a deployment depends on fixed firewall forwarding or ZeroTier's shared
-bridge port. Without embedded ZeroTier, worldd defaults to ephemeral HTTP and
-P2P ports. With embedded ZeroTier enabled, it keeps the bridge-compatible P2P
-port unless `--p2p-port` is explicitly supplied.
+For temporary local hosting, use `--autoport`. The daemon binds OS-assigned
+loopback HTTP and libp2p TCP/QUIC ports, then prints the selected gateway
+address and actual peer addresses at startup. `--autoport` and `--http` are
+mutually exclusive. An explicit `--p2p-port` overrides automatic P2P allocation
+when a stable peer port is needed. Do not use ephemeral peer ports when a
+deployment depends on fixed firewall forwarding or ZeroTier's shared bridge
+port. Without embedded ZeroTier, worldd defaults to ephemeral HTTP and P2P
+ports. With embedded ZeroTier enabled, it keeps the bridge-compatible P2P port
+unless `--p2p-port` is explicitly supplied.
 
 Build `worldd` for the host first, then run (from the repository root):
 
@@ -78,7 +76,7 @@ node tools/serve-world-profile.mjs \
   --profile island-example \
   --source worlds/tidewater/world-source.json \
   --assets worlds/tidewater/assets \
-  --autoport --p2p-port 0
+  --autoport
 ```
 
 To advertise a newly provisioned world through the node's DHT without operating a directory, pass `--discoverable true --dht-mode server` to `tools/serve-world-profile.mjs`; the helper puts discoverability in the owner-signed manifest and starts `worldd` as a DHT server. `worldd` itself has no `--discoverable` flag. Existing profiles need an owner-reviewed source update and signed manifest publication before becoming discoverable. Peers still need a shared reachable DHT/bootstrap route. A portal may omit `destinationPeerId`: the client asks its configured directory or current gateway to resolve providers by the stable destination world ID. Keep a peer ID in the portal only when you intentionally want to pin a particular provider.

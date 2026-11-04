@@ -94,6 +94,7 @@ async function serve( options ) {
 	if ( options[ '--autoport' ] ) args.push( '--http', '127.0.0.1:0' );
 	else if ( options[ '--http' ] ) args.push( '--http', options[ '--http' ] );
 	if ( options[ '--p2p-port' ] ) args.push( '--p2p-port', options[ '--p2p-port' ] );
+	else if ( options[ '--autoport' ] ) args.push( '--p2p-port', '0' );
 	if ( options[ '--dht-mode' ] ) args.push( '--dht-mode', options[ '--dht-mode' ] );
 	if ( options[ '--public-gateway' ] ) args.push( '--public-gateway', options[ '--public-gateway' ] );
 	if ( options[ '--directory-url' ] ) args.push( '--directory-url', options[ '--directory-url' ] );
