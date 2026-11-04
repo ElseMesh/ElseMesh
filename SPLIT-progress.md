@@ -229,6 +229,13 @@ finding changes them.
   capture does not compare matched WebGPU/WebGL wetness state, so no visual
   parity gate or percentage changes; dynamic wet-sand parity remains open.
 
+- 2026-11-04: tightened the WebGL wet-sand mask to match WebGPU's sand coverage,
+  rock exclusion, and jungle suppression inputs. The CPU-built terrain mask now
+  supplies rock and jungle weights to the shader; dynamic wetness still comes
+  from the analytic shore estimate rather than WebGPU's persistent ShoreSim
+  channel. The focused terrain material test and external production build pass;
+  visual parity remains unverified and the estimate stays 82%.
+
 - 2026-11-04: isolated the WebGL terrain patch by capturing the hosted world
   with `noWater`; the pale geometry remained with the water scene disabled. The
   manifest's full terrain replaces a `portal-preview` terrain. WebGL had loaded

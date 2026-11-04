@@ -253,7 +253,7 @@ function setWebGLLODFade( root, value ) {
 
 export function webglTerrainMaterial( T, terrain, packagedSurface = null, { seaLevel = 0 } = {} ) {
 
-	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
+	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), flags = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
 	const smooth = ( a, b, x ) => { const t = T.MathUtils.clamp( ( x - a ) / ( b - a ), 0, 1 ); return t * t * ( 3 - 2 * t ); };
 	const linear = c => c <= 0.04045 ? c / 12.92 : Math.pow( ( c + 0.055 ) / 1.055, 2.4 );
 	const mix = ( a, b, t ) => a.map( ( c, i ) => c + ( b[ i ] - c ) * t );
@@ -277,7 +277,7 @@ uniform float uTerrainShoreSize;
 ` : '';
 	const shoreWetness = shore ? /* glsl */`
 			vec2 shoreUv = ( terrainXZ - vec2( uTerrainShoreOrigin ) ) / uTerrainShoreSize;
-			if ( all( greaterThanEqual( shoreUv, vec2( 0.0 ) ) ) && all( lessThanEqual( shoreUv, vec2( 1.0 ) ) ) && sandCoverage > 0.05 ) {
+			if ( all( greaterThanEqual( shoreUv, vec2( 0.0 ) ) ) && all( lessThanEqual( shoreUv, vec2( 1.0 ) ) ) && sandWeight > 0.05 ) {
 				vec4 shoreSample = texture2D( uTerrainShoreField, shoreUv );
 				vec2 shoreDirection = normalize( shoreSample.rg * 2.0 - 1.0 );
 				float exposure = shoreSample.b;
@@ -350,6 +350,11 @@ uniform float uTerrainShoreSize;
 			const sand = packagedSurface ? packagedSurface.splat[ splatOffset ] / 255 : terrain.sand[ source ] / 255;
 			const sandWeight = smooth( 0.3, 0.72, sand ), seabed = 1 - smooth( - 0.6, 0.12, h );
 			const rock = Math.max( packagedSurface ? packagedSurface.normal[ splatOffset + 2 ] / 255 : terrain.rock[ source ], smooth( 0.34, 0.62, slope ) * smooth( 2, 30, h ) );
+			const gullyExposure = gully * smooth( -0.5, 0.5, h );
+			const macro = macroA * 0.6 + macroB * 0.4;
+			const jungle = T.MathUtils.clamp( smooth( 9, 24, h + ( macro - 0.5 ) * 18 ) + smooth( 0.18, 0.36, slope ) + gullyExposure * 0.6, 0, 1 );
+			flags[ out ] = Math.round( ( 1 - rock ) * 255 );
+			flags[ out + 1 ] = Math.round( jungle * 255 );
 			color = mix( color, palette.soil, Math.max( path * 0.92, gully * ( 1 - rock ) * 0.5 ) );
 			color = mix( color, palette.rock, rock );
 			color = mix( color, palette.sand, sandWeight * ( 1 - seabed ) );
@@ -372,10 +377,13 @@ uniform float uTerrainShoreSize;
 	const detailTexture = new T.DataTexture( detailImage.data, detailImage.width, detailImage.height, T.RGBAFormat, T.UnsignedByteType );
 	detailTexture.wrapS = detailTexture.wrapT = T.RepeatWrapping;
 	detailTexture.magFilter = T.LinearFilter; detailTexture.minFilter = T.LinearMipmapLinearFilter; detailTexture.generateMipmaps = true; detailTexture.needsUpdate = true;
+	const flagsTexture = new T.DataTexture( flags, resolution, resolution, T.RGBAFormat, T.UnsignedByteType );
+	flagsTexture.magFilter = T.LinearFilter; flagsTexture.minFilter = T.LinearMipmapLinearFilter; flagsTexture.generateMipmaps = true; flagsTexture.needsUpdate = true;
 	const material = new T.MeshStandardMaterial( { roughness, side: T.DoubleSide } );
 	material.onBeforeCompile = shader => {
 		shader.uniforms.uTerrainColor = { value: texture };
 		shader.uniforms.uTerrainDetail = { value: detailTexture };
+		shader.uniforms.uTerrainFlags = { value: flagsTexture };
 		shader.uniforms.uTerrainWetDarken = { value: wetDarken };
 		shader.uniforms.uTerrainSeaLevel = { value: seaLevel };
 		if ( shore ) {
@@ -392,6 +400,7 @@ uniform float uTerrainShoreSize;
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>
 uniform sampler2D uTerrainColor;
 uniform sampler2D uTerrainDetail;
+uniform sampler2D uTerrainFlags;
 uniform float uTerrainWetDarken;
 uniform float uTerrainSeaLevel;
 ${shoreUniformDeclarations}
@@ -400,10 +409,12 @@ varying vec3 vTerrainWorldPosition;
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>
 			vec2 terrainUv = ( vTerrainWorldPosition.xz - vec2( ${ terrain.origin.toFixed( 1 ) } ) ) / ${ terrain.size.toFixed( 1 ) };
 			vec4 terrainSample = texture2D( uTerrainColor, terrainUv );
+			vec4 terrainFlags = texture2D( uTerrainFlags, terrainUv );
 			vec3 terrainBase = terrainSample.rgb;
 			vec2 terrainXZ = vTerrainWorldPosition.xz;
 			vec4 terrainNear = texture2D( uTerrainDetail, terrainXZ / 1.9 );
 			vec4 terrainMid = texture2D( uTerrainDetail, mat2( 0.2675, 0.9636, -0.9636, 0.2675 ) * terrainXZ / 6.7 + 0.21 );
+			float terrainMacroA = texture2D( uTerrainDetail, mat2( 0.764842, 0.644218, -0.644218, 0.764842 ) * terrainXZ / 173.0 ).a;
 			float terrainMacroB = texture2D( uTerrainDetail, mat2( -0.504846, 0.863209, -0.863209, -0.504846 ) * terrainXZ / 47.0 ).a;
 			vec4 terrainFine = texture2D( uTerrainDetail, mat2( -0.7374, 0.6755, -0.6755, -0.7374 ) * terrainXZ / 0.63 + 0.53 );
 			float terrainPixelWorld = max( length( dFdx( terrainXZ ) ), length( dFdy( terrainXZ ) ) );
@@ -422,21 +433,25 @@ varying vec3 vTerrainWorldPosition;
 			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage ) * mix( 1.0, terrainDetailVisibility, sandCoverage );
 			float terrainHeight = vTerrainWorldPosition.y - uTerrainSeaLevel;
 			float landWeight = smoothstep( -0.6, 0.12, terrainHeight );
+			float notRock = terrainFlags.r;
+			float jungleWeight = terrainFlags.g;
+			float terrainMacro = terrainMacroA * 0.6 + terrainMacroB * 0.4;
+			float sandWeight = smoothstep( 0.3, 0.72, terrainSample.a + ( terrainMid.b - 0.5 ) * 0.5 + ( terrainMacro - 0.5 ) * 0.35 ) * notRock;
 			float wet = 0.0;
 			${shoreWetness}
 			float dampMottle = smoothstep( 0.3, 0.7, terrainMid.a + ( terrainNear.g - 0.45 ) * 0.6 + ( terrainMacroB - 0.5 ) * 0.4 );
-			wet *= landWeight;
-			float damp = ( 1.0 - smoothstep( 0.5, 1.7, terrainHeight + terrainMid.a * 0.3 ) ) * sandCoverage * landWeight * mix( 0.22, 0.5, dampMottle );
+			wet *= ( 1.0 - jungleWeight * 0.8 ) * landWeight;
+			float damp = ( 1.0 - smoothstep( 0.5, 1.7, terrainHeight + terrainMid.a * 0.3 ) ) * sandWeight * landWeight * mix( 0.22, 0.5, dampMottle );
 			float wetMottle = smoothstep( 0.25, 0.75, terrainMid.a + ( terrainNear.g - 0.45 ) * 0.5 );
 			float dryEdge = smoothstep( 0.0, 0.6, wet ) * ( 1.0 - smoothstep( 0.6, 1.0, wet ) );
-			float wetK = max( wet, damp ) * ( 1.0 - dryEdge * wetMottle * 0.6 );
+			float wetK = max( wet, damp ) * ( 1.0 - dryEdge * wetMottle * 0.6 ) * notRock;
 			vec3 terrainDryAlbedo = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 * terrainDetailVisibility + 1.0 );
 			vec3 dpdxTerrain = dFdx( vec3( terrainXZ.x, terrainHeight, terrainXZ.y ) );
 			vec3 dpdyTerrain = dFdy( vec3( terrainXZ.x, terrainHeight, terrainXZ.y ) );
 			vec3 terrainNormal = normalize( cross( dpdxTerrain, dpdyTerrain ) );
 			if ( terrainNormal.y < 0.0 ) terrainNormal = -terrainNormal;
 			vec2 slopeDirection = normalize( terrainNormal.xz + vec2( 1e-4, 0.0 ) );
-			float rillK = smoothstep( 0.2, 0.9, wet ) * smoothstep( 0.05, 0.6, terrainHeight ) * sandCoverage;
+			float rillK = smoothstep( 0.2, 0.9, wet ) * smoothstep( 0.05, 0.6, terrainHeight ) * sandWeight;
 			float rill = 0.5;
 			if ( rillK > 0.0 ) rill = texture2D( uTerrainDetail, vec2( dot( terrainXZ, slopeDirection ) / 3.2, dot( terrainXZ, vec2( -slopeDirection.y, slopeDirection.x ) ) / 0.3 ) ).a;
 			float terrainLuminance = dot( terrainDryAlbedo * uTerrainWetDarken, vec3( 0.2126, 0.7152, 0.0722 ) );
@@ -445,13 +460,13 @@ varying vec3 vTerrainWorldPosition;
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 			roughnessFactor = mix( roughnessFactor, mix( 0.42, 0.16, wet ), wetK );` );
 	};
-	material.customProgramCacheKey = () => shore ? 'elsemesh-webgl-baked-terrain-detail-v4-shore' : 'elsemesh-webgl-baked-terrain-detail-v4';
+	material.customProgramCacheKey = () => shore ? 'elsemesh-webgl-baked-terrain-detail-v5-shore-masks' : 'elsemesh-webgl-baked-terrain-detail-v5-masks';
 	material.userData.terrainTime = 0;
 	material.userData.updateTerrainTime = time => {
 		material.userData.terrainTime = time;
 		if ( material.userData.terrainShaderUniforms ) material.userData.terrainShaderUniforms.uTerrainTime.value = time;
 	};
-	material.userData.terrainTextures = [ texture, detailTexture, shore?.texture, shore?.swashTexture ].filter( Boolean );
+	material.userData.terrainTextures = [ texture, detailTexture, flagsTexture, shore?.texture, shore?.swashTexture ].filter( Boolean );
 	return material;
 
 }

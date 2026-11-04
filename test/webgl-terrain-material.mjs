@@ -5,6 +5,7 @@ import { applyHostedTerrainMaterial, prepareWebGLLODFade, webglTerrainMaterial }
 const terrain = {
 	res: 2, size: 2, origin: 0, texel: 1,
 	heights: new Float32Array( 4 ),
+	rock: new Float32Array( 4 ), gully: new Uint8Array( 4 ), sand: new Uint8Array( [ 255, 255, 255, 255 ] ),
 };
 const surface = {
 	normal: new Uint8Array( 16 ),
@@ -21,9 +22,14 @@ material.onBeforeCompile( shader );
 assert.equal( shader.uniforms.uTerrainWetDarken.value, 0.58, 'WebGL uses the package wet-darken parameter' );
 assert.equal( shader.uniforms.uTerrainSeaLevel.value, 1.5, "WebGL swash uses the hosted world's sea level" );
 assert.match( shader.fragmentShader, /float dampMottle = smoothstep\( 0\.3, 0\.7,/ );
-assert.match( shader.fragmentShader, /float damp = \( 1\.0 - smoothstep\( 0\.5, 1\.7, terrainHeight \+ terrainMid\.a \* 0\.3 \) \) \* sandCoverage \* landWeight \* mix\( 0\.22, 0\.5, dampMottle \)/ );
+assert.match( shader.fragmentShader, /float damp = \( 1\.0 - smoothstep\( 0\.5, 1\.7, terrainHeight \+ terrainMid\.a \* 0\.3 \) \) \* sandWeight \* landWeight \* mix\( 0\.22, 0\.5, dampMottle \)/ );
+assert.match( shader.fragmentShader, /float sandWeight = smoothstep\( 0\.3, 0\.72, terrainSample\.a \+ \( terrainMid\.b - 0\.5 \) \* 0\.5 \+ \( terrainMacro - 0\.5 \) \* 0\.35 \) \* notRock/ );
+assert.match( shader.fragmentShader, /&& sandWeight > 0\.05/ );
+assert.match( shader.fragmentShader, /wet \*= \( 1\.0 - jungleWeight \* 0\.8 \) \* landWeight/ );
+assert.match( shader.fragmentShader, /\* notRock;/, 'wet shading excludes the same baked rock mask as the WebGPU terrain shader' );
+assert.ok( shader.uniforms.uTerrainFlags, 'WebGL binds the baked terrain rock and jungle masks' );
 assert.match( shader.fragmentShader, /float dryEdge = smoothstep\( 0\.0, 0\.6, wet \) \* \( 1\.0 - smoothstep\( 0\.6, 1\.0, wet \) \)/ );
-assert.match( shader.fragmentShader, /float rillK = smoothstep\( 0\.2, 0\.9, wet \) \* smoothstep\( 0\.05, 0\.6, terrainHeight \) \* sandCoverage/ );
+assert.match( shader.fragmentShader, /float rillK = smoothstep\( 0\.2, 0\.9, wet \) \* smoothstep\( 0\.05, 0\.6, terrainHeight \) \* sandWeight/ );
 assert.match( shader.fragmentShader, /terrainLuminance = dot\( terrainDryAlbedo \* uTerrainWetDarken, vec3\( 0\.2126, 0\.7152, 0\.0722 \) \)/ );
 assert.match( shader.fragmentShader, /uTerrainSwashField/ );
 assert.match( shader.fragmentShader, /float swashArrival = mix\( uTerrainSwashTimeRange/ );
