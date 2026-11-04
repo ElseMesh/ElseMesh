@@ -17,7 +17,10 @@ try {
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 		models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
-		instances: [ { model: 'render-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
+		instances: [
+			{ model: 'render-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] },
+			{ model: 'render-triangle', position: [ 80, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 2, 1, 1 ] },
+		],
 	};
 	const setBytes = new TextEncoder().encode( JSON.stringify( packageDocument ) ), setAssetID = await hash( setBytes );
 	const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' } ] };
@@ -41,6 +44,9 @@ try {
 	const installed = await install( { fallback }, component );
 	if ( ! installed?.installed ) throw new Error( 'WebGL static-model adapter did not install the component' );
 	runtime = installed.runtime;
+	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
+	if ( mesh.frustumCulled !== true ) throw new Error( 'Instanced draws do not use view-frustum culling when conservative bounds exist' );
+	if ( ! mesh.boundingSphere?.containsPoint( new THREE.Vector3( 81.5, 0.5, - 5 ) ) ) throw new Error( 'Draw bounds omit the scaled outer extent of the farthest instance' );
 	runtime.update( 1 / 60, camera );
 	const light = new THREE.DirectionalLight( 0xffffff, 3 );
 	light.position.set( - 2, 4, 3 ); light.castShadow = true;

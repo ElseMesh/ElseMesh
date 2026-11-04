@@ -57,8 +57,9 @@ export function selectWorldComponentsForView( manifest, camera, { nearbyDistance
 	for ( const component of manifest.components || [] ) {
 		const priority = worldComponentPriority( component, assets );
 		const rank = VIEW_RANK[ priority ] ?? VIEW_RANK.visible;
+		if ( rank > maxRank ) continue;
 		const bounds = component.streamingBounds;
-		if ( ! bounds ) { if ( rank <= maxRank ) selected.push( component ); continue; }
+		if ( ! bounds ) { selected.push( component ); continue; }
 		_center.fromArray( bounds.center );
 		_sphere.center.copy( _center );
 		_sphere.radius = bounds.radius;

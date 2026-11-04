@@ -63,6 +63,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
+	const modelBoundsSpheres = document.models.map( ( _model, modelIndex ) => staticModelInstanceBoundsSphere( T, document, modelIndex ) );
 	const modelOffsets = [];
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
@@ -98,7 +99,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			const coarse = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials ) );
+			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ] ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 		}
 		const runtime = new StaticModelInstanceSetRuntime( document, {
@@ -114,7 +115,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				const source = await parseModel( assetId, webGLBytes || bytes );
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials );
+				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ] );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 			} ),
@@ -128,7 +129,33 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	}
 }
 
-function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ownedMaterials ) {
+function staticModelInstanceBoundsSphere( T, document, modelIndex ) {
+	const model = document.models[ modelIndex ];
+	const { center, radius } = model.bounds;
+	const localCenter = new T.Vector3( ...center );
+	const position = new T.Vector3(), rotation = new T.Quaternion(), scale = new T.Vector3(), matrix = new T.Matrix4();
+	const bounds = { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] };
+	let count = 0;
+	for ( const instance of document.instances ) {
+		if ( instance.model !== model.id ) continue;
+		position.fromArray( instance.position ); rotation.fromArray( instance.rotation ); scale.fromArray( instance.scale );
+		const instanceCenter = localCenter.clone().applyMatrix4( matrix.compose( position, rotation, scale ) );
+		const instanceRadius = radius * Math.max( Math.abs( scale.x ), Math.abs( scale.y ), Math.abs( scale.z ) );
+		for ( let axis = 0; axis < 3; axis ++ ) {
+			const value = instanceCenter.getComponent( axis );
+			bounds.min[ axis ] = Math.min( bounds.min[ axis ], value - instanceRadius );
+			bounds.max[ axis ] = Math.max( bounds.max[ axis ], value + instanceRadius );
+		}
+		count ++;
+	}
+	if ( count === 0 ) return null;
+	const sphereCenter = bounds.min.map( ( value, axis ) => ( value + bounds.max[ axis ] ) * 0.5 );
+	const sphereRadius = Math.hypot( ...bounds.max.map( ( value, axis ) => value - sphereCenter[ axis ] ) );
+	if ( ! Number.isFinite( sphereRadius ) || sphereRadius <= 0 ) return null;
+	return new T.Sphere( new T.Vector3( ...sphereCenter ), sphereRadius );
+}
+
+function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ownedMaterials, instanceBoundsSphere ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
@@ -151,7 +178,8 @@ function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ow
 		const mesh = new T.InstancedMesh( geometry, material, capacity );
 		mesh.instanceMatrix = matrixAttribute;
 		mesh.count = 0;
-		mesh.frustumCulled = false;
+		mesh.frustumCulled = !! instanceBoundsSphere;
+		mesh.boundingSphere = instanceBoundsSphere?.clone() || null;
 		mesh.castShadow = true;
 		mesh.receiveShadow = true;
 		mesh.customDepthMaterial = staticFadeDepthMaterial( T, sourceMaterial );
