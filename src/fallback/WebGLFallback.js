@@ -767,10 +767,10 @@ export class WebGLFallback {
 		this.cloudsEnabled = this.worldEnvironment.clouds && ! this.app.qs.has( 'noClouds' );
 		this.reviewPose = cameraPoseFromSearch( location.search );
 		if ( this.reviewPose?.time !== undefined ) this.app.settings.timeOfDay = this.reviewPose.time;
-		this.renderer.toneMapping = T.ACESFilmicToneMapping;
+		this.renderer.toneMapping = T.ReinhardToneMapping;
 		this.ktx2Loader ||= createWebGLKTX2Loader( this.renderer );
 		this.loader.setKTX2Loader( this.ktx2Loader );
-		this.renderer.toneMappingExposure = 0.9;
+		this.renderer.toneMappingExposure = this.app.settings.exposure;
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = T.PCFSoftShadowMap;
 		this.spray = new WebGLSpray( T, this.scene );
@@ -1805,6 +1805,10 @@ export class WebGLFallback {
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
 		const backendInstallStarted = performance.now();
+		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation start:', JSON.stringify( {
+			components: startupComponents.length,
+			staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
+		} ) );
 		await progress( 0.18, 'Preparing visible models…', 0.9 );
 		const backendComponentIDs = await this._installHostedBackendComponents( startupComponents, manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
 		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
@@ -2067,6 +2071,7 @@ export class WebGLFallback {
 			this.wildlifeAdapter.update( this.wildlifeRuntime, this.camera );
 		}
 		this._updateAudio( dt );
+		this.renderer.toneMappingExposure = this.app.settings.exposure;
 		this.renderer.autoClear = true;
 		this.renderer.render( this.scene, this.camera );
 		if ( this.waterScene.children.length && ! this.debugNoWater ) {
