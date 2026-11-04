@@ -61,6 +61,7 @@ renderer.render( scene, {
 	depthView: target.depthTexture.view(), depthFormat: 'depth32float', clearDepth: 0,
 } );
 const scratch = renderer.renderScratch[ 0 ];
+const dynamicOffsets = renderer.dynamicOffsets;
 const firstItem = scratch.lists.opaque[ 0 ];
 const firstDistance = firstItem.z;
 GPU.submit();
@@ -80,6 +81,7 @@ renderer.render( scene, {
 GPU.submit();
 await GPU.queue.onSubmittedWorkDone();
 assert.equal( renderer.renderScratch[ 0 ], scratch, 'frame scratch storage is reused' );
+assert.equal( renderer.dynamicOffsets, dynamicOffsets, 'dynamic-offset storage is reused for every draw' );
 assert.equal( scratch.lists.opaque[ 0 ], firstItem, 'collected draw-item records are reused' );
 assert.notEqual( firstItem.z, firstDistance, 'reused draw-item records refresh camera-dependent distance' );
 assert.deepEqual( errors, [], `reused renderer scratch stays valid: ${errors.join( '; ' )}` );

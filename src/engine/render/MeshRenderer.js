@@ -59,6 +59,7 @@ export class MeshRenderer {
 		this.stats = { draws: 0, triangles: 0, pipelines: 0 };
 		this.drawLayout = null;
 		this.drawBindGroup = null;
+		this.dynamicOffsets = [ 0 ];
 		this.renderScratch = [];
 		this.renderDepth = 0;
 		// true: a draw compiles its pipeline on the spot (one-off bakes, portraits, tests); the engine's
@@ -661,7 +662,8 @@ export class MeshRenderer {
 
 			}
 
-			rp.setBindGroup( 2, this.drawBindGroup, [ this._slot( o ) * DRAW_STRIDE ] );
+			this.dynamicOffsets[ 0 ] = this._slot( o ) * DRAW_STRIDE;
+			rp.setBindGroup( 2, this.drawBindGroup, this.dynamicOffsets );
 			for ( let i = 0; i < vl.buffers.length; i ++ ) rp.setVertexBuffer( i, this._attributeBuffer( geo, vl.buffers[ i ].attr ) );
 			const instances = o.isInstancedMesh ? o.count : geo.instanceCount ?? 1;
 			if ( instances === 0 ) continue;
