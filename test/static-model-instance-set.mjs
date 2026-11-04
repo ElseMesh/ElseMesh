@@ -113,6 +113,18 @@ const [ coarseLod, middleLod, fineLod ] = planner.groups;
 assert.deepEqual( Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ), [ 3 ] );
 assert.deepEqual( Array.from( middleLod.indices.subarray( 0, middleLod.count ) ), [ 1, 2 ] );
 assert.deepEqual( Array.from( fineLod.indices.subarray( 0, fineLod.count ) ), [ 0, 1 ] );
+const loadBiasedPlanner = new StaticModelInstanceSetPlanner( { ...valid, instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, 20 ] } ] } );
+loadBiasedPlanner.update( {
+	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
+} );
+assert.equal( loadBiasedPlanner.groups[ 2 ].count, 1, 'the nearest LOD is selected without renderer-load bias' );
+loadBiasedPlanner.update( {
+	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
+}, { renderLoadBias: 1 } );
+assert.equal( loadBiasedPlanner.groups[ 1 ].count, 1, 'sustained renderer load moves a projected-size model one authored LOD coarser' );
+assert.throws( () => loadBiasedPlanner.update( { position: [ 0, 0, 0 ], verticalFovRadians: 1, frustumPlanes: [ [ 1, 0, 0, 1 ], [ -1, 0, 0, 1 ], [ 0, 1, 0, 1 ], [ 0, -1, 0, 1 ], [ 0, 0, 1, 1 ], [ 0, 0, -1, 1 ] ] }, { renderLoadBias: 3 } ), /bias/ );
 const outgoingOffset = Array.from( middleLod.indices.subarray( 0, middleLod.count ) ).indexOf( 1 );
 const incomingOffset = Array.from( fineLod.indices.subarray( 0, fineLod.count ) ).indexOf( 1 );
 assert.ok( fineLod.fade[ incomingOffset ] > 0.4 && fineLod.fade[ incomingOffset ] < 0.6, 'shared LOD transition produces a fractional incoming fade' );

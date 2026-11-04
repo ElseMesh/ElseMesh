@@ -1454,7 +1454,7 @@ export class App {
 
 	updateWorldComponents( root, dt, camera ) {
 		const components = root?.userData?.worldComponents || [];
-		for ( const component of components ) component.update?.( dt, camera, this.player );
+		for ( const component of components ) component.update?.( dt, camera, this.player, this.renderLoadBias );
 	}
 
 	updateFreeCamera( dt ) {

@@ -63,9 +63,11 @@ export class StaticModelInstanceSetPlanner {
 	 * Updates stable output buffers. Camera planes use inward-facing [nx, ny, nz, constant]
 	 * coefficients; they are normalized here so sphere radii are in world units.
 	 */
-	update( camera, { includeShadows = true } = {} ) {
+	update( camera, { includeShadows = true, renderLoadBias = 0 } = {} ) {
 		if ( ! camera || ! finiteVector3( camera.position ) || ! Number.isFinite( camera.verticalFovRadians ) || camera.verticalFovRadians <= 0 || camera.verticalFovRadians >= Math.PI || ! Array.isArray( camera.frustumPlanes ) || camera.frustumPlanes.length !== 6 ) throw new Error( 'Invalid static model planner camera' );
+		if ( ! Number.isInteger( renderLoadBias ) || renderLoadBias < 0 || renderLoadBias > 2 ) throw new Error( 'Invalid static model planner render-load bias' );
 		const tanHalfFov = Math.tan( camera.verticalFovRadians * 0.5 );
+		const loadScale = 2 ** renderLoadBias;
 		for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
 			const plane = camera.frustumPlanes[ planeIndex ];
 			if ( ! Array.isArray( plane ) || plane.length !== 4 || ! plane.every( Number.isFinite ) ) throw new Error( 'Invalid static model planner frustum plane' );
@@ -112,9 +114,11 @@ export class StaticModelInstanceSetPlanner {
 			}
 			if ( ! visible ) continue;
 
-			const lodMeasure = model.lodMetric === 'projected-radius'
+			const baseLodMeasure = model.lodMetric === 'projected-radius'
 				? radius / ( Math.max( distance, 1e-6 ) * tanHalfFov )
 				: distance / Math.max( sx, sy, sz );
+			// Sustained render overload shifts demand toward coarser authored LODs.
+			const lodMeasure = model.lodMetric === 'projected-radius' ? baseLodMeasure / loadScale : baseLodMeasure * loadScale;
 			const drawFade = model.drawFadeStartDistance < model.drawMaxDistance
 				? 1 - smoothstep( model.drawFadeStartDistance, model.drawMaxDistance, distance )
 				: 1;

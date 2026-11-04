@@ -61,9 +61,9 @@ export class StaticModelInstanceSetRuntime {
 		if ( ! Array.isArray( batches ) || batches.length !== this.planner.groups.length || ( this.usesShadowBatches && ( ! Array.isArray( shadowBatches ) || shadowBatches.length !== this.planner.shadowGroups.length ) ) ) throw new Error( 'Static model instance batches do not match the declared models and LODs' );
 	}
 
-	update( _dt, camera ) {
+	update( _dt, camera, _player, renderLoadBias = 0 ) {
 		if ( this.disposed ) return;
-		this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches } );
+		this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias } );
 		this.#requestVisibleLODs();
 		this._updateBatches( this.planner.groups, this.batches );
 		if ( this.usesShadowBatches ) this._updateBatches( this.planner.shadowGroups, this.shadowBatches );
