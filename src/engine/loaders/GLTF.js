@@ -218,6 +218,56 @@ export function parseGLB( buffer ) {
 
 }
 
+// Read the GLB JSON chunk without decoding vertex/index accessors. Callers that
+// only inspect document metadata should not allocate a second copy of the
+// geometry buffers before the renderer consumes the asset.
+export function parseGLBJSON( buffer ) {
+
+	if ( ArrayBuffer.isView( buffer ) ) {
+
+		const view = buffer;
+		buffer = view.byteOffset === 0 && view.byteLength === view.buffer.byteLength
+			? view.buffer
+			: view.buffer.slice( view.byteOffset, view.byteOffset + view.byteLength );
+
+	}
+
+	const dv = new DataView( buffer );
+	if ( dv.getUint32( 0, true ) !== 0x46546C67 ) throw new Error( 'GLB: bad magic' );
+	const length = dv.getUint32( 8, true );
+	let json = null;
+	for ( let offset = 12; offset < length; ) {
+
+		const chunkLength = dv.getUint32( offset, true ), type = dv.getUint32( offset + 4, true );
+		if ( type === 0x4E4F534A ) json = JSON.parse( new TextDecoder().decode( new Uint8Array( buffer, offset + 8, chunkLength ) ) );
+		offset += 8 + chunkLength;
+
+	}
+
+	if ( ! json ) throw new Error( 'GLB: no JSON chunk' );
+	const unsupportedExtensions = ( json.extensionsRequired || [] ).filter( extension => ! SUPPORTED_REQUIRED_EXTENSIONS.has( extension ) );
+	if ( unsupportedExtensions.length ) throw new Error( 'GLB: unsupported extensions ' + unsupportedExtensions.join( ', ' ) );
+	for ( const [ index, image ] of ( json.images || [] ).entries() ) {
+
+		const reference = image.extensions?.EXT_elsemesh_asset_reference;
+		if ( reference !== undefined && ( ! reference || typeof reference !== 'object' || Array.isArray( reference ) || Object.keys( reference ).length !== 1 || ! Object.hasOwn( reference, 'assetId' ) || ! /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/.test( reference.assetId || '' ) || image.bufferView !== undefined || image.uri !== undefined ) ) {
+			throw new Error( `GLB: image ${index} has an invalid ElseMesh asset reference` );
+		}
+		if ( image.bufferView === undefined && image.uri === undefined && reference === undefined ) throw new Error( `GLB: image ${index} has no image data or asset reference` );
+
+	}
+	for ( const [ index, texture ] of ( json.textures || [] ).entries() ) {
+
+		const basisSource = texture.extensions?.KHR_texture_basisu?.source;
+		const source = basisSource ?? texture.source;
+		if ( ! Number.isSafeInteger( source ) || source < 0 || source >= ( json.images || [] ).length ) throw new Error( `GLB: texture ${index} has no valid image source` );
+		if ( basisSource !== undefined && json.images[ basisSource ].mimeType !== 'image/ktx2' ) throw new Error( `GLB: texture ${index} KHR_texture_basisu source is not image/ktx2` );
+
+	}
+	return json;
+
+}
+
 function identities( n ) {
 
 	const a = new Float32Array( n * 16 );

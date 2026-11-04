@@ -1,12 +1,12 @@
 import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js';
-import { parseGLB } from '../engine/loaders/GLTF.js';
+import { parseGLBJSON } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 
 // Resolve an instance set only against assets declared by its connector. Signed
 // package IDs are content hashes; the local dynamic provider uses source-scoped
 // IDs and verifies each response against the provider's SHA-256 ETag.
-export async function loadStaticModelInstanceSetAssets( connector, component, { signal } = {} ) {
+export async function loadStaticModelInstanceSetAssets( connector, component, { signal, parseModel = parseGLBJSON } = {} ) {
 	if ( ! connector?.manifest || ! Array.isArray( connector.manifest.assets ) || ! Array.isArray( component?.assets ) ) throw new Error( 'Static model instance set requires a loaded world manifest and component asset references' );
 	const records = connector.manifest.assets;
 	const assetsByID = new Map( records.map( asset => [ asset.id, asset ] ) );
@@ -38,10 +38,10 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 				: null;
 			const bytes = progressive?.bytes || connector.assets.get( assetId ) || await connector.getAsset( assetId, { signal: requestSignal } );
 			const webGLBytes = progressive?.webGLBytes || null;
-			const gltf = parseGLB( bytes );
-			if ( gltf.skins.length || gltf.animations.length || gltf.nodes.some( node => node.skin !== undefined ) || ( gltf.json.meshes || [] ).some( mesh => mesh.primitives.some( primitive => primitive.targets?.length ) ) ) throw new Error( `Static model GLB cannot contain skins, animation, or morph targets: ${assetId}` );
-			for ( const primitives of gltf.meshes ) for ( const primitive of primitives ) {
-				if ( primitive.mode !== 4 ) throw new Error( `Static model GLB must use triangle-list primitives: ${assetId}` );
+			const gltf = parseModel( bytes );
+			if ( ( gltf.skins || [] ).length || ( gltf.animations || [] ).length || ( gltf.nodes || [] ).some( node => node.skin !== undefined ) || ( gltf.meshes || [] ).some( mesh => mesh.primitives.some( primitive => primitive.targets?.length ) ) ) throw new Error( `Static model GLB cannot contain skins, animation, or morph targets: ${assetId}` );
+			for ( const mesh of gltf.meshes || [] ) for ( const primitive of mesh.primitives ) {
+				if ( ( primitive.mode ?? 4 ) !== 4 ) throw new Error( `Static model GLB must use triangle-list primitives: ${assetId}` );
 				if ( Object.keys( primitive.attributes ).some( name => ! [ 'POSITION', 'NORMAL', 'TEXCOORD_0', 'COLOR_0', '_ELSEMESH_VDATA' ].includes( name ) ) ) throw new Error( `Static model GLB has unsupported vertex attributes: ${assetId}` );
 			}
 			modelAssets.set( assetId, bytes );
