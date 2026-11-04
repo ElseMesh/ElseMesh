@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -25,10 +27,47 @@ type dynamicRegionProviderDescriptor struct {
 }
 
 type regionProviderGateway struct {
-	upstream       *url.URL
-	worldID        string
-	allowedOrigins map[string]struct{}
-	proxy          *httputil.ReverseProxy
+	upstream          *url.URL
+	worldID           string
+	allowedOrigins    map[string]struct{}
+	regionDiagnostics bool
+	proxy             *httputil.ReverseProxy
+}
+
+type regionProviderMetricsWriter struct {
+	http.ResponseWriter
+	statusCode int
+	bytes      int64
+}
+
+func (writer *regionProviderMetricsWriter) WriteHeader(statusCode int) {
+	if writer.statusCode != 0 {
+		return
+	}
+	writer.statusCode = statusCode
+	writer.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (writer *regionProviderMetricsWriter) Write(data []byte) (int, error) {
+	if writer.statusCode == 0 {
+		writer.WriteHeader(http.StatusOK)
+	}
+	written, err := writer.ResponseWriter.Write(data)
+	writer.bytes += int64(written)
+	return written, err
+}
+
+func (writer *regionProviderMetricsWriter) Flush() {
+	if writer.statusCode == 0 {
+		writer.WriteHeader(http.StatusOK)
+	}
+	if flusher, ok := writer.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (writer *regionProviderMetricsWriter) Unwrap() http.ResponseWriter {
+	return writer.ResponseWriter
 }
 
 func parseRegionProviderURL(raw string) (*url.URL, error) {
@@ -64,9 +103,10 @@ func newRegionProviderGateway(rawURL, expectedWorldID string, allowedOrigins map
 		return nil, errors.New("expected world ID is invalid")
 	}
 	gateway := &regionProviderGateway{
-		upstream:       upstream,
-		worldID:        expectedWorldID,
-		allowedOrigins: allowedOrigins,
+		upstream:          upstream,
+		worldID:           expectedWorldID,
+		allowedOrigins:    allowedOrigins,
+		regionDiagnostics: os.Getenv("ELSEMESH_REGION_PROVIDER_DIAGNOSTICS") == "1",
 	}
 	proxy := httputil.NewSingleHostReverseProxy(upstream)
 	proxy.Transport = &http.Transport{
@@ -193,7 +233,28 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	r.Header.Del("Cookie")
 	r.Header.Del("Authorization")
 	r.Header.Del("Proxy-Authorization")
+	if gateway.regionDiagnostics && r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/regions/") {
+		started := time.Now()
+		metrics := &regionProviderMetricsWriter{ResponseWriter: w}
+		gateway.proxy.ServeHTTP(metrics, r)
+		statusCode := metrics.statusCode
+		if statusCode == 0 {
+			statusCode = http.StatusOK
+		}
+		log.Printf("Thruholdd region proxy metric: path=%q cell=%q payload=%q mesh=%q lod=%q texture=%q status=%d bytes=%d elapsed_ms=%d",
+			r.URL.Path, diagnosticQueryValue(r, "cell"), diagnosticQueryValue(r, "payload"), diagnosticQueryValue(r, "mesh"),
+			diagnosticQueryValue(r, "lod"), diagnosticQueryValue(r, "texture"), statusCode, metrics.bytes, time.Since(started).Milliseconds())
+		return
+	}
 	gateway.proxy.ServeHTTP(w, r)
+}
+
+func diagnosticQueryValue(r *http.Request, key string) string {
+	value := r.URL.Query().Get(key)
+	if len(value) > 160 {
+		return value[:160] + "..."
+	}
+	return value
 }
 
 func regionProviderMethodAllowed(method, path string) bool {

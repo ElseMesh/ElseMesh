@@ -155,6 +155,7 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		}
 
 		request = httptest.NewRequest(http.MethodGet, "/v1/regions/SUB_GreatHall_Int", nil)
+		gateway.regionDiagnostics = true
 		request.Host = "gateway.example"
 		request.Header.Set("Origin", "https://client.example")
 		request.Header.Set("Range", "bytes=0-0")
