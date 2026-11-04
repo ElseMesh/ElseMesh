@@ -183,6 +183,18 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-04: isolated the WebGL terrain patch by capturing the hosted world
+  with `noWater`; the pale geometry remained with the water scene disabled. The
+  manifest's full terrain replaces a `portal-preview` terrain. WebGL had loaded
+  both objects but did not hide the placeholder as WebGPU's package path does.
+  Added a post-load replacement visibility reconciliation to hosted WebGL
+  object installation, plus a regression test for both arrival orders. The
+  focused visibility test and WebGL backend test pass. A fresh
+  same-pose, same-time, 1588×780 WebGL capture no longer shows the overlapping
+  terrain pattern. The remaining terrain is still much paler than WebGPU, and
+  shoreline and foliage parity remain open. Estimate remains 82%; no visual
+  parity gate has passed.
+
 - 2026-11-04: captured the hosted Tidewater world in the same isolated Weston
   session at the same camera pose, time of day, and native 1588×780 viewport in
   WebGPU and WebGL. The WebGPU view retains detailed terrain/foliage, blue water,

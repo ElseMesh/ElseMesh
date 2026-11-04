@@ -20,6 +20,7 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
+import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
 import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
@@ -1802,6 +1803,7 @@ export class WebGLFallback {
 
 
 		}
+		hideReplacedWorldObjects( manifest.objects, this.hostedObjectRoots );
 		this.portals = ( manifest.portals || [] ).filter( portal => portal.enabled || portal.back?.enabled );
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
