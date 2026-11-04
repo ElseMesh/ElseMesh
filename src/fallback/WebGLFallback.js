@@ -1276,7 +1276,7 @@ export class WebGLFallback {
 					float shoreCrest = smoothstep( 0.62, 0.86, shoreWave ) * smoothstep( 0.22, 0.66, shoreDetail );
 					float shoreFoam = shoreBand * shoreCrest;
 					float faceBand = smoothstep( -0.19, -0.13, vShoreU ) * ( 1.0 - smoothstep( -0.015, 0.01, vShoreU ) );
-					float faceProgress = smoothstep( -0.4, 0.0, vShoreBreaking ) * ( 1.0 - smoothstep( 0.9, 1.08, vShoreBreaking ) );
+					float faceProgress = smoothstep( -0.4, 0.0, vShoreBreaking ) * ( 1.0 - smoothstep( 1.3, 1.7, vShoreBreaking ) );
 					float breakerFace = faceBand * faceProgress * vShoreEnv;
 					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.03 ) * 30.0 );
 					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU - 0.01 ) * 22.0 );
