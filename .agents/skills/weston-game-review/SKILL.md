@@ -18,7 +18,7 @@ Use the checked-in display setup and browser helper; do not launch Weston with
    checked-in `weston.ini`, disables input and idle blanking, and creates a
    dedicated socket. Keep the windowed Weston display visible; do not mute the
    host audio or fullscreen the outer Weston window.
-3. Start Chromium with `worlds/Hogwarts/tools/review-browser.mjs`, a dedicated
+3. Start Chromium with `tools/review-browser.mjs`, a dedicated
    profile, and a maximized window. Use the intended Weston display environment
    explicitly. Keep the address bar visible; the browser helper must not add
    kiosk/fullscreen mode. Prefer hardware WebGPU for the standard review and
@@ -31,6 +31,7 @@ Use the checked-in display setup and browser helper; do not launch Weston with
    Weston running when the user is watching its output; stop only a Weston
    process started for this review when it is no longer needed.
 
-The Weston config, launcher, and review-browser helper are authoritative for
-runtime flags. Read their current contents before using them; do not copy their
-configuration into another script or invent persistent process cleanup rules.
+The Weston config and launcher, plus `tools/review-browser.mjs`, are authoritative
+for runtime flags. Read their current contents before using them; do not copy
+their configuration into another script or invent persistent process cleanup
+rules.
