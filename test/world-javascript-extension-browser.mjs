@@ -109,9 +109,10 @@ try {
 	browserProcess = browser.child;
 	const result = await inspectPage( browser.page, url );
 	assert.equal( result.status, 'passed', `actual browser Worker passes: ${result.text}` );
-	assert.match( result.text, /owner-signed package and actual module Worker/, 'the browser verifies and loads an owner-signed package before running the extension' );
+	assert.match( result.text, /owner-signed package, App activation event, and actual module Worker/, 'the browser verifies the owner-signed package and exercises App activation dispatch' );
 	assert.match( result.text, /"calls":1.*"isWorker":true/, 'the extension executes in a Worker global scope and retains module state' );
 	assert.match( result.text, /"calls":2.*"isWorker":true/, 'the same dedicated Worker handles sequential calls' );
+	assert.match( result.text, /"calls":3,"eventType":"elsemesh\.world\.activated\/1".*"isWorker":true/, 'App dispatches the subscribed activation event to the same Worker' );
 	console.log( 'World JavaScript extension: owner-signed manifest, loaded world package, and isolated Chromium module Worker passed' );
 } finally {
 	if ( browserProcess ) await stopBrowser( browserProcess );

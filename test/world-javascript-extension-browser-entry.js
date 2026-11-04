@@ -1,4 +1,6 @@
 import { createWorldBehaviorExtensions } from '../src/network/WorldBehaviorRegistry.js';
+import { App } from '../src/App.js';
+import { registerWorldBehavior, registerWorldBehaviorImplementation, WORLD_EXTENSION_EVENT_ACTIVATED } from '../src/network/WorldBehaviorRegistry.js';
 import { verifySignedWorldManifest } from '../src/network/WorldConnector.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 
@@ -8,9 +10,17 @@ let marker = null;
 export function run( event ) {
 	if ( event.type === 'initialize' ) { marker = event.behaviorData.marker; return { initialized: true }; }
 	calls ++;
-	return { calls, eventType: event.type, value: event.value, marker, isWorker: typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope };
+	return { calls, eventType: event.type, value: event.value, worldId: event.worldId, marker, isWorker: typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope };
 }`;
 const behaviorId = 'elsemesh.browser-worker-test/1';
+registerWorldBehavior( behaviorId, {
+	validateExperienceData: data => { if ( data.marker !== 'signed-world-data' ) throw new Error( 'invalid fixture behavior data' ); },
+	validateExtensionEvent: event => { if ( event.type === WORLD_EXTENSION_EVENT_ACTIVATED ? typeof event.worldId !== 'string' : event.type !== 'probe' ) throw new Error( 'invalid extension event' ); },
+	validateExtensionResult: ( value, event ) => { if ( value.eventType !== event.type || value.isWorker !== true || ( event.type === WORLD_EXTENSION_EVENT_ACTIVATED && value.worldId !== event.worldId ) ) throw new Error( 'invalid extension result' ); },
+} );
+let resolveActivation;
+const activationResult = new Promise( resolve => { resolveActivation = resolve; } );
+registerWorldBehaviorImplementation( behaviorId, { onWorldExtensionResult: state => resolveActivation( state ) } );
 let extensions;
 let worldRoot;
 
@@ -51,7 +61,7 @@ try {
 	const experience = {
 		genre: 'Extension fixture', tagline: 'Owner signed behavior fixture.', loadingNote: 'Preparing the extension fixture.',
 		tips: [ 'The behavior module runs in a dedicated Worker.' ], stages: { world: 'Loading signed content…' },
-		behaviors: { [ behaviorId ]: { marker: 'signed-world-data' } }, extensions: [ { behaviorId, assetId } ],
+		behaviors: { [ behaviorId ]: { marker: 'signed-world-data' } }, extensions: [ { behaviorId, assetId, events: [ WORLD_EXTENSION_EVENT_ACTIVATED ] } ],
 	};
 	const payload = {
 		protocol: 'elsemesh.world/3', worldId: 'elsemesh:browser-worker-test', ownerPeerId: signer,
@@ -75,7 +85,12 @@ try {
 	const second = await extensions.run( behaviorId, { type: 'probe', value: 23 } );
 	if ( JSON.stringify( first ) !== JSON.stringify( { calls: 1, eventType: 'probe', value: 17, marker: 'signed-world-data', isWorker: true } ) ) throw new Error( `unexpected first Worker result: ${JSON.stringify( first )}` );
 	if ( JSON.stringify( second ) !== JSON.stringify( { calls: 2, eventType: 'probe', value: 23, marker: 'signed-world-data', isWorker: true } ) ) throw new Error( `unexpected second Worker result: ${JSON.stringify( second )}` );
-	result.textContent = `PASS owner-signed package and actual module Worker: ${JSON.stringify( [ first, second ] )}`;
+	const app = Object.create( App.prototype );
+	Object.assign( app, { worldExtensionGeneration: 0, localWorldExtensions: null, activeHostedExtensions: extensions } );
+	app.dispatchWorldActivated( manifest.experience, extensions, manifest.worldId, { mode: 'hosted' } );
+	const routed = await Promise.race( [ activationResult, new Promise( ( _resolve, reject ) => setTimeout( () => reject( new Error( 'App did not route the subscribed activation event' ) ), 5000 ) ) ] );
+	if ( routed.event.type !== WORLD_EXTENSION_EVENT_ACTIVATED || routed.event.worldId !== manifest.worldId || routed.result.calls !== 3 || routed.result.isWorker !== true ) throw new Error( `unexpected App activation result: ${JSON.stringify( routed )}` );
+	result.textContent = `PASS owner-signed package, App activation event, and actual module Worker: ${JSON.stringify( [ first, second, routed.result ] )}`;
 	result.dataset.status = 'passed';
 } catch ( error ) {
 	result.textContent = `FAIL ${error.stack || error}`;
