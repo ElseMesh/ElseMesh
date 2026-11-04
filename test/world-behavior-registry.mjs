@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor } from '../src/network/WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 
 registerWorldBehavior( 'elsemesh.registry-test/1', {
@@ -31,11 +31,13 @@ let worldFrame = null;
 let worldDeactivation = null;
 let webglFrame = null;
 let webglKey = null;
+let extensionResult = null;
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: state => { worldActivation = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldActivated: state => { webglActivation = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onBuiltinWorldActivated: state => { builtInActivation = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldFrame: state => { worldFrame = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldDeactivated: state => { worldDeactivation = state; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldExtensionResult: state => { extensionResult = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldFrame: state => { webglFrame = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLKeyDown: state => { webglKey = state; return state.active && state.code === 'KeyE'; } } );
 dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onHostedWorldActivated', { marker: 7 } );
@@ -73,7 +75,10 @@ const extensionExperience = { behaviors: { [ behaviorID ]: {} }, extensions: [ {
 const extensions = createWorldBehaviorExtensions( extensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { echo: event }; }' ) ] ] ), { workerFactory: () => worker } );
 assert.equal( extensions.has( 'elsemesh.registry-test/1' ), true, 'the manager exposes registered Worker availability without custom hooks' );
 assert.deepEqual( await extensions.run( 'elsemesh.registry-test/1', { type: 'ping' } ), { echo: { type: 'ping' } }, 'generic behavior extensions exchange bounded JSON through the Worker manager' );
-assert.deepEqual( worker.messages.filter( message => message.type === 'run' ).map( message => message.event.type ), [ 'initialize', 'ping' ], 'the worker receives behavior data before normal events' );
+assert.deepEqual( await dispatchWorldBehaviorExtensionEvent( extensionExperience, extensions, { type: 'ping' }, { marker: 11 } ), [ { behaviorId: behaviorID, result: { echo: { type: 'ping' } } } ], 'the Engine broadcasts a bounded JSON event to the world extension' );
+assert.deepEqual( { behaviorId: extensionResult.behaviorId, active: extensionResult.active, data: extensionResult.data, marker: extensionResult.marker, event: extensionResult.event, result: extensionResult.result }, { behaviorId: behaviorID, active: true, data: {}, marker: 11, event: { type: 'ping' }, result: { echo: { type: 'ping' } } }, 'extension results return through the registered world behavior adapter' );
+assert.deepEqual( worker.messages.filter( message => message.type === 'run' ).map( message => message.event.type ), [ 'initialize', 'ping', 'ping' ], 'the worker receives behavior data before direct and Engine-dispatched events' );
+assert.equal( 'marker' in worker.messages.filter( message => message.type === 'run' )[ 2 ].event, false, 'Engine-only adapter context is not sent into the Worker' );
 await assert.rejects( extensions.run( 'elsemesh.registry-test/1', { type: 'unknown' } ), /invalid test event/, 'event meaning stays in the registered behavior package' );
 extensions.dispose();
 assert.equal( worker.terminated, true, 'world extension teardown terminates its Worker' );
@@ -88,6 +93,7 @@ const worldOwnedWorker = new FakeWorker();
 const worldOwnedExtensions = createWorldBehaviorExtensions( worldOwnedExtensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { accepted: event }; }' ) ] ] ), { workerFactory: () => worldOwnedWorker } );
 assert.deepEqual( await worldOwnedExtensions.ready( worldOwnedBehaviorID ), { echo: { type: 'initialize', behaviorData: { privateRule: 'module-owned' } } }, 'the generic Worker initialization receives its owner-authored behavior data' );
 assert.deepEqual( await worldOwnedExtensions.run( worldOwnedBehaviorID, { action: 'world-specific' } ), { echo: { action: 'world-specific' } }, 'unregistered world behavior messages are delegated to the owner module' );
+assert.deepEqual( await worldOwnedExtensions.dispatch( { type: 'world.event', value: 3 } ), [ { behaviorId: worldOwnedBehaviorID, result: { echo: { type: 'world.event', value: 3 } } } ], 'the Engine can broadcast generic events to owner-defined extensions without a built-in behavior registration' );
 worldOwnedExtensions.dispose();
 assert.equal( worldOwnedWorker.terminated, true, 'owner-defined behavior worker is terminated with its world' );
 

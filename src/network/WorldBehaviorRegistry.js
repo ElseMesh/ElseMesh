@@ -30,12 +30,12 @@ export function worldBehaviorData( experience, id ) {
 export function registerWorldBehaviorImplementation( id, implementation ) {
 	const existing = implementations.get( id ) || {};
 	const entries = implementation && typeof implementation === 'object' && ! Array.isArray( implementation ) ? Object.entries( implementation ) : [];
-	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown', 'onWebGLBlocksPlayerInput' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
+	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown', 'onWebGLBlocksPlayerInput' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
 	implementations.set( id, Object.freeze( { ...existing, ...implementation } ) );
 }
 
 export function dispatchWorldBehaviorHooks( experience, hook, context ) {
-	if ( ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown', 'onWebGLBlocksPlayerInput' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
+	if ( ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown', 'onWebGLBlocksPlayerInput' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
 	let resolved = resolvedExperiences.get( experience );
 	if ( ! resolved ) {
 		resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
@@ -44,6 +44,26 @@ export function dispatchWorldBehaviorHooks( experience, hook, context ) {
 	let handled = false;
 	for ( const [ id, implementation ] of implementations ) if ( implementation[ hook ]?.( { ...context, experience, active: resolved.has( id ), data: resolved.get( id )?.data, behaviorId: id } ) === true ) handled = true;
 	return handled;
+}
+
+export async function dispatchWorldBehaviorExtensionEvent( experience, extensions, event, context = {} ) {
+	if ( ! extensions || typeof extensions.dispatch !== 'function' ) return [];
+	const responses = await extensions.dispatch( event );
+	for ( const { behaviorId, result } of responses ) {
+		const implementation = implementations.get( behaviorId );
+		if ( ! implementation?.onWorldExtensionResult ) continue;
+		const behavior = worldBehaviorsFor( experience ).find( item => item.id === behaviorId );
+		implementation.onWorldExtensionResult( {
+			...context,
+			experience,
+			active: Boolean( behavior ),
+			behaviorId,
+			data: behavior?.data,
+			event,
+			result,
+		} );
+	}
+	return responses;
 }
 
 export function hasWorldBehavior( experience, id ) {
@@ -93,6 +113,10 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 	let disposed = false;
 	return Object.freeze( {
 		has( behaviorId ) { return ! disposed && runtimes.has( behaviorId ); },
+		dispatch( event ) {
+			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
+			return Promise.all( [ ...runtimes ].map( async ( [ behaviorId, runtime ] ) => ( { behaviorId, result: await runtime.run( event ) } ) ) );
+		},
 		run( behaviorId, event ) {
 			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
 			const runtime = runtimes.get( behaviorId );
