@@ -383,7 +383,7 @@ export class AppUI {
 
 		const app = this.app;
 		const ui = this.ui;
-		ui.setStats( { fps: app.fps, frameMs: dt * 1000 } );
+		ui.setStats( { fps: app.fps, frameMs: dt * 1000, cpuMs: app.cpuMs, gpuMs: app.frameWorkMeter?.gpuMilliseconds() } );
 		this.s.renderScale = app.settings.renderScale;
 
 		const p = app.player;

@@ -916,7 +916,7 @@ export class App {
 		GPU.beginFrame();
 		this.frameWorkMeter?.begin();
 		this.updateFPS();
-		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs, gpuMs: this.frameWorkMeter?.gpuMilliseconds() } );
+		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs, cpuMs: this.cpuMs, gpuMs: this.frameWorkMeter?.gpuMilliseconds() } );
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		FrameUniforms.fields.dt.value = dt;
 		FrameUniforms.fields.time.value += dt;

@@ -1929,11 +1929,14 @@ export class UI {
 			<div class="em-stats-main"><span class="em-fps">--</span><span class="em-fps-unit">fps</span></div>
 			<canvas class="em-spark"></canvas>
 			<div class="em-stats-sub">
-				<span class="em-kv"><span class="em-k">frame</span><span class="em-v em-ms">--</span></span>
-				<span class="em-kv em-kv-gpu" hidden><span class="em-k">gpu</span><span class="em-v em-gpu">--</span></span>
+				<span class="em-kv"><span class="em-k" title="Time between animation-frame callbacks">gap</span><span class="em-v em-ms">--</span></span>
+				<span class="em-kv em-kv-cpu" hidden><span class="em-k" title="Browser-side CPU time for a frame">cpu</span><span class="em-v em-cpu">--</span></span>
+				<span class="em-kv em-kv-gpu" hidden><span class="em-k" title="Measured GPU execution time">gpu</span><span class="em-v em-gpu">--</span></span>
 			</div>`;
 		this.fpsEl = stats.querySelector( '.em-fps' );
 		this.msEl = stats.querySelector( '.em-ms' );
+		this.cpuEl = stats.querySelector( '.em-cpu' );
+		this.cpuKv = stats.querySelector( '.em-kv-cpu' );
 		this.gpuEl = stats.querySelector( '.em-gpu' );
 		this.gpuKv = stats.querySelector( '.em-kv-gpu' );
 		this.sparkEl = stats.querySelector( '.em-spark' );
@@ -3021,6 +3024,7 @@ export class UI {
 
 		const num = ( v ) => ( typeof v === 'number' && isFinite( v ) ? v : NaN );
 		let fps = num( s.fps ), frameMs = num( s.frameMs );
+		const cpuMs = num( s.cpuMs );
 		const gpuMs = num( s.gpuMs );
 		if ( ! ( fps > 0 ) && frameMs > 0 ) fps = 1000 / frameMs;
 		if ( ! ( frameMs > 0 ) && fps > 0 ) frameMs = 1000 / fps;
@@ -3061,6 +3065,9 @@ export class UI {
 		}
 
 		if ( frameMs > 0 ) this.msEl.textContent = `${ frameMs.toFixed( 1 ) } ms`;
+		const hasCpu = cpuMs >= 0;
+		if ( this.cpuKv.hidden === hasCpu ) this.cpuKv.hidden = ! hasCpu;
+		if ( hasCpu ) this.cpuEl.textContent = `${ cpuMs.toFixed( 1 ) } ms`;
 		const hasGpu = gpuMs >= 0;
 		if ( this.gpuKv.hidden === hasGpu ) this.gpuKv.hidden = ! hasGpu;
 		if ( hasGpu ) this.gpuEl.textContent = `${ gpuMs.toFixed( 1 ) } ms`;

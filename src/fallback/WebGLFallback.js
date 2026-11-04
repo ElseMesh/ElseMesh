@@ -1980,7 +1980,7 @@ export class WebGLFallback {
 
 		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		this.app.updateFPS();
-		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
+		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, cpuMs: this.app.cpuMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		this.terrainMaterial?.userData.updateTerrainTime?.( simulationTime );
@@ -2045,6 +2045,7 @@ export class WebGLFallback {
 			this.renderer.autoClear = true;
 			this.frameWorkMeter.end();
 		}
+		this.app.cpuMs = performance.now() - now;
 		this.input.endFrame();
 
 	}
