@@ -139,6 +139,35 @@ func TestWorldManifestAcceptsDeclarativeFishingRules(t *testing.T) {
 	}
 }
 
+func TestWorldManifestValidatesRendererNeutralEnvironmentProfile(t *testing.T) {
+	for _, environment := range []*worldEnvironment{
+		{Sky: "atmosphere", Clouds: "procedural"},
+		{Sky: "none", Clouds: "none"},
+		{},
+	} {
+		experience := &worldExperience{
+			Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{},
+			Environment: environment,
+		}
+		if err := validateWorldExperience(experience); err != nil {
+			t.Errorf("valid environment profile %#v was rejected: %v", environment, err)
+		}
+	}
+	for _, environment := range []*worldEnvironment{
+		{Sky: "unsupported"},
+		{Clouds: "unsupported"},
+		{Sky: "none", Clouds: "procedural"},
+	} {
+		experience := &worldExperience{
+			Genre: "A world", Tagline: "Explore", LoadingNote: "Loading", Tips: []string{"Look around"}, Stages: map[string]string{},
+			Environment: environment,
+		}
+		if err := validateWorldExperience(experience); err == nil {
+			t.Errorf("invalid environment profile %#v was accepted", environment)
+		}
+	}
+}
+
 func TestWorldManifestValidatesJavaScriptBehaviorAssets(t *testing.T) {
 	owner := testKey(t)
 	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())

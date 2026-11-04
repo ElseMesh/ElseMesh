@@ -459,8 +459,14 @@ type worldExperience struct {
 	LoadingNote string                     `json:"loadingNote"`
 	Tips        []string                   `json:"tips"`
 	Stages      map[string]string          `json:"stages"`
+	Environment *worldEnvironment          `json:"environment,omitempty"`
 	Behaviors   map[string]json.RawMessage `json:"behaviors,omitempty"`
 	Extensions  []worldJavaScriptExtension `json:"extensions,omitempty"`
+}
+
+type worldEnvironment struct {
+	Sky    string `json:"sky,omitempty"`
+	Clouds string `json:"clouds,omitempty"`
 }
 
 type worldJavaScriptExtension struct {
@@ -508,6 +514,17 @@ func validateWorldExperience(experience *worldExperience) error {
 	for stage, text := range experience.Stages {
 		if !allowedStages[stage] || strings.TrimSpace(text) == "" || len(text) > 120 {
 			return fmt.Errorf("world experience loading stage %q is invalid", stage)
+		}
+	}
+	if environment := experience.Environment; environment != nil {
+		if environment.Sky != "" && environment.Sky != "none" && environment.Sky != "atmosphere" {
+			return errors.New("world experience has an invalid sky mode")
+		}
+		if environment.Clouds != "" && environment.Clouds != "none" && environment.Clouds != "procedural" {
+			return errors.New("world experience has an invalid cloud mode")
+		}
+		if environment.Clouds == "procedural" && environment.Sky != "atmosphere" {
+			return errors.New("procedural clouds require the atmospheric sky")
 		}
 	}
 	if len(experience.Behaviors) > 16 {
