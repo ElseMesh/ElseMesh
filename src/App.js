@@ -21,7 +21,7 @@ import { Environment } from './sky/Environment.js';
 
 import { HeightfieldTerrainData } from './world/HeightfieldTerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
-import { Terrain } from './world/Terrain.js';
+import { Terrain, normalizeTerrainSurfaceProfile } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { Village } from './world/Village.js';
 import { Reef } from './world/Reef.js';
@@ -371,10 +371,12 @@ export class App {
 		}
 
 		await progress( 0.19, 'Rolling in the swell…', undefined, 'ocean' );
-		this.shoreField = computeShoreField( this.terrainData, { res: 512, swellDir: [ this.worldLayout.swellDir.x, this.worldLayout.swellDir.y ] } );
+		const terrainComponent = this.worldPackage?.source?.components?.find( component => component.type === 'elsemesh.terrain-surface/1' );
+		const terrainSurfaceProfile = normalizeTerrainSurfaceProfile( terrainComponent?.data?.surfaceProfile ?? { swellDirection: [ this.worldLayout.swellDir.x, this.worldLayout.swellDir.y ] } );
+		this.shoreField = computeShoreField( this.terrainData, { res: 512, swellDir: terrainSurfaceProfile.swellDirection } );
 		this.terrainGPU = new TerrainGPU( this.terrainData, this.shoreField );
 		// terrain and rocks apply the heightfield sun shadow (long hill shadows) in their own lighting
-		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, renderer } );
+		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, surfaceProfile: terrainSurfaceProfile, renderer } );
 		this.rocks = new Rocks( { scene, terrain: this.terrain, village: this.village, colliders: this.colliders } );
 		// driftwood (CC0 photoscans), wrack, pebbles and village clutter
 		this.debris = new Debris( { scene, terrain: this.terrain, village: this.village, vegetation: this.vegetation, rocks: this.rocks, colliders: this.colliders } );

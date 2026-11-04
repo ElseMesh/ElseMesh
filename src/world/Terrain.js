@@ -3,7 +3,6 @@ import { ShaderModule } from '../engine/gpu/Shader.js';
 import { CDLOD } from '../core/CDLOD.js';
 import { standard } from '../materials/Materials.js';
 import { G } from '../engine/render/Frame.js';
-import { WORLD } from './WorldLayout.js';
 import { srgb, rot2, terrainShadingModule } from './terrain/TerrainShading.js';
 
 // = GrassField FADE_T0 (vegetation/GrassField.js): tier 0 blades drop out at random distances in
@@ -30,7 +29,7 @@ export class Terrain {
 	// sunShadow: apply the heightfield sun shadow here (pass false if it is applied to every scene
 	// material through SceneLighting.directModulation). renderer: optional (unused: the sun shadow
 	// map is baked from update() into the frame encoder).
-	constructor( { scene, terrainData, terrainGPU, gridSize = 40, rangeFactor = 2.0, sunShadow = true, renderer = null } ) {
+	constructor( { scene, terrainData, terrainGPU, surfaceProfile = null, gridSize = 40, rangeFactor = 2.0, sunShadow = true, renderer = null } ) {
 
 		this.data = terrainData;
 		this.gpu = terrainGPU;
@@ -49,6 +48,7 @@ export class Terrain {
 		this.wetness = null;
 		this.sunShadow = sunShadow;
 		this.renderer = renderer;
+		this.surface = buildTerrainSurfaceWGSL( surfaceProfile );
 
 		// Morph toward the view camera in every pass: the shadow passes render the same surface
 		// (with the pass camera they would morph toward the light camera instead).
@@ -107,7 +107,7 @@ export class Terrain {
 		mat.modules = modules;
 		mat.defines.HAS_WETNESS = this.wetness ? 1 : 0;
 		mat.defines.MATERIAL_SUN_MODULATION = this.sunShadow ? 1 : 0;
-		mat.surface = TERRAIN_SURFACE;
+		mat.surface = this.surface;
 		mat.needsUpdate = true;
 
 	}
@@ -166,7 +166,21 @@ fn terDetail( uv: vec2f ) -> vec4f {
 }
 `;
 
-const TERRAIN_SURFACE = /* wgsl */`
+export function normalizeTerrainSurfaceProfile( profile = null ) {
+	const swellDirection = profile?.swellDirection ?? [ 0, - 1 ];
+	if ( ! Array.isArray( swellDirection ) || swellDirection.length !== 2 || swellDirection.some( value => ! Number.isFinite( value ) ) || Math.hypot( ...swellDirection ) < 1e-6 ) throw new Error( 'Terrain surface profile swellDirection must be a finite non-zero 2D vector' );
+	const swellLength = Math.hypot( ...swellDirection );
+	const reef = profile?.reef ?? null;
+	if ( reef && ( ! Array.isArray( reef.center ) || reef.center.length !== 2 || reef.center.some( value => ! Number.isFinite( value ) ) || ! Number.isFinite( reef.radius ) || reef.radius <= 0 ) ) throw new Error( 'Terrain surface profile reef must have a finite 2D center and positive radius' );
+	return { swellDirection: swellDirection.map( value => value / swellLength ), reef: reef ? { center: [ ...reef.center ], radius: reef.radius } : null };
+}
+
+export function buildTerrainSurfaceWGSL( profile = null ) {
+	const { swellDirection, reef } = normalizeTerrainSurfaceProfile( profile );
+	const swell = swellDirection.map( value => value.toFixed( 6 ) );
+	const reefCenter = reef ? reef.center.map( value => value.toFixed( 3 ) ) : [ '0.000', '0.000' ];
+	const reefWeight = reef ? `1.0 - smoothstep( ${( reef.radius * 0.5 ).toFixed( 3 )}, ${( reef.radius * 1.15 ).toFixed( 3 )}, reefD + ( mcr - 0.5 ) * 30.0 )` : '0.0';
+	return /* wgsl */`
 	let p = in.P;
 	let xz = p.xz;
 	let h = p.y;
@@ -203,9 +217,9 @@ const TERRAIN_SURFACE = /* wgsl */`
 #else
 	let seabedPath = h < -0.8 && nr.z < 0.05 && slope < 0.18;
 #endif
-	let sw = vec2f( ${ WORLD.swellDir.x }, ${ WORLD.swellDir.y } );
+	let sw = vec2f( ${ swell[ 0 ] }, ${ swell[ 1 ] } );
 	let swDir = sw;
-	let rc = vec2f( ${ WORLD.reef.center.x.toFixed( 3 ) }, ${ WORLD.reef.center.z.toFixed( 3 ) } );
+	let rc = vec2f( ${ reefCenter[ 0 ] }, ${ reefCenter[ 1 ] } );
 	// ripple phases of both paths (identical there), differentiated in uniform control flow
 	let ph2 = dot( xz, swDir ) * ( 6.2832 / 0.75 ) + dM.w * 16.0 + macroB * 24.0;
 	let fade2 = 1.0 - smoothstep( 0.5, 2.0, fwidth( ph2 ) );
@@ -223,7 +237,7 @@ const TERRAIN_SURFACE = /* wgsl */`
 		// ---- seabed: sand with ripple fields, seagrass meadows, rubble heads
 		let depth = -h;
 		let reefD = length( xz - rc );
-		let reefW = 1.0 - smoothstep( ${ WORLD.reef.radius * 0.5 }, ${ WORLD.reef.radius * 1.15 }, reefD + ( mcr - 0.5 ) * 30.0 );
+		let reefW = ${ reefWeight };
 		var under = mix( ${ S( 0.84, 0.78, 0.64 ) }, ${ S( 0.72, 0.7, 0.58 ) }, smoothstep( 1.0, 9.0, depth ) );
 		under = under * ( ( dM.w - 0.5 ) * 0.14 + 1.0 ) * ( ( grain - 0.45 ) * 0.25 + 1.0 );
 		// megaripple fields (~0.75 m) across the swell, troughs collect darker shell hash; not in
@@ -389,7 +403,7 @@ const TERRAIN_SURFACE = /* wgsl */`
 		var under = sand;
 		if ( underW > 0.0 ) {
 			let reefD = length( xz - rc );
-			let reefW = 1.0 - smoothstep( ${ WORLD.reef.radius * 0.5 }, ${ WORLD.reef.radius * 1.15 }, reefD + ( mcr - 0.5 ) * 30.0 );
+			let reefW = ${ reefWeight };
 			under = mix( ${ S( 0.84, 0.78, 0.64 ) }, ${ S( 0.72, 0.7, 0.58 ) }, smoothstep( 1.0, 9.0, depth ) );
 			under = under * ( ( dM.w - 0.5 ) * 0.14 + 1.0 ) * ( ( grain - 0.45 ) * 0.25 + 1.0 );
 			// megaripple fields (~0.75 m) across the swell, troughs collect darker shell hash; not in
@@ -624,3 +638,4 @@ const TERRAIN_SURFACE = /* wgsl */`
 	s.normal = outN;
 	s.ao = sat( outAO );
 `;
+}

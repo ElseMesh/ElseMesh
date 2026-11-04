@@ -6,7 +6,6 @@ import { TerrainData } from '../src/world/TerrainData.js';
 import { TerrainGPU } from '../src/world/TerrainGPU.js';
 import { Terrain } from '../src/world/Terrain.js';
 import { computeShoreField } from '../src/world/ShoreField.js';
-import { WORLD } from '../src/world/WorldLayout.js';
 import { Rocks } from '../src/world/Rocks.js';
 import { Colliders } from '../src/world/Colliders.js';
 
@@ -16,7 +15,7 @@ let t = performance.now();
 const data = new TerrainData();
 console.log( 'TerrainData', ( performance.now() - t ).toFixed( 0 ), 'ms' );
 t = performance.now();
-const shore = computeShoreField( data, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ] } );
+const shore = computeShoreField( data, { res: 512 } );
 console.log( 'ShoreField', ( performance.now() - t ).toFixed( 0 ), 'ms' );
 const gpu = new TerrainGPU( data, shore );
 console.log( 'TerrainGPU', gpu.timings );
