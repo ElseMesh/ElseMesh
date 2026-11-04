@@ -28,6 +28,7 @@ assert.match( shader.fragmentShader, /float swashArrival = mix\( uTerrainSwashTi
 assert.match( shader.fragmentShader, /float runupFront =/ );
 assert.match( shader.fragmentShader, /runupMax = amp \* 2\.1 \* 0\.65 \*/, 'WebGL uses the reduced shared run-up scale for a tighter wet-sand front' );
 assert.match( shader.fragmentShader, /terrainPixelWorld = max\( length\( dFdx\( terrainXZ \) \), length\( dFdy\( terrainXZ \) \) \)/, 'high-frequency sand detail fades with the projected pixel footprint instead of forming distant bands' );
+assert.match( shader.fragmentShader, /terrainDetailContrast = mix\( terrainClumpContrast, 0\.85, sandCoverage \) \* mix\( 1\.0, terrainDetailVisibility, sandCoverage \)/, 'sand detail contrast is filtered by its projected pixel footprint' );
 assert.match( shader.fragmentShader, /roughnessFactor = mix\( roughnessFactor, mix\( 0\.42, 0\.16, wetSand \), terrainWetness \)/ );
 material.userData.updateTerrainTime( 5.25 );
 assert.equal( shader.uniforms.uTerrainTime.value, 5.25, 'terrain swash animation follows the shared frame time' );

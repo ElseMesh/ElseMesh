@@ -5,6 +5,7 @@ import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector
 import { makePresencePose } from '../network/WorldPresenceSession.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
+import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
 import { Player } from '../player/Player.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
@@ -409,6 +410,7 @@ varying vec3 vTerrainWorldPosition;
 			float terrainPixelWorld = max( length( dFdx( terrainXZ ) ), length( dFdy( terrainXZ ) ) );
 			float terrainFineFade = 1.0 - smoothstep( 0.006, 0.02, terrainPixelWorld );
 			float terrainMidFade = 1.0 - smoothstep( 0.03, 0.1, terrainPixelWorld );
+			float terrainDetailVisibility = 1.0 - smoothstep( 0.005, 0.025, terrainPixelWorld );
 			terrainNear = mix( vec4( 0.5 ), terrainNear, terrainFineFade );
 			terrainMid = mix( vec4( 0.5 ), terrainMid, terrainMidFade );
 			terrainFine = mix( vec4( 0.5 ), terrainFine, terrainFineFade );
@@ -418,13 +420,13 @@ varying vec3 vTerrainWorldPosition;
 			float terrainFineDetail = mix( terrainFine.g, terrainFine.b, sandCoverage );
 			float terrainDistance = length( cameraPosition - vTerrainWorldPosition );
 			float terrainClumpContrast = mix( 0.34, 0.95, smoothstep( 40.0, 140.0, terrainDistance ) );
-			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage );
+			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage ) * mix( 1.0, terrainDetailVisibility, sandCoverage );
 			// Approximate WebGPU's mottled static damp term with its 0.22-0.5 midpoint; moving swash uses the shared arrival field below.
 			float dampSand = sandCoverage * ( 1.0 - smoothstep( 0.5, 1.7, vTerrainWorldPosition.y ) ) * 0.36;
 			float wetSand = sandCoverage * ( 1.0 - smoothstep( -0.1, 0.35, vTerrainWorldPosition.y ) );
 			float terrainWetness = max( dampSand, wetSand );
 			${shoreWetness}
-			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 + 1.0 ) * mix( 1.0, uTerrainWetDarken, terrainWetness );` );
+			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 * terrainDetailVisibility + 1.0 ) * mix( 1.0, uTerrainWetDarken, terrainWetness );` );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 			roughnessFactor = mix( roughnessFactor, mix( 0.42, 0.16, wetSand ), terrainWetness );` );
 	};
@@ -481,12 +483,23 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 			add( px, pz, seaLevel - terrain.heightAt( px, pz ) );
 		}
 	} else if ( terrain?.heights && terrain.res > 1 ) {
-		// Hosted island-ocean content has no engine-owned beach coordinates. Seed
-		// spray from its packaged terrain's shallow-water band instead.
+		// Hosted worlds provide no engine-owned beach rectangle. Find their shallow
+		// shoreline from the packaged heightfield and jitter one sample per coarse
+		// cell to avoid a visible grid without creating an excessive particle count.
 		const stride = Math.max( 1, Math.ceil( terrain.res / 1400 ) ), cell = terrain.size / terrain.res;
+		const hash = ( i, j, salt ) => {
+			const value = Math.sin( i * 127.1 + j * 311.7 + salt * 74.7 ) * 43758.5453;
+			return value - Math.floor( value );
+		};
 		for ( let j = 0; j < terrain.res; j += stride ) for ( let i = 0; i < terrain.res; i += stride ) {
 			const depth = seaLevel - terrain.heights[ j * terrain.res + i ];
-			if ( depth > 0.15 && depth < 5.5 ) add( terrain.origin + ( i + 0.5 ) * cell, terrain.origin + ( j + 0.5 ) * cell, depth );
+			if ( depth <= - 2 || depth >= 8 ) continue;
+			const spacing = cell * stride;
+			const x = terrain.origin + ( i + stride * 0.5 + 0.5 ) * cell + ( hash( i, j, 1 ) - 0.5 ) * Math.min( 0.7, spacing * 0.7 );
+			const z = terrain.origin + ( j + stride * 0.5 + 0.5 ) * cell + ( hash( i, j, 2 ) - 0.5 ) * Math.min( 0.7, spacing * 0.7 );
+			const px = T.MathUtils.clamp( x, terrain.origin + cell * 0.5, terrain.origin + terrain.size - cell * 0.5 );
+			const pz = T.MathUtils.clamp( z, terrain.origin + cell * 0.5, terrain.origin + terrain.size - cell * 0.5 );
+			add( px, pz, seaLevel - terrain.heightAt( px, pz ) );
 		}
 	}
 	const geometry = new T.BufferGeometry();
@@ -756,6 +769,7 @@ export class WebGLFallback {
 		this.engine = engine;
 		this.THREE = engine.THREE;
 		this.renderer = engine.renderer;
+		this.frameWorkMeter = new FrameWorkMeter( { webglRenderer: this.renderer } );
 		this.scene = new this.THREE.Scene();
 		this.waterScene = new this.THREE.Scene();
 		this.sceneColorTexture = new this.THREE.FramebufferTexture( 1, 1 );
@@ -909,6 +923,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
+		window.addEventListener( 'pagehide', () => this.frameWorkMeter.dispose(), { once: true } );
 		this.animationStartTime = performance.now();
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
@@ -1262,13 +1277,16 @@ export class WebGLFallback {
 					vec4 foamLaceData = texture2D( uFoamLace, p / 3.5 + vec2( -uTime * 0.0008, uTime * 0.00057 ) );
 					float foamLace = 1.0 - smoothstep( 0.42, 0.72, foamLaceData.r );
 					float crestFoam = smoothstep( 0.68, 0.94, vShoreBreaking ) * ( 1.0 - smoothstep( 1.45, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.06 ) * 16.0 ) * mix( 0.2, 1.0, foamLace );
-					float breakerFoam = max( max( impact, roller ), crestFoam * 0.85 ) * vShoreEnv * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) * smoothstep( 0.14, 0.58, shoreDetail );
+					float breakerFoam = max( max( impact, roller ), crestFoam * 0.85 ) * vShoreEnv
+						* ( 0.65 + 0.35 * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) )
+						* ( 0.7 + 0.3 * smoothstep( 0.14, 0.58, shoreDetail ) )
+						* smoothstep( 0.2, 0.7, vWaveHeight );
 					float laceWidth = clamp( pow( breakerFoam, 1.4 ) * ( 0.7 + foamLaceData.b * 0.2 ), 0.0, 0.78 );
 					float laceMat = 1.0 - smoothstep( laceWidth - 0.035, laceWidth + 0.035, foamLaceData.r );
 					float laceBubbles = foamLaceData.g * smoothstep( laceWidth + 0.22, laceWidth, foamLaceData.r );
 					breakerFoam *= mix( laceMat, 1.0, smoothstep( 0.55, 0.92, breakerFoam ) );
 					breakerFoam = max( breakerFoam, laceBubbles * smoothstep( 0.12, 0.5, breakerFoam ) * 0.48 );
-					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.34 );
+					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.55 );
 					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 ), vSwashFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
@@ -1956,7 +1974,7 @@ export class WebGLFallback {
 
 		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		this.app.updateFPS();
-		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs } );
+		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		this.terrainMaterial?.userData.updateTerrainTime?.( simulationTime );
@@ -2009,12 +2027,17 @@ export class WebGLFallback {
 		this._updateAudio( dt );
 		this.renderer.toneMappingExposure = this.app.settings.exposure;
 		this.renderer.autoClear = true;
-		this.renderer.render( this.scene, this.camera );
-		if ( this.waterScene.children.length && ! this.debugNoWater ) {
-			this.renderer.copyFramebufferToTexture( this.sceneColorTexture );
-			this.renderer.autoClear = false;
-			this.renderer.render( this.waterScene, this.camera );
+		this.frameWorkMeter.begin();
+		try {
+			this.renderer.render( this.scene, this.camera );
+			if ( this.waterScene.children.length && ! this.debugNoWater ) {
+				this.renderer.copyFramebufferToTexture( this.sceneColorTexture );
+				this.renderer.autoClear = false;
+				this.renderer.render( this.waterScene, this.camera );
+			}
+		} finally {
 			this.renderer.autoClear = true;
+			this.frameWorkMeter.end();
 		}
 		this.input.endFrame();
 

@@ -9,6 +9,11 @@ const terrain = {
 	res: resolution, size: resolution, origin: 0,
 	heights: new Float32Array( resolution * resolution ).fill( - 1.5 ),
 	splat: new Uint8Array( resolution * resolution * 4 ),
+	heightAt( x, z ) {
+		const i = Math.max( 0, Math.min( resolution - 1, Math.floor( x ) ) );
+		const j = Math.max( 0, Math.min( resolution - 1, Math.floor( z ) ) );
+		return this.heights[ j * resolution + i ];
+	},
 };
 for ( let z = 2; z < 6; z ++ ) for ( let x = 2; x < 6; x ++ ) {
 	const index = z * resolution + x;
