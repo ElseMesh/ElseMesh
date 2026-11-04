@@ -100,7 +100,7 @@ and matched renderer parity remain engine/world separation gaps.
 Earlier commits ElseMesh `69e8805` and Tidewater `4896050` moved WebGPU
 component installers into Tidewater and dispatched them through the registry.
 The current v3 cleanup removes obsolete local migration aliases in Blender and
-Worldd profile handling. The Hogwarts submodule is reported dirty and is outside this work;
+`worldd` profile handling. The Hogwarts submodule is reported dirty and is outside this work;
 preserve it without inspection beyond its pointer/status or staging.
 
 ### Fish-prop ownership boundary

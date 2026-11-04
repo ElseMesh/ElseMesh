@@ -179,8 +179,8 @@ variant was removed; optional ZeroTier joining is a runtime setting of the
 same daemon. `server/worldd` remains an internal Go source/package path. KTX2
 encoding currently uses the reusable native C ABI library in `native/ktx2`;
 HogwartsBridge calls it in process and streams encoded chunks into the GLB
-buffer. A Worldd encoding service and shared cross-visitor texture cache are
-deferred until another world needs centralized encoding. Worldd should link
+buffer. A `worldd` encoding service and shared cross-visitor texture cache are
+deferred until another world needs centralized encoding. `worldd` should link
 the same library rather than implement a second encoder.
 
 The full `server/worldd` Go suite passes on Termux with
