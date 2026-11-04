@@ -4,6 +4,17 @@ This is the dated implementation and verification log. Current priorities and
 open product requirements are tracked in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md);
 completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
+## 2026-11-04
+
+- Fixed two Tidewater WebGL gameplay discrepancies against the retained WebGPU
+  `Game` behavior: vendors are available only while walking, and successful
+  fish sales play the coin cue. `worlds/tidewater/test/webgl-game-adapter.mjs`
+  now checks both rules, including that empty sales stay silent. The adapter,
+  paired 987-frame WebGPU/WebGL fight trace, 2,400-frame pre-split bite golden,
+  987-frame pre-split fight golden, and external production build pass. This
+  closes those interaction details only; full cast-to-sale and production boat
+  traces remain open. Tidewater commit: `df6925a`.
+
 ## 2026-10-29
 
 - Removed the retired Wasm guard, worker, and `wasm/1` manifest validation. The

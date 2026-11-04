@@ -183,6 +183,12 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-04: Tidewater's WebGL game adapter now matches WebGPU's walk-only
+  vendor access and coin cue on successful fish sales. Its focused adapter test,
+  the paired 987-frame WebGPU/WebGL fight trace, pre-split bite/fight goldens,
+  and external production build pass. The gameplay estimate remains 78% because
+  full cast-to-sale flow, matched boat behavior with wake/collisions, and
+  hardware runtime measurements remain open.
 - 2026-11-04: moved App's built-in Village, Reef, boat, debris, wildlife, and
   whale constructors into `BuiltinWorldPresentation.js`, loaded only after the
   hosted WebGPU package-only branch has returned. The source-boundary check
