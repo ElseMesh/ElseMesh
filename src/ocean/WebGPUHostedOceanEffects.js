@@ -2,6 +2,21 @@ import { Breakers } from './Breakers.js';
 import { ShoreSim } from './ShoreSim.js';
 import { SurfFoam } from './SurfFoam.js';
 
+export function ensureWebGPUHostedOceanEffects( options, factory = createWebGPUHostedOceanEffects ) {
+	const { root, enabled } = options;
+	let effects = root.userData.hostedWaterEffects;
+	if ( ! effects && enabled ) {
+		effects = factory( options );
+		root.userData.hostedWaterEffects = effects;
+		( root.userData.worldComponents ||= [] ).push( effects );
+	}
+	return effects || null;
+}
+
+export function updateHostedShoreWetness( root ) {
+	root?.userData?.hostedWaterEffects?.shoreSim?.update();
+}
+
 export function createWebGPUHostedOceanEffects( { renderer, root, terrainGPU, terrainData, surface, sky, spray, clouds, includeBreakers = false } ) {
 
 	if ( ! surface?.shore || ! terrainGPU || ! terrainData ) throw new Error( 'Hosted shoreline effects require a water surface, terrain GPU, and terrain data' );

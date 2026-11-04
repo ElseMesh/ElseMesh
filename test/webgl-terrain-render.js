@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { webglTerrainMaterial } from '../src/fallback/WebGLFallback.js';
+import { WebGLShoreWetness } from '../src/fallback/WebGLShoreWetness.js';
 
 const result = document.querySelector( '#result' );
 try {
@@ -56,8 +57,32 @@ try {
 	}
 	const error = renderer.getContext().getError();
 	if ( error !== renderer.getContext().NO_ERROR ) throw new Error( `WebGL error ${error}` );
+	const wetness = new WebGLShoreWetness( THREE, renderer, {
+		terrain, shore: material.userData.shoreWetnessSource.shore, seaLevel: 0,
+		center: [ 0, 0 ], size: 1, res: 4,
+		shoreDeclarations: 'uniform float uTerrainTime, uTerrainSeaLevel;',
+		coverageSource: 'float shoreCoverage(vec2 p, float ground, float cellSize) { return uTerrainTime < 0.5 ? 1.0 : 0.0; }',
+	} );
+	wetness.update( 1 / 60, 0 );
+	for ( let i = 0; i < 120; i ++ ) wetness.update( 1 / 60, 1 + i / 60 );
+	if ( renderer.getRenderTarget() !== target ) throw new Error( 'wetness pass did not restore render target' );
+	const copyMaterial = new THREE.ShaderMaterial( {
+		uniforms: { source: { value: wetness.texture } },
+		vertexShader: 'varying vec2 v; void main() { v = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+		fragmentShader: 'varying vec2 v; uniform sampler2D source; void main() { gl_FragColor = vec4(texture2D(source, v).rrr, 1.0); }',
+		depthTest: false, depthWrite: false,
+	} );
+	const copyGeometry = new THREE.PlaneGeometry( 2, 2 ), copyScene = new THREE.Scene();
+	copyScene.add( new THREE.Mesh( copyGeometry, copyMaterial ) );
+	renderer.render( copyScene, new THREE.Camera() );
+	if ( shaderError ) throw new Error( shaderError );
+	const pixel = new Uint8Array( 4 );
+	renderer.readRenderTargetPixels( target, 32, 32, 1, 1, pixel );
+	const wetAfterTwoSeconds = pixel[ 0 ] / 255;
+	if ( Math.abs( wetAfterTwoSeconds - Math.exp( - 2 / 28 ) ) > 0.035 ) throw new Error( `wetness did not dry over time: ${wetAfterTwoSeconds}` );
+	wetness.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
 	result.dataset.status = 'complete';
-	result.textContent = JSON.stringify( { changes, programCount: renderer.info.programs.length } );
+	result.textContent = JSON.stringify( { changes, wetAfterTwoSeconds, programCount: renderer.info.programs.length } );
 	target.dispose(); geometry.dispose(); material.dispose();
 	for ( const texture of material.userData.terrainTextures ) texture.dispose();
 	renderer.dispose();

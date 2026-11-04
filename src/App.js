@@ -79,7 +79,7 @@ import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapP
 import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
 import './network/WebGPUWorldComponentAdapters.js';
-import { createWebGPUHostedOceanEffects } from './ocean/WebGPUHostedOceanEffects.js';
+import { ensureWebGPUHostedOceanEffects, updateHostedShoreWetness } from './ocean/WebGPUHostedOceanEffects.js';
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
 import { FrameWorkMeter } from './core/FrameWorkMeter.js';
@@ -930,6 +930,7 @@ export class App {
 		this.environment.update( dt );
 		if ( this.player.hostedSeaLevel !== null ) {
 			this.fft.update( dt );
+			updateHostedShoreWetness( this.linkedWorldRoot );
 			this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
 			const hostedBoat = this.activeHostedBoat?.boat?.controller;
@@ -1315,15 +1316,11 @@ export class App {
 			terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
 			waterSurface.terrain = terrain.terrainGPU;
 			waterSurface.shore = terrain.shore;
-			let effects = root.userData.hostedWaterEffects;
-			if ( ! effects && this.shoreSim ) {
-				effects = createWebGPUHostedOceanEffects( {
-					renderer: this.renderer, root, terrainGPU: terrain.terrainGPU, terrainData: root.userData.terrainData,
-					surface: waterSurface, sky: this.sky, spray: this.spray, clouds: this.clouds, includeBreakers: this.activeHostedOcean,
-				} );
-				root.userData.hostedWaterEffects = effects;
-				components.push( effects );
-			}
+			const effects = ensureWebGPUHostedOceanEffects( {
+				enabled: ! this.qs.has( 'noSim' ) && components.some( component => component.surface ),
+				renderer: this.renderer, root, terrainGPU: terrain.terrainGPU, terrainData: root.userData.terrainData,
+				surface: waterSurface, sky: this.sky, spray: this.spray, clouds: this.clouds, includeBreakers: this.activeHostedOcean,
+			} );
 			if ( effects ) {
 				waterSurface.shoreSim = effects.shoreSim;
 				waterSurface.foamShading = ( args ) => effects.surfFoam.shading( args );
@@ -1934,6 +1931,7 @@ export class App {
 
 		}
 		if ( this.remoteWorldActive ) {
+			if ( ! this.activeHostedOcean ) updateHostedShoreWetness( this.linkedWorldRoot );
 			const hostedBoat = this.activeHostedBoat?.boat.controller;
 			this.portalVehiclePreviousState = [ 'boat', 'deck' ].includes( this.player.mode ) && hostedBoat ? {
 				controller: hostedBoat, state: hostedBoat.transferState(), mode: this.player.mode,
@@ -1960,7 +1958,7 @@ export class App {
 					dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
 					marineSnowUnderwater: this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH,
 					query: this.hostedQuery, wake: this.wake, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
-					shoreSim: this.hostedSurfaceState?.surface.shoreSim || this.shoreSim,
+					shoreSim: this.hostedSurfaceState?.surface.shoreSim || null,
 					underwaterLighting: this.underwaterLighting, breakers: this.hostedBreakers || this.breakers, spray: this.spray,
 				} );
 			}

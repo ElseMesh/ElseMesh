@@ -65,6 +65,18 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: Hosted WebGPU now creates and advances its own `ShoreSim`, rather
+  than depending on the built-in island simulation. WebGL terrain now has a
+  persistent half-float GPU wetness field with the same 28-second drying
+  constant and shoreline run-up coverage; focused material and isolated GPU
+  render checks pass, including sand wetting and rock exclusion. This does not
+  yet establish matched live wetness visuals. Wet terrain in hosted WebGPU gets
+  environment specular from ElseMesh's environment lighting as its roughness
+  falls. WebGL currently has no terrain environment probe, so its roughness
+  change does not produce the same reflected-sky sheen; its custom reflection
+  path applies to water. Matched visual parity remains open and the estimate
+  stays 82%.
+
 The default world package is dynamically loaded only for built-in play. The
 build emits the default package and `IslandWorldState` as separate dynamic
 chunks. An isolated Chromium WebGL fixture rendered 128 non-background pixels
