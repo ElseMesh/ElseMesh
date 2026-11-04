@@ -173,6 +173,18 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-04: the full client suite and external production build passed after
+  restoring the Tidewater terrain `surfaceProfile` through the deterministic
+  exporter. The profile is now sourced only from Tidewater `world-source.json`
+  and survives regenerated package data; the old duplicate in `presentation.json`
+  was removed. WebGPU/WebGL fishing parity (987 frames), pre-split WebGPU fishing
+  and bite traces (987/2,400 frames), and pre-split boat gameplay parity passed.
+  The isolated WebGL water render changed 9,268 pixels. Mesh and fullscreen
+  render passes now close in `finally`, with an exception-path regression test;
+  this prevents a thrown recorder callback from leaving the shared encoder
+  locked, but does not prove the original hosted black-frame cause is fixed.
+  The hosted WebGPU visual capture and live cross-renderer comparison remain
+  open, so the parity estimate remains 78%.
 - 2026-11-04: reran `node test/world-behavior-registry.mjs` and
   `node test/world-javascript-extension.mjs`; both passed. The isolated
   Chromium Worker check also passed owner-signature verification, package

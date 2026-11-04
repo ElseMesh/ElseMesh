@@ -1,4 +1,5 @@
 import { GPU } from '../gpu/GPU.js';
+import { withRenderPass } from '../gpu/RenderPass.js';
 import { composeShader, createShaderModule, getBindGroupLayout, group0ForBlock } from '../gpu/Shader.js';
 import { buildMeshShader } from './MeshShader.js';
 import { blendState } from './Material.js';
@@ -505,14 +506,16 @@ export class MeshRenderer {
 			depthClearValue: pass.clearDepth ?? 0,
 		};
 		if ( pass.timestampWrites ) desc.timestampWrites = pass.timestampWrites;
-		const rp = enc.beginRenderPass( desc );
-		if ( pass.viewport ) rp.setViewport( ...pass.viewport );
-		rp.setBindGroup( 0, group0ForBlock( pass.frameBlock, 'render' ).getBindGroup() );
-		this.drawItems( rp, lists.opaque, pass );
-		if ( pass.betweenLists ) pass.betweenLists( rp );
-		this.drawItems( rp, lists.transparent, pass );
-		if ( pass.after ) pass.after( rp );
-		rp.end();
+		withRenderPass( enc, desc, ( rp ) => {
+
+			if ( pass.viewport ) rp.setViewport( ...pass.viewport );
+			rp.setBindGroup( 0, group0ForBlock( pass.frameBlock, 'render' ).getBindGroup() );
+			this.drawItems( rp, lists.opaque, pass );
+			if ( pass.betweenLists ) pass.betweenLists( rp );
+			this.drawItems( rp, lists.transparent, pass );
+			if ( pass.after ) pass.after( rp );
+
+		} );
 
 	}
 

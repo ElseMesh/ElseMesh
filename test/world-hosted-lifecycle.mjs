@@ -5,6 +5,7 @@ const app = Object.create( App.prototype );
 const surface = {}, query = { allocate: () => 9 };
 Object.assign( app, {
 	player: { boat: null, mode: 'walk', velocity: { set() {} }, audio: null },
+	localLights: { setWorldPackage() {} },
 	hostedQueries: new WeakMap( [ [ surface, query ] ] ),
 	hostedWaterSurface: surface,
 	hostedColliders: {},

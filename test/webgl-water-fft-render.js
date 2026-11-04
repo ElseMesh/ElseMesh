@@ -26,6 +26,7 @@ try {
 	Object.assign( fallback, {
 		THREE, renderer, scene: new THREE.Scene(), waterScene: new THREE.Scene(),
 		sunDirection: new THREE.Vector3( 0.2, 0.9, 0.1 ).normalize(),
+		worldEnvironment: { sky: true }, cloudsEnabled: true,
 		cloudLayer: { userData: { cloudNoise: texture } }, sceneColorTexture: sceneColor,
 		terrainColorTexture: null,
 	} );
