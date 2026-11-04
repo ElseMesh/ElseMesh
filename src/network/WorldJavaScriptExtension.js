@@ -1,7 +1,7 @@
 export const WORLD_JAVASCRIPT_EXTENSION_MAX_BYTES = 1024 * 1024;
 export const WORLD_JAVASCRIPT_EXTENSION_MAX_MESSAGE_BYTES = 16 * 1024;
 export const WORLD_JAVASCRIPT_EXTENSION_MAX_RUN_MS = 50;
-export const WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS = 1000;
+export const WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS = 10000;
 const WORLD_JAVASCRIPT_EXTENSION_MAX_PENDING_CALLS = 32;
 export const WORLD_JAVASCRIPT_EXTENSION_PROTOCOL = 'elsemesh.world-extension/1';
 
@@ -27,10 +27,10 @@ export function decodeWorldJavaScriptExtension( bytes ) {
 	return source;
 }
 
-export function createWorldJavaScriptExtensionRuntime( { moduleBytes, timeoutMs = 50, startupTimeoutMs = 1000, workerFactory = url => new Worker( url, { type: 'module' } ) } = {} ) {
+export function createWorldJavaScriptExtensionRuntime( { moduleBytes, timeoutMs = 50, startupTimeoutMs = 5000, workerFactory = url => new Worker( url, { type: 'module' } ) } = {} ) {
 	const source = decodeWorldJavaScriptExtension( moduleBytes );
 	if ( ! Number.isInteger( timeoutMs ) || timeoutMs < 1 || timeoutMs > WORLD_JAVASCRIPT_EXTENSION_MAX_RUN_MS ) fail( 'run timeout must be between 1 and 50 ms' );
-	if ( ! Number.isInteger( startupTimeoutMs ) || startupTimeoutMs < 1 || startupTimeoutMs > WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS ) fail( 'startup timeout must be between 1 and 1000 ms' );
+	if ( ! Number.isInteger( startupTimeoutMs ) || startupTimeoutMs < 1 || startupTimeoutMs > WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS ) fail( 'startup timeout must be between 1 and 10000 ms' );
 	if ( typeof workerFactory !== 'function' ) fail( 'worker factory must be callable' );
 	const worker = workerFactory( new URL( './WorldJavaScriptExtensionWorker.js', import.meta.url ) );
 	let requestID = 0;

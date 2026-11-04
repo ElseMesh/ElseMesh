@@ -492,6 +492,8 @@ export class MeshRenderer {
 		pass.passKey = `${ pass.kind }.${ pass.late ? 1 : 0 }.${ pass.colorFormats.join( ',' ) }.${ pass.depthFormat }.${ pass.depthCompare }.${ pass.cullOverride || '' }.${ pass.defines ? JSON.stringify( pass.defines ) : '' }`;
 		const lists = pass.items || this.collect( scene, pass );
 		const enc = GPU.getEncoder();
+		const opaque = this._prepareItems( lists.opaque, pass );
+		const transparent = this._prepareItems( lists.transparent, pass );
 		const colorAttachments = ( pass.colorViews || [] ).map( ( view, i ) => {
 
 			const clear = pass.clearColors ? pass.clearColors[ i ] : null;
@@ -510,23 +512,24 @@ export class MeshRenderer {
 
 			if ( pass.viewport ) rp.setViewport( ...pass.viewport );
 			rp.setBindGroup( 0, group0ForBlock( pass.frameBlock, 'render' ).getBindGroup() );
-			this.drawItems( rp, lists.opaque, pass );
+			this.drawItems( rp, lists.opaque, opaque );
 			if ( pass.betweenLists ) pass.betweenLists( rp );
-			this.drawItems( rp, lists.transparent, pass );
+			this.drawItems( rp, lists.transparent, transparent );
 			if ( pass.after ) pass.after( rp );
 
 		} );
 
 	}
 
-	drawItems( rp, items, pass ) {
+	_prepareItems( items, pass ) {
 
-		let lastPipeline = null, lastGroup = null;
 		const token = ++ _listToken;
+		const prepared = new Map();
 		for ( const it of items ) {
 
 			const { object: o, geometry: geo, material } = it;
 			if ( ! geo.attributes.position && ! geo.vertexCount && ! geo.indirect ) continue;
+			if ( ( o.isInstancedMesh ? o.count : geo.instanceCount ?? 1 ) === 0 ) continue;
 			let vl, p;
 			if ( this.precompiling ) {
 
@@ -550,6 +553,26 @@ export class MeshRenderer {
 			p = this._pipeline( material, vl, pass );
 			const pipeline = p.handle.pipeline || ( this.syncPipelines ? GPU.ready( p.handle ) : null );
 			if ( ! pipeline ) continue; // still compiling
+			const group = p.bindings.getBindGroup( token );
+			prepared.set( it, { vl, p, pipeline, group } );
+
+		}
+
+		return prepared;
+
+	}
+
+	drawItems( rp, items, prepared ) {
+
+		let lastPipeline = null, lastGroup = null;
+		for ( const it of items ) {
+
+			const draw = prepared.get( it );
+			if ( ! draw ) continue;
+			const { object: o, geometry: geo } = it;
+			const { vl, p, pipeline, group } = draw;
+			if ( this.precompiling ) continue;
+
 			if ( p !== lastPipeline ) {
 
 				rp.setPipeline( pipeline );
@@ -557,7 +580,6 @@ export class MeshRenderer {
 
 			}
 
-			const group = p.bindings.getBindGroup( token );
 			if ( group !== lastGroup ) {
 
 				rp.setBindGroup( 1, group );

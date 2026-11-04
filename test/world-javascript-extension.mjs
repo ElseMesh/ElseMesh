@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
-import { createWorldJavaScriptExtensionRuntime, decodeWorldJavaScriptExtension, WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
+import { createWorldJavaScriptExtensionRuntime, decodeWorldJavaScriptExtension, WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS, WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 
 const source = 'export function run(event) { return { type: event.type }; }';
 const bytes = new TextEncoder().encode( source );
+assert.equal( WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS, 10000, 'Worker startup remains bounded while allowing cold browser startup' );
+assert.throws( () => createWorldJavaScriptExtensionRuntime( { moduleBytes: bytes, startupTimeoutMs: WORLD_JAVASCRIPT_EXTENSION_MAX_STARTUP_MS + 1, workerFactory: () => new FakeWorker() } ), /1 and 10000 ms/ );
 assert.equal( decodeWorldJavaScriptExtension( bytes ), source );
 assert.throws( () => decodeWorldJavaScriptExtension( Uint8Array.of( 0xff ) ), /encoded data/ );
 assert.throws( () => decodeWorldJavaScriptExtension( new Uint8Array( 1024 * 1024 + 1 ) ), /1 MiB/ );

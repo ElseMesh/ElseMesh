@@ -849,7 +849,9 @@ export class App {
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 		await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
-		this.player.hostedCollisionGuard = ( from, to ) => connector.isCollisionPathReady( from, to, this.linkedWorldRoot?.userData?.worldPackage );
+		this.player.hostedCollisionGuard = typeof connector.isCollisionPathReady === 'function'
+			? ( from, to ) => connector.isCollisionPathReady( from, to, this.linkedWorldRoot?.userData?.worldPackage )
+			: null;
 		this.linkedWorldRoot.name = `hosted-world:${connector.worldId}`;
 		scene.add( this.linkedWorldRoot );
 		this.player.setHostedWorldPose( camera.position, spawn.yaw, spawn.pitch );
