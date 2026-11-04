@@ -26,6 +26,6 @@ ctest --test-dir native/ktx2 --output-on-failure
 ```
 
 The public C interface is in `include/elsemesh_ktx2.h`. HogwartsBridge invokes
-it directly. A future Thruholdd integration should link this same library
+it directly. A future `worldd` integration should link this same library
 instead of implementing or launching a second encoder; see
 [`docs/world-network-design.md`](../../docs/world-network-design.md).

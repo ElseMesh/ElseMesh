@@ -255,7 +255,7 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 		if statusCode == 0 {
 			statusCode = http.StatusOK
 		}
-		log.Printf("Thruholdd region proxy metric: request_id=%q path=%q cell=%q payload=%q mesh=%q lod=%q texture=%q status=%d bytes=%d elapsed_ms=%d",
+		log.Printf("worldd region proxy metric: request_id=%q path=%q cell=%q payload=%q mesh=%q lod=%q texture=%q status=%d bytes=%d elapsed_ms=%d",
 			requestID, r.URL.Path, diagnosticQueryValue(r, "cell"), diagnosticQueryValue(r, "payload"), diagnosticQueryValue(r, "mesh"),
 			diagnosticQueryValue(r, "lod"), diagnosticQueryValue(r, "texture"), statusCode, metrics.bytes, time.Since(started).Milliseconds())
 		return

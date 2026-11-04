@@ -48,7 +48,7 @@ import (
 )
 
 const defaultZeroTierNetworkID = "e3918db4832a3056"
-const daemonName = "thruholdd"
+const daemonName = "worldd"
 const ztSocketCallTimeout = 10 * time.Millisecond
 
 type libztRuntime struct {

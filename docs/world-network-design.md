@@ -22,7 +22,7 @@ route hint, not identity or membership proof.
 When one machine hosts multiple worlds that need distinct HostIDs, give each
 world a persistent node profile and `node.key`. Its signed node record binds
 that profile's PeerID to one `worldId`, and restarting the profile preserves
-the HostID. `thruholdd --world-profile` provides separate identities and data
+the HostID. `worldd --world-profile` provides separate identities and data
 directories for this model.
 
 The ordinary package provider serves declared, hash-verified assets. A dynamic
@@ -64,7 +64,7 @@ canceled when the final lease is released or expires.
 
 Treat the browser as an untrusted requester. It must not choose arbitrary
 world-region IDs or claim a player position to unlock content. The active world
-authority (`thruholdd`) tracks the accepted player pose and movement mode,
+authority (`worldd`) tracks the accepted player pose and movement mode,
 validates input against the world's collision and movement rules, and enforces
 the configured speed/acceleration limits. A client sends input intent and
 camera/view information; it does not authoritatively set position. World data
@@ -103,13 +103,13 @@ buffer. This avoids a second process boundary, per-texture PNG/KTX2 files, and
 an extra full-size encoded-output copy. The library serializes encode calls
 and caps each Basis job pool at four threads, the measured setting for the
 current Hogwarts workload. The native API is deliberately independent of Unreal, Hogwarts,
-Go, C#, and the renderer, so Thruholdd can link the same implementation if
+Go, C#, and the renderer, so `worldd` can link the same implementation if
 centralized encoding becomes useful to another world.
 
-This is not yet a Thruholdd encoding service or content-addressed cross-visitor
+This is not yet a `worldd` encoding service or content-addressed cross-visitor
 texture cache. The source provider remains responsible for decoding source formats,
 selecting mip/sample levels, and choosing metadata such as sRGB or normal-map
-handling. If another world needs centralized encoding, Thruholdd can reuse the
+handling. If another world needs centralized encoding, `worldd` can reuse the
 same library and accept bounded raw pixel streams with dimensions and encoding
 options; it should validate sizes, limit concurrent work by memory budget,
 deduplicate identical in-flight requests, and cache results by source digest
@@ -118,15 +118,15 @@ uploading KTX2 on its active WebGL or WebGPU backend.
 
 The current C ABI streams encoded chunks to its caller in process; no
 inter-process transport is needed for the Hogwarts encoder path. The Hogwarts
-bridge and Thruholdd do exchange generated region data, but current profiling
+bridge and `worldd` do exchange generated region data, but current profiling
 does not identify that host-local transfer as a material cost ([Hogwarts
 measurements](../worlds/Hogwarts/docs/bridge-issues.md)). If later
 measurements do, start with bounded streaming and measure representative
 payload sizes and concurrent visitor loads before adding shared memory. Shared
-memory can optimize only the same-host bridge-to-Thruholdd handoff; Thruholdd
+memory can optimize only the same-host bridge-to-`worldd` handoff; `worldd`
 must still deliver content to each visitor. It also adds platform-specific
 allocation, ownership, synchronization, and cleanup rules. Do not maintain a
-second encoder implementation in Thruholdd; link this library or deliberately
+second encoder implementation in `worldd`; link this library or deliberately
 move it to a central package when more than one world needs the service.
 Regression acceptance must cover Tidewater package loading and gameplay under
 both WebGPU and WebGL while the new provider path is exercised separately.
@@ -460,7 +460,7 @@ accept normal play; otherwise the visitor continues in read-only mode.
 
 The basic current presence channel accepts and relays client-reported
 pose; that does not restrict the choices of independently owned
-Thruholdd instances. The daemon must support future owner-defined
+`worldd` instances. The daemon must support future owner-defined
 physics/simulation, movement and collision validation and anti-cheat,
 including authoritative corrections, as opt-in world capabilities.
 
