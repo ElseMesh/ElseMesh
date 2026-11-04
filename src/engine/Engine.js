@@ -116,6 +116,9 @@ export class Engine {
 		let nextFrame = null;
 		const loop = ( t ) => {
 
+			// Queue the next callback before user code runs, so a frame exception stays visible
+			// without silently terminating the animation loop.
+			this._raf = requestAnimationFrame( loop );
 			this.clock.update( t );
 			pendingDt += this.clock.getDelta();
 			const frameInterval = this.maxFps > 0 ? 1000 / this.maxFps : 0;
@@ -138,7 +141,6 @@ export class Engine {
 				update( dt, this.clock.getElapsed() );
 
 			}
-			this._raf = requestAnimationFrame( loop );
 
 		};
 
