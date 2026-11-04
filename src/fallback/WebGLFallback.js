@@ -745,7 +745,8 @@ export class WebGLFallback {
 		this.hostedSeaLevel = null;
 		this.worldSeaLevel = this.defaultWorldSource?.rules.seaLevel ?? 0;
 		this.hostedWildlifeComponent = null;
-		this.hostedComponentRuntimes = [];
+		this.hostedComponentRuntimes = new Map();
+		this.hostedInstalledComponentIDs = new Set();
 		this.hostedCollisionPayloads = new Map();
 		this.vegetationRecords = null;
 		this.wildlifeRuntime = null;
@@ -1608,6 +1609,7 @@ export class WebGLFallback {
 		let localSpawn = null;
 		let assets;
 		const components = manifest.components || [];
+		let startupComponents = components;
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.hostedModelCache = cache;
 		this.worldLODs = new Map();
@@ -1621,9 +1623,13 @@ export class WebGLFallback {
 			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjects = selectLocalRegionEntryObjects( this.connector, manifest, selectedObjects, this.camera );
 			const initialComponents = selectWorldComponentsForView( manifest, this.camera, { maxPriority: 'nearby' } );
+			const initialComponentIDs = new Set( initialComponents.map( component => component.id ) );
+			// Keep world setup components available at entry; only spatial static-model
+			// sets should wait for view-driven streaming.
+			startupComponents = components.filter( component => component.type !== 'elsemesh.static-model-instance-set/1' || initialComponentIDs.has( component.id ) );
 			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
-			const retainAssetIDs = new Set( initialComponents.flatMap( worldComponentAssetIDs ) );
+			const retainAssetIDs = new Set( startupComponents.flatMap( worldComponentAssetIDs ) );
 			for ( const assetId of retainAssetIDs ) assetIDs.add( assetId );
 			for ( const extension of manifest.experience?.extensions || [] ) {
 				assetIDs.add( extension.assetId );
@@ -1798,7 +1804,7 @@ export class WebGLFallback {
 		this._collectManifestBlockers( manifest.objects || [] );
 		const backendInstallStarted = performance.now();
 		await progress( 0.18, 'Preparing visible models…', 0.9 );
-		const backendComponentIDs = await this._installHostedBackendComponents( components, manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
+		const backendComponentIDs = await this._installHostedBackendComponents( startupComponents, manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
 		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
 			components: backendComponentIDs.size,
 			elapsedMs: Math.round( performance.now() - backendInstallStarted ),
@@ -1810,6 +1816,7 @@ export class WebGLFallback {
 			terrainReady: !! this.hostedTerrainData, vehicleComponentId: this.hostedVehicleSpec?.component.id,
 		} );
 		for ( const id of backendComponentIDs ) supportedComponents.add( id );
+		this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
 		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
 		const hostedReefRecords = [], hostedReefIds = [];
@@ -1915,9 +1922,11 @@ export class WebGLFallback {
 		const installed = new Set();
 		const applicable = components.map( component => ( { component, adapter: worldComponentBackendAdapter( this.engine.backend, component.type ) } ) ).filter( item => item.adapter );
 		for ( const [ index, { component, adapter } ] of applicable.entries() ) {
+			if ( this.hostedInstalledComponentIDs?.has( component.id ) ) continue;
 			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component );
 			if ( result === true || result?.installed ) installed.add( component.id );
-			if ( result?.runtime ) this.hostedComponentRuntimes.push( result.runtime );
+			if ( result?.runtime ) this.hostedComponentRuntimes.set( component.id, result.runtime );
+			if ( result === true || result?.installed ) this.hostedInstalledComponentIDs?.add( component.id );
 			onProgress( index + 1, applicable.length );
 		}
 		return installed;
@@ -2002,7 +2011,7 @@ export class WebGLFallback {
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
-		for ( const runtime of this.hostedComponentRuntimes || [] ) runtime.update( dt, this.camera, this.player );
+		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update( dt, this.camera, this.player );
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();
@@ -2146,9 +2155,14 @@ export class WebGLFallback {
 			const cellSize = connector.cellSizeMeters || 8;
 			const lookahead = collisionLookaheadDistance( speed, connector.collisionLoadLatencyMs || 2000, cellSize );
 			const destination = position.clone().addScaledVector( direction.normalize(), lookahead );
-			connector.ensureCellsForView?.( position, destination ).catch( error => {
-				if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region cell query failed:', error );
-			} );
+			if ( connector.ensureCellsForView && ! this.hostedCollisionCellsPending ) {
+				const pending = Promise.resolve().then( () => connector.ensureCellsForView( position, destination ) ).catch( error => {
+					if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region cell query failed:', error );
+				} ).finally( () => {
+					if ( this.hostedCollisionCellsPending === pending ) this.hostedCollisionCellsPending = null;
+				} );
+				this.hostedCollisionCellsPending = pending;
+			}
 			const selected = new Set( objects.map( object => object.id ) );
 			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) selected.add( objectID );
 			const objectByID = new Map( manifest.objects.map( object => [ object.id, object ] ) );
@@ -2158,7 +2172,10 @@ export class WebGLFallback {
 			}
 		}
 		const wanted = objects.filter( object => ! loaded.has( object.id ) );
-		if ( wanted.length === 0 ) return;
+		if ( wanted.length === 0 ) {
+			if ( connector.localOnly ) this._streamHostedWorldComponents( manifest );
+			return;
+		}
 		if ( connector.localOnly ) {
 			const center = new this.THREE.Vector3();
 			wanted.sort( ( a, b ) => {
@@ -2211,6 +2228,69 @@ export class WebGLFallback {
 			}
 		} ).catch( error => {
 			console.warn( `WebGL hosted-world streaming failed for ${connector.worldId}`, error );
+		} ).finally( () => { this.hostedWorldStreaming = false; } );
+
+	}
+
+	_streamHostedWorldComponents( manifest ) {
+
+		const connector = this.connector;
+		if ( this.hostedCollisionCellsPending ) return;
+		const installed = this.hostedInstalledComponentIDs || ( this.hostedInstalledComponentIDs = new Set() );
+		const staticType = 'elsemesh.static-model-instance-set/1';
+		const maxDistance = Number.isFinite( connector.maxViewDistanceMeters ) ? connector.maxViewDistanceMeters : 500;
+		const center = new this.THREE.Vector3();
+		const releaseIDs = new Set();
+		for ( const component of manifest.components || [] ) {
+			if ( component.type !== staticType || ! installed.has( component.id ) || ! component.streamingBounds ) continue;
+			center.fromArray( component.streamingBounds.center );
+			const limit = maxDistance * 1.1 + ( component.streamingBounds.radius || 0 );
+			if ( this.camera.position.distanceTo( center ) > limit ) releaseIDs.add( component.id );
+		}
+		for ( const id of releaseIDs ) {
+			this.hostedComponentRuntimes.get( id )?.dispose?.();
+			this.hostedComponentRuntimes.delete( id );
+			installed.delete( id );
+			this.hostedSupportedComponents?.delete( id );
+		}
+		if ( releaseIDs.size ) {
+			const retained = new Set();
+			for ( const object of manifest.objects || [] ) {
+				if ( ! this.localLoadedObjectIDs?.has( object.id ) ) continue;
+				if ( object.assetId ) retained.add( object.assetId );
+				for ( const lod of object.lods || [] ) retained.add( lod.assetId );
+			}
+			for ( const component of manifest.components || [] ) {
+				if ( component.type === staticType && ! installed.has( component.id ) ) continue;
+				for ( const reference of component.assets || [] ) if ( reference.assetId ) retained.add( reference.assetId );
+			}
+			for ( const id of releaseIDs ) {
+				const component = manifest.components.find( candidate => candidate.id === id );
+				for ( const reference of component?.assets || [] ) if ( reference.assetId && ! retained.has( reference.assetId ) ) connector.releaseAsset?.( reference.assetId );
+			}
+		}
+		const candidates = selectWorldComponentsForView( manifest, this.camera, {
+			nearbyDistance: connector.cellSizeMeters || 8,
+			maxDistance,
+			maxPriority: 'background',
+		} ).filter( component => component.type === staticType && ! installed.has( component.id ) && worldComponentBackendAdapter( this.engine.backend, component.type ) );
+		if ( candidates.length === 0 ) return;
+		const component = candidates[ 0 ];
+		const assetIDs = new Set( worldComponentAssetIDs( component ) );
+		this.hostedWorldStreaming = true;
+		connector.preload( {
+			assetIDs,
+			position: this.camera.position.toArray(),
+			concurrency: 1,
+			retainAssets: false,
+			retainAssetIDs: assetIDs,
+		} ).then( async assets => {
+			if ( this.connector !== connector || installed.has( component.id ) ) return;
+			const installedIDs = await this._installHostedBackendComponents( [ component ], manifest, assets );
+			for ( const id of installedIDs ) this.hostedSupportedComponents?.add( id );
+			this._updateHostedWebGLStatus();
+		} ).catch( error => {
+			if ( error?.name !== 'AbortError' ) console.warn( `WebGL hosted-world component streaming failed for ${connector.worldId}`, error );
 		} ).finally( () => { this.hostedWorldStreaming = false; } );
 
 	}
