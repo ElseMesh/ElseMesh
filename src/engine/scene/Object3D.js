@@ -61,6 +61,7 @@ export class Object3D extends EventDispatcher {
 
 		this.matrix = new Matrix4();
 		this.matrixWorld = new Matrix4();
+		this._lastMatrixTransform = null;
 		this.matrixAutoUpdate = Object3D.DEFAULT_MATRIX_AUTO_UPDATE;
 		this.matrixWorldAutoUpdate = Object3D.DEFAULT_MATRIX_WORLD_AUTO_UPDATE;
 		this.matrixWorldNeedsUpdate = false;
@@ -275,13 +276,37 @@ export class Object3D extends EventDispatcher {
 	updateMatrix() {
 
 		this.matrix.compose( this.position, this.quaternion, this.scale );
+		this.#rememberMatrixTransform();
 		this.matrixWorldNeedsUpdate = true;
+
+	}
+
+	#rememberMatrixTransform() {
+
+		const p = this.position, q = this.quaternion, s = this.scale;
+		const values = this._lastMatrixTransform || ( this._lastMatrixTransform = new Float64Array( 10 ) );
+		values[ 0 ] = p.x; values[ 1 ] = p.y; values[ 2 ] = p.z;
+		values[ 3 ] = q.x; values[ 4 ] = q.y; values[ 5 ] = q.z; values[ 6 ] = q.w;
+		values[ 7 ] = s.x; values[ 8 ] = s.y; values[ 9 ] = s.z;
+		return values;
+
+	}
+
+	#updateMatrixIfChanged() {
+
+		const p = this.position, q = this.quaternion, s = this.scale;
+		const values = this._lastMatrixTransform;
+		if ( values && Object.is( values[ 0 ], p.x ) && Object.is( values[ 1 ], p.y ) && Object.is( values[ 2 ], p.z ) &&
+			Object.is( values[ 3 ], q.x ) && Object.is( values[ 4 ], q.y ) && Object.is( values[ 5 ], q.z ) && Object.is( values[ 6 ], q.w ) &&
+			Object.is( values[ 7 ], s.x ) && Object.is( values[ 8 ], s.y ) && Object.is( values[ 9 ], s.z ) ) return;
+
+		this.updateMatrix();
 
 	}
 
 	updateMatrixWorld( force ) {
 
-		if ( this.matrixAutoUpdate ) this.updateMatrix();
+		if ( this.matrixAutoUpdate ) this.#updateMatrixIfChanged();
 
 		if ( this.matrixWorldNeedsUpdate || force ) {
 
@@ -311,7 +336,7 @@ export class Object3D extends EventDispatcher {
 
 		const parent = this.parent;
 		if ( updateParents === true && parent !== null ) parent.updateWorldMatrix( true, false );
-		if ( this.matrixAutoUpdate ) this.updateMatrix();
+		if ( this.matrixAutoUpdate ) this.#updateMatrixIfChanged();
 
 		if ( this.matrixWorldAutoUpdate === true ) {
 
