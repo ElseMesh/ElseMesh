@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -31,6 +32,7 @@ type regionProviderGateway struct {
 	worldID           string
 	allowedOrigins    map[string]struct{}
 	regionDiagnostics bool
+	requestSequence   atomic.Uint64
 	proxy             *httputil.ReverseProxy
 }
 
@@ -175,6 +177,11 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	response.Header.Del("Access-Control-Allow-Methods")
 	response.Header.Del("Access-Control-Allow-Headers")
 	response.Header.Del("Access-Control-Allow-Credentials")
+	if response.Request != nil {
+		if requestID := response.Request.Header.Get("X-ElseMesh-Request-ID"); requestID != "" {
+			response.Header.Set("X-ElseMesh-Request-ID", requestID)
+		}
+	}
 	if response.Request == nil || response.Request.URL.Path != "/v1/descriptor" {
 		return nil
 	}
@@ -212,7 +219,11 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	if origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Expose-Headers", "ETag, Cache-Control, Content-Range")
+		exposedHeaders := "ETag, Cache-Control, Content-Range"
+		if gateway.regionDiagnostics {
+			exposedHeaders += ", X-ElseMesh-Request-ID"
+		}
+		w.Header().Set("Access-Control-Expose-Headers", exposedHeaders)
 		w.Header().Add("Vary", "Origin")
 	}
 	if r.Method == http.MethodOptions {
@@ -233,7 +244,10 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	r.Header.Del("Cookie")
 	r.Header.Del("Authorization")
 	r.Header.Del("Proxy-Authorization")
+	r.Header.Del("X-ElseMesh-Request-ID")
 	if gateway.regionDiagnostics && r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/regions/") {
+		requestID := strconv.Itoa(os.Getpid()) + "-" + strconv.FormatUint(gateway.requestSequence.Add(1), 10)
+		r.Header.Set("X-ElseMesh-Request-ID", requestID)
 		started := time.Now()
 		metrics := &regionProviderMetricsWriter{ResponseWriter: w}
 		gateway.proxy.ServeHTTP(metrics, r)
@@ -241,8 +255,8 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 		if statusCode == 0 {
 			statusCode = http.StatusOK
 		}
-		log.Printf("Thruholdd region proxy metric: path=%q cell=%q payload=%q mesh=%q lod=%q texture=%q status=%d bytes=%d elapsed_ms=%d",
-			r.URL.Path, diagnosticQueryValue(r, "cell"), diagnosticQueryValue(r, "payload"), diagnosticQueryValue(r, "mesh"),
+		log.Printf("Thruholdd region proxy metric: request_id=%q path=%q cell=%q payload=%q mesh=%q lod=%q texture=%q status=%d bytes=%d elapsed_ms=%d",
+			requestID, r.URL.Path, diagnosticQueryValue(r, "cell"), diagnosticQueryValue(r, "payload"), diagnosticQueryValue(r, "mesh"),
 			diagnosticQueryValue(r, "lod"), diagnosticQueryValue(r, "texture"), statusCode, metrics.bytes, time.Since(started).Milliseconds())
 		return
 	}
