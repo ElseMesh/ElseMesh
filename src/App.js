@@ -215,6 +215,21 @@ export class App {
 
 	}
 
+	configureGraphicsPriorityForBackend( backend ) {
+
+		const priority = resolveGraphicsPriority( {
+			isLinuxDesktop: this.isLinuxDesktop,
+			backend,
+			queryQuality: this.qs.has( 'quality' ),
+			savedPriority: this.savedGraphicsPriority,
+		} );
+		if ( priority !== this.graphicsPriority ) {
+			this.graphicsPriority = priority;
+			this.configureGraphicsPriority();
+		}
+
+	}
+
 	setGraphicsPriority( priority ) {
 
 		if ( ! this.isLinuxDesktop || ! [ 'fps', 'quality' ].includes( priority ) || priority === this.graphicsPriority ) return;
@@ -262,6 +277,7 @@ export class App {
 			const engine = this.engine = new Engine( document.getElementById( 'app' ) );
 			await engine.init();
 			this.backend = engine.backend;
+			this.configureGraphicsPriorityForBackend( engine.backend );
 			console.info( 'ElseMesh renderer selected:', engine.backend === 'webgpu' ? 'WebGPU' : 'WebGL fallback', engine.fallbackReason || '' );
 			if ( engine.backend === 'webgpu' ) return this.initHostedPackageWorld( progress );
 			this.hostedColliders = new Colliders();
@@ -283,16 +299,7 @@ export class App {
 		await engine.init();
 		this.backend = engine.backend;
 		console.info( 'ElseMesh renderer selected:', engine.backend === 'webgpu' ? 'WebGPU' : 'WebGL fallback', engine.fallbackReason || '' );
-		const backendGraphicsPriority = resolveGraphicsPriority( {
-			isLinuxDesktop: this.isLinuxDesktop,
-			backend: engine.backend,
-			queryQuality: qs.has( 'quality' ),
-			savedPriority: this.savedGraphicsPriority,
-		} );
-		if ( backendGraphicsPriority !== this.graphicsPriority ) {
-			this.graphicsPriority = backendGraphicsPriority;
-			this.configureGraphicsPriority();
-		}
+		this.configureGraphicsPriorityForBackend( engine.backend );
 		// Hosted WebGPU launches must build only the active package. The built-in
 		// island is a world package too; it is not a hidden renderer bootstrap.
 		if ( engine.backend === 'webgpu' && worldLink ) return this.initHostedPackageWorld( progress );
@@ -2054,8 +2061,8 @@ export class App {
 
 	}
 
-	// Internal render resolution relative to the output. Lower values reduce GPU pixel work; the
-	// temporal upscaler reconstructs the full output resolution.
+	// Internal render resolution relative to output. PostFX can keep the canvas at a larger scale
+	// and upscale its targets; the hosted-package path scales its canvas and scene directly.
 	setRenderScale( v ) {
 
 		const scale = MathUtils.clamp( Math.round( v * 20 ) / 20, 0.35, 1 );
@@ -2064,12 +2071,13 @@ export class App {
 			this.webglFallback?.setRenderScale( scale );
 			return;
 		}
-		const canvasScale = Math.max( this.desktopCanvasScale, scale );
-		const postScale = scale / canvasScale;
-		if ( scale === this.settings.renderScale && this.engine.renderScale === canvasScale && this.post.scale === postScale ) return;
+		const hasPost = Boolean( this.post );
+		const canvasScale = hasPost ? Math.max( this.desktopCanvasScale, scale ) : scale;
+		const postScale = hasPost ? scale / canvasScale : 1;
+		if ( scale === this.settings.renderScale && this.engine.renderScale === canvasScale && ( ! hasPost || this.post.scale === postScale ) ) return;
 		this.settings.renderScale = scale;
 		if ( this.engine.renderScale !== canvasScale ) this.engine.setRenderScale( canvasScale );
-		if ( this.post.scale !== postScale ) this.post.setScale( postScale );
+		if ( hasPost && this.post.scale !== postScale ) this.post.setScale( postScale );
 		if ( this.clouds ) this.clouds.resolutionScale = postScale;
 
 	}

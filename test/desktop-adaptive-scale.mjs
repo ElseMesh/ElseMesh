@@ -16,6 +16,23 @@ if ( injected.worldPackage !== worldPackage || injected.localWorldExperience !==
 const linux = new App();
 if ( linux.graphicsPriority !== 'fps' || ! linux.desktopAdaptiveScale || linux.settings.renderScale !== 0.75 || linux.desktopCanvasScale !== 0.7 || linux.desktopFrameRateLimit !== 24 || linux.desktopAntiAliasingMode !== 'none' || linux.desktopRefractionScale !== 0.35 ) throw new Error( 'Linux desktop should default to FPS priority with adaptive scaling and a 24 fps GPU budget' );
 
+const webgpuDefault = new App();
+let hostedFrameRateLimit = null;
+webgpuDefault.engine = { setFrameRateLimit( value ) { hostedFrameRateLimit = value; } };
+webgpuDefault.configureGraphicsPriorityForBackend( 'webgpu' );
+if ( webgpuDefault.graphicsPriority !== 'quality' || webgpuDefault.autoScale || webgpuDefault.settings.renderScale !== 1 || hostedFrameRateLimit !== 0 ) throw new Error( 'Local hosted WebGPU should apply its Visual Quality default after backend selection' );
+
+stored.set( 'elsemesh.graphics-priority', 'fps' );
+const webgpuFPS = new App();
+const hostedScales = { engine: 1 };
+let hostedFpsLimit = null;
+webgpuFPS.engine = { get renderScale() { return hostedScales.engine; }, setRenderScale( value ) { hostedScales.engine = value; }, setFrameRateLimit( value ) { hostedFpsLimit = value; } };
+webgpuFPS.configureGraphicsPriorityForBackend( 'webgpu' );
+webgpuFPS.backend = 'webgpu';
+webgpuFPS.clouds = { resolutionScale: 1 };
+webgpuFPS.setRenderScale( 0.5 );
+if ( ! webgpuFPS.autoScale || hostedFpsLimit !== null || hostedScales.engine !== 0.5 || webgpuFPS.settings.renderScale !== 0.5 || webgpuFPS.clouds.resolutionScale !== 1 ) throw new Error( 'Hosted WebGPU FPS mode should lower canvas resolution without requiring a post-processing chain' );
+
 stored.set( 'elsemesh.graphics-priority', 'quality' );
 const quality = new App();
 if ( quality.graphicsPriority !== 'quality' || quality.desktopAdaptiveScale || quality.settings.renderScale !== 1 || quality.desktopCanvasScale !== 1 || quality.desktopFrameRateLimit !== 0 || quality.desktopAntiAliasingMode !== null || quality.desktopRefractionScale !== 0.5 || quality.autoScale ) throw new Error( 'Saved Visual Quality priority should restore full-quality defaults without adaptive scaling' );
