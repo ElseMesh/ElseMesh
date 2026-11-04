@@ -32,14 +32,16 @@ registerWorldComponentBackendBatchAdapter( 'webgl', 'elsemesh.static-vegetation/
 	const spawn = manifest.spawn?.position || [ 0, 0, 0 ];
 	for ( const component of components ) {
 		const placementBytes = assets.get( component.placementAssetId );
+		const placementKind = component.assets?.find( asset => asset.assetId === component.placementAssetId )?.kind;
 		const grassMaskBytes = component.grassMaskAssetId && assets.get( component.grassMaskAssetId );
 		if ( ! placementBytes || component.grassMaskAssetId && ! grassMaskBytes ) continue;
+		if ( typeof placementKind !== 'string' ) throw new Error( `Static vegetation component ${component.id} does not declare its placement asset kind` );
 		if ( component.grassMaskAssetId ) {
 			fallback.hostedGrassMask = decodeGrassDensityAsset( bytesOf( grassMaskBytes ) );
 			if ( ! fallback.hostedTerrainData ) throw new Error( `Static grass component ${component.id} requires its terrain surface` );
 			if ( fallback.hostedGrassMask.size !== fallback.hostedTerrainData.size || fallback.hostedGrassMask.origin !== fallback.hostedTerrainData.origin ) throw new Error( `Static grass component ${component.id} does not match its terrain surface` );
 		}
-		const group = await fallback._loadVegetation( { placementBytes, centerPosition: [ spawn[ 0 ], spawn[ 2 ] ] } );
+		const group = await fallback._loadVegetation( { placementBytes, placementKind, centerPosition: [ spawn[ 0 ], spawn[ 2 ] ] } );
 		if ( ! group ) continue;
 		groups.push( group );
 		componentIDs.push( component.id );

@@ -1566,7 +1566,7 @@ export class WebGLFallback {
 
 	}
 
-	async _loadVegetation( { placementBytes = null, centerPosition = null } = {} ) {
+	async _loadVegetation( { placementBytes = null, placementKind = null, centerPosition = null } = {} ) {
 
 		const packaged = placementBytes !== null;
 		try {
@@ -1576,8 +1576,10 @@ export class WebGLFallback {
 				if ( ! response.ok ) throw new Error( `Vegetation placement asset returned ${response.status}` );
 				placementBytes = new Uint8Array( await response.arrayBuffer() );
 				expectedSeed = 7;
+				const vegetation = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
+				placementKind = vegetation?.assets?.find( asset => asset.assetId === vegetation.placementAssetId )?.kind || null;
 			}
-			const records = decodeWorldComponentAsset( 'vegetation-placement/1', asBytes( placementBytes ), expectedSeed );
+			const records = decodeWorldComponentAsset( placementKind, asBytes( placementBytes ), expectedSeed );
 			this.vegetationRecords ||= {};
 			for ( const [ kind, placements ] of Object.entries( records ) ) if ( Array.isArray( placements ) ) this.vegetationRecords[ kind ] = [ ...( this.vegetationRecords[ kind ] || [] ), ...placements ];
 			const start = this.islandDefinition?.start || this.islandDefinition?.spawn;

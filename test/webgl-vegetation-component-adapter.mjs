@@ -5,8 +5,8 @@ import { encodeGrassDensityAsset } from '../src/network/GrassDensityAsset.js';
 
 const type = 'elsemesh.static-vegetation/1';
 const components = [
-	{ id: 'canopy-a', type, placementAssetId: 'plants-a', grassMaskAssetId: 'grass-a' },
-	{ id: 'canopy-b', type, placementAssetId: 'plants-b' },
+	{ id: 'canopy-a', type, placementAssetId: 'plants-a', grassMaskAssetId: 'grass-a', assets: [ { assetId: 'plants-a', kind: 'tropical-plants/1' }, { assetId: 'grass-a', kind: 'grass-density/1' } ] },
+	{ id: 'canopy-b', type, placementAssetId: 'plants-b', assets: [ { assetId: 'plants-b', kind: 'world-plants/2' } ] },
 ];
 const calls = [], removed = [];
 const fallback = {
@@ -25,6 +25,7 @@ const result = await adapter( { fallback, assets, manifest: { spawn: { position:
 
 assert.deepEqual( result.componentIDs, [ 'canopy-a', 'canopy-b' ] );
 assert.deepEqual( calls.map( call => call.centerPosition ), [ [ 12, - 8 ], [ 12, - 8 ] ] );
+assert.deepEqual( calls.map( call => call.placementKind ), [ 'tropical-plants/1', 'world-plants/2' ], 'WebGL vegetation dispatches the owner-declared asset codec' );
 assert.equal( fallback.hostedGrassMask.size, 20, 'ArrayBuffer grass masks remain valid package assets' );
 result.runtime.dispose();
 assert.equal( removed.length, 2, 'world teardown removes each static vegetation group' );
