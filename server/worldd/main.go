@@ -136,8 +136,8 @@ func run() error {
 	var allowedBrowserOriginsFlags stringFlags
 	var webrtcSTUNServers stringFlags
 	var zeroTierBlacklistInterfaces stringFlags
-	webrtcUDPPortMin := flag.Uint("webrtc-udp-port-min", 42950, "first local UDP port available to WebRTC ICE")
-	webrtcUDPPortMax := flag.Uint("webrtc-udp-port-max", 43049, "last local UDP port available to WebRTC ICE")
+	webrtcUDPPortMin := flag.Uint("webrtc-udp-port-min", 0, "first local UDP port available to WebRTC ICE (0 with max 0 lets Pion allocate ports dynamically)")
+	webrtcUDPPortMax := flag.Uint("webrtc-udp-port-max", 0, "last local UDP port available to WebRTC ICE (0 with min 0 lets Pion allocate ports dynamically)")
 	dhtMode := flag.String("dht-mode", "auto", "DHT mode: auto, client, or server")
 	serveRelay := flag.Bool("relay-service", false, "allow this node to provide a bounded libp2p circuit relay")
 	var bootstrap stringFlags

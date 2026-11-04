@@ -11,8 +11,11 @@ func TestWebRTCConfigurationValidation(t *testing.T) {
 			t.Errorf("invalid STUN configuration accepted: %q", invalid)
 		}
 	}
-	if err := validateWebRTCPortRange(42950, 43049); err != nil {
-		t.Fatalf("default WebRTC UDP range rejected: %v", err)
+	if err := validateWebRTCPortRange(0, 0); err != nil {
+		t.Fatalf("dynamic WebRTC UDP port allocation rejected: %v", err)
+	}
+	if err := validateWebRTCPortRange(43000, 43099); err != nil {
+		t.Fatalf("valid configured WebRTC UDP range rejected: %v", err)
 	}
 	for _, ports := range [][2]uint{{0, 100}, {43000, 42950}, {1, 31}, {65536, 65560}} {
 		if err := validateWebRTCPortRange(ports[0], ports[1]); err == nil {

@@ -48,6 +48,9 @@ func validateSTUNServerURLs(values []string) error {
 }
 
 func validateWebRTCPortRange(minimum, maximum uint) error {
+	if minimum == 0 && maximum == 0 {
+		return nil
+	}
 	if minimum < 1 || maximum > 65535 || maximum < minimum || maximum-minimum+1 < maxWebRTCOffers {
 		return fmt.Errorf("WebRTC UDP port range must contain at least %d ports", maxWebRTCOffers)
 	}
@@ -101,11 +104,7 @@ func (d *daemon) acceptWebRTCOffer(request gatewayMessage) (peerResponse, error)
 	d.webrtcMu.Unlock()
 
 	settingEngine := webrtc.SettingEngine{}
-	portMin, portMax := d.webrtcUDPPortMin, d.webrtcUDPPortMax
-	if portMin == 0 && portMax == 0 {
-		portMin, portMax = 42950, 43049
-	}
-	if err := settingEngine.SetEphemeralUDPPortRange(portMin, portMax); err != nil {
+	if err := settingEngine.SetEphemeralUDPPortRange(d.webrtcUDPPortMin, d.webrtcUDPPortMax); err != nil {
 		d.closeWebRTCSession(session)
 		return peerResponse{}, fmt.Errorf("configure WebRTC UDP ports: %w", err)
 	}

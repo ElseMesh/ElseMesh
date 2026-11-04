@@ -66,12 +66,12 @@ firewalls. TURN credentials are not currently configurable; the existing
 HTTPS/WSS gateway is the fallback relay. Never put relay credentials in a world
 package, invite URL, source repository, or long-lived client bundle.
 
-The daemon limits its local ICE sockets to UDP ports `42950` through `43049` by
-default. These bounds can be changed with `--webrtc-udp-port-min` and
-`--webrtc-udp-port-max`; the configured range must contain at least 32 ports.
-If direct browser connectivity is desired, allow this UDP destination range on
-the host firewall and forward it at the edge router to the daemon. Replies are
-stateful. Keep the HTTPS/WSS gateway path available when those ports cannot be
+By default, the daemon lets Pion allocate local ICE UDP ports dynamically. To
+use a bounded range for firewall rules, set both `--webrtc-udp-port-min` and
+`--webrtc-udp-port-max`; the range must contain at least 32 ports. If direct
+browser connectivity is desired, allow the gathered UDP candidate ports on the
+host firewall and forward them at the edge router to the daemon. Replies are
+stateful. Keep the HTTPS/WSS gateway path available when direct UDP cannot be
 opened; direct WebRTC is opportunistic.
 
 The existing HTTPS/WSS gateway remains the relay fallback when ICE fails or

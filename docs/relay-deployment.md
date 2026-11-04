@@ -285,8 +285,9 @@ not join the native libp2p or ZeroTier network themselves. Direct WebRTC to a
 standalone `worldd` is implemented and verified in loopback Chromium tests; it
 uses WSS signaling and falls back to the gateway when ICE or the data channel
 fails. Configure `--webrtc-stun-server` on the signaling gateway and target,
-then permit/forward the configured UDP ICE range (`42950-43049` by default)
-for direct paths. Public NAT traversal remains unverified. The gateway daemon
+then permit/forward the UDP ICE ports gathered by the target (or configure a
+bounded range with `--webrtc-udp-port-min` and `--webrtc-udp-port-max`) for
+direct paths. Public NAT traversal remains unverified. The gateway daemon
 needs the same bootstrap/relay setup if the world's owner is reachable only
 through a circuit relay. Browser-hosted owner sessions and their required
 reverse gateway path are described in [browser hosting](browser-hosting.md).
