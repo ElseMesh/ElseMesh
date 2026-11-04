@@ -17,7 +17,6 @@ import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
-import './WebGLFishPropsComponentAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';

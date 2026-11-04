@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerWorldComponentBackendAdapter, registerWorldComponentBackendBatchAdapter, worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../src/network/WorldComponentBackendRegistry.js';
+import { worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
 
 const webgpu = ( context, component ) => ( { backend: 'webgpu', context, component } );
 const webgl = ( context, component ) => ( { backend: 'webgl', context, component } );
@@ -57,4 +58,12 @@ assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGPU static-model adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGL static-model adapter' );
+const tidewaterFishProps = 'elsemesh.static-fish-props/1';
+assert.equal( worldComponentDescriptor( tidewaterFishProps ), null, 'the engine does not register Tidewater fish content globally' );
+assert.equal( worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), null, 'the engine does not install a Tidewater fish renderer globally' );
+assert.equal( worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), null, 'the engine does not install a Tidewater WebGL fish renderer globally' );
+await import( '../worlds/tidewater/register-components.js' );
+assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'the Tidewater provider registers its own fish component contract' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'the Tidewater provider registers its WebGPU renderer' );
+assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'the Tidewater provider registers its WebGL batch renderer' );
 console.log( 'World component backend registry selects engine adapters by backend and component type' );
