@@ -269,7 +269,6 @@ export function webglTerrainMaterial( T, terrain, packagedSurface = null, { seaL
 	const shore = packagedSurface?.shoreField ? encodeWebGLShoreField( T, packagedSurface.shoreField ) : null;
 	const shoreUniformDeclarations = shore ? /* glsl */`
 uniform float uTerrainTime;
-uniform float uTerrainSeaLevel;
 uniform sampler2D uTerrainShoreField;
 uniform sampler2D uTerrainSwashField;
 uniform vec2 uTerrainSwashTimeRange;
@@ -301,8 +300,7 @@ uniform float uTerrainShoreSize;
 				float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
 				float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 ) - max( vTerrainWorldPosition.y - uTerrainSeaLevel, 0.0 ) / ${SHORE_BEACH_SLOPE};
 				float swashWet = smoothstep( -0.2, 0.25, runupFront ) * exposure;
-				terrainWetness = max( terrainWetness, swashWet );
-				wetSand = max( wetSand, swashWet );
+				wet = max( wet, swashWet );
 			}
 ` : '';
 	const samplePackagedFbm = ( x, z, scale ) => {
@@ -379,9 +377,9 @@ uniform float uTerrainShoreSize;
 		shader.uniforms.uTerrainColor = { value: texture };
 		shader.uniforms.uTerrainDetail = { value: detailTexture };
 		shader.uniforms.uTerrainWetDarken = { value: wetDarken };
+		shader.uniforms.uTerrainSeaLevel = { value: seaLevel };
 		if ( shore ) {
 			shader.uniforms.uTerrainTime = { value: material.userData.terrainTime || 0 };
-			shader.uniforms.uTerrainSeaLevel = { value: seaLevel };
 			shader.uniforms.uTerrainShoreField = { value: shore.texture };
 			shader.uniforms.uTerrainSwashField = { value: shore.swashTexture };
 			shader.uniforms.uTerrainSwashTimeRange = { value: shore.swashTimeRange };
@@ -395,6 +393,7 @@ uniform float uTerrainShoreSize;
 uniform sampler2D uTerrainColor;
 uniform sampler2D uTerrainDetail;
 uniform float uTerrainWetDarken;
+uniform float uTerrainSeaLevel;
 ${shoreUniformDeclarations}
 varying vec3 vTerrainWorldPosition;
 ` );
@@ -405,6 +404,7 @@ varying vec3 vTerrainWorldPosition;
 			vec2 terrainXZ = vTerrainWorldPosition.xz;
 			vec4 terrainNear = texture2D( uTerrainDetail, terrainXZ / 1.9 );
 			vec4 terrainMid = texture2D( uTerrainDetail, mat2( 0.2675, 0.9636, -0.9636, 0.2675 ) * terrainXZ / 6.7 + 0.21 );
+			float terrainMacroB = texture2D( uTerrainDetail, mat2( -0.504846, 0.863209, -0.863209, -0.504846 ) * terrainXZ / 47.0 ).a;
 			vec4 terrainFine = texture2D( uTerrainDetail, mat2( -0.7374, 0.6755, -0.6755, -0.7374 ) * terrainXZ / 0.63 + 0.53 );
 			float terrainPixelWorld = max( length( dFdx( terrainXZ ) ), length( dFdy( terrainXZ ) ) );
 			float terrainFineFade = 1.0 - smoothstep( 0.006, 0.02, terrainPixelWorld );
@@ -420,14 +420,30 @@ varying vec3 vTerrainWorldPosition;
 			float terrainDistance = length( cameraPosition - vTerrainWorldPosition );
 			float terrainClumpContrast = mix( 0.34, 0.95, smoothstep( 40.0, 140.0, terrainDistance ) );
 			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage ) * mix( 1.0, terrainDetailVisibility, sandCoverage );
-			// Approximate WebGPU's mottled static damp term with its 0.22-0.5 midpoint; moving swash uses the shared arrival field below.
-			float dampSand = sandCoverage * ( 1.0 - smoothstep( 0.5, 1.7, vTerrainWorldPosition.y ) ) * 0.36;
-			float wetSand = sandCoverage * ( 1.0 - smoothstep( -0.1, 0.35, vTerrainWorldPosition.y ) );
-			float terrainWetness = max( dampSand, wetSand );
+			float terrainHeight = vTerrainWorldPosition.y - uTerrainSeaLevel;
+			float landWeight = smoothstep( -0.6, 0.12, terrainHeight );
+			float wet = 0.0;
 			${shoreWetness}
-			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 * terrainDetailVisibility + 1.0 ) * mix( 1.0, uTerrainWetDarken, terrainWetness );` );
+			float dampMottle = smoothstep( 0.3, 0.7, terrainMid.a + ( terrainNear.g - 0.45 ) * 0.6 + ( terrainMacroB - 0.5 ) * 0.4 );
+			wet *= landWeight;
+			float damp = ( 1.0 - smoothstep( 0.5, 1.7, terrainHeight + terrainMid.a * 0.3 ) ) * sandCoverage * landWeight * mix( 0.22, 0.5, dampMottle );
+			float wetMottle = smoothstep( 0.25, 0.75, terrainMid.a + ( terrainNear.g - 0.45 ) * 0.5 );
+			float dryEdge = smoothstep( 0.0, 0.6, wet ) * ( 1.0 - smoothstep( 0.6, 1.0, wet ) );
+			float wetK = max( wet, damp ) * ( 1.0 - dryEdge * wetMottle * 0.6 );
+			vec3 terrainDryAlbedo = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 * terrainDetailVisibility + 1.0 );
+			vec3 dpdxTerrain = dFdx( vec3( terrainXZ.x, terrainHeight, terrainXZ.y ) );
+			vec3 dpdyTerrain = dFdy( vec3( terrainXZ.x, terrainHeight, terrainXZ.y ) );
+			vec3 terrainNormal = normalize( cross( dpdxTerrain, dpdyTerrain ) );
+			if ( terrainNormal.y < 0.0 ) terrainNormal = -terrainNormal;
+			vec2 slopeDirection = normalize( terrainNormal.xz + vec2( 1e-4, 0.0 ) );
+			float rillK = smoothstep( 0.2, 0.9, wet ) * smoothstep( 0.05, 0.6, terrainHeight ) * sandCoverage;
+			float rill = 0.5;
+			if ( rillK > 0.0 ) rill = texture2D( uTerrainDetail, vec2( dot( terrainXZ, slopeDirection ) / 3.2, dot( terrainXZ, vec2( -slopeDirection.y, slopeDirection.x ) ) / 0.3 ) ).a;
+			float terrainLuminance = dot( terrainDryAlbedo * uTerrainWetDarken, vec3( 0.2126, 0.7152, 0.0722 ) );
+			vec3 wetAlbedo = mix( vec3( terrainLuminance ), terrainDryAlbedo * uTerrainWetDarken, 1.15 ) * vec3( 0.97, 0.98, 1.0 ) * ( ( rill - 0.5 ) * 0.25 * rillK + 1.0 );
+			diffuseColor.rgb = mix( terrainDryAlbedo, wetAlbedo, wetK );` );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-			roughnessFactor = mix( roughnessFactor, mix( 0.42, 0.16, wetSand ), terrainWetness );` );
+			roughnessFactor = mix( roughnessFactor, mix( 0.42, 0.16, wet ), wetK );` );
 	};
 	material.customProgramCacheKey = () => shore ? 'elsemesh-webgl-baked-terrain-detail-v4-shore' : 'elsemesh-webgl-baked-terrain-detail-v4';
 	material.userData.terrainTime = 0;

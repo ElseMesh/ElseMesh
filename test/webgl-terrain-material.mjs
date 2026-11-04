@@ -20,16 +20,20 @@ const shader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin
 material.onBeforeCompile( shader );
 assert.equal( shader.uniforms.uTerrainWetDarken.value, 0.58, 'WebGL uses the package wet-darken parameter' );
 assert.equal( shader.uniforms.uTerrainSeaLevel.value, 1.5, "WebGL swash uses the hosted world's sea level" );
-assert.match( shader.fragmentShader, /float dampSand =/ );
-assert.match( shader.fragmentShader, /\) \* 0\.36;/, 'WebGL approximates the midpoint of WebGPU static dampness while swash uses the packaged arrival field' );
-assert.match( shader.fragmentShader, /mix\( 1\.0, uTerrainWetDarken, terrainWetness \)/ );
+assert.match( shader.fragmentShader, /float dampMottle = smoothstep\( 0\.3, 0\.7,/ );
+assert.match( shader.fragmentShader, /float damp = \( 1\.0 - smoothstep\( 0\.5, 1\.7, terrainHeight \+ terrainMid\.a \* 0\.3 \) \) \* sandCoverage \* landWeight \* mix\( 0\.22, 0\.5, dampMottle \)/ );
+assert.match( shader.fragmentShader, /float dryEdge = smoothstep\( 0\.0, 0\.6, wet \) \* \( 1\.0 - smoothstep\( 0\.6, 1\.0, wet \) \)/ );
+assert.match( shader.fragmentShader, /float rillK = smoothstep\( 0\.2, 0\.9, wet \) \* smoothstep\( 0\.05, 0\.6, terrainHeight \) \* sandCoverage/ );
+assert.match( shader.fragmentShader, /terrainLuminance = dot\( terrainDryAlbedo \* uTerrainWetDarken, vec3\( 0\.2126, 0\.7152, 0\.0722 \) \)/ );
 assert.match( shader.fragmentShader, /uTerrainSwashField/ );
 assert.match( shader.fragmentShader, /float swashArrival = mix\( uTerrainSwashTimeRange/ );
 assert.match( shader.fragmentShader, /float runupFront =/ );
 assert.match( shader.fragmentShader, /runupMax = amp \* 2\.1 \* 0\.65 \*/, 'WebGL uses the reduced shared run-up scale for a tighter wet-sand front' );
+assert.match( shader.fragmentShader, /wet = max\( wet, swashWet \)/, 'WebGL feeds its analytic swash estimate through the shared wet-surface blend' );
+assert.doesNotMatch( shader.fragmentShader, /0\.36;/, 'WebGL no longer substitutes a fixed midpoint for WebGPU static dampness' );
 assert.match( shader.fragmentShader, /terrainPixelWorld = max\( length\( dFdx\( terrainXZ \) \), length\( dFdy\( terrainXZ \) \) \)/, 'high-frequency sand detail fades with the projected pixel footprint instead of forming distant bands' );
 assert.match( shader.fragmentShader, /terrainDetailContrast = mix\( terrainClumpContrast, 0\.85, sandCoverage \) \* mix\( 1\.0, terrainDetailVisibility, sandCoverage \)/, 'sand detail contrast is filtered by its projected pixel footprint' );
-assert.match( shader.fragmentShader, /roughnessFactor = mix\( roughnessFactor, mix\( 0\.42, 0\.16, wetSand \), terrainWetness \)/ );
+assert.match( shader.fragmentShader, /roughnessFactor = mix\( roughnessFactor, mix\( 0\.42, 0\.16, wet \), wetK \)/ );
 material.userData.updateTerrainTime( 5.25 );
 assert.equal( shader.uniforms.uTerrainTime.value, 5.25, 'terrain swash animation follows the shared frame time' );
 
@@ -56,4 +60,14 @@ fadedMaterial.dispose();
 
 material.dispose();
 for ( const texture of material.userData.terrainTextures ) texture.dispose();
+
+const surfaceWithoutShore = { ...surface, shoreField: null };
+const builtInMaterial = webglTerrainMaterial( THREE, terrain, surfaceWithoutShore, { seaLevel: 1.5 } );
+const builtInShader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <color_fragment>\n#include <roughnessmap_fragment>' };
+builtInMaterial.onBeforeCompile( builtInShader );
+assert.equal( builtInShader.uniforms.uTerrainSeaLevel.value, 1.5, 'built-in WebGL terrain binds sea level for the damp-sand blend without shore textures' );
+assert.match( builtInShader.fragmentShader, /float dampMottle =/ );
+assert.doesNotMatch( builtInShader.fragmentShader, /uTerrainShoreField/ );
+builtInMaterial.dispose();
+for ( const texture of builtInMaterial.userData.terrainTextures ) texture.dispose();
 console.log( 'WebGL terrain material consumes package roughness, wet-darken, and shore-arrival data' );

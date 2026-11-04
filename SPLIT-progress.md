@@ -221,6 +221,14 @@ finding changes them.
   matched visual capture; shoreline/material parity remains open and the
   estimate stays 82%.
 
+- 2026-11-04: WebGL terrain wet shading now follows WebGPU's damp mottle, dry-edge
+  breakup, saturated dark albedo, rill modulation, and wet roughness equations.
+  The moving wetness source remains WebGL's analytic shore-arrival estimate; it
+  does not consume WebGPU's ShoreSim state. The focused terrain material check,
+  external production build, and an isolated hosted WebGL capture pass. The
+  capture does not compare matched WebGPU/WebGL wetness state, so no visual
+  parity gate or percentage changes; dynamic wet-sand parity remains open.
+
 - 2026-11-04: isolated the WebGL terrain patch by capturing the hosted world
   with `noWater`; the pale geometry remained with the water scene disabled. The
   manifest's full terrain replaces a `portal-preview` terrain. WebGL had loaded
