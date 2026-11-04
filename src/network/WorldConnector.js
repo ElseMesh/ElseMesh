@@ -6,6 +6,7 @@ import { validateWorldExperience } from './WorldExperience.js';
 import { verifySignedDocument } from './SignedDocument.js';
 import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
+import { loadWorldManifestProviders } from './WorldProviderLoader.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
 
@@ -981,7 +982,7 @@ export async function verifySignedWorldManifest( document, { loadWorldProviders 
 	await verifySignedDocument( document, 'elsemesh.world/3' );
 	const manifest = document.payload;
 	invariant( manifest.protocol === 'elsemesh.world/3' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
-	await loadWorldProviders?.( manifest );
+	await loadWorldManifestProviders( manifest, loadWorldProviders );
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience, manifest.assets ?? null );
 	validateWorldSpawn( manifest.spawn );

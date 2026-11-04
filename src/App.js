@@ -62,6 +62,7 @@ import { SoundScape } from './audio/SoundScape.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
 import { Group } from './engine/scene/Group.js';
 import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.js';
+import { loadWorldPackageProviders } from './network/WorldProviderLoader.js';
 import { LocalRegionConnector } from './network/LocalRegionConnector.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from './network/LocalRegionStartup.js';
 import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
@@ -230,12 +231,7 @@ export class App {
 			if ( ! this.loadDefaultWorldPackage ) throw new Error( 'The application entry point must provide a default world package loader for local play' );
 			this.worldPackage = await this.loadDefaultWorldPackage();
 		}
-		if ( ! worldLink && this.worldPackage?.source && this.loadWorldProviders ) {
-			await this.loadWorldProviders( {
-				components: this.worldPackage.source.components || [],
-				experience: this.worldPackage.source.experience || null,
-			} );
-		}
+		if ( ! worldLink ) await loadWorldPackageProviders( this.worldPackage, this.loadWorldProviders );
 		this.localWorldExperience = this.worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
