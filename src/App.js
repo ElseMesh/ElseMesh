@@ -19,17 +19,9 @@ import { Clouds } from './sky/Clouds.js';
 import { SkyProClouds } from './sky/SkyProClouds.js';
 import { Environment } from './sky/Environment.js';
 
-import { HeightfieldTerrainData } from './world/HeightfieldTerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain, normalizeTerrainSurfaceProfile } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
-import { Village } from './world/Village.js';
-import { Reef } from './world/Reef.js';
-import { BoatModel } from './world/BoatModel.js';
-import { Rocks } from './world/Rocks.js';
-import { Debris } from './world/Debris.js';
-import { Wildlife } from './world/wildlife/Wildlife.js';
-import { Whale } from './world/marine/Whale.js';
 
 import { OceanFFT } from './ocean/OceanFFT.js';
 import { WaterSurface } from './ocean/WaterSurface.js';
@@ -368,6 +360,9 @@ export class App {
 		await progress( 0.06, 'Shaping the island…', undefined, 'terrain' );
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
+		// Hosted launches have already returned through their package-only path. Keep
+		// built-in Tidewater presentation out of the shared App import graph.
+		const { Village, Reef, BoatModel, Rocks, Debris, Wildlife, Whale } = await import( './world/BuiltinWorldPresentation.js' );
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
 		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, fishPresentation: this.fishPresentation } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
