@@ -32,5 +32,6 @@ function installIslandOcean( { fallback, rules, terrain, terrainWater } ) {
 		patch.position.set( ( bounds.xMin + bounds.xMax ) * 0.5, 0, ( bounds.zMin + bounds.zMax ) * 0.5 );
 		fallback.waterScene.add( patch );
 	}
+	if ( terrain && terrainWater?.shore ) fallback.waterScene.add( fallback._makeBreakerSpray( terrain, terrainWater, seaLevel ) );
 	return true;
 }

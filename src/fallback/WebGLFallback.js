@@ -456,18 +456,28 @@ function webglShoreFieldTexture( T, terrain, seaLevel, worldDefinition ) {
 
 }
 
-function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition ) {
+function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition = null ) {
 
 	const positions = [], seeds = [], depths = [];
-	for ( let x = worldDefinition.beach.xMin - 25; x <= worldDefinition.beach.xMax + 25; x += 0.75 ) for ( let z = - 64; z <= 28; z += 0.75 ) {
+	const add = ( x, z, depth ) => {
+		if ( depth <= 0.15 || depth >= 5.5 ) return;
 		const seed = ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1;
-		const jitter = salt => ( ( Math.sin( x * 39.346 + z * 11.135 + salt ) * 24634.6345 ) % 1 + 1 ) % 1;
-		const px = x + ( jitter( 1.7 ) - 0.5 ) * 0.7, pz = z + ( jitter( 8.3 ) - 0.5 ) * 0.7;
-		const depth = seaLevel - terrain.heightAt( px, pz );
-		if ( depth <= 0.15 || depth >= 5.5 ) continue;
-		positions.push( px, 0, pz );
-		seeds.push( seed );
-		depths.push( depth );
+		positions.push( x, 0, z ); seeds.push( seed ); depths.push( depth );
+	};
+	if ( worldDefinition?.beach ) {
+		for ( let x = worldDefinition.beach.xMin - 25; x <= worldDefinition.beach.xMax + 25; x += 0.75 ) for ( let z = - 64; z <= 28; z += 0.75 ) {
+			const jitter = salt => ( ( Math.sin( x * 39.346 + z * 11.135 + salt ) * 24634.6345 ) % 1 + 1 ) % 1;
+			const px = x + ( jitter( 1.7 ) - 0.5 ) * 0.7, pz = z + ( jitter( 8.3 ) - 0.5 ) * 0.7;
+			add( px, pz, seaLevel - terrain.heightAt( px, pz ) );
+		}
+	} else if ( terrain?.heights && terrain.res > 1 ) {
+		// Hosted island-ocean content has no engine-owned beach coordinates. Seed
+		// spray from its packaged terrain's shallow-water band instead.
+		const stride = Math.max( 1, Math.ceil( terrain.res / 1400 ) ), cell = terrain.size / terrain.res;
+		for ( let j = 0; j < terrain.res; j += stride ) for ( let i = 0; i < terrain.res; i += stride ) {
+			const depth = seaLevel - terrain.heights[ j * terrain.res + i ];
+			if ( depth > 0.15 && depth < 5.5 ) add( terrain.origin + ( i + 0.5 ) * cell, terrain.origin + ( j + 0.5 ) * cell, depth );
+		}
 	}
 	const geometry = new T.BufferGeometry();
 	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
@@ -1259,6 +1269,12 @@ export class WebGLFallback {
 			material.uniforms.uViewProjection.value.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
 		};
 		return water;
+
+	}
+
+	_makeBreakerSpray( terrain, terrainWater, seaLevel ) {
+
+		return webglBreakerSpray( this.THREE, terrain, terrainWater, seaLevel );
 
 	}
 
