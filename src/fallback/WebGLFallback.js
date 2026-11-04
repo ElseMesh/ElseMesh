@@ -20,15 +20,12 @@ import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
-import { WebGLWildlifeAdapter } from './WebGLWildlifeAdapter.js';
-import { WebGLSwashProbe } from './WebGLSwashProbe.js';
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
-import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
-import { WildlifeSimulation, DEFAULT_WILDLIFE_ENVIRONMENT } from '../world/wildlife/WildlifeSimulation.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
@@ -759,14 +756,11 @@ export class WebGLFallback {
 		this.player = null;
 		this.hostedSeaLevel = null;
 		this.worldSeaLevel = this.defaultWorldSource?.rules.seaLevel ?? 0;
-		this.hostedWildlifeComponent = null;
 		this.hostedComponentRuntimes = new Map();
 		this.builtinComponentRuntimes = new Map();
 		this.hostedInstalledComponentIDs = new Set();
 		this.hostedCollisionPayloads = new Map();
 		this.vegetationRecords = null;
-		this.wildlifeRuntime = null;
-		this.wildlifeAdapter = null;
 
 	}
 
@@ -878,12 +872,6 @@ export class WebGLFallback {
 			}
 			this._updateHostedWebGLStatus();
 		} else await this._loadIslandWhale();
-		if ( this.worldLink ) {
-			if ( this.hostedWildlifeComponent ) {
-				if ( ! this.hostedTerrainData ) throw new Error( `Wildlife component ${this.hostedWildlifeComponent.id} requires its packaged terrain surface` );
-				this._createWildlifeRuntime( this.hostedTerrainData, this.app.hostedColliders, this.hostedWildlifeComponent );
-			}
-		} else this._createWildlifeRuntime( this.terrain, this.app.worldState.colliders, this.islandWildlifeComponent );
 		if ( this.terrain ) {
 			this.beachDebris = webglBeachDebris( T, this.terrain, this.camera );
 			this.scene.add( this.beachDebris );
@@ -895,23 +883,6 @@ export class WebGLFallback {
 		this.animationStartTime = performance.now();
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
-	}
-
-	_createWildlifeRuntime( terrain, colliders, component = null ) {
-
-		this.wildlifeRuntime = new WildlifeSimulation( {
-			terrain, colliders, vegetation: { records: this.vegetationRecords || {} },
-			footprints: component?.footprints || [], roofPerches: component?.roofPerches || [],
-			boat: this.boat?.controller || null,
-			boatModel: this.boat?.model || null,
-			shoreProbe: this.shoreField ? new WebGLSwashProbe( {
-				field: this.shoreField, terrain, seaLevel: this.worldSeaLevel,
-				time: () => this.animationStartTime ? ( performance.now() - this.animationStartTime ) * 0.001 : 0,
-			} ) : null,
-			query: this.waterQuery, seed: component?.seed ?? 5,
-		} );
-		this.wildlifeAdapter = new WebGLWildlifeAdapter( this.THREE, this.scene, terrain );
-
 	}
 
 	async _loadWebGLWhale( component, assets, terrain = null, seaLevel = 0 ) {
@@ -1653,7 +1624,6 @@ export class WebGLFallback {
 			assets = await this.connector.preload( { through: 'visible' } );
 			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => object.assetId && assets.has( object.assetId ) ).map( object => object.id ) );
 		}
-		this.hostedWildlifeComponent = components.find( component => worldComponentDescriptor( component.type )?.wildlifeSimulation ) || null;
 		const terrainComponent = components.find( component => component.type === 'elsemesh.terrain-surface/1' );
 		this.hostedTerrainComponent = terrainComponent;
 		let terrainSurface = null, hostedTerrainMaterial = null, hostedTerrainVisualReady = false;
@@ -1757,7 +1727,7 @@ export class WebGLFallback {
 		} ) );
 		this.hostedVehicleSpec = resolveHostedWebGLVehicleSpec( components, manifest.objects || [], this.hostedObjectRoots );
 		const supportedComponents = initialHostedWebGLSupport( components, {
-			terrainReady: !! this.hostedTerrainData, vehicleComponentId: this.hostedVehicleSpec?.component.id,
+			vehicleComponentId: this.hostedVehicleSpec?.component.id,
 		} );
 		for ( const id of backendComponentIDs ) supportedComponents.add( id );
 		this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
@@ -1999,16 +1969,8 @@ export class WebGLFallback {
 			}
 		}
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
-		if ( this.wildlifeRuntime ) {
-			const sunY = this._sunDirection( this.app.settings.timeOfDay ).y;
-			this.wildlifeRuntime.update( dt, this.camera, this.player, {
-				windX: DEFAULT_WILDLIFE_ENVIRONMENT.windX, windZ: DEFAULT_WILDLIFE_ENVIRONMENT.windZ,
-				windSpeed: DEFAULT_WILDLIFE_ENVIRONMENT.windSpeed,
-				night: T.MathUtils.smoothstep( - sunY, 0.02, 0.18 ), sunY,
-				seaLevel: this.hostedSeaLevel ?? DEFAULT_WILDLIFE_ENVIRONMENT.seaLevel,
-			} );
-			this.wildlifeAdapter.update( this.wildlifeRuntime, this.camera );
-		}
+		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
+		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
 		this._updateAudio( dt );
 		this.renderer.toneMappingExposure = this.app.settings.exposure;
 		this.renderer.autoClear = true;

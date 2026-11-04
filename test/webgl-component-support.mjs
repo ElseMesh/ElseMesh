@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import '../worlds/tidewater/register-components.js';
 import { registerWorldComponent } from '../src/network/WorldComponentRegistry.js';
-import { registerWorldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
+import { registerWorldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from '../src/fallback/WebGLComponentSupport.js';
 
 registerWorldComponent( 'elsemesh.fixture-water/1', { waterSurface: true } );
 registerWorldComponent( 'elsemesh.fixture-unhandled-water/1', { waterSurface: true } );
-registerWorldComponent( 'elsemesh.fixture-wildlife/1', { wildlifeSimulation: true } );
 registerWorldComponent( 'elsemesh.fixture-vehicle/1', { vehicle: true, complexityTriangles: 12 } );
 registerWorldComponentBackendAdapter( 'webgl', 'elsemesh.fixture-water/1', () => true );
 
@@ -37,15 +36,15 @@ assert.deepEqual( unsupportedHostedWebGLComponents( components, withoutTerrain )
 	'elsemesh.humpback-whale/1', 'elsemesh.downeast-boat/1',
 ], 'terrain-dependent hosted presentation is not reported ready before terrain data is decoded' );
 
-const withTerrain = initialHostedWebGLSupport( components, { terrainReady: true } );
+const withTerrain = initialHostedWebGLSupport( components );
 assert.deepEqual( unsupportedHostedWebGLComponents( components, withTerrain ), [
-	'elsemesh.terrain-surface/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1', 'elsemesh.downeast-boat/1',
-], 'decoded terrain data alone does not claim visual terrain support; shared wildlife is ready' );
+	'elsemesh.terrain-surface/1', 'elsemesh.example-island-wildlife/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1', 'elsemesh.downeast-boat/1',
+	], 'terrain data alone does not claim support for a component without a registered backend adapter' );
 
 const boatComponent = { ...components.find( component => component.id === 'boat' ), objectId: 'berth' };
-const withVehicle = initialHostedWebGLSupport( components, { terrainReady: true, vehicleComponentId: boatComponent.id } );
+const withVehicle = initialHostedWebGLSupport( components, { vehicleComponentId: boatComponent.id } );
 assert.deepEqual( unsupportedHostedWebGLComponents( components, withVehicle ), [
-	'elsemesh.terrain-surface/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1',
+	'elsemesh.terrain-surface/1', 'elsemesh.example-island-wildlife/1', 'elsemesh.reef-placement/1', 'elsemesh.humpback-whale/1',
 ], 'hosted vehicle is reported ready only after its signed object preview is available' );
 
 const berth = { id: 'berth', transform: { position: [ 12, 0.8, - 42 ], yaw: 1.1 } };
@@ -58,14 +57,22 @@ assert.equal( resolveHostedWebGLVehicleSpec( [ boatComponent ], [ berth ], new M
 const neutralComponents = [
 	{ id: 'water', type: 'elsemesh.fixture-water/1' },
 	{ id: 'unhandled-water', type: 'elsemesh.fixture-unhandled-water/1' },
-	{ id: 'wildlife', type: 'elsemesh.fixture-wildlife/1' },
 	{ id: 'vehicle', type: 'elsemesh.fixture-vehicle/1', objectId: 'vehicle-object' },
 ];
-const neutralSupport = initialHostedWebGLSupport( neutralComponents, { terrainReady: true, vehicleComponentId: 'vehicle' } );
+const neutralSupport = initialHostedWebGLSupport( neutralComponents, { vehicleComponentId: 'vehicle' } );
 assert.deepEqual( unsupportedHostedWebGLComponents( neutralComponents, neutralSupport ), [ 'elsemesh.fixture-unhandled-water/1' ], 'registered water without a WebGL adapter remains explicitly unsupported' );
 const vehicleObject = { id: 'vehicle-object', transform: { position: [ 1, 2, 3 ] } };
 assert.deepEqual( resolveHostedWebGLVehicleSpec( neutralComponents, [ vehicleObject ], new Map( [ [ vehicleObject.id, preview ] ] ) ), {
-	component: neutralComponents[ 3 ], object: vehicleObject, preview,
+	component: neutralComponents[ 2 ], object: vehicleObject, preview,
 }, 'vehicle setup resolves a registered component without Tidewater IDs' );
+
+const wildlifeAdapter = worldComponentBackendBatchAdapter( 'webgl', 'elsemesh.example-island-wildlife/1' );
+assert.equal( typeof wildlifeAdapter, 'function', 'Tidewater registers its WebGL wildlife backend through the component registry' );
+const wildlifeInstall = wildlifeAdapter( { fallback: {} }, [ { id: 'wildlife-runtime' } ] );
+assert.deepEqual( wildlifeInstall.componentIDs, [ 'wildlife-runtime' ] );
+assert.equal( typeof wildlifeInstall.runtime.update, 'function' );
+assert.equal( typeof wildlifeInstall.runtime.afterPlayerUpdate, 'function' );
+assert.equal( typeof wildlifeInstall.runtime.dispose, 'function' );
+wildlifeInstall.runtime.dispose();
 
 console.log( 'WebGL hosted component support classification passed' );

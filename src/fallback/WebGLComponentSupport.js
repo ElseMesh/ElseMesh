@@ -1,5 +1,5 @@
 import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
-import { worldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
+import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import './WebGLWaterComponentAdapters.js';
 import './WebGLStaticModelInstanceSetAdapter.js';
 
@@ -14,9 +14,8 @@ export function hostedCollisionBoxes( collision ) {
 }
 
 // Components whose hosted WebGL implementation is ready before asset-specific loaders run.
-export function initialHostedWebGLSupport( components, { terrainReady = false, vehicleComponentId = null } = {} ) {
-	const supported = new Set( components.filter( component => worldComponentDescriptor( component.type )?.waterSurface && worldComponentBackendAdapter( 'webgl', component.type ) ).map( component => component.id ) );
-	if ( terrainReady ) for ( const component of components ) if ( worldComponentDescriptor( component.type )?.wildlifeSimulation ) supported.add( component.id );
+export function initialHostedWebGLSupport( components, { vehicleComponentId = null } = {} ) {
+	const supported = new Set( components.filter( component => worldComponentDescriptor( component.type )?.waterSurface && ( worldComponentBackendAdapter( 'webgl', component.type ) || worldComponentBackendBatchAdapter( 'webgl', component.type ) ) ).map( component => component.id ) );
 	if ( vehicleComponentId && components.some( component => component.id === vehicleComponentId && worldComponentDescriptor( component.type )?.vehicle ) ) supported.add( vehicleComponentId );
 	return supported;
 }
