@@ -230,6 +230,12 @@ export class App {
 			if ( ! this.loadDefaultWorldPackage ) throw new Error( 'The application entry point must provide a default world package loader for local play' );
 			this.worldPackage = await this.loadDefaultWorldPackage();
 		}
+		if ( ! worldLink && this.worldPackage?.source && this.loadWorldProviders ) {
+			await this.loadWorldProviders( {
+				components: this.worldPackage.source.components || [],
+				experience: this.worldPackage.source.experience || null,
+			} );
+		}
 		this.localWorldExperience = this.worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
