@@ -1272,11 +1272,11 @@ export class WebGLFallback {
 					float faceBand = smoothstep( -0.19, -0.13, vShoreU ) * ( 1.0 - smoothstep( -0.015, 0.01, vShoreU ) );
 					float faceProgress = smoothstep( -0.4, 0.0, vShoreBreaking ) * ( 1.0 - smoothstep( 0.9, 1.08, vShoreBreaking ) );
 					float breakerFace = faceBand * faceProgress * vShoreEnv;
-					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.08 ) * 38.0 );
-					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU + 0.08 ) * 24.0 );
+					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.03 ) * 30.0 );
+					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU - 0.01 ) * 22.0 );
 					vec4 foamLaceData = texture2D( uFoamLace, p / 3.5 + vec2( -uTime * 0.0008, uTime * 0.00057 ) );
 					float foamLace = 1.0 - smoothstep( 0.42, 0.72, foamLaceData.r );
-					float crestFoam = smoothstep( 0.68, 0.94, vShoreBreaking ) * ( 1.0 - smoothstep( 1.45, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.06 ) * 16.0 ) * mix( 0.2, 1.0, foamLace );
+					float crestFoam = smoothstep( 0.68, 0.94, vShoreBreaking ) * ( 1.0 - smoothstep( 1.45, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.02 ) * 20.0 ) * mix( 0.2, 1.0, foamLace );
 					float breakerFoam = max( max( impact, roller ), crestFoam * 0.85 ) * vShoreEnv
 						* ( 0.65 + 0.35 * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) )
 						* ( 0.7 + 0.3 * smoothstep( 0.14, 0.58, shoreDetail ) )
