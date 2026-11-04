@@ -87,8 +87,7 @@ export class LocalRegionDiskCache {
 				const handle = await this.directory.getFileHandle( name );
 				const metadata = JSON.parse( await ( await handle.getFile() ).text() );
 				if ( metadata?.schema !== CACHE_SCHEMA || metadata.id !== id || ! Number.isSafeInteger( metadata.bytes ) || metadata.bytes < 0 || !( metadata.digest === null || DIGEST.test( metadata.digest || '' ) ) || ! Number.isFinite( metadata.lastUsed ) ) throw new Error( 'Invalid local region cache metadata' );
-				const data = await this.directory.getFileHandle( `${id}.bin` );
-				if ( ( await data.getFile() ).size !== metadata.bytes ) throw new Error( 'Local region cache entry length changed' );
+				if ( ! dataFiles.has( id ) ) throw new Error( 'Local region cache data file is missing' );
 				this.entries.set( id, metadata );
 				this.cachedBytes += metadata.bytes;
 				this.lastUsed = Math.max( this.lastUsed, metadata.lastUsed );

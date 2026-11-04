@@ -104,6 +104,7 @@ let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
 const payloadFetchOrder = [];
 const cellIndexRequests = [];
+const cellInventoryRequests = [];
 let secondCellCollisionMissing = true;
 let knownEmptyCellCollisionMissing = true;
 let includeUnknownPrimitiveCell = false;
@@ -114,6 +115,15 @@ let abortNextCellFetch = false;
 let abortableFetchStarted;
 let createdRegionLeaseQuery = null;
 let requestedRegionMeshLodQuery = null;
+
+async function waitForDiskWriteQueue( connector ) {
+	const deadline = Date.now() + 5000;
+	while ( connector.pendingDiskWriteBytes > 0 || connector.pendingDiskWriteEntries.length > 0 || connector.diskWriteFlushTimer !== null ) {
+		if ( Date.now() >= deadline ) throw new Error( 'Browser disk-cache writes did not drain before the test deadline' );
+		await new Promise( resolve => setTimeout( resolve, 1 ) );
+	}
+}
+
 const staticVisualInstance = {
 	componentPath: '/Game/GreatHall/SM_Table.Component0',
 	staticMeshPath: '/Game/GreatHall/SM_Table',
@@ -159,8 +169,9 @@ globalThis.fetch = async ( input, options = {} ) => {
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) {
 		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
+		cellInventoryRequests.push( url.searchParams.get( 'sourceInventory' ) );
 		return Response.json( {
-		sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: { staticMeshComponents: 3, otherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), unclassifiedOtherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents, unindexedSpatialBoundsFailures: unindexedSpatialBoundsComponents ? [ { objectPath: '/test/oversized-volume', reason: 'bounds exceed index limit' } ] : [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell || includeSupportedPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ) } : {} }, cells: [
+			sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: url.searchParams.get( 'sourceInventory' ) === '0' ? null : { staticMeshComponents: 3, otherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), unclassifiedOtherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents, unindexedSpatialBoundsFailures: unindexedSpatialBoundsComponents ? [ { objectPath: '/test/oversized-volume', reason: 'bounds exceed index limit' } ] : [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell || includeSupportedPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ) } : {} }, cells: [
 			{ x: 0, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 1, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [], visualInstances: [ staticVisualInstance ], meshLods: [ { staticMeshPath: '/Game/GreatHall/SM_Table', lods: staticMeshLODs } ] },
 			{ x: 1, y: 0, z: 0, collisionEvidence: { scope: 'incomplete-collision-source-index', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 1, staticMeshComponentsClassified: false, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [ { objectPath: '/test/unknown', instanceIndex: null, status: 'unknown', bounds: [ 8, 0, 0, 9, 1, 1 ] } ] },
 			{ x: 2, y: 0, z: 0, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 1, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 1, explicitlyNonBlockingForPawnComponents: 0, unknownComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] },
@@ -261,6 +272,8 @@ try {
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
+	assert.equal( cellInventoryRequests[ 0 ], '1', 'the first bounded cell-index batch requests the global collision inventory' );
+	assert.ok( cellInventoryRequests.slice( 1 ).every( value => value === '0' ), 'later cell-index batches omit the already received global inventory' );
 	assert.equal( manifest.components.length, 1, 'complete provider placements and LOD profiles publish a static-model instance-set component' );
 	const staticSet = manifest.components[ 0 ];
 	assert.equal( staticSet.type, 'elsemesh.static-model-instance-set/1' );
@@ -447,6 +460,7 @@ try {
 	const providerFetchesBeforeDiskCache = cellFetches;
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'first request gets bytes from the local provider' );
+	await waitForDiskWriteQueue( diskCacheConnector );
 	assert.equal( diskCacheConnector.releaseAsset( visualAssetID ), true, 'unloading evicts the response from browser RAM' );
 	assert.equal( diskCacheConnector.assets.has( visualAssetID ), false, 'unloaded response is no longer held in the connector memory cache' );
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes, 'the unloaded response is promoted back from the persistent browser disk cache' );
@@ -481,6 +495,7 @@ try {
 	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'disjoint ranges share one leased multipart request' );
 	await rangeCacheConnector.getAssetRanges( rangeAssetID, multiRanges, { etag: rangeRequest.etag, totalLength: bytes.byteLength } );
 	assert.equal( rangeFetches, multiRangeFetchesBefore + 1, 'multipart ranges are independently reused from browser RAM' );
+	await waitForDiskWriteQueue( rangeCacheConnector );
 	rangeCacheConnector.close();
 	const rangeDiskReloadedConnector = new LocalRegionConnector( link );
 	const rangeDiskReloadedManifest = await rangeDiskReloadedConnector.getManifest();

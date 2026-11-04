@@ -272,6 +272,7 @@ export class LocalRegionConnector {
 		this.previewRegion = previewRegion;
 		this.sourceRegions = regions;
 		this.queriedCellsByRegion = new Map( regions.map( item => [ item.id, new Set() ] ) );
+		this.collisionSourceInventories = new Map();
 		this.knownCells = new Set();
 		this.cellQueryQueue = Promise.resolve();
 		this.explicitStartupCellKeys = explicitStartupCellKeys;
@@ -316,6 +317,7 @@ export class LocalRegionConnector {
 				const batch = pending.slice( offset, offset + 512 );
 				const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
 				cellIndexURL.searchParams.set( 'size', String( cellSize ) );
+				cellIndexURL.searchParams.set( 'sourceInventory', this.collisionSourceInventories.has( sourceRegion.id ) ? '0' : '1' );
 				for ( const cell of batch ) cellIndexURL.searchParams.append( 'cell', cell );
 				const cellIndex = await fetchJSON( cellIndexURL, signal );
 				requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === cellSize && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= batch.length, 'Local provider returned an invalid cell response' );
@@ -351,7 +353,10 @@ export class LocalRegionConnector {
 		const { baseURL: base, previewRegion, explicitStartupCellKeys } = this;
 		const sourceURL = new URL( sourceRegion.asset, `${base}/` );
 		const startupCellKeys = new Set( this.initialStartupCellKeys );
-		const sourceInventory = cellIndex.collisionSourceInventory;
+		let sourceInventory = cellIndex.collisionSourceInventory;
+		if ( sourceInventory ) this.collisionSourceInventories.set( sourceRegion.id, sourceInventory );
+		else sourceInventory = this.collisionSourceInventories.get( sourceRegion.id );
+		requireValue( sourceInventory, 'Local provider omitted its initial collision source inventory' );
 		requireValue( Number.isSafeInteger( sourceInventory?.staticMeshComponents ) && sourceInventory.staticMeshComponents >= 0 && Number.isSafeInteger( sourceInventory.otherPrimitiveComponents ) && sourceInventory.otherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.unclassifiedOtherPrimitiveComponents ) && sourceInventory.unclassifiedOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.explicitlyNonQueryOtherPrimitiveComponents ) && sourceInventory.explicitlyNonQueryOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.explicitlyNonBlockingForPawnOtherPrimitiveComponents ) && sourceInventory.explicitlyNonBlockingForPawnOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.audioOnlyPolicyExcludedOtherPrimitiveComponents ) && sourceInventory.audioOnlyPolicyExcludedOtherPrimitiveComponents >= 0 && Number.isSafeInteger( sourceInventory.noSkeletalCollisionGeometryComponents ) && sourceInventory.noSkeletalCollisionGeometryComponents >= 0 && sourceInventory.unclassifiedOtherPrimitiveComponents + sourceInventory.explicitlyNonQueryOtherPrimitiveComponents + sourceInventory.explicitlyNonBlockingForPawnOtherPrimitiveComponents + sourceInventory.audioOnlyPolicyExcludedOtherPrimitiveComponents + sourceInventory.noSkeletalCollisionGeometryComponents === sourceInventory.otherPrimitiveComponents && Number.isSafeInteger( sourceInventory.landscapeHeightfieldCollisionComponents ) && sourceInventory.landscapeHeightfieldCollisionComponents >= 0 && Number.isSafeInteger( sourceInventory.unresolvedInstancedMeshComponents ) && sourceInventory.unresolvedInstancedMeshComponents >= 0 && sourceInventory.otherPrimitiveStatuses && typeof sourceInventory.otherPrimitiveStatuses === 'object' && Object.values( sourceInventory.otherPrimitiveStatuses ).every( count => Number.isSafeInteger( count ) && count >= 0 ) && Object.values( sourceInventory.otherPrimitiveStatuses ).reduce( ( total, count ) => total + count, 0 ) === sourceInventory.otherPrimitiveComponents, 'Local provider returned invalid collision source inventory' );
 		requireValue( Number.isSafeInteger( sourceInventory.unindexedOtherPrimitiveComponents ) && sourceInventory.unindexedOtherPrimitiveComponents >= 0 && sourceInventory.unindexedOtherPrimitiveComponents <= sourceInventory.unclassifiedOtherPrimitiveComponents, 'Local provider returned invalid unindexed collision source count' );
 		requireValue( Number.isSafeInteger( sourceInventory.unindexedSpatialBoundsComponents ) && sourceInventory.unindexedSpatialBoundsComponents >= 0 && Array.isArray( sourceInventory.unindexedSpatialBoundsFailures ) && sourceInventory.unindexedSpatialBoundsFailures.length <= sourceInventory.unindexedSpatialBoundsComponents && sourceInventory.unindexedSpatialBoundsFailures.every( failure => typeof failure?.objectPath === 'string' && failure.objectPath.length > 0 && typeof failure.reason === 'string' && failure.reason.length > 0 ) && typeof sourceInventory.unindexedSpatialBoundsFailuresTruncated === 'boolean', 'Local provider returned invalid spatial-bounds indexing failures' );
