@@ -37,6 +37,16 @@ export class Bench {
 
 	}
 
+	collectorURL( url ) {
+
+		const value = url || this.app.qs.get( 'collector' );
+		if ( ! value ) throw new Error( 'Benchmark captures require a collector URL; add ?collector=http%3A%2F%2F127.0.0.1%3A<allocated-port>%2F to the page URL' );
+		const endpoint = new URL( value, location.href );
+		if ( ! [ 'http:', 'https:' ].includes( endpoint.protocol ) || ! [ 'localhost', '127.0.0.1', '[::1]' ].includes( endpoint.hostname ) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash ) throw new Error( 'Benchmark collector must be a loopback HTTP(S) origin or path without credentials, query, or fragment' );
+		return endpoint.href.endsWith( '/' ) ? endpoint.href : `${endpoint.href}/`;
+
+	}
+
 	_wrap() {
 
 		const self = this;
@@ -207,8 +217,9 @@ export class Bench {
 
 	// ?bench&auto=tag: reference shots (tag-view.bgra), then the timings (bench-tag.json), both uploaded
 	// to `url` (a local collector, see shots())
-	async auto( tag, { url = 'http://127.0.0.1:5190/', runs = 1 } = {} ) {
+	async auto( tag, { url, runs = 1 } = {} ) {
 
+		url = this.collectorURL( url );
 		const views = [ ...DEFAULT_VIEWS, 'boatHelm' ];
 		await this.shots( views, { tag, url } );
 		// per view the fastest of the runs (clock and thermal drift only ever add time)
@@ -281,8 +292,9 @@ export class Bench {
 	// the same images, so a shot before and after a change can be compared pixel by pixel.
 	// dt > 0: the clock runs (animated artefacts: noise the temporal filters don't settle); one image per
 	// `every` frames after the first `frames` is uploaded as tag-view-N.bgra when `seq` > 1
-	async shots( views = DEFAULT_VIEWS, { tag = 'shot', frames = 64, url = 'http://127.0.0.1:5190/', dt = 0, seq = 1, every = 1 } = {} ) {
+	async shots( views = DEFAULT_VIEWS, { tag = 'shot', frames = 64, url, dt = 0, seq = 1, every = 1 } = {} ) {
 
+		url = this.collectorURL( url );
 		const app = this.app;
 		app.engine.stop();
 		this.setSize();
