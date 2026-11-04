@@ -464,8 +464,9 @@ type worldExperience struct {
 }
 
 type worldJavaScriptExtension struct {
-	BehaviorID string `json:"behaviorId"`
-	AssetID    string `json:"assetId"`
+	BehaviorID string   `json:"behaviorId"`
+	AssetID    string   `json:"assetId"`
+	Events     []string `json:"events,omitempty"`
 }
 
 func (extension *worldJavaScriptExtension) UnmarshalJSON(data []byte) error {
@@ -473,8 +474,11 @@ func (extension *worldJavaScriptExtension) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
-	if len(fields) != 2 || fields["behaviorId"] == nil || fields["assetId"] == nil {
-		return errors.New("JavaScript extension requires only behaviorId and assetId")
+	if (len(fields) != 2 && len(fields) != 3) || fields["behaviorId"] == nil || fields["assetId"] == nil || (len(fields) == 3 && fields["events"] == nil) {
+		return errors.New("JavaScript extension requires behaviorId, assetId, and optional events")
+	}
+	if raw, exists := fields["events"]; exists && (len(raw) == 0 || raw[0] != '[') {
+		return errors.New("JavaScript extension events must be an array")
 	}
 	type plainExtension worldJavaScriptExtension
 	return json.Unmarshal(data, (*plainExtension)(extension))
@@ -525,8 +529,15 @@ func validateWorldExperience(experience *worldExperience) error {
 	}
 	seenExtensions := make(map[string]bool, len(experience.Extensions))
 	for _, extension := range experience.Extensions {
-		if !worldBehaviorPattern.MatchString(extension.BehaviorID) || experience.Behaviors[extension.BehaviorID] == nil || !assetIDPattern.MatchString(extension.AssetID) || seenExtensions[extension.BehaviorID] {
+		if !worldBehaviorPattern.MatchString(extension.BehaviorID) || experience.Behaviors[extension.BehaviorID] == nil || !assetIDPattern.MatchString(extension.AssetID) || seenExtensions[extension.BehaviorID] || len(extension.Events) > 16 {
 			return errors.New("world experience contains an invalid JavaScript extension reference")
+		}
+		seenEvents := make(map[string]bool, len(extension.Events))
+		for _, event := range extension.Events {
+			if !worldBehaviorPattern.MatchString(event) || seenEvents[event] {
+				return errors.New("world experience contains an invalid JavaScript extension event")
+			}
+			seenEvents[event] = true
 		}
 		seenExtensions[extension.BehaviorID] = true
 	}

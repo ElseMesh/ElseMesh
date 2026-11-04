@@ -57,6 +57,18 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   once. Current presence is self-reported pose/appearance only and cannot
   authorize a door state or sound event.
 
+## Owner-signed browser behavior events
+
+An experience extension reference may include an `events` array of up to 16
+unique ElseMesh event IDs. The owner signature covers this subscription list.
+The browser dispatches only event IDs the module declared; omitting `events`
+subscribes to none. The current engine event is
+`elsemesh.world.activated/1`, with a JSON payload containing `type` and
+`worldId`. The module runs in its dedicated JavaScript Worker and returns a
+bounded JSON result to the registered behavior adapter. App and renderer
+objects never cross the Worker boundary. WebGPU and WebGL share this event
+contract.
+
 ## Invitation admission and launch grants
 
 World access may be invitation-gated independently of signed content and

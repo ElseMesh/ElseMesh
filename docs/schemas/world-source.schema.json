@@ -142,6 +142,16 @@
               "assetId": {
                 "type": "string",
                 "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "events": {
+                "type": "array",
+                "maxItems": 16,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^elsemesh\\.[a-z0-9.-]+/\\d+$"
+                },
+                "description": "ElseMesh event IDs this signed module opts into receiving from the browser client. Omission subscribes to no engine events."
               }
             },
             "additionalProperties": false

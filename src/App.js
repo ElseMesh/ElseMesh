@@ -80,7 +80,7 @@ import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
-import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from './network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { vehiclePolicy } from './network/WorldRules.js';
@@ -139,6 +139,7 @@ export class App {
 
 		this.qs = new URLSearchParams( location.search );
 		this.worldPackage = worldPackage;
+		this.worldExtensionGeneration = 0;
 		this.loadDefaultWorldPackage = loadDefaultWorldPackage;
 		this.loadWorldProviders = loadWorldProviders;
 		this.hostedQueries = new WeakMap();
@@ -177,6 +178,15 @@ export class App {
 			renderScale: this.desktopAdaptiveScale ? 0.75 : 1, // Linux starts lighter; adaptive scale targets 24 fps
 		};
 		this.configureGraphicsPriority();
+	}
+
+	dispatchWorldActivated( experience, extensions, worldId, context ) {
+
+		if ( ! extensions ) return;
+		const generation = ++ this.worldExtensionGeneration;
+		const isCurrent = () => this.worldExtensionGeneration === generation && ( this.localWorldExtensions === extensions || this.activeHostedExtensions === extensions );
+		void dispatchWorldBehaviorExtensionEvent( experience, extensions, { type: WORLD_EXTENSION_EVENT_ACTIVATED, worldId }, { ...context, app: this, worldId, isCurrent } ).catch( error => console.error( 'World JavaScript extension event failed:', error ) );
+
 	}
 
 	configureGraphicsPriority( persist = false ) {
@@ -568,7 +578,10 @@ export class App {
 		this.worldGames = new Map();
 		this.game = null;
 		this.localWorldExtensions = ! worldLink ? createWorldBehaviorExtensions( this.localWorldExperience, this.worldPackage.assets.extensionModules ) : null;
-		if ( ! worldLink ) dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local', extensions: this.localWorldExtensions } );
+		if ( ! worldLink ) {
+			dispatchWorldBehaviorHooks( this.localWorldExperience, 'onBuiltinWorldActivated', { app: this, mode: 'builtin', worldId: 'elsemesh:local', extensions: this.localWorldExtensions } );
+			this.dispatchWorldActivated( this.localWorldExperience, this.localWorldExtensions, 'elsemesh:local', { mode: 'builtin' } );
+		}
 		this.boatCtl.onSlam = ( s ) => this.audio && this.audio.hullSlap( s );
 		engine.domElement.addEventListener( 'click', () => {
 
@@ -1353,6 +1366,7 @@ export class App {
 		}
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
+		this.dispatchWorldActivated( experience, this.activeHostedExtensions, connector.worldId, { mode: 'hosted', connector, root, terrain, runtime } );
 
 	}
 
@@ -1376,6 +1390,7 @@ export class App {
 
 	deactivateHostedWorld() {
 
+		this.worldExtensionGeneration ++;
 		this.localLights?.setWorldPackage( null );
 		if ( this.ocean ) this.ocean.visible = true;
 		this.worldPresence?.dispose();

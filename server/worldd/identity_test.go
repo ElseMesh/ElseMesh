@@ -131,11 +131,25 @@ func TestWorldExperienceAcceptsGenericElseMeshBehaviors(t *testing.T) {
 	if err := validateWorldExperience(&base); err != nil {
 		t.Fatalf("valid behavior-bound JavaScript reference rejected: %v", err)
 	}
+	base.Extensions[0].Events = []string{"elsemesh.world.activated/1"}
+	if err := validateWorldExperience(&base); err != nil {
+		t.Fatalf("valid signed JavaScript event subscription rejected: %v", err)
+	}
+	base.Extensions[0].Events = []string{"invalid"}
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("invalid JavaScript event subscription was accepted")
+	}
+	base.Extensions[0].Events = []string{"elsemesh.world.activated/1"}
 	base.Extensions[0].BehaviorID = "elsemesh.unregistered/1"
 	if err := validateWorldExperience(&base); err == nil {
 		t.Fatal("JavaScript reference to an undeclared behavior was accepted")
 	}
 	base.Extensions[0].BehaviorID = "elsemesh.fishing-game/1"
+	base.Extensions[0].Events = []string{"elsemesh.world.activated/1", "elsemesh.world.activated/1"}
+	if err := validateWorldExperience(&base); err == nil {
+		t.Fatal("duplicate JavaScript event subscription was accepted")
+	}
+	base.Extensions[0].Events = nil
 	base.Extensions = append(base.Extensions, base.Extensions[0])
 	if err := validateWorldExperience(&base); err == nil {
 		t.Fatal("duplicate behavior extension was accepted")
@@ -143,6 +157,13 @@ func TestWorldExperienceAcceptsGenericElseMeshBehaviors(t *testing.T) {
 	var unknownExtensionField []worldJavaScriptExtension
 	if err := json.Unmarshal([]byte(`[{"behaviorId":"elsemesh.fishing-game/1","assetId":"sha256:`+strings.Repeat("a", 64)+`","entry":"run"}]`), &unknownExtensionField); err == nil {
 		t.Fatal("unknown JavaScript extension fields were accepted")
+	}
+	var subscribedExtension []worldJavaScriptExtension
+	if err := json.Unmarshal([]byte(`[{"behaviorId":"elsemesh.fishing-game/1","assetId":"sha256:`+strings.Repeat("a", 64)+`","events":["elsemesh.world.activated/1"]}]`), &subscribedExtension); err != nil || len(subscribedExtension) != 1 || len(subscribedExtension[0].Events) != 1 {
+		t.Fatalf("valid JavaScript event subscription failed to decode: %v", err)
+	}
+	if err := json.Unmarshal([]byte(`[{"behaviorId":"elsemesh.fishing-game/1","assetId":"sha256:`+strings.Repeat("a", 64)+`","events":null}]`), &subscribedExtension); err == nil {
+		t.Fatal("null JavaScript event subscriptions were accepted")
 	}
 	base.Behaviors["elsemesh.fishing-game/1"] = json.RawMessage(`[]`)
 	if err := validateWorldExperience(&base); err == nil {

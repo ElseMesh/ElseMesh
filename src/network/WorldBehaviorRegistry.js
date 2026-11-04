@@ -3,6 +3,7 @@ import { createWorldJavaScriptExtensionRuntime } from './WorldJavaScriptExtensio
 const behaviors = new Map();
 const implementations = new Map();
 const resolvedExperiences = new WeakMap();
+export const WORLD_EXTENSION_EVENT_ACTIVATED = 'elsemesh.world.activated/1';
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
@@ -50,6 +51,7 @@ export async function dispatchWorldBehaviorExtensionEvent( experience, extension
 	if ( ! extensions || typeof extensions.dispatch !== 'function' ) return [];
 	const responses = await extensions.dispatch( event );
 	for ( const { behaviorId, result } of responses ) {
+		if ( typeof context.isCurrent === 'function' && ! context.isCurrent() ) continue;
 		const implementation = implementations.get( behaviorId );
 		if ( ! implementation?.onWorldExtensionResult ) continue;
 		const behavior = worldBehaviorsFor( experience ).find( item => item.id === behaviorId );
@@ -79,9 +81,11 @@ export function createWorldBehaviorRuntime( experience, id, options ) {
 export function createWorldBehaviorExtensions( experience, assets, options = {} ) {
 	const resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
 	const runtimes = new Map();
+	const eventTypesByBehavior = new Map();
 	try {
 		for ( const reference of experience?.extensions || [] ) {
 			const behavior = resolved.get( reference.behaviorId );
+			eventTypesByBehavior.set( reference.behaviorId, reference.events || [] );
 			const moduleBytes = assets instanceof Map ? assets.get( reference.assetId ) : assets?.[ reference.assetId ];
 			if ( ! ( moduleBytes instanceof Uint8Array || moduleBytes instanceof ArrayBuffer || typeof moduleBytes === 'string' ) ) throw new Error( `World behavior JavaScript asset is not loaded: ${reference.behaviorId}` );
 			const workerRuntime = createWorldJavaScriptExtensionRuntime( {
@@ -115,7 +119,10 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 		has( behaviorId ) { return ! disposed && runtimes.has( behaviorId ); },
 		dispatch( event ) {
 			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
-			return Promise.all( [ ...runtimes ].map( async ( [ behaviorId, runtime ] ) => ( { behaviorId, result: await runtime.run( event ) } ) ) );
+			if ( typeof event?.type !== 'string' ) throw new Error( 'World behavior extension events require a type' );
+			return Promise.all( [ ...runtimes ]
+				.filter( ( [ behaviorId ] ) => eventTypesByBehavior.get( behaviorId )?.includes( event.type ) )
+				.map( async ( [ behaviorId, runtime ] ) => ( { behaviorId, result: await runtime.run( event ) } ) ) );
 		},
 		run( behaviorId, event ) {
 			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );

@@ -24,6 +24,9 @@ assert.doesNotThrow( () => validateWorldExperience( withJavaScript, [ { id: java
 for ( const asset of [ undefined, { id: javascriptAssetID, kind: 'glb', bytes: 1, priority: 'visible' }, { id: javascriptAssetID, kind: 'javascript/1', bytes: 1024 * 1024 + 1, priority: 'visible' }, { id: javascriptAssetID, kind: 'javascript/1', bytes: 1, priority: 'background' } ] ) assert.throws( () => validateWorldExperience( withJavaScript, asset ? [ asset ] : [] ), /invalid JavaScript asset reference/ );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, extensions: [ javascriptExtension ] } ), /Invalid world JavaScript extension reference/ );
 assert.throws( () => validateWorldExperience( { ...withJavaScript, extensions: [ javascriptExtension, javascriptExtension ] } ), /Invalid world JavaScript extension reference/ );
+const subscribedExtension = { ...javascriptExtension, events: [ 'elsemesh.world.activated/1' ] };
+assert.deepEqual( validateWorldExperience( { ...withJavaScript, extensions: [ subscribedExtension ] } ).extensions, [ subscribedExtension ], 'signed extensions can opt into versioned generic browser events' );
+for ( const events of [ null, [ 'invalid' ], [ 'elsemesh.world.activated/1', 'elsemesh.world.activated/1' ], Array( 17 ).fill( 'elsemesh.world.activated/1' ) ] ) assert.throws( () => validateWorldExperience( { ...withJavaScript, extensions: [ { ...javascriptExtension, events } ] } ), /Invalid world JavaScript extension reference/ );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, extra: 'not allowed' } ), /descriptor/ );
 const markupText = '<script>alert(1)</script>';
 assert.equal( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, tips: [ markupText ] } ).tips[ 0 ], markupText, 'authored text remains data for the UI text renderer, never HTML' );
