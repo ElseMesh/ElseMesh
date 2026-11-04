@@ -183,6 +183,15 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-04: added a Tidewater-owned paired cast trace that drives the
+  retained WebGPU `Game.update()` path and Tidewater's WebGL adapter through rod
+  equip, charging, cast flight, water landing, Worker bite start, and retrieval
+  cancellation. All state matches across 171 fixed-step frames. The paired
+  fishing trace now continues through sale and compares proceeds, inventory,
+  audio, and toast output. These establish WebGPU/WebGL alignment for the
+  exercised paths, but there is no historical pre-split cast golden yet;
+  production boat/wake/collision and hardware gates remain open. The gameplay
+  estimate remains 78%.
 - 2026-11-04: Tidewater's WebGL game adapter now matches WebGPU's walk-only
   vendor access and coin cue on successful fish sales. Its focused adapter test,
   the paired 987-frame WebGPU/WebGL fight trace, pre-split bite/fight goldens,

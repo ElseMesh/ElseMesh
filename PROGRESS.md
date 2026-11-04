@@ -6,6 +6,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-11-04
 
+- Added Tidewater-owned `renderer-cast-parity.mjs` and registered it in the
+  engine test runner. It drives the retained WebGPU `Game.update()` path and
+  Tidewater's WebGL adapter through rod equip, charged cast, water landing,
+  Worker bite start, and retrieval/cancellation; both produce identical
+  fixed-step state over 171 frames. The paired fight trace now continues
+  through fish sale and compares proceeds, inventory, audio, and toast output.
+  These checks establish renderer alignment for those paths; they do not yet
+  provide a historical pre-split cast golden or production boat/wake/collision
+  parity, so the gameplay estimate remains 78%.
 - Fixed two Tidewater WebGL gameplay discrepancies against the retained WebGPU
   `Game` behavior: vendors are available only while walking, and successful
   fish sales play the coin cue. `worlds/tidewater/test/webgl-game-adapter.mjs`
