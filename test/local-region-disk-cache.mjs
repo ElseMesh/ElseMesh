@@ -36,6 +36,7 @@ class MemoryDirectoryHandle {
 }
 
 const originalNavigator = Object.getOwnPropertyDescriptor( globalThis, 'navigator' );
+const openedCaches = [];
 const storage = {
 	getDirectory: async () => new MemoryDirectoryHandle(),
 	estimate: async () => ( { quota, usage: baseUsage + [ ...files.entries() ].filter( ( [ name ] ) => name.endsWith( '.bin' ) ).reduce( ( total, [ , value ] ) => total + value.byteLength, 0 ) } ),
@@ -46,6 +47,7 @@ try {
 	const bytes = new TextEncoder().encode( 'validated local region bytes' );
 	const digest = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' );
 	const cache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-1' } );
+	openedCaches.push( cache );
 	assert.ok( cache, 'OPFS cache opens when storage APIs are available' );
 	assert.equal( await cache.put( 'cell-1:visual', bytes, digest ), true );
 	assert.deepEqual( await cache.get( 'cell-1:visual' ), bytes );
@@ -53,8 +55,18 @@ try {
 	assert.ok( files.has( 'index.json' ), 'cache writes a compact metadata index after content is stored' );
 	const readsBeforeIndexedOpen = metadataFileReads;
 	const indexedCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-3' } );
+	openedCaches.push( indexedCache );
 	await indexedCache.ready;
 	assert.equal( metadataFileReads, readsBeforeIndexedOpen, 'a valid cache index avoids reading every per-entry metadata file on startup' );
+
+	const pendingID = Buffer.from( await crypto.subtle.digest( 'SHA-256', new TextEncoder().encode( 'elsemesh:hogwarts\0revision-1\0pending-index-write' ) ) ).toString( 'hex' );
+	assert.equal( await cache.put( 'pending-index-write', bytes, digest ), true );
+	await new Promise( resolve => setTimeout( resolve, 1100 ) );
+	const delayedIndex = JSON.parse( new TextDecoder().decode( files.get( 'index.json' ) ) );
+	assert.equal( delayedIndex.entries.some( entry => entry.id === pendingID ), false, 'cache writes coalesce index snapshots after the first recent write' );
+	assert.ok( files.has( `${pendingID}.meta` ), 'per-entry metadata persists immediately while the rebuildable index is delayed' );
+	clearTimeout( cache.indexWriteTimer );
+	cache.indexWriteTimer = null;
 
 	const deltaBytes = new TextEncoder().encode( 'recovered from a write after the last index snapshot' );
 	const deltaId = Buffer.from( await crypto.subtle.digest( 'SHA-256', new TextEncoder().encode( 'elsemesh:hogwarts\0revision-1\0interrupted-write' ) ) ).toString( 'hex' );
@@ -62,13 +74,15 @@ try {
 	files.set( `${deltaId}.meta`, new TextEncoder().encode( JSON.stringify( { schema: 1, id: deltaId, bytes: deltaBytes.byteLength, digest: null, lastUsed: Date.now() } ) ) );
 	const readsBeforeDeltaOpen = metadataFileReads;
 	const recoveredCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-1' } );
+	openedCaches.push( recoveredCache );
 	await recoveredCache.ready;
-	assert.equal( metadataFileReads, readsBeforeDeltaOpen + 1, 'startup reads only metadata that was added after the saved index' );
+	assert.equal( metadataFileReads, readsBeforeDeltaOpen + 2, 'startup reads only metadata added after the saved index' );
 	assert.deepEqual( await recoveredCache.get( 'interrupted-write' ), deltaBytes, 'a valid entry written after the last index snapshot is recovered' );
 	files.delete( `${deltaId}.bin` );
 	files.delete( `${deltaId}.meta` );
 
 	const changedRevision = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-2' } );
+	openedCaches.push( changedRevision );
 	assert.equal( await changedRevision.get( 'cell-1:visual' ), null, 'source revisions do not share cached bytes' );
 
 	const dataName = [ ...files.keys() ].find( name => name.endsWith( '.bin' ) );
@@ -109,6 +123,7 @@ try {
 	assert.equal( JSON.parse( new TextDecoder().decode( files.get( `${sourceTextureID}.meta` ) ) ).digest, null, 'opaque texture cache entries omit payload digest metadata' );
 	console.log( 'local region disk cache tests passed' );
 } finally {
+	for ( const cache of openedCaches ) if ( cache?.indexWriteTimer !== null ) clearTimeout( cache.indexWriteTimer );
 	if ( originalNavigator ) Object.defineProperty( globalThis, 'navigator', originalNavigator );
 	else delete globalThis.navigator;
 }

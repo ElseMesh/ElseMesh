@@ -3,7 +3,10 @@ const MAX_CACHE_BYTES = 42 * 1024 * 1024 * 1024;
 const MIN_STORAGE_RESERVE_BYTES = 512 * 1024 * 1024;
 const MAX_PENDING_WRITE_BYTES = 768 * 1024 * 1024;
 const INDEX_RECONCILE_MS = 5 * 60 * 1000;
+// Entry metadata is authoritative and reconciled on open. Keep the first snapshot quick,
+// then coalesce cache bursts to avoid repeatedly serializing every entry.
 const INDEX_WRITE_DELAY_MS = 1000;
+const INDEX_WRITE_INTERVAL_MS = 30 * 1000;
 const MAX_INDEX_BYTES = 64 * 1024 * 1024;
 const MAX_INDEX_ENTRIES = 1_000_000;
 const RECENCY_WRITE_INTERVAL_MS = 30 * 1000;
@@ -65,6 +68,7 @@ export class LocalRegionDiskCache {
 		this.nextEstimateAt = 0;
 		this.nextIndexAt = 0;
 		this.lastUsed = 0;
+		this.lastIndexWriteAt = 0;
 		this.queue = Promise.resolve();
 		this.pendingWriteBytes = 0;
 		this.indexDirty = false;
@@ -334,6 +338,7 @@ export class LocalRegionDiskCache {
 	}
 
 	async #writeIndex() {
+		const startedAt = performance.now();
 		const entries = [ ...this.entries.values() ];
 		const dataFiles = new Set();
 		const metadataFiles = new Set();
@@ -362,27 +367,32 @@ export class LocalRegionDiskCache {
 		if ( merged.size > MAX_INDEX_ENTRIES ) {
 			try { await this.directory.removeEntry( INDEX_FILE_NAME ); } catch { /* An absent snapshot is rebuilt from entry metadata. */ }
 			this.indexDirty = false;
+			if ( merged.size > 0 ) this.lastIndexWriteAt = Date.now();
 			return;
 		}
 		const contents = JSON.stringify( { schema: INDEX_SCHEMA, entries: [ ...merged.values() ] } );
 		if ( contents.length > MAX_INDEX_BYTES ) {
 			try { await this.directory.removeEntry( INDEX_FILE_NAME ); } catch { /* An absent snapshot is rebuilt from entry metadata. */ }
 			this.indexDirty = false;
+			if ( merged.size > 0 ) this.lastIndexWriteAt = Date.now();
 			return;
 		}
 		await writeFile( this.directory, INDEX_FILE_NAME, contents );
 		this.indexDirty = false;
+		if ( merged.size > 0 ) this.lastIndexWriteAt = Date.now();
+		this.onMetric( { operation: 'index-write', entries: merged.size, bytes: contents.length, elapsedMs: performance.now() - startedAt } );
 	}
 
 	#scheduleIndexWrite() {
 		this.indexDirty = true;
 		if ( this.indexWriteTimer !== null ) return;
+		const intervalDelay = this.lastIndexWriteAt === 0 ? 0 : Math.max( 0, this.lastIndexWriteAt + INDEX_WRITE_INTERVAL_MS - Date.now() );
 		this.indexWriteTimer = setTimeout( () => {
 			this.indexWriteTimer = null;
 			void this.#exclusive( async () => {
 				if ( this.indexDirty ) await this.#writeIndex();
 			} ).catch( error => this.onError( error ) );
-		}, INDEX_WRITE_DELAY_MS );
+		}, Math.max( INDEX_WRITE_DELAY_MS, intervalDelay ) );
 	}
 
 	#nextLastUsed( previous ) {
