@@ -1273,7 +1273,7 @@ export class WebGLFallback {
 					float shoreDepth = depth + sin( p.x * 0.13 - uTime * 0.42 ) * 0.3 + ( shoreDetail - 0.5 ) * 0.45;
 					float shoreWave = 0.5 + 0.5 * sin( shoreDepth * 1.8 + dot( p, vec2( 0.038, 0.061 ) ) - uTime * 0.9 + ( shoreDetail - 0.5 ) * 4.8 );
 					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.08, 0.42, shoreDepth ) );
-					float shoreCrest = smoothstep( 0.62, 0.86, shoreWave ) * smoothstep( 0.22, 0.66, shoreDetail );
+					float shoreCrest = smoothstep( 0.62, 0.86, shoreWave ) * smoothstep( 0.22, 0.66, shoreDetail ) * smoothstep( 0.1, 0.5, vWaveHeight );
 					float shoreFoam = shoreBand * shoreCrest;
 					float faceBand = smoothstep( -0.22, -0.12, vShoreU ) * ( 1.0 - smoothstep( -0.055, 0.005, vShoreU ) );
 					float faceProgress = smoothstep( -0.4, 0.0, vShoreBreaking ) * ( 1.0 - smoothstep( 1.3, 1.7, vShoreBreaking ) );
