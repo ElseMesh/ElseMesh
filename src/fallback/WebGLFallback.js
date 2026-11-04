@@ -1003,10 +1003,10 @@ export class WebGLFallback {
 				varying vec3 vWorldPosition;
 				varying vec2 vRestPosition;
 				varying float vWaveHeight;
-				varying float vShoreU;
-				varying float vShoreBreaking;
-				varying float vShoreEnv;
-				varying float vShoreAlongVariation;
+				varying float vShoreFoam;
+				varying float vShoreFace;
+				varying float vShoreRoller;
+				varying vec2 vShoreDirection;
 				varying float vShoreSlope;
 				varying float vSwashFront;
 				varying float vSwashFoam;
@@ -1028,6 +1028,87 @@ export class WebGLFallback {
 					}
 					return displacement;
 				}
+				struct WebGLShoreBreak {
+					float b; float Ash; float p; float meanP; float crestPeak; float H;
+					float Hb; float ycB; float ytB; float Xc; float Wt; float wBore; float Xi;
+				};
+				struct WebGLShoreProfile { float x; float y; float foam; float face; float roller; };
+				float webglShoreBar( float along ) {
+					float w = sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9;
+					float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + w ) );
+					return ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
+				}
+				float webglShoreAmp( float m, float along ) {
+					float waveSet = abs( sin( m * 0.4487989505 ) ) * 0.6 + 0.55;
+					float randomWave = fract( sin( m * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
+					float warp = sin( along * 0.016 + m * 0.9 ) * 1.6;
+					float alongV = sin( along * 0.062 + m * 1.7 + warp ) * 0.6 + sin( along * 0.13 + m * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
+					alongV += ( sin( along * 0.29 + m * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + m * 5.9 + 0.8 ) * 0.4 ) * 0.28;
+					return max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${ ( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 ) } + alongV * ${ ( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 ) } ) * webglShoreBar( along ), 0.02 );
+				}
+				WebGLShoreBreak webglShoreBreakParams( float amplitude, float depth ) {
+					WebGLShoreBreak P;
+					P.b = ( pow( amplitude * 3.556 / 0.78, 0.8 ) - depth ) / max( pow( amplitude * 3.556 / 0.78, 0.8 ) * 0.13, 0.05 );
+					P.Ash = amplitude * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
+					P.p = mix( 1.0, 3.0, smoothstep( -2.5, 0.0, P.b ) );
+					P.meanP = inversesqrt( ( P.p + 0.25 ) * 3.14159265 );
+					P.crestPeak = 1.0 + smoothstep( -1.0, 0.3, P.b ) * 0.22;
+					float yc = P.Ash * 2.0 * ( 1.0 - P.meanP ) * P.crestPeak;
+					float yt = P.Ash * -2.0 * P.meanP * P.crestPeak;
+					P.H = yc - yt;
+					P.wBore = smoothstep( 0.85, 1.35, P.b );
+					P.Hb = min( P.H * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
+					P.ycB = mix( yc, yt * 0.6 + P.Hb, P.wBore );
+					P.ytB = mix( yt, yt * 0.6, P.wBore );
+					P.Xi = P.H * 0.8;
+					P.Xc = mix( 0.0, P.Xi - P.Hb * 0.55, P.wBore ) * smoothstep( 0.03, 0.3, P.Hb );
+					P.Wt = mix( P.H * mix( 0.25, 0.55, smoothstep( 0.1, 0.9, P.b ) ), P.Hb * 0.6 + 0.08, P.wBore );
+					return P;
+				}
+				float webglShoreFaceFill( float breaking, float s ) {
+					float k = ( 1.0 - s ) * 0.45;
+					return smoothstep( k + 0.9, k + 1.08, breaking );
+				}
+				float webglShoreWhitewater( float xi, float lam, WebGLShoreBreak P ) {
+					float landed = smoothstep( 0.86, 0.99, P.b );
+					float spread = clamp( ( P.b - 0.9 ) / 0.45, 0.0, 1.0 );
+					float reach = P.Xi * 0.25 + spread * ( P.Xi * 0.9 + 1.0 );
+					float impact = landed * ( 1.0 - smoothstep( reach * 0.6, reach, abs( xi - P.Xi ) ) ) * ( 1.0 - smoothstep( 1.4, 1.9, P.b ) );
+					float toe = P.Xc + P.Wt;
+					float faceFill = webglShoreFaceFill( P.b, clamp( ( xi - P.Xc ) / max( P.Wt, 0.05 ), 0.0, 1.0 ) );
+					float ahead = exp( ( xi - toe ) * -3.0 ) * P.wBore;
+					float behind = exp( ( P.Xc - xi ) / lam * -16.0 ) * P.wBore;
+					float roller = xi > toe ? ahead : ( xi < P.Xc ? behind : max( faceFill, P.wBore ) );
+					return clamp( max( impact, roller ), 0.0, 1.0 );
+				}
+				WebGLShoreProfile webglShoreProfile( float u, float lam, WebGLShoreBreak P ) {
+					float skew = smoothstep( -3.0, 0.0, P.b ) * 0.55;
+					float phi = u - skew * ( 1.0 - cos( u * 6.2831853 ) ) / 6.2831853;
+					float c = max( ( cos( phi * 6.2831853 ) + 1.0 ) * 0.5, 0.0 );
+					float yPre = P.Ash * 2.0 * ( pow( c, P.p ) - P.meanP ) * P.crestPeak;
+					float Q = smoothstep( -3.0, 0.0, P.b ) * 0.25 + 0.1;
+					float xPre = sin( u * 6.2831853 ) * P.Ash * Q;
+					float inFace = step( -0.09, u );
+					float th = clamp( -u / 0.09, 0.0, 1.0 ) * 1.5707963;
+					float fx = mix( 1.0 - cos( th ), sin( th ), P.wBore );
+					float fy = mix( 1.0 - sin( th ), cos( th ), P.wBore );
+					float sTr = clamp( ( -u - 0.09 ) / ( 0.5 - 0.09 ), 0.0, 1.0 );
+					float ul = u * lam;
+					float xFront = ( inFace > 0.5 ? P.Xc + P.Wt * fx : mix( P.Xc + P.Wt, lam * 0.5, sTr ) ) + ul;
+					float yFront = inFace > 0.5 ? P.ytB + ( P.ycB - P.ytB ) * fy : P.ytB;
+					float cb = pow( max( ( cos( u * ( 6.2831853 * 0.85 ) ) + 1.0 ) * 0.5, 0.0 ), P.p );
+					float yBack = P.ytB + ( P.ycB - P.ytB ) * mix( cb, exp( u * -7.0 ), P.wBore );
+					float xBack = P.Xc * exp( u * -6.0 ) * smoothstep( 0.5, 0.35, u ) + xPre * ( 1.0 - P.wBore );
+					float front = step( u, 0.0 );
+					float wC = smoothstep( -0.35, 0.25, P.b );
+					WebGLShoreProfile r;
+					r.x = mix( xPre, front > 0.5 ? xFront : xBack, wC );
+					r.y = mix( yPre, front > 0.5 ? yFront : yBack, wC );
+					r.foam = webglShoreWhitewater( r.x - u * lam, lam, P );
+					r.face = front * inFace * smoothstep( -0.4, 0.0, P.b ) * ( 1.0 - webglShoreFaceFill( P.b, fx ) );
+					r.roller = ( front > 0.5 ? inFace : exp( u * -25.0 ) ) * P.wBore * P.Hb * wC;
+					return r;
+				}
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
 					vec2 p = world.xz;
@@ -1037,18 +1118,16 @@ export class WebGLFallback {
 					float vertexGroundHeight = uHeightRange.x;
 					float vertexSandCoverage = 0.0;
 					float shoreWaveHeight = 0.0;
-					vec2 shoreWaveDirection = vec2( 0.0 );
-					float shoreWaveLambda = 1.0;
 					float a = dot( p, vec2( 0.035, 0.025 ) ) + uTime * 0.3;
 					float b = dot( p, vec2( -0.07, 0.15 ) ) - uTime * 0.55;
 					float c = dot( p, vec2( 0.21, -0.16 ) ) + uTime * 0.7;
 					float d = dot( p, vec2( 0.42, 0.09 ) ) + uTime * 1.3;
 					float e = dot( p, vec2( 0.72, -0.48 ) ) + uTime * 1.6;
 					vWaveHeight = 0.95 * sin( a ) + 0.55 * sin( b ) + 0.08 * sin( c ) + 0.03 * sin( d ) + 0.01 * sin( e );
-					vShoreU = 0.0;
-					vShoreBreaking = -10.0;
-					vShoreEnv = 0.0;
-					vShoreAlongVariation = 0.0;
+					vShoreFoam = 0.0;
+					vShoreFace = 0.0;
+					vShoreRoller = 0.0;
+					vShoreDirection = vec2( 0.0 );
 					vShoreSlope = 0.0;
 					if ( uTerrainSize > 0.0 ) {
 						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
@@ -1062,55 +1141,33 @@ export class WebGLFallback {
 								vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 								vec4 shore = texture2D( uShoreField, shoreUv );
 								vec2 shoreDirection = normalize( shore.rg * 2.0 - 1.0 );
-								shoreWaveDirection = shoreDirection;
 								float exposure = shore.b;
 								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
 								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
-								float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
-								float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
-								float phase = ( uTime - arrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
-								float waveIndex = floor( phase + 0.5 );
-								float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
-								float alongVariation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
-								alongVariation += ( sin( along * 0.29 + waveIndex * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + waveIndex * 5.9 + 0.8 ) * 0.4 ) * 0.28;
-								float u = phase - waveIndex;
-								float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
-								float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
-								float amplitude = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + alongVariation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
-								float lam = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0;
-								shoreWaveLambda = lam;
-								vec2 crestPosition = p + shoreDirection * ( u * lam );
-								vec2 crestTerrainUv = ( crestPosition - vec2( uTerrainOrigin ) ) / uTerrainSize;
-								vec4 crestTerrain = texture2D( uTerrainHeight, crestTerrainUv );
-								float crestEncodedHeight = ( crestTerrain.r * 255.0 * 256.0 + crestTerrain.g * 255.0 ) / 65535.0;
-								float depthAtCrest = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, crestEncodedHeight );
-								depthAtCrest = mix( depthAtCrest, depth, smoothstep( 0.3, 0.5, abs( u ) ) );
-								float breakDepth = pow( amplitude * 3.556 / 0.78, 0.8 );
-								float breaking = ( breakDepth - depthAtCrest ) / max( breakDepth * 0.13, 0.05 );
-								vShoreU = u;
-								vShoreBreaking = breaking;
-								vShoreAlongVariation = alongVariation;
-								float shoaledAmplitude = amplitude * pow( 10.0 / clamp( depth, 0.35, 10.0 ), 0.25 );
-								float sharpness = mix( 1.0, 3.0, smoothstep( -2.5, 0.0, breaking ) );
-								float meanProfile = inversesqrt( ( sharpness + 0.25 ) * 3.14159265 );
-								float skew = smoothstep( -3.0, 0.0, breaking ) * 0.55;
-								float phaseSkew = u - skew * ( 1.0 - cos( u * 6.2831853 ) ) / 6.2831853;
-								float skewCrest = max( ( cos( phaseSkew * 6.2831853 ) + 1.0 ) * 0.5, 0.0 );
-								float curl = smoothstep( -3.0, 0.0, breaking );
-								float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * smoothstep( 0.02, 0.3, exposure );
-								vShoreEnv = env;
-								float preHeight = shoaledAmplitude * 2.0 * ( pow( skewCrest, sharpness ) - meanProfile ) * ( 1.0 + smoothstep( -1.0, 0.3, breaking ) * 0.22 );
-								vShoreSlope = 2.0 * shoaledAmplitude * sharpness * 3.14159265 * pow( skewCrest, max( sharpness - 1.0, 0.0 ) ) * sin( phaseSkew * 6.2831853 ) * ( 1.0 - skew * sin( u * 6.2831853 ) ) / ( sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * 9.0 ) * env;
-								shoreWaveHeight += preHeight * env;
-								float bore = smoothstep( 0.85, 1.35, breaking );
-								float waveHeight = shoaledAmplitude * 2.0 * ( 1.0 - meanProfile );
-								float lipHeight = min( waveHeight * 0.6, max( depth, 0.0 ) * 0.75 ) * ( smoothstep( 0.0, 0.3, depth ) * 0.7 + 0.3 );
-								float lip = smoothstep( -0.17, -0.12, u ) * ( 1.0 - smoothstep( -0.025, 0.015, u ) );
-								float crestHeight = preHeight + lipHeight * bore * curl * lip;
-								float shoreDisplacement = ( sin( u * 6.2831853 ) * shoaledAmplitude * 0.12 + lipHeight * 0.55 * bore * curl * lip ) * env;
-								world.xz += shoreDirection * shoreDisplacement;
-								vShoreU = u - shoreDisplacement / max( lam, 0.001 );
-								shoreWaveHeight += ( crestHeight - preHeight ) * env;
+							float wobble = sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011;
+							float phase = ( uTime - arrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + wobble;
+							float waveIndex = floor( phase + 0.5 );
+							float u = phase - waveIndex;
+							float amplitudeBlend = smoothstep( 0.32, 0.5, abs( u ) ) * 0.5;
+							float amplitude = mix( webglShoreAmp( waveIndex, along ), webglShoreAmp( waveIndex + sign( u ), along ), amplitudeBlend );
+							float lam = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * ${SHORE_DEFAULT_PERIOD.toFixed( 1 )};
+							vec2 crestPosition = p + shoreDirection * ( u * lam );
+							vec2 crestTerrainUv = ( crestPosition - vec2( uTerrainOrigin ) ) / uTerrainSize;
+							vec4 crestTerrain = texture2D( uTerrainHeight, crestTerrainUv );
+							float crestEncodedHeight = ( crestTerrain.r * 255.0 * 256.0 + crestTerrain.g * 255.0 ) / 65535.0;
+							float depthAtCrest = uSeaLevel - mix( uHeightRange.x, uHeightRange.y, crestEncodedHeight );
+							depthAtCrest = mix( depthAtCrest, depth, smoothstep( 0.3, 0.5, abs( u ) ) );
+							WebGLShoreBreak shoreBreak = webglShoreBreakParams( amplitude, depthAtCrest );
+							float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * clamp( exposure * 1.4, 0.0, 1.0 );
+							WebGLShoreProfile shoreProfile = webglShoreProfile( u, lam, shoreBreak );
+							WebGLShoreProfile shoreAhead = webglShoreProfile( u - 0.15 / lam, lam, shoreBreak );
+							world.xz += shoreDirection * shoreProfile.x * env;
+							shoreWaveHeight += shoreProfile.y * env;
+							vShoreFoam = shoreProfile.foam * env;
+							vShoreFace = shoreProfile.face * env;
+							vShoreRoller = shoreProfile.roller * env;
+							vShoreDirection = shoreDirection;
+							vShoreSlope = ( shoreAhead.y - shoreProfile.y ) * env / max( 0.15 + ( shoreAhead.x - shoreProfile.x ) * env, 0.05 );
 							}
 						}
 					}
@@ -1120,7 +1177,6 @@ export class WebGLFallback {
 						for ( int iteration = 0; iteration < 2; iteration ++ ) displaced = rest - oceanDisplacementAt( displaced, oceanDepth ).xz;
 						vec3 ocean = oceanDisplacementAt( displaced, oceanDepth );
 						world.xz += ocean.xz;
-						if ( vShoreEnv > 0.0 ) vShoreU -= dot( ocean.xz, shoreWaveDirection ) / max( shoreWaveLambda, 0.001 );
 						vWaveHeight = ocean.y + shoreWaveHeight;
 					}
 					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vertexSandCoverage > 0.05 ) {
@@ -1179,10 +1235,10 @@ export class WebGLFallback {
 				varying vec3 vWorldPosition;
 				varying vec2 vRestPosition;
 				varying float vWaveHeight;
-				varying float vShoreU;
-				varying float vShoreBreaking;
-				varying float vShoreEnv;
-				varying float vShoreAlongVariation;
+				varying float vShoreFoam;
+				varying float vShoreFace;
+				varying float vShoreRoller;
+				varying vec2 vShoreDirection;
 				varying float vShoreSlope;
 				varying float vSwashFront;
 				varying float vSwashFoam;
@@ -1208,7 +1264,7 @@ export class WebGLFallback {
 					float fineSlopeX = texture2D( uCloudNoise, fineUv + fineStep ).r - texture2D( uCloudNoise, fineUv - fineStep ).r;
 					float fineSlopeY = texture2D( uCloudNoise, fineUv + fineStep.yx ).r - texture2D( uCloudNoise, fineUv - fineStep.yx ).r;
 					slope += ( waterNoise.rg - 0.5 ) * 0.11 + vec2( fineSlopeX, fineSlopeY ) * 0.52;
-					slope.y += vShoreSlope;
+					slope += vShoreDirection * vShoreSlope;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
 					vec3 seabedColor = vec3( 0.31, 0.27, 0.19 );
@@ -1270,30 +1326,16 @@ export class WebGLFallback {
 					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.025 + 0.055 * ripple );
 					float foamNoise = texture2D( uCloudNoise, p * 0.09 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
 					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
-					float shoreDepth = depth + sin( p.x * 0.13 - uTime * 0.42 ) * 0.3 + ( shoreDetail - 0.5 ) * 0.45;
-					float shoreWave = 0.5 + 0.5 * sin( shoreDepth * 1.8 + dot( p, vec2( 0.038, 0.061 ) ) - uTime * 0.9 + ( shoreDetail - 0.5 ) * 4.8 );
-					float shoreBand = sandCoverage * ( 1.0 - smoothstep( 0.08, 0.42, shoreDepth ) );
-					float shoreCrest = smoothstep( 0.62, 0.86, shoreWave ) * smoothstep( 0.22, 0.66, shoreDetail ) * smoothstep( 0.1, 0.5, vWaveHeight );
-					float shoreFoam = shoreBand * shoreCrest;
-					float faceBand = smoothstep( -0.22, -0.12, vShoreU ) * ( 1.0 - smoothstep( -0.055, 0.005, vShoreU ) );
-					float faceProgress = smoothstep( -0.4, 0.0, vShoreBreaking ) * ( 1.0 - smoothstep( 1.3, 1.7, vShoreBreaking ) );
-					float breakerFace = faceBand * faceProgress * vShoreEnv;
-					float impact = smoothstep( 0.86, 0.99, vShoreBreaking ) * ( 1.0 - smoothstep( 1.4, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.03 ) * 30.0 );
-					float roller = smoothstep( 0.85, 1.35, vShoreBreaking ) * exp( -abs( vShoreU - 0.01 ) * 22.0 );
 					vec4 foamLaceData = texture2D( uFoamLace, p / 3.5 + vec2( -uTime * 0.0008, uTime * 0.00057 ) );
 					float foamLace = 1.0 - smoothstep( 0.42, 0.72, foamLaceData.r );
-					float crestFoam = smoothstep( 0.68, 0.94, vShoreBreaking ) * ( 1.0 - smoothstep( 1.45, 1.9, vShoreBreaking ) ) * exp( -abs( vShoreU - 0.02 ) * 20.0 ) * mix( 0.2, 1.0, foamLace );
-					float breakerFoam = max( max( impact, roller ), crestFoam * 0.85 ) * vShoreEnv
-						* ( 0.65 + 0.35 * smoothstep( 0.15, 0.55, vShoreAlongVariation + 0.6 ) )
-						* ( 0.7 + 0.3 * smoothstep( 0.14, 0.58, shoreDetail ) )
-						* smoothstep( 0.2, 0.7, vWaveHeight );
+				float breakerFoam = vShoreFoam * ( 0.7 + 0.3 * smoothstep( 0.14, 0.58, shoreDetail ) );
 					float laceWidth = clamp( pow( breakerFoam, 1.4 ) * ( 0.7 + foamLaceData.b * 0.2 ), 0.0, 0.78 );
 					float laceMat = 1.0 - smoothstep( laceWidth - 0.035, laceWidth + 0.035, foamLaceData.r );
 					float laceBubbles = foamLaceData.g * smoothstep( laceWidth + 0.22, laceWidth, foamLaceData.r );
 					breakerFoam *= mix( laceMat, 1.0, smoothstep( 0.55, 0.92, breakerFoam ) );
 					breakerFoam = max( breakerFoam, laceBubbles * smoothstep( 0.12, 0.5, breakerFoam ) * 0.48 );
-					reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), breakerFace * 0.55 );
-					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), max( shoreFoam, breakerFoam ) * 0.88 ), vSwashFoam );
+				reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), vShoreFace * 0.55 );
+					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), vSwashFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
