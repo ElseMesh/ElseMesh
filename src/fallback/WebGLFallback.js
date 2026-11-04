@@ -254,7 +254,7 @@ function setWebGLLODFade( root, value ) {
 	} );
 }
 
-function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
+export function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 
 	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
 	const smooth = ( a, b, x ) => { const t = T.MathUtils.clamp( ( x - a ) / ( b - a ), 0, 1 ); return t * t * ( 3 - 2 * t ); };
@@ -266,6 +266,9 @@ function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 		sand: [ 0.84, 0.77, 0.64 ], seabed: [ 0.72, 0.7, 0.58 ], rock: [ 0.3, 0.285, 0.265 ],
 	} ).map( ( [ name, color ] ) => [ name, color.map( linear ) ] ) );
 	const { noise, noise2 } = terrain;
+	const materialProfile = packagedSurface?.metadata?.material || {};
+	const wetDarken = materialProfile.wetDarken ?? 0.58;
+	const roughness = materialProfile.roughness ?? 0.9;
 	const samplePackagedFbm = ( x, z, scale ) => {
 		const width = packagedSurface.detailWidth, height = packagedSurface.detailHeight, data = packagedSurface.detail;
 		const u = ( ( x / scale % 1 ) + 1 ) % 1, v = ( ( z / scale % 1 ) + 1 ) % 1;
@@ -335,15 +338,17 @@ function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 	const detailTexture = new T.DataTexture( detailImage.data, detailImage.width, detailImage.height, T.RGBAFormat, T.UnsignedByteType );
 	detailTexture.wrapS = detailTexture.wrapT = T.RepeatWrapping;
 	detailTexture.magFilter = T.LinearFilter; detailTexture.minFilter = T.LinearMipmapLinearFilter; detailTexture.generateMipmaps = true; detailTexture.needsUpdate = true;
-	const material = new T.MeshStandardMaterial( { roughness: 0.94, side: T.DoubleSide } );
+	const material = new T.MeshStandardMaterial( { roughness, side: T.DoubleSide } );
 	material.onBeforeCompile = shader => {
 		shader.uniforms.uTerrainColor = { value: texture };
 		shader.uniforms.uTerrainDetail = { value: detailTexture };
+		shader.uniforms.uTerrainWetDarken = { value: wetDarken };
 		shader.vertexShader = shader.vertexShader.replace( '#include <common>', '#include <common>\nvarying vec3 vTerrainWorldPosition;' );
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', '#include <begin_vertex>\nvTerrainWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>
 uniform sampler2D uTerrainColor;
 uniform sampler2D uTerrainDetail;
+uniform float uTerrainWetDarken;
 varying vec3 vTerrainWorldPosition;
 ` );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>
@@ -361,10 +366,15 @@ varying vec3 vTerrainWorldPosition;
 			float terrainDistance = length( cameraPosition - vTerrainWorldPosition );
 			float terrainClumpContrast = mix( 0.34, 0.95, smoothstep( 40.0, 140.0, terrainDistance ) );
 			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage );
+			// WebGPU varies static dampness from 0.22 to 0.5; use its midpoint until WebGL samples shore arrivals.
+			float dampSand = sandCoverage * ( 1.0 - smoothstep( 0.5, 1.7, vTerrainWorldPosition.y ) ) * 0.36;
 			float wetSand = sandCoverage * ( 1.0 - smoothstep( -0.1, 0.35, vTerrainWorldPosition.y ) );
-			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 + 1.0 ) * ( 1.0 - wetSand * 0.2 );` );
+			float terrainWetness = max( dampSand, wetSand );
+			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 + 1.0 ) * mix( 1.0, uTerrainWetDarken, terrainWetness );` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+			roughnessFactor = mix( roughnessFactor, mix( 0.42, 0.16, wetSand ), terrainWetness );` );
 	};
-	material.customProgramCacheKey = () => 'elsemesh-webgl-baked-terrain-detail-v2';
+	material.customProgramCacheKey = () => 'elsemesh-webgl-baked-terrain-detail-v3';
 	material.userData.terrainTextures = [ texture, detailTexture ];
 	return material;
 
