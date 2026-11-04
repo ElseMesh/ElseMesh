@@ -238,6 +238,14 @@ finding changes them.
   wet darkening changes the sand and leaves the rock unchanged. Tidewater
   visual parity remains unverified and the estimate stays 82%.
 
+- 2026-11-04: checked precision for a WebGL GPU wetness field. With the
+  WebGPU simulation's 28-second drying time and a 1/60-second step, a wetness
+  of 1 decays to approximately 0.999405. Rounding each step to an 8-bit
+  normalized channel returns 1, so that representation can remain saturated
+  indefinitely. A 16-bit normalized value retains the first step (approximately
+  0.999405); the final GPU implementation still needs suitable precision,
+  coverage generation, and a matched rendering check. No percentage changes.
+
 - 2026-11-04: isolated the WebGL terrain patch by capturing the hosted world
   with `noWater`; the pale geometry remained with the water scene disabled. The
   manifest's full terrain replaces a `portal-preview` terrain. WebGL had loaded
