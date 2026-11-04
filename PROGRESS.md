@@ -6,6 +6,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-11-04
 
+- Extended the signed Tidewater module's isolated Chromium/worldd test to run
+  the real dedicated browser Worker from bite start through fight-to-catch and
+  sale. The worker-generated catch enters inventory, and sale updates money and
+  clears inventory. The live test passes with the signed gateway asset. The
+  gameplay parity estimate moves from 80% to 81%; the test starts from a
+  supplied habitat and does not yet cover live cast input or production water
+  queries.
 - The headless parity scenario now runs each renderer's actual game update path
   from a charged cast through the authored bite schedule, input strike, caught
   fish, and vendor sale. WebGPU and WebGL traces match for 519 bite frames and
