@@ -24,6 +24,7 @@ import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../ne
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { WebGLShoreWetness } from './WebGLShoreWetness.js';
+import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
@@ -907,6 +908,8 @@ export class WebGLFallback {
 		this.scene.add( sun );
 		this.sunDirection = sunDirection;
 		this._updateLighting();
+		this.webglEnvironment = this.worldEnvironment.sky ? new WebGLSkyEnvironment( T, this.renderer, this.cloudLayer ) : null;
+		if ( this.webglEnvironment.texture ) this.scene.environment = this.webglEnvironment.texture;
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
@@ -984,7 +987,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.webglEnvironment?.dispose(); }, { once: true } );
 		this.animationStartTime = performance.now();
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
@@ -2132,6 +2135,7 @@ export class WebGLFallback {
 		this.spray?.update( dt );
 		const T = this.THREE;
 		this._updateLighting();
+		if ( this.webglEnvironment?.update( this.sunDirection, simulationTime ) ) this.scene.environment = this.webglEnvironment.texture;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;
 		this.cloudLayer.material.uniforms.uCameraPosition.value.copy( this.camera.position );

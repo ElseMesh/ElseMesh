@@ -65,6 +65,20 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: WebGL now builds a sky-only cubemap from its existing cloud/sky
+  shader, GGX-prefilters it, and assigns it as the renderer scene environment.
+  This lets the existing wetness-dependent terrain roughness produce the same
+  class of sky specular response as WebGPU, without world-specific reflection
+  code. A synthetic WebGL2 render confirms that the environment changes terrain
+  shading. A hosted Tidewater capture at the authored beach view also confirms
+  the terrain has an environment response; a frozen with/without comparison
+  shows a clear beach-pixel change. See
+  [hosted WebGL sky IBL capture](docs/images/hosted-tidewater-webgl-sky-ibl-2026-11-05.png).
+  The capture is not synchronized against the pre-split WebGPU image, and WebGL
+  still differs in water, beach materials, and post-processing. The renderer
+  test and production build pass; visual parity remains open and the estimate
+  stays 82%.
+
 - 2026-11-05: Hosted WebGPU now creates and advances its own `ShoreSim`, rather
   than depending on the built-in island simulation. WebGL terrain now has a
   persistent half-float GPU wetness field with the same 28-second drying

@@ -12,6 +12,7 @@ assert.deepEqual( options[ 'allow-browser-origin' ], [ 'https://elsemesh.github.
 assert.equal( options[ '--discoverable' ], 'true' );
 assert.equal( options[ '--dht-mode' ], 'server' );
 assert.equal( parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--p2p-port', '0' ] )[ '--p2p-port' ], '0' );
+assert.equal( parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--autoport', '--zerotier-network', '' ] )[ '--zerotier-network' ], '' );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', '../escape' ] ), /profile must be/ );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--source', 'world.json' ] ), /supplied together/ );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--directory-url', 'https://thruhold.org' ] ), /requires --public-gateway/ );

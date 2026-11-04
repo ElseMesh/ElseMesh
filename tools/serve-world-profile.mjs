@@ -14,7 +14,7 @@ function temporaryRoot() {
 
 export function parseArguments( argv ) {
 	const options = {};
-	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
+	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--zerotier-network', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
 		if ( key === '--autoport' ) {
@@ -22,7 +22,8 @@ export function parseArguments( argv ) {
 			options[ key ] = true;
 			continue;
 		}
-		if ( ! valueOptions.has( key ) || ! argv[ i + 1 ] || argv[ i + 1 ].startsWith( '--' ) ) throw new Error( `Invalid or incomplete option: ${key}` );
+		const value = argv[ i + 1 ];
+		if ( ! valueOptions.has( key ) || value === undefined || ( value === '' && key !== '--zerotier-network' ) || value.startsWith( '--' ) ) throw new Error( `Invalid or incomplete option: ${key}` );
 		if ( [ '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ].includes( key ) ) ( options[ key.slice( 2 ) ] ||= [] ).push( argv[ ++ i ] );
 		else {
 			if ( options[ key ] !== undefined ) throw new Error( `Option may only be specified once: ${key}` );
@@ -50,7 +51,9 @@ function run( command, args, options = {} ) {
 }
 
 function worlddArgs( options, args ) {
-	return [ '--worlds-dir', path.resolve( options[ '--worlds-dir' ] ), '--world-profile', options[ '--profile' ], ...args ];
+	const result = [ '--worlds-dir', path.resolve( options[ '--worlds-dir' ] ), '--world-profile', options[ '--profile' ] ];
+	if ( options[ '--zerotier-network' ] !== undefined ) result.push( '--zerotier-network', options[ '--zerotier-network' ] );
+	return [ ...result, ...args ];
 }
 
 async function serve( options ) {

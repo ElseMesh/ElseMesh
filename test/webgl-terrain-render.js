@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { webglTerrainMaterial } from '../src/fallback/WebGLFallback.js';
 import { WebGLShoreWetness } from '../src/fallback/WebGLShoreWetness.js';
+import { WebGLSkyEnvironment } from '../src/fallback/WebGLSkyEnvironment.js';
 
 const result = document.querySelector( '#result' );
 try {
@@ -24,6 +25,15 @@ try {
 	};
 	const scene = new THREE.Scene();
 	scene.add( new THREE.AmbientLight( 0xffffff, 2 ) );
+	const skyLayer = new THREE.Mesh( new THREE.SphereGeometry( 1, 16, 8 ), new THREE.ShaderMaterial( {
+		uniforms: { uSunDirection: { value: new THREE.Vector3( 0.2, 0.8, 0.1 ) }, uCameraPosition: { value: new THREE.Vector3() }, uTime: { value: 0 } },
+		vertexShader: 'varying vec3 vDirection; void main() { vDirection = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+		fragmentShader: 'varying vec3 vDirection; void main() { float h = normalize(vDirection).y * 0.5 + 0.5; gl_FragColor = vec4(mix(vec3(0.04, 0.08, 0.16), vec3(0.55, 0.72, 0.95), h), 1.0); }',
+		side: THREE.BackSide,
+	} ) );
+	const skyEnvironment = new WebGLSkyEnvironment( THREE, renderer, skyLayer, { cloudRefreshSeconds: 0.25 } );
+	if ( ! skyEnvironment.texture ) throw new Error( 'sky environment capture returned no IBL texture' );
+	scene.environment = skyEnvironment.texture;
 	const material = webglTerrainMaterial( THREE, terrain, surface, { seaLevel: 0.3 } );
 	material.userData.updateTerrainTime( 2 );
 	const geometry = new THREE.PlaneGeometry( 2, 2 );
@@ -46,6 +56,12 @@ try {
 		return pixels;
 	};
 	render( 0.58 ); // Compile the material and expose its uniforms.
+	const withEnvironment = render( 0.58 );
+	scene.environment = null;
+	const withoutEnvironment = render( 0.58 );
+	scene.environment = skyEnvironment.texture;
+	const environmentChange = withEnvironment.reduce( ( sum, value, index ) => sum + Math.abs( value - withoutEnvironment[ index ] ), 0 );
+	if ( environmentChange < 100 ) throw new Error( `sky IBL did not affect terrain shading (${environmentChange})` );
 	const dark = render( 0.1 ), light = render( 1.0 );
 	const changes = [ 0, 0 ];
 	for ( let y = 16; y < 48; y ++ ) for ( let side = 0; side < 2; side ++ ) {
@@ -82,7 +98,8 @@ try {
 	if ( Math.abs( wetAfterTwoSeconds - Math.exp( - 2 / 28 ) ) > 0.035 ) throw new Error( `wetness did not dry over time: ${wetAfterTwoSeconds}` );
 	wetness.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
 	result.dataset.status = 'complete';
-	result.textContent = JSON.stringify( { changes, wetAfterTwoSeconds, programCount: renderer.info.programs.length } );
+	result.textContent = JSON.stringify( { changes, wetAfterTwoSeconds, environmentChange, programCount: renderer.info.programs.length } );
+	skyEnvironment.dispose(); skyLayer.geometry.dispose(); skyLayer.material.dispose();
 	target.dispose(); geometry.dispose(); material.dispose();
 	for ( const texture of material.userData.terrainTextures ) texture.dispose();
 	renderer.dispose();
