@@ -51,6 +51,11 @@ export class StaticModelInstanceSetRuntime {
 		this.batches = batches;
 		this.usesShadowBatches = shadowBatches !== null;
 		this.shadowBatches = shadowBatches || [];
+		this._batchAttributeGroups = new Array( batches.length );
+		this._shadowBatchAttributeGroups = this.usesShadowBatches ? new Array( this.shadowBatches.length ) : [];
+		this._cameraState = new Float64Array( 37 );
+		this._cameraStateValid = false;
+		this._plannerDirty = true;
 		this.loadLOD = loadLOD;
 		this.loadController = new AbortController();
 		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
@@ -63,10 +68,37 @@ export class StaticModelInstanceSetRuntime {
 
 	update( _dt, camera, _player, renderLoadBias = 0 ) {
 		if ( this.disposed ) return;
-		this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias } );
+		const cameraChanged = this.#cameraChanged( camera, renderLoadBias );
+		const plannerChanged = cameraChanged || this._plannerDirty;
+		if ( plannerChanged ) {
+			this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias } );
+			this._plannerDirty = false;
+		}
 		this.#requestVisibleLODs();
-		this._updateBatches( this.planner.groups, this.batches );
-		if ( this.usesShadowBatches ) this._updateBatches( this.planner.shadowGroups, this.shadowBatches );
+		if ( plannerChanged || this._batchRefreshPending ) {
+			this._updateBatches( this.planner.groups, this.batches, this._batchAttributeGroups );
+			if ( this.usesShadowBatches ) this._updateBatches( this.planner.shadowGroups, this.shadowBatches, this._shadowBatchAttributeGroups );
+			this._batchRefreshPending = false;
+		}
+	}
+
+	#cameraChanged( camera, renderLoadBias ) {
+		camera.updateMatrixWorld( true );
+		const world = camera.matrixWorld.elements, projection = camera.projectionMatrix.elements;
+		let changed = ! this._cameraStateValid;
+		for ( let index = 0; index < 16; index ++ ) {
+			if ( this._cameraState[ index ] !== world[ index ] || this._cameraState[ index + 16 ] !== projection[ index ] ) changed = true;
+			this._cameraState[ index ] = world[ index ];
+			this._cameraState[ index + 16 ] = projection[ index ];
+		}
+		const fov = camera.getEffectiveFOV();
+		const state = [ renderLoadBias, this.usesShadowBatches ? 1 : 0, camera.reversedDepth ? 1 : 0, camera.coordinateSystem || 0, fov ];
+		for ( let index = 0; index < state.length; index ++ ) {
+			if ( this._cameraState[ index + 32 ] !== state[ index ] ) changed = true;
+			this._cameraState[ index + 32 ] = state[ index ];
+		}
+		this._cameraStateValid = true;
+		return changed;
 	}
 
 	#requestVisibleLODs() {
@@ -81,7 +113,11 @@ export class StaticModelInstanceSetRuntime {
 				const key = `${ modelIndex }:${ level }`;
 				if ( ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
 					const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {
-						if ( ! this.disposed ) loaded.add( level );
+						if ( ! this.disposed ) {
+							loaded.add( level );
+							this._plannerDirty = true;
+							this._batchRefreshPending = true;
+						}
 					} ).catch( error => {
 						if ( ! this.disposed ) {
 							this.retryAfter.set( key, performance.now() + 5000 );
@@ -115,21 +151,29 @@ export class StaticModelInstanceSetRuntime {
 		source.count = 0;
 	}
 
-	_updateBatches( groups, batches ) {
+	_updateBatches( groups, batches, attributeGroups ) {
 		for ( let groupIndex = 0; groupIndex < groups.length; groupIndex ++ ) {
 			const group = groups[ groupIndex ];
-			const updatedMatrices = new Set(), updatedFades = new Set();
-			for ( const batch of batches[ groupIndex ] ) {
-				if ( ! updatedMatrices.has( batch.matrixAttribute ) ) {
-					writeStaticModelInstanceMatrices( this.document, group, batch.matrixAttribute.array );
-					batch.matrixAttribute.needsUpdate = true;
-					updatedMatrices.add( batch.matrixAttribute );
+			const groupBatches = batches[ groupIndex ];
+			if ( groupBatches.length === 0 ) continue;
+			let attributes = attributeGroups[ groupIndex ];
+			if ( ! attributes || attributes.batches !== groupBatches ) {
+				const matrices = [], fades = [];
+				for ( const batch of groupBatches ) {
+					if ( ! matrices.includes( batch.matrixAttribute ) ) matrices.push( batch.matrixAttribute );
+					if ( ! fades.includes( batch.fadeAttribute ) ) fades.push( batch.fadeAttribute );
 				}
-				if ( ! updatedFades.has( batch.fadeAttribute ) ) {
-					writeStaticModelInstanceFades( group, batch.fadeAttribute.array );
-					batch.fadeAttribute.needsUpdate = true;
-					updatedFades.add( batch.fadeAttribute );
-				}
+				attributes = attributeGroups[ groupIndex ] = { batches: groupBatches, matrices, fades };
+			}
+			for ( const attribute of attributes.matrices ) {
+				writeStaticModelInstanceMatrices( this.document, group, attribute.array );
+				attribute.needsUpdate = true;
+			}
+			for ( const attribute of attributes.fades ) {
+				writeStaticModelInstanceFades( group, attribute.array );
+				attribute.needsUpdate = true;
+			}
+			for ( const batch of groupBatches ) {
 				batch.mesh.count = group.count;
 				batch.mesh.visible = group.count > 0;
 			}

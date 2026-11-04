@@ -30,7 +30,7 @@ function makeGLB( image, mimeType = 'image/png', assetId = null ) {
 			pbrMetallicRoughness: { baseColorFactor: [ 0.5, 0.25, 0.1, 1 ], baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: 1 },
 		} ],
 		meshes: [ { primitives: [ { attributes: { POSITION: 0 }, material: 0, mode: 4 } ] } ],
-		nodes: [ { mesh: 0 } ], scenes: [ { nodes: [ 0 ] } ], scene: 0,
+		nodes: [ { name: 'Static imported node', mesh: 0, translation: [ 0.25, 0.5, - 0.75 ] } ], scenes: [ { nodes: [ 0 ] } ], scene: 0,
 	};
 	const requiredExtensions = [];
 	if ( mimeType === 'image/ktx2' ) requiredExtensions.push( 'KHR_texture_basisu' );
@@ -67,6 +67,12 @@ try {
 	root = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', makeGLB( Buffer.from( [ 0 ] ) ) ] ] ) } );
 	let material;
 	root.traverse( node => { if ( node.isMesh ) material = node.material; } );
+	const instance = root.children[ 0 ];
+	const importedNode = instance.children[ 0 ];
+	assert.equal( importedNode.matrixAutoUpdate, false, 'static GLB node transforms cache their local matrix' );
+	assert.equal( instance.matrixAutoUpdate, true, 'placed world-object roots remain movable' );
+	root.updateMatrixWorld( true );
+	assert.equal( importedNode.matrixWorld.elements[ 12 ], 0.25, 'cached GLB node translation remains in its world transform' );
 	assert.ok( material, 'GLB scene contains its expected mesh' );
 	assert.ok( material.bindings.worldEmissive?.texture?.isTexture, 'GLB emissive image is bound to the engine material' );
 	assert.equal( material.bindings.worldNormal?.texture?.format, 'rgba8unorm', 'GLB normal maps use linear texture data' );

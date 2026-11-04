@@ -161,7 +161,36 @@ export class Material {
 	// the state that selects a pipeline (besides geometry layout and pass)
 	pipelineKey() {
 
-		return `${ this.id }.${ this.version }.${ this.side }.${ this.transparent }.${ typeof this.blending === 'string' ? this.blending : JSON.stringify( this.blending ) }.${ this.depthWrite }.${ this.depthTest }.${ this.depthCompare }.${ this.colorWrite }.${ this.topology }.${ this.alphaTest > 0 }.${ this.underwaterLighting }.${ this.appliesHillShadow }.${ this.localLightsCheap }.${ this.receiveShadows }.${ this.depthBias }.${ this.depthBiasSlopeScale }.${ this.vertexColors }`;
+		const blending = typeof this.blending === 'string' ? this.blending : JSON.stringify( this.blending );
+		let state = this._pipelineKeyState;
+		if ( state && state.id === this.id && state.version === this.version && state.side === this.side && state.transparent === this.transparent && state.blending === blending
+			&& state.depthWrite === this.depthWrite && state.depthTest === this.depthTest && state.depthCompare === this.depthCompare && state.colorWrite === this.colorWrite
+			&& state.topology === this.topology && state.alphaTest === ( this.alphaTest > 0 ) && state.underwaterLighting === this.underwaterLighting
+			&& state.appliesHillShadow === this.appliesHillShadow && state.localLightsCheap === this.localLightsCheap && state.receiveShadows === this.receiveShadows
+			&& state.depthBias === this.depthBias && state.depthBiasSlopeScale === this.depthBiasSlopeScale && state.vertexColors === this.vertexColors ) return state.key;
+
+		const key = `${ this.id }.${ this.version }.${ this.side }.${ this.transparent }.${ blending }.${ this.depthWrite }.${ this.depthTest }.${ this.depthCompare }.${ this.colorWrite }.${ this.topology }.${ this.alphaTest > 0 }.${ this.underwaterLighting }.${ this.appliesHillShadow }.${ this.localLightsCheap }.${ this.receiveShadows }.${ this.depthBias }.${ this.depthBiasSlopeScale }.${ this.vertexColors }`;
+		if ( ! state ) state = this._pipelineKeyState = {};
+		state.id = this.id;
+		state.version = this.version;
+		state.side = this.side;
+		state.transparent = this.transparent;
+		state.blending = blending;
+		state.depthWrite = this.depthWrite;
+		state.depthTest = this.depthTest;
+		state.depthCompare = this.depthCompare;
+		state.colorWrite = this.colorWrite;
+		state.topology = this.topology;
+		state.alphaTest = this.alphaTest > 0;
+		state.underwaterLighting = this.underwaterLighting;
+		state.appliesHillShadow = this.appliesHillShadow;
+		state.localLightsCheap = this.localLightsCheap;
+		state.receiveShadows = this.receiveShadows;
+		state.depthBias = this.depthBias;
+		state.depthBiasSlopeScale = this.depthBiasSlopeScale;
+		state.vertexColors = this.vertexColors;
+		state.key = key;
+		return key;
 
 	}
 
@@ -199,6 +228,8 @@ export class Material {
 		Object.assign( m, this );
 		m.id = _id ++;
 		m.version = 0;
+		m._pipelineKeyState = null;
+		m._waterPipelineKeyState = null;
 		m.defines = { ...this.defines };
 		m.bindings = { ...this.bindings };
 		m.uniformBlock = new UniformBlock( 'MaterialParams' + m.id, Object.fromEntries( this.uniformBlock.order.map( ( k ) => [ k, [ this.uniformBlock.layout[ k ].typeStr, cloneValue( this.uniforms[ k ].value ) ] ] ) ), { label: m.name } );

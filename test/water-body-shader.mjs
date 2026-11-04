@@ -22,6 +22,15 @@ assert.doesNotMatch( hostedSurface.module.code, /frame\.seaLevel/, 'hosted water
 const hostedMaterial = makeMaterial( hostedSurface );
 assert.match( hostedMaterial.output, /_waterSSR\( posV, Rv, pos\.y, Rraw\.y, waterSurface\.seaLevel \)/, 'hosted water reflections use their own sea level' );
 assert.match( hostedMaterial.modules.find( ( module ) => module.name === 'waterHelpers' ).code, /fn _waterSSR\( posV: vec3f, Rv: vec3f, y0: f32, ry: f32, seaLevel: f32 \)/, 'reflection helper accepts a surface-specific level' );
+const hullMaskActive = { value: 0 };
+const hullMaterial = new WaterMaterial( { surface: hostedSurface, sky: null, sceneCopy: { texture: {}, depthTexture: {} }, hullMask: {}, hullMaskActive } );
+hullMaterial._build();
+const hullOffKey = hullMaterial.pipelineKey();
+assert.equal( hullMaterial.pipelineKey(), hullOffKey, 'unchanged water pipeline keys are cached' );
+hullMaskActive.value = 1;
+const hullOnKey = hullMaterial.pipelineKey();
+assert.notEqual( hullOnKey, hullOffKey, 'changing the water hull variant invalidates its cached key' );
+assert.equal( hullMaterial.pipelineKey(), hullOnKey, 'the active water hull variant is cached' );
 
 const legacySurface = makeSurface();
 assert.match( legacySurface.module.code, /var y = frame\.seaLevel \+ total\.y;/, 'legacy island water continues using its unchanged frame sea level' );

@@ -137,7 +137,17 @@ export class WaterMaterial extends Material {
 	pipelineKey() {
 
 		if ( ! this._built ) this._build();
-		return super.pipelineKey() + ( this._hullOn ? '.hull' : '' );
+		const baseKey = super.pipelineKey();
+		const hullOn = this._hullOn;
+		const cached = this._waterPipelineKeyState;
+		if ( cached && cached.baseKey === baseKey && cached.hullOn === hullOn ) return cached.key;
+		const key = baseKey + ( hullOn ? '.hull' : '' );
+		if ( cached ) {
+			cached.baseKey = baseKey;
+			cached.hullOn = hullOn;
+			cached.key = key;
+		} else this._waterPipelineKeyState = { baseKey, hullOn, key };
+		return key;
 
 	}
 

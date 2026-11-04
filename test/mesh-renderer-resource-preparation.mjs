@@ -25,6 +25,17 @@ const target = new RenderTarget( W, H, { colors: [ 'rgba16float', 'rgba16float',
 const material = new Material( {
 	name: 'resource-preparation',
 } );
+const stablePipelineKey = material.pipelineKey();
+assert.equal( material.pipelineKey(), stablePipelineKey, 'unchanged material pipeline keys reuse the same string' );
+material.depthWrite = false;
+const changedPipelineKey = material.pipelineKey();
+assert.notEqual( changedPipelineKey, stablePipelineKey, 'direct pipeline-state changes invalidate the cached key' );
+assert.equal( material.pipelineKey(), changedPipelineKey, 'the changed key is cached after invalidation' );
+material.blending = { mode: 'normal' };
+const objectBlendingKey = material.pipelineKey();
+material.blending.mode = 'add';
+assert.notEqual( material.pipelineKey(), objectBlendingKey, 'mutating object-form blending invalidates the cached key' );
+assert.notEqual( material.clone().pipelineKey(), material.pipelineKey(), 'clones keep independent pipeline-key caches and identities' );
 scene.add( new Mesh( new PlaneGeometry( 2, 2 ), material ) );
 
 const renderer = new MeshRenderer();

@@ -313,13 +313,15 @@ export class MeshRenderer {
 
 	// ------------------------------------------------------------------------------ pipelines
 
-	// the pipeline of ( material, vertex layout, pass ); the material key is computed once per frame
+	// the pipeline of ( material, vertex layout, pass ); the material key is cached until its state changes
 	_pipeline( material, vl, pass ) {
 
-		if ( material.__pkFrame !== GPU.frame ) {
+		const pipelineKey = material.pipelineKey();
+		if ( material.__pkPipeline !== pipelineKey || material.__pkLightingVersion !== SceneLighting.version ) {
 
-			material.__pk = material.pipelineKey() + '|' + SceneLighting.version;
-			material.__pkFrame = GPU.frame;
+			material.__pkPipeline = pipelineKey;
+			material.__pkLightingVersion = SceneLighting.version;
+			material.__pk = `${ pipelineKey }|${ SceneLighting.version }`;
 
 		}
 

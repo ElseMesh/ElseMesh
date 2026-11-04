@@ -170,6 +170,8 @@ export class App {
 			exposure: 0.55,
 			renderScale: this.desktopAdaptiveScale ? 0.75 : 1, // Linux starts lighter; adaptive scale targets 24 fps
 		};
+		this.renderLoadLOD = new RenderLoadLOD();
+		this.renderLoadWarmup = 0;
 		this.configureGraphicsPriority();
 	}
 
@@ -597,8 +599,6 @@ export class App {
 
 		this.profiler = new Profiler( renderer );
 		this.frameWorkMeter = new FrameWorkMeter();
-		this.renderLoadLOD = new RenderLoadLOD();
-		this.renderLoadWarmup = 0;
 		this.profiler.track( 'fft rows', this.fft.rowKernel );
 		this.profiler.track( 'fft columns', this.fft.columnKernel );
 		this.profiler.track( 'sky view', this.atmosphere.skyViewKernel );
@@ -720,6 +720,7 @@ export class App {
 	async initHostedPackageWorld( progress ) {
 
 		const engine = this.engine;
+		this.frameWorkMeter = new FrameWorkMeter();
 		const { scene, camera } = engine;
 		const manifestResult = await this.worldManifestPromise;
 		if ( manifestResult.error ) throw manifestResult.error;
@@ -911,7 +912,9 @@ export class App {
 
 	hostedPackageFrame( dt ) {
 
+		const t0 = performance.now();
 		GPU.beginFrame();
+		this.frameWorkMeter?.begin();
 		this.updateFPS();
 		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs, gpuMs: this.frameWorkMeter?.gpuMilliseconds() } );
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
@@ -947,16 +950,18 @@ export class App {
 		this.updateWorldPortals();
 		this.updateWorldStreaming();
 		this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
-		this.updateWorldComponents( this.linkedWorldRoot, dt, this.camera );
-		updateWorldPackageLOD( this.linkedWorldRoot, this.camera );
+		this.updateWorldComponents( this.linkedWorldRoot, dt, this.camera, this.renderLoadBias );
+		updateWorldPackageLOD( this.linkedWorldRoot, this.camera, this.renderLoadBias );
 		setFrameCamera( this.camera, this.engine.width, this.engine.height );
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
-		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera );
+		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera, this.renderLoadBias );
 		this.sceneRenderer.render();
 		this.localPresent.render( { colorViews: [ GPU.context.getCurrentTexture().createView() ] } );
+		this.frameWorkMeter?.end();
 		GPU.submit();
 		this.input.endFrame();
 		this.audio && this.updateAudio( dt );
+		this.updateRenderLoadBias( dt, t0 );
 
 	}
 
@@ -1227,12 +1232,17 @@ export class App {
 			}, 0 );
 			this.deferWorldWarmup = false;
 		}
-		const ms = performance.now() - t0;
+		this.updateRenderLoadBias( dt, t0 );
+
+	}
+
+	updateRenderLoadBias( dt, startedAt ) {
+
+		const ms = performance.now() - startedAt;
 		this.cpuMs = this.cpuMs === undefined ? ms : this.cpuMs * 0.95 + ms * 0.05;
 		this.renderLoadWarmup += Math.min( dt, 0.1 );
 		const gpuSample = this.frameWorkMeter?.takeGPUSample();
-		const loadBias = ! this.isLinuxDesktop || this.graphicsPriority === 'fps' ? ( this.renderLoadWarmup < 8 ? 0 : this.renderLoadLOD.sample( { cpuMs: ms, gpuMs: gpuSample?.gpuMs ?? null, gpuElapsedSeconds: gpuSample?.elapsedSeconds, budgetMs: 1000 / ( this.desktopFrameRateLimit || 60 ), elapsedSeconds: dt } ) ) : 0;
-		this.renderLoadBias = loadBias;
+		this.renderLoadBias = ! this.isLinuxDesktop || this.graphicsPriority === 'fps' ? ( this.renderLoadWarmup < 8 ? 0 : this.renderLoadLOD.sample( { cpuMs: ms, gpuMs: gpuSample?.gpuMs ?? null, gpuElapsedSeconds: gpuSample?.elapsedSeconds, budgetMs: 1000 / ( this.desktopFrameRateLimit || 60 ), elapsedSeconds: dt } ) ) : 0;
 
 	}
 

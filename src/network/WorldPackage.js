@@ -634,6 +634,12 @@ const MAX_EMBEDDED_SHAPES_PER_OBJECT = 4096;
 const COLLISION_COORDINATE_SYSTEM = 'elsemesh-y-up-meters/1';
 
 function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
+	// Static GLTF nodes cache their local matrices for rendering. Embedded collider
+	// registration must still honor transforms adjusted by world setup before the
+	// package is handed to the renderer.
+	instance.traverse( node => {
+		if ( node.matrixAutoUpdate === false ) node.updateMatrix();
+	} );
 	root.updateMatrixWorld( true );
 	const registered = [];
 	let count = 0;
@@ -960,13 +966,21 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		return mesh;
 
 	} ) );
-	const nodes = gltf.nodes.map( ( node ) => {
+	const animatedNodes = new Set();
+	for ( const animation of gltf.animations || [] ) for ( const channel of animation.channels ) if ( channel.node !== undefined ) animatedNodes.add( channel.node );
+	const nodes = gltf.nodes.map( ( node, index ) => {
 
 		const object = new Group();
 		object.name = node.name;
 		object.position.set( ...node.t );
 		object.quaternion.set( ...node.r );
 		object.scale.set( ...node.s );
+		if ( ! animatedNodes.has( index ) ) {
+			// GLB node transforms are authored asset data. Cache their local matrices once;
+			// placed world-object roots remain movable, and animation targets stay automatic.
+			object.updateMatrix();
+			object.matrixAutoUpdate = false;
+		}
 		if ( node.extras ) Object.assign( object.userData, node.extras );
 		if ( node.light !== undefined ) {
 			const light = gltf.punctualLights[ node.light ];
