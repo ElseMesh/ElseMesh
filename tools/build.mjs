@@ -35,7 +35,7 @@ const buildExitCode = await new Promise((resolve, reject) => {
 if (buildExitCode !== 0) process.exit(buildExitCode);
 
 if (runPreview) {
-  const preview = spawn(process.execPath, [viteCli, 'preview', '--host', '127.0.0.1', '--no-strictPort'], { stdio: 'inherit' });
+  const preview = spawn(process.execPath, [viteCli, 'preview', '--host', '127.0.0.1', '--port', '0'], { stdio: 'inherit' });
   const stopPreview = (signal) => preview.kill(signal);
   process.once('SIGINT', stopPreview);
   process.once('SIGTERM', stopPreview);
