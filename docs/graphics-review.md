@@ -18,6 +18,18 @@ attempt fell back because its adapter reports `maxSampledTexturesPerShaderStage
 16 < 21` and `maxStorageTexturesPerShaderStage 4 < 5`; a fresh same-host WebGPU
 pair remains unavailable.
 
+A fresh headless Chromium run then rendered the hosted signed package with a
+confirmed WebGL2 context and reached Ready. The capture uses the signed spawn
+and a 1280×720 viewport; the review hid only the start overlay after load. It
+is software-backed and is not FPS evidence. One resource request returned 404
+(the URL has not yet been identified), with no JavaScript exception. Compared
+visually with the saved WebGPU capture at the same spawn and resolution, WebGL
+still has turquoise water, broad pale beach bands, and darker, simpler house
+and wood materials. The captures were made separately, so this is visual
+diagnosis rather than a synchronized pixel comparison.
+
+![Hosted Tidewater WebGL2 after restoring ACES output](images/hosted-tidewater-webgl-aces-2026-11-04.png)
+
 ## 2026-10-30 matched hosted WebGPU/WebGL check
 
 Both isolated browsers loaded the same signed Tidewater package and were set
