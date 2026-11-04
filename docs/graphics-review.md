@@ -1,5 +1,22 @@
 # Reproducible graphics review
 
+## 2026-11-04 WebGL tone-mapping follow-up
+
+WebGL now uses the engine's Reinhard output curve and current app exposure,
+matching the WebGPU presentation pass instead of using a separate ACES curve
+and fixed exposure. An isolated headless Chromium loaded the signed Example
+Island world at 1280×720 through the hosted WebGL path and reached Ready with
+no JavaScript exceptions. The resulting image is
+[`hosted-tidewater-webgl-reinhard-2026-11-04.png`](images/hosted-tidewater-webgl-reinhard-2026-11-04.png).
+
+The capture still shows pale, neutral beach sand and turquoise water compared
+with the saved WebGPU view's tan sand and bluer ocean. The local Chromium WebGPU
+attempt fell back because its adapter reports `maxSampledTexturesPerShaderStage
+16 < 21` and `maxStorageTexturesPerShaderStage 4 < 5`; a fresh same-host WebGPU
+pair was therefore unavailable. This software-backed capture verifies the
+updated WebGL route, not visual parity or performance; its displayed frame rate
+is not a hardware measurement.
+
 ## 2026-10-30 matched hosted WebGPU/WebGL check
 
 Both isolated browsers loaded the same signed Tidewater package and were set
