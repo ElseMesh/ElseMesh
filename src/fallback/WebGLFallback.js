@@ -1642,7 +1642,9 @@ export class WebGLFallback {
 				collisionAssets: [ ...assetIDs ].filter( assetId => this.connector.collisionAssetIDs.has( assetId ) ).length,
 				visualAssets: [ ...assetIDs ].filter( assetId => ! this.connector.collisionAssetIDs.has( assetId ) && this.connector.regionAssets.has( assetId ) ).length,
 				explicitStartupVisualCells: this.connector.explicitStartupCellVisualObjectIDs.size,
-				components: initialComponents.length,
+				components: startupComponents.length,
+				staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
+				staticModelComponentsAvailable: components.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
 				componentAssets: retainAssetIDs.size,
 			} ) );
 			const objectsByAsset = new Map();
@@ -2253,6 +2255,7 @@ export class WebGLFallback {
 			installed.delete( id );
 			this.hostedSupportedComponents?.delete( id );
 		}
+		if ( releaseIDs.size && connector.regionDiagnostics ) console.info( 'ElseMesh local-region components evicted:', JSON.stringify( { count: releaseIDs.size, componentIDs: [ ...releaseIDs ] } ) );
 		if ( releaseIDs.size ) {
 			const retained = new Set();
 			for ( const object of manifest.objects || [] ) {
@@ -2288,6 +2291,7 @@ export class WebGLFallback {
 			if ( this.connector !== connector || installed.has( component.id ) ) return;
 			const installedIDs = await this._installHostedBackendComponents( [ component ], manifest, assets );
 			for ( const id of installedIDs ) this.hostedSupportedComponents?.add( id );
+			if ( connector.regionDiagnostics ) console.info( 'ElseMesh local-region component streamed:', JSON.stringify( { componentID: component.id, installed: installedIDs.has( component.id ) } ) );
 			this._updateHostedWebGLStatus();
 		} ).catch( error => {
 			if ( error?.name !== 'AbortError' ) console.warn( `WebGL hosted-world component streaming failed for ${connector.worldId}`, error );

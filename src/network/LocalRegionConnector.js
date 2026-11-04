@@ -9,6 +9,8 @@ import { MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KI
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
+const MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES = 768 * 1024 * 1024;
+const MAX_LOCAL_REGION_DISK_WRITE_BATCH_ENTRIES = 64;
 const DEFAULT_LOCAL_REGION_CACHE_BYTES = 128 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 1024 * 1024 * 1024;
 const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
@@ -202,6 +204,9 @@ export class LocalRegionConnector {
 		this.manifest = null;
 		this.closed = false;
 		this.diskCache = null;
+		this.pendingDiskWriteBytes = 0;
+		this.pendingDiskWriteEntries = [];
+		this.diskWriteFlushTimer = null;
 	}
 
 	async getManifest( { signal } = {} ) {
@@ -242,6 +247,7 @@ export class LocalRegionConnector {
 			worldId: this.worldId,
 			sourceRevision: this.sourceRevision,
 			onError: error => { if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache unavailable:', error ); },
+			onMetric: metric => { if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache index:', JSON.stringify( metric ) ); },
 		} );
 		const startupCellKeys = new Set( startupCells.map( cell => cell.join( ',' ) ) );
 		const spawnCell = selection.previewSpawn.position.map( coordinate => cellCoordinate( coordinate, previewRegion.cellSizeMeters ) );
@@ -493,6 +499,48 @@ export class LocalRegionConnector {
 		return objectIDs;
 	}
 
+	#persistDiskEntries( entries, label ) {
+		if ( ! this.diskCache || entries.length === 0 ) return;
+		const queuedBytes = entries.reduce( ( total, entry ) => total + entry.bytes.byteLength, 0 );
+		if ( ! Number.isSafeInteger( queuedBytes ) || queuedBytes > MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES || this.pendingDiskWriteBytes + queuedBytes > MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES ) {
+			if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache batch skipped:', JSON.stringify( { label, queuedBytes, pendingBytes: this.pendingDiskWriteBytes, limitBytes: MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES } ) );
+			return;
+		}
+		this.pendingDiskWriteBytes += queuedBytes;
+		const queuedAt = performance.now();
+		for ( const entry of entries ) this.pendingDiskWriteEntries.push( { ...entry, label, queuedAt } );
+		if ( this.diskWriteFlushTimer === null ) {
+			// A short provisional batching window collects sibling range writes without delaying delivery to the renderer.
+			this.diskWriteFlushTimer = setTimeout( () => {
+				this.diskWriteFlushTimer = null;
+				void this.#flushDiskEntries();
+			}, 16 );
+		}
+	}
+
+	async #flushDiskEntries() {
+		while ( this.pendingDiskWriteEntries.length ) {
+			const entries = this.pendingDiskWriteEntries.splice( 0, MAX_LOCAL_REGION_DISK_WRITE_BATCH_ENTRIES );
+			const batchBytes = entries.reduce( ( total, entry ) => total + entry.bytes.byteLength, 0 );
+			try {
+				const prepared = await Promise.all( entries.map( async entry => ( {
+					assetId: entry.assetId,
+					bytes: entry.bytes,
+					digest: typeof entry.digest === 'function' ? await entry.digest() : await entry.digest,
+				} ) ) );
+				const stored = await this.diskCache.putMany( prepared );
+				if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache batch:', JSON.stringify( {
+					labels: [ ...new Set( entries.map( entry => entry.label ) ) ], entries: prepared.length, bytes: batchBytes, stored,
+					elapsedMs: performance.now() - Math.min( ...entries.map( entry => entry.queuedAt ) ),
+				} ) );
+			} catch ( error ) {
+				if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk-cache batch write failed:', error );
+			} finally {
+				this.pendingDiskWriteBytes = Math.max( 0, this.pendingDiskWriteBytes - batchBytes );
+			}
+		}
+	}
+
 	async getAsset( assetId, { signal } = {} ) {
 		abortIfNeeded( signal );
 		if ( this.assets.has( assetId ) ) {
@@ -524,10 +572,7 @@ export class LocalRegionConnector {
 		if ( syntheticAssetLoader ) {
 			const bytes = await syntheticAssetLoader( signal );
 			requireValue( bytes instanceof Uint8Array && bytes.byteLength > 0 && bytes.byteLength <= MAX_STATIC_MODEL_INSTANCE_SET_BYTES, 'Generated local static-model descriptor exceeds its size limit' );
-			const digest = await this.#digestSHA256( bytes );
-			try { await this.diskCache?.put( assetId, bytes, digest ); } catch ( error ) {
-				if ( this.regionDiagnostics ) console.warn( 'ElseMesh local static-model descriptor disk-cache write failed:', error );
-			}
+			this.#persistDiskEntries( [ { assetId, bytes, digest: () => this.#digestSHA256( bytes ) } ], 'local static-model descriptor' );
 			if ( this.regionDiagnostics ) console.info( 'ElseMesh local static-model descriptor generated:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: performance.now() - startedAt } ) );
 			return this.#cacheAsset( assetId, bytes );
 		}
@@ -565,11 +610,7 @@ export class LocalRegionConnector {
 			phaseStartedAt = performance.now();
 			this.#updateCollisionCoverage( assetId, bytes );
 			phaseMs.collisionCoverage = performance.now() - phaseStartedAt;
-			phaseStartedAt = performance.now();
-			try { await this.diskCache?.put( assetId, bytes, digestHex ); } catch ( error ) {
-				if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache write failed:', error );
-			}
-			phaseMs.browserDiskCacheWrite = performance.now() - phaseStartedAt;
+			this.#persistDiskEntries( [ { assetId, bytes, digest: digestHex } ], 'local-region asset' );
 			return this.#cacheAsset( assetId, bytes );
 		}, phaseMs ).catch( error => {
 			if ( this.regionDiagnostics ) {
@@ -647,9 +688,7 @@ export class LocalRegionConnector {
 			if ( sha256 ) requireValue( await this.#matchesSHA256( result.bytes, sha256 ), 'Cached local region range does not match its digest' );
 			this.#cacheAssetRange( rangeKey, result, assetId );
 			if ( diskKey && totalLength !== undefined && rangeEnd === end ) {
-				try { await this.diskCache?.put( diskKey, result.bytes, await this.#rangeCacheDigest( assetId, result.bytes ) ); } catch ( error ) {
-					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
-				}
+				this.#persistDiskEntries( [ { assetId: diskKey, bytes: result.bytes, digest: () => this.#rangeCacheDigest( assetId, result.bytes ) } ], 'local-region range' );
 			}
 			return result;
 		}
@@ -671,11 +710,7 @@ export class LocalRegionConnector {
 			const result = { bytes, etag: returnedETag, start: rangeStart, end: rangeEnd, totalLength: returnedTotalLength };
 			this.#cacheAssetRange( rangeKey, result, assetId );
 			if ( diskKey && rangeStart === start && rangeEnd === end ) {
-				try {
-					await this.diskCache?.put( diskKey, bytes, await this.#rangeCacheDigest( assetId, bytes ) );
-				} catch ( error ) {
-					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
-				}
+				this.#persistDiskEntries( [ { assetId: diskKey, bytes, digest: () => this.#rangeCacheDigest( assetId, bytes ) } ], 'local-region range' );
 			}
 			return result;
 		}, {}, { Range: `bytes=${start}-${end}`, ...( etag ? { 'If-Range': etag } : {} ) } );
@@ -730,6 +765,7 @@ export class LocalRegionConnector {
 			requireValue( LOCAL_REGION_ETAG.test( returnedETag || '' ) && ( etag === undefined || returnedETag === etag ), 'Local region multi-range ETag is missing or changed' );
 			const parts = await parseByteRangeResponse( response );
 			for ( const part of parts ) requireValue( Number.isSafeInteger( part.totalLength ) && part.totalLength > part.end && part.bytes.byteLength === part.end - part.start + 1 && ( totalLength === undefined || totalLength === part.totalLength ), 'Local region multi-range part is invalid' );
+			const diskEntries = [];
 			for ( const range of missing ) {
 				const part = parts.find( candidate => candidate.start <= range.start && candidate.end >= range.end );
 				requireValue( part, 'Local region multi-range response omitted a requested interval' );
@@ -738,11 +774,10 @@ export class LocalRegionConnector {
 				this.#cacheAssetRange( range.key, value, assetId );
 				results[ range.index ] = value;
 				if ( range.diskKey ) {
-					try { await this.diskCache?.put( range.diskKey, bytes, await this.#rangeCacheDigest( assetId, bytes ) ); } catch ( error ) {
-						if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache write failed:', error );
-					}
+					diskEntries.push( { assetId: range.diskKey, bytes, digest: () => this.#rangeCacheDigest( assetId, bytes ) } );
 				}
 			}
+			this.#persistDiskEntries( diskEntries, 'local-region range batch' );
 			return results;
 		}, {}, { Range: `bytes=${missing.map( range => `${range.start}-${range.end}` ).join( ',' )}`, ...( etag ? { 'If-Range': etag } : {} ) } );
 	}

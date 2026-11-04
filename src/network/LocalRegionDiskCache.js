@@ -1,6 +1,9 @@
 const DIRECTORY_NAME = 'elsemesh-local-region-cache-v1';
 const MAX_CACHE_BYTES = 42 * 1024 * 1024 * 1024;
 const MIN_STORAGE_RESERVE_BYTES = 512 * 1024 * 1024;
+const MAX_PENDING_WRITE_BYTES = 768 * 1024 * 1024;
+const INDEX_RECONCILE_MS = 5 * 60 * 1000;
+const RECENCY_WRITE_INTERVAL_MS = 30 * 1000;
 const CACHE_SCHEMA = 1;
 const DIGEST = /^[0-9a-f]{64}$/;
 
@@ -22,13 +25,13 @@ async function writeFile( directory, name, contents ) {
 }
 
 export class LocalRegionDiskCache {
-	static async open( { worldId, sourceRevision, onError = () => {} } ) {
+	static async open( { worldId, sourceRevision, onError = () => {}, onMetric = () => {} } ) {
 		const storage = globalThis.navigator?.storage;
 		if ( ! globalThis.crypto?.subtle || typeof storage?.getDirectory !== 'function' ) return null;
 		try {
 			const root = await storage.getDirectory();
 			const directory = await root.getDirectoryHandle( DIRECTORY_NAME, { create: true } );
-			const cache = new LocalRegionDiskCache( { directory, storage, worldId, sourceRevision, onError } );
+			const cache = new LocalRegionDiskCache( { directory, storage, worldId, sourceRevision, onError, onMetric } );
 			cache.ready = cache.#exclusive( async () => {
 				await cache.#indexExistingEntries();
 				await cache.#refreshBudget();
@@ -40,11 +43,12 @@ export class LocalRegionDiskCache {
 		}
 	}
 
-	constructor( { directory, storage, worldId, sourceRevision, onError } ) {
+	constructor( { directory, storage, worldId, sourceRevision, onError, onMetric } ) {
 		this.directory = directory;
 		this.storage = storage;
 		this.scope = `${worldId}\0${sourceRevision}`;
 		this.onError = onError;
+		this.onMetric = onMetric;
 		this.entries = new Map();
 		this.cachedBytes = 0;
 		this.budgetBytes = MAX_CACHE_BYTES;
@@ -52,6 +56,7 @@ export class LocalRegionDiskCache {
 		this.nextIndexAt = 0;
 		this.lastUsed = 0;
 		this.queue = Promise.resolve();
+		this.pendingWriteBytes = 0;
 		this.lockName = 'elsemesh-local-region-cache-v1';
 		this.ready = Promise.resolve();
 	}
@@ -67,6 +72,7 @@ export class LocalRegionDiskCache {
 	}
 
 	async #indexExistingEntries() {
+		const startedAt = performance.now();
 		this.entries.clear();
 		this.cachedBytes = 0;
 		const dataFiles = new Set();
@@ -91,7 +97,8 @@ export class LocalRegionDiskCache {
 			}
 		}
 		for ( const id of dataFiles ) if ( ! this.entries.has( id ) ) await this.#removeFiles( id );
-		this.nextIndexAt = Date.now() + 30000;
+		this.nextIndexAt = Date.now() + INDEX_RECONCILE_MS;
+		this.onMetric( { operation: 'index', entries: this.entries.size, bytes: this.cachedBytes, elapsedMs: performance.now() - startedAt } );
 	}
 
 	async #refreshBudget( force = false ) {
@@ -129,14 +136,17 @@ export class LocalRegionDiskCache {
 			const handle = await this.directory.getFileHandle( `${id}.bin` );
 			const bytes = new Uint8Array( await ( await handle.getFile() ).arrayBuffer() );
 			if ( bytes.byteLength !== metadata.bytes || metadata.digest !== null && await sha256Hex( bytes ) !== metadata.digest ) throw new Error( 'Local region cache digest mismatch' );
-			metadata.lastUsed = this.#nextLastUsed( metadata.lastUsed );
-			try { await this.#writeMetadata( metadata ); } catch ( error ) { this.onError( error ); }
 			const indexed = this.entries.get( id );
+			const indexedLastUsed = indexed?.lastUsed || 0;
+			const previousLastUsed = Math.max( metadata.lastUsed, indexedLastUsed );
+			const persistRecency = Date.now() - previousLastUsed >= RECENCY_WRITE_INTERVAL_MS;
+			metadata.lastUsed = persistRecency ? this.#nextLastUsed( previousLastUsed ) : previousLastUsed;
 			if ( indexed ) indexed.lastUsed = metadata.lastUsed;
 			else {
 				this.entries.set( id, metadata );
 				this.cachedBytes += metadata.bytes;
 			}
+			if ( persistRecency ) void this.#exclusive( () => this.#writeMetadata( metadata ) ).catch( error => this.onError( error ) );
 			return bytes;
 		} catch ( error ) {
 			this.onError( error );
@@ -176,34 +186,52 @@ export class LocalRegionDiskCache {
 	}
 
 	async put( assetId, bytes, digest ) {
-		if ( bytes.byteLength > MAX_CACHE_BYTES || !( digest === null || DIGEST.test( digest || '' ) ) ) return false;
-		await this.ready;
-		return this.#exclusive( async () => {
-			const id = await this.#idFor( assetId );
-			if ( Date.now() >= this.nextIndexAt ) await this.#indexExistingEntries();
-			await this.#refreshBudget();
-			if ( bytes.byteLength > this.budgetBytes ) return false;
-			const existing = this.entries.get( id );
-			await this.#evictTo( Math.max( 0, this.budgetBytes - bytes.byteLength + ( existing?.bytes || 0 ) ), id );
-			let attempts = 0;
-			while ( attempts < 3 ) {
-				try {
-					await writeFile( this.directory, `${id}.bin`, bytes );
-					const metadata = { schema: CACHE_SCHEMA, id, bytes: bytes.byteLength, digest, lastUsed: this.#nextLastUsed( existing?.lastUsed || 0 ) };
-					await this.#writeMetadata( metadata );
-					this.entries.set( id, metadata );
-					this.cachedBytes = this.cachedBytes - ( existing?.bytes || 0 ) + bytes.byteLength;
-					return true;
-				} catch ( error ) {
-					this.onError( error );
-					await this.#removeEntry( id );
-					attempts ++;
-					if ( ! await this.#evictOldest( id ) ) return false;
-					await this.#refreshBudget( true );
+		return this.putMany( [ { assetId, bytes, digest } ] );
+	}
+
+	async putMany( entries ) {
+		if ( ! Array.isArray( entries ) || entries.length === 0 ) return true;
+		const totalBytes = entries.reduce( ( total, entry ) => total + ( entry?.bytes?.byteLength || 0 ), 0 );
+		if ( ! Number.isSafeInteger( totalBytes ) || totalBytes > MAX_PENDING_WRITE_BYTES || this.pendingWriteBytes + totalBytes > MAX_PENDING_WRITE_BYTES
+			|| entries.some( entry => typeof entry?.assetId !== 'string' || !( entry.bytes instanceof Uint8Array ) || !( entry.digest === null || DIGEST.test( entry.digest || '' ) ) ) ) return false;
+		this.pendingWriteBytes += totalBytes;
+		try {
+			await this.ready;
+			return await this.#exclusive( async () => {
+				if ( Date.now() >= this.nextIndexAt ) await this.#indexExistingEntries();
+				await this.#refreshBudget();
+				let storedAll = true;
+				for ( const { assetId, bytes, digest } of entries ) {
+					if ( bytes.byteLength > MAX_CACHE_BYTES || bytes.byteLength > this.budgetBytes ) {
+						storedAll = false;
+						continue;
+					}
+					const id = await this.#idFor( assetId );
+					const existing = this.entries.get( id );
+					await this.#evictTo( Math.max( 0, this.budgetBytes - bytes.byteLength + ( existing?.bytes || 0 ) ), id );
+					let stored = false;
+					for ( let attempts = 0; attempts < 3 && ! stored; attempts ++ ) {
+						try {
+							await writeFile( this.directory, `${id}.bin`, bytes );
+							const metadata = { schema: CACHE_SCHEMA, id, bytes: bytes.byteLength, digest, lastUsed: this.#nextLastUsed( existing?.lastUsed || 0 ) };
+							await this.#writeMetadata( metadata );
+							this.entries.set( id, metadata );
+							this.cachedBytes = this.cachedBytes - ( existing?.bytes || 0 ) + bytes.byteLength;
+							stored = true;
+						} catch ( error ) {
+							this.onError( error );
+							await this.#removeEntry( id );
+							if ( ! await this.#evictOldest( id ) ) break;
+							await this.#refreshBudget( true );
+						}
+					}
+					storedAll &&= stored;
 				}
-			}
-			return false;
-		} );
+				return storedAll;
+			} );
+		} finally {
+			this.pendingWriteBytes = Math.max( 0, this.pendingWriteBytes - totalBytes );
+		}
 	}
 
 	async #writeMetadata( metadata ) {
