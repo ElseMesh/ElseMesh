@@ -184,13 +184,13 @@ finding changes them.
 ## Verification record
 
 - 2026-11-04: hosted WebGL terrain now consumes the signed terrain package's
-  roughness and wet-darken values and applies wet-sand roughness/darkening from
-  the shared sand mask. The WebGPU dampness field is approximated by its
-  documented 0.22–0.5 midpoint until WebGL samples shore-arrival data. The
-  focused material and terrain-profile tests pass. The shared review display is
-  currently owned by a Hogwarts review, so this change has not had a matched
-  visual capture; shoreline/material parity remains open and the estimate stays
-  82%.
+  roughness and wet-darken values. Its dynamic swash now reads the packaged
+  shore-arrival field and uses the WebGL water path's run-up timing; the static
+  mottled damp term still uses the WebGPU range midpoint (0.36). Focused
+  material, terrain-profile, and shore-field tests pass. The shared review
+  display is currently owned by a Hogwarts review, so this change has not had a
+  matched visual capture; shoreline/material parity remains open and the
+  estimate stays 82%.
 
 - 2026-11-04: isolated the WebGL terrain patch by capturing the hosted world
   with `noWater`; the pale geometry remained with the water scene disabled. The

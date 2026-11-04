@@ -254,7 +254,7 @@ function setWebGLLODFade( root, value ) {
 	} );
 }
 
-export function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
+export function webglTerrainMaterial( T, terrain, packagedSurface = null, { seaLevel = 0 } = {} ) {
 
 	const resolution = 1024, pixels = new Uint8Array( resolution * resolution * 4 ), step = terrain.res / resolution;
 	const smooth = ( a, b, x ) => { const t = T.MathUtils.clamp( ( x - a ) / ( b - a ), 0, 1 ); return t * t * ( 3 - 2 * t ); };
@@ -269,6 +269,45 @@ export function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 	const materialProfile = packagedSurface?.metadata?.material || {};
 	const wetDarken = materialProfile.wetDarken ?? 0.58;
 	const roughness = materialProfile.roughness ?? 0.9;
+	const shore = packagedSurface?.shoreField ? encodeWebGLShoreField( T, packagedSurface.shoreField ) : null;
+	const shoreUniformDeclarations = shore ? /* glsl */`
+uniform float uTerrainTime;
+uniform float uTerrainSeaLevel;
+uniform sampler2D uTerrainShoreField;
+uniform sampler2D uTerrainSwashField;
+uniform vec2 uTerrainSwashTimeRange;
+uniform float uTerrainShoreOrigin;
+uniform float uTerrainShoreSize;
+` : '';
+	const shoreWetness = shore ? /* glsl */`
+			vec2 shoreUv = ( terrainXZ - vec2( uTerrainShoreOrigin ) ) / uTerrainShoreSize;
+			if ( all( greaterThanEqual( shoreUv, vec2( 0.0 ) ) ) && all( lessThanEqual( shoreUv, vec2( 1.0 ) ) ) && sandCoverage > 0.05 ) {
+				vec4 shoreSample = texture2D( uTerrainShoreField, shoreUv );
+				vec2 shoreDirection = normalize( shoreSample.rg * 2.0 - 1.0 );
+				float exposure = shoreSample.b;
+				float along = dot( terrainXZ, vec2( -shoreDirection.y, shoreDirection.x ) );
+				float swashArrival = mix( uTerrainSwashTimeRange.x, uTerrainSwashTimeRange.y, texture2D( uTerrainSwashField, shoreUv ).r );
+				float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
+				float phase = ( uTerrainTime - swashArrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+				float waveIndex = floor( phase );
+				float tau = fract( phase );
+				float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
+				float variation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
+				variation += ( sin( along * 0.29 + waveIndex * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + waveIndex * 5.9 + 0.8 ) * 0.4 ) * 0.28;
+				float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
+				float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
+				float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
+				float amp = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet * ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + variation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
+				float runupMax = amp * 2.1 * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
+				float su = clamp( tau / ${SHORE_SWASH_UP}, 0.0, 1.0 ), sb = clamp( ( tau - ${SHORE_SWASH_UP} ) / ${SHORE_SWASH_DOWN}, 0.0, 1.0 );
+				float runup = ( tau < ${SHORE_SWASH_UP} ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
+				float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
+				float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 ) - max( vTerrainWorldPosition.y - uTerrainSeaLevel, 0.0 ) / ${SHORE_BEACH_SLOPE};
+				float swashWet = smoothstep( -0.2, 0.25, runupFront ) * exposure;
+				terrainWetness = max( terrainWetness, swashWet );
+				wetSand = max( wetSand, swashWet );
+			}
+` : '';
 	const samplePackagedFbm = ( x, z, scale ) => {
 		const width = packagedSurface.detailWidth, height = packagedSurface.detailHeight, data = packagedSurface.detail;
 		const u = ( ( x / scale % 1 ) + 1 ) % 1, v = ( ( z / scale % 1 ) + 1 ) % 1;
@@ -343,12 +382,23 @@ export function webglTerrainMaterial( T, terrain, packagedSurface = null ) {
 		shader.uniforms.uTerrainColor = { value: texture };
 		shader.uniforms.uTerrainDetail = { value: detailTexture };
 		shader.uniforms.uTerrainWetDarken = { value: wetDarken };
+		if ( shore ) {
+			shader.uniforms.uTerrainTime = { value: material.userData.terrainTime || 0 };
+			shader.uniforms.uTerrainSeaLevel = { value: seaLevel };
+			shader.uniforms.uTerrainShoreField = { value: shore.texture };
+			shader.uniforms.uTerrainSwashField = { value: shore.swashTexture };
+			shader.uniforms.uTerrainSwashTimeRange = { value: shore.swashTimeRange };
+			shader.uniforms.uTerrainShoreOrigin = { value: shore.origin };
+			shader.uniforms.uTerrainShoreSize = { value: shore.size };
+			material.userData.terrainShaderUniforms = shader.uniforms;
+		}
 		shader.vertexShader = shader.vertexShader.replace( '#include <common>', '#include <common>\nvarying vec3 vTerrainWorldPosition;' );
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', '#include <begin_vertex>\nvTerrainWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;' );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>
 uniform sampler2D uTerrainColor;
 uniform sampler2D uTerrainDetail;
 uniform float uTerrainWetDarken;
+${shoreUniformDeclarations}
 varying vec3 vTerrainWorldPosition;
 ` );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>
@@ -366,16 +416,22 @@ varying vec3 vTerrainWorldPosition;
 			float terrainDistance = length( cameraPosition - vTerrainWorldPosition );
 			float terrainClumpContrast = mix( 0.34, 0.95, smoothstep( 40.0, 140.0, terrainDistance ) );
 			float terrainDetailContrast = mix( terrainClumpContrast, 0.85, sandCoverage );
-			// WebGPU varies static dampness from 0.22 to 0.5; use its midpoint until WebGL samples shore arrivals.
+			// Approximate WebGPU's mottled static damp term with its 0.22-0.5 midpoint; moving swash uses the shared arrival field below.
 			float dampSand = sandCoverage * ( 1.0 - smoothstep( 0.5, 1.7, vTerrainWorldPosition.y ) ) * 0.36;
 			float wetSand = sandCoverage * ( 1.0 - smoothstep( -0.1, 0.35, vTerrainWorldPosition.y ) );
 			float terrainWetness = max( dampSand, wetSand );
+			${shoreWetness}
 			diffuseColor.rgb = terrainBase.rgb * ( ( terrainDetail - 0.5 ) * terrainDetailContrast + 1.0 ) * ( ( terrainFineDetail - 0.4 ) * 0.24 + 1.0 ) * mix( 1.0, uTerrainWetDarken, terrainWetness );` );
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 			roughnessFactor = mix( roughnessFactor, mix( 0.42, 0.16, wetSand ), terrainWetness );` );
 	};
-	material.customProgramCacheKey = () => 'elsemesh-webgl-baked-terrain-detail-v3';
-	material.userData.terrainTextures = [ texture, detailTexture ];
+	material.customProgramCacheKey = () => shore ? 'elsemesh-webgl-baked-terrain-detail-v4-shore' : 'elsemesh-webgl-baked-terrain-detail-v4';
+	material.userData.terrainTime = 0;
+	material.userData.updateTerrainTime = time => {
+		material.userData.terrainTime = time;
+		if ( material.userData.terrainShaderUniforms ) material.userData.terrainShaderUniforms.uTerrainTime.value = time;
+	};
+	material.userData.terrainTextures = [ texture, detailTexture, shore?.texture, shore?.swashTexture ].filter( Boolean );
 	return material;
 
 }
@@ -1420,7 +1476,8 @@ export class WebGLFallback {
 		const T = this.THREE;
 		try {
 			const model = await this.loader.loadAsync( this.defaultWorldAssets.terrainLOD );
-			const terrainMaterial = webglTerrainMaterial( T, this.terrain );
+			const terrainMaterial = webglTerrainMaterial( T, this.terrain, null, { seaLevel: this.worldSeaLevel } );
+			this.terrainMaterial = terrainMaterial;
 			this.terrainColorTexture = terrainMaterial.userData.terrainTextures[ 0 ];
 			model.scene.traverse( object => {
 				if ( ! object.isMesh ) return;
@@ -1754,7 +1811,7 @@ export class WebGLFallback {
 			prepareHostedWebGLModel( base );
 			if ( object.id === villageMaterialComponent?.objectId && villageMaterials ) villageMaterialApplied += applyWebGLVillageMaterials( base, villageMaterials );
 			if ( object.id === terrainComponent?.objectId && terrainSurface ) {
-				hostedTerrainMaterial ||= webglTerrainMaterial( T, this.hostedTerrainData, terrainSurface );
+				hostedTerrainMaterial ||= webglTerrainMaterial( T, this.hostedTerrainData, terrainSurface, { seaLevel: manifest.rules.seaLevel ?? 0 } );
 				this.hostedTerrainMaterial = hostedTerrainMaterial;
 				applyHostedTerrainMaterial( base, hostedTerrainMaterial );
 				this.terrainColorTexture = hostedTerrainMaterial.userData.terrainTextures[ 0 ];
@@ -2034,6 +2091,8 @@ export class WebGLFallback {
 		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs } );
 		const simulationTime = ( now - this.animationStartTime ) * 0.001;
 		this.lastFrame = now;
+		this.terrainMaterial?.userData.updateTerrainTime?.( simulationTime );
+		this.hostedTerrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update( dt, this.camera, this.player );
 		if ( this.waterQuery ) {
