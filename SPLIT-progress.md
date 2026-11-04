@@ -161,6 +161,16 @@ Tidewater's registered fish-presentation profile; the engine's `FishProps`
 static placement helpers were removed. WebGPU/WebGL rendering code remains in
 ElseMesh, and the WebGL mesh expansion/LOD gap is unchanged.
 
+The current signed stand asset contains 78 placements across 18 kind/species
+geometry groups. Each record also carries curl, sag, jaw, pattern seed, and
+wet/dried/blood/cloudy-eye values that affect the existing mesh or material.
+The generic static-model instance-set currently accepts only a model reference
+and transform per instance. A valid migration therefore needs a generic,
+renderer-neutral way to represent those per-instance model/material inputs (or
+authored model variants) while retaining instancing, per-item culling, LOD, and
+shadows. The existing asset cannot be converted by mapping only its positions
+and rotations.
+
 Village material profile names, roles, and map metadata now register in the
 generic `WorldMaterialProfileRegistry`. Tidewater owns the packaged map schema
 and binary codec and registers it through the generic component-asset decoder;
@@ -182,6 +192,14 @@ gameplay. Update the estimates above only when a gate is newly supported or a
 finding changes them.
 
 ## Verification record
+
+- 2026-11-04: the shared renderer setup changes now cache static GLTF node
+  matrices while refreshing them at embedded-collider registration, so
+  world-setup transform edits remain reflected in collision. The full client
+  suite passed, including generic WebGPU/WebGL static-model render checks and
+  `world-collision`; the external production build passed. These checks do not
+  exercise Tidewater's full fish-prop appearance or close a visual parity gate,
+  so no separation or parity estimate changed.
 
 - 2026-11-04: hosted WebGL terrain now consumes the signed terrain package's
   roughness and wet-darken values. Its dynamic swash now reads the packaged
