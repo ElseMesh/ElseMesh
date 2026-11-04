@@ -9,7 +9,7 @@ import { PlaneGeometry } from '../src/engine/geometry/PrimitiveGeometries.js';
 import { Scene } from '../src/engine/scene/Scene.js';
 import { Material } from '../src/engine/render/Material.js';
 import { MeshRenderer } from '../src/engine/render/MeshRenderer.js';
-import { G, setFrameCamera } from '../src/engine/render/Frame.js';
+import { FrameUniforms, G, setFrameCamera } from '../src/engine/render/Frame.js';
 import { SunShadows } from '../src/engine/render/Shadows.js';
 
 await GPU.init( { headless: true } );
@@ -55,6 +55,10 @@ renderer._pipeline = ( ...args ) => {
 
 GPU.beginFrame();
 setFrameCamera( camera, W, H );
+const cameraMatrixNames = [ 'view', 'proj', 'viewProj', 'invView', 'invProj', 'invViewProj', 'viewProjNoJitter', 'prevViewProjNoJitter' ];
+const cameraMatrices = new Map( cameraMatrixNames.map( name => [ name, FrameUniforms.fields[ name ].value ] ) );
+const firstView = Array.from( FrameUniforms.fields.view.value.elements );
+const cameraPosition = FrameUniforms.fields.cameraPos.value;
 shadows.render( scene, renderer, shadows.update( camera, G.sunDir.value ) );
 renderer.render( scene, {
 	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,
@@ -74,6 +78,9 @@ assert.deepEqual( errors, [], `lazy texture mip generation stays outside the ren
 camera.position.z = 4;
 GPU.beginFrame();
 setFrameCamera( camera, W, H );
+for ( const name of cameraMatrixNames ) assert.strictEqual( FrameUniforms.fields[ name ].value, cameraMatrices.get( name ), `${name} uniform matrix is reused` );
+assert.strictEqual( FrameUniforms.fields.cameraPos.value, cameraPosition, 'camera position uniform vector is reused' );
+assert.notDeepEqual( Array.from( FrameUniforms.fields.view.value.elements ), firstView, 'reused view matrix refreshes after camera movement' );
 renderer.render( scene, {
 	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,
 	depthView: target.depthTexture.view(), depthFormat: 'depth32float', clearDepth: 0,
