@@ -1589,6 +1589,7 @@ export class WebGLFallback {
 				}
 			}
 			this.scene.add( group );
+			return group;
 		} catch ( error ) {
 			if ( packaged ) throw error;
 			console.warn( 'WebGL fallback vegetation unavailable:', error );
@@ -1828,18 +1829,6 @@ export class WebGLFallback {
 		this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
 		if ( villageMaterialApplied > 0 ) supportedComponents.add( villageMaterialComponent.id );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
-		for ( const vegetation of components.filter( component => component.type === 'elsemesh.static-vegetation/1' ) ) {
-			const placementBytes = assets.get( vegetation.placementAssetId );
-			const grassMaskBytes = vegetation.grassMaskAssetId && assets.get( vegetation.grassMaskAssetId );
-			if ( ! placementBytes || vegetation.grassMaskAssetId && ! grassMaskBytes ) continue;
-			if ( vegetation.grassMaskAssetId ) {
-				this.hostedGrassMask = decodeGrassDensityAsset( asBytes( grassMaskBytes ) );
-				if ( ! this.hostedTerrainData ) throw new Error( `Static grass component ${vegetation.id} requires its terrain surface` );
-				if ( this.hostedGrassMask.size !== this.hostedTerrainData.size || this.hostedGrassMask.origin !== this.hostedTerrainData.origin ) throw new Error( `Static grass component ${vegetation.id} does not match its terrain surface` );
-			}
-			await this._loadVegetation( { placementBytes, centerPosition: [ ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 0 ], ( manifest.spawn?.position || [ 0, 0, 0 ] )[ 2 ] ] } );
-			supportedComponents.add( vegetation.id );
-		}
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
 		}
