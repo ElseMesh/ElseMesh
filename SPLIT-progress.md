@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-04. Percentages are rough completion estimates for the
+Last assessed: 2026-11-05. Percentages are rough completion estimates for the
 active engine/world-separation and Tidewater parity goal. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -65,6 +65,15 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: A hosted WebGL beach capture isolated the long sand bands to the
+  terrain mesh casting shadows: disabling terrain shadow casting removes the
+  bands while retaining its shadow reception. Hosted terrain now disables
+  `castShadow` and keeps `receiveShadow` enabled; the focused terrain check
+  asserts both roles. The visual comparison used the same live scene and changed
+  only the terrain caster flag. See [post-fix hosted WebGL beach capture](docs/images/hosted-tidewater-webgl-terrain-shadow-fix-2026-11-05.png).
+  This removes a hosted WebGL artifact; broader renderer and pre-split parity
+  remain open, so the estimate stays 82%.
+
 - 2026-11-05: WebGL now builds a sky-only cubemap from its existing cloud/sky
   shader, GGX-prefilters it, and assigns it as the renderer scene environment.
   This lets the existing wetness-dependent terrain roughness produce the same
@@ -81,17 +90,18 @@ parity is complete.
   test and production build pass; visual parity remains open and the estimate
   stays 82%.
 
-- 2026-11-05: Hosted WebGPU now creates and advances its own `ShoreSim`, rather
-  than depending on the built-in island simulation. WebGL terrain now has a
+- 2026-11-05 (earlier checkpoint): Hosted WebGPU now creates and advances its
+  own `ShoreSim`, rather than depending on the built-in island simulation.
+  WebGL terrain now has a
   persistent half-float GPU wetness field with the same 28-second drying
   constant and shoreline run-up coverage; focused material and isolated GPU
   render checks pass, including sand wetting and rock exclusion. This does not
   yet establish matched live wetness visuals. Wet terrain in hosted WebGPU gets
   environment specular from ElseMesh's environment lighting as its roughness
-  falls. WebGL currently has no terrain environment probe, so its roughness
-  change does not produce the same reflected-sky sheen; its custom reflection
-  path applies to water. Matched visual parity remains open and the estimate
-  stays 82%.
+  falls. At this checkpoint WebGL still had no terrain environment probe; the
+  subsequent 2026-11-05 checkpoint above adds sky-only IBL to WebGL, so that
+  specific implementation gap is closed. Matched visual parity remains open
+  and the estimate stays 82%.
 
 The default world package is dynamically loaded only for built-in play. The
 build emits the default package and `IslandWorldState` as separate dynamic

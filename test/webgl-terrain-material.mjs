@@ -46,9 +46,12 @@ assert.equal( shader.uniforms.uTerrainTime.value, 5.25, 'terrain swash animation
 const root = new THREE.Group();
 const terrainMesh = new THREE.Mesh( new THREE.BufferGeometry(), new THREE.MeshStandardMaterial() );
 const replacedMaterial = terrainMesh.material;
+terrainMesh.castShadow = true;
 root.add( terrainMesh );
 applyHostedTerrainMaterial( root, material );
 assert.equal( terrainMesh.material, material, 'hosted terrain assignment preserves the custom terrain shader instead of cloning it away' );
+assert.equal( terrainMesh.castShadow, false, 'hosted terrain avoids self-shadow bands while remaining a shadow receiver' );
+assert.equal( terrainMesh.receiveShadow, true, 'hosted terrain continues to receive object shadows' );
 prepareWebGLLODFade( root );
 const fadedMaterial = root.children[ 0 ].material;
 const fadedShader = {

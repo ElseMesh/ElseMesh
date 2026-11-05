@@ -87,6 +87,10 @@ function disposeHostedWebGLModel( model ) {
 export function applyHostedTerrainMaterial( root, material ) {
 	root.traverse( object => {
 		if ( ! object.isMesh ) return;
+		// The dense terrain surface self-shadows through its own shadow map, producing
+		// broad directional bands on the beach. Keep receiving prop shadows, but do
+		// not submit this surface as a shadow caster.
+		object.castShadow = false;
 		object.receiveShadow = true;
 		object.material = Array.isArray( object.material ) ? object.material.map( () => material ) : material;
 	} );
