@@ -1985,7 +1985,7 @@ export class WebGLFallback {
 		let completed = 0;
 		for ( const { component, adapter } of singles ) {
 			if ( this.hostedInstalledComponentIDs?.has( component.id ) ) continue;
-			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, manifest, assets }, component );
+			const result = await adapter( { fallback: this, rules: manifest.rules || {}, terrain, terrainWater, terrainSurface: this.hostedTerrainSurface, manifest, assets }, component );
 			if ( result === true || result?.installed ) installed.add( component.id );
 			if ( result?.runtime ) {
 				this.hostedComponentRuntimes.set( component.id, result.runtime );
@@ -2130,8 +2130,8 @@ export class WebGLFallback {
 		this.terrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		this.hostedTerrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
-		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update( dt, this.camera, this.player );
-		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player );
+		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update( dt, this.camera, this.player, simulationTime );
+		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player, simulationTime );
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();

@@ -1,5 +1,6 @@
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { webglSandShoreBounds, webglShorePatchSegments } from './WebGLShoreField.js';
+import { createWebGLBreakerLips } from './WebGLBreakerLips.js';
 
 registerWorldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1', installWaterBody );
 registerWorldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1', installIslandOcean );
@@ -13,7 +14,7 @@ function installWaterBody( { fallback, rules, terrainWater }, component ) {
 	return true;
 }
 
-function installIslandOcean( { fallback, rules, terrain, terrainWater } ) {
+function installIslandOcean( { fallback, rules, terrain, terrainWater, terrainSurface } ) {
 	const T = fallback.THREE;
 	const size = Math.max( 4000, ( terrain?.size || 2000 ) * 2 );
 	const segments = Math.max( 128, Math.min( 768, Math.ceil( size / 5 ) ) );
@@ -33,5 +34,6 @@ function installIslandOcean( { fallback, rules, terrain, terrainWater } ) {
 		fallback.waterScene.add( patch );
 	}
 	if ( terrain && terrainWater?.shore ) fallback.waterScene.add( fallback._makeBreakerSpray( terrain, terrainWater, seaLevel ) );
-	return true;
+	const breakerLips = terrainSurface?.shoreField ? createWebGLBreakerLips( T, { terrain, shoreField: terrainSurface.shoreField, seaLevel, scene: fallback.waterScene } ) : null;
+	return breakerLips ? { installed: true, runtime: breakerLips } : true;
 }

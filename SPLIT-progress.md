@@ -65,6 +65,17 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: Hosted WebGL now extracts connected shoreline stations from the
+  packaged terrain and shore field, then updates a GPU-rendered breaker lip
+  from the same phase, amplitude, depth, and crest equations used by WebGPU.
+  The CPU state test confirms the crest follows simulation time; an isolated
+  Chromium WebGL render compiles the shader and reports 1,937 pixels changed by
+  the lip against the water-only baseline. The existing WebGL water/shore phase
+  render and terrain material checks pass. This closes the missing-lip
+  implementation gap for hosted WebGL, but does not yet prove matched appearance
+  against hosted or pre-split WebGPU; spray, foam, roughness, and full-scene
+  comparison remain open. The parity estimate stays 82%.
+
 - 2026-11-05: Captured hosted WebGPU and WebGL at the same signed Tidewater
   world, `view=beach` pose/time, and 1588×867 review viewport in the isolated
   Weston display. The WebGL capture still has a sharper, longer shore-foam
@@ -79,8 +90,8 @@ parity is complete.
   offset already used by the WebGPU shore waves and WebGL spray. Water and
   spray use one WebGL phase function, and an isolated WebGL render checks that
   function against the shared CPU shore calculation, including rip channels.
-  This removes a source of crest/spray timing differences; it does not add the
-  missing WebGL breaker lip or simulated spray, and visual parity remains open.
+  This removes a source of crest/spray timing differences; simulated spray and
+  matched visual parity remain open.
   The parity estimate remains 82%.
 
 - 2026-11-05: Fixed WebGL startup for worlds that omit the optional sky or
