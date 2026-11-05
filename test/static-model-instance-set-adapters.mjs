@@ -72,7 +72,7 @@ webgpuResult.runtime.dispose();
 disposeWorldPackage( webgpuRoot );
 assert.equal( webgpuRoot.children.length, 0 );
 
-const webglFallback = { THREE, connector, loader: new GLTFLoader(), scene: new THREE.Scene() };
+const webglFallback = { THREE, connector, loader: new GLTFLoader(), scene: new THREE.Scene(), app: { renderLoadBias: 1 } };
 const webglInstall = worldComponentBackendAdapter( 'webgl', component.type );
 assert.equal( typeof webglInstall, 'function' );
 const webglResult = await webglInstall( { fallback: webglFallback }, component );
@@ -80,7 +80,7 @@ assert.equal( webglResult.installed, true );
 assert.ok( webglFallback.scene.children.filter( mesh => mesh.isInstancedMesh ).every( mesh => mesh.matrixAutoUpdate === false && mesh.matrixWorldAutoUpdate === false ), 'static WebGL batches freeze their world transforms' );
 assert.equal( requestedAssets.filter( id => id === modelAssetID ).length, 2, 'the WebGL renderer begins by requesting its coarse model' );
 releaseFineAsset = undefined;
-webglResult.runtime.update( 1 / 60, new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) );
+webglResult.runtime.update( 1 / 60, new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ), null, 0.025 );
 await new Promise( resolve => setTimeout( resolve, 0 ) );
 assert.equal( typeof releaseFineAsset, 'function', 'WebGL starts the finer request asynchronously' );
 assert.ok( webglFallback.scene.children.some( mesh => mesh.isInstancedMesh && ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the coarse WebGL model stays visible while refinement is pending' );

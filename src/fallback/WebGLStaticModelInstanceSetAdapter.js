@@ -123,6 +123,12 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			} ),
 			dispose: disposeOwned,
 		} );
+		// WebGLFallback's component runtime contract uses the fourth update
+		// argument for elapsed simulation time. Static model planning uses render
+		// load bias there, so translate at this backend boundary instead of letting
+		// simulation time reach the planner as an invalid LOD bias.
+		const updateRuntime = runtime.update.bind( runtime );
+		runtime.update = ( dt, camera, player ) => updateRuntime( dt, camera, player, fallback.app?.renderLoadBias ?? 0 );
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
 		freezeStaticModelInstanceBatchTransforms( fallback.scene, mainBatches );
 		return { installed: true, runtime };

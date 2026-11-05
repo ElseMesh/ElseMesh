@@ -65,7 +65,7 @@ export class StaticModelInstanceSetPlanner {
 	 */
 	update( camera, { includeShadows = true, renderLoadBias = 0 } = {} ) {
 		if ( ! camera || ! finiteVector3( camera.position ) || ! Number.isFinite( camera.verticalFovRadians ) || camera.verticalFovRadians <= 0 || camera.verticalFovRadians >= Math.PI || ! Array.isArray( camera.frustumPlanes ) || camera.frustumPlanes.length !== 6 ) throw new Error( 'Invalid static model planner camera' );
-		if ( ! Number.isInteger( renderLoadBias ) || renderLoadBias < 0 || renderLoadBias > 2 ) throw new Error( 'Invalid static model planner render-load bias' );
+		if ( ! Number.isInteger( renderLoadBias ) || renderLoadBias < 0 || renderLoadBias > 2 ) throw new Error( `Invalid static model planner render-load bias: ${ typeof renderLoadBias } ${ String( renderLoadBias ) }` );
 		const tanHalfFov = Math.tan( camera.verticalFovRadians * 0.5 );
 		const loadScale = 2 ** renderLoadBias;
 		for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {

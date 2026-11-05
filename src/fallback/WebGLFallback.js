@@ -1042,7 +1042,9 @@ export class WebGLFallback {
 	_updateHostedWebGLStatus() {
 
 		const unsupported = unsupportedHostedWebGLComponents( this.hostedComponents, this.hostedSupportedComponents );
-		this.fallbackBadge.textContent = `WebGL fallback · ${ this.engine.fallbackReason }${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
+		const explicitlySelected = this.engine.fallbackReason === 'WebGL was selected explicitly.';
+		this.fallbackBadge.hidden = explicitlySelected && unsupported.length === 0;
+		this.fallbackBadge.textContent = `${ explicitlySelected ? 'WebGL' : `WebGL fallback · ${ this.engine.fallbackReason }` }${ unsupported.length ? ` · ${ unsupported.length } package feature(s) omitted` : '' }`;
 
 	}
 
@@ -2105,7 +2107,9 @@ export class WebGLFallback {
 
 		const badge = document.createElement( 'div' );
 		badge.className = 'elsemesh-webgl-badge';
-		badge.textContent = `WebGL fallback · ${ this.engine.fallbackReason }`;
+		const explicitlySelected = this.engine.fallbackReason === 'WebGL was selected explicitly.';
+		badge.hidden = explicitlySelected;
+		badge.textContent = explicitlySelected ? 'WebGL' : `WebGL fallback · ${ this.engine.fallbackReason }`;
 		this.fallbackBadge = badge;
 		Object.assign( badge.style, { position: 'fixed', top: '14px', right: '14px', zIndex: 30, maxWidth: 'min(440px, 80vw)', padding: '8px 11px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '12px/1.4 system-ui', pointerEvents: 'none' } );
 		document.body.appendChild( badge );

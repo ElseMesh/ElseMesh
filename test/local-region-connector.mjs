@@ -104,6 +104,7 @@ let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
 const payloadFetchOrder = [];
 const cellIndexRequests = [];
+const cellIndexRequestQueryLengths = [];
 const cellInventoryRequests = [];
 let secondCellCollisionMissing = true;
 let knownEmptyCellCollisionMissing = true;
@@ -169,6 +170,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) {
 		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
+		cellIndexRequestQueryLengths.push( url.search.slice( 1 ).length );
 		cellInventoryRequests.push( url.searchParams.get( 'sourceInventory' ) );
 		return Response.json( {
 			sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: url.searchParams.get( 'sourceInventory' ) === '0' ? null : { staticMeshComponents: 3, otherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), unclassifiedOtherPrimitiveComponents: Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ), explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents, unindexedSpatialBoundsFailures: unindexedSpatialBoundsComponents ? [ { objectPath: '/test/oversized-volume', reason: 'bounds exceed index limit' } ] : [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents, otherPrimitiveStatuses: includeUnknownPrimitiveCell || includeSupportedPrimitiveCell ? { 'BoxComponent/query-collidable-unconverted': Number( includeUnknownPrimitiveCell ) + Number( includeSupportedPrimitiveCell ) } : {} }, cells: [
@@ -311,13 +313,15 @@ try {
 	externalTextureConnector.close();
 	leaseReleases = 0;
 	assert.ok( cellIndexRequests.length > 0 && cellIndexRequests.every( cells => cells.length > 0 && cells.length <= 512 ), 'startup and view cells use bounded coordinate requests' );
+	assert.ok( cellIndexRequestQueryLengths.every( length => length <= 4096 ), 'cell index URLs fit worldd dynamic-provider query limit' );
 	await connector.ensureCellsForView( [ 1, 0, 1 ], [ 100, 0, 1 ] );
 	assert.ok( connector.knownCells.has( '6,0,0' ), 'the projected movement frontier is queried before its cell can be entered' );
-	assert.ok( cellIndexRequests.every( cells => cells.length <= 512 ), 'movement-frontier batches remain within the provider request limit' );
+	assert.ok( cellIndexRequests.every( cells => cells.length <= 512 ) && cellIndexRequestQueryLengths.every( length => length <= 4096 ), 'movement-frontier batches remain within provider count and URL limits' );
 	cellIndexRequests.length = 0;
+	cellIndexRequestQueryLengths.length = 0;
 	const largeCellQuery = Array.from( { length: 513 }, ( _, index ) => [ index + 1000, 0, 0 ] );
 	await connector.ensureCells( largeCellQuery );
-	assert.deepEqual( cellIndexRequests.map( cells => cells.length ), [ 512, 1 ], 'cell queries larger than one HTTP batch are split without dropping their tail' );
+	assert.ok( cellIndexRequests.length >= 2 && cellIndexRequests.reduce( ( total, cells ) => total + cells.length, 0 ) === 513 && cellIndexRequests.every( cells => cells.length <= 512 ) && cellIndexRequestQueryLengths.every( length => length <= 4096 ), 'large cell queries split by encoded URL size without dropping cells' );
 	assert.equal( connector.knownCells.has( '1512,0,0' ), true, 'the last cell in a multi-batch query is recorded' );
 	assert.equal( manifest.title, 'Hogwarts Legacy · Great Hall' );
 	assert.deepEqual( manifest.spawn.position, [ 1, 8.62, 9 ] );

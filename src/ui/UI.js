@@ -3080,7 +3080,10 @@ export class UI {
 		if ( ! ctx ) return;
 		const { g, w, h: hh } = ctx;
 		const data = this._spark;
-		const top = Math.max( 34, ...data ) * 1.1;
+		// Keep the same frame-time scale in WebGL and WebGPU. Autoscaling to the
+		// worst recent frame makes a consistently slow GPU trace fill the chart,
+		// hiding variation and making the two renderers hard to compare.
+		const top = 100;
 		const Y = ( ms ) => hh - 1.5 - ( Math.min( ms, top ) / top ) * ( hh - 4 );
 		const X = ( i ) => w - 2 - ( data.length - 1 - i ) * ( ( w - 4 ) / 59 );
 
@@ -3092,6 +3095,9 @@ export class UI {
 		const yr = Math.round( Y( 1000 / 60 ) ) + 0.5;
 		g.moveTo( 0, yr );
 		g.lineTo( w, yr );
+		const thirtyFpsY = Math.round( Y( 1000 / 30 ) ) + 0.5;
+		g.moveTo( 0, thirtyFpsY );
+		g.lineTo( w, thirtyFpsY );
 		g.stroke();
 		g.setLineDash( [] );
 		if ( data.length < 2 ) return;

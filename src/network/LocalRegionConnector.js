@@ -19,6 +19,9 @@ const LOCAL_REGION_CACHE_BYTES_PER_GIB = 64 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
 // Provisional render-prefetch radius; tune it from streamed-cell latency and cache telemetry.
 const LOCAL_REGION_PREFETCH_RADIUS_CELLS = 4;
+// worldd's dynamic-provider gateway limits raw query strings to 4096 characters.
+const LOCAL_REGION_CELL_QUERY_LIMIT = 4096;
+const LOCAL_REGION_CELL_BATCH_LIMIT = 512;
 const EMPTY_GLB = createEmptyGlb();
 const EXTERNAL_TEXTURE_ID = /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/;
 const LOCAL_REGION_ETAG = /^\"(?:sha256-[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})\"$/;
@@ -291,18 +294,31 @@ export class LocalRegionConnector {
 			if ( pending.length === 0 ) continue;
 			const sourceURL = new URL( sourceRegion.asset, `${this.baseURL}/` );
 			requireValue( sourceURL.origin === this.localProvider && sourceURL.pathname.startsWith( '/v1/regions/' ), 'Local provider returned an unsafe region URL' );
-			for ( let offset = 0; offset < pending.length; offset += 512 ) {
-				const batch = pending.slice( offset, offset + 512 );
+			for ( let offset = 0; offset < pending.length; ) {
+				const params = new URLSearchParams();
+				params.set( 'size', String( cellSize ) );
+				params.set( 'sourceInventory', this.collisionSourceInventories.has( sourceRegion.id ) ? '0' : '1' );
+				const batch = [];
+				let queryLength = params.toString().length;
+				while ( offset + batch.length < pending.length && batch.length < LOCAL_REGION_CELL_BATCH_LIMIT ) {
+					const cell = pending[ offset + batch.length ];
+					const cellParameterLength = new URLSearchParams( [ [ 'cell', cell ] ] ).toString().length;
+					const nextQueryLength = queryLength + ( batch.length ? 1 : 0 ) + cellParameterLength;
+					if ( nextQueryLength > LOCAL_REGION_CELL_QUERY_LIMIT ) break;
+					params.append( 'cell', cell );
+					batch.push( cell );
+					queryLength = nextQueryLength;
+				}
+				requireValue( batch.length > 0, 'Local provider cell coordinate exceeds the request URL limit' );
 				const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
-				cellIndexURL.searchParams.set( 'size', String( cellSize ) );
-				cellIndexURL.searchParams.set( 'sourceInventory', this.collisionSourceInventories.has( sourceRegion.id ) ? '0' : '1' );
-				for ( const cell of batch ) cellIndexURL.searchParams.append( 'cell', cell );
+				cellIndexURL.search = params.toString();
 				const cellIndex = await fetchJSON( cellIndexURL, signal );
 				requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === cellSize && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= batch.length, 'Local provider returned an invalid cell response' );
 				const requestedSet = new Set( batch );
 				for ( const cell of cellIndex.cells ) requireValue( requestedSet.has( `${cell?.x},${cell?.y},${cell?.z}` ), 'Local provider returned an unrequested cell' );
 				this.#installCellIndex( sourceRegion, cellIndex );
 				for ( const cell of batch ) queried.add( cell );
+				offset += batch.length;
 			}
 		}
 		for ( const key of requested ) this.knownCells.add( key );
