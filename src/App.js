@@ -1,8 +1,7 @@
 import { Vector3, Euler, Color, MathUtils, Mesh } from './engine/index.js';
 import { GPU } from './engine/gpu/GPU.js';
 import { SunShadows } from './engine/render/Shadows.js';
-import { FrameUniforms, setFrameCamera } from './engine/render/Frame.js';
-import { FullscreenPass } from './engine/render/FullscreenPass.js';
+import { FrameUniforms } from './engine/render/Frame.js';
 
 import { Engine } from './core/Engine.js';
 import { Input } from './core/Input.js';
@@ -759,9 +758,13 @@ export class App {
 		this.portalView = new WorldPortalView( { scene, meshRenderer: engine.meshRenderer, sceneRenderer: this.sceneRenderer, camera } );
 		this.localLights = new LocalLights();
 		this.fft = new OceanFFT( engine );
+		this.caustics = this.qs.has( 'noCaustics' ) ? null : new Caustics( engine, this.fft );
+		this.seaDetail = new SeaDetail();
 		this.foamTexture = createFoamTexture( engine );
 		this.oceanLOD = new CDLOD( { gridSize: Number( this.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
 		this.surface = new WaterSurface( { fft: this.fft, cdlod: this.oceanLOD, foamTexture: this.foamTexture } );
+		this.surface.detail = this.seaDetail;
+		if ( this.caustics ) this.caustics.detail = this.seaDetail;
 		this.waterMaterial = new WaterMaterial( {
 			surface: this.surface, sky: this.sky, sceneCopy: this.sceneRenderer.opaqueCopy,
 			sceneDepthHalf: this.sceneRenderer.opaqueDepthHalf.texture,
@@ -773,20 +776,25 @@ export class App {
 		this.hostedPlayerSlot = this.hostedQuery.allocate( 'player', 1 );
 		this.player.query = this.hostedQuery;
 		this.player.slot = this.hostedPlayerSlot;
+		this.underwater = new Underwater( {
+			depthTexture: this.sceneRenderer.sceneRT.depthTexture,
+			maskTexture: this.sceneRenderer.waterMaskTexture,
+			query: this.hostedQuery, caustics: this.caustics, fft: this.fft,
+		} );
+		this.haze = this.qs.has( 'noHaze' ) ? null : new AirHaze( {
+			depthTexture: this.sceneRenderer.sceneRT.depthTexture, underwater: this.underwater,
+			atmosphere: this.atmosphere, sky: this.sky, clouds: this.clouds, csm: this.shadows,
+		} );
+		this.post = new PostFX( engine, {
+			sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater,
+			clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze,
+		} );
+		if ( this.desktopAntiAliasingMode ) this.post.aaMode = this.desktopAntiAliasingMode;
+		G.exposure.value = this.settings.exposure;
 		this.audio = this.qs.has( 'noAudio' ) ? null : new SoundScape();
 		this.player.audio = this.audio;
 		this.worldGames = new Map();
 		this.game = null;
-		this.localPresent = new FullscreenPass( {
-			label: 'world presentation', colorFormats: [ GPU.format ],
-			bindings: { sceneColor: { texture: () => this.sceneRenderer.sceneRT.texture } },
-			code: `fn fragment( in: FSIn ) -> vec4f {
-				let hdr = max( textureSampleLevel( sceneColor, smpLinearClamp, in.uv, 0.0 ).rgb, vec3f( 0.0 ) );
-				let exposed = hdr * frame.exposure;
-				let mapped = exposed / ( vec3f( 1.0 ) + exposed );
-				return vec4f( pow( mapped, vec3f( 1.0 / 2.2 ) ), 1.0 );
-			}`,
-		} );
 		engine.setRenderScale( this.settings.renderScale );
 
 		await progress( 0.18, 'Connecting to ThruHold…', undefined, 'world' );
@@ -897,11 +905,14 @@ export class App {
 		// background and become visible when ready.
 		await progress( 0.82, 'Preparing the rendered scene…', undefined, 'gpu' );
 		GPU.beginFrame();
-		setFrameCamera( camera, engine.width, engine.height );
+		this.underwater.updateCamera( camera );
+		this.post.beginFrame();
 		this.atmosphere.update( 1 / 60, camera.position.y );
 		this.environment.update( 1 / 60 );
 		this.sceneRenderer.render();
-		this.localPresent.render( { colorViews: [ GPU.context.getCurrentTexture().createView() ] } );
+		if ( this.post.flare ) this.post.flare.kernel.dispatch( 1 );
+		this.post.render();
+		this.post.endFrame();
 		GPU.submit();
 		await GPU.pipelinesReady();
 		await GPU.queue.onSubmittedWorkDone();
@@ -930,12 +941,13 @@ export class App {
 		this.environment.update( dt );
 		if ( this.player.hostedSeaLevel !== null ) {
 			this.fft.update( dt );
+			this.seaDetail.update( dt );
 			updateHostedShoreWetness( this.linkedWorldRoot );
 			this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
 			const hostedBoat = this.activeHostedBoat?.boat?.controller;
 			if ( this.player.hostedSeaLevel !== null ) hostedBoat?.queueQueries?.();
-			this.hostedQuery.update();
+			if ( ! this.activeHostedOcean ) this.hostedQuery.update();
 			if ( this.player.hostedSeaLevel !== null ) {
 				hostedBoat?.update( dt );
 				this.player.waterH = this.player.waterHeight();
@@ -945,6 +957,13 @@ export class App {
 		this.cameraWaterHeight = this.player.hostedSeaLevel === null ? null : this.hostedQuery?.cpuValid && Number.isFinite( this.hostedQuery.cpu[ 0 ] ) ? this.hostedQuery.cpu[ 0 ] : this.player.hostedSeaLevel;
 		G.cameraUnderwater.value = this.cameraWaterHeight !== null && this.camera.position.y < this.cameraWaterHeight - LENS_REACH ? 1 : 0;
 		G.cameraWaterHeight.value = this.cameraWaterHeight ?? G.seaLevel.value;
+		if ( this.activeHostedOcean ) updateWorldOceanFrame( {
+			dt, camera: this.camera, waterHeight: this.cameraWaterHeight ?? 0,
+			marineSnowUnderwater: this.cameraWaterHeight !== null && this.camera.position.y < this.cameraWaterHeight + LENS_REACH,
+			query: this.hostedQuery, caustics: this.caustics, marineSnow: this.marineSnow, airMotes: this.airMotes,
+			shoreSim: this.hostedSurfaceState?.surface.shoreSim || null,
+			underwaterLighting: this.underwaterLighting, breakers: this.hostedBreakers, spray: this.spray,
+		} );
 		if ( this.freeCam ) this.updateFreeCamera( dt );
 		else this.player.updateHostedWorld( dt );
 		dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
@@ -954,11 +973,22 @@ export class App {
 		this.updateWorldComponents( this.linkedWorldRoot, dt, this.camera, this.renderLoadBias );
 		updateWorldPackageLOD( this.linkedWorldRoot, this.camera, this.renderLoadBias );
 		this.localLights.update( this.camera, dt, { includeDefaultSources: ! this.remoteWorldActive } );
-		setFrameCamera( this.camera, this.engine.width, this.engine.height );
+		updateCameraVelocity( this.camera );
+		this.underwater.updateCamera( this.camera );
+		this.post.lens.update( dt, this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) );
+		if ( this.post.flare ) {
+
+			this.post.flare.setDepthHeight( this.sceneRenderer.sceneRT.height );
+			this.post.flare.update( this.camera, dt, { aboveWater: this.camera.position.y > ( this.cameraWaterHeight ?? 0 ) - 0.02 } );
+
+		}
+		this.post.beginFrame();
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
 		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera, this.renderLoadBias );
 		this.sceneRenderer.render();
-		this.localPresent.render( { colorViews: [ GPU.context.getCurrentTexture().createView() ] } );
+		if ( this.post.flare ) this.post.flare.kernel.dispatch( 1 );
+		this.post.render();
+		this.post.endFrame();
 		this.frameWorkMeter?.end();
 		GPU.submit();
 		this.input.endFrame();
@@ -1325,6 +1355,13 @@ export class App {
 		const runtime = components.find( ( component ) => component.hostedBoat );
 		this.activeHostedOcean = components.some( ( component ) => component.islandOcean );
 		this.activeHostedBoat = runtime || null;
+		if ( this.activeHostedOcean && ! this.spray ) {
+			this.spray = new Spray( this.renderer, {
+				query: this.hostedQuery, terrain: terrain?.terrainGPU,
+				sceneCopy: this.sceneRenderer.opaqueCopy, clouds: this.clouds,
+			} );
+			this.scene.add( this.spray.mesh );
+		}
 		const berthComponent = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
 		this.activeHostedVehicleType = runtime ? berthComponent?.type || null : null;
 		const berthObject = connector.manifest.objects?.find( object => object.id === berthComponent?.objectId );

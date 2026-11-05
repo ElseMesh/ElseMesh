@@ -20,4 +20,11 @@ assert.equal( calls[ 4 ][ 2 ], true, 'marine snow receives the camera waterline 
 assert.equal( calls[ 5 ][ 1 ], 1 / 60 );
 assert.equal( calls[ 5 ][ 3 ], 0 );
 
+calls.length = 0;
+updateWorldOceanFrame( {
+	dt: 1 / 30, camera, waterHeight: 0, marineSnowUnderwater: false,
+	query, breakers: system( 'hosted-breakers' ), spray: system( 'hosted-spray' ),
+} );
+assert.deepEqual( calls.map( call => call[ 0 ] ), [ 'camera', 'query', 'hosted-breakers', 'hosted-spray' ], 'hosted ocean frames advance wave spray without requiring optional local-world effects' );
+
 console.log( 'hosted and local island-ocean frames advance the same query and shoreline effects' );

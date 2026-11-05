@@ -86,6 +86,18 @@ parity is complete.
   matched wall-clock interval. No parity percentage changes: missing pebbles,
   unexplained color differences, and WebGL comparison gates remain open.
 
+- 2026-11-05: The original's wave spray and fine mist were missing from hosted
+  WebGPU because that bootstrap never created `Spray`, and its separate frame
+  loop never advanced the hosted breakers or spray. Hosted island oceans now
+  create the shared particle system and advance the same ocean-frame updater as
+  built-in play, with one water-query update per frame. Focused routing/frame
+  checks and the external production build pass. The isolated live WebGPU page
+  now advances the spray simulation (536 frames observed), compiles its update
+  kernel, and renders spray off 577 breaker stations without browser exceptions.
+  The estimate remains 82%: this closes a confirmed hosted-WebGPU surf defect,
+  while pebbles, color matching, WebGL parity, and full gameplay/performance
+  comparison remain open.
+
 - 2026-11-05: Hosted WebGL now extracts connected shoreline stations from the
   packaged terrain and shore field, then updates a GPU-rendered breaker lip
   from the same phase, amplitude, depth, and crest equations used by WebGPU.
