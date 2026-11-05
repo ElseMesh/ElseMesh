@@ -1,5 +1,6 @@
 import { validateWorldExperience } from './WorldExperience.js';
 import { collisionPathStatus, sweptCollisionCellKeys } from './CollisionFrontier.js';
+import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
@@ -76,27 +77,10 @@ function cellCoordinate( position, sizeMeters ) {
 }
 
 function deriveStartupCells( position, previewRegion ) {
-	const { cellSizeMeters, startupCellOffsetBounds } = previewRegion;
-	const origin = position.map( coordinate => cellCoordinate( coordinate, cellSizeMeters ) );
-	const { min, max } = startupCellOffsetBounds || {};
-	requireValue( Array.isArray( min ) && Array.isArray( max ) && min.length === 3 && max.length === 3 && min.every( Number.isSafeInteger ) && max.every( Number.isSafeInteger ) && min.every( ( value, axis ) => value <= max[ axis ] ), 'Local provider has invalid startup cell offset bounds' );
-	const count = min.reduce( ( total, value, axis ) => total * ( max[ axis ] - value + 1 ), 1 );
-	requireValue( count >= 1 && count <= 64, 'Local provider startup cell footprint exceeds its limit' );
-	const cells = new Map();
-	for ( let x = min[ 0 ]; x <= max[ 0 ]; x ++ ) {
-		for ( let y = min[ 1 ]; y <= max[ 1 ]; y ++ ) {
-			for ( let z = min[ 2 ]; z <= max[ 2 ]; z ++ ) {
-				const cell = [ origin[ 0 ] + x, origin[ 1 ] + y, origin[ 2 ] + z ];
-				cells.set( cell.join( ',' ), cell );
-			}
-		}
-	}
-	for ( const offset of previewRegion.startupCellOffsets || [] ) {
-		const cell = origin.map( ( value, axis ) => value + offset[ axis ] );
-		cells.set( cell.join( ',' ), cell );
-	}
-	requireValue( cells.size <= 64, 'Local provider startup cell footprint exceeds its limit' );
-	return [ ...cells.values() ];
+	const { cellSizeMeters } = previewRegion;
+	const spawnFoot = [ position[ 0 ], position[ 1 ] - PLAYER_EYE_HEIGHT, position[ 2 ] ];
+	return [ ...sweptCollisionCellKeys( spawnFoot, spawnFoot, { cellSizeMeters } ) ]
+		.map( key => key.split( ',' ).map( Number ) );
 }
 
 function abortIfNeeded( signal ) {
@@ -219,8 +203,6 @@ export class LocalRegionConnector {
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
 		requireValue( Number.isFinite( previewRegion.maxViewDistanceMeters ) && previewRegion.maxViewDistanceMeters > 0 && previewRegion.maxViewDistanceMeters <= 10000, 'Local provider has no valid world-authored cell view distance' );
-		const startupCellOffsets = previewRegion.startupCellOffsets ?? [];
-		requireValue( Array.isArray( startupCellOffsets ) && startupCellOffsets.length <= 40 && startupCellOffsets.every( offset => Array.isArray( offset ) && offset.length === 3 && offset.every( value => Number.isSafeInteger( value ) && Math.abs( value ) <= 128 ) ), 'Local provider has invalid startup cell offsets' );
 		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
@@ -250,12 +232,9 @@ export class LocalRegionConnector {
 			onMetric: metric => { if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region disk cache index:', JSON.stringify( metric ) ); },
 		} );
 		const startupCellKeys = new Set( startupCells.map( cell => cell.join( ',' ) ) );
-		const spawnCell = selection.previewSpawn.position.map( coordinate => cellCoordinate( coordinate, previewRegion.cellSizeMeters ) );
-		const explicitStartupCellKeys = new Set( startupCellOffsets.map( offset => spawnCell.map( ( value, axis ) => value + offset[ axis ] ).join( ',' ) ) );
 		this.allCollisionSourcesIndexed = true;
 		this.emptyCollisionCellsAreVerified = true;
 		this.initialRegionCellObjectIDs = new Set();
-		this.explicitStartupCellVisualObjectIDs = new Set();
 		this.initialStartupCellKeys = startupCellKeys;
 		const spawn = selection.previewSpawn;
 		this.manifest = {
@@ -275,7 +254,6 @@ export class LocalRegionConnector {
 		this.collisionSourceInventories = new Map();
 		this.knownCells = new Set();
 		this.cellQueryQueue = Promise.resolve();
-		this.explicitStartupCellKeys = explicitStartupCellKeys;
 		await this.ensureCells( startupCells, { signal } );
 		if ( ! this.allCollisionSourcesIndexed ) this.unknownSourcesCompleteByCell.clear();
 		const support = selection.previewSupport;
@@ -350,7 +328,7 @@ export class LocalRegionConnector {
 	}
 
 	#installCellIndex( sourceRegion, cellIndex ) {
-		const { baseURL: base, previewRegion, explicitStartupCellKeys } = this;
+		const { baseURL: base, previewRegion } = this;
 		const sourceURL = new URL( sourceRegion.asset, `${base}/` );
 		const startupCellKeys = new Set( this.initialStartupCellKeys );
 		let sourceInventory = cellIndex.collisionSourceInventory;
@@ -463,7 +441,6 @@ export class LocalRegionConnector {
 					}
 				}
 			} else {
-				if ( explicitStartupCellKeys.has( cellKey ) ) this.explicitStartupCellVisualObjectIDs.add( visualObjectId );
 				this.regionAssets.set( visualAssetId, visualURL.href );
 				this.manifest.assets.push( { id: visualAssetId, bytes: 0, kind: 'model/gltf-binary', priority } );
 				this.manifest.objects.push( {
@@ -973,7 +950,6 @@ export class LocalRegionConnector {
 		this.assetRangeBytes = 0;
 		this.regionAssets.clear();
 		this.initialRegionCellObjectIDs.clear();
-		this.explicitStartupCellVisualObjectIDs.clear();
 		this.collisionAssetIDs.clear();
 		this.collisionObjectIDByAsset.clear();
 		this.unknownCollisionObjectIDs.clear();

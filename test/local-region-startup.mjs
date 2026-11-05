@@ -10,7 +10,6 @@ let collisionPath;
 const connector = {
 	localOnly: true,
 	cellSizeMeters: 8,
-	explicitStartupCellVisualObjectIDs: new Set( [ 'startup-roof' ] ),
 	collisionObjectIDsAlongPath: ( from, to ) => {
 		collisionPath = { from, to };
 		return [ 'spawn-collision' ];
@@ -44,7 +43,7 @@ assert.deepEqual( collisionPath.from, collisionPath.to, 'initial collision reque
 
 assert.ok( selectedIDs.includes( 'visible-far-cell' ), 'world streaming selection retains farther visible geometry for background loading' );
 assert.ok( entryIDs.includes( 'visible-floor' ), 'entry retains a visual cell intersecting the spawn neighborhood' );
-assert.ok( ! entryIDs.includes( 'startup-roof' ), 'world-authored but off-view startup visuals do not delay entry' );
+assert.ok( ! selectedIDs.includes( 'startup-roof' ) && ! entryIDs.includes( 'startup-roof' ), 'off-view visuals are not forced into startup by a world-specific cell list' );
 assert.ok( entryIDs.includes( 'spawn-collision' ), 'spawn collision remains in the entry barrier' );
 assert.ok( entryIDs.includes( 'visible-far-cell' ), 'camera-visible cells remain in the entry barrier even when farther away' );
 console.log( 'ok local startup waits for visible geometry and spawn collision, while deferring off-view authored visuals' );

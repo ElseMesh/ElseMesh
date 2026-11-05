@@ -1803,7 +1803,6 @@ export class WebGLFallback {
 				entryAssets: assetIDs.size,
 				collisionAssets: [ ...assetIDs ].filter( assetId => this.connector.collisionAssetIDs.has( assetId ) ).length,
 				visualAssets: [ ...assetIDs ].filter( assetId => ! this.connector.collisionAssetIDs.has( assetId ) && this.connector.regionAssets.has( assetId ) ).length,
-				explicitStartupVisualCells: this.connector.explicitStartupCellVisualObjectIDs.size,
 				components: startupComponents.length,
 				staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
 				staticModelComponentsAvailable: components.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,

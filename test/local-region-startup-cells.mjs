@@ -12,7 +12,7 @@ const descriptor = {
 			stages: { world: 'Loading the starting area…' }, theme: { logo: { src: '/v1/presentation/logo.svg', alt: 'Castle mark' }, colors: { accent: '#c6a664' } },
 		},
 		previewSpawn: { position: [ 0, 8.62, 90 ], yaw: 0 },
-		previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, startupCellOffsetBounds: { min: [ -1, 0, -1 ], max: [ 1, 0, 1 ] } },
+		previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32 },
 	},
 };
 const originalFetch = globalThis.fetch;
@@ -23,7 +23,7 @@ globalThis.fetch = async url => {
 		payload.collisionSourceInventory = {
 			staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0,
 			unindexedSpatialBoundsComponents: 0, unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false,
-			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0,
+			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0,
 			audioOnlyPolicyExcludedOtherPrimitiveComponents: 0,
 			noSkeletalCollisionGeometryComponents: 0,
 			landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {},
@@ -43,7 +43,7 @@ try {
 	const manifest = await connector.getManifest();
 	assert.equal( manifest.title, 'Great Hall', 'providers without an optional title use the selected region label' );
 	assert.equal( connector.initialRegionCellObjectIDs.size, 1, 'only an indexed startup collision cell is marked for preload' );
-	assert.equal( manifest.objects.filter( object => object.priority === 'visible' && object.regionCell && ! object.collisionPayload ).length, 1, 'only indexed visual cells inside the authored startup footprint receive visible priority' );
+	assert.equal( manifest.objects.filter( object => object.priority === 'visible' && object.regionCell && ! object.collisionPayload ).length, 1, 'only the indexed spawn-capsule cell receives startup priority' );
 	assert.equal( connector.emptyCollisionCellsAreVerified, true, 'complete per-layer inventories prove absent cells are empty' );
 	assert.equal( manifest.experience.genre, 'The Great Hall', 'the local world controls its loading copy' );
 	assert.equal( manifest.experience.theme.logo.src, 'http://127.0.0.1:4179/v1/presentation/logo.svg', 'world logo paths resolve against the local content provider' );
@@ -55,4 +55,4 @@ try {
 	globalThis.fetch = originalFetch;
 }
 
-console.log( 'ok world-authored startup cells are required before local-world entry' );
+console.log( 'ok spawn-capsule startup cells are derived without world-specific offsets' );

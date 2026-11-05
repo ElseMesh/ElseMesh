@@ -6,7 +6,7 @@ const descriptor = {
 	entrySelection: {
 		schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ], previewSpawn: { position: [ 0, 8, 0 ], yaw: 0 },
-		previewRegion: { cellSizeMeters: 8, maxViewDistanceMeters: 16, startupCellOffsetBounds: { min: [ 0, 0, 0 ], max: [ 1, 0, 0 ] }, layers: [ 'Tech', 'Lighting', 'Collision' ] },
+		previewRegion: { cellSizeMeters: 8, maxViewDistanceMeters: 16, layers: [ 'Tech', 'Lighting', 'Collision' ] },
 	},
 };
 const regions = [
@@ -29,7 +29,7 @@ globalThis.fetch = async url => {
 	const regionId = request.pathname.split( '/' )[ 3 ];
 	return new Response( JSON.stringify( {
 		sourceRevision: 'test-revision', cellSizeMeters: 8,
-		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents: 0, unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {} },
+		collisionSourceInventory: { staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0, noSkeletalCollisionGeometryComponents: 0, unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents: 0, unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false, landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {} },
 		cells: ( cellsByRegion[ regionId ] || [] ).filter( cell => request.searchParams.getAll( 'cell' ).includes( `${cell.x},${cell.y},${cell.z}` ) ).map( cell => ( { ...cell, collisionEvidence: { scope: 'all-collision-sources', staticMeshComponentCount: 0, unknownComponents: 0, supportedSimpleShapeComponents: 0, explicitlyNonQueryCollidableComponents: 0, explicitlyNonBlockingForPawnComponents: 0, staticMeshComponentsClassified: true, otherPrimitiveComponentCount: 0, supportedOtherPrimitiveComponents: 0, unknownOtherPrimitiveComponents: 0 }, unknownCollisionSources: [] } ) ),
 	} ) );
 };
@@ -40,8 +40,8 @@ try {
 	const cellObjects = manifest.objects.filter( object => object.regionCell );
 	assert.deepEqual( cellObjects.map( object => object.label ), [
 		'GreatHall_Int collision cell 0,1,0', 'GreatHall_Int visual cell 0,1,0',
-		'GreatHall_Int collision cell 1,1,0', 'GreatHall_Int visual cell 1,1,0',
 		'Tech collision cell 0,0,0', 'Tech visual cell 0,0,0',
+		'GreatHall_Int collision cell 1,1,0', 'GreatHall_Int visual cell 1,1,0',
 		'Lighting collision cell 1,0,0', 'Lighting visual cell 1,0,0',
 	], 'the manifest combines only occupied cells from each authored layer' );
 	assert.equal( connector.initialRegionCellObjectIDs.size, 2, 'primary startup collision cells are required before entry' );
