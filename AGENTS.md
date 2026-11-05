@@ -4,7 +4,7 @@
 
 - Always run network-related commands in an escalated shell, even when they only access localhost. This includes `curl`, HTTP clients, browser/CDP checks, SSH, and Git fetch/push. Use an escalated shell for other commands that require elevated permissions as well.
 - Always use an escalated shell when checking running processes or process ownership (for example, `ps`, `pgrep`, or inspecting `/proc`); an un-escalated process listing may be incomplete or misleading.
-- For system-level `systemd-run`, use the escalated shell and invoke `sudo -n /usr/bin/systemd-run`; plain `systemd-run` may trigger an interactive Polkit password prompt. Do not use `systemd-run --user` for system scopes. Confirm the exact scope options first; `--wait` cannot be combined with `--scope`.
+- For a process owned by the current user, prefer an unprivileged user scope, for example `systemd-run --user --scope --property=MemoryMax=3G COMMAND`. This machine accepted `MemoryMax` on a user scope without `sudo`; on other machines, verify that the user manager and cgroup setup support the requested property, then confirm the effective value with `systemctl --user show UNIT -p MemoryMax`. Do not use `systemd-run --user` for system scopes. Use a system scope only when system-level ownership or controls are required; then use the escalated shell and invoke `sudo -n /usr/bin/systemd-run` so the command cannot prompt for a password. Confirm the exact scope options first; `--wait` cannot be combined with `--scope`.
 
 ## Design maturity and compatibility
 
