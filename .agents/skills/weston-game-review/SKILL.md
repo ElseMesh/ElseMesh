@@ -16,8 +16,14 @@ Use the checked-in display setup and browser helper; do not launch Weston with
 2. Start a project Weston display with
    `worlds/Hogwarts/tools/hogwartsmp-parity/start-weston-review.sh`. It uses the
    checked-in `weston.ini`, disables input and idle blanking, and creates a
-   dedicated socket. Keep the windowed Weston display visible; do not mute the
-   host audio or fullscreen the outer Weston window.
+   dedicated socket. Give each outer Weston window a concise title that names
+   the task, build/revision, and renderer (for example, `Tidewater original —
+   WebGPU` and `ElseMesh split — WebGPU`). Target the exact outer-window ID with
+   `wmctrl -ir WINDOW_ID -T TITLE`. Prefer matching its PID from `wmctrl -lp`;
+   Weston may publish PID 0, so in that case record the existing window IDs
+   before launch and select the newly created Weston window afterward. Never
+   rename the active window by assumption. Keep the windowed Weston display
+   visible; do not mute the host audio or fullscreen the outer Weston window.
 3. Start Chromium with `tools/review-browser.mjs`, a dedicated
    profile, and a maximized window. Use the intended Weston display environment
    explicitly. Keep the address bar visible; the browser helper must not add
