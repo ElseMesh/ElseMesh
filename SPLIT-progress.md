@@ -65,6 +65,16 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: Captured hosted WebGPU and WebGL at the same signed Tidewater
+  world, `view=beach` pose/time, and 1588×867 review viewport in the isolated
+  Weston display. The WebGL capture still has a sharper, longer shore-foam
+  line and more visible spray points; the hosted WebGPU surf is smoother in
+  this view. These captures show a live visual gap after the shared phase fix,
+  but do not compare against the pre-split build or establish performance.
+  See [hosted WebGPU](docs/images/hosted-tidewater-parity-webgpu-2026-11-05.png)
+  and [hosted WebGL](docs/images/hosted-tidewater-parity-webgl-2026-11-05.png).
+  The 82% parity estimate remains unchanged.
+
 - 2026-11-05: WebGL's visible shore waves now include the rip-channel phase
   offset already used by the WebGPU shore waves and WebGL spray. Water and
   spray use one WebGL phase function, and an isolated WebGL render checks that
