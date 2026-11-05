@@ -24,6 +24,7 @@ import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../ne
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { WebGLShoreWetness } from './WebGLShoreWetness.js';
+import { webglShoreWobbleGLSL } from './WebGLShoreWaveMath.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
@@ -594,6 +595,7 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 			attribute float aSeed;
 			attribute float aDepth;
 			varying float vOpacity;
+			${ webglShoreWobbleGLSL }
 			void main() {
 				vec3 p = position;
 				vOpacity = 0.0;
@@ -607,7 +609,7 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 					float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
 					float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 					float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
-					float phase = ( uTime - arrival ) / 9.0 + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+					float phase = ( uTime - arrival ) / 9.0 + webglShoreWobble( along );
 					float index = floor( phase + 0.5 );
 					float warp = sin( along * 0.016 + index * 0.9 ) * 1.6;
 					float u = phase - index;
@@ -1097,6 +1099,7 @@ export class WebGLFallback {
 					}
 					return displacement;
 				}
+				${ webglShoreWobbleGLSL }
 				struct WebGLShoreBreak {
 					float b; float Ash; float p; float meanP; float crestPeak; float H;
 					float Hb; float ycB; float ytB; float Xc; float Wt; float wBore; float Xi;
@@ -1213,7 +1216,7 @@ export class WebGLFallback {
 								float exposure = shore.b;
 								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
 								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
-							float wobble = sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011;
+							float wobble = webglShoreWobble( along );
 							float phase = ( uTime - arrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + wobble;
 							float waveIndex = floor( phase + 0.5 );
 							float u = phase - waveIndex;

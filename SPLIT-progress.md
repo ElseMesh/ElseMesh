@@ -65,6 +65,14 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: WebGL's visible shore waves now include the rip-channel phase
+  offset already used by the WebGPU shore waves and WebGL spray. Water and
+  spray use one WebGL phase function, and an isolated WebGL render checks that
+  function against the shared CPU shore calculation, including rip channels.
+  This removes a source of crest/spray timing differences; it does not add the
+  missing WebGL breaker lip or simulated spray, and visual parity remains open.
+  The parity estimate remains 82%.
+
 - 2026-11-05: Fixed WebGL startup for worlds that omit the optional sky or
   explicitly select `sky: none`. Lighting initialization now accepts the
   absence of an environment map; a hosted initialization fixture exercises

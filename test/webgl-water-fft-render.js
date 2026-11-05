@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { WebGLFallback } from '../src/fallback/WebGLFallback.js';
 import { WebGLWaterQuery } from '../src/fallback/WebGLWaterQuery.js';
+import { webglShoreWobbleGLSL } from '../src/fallback/WebGLShoreWaveMath.js';
+import { shoreBar, shoreWobble } from '../src/ocean/ShoreSwash.js';
 
 const result = document.querySelector( '#result' );
 let renderer, query;
@@ -31,7 +33,31 @@ try {
 		terrainColorTexture: null,
 	} );
 	const water = fallback._makeWater( new THREE.PlaneGeometry( 120, 120, 128, 128 ), 0, null );
+	if ( ! water.material.vertexShader.includes( 'webglShoreWobble( along )' ) ) throw new Error( 'Water does not use the shared shore phase' );
 	fallback.waterScene.add( water );
+	// Render the actual GLSL phase function and compare it with the shared CPU
+	// reference at ordinary shore locations and inside rip channels.
+	const phaseScene = new THREE.Scene();
+	const phaseMaterial = new THREE.ShaderMaterial( {
+		vertexShader: 'void main() { gl_Position = vec4( position, 1.0 ); }',
+		fragmentShader: `${webglShoreWobbleGLSL}\nvoid main() { float along = gl_FragCoord.x * 4.0 - 128.0; gl_FragColor = vec4( ( webglShoreWobble( along ) + 0.3 ) / 0.6, 0.0, 0.0, 1.0 ); }`,
+		depthTest: false, depthWrite: false, toneMapped: false,
+	} );
+	const phaseGeometry = new THREE.PlaneGeometry( 2, 2 );
+	phaseScene.add( new THREE.Mesh( phaseGeometry, phaseMaterial ) );
+	const phaseTarget = new THREE.WebGLRenderTarget( 64, 1 );
+	renderer.setRenderTarget( phaseTarget );
+	renderer.render( phaseScene, new THREE.Camera() );
+	const phasePixels = new Uint8Array( 64 * 4 );
+	renderer.readRenderTargetPixels( phaseTarget, 0, 0, 64, 1, phasePixels );
+	let phaseMaxError = 0, ripSamples = 0;
+	for ( let i = 0; i < 64; i ++ ) {
+		const along = ( i + 0.5 ) * 4 - 128;
+		phaseMaxError = Math.max( phaseMaxError, Math.abs( phasePixels[ i * 4 ] / 255 * 0.6 - 0.3 - shoreWobble( along ) ) );
+		if ( shoreBar( along ).rip > 0.8 ) ripSamples ++;
+	}
+	phaseTarget.dispose(); phaseGeometry.dispose(); phaseMaterial.dispose();
+	if ( ripSamples === 0 || phaseMaxError > 0.006 ) throw new Error( `WebGL shore phase differs from the CPU reference: max ${phaseMaxError}, rip samples ${ripSamples}` );
 	query = new WebGLWaterQuery( THREE, renderer, null, 0 );
 	fallback.waterQuery = query;
 	fallback._bindOceanFFTToWater();
@@ -44,6 +70,21 @@ try {
 	camera.lookAt( 0, 0, 0 );
 	camera.updateProjectionMatrix();
 	const gl = renderer.getContext();
+	const shoreTexture = new THREE.DataTexture( new Uint8Array( [ 128, 255, 255, 128 ] ), 1, 1, THREE.RGBAFormat );
+	shoreTexture.needsUpdate = true;
+	const sprayTerrain = { res: 2, size: 2, origin: 0, heights: new Float32Array( 4 ).fill( -1 ), heightAt: () => -1 };
+	const spray = fallback._makeBreakerSpray( sprayTerrain, {
+		texture: shoreTexture, origin: 0, size: 2, minHeight: -10, maxHeight: 10,
+		shore: { texture: shoreTexture, origin: 0, size: 2, timeRange: new THREE.Vector2( 0, 1 ) },
+	}, 0 );
+	const sprayScene = new THREE.Scene();
+	sprayScene.add( spray );
+	renderer.setRenderTarget( null );
+	renderer.render( sprayScene, camera );
+	const sprayError = gl.getError();
+	const sprayProgram = renderer.info.programs?.at( -1 );
+	if ( sprayError !== gl.NO_ERROR || sprayProgram?.diagnostics?.runnable === false ) throw new Error( `Breaker spray failed to render: 0x${sprayError.toString(16)} ${sprayProgram?.diagnostics?.programLog || ''}` );
+	spray.geometry.dispose(); spray.material.dispose(); shoreTexture.dispose();
 	const read = () => {
 		renderer.setRenderTarget( null );
 		renderer.render( fallback.waterScene, camera );
@@ -69,7 +110,7 @@ try {
 	if ( errorsAfterFFT.length || fftRender.renderError !== gl.NO_ERROR || noFFTRender.renderError !== gl.NO_ERROR ) throw new Error( `WebGL errors after FFT ${errorsAfterFFT}, FFT render 0x${fftRender.renderError.toString(16)}, no-FFT render 0x${noFFTRender.renderError.toString(16)}` );
 	if ( visiblePixels < 100 ) throw new Error( `Water rendered too few visible pixels: ${visiblePixels}; FFT delta ${changedPixels}` );
 	if ( changedPixels < 100 ) throw new Error( `FFT displacement changed too few rendered pixels: ${changedPixels}; visible ${visiblePixels}` );
-	result.textContent = JSON.stringify( { status: 'complete', changedPixels, visiblePixels, programCount: programs.length } );
+	result.textContent = JSON.stringify( { status: 'complete', changedPixels, visiblePixels, programCount: programs.length, phaseMaxError, ripSamples } );
 	result.dataset.status = 'complete';
 } catch ( error ) {
 	result.textContent = `FAIL ${error.stack || error}`;

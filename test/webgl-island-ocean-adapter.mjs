@@ -43,6 +43,7 @@ assert.equal( adapter( {
 
 const breakerSpray = fallback.waterScene.children.find( child => child.isPoints );
 assert( breakerSpray, 'hosted WebGL island ocean installs the same breaker spray presentation used by the built-in ocean' );
+assert( breakerSpray.material.vertexShader.includes( 'webglShoreWobble( along )' ), 'breaker spray uses the water surface shore phase' );
 assert( breakerSpray.geometry.getAttribute( 'position' ).count > 0, 'breaker spray samples shallow-water points from packaged terrain' );
 assert( fallback.waterScene.children.some( child => child.material?.uniforms?.uOceanEnabled ), 'the hosted water mesh is installed for FFT binding' );
 
