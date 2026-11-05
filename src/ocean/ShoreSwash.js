@@ -3,6 +3,7 @@
 export const SHORE_BEACH_SLOPE = 0.066;
 export const SHORE_SWASH_UP = 0.4;
 export const SHORE_SWASH_DOWN = 0.55;
+export const SHORE_SWASH_OVERSHOOT = 1.2;
 export const SHORE_DEFAULT_PERIOD = 9;
 export const SHORE_DEFAULT_AMPLITUDE = 0.34;
 export const SHORE_DEFAULT_VARIATION = 0.55;

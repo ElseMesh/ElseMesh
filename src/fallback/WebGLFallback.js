@@ -30,7 +30,7 @@ import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
-import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
+import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
@@ -1080,6 +1080,7 @@ export class WebGLFallback {
 				varying vec2 vShoreDirection;
 				varying float vShoreSlope;
 				varying float vSwashFront;
+				varying float vSwashLevel;
 				varying float vSwashFoam;
 				vec3 oceanDisplacementCascade( vec2 xz, int cascade ) {
 					vec2 g = fract( xz / uOceanSizes[ cascade ] ) * 256.0 - 0.5;
@@ -1186,6 +1187,7 @@ export class WebGLFallback {
 					vec2 p = world.xz;
 					vRestPosition = p;
 					vSwashFront = -1.0;
+					vSwashLevel = uSeaLevel;
 					vSwashFoam = 0.0;
 					float vertexGroundHeight = uHeightRange.x;
 					float vertexSandCoverage = 0.0;
@@ -1275,10 +1277,23 @@ export class WebGLFallback {
 						float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
 						float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 ) - max( vertexGroundHeight - uSeaLevel, 0.0 ) / ${SHORE_BEACH_SLOPE};
 						vSwashFront = runupFront;
+						float filmFront = runupFront + ${SHORE_SWASH_OVERSHOOT};
+						float filmThickness = clamp( min( filmFront * 0.3, max( filmFront - 0.1, 0.0 ) * ${SHORE_BEACH_SLOPE} * 0.22 + 0.03 ), -0.1, 0.12 );
+						vSwashLevel = vertexGroundHeight + filmThickness;
 						if ( runupFront > 0.0 ) {
 							float uprush = 1.0 - smoothstep( 0.32, 0.46, tau );
 							vSwashFoam = ( 1.0 - smoothstep( 0.0, 0.8, runupFront ) ) * smoothstep( -0.05, 0.05, runupFront ) * uprush * 0.9;
 						}
+					}
+					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vSwashFront > -${SHORE_SWASH_OVERSHOOT} ) {
+						float seaSurfaceY = world.y + vWaveHeight;
+						float filmWeight = clamp( ( vSwashLevel - seaSurfaceY ) / 0.04 * 0.5 + 0.5, 0.0, 1.0 );
+						float continuousY = mix( seaSurfaceY, vSwashLevel, filmWeight ) + filmWeight * ( 1.0 - filmWeight ) * 0.04;
+						world.xz = mix( world.xz, vRestPosition, filmWeight );
+						world.y = continuousY - vWaveHeight;
+						vShoreFoam *= 1.0 - filmWeight;
+						vShoreFace *= 1.0 - filmWeight;
+						vShoreRoller *= 1.0 - filmWeight;
 					}
 					world.y += vWaveHeight;
 					vWorldPosition = world.xyz;
@@ -1298,6 +1313,11 @@ export class WebGLFallback {
 				uniform vec2 uViewport;
 				uniform sampler2D uTerrainColor;
 				uniform sampler2D uTerrainHeight;
+				uniform sampler2D uShoreField;
+				uniform float uShoreFieldOrigin;
+				uniform float uShoreFieldSize;
+				uniform sampler2D uSwashField;
+				uniform vec2 uSwashTimeRange;
 				uniform float uTerrainOrigin;
 				uniform float uTerrainSize;
 				uniform vec2 uHeightRange;
@@ -1313,7 +1333,44 @@ export class WebGLFallback {
 				varying vec2 vShoreDirection;
 				varying float vShoreSlope;
 				varying float vSwashFront;
+				varying float vSwashLevel;
 				varying float vSwashFoam;
+				float webglSwashEdge( vec2 p, float groundHeight, float thickness ) {
+					if ( thickness >= 0.3 || uShoreFieldSize <= 0.0 ) return thickness;
+					if ( groundHeight <= uSeaLevel - 0.8 ) return thickness;
+					vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
+					if ( any( lessThan( shoreUv, vec2( 0.0 ) ) ) || any( greaterThan( shoreUv, vec2( 1.0 ) ) ) ) return thickness;
+					vec4 shore = texture2D( uShoreField, shoreUv );
+					vec2 direction = normalize( shore.rg * 2.0 - 1.0 );
+					float exposure = shore.b;
+					float along = dot( p, vec2( -direction.y, direction.x ) );
+					float arrival = mix( uSwashTimeRange.x, uSwashTimeRange.y, texture2D( uSwashField, shoreUv ).r );
+					float ripBase = sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9;
+					float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + ripBase ) );
+					float phase = ( uTime - arrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )}
+						+ sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035
+						+ sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
+					float waveIndex = floor( phase );
+					float tau = phase - waveIndex;
+					float warp = sin( along * 0.016 + waveIndex * 0.9 ) * 1.6;
+					float variation = sin( along * 0.062 + waveIndex * 1.7 + warp ) * 0.6 + sin( along * 0.13 + waveIndex * 4.1 + 1.3 - warp * 0.7 ) * 0.4;
+					variation += ( sin( along * 0.29 + waveIndex * 2.3 + warp * 0.5 ) * 0.6 + sin( along * 0.47 + waveIndex * 5.9 + 0.8 ) * 0.4 ) * 0.28;
+					float randomWave = fract( sin( waveIndex * 127.1 + 311.7 ) * 43758.5453 ) * 2.0 - 1.0;
+					float waveSet = abs( sin( waveIndex * 0.448799 ) ) * 0.6 + 0.55;
+					float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
+					float amplitude = max( ${SHORE_DEFAULT_AMPLITUDE.toFixed( 2 )} * waveSet
+						* ( 1.0 + randomWave * ${( SHORE_DEFAULT_VARIATION * 0.5 ).toFixed( 3 )} + variation * ${( SHORE_DEFAULT_VARIATION * 0.7 ).toFixed( 3 )} ) * bar, 0.02 );
+					float runupMax = amplitude * 2.1 * ${SHORE_DEFAULT_RUNUP.toFixed( 2 )} * clamp( exposure * 1.4, 0.0, 1.0 ) / ${SHORE_BEACH_SLOPE};
+					float su = clamp( tau / ${SHORE_SWASH_UP}, 0.0, 1.0 );
+					float sb = clamp( ( tau - ${SHORE_SWASH_UP} ) / ${SHORE_SWASH_DOWN}, 0.0, 1.0 );
+					float runup = ( tau < ${SHORE_SWASH_UP} ? 1.0 - pow( 1.0 - su, 1.5 ) : 1.0 - pow( sb, 1.6 ) ) * runupMax - 0.3;
+					float lobes = sin( along * 0.61 + waveIndex * 2.3 ) * 0.5 + sin( along * 1.73 + waveIndex * 5.1 ) * 0.3 + sin( along * 4.3 + waveIndex * 1.7 ) * 0.2;
+					float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 );
+					float inland = max( groundHeight - uSeaLevel, 0.0 ) / ${SHORE_BEACH_SLOPE};
+					float front = runupFront - inland;
+					float w = smoothstep( uSeaLevel - 0.8, uSeaLevel - 0.4, groundHeight ) * ( 1.0 - smoothstep( 0.15, 0.3, thickness ) );
+					return mix( thickness, min( thickness, front * 0.08 ), w );
+				}
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
 				}
@@ -1351,8 +1408,11 @@ export class WebGLFallback {
 							sandCoverage = terrain.b;
 						}
 					}
-					if ( uBeachPatchMode == 2 && groundHeight > uSeaLevel ) {
-						if ( sandCoverage <= 0.05 || vSwashFront <= 0.0 ) discard;
+					if ( uBeachPatchMode == 1 && groundHeight > uSeaLevel ) discard;
+					float swashThickness = vWorldPosition.y - groundHeight;
+					if ( uBeachPatchMode == 2 ) {
+						swashThickness = webglSwashEdge( p, groundHeight, swashThickness );
+						if ( sandCoverage <= 0.05 || swashThickness <= 0.001 ) discard;
 					}
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );

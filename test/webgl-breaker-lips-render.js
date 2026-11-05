@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createWebGLBreakerLips, updateWebGLBreakerCrestState } from '../src/fallback/WebGLBreakerLips.js';
+import { createWebGLBreakerLips, prepareWebGLBreakerTransects, updateWebGLBreakerCrestState } from '../src/fallback/WebGLBreakerLips.js';
 import { extractWebGLShorelineStations } from '../src/fallback/WebGLShorelineStations.js';
 
 const result = document.querySelector( '#result' );
@@ -23,8 +23,9 @@ try {
 	const shoreField = { data: fieldData, res: resolution, origin, size };
 	const terrain = { origin, size, res: resolution, heightAt: ( _x, z ) => z };
 	const stations = extractWebGLShorelineStations( { terrain, shoreField, seaLevel: 0, targetSpacing: 2, maxStations: 256 } );
+	const transects = prepareWebGLBreakerTransects( stations, terrain, shoreField, 0 );
 	const debugState = new Float32Array( stations.length * 2 * 12 );
-	updateWebGLBreakerCrestState( stations, terrain, shoreField, 0, 97.6, debugState );
+	updateWebGLBreakerCrestState( stations, transects, 0, 97.6, debugState );
 	const width = stations.length * 2, active = [];
 	for ( let texel = 0; texel < width; texel ++ ) {
 		const id = debugState[ ( width * 2 + texel ) * 4 + 3 ], b = debugState[ texel * 4 + 3 ];
