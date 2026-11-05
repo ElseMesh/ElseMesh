@@ -1396,6 +1396,7 @@ export class WebGLFallback {
 					slope += vShoreDirection * vShoreSlope;
 					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
+					float shorelineCoverage = 1.0;
 					vec3 seabedColor = vec3( 0.31, 0.27, 0.19 );
 					if ( uTerrainSize > 0.0 ) {
 						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
@@ -1412,9 +1413,13 @@ export class WebGLFallback {
 					float swashThickness = vWorldPosition.y - groundHeight;
 					if ( uBeachPatchMode == 2 ) {
 						swashThickness = webglSwashEdge( p, groundHeight, swashThickness );
-						if ( sandCoverage <= 0.05 || swashThickness <= 0.001 ) discard;
+						float edgeWidth = max( fwidth( swashThickness ) * 1.5, 0.004 );
+						float edgeAA = smoothstep( 0.0, edgeWidth, swashThickness );
+						float landCoverage = groundHeight > uSeaLevel ? smoothstep( 0.02, 0.08, sandCoverage ) : 1.0;
+						shorelineCoverage = edgeAA * landCoverage;
 					}
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
+					vec3 sceneBaseColor = screenColorToLinear( texture2D( uSceneColor, screenUv ).rgb );
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
 					vec3 sceneColor = screenColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
 					vec3 absorption = exp( -vec3( 0.42, 0.075, 0.035 ) * min( depth, 60.0 ) );
@@ -1469,7 +1474,7 @@ export class WebGLFallback {
 				reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), vShoreFace * 0.55 );
 					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), vSwashFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
-					gl_FragColor = vec4( reflected, 1.0 );
+					gl_FragColor = vec4( mix( sceneBaseColor, reflected, shorelineCoverage ), 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>
 				}
