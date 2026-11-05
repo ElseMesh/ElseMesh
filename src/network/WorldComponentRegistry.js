@@ -29,3 +29,4 @@ export function registeredWorldComponents() {
 registerWorldComponent( 'elsemesh.water-body/1', { waterSurface: true } );
 registerWorldComponent( 'elsemesh.ambient-audio/1' );
 registerWorldComponent( 'elsemesh.static-model-instance-set/1', { installRank: 2 } );
+registerWorldComponent( 'elsemesh.ground-detail-field/1', { installRank: 2 } );

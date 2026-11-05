@@ -65,14 +65,29 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: Tidewater now authors a renderer-neutral `ground-detail-field/1`
+  component from the same `DebrisPlacer.mask` used by the built-in world. The
+  engine stores its RGBA density mask as a DEFLATE-compressed
+  `ground-detail-density/1` asset and installs the existing camera-local
+  WebGPU field through the generic component adapter. The 4 MiB mask compresses
+  to 234 KiB; the complete package is 126.18 MiB of its 128 MiB limit. The
+  deterministic Tidewater export test, density decoder/registration test, and
+  isolated production build pass. A live signed-world headless WebGPU capture
+  confirmed the hosted component installed and drew 49 field cells with no
+  browser errors; the current frame has no black horizon band. This fixes the
+  hosted WebGPU pebble-field omission and visually rechecks the horizon after
+  the camera-uniform rollback. The hosted WebGL path still uses its separate
+  terrain-derived beach clutter, spray is not visually confirmed in this frame,
+  and a matched pre-split/WebGL comparison is still required. The parity
+  estimate remains 82%.
+
 - 2026-11-05: A fresh hosted WebGPU review found that Tidewater's minimap frame
   hook could throw before `sceneRenderer.render()`: it read the built-in-only
   `app.terrainData` field and assumed terrain mask arrays that hosted heightfield
   data does not provide. The Tidewater minimap now reads `game.terrain` and
   treats those masks as optional, with a Tidewater-owned regression test. That
-  removes this hosted frame-loop failure, but the latest source has not yet had
-  a fresh visible WebGPU parity review, so the band and spray gates remain open
-  and the overall estimate stays 82%.
+  removes this hosted frame-loop failure. At this checkpoint, the band and
+  spray gates remained open pending a fresh WebGPU capture (recorded above).
 
 - 2026-11-05: A visual bisect in an isolated worktree identified
   `add53b1d` (`perf(renderer): reuse camera frame uniforms`) as the first bad

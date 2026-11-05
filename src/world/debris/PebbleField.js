@@ -255,7 +255,7 @@ export class PebbleField {
 			roughness: 0.8, metalness: 0,
 			underwaterLighting: 'lite',
 			// the former TerrainLightingModel (heightfield sun shadow on the key light)
-			modules: [ commonModule, terrainShadingModule(), gpu.module, gpu.sunModulationModule, stoneSurfaceModule, pebbleModule ],
+			modules: [ commonModule, terrainShadingModule( gpu.detailTexture ), gpu.module, gpu.sunModulationModule, stoneSurfaceModule, pebbleModule ],
 			defines: { MATERIAL_SUN_MODULATION: 1 },
 			appliesHillShadow: true, // (applied above: the lighting hook must not apply it again)
 			textures: { debrisPebbleMask: this.maskTex },

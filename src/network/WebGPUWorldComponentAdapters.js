@@ -7,8 +7,35 @@ import { ShoreWaves } from '../ocean/ShoreWaves.js';
 import { applyWaterBodyProfile } from '../ocean/WaterProfiles.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import './WebGPUStaticModelInstanceSetAdapter.js';
+import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js';
+import { GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js';
+import { PebbleField } from '../world/debris/PebbleField.js';
 
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWaterBody );
+registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.ground-detail-field/1', installGroundDetailField );
+
+async function installGroundDetailField( { app, root, connector, installed }, component ) {
+
+	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
+	if ( ! terrain || ! root.userData.terrainData ) throw new Error( `Ground-detail field ${component.id} requires an installed terrain surface` );
+	const references = ( component.assets || [] ).filter( asset => asset.kind === GROUND_DETAIL_DENSITY_ASSET_KIND );
+	if ( references.length !== 1 ) throw new Error( `Ground-detail field ${component.id} must reference exactly one density asset` );
+	const density = await decodeWorldComponentAsset( GROUND_DETAIL_DENSITY_ASSET_KIND, connector.assets.get( references[ 0 ].assetId ), {
+		resolution: component.data?.resolution,
+		texel: component.data?.texel,
+	} );
+	const field = new PebbleField( { terrain: root.userData.terrainData, gpu: terrain.terrainGPU, mask: density } );
+	root.add( field.mesh );
+	field.update( app.camera );
+	installed.push( {
+		groundDetailField: true,
+		update: ( _dt, camera ) => field.update( camera ),
+		dispose: () => { root.remove( field.mesh ); field.dispose(); },
+	} );
+	return true;
+
+}
+
 function installWaterBody( { app, root, connector, installed }, component ) {
 
 	const extent = component.extent;
