@@ -65,6 +65,27 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: A matched Weston WebGPU comparison of the pre-split Tidewater
+  build and hosted ElseMesh confirms two remaining content/presentation gaps:
+  the original has beach pebbles that the hosted world lacks, and the original
+  sky/sea look slightly bluer. The Tidewater package's
+  [`world-source.json`](worlds/tidewater/world-source.json) declares no debris
+  or pebble component; the built-in route instead constructs
+  [`Debris`](src/world/Debris.js), which adds `PebbleField`. The fix belongs in
+  Tidewater-authored renderer-neutral content plus an engine-owned generic
+  renderer path, not in Tidewater-specific `App.js` logic. Source comparison
+  found the atmosphere and environment implementations unchanged; the
+  `Sky.js` change only forwards the frame uniform block, and the water changes
+  concern pipeline-key caching and world sea-level use. These differences do
+  not yet explain the color shift, so compare live sky/water inputs and pixels
+  before changing color math. A concurrent 15-second sample counted 98 hosted
+  ElseMesh engine frames (6.53 FPS) and 102 original Tidewater frames (6.80
+  FPS), while the HUDs ended at 7 and 13 FPS. The original HUD accumulates
+  engine `dt` after its 100 ms clamp, so it omits long stalls from its time
+  denominator; future performance comparisons must count engine frames over a
+  matched wall-clock interval. No parity percentage changes: missing pebbles,
+  unexplained color differences, and WebGL comparison gates remain open.
+
 - 2026-11-05: Hosted WebGL now extracts connected shoreline stations from the
   packaged terrain and shore field, then updates a GPU-rendered breaker lip
   from the same phase, amplitude, depth, and crest equations used by WebGPU.
