@@ -65,6 +65,13 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: Fixed WebGL startup for worlds that omit the optional sky or
+  explicitly select `sky: none`. Lighting initialization now accepts the
+  absence of an environment map; a hosted initialization fixture exercises
+  both cases through the real fallback initialization path. This closes a
+  world-agnostic startup defect, but the remaining separation gates are still
+  open, so the 69% estimate is unchanged.
+
 - 2026-11-05: A hosted WebGL beach capture isolated the long sand bands to the
   terrain mesh casting shadows: disabling terrain shadow casting removes the
   bands while retaining its shadow reception. Hosted terrain now disables

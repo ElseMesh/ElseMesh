@@ -913,7 +913,7 @@ export class WebGLFallback {
 		this.sunDirection = sunDirection;
 		this._updateLighting();
 		this.webglEnvironment = this.worldEnvironment.sky ? new WebGLSkyEnvironment( T, this.renderer, this.cloudLayer ) : null;
-		if ( this.webglEnvironment.texture ) this.scene.environment = this.webglEnvironment.texture;
+		if ( this.webglEnvironment?.texture ) this.scene.environment = this.webglEnvironment.texture;
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
