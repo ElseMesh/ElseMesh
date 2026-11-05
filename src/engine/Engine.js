@@ -23,6 +23,7 @@ export class Engine {
 		this.renderScale = 1;
 		this.clock = new Timer();
 		this.frame = 0;
+		this.rafCallbacks = 0;
 		this.onResize = [];
 		this.backend = 'webgpu';
 
@@ -115,6 +116,8 @@ export class Engine {
 		let pendingDt = 0;
 		let nextFrame = null;
 		const loop = ( t ) => {
+
+			this.rafCallbacks ++;
 
 			// Queue the next callback before user code runs, so a frame exception stays visible
 			// without silently terminating the animation loop.

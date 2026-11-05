@@ -1929,7 +1929,7 @@ export class UI {
 			<div class="em-stats-main"><span class="em-fps">--</span><span class="em-fps-unit">fps</span></div>
 			<canvas class="em-spark"></canvas>
 			<div class="em-stats-sub">
-				<span class="em-kv"><span class="em-k" title="Time between animation-frame callbacks">gap</span><span class="em-v em-ms">--</span></span>
+				<span class="em-kv"><span class="em-k" title="Elapsed time between successive app-frame updates, including browser scheduling pauses">gap</span><span class="em-v em-ms">--</span></span>
 				<span class="em-kv em-kv-cpu" hidden><span class="em-k" title="Browser-side CPU time for a frame">cpu</span><span class="em-v em-cpu">--</span></span>
 				<span class="em-kv em-kv-gpu" hidden><span class="em-k" title="Measured GPU execution time">gpu</span><span class="em-v em-gpu">--</span></span>
 			</div>`;

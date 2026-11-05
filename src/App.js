@@ -1146,10 +1146,11 @@ export class App {
 	updateFPS() {
 
 		const now = performance.now();
-		const f = this._fps || ( this._fps = { el: document.getElementById( 'fps' ), acc: 0, n: 0, worst: 0, last: null } );
+		const f = this._fps || ( this._fps = { el: document.getElementById( 'fps' ), acc: 0, n: 0, worst: 0, last: null, lastRafCallbacks: null, lastGapWarningAt: -Infinity } );
 		if ( f.last === null ) {
 
 			f.last = now;
+			f.lastRafCallbacks = Number.isFinite( this.engine?.rafCallbacks ) ? this.engine.rafCallbacks : null;
 			this.frameMs = 0;
 			return;
 
@@ -1160,6 +1161,26 @@ export class App {
 		f.acc += elapsed;
 		f.n ++;
 		f.worst = Math.max( f.worst, elapsed );
+		const rafCallbacks = Number.isFinite( this.engine?.rafCallbacks ) ? this.engine.rafCallbacks : null;
+		const rafCallbacksSincePreviousFrame = rafCallbacks !== null && f.lastRafCallbacks !== null
+			? rafCallbacks - f.lastRafCallbacks
+			: null;
+		f.lastRafCallbacks = rafCallbacks;
+		if ( this.frameMs >= 1000 && now - f.lastGapWarningAt >= 5000 ) {
+
+			const gpuMs = this.frameWorkMeter?.gpuMilliseconds();
+			console.warn( '[ElseMesh] Long app-frame interval', {
+				intervalMs: this.frameMs,
+				animationFrameCallbacksSincePreviousFrame: rafCallbacksSincePreviousFrame,
+				backend: this.engine?.backend ?? null,
+				documentVisibility: document.visibilityState,
+				hasFocus: document.hasFocus(),
+				previousFrameCpuMs: Number.isFinite( this.cpuMs ) ? this.cpuMs : null,
+				previousGpuMs: Number.isFinite( gpuMs ) ? gpuMs : null,
+			} );
+			f.lastGapWarningAt = now;
+
+		}
 		if ( f.acc >= 0.5 ) {
 
 			const fps = f.n / f.acc;

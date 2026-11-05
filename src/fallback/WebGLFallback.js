@@ -1336,7 +1336,7 @@ export class WebGLFallback {
 				varying float vSwashLevel;
 				varying float vSwashFoam;
 				float webglSwashEdge( vec2 p, float groundHeight, float thickness ) {
-					if ( thickness >= 0.3 || uShoreFieldSize <= 0.0 ) return thickness;
+					if ( uShoreFieldSize <= 0.0 ) return thickness;
 					if ( groundHeight <= uSeaLevel - 0.8 ) return thickness;
 					vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 					if ( any( lessThan( shoreUv, vec2( 0.0 ) ) ) || any( greaterThan( shoreUv, vec2( 1.0 ) ) ) ) return thickness;
@@ -1368,7 +1368,7 @@ export class WebGLFallback {
 					float runupFront = max( runup + lobes * ( max( runup, 0.0 ) * 0.07 + 0.35 ), 0.35 );
 					float inland = max( groundHeight - uSeaLevel, 0.0 ) / ${SHORE_BEACH_SLOPE};
 					float front = runupFront - inland;
-					float w = smoothstep( uSeaLevel - 0.8, uSeaLevel - 0.4, groundHeight ) * ( 1.0 - smoothstep( 0.15, 0.3, thickness ) );
+					float w = smoothstep( uSeaLevel - 0.8, uSeaLevel - 0.4, groundHeight );
 					return mix( thickness, min( thickness, front * 0.08 ), w );
 				}
 				vec3 screenColorToLinear( vec3 color ) {
@@ -2182,6 +2182,7 @@ export class WebGLFallback {
 
 	_frame() {
 
+		this.engine.rafCallbacks ++;
 		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		this.app.updateFPS();
 		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, cpuMs: this.app.cpuMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
