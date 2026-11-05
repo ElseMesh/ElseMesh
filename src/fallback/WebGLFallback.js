@@ -6,6 +6,7 @@ import { makePresencePose } from '../network/WorldPresenceSession.js';
 import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
 import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
+import { CDLOD } from '../core/CDLOD.js';
 import { Player } from '../player/Player.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
@@ -289,7 +290,9 @@ vec4 shoreSample = texture2D( uTerrainShoreField, shoreUv );
 				vec2 shoreDirection = normalize( shoreSample.rg * 2.0 - 1.0 );
 				float exposure = shoreSample.b;
 				float along = dot( terrainXZ, vec2( -shoreDirection.y, shoreDirection.x ) );
-				float swashArrival = mix( uTerrainSwashTimeRange.x, uTerrainSwashTimeRange.y, texture2D( uTerrainSwashField, shoreUv ).r );
+				vec2 swashEncoded = texture2D( uTerrainSwashField, shoreUv ).rg;
+				float swashFraction = ( swashEncoded.x * 255.0 * 256.0 + swashEncoded.y * 255.0 ) / 65535.0;
+				float swashArrival = mix( uTerrainSwashTimeRange.x, uTerrainSwashTimeRange.y, swashFraction );
 				float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 				float phase = ( uTerrainTime - swashArrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 				float waveIndex = floor( phase );
@@ -503,7 +506,7 @@ varying vec3 vTerrainWorldPosition;
 		material.userData.terrainTime = time;
 		if ( material.userData.terrainShaderUniforms ) material.userData.terrainShaderUniforms.uTerrainTime.value = time;
 	};
-	material.userData.terrainTextures = [ texture, detailTexture, flagsTexture, shore?.texture, shore?.swashTexture ].filter( Boolean );
+	material.userData.terrainTextures = [ texture, detailTexture, flagsTexture, shore?.texture, shore?.arrivalTexture, shore?.swashTexture ].filter( Boolean );
 	return material;
 
 }
@@ -576,7 +579,7 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 	const material = new T.ShaderMaterial( {
 		uniforms: {
 			uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() },
-			uShoreField: { value: terrainWater.shore.texture }, uShoreFieldOrigin: { value: terrainWater.shore.origin }, uShoreFieldSize: { value: terrainWater.shore.size }, uShoreTimeRange: { value: terrainWater.shore.timeRange }, uSeaLevel: { value: seaLevel },
+			uShoreField: { value: terrainWater.shore.texture }, uShoreArrivalField: { value: terrainWater.shore.arrivalTexture }, uShoreFieldOrigin: { value: terrainWater.shore.origin }, uShoreFieldSize: { value: terrainWater.shore.size }, uShoreTimeRange: { value: terrainWater.shore.timeRange }, uSeaLevel: { value: seaLevel },
 			uTerrainHeight: { value: terrainWater.texture }, uTerrainOrigin: { value: terrainWater.origin }, uTerrainSize: { value: terrainWater.size },
 			uHeightRange: { value: new T.Vector2( terrainWater.minHeight, terrainWater.maxHeight ) },
 		},
@@ -584,6 +587,7 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 			uniform float uTime;
 			uniform vec3 uCameraPosition;
 			uniform sampler2D uShoreField;
+			uniform sampler2D uShoreArrivalField;
 			uniform float uShoreFieldOrigin;
 			uniform float uShoreFieldSize;
 			uniform vec2 uShoreTimeRange;
@@ -606,7 +610,9 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 					vec2 dir = normalize( shore.rg * 2.0 - 1.0 );
 					float exposure = shore.b;
 					float along = dot( p.xz, vec2( -dir.y, dir.x ) );
-					float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
+					vec2 arrivalEncoded = texture2D( uShoreArrivalField, shoreUv ).rg;
+					float arrivalFraction = ( arrivalEncoded.x * 255.0 * 256.0 + arrivalEncoded.y * 255.0 ) / 65535.0;
+					float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, arrivalFraction );
 					float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 					float bar = ( 0.9 + ( sin( along * 0.031 + 7.3 ) * 0.6 + sin( along * 0.083 + 1.1 ) * 0.4 ) * 0.14 ) * ( 1.0 - rip * 0.58 );
 					float phase = ( uTime - arrival ) / 9.0 + webglShoreWobble( along );
@@ -840,6 +846,7 @@ export class WebGLFallback {
 		this.frameWorkMeter = new FrameWorkMeter( { webglRenderer: this.renderer } );
 		this.scene = new this.THREE.Scene();
 		this.waterScene = new this.THREE.Scene();
+		this.oceanLODs = new Set();
 		this.sceneColorTexture = new this.THREE.FramebufferTexture( 1, 1 );
 		this.sceneColorTexture.magFilter = this.THREE.LinearFilter;
 		this.sceneColorTexture.minFilter = this.THREE.LinearFilter;
@@ -1039,9 +1046,27 @@ export class WebGLFallback {
 
 	}
 
-	_makeWater( geometry, seaLevel, terrainWater, beachPatchMode = 0, beachPatchBounds = null ) {
+	_createOceanLOD() {
 
 		const T = this.THREE;
+		const lod = new CDLOD( { gridSize: 32, leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
+		const source = lod.geometry;
+		const geometry = new T.InstancedBufferGeometry();
+		geometry.setAttribute( 'position', new T.BufferAttribute( source.attributes.position.array, 3 ) );
+		geometry.setIndex( new T.BufferAttribute( source.index.array, 1 ) );
+		geometry.setAttribute( 'nodeData', new T.InstancedBufferAttribute( lod.nodeArray, 4 ) );
+		geometry.boundingSphere = new T.Sphere( new T.Vector3(), 1e7 );
+		geometry.instanceCount = 0;
+		geometry.userData.oceanLOD = lod;
+		this.oceanLODs.add( { lod, geometry } );
+		return { lod, geometry };
+
+	}
+
+	_makeWater( geometry, seaLevel, terrainWater, oceanLOD = null ) {
+
+		const T = this.THREE;
+		const cdlodMorph = oceanLOD ? oceanLOD.uMorph.array.map( ( value, lod ) => new T.Vector4( value.x, value.y, oceanLOD.uSpacing.array[ lod ], 0 ) ) : null;
 		const material = new T.ShaderMaterial( {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
@@ -1050,17 +1075,20 @@ export class WebGLFallback {
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
-				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
+				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreArrivalField: { value: terrainWater?.shore?.arrivalTexture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
 				uShoreTimeRange: { value: terrainWater?.shore?.timeRange || new T.Vector2() }, uSwashField: { value: terrainWater?.shore?.swashTexture || null }, uSwashTimeRange: { value: terrainWater?.shore?.swashTimeRange || new T.Vector2() },
-				uBeachPatchMode: { value: beachPatchMode }, uBeachPatchBounds: { value: beachPatchBounds ? new T.Vector4( beachPatchBounds.xMin, beachPatchBounds.zMin, beachPatchBounds.xMax, beachPatchBounds.zMax ) : new T.Vector4() },
+				uBeachPatchMode: { value: 0 }, uBeachPatchBounds: { value: new T.Vector4() },
+				...( oceanLOD ? { uCdlodMorph: { value: cdlodMorph } } : {} ),
 			},
 			vertexShader: /* glsl */`
 				uniform float uTime;
+				uniform vec3 uCameraPosition;
 				uniform sampler2D uOceanDisplacement;
 				uniform vec4 uOceanSizes;
 				uniform int uOceanEnabled;
 				uniform sampler2D uTerrainHeight;
 				uniform sampler2D uShoreField;
+				uniform sampler2D uShoreArrivalField;
 				uniform float uTerrainOrigin;
 				uniform float uTerrainSize;
 				uniform float uShoreFieldOrigin;
@@ -1068,6 +1096,7 @@ export class WebGLFallback {
 				uniform vec2 uShoreTimeRange;
 				uniform sampler2D uSwashField;
 				uniform vec2 uSwashTimeRange;
+				${ oceanLOD ? `attribute vec4 nodeData; uniform vec4 uCdlodMorph[${oceanLOD.levels}];` : '' }
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
 				uniform int uBeachPatchMode;
@@ -1185,6 +1214,17 @@ export class WebGLFallback {
 				void main() {
 					vec4 world = modelMatrix * vec4( position, 1.0 );
 					vec2 p = world.xz;
+					${ oceanLOD ? `
+						int lodIndex = clamp( int( nodeData.w ), 0, ${oceanLOD.levels - 1} );
+						vec4 lodMorph = uCdlodMorph[ lodIndex ];
+						vec2 nodePosition = nodeData.xy + position.xz * nodeData.z;
+						vec2 lattice = floor( nodePosition / lodMorph.z + 1e-3 );
+						vec2 snapped = lattice * lodMorph.z;
+						float morphK = clamp( ( length( uCameraPosition - vec3( snapped.x, uSeaLevel, snapped.y ) ) - lodMorph.x ) * lodMorph.y, 0.0, 1.0 );
+						vec2 odd = fract( lattice * 0.5 ) * 2.0;
+						p = snapped - odd * lodMorph.z * morphK;
+						world.xz = p;
+					` : '' }
 					vRestPosition = p;
 					vSwashFront = -1.0;
 					vSwashLevel = uSeaLevel;
@@ -1216,7 +1256,9 @@ export class WebGLFallback {
 								vec4 shore = texture2D( uShoreField, shoreUv );
 								vec2 shoreDirection = normalize( shore.rg * 2.0 - 1.0 );
 								float exposure = shore.b;
-								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, shore.a );
+								vec2 arrivalEncoded = texture2D( uShoreArrivalField, shoreUv ).rg;
+								float arrivalFraction = ( arrivalEncoded.x * 255.0 * 256.0 + arrivalEncoded.y * 255.0 ) / 65535.0;
+								float arrival = mix( uShoreTimeRange.x, uShoreTimeRange.y, arrivalFraction );
 								float along = dot( p, vec2( -shoreDirection.y, shoreDirection.x ) );
 							float wobble = webglShoreWobble( along );
 							float phase = ( uTime - arrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + wobble;
@@ -1253,13 +1295,15 @@ export class WebGLFallback {
 						world.xz += ocean.xz;
 						vWaveHeight = ocean.y + shoreWaveHeight;
 					}
-					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vertexSandCoverage > 0.05 ) {
+					if ( uShoreFieldSize > 0.0 && uSwashTimeRange.y > uSwashTimeRange.x && uSeaLevel - vertexGroundHeight < 26.0 && vertexSandCoverage > 0.05 ) {
 						vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 						vec4 shore = texture2D( uShoreField, shoreUv );
 						vec2 dir = normalize( shore.rg * 2.0 - 1.0 );
 						float exposure = shore.b;
 						float along = dot( p, vec2( -dir.y, dir.x ) );
-						float swashArrival = mix( uSwashTimeRange.x, uSwashTimeRange.y, texture2D( uSwashField, shoreUv ).r );
+						vec2 swashEncoded = texture2D( uSwashField, shoreUv ).rg;
+						float swashFraction = ( swashEncoded.x * 255.0 * 256.0 + swashEncoded.y * 255.0 ) / 65535.0;
+						float swashArrival = mix( uSwashTimeRange.x, uSwashTimeRange.y, swashFraction );
 						float rip = smoothstep( 0.8 + sin( along * 0.017 + 4.1 ) * 0.08, 0.985, sin( along * 0.059 + sin( along * 0.021 + 1.9 ) * 1.4 + sin( along * 0.009 + 0.3 ) * 0.9 ) );
 						float phase = ( uTime - swashArrival ) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + sin( along * 0.029 + 0.7 ) * 0.07 + sin( along * 0.083 + 2.1 ) * 0.035 + sin( along * 0.19 + 0.4 ) * 0.022 + sin( along * 0.37 + 2.6 ) * 0.011 + rip * 0.045;
 						float waveIndex = floor( phase );
@@ -1285,7 +1329,7 @@ export class WebGLFallback {
 							vSwashFoam = ( 1.0 - smoothstep( 0.0, 0.8, runupFront ) ) * smoothstep( -0.05, 0.05, runupFront ) * uprush * 0.9;
 						}
 					}
-					if ( uBeachPatchMode == 2 && vertexGroundHeight > uSeaLevel && vSwashFront > -${SHORE_SWASH_OVERSHOOT} ) {
+					if ( uShoreFieldSize > 0.0 && uSeaLevel - vertexGroundHeight < 26.0 && vertexSandCoverage > 0.05 ) {
 						float seaSurfaceY = world.y + vWaveHeight;
 						float filmWeight = clamp( ( vSwashLevel - seaSurfaceY ) / 0.04 * 0.5 + 0.5, 0.0, 1.0 );
 						float continuousY = mix( seaSurfaceY, vSwashLevel, filmWeight ) + filmWeight * ( 1.0 - filmWeight ) * 0.04;
@@ -1314,6 +1358,7 @@ export class WebGLFallback {
 				uniform sampler2D uTerrainColor;
 				uniform sampler2D uTerrainHeight;
 				uniform sampler2D uShoreField;
+				uniform sampler2D uShoreArrivalField;
 				uniform float uShoreFieldOrigin;
 				uniform float uShoreFieldSize;
 				uniform sampler2D uSwashField;
@@ -1373,7 +1418,7 @@ export class WebGLFallback {
 						}
 					}
 					if ( uBeachPatchMode == 1 && groundHeight > uSeaLevel ) discard;
-					if ( uBeachPatchMode == 2 && groundHeight > uSeaLevel ) {
+					if ( ( uBeachPatchMode == 2 || ${oceanLOD ? 'true' : 'false'} ) && groundHeight > uSeaLevel ) {
 						if ( sandCoverage <= 0.05 || vSwashFront <= 0.0 ) discard;
 					}
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
@@ -1440,7 +1485,8 @@ export class WebGLFallback {
 			depthWrite: true,
 		} );
 		const water = new T.Mesh( geometry, material );
-		water.rotation.x = - Math.PI / 2;
+		if ( oceanLOD ) water.frustumCulled = false;
+		else water.rotation.x = - Math.PI / 2;
 		water.position.y = seaLevel;
 		water.isWater = true;
 		water.onBeforeRender = ( renderer, scene, camera ) => {
@@ -1622,12 +1668,10 @@ export class WebGLFallback {
 		waterTerrain.shore = webglShoreFieldTexture( T, this.terrain, this.worldSeaLevel, WORLD );
 		this.shoreField = waterTerrain.shore?.field || null;
 		if ( this.terrainMaterial && waterTerrain.shore ) this._initShoreWetness( this.terrainMaterial, this.terrain, waterTerrain.shore, this.worldSeaLevel );
-		this.waterScene.add( this._makeWater( new T.PlaneGeometry( 4000, 4000, 768, 768 ), this.worldSeaLevel, waterTerrain, 1 ) );
-		const beachBounds = { xMin: WORLD.beach.xMin - 50, xMax: WORLD.beach.xMax + 50, zMin: - 120, zMax: 40 };
-		const beachPatch = this._makeWater( new T.PlaneGeometry( beachBounds.xMax - beachBounds.xMin, beachBounds.zMax - beachBounds.zMin, 672, 256 ), this.worldSeaLevel, waterTerrain, 2, beachBounds );
-		beachPatch.position.x = ( WORLD.beach.xMin + WORLD.beach.xMax ) * 0.5;
-		beachPatch.position.z = - 40;
-		this.waterScene.add( beachPatch );
+		const oceanLOD = this._createOceanLOD();
+		const water = this._makeWater( oceanLOD.geometry, this.worldSeaLevel, waterTerrain, oceanLOD.lod );
+		water.position.y = this.worldSeaLevel;
+		this.waterScene.add( water );
 		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel, WORLD ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
@@ -2178,6 +2222,11 @@ export class WebGLFallback {
 		if ( this.player && ! gamePanelOpen ) {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );
+		}
+		for ( const { lod, geometry } of this.oceanLODs ) {
+			lod.update( this.camera );
+			geometry.instanceCount = lod.count;
+			geometry.attributes.nodeData.needsUpdate = true;
 		}
 		if ( this.worldLink ) this._updateHostedWorldStreaming();
 		this.useButton.style.display = this._nearestPortalRoute() ? '' : 'none';

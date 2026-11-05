@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { webglSandShoreBounds, webglShoreFieldTexture, webglShorePatchSegments } from '../src/fallback/WebGLShoreField.js';
+import { webglShoreFieldTexture } from '../src/fallback/WebGLShoreField.js';
 
 class DataTexture {
 	constructor( data, width, height, format, type ) { Object.assign( this, { image: { data, width, height }, format, type } ); }
@@ -18,18 +18,10 @@ assert.ok( shore );
 assert.deepEqual( [ shore.timeRange.x, shore.timeRange.y ], [ 12, 14 ] );
 assert.deepEqual( [ shore.swashTimeRange.x, shore.swashTimeRange.y ], [ 20, 24 ] );
 assert.deepEqual( [ ...shore.texture.image.data.slice( 0, 4 ) ], [ 204, 229, 255, 0 ] );
+assert.deepEqual( [ ...shore.arrivalTexture.image.data.slice( 0, 4 ) ], [ 0, 0, 0, 255 ] );
+assert.deepEqual( [ ...shore.arrivalTexture.image.data.slice( 4, 8 ) ], [ 255, 255, 0, 255 ] );
+assert.deepEqual( [ ...shore.swashTexture.image.data.slice( 0, 4 ) ], [ 0, 0, 0, 255 ] );
+assert.deepEqual( [ ...shore.swashTexture.image.data.slice( 4, 8 ) ], [ 255, 255, 0, 255 ] );
 assert.equal( shore.texture.image.data[ 7 ], 255 );
-assert.equal( shore.swashTexture.image.data[ 4 ], 255 );
 
-const heights = new Float32Array( 16 ).fill( -3 );
-heights[ 5 ] = 1;
-const splat = new Uint8Array( 16 * 4 );
-splat[ 5 * 4 ] = 255;
-const bounds = webglSandShoreBounds( { res: 4, size: 40, origin: -20, heights, splat }, 0, { cellPadding: 0 } );
-assert.deepEqual( bounds, { xMin: -10, xMax: 0, zMin: -10, zMax: 0 } );
-assert.equal( webglSandShoreBounds( { res: 4, size: 40, origin: -20, heights, splat }, 2 ), null );
-const segments = webglShorePatchSegments( { xMin: -600, xMax: 600, zMin: -500, zMax: 500 } );
-assert.ok( segments.x * segments.z <= 220000 );
-assert.ok( segments.x >= 128 && segments.z >= 128 );
-
-console.log( 'ok WebGL packaged shore texture encoding and generic sand-shore bounds' );
+console.log( 'ok WebGL packaged shore texture encoding uses 16-bit arrival times' );

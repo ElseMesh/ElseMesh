@@ -11,7 +11,7 @@ export function webglShoreFieldTexture( THREE, field, fallbackDirection = [ 1, 0
 	const timeRange = Math.max( maxTime - minTime, 1e-6 ), swashTimeRange = Math.max( maxSwashTime - minSwashTime, 1e-6 );
 	const fallbackLength = Math.hypot( fallbackDirection[ 0 ], fallbackDirection[ 1 ] ) || 1;
 	const fallbackX = fallbackDirection[ 0 ] / fallbackLength, fallbackZ = fallbackDirection[ 1 ] / fallbackLength;
-	const data = new Uint8Array( field.res * field.res * 4 ), swashData = new Uint8Array( field.res * field.res * 4 );
+	const data = new Uint8Array( field.res * field.res * 4 ), arrivalData = new Uint8Array( field.res * field.res * 4 ), swashData = new Uint8Array( field.res * field.res * 4 );
 	for ( let i = 0; i < field.res * field.res; i ++ ) {
 		const offset = i * 4, arrival = field.data[ offset ], directionX = field.data[ offset + 1 ], directionZ = field.data[ offset + 2 ], directionLength = Math.hypot( directionX, directionZ );
 		const exposure = Math.min( 1, directionLength );
@@ -19,7 +19,13 @@ export function webglShoreFieldTexture( THREE, field, fallbackDirection = [ 1, 0
 		data[ offset + 1 ] = Math.round( ( ( directionLength > 1e-5 ? directionZ / directionLength : fallbackZ ) * 0.5 + 0.5 ) * 255 );
 		data[ offset + 2 ] = Math.round( exposure * 255 );
 		data[ offset + 3 ] = Math.round( ( Math.min( maxTime, Math.max( minTime, arrival ) ) - minTime ) / timeRange * 255 );
-		swashData[ offset ] = Math.round( ( Math.min( maxSwashTime, Math.max( minSwashTime, field.data[ offset + 3 ] ) ) - minSwashTime ) / swashTimeRange * 255 );
+		const arrival16 = Math.round( ( Math.min( maxTime, Math.max( minTime, arrival ) ) - minTime ) / timeRange * 65535 );
+		arrivalData[ offset ] = arrival16 >>> 8;
+		arrivalData[ offset + 1 ] = arrival16 & 255;
+		arrivalData[ offset + 3 ] = 255;
+		const swash16 = Math.round( ( Math.min( maxSwashTime, Math.max( minSwashTime, field.data[ offset + 3 ] ) ) - minSwashTime ) / swashTimeRange * 65535 );
+		swashData[ offset ] = swash16 >>> 8;
+		swashData[ offset + 1 ] = swash16 & 255;
 		swashData[ offset + 3 ] = 255;
 	}
 	const makeTexture = pixels => {
@@ -31,7 +37,7 @@ export function webglShoreFieldTexture( THREE, field, fallbackDirection = [ 1, 0
 		return texture;
 	};
 	return {
-		texture: makeTexture( data ), swashTexture: makeTexture( swashData ),
+		texture: makeTexture( data ), arrivalTexture: makeTexture( arrivalData ), swashTexture: makeTexture( swashData ),
 		timeRange: new THREE.Vector2( minTime, maxTime ), swashTimeRange: new THREE.Vector2( minSwashTime, maxSwashTime ),
 		origin: field.origin, size: field.size,
 	};
