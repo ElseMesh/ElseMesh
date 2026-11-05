@@ -49,6 +49,7 @@ not a replacement for content-addressed package assets.
     {
       "id": "market-table",
       "bounds": { "center": [0, 0.1, 0], "radius": 0.6 },
+      "geometryMirrorX": false,
       "lods": [
         { "assetId": "sha256:..." },
         { "assetId": "sha256:..." },
@@ -77,6 +78,12 @@ not a replacement for content-addressed package assets.
 Each model asset is a static GLB using the core glTF feature subset supported by
 both renderers and local-space geometry. Skins, animation, morph targets,
 non-triangle primitives, and unsupported vertex attributes are rejected.
+`geometryMirrorX` records an odd-parity source reflection. The loader reflects
+the LOD geometry across local X, reverses triangle winding, and adjusts tangent
+handedness. The corresponding instance rotations absorb the source scale-sign
+pattern, while every serialized instance scale remains positive. This lets
+mirrored source placements use per-mesh LODs without relying on negative-scale
+instanced matrices, which neither renderer can cull consistently.
 LOD entries are ordered from coarsest to finest detail. With `lodMetric` set to
 `projected-radius`, each `lodThresholds` entry is a normalized projected-radius
 boundary for the next finer level and values ascend. With `scaled-distance`,

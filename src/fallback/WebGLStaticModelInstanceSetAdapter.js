@@ -1,4 +1,5 @@
 import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
+import { mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
@@ -99,7 +100,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			const coarse = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ] ) );
+			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 		}
 		const runtime = new StaticModelInstanceSetRuntime( document, {
@@ -115,7 +116,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				const source = await parseModel( assetId, webGLBytes || bytes );
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ] );
+				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
@@ -157,7 +158,7 @@ function staticModelInstanceBoundsSphere( T, document, modelIndex ) {
 	return new T.Sphere( new T.Vector3( ...sphereCenter ), sphereRadius );
 }
 
-function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ownedMaterials, instanceBoundsSphere ) {
+function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ownedMaterials, instanceBoundsSphere, geometryMirrorX ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
@@ -167,6 +168,7 @@ function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ow
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Static model instance GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
 		const geometry = object.geometry.clone().applyMatrix4( object.matrixWorld );
+		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
 		geometry.computeBoundingSphere();
 		const sourceMaterial = object.material;

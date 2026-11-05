@@ -3,6 +3,7 @@ import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
 import { loadWorldPackageModelAsset } from './WorldPackage.js';
+import { mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from './WorldObjectLOD.js';
@@ -40,10 +41,10 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 			const { bytes, progressive } = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await getScene( model.lods[ 0 ].assetId, bytes, progressive );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials ) );
+			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], model.geometryMirrorX, false, materialCache, ownedGeometry, ownedMaterials ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 			const shadowSource = coarseSource;
-			shadowBatches.push( createModelDraws( shadowSource, modelCapacity[ modelIndex ], true, materialCache, ownedGeometry, ownedMaterials ) );
+			shadowBatches.push( createModelDraws( shadowSource, modelCapacity[ modelIndex ], model.geometryMirrorX, true, materialCache, ownedGeometry, ownedMaterials ) );
 		}
 		if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 		const runtime = new StaticModelInstanceSetRuntime( document, {
@@ -56,7 +57,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				const source = await getScene( assetId, bytes, progressive );
 				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( source, modelCapacity[ modelIndex ], false, materialCache, ownedGeometry, ownedMaterials );
+				const draws = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, false, materialCache, ownedGeometry, ownedMaterials );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( root, [ draws ] );
@@ -72,7 +73,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	}
 }
 
-function createModelDraws( source, capacity, shadowOnly, materialCache, ownedGeometry, ownedMaterials ) {
+function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, materialCache, ownedGeometry, ownedMaterials ) {
 	const matrixAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
@@ -83,6 +84,7 @@ function createModelDraws( source, capacity, shadowOnly, materialCache, ownedGeo
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
 		const geometry = object.geometry.clone();
 		geometry.applyMatrix4( object.matrixWorld );
+		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
 		geometry.computeBoundingSphere();
 		const sourceMaterial = object.material;

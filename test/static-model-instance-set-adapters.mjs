@@ -16,7 +16,7 @@ const hash = bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( '
 const glbBytes = staticModelGLB(), modelAssetID = hash( glbBytes ), fineModelAssetID = `sha256:${'f'.repeat( 64 )}`;
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID }, { assetId: fineModelAssetID } ], lodThresholds: [ 0.001 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID }, { assetId: fineModelAssetID } ], lodThresholds: [ 0.001 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
 	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
@@ -62,7 +62,9 @@ const webgpuShadow = webgpuMeshes.find( mesh => mesh.userData.shadowOnly );
 assert.ok( webgpuMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the requested fine WebGPU model becomes active after it loads' );
 assert.ok( webgpuMeshes.every( mesh => mesh.matrixAutoUpdate === false && mesh.matrixWorldAutoUpdate === false ), 'newly streamed WebGPU LOD batches also freeze their world transforms' );
 assert.equal( webgpuShadow.count, 1 );
-assert.equal( webgpuMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5, 'GLB node translation is baked into the cloned primitive geometry' );
+assert.equal( webgpuMain.geometry.getAttribute( 'position' ).getX( 0 ), -1.5, 'mirrored LOD geometry reflects the baked GLB node translation' );
+assert.deepEqual( [ webgpuMain.geometry.getIndex().getX( 0 ), webgpuMain.geometry.getIndex().getX( 1 ), webgpuMain.geometry.getIndex().getX( 2 ) ], [ 0, 2, 1 ], 'mirroring reverses triangle winding for the WebGPU rasterizer' );
+assert.deepEqual( [ webgpuShadow.geometry.getIndex().getX( 0 ), webgpuShadow.geometry.getIndex().getX( 1 ), webgpuShadow.geometry.getIndex().getX( 2 ) ], [ 0, 2, 1 ], 'WebGPU shadow geometry uses the same mirrored winding' );
 assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
 assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'shared adapter fade data carries LOD and draw-distance fades' );
 assert.equal( webgpuShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0, 'shadow-only instances remain fully visible with complementary fade enabled' );
@@ -94,7 +96,8 @@ assert.equal( webglMeshes.some( mesh => mesh.userData.shadowOnly ), false, 'WebG
 assert.equal( webglMain.castShadow, true, 'the selected WebGL color LOD casts shadows without a duplicate mesh' );
 assert.ok( webglMain.customDepthMaterial, 'the selected color LOD uses a screen-door aware depth material' );
 assert.equal( webglResult.runtime.planner.shadowGroups[ 0 ].count, 0, 'WebGL skips its unused separate shadow-instance selection' );
-assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 1.5 );
+assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), -1.5, 'the WebGL batch uses mirrored LOD geometry' );
+assert.deepEqual( [ webglMain.geometry.getIndex().getX( 0 ), webglMain.geometry.getIndex().getX( 1 ), webglMain.geometry.getIndex().getX( 2 ) ], [ 0, 2, 1 ], 'mirroring reverses triangle winding for the WebGL rasterizer' );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'WebGL uses the shared four-channel fade policy' );
 webglResult.runtime.dispose();

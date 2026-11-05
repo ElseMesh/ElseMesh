@@ -16,7 +16,7 @@ try {
 	const glbBytes = staticModelGLB(), modelAssetID = await hash( glbBytes );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-		models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+		models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
 		instances: [
 			{ model: 'render-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] },
 			{ model: 'render-triangle', position: [ 80, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 2, 1, 1 ] },

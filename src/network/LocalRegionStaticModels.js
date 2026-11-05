@@ -18,6 +18,40 @@ function boundsSphere( bounds, maxDistanceMeters ) {
 	return { center, radius, maxDistanceMeters };
 }
 
+function mirroredInstanceTransform( transform ) {
+	const signs = transform.scale.map( value => Math.sign( value ) );
+	if ( signs.some( value => value === 0 ) ) return null;
+	const geometryMirrorX = signs[ 0 ] * signs[ 1 ] * signs[ 2 ] < 0;
+	// Factor odd reflection parity into mesh geometry; absorb the remaining
+	// even sign matrix into a proper rotation so every instance scale stays positive.
+	const correction = [
+		signs[ 0 ] * ( geometryMirrorX ? -1 : 1 ),
+		signs[ 1 ],
+		signs[ 2 ],
+	];
+	let correctionRotation;
+	if ( correction[ 0 ] === 1 && correction[ 1 ] === 1 && correction[ 2 ] === 1 ) correctionRotation = [ 0, 0, 0, 1 ];
+	else if ( correction[ 0 ] === -1 && correction[ 1 ] === -1 && correction[ 2 ] === 1 ) correctionRotation = [ 0, 0, 1, 0 ];
+	else if ( correction[ 0 ] === -1 && correction[ 1 ] === 1 && correction[ 2 ] === -1 ) correctionRotation = [ 0, 1, 0, 0 ];
+	else if ( correction[ 0 ] === 1 && correction[ 1 ] === -1 && correction[ 2 ] === -1 ) correctionRotation = [ 1, 0, 0, 0 ];
+	else return null;
+	const [ x, y, z, w ] = transform.rotation, [ cx, cy, cz, cw ] = correctionRotation;
+	const rotation = [
+		w * cx + x * cw + y * cz - z * cy,
+		w * cy - x * cz + y * cw + z * cx,
+		w * cz + x * cy - y * cx + z * cw,
+		w * cw - x * cx - y * cy - z * cz,
+	];
+	return {
+		geometryMirrorX,
+		transform: {
+			position: transform.position,
+			rotation,
+			scale: transform.scale.map( Math.abs ),
+		},
+	};
+}
+
 export function localRegionVisualStreamingBounds( instances, fallback ) {
 	if ( ! Array.isArray( instances ) || instances.length === 0 ) return fallback;
 	const bounds = { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] };
@@ -45,14 +79,17 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 	for ( const source of cell.visualInstances ) {
 		if ( source?.isSplineMesh !== false || typeof source.componentPath !== 'string' || source.componentPath.length === 0 || source.componentPath.length > ID_PART_LIMIT
 			|| typeof source.staticMeshPath !== 'string' || ! finiteVector( source.transform?.position, 3 ) || ! finiteVector( source.transform?.rotation, 4 )
-			|| ! finiteVector( source.transform?.scale, 3 ) || source.transform.scale.some( value => value <= 0 )
+			|| ! finiteVector( source.transform?.scale, 3 ) || source.transform.scale.some( value => value === 0 )
 			|| ! finiteVector( source.boundsMeters?.min, 3 ) || ! finiteVector( source.boundsMeters?.max, 3 )
 			|| source.boundsMeters.min.some( ( value, axis ) => value > source.boundsMeters.max[ axis ] )
 			|| ( source.instanceIndex !== null && ( ! Number.isSafeInteger( source.instanceIndex ) || source.instanceIndex < 0 ) )
 			|| ! Number.isSafeInteger( source.instanceTransformCount ) || source.instanceTransformCount < 1 ) return null;
+		const mirrored = mirroredInstanceTransform( source.transform );
+		if ( ! mirrored ) return null;
 		const lods = profiles.get( source.staticMeshPath );
 		if ( ! lods ) return null;
-		let model = groups.get( source.componentPath );
+		const groupKey = `${ source.componentPath }\u001f${ mirrored.geometryMirrorX ? 'mirror-x' : 'identity' }`;
+		let model = groups.get( groupKey );
 		if ( ! model ) {
 			const usable = lods.filter( lod => lod?.usable === true && Number.isSafeInteger( lod.index ) && lod.index >= 0 && Number.isFinite( lod.screenSize ) && lod.screenSize > 0 && lod.screenSize <= 1 )
 				.sort( ( a, b ) => b.index - a.index );
@@ -64,10 +101,10 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				// Keep adjacent cross-fades inside the game-authored screen-size gap.
 				lodFadeFraction = Math.min( lodFadeFraction, ( thresholds[ index ] - thresholds[ index - 1 ] ) / thresholds[ index ] * 0.5 );
 			}
-			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, sourceLods: usable, lodFadeFraction, radius: 0, instances: [], bounds: { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] } };
-			groups.set( source.componentPath, model );
+			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, geometryMirrorX: mirrored.geometryMirrorX, sourceLods: usable, lodFadeFraction, radius: 0, instances: [], bounds: { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] } };
+			groups.set( groupKey, model );
 		} else if ( model.staticMeshPath !== source.staticMeshPath ) return null;
-		const scaleFloor = Math.min( ...source.transform.scale );
+		const scaleFloor = Math.min( ...mirrored.transform.scale );
 		if ( scaleFloor <= 0 ) return null;
 		let instanceRadius = 0;
 		for ( let corner = 0; corner < 8; corner ++ ) {
@@ -79,13 +116,13 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		includeBounds( model.bounds, source.boundsMeters );
 		model.instances.push( {
 			model: '',
-			position: source.transform.position,
-			rotation: source.transform.rotation,
-			scale: source.transform.scale,
+			position: mirrored.transform.position,
+			rotation: mirrored.transform.rotation,
+			scale: mirrored.transform.scale,
 			instanceIndex: source.instanceIndex,
 		} );
 	}
-	const models = [ ...groups.values() ].sort( ( a, b ) => a.componentPath.localeCompare( b.componentPath ) );
+	const models = [ ...groups.values() ].sort( ( a, b ) => a.componentPath.localeCompare( b.componentPath ) || Number( a.geometryMirrorX ) - Number( b.geometryMirrorX ) );
 	if ( models.some( model => model.instances.length === 0 ) ) return null;
 	const result = [];
 	for ( let offset = 0, chunk = 0; offset < models.length; offset += MODELS_PER_COMPONENT, chunk ++ ) {
@@ -94,11 +131,12 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		for ( const model of modelChunk ) includeBounds( chunkBounds, model.bounds );
 		const cellCenter = [ 0, 1, 2 ].map( axis => ( coordinates[ axis ] + 0.5 ) * cellSizeMeters );
 		const streamingBounds = boundsSphere( chunkBounds, maxDistanceMeters ) || { center: cellCenter, radius: cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters };
-		const ids = new Map( modelChunk.map( ( model, index ) => [ model.componentPath, `m${index}` ] ) );
+		const ids = new Map( modelChunk.map( ( model, index ) => [ model, `m${index}` ] ) );
 		const document = {
 			format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 			models: modelChunk.map( ( model, index ) => ( {
-				id: ids.get( model.componentPath ),
+				id: ids.get( model ),
+				geometryMirrorX: model.geometryMirrorX,
 				bounds: { center: [ 0, 0, 0 ], radius: model.radius },
 				lods: model.sourceLods.map( lod => ( { assetId: localMeshLODAssetID( regionID, model.componentPath, lod.index ) } ) ),
 				lodThresholds: model.sourceLods.slice( 1 ).map( lod => lod.screenSize ),
@@ -111,7 +149,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				drawFadeStartDistance: maxDistanceMeters,
 			} ) ),
 			instances: modelChunk.flatMap( model => model.instances.map( instance => ( {
-				model: ids.get( model.componentPath ),
+				model: ids.get( model ),
 				position: instance.position,
 				rotation: instance.rotation,
 				scale: instance.scale,
@@ -151,5 +189,5 @@ export function localMeshLODAssetID( regionID, componentPath, lodIndex ) {
 }
 
 export function localStaticModelSetAssetID( regionID, cellSizeMeters, coordinates, chunk ) {
-	return `local-static-model-set:${regionID}:${cellSizeMeters}:${coordinates.join( ':')}:${chunk}`;
+	return `local-static-model-set:${regionID}:${cellSizeMeters}:${coordinates.join( ':')}:${chunk}:geometry-mirror-x`;
 }
