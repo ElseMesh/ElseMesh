@@ -65,6 +65,15 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-05: A fresh hosted WebGPU review found that Tidewater's minimap frame
+  hook could throw before `sceneRenderer.render()`: it read the built-in-only
+  `app.terrainData` field and assumed terrain mask arrays that hosted heightfield
+  data does not provide. The Tidewater minimap now reads `game.terrain` and
+  treats those masks as optional, with a Tidewater-owned regression test. That
+  removes this hosted frame-loop failure, but the latest source has not yet had
+  a fresh visible WebGPU parity review, so the band and spray gates remain open
+  and the overall estimate stays 82%.
+
 - 2026-11-05: A visual bisect in an isolated worktree identified
   `add53b1d` (`perf(renderer): reuse camera frame uniforms`) as the first bad
   WebGPU revision: it showed both the black horizon band and missing wave
