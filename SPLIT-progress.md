@@ -65,6 +65,21 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: Tested a headless WebGL-only exposure change from 0.55 to 1.05,
+  keeping ACES and the signed world unchanged. At the controlled beach view,
+  full-frame RGB MAE against pre-split WebGPU falls from 58.63 to 24.61 (sky
+  59.77 to 25.16, sea 73.09 to 37.21, sand 52.99 to 13.78). At the separate
+  wave-focused `surf` view, hosted WebGPU at exposure 0.55 versus WebGL at 1.05
+  still differs by MAE 35.58 overall (sky 22.63, sea 46.22, sand 44.35); the
+  WebGL shore sheet becomes overbright and covers inland sand. The global
+  exposure change is therefore not a suitable parity fix. See the [beach
+  exposure trial](docs/images/tidewater-hosted-webgl-beach-exposure-trial-2026-11-06.png),
+  [hosted WebGPU surf](docs/images/tidewater-hosted-webgpu-surf-controlled-2026-11-06.png),
+  and [WebGL surf exposure trial](docs/images/tidewater-hosted-webgl-surf-exposure-trial-2026-11-06.png).
+  These captures are not animation-phase or hardware-performance evidence.
+  The parity estimate remains 82%; next isolate WebGL sky/direct lighting from
+  water and shoreline presentation.
+
 - 2026-11-06: Repeated the live pre-split, hosted WebGPU, and hosted WebGL
   beach captures at 1280×720 after waiting for the loader to disappear and
   dismissing the start and Tidewater guide overlays. The named `beach` view
