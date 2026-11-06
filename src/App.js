@@ -373,7 +373,7 @@ export class App {
 		// data is derived (shore field, GPU textures, meshes)
 		// Hosted launches have already returned through their package-only path. Keep
 		// built-in Tidewater presentation out of the shared App import graph.
-		const { Village, Reef, BoatModel, Rocks, Debris, Wildlife, Whale } = await import( './world/BuiltinWorldPresentation.js' );
+		const { Village, Reef, BoatModel, Rocks, Debris, Whale } = await import( './world/BuiltinWorldPresentation.js' );
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
 		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, fishPresentation: this.fishPresentation } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
@@ -549,11 +549,11 @@ export class App {
 		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, query: this.query, boat: this.boatCtl, reef: this.reef, worldLayout: this.worldLayout } );
 		this.localPlayerEnvironment = { terrain: this.player.terrain, colliders: this.player.colliders, query: this.player.query, slot: this.player.slot, reef: this.player.reef, boat: this.player.boat, hostedSeaLevel: null };
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
-		this.wildlife = new Wildlife( {
+		this.wildlife = await this.worldPackage.presentation?.createWildlife?.( {
 			scene, renderer, terrain: this.terrainData, terrainGPU: this.terrainGPU, shore: this.shore,
 			village: this.village, colliders: this.colliders, vegetation: this.vegetation, boat: this.boatCtl, boatModel: this.boat,
 			query: this.query, spray: this.spray, csm: this.csm,
-		} );
+		} ) || null;
 		this.freeCam = qs.has( 'fly' );
 
 		// ---------------------------------------------------------------- post
@@ -2119,7 +2119,7 @@ export class App {
 		}
 		this.boat.sync( this.boatCtl );
 		this.boat.update( dt );
-		this.wildlife.update( dt, this.camera, this.freeCam ? null : this.player );
+		if ( this.wildlife ) this.wildlife.update( dt, this.camera, this.freeCam ? null : this.player );
 
 		}
 

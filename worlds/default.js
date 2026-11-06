@@ -18,6 +18,12 @@ const assetURLs = {
 // package interface and does not select or name an authored world.
 export const defaultWorldPackage = Object.freeze( {
 	source,
+	presentation: Object.freeze( {
+		createWildlife: async options => {
+			const { Wildlife } = await import( './tidewater/wildlife/Wildlife.js' );
+			return new Wildlife( options );
+		},
+	} ),
 	assets: Object.freeze( {
 		terrainLOD,
 		villageLOD,
