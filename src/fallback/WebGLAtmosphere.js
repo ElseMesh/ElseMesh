@@ -21,6 +21,7 @@ import {
 const TRANSMITTANCE_SIZE = [ 256, 64 ];
 const MULTISCAT_SIZE = [ 32, 32 ];
 const SKY_VIEW_SIZE = [ 192, 108 ];
+const SKY_IRRADIANCE_SIZE = [ 1, 1 ];
 
 const mediumGLSL = /* glsl */`
 const float PI = 3.141592653589793;
@@ -178,6 +179,24 @@ void main() {
 }
 `;
 
+const skyIrradianceShader = /* glsl */`
+varying vec2 vUv;
+uniform sampler2D uAtmosphereSkyView;
+uniform vec3 uSunDirection;
+${ webglAtmosphereSkyLookupGLSL }
+void main() {
+	vec3 sum = vec3( 0.0 );
+	for ( int i = 0; i < 256; i ++ ) {
+		float a = ( mod( float( i ), 16.0 ) + 0.5 ) / 16.0;
+		float b = ( floor( float( i ) / 16.0 ) + 0.5 ) / 16.0;
+		float r = sqrt( b ), phi = a * 2.0 * 3.14159265359;
+		vec3 direction = vec3( r * cos( phi ), sqrt( max( 1.0 - b, 0.0 ) ), r * sin( phi ) );
+		sum += atmosphereSky( direction );
+	}
+	gl_FragColor = vec4( sum / 256.0, 1.0 );
+}
+`;
+
 export class WebGLAtmosphere {
 
 	constructor( THREE, renderer, sunDirection ) {
@@ -186,13 +205,13 @@ export class WebGLAtmosphere {
 		this.renderer = renderer;
 		this.supported = renderer.extensions.has( 'EXT_color_buffer_float' );
 		if ( ! this.supported ) return;
-		this.targets = [ TRANSMITTANCE_SIZE, MULTISCAT_SIZE, SKY_VIEW_SIZE ].map( ( [ width, height ] ) => {
+		this.targets = [ TRANSMITTANCE_SIZE, MULTISCAT_SIZE, SKY_VIEW_SIZE, SKY_IRRADIANCE_SIZE ].map( ( [ width, height ] ) => {
 			const target = new THREE.WebGLRenderTarget( width, height, { format: THREE.RGBAFormat, type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false } );
 			target.texture.colorSpace = THREE.LinearSRGBColorSpace;
 			return target;
 		} );
-		const shaders = [ transmittanceShader, multiscatShader, skyViewShader ];
-		this.materials = shaders.map( fragmentShader => new THREE.ShaderMaterial( { vertexShader, fragmentShader, uniforms: { uTransmittance: { value: this.targets[ 0 ].texture }, uMultiScat: { value: this.targets[ 1 ].texture }, uSunDirection: { value: sunDirection.clone() } }, depthTest: false, depthWrite: false, toneMapped: false } ) );
+		const shaders = [ transmittanceShader, multiscatShader, skyViewShader, skyIrradianceShader ];
+		this.materials = shaders.map( fragmentShader => new THREE.ShaderMaterial( { vertexShader, fragmentShader, uniforms: { uTransmittance: { value: this.targets[ 0 ].texture }, uMultiScat: { value: this.targets[ 1 ].texture }, uAtmosphereSkyView: { value: this.targets[ 2 ].texture }, uSunDirection: { value: sunDirection.clone() } }, depthTest: false, depthWrite: false, toneMapped: false } ) );
 		this.scene = new THREE.Scene();
 		this.camera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
 		this.quad = new THREE.Mesh( new THREE.PlaneGeometry( 2, 2 ), this.materials[ 0 ] );
@@ -201,10 +220,12 @@ export class WebGLAtmosphere {
 		this._render( 0 );
 		this._render( 1 );
 		this._render( 2 );
+		this._render( 3 );
 
 	}
 
 	get skyViewTexture() { return this.targets?.[ 2 ]?.texture || null; }
+	get skyIrradianceTexture() { return this.targets?.[ 3 ]?.texture || null; }
 
 	_render( index ) {
 
@@ -227,7 +248,9 @@ export class WebGLAtmosphere {
 		if ( ! this.supported || this.sunDirection.distanceToSquared( sunDirection ) < 1e-8 ) return false;
 		this.sunDirection.copy( sunDirection );
 		this.materials[ 2 ].uniforms.uSunDirection.value.copy( sunDirection );
+		this.materials[ 3 ].uniforms.uSunDirection.value.copy( sunDirection );
 		this._render( 2 );
+		this._render( 3 );
 		return true;
 
 	}

@@ -45,10 +45,23 @@ import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 import { worldHasWater } from '../network/WorldRules.js';
+import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
+import { WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
 
 let sharedFoamLaceTexture;
+let sharedWebGLWaterSkyIrradiance;
+
+function webglWaterSkyIrradianceTexture( THREE ) {
+
+	if ( sharedWebGLWaterSkyIrradiance ) return sharedWebGLWaterSkyIrradiance;
+	sharedWebGLWaterSkyIrradiance = new THREE.DataTexture( new Uint8Array( [ 77, 102, 153, 255 ] ), 1, 1, THREE.RGBAFormat );
+	sharedWebGLWaterSkyIrradiance.colorSpace = THREE.LinearSRGBColorSpace;
+	sharedWebGLWaterSkyIrradiance.needsUpdate = true;
+	return sharedWebGLWaterSkyIrradiance;
+
+}
 
 function asBytes( bytes ) {
 	return bytes instanceof Uint8Array ? bytes : new Uint8Array( bytes );
@@ -1019,7 +1032,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -1296,10 +1309,16 @@ export class WebGLFallback {
 				uniform float uTime;
 				uniform vec3 uCameraPosition;
 				uniform vec3 uSunDirection;
+				uniform vec3 uKeyLightDirection;
+				uniform vec3 uKeyLightRadiance;
 				uniform sampler2D uCloudNoise;
 				uniform sampler2D uAtmosphereSkyView;
+				uniform sampler2D uSkyIrradiance;
 				uniform float uSkyEnabled;
 				uniform float uAtmosphereEnabled;
+				uniform vec3 uWaterAbsorption;
+				uniform vec3 uWaterScattering;
+				uniform float uWindSpeed;
 				uniform float uCloudsEnabled;
 				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
@@ -1332,6 +1351,27 @@ export class WebGLFallback {
 				varying float vSwashFoam;
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
+				}
+				float waterFresnelDielectric( float cosI ) {
+					float c = clamp( cosI, 0.0, 1.0 );
+					float eta = ${ WATER_IOR.toFixed( 3 ) }, g2 = eta * eta - 1.0 + c * c;
+					if ( g2 < 0.0 ) return 1.0;
+					float g = sqrt( g2 ), a = ( g - c ) / ( g + c );
+					float b = ( c * ( g + c ) - 1.0 ) / ( c * ( g - c ) + 1.0 );
+					return 0.5 * a * a * ( b * b + 1.0 );
+				}
+				float waterPhaseHG( float cosT, float g ) {
+					float g2 = g * g;
+					return ( ( 1.0 - g2 ) / ( 4.0 * 3.14159265359 ) ) / pow( max( 1.0 + g2 - 2.0 * cosT * g, 1e-4 ), 1.5 );
+				}
+				float waterDGGX( float ndh, float alpha2 ) {
+					float d = ndh * ndh * ( alpha2 - 1.0 ) + 1.0;
+					return alpha2 / ( d * d * 3.14159265359 );
+				}
+				float waterVSmithGGX( float ndl, float ndv, float alpha2 ) {
+					float gv = ndl * sqrt( ndv * ndv * ( 1.0 - alpha2 ) + alpha2 );
+					float gl = ndv * sqrt( ndl * ndl * ( 1.0 - alpha2 ) + alpha2 );
+					return 0.5 / max( gv + gl, 1e-5 );
 				}
 				${ webglAtmosphereSkyLookupGLSL }
 				void main() {
@@ -1375,12 +1415,18 @@ export class WebGLFallback {
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
 					vec3 sceneColor = screenColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
-					vec3 absorption = exp( -vec3( 0.42, 0.075, 0.035 ) * min( depth, 60.0 ) );
 					vec3 refractedBed = mix( seabedColor, sceneColor, 0.1 ) * vec3( 0.58, 0.86, 0.96 );
-					vec3 transmitted = refractedBed * absorption + vec3( 0.008, 0.13, 0.17 ) * ( 1.0 - absorption );
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
-					vec3 reflectionDirection = reflect( -viewDirection, normal );
-					float fresnel = 0.025 + 0.86 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
+					float ndv = max( dot( normal, viewDirection ), 1e-4 );
+					float fresnel = waterFresnelDielectric( ndv );
+					float footprint = max( length( dFdx( vWorldPosition ) ), length( dFdy( vWorldPosition ) ) );
+					float unresolved = clamp( log2( max( 110.0 * footprint / 3.14159265359, 1e-4 ) ) / 9.0, 0.0, 1.0 );
+					float mss = 0.003 + uWindSpeed * 0.00512;
+					float alpha2 = ${ ( WATER_ROUGHNESS * WATER_ROUGHNESS ).toFixed( 6 ) } + mss * 2.0 * unresolved + vShoreFoam * 0.2;
+					float sigmaUnresolved = sqrt( mss * unresolved );
+					vec3 reflectionRaw = reflect( -viewDirection, normal );
+					float reflectedY = max( reflectionRaw.y, 0.004 ) + sigmaUnresolved * 1.3 * ( 1.0 - max( reflectionRaw.y, 0.0 ) );
+					vec3 reflectionDirection = normalize( vec3( reflectionRaw.x, reflectedY, reflectionRaw.z ) );
 					vec3 sky = mix( vec3( 0.018, 0.022, 0.03 ), mix( vec3( 0.025, 0.07, 0.18 ), vec3( 0.13, 0.25, 0.43 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) ), uSkyEnabled );
 					sky = mix( sky, atmosphereSky( reflectionDirection ), uAtmosphereEnabled );
 					vec2 skyUv = vec2( atan( reflectionDirection.x, reflectionDirection.z ) / 6.2831853 + 0.5, asin( clamp( reflectionDirection.y, -1.0, 1.0 ) ) / 3.1415927 + 0.5 );
@@ -1406,15 +1452,28 @@ export class WebGLFallback {
 					sky = mix( sky, screenReflection, reflectedOnScreen * 0.72 );
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = fineNoise.r * 0.65 + fineNoise.g * 0.35;
-					float shallow = smoothstep( 0.0, 18.0, depth );
-					vec3 water = mix( vec3( 0.012, 0.16, 0.24 ), vec3( 0.002, 0.016, 0.065 ), shallow ) * ( 0.97 + ( ripple - 0.5 ) * 0.18 + ( micro - 0.5 ) * 0.08 );
-					float bottomVisibility = ( uTerrainSize > 0.0 ) ? 1.0 - smoothstep( 4.0, 36.0, depth ) : 0.0;
-					float waterFresnel = fresnel * mix( 1.0, 0.38, bottomVisibility );
-					vec3 waterBody = mix( water, transmitted, bottomVisibility * 0.18 * ( 1.0 - waterFresnel ) );
-					vec3 reflected = mix( waterBody, sky, waterFresnel * 0.82 );
-					vec3 sunReflection = reflect( -normalize( uSunDirection ), normal );
-					float glint = pow( max( dot( viewDirection, sunReflection ), 0.0 ), 96.0 ) * uSkyEnabled;
-					reflected += vec3( 1.0, 0.88, 0.72 ) * glint * ( 0.025 + 0.055 * ripple );
+					vec3 lightDirection = normalize( uKeyLightDirection );
+					vec3 refractedView = refract( -viewDirection, normal, 1.0 / ${ WATER_IOR.toFixed( 3 ) } );
+					vec3 waterView = normalize( vec3( refractedView.x, min( refractedView.y, -0.08 ), refractedView.z ) );
+					float waterPath = clamp( depth / max( -waterView.y, 0.04 ), 0.0, 80.0 );
+					vec3 sigmaA = uWaterAbsorption, sigmaS = uWaterScattering, sigmaT = sigmaA + sigmaS;
+					vec3 waterTransmittance = exp( -sigmaT * waterPath );
+					vec3 refractedSun = -refract( -lightDirection, vec3( 0.0, 1.0, 0.0 ), 1.0 / ${ WATER_IOR.toFixed( 3 ) } );
+					float muSun = max( refractedSun.y, 0.1 ), muView = max( -waterView.y, 0.15 );
+					vec3 kSun = sigmaT * ( 1.0 + muView / muSun ), kAmbient = sigmaT * ( 1.0 + muView / 0.75 );
+					float phase = waterPhaseHG( dot( waterView, refractedSun ), 0.86 ) * 0.7 + 0.3 / ( 4.0 * 3.14159265359 );
+					vec3 backscatter = sigmaS * ${ WATER_BACKSCATTER.toFixed( 3 ) };
+					vec3 albedoMS = backscatter * 1.32 / max( sigmaA + backscatter, vec3( 1e-5 ) );
+					vec3 skyIrradiance = mix( vec3( 0.3, 0.4, 0.6 ), texture2D( uSkyIrradiance, vec2( 0.5 ) ).rgb, uAtmosphereEnabled );
+					vec3 waterSunIn = uKeyLightRadiance * ( 1.0 - waterFresnelDielectric( max( lightDirection.y, 0.02 ) ) );
+					vec3 inSun = waterSunIn * ( sigmaS * phase + albedoMS * sigmaT / 3.14159265359 ) * ( 1.0 - exp( -kSun * waterPath ) ) / kSun;
+					vec3 inAmbient = skyIrradiance * ( sigmaS * 0.25 + albedoMS * sigmaT ) * ( 1.0 - exp( -kAmbient * waterPath ) ) / kAmbient;
+					vec3 waterBody = refractedBed * waterTransmittance + inSun + inAmbient;
+					vec3 halfVector = normalize( lightDirection + viewDirection );
+					float ndl = max( dot( normal, lightDirection ), 0.0 ), ndh = max( dot( normal, halfVector ), 0.0 ), vdh = max( dot( viewDirection, halfVector ), 0.0 );
+					float specular = waterDGGX( ndh, alpha2 ) * waterVSmithGGX( ndl, ndv, alpha2 ) * waterFresnelDielectric( vdh ) * ndl;
+					vec3 sunSpecular = uKeyLightRadiance * min( specular, 400.0 );
+					vec3 reflected = mix( waterBody, sky, fresnel ) + sunSpecular;
 					float foamNoise = texture2D( uCloudNoise, p * 0.09 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
 					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
 					vec4 foamLaceData = texture2D( uFoamLace, p / 3.5 + vec2( -uTime * 0.0008, uTime * 0.00057 ) );
@@ -1574,13 +1633,19 @@ export class WebGLFallback {
 	_updateLighting() {
 
 		const T = this.THREE, lighting = webglLightingForTime( T, this.app.settings.timeOfDay );
+		this.lighting = lighting;
 		this.sunDirection.copy( lighting.sunDirection );
 		this.sunLight.position.copy( lighting.keyDirection ).multiplyScalar( 500 );
 		this.sunLight.color.copy( lighting.keyColor );
 		this.sunLight.intensity = lighting.keyIntensity;
 		this.hemisphereLight.intensity = lighting.ambientIntensity;
 		this.cloudLayer.material.uniforms.uSunDirection.value.copy( this.sunDirection );
-		for ( const water of this.waterScene.children ) water.material.uniforms.uSunDirection?.value.copy( this.sunDirection );
+		for ( const water of this.waterScene.children ) {
+			const uniforms = water.material.uniforms;
+			uniforms.uSunDirection?.value.copy( this.sunDirection );
+			uniforms.uKeyLightDirection?.value.copy( lighting.keyDirection );
+			uniforms.uKeyLightRadiance?.value.set( lighting.keyColor.r, lighting.keyColor.g, lighting.keyColor.b ).multiplyScalar( lighting.keyIntensity );
+		}
 
 	}
 

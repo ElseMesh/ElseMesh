@@ -2,8 +2,9 @@ import { Material, ShaderModule, G } from '../engine/webgpu.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
 import { whaleWaterModule } from './WhaleWater.js';
 import { REFRACTION_GUARD } from './RefractionPass.js';
+import { WATER_BACKSCATTER, WATER_IOR, WATER_REFLECTION_STRENGTH, WATER_ROUGHNESS } from './WaterDefaults.js';
 
-const IOR = 1.333;
+const IOR = WATER_IOR;
 
 // WGSL helpers shared with other water effects (Breakers, spray):
 //   fn fresnelDielectric( cosI: f32, eta: f32 ) -> f32   exact unpolarized dielectric Fresnel, cosI > 0, eta = n2/n1
@@ -69,12 +70,12 @@ export class WaterMaterial extends Material {
 				vShoreFoam: 'f32', vSurfMask: 'vec2f',
 			},
 			uniforms: {
-				backscatter: [ 'f32', 0.035 ],
+				backscatter: [ 'f32', WATER_BACKSCATTER ],
 				sss: [ 'f32', 1.0 ],
 				refraction: [ 'f32', 0.06 ],
 				foamIntensity: [ 'f32', 1.0 ],
-				waterRoughness: [ 'f32', 0.035 ],
-				reflectionStrength: [ 'f32', 1.0 ],
+				waterRoughness: [ 'f32', WATER_ROUGHNESS ],
+				reflectionStrength: [ 'f32', WATER_REFLECTION_STRENGTH ],
 				ssr: [ 'f32', 1 ], // screen-space reflections on/off
 				debugMode: [ 'i32', 0 ],
 				hullActive: [ 'f32', 0 ],

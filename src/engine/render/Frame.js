@@ -2,6 +2,7 @@ import { UniformBlock } from '../gpu/Uniforms.js';
 import { setFrameUniforms } from '../gpu/Shader.js';
 import { Vector2, Vector3, Vector4, Matrix4, Color } from '../math/index.js';
 import { DEFAULT_ENVIRONMENT } from '../../core/EnvironmentDefaults.js';
+import { WATER_ABSORPTION, WATER_SCATTERING } from '../../ocean/WaterDefaults.js';
 
 // Per-frame uniforms visible to every shader as `frame` (group 0, binding 0).
 //
@@ -48,9 +49,9 @@ const FRAME_FIELDS = {
 	horizonColor: [ 'vec3f', new Color( 0.6, 0.7, 0.8 ) ],
 	cameraWaterHeight: [ 'f32', 0 ],
 	// Water optical properties (per meter).
-	waterAbsorption: [ 'vec3f', new Vector3( 0.42, 0.075, 0.035 ) ],
+	waterAbsorption: [ 'vec3f', new Vector3( ...WATER_ABSORPTION ) ],
 	windSpeed: [ 'f32', DEFAULT_ENVIRONMENT.windSpeed ], // m/s at 10 m height
-	waterScattering: [ 'vec3f', new Vector3( 0.012, 0.018, 0.024 ) ],
+	waterScattering: [ 'vec3f', new Vector3( ...WATER_SCATTERING ) ],
 	envIntensity: [ 'f32', 1 ],
 	// direction the wind blows toward
 	windDir: [ 'vec2f', new Vector2( ...DEFAULT_ENVIRONMENT.windDirection ) ],
