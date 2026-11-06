@@ -77,6 +77,13 @@ parity is complete.
   still use the legacy `WorldLayout` adapter, so this is one removed dependency,
   not completion of the world boundary. The percentage remains 73%.
 
+- 2026-11-06: `pierWalkableHeightAt()` now receives the active world layout
+  from the WebGL fallback, and the Tidewater-owned fixture supplies Tidewater's
+  layout explicitly. `PierSurface.js` no longer imports `IslandDefinition`.
+  Remaining static imports through the legacy adapter include `Pier`, `Fish`,
+  `Reef`, reef materials, debris placement, and vegetation scatter. No progress
+  percentage changed; the external production build passes. Tests were not run.
+
 - 2026-11-06: Moved the plain Tidewater `IslandDefinition` data from `src/world`
   to `worlds/tidewater/IslandDefinition.js`. Tidewater wildlife and parity
   fixtures import it from their own repository; `WorldLayout` and `PierSurface`

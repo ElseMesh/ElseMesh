@@ -1768,7 +1768,7 @@ export class WebGLFallback {
 		const box = ( x, cy, z, hx, hy, hz, tag, options = {} ) => C.addBox( new EngineVector3( x, cy, z ), new EngineVector3( hx, hy, hz ), 0, { tag, ...options } );
 		const stepGround = this.terrain.heightAt( P.x, P.zStart - 0.7 ), nSteps = Math.max( 2, Math.ceil( Math.max( 0, y - stepGround ) / 0.22 ) ), tread = 0.32;
 		for ( let k = 1; k < nSteps; k ++ ) {
-			const zc = P.zStart - ( k - 0.5 ) * tread, top = pierWalkableHeightAt( P.x, zc, ( px, pz ) => this.terrain.heightAt( px, pz ) ), gb = this.terrain.heightAt( P.x, zc );
+			const zc = P.zStart - ( k - 0.5 ) * tread, top = pierWalkableHeightAt( P.x, zc, ( px, pz ) => this.terrain.heightAt( px, pz ), this.worldLayout ), gb = this.terrain.heightAt( P.x, zc );
 			box( P.x, ( top + gb - 0.4 ) * 0.5, zc, P.width * 0.5, ( top - gb + 0.4 ) * 0.5, tread * 0.5 + 0.005, 'pierStep', { walkable: true } );
 		}
 		// Walkable pier deck and T-head.

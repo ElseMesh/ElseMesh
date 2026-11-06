@@ -1,11 +1,10 @@
-import { ISLAND_DEFINITION } from '../../worlds/tidewater/IslandDefinition.js';
-
 // Renderer-neutral walkable height for the authored pier surface. The full
 // collision world still supplies exact step boxes; this continuous step ramp is
 // the equivalent lightweight query used by renderer fallbacks.
-export function pierWalkableHeightAt( x, z, terrainHeightAt ) {
+export function pierWalkableHeightAt( x, z, terrainHeightAt, worldLayout ) {
 
-	const P = ISLAND_DEFINITION.pier;
+	if ( ! worldLayout ) throw new Error( 'Pier surface query requires the active world package layout' );
+	const P = worldLayout.pier;
 	let height = terrainHeightAt( x, z );
 	const stepGround = terrainHeightAt( P.x, P.zStart - 0.7 );
 	const rise = Math.max( 0, P.deckHeight - stepGround );
