@@ -87,7 +87,9 @@ parity is complete.
 - 2026-11-06: Tidewater pier geometry no longer reads a module-global layout.
   `App` passes the package layout through `Village` to `buildPier`, and Tidewater
   fixtures/export tools pass it explicitly. `Village` no longer imports the
-  pier's module-global geometry constant. The external build is the next gate.
+  pier's module-global geometry constant. The external production build passes;
+  the focused Tidewater pier-surface fixture passes, but rendered pier geometry
+  was not reviewed.
 
 - 2026-11-06: Moved the plain Tidewater `IslandDefinition` data from `src/world`
   to `worlds/tidewater/IslandDefinition.js`. Tidewater wildlife and parity
