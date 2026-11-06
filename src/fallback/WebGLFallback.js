@@ -1565,7 +1565,7 @@ export class WebGLFallback {
 		const T = this.THREE, lighting = webglLightingForTime( T, this.app.settings.timeOfDay );
 		this.sunDirection.copy( lighting.sunDirection );
 		this.sunLight.position.copy( lighting.keyDirection ).multiplyScalar( 500 );
-		this.sunLight.color.setHex( lighting.keyColor );
+		this.sunLight.color.copy( lighting.keyColor );
 		this.sunLight.intensity = lighting.keyIntensity;
 		this.hemisphereLight.intensity = lighting.ambientIntensity;
 		this.cloudLayer.material.uniforms.uSunDirection.value.copy( this.sunDirection );

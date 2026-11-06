@@ -65,6 +65,18 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: WebGL direct sun now uses the atmosphere's shared spectral
+  extinction coefficients and illuminance instead of a fixed warm light. At
+  Tidewater's 16.2 beach time its linear RGB radiance matches the WebGPU
+  atmosphere readback within 0.05 per channel. A fresh isolated 1280×720
+  hosted WebGL capture at the original 0.55 exposure reduces dry-sand RGB MAE
+  against pre-split WebGPU from 52.99 to 7.50; full-frame MAE falls from 58.63
+  to 41.45. Sky MAE remains 59.76 and sea MAE is 50.29, so this fixes the
+  direct-light contribution without closing sky or water parity. The screenshots
+  are not animation-phase or hardware-performance evidence; overall parity
+  remains 82%. See `/var/tmp/elsemesh-webgl-shared-sun-beach.png` for the
+  current local capture.
+
 - 2026-11-06: Tested a headless WebGL-only exposure change from 0.55 to 1.05,
   keeping ACES and the signed world unchanged. At the controlled beach view,
   full-frame RGB MAE against pre-split WebGPU falls from 58.63 to 24.61 (sky
