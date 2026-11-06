@@ -1,0 +1,82 @@
+<!doctype html>
+<meta charset="utf-8">
+<div id="result" data-status="running">running</div>
+<script type="module">
+import * as THREE from 'three';
+import { WEBGL_WAKE_GLSL, WEBGL_WAKE_SOURCE_COUNT } from '../src/fallback/WebGLWake.js';
+import { WebGLFallback } from '../src/fallback/WebGLFallback.js';
+
+const result = document.querySelector( '#result' );
+let renderer;
+try {
+	renderer = new THREE.WebGLRenderer( { antialias: false } );
+	renderer.setSize( 32, 32 );
+	const scene = new THREE.Scene();
+	const camera = new THREE.OrthographicCamera( - 2, 2, 2, - 2, 0.1, 10 );
+	camera.position.z = 5;
+	const uniforms = {
+		uWakeSources: { value: Array.from( { length: WEBGL_WAKE_SOURCE_COUNT }, () => new THREE.Vector4() ) },
+		uWakeCount: { value: 1 },
+		uWakeEnabled: { value: 1 },
+	};
+	uniforms.uWakeSources.value[ 0 ].set( 0, 0, 1, 0 );
+	const material = new THREE.ShaderMaterial( {
+		uniforms,
+		vertexShader: `varying vec2 vWakeCoord; void main() { vWakeCoord = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+		fragmentShader: `precision highp float; ${WEBGL_WAKE_GLSL} varying vec2 vWakeCoord; void main() { float h = webglWakeHeight( vec2( 0.0, -2.0 ), 1.5 ); float f = webglWakeFoam( vec2( 0.0, -2.0 ), 1.5 ); gl_FragColor = vec4( 0.5 + h, f, vWakeCoord.x * 0.0, 1.0 ); }`,
+	} );
+	scene.add( new THREE.Mesh( new THREE.PlaneGeometry( 4, 4 ), material ) );
+	renderer.render( scene, camera );
+	if ( ! renderer.info.programs?.length ) throw new Error( 'WebGL did not compile a wake shader program' );
+	if ( renderer.getContext().getError() !== renderer.getContext().NO_ERROR ) throw new Error( 'WebGL reported an error while rendering the wake shader' );
+	const texture = new THREE.DataTexture( new Uint8Array( [ 128, 128, 128, 255 ] ), 1, 1, THREE.RGBAFormat );
+	texture.needsUpdate = true;
+	const fallback = Object.create( WebGLFallback.prototype );
+	Object.assign( fallback, {
+		THREE,
+		sunDirection: new THREE.Vector3( 0.2, 0.9, 0.1 ).normalize(),
+		worldEnvironment: { sky: false },
+		cloudLayer: { userData: { cloudNoise: texture } },
+		lighting: { keyDirection: new THREE.Vector3( 0.2, 0.9, 0.1 ).normalize(), keyColor: new THREE.Color( 0xffffff ), keyIntensity: 1 },
+		cloudsEnabled: false,
+		webglAtmosphere: null,
+		sceneColorTexture: texture,
+		terrainColorTexture: texture,
+	} );
+	const actualWater = fallback._makeWater( new THREE.PlaneGeometry( 8, 8, 64, 64 ), 0, null );
+	const actualScene = new THREE.Scene();
+	actualScene.add( actualWater );
+	const waterCamera = new THREE.PerspectiveCamera( 60, 1, 0.1, 100 );
+	waterCamera.position.set( 0, 8, 0 );
+	waterCamera.up.set( 0, 0, -1 );
+	waterCamera.lookAt( 0, 0, 0 );
+	actualWater.material.uniforms.uWakeSources.value[ 0 ].set( 0, 0, 1, 0 );
+	actualWater.material.uniforms.uWakeCount.value = 1;
+	actualWater.material.uniforms.uWakeEnabled.value = 1;
+	actualWater.material.uniforms.uTime.value = 1.5;
+	const target = new THREE.WebGLRenderTarget( 64, 64, { format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: true } );
+	renderer.setRenderTarget( target );
+	renderer.render( actualScene, waterCamera );
+	const withWake = new Uint8Array( 64 * 64 * 4 );
+	renderer.readRenderTargetPixels( target, 0, 0, 64, 64, withWake );
+	actualWater.material.uniforms.uWakeEnabled.value = 0;
+	renderer.render( actualScene, waterCamera );
+	const withoutWake = new Uint8Array( withWake.length );
+	renderer.readRenderTargetPixels( target, 0, 0, 64, 64, withoutWake );
+	renderer.setRenderTarget( null );
+	let changedPixels = 0;
+	for ( let i = 0; i < withWake.length; i += 4 ) if ( Math.abs( withWake[ i ] - withoutWake[ i ] ) + Math.abs( withWake[ i + 1 ] - withoutWake[ i + 1 ] ) + Math.abs( withWake[ i + 2 ] - withoutWake[ i + 2 ] ) > 3 ) changedPixels ++;
+	if ( changedPixels < 1 ) throw new Error( 'wake sources did not change pixels in WebGLFallback water output' );
+	if ( renderer.info.programs.length < 2 ) throw new Error( 'WebGLFallback water material did not compile its wake-enabled shader' );
+	if ( renderer.getContext().getError() !== renderer.getContext().NO_ERROR ) throw new Error( 'WebGLFallback water render reported a GL error' );
+	target.dispose();
+	texture.dispose();
+	result.textContent = `PASS wake helper and WebGLFallback water shader compiled; wake changed ${changedPixels} rendered pixels (${renderer.info.programs.length} programs)`;
+	result.dataset.status = 'complete';
+} catch ( error ) {
+	result.textContent = `FAIL ${error.stack || error}`;
+	result.dataset.status = 'failed';
+} finally {
+	renderer?.dispose();
+}
+</script>

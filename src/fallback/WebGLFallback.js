@@ -19,6 +19,7 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
+import { WebGLWake, WEBGL_WAKE_GLSL } from './WebGLWake.js';
 import { createWebGLShoreSurfaceOffset } from './WebGLShoreSurface.js';
 import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
@@ -894,6 +895,7 @@ export class WebGLFallback {
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldLayout.boatDock.position ), initialHeading: worldLayout.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
 			this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
+			this._createWebGLWake();
 			this._addIslandGameplayColliders();
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout } );
 			this.player.yaw = this.spawn.yaw || 0;
@@ -928,6 +930,7 @@ export class WebGLFallback {
 				} );
 				this.boat.controller.model = this.boat.model;
 				this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
+				this._createWebGLWake();
 				this.player.boat = this.boat.controller;
 			}
 			if ( this.hostedTerrainData && this.hostedGrassMask ) {
@@ -963,7 +966,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
 	}
@@ -1035,6 +1038,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
+				uWakeSources: { value: Array.from( { length: 24 }, () => new T.Vector4() ) }, uWakeCount: { value: 0 }, uWakeEnabled: { value: 0 },
 				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
@@ -1075,6 +1079,7 @@ export class WebGLFallback {
 				varying float vSwashFront;
 				varying float vSwashLevel;
 				varying float vSwashFoam;
+				varying float vWakeFoam;
 				vec3 oceanDisplacementCascade( vec2 xz, int cascade ) {
 					vec2 g = fract( xz / uOceanSizes[ cascade ] ) * 256.0 - 0.5;
 					// Keep hardware bilinear filtering inside the selected 256x256 cascade
@@ -1093,6 +1098,7 @@ export class WebGLFallback {
 					}
 					return displacement;
 				}
+				${WEBGL_WAKE_GLSL}
 				${ webglShoreWobbleGLSL }
 				struct WebGLShoreBreak {
 					float b; float Ash; float p; float meanP; float crestPeak; float H;
@@ -1193,6 +1199,7 @@ export class WebGLFallback {
 					vSwashFront = -1.0;
 					vSwashLevel = uSeaLevel;
 					vSwashFoam = 0.0;
+					vWakeFoam = 0.0;
 					float vertexGroundHeight = uHeightRange.x;
 					float vertexSandCoverage = 0.0;
 					float shoreWaveHeight = 0.0;
@@ -1259,6 +1266,8 @@ export class WebGLFallback {
 						world.xz += ocean.xz;
 						vWaveHeight = ocean.y + shoreWaveHeight;
 					}
+					vWaveHeight += webglWakeHeight( p, uTime );
+					vWakeFoam = webglWakeFoam( p, uTime );
 					if ( uShoreFieldSize > 0.0 && uSwashTimeRange.y > uSwashTimeRange.x && uSeaLevel - vertexGroundHeight < 26.0 && vertexSandCoverage > 0.05 ) {
 						vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 						vec4 shore = texture2D( uShoreField, shoreUv );
@@ -1352,6 +1361,7 @@ export class WebGLFallback {
 				varying float vSwashFront;
 				varying float vSwashLevel;
 				varying float vSwashFoam;
+				varying float vWakeFoam;
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
 				}
@@ -1488,7 +1498,7 @@ export class WebGLFallback {
 					breakerFoam *= mix( laceMat, 1.0, smoothstep( 0.55, 0.92, breakerFoam ) );
 					breakerFoam = max( breakerFoam, laceBubbles * smoothstep( 0.12, 0.5, breakerFoam ) * 0.48 );
 				reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), vShoreFace * 0.55 );
-					float foam = max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), vSwashFoam );
+					float foam = max( max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), vSwashFoam ), vWakeFoam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
@@ -1537,6 +1547,31 @@ export class WebGLFallback {
 			seaLevel: this.worldSeaLevel,
 			field: this.shoreField || this.hostedTerrainSurface?.shoreField || null,
 		} ) );
+	}
+
+	_createWebGLWake() {
+
+		if ( ! this.boat?.controller || ! this.waterQuery ) return;
+		this.wake?.dispose();
+		this.wake = new WebGLWake( this.boat.controller, this.THREE );
+		this.waterQuery.setSurfaceOffsetSampler( 'wake', ( x, z, time ) => this.wake?.heightAt( x, z, time ) || 0 );
+		this._bindWakeToWater();
+
+	}
+
+	_bindWakeToWater() {
+
+		if ( ! this.wake ) return;
+		for ( const water of this.waterScene.children ) {
+
+			const uniforms = water.material?.uniforms;
+			if ( ! uniforms?.uWakeSources ) continue;
+			uniforms.uWakeSources.value = this.wake.uniforms.uWakeSources.value;
+			uniforms.uWakeCount.value = this.wake.uniforms.uWakeCount.value;
+			uniforms.uWakeEnabled.value = this.wake.uniforms.uWakeEnabled.value;
+
+		}
+
 	}
 
 	_makeCloudLayer( sunDirection, cloudsEnabled ) {
@@ -2241,6 +2276,8 @@ export class WebGLFallback {
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();
+			this.wake?.update( simulationTime );
+			this._bindWakeToWater();
 			this.waterQuery.update( dt, simulationTime );
 		}
 		this.boat?.update( dt );
