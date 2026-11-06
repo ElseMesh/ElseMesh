@@ -65,6 +65,12 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: Built-in and hosted WebGL boats now run the shared
+  `BoatSpray` generator against the WebGL particle sink; `WebGLSpray` tracks
+  and resets per-frame requests using the same 32-request limit. The external
+  production build passes. No tests or visual capture were run, so matching
+  spray appearance and performance remain unverified.
+
 - 2026-11-06: WebGL shoreline water-query setup now belongs to ElseMesh and
   binds automatically from the active terrain shore field and sea level.
   Tidewater removed its `shore-aware-boat/1` backend hook and behavior entry;

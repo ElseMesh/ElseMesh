@@ -4,6 +4,8 @@
 // batch so shared effects such as Whale blows and flipper slaps still appear.
 import { SPRAY } from '../fx/SprayTypes.js';
 
+const MAX_REQUESTS = 32;
+
 export class WebGLSpray {
 
 	constructor( THREE, scene, { capacity = 2048, random = Math.random } = {} ) {
@@ -12,6 +14,7 @@ export class WebGLSpray {
 		this.capacity = capacity;
 		this.random = random;
 		this.cursor = 0;
+		this.nReq = 0;
 		this.activeCount = 0;
 		this.position = new Float32Array( capacity * 3 );
 		this.velocity = new Float32Array( capacity * 3 );
@@ -70,8 +73,11 @@ export class WebGLSpray {
 
 	emit( position, velocity, count, size = 0.04, kind = SPRAY.DROPLET, options = {} ) {
 
+		if ( this.nReq >= MAX_REQUESTS || count <= 0 ) return;
 		const { spread = 0.6, jitter = 0.05, life = kind === SPRAY.MIST ? 2.5 : 1.6, sizeJitter = 0.5 } = options;
 		const n = Math.min( Math.round( count ), this.capacity );
+		if ( n <= 0 ) return;
+		this.nReq ++;
 		for ( let i = 0; i < n; i ++ ) {
 
 			const slot = this.cursor;
@@ -98,7 +104,10 @@ export class WebGLSpray {
 
 	update( dt ) {
 
-		if ( ! this.activeCount ) return;
+		if ( ! this.activeCount ) {
+			this.nReq = 0;
+			return;
+		}
 		dt = Math.max( 0, dt );
 		for ( let slot = 0; slot < this.capacity; slot ++ ) {
 			if ( ! this.active[ slot ] ) continue;
@@ -126,6 +135,7 @@ export class WebGLSpray {
 		}
 		for ( const name of [ 'position', 'aSize', 'aKind', 'aOpacity' ] ) this.geometry.attributes[ name ].needsUpdate = true;
 		if ( ! this.activeCount ) this.mesh.visible = false;
+		this.nReq = 0;
 
 	}
 

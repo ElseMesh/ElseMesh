@@ -20,6 +20,7 @@ import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { createWebGLShoreSurfaceOffset } from './WebGLShoreSurface.js';
+import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
@@ -897,6 +898,7 @@ export class WebGLFallback {
 			const worldDefinition = this.islandDefinition;
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldDefinition.boatDock.position ), initialHeading: worldDefinition.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
+			this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 			this._addIslandGameplayColliders();
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout: this.islandDefinition } );
 			this.player.yaw = this.spawn.yaw || 0;
@@ -930,6 +932,7 @@ export class WebGLFallback {
 					initialPosition: new EngineVector3( ...berth.transform.position ), initialHeading: berth.transform.yaw || 0,
 				} );
 				this.boat.controller.model = this.boat.model;
+				this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 				this.player.boat = this.boat.controller;
 			}
 			if ( this.hostedTerrainData && this.hostedGrassMask ) {
@@ -2243,6 +2246,7 @@ export class WebGLFallback {
 			this.waterQuery.update( dt, simulationTime );
 		}
 		this.boat?.update( dt );
+		this.boatSpray?.update( dt );
 		for ( const whale of this.whales || [] ) whale.update( dt, this.camera );
 		this.spray?.update( dt );
 		const T = this.THREE;
