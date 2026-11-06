@@ -76,10 +76,19 @@ parity is complete.
   confirmed the hosted component installed and drew 49 field cells with no
   browser errors; the current frame has no black horizon band. This fixes the
   hosted WebGPU pebble-field omission and visually rechecks the horizon after
-  the camera-uniform rollback. The hosted WebGL path still uses its separate
-  terrain-derived beach clutter, spray is not visually confirmed in this frame,
-  and a matched pre-split/WebGL comparison is still required. The parity
-  estimate remains 82%.
+  the camera-uniform rollback. Hosted WebGL now consumes the same signed density
+  asset through its registered backend adapter. Its camera-local count was
+  1,367 instances at the authored spawn, consistent with WebGPU's density and
+  49 visible field cells. The WebGL runtime now allows components without a
+  per-frame update method; a live headless run advanced beyond 1,300 renderer
+  frames, confirmed all 39/39 package components installed, and captured the
+  beach, pier, and fish stand. Tidewater's WebGL village-material adapter now
+  awaits its asynchronous signed-map decoder, removing the last omitted
+  component. Focused density and Tidewater adapter checks and the production
+  build pass. This was SwiftShader software rendering, so it does not establish
+  hardware FPS or matched pixels; spray is not visually confirmed, and a
+  synchronized comparison against pre-split WebGPU is still required. The
+  parity estimate remains 82%.
 
 - 2026-11-05: A fresh hosted WebGPU review found that Tidewater's minimap frame
   hook could throw before `sceneRenderer.render()`: it read the built-in-only

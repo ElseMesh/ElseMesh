@@ -1,12 +1,13 @@
 export const GROUND_DETAIL_DENSITY_ASSET_KIND = 'ground-detail-density/1';
 export const MAX_GROUND_DETAIL_DENSITY_RESOLUTION = 2048;
 
-export async function decodeGroundDetailDensityAsset( bytes, { resolution, texel } = {} ) {
+export async function decodeGroundDetailDensityAsset( bytes, { resolution, texel, terrainSize = null } = {} ) {
 
 	const data = bytes instanceof Uint8Array ? bytes : bytes instanceof ArrayBuffer ? new Uint8Array( bytes ) : null;
 	if ( ! data || data.byteLength === 0 || data.byteLength > 16 * 1024 * 1024 || ! Number.isInteger( resolution ) || resolution < 2 || resolution > MAX_GROUND_DETAIL_DENSITY_RESOLUTION || ! Number.isFinite( texel ) || texel <= 0 || texel > 10000 ) {
 		throw new Error( 'Invalid ground-detail density asset dimensions or bytes' );
 	}
+	if ( terrainSize !== null && ( ! Number.isFinite( terrainSize ) || Math.abs( resolution * texel - terrainSize ) > 1e-3 ) ) throw new Error( 'Ground-detail density domain does not match terrain size' );
 	const expectedBytes = resolution * resolution * 4;
 	if ( typeof DecompressionStream !== 'function' ) throw new Error( 'Ground-detail density requires DEFLATE decompression support' );
 	let decompressor;

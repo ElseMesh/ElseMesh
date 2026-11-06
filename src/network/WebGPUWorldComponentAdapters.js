@@ -23,6 +23,7 @@ async function installGroundDetailField( { app, root, connector, installed }, co
 	const density = await decodeWorldComponentAsset( GROUND_DETAIL_DENSITY_ASSET_KIND, connector.assets.get( references[ 0 ].assetId ), {
 		resolution: component.data?.resolution,
 		texel: component.data?.texel,
+		terrainSize: root.userData.terrainData.size,
 	} );
 	const field = new PebbleField( { terrain: root.userData.terrainData, gpu: terrain.terrainGPU, mask: density } );
 	root.add( field.mesh );

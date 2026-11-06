@@ -21,5 +21,6 @@ for ( const input of [
 ] ) await assert.rejects( decodeGroundDetailDensityAsset( ...input ), /Invalid ground-detail density asset/ );
 await assert.rejects( decodeGroundDetailDensityAsset( new Uint8Array( 16 ), { resolution: 2, texel: 1 } ), /not a valid DEFLATE/ );
 await assert.rejects( decodeGroundDetailDensityAsset( deflateSync( bytes.subarray( 1 ) ), { resolution: 4, texel: 0.5 } ), /wrong dimensions/ );
+await assert.rejects( decodeGroundDetailDensityAsset( asset, { resolution: 4, texel: 0.5, terrainSize: 3 } ), /does not match terrain size/ );
 
 console.log( 'Ground-detail density asset codec and WebGPU registration passed' );
