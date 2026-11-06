@@ -27,6 +27,14 @@ const _vp = new Matrix4();
 const _v = new Vector3();
 const _camPos = new Vector3();
 
+export function frontFaceForMatrix( matrix ) {
+	return matrix.determinant() < 0 ? 'cw' : 'ccw';
+}
+
+function cullModeFor( material, pass ) {
+	return pass.cullOverride || ( material.side === 'double' ? 'none' : material.side === 'back' ? 'front' : 'back' );
+}
+
 const _layouts = new WeakMap();
 let _listToken = 0; // one per drawItems call (see BindingSet.getBindGroup)
 
@@ -329,7 +337,7 @@ export class MeshRenderer {
 	// ------------------------------------------------------------------------------ pipelines
 
 	// the pipeline of ( material, vertex layout, pass ); the material key is cached until its state changes
-	_pipeline( material, vl, pass ) {
+	_pipeline( material, vl, pass, frontFace = 'ccw' ) {
 
 		const pipelineKey = material.pipelineKey();
 		if ( material.__pkPipeline !== pipelineKey || material.__pkLightingVersion !== SceneLighting.version ) {
@@ -340,18 +348,19 @@ export class MeshRenderer {
 
 		}
 
-		const passKey = pass.passKey;
+		if ( cullModeFor( material, pass ) === 'none' ) frontFace = 'ccw';
+		const passKey = `${ pass.passKey }|${ frontFace }`;
 		let c = vl.pipelines && vl.pipelines.get( passKey );
 		if ( c && c.materialKey === material.__pk ) return c.p;
 		const key = `${ material.__pk }|${ vl.key }|${ passKey }`;
 		let p = this.pipelines.get( key );
-		if ( ! p ) p = this._createPipeline( material, vl, pass, key );
+		if ( ! p ) p = this._createPipeline( material, vl, pass, key, frontFace );
 		if ( vl.pipelines ) vl.pipelines.set( passKey, { materialKey: material.__pk, p } );
 		return p;
 
 	}
 
-	_createPipeline( material, vl, pass, key ) {
+	_createPipeline( material, vl, pass, key, frontFace = 'ccw' ) {
 
 		const src = buildMeshShader( material, vl.layout, pass );
 		const c = composeShader( { modules: src.modules, bindings: src.bindings, code: src.code, defines: src.defines, stage: 'render', label: material.name } );
@@ -375,14 +384,13 @@ export class MeshRenderer {
 
 		}
 
-		const side = material.side;
-		const cullMode = pass.cullOverride || ( side === 'double' ? 'none' : side === 'back' ? 'front' : 'back' );
+		const cullMode = cullModeFor( material, pass );
 		const depthCompare = material.depthTest ? ( material.depthCompare || pass.depthCompare ) : 'always';
 		const desc = {
 			label: material.name + ' ' + pass.kind,
 			layout,
 			vertex: { module, entryPoint: 'vs', buffers: vl.buffers.map( ( b ) => b.layout ) },
-			primitive: { topology: material.topology, cullMode, frontFace: 'ccw' },
+			primitive: { topology: material.topology, cullMode, frontFace },
 		};
 		if ( src.hasFragment ) desc.fragment = { module, entryPoint: 'fs', targets };
 		if ( pass.depthFormat ) desc.depthStencil = {
@@ -510,11 +518,12 @@ export class MeshRenderer {
 		item.object = o;
 		item.geometry = geo;
 		item.material = material;
+		item.frontFace = frontFaceForMatrix( o.matrixWorld );
 		item.start = start;
 		item.count = count;
 		item.z = z;
 		item.renderOrder = o.renderOrder || 0;
-		item.pipeKey = material.id;
+		item.pipeKey = material.id * 2 + ( item.frontFace === 'cw' ? 1 : 0 );
 		( material.transparent ? transparent : opaque ).push( item );
 
 	}
@@ -596,7 +605,7 @@ export class MeshRenderer {
 				try {
 
 					vl = this._cachedLayout( o, geo, material );
-					p = this._pipeline( material, vl, pass );
+					p = this._pipeline( material, vl, pass, it.frontFace );
 
 				} catch ( e ) {
 
@@ -611,7 +620,7 @@ export class MeshRenderer {
 			}
 
 			vl = this._cachedLayout( o, geo, material );
-			p = this._pipeline( material, vl, pass );
+			p = this._pipeline( material, vl, pass, it.frontFace );
 			const pipeline = p.handle.pipeline || ( this.syncPipelines ? GPU.ready( p.handle ) : null );
 			if ( ! pipeline ) {
 
