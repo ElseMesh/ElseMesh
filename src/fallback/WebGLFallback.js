@@ -556,7 +556,7 @@ function webglShoreFieldTexture( T, terrain, seaLevel, worldDefinition ) {
 
 }
 
-function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition = null ) {
+function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 
 	const positions = [], seeds = [], depths = [];
 	const add = ( x, z, depth ) => {
@@ -564,17 +564,12 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 		const seed = ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1;
 		positions.push( x, 0, z ); seeds.push( seed ); depths.push( depth );
 	};
-	if ( worldDefinition?.beach ) {
-		for ( let x = worldDefinition.beach.xMin - 25; x <= worldDefinition.beach.xMax + 25; x += 0.75 ) for ( let z = - 64; z <= 28; z += 0.75 ) {
-			const jitter = salt => ( ( Math.sin( x * 39.346 + z * 11.135 + salt ) * 24634.6345 ) % 1 + 1 ) % 1;
-			const px = x + ( jitter( 1.7 ) - 0.5 ) * 0.7, pz = z + ( jitter( 8.3 ) - 0.5 ) * 0.7;
-			add( px, pz, seaLevel - terrain.heightAt( px, pz ) );
-		}
-	} else if ( terrain?.heights && terrain.res > 1 ) {
-		// Hosted worlds provide no engine-owned beach rectangle. Find their shallow
-		// shoreline from the packaged heightfield and jitter one sample per coarse
-		// cell to avoid a visible grid without creating an excessive particle count.
-		const stride = Math.max( 1, Math.ceil( terrain.res / 1400 ) ), cell = terrain.size / terrain.res;
+	if ( terrain?.heights && terrain.res > 1 ) {
+		// Use the same terrain-derived shore sampling for built-in and hosted worlds.
+		// A fixed world-space spacing bounds the particle count independently of
+		// the source heightfield resolution.
+		const cell = terrain.size / terrain.res, stride = Math.max( 1, Math.ceil( 0.75 / cell ) );
+		const spacing = cell * stride;
 		const hash = ( i, j, salt ) => {
 			const value = Math.sin( i * 127.1 + j * 311.7 + salt * 74.7 ) * 43758.5453;
 			return value - Math.floor( value );
@@ -582,7 +577,6 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel, worldDefinition 
 		for ( let j = 0; j < terrain.res; j += stride ) for ( let i = 0; i < terrain.res; i += stride ) {
 			const depth = seaLevel - terrain.heights[ j * terrain.res + i ];
 			if ( depth <= - 2 || depth >= 8 ) continue;
-			const spacing = cell * stride;
 			const x = terrain.origin + ( i + stride * 0.5 + 0.5 ) * cell + ( hash( i, j, 1 ) - 0.5 ) * Math.min( 0.7, spacing * 0.7 );
 			const z = terrain.origin + ( j + stride * 0.5 + 0.5 ) * cell + ( hash( i, j, 2 ) - 0.5 ) * Math.min( 0.7, spacing * 0.7 );
 			const px = T.MathUtils.clamp( x, terrain.origin + cell * 0.5, terrain.origin + terrain.size - cell * 0.5 );
@@ -1710,7 +1704,7 @@ export class WebGLFallback {
 		const water = this._makeWater( oceanLOD.geometry, this.worldSeaLevel, waterTerrain, oceanLOD.lod );
 		water.position.y = this.worldSeaLevel;
 		this.waterScene.add( water );
-		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel, WORLD ) );
+		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( this.defaultWorldAssets.villageLOD );
