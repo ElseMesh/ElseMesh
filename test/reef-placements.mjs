@@ -7,7 +7,7 @@ import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
 const terrain = new TerrainData( { seed: 7, worldLayout: TIDEWATER_LAYOUT } );
 function generate() {
-	const reef = new Reef( { terrain, layoutOnly: true } );
+	const reef = new Reef( { terrain, worldLayout: TIDEWATER_LAYOUT, layoutOnly: true } );
 	assert.equal( reef.group.parent, null, 'layout-only reef is not inserted into a scene' );
 	assert.equal( reef.fish, null, 'layout-only reef skips fish simulation' );
 	assert.equal( reef.batches, undefined, 'layout-only reef allocates no GPU batches' );

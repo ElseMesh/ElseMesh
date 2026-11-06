@@ -3,17 +3,17 @@
 //   node test/life-fish.mjs [outDir]
 import { setupLife } from './life-harness.mjs';
 import * as E from '../src/engine/index.js';
-import { WORLD } from '../src/world/WorldLayout.js';
 import { FishSchools } from '../src/world/Fish.js';
 import { FishProps } from '../src/world/fish/FishProps.js';
 import * as fishPresentation from '../worlds/tidewater/FishPresentation.js';
+import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
 const out = process.argv[ 2 ] || '/var/tmp';
 const W = 2560, H = 1267;
-const rc = WORLD.reef.center;
+const rc = TIDEWATER_LAYOUT.reef.center;
 const L = await setupLife( { W, H, ground: { center: [ rc.x, rc.z ], size: 360, res: 0.75 }, water: true, near: 0.05 } );
 const t0 = performance.now();
-const fish = new FishSchools( { parent: L.scene, terrain: L.terrain, center: rc.clone(), radius: WORLD.reef.radius + 10, presentation: fishPresentation } );
+const fish = new FishSchools( { parent: L.scene, terrain: L.terrain, center: rc.clone(), radius: TIDEWATER_LAYOUT.reef.radius + 10, worldLayout: TIDEWATER_LAYOUT, presentation: fishPresentation } );
 console.log( 'fish', fish.fishCount, 'groups', fish.groups.length, 'build ms', ( performance.now() - t0 ).toFixed( 0 ) );
 
 // pick the reef group nearest to the reef centre with a decent count, to aim the camera at

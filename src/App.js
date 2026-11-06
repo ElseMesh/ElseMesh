@@ -401,7 +401,7 @@ export class App {
 		this.rocks.material.appliesHillShadow = true;
 
 		await progress( 0.23, 'Growing the reef…', undefined, 'reef' );
-		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField, fishPresentation: this.fishPresentation } );
+		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
 
 		this.boat = new BoatModel();
 		scene.add( this.boat.group );

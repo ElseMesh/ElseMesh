@@ -1,5 +1,4 @@
 import * as THREE from '../engine/index.js';
-import { WORLD } from './WorldLayout.js';
 import { mulberry32, Noise2D, smoothstep } from '../util/Noise.js';
 import * as Geo from './reef/ReefGeometry.js';
 import { MultiKindInstanceBatch } from '../engine/render/MultiKindInstanceBatch.js';
@@ -11,7 +10,7 @@ import { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacem
 
 export { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacementTypes.js';
 
-// Caribbean fringing reef around WORLD.reef, 1.5 - 12 m deep.
+// Caribbean fringing reef around the authored reef center, 1.5 - 12 m deep.
 //
 // Zonation (the swell arrives from the south, the island lies to the north):
 //  - reef crest on the shallow platform: elkhorn stands, fire coral, brain and mustard
@@ -37,7 +36,6 @@ export { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacem
 
 const TAU = Math.PI * 2;
 const MAX_TOP = - 0.6; // nothing rises above this (m)
-const SWELL = new THREE.Vector2( WORLD.swellDir.x, WORLD.swellDir.y ).normalize();
 export const REEF_CULLING = Object.freeze( {
 	cellSize: 8,
 	underwaterRange: 45,
@@ -280,18 +278,21 @@ export function reefLODAtDistance( distance, data, index ) {
 
 export class Reef {
 
-	constructor( { scene, terrain, shoreField = null, layoutOnly = false, placementRecords = null, maxInstances = null, fishPresentation = null } ) {
+	constructor( { scene, terrain, shoreField = null, worldLayout = null, layoutOnly = false, placementRecords = null, maxInstances = null, fishPresentation = null } ) {
 
 		if ( maxInstances !== null && ( ! Number.isInteger( maxInstances ) || maxInstances < 1 || maxInstances > 200000 ) ) throw new Error( 'Reef maxInstances must be an integer from 1 to 200000' );
 		if ( maxInstances !== null && placementRecords === null ) throw new Error( 'Reef maxInstances is only valid with placementRecords' );
+		if ( ! worldLayout ) throw new Error( 'Reef requires the active world package layout' );
 
 		const t0 = performance.now();
 		this.terrain = terrain;
+		this.worldLayout = worldLayout;
+		this.swell = new THREE.Vector2( worldLayout.swellDir.x, worldLayout.swellDir.y ).normalize();
 		this.layoutOnly = layoutOnly;
 		this.staticPlacement = placementRecords !== null;
 		this.maxInstances = this.staticPlacement ? maxInstances ?? Math.max( 1, placementRecords.length ) : null;
-		this.center = WORLD.reef.center.clone();
-		this.radius = WORLD.reef.radius;
+		this.center = worldLayout.reef.center.clone();
+		this.radius = worldLayout.reef.radius;
 		this.group = new THREE.Group();
 		this.group.name = 'Reef';
 		if ( ! layoutOnly ) {
@@ -319,6 +320,7 @@ export class Reef {
 			this.buildCells();
 			this.fish = this.staticPlacement ? null : new FishSchools( {
 				parent: this.group, terrain, center: this.center, radius: this.radius + 10,
+				worldLayout,
 				floorAt: ( x, z ) => this.floorHeightAt( x, z ),
 				anchors: this.anchors,
 				shoreField, // keeps the bay fish out of the breakers
@@ -496,7 +498,7 @@ export class Reef {
 	frameUV( x, z ) {
 
 		const dx = x - this.center.x, dz = z - this.center.z;
-		return [ - ( dx * SWELL.x + dz * SWELL.y ), - dx * SWELL.y + dz * SWELL.x ];
+		return [ - ( dx * this.swell.x + dz * this.swell.y ), - dx * this.swell.y + dz * this.swell.x ];
 
 	}
 
@@ -716,7 +718,7 @@ export class Reef {
 		_v.copy( _up ).lerp( _n, t.align ).normalize();
 		_q.setFromUnitVectors( _up, _v );
 		let yaw = rng() * TAU;
-		if ( t.fan ) yaw = Math.atan2( SWELL.x, SWELL.y ) + ( rng() - 0.5 ) * 0.7; // fans grow broadside to the surge
+		if ( t.fan ) yaw = Math.atan2( this.swell.x, this.swell.y ) + ( rng() - 0.5 ) * 0.7; // fans grow broadside to the surge
 		_q2.setFromAxisAngle( _up, yaw );
 		_q.multiply( _q2 );
 
@@ -1016,7 +1018,7 @@ export class Reef {
 	placeBay( rng, stats ) {
 
 		const T = this.terrain, n = this.noise, n2 = this.noise2;
-		const P = WORLD.pier;
+		const P = this.worldLayout.pier;
 		const hab = {};
 		const count = ( k ) => ( stats[ k ] = ( stats[ k ] || 0 ) + 1 );
 		const inPier = ( x, z ) => ( Math.abs( x - P.x ) < 3.2 && z > P.zStart - 2 && z < P.zEnd + 1 ) || ( Math.abs( x - P.x ) < P.headWidth / 2 + 1.5 && z > P.zEnd - P.headDepth - 1.5 && z < P.zEnd + 1.5 );
@@ -1197,7 +1199,7 @@ export class Reef {
 			// (from ~3 m: the bigger sets break in up to ~2.8 m of water); ragged edges
 			const g = smoothstep( 0.2, 0.65, mask( px, pz ) ) * smoothstep( 2.0, 2.8, depth ) * ( 1 - smoothstep( 9, 11, depth ) );
 			const bed = smoothstep( 0.02, 0.3, this.noise.fbm( px / 24 + 5.3, pz / 24 - 9.1, 3 ) ) * smoothstep( 3.0, 3.8, depth ) * ( 1 - smoothstep( 7, 9, depth ) );
-			const pier = Math.abs( px - WORLD.pier.x ) < 4 && pz < WORLD.pier.zEnd + 3 ? 0 : 1;
+			const pier = Math.abs( px - this.worldLayout.pier.x ) < 4 && pz < this.worldLayout.pier.zEnd + 3 ? 0 : 1;
 			const dens = Math.max( g, bed * 0.9 ) * pier * ( 0.75 + 0.25 * this.noise2.noise( px / 5, pz / 5 ) );
 			if ( r > dens ) continue;
 			if ( this.structureAt( px, pz ) > T.heightAt( px, pz ) + 0.05 ) continue;

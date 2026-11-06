@@ -1,7 +1,6 @@
 import * as THREE from '../engine/index.js';
 import { mulberry32 } from '../util/Noise.js';
 import { MultiKindInstanceBatch } from '../engine/render/MultiKindInstanceBatch.js';
-import { WORLD } from './WorldLayout.js';
 import { fishGeometry } from './fish/FishGeometry.js';
 import { rayGeometry, turtleGeometry } from './fish/CreatureGeometry.js';
 import { createSwimMaterial } from './fish/FishMaterial.js';
@@ -155,10 +154,12 @@ export class FishSchools {
 	// floorAt( x, z ): highest obstacle (seabed or reef); anchors: [ [ x, z ], ... ] coral heads;
 	// bay: also populate the bay, the pier and the beach; shoreField (optional, ShoreField.js)
 	// locates the breakers (without it every beach counts as fully exposed)
-	constructor( { parent, terrain, floorAt = null, center, radius, anchors = [], seed = 23, bay = true, shoreField = null, presentation } ) {
+	constructor( { parent, terrain, floorAt = null, center, radius, anchors = [], seed = 23, bay = true, shoreField = null, worldLayout, presentation } ) {
 
 		if ( ! presentation?.SPECIES || ! presentation?.PATTERN || ! presentation?.SKIN ) throw new Error( 'Fish schools require a registered world fish-presentation profile' );
+		if ( ! worldLayout ) throw new Error( 'Fish schools require the active world package layout' );
 		this.presentation = presentation;
+		this.worldLayout = worldLayout;
 
 		this.terrain = terrain;
 		this.floorAt = floorAt ?? ( ( x, z ) => terrain.heightAt( x, z ) );
@@ -391,9 +392,9 @@ export class FishSchools {
 		// ---- the bay (east of the reef, south of the beach)
 		const bayZone = { x: 45, z: 70, r: 45 };
 		place( 'tarpon', 3, { ...bayZone, band: [ 5, 14 ] } );
-		place( 'jack', 5, { x: WORLD.pier.x, z: WORLD.pier.zEnd, r: 20, band: [ 3, 10 ] } );
+		place( 'jack', 5, { x: this.worldLayout.pier.x, z: this.worldLayout.pier.zEnd, r: 20, band: [ 3, 10 ] } );
 		place( 'stingray', 1, { ...bayZone, band: [ 3, 9 ], sand: true } );
-		place( 'barracuda', 1, { x: WORLD.pier.x + 6, z: WORLD.pier.zEnd - 4, r: 8, band: [ 3, 8 ] } );
+		place( 'barracuda', 1, { x: this.worldLayout.pier.x + 6, z: this.worldLayout.pier.zEnd - 4, r: 8, band: [ 3, 8 ] } );
 		for ( const c of [ 3, 2, 1 ] ) place( 'needlefish', c, { x: 30, z: 30, r: 60, band: [ 2, 12 ] } );
 		for ( const c of [ 9, 7 ] ) place( 'mullet', c, { x: 20, z: 5, r: 70 } );
 
@@ -402,7 +403,7 @@ export class FishSchools {
 
 		// snappers, grunts and sergeant majors around the pier piles (in water deep enough)
 		const piles = [];
-		const P = WORLD.pier;
+		const P = this.worldLayout.pier;
 		const off = P.width / 2 + 0.17;
 		for ( let z = P.zStart + 1.5; z < P.zEnd - P.headDepth; z += 3 ) for ( const s of [ - 1, 1 ] ) piles.push( [ P.x + s * off, z ] );
 		for ( let k = 0; k < 5; k ++ ) for ( const z of [ P.zEnd - P.headDepth + 0.25, P.zEnd - P.headDepth / 2, P.zEnd - 0.25 ] ) piles.push( [ P.x - P.headWidth / 2 + 0.3 + k * ( P.headWidth - 0.6 ) / 4, z ] );

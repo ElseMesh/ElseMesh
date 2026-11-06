@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { setupLife } from './life-harness.mjs';
 import { Reef } from '../src/world/Reef.js';
+import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
 const L = await setupLife( { W: 320, H: 240, shadowSplits: [ 12 ] } );
 let reef;
 try {
 	const rock = { type: 'rock', variant: 0, x: 0, y: - 2, z: 0, s: 1, sx: 1, sy: 1, sz: 1, q: [ 0, 0, 0, 1 ], c1: 0x887766, c2: 0x997788, seed: 0.25, flex: - 0.05 };
 	const fan = { type: 'fan', variant: 0, x: 1, y: - 2, z: 0, s: 1, sx: 1, sy: 1, sz: 1, q: [ 0, 0, 0, 1 ], c1: 0x776688, c2: 0x665577, seed: 0.5, flex: 0.3 };
-	reef = new Reef( { scene: L.scene, terrain: null, placementRecords: [ rock, fan ], maxInstances: 8 } );
+	reef = new Reef( { scene: L.scene, terrain: null, worldLayout: TIDEWATER_LAYOUT, placementRecords: [ rock, fan ], maxInstances: 8 } );
 	assert.equal( reef.fish, null, 'static reef omits fish simulation' );
 	assert.equal( reef.items.hard.length, 1 );
 	assert.equal( reef.items.soft.length, 1 );
