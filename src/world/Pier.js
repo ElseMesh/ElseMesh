@@ -1,5 +1,4 @@
 import { Color, Vector3 } from '../engine/index.js';
-import { WORLD } from './WorldLayout.js';
 import {
 	WOOD, HARD, C, lin, bollard, cleat, tireFender, ropeCoil, ropeLoop, lifeRing, lampPost,
 	bench, cleaningTable, buoyString, bucket, lantern,
@@ -8,33 +7,39 @@ import {
 // Timber pier with a T-shaped head. Everything is procedural geometry written into a
 // GeoBuilder; colliders are registered for decks, steps, rails, piles and props.
 //
-// Deck top is exactly WORLD.pier.deckHeight everywhere (colliders tagged 'pierDeck').
-
-const P = WORLD.pier;
+// Deck top is exactly the authored pier deck height everywhere (colliders
+// tagged 'pierDeck').
 
 const ARCH_H = 2.75; // entrance arch beam height above the deck
 
-export const PIER = {
-	x: P.x,
-	zStart: P.zStart,
-	zEnd: P.zEnd,
-	deck: P.deckHeight,
-	width: P.width,
-	halfW: P.width / 2,
-	headZ0: P.zEnd - P.headDepth,
-	headX0: P.x - P.headWidth / 2,
-	headX1: P.x + P.headWidth / 2,
-	plankT: 0.055,
-	pileR: 0.15,
-	pileOff: P.width / 2 + 0.17,
-	stringerH: 0.22,
-	capH: 0.26,
-};
+function pierDimensions( P ) {
+
+	return {
+		x: P.x,
+		zStart: P.zStart,
+		zEnd: P.zEnd,
+		deck: P.deckHeight,
+		width: P.width,
+		halfW: P.width / 2,
+		headZ0: P.zEnd - P.headDepth,
+		headX0: P.x - P.headWidth / 2,
+		headX1: P.x + P.headWidth / 2,
+		plankT: 0.055,
+		pileR: 0.15,
+		pileOff: P.width / 2 + 0.17,
+		stringerH: 0.22,
+		capH: 0.26,
+	};
+
+}
 
 const _v = new Vector3();
 const _h = new Vector3();
 
-export function buildPier( { B, terrain, colliders, rand, lights, inst, signB = null, hang = null } ) {
+export function buildPier( { B, terrain, colliders, rand, lights, inst, worldLayout, signB = null, hang = null } ) {
+
+	if ( ! worldLayout ) throw new Error( 'Pier construction requires the active world package layout' );
+	const PIER = pierDimensions( worldLayout.pier );
 
 	const X = PIER.x, DK = PIER.deck, halfW = PIER.halfW;
 	const z0 = PIER.zStart, zH = PIER.headZ0, z1 = PIER.zEnd;

@@ -375,7 +375,7 @@ export class App {
 		// built-in Tidewater presentation out of the shared App import graph.
 		const { Village, Reef, BoatModel, Rocks, Debris, Whale } = await import( './world/BuiltinWorldPresentation.js' );
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
-		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, fishPresentation: this.fishPresentation } );
+		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
 		this.vegetationEnabled = ! qs.has( 'noVeg' );
 		if ( this.vegetationEnabled ) {

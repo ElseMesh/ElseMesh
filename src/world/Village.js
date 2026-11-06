@@ -5,7 +5,7 @@ import { createVillageMaterials } from './village/VillageMaterials.js';
 import { VillageTextures } from './village/TextureBaker.js';
 import { buildHouse, buildBoathouse, buildMarketStall, buildShed } from './village/Buildings.js';
 import { buildBoardwalk } from './village/Boardwalk.js';
-import { buildPier, PIER } from './Pier.js';
+import { buildPier } from './Pier.js';
 import { G } from '../engine/render/Frame.js';
 import {
 	InstancedProps, Rand, lin, C, WOOD, rowboat, netRack, fishRack, fence, laundryLine, oar, buoy,
@@ -61,11 +61,14 @@ const _lanternEuler = new Euler();
 
 export class Village {
 
-	constructor( { scene, terrain, colliders, fishPresentation = null } ) {
+	constructor( { scene, terrain, colliders, worldLayout, fishPresentation = null } ) {
+
+		if ( ! worldLayout ) throw new Error( 'Village construction requires the active world package layout' );
 
 		this.scene = scene;
 		this.terrain = terrain;
 		this.colliders = colliders;
+		this.worldLayout = worldLayout;
 		this.lights = [];
 		this.footprints = [];
 		this.foundationChecks = [];
@@ -92,7 +95,7 @@ export class Village {
 
 		// the fish sign at the pier entrance is its own small mesh: it swings in the wind (update())
 		this.signB = new Builder();
-		this.pierInfo = buildPier( { B: this.harbor, terrain, colliders, rand, lights: this.lights, inst: this.inst, signB: this.signB, hang: () => new Builder() } );
+		this.pierInfo = buildPier( { B: this.harbor, terrain, colliders, rand, lights: this.lights, inst: this.inst, worldLayout, signB: this.signB, hang: () => new Builder() } );
 
 		// boardwalk from the foot of the pier steps up to the plaza
 		const foot = this.pierInfo.stepFoot;
@@ -332,7 +335,7 @@ export class Village {
 		this.foundationChecks.push( { x: 73.8, y: g( 73.8, - 69.5 ) - 0.2, z: - 69.5 } );
 
 		// crates, traps and barrels around the pier foot and the huts
-		const X = PIER.x;
+		const X = this.worldLayout.pier.x;
 		const cluster = ( items ) => {
 
 			for ( const [ type, x, z, ry, stack ] of items ) {
