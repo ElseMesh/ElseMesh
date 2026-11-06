@@ -132,7 +132,7 @@ try {
 const { Debris } = await import( '../src/world/Debris.js' );
 const colliders = new Colliders();
 t0 = performance.now();
-const debris = new Debris( { scene: H.scene, terrain: { data, gpu }, village: { materials: villageMats, textures: villageTextures, buildings: [], getFootprints: () => [], path: null }, colliders } );
+const debris = new Debris( { scene: H.scene, terrain: { data, gpu }, village: { materials: villageMats, textures: villageTextures, buildings: [], getFootprints: () => [], path: null }, colliders, worldLayout: TIDEWATER_LAYOUT } );
 console.log( 'debris built', ( performance.now() - t0 ).toFixed( 0 ), 'ms' );
 await debris.scanned.promise;
 console.log( 'stats', JSON.stringify( { ...debris.stats(), timings: undefined } ) );

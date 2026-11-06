@@ -32,7 +32,7 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 
 export class Debris {
 
-	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, seed = 5150 } ) {
+	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, seed = 5150 } ) {
 
 		this.scene = scene;
 		this.terrainData = terrain.data || terrain;
@@ -44,7 +44,7 @@ export class Debris {
 
 		const B = new Builder();
 		const inst = new InstancedProps( B );
-		const placer = new DebrisPlacer( { B, inst, terrain: this.terrainData, village, vegetation, rocks, colliders, seed } ).run();
+		const placer = new DebrisPlacer( { B, inst, terrain: this.terrainData, village, vegetation, rocks, colliders, worldLayout, seed } ).run();
 		this.counts = placer.counts;
 		this.newColliders = placer.newColliders;
 		const t1 = performance.now();

@@ -1,6 +1,5 @@
 import { Vector3 } from '../../engine/index.js';
 import { Noise2D, mulberry32, smoothstep as sstep } from '../../util/Noise.js';
-import { WORLD } from '../WorldLayout.js';
 import { PATHS, polylineDistance } from '../terrain/IslandShape.js';
 import { C, lin, mulc, WOOD, buoy, ropeCoil, bucket, rowboat, oar, woodpile } from '../Props.js';
 import {
@@ -158,11 +157,14 @@ class Occupancy {
 
 export class DebrisPlacer {
 
-	constructor( { B, inst, terrain, village = null, vegetation = null, rocks = null, colliders = null, seed = 5150, detail = null } ) {
+	constructor( { B, inst, terrain, village = null, vegetation = null, rocks = null, colliders = null, worldLayout, seed = 5150, detail = null } ) {
+
+		if ( ! worldLayout ) throw new Error( 'Debris placement requires the active world package layout' );
 
 		this.B = B;
 		this.inst = inst;
 		this.T = terrain;
+		this.worldLayout = worldLayout;
 		this.village = village;
 		this.vegetation = vegetation;
 		this.rocks = rocks;
@@ -292,9 +294,9 @@ export class DebrisPlacer {
 
 		}
 
-		const pier = WORLD.pier;
+		const pier = this.worldLayout.pier;
 		O.capsule( pier.x, pier.zStart - 3, pier.x, pier.zEnd + pier.headDepth, pier.width / 2, 0.6, 'pier' );
-		const sp = WORLD.spawn.position;
+		const sp = this.worldLayout.spawn.position;
 		O.circle( sp.x, sp.z, 3.5, 0, 'spawn' );
 		// big village props registered as footprints (boats, wreck, racks)
 		if ( this.village ) for ( const f of this.village.getFootprints() ) if ( f.kind === 'prop' ) O.circle( f.x, f.z, f.r * 0.55, 0, 'prop' );
@@ -983,7 +985,7 @@ export class DebrisPlacer {
 		const B = this.B;
 		const V = this.vegetation && this.vegetation.records;
 		if ( ! V ) return;
-		const vc = WORLD.village.center;
+		const vc = this.worldLayout.village.center;
 		for ( const p of V.palms ) {
 
 			const dv = Math.hypot( p.x - vc.x, p.z - vc.z );
@@ -1262,7 +1264,7 @@ export class DebrisPlacer {
 		const g = this.ground;
 		const B = this.B;
 		const nz = this.noise;
-		const vc = WORLD.village.center;
+		const vc = this.worldLayout.village.center;
 		let n = 0;
 		for ( let z = - 200; z < 330; z += 1.2 ) for ( let x = - 520; x < 520; x += 1.2 ) {
 
@@ -1303,7 +1305,7 @@ export class DebrisPlacer {
 		const nz = this.noise;
 		const res = T.res, H = T.heights;
 		const step = Math.round( texel / T.texel );
-		const vc = WORLD.village.center;
+		const vc = this.worldLayout.village.center;
 		for ( let j = 0; j < MR; j ++ ) {
 
 			const z = T.origin + ( j + 0.5 ) * texel;

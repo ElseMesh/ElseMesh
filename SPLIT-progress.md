@@ -80,8 +80,8 @@ parity is complete.
 - 2026-11-06: `pierWalkableHeightAt()` now receives the active world layout
   from the WebGL fallback, and the Tidewater-owned fixture supplies Tidewater's
   layout explicitly. `PierSurface.js` no longer imports `IslandDefinition`.
-  Remaining static imports through the legacy adapter include reef materials,
-  debris placement, and vegetation scatter. No progress
+  Remaining static imports through the legacy adapter include reef materials
+  and vegetation scatter. No progress
   percentage changed; the external production build passes. Tests were not run.
 
 - 2026-11-06: Tidewater pier geometry no longer reads a module-global layout.
@@ -99,6 +99,13 @@ parity is complete.
   passes with 83,601 records (5,350,480 bytes), and the external production
   build passes.
   fish rendering and gameplay parity were not exercised in this slice.
+
+- 2026-11-06: `DebrisPlacer` no longer imports the Tidewater layout adapter.
+  `App` passes layout through `Debris`; Tidewater's world render fixture and
+  export tool also provide it explicitly. Those Tidewater files now read their
+  own package layout directly instead of importing the engine adapter. The
+  external production build passes. The debris render fixture was not run, and
+  no progress percentage changed.
 
 - 2026-11-06: Moved the plain Tidewater `IslandDefinition` data from `src/world`
   to `worlds/tidewater/IslandDefinition.js`. Tidewater wildlife and parity
