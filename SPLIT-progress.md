@@ -1179,3 +1179,12 @@ finding changes them.
   inherited the shared 3.5 m reaction distance. Tidewater's owned parity test
   now asserts both the full profile hash and that value. The 63-group seeded
   population snapshot passes; no estimate changes.
+
+- 2026-11-06: audited production boat-water wiring after the fixed-clock work.
+  WebGPU `WakeSim` contributes to both rendered water and `WaterQuery`; the
+  WebGL fallback has no wake simulation, wake renderer contribution, or wake
+  term in `WebGLWaterQuery`. Existing production-style boat traces explicitly
+  exclude interactive wake and collisions, while the synthetic sensitivity
+  fixture does not exercise production wiring. This confirms an open gameplay
+  and visual parity gap. The parity estimate remains 82%; implement and compare
+  the engine-owned WebGL water-effect path before claiming boat parity.
