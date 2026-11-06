@@ -27,6 +27,7 @@ import { WebGLSpray } from './WebGLSpray.js';
 import { WebGLShoreWetness } from './WebGLShoreWetness.js';
 import { webglShoreWobbleGLSL } from './WebGLShoreWaveMath.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
+import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
@@ -846,6 +847,7 @@ export class WebGLFallback {
 		this.spray = new WebGLSpray( T, this.scene );
 		const sunDirection = this._sunDirection( this.app.settings.timeOfDay );
 		this.scene.background = this.worldEnvironment.sky ? null : new T.Color( 0x080b10 );
+		this.webglAtmosphere = this.worldEnvironment.sky ? new WebGLAtmosphere( T, this.renderer, sunDirection ) : null;
 		this.cloudLayer = this._makeCloudLayer( sunDirection, this.cloudsEnabled );
 		this.cloudLayer.visible = this.worldEnvironment.sky;
 		this.scene.add( this.cloudLayer );
@@ -944,7 +946,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.webglEnvironment?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		this.animationStartTime = performance.now();
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
@@ -1017,7 +1019,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -1295,7 +1297,9 @@ export class WebGLFallback {
 				uniform vec3 uCameraPosition;
 				uniform vec3 uSunDirection;
 				uniform sampler2D uCloudNoise;
+				uniform sampler2D uAtmosphereSkyView;
 				uniform float uSkyEnabled;
+				uniform float uAtmosphereEnabled;
 				uniform float uCloudsEnabled;
 				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
@@ -1329,6 +1333,7 @@ export class WebGLFallback {
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
 				}
+				${ webglAtmosphereSkyLookupGLSL }
 				void main() {
 					vec2 p = vWorldPosition.xz;
 					bool inBeachPatch = vRestPosition.x >= uBeachPatchBounds.x && vRestPosition.x <= uBeachPatchBounds.z && vRestPosition.y >= uBeachPatchBounds.y && vRestPosition.y <= uBeachPatchBounds.w;
@@ -1377,6 +1382,7 @@ export class WebGLFallback {
 					vec3 reflectionDirection = reflect( -viewDirection, normal );
 					float fresnel = 0.025 + 0.86 * pow( 1.0 - max( dot( normal, viewDirection ), 0.0 ), 5.0 );
 					vec3 sky = mix( vec3( 0.018, 0.022, 0.03 ), mix( vec3( 0.025, 0.07, 0.18 ), vec3( 0.13, 0.25, 0.43 ), smoothstep( -0.08, 0.75, reflectionDirection.y ) ), uSkyEnabled );
+					sky = mix( sky, atmosphereSky( reflectionDirection ), uAtmosphereEnabled );
 					vec2 skyUv = vec2( atan( reflectionDirection.x, reflectionDirection.z ) / 6.2831853 + 0.5, asin( clamp( reflectionDirection.y, -1.0, 1.0 ) ) / 3.1415927 + 0.5 );
 					skyUv += vec2( uTime * 0.0005, -uTime * 0.00014 );
 					vec4 cloudField = texture2D( uCloudNoise, skyUv * 0.38 );
@@ -1470,6 +1476,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() }, uCameraPosition: { value: new T.Vector3() },
 				uCloudNoise: { value: cloudNoise }, uCloudVolume: { value: cloudVolume }, uCloudsEnabled: { value: cloudsEnabled ? 1 : 0 },
+				uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 },
 			},
 			vertexShader: /* glsl */`
 				varying vec3 vDirection;
@@ -1486,7 +1493,10 @@ export class WebGLFallback {
 				uniform float uCloudsEnabled;
 				uniform sampler2D uCloudNoise;
 				uniform sampler3D uCloudVolume;
+				uniform sampler2D uAtmosphereSkyView;
+				uniform float uAtmosphereEnabled;
 				varying vec3 vDirection;
+				${ webglAtmosphereSkyLookupGLSL }
 				void main() {
 					vec3 dir = normalize( vDirection );
 					float elevation = max( dir.y, 0.0 );
@@ -1499,6 +1509,7 @@ export class WebGLFallback {
 					sky = mix( sky, vec3( 0.22, 0.28, 0.32 ), horizonHaze * 0.6 );
 					float sunGlow = pow( max( dot( dir, normalize( uSunDirection ) ), 0.0 ), 10.0 ) * day;
 					sky += vec3( 0.16, 0.095, 0.035 ) * sunGlow;
+					sky = mix( sky, atmosphereSky( dir ), uAtmosphereEnabled );
 					vec2 uv = vec2( atan( dir.x, dir.z ) / 6.2831853 + 0.5, asin( clamp( dir.y, -1.0, 1.0 ) ) / 3.1415927 + 0.5 );
 					uv += vec2( uTime * 0.0005, -uTime * 0.00014 );
 					vec4 field = texture2D( uCloudNoise, uv * 0.28 );
@@ -2156,6 +2167,7 @@ export class WebGLFallback {
 		this.spray?.update( dt );
 		const T = this.THREE;
 		this._updateLighting();
+		this.webglAtmosphere?.updateSun( this.sunDirection );
 		if ( this.webglEnvironment?.update( this.sunDirection, simulationTime ) ) this.scene.environment = this.webglEnvironment.texture;
 		this.cloudLayer.position.copy( this.camera.position );
 		this.cloudLayer.material.uniforms.uTime.value = simulationTime;

@@ -65,6 +65,19 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: The WebGL renderer now builds the same transmittance,
+  multiple-scattering, and sky-view LUTs as the WebGPU atmosphere from a shared
+  renderer-neutral parameter module. The sky dome and water reflections sample
+  that atmosphere instead of separate fixed gradients. At the matched 16.2
+  beach pose and 0.55 exposure, hosted WebGL versus pre-split WebGPU sky-region
+  RGB MAE falls from 59.76 to 19.26 (49.93 to 17.10 on pixels that are
+  cloud-free in both captures); full-frame MAE falls from 41.45 to 22.70, and
+  sand MAE remains about 7.2. Sea MAE is 40.88; water, spray, and cloud phases
+  are not synchronized, so this is not a wave-phase or gameplay parity result.
+  The capture is software-backed and does not establish hardware FPS. See the
+  [hosted WebGL atmosphere capture](docs/images/tidewater-hosted-webgl-atmosphere-2026-11-06.png).
+  Overall parity remains 82%.
+
 - 2026-11-06: WebGL direct sun now uses the atmosphere's shared spectral
   extinction coefficients and illuminance instead of a fixed warm light. At
   Tidewater's 16.2 beach time its linear RGB radiance matches the WebGPU

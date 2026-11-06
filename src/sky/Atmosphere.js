@@ -4,6 +4,20 @@ import { Texture, StorageBuffer } from '../engine/gpu/Texture.js';
 import { Readback } from '../engine/gpu/Readback.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
 import { Color, Vector3 } from '../engine/math/index.js';
+import {
+	ATMOSPHERE_GROUND_ALBEDO, ATMOSPHERE_GROUND_RADIUS_KM, ATMOSPHERE_TOP_RADIUS_KM,
+	ATMOSPHERE_VIEW_HEIGHT_OFFSET_KM, MIE_ASYMMETRY_G, MIE_EXTINCTION_COEFFICIENT,
+	MIE_SCALE, MIE_SCALE_HEIGHT_KM, MIE_SCATTERING_COEFFICIENT, OZONE_ABSORPTION_COEFFICIENTS,
+	OZONE_LAYER_CENTER_KM, OZONE_LAYER_HALF_WIDTH_KM, OZONE_SCALE, RAYLEIGH_SCALE,
+	RAYLEIGH_SCALE_HEIGHT_KM, RAYLEIGH_SCATTERING_COEFFICIENTS, SUN_ANGULAR_RADIUS, SUN_ILLUMINANCE,
+} from './AtmosphereParameters.js';
+export {
+	ATMOSPHERE_GROUND_ALBEDO, ATMOSPHERE_GROUND_RADIUS_KM, ATMOSPHERE_TOP_RADIUS_KM,
+	ATMOSPHERE_VIEW_HEIGHT_OFFSET_KM, MIE_ASYMMETRY_G, MIE_EXTINCTION_COEFFICIENT,
+	MIE_SCALE, MIE_SCALE_HEIGHT_KM, MIE_SCATTERING_COEFFICIENT, OZONE_ABSORPTION_COEFFICIENTS,
+	OZONE_LAYER_CENTER_KM, OZONE_LAYER_HALF_WIDTH_KM, OZONE_SCALE, RAYLEIGH_SCALE,
+	RAYLEIGH_SCALE_HEIGHT_KM, RAYLEIGH_SCATTERING_COEFFICIENTS, SUN_ANGULAR_RADIUS, SUN_ILLUMINANCE,
+};
 
 // Physically based sky (Hillaire 2020, "A Scalable and Production Ready Sky and Atmosphere
 // Rendering Technique"). All distances in km inside the atmosphere code.
@@ -18,19 +32,8 @@ import { Color, Vector3 } from '../engine/math/index.js';
 //   const ATMO_RG / ATMO_RT (km)
 // `atmosphere.multiScatModule`: fn atmosphereSampleMultiScat( rKm: f32, cosSun: f32 ) -> vec3f
 
-const RG = 6360.0;
-const RT = 6460.0;
-
-export const SUN_ILLUMINANCE = 11.0; // scene units (sun irradiance outside the atmosphere)
-export const SUN_ANGULAR_RADIUS = 0.004675 * 1.15;
-export const RAYLEIGH_SCALE_HEIGHT_KM = 8.0;
-export const MIE_SCALE_HEIGHT_KM = 1.2;
-export const OZONE_LAYER_CENTER_KM = 25.0;
-export const OZONE_LAYER_HALF_WIDTH_KM = 15.0;
-export const RAYLEIGH_SCATTERING_COEFFICIENTS = Object.freeze( [ 5.802e-3, 13.558e-3, 33.1e-3 ] );
-export const MIE_SCATTERING_COEFFICIENT = 3.996e-3;
-export const MIE_EXTINCTION_COEFFICIENT = 4.440e-3;
-export const OZONE_ABSORPTION_COEFFICIENTS = Object.freeze( [ 0.650e-3, 1.881e-3, 0.085e-3 ] );
+const RG = ATMOSPHERE_GROUND_RADIUS_KM;
+const RT = ATMOSPHERE_TOP_RADIUS_KM;
 
 const T_W = 256, T_H = 64;
 const MS_RES = 32;
@@ -116,12 +119,12 @@ export class Atmosphere {
 		this.skyViewLUT = makeLUT( SV_W, SV_H, 'atmoSkyView' );
 
 		this.params = new UniformBlock( 'AtmosphereParams', {
-			rayleighScale: [ 'f32', 1 ],
-			mieScale: [ 'f32', 1 ],
-			mieG: [ 'f32', 0.8 ],
-			ozoneScale: [ 'f32', 1 ],
-			groundAlbedo: [ 'vec3f', new Color( 0.06, 0.08, 0.1 ) ],
-			viewHeight: [ 'f32', RG + 0.002 ], // km
+			rayleighScale: [ 'f32', RAYLEIGH_SCALE ],
+			mieScale: [ 'f32', MIE_SCALE ],
+			mieG: [ 'f32', MIE_ASYMMETRY_G ],
+			ozoneScale: [ 'f32', OZONE_SCALE ],
+			groundAlbedo: [ 'vec3f', new Color( ...ATMOSPHERE_GROUND_ALBEDO ) ],
+			viewHeight: [ 'f32', RG + ATMOSPHERE_VIEW_HEIGHT_OFFSET_KM ], // km
 			sunIlluminance: [ 'vec3f', new Color( SUN_ILLUMINANCE, SUN_ILLUMINANCE, SUN_ILLUMINANCE ) ],
 			pad0: [ 'f32', 0 ],
 			// the real sun (may be below the horizon: twilight, night). G.sunDir is the key light, which
