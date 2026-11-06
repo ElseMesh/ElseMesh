@@ -1534,7 +1534,7 @@ export class WebGLFallback {
 	}
 
 	_bindShoreSurfaceToWater() {
-		this.waterQuery?.setSurfaceOffsetSampler( createWebGLShoreSurfaceOffset( {
+		this.waterQuery?.setSurfaceOffsetSampler( 'shore', createWebGLShoreSurfaceOffset( {
 			terrain: this.terrain || this.hostedTerrainData,
 			seaLevel: this.worldSeaLevel,
 			field: this.shoreField || this.hostedTerrainSurface?.shoreField || null,

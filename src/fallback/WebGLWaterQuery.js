@@ -101,7 +101,7 @@ export class WebGLWaterQuery {
 		this.renderer = renderer;
 		this.terrain = terrain;
 		this.seaLevel = seaLevel;
-		this.surfaceOffsetAt = null;
+		this.surfaceOffsetSamplers = new Map();
 		this.inputs = new Float32Array( MAX_QUERIES * 4 );
 		this.cpu = new Float32Array( MAX_QUERIES * 4 );
 		this.resultInputs = new Float32Array( MAX_QUERIES * 4 );
@@ -158,10 +158,25 @@ export class WebGLWaterQuery {
 
 	}
 
-	setSurfaceOffsetSampler( sampler ) {
+	setSurfaceOffsetSampler( name, sampler ) {
 
-		if ( sampler !== null && typeof sampler !== 'function' ) throw new TypeError( 'Water surface sampler must be a function or null' );
-		this.surfaceOffsetAt = sampler;
+		if ( typeof name !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( name ) || sampler !== null && typeof sampler !== 'function' ) throw new TypeError( 'Water surface sampler requires a stable name and a function or null' );
+		if ( sampler === null ) this.surfaceOffsetSamplers.delete( name );
+		else this.surfaceOffsetSamplers.set( name, sampler );
+
+	}
+
+	getSurfaceOffsetSampler( name ) {
+
+		return this.surfaceOffsetSamplers.get( name ) || null;
+
+	}
+
+	sampleSurfaceOffset( x, z, time ) {
+
+		let offset = 0;
+		for ( const sampler of this.surfaceOffsetSamplers.values() ) offset += sampler( x, z, time ) || 0;
+		return offset;
 
 	}
 
@@ -202,16 +217,16 @@ export class WebGLWaterQuery {
 
 	_updateOffset( data, points, time ) {
 
-		if ( ! this.surfaceOffsetAt ) return;
+		if ( ! this.surfaceOffsetSamplers.size ) return;
 		const e = 0.35;
 		for ( let i = 0; i < this.count; i ++ ) {
 
 			const k = i * 4, x = points[ k ], z = points[ k + 1 ];
-			const offset = this.surfaceOffsetAt( x, z, time ) || 0;
+			const offset = this.sampleSurfaceOffset( x, z, time );
 			const gx = - data[ k + 1 ] / Math.sqrt( Math.max( 1 - data[ k + 1 ] ** 2 - data[ k + 2 ] ** 2, 0.05 ) )
-				+ ( ( this.surfaceOffsetAt( x + e, z, time ) || 0 ) - offset ) / e;
+				+ ( this.sampleSurfaceOffset( x + e, z, time ) - offset ) / e;
 			const gz = - data[ k + 2 ] / Math.sqrt( Math.max( 1 - data[ k + 1 ] ** 2 - data[ k + 2 ] ** 2, 0.05 ) )
-				+ ( ( this.surfaceOffsetAt( x, z + e, time ) || 0 ) - offset ) / e;
+				+ ( this.sampleSurfaceOffset( x, z + e, time ) - offset ) / e;
 			const h = data[ k ] + offset;
 			const n = Math.sqrt( gx * gx + gz * gz + 1 );
 			data[ k ] = h;

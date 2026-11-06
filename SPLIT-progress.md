@@ -69,9 +69,11 @@ parity is complete.
   binds automatically from the active terrain shore field and sea level.
   Tidewater removed its `shore-aware-boat/1` backend hook and behavior entry;
   WebGL shore-profile math moved to `src/fallback/WebGLShoreSurface.js`, and
-  the world-owned parity fixtures import that engine adapter directly. The
-  external production build passes. No browser capture or tests were run, so
-  runtime numerical parity remains to be rechecked.
+  the world-owned parity fixtures import that engine adapter directly.
+  `WebGLWaterQuery` now composes named surface-offset samplers, so future wake
+  displacement can coexist with shore displacement. The external production
+  build passes. No browser capture or tests were run, so runtime numerical
+  parity remains to be rechecked.
 
 - 2026-11-06: Built-in wildlife creation now crosses the default world package
   boundary: the Tidewater package supplies `createWildlife`, while `App` treats
