@@ -80,8 +80,8 @@ parity is complete.
 - 2026-11-06: `pierWalkableHeightAt()` now receives the active world layout
   from the WebGL fallback, and the Tidewater-owned fixture supplies Tidewater's
   layout explicitly. `PierSurface.js` no longer imports `IslandDefinition`.
-  Remaining static imports through the legacy adapter include reef materials
-  and vegetation scatter. No progress
+  The remaining static import through the legacy adapter is vegetation scatter.
+  No progress
   percentage changed; the external production build passes. Tests were not run.
 
 - 2026-11-06: Tidewater pier geometry no longer reads a module-global layout.
@@ -106,6 +106,13 @@ parity is complete.
   own package layout directly instead of importing the engine adapter. The
   external production build passes. The debris render fixture was not run, and
   no progress percentage changed.
+
+- 2026-11-06: Reef swell code now receives the active world layout in both
+  WebGPU material construction and Tidewater's WebGL reef shader. Generated
+  shader modules are keyed by normalized swell direction, avoiding a
+  module-global direction. The static reef rendering checks pass on both the
+  headless WebGPU path and Tidewater's WebGL adapter; the external production
+  build passes. These checks do not establish full visual parity.
 
 - 2026-11-06: Moved the plain Tidewater `IslandDefinition` data from `src/world`
   to `worlds/tidewater/IslandDefinition.js`. Tidewater wildlife and parity

@@ -1256,10 +1256,10 @@ export class Reef {
 		this.view = this.viewBlock.fields; // { position, range } handles (WGSL reefView.position / .range)
 		this.view.position.value = new THREE.Vector3();
 		this.view.range.value = RANGE;
-		const mats = createReefMaterials( { hard: this.batches.hard, soft: this.batches.soft, getOcean: () => this.fft, noise: this.noise3D, view: this.viewBlock } );
+		const mats = createReefMaterials( { hard: this.batches.hard, soft: this.batches.soft, getOcean: () => this.fft, noise: this.noise3D, view: this.viewBlock, worldLayout: this.worldLayout } );
 		this.materials = mats;
 		// level-of-detail cross-fades: dithered second draws of the instances in transition bands
-		const fadeMats = createReefMaterials( { hard: this.batches.hard, soft: this.batches.soft, getOcean: () => this.fft, noise: this.noise3D, view: this.viewBlock, fade: true } );
+		const fadeMats = createReefMaterials( { hard: this.batches.hard, soft: this.batches.soft, getOcean: () => this.fft, noise: this.noise3D, view: this.viewBlock, worldLayout: this.worldLayout, fade: true } );
 		this.fadeMaterials = fadeMats;
 		this.group.add( this.batches.hard.createFadeMesh( fadeMats.hard ), this.batches.soft.createFadeMesh( fadeMats.soft ) );
 		const hard = this.batches.hard.createMesh( mats.hard, { castShadow: true } );
