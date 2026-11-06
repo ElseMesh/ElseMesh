@@ -47,6 +47,7 @@ import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 import { worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
 import { WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
+import { G } from '../engine/render/Frame.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
 
@@ -960,7 +961,6 @@ export class WebGLFallback {
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
 		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
-		this.animationStartTime = performance.now();
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
 	}
@@ -2210,7 +2210,9 @@ export class WebGLFallback {
 		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		this.app.updateFPS();
 		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, cpuMs: this.app.cpuMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
-		const simulationTime = ( now - this.animationStartTime ) * 0.001;
+		G.dt.value = dt;
+		G.time.value += dt;
+		const simulationTime = G.time.value;
 		this.lastFrame = now;
 		if ( this.shoreWetness ) {
 			this.shoreWetness.update( dt, simulationTime );

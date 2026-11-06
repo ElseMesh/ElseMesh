@@ -69,12 +69,14 @@ parity is complete.
   ports the pre-split WebGPU material's dielectric Fresnel, roughness-adjusted
   sky reflection, GGX direct glint, and depth-dependent sun/sky scattering. The
   shared atmosphere pass supplies the water's sky irradiance, and WebGL uses
-  the renderer's current key-light direction/radiance. In a fresh 1280×720
-  hosted capture at the named 16.2 beach pose and 0.55 exposure, sea-region
-  RGB MAE against pre-split WebGPU falls from 40.88 to 32.31, while full-frame
-  MAE falls from 22.70 to 20.64; sky remains 19.23 and sand 7.16. Wave, cloud,
-  and spray phases are not synchronized, and this software-backed capture does
-  not establish hardware FPS. See the [hosted WebGL water capture](docs/images/tidewater-hosted-webgl-water-2026-11-06.png).
+  the renderer's current key-light direction/radiance. WebGL water, shore,
+  terrain, and world hooks now advance from the engine's shared clamped frame
+  time rather than wall time. In a fresh 1280×720 hosted capture at the named
+  16.2 beach pose and 0.55 exposure, sea-region RGB MAE against pre-split
+  WebGPU falls from 40.88 to 30.34 and full-frame MAE is 20.13; sky is 19.28
+  and sand 7.16. The capture remains unsynchronized to a particular WebGPU
+  frame, and this software-backed result does not establish hardware FPS. See
+  the [hosted WebGL water capture](docs/images/tidewater-hosted-webgl-water-2026-11-06.png).
   Overall parity remains 82%.
 
 - 2026-11-06: The WebGL renderer now builds the same transmittance,
