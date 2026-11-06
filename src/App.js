@@ -71,7 +71,7 @@ import { avatarProfileId, loadAppearance } from './player/AvatarAppearance.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, registerWorldPackageCollisions, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -86,6 +86,7 @@ import { GENERIC_WORLD_EXPERIENCE, worldEnvironmentSettings } from './network/Wo
 
 const _up = new Vector3( 0, 1, 0 );
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
+const _componentPriorityBounds = { transform: { position: [ 0, 0, 0 ] }, streamingBounds: null };
 
 function terrainWetnessFor( shoreSim ) {
 
@@ -1608,6 +1609,16 @@ export class App {
 		const objectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const componentIDs = new Set( components.map( ( component ) => component.id ) );
 		const assetIDs = new Set( [ ...objects.map( ( object ) => object.assetId ), ...components.flatMap( componentAssetIDs ) ] );
+		const viewPriorityByAsset = new Map();
+		const prioritize = ( assetIds, fraction ) => {
+			if ( fraction === null || fraction === undefined ) return;
+			for ( const assetId of assetIds ) viewPriorityByAsset.set( assetId, Math.max( viewPriorityByAsset.get( assetId ) ?? 0, fraction ) );
+		};
+		for ( const object of objects ) if ( object.assetId && object.streamingBounds ) prioritize( [ object.assetId ], projectedBoundsScreenFraction( object, this.camera ) );
+		for ( const component of components ) if ( component.streamingBounds ) {
+			_componentPriorityBounds.streamingBounds = component.streamingBounds;
+			prioritize( componentAssetIDs( component ), projectedBoundsScreenFraction( _componentPriorityBounds, this.camera ) );
+		}
 		const objectIDsByAsset = new Map();
 		const standaloneComponentIDsByAsset = new Map();
 		if ( connector.localOnly ) {
@@ -1637,7 +1648,7 @@ export class App {
 		state.loadingObjectIDs = objectIDs;
 		state.loadingComponentIDs = componentIDs;
 		state.loadingRank = loadRank;
-		const preloadOptions = { assetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined, signal: loadController.signal, concurrency: 2 };
+		const preloadOptions = { assetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined, viewPriorityByAsset, signal: loadController.signal, concurrency: 2 };
 		if ( connector.localOnly ) {
 			preloadOptions.retainAssets = false;
 			preloadOptions.retainAssetIDs = new Set( components.flatMap( componentAssetIDs ) );

@@ -306,7 +306,7 @@ function indexPackageObjectByAsset( state, object ) {
 const _textureBoundsCenter = new Vector3();
 const _textureViewCenter = new Vector3();
 
-function projectedBoundsScreenFraction( object, camera ) {
+export function projectedBoundsScreenFraction( object, camera ) {
 	if ( ! object.transform?.position ) return null;
 	transformBoundsCenter( object, object.streamingBounds.center, _textureBoundsCenter );
 	const radius = object.streamingBounds.radius * Math.max( ...( object.scale || [ 1, 1, 1 ] ).map( Math.abs ) );

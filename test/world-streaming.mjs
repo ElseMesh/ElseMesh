@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { assetConcurrencyForConnection, WorldConnector } from '../src/network/WorldConnector.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView } from '../src/network/WorldStreaming.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
+import { projectedBoundsScreenFraction } from '../src/network/WorldPackage.js';
 await import( '../worlds/tidewater/register-components.js' );
 
 const connector = new WorldConnector( { worldId: 'elsemesh:stream-test', nodeId: '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ', gateway: 'https://example.test' } );
@@ -65,6 +66,16 @@ assert.equal( maxActive, 2, 'moderate measured throughput permits two parallel d
 
 const camera = new PerspectiveCamera( 60, 1, 0.1, 100 );
 camera.position.set( 0, 0, 0 ); camera.lookAt( 0, 0, -1 ); camera.updateMatrixWorld( true );
+const nearPropScreenFraction = projectedBoundsScreenFraction( {
+	transform: { position: [ 0, 0, - 3 ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 0.2 },
+}, camera );
+const farWallScreenFraction = projectedBoundsScreenFraction( {
+	transform: { position: [ 0, 0, - 30 ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 8 },
+}, camera );
+assert.ok( farWallScreenFraction > nearPropScreenFraction, 'a large visible facade outranks a small nearby prop by projected screen size' );
+assert.equal( projectedBoundsScreenFraction( {
+	transform: { position: [ 0, 0, 10 ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 1 },
+}, camera ), null, 'bounds behind the camera receive no visual preload priority' );
 const objects = [
 	{ id: 'front', assetId: 'front', priority: 'visible', transform: { position: [ 0, 0, -10 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } },
 	{ id: 'behind', assetId: 'behind', priority: 'visible', transform: { position: [ 0, 0, 10 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } },

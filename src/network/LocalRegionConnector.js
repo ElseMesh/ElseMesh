@@ -924,12 +924,13 @@ export class LocalRegionConnector {
 		return Boolean( bytes ) || releasedRange;
 	}
 
-	async preload( { assetIDs, position, signal, onProgress = () => {}, onAsset, retainAssets = true, retainAssetIDs = new Set() } = {} ) {
+	async preload( { assetIDs, position, viewPriorityByAsset = new Map(), signal, onProgress = () => {}, onAsset, retainAssets = true, retainAssetIDs = new Set() } = {} ) {
 		requireValue( this.manifest, 'Load the local world descriptor first' );
 		requireValue( typeof onProgress === 'function', 'Local region preload progress callback must be a function' );
 		requireValue( onAsset === undefined || typeof onAsset === 'function', 'Local region asset callback must be a function' );
 		requireValue( typeof retainAssets === 'boolean', 'Local region retention option must be a boolean' );
 		requireValue( retainAssetIDs instanceof Set, 'Local region retained asset IDs must be a Set' );
+		requireValue( viewPriorityByAsset instanceof Map && [ ...viewPriorityByAsset.values() ].every( value => typeof value === 'number' && ! Number.isNaN( value ) && value >= 0 ), 'Local region visual priority map is invalid' );
 		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...new Set( [
 			...( this.manifest.objects || [] ).map( object => object.assetId ).filter( Boolean ),
 			...( this.manifest.components || [] ).flatMap( worldComponentAssetIDs ),
@@ -957,11 +958,13 @@ export class LocalRegionConnector {
 				}
 			}
 		}
-		selected.sort( ( a, b ) =>
-			Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) ) ||
-			( distanceByAsset.get( a ) ?? Infinity ) - ( distanceByAsset.get( b ) ?? Infinity ) ||
-			originalOrder.get( a ) - originalOrder.get( b ),
-		);
+		selected.sort( ( a, b ) => {
+			const collisionOrder = Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) );
+			if ( collisionOrder ) return collisionOrder;
+			const priorityA = viewPriorityByAsset.get( a ) ?? 0, priorityB = viewPriorityByAsset.get( b ) ?? 0;
+			if ( priorityA !== priorityB ) return priorityA > priorityB ? -1 : 1;
+			return ( distanceByAsset.get( a ) ?? Infinity ) - ( distanceByAsset.get( b ) ?? Infinity ) || originalOrder.get( a ) - originalOrder.get( b );
+		} );
 		const loaded = new Map();
 		for ( const [ index, assetId ] of selected.entries() ) {
 			const kind = assetKinds.get( assetId );

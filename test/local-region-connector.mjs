@@ -266,6 +266,25 @@ try {
 	} ), /cannot be combined/ );
 	const invalidIDConnector = new LocalRegionConnector( link );
 	assert.equal( invalidIDConnector.assetCacheBudgetBytes + invalidIDConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'browsers without a reported RAM hint use the conservative default cache budget' );
+	const visualPriorityConnector = new LocalRegionConnector( link );
+	visualPriorityConnector.manifest = {
+		assets: [ 'near-prop', 'far-wall', 'collision' ].map( id => ( { id, kind: 'application/json' } ) ),
+		objects: [
+			{ id: 'near-prop-object', assetId: 'near-prop', regionCell: true, streamingBounds: { center: [ 2, 0, 0 ], radius: 0 } },
+			{ id: 'far-wall-object', assetId: 'far-wall', regionCell: true, streamingBounds: { center: [ 0, 0, 20 ], radius: 0 } },
+			{ id: 'collision-object', assetId: 'collision', regionCell: true, streamingBounds: { center: [ 1, 0, 0 ], radius: 0 } },
+		],
+		components: [],
+	};
+	visualPriorityConnector.collisionAssetIDs.add( 'collision' );
+	const visualPriorityFetches = [];
+	visualPriorityConnector.getAsset = async id => { visualPriorityFetches.push( id ); return new Uint8Array( [ 1 ] ); };
+	await visualPriorityConnector.preload( {
+		assetIDs: [ 'near-prop', 'far-wall', 'collision' ], position: [ 0, 0, 0 ],
+		viewPriorityByAsset: new Map( [ [ 'near-prop', 0.05 ], [ 'far-wall', 0.4 ] ] ),
+	} );
+	assert.deepEqual( visualPriorityFetches, [ 'collision', 'far-wall', 'near-prop' ], 'collision remains first, then larger on-screen content can outrank a closer prop' );
+	await assert.rejects( visualPriorityConnector.preload( { assetIDs: [], viewPriorityByAsset: new Map( [ [ 'invalid', Number.NaN ] ] ) } ), /priority map is invalid/ );
 	for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) {
 		descriptorWorldId = worldId;
 		await assert.rejects( invalidIDConnector.getManifest(), /unsupported descriptor/, `dynamic world providers must reject ${worldId}` );
