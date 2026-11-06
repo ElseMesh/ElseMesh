@@ -2,7 +2,7 @@ import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js'
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
-import { loadWorldPackageModelAsset } from './WorldPackage.js';
+import { loadWorldPackageModelAsset, registerStaticModelTextureDemand } from './WorldPackage.js';
 import { mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
@@ -16,6 +16,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
 	const materialCache = new Map(), sceneCache = new Map(), lodQueue = new LODLoadQueue( 2 );
+	let unregisterTextureDemand = null;
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const getScene = async ( assetId, bytes, progressive ) => {
 		if ( progressive?.textures ) root.userData.worldPackage?.progressiveAssets?.set( assetId, { textures: progressive.textures } );
@@ -26,6 +27,8 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const disposeOwned = () => {
+		unregisterTextureDemand?.();
+		unregisterTextureDemand = null;
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) mesh.parent?.remove( mesh );
 		for ( const geometry of ownedGeometry ) geometry.dispose();
 		for ( const material of ownedMaterials ) material.dispose();
@@ -65,6 +68,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 			} ),
 			dispose: disposeOwned,
 		} );
+		unregisterTextureDemand = registerStaticModelTextureDemand( root, runtime );
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) root.add( mesh );
 		freezeStaticModelInstanceBatchTransforms( root, [ ...mainBatches, ...shadowBatches ] );
 		return { installed: true, runtime };

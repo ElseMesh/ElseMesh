@@ -3,6 +3,7 @@ import { mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
+import { WebGLProgressiveStaticTextures } from './WebGLProgressiveStaticTextures.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installStaticModelInstanceSet );
@@ -64,11 +65,16 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
+	if ( fallback.hostedStaticTextureLOD?.connector !== connector ) fallback.hostedStaticTextureLOD = new WebGLProgressiveStaticTextures( fallback, connector );
+	const textureLOD = fallback.hostedStaticTextureLOD;
+	let runtime = null;
+	const pendingTextureRegistrations = [];
 	const modelBoundsSpheres = document.models.map( ( _model, modelIndex ) => staticModelInstanceBoundsSphere( T, document, modelIndex ) );
 	const modelOffsets = [];
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const disposeOwned = () => {
+		if ( runtime ) textureLOD.unregister( runtime );
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) {
 			mesh.parent?.remove( mesh );
 			mesh.customDepthMaterial?.dispose();
@@ -99,11 +105,12 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			}
 			const coarse = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
+			pendingTextureRegistrations.push( [ modelIndex, 0, model.lods[ 0 ].assetId, coarseSource, coarse.progressive ] );
 			releaseModelLOD( modelIndex, 0 );
 			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 		}
-		const runtime = new StaticModelInstanceSetRuntime( document, {
+		runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
 			batches: mainBatches,
 			// Three.js submits scene-visible meshes in the color pass even when
@@ -111,11 +118,12 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			// cast its own shadow instead of adding a duplicate draw per primitive.
 			shadowBatches: null,
 			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
-				const { bytes, webGLBytes } = await loadModelLOD( modelIndex, lodIndex, { signal } );
+				const { bytes, webGLBytes, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
 				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
 				const source = await parseModel( assetId, webGLBytes || bytes );
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
+				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
 				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
@@ -124,12 +132,16 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			} ),
 			dispose: disposeOwned,
 		} );
+		for ( const args of pendingTextureRegistrations ) textureLOD.register( runtime, ...args );
 		// WebGLFallback's component runtime contract uses the fourth update
 		// argument for elapsed simulation time. Static model planning uses render
 		// load bias there, so translate at this backend boundary instead of letting
 		// simulation time reach the planner as an invalid LOD bias.
 		const updateRuntime = runtime.update.bind( runtime );
-		runtime.update = ( dt, camera, player ) => updateRuntime( dt, camera, player, fallback.app?.renderLoadBias ?? 0 );
+		runtime.update = ( dt, camera, player, elapsed ) => {
+			updateRuntime( dt, camera, player, fallback.app?.renderLoadBias ?? 0 );
+			textureLOD.update( camera, elapsed );
+		};
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
 		freezeStaticModelInstanceBatchTransforms( fallback.scene, mainBatches );
 		return { installed: true, runtime };

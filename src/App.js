@@ -1609,12 +1609,23 @@ export class App {
 		const componentIDs = new Set( components.map( ( component ) => component.id ) );
 		const assetIDs = new Set( [ ...objects.map( ( object ) => object.assetId ), ...components.flatMap( componentAssetIDs ) ] );
 		const objectIDsByAsset = new Map();
+		const standaloneComponentIDsByAsset = new Map();
 		if ( connector.localOnly ) {
 			for ( const object of objects ) {
 				if ( ! object.assetId ) continue;
 				const assetObjectIDs = objectIDsByAsset.get( object.assetId ) || new Set();
 				assetObjectIDs.add( object.id );
 				objectIDsByAsset.set( object.assetId, assetObjectIDs );
+			}
+			// Static model sets have no installation dependency on other components.
+			// Other component types retain the ordered installation pass below.
+			for ( const component of components ) {
+				if ( component.type !== 'elsemesh.static-model-instance-set/1' ) continue;
+				for ( const assetId of componentAssetIDs( component ) ) {
+					const ids = standaloneComponentIDsByAsset.get( assetId ) || new Set();
+					ids.add( component.id );
+					standaloneComponentIDsByAsset.set( assetId, ids );
+				}
 			}
 		}
 		const loadController = new AbortController();
@@ -1632,9 +1643,15 @@ export class App {
 			preloadOptions.retainAssetIDs = new Set( components.flatMap( componentAssetIDs ) );
 			preloadOptions.onAsset = async ( assetId, bytes, progressive ) => {
 				const assetObjectIDs = objectIDsByAsset.get( assetId );
-				if ( ! assetObjectIDs ) return;
-				await appendWorldPackageAssets( connector, root, new Map( [ [ assetId, bytes ] ] ), { signal: loadController.signal, objectIDs: assetObjectIDs, progressiveAsset: progressive } );
-				if ( connector.collisionAssetIDs.has( assetId ) ) registerWorldPackageCollisions( root, this.hostedColliders, assetObjectIDs );
+				if ( assetObjectIDs ) {
+					await appendWorldPackageAssets( connector, root, new Map( [ [ assetId, bytes ] ] ), { signal: loadController.signal, objectIDs: assetObjectIDs, progressiveAsset: progressive } );
+					if ( connector.collisionAssetIDs.has( assetId ) ) registerWorldPackageCollisions( root, this.hostedColliders, assetObjectIDs );
+				}
+				const ids = standaloneComponentIDsByAsset.get( assetId );
+				if ( ids && ! loadController.signal.aborted ) {
+					await this.installWorldComponents( root, connector, ids );
+					if ( loadController.signal.aborted ) unloadWorldPackageComponents( root, connector, ids );
+				}
 			};
 		}
 		connector.preload( preloadOptions ).then( async ( assets ) => {

@@ -184,14 +184,25 @@ function updateWorldPackageTextureLOD( root, camera ) {
 	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
 	const requests = [];
+	const assetScreenFractions = new Map();
 	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
 		if ( state.progressiveTextureJobs.has( targetID ) ) continue;
 		let screenFraction = 0;
 		for ( const assetId of target.sourceAssets.keys() ) {
-			for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
-				const fraction = projectedBoundsScreenFraction( object, camera );
-				if ( fraction !== null ) screenFraction = Math.max( screenFraction, fraction );
+			let assetFraction = assetScreenFractions.get( assetId );
+			if ( assetFraction === undefined ) {
+				assetFraction = 0;
+				for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
+					const fraction = projectedBoundsScreenFraction( object, camera );
+					if ( fraction !== null ) assetFraction = Math.max( assetFraction, fraction );
+				}
+				for ( const demand of state.staticModelTextureDemand?.get( assetId ) || [] ) {
+					const fraction = staticModelTextureScreenFraction( demand, camera );
+					if ( fraction !== null ) assetFraction = Math.max( assetFraction, fraction );
+				}
+				assetScreenFractions.set( assetId, assetFraction );
 			}
+			screenFraction = Math.max( screenFraction, assetFraction );
 		}
 		if ( ! screenFraction ) continue;
 		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 );
@@ -221,7 +232,11 @@ function updateWorldPackageTextureLOD( root, camera ) {
 	requests.sort( ( a, b ) => b.priority - a.priority );
 	if ( ! requests.length ) return;
 	state.textureLODQueue ||= new LODLoadQueue( 1 );
-	for ( const request of requests ) {
+	// Re-evaluate visibility and priority before admitting the next job. Enqueuing
+	// every candidate into the FIFO would leave later visible surfaces behind a
+	// stale backlog, and each finer mip would return to the end of that backlog.
+	const available = Math.max( 0, state.textureLODQueue.limit - state.textureLODQueue.active - state.textureLODQueue.waiting.length );
+	for ( const request of requests.slice( 0, available ) ) {
 		state.progressiveTextureJobs.set( request.targetID, true );
 		state.textureLODQueue.run( state.progressiveController.signal, async () => {
 			const levels = await fetchGLBTextureLevel( state.connector, request.assetId, request.progressive, { imageIndices: request.imageIndices, levelIndex: request.levelIndex, signal: state.progressiveController.signal } );
@@ -233,6 +248,50 @@ function updateWorldPackageTextureLOD( root, camera ) {
 			if ( error?.name !== 'AbortError' && ! state.disposed ) console.warn( 'World texture mip upgrade failed', request.assetId, error );
 		} ).finally( () => state.progressiveTextureJobs.delete( request.targetID ) );
 	}
+}
+
+// Reuse the runtime's selected groups: these already exclude duplicate cell
+// placements and contain the active fallback LOD while a finer LOD loads.
+export function registerStaticModelTextureDemand( root, runtime ) {
+	const state = root.userData.worldPackage;
+	const demands = state.staticModelTextureDemand ||= new Map();
+	const registered = [];
+	for ( let modelIndex = 0; modelIndex < runtime.document.models.length; modelIndex ++ ) {
+		const model = runtime.document.models[ modelIndex ];
+		for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) {
+			const assetId = model.lods[ lodIndex ].assetId;
+			let entries = demands.get( assetId );
+			if ( ! entries ) demands.set( assetId, entries = new Set() );
+			const entry = { runtime, modelIndex, lodIndex };
+			entries.add( entry );
+			registered.push( [ assetId, entry ] );
+		}
+	}
+	return () => {
+		for ( const [ assetId, entry ] of registered ) {
+			const entries = demands.get( assetId );
+			entries?.delete( entry );
+			if ( entries?.size === 0 ) demands.delete( assetId );
+		}
+	};
+}
+
+const _staticTextureObject = { transform: { position: null, rotation: null }, scale: null, streamingBounds: null };
+export function staticModelTextureScreenFraction( { runtime, modelIndex, lodIndex }, camera ) {
+	if ( runtime.disposed ) return null;
+	const model = runtime.document.models[ modelIndex ];
+	const group = runtime.planner._groupsByModel[ modelIndex ][ lodIndex ];
+	let maximum = null;
+	_staticTextureObject.streamingBounds = model.bounds;
+	for ( let i = 0; i < group.count; i ++ ) {
+		const instance = runtime.document.instances[ group.indices[ i ] ];
+		_staticTextureObject.transform.position = instance.position;
+		_staticTextureObject.transform.rotation = instance.rotation;
+		_staticTextureObject.scale = instance.scale;
+		const fraction = projectedBoundsScreenFraction( _staticTextureObject, camera );
+		if ( fraction !== null ) maximum = Math.max( maximum ?? 0, fraction );
+	}
+	return maximum;
 }
 
 function indexPackageObjectByAsset( state, object ) {
@@ -250,7 +309,7 @@ const _textureViewCenter = new Vector3();
 function projectedBoundsScreenFraction( object, camera ) {
 	if ( ! object.transform?.position ) return null;
 	transformBoundsCenter( object, object.streamingBounds.center, _textureBoundsCenter );
-	const radius = object.streamingBounds.radius * Math.max( ...( object.scale || [ 1, 1, 1 ] ) );
+	const radius = object.streamingBounds.radius * Math.max( ...( object.scale || [ 1, 1, 1 ] ).map( Math.abs ) );
 	_textureViewCenter.copy( _textureBoundsCenter ).applyMatrix4( camera.matrixWorldInverse );
 	const depth = - _textureViewCenter.z;
 	if ( depth + radius <= 0 ) return null;
@@ -802,6 +861,7 @@ export function disposeWorldPackage( root ) {
 	state?.progressiveTextureTargetsByAsset?.clear();
 	state?.progressiveTextureJobs?.clear();
 	state?.objectsByAsset?.clear();
+	state?.staticModelTextureDemand?.clear();
 }
 
 function unregisterPackageLightNodes( state, root ) {

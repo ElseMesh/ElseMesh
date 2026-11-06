@@ -947,6 +947,15 @@ export class LocalRegionConnector {
 				const distance = Math.max( 0, Math.hypot( dx, dy, dz ) - ( object.streamingBounds.radius || 0 ) );
 				distanceByAsset.set( object.assetId, Math.min( distanceByAsset.get( object.assetId ) ?? Infinity, distance ) );
 			}
+			for ( const component of this.manifest.components || [] ) {
+				const bounds = component.streamingBounds;
+				if ( ! bounds?.center ) continue;
+				const dx = bounds.center[ 0 ] - position[ 0 ], dy = bounds.center[ 1 ] - position[ 1 ], dz = bounds.center[ 2 ] - position[ 2 ];
+				const distance = Math.max( 0, Math.hypot( dx, dy, dz ) - ( bounds.radius || 0 ) );
+				for ( const assetId of worldComponentAssetIDs( component ) ) {
+					if ( selectedSet.has( assetId ) ) distanceByAsset.set( assetId, Math.min( distanceByAsset.get( assetId ) ?? Infinity, distance ) );
+				}
+			}
 		}
 		selected.sort( ( a, b ) =>
 			Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) ) ||

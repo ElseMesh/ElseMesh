@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
+import { WebGLProgressiveStaticTextures } from '../src/fallback/WebGLProgressiveStaticTextures.js';
+
+const levels = [];
+const fallback = { renderer: { domElement: { height: 800 } }, ktx2Loader: { parse( bytes, done ) { const level = new Uint8Array( bytes )[ 0 ]; done( { isCompressedTexture: true, image: { width: 2 ** ( 3 - level ) }, mipmaps: [ { data: new Uint8Array( [ level ] ) } ], format: 1, type: 1, minFilter: 1, dispose() {} } ); } } };
+const manager = new WebGLProgressiveStaticTextures( fallback, {}, { fetchLevel: async ( _connector, _asset, _progressive, options ) => { levels.push( options.levelIndex ); return [ { bytes: new Uint8Array( [ options.levelIndex ] ) } ]; } } );
+const header = new Uint8Array( 80 + 4 * 24 );
+for ( let i = 0; i < 4; i ++ ) new DataView( header.buffer ).setBigUint64( 80 + i * 24 + 8, 64n, true );
+const image = { imageIndices: [ 0 ], levelCount: 4, baseWidth: 8, baseHeight: 8, headerAndIndex: header, textureAssetId: 'shared' };
+const progressive = { textures: [ image ] };
+const texture = { isTexture: true, isCompressedTexture: true, image: { width: 1 }, mipmaps: [], needsUpdate: false };
+const source = { parser: { json: { textures: [ { extensions: { KHR_texture_basisu: { source: 0 } } } ] }, associations: new Map( [ [ texture, { textures: 0 } ] ] ) } };
+const runtime = { document: { models: [ { bounds: { center: [ 0, 0, 0 ], radius: 1 } } ], instances: [ { position: [ 0, 0, -5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ] }, planner: { _groupsByModel: [ [ { count: 1, indices: [ 0 ] } ] ] } };
+const camera = new PerspectiveCamera( 60, 1, 0.1, 100 ); camera.updateMatrixWorld( true );
+manager.register( runtime, 0, 0, 'model', source, progressive );
+manager.update( camera, 1 ); await manager.inFlight;
+assert.deepEqual( levels, [ 2 ] ); assert.equal( texture.image.width, 2 );
+manager.update( camera, 2 ); await manager.inFlight;
+assert.deepEqual( levels, [ 2, 1 ] ); assert.equal( texture.image.width, 4 );
+fallback.renderer.domElement.height = 1;
+manager.update( camera, 3 ); await manager.inFlight;
+assert.deepEqual( levels, [ 2, 1, 3 ] ); assert.equal( texture.image.width, 1 );
+manager.unregister( runtime ); assert.equal( manager.entries.size, 0 );
+console.log( 'WebGL static texture levels upgrade and unregister.' );
