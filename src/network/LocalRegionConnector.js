@@ -8,6 +8,7 @@ import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './LocalRegionStaticModels.js';
 import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
+import { PriorityRequestQueue } from './PriorityRequestQueue.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES = 768 * 1024 * 1024;
@@ -17,6 +18,9 @@ const MAX_LOCAL_REGION_CACHE_BYTES = 1024 * 1024 * 1024;
 const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
 const LOCAL_REGION_CACHE_BYTES_PER_GIB = 64 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
+// Provisional shared request budget: browsers do not expose their per-origin
+// connection limit. Two data requests leave control headroom in Chromium.
+const REGION_DATA_REQUEST_LIMIT = 2;
 // Provisional render-prefetch radius; tune it from streamed-cell latency and cache telemetry.
 const LOCAL_REGION_PREFETCH_RADIUS_CELLS = 4;
 // worldd's dynamic-provider gateway limits raw query strings to 4096 characters.
@@ -170,6 +174,7 @@ export class LocalRegionConnector {
 		this.assetRangeBytes = 0;
 		this.assetRangeCacheBudgetBytes = memoryCacheBudgetBytes - this.assetCacheBudgetBytes;
 		this.regionAssets = new Map();
+		this.regionRequestQueue = new PriorityRequestQueue( REGION_DATA_REQUEST_LIMIT );
 		this.syntheticAssetLoaders = new Map();
 		this.collisionAssetIDs = new Set();
 		this.collisionObjectIDByAsset = new Map();
@@ -831,6 +836,12 @@ export class LocalRegionConnector {
 	}
 
 	async #withRegionLease( assetURL, signal, consumeResponse, phaseMs = {}, requestHeaders = {} ) {
+		const url = new URL( assetURL, this.localProvider );
+		const priority = url.searchParams.get( 'payload' ) === 'collision' ? 0 : url.searchParams.has( 'texture' ) ? 2 : 1;
+		return this.regionRequestQueue.run( signal, priority, () => this.#fetchWithRegionLease( assetURL, signal, consumeResponse, phaseMs, requestHeaders ) );
+	}
+
+	async #fetchWithRegionLease( assetURL, signal, consumeResponse, phaseMs, requestHeaders ) {
 		abortIfNeeded( signal );
 		const regionURL = new URL( assetURL, this.localProvider );
 		const leaseURL = new URL( `${regionURL.pathname}/leases`, this.localProvider );
