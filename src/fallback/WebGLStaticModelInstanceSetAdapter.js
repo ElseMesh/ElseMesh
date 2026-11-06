@@ -1,5 +1,5 @@
 import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
-import { mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
+import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
@@ -187,6 +187,7 @@ function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ow
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Static model instance GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
 		const geometry = object.geometry.clone().applyMatrix4( object.matrixWorld );
+		if ( object.matrixWorld.determinant() < 0 ) correctStaticModelGeometryReflection( geometry );
 		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
 		geometry.computeBoundingSphere();

@@ -2,6 +2,16 @@ export function mirrorStaticModelGeometryX( geometry ) {
 	const position = geometry.getAttribute( 'position' );
 	if ( ! position || position.itemSize < 3 ) throw new Error( 'Static model geometry needs three-dimensional positions' );
 	geometry.scale( -1, 1, 1 );
+	return correctStaticModelGeometryReflection( geometry );
+}
+
+// Bake the orientation change from a reflected node transform into triangle
+// winding. GLB node transforms are applied to geometry before these meshes are
+// instanced, so the final draw object's world matrix no longer carries the
+// negative determinant needed to choose the opposite front-face pipeline.
+export function correctStaticModelGeometryReflection( geometry ) {
+	const position = geometry.getAttribute( 'position' );
+	if ( ! position || position.itemSize < 3 ) throw new Error( 'Static model geometry needs three-dimensional positions' );
 	const tangent = geometry.getAttribute( 'tangent' );
 	if ( tangent ) {
 		if ( tangent.itemSize !== 4 ) throw new Error( 'Static model tangent attributes must have four components' );

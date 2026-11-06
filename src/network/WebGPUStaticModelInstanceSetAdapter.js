@@ -3,7 +3,7 @@ import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
 import { loadWorldPackageModelAsset, registerStaticModelTextureDemand } from './WorldPackage.js';
-import { mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
+import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from './WorldObjectLOD.js';
@@ -89,6 +89,7 @@ function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, materi
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
 		const geometry = object.geometry.clone();
 		geometry.applyMatrix4( object.matrixWorld );
+		if ( object.matrixWorld.determinant() < 0 ) correctStaticModelGeometryReflection( geometry );
 		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
 		geometry.computeBoundingSphere();

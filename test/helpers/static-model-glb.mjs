@@ -1,4 +1,4 @@
-export function staticModelGLB() {
+export function staticModelGLB( { nodeScale = [ 1, 1, 1 ] } = {} ) {
 	const binary = new ArrayBuffer( 80 ), data = new DataView( binary );
 	const positions = [ - 0.5, 0, 0, 0.5, 0, 0, 0, 1, 0 ];
 	const normals = [ 0, 0, 1, 0, 0, 1, 0, 0, 1 ];
@@ -7,7 +7,7 @@ export function staticModelGLB() {
 	data.setUint16( 72, 0, true ); data.setUint16( 74, 1, true ); data.setUint16( 76, 2, true );
 	const json = {
 		asset: { version: '2.0' }, scene: 0, scenes: [ { nodes: [ 0 ] } ],
-		nodes: [ { name: 'translated-triangle', mesh: 0, translation: [ 2, 0, 0 ] } ],
+		nodes: [ { name: 'translated-triangle', mesh: 0, translation: [ 2, 0, 0 ], scale: nodeScale } ],
 		meshes: [ { primitives: [ { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 } ] } ],
 		materials: [ { pbrMetallicRoughness: { baseColorFactor: [ 0.8, 0.4, 0.2, 1 ], metallicFactor: 0, roughnessFactor: 0.8 } } ],
 		buffers: [ { byteLength: binary.byteLength } ],
