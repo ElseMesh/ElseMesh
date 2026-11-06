@@ -63,7 +63,6 @@ export class WebGLWake {
 		this.maxSources = Math.max( 1, Math.min( WEBGL_WAKE_SOURCE_COUNT, maxSources | 0 ) );
 		this.sources = [];
 		this.lastSampleTime = - Infinity;
-		this.lastPosition = null;
 		this.disposed = false;
 		this.uniformSources = Array.from( { length: WEBGL_WAKE_SOURCE_COUNT }, () => new THREE.Vector4() );
 		this.uniforms = {
@@ -79,17 +78,14 @@ export class WebGLWake {
 		if ( this.disposed ) return;
 		if ( ! Number.isFinite( time ) ) throw new TypeError( 'WebGLWake time must be finite' );
 		const boat = this.boat, position = boat.position;
-		const dx = this.lastPosition ? position.x - this.lastPosition.x : 0;
-		const dz = this.lastPosition ? position.z - this.lastPosition.z : 0;
 		const speed = Math.hypot( boat.velocity?.x || 0, boat.velocity?.z || 0 );
-		if ( speed > 0.45 && time - this.lastSampleTime >= WEBGL_WAKE_SAMPLE_INTERVAL && ( ! this.lastPosition || dx * dx + dz * dz >= 0.04 ) ) {
+		if ( speed > 0.45 && time - this.lastSampleTime >= WEBGL_WAKE_SAMPLE_INTERVAL ) {
 
 			const yaw = Math.atan2( 2 * ( boat.quaternion.w * boat.quaternion.y + boat.quaternion.x * boat.quaternion.z ), 1 - 2 * ( boat.quaternion.y ** 2 + boat.quaternion.z ** 2 ) );
 			this.sources.push( { x: position.x, z: position.z, time, yaw: wrapAngle( yaw ) } );
 			this.lastSampleTime = time;
 
 		}
-		this.lastPosition = { x: position.x, z: position.z };
 		this.sources = this.sources.filter( source => time - source.time >= 0 && time - source.time <= WEBGL_WAKE_LIFETIME ).slice( - this.maxSources );
 		for ( let i = 0; i < WEBGL_WAKE_SOURCE_COUNT; i ++ ) {
 

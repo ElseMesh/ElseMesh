@@ -19,11 +19,21 @@ assert.equal( wake.sources.length, 2, 'moving boat adds sources at the fixed sam
 assert.ok( Math.abs( wake.heightAt( 0, - 2, 1.5 ) ) > 1e-4, 'wake displaces water behind the boat' );
 assert.equal( wake.heightAt( 0, 2, 1.5 ), 0, 'wake does not displace water ahead of the boat' );
 assert.ok( wake.foamAt( 0, - 2, 1.5 ) > 0, 'wake foam follows its diverging arms' );
+
+const frameBoat = { position: { x: 0, z: 0 }, velocity: { x: 7, z: 0 }, quaternion: { x: 0, y: 0, z: 0, w: 1 } };
+const frameWake = new WebGLWake( frameBoat, { Vector4 } );
+for ( let frame = 1; frame <= 60; frame ++ ) {
+	frameBoat.position.x = frame * 7 / 60;
+	frameWake.update( frame / 60 );
+}
+assert.ok( frameWake.sources.length >= 3, 'frame-paced movement emits repeated wake sources at 60 FPS' );
+
 assert.match( WEBGL_WAKE_GLSL, /webglWakeHeight/ );
 assert.match( WEBGL_WAKE_GLSL, /webglWakeFoam/ );
 assert.match( WebGLFallback.prototype._createWebGLWake.toString(), /setSurfaceOffsetSampler\( 'wake'/, 'boat wake height feeds WebGL boat water queries' );
 assert.match( WebGLFallback.prototype._bindWakeToWater.toString(), /uWakeSources/, 'the wake source trail feeds the shared WebGL water shader' );
 assert.match( WebGLFallback.prototype._frame.toString(), /this\.wake\?\.update\( simulationTime \)/, 'the wake trail advances from engine simulation time' );
+boat.velocity.x = boat.velocity.z = 0;
 wake.update( 20 );
 assert.equal( wake.sources.length, 0, 'expired wake sources are discarded' );
 wake.dispose();
