@@ -63,7 +63,7 @@ export class StaticModelInstanceSetPlanner {
 	 * Updates stable output buffers. Camera planes use inward-facing [nx, ny, nz, constant]
 	 * coefficients; they are normalized here so sphere radii are in world units.
 	 */
-	update( camera, { includeShadows = true, renderLoadBias = 0 } = {} ) {
+	update( camera, { includeShadows = true, renderLoadBias = 0, includeInstance = null } = {} ) {
 		if ( ! camera || ! finiteVector3( camera.position ) || ! Number.isFinite( camera.verticalFovRadians ) || camera.verticalFovRadians <= 0 || camera.verticalFovRadians >= Math.PI || ! Array.isArray( camera.frustumPlanes ) || camera.frustumPlanes.length !== 6 ) throw new Error( 'Invalid static model planner camera' );
 		if ( ! Number.isInteger( renderLoadBias ) || renderLoadBias < 0 || renderLoadBias > 2 ) throw new Error( `Invalid static model planner render-load bias: ${ typeof renderLoadBias } ${ String( renderLoadBias ) }` );
 		const tanHalfFov = Math.tan( camera.verticalFovRadians * 0.5 );
@@ -90,6 +90,7 @@ export class StaticModelInstanceSetPlanner {
 
 		for ( let instanceIndex = 0; instanceIndex < this.document.instances.length; instanceIndex ++ ) {
 			const instance = this.document.instances[ instanceIndex ];
+			if ( includeInstance && ! includeInstance( instanceIndex ) ) continue;
 			const modelIndex = this._instanceModelIndices[ instanceIndex ];
 			const model = this.document.models[ modelIndex ];
 			const [ sx, sy, sz ] = instance.scale;

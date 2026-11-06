@@ -285,6 +285,25 @@ try {
 	const descriptorBytes = await connector.getAsset( setDescriptorID );
 	const descriptor = JSON.parse( new TextDecoder().decode( descriptorBytes ) );
 	assert.deepEqual( descriptor.models[ 0 ].lodThresholds, [ 0.05985, 0.1794 ], 'the provider descriptor retains authored coarse-to-fine thresholds' );
+	const priorDiskCache = connector.diskCache;
+	let storedDescriptor = new TextEncoder().encode( JSON.stringify( { ...descriptor, instances: descriptor.instances.map( ( { placementId, ...instance } ) => instance ) } ) );
+	let generatedDescriptors = 0;
+	const originalDescriptorLoader = connector.syntheticAssetLoaders.get( setDescriptorID );
+	connector.syntheticAssetLoaders.set( setDescriptorID, async signal => { generatedDescriptors ++; return originalDescriptorLoader( signal ); } );
+	connector.diskCache = {
+		get: async id => id === setDescriptorID ? storedDescriptor : null,
+		touch: async () => {},
+		putMany: async entries => { for ( const entry of entries ) if ( entry.assetId === setDescriptorID ) storedDescriptor = entry.bytes; return true; },
+	};
+	connector.releaseAsset( setDescriptorID );
+	const refreshedDescriptor = await connector.getAsset( setDescriptorID );
+	assert.equal( generatedDescriptors, 1, 'a cached descriptor without placement IDs is regenerated' );
+	assert.ok( JSON.parse( new TextDecoder().decode( refreshedDescriptor ) ).instances.every( instance => instance.placementId ) );
+	await waitForDiskWriteQueue( connector );
+	connector.releaseAsset( setDescriptorID );
+	assert.deepEqual( await connector.getAsset( setDescriptorID ), refreshedDescriptor );
+	assert.equal( generatedDescriptors, 1, 'a valid regenerated descriptor is reused from disk' );
+	connector.diskCache = priorDiskCache;
 	const meshLodAssetID = staticSet.assets[ 1 ].assetId;
 	const meshLodURL = new URL( connector.regionAssets.get( meshLodAssetID ) );
 	assert.equal( meshLodURL.searchParams.get( 'mesh' ), staticVisualInstance.componentPath );

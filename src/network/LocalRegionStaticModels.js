@@ -120,6 +120,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 			rotation: mirrored.transform.rotation,
 			scale: mirrored.transform.scale,
 			instanceIndex: source.instanceIndex,
+			placementId: JSON.stringify( [ regionID, source.componentPath, source.instanceIndex, source.transform.position, source.transform.rotation, source.transform.scale ] ),
 		} );
 	}
 	const models = [ ...groups.values() ].sort( ( a, b ) => a.componentPath.localeCompare( b.componentPath ) || Number( a.geometryMirrorX ) - Number( b.geometryMirrorX ) );
@@ -150,6 +151,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 			} ) ),
 			instances: modelChunk.flatMap( model => model.instances.map( instance => ( {
 				model: ids.get( model ),
+				placementId: instance.placementId,
 				position: instance.position,
 				rotation: instance.rotation,
 				scale: instance.scale,
@@ -189,5 +191,5 @@ export function localMeshLODAssetID( regionID, componentPath, lodIndex ) {
 }
 
 export function localStaticModelSetAssetID( regionID, cellSizeMeters, coordinates, chunk ) {
-	return `local-static-model-set:${regionID}:${cellSizeMeters}:${coordinates.join( ':')}:${chunk}:geometry-mirror-x`;
+	return `local-static-model-set:${regionID}:${cellSizeMeters}:${coordinates.join( ':')}:${chunk}`;
 }

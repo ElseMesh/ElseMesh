@@ -215,4 +215,38 @@ assert.equal( runtimePlannerUpdates, 3, 'render-load bias changes refresh static
 runtime.dispose();
 assert.equal( disposedRuntime, true );
 
+// A provider may report the same placement in several overlapping cells.
+// Ownership follows the installed runtimes, including when an owner is evicted.
+const claims = new Map();
+const duplicate = { ...runtimeDocument.instances[ 0 ], placementId: 'source-a' };
+const colocated = { ...duplicate, placementId: 'source-b' };
+const duplicateDocument = { ...runtimeDocument, instances: [ duplicate, duplicate, colocated ] };
+validateStaticModelInstanceSet( duplicateDocument );
+const makeClaimRuntime = document => {
+	const shape = new StaticModelInstanceSetPlanner( document );
+	const batch = () => ( { mesh: { count: 0, visible: false }, matrixAttribute: { array: new Float32Array( document.instances.length * 16 ) }, fadeAttribute: { array: new Float32Array( document.instances.length * 4 ) } } );
+	return new StaticModelInstanceSetRuntime( document, { batches: shape.groups.map( () => [ batch() ] ), shadowBatches: shape.shadowGroups.map( () => [ batch() ] ), placementOwners: claims } );
+};
+const drawn = r => r.batches.reduce( ( n, group ) => n + group.reduce( ( sum, b ) => sum + b.mesh.count, 0 ), 0 );
+const first = makeClaimRuntime( duplicateDocument );
+let second = makeClaimRuntime( duplicateDocument );
+first.update( 0, runtimeCamera ); second.update( 0, runtimeCamera );
+assert.equal( drawn( first ), 2, 'duplicate placement within a component draws once while distinct colocated placement remains' );
+assert.equal( drawn( second ), 0, 'overlapping cell does not draw duplicate placements' );
+second.dispose();
+first.update( 0, runtimeCamera );
+assert.equal( drawn( first ), 2, 'removing a non-owner preserves the owner' );
+second = makeClaimRuntime( duplicateDocument );
+second.update( 0, runtimeCamera );
+first.dispose();
+second.update( 0, runtimeCamera );
+assert.equal( drawn( second ), 2, 'owner removal transfers each placement before the next frame' );
+const reloaded = makeClaimRuntime( duplicateDocument );
+reloaded.update( 0, runtimeCamera );
+assert.equal( drawn( reloaded ), 0, 'a reloaded cell shares existing ownership' );
+second.dispose(); reloaded.update( 0, runtimeCamera );
+assert.equal( drawn( reloaded ), 2, 'reloaded cell takes ownership after eviction' );
+reloaded.dispose();
+assert.equal( claims.size, 0, 'all placement claims are released' );
+
 console.log( 'static model instance-set contract checks passed' );

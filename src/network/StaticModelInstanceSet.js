@@ -55,7 +55,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 	}
 
 	for ( const instance of document.instances ) {
-		if ( ! hasExactKeys( instance, [ 'model', 'position', 'rotation', 'scale' ] ) || typeof instance.model !== 'string' || ! modelIDs.has( instance.model ) || ! validVector( instance.position, 3, 1e6 ) || ! validVector( instance.rotation, 4, 1.001 ) || ! validVector( instance.scale, 3, 1e4 ) || instance.scale.some( value => value <= 0 ) ) throw new Error( 'Invalid static model instance transform' );
+		if ( ! ( hasExactKeys( instance, [ 'model', 'position', 'rotation', 'scale' ] ) || hasExactKeys( instance, [ 'model', 'position', 'rotation', 'scale', 'placementId' ] ) && typeof instance.placementId === 'string' && instance.placementId.length > 0 && instance.placementId.length <= 8192 ) || typeof instance.model !== 'string' || ! modelIDs.has( instance.model ) || ! validVector( instance.position, 3, 1e6 ) || ! validVector( instance.rotation, 4, 1.001 ) || ! validVector( instance.scale, 3, 1e4 ) || instance.scale.some( value => value <= 0 ) ) throw new Error( 'Invalid static model instance transform' );
 		const quaternionLength = Math.hypot( ...instance.rotation );
 		if ( Math.abs( quaternionLength - 1 ) > 0.002 ) throw new Error( 'Static model instance rotation must be a normalized quaternion' );
 	}

@@ -45,7 +45,7 @@ export function writeStaticModelInstanceFades( group, target ) {
 
 /** Shared visibility/LOD update for backend-owned static model draw batches. */
 export class StaticModelInstanceSetRuntime {
-	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null } = {} ) {
+	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null } = {} ) {
 		this.document = document;
 		this.planner = new StaticModelInstanceSetPlanner( document );
 		this.batches = batches;
@@ -64,6 +64,15 @@ export class StaticModelInstanceSetRuntime {
 		this.disposeBatches = dispose;
 		this.disposed = false;
 		if ( ! Array.isArray( batches ) || batches.length !== this.planner.groups.length || ( this.usesShadowBatches && ( ! Array.isArray( shadowBatches ) || shadowBatches.length !== this.planner.shadowGroups.length ) ) ) throw new Error( 'Static model instance batches do not match the declared models and LODs' );
+		this.placementOwners = placementOwners;
+		this.placementClaims = document.instances.map( instance => {
+			if ( ! placementOwners || ! instance.placementId ) return null;
+			let owners = placementOwners.get( instance.placementId );
+			if ( ! owners ) placementOwners.set( instance.placementId, owners = new Set() );
+			const claim = { runtime: this, id: instance.placementId };
+			owners.add( claim );
+			return claim;
+		} );
 	}
 
 	update( _dt, camera, _player, renderLoadBias = 0 ) {
@@ -71,7 +80,10 @@ export class StaticModelInstanceSetRuntime {
 		const cameraChanged = this.#cameraChanged( camera, renderLoadBias );
 		const plannerChanged = cameraChanged || this._plannerDirty;
 		if ( plannerChanged ) {
-			this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias } );
+			this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias, includeInstance: index => {
+				const claim = this.placementClaims[ index ];
+				return ! claim || this.placementOwners.get( claim.id )?.values().next().value === claim;
+			} } );
 			this._plannerDirty = false;
 		}
 		this.#requestVisibleLODs();
@@ -185,6 +197,15 @@ export class StaticModelInstanceSetRuntime {
 		this.disposed = true;
 		this.loadController.abort( new DOMException( 'World unloaded', 'AbortError' ) );
 		this.pendingLods.clear();
+		if ( this.placementOwners ) for ( const claim of this.placementClaims ) {
+			if ( ! claim ) continue;
+			const owners = this.placementOwners.get( claim.id );
+			if ( ! owners ) continue;
+			const wasOwner = owners.values().next().value === claim;
+			owners.delete( claim );
+			if ( owners.size === 0 ) this.placementOwners.delete( claim.id );
+			else if ( wasOwner ) owners.values().next().value.runtime._plannerDirty = true;
+		}
 		this.disposeBatches?.();
 	}
 }

@@ -104,6 +104,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 		}
 		const runtime = new StaticModelInstanceSetRuntime( document, {
+			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
 			batches: mainBatches,
 			// Three.js submits scene-visible meshes in the color pass even when
 			// their material has colorWrite disabled. Let each selected color LOD

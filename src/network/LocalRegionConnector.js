@@ -6,7 +6,7 @@ import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './LocalRegionStaticModels.js';
-import { MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
+import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
@@ -559,6 +559,16 @@ export class LocalRegionConnector {
 			if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region disk cache read failed:', error );
 		}
 		phaseMs.browserDiskCacheRead = performance.now() - phaseStartedAt;
+		if ( diskBytes && syntheticAssetLoader ) {
+			try {
+				const cached = JSON.parse( new TextDecoder().decode( diskBytes ) );
+				const declared = new Set( ( cached.models || [] ).flatMap( model => ( model.lods || [] ).map( lod => lod.assetId ) ).filter( id => this.regionAssets.has( id ) ) );
+				const document = decodeStaticModelInstanceSet( diskBytes, { availableAssetIDs: declared } );
+				if ( document.instances.some( instance => ! instance.placementId ) ) diskBytes = null;
+			} catch {
+				diskBytes = null;
+			}
+		}
 		if ( diskBytes ) {
 			phaseStartedAt = performance.now();
 			this.#registerExternalTextureAssets( assetId, diskBytes );
@@ -570,7 +580,7 @@ export class LocalRegionConnector {
 		if ( syntheticAssetLoader ) {
 			const bytes = await syntheticAssetLoader( signal );
 			requireValue( bytes instanceof Uint8Array && bytes.byteLength > 0 && bytes.byteLength <= MAX_STATIC_MODEL_INSTANCE_SET_BYTES, 'Generated local static-model descriptor exceeds its size limit' );
-			this.#persistDiskEntries( [ { assetId, bytes, digest: () => this.#digestSHA256( bytes ) } ], 'local static-model descriptor' );
+			this.#persistDiskEntries( [ { assetId, bytes, digest: null } ], 'local static-model descriptor' );
 			if ( this.regionDiagnostics ) console.info( 'ElseMesh local static-model descriptor generated:', JSON.stringify( { assetId, bytes: bytes.byteLength, elapsedMs: performance.now() - startedAt } ) );
 			return this.#cacheAsset( assetId, bytes );
 		}
