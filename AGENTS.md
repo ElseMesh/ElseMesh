@@ -12,6 +12,10 @@
 - Whenever changing an existing implementation or API, always consider whether it should be redesigned. Prefer the clearest architecture for the intended product, and update callers, tests, and documentation together when changing an unstable interface.
 - Refer to the sole world-server daemon and executable as `worldd`. A ThruHold is a hosted world, not a daemon. `server/worldd` is an internal source/package path.
 
+## Persistent artifacts
+
+- Use `/var/tmp` only for disposable or reproducible scratch, caches, and build output. Never keep the only copy of a source file, deliverable, or evidence that must survive cleanup there; put repository material in Git and other retained user data in an appropriate persistent location outside temporary storage.
+
 ## Evidence and assumptions
 
 - Do not present guessed values or behavior as verified facts. Check source code, runtime evidence, or authoritative documentation first. If a provisional assumption must be used, label it explicitly as an assumption in the relevant code comment or documentation, and record what evidence is still needed to verify it.
