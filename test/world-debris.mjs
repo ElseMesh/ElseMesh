@@ -12,6 +12,7 @@ import { TerrainGPU } from '../src/world/TerrainGPU.js';
 import { computeShoreField } from '../src/world/ShoreField.js';
 import { Colliders } from '../src/world/Colliders.js';
 import { standard } from '../src/materials/Materials.js';
+import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
 const OUT = process.argv[ 2 ] || '/tmp/claude-debris-';
 const ROOT = new URL( '../public', import.meta.url ).pathname;
@@ -54,7 +55,7 @@ const H = await worldHarness( { width: 2560, height: 1267 } );
 const { E } = H;
 
 let t0 = performance.now();
-const data = new TerrainData();
+const data = new TerrainData( { worldLayout: TIDEWATER_LAYOUT } );
 let shore = null;
 try {
 

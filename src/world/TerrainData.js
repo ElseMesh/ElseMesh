@@ -1,5 +1,4 @@
 import { Noise2D, smoothstep, clamp, lerp } from '../util/Noise.js';
-import { WORLD } from './WorldLayout.js';
 import { softRamp, erosionNoise, sampleGrid, upsample2, boxBlur } from './terrain/TerrainNoise.js';
 import { ridgeEnvelope, SEA_STACKS, PATHS, polylineDistance } from './terrain/IslandShape.js';
 
@@ -24,7 +23,6 @@ const RES = 2048; // 1 m texels over the 2048 m domain
 
 // volcanic plugs on the summit ridge: [x, z, radius, height above the envelope]
 const PLUGS = [ [ - 42, - 505, 72, 62 ], [ 152, - 466, 46, 38 ], [ - 238, - 458, 40, 26 ] ];
-const VILLAGE = WORLD.village.center;
 
 // CPU-side procedural island heightmap plus bilinear queries.
 //
@@ -43,9 +41,12 @@ const VILLAGE = WORLD.village.center;
 //            rubble, then the rock / sand / path / gully masks
 export class TerrainData {
 
-	constructor( seed = 7 ) {
+	constructor( { seed = 7, worldLayout } = {} ) {
 
-		this.size = WORLD.terrainSize;
+		if ( ! worldLayout ) throw new Error( 'TerrainData requires the active world package layout' );
+		this.worldLayout = worldLayout;
+
+		this.size = worldLayout.terrainSize;
 		this.res = RES;
 		this.texel = this.size / this.res;
 		this.origin = - this.size / 2;
@@ -171,9 +172,9 @@ export class TerrainData {
 			if ( rock > 0 && d < 300 ) h += rock * n2.ridged( x / 25, z / 25, 4 ) * 5 * smoothstep( 0, 20, d ) * ( 1 - smoothstep( 120, 300, d ) );
 
 			// coral reef platform
-			const rc = WORLD.reef.center;
+			const rc = this.worldLayout.reef.center;
 			const rd = Math.hypot( x - rc.x, z - rc.z );
-			const reefMask = 1 - smoothstep( WORLD.reef.radius * 0.35, WORLD.reef.radius, rd );
+			const reefMask = 1 - smoothstep( this.worldLayout.reef.radius * 0.35, this.worldLayout.reef.radius, rd );
 			if ( reefMask > 0 ) {
 
 				const bumps = n2.ridged( x / 11, z / 11, 4 ) * 2.8 + n.fbm( x / 5, z / 5, 2 ) * 0.5;
@@ -183,7 +184,7 @@ export class TerrainData {
 			}
 
 			// keep the swim/boat channel along the pier sandy
-			const px = WORLD.pier.x;
+			const px = this.worldLayout.pier.x;
 			const pierMask = ( 1 - smoothstep( 6, 16, Math.abs( x - px - 4 ) ) ) * smoothstep( - 60, - 20, z );
 			if ( pierMask > 0 ) h = lerp( h, - depth + sandRipple * 0.3, pierMask * 0.8 );
 
@@ -428,7 +429,8 @@ export class TerrainData {
 				const e = - d;
 				const bz = BZ[ k ];
 				// keep the bay beach, its dunes and the village smooth
-				const vd = Math.hypot( x - VILLAGE.x, z - VILLAGE.z );
+				const village = this.worldLayout.village.center;
+				const vd = Math.hypot( x - village.x, z - village.z );
 				const calm = Math.max( bz * ( 1 - smoothstep( 70, 130, e ) ), 1 - smoothstep( 105, 150, vd ) );
 				const wild = 1 - calm;
 				if ( wild <= 0.01 ) continue;
@@ -578,8 +580,9 @@ export class TerrainData {
 					// berm crest at the top of the swash
 					add += 0.14 * Math.exp( - Math.pow( ( e - 38 ) / 5, 2 ) );
 					// dune ridges behind the beach, away from the village and the pier foot
-					const vd = Math.hypot( ( x - VILLAGE.x ) * 0.8, z - VILLAGE.z );
-					const away = smoothstep( 85, 125, vd ) * smoothstep( 14, 30, Math.abs( x - WORLD.pier.x ) );
+					const village = this.worldLayout.village.center;
+					const vd = Math.hypot( ( x - village.x ) * 0.8, z - village.z );
+					const away = smoothstep( 85, 125, vd ) * smoothstep( 14, 30, Math.abs( x - this.worldLayout.pier.x ) );
 					if ( away > 0 && e > 40 && e < 130 ) {
 
 						const rid = 1 - Math.abs( n2.noise( x / 34, e / 15 + 11.3 ) );
@@ -658,8 +661,9 @@ export class TerrainData {
 			const x = o + i + 0.5, z = o + j + 0.5;
 
 			// gaps: village core, pier foot, footpaths, rock
-			const vd = Math.hypot( ( x - VILLAGE.x ) * 0.8, z - VILLAGE.z );
-			let gap = smoothstep( 45, 70, vd ) * smoothstep( 10, 22, Math.abs( x - WORLD.pier.x ) ) * ( 1 - smoothstep( 0.15, 0.4, R0[ k ] ) );
+			const village = this.worldLayout.village.center;
+			const vd = Math.hypot( ( x - village.x ) * 0.8, z - village.z );
+			let gap = smoothstep( 45, 70, vd ) * smoothstep( 10, 22, Math.abs( x - this.worldLayout.pier.x ) ) * ( 1 - smoothstep( 0.15, 0.4, R0[ k ] ) );
 			for ( const p of PATHS ) {
 
 				const [ dist ] = polylineDistance( p.pts, x, z );
@@ -701,8 +705,8 @@ export class TerrainData {
 
 		const res = RES, o = this.origin, n = this.noise, n2 = this.noise2, n3 = this.noise3;
 		const grass = this.seagrass, rubble = this.rubble;
-		const rc = WORLD.reef.center, rr = WORLD.reef.radius;
-		const px = WORLD.pier.x;
+		const rc = this.worldLayout.reef.center, rr = this.worldLayout.reef.radius;
+		const px = this.worldLayout.pier.x;
 		for ( let j = 1; j < res - 1; j ++ ) {
 
 			const z = o + j + 0.5;
@@ -824,8 +828,9 @@ export class TerrainData {
 					// into the village lawn, while the dunes away from the village stay sandy
 					const beach = bz * ( 1 - smoothstep( 36 + nz * 10, 50 + nz * 14, e ) );
 					const backBeach = bz * 0.45 * ( 1 - smoothstep( 60 + nz * 20, 100 + nz * 20, e ) );
-					const vd = Math.hypot( ( x - VILLAGE.x ) * 0.8, z - VILLAGE.z );
-					const away = smoothstep( 80, 120, vd ) * smoothstep( 14, 30, Math.abs( x - WORLD.pier.x ) );
+					const village = this.worldLayout.village.center;
+					const vd = Math.hypot( ( x - village.x ) * 0.8, z - village.z );
+					const away = smoothstep( 80, 120, vd ) * smoothstep( 14, 30, Math.abs( x - this.worldLayout.pier.x ) );
 					const dune = bz * away * ( 1 - smoothstep( 4.5 + nz * 2, 7 + nz * 2, h ) ) * ( 1 - smoothstep( 110, 140, e ) );
 					const cove = ( 1 - smoothstep( 6, 16, e ) ) * ( 1 - smoothstep( 0.25, 0.5, rk ) ) * ( 1 - smoothstep( 1.8, 3.2, h ) ) * ( 1 - smoothstep( 0.12, 0.3, slope ) );
 					sd = Math.max( beach, backBeach, dune, cove ) * ( 1 - smoothstep( 0.3, 0.6, slope ) );

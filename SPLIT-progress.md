@@ -66,6 +66,16 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: `TerrainData` no longer imports the Tidewater `WorldLayout`
+  adapter or reads its module-global island values. `App` passes the layout
+  supplied by the default world package through `IslandWorldState`, and
+  Tidewater tools and rendering fixtures pass their own layout explicitly.
+  The generic vector adapter now lives in `src/world/createWorldLayout.js`,
+  while Tidewater owns `worlds/tidewater/layout.js`. The external production
+  build passes; tests were not run. The procedural engine modules listed below
+  still use the legacy `WorldLayout` adapter, so this is one removed dependency,
+  not completion of the world boundary. The percentage remains 73%.
+
 - 2026-11-06: Moved the plain Tidewater `IslandDefinition` data from `src/world`
   to `worlds/tidewater/IslandDefinition.js`. Tidewater wildlife and parity
   fixtures import it from their own repository; `WorldLayout` and `PierSurface`

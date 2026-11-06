@@ -8,11 +8,12 @@ import { Terrain } from '../src/world/Terrain.js';
 import { computeShoreField } from '../src/world/ShoreField.js';
 import { Rocks } from '../src/world/Rocks.js';
 import { Colliders } from '../src/world/Colliders.js';
+import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
 const out = process.argv[ 2 ] && ! process.argv[ 2 ].startsWith( '--' ) ? process.argv[ 2 ] : '/tmp';
 const H = await worldHarness( { sun: [ 0.5, 0.42, 0.45 ] } );
 let t = performance.now();
-const data = new TerrainData();
+const data = new TerrainData( { worldLayout: TIDEWATER_LAYOUT } );
 console.log( 'TerrainData', ( performance.now() - t ).toFixed( 0 ), 'ms' );
 t = performance.now();
 const shore = computeShoreField( data, { res: 512 } );

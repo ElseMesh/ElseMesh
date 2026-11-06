@@ -19,6 +19,7 @@ import { MeshRenderer } from '../src/engine/render/MeshRenderer.js';
 import { SunShadows } from '../src/engine/render/Shadows.js';
 import { FullscreenPass } from '../src/engine/render/FullscreenPass.js';
 import * as E from '../src/engine/index.js';
+import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
 let _terrain = null;
 export async function terrainData() {
@@ -26,7 +27,7 @@ export async function terrainData() {
 	if ( ! _terrain ) {
 
 		const { TerrainData } = await import( '../src/world/TerrainData.js' );
-		_terrain = new TerrainData();
+		_terrain = new TerrainData( { worldLayout: TIDEWATER_LAYOUT } );
 
 	}
 

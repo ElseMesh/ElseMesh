@@ -5,9 +5,9 @@ import { Colliders } from './Colliders.js';
 // presentation adapters. Render objects and GPU resources belong elsewhere.
 export class IslandWorldState {
 
-	constructor( { terrainSeed = 7 } = {} ) {
+	constructor( { terrainSeed = 7, worldLayout } = {} ) {
 
-		this.terrain = new TerrainData( terrainSeed );
+		this.terrain = new TerrainData( { seed: terrainSeed, worldLayout } );
 		this.colliders = new Colliders();
 
 	}

@@ -711,7 +711,7 @@ export class App {
 	async initializeIslandWorldState() {
 
 		const { IslandWorldState } = await import( './world/IslandWorldState.js' );
-		this.worldState = new IslandWorldState();
+		this.worldState = new IslandWorldState( { worldLayout: this.worldLayout } );
 		this.terrainData = this.worldState.terrain;
 		this.colliders = this.worldState.colliders;
 

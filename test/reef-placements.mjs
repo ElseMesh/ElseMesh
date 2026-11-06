@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto';
 import { TerrainData } from '../src/world/TerrainData.js';
 import { Reef, REEF_TYPE_NAMES } from '../src/world/Reef.js';
 import { decodeReefPlacements, encodeReefPlacements, MAX_REEF_PLACEMENTS, REEF_PLACEMENT_RECORD_BYTES } from '../src/network/ReefPlacements.js';
+import { TIDEWATER_LAYOUT } from '../worlds/tidewater/layout.js';
 
-const terrain = new TerrainData( 7 );
+const terrain = new TerrainData( { seed: 7, worldLayout: TIDEWATER_LAYOUT } );
 function generate() {
 	const reef = new Reef( { terrain, layoutOnly: true } );
 	assert.equal( reef.group.parent, null, 'layout-only reef is not inserted into a scene' );
