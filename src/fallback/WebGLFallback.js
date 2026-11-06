@@ -19,6 +19,7 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
+import { createWebGLShoreSurfaceOffset } from './WebGLShoreSurface.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
@@ -892,6 +893,7 @@ export class WebGLFallback {
 		if ( ! this.worldLink ) {
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
 			this._bindOceanFFTToWater();
+			this._bindShoreSurfaceToWater();
 			const worldDefinition = this.islandDefinition;
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldDefinition.boatDock.position ), initialHeading: worldDefinition.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
@@ -912,7 +914,10 @@ export class WebGLFallback {
 			// frame. Hosted worlds opt into it through their water component and sea
 			// level; a flat fallback query would waste work in worlds with no water.
 			this.waterQuery = this.hostedSeaLevel === null ? null : new WebGLWaterQuery( T, this.renderer, hostedTerrain, this.hostedSeaLevel );
-			if ( this.waterQuery ) this._bindOceanFFTToWater();
+			if ( this.waterQuery ) {
+				this._bindOceanFFTToWater();
+				this._bindShoreSurfaceToWater();
+			}
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );
@@ -1526,6 +1531,14 @@ export class WebGLFallback {
 			uniforms.uOceanEnabled.value = 1;
 		}
 
+	}
+
+	_bindShoreSurfaceToWater() {
+		this.waterQuery?.setSurfaceOffsetSampler( createWebGLShoreSurfaceOffset( {
+			terrain: this.terrain || this.hostedTerrainData,
+			seaLevel: this.worldSeaLevel,
+			field: this.shoreField || this.hostedTerrainSurface?.shoreField || null,
+		} ) );
 	}
 
 	_makeCloudLayer( sunDirection, cloudsEnabled ) {
