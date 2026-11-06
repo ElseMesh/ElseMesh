@@ -1,19 +1,10 @@
 import { Vector2, Vector3, Vector4, MathUtils, DataUtils } from '../engine/index.js';
 import { GPU, UniformBlock, Texture, StorageBuffer, ShaderModule, ComputeKernel, commonModule } from '../engine/webgpu.js';
 import { GRAVITY } from '../core/Globals.js';
+import { WAKE_GRID_SIZE as N, WAKE_LOG2_SIZE as LOG2N, WAKE_HALF_SIZE as HALF, WAKE_GRID_MASK as MASK, WAKE_CELL_SIZE as CELL, WAKE_DOMAIN_SIZE as SIZE, WAKE_DEPTH_LEVELS as DEPTHS, WAKE_SPONGE_CELLS as SPONGE, WAKE_NEAR_FIELD } from './WakeConstants.js';
 
-const N = 512; // grid cells per side
-const LOG2N = 9;
-const HALF = N / 2;
-const MASK = N - 1;
-const CELL = 0.4; // m
-const SIZE = N * CELL; // window size (m)
-// reference depths of the four spectral operators (m); a cell blends the two bracketing its depth
-const DEPTHS = [ Infinity, 6, 1.8, 0.6 ];
-const SPONGE = 22; // absorbing band at the window edges (cells)
 // boat-frame box of the near-field template (steady wave pattern under the hull)
-const TW = 32, TH = 88; // 0.1 m texels (steep pressure near the stem: keep resampling errors small)
-const TX0 = - 1.6, TX1 = 1.6, TZ0 = - 4.4, TZ1 = 4.4;
+const { width: TW, height: TH, x0: TX0, x1: TX1, z0: TZ0, z1: TZ1 } = WAKE_NEAR_FIELD; // 0.1 m texels (steep pressure near the stem: keep resampling errors small)
 
 // WGSL float literal
 const f = ( x ) => {
