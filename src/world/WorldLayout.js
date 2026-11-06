@@ -1,5 +1,5 @@
 import * as THREE from '../engine/math/index.js';
-import { ISLAND_DEFINITION as D } from './IslandDefinition.js';
+import { ISLAND_DEFINITION as D } from '../../worlds/tidewater/IslandDefinition.js';
 
 // Engine-facing vector adapter for the renderer-independent island definition.
 export const WORLD = {

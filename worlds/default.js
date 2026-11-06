@@ -5,6 +5,7 @@ import terrainLOD from './tidewater/lod-source/terrain-full.glb?url';
 import villageLOD from './tidewater/lod-source/village-full.glb?url';
 import vegetationPlacements from './tidewater/lod-source/vegetation-placements.bin?url';
 import { DEFAULT_REEF_PLACEMENT_ASSETS as reefPlacementAssets } from './tidewater/default-reef-assets.js';
+import { WORLD as defaultLayout } from '../src/world/WorldLayout.js';
 
 const vegetation = source.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
 const vegetationPlacementAssetId = vegetation?.data?.placementAssetId;
@@ -19,6 +20,7 @@ const assetURLs = {
 export const defaultWorldPackage = Object.freeze( {
 	source,
 	presentation: Object.freeze( {
+		layout: defaultLayout,
 		createWildlife: async options => {
 			const { Wildlife } = await import( './tidewater/wildlife/Wildlife.js' );
 			return new Wildlife( options );

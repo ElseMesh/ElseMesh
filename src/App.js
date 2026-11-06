@@ -308,8 +308,8 @@ export class App {
 		// The WebGL hosted path builds its player and collision state from the
 		// active package. Do not instantiate the built-in island for that launch.
 		if ( ! worldLink ) {
-			const { WORLD } = await import( './world/WorldLayout.js' );
-			this.worldLayout = WORLD;
+			this.worldLayout = this.worldPackage.presentation?.layout || null;
+			if ( ! this.worldLayout ) throw new Error( 'The default world package must provide its layout' );
 		}
 		if ( engine.backend !== 'webgl' || ! worldLink ) await this.initializeIslandWorldState();
 		if ( engine.backend === 'webgl' ) {

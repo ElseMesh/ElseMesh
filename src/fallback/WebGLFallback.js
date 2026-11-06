@@ -794,6 +794,7 @@ export class WebGLFallback {
 			components: ( bundledSource.components || [] ).map( worldComponentRuntimeRecord ),
 		} : null;
 		this.defaultWorldAssets = this.defaultWorldPackage?.assets || null;
+		this.worldLayout = app.worldLayout || null;
 		this.islandWhaleComponent = this.defaultWorldSource?.components.find( component => component.type === 'elsemesh.humpback-whale/1' ) || null;
 		this.engine = engine;
 		this.THREE = engine.THREE;
@@ -889,12 +890,12 @@ export class WebGLFallback {
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
 			this._bindOceanFFTToWater();
 			this._bindShoreSurfaceToWater();
-			const worldDefinition = this.islandDefinition;
-			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldDefinition.boatDock.position ), initialHeading: worldDefinition.boatDock.heading } );
+			const worldLayout = this.worldLayout;
+			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldLayout.boatDock.position ), initialHeading: worldLayout.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
 			this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 			this._addIslandGameplayColliders();
-			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout: this.islandDefinition } );
+			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout } );
 			this.player.yaw = this.spawn.yaw || 0;
 			this.player.pitch = this.spawn.pitch || 0;
 			this.player.position.set( this.spawn.position[ 0 ], this.spawn.position[ 1 ] - 1.62, this.spawn.position[ 2 ] );
@@ -1661,8 +1662,8 @@ export class WebGLFallback {
 
 	async _loadIsland( progress ) {
 
-		const { ISLAND_DEFINITION: WORLD } = await import( '../world/IslandDefinition.js' );
-		this.islandDefinition = WORLD;
+		const WORLD = this.worldLayout;
+		if ( ! WORLD ) throw new Error( 'The built-in world package must provide its layout to the WebGL renderer' );
 		progress( 0.15, 'Building a WebGL terrain…' );
 		this.terrain = this.app.worldState.terrain;
 		const T = this.THREE;
@@ -1763,7 +1764,7 @@ export class WebGLFallback {
 
 	_addIslandGameplayColliders() {
 
-		const C = this.app.worldState.colliders, P = this.islandDefinition.pier, y = P.deckHeight;
+		const C = this.app.worldState.colliders, P = this.worldLayout.pier, y = P.deckHeight;
 		const box = ( x, cy, z, hx, hy, hz, tag, options = {} ) => C.addBox( new EngineVector3( x, cy, z ), new EngineVector3( hx, hy, hz ), 0, { tag, ...options } );
 		const stepGround = this.terrain.heightAt( P.x, P.zStart - 0.7 ), nSteps = Math.max( 2, Math.ceil( Math.max( 0, y - stepGround ) / 0.22 ) ), tread = 0.32;
 		for ( let k = 1; k < nSteps; k ++ ) {
@@ -2554,7 +2555,7 @@ export class WebGLFallback {
 			underwater: p.y < this.worldSeaLevel ? 1 : 0,
 			depthBelowSurface: Math.max( 0, this.worldSeaLevel - p.y ),
 			distanceToShore: Math.abs( coast ), coastDistance: coast,
-			nearPier: !! this.islandDefinition && Math.abs( p.x - this.islandDefinition.pier.x ) < 12 && p.z > this.islandDefinition.pier.zStart - 5 && p.z < this.islandDefinition.pier.zEnd + 8,
+			nearPier: !! this.worldLayout && Math.abs( p.x - this.worldLayout.pier.x ) < 12 && p.z > this.worldLayout.pier.zStart - 5 && p.z < this.worldLayout.pier.zEnd + 8,
 			boat: { active: !! boat?.driven, rpm: boat?.rpm || 0, speed: boat?.velocity?.length?.() || 0, position: this.boat?.model?.group?.position, listenerInside: false },
 		} );
 

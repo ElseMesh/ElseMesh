@@ -110,9 +110,10 @@ batches, contact shadows, and optional GPU swash probe. Tidewater registers its
 WebGL presentation adapter through the component backend registry; it consumes
 the same simulation, bird and shorebird poses, species rest shapes, frame
 visibility policy, and crab presentation records. The WebGL island evaluates
-shorebird swash from the same shoreline field and shared math as WebGPU. These
-modules still import engine rendering/math APIs and `IslandDefinition`, so the
-world package is not yet fully independent of engine internals. The WebGL
+shorebird swash from the same shoreline field and shared math as WebGPU. The
+plain `IslandDefinition` data now lives in the Tidewater repository, but these
+modules still import engine rendering/math APIs and the world layout directly,
+so the package is not yet fully independent of engine internals. The WebGL
 fallback also lacks the WebGPU species materials and contact shadows, and
 hosted animal authority remains unimplemented. This is package ownership and
 runtime reuse, not cross-backend wildlife parity.

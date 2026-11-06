@@ -1,4 +1,4 @@
-import { ISLAND_DEFINITION } from './IslandDefinition.js';
+import { ISLAND_DEFINITION } from '../../worlds/tidewater/IslandDefinition.js';
 
 // Renderer-neutral walkable height for the authored pier surface. The full
 // collision world still supplies exact step boxes; this continuous step ramp is
