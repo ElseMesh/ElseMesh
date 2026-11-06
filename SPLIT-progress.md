@@ -65,6 +65,17 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06 source audit: WebGPU's production `WaterQuery.heightModule`
+  composes FFT displacement, shoreline displacement, and
+  `WakeSim.wakeDisplacement()` when the active surface has a wake. The
+  production `WebGLWaterQuery` updates its GPU FFT and applies Tidewater's
+  shore offset, but exposes no wake sampler or wake contribution. Both paths
+  use the same `BoatController`; therefore the existing 18-second boat trace,
+  which explicitly excludes interactive wake and collisions, does not verify
+  live production boat parity. The next boat gate is a WebGL wake surface/query
+  implementation with matching wake input to boat hydrostatics, then a live
+  moving-boat trace including collisions. The parity estimate remains 82%.
+
 - 2026-11-06: WebGL water now uses the renderer-neutral optical defaults and
   ports the pre-split WebGPU material's dielectric Fresnel, roughness-adjusted
   sky reflection, GGX direct glint, and depth-dependent sun/sky scattering. The
