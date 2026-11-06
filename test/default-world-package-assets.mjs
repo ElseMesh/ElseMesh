@@ -9,7 +9,8 @@ const server = await createServer( {
 
 try {
 	const { defaultWorldPackage } = await server.ssrLoadModule( '/worlds/default.js' );
-	const { source, assets } = defaultWorldPackage;
+	const { source, assets, presentation } = defaultWorldPackage;
+	assert.equal( typeof presentation.createVegetation, 'function', 'the default world supplies its vegetation renderer through the package presentation interface' );
 	for ( const component of source.components.filter( candidate => [ 'elsemesh.static-reef/1', 'elsemesh.static-vegetation/1' ].includes( candidate.type ) ) ) {
 		for ( const reference of component.assets || [] ) {
 			if ( reference.kind === 'reef-placement/1' || reference.kind === 'vegetation-placement/1' ) {

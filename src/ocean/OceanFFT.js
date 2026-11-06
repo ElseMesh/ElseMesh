@@ -602,7 +602,7 @@ ${ reduce( 's7', null, 1, 8, t ) }
 
 	}
 
-	update( dt ) {
+	update( dt, simulationTime = null ) {
 
 		const C = this.cascades;
 
@@ -616,7 +616,8 @@ ${ reduce( 's7', null, 1, 8, t ) }
 
 		}
 
-		this.time.value += dt * this.timeScale;
+		if ( Number.isFinite( simulationTime ) ) this.time.value = simulationTime;
+		else this.time.value += dt * this.timeScale;
 		GPU.computePass( 'Ocean FFT', ( pass ) => {
 
 			this.rowKernel.dispatch( [ N, C, 1 ], { pass } );

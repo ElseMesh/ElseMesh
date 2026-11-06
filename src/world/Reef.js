@@ -278,7 +278,7 @@ export function reefLODAtDistance( distance, data, index ) {
 
 export class Reef {
 
-	constructor( { scene, terrain, shoreField = null, worldLayout = null, layoutOnly = false, placementRecords = null, maxInstances = null, fishPresentation = null } ) {
+	constructor( { scene, terrain, shoreField = null, worldLayout = null, layoutOnly = false, placementRecords = null, maxInstances = null, fishPresentation = null, fishPopulation = null } ) {
 
 		if ( maxInstances !== null && ( ! Number.isInteger( maxInstances ) || maxInstances < 1 || maxInstances > 200000 ) ) throw new Error( 'Reef maxInstances must be an integer from 1 to 200000' );
 		if ( maxInstances !== null && placementRecords === null ) throw new Error( 'Reef maxInstances is only valid with placementRecords' );
@@ -325,6 +325,7 @@ export class Reef {
 				anchors: this.anchors,
 				shoreField, // keeps the bay fish out of the breakers
 				presentation: fishPresentation,
+				population: fishPopulation,
 			} );
 		} else {
 			this.fish = null;

@@ -30,57 +30,12 @@ import { FrameUniforms } from '../engine/render/Frame.js';
 // motion vectors.
 
 const TAU = Math.PI * 2;
-const CEILING = - 0.7; // reef fish stay below this (m)
 const FLOOR_CLEARANCE = 0.18; // minimum above the reef / seabed (m)
 const RANGE = 45; // draw distance (m)
 const SIM_RANGE = 65; // groups further than this from the camera are frozen (m)
 const GRAVITY = 9.81;
 const LOD_PX = [ 320, 80, 22 ]; // screen length (px) below which the next level of detail takes over
 const LOD_BAND = 1.15; // cross-fade band above each switch (screen length ratio)
-
-// Behaviour per kind of swimmer. model: anatomy supplied by the world presentation profile or 'stingray' / 'eagleRay' /
-// 'turtle'; length range (m); mode (see stepGroup); speeds in body lengths / s (cruise, max,
-// burst when fleeing), steering accel, boids (separation distance and neighbour radius in body
-// lengths, weights); depth: preferred height above the bottom (fraction of the local water
-// column above it: 0 on the bottom .. 1 at the ceiling); band: water depth range of the homes;
-// flee: reaction distance (m); amp / freq: tail beat amplitude and frequency (Hz at rest, per
-// body length / s).
-const base = {
-	cruise: 1, max: 2.5, burst: 6, accel: 4, sep: 2, nbr: 5, wSep: 5, wAli: 1, wCoh: 0.8, wGoal: 1, flee: 3.5,
-	depth: [ 0.1, 0.5 ], homeRadius: 6, amp: 0.08, freq: [ 1.6, 0.9 ], ceiling: CEILING, minDepth: 1.2, band: [ 1.5, 20 ],
-};
-const BEHAVIOUR = {
-	bait: { model: 'silverside', length: [ 0.06, 0.09 ], mode: 'bait', cruise: 1.8, max: 4, burst: 10, accel: 7, flee: 3, depth: [ 0.35, 0.75 ], amp: 0.1, freq: [ 3, 1.1 ] },
-	silverside: { model: 'silverside', length: [ 0.06, 0.09 ], mode: 'school', cruise: 1.6, max: 3.5, burst: 9, accel: 6, sep: 1.8, nbr: 7, wSep: 7, wAli: 2.6, wCoh: 1.4, wGoal: 0.7, flee: 4.5, depth: [ 0.35, 0.8 ], homeRadius: 18, amp: 0.1, freq: [ 3, 1.1 ], band: [ 4, 20 ] },
-	chromis: { model: 'chromis', length: [ 0.08, 0.11 ], mode: 'hover', cruise: 0.8, max: 2.5, burst: 7, accel: 5, sep: 2.2, nbr: 6, wAli: 0.5, wCoh: 0.5, flee: 3.0, depth: [ 0.12, 0.45 ], homeRadius: 3, freq: [ 2.5, 0.9 ], amp: 0.1, band: [ 4, 16 ] },
-	grunt: { model: 'grunt', length: [ 0.16, 0.24 ], mode: 'mill', cruise: 0.45, max: 1.8, burst: 5, accel: 3, sep: 1.6, nbr: 4, wAli: 1.8, wCoh: 1.0, wGoal: 0.9, depth: [ 0.04, 0.2 ], homeRadius: 1.5, band: [ 2.5, 10 ] },
-	yellowtail: { model: 'yellowtail', length: [ 0.25, 0.36 ], mode: 'school', cruise: 0.8, max: 2.2, burst: 5, accel: 3, sep: 1.8, wAli: 1.6, wGoal: 0.7, flee: 5, depth: [ 0.15, 0.5 ], homeRadius: 16, freq: [ 1.5, 0.9 ], band: [ 3, 14 ] },
-	tang: { model: 'tang', length: [ 0.15, 0.24 ], mode: 'forage', cruise: 0.7, max: 2, burst: 5, accel: 3, sep: 1.8, wAli: 1.0, wCoh: 0.7, wGoal: 0.9, flee: 4, depth: [ 0.03, 0.2 ], homeRadius: 14, amp: 0.07, band: [ 2, 9 ] },
-	sergeant: { model: 'sergeant', length: [ 0.12, 0.17 ], mode: 'hover', cruise: 0.6, max: 2, burst: 6, accel: 4, wAli: 0.6, wCoh: 0.6, flee: 3.2, depth: [ 0.08, 0.3 ], homeRadius: 2, amp: 0.09, freq: [ 2, 0.9 ], band: [ 1.5, 6 ] },
-	wrasse: { model: 'wrasse', length: [ 0.07, 0.12 ], mode: 'forage', cruise: 1.3, max: 3, burst: 7, accel: 6, wAli: 0.5, wCoh: 0.6, wGoal: 1.2, flee: 2.5, depth: [ 0.02, 0.1 ], homeRadius: 5, amp: 0.1, freq: [ 2.5, 1.0 ], band: [ 1.5, 9 ] },
-	parrot: { model: 'parrot', length: [ 0.3, 0.45 ], mode: 'forage', cruise: 0.55, max: 1.6, burst: 4, accel: 2, sep: 2.2, nbr: 6, wSep: 4, wAli: 0.6, wCoh: 0.5, flee: 4.5, depth: [ 0.02, 0.1 ], homeRadius: 18, amp: 0.05, freq: [ 1.0, 0.6 ], band: [ 2, 12 ] },
-	angel: { model: 'angel', length: [ 0.25, 0.35 ], mode: 'pair', cruise: 0.45, max: 1.4, burst: 3.5, accel: 2, sep: 1.5, nbr: 4, wSep: 3, wAli: 0.8, wCoh: 1.2, depth: [ 0.04, 0.15 ], homeRadius: 3, amp: 0.05, freq: [ 1.0, 0.6 ], band: [ 5, 16 ] },
-	grouper: { model: 'grouper', length: [ 0.6, 0.85 ], mode: 'lurk', cruise: 0.15, max: 1.2, burst: 3, accel: 1.5, sep: 1, nbr: 2, wSep: 1, wAli: 0, wCoh: 0, wGoal: 0.8, flee: 3, depth: [ 0.0, 0.05 ], homeRadius: 2.5, amp: 0.04, freq: [ 0.6, 0.6 ], band: [ 5, 16 ] },
-	barracuda: { model: 'barracuda', length: [ 1.0, 1.35 ], mode: 'solo', cruise: 0.15, max: 1.2, burst: 3, accel: 1.2, sep: 1, nbr: 2, wSep: 1, wAli: 0, wCoh: 0, wGoal: 0.6, depth: [ 0.3, 0.6 ], homeRadius: 10, amp: 0.035, freq: [ 0.5, 0.8 ], band: [ 4, 16 ] },
-	jack: { model: 'jack', length: [ 0.4, 0.6 ], mode: 'patrol', cruise: 1.1, max: 2.6, burst: 5, accel: 3, sep: 2, nbr: 5, wAli: 1.4, wCoh: 0.9, wGoal: 0.9, flee: 4, depth: [ 0.25, 0.6 ], homeRadius: 20, amp: 0.07, freq: [ 1.6, 0.8 ], band: [ 6, 20 ] },
-	eagleRay: { model: 'eagleRay', length: [ 1.6, 2.0 ], mode: 'cruise', cruise: 0.35, max: 0.9, burst: 1.8, accel: 0.8, sep: 1, nbr: 2, wSep: 1, wAli: 0, wCoh: 0, wGoal: 0.8, flee: 5, depth: [ 0.25, 0.55 ], homeRadius: 30, amp: 0.13, freq: [ 0.45, 0.2 ], band: [ 6, 20 ] },
-	stingray: { model: 'stingray', length: [ 0.9, 1.3 ], mode: 'glide', cruise: 0.3, max: 0.8, burst: 1.6, accel: 0.8, sep: 1, nbr: 2, wSep: 1, wAli: 0, wCoh: 0, wGoal: 0.8, flee: 3.5, depth: [ 0, 0 ], homeRadius: 14, amp: 0.05, freq: [ 0.9, 0.5 ], band: [ 2.5, 16 ] },
-	turtle: { model: 'turtle', length: [ 0.9, 1.1 ], mode: 'turtle', cruise: 0.3, max: 0.8, burst: 1.4, accel: 0.6, sep: 1, nbr: 2, wSep: 1, wAli: 0, wCoh: 0, wGoal: 0.7, flee: 4, depth: [ 0.15, 0.6 ], homeRadius: 25, amp: 0, freq: [ 0.3, 0.25 ], ceiling: - 0.25, band: [ 3, 12 ] },
-	// bay
-	tarpon: { model: 'tarpon', length: [ 1.3, 1.8 ], mode: 'cruise', cruise: 0.3, max: 1.2, burst: 3, accel: 1, sep: 1.5, nbr: 3, wSep: 2, wAli: 0.8, wCoh: 0.5, wGoal: 0.7, flee: 5, depth: [ 0.3, 0.7 ], homeRadius: 25, amp: 0.04, freq: [ 0.5, 0.7 ], band: [ 4, 14 ] },
-	needlefish: { model: 'needlefish', length: [ 0.5, 0.8 ], mode: 'surface', cruise: 0.9, max: 2.5, burst: 6, accel: 3, sep: 3, nbr: 4, wSep: 3, wAli: 1, wCoh: 0.5, wGoal: 0.9, flee: 4, homeRadius: 25, amp: 0.05, freq: [ 1.2, 0.7 ], ceiling: - 0.12, minDepth: 1.0, band: [ 1.8, 12 ] },
-	mullet: { model: 'mullet', length: [ 0.3, 0.4 ], mode: 'jumper', cruise: 0.8, max: 2.2, burst: 5, accel: 3, sep: 1.8, nbr: 5, wAli: 1.5, wCoh: 1, wGoal: 0.8, flee: 4, depth: [ 0.3, 0.9 ], homeRadius: 14, amp: 0.07, freq: [ 1.5, 0.9 ], ceiling: - 0.25, minDepth: 1.2, band: [ 1.8, 4.5 ] },
-	fry: { model: 'silverside', length: [ 0.045, 0.065 ], mode: 'fry', cruise: 2, max: 4, burst: 14, accel: 9, sep: 1.6, nbr: 8, wSep: 7, wAli: 2.4, wCoh: 1.6, wGoal: 0.9, flee: 3.2, depth: [ 0.3, 0.8 ], homeRadius: 6, amp: 0.11, freq: [ 3.5, 1.2 ], ceiling: - 0.2, minDepth: 0.5, band: [ 0.5, 3.5 ] },
-	pierGrunt: { model: 'grunt', length: [ 0.16, 0.26 ], mode: 'pile', cruise: 0.45, max: 1.8, burst: 5, accel: 3, sep: 1.6, nbr: 4, wAli: 1.4, wCoh: 0.9, depth: [ 0.1, 0.5 ], homeRadius: 1.6, band: [ 2, 6 ] },
-	pierSnapper: { model: 'yellowtail', length: [ 0.25, 0.34 ], mode: 'pile', cruise: 0.6, max: 2.2, burst: 5, accel: 3, sep: 1.8, wAli: 1.4, wCoh: 0.8, flee: 4.5, depth: [ 0.3, 0.8 ], homeRadius: 2.5, freq: [ 1.5, 0.9 ], band: [ 2, 6 ] },
-	// escort of the humpback (setWhale): pilot fish / small jacks around its head and flippers,
-	// juveniles near the head, remoras holding on to its belly and flanks
-	pilot: { model: 'jack', length: [ 0.25, 0.4 ], mode: 'escort', cruise: 1.2, max: 3.5, burst: 7, accel: 5, flee: 2, amp: 0.07, freq: [ 1.8, 0.9 ], ceiling: - 0.3, minDepth: 2, band: [ 0, 1e9 ] },
-	juvenile: { model: 'jack', length: [ 0.1, 0.16 ], mode: 'escort', cruise: 1.5, max: 4, burst: 9, accel: 7, flee: 1.5, amp: 0.1, freq: [ 2.5, 1 ], ceiling: - 0.3, minDepth: 2, band: [ 0, 1e9 ] },
-	remora: { model: 'mullet', length: [ 0.35, 0.55 ], mode: 'remora', cruise: 0.5, max: 3, burst: 3, accel: 3, flee: 0, amp: 0.03, freq: [ 0.8, 0.3 ], ceiling: 5, minDepth: 0, band: [ 0, 1e9 ] },
-	pierSergeant: { model: 'sergeant', length: [ 0.12, 0.17 ], mode: 'pile', cruise: 0.6, max: 2, burst: 6, accel: 4, wAli: 0.6, wCoh: 0.6, flee: 3.2, depth: [ 0.3, 0.9 ], homeRadius: 1.2, amp: 0.09, freq: [ 2, 0.9 ], band: [ 2, 6 ] },
-};
-for ( const k in BEHAVIOUR ) BEHAVIOUR[ k ] = { name: k, ...base, ...BEHAVIOUR[ k ] };
 
 // models per level of detail (0 nearest .. 3)
 function buildModels( names, presentation ) {
@@ -151,14 +106,15 @@ const _frustum = new THREE.Frustum(), _sphere = new THREE.Sphere(), _m = new THR
 
 export class FishSchools {
 
-	// floorAt( x, z ): highest obstacle (seabed or reef); anchors: [ [ x, z ], ... ] coral heads;
-	// bay: also populate the bay, the pier and the beach; shoreField (optional, ShoreField.js)
-	// locates the breakers (without it every beach counts as fully exposed)
-	constructor( { parent, terrain, floorAt = null, center, radius, anchors = [], seed = 23, bay = true, shoreField = null, worldLayout, presentation } ) {
+	// floorAt( x, z ): highest obstacle (seabed or reef); anchors: [ [ x, z ], ... ] coral heads.
+	// shoreField (optional, ShoreField.js) locates breakers for habitat sampling.
+	constructor( { parent, terrain, floorAt = null, center, radius, anchors = [], seed = 23, bay = true, shoreField = null, worldLayout, presentation, population } ) {
 
-		if ( ! presentation?.SPECIES || ! presentation?.PATTERN || ! presentation?.SKIN ) throw new Error( 'Fish schools require a registered world fish-presentation profile' );
+		if ( ! presentation?.SPECIES || ! presentation?.PATTERN || ! presentation?.SKIN || ! presentation?.SCHOOLS ) throw new Error( 'Fish schools require a registered world fish-school profile' );
+		if ( ! population?.groups || ! Array.isArray( population.groups ) ) throw new Error( 'Fish schools require a registered world fish-population profile' );
 		if ( ! worldLayout ) throw new Error( 'Fish schools require the active world package layout' );
 		this.presentation = presentation;
+		this.population = population;
 		this.worldLayout = worldLayout;
 
 		this.terrain = terrain;
@@ -286,7 +242,8 @@ export class FishSchools {
 
 	addGroup( name, count, zone ) {
 
-		const sp = BEHAVIOUR[ name ];
+		const sp = this.presentation.SCHOOLS[ name ];
+		if ( ! sp ) throw new Error( `Fish population references an unknown school: ${name}` );
 		const g = new Group( sp, count, this.n, zone, mulberry32( Math.floor( this.rng() * 1e9 ) ) );
 		this.n += count;
 		this.groups.push( g );
@@ -342,83 +299,78 @@ export class FishSchools {
 
 	layout( bay ) {
 
-		const reef = { x: this.center.x, z: this.center.z, r: this.radius * 0.75, anchors: this.anchors };
 		const homes = [];
-		const place = ( name, count, zone, anchored = false ) => {
+		this.baitGroups = [];
+		this.escort = [];
+		const place = ( name, count, region, anchored = false ) => {
 
-			const sp = BEHAVIOUR[ name ];
-			const z = { ...zone, band: zone.band || sp.band };
-			const spot = this.pickSpot( sp, z, homes, anchored );
+			const sp = this.presentation.SCHOOLS[ name ];
+			if ( ! sp ) throw new Error( `Fish population references an unknown school: ${name}` );
+			const zone = this.resolvePopulationZone( region );
+			zone.band ||= sp.band;
+			const spot = this.pickSpot( sp, zone, homes, anchored );
 			if ( ! spot ) return null;
 			homes.push( spot );
-			return this.addGroup( name, count, { ...z, x: spot[ 0 ], z: spot[ 1 ], r: Math.min( z.r, sp.homeRadius * 1.5 + 4 ) } );
+			return this.addGroup( name, count, { ...zone, x: spot[ 0 ], z: spot[ 1 ], r: Math.min( zone.r, sp.homeRadius * 1.5 + 4 ) } );
 
 		};
+		const groups = [ ...this.population.groups, ...( bay ? this.population.bayGroups || [] : [] ) ];
+		for ( const entry of groups ) {
 
-		// ---- reef, by depth band
-		for ( const c of [ 14, 12, 10, 12 ] ) place( 'sergeant', c, reef, true );
-		for ( const c of [ 26, 22, 20, 24, 18, 22 ] ) place( 'chromis', c, reef, true );
-		for ( const c of [ 28, 22, 20, 16, 16 ] ) place( 'grunt', c, reef, true );
-		for ( const c of [ 16, 12 ] ) place( 'yellowtail', c, reef );
-		for ( const c of [ 18, 12 ] ) place( 'tang', c, reef );
-		for ( const c of [ 16, 12, 12, 14 ] ) place( 'wrasse', c, reef );
-		for ( const c of [ 4, 3, 3, 3 ] ) place( 'parrot', c, reef );
-		for ( let i = 0; i < 3; i ++ ) place( 'angel', 2, reef, true );
-		for ( let i = 0; i < 2; i ++ ) place( 'grouper', 1, reef, true );
-		for ( let i = 0; i < 2; i ++ ) place( 'barracuda', 1, reef );
-		for ( const c of [ 150, 120 ] ) place( 'silverside', c, reef );
+			const regions = entry.zones || entry.counts.map( () => entry.zone );
+			for ( let i = 0; i < entry.counts.length; i ++ ) {
 
-		// ---- the drop-off: the reef's deep seaward slope
-		const drop = this.dropOff();
-		this.dropPath = drop;
-		const mid = drop[ Math.floor( drop.length / 2 ) ] || [ reef.x, reef.z + reef.r ];
-		const dropZone = { x: mid[ 0 ], z: mid[ 1 ], r: 30, path: drop };
-		const ball = place( 'bait', 900, { ...dropZone, r: 14 } );
-		this.baitGroups = ball ? [ ball ] : [];
-		for ( const c of [ 9, 6 ] ) {
+				const group = entry.direct ? this.addGroup( entry.school, entry.counts[ i ], this.resolvePopulationZone( regions[ i ] ) ) : place( entry.school, entry.counts[ i ], regions[ i ], entry.anchored );
+				if ( entry.collect === 'baitGroups' ) this.baitGroups = group ? [ group ] : [];
+				if ( entry.collect === 'escort' && group ) this.escort.push( group );
+				if ( entry.pilesNearHome && group ) {
 
-			const g = place( 'jack', c, dropZone );
-			if ( g ) g.zone.path = drop;
+					group.zone.piles = group.zone.piles.filter( p => Math.hypot( p[ 0 ] - group.home.x, p[ 1 ] - group.home.z ) < regions[ i ].homeRadius );
+					if ( ! group.zone.piles.length ) group.zone.piles = [ [ group.home.x, group.home.z ] ];
+
+				}
+
+			}
 
 		}
 
-		const eagle = place( 'eagleRay', 1, dropZone );
-		if ( eagle ) eagle.zone.path = drop;
-		for ( let i = 0; i < 2; i ++ ) place( 'stingray', 1, { ...reef, r: this.radius, band: [ 3, 12 ], sand: true } );
-		place( 'turtle', 1, { ...reef, r: this.radius, band: [ 3, 10 ] } );
+	}
 
-		if ( ! bay ) return;
+	resolvePopulationZone( region ) {
 
-		// ---- the bay (east of the reef, south of the beach)
-		const bayZone = { x: 45, z: 70, r: 45 };
-		place( 'tarpon', 3, { ...bayZone, band: [ 5, 14 ] } );
-		place( 'jack', 5, { x: this.worldLayout.pier.x, z: this.worldLayout.pier.zEnd, r: 20, band: [ 3, 10 ] } );
-		place( 'stingray', 1, { ...bayZone, band: [ 3, 9 ], sand: true } );
-		place( 'barracuda', 1, { x: this.worldLayout.pier.x + 6, z: this.worldLayout.pier.zEnd - 4, r: 8, band: [ 3, 8 ] } );
-		for ( const c of [ 3, 2, 1 ] ) place( 'needlefish', c, { x: 30, z: 30, r: 60, band: [ 2, 12 ] } );
-		for ( const c of [ 9, 7 ] ) place( 'mullet', c, { x: 20, z: 5, r: 70 } );
+		if ( ! region || typeof region !== 'object' ) throw new Error( 'Fish population zone is missing' );
+		const common = {
+			...( region.band ? { band: region.band } : {} ),
+			...( region.sand ? { sand: true } : {} ),
+		};
+		if ( region.kind === 'reef' ) return { x: this.center.x, z: this.center.z, r: this.radius * ( region.radiusScale ?? 0.75 ), anchors: this.anchors, ...common };
+		if ( region.kind === 'circle' ) return { x: region.center[ 0 ], z: region.center[ 1 ], r: region.radius, ...common };
+		if ( region.kind === 'point' ) return { x: region.center[ 0 ], z: region.center[ 1 ], r: region.radius, ...common };
+		if ( region.kind === 'drop-off' ) {
 
-		// fry along the beach, just outside the breakers (or inside sheltered water)
-		for ( const [ c, x ] of [ [ 90, - 60 ], [ 70, - 10 ], [ 80, 30 ], [ 60, 110 ], [ 70, 150 ] ] ) place( 'fry', c, { x, z: 0, r: 30 } );
-
-		// snappers, grunts and sergeant majors around the pier piles (in water deep enough)
-		const piles = [];
-		const P = this.worldLayout.pier;
-		const off = P.width / 2 + 0.17;
-		for ( let z = P.zStart + 1.5; z < P.zEnd - P.headDepth; z += 3 ) for ( const s of [ - 1, 1 ] ) piles.push( [ P.x + s * off, z ] );
-		for ( let k = 0; k < 5; k ++ ) for ( const z of [ P.zEnd - P.headDepth + 0.25, P.zEnd - P.headDepth / 2, P.zEnd - 0.25 ] ) piles.push( [ P.x - P.headWidth / 2 + 0.3 + k * ( P.headWidth - 0.6 ) / 4, z ] );
-		// the whale's escort, waiting until a whale is set (setWhale)
-		this.escort = [ [ 'pilot', 12 ], [ 'juvenile', 6 ], [ 'remora', 4 ] ].map( ( [ name, c ] ) => this.addGroup( name, c, { x: 0, z: 200, r: 5, band: [ 0, 1e9 ] } ) );
-		const wet = piles.filter( ( p ) => this.depthAt( p[ 0 ], p[ 1 ] ) > 2.2 );
-		const pierZone = { x: P.x, z: P.zEnd - 8, r: 18, anchors: wet, piles: wet };
-		for ( const [ name, c ] of [ [ 'pierGrunt', 14 ], [ 'pierSnapper', 10 ], [ 'pierSergeant', 12 ] ] ) {
-
-			const g = place( name, c, pierZone, true );
-			// the piles around its home
-			if ( g ) g.zone.piles = wet.filter( ( p ) => Math.hypot( p[ 0 ] - g.home.x, p[ 1 ] - g.home.z ) < 5 );
-			if ( g && ! g.zone.piles.length ) g.zone.piles = [ [ g.home.x, g.home.z ] ];
+			if ( ! this.dropPath ) this.dropPath = this.dropOff();
+			const fallback = [ this.center.x, this.center.z + this.radius * 0.75 ];
+			const mid = this.dropPath[ Math.floor( this.dropPath.length / 2 ) ] || fallback;
+			return { x: mid[ 0 ], z: mid[ 1 ], r: region.radius, path: this.dropPath, ...common };
 
 		}
+		if ( region.kind === 'pier-end' ) {
+
+			const pier = this.worldLayout.pier;
+			return { x: pier.x + region.offset[ 0 ], z: pier.zEnd + region.offset[ 1 ], r: region.radius, ...common };
+
+		}
+		if ( region.kind === 'pier-piles' ) {
+
+			const pier = this.worldLayout.pier, piles = [];
+			const sideOffset = pier.width / 2 + region.sideOffset;
+			for ( let z = pier.zStart + region.walkStart; z < pier.zEnd - pier.headDepth; z += region.walkSpacing ) for ( const side of [ - 1, 1 ] ) piles.push( [ pier.x + side * sideOffset, z ] );
+			for ( let k = 0; k < region.headColumns; k ++ ) for ( const z of [ pier.zEnd - pier.headDepth + region.edgeInset, pier.zEnd - pier.headDepth / 2, pier.zEnd - region.edgeInset ] ) piles.push( [ pier.x - pier.headWidth / 2 + region.headInset + k * ( pier.headWidth - region.headInset * 2 ) / ( region.headColumns - 1 ), z ] );
+			const wet = piles.filter( p => this.depthAt( p[ 0 ], p[ 1 ] ) > region.minDepth );
+			return { x: pier.x, z: pier.zEnd - 8, r: region.radius, anchors: wet, piles: wet, ...common };
+
+		}
+		throw new Error( `Unsupported fish population zone: ${region.kind}` );
 
 	}
 

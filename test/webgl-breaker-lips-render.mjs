@@ -28,9 +28,13 @@ try {
 	const address = vite.httpServer.address();
 	browser = spawn( findChromium(), [ '--headless=new', '--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', '--remote-allow-origins=*', `--user-data-dir=${profile}`, 'about:blank' ], { detached: true, stdio: 'ignore' } );
 	const activePort = join( profile, 'DevToolsActivePort' );
-	for ( let i = 0; i < 200 && ! existsSync( activePort ); i ++ ) { if ( browser.exitCode !== null ) throw new Error( `Chromium exited (${browser.exitCode})` ); await wait( 50 ); }
-	assert( existsSync( activePort ), 'isolated Chromium publishes its DevTools port' );
-	const [ port ] = readFileSync( activePort, 'utf8' ).trim().split( /\r?\n/ );
+	let port = '';
+	for ( let i = 0; i < 200 && ! /^[1-9]\d*$/.test( port ); i ++ ) {
+		if ( browser.exitCode !== null ) throw new Error( `Chromium exited (${browser.exitCode})` );
+		if ( existsSync( activePort ) ) port = readFileSync( activePort, 'utf8' ).trim().split( /\r?\n/ )[ 0 ] || '';
+		if ( ! /^[1-9]\d*$/.test( port ) ) await wait( 50 );
+	}
+	assert.match( port, /^[1-9]\d*$/, 'isolated Chromium publishes a complete DevTools port' );
 	const targets = await ( await fetch( `http://127.0.0.1:${port}/json/list` ) ).json();
 	const page = targets.find( target => target.type === 'page' );
 	assert( page?.webSocketDebuggerUrl, 'isolated Chromium exposes a page target' );

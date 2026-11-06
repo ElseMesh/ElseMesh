@@ -33,6 +33,7 @@ const shoreField = { data: shoreFieldData, res: resolution, origin: 0, size: res
 const fallback = Object.create( WebGLFallback.prototype );
 fallback.THREE = THREE;
 fallback.waterScene = new THREE.Scene();
+fallback.oceanLODs = new Set();
 fallback._makeWater = geometry => {
 	const water = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial() );
 	water.material.uniforms = { uOceanEnabled: { value: 0 } };

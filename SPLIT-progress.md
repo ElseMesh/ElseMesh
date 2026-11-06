@@ -17,7 +17,7 @@ unfinished runtime boundary or parity gate.
 | Keep authored Tidewater and Hogwarts world data in their own repositories | **100%** | Both are mounted as submodules and documented in [`docs/world-repository-layout.md`](docs/world-repository-layout.md). Repository separation is recorded complete in [`GOAL-done.md`](GOAL-done.md). This measures authored-data ownership only; engine-side runtime handlers still need extraction. |
 | ElseMesh protocol and world identity namespace v3, with no old-ID compatibility | **100%** | Signed manifests require `elsemesh.world/3`; source requires `elsemesh.world-source/3`; client/server/Blender reject old world IDs and manifest/source protocols. Obsolete Blender metadata aliases and the daemon's Tidewater-named local profile/ZeroTier auto-migration paths have been removed. Focused identity/Blender checks, `go test ./...`, the full client suite, and the external build passed. Historical negative tests mention old forms only to prove rejection. |
 | Owner-signed JavaScript world extensions run in dedicated browser Workers; no Wasm implementation | **92%** | `src/network/WorldJavaScriptExtension.js` and its Worker enforce message bounds, bounded startup/run limits, and worker teardown; the startup deadline now defaults to 5 seconds (10-second maximum) to tolerate cold browser startup. Server validation binds modules to signed `javascript/1` assets. Tidewater's fishing behavior calls its signed module for browser gameplay. Isolated Chromium verifies both an owner-signed in-memory package and a live `worldd` path: the browser fetches the signed module over the gateway, calls `App.activateHostedWorld()`, receives the subscribed activation event result from the real Worker, and calls `App.deactivateHostedWorld()` to dispose it. Tidewater's own live browser test signs the authored world experience, fetches the exact SHA-256 fishing module through the gateway, and drives both the WebGPU `Game.update()` path and WebGL adapter through cast input, bite, fight-to-catch, inventory, and sale using separate dedicated Workers. The generic manifest schema now accepts and validates the renderer-neutral sky/cloud profile used by Tidewater source. A hosted Tidewater WebGPU launch completed cold startup with no Worker or browser-console errors after the larger deadline. Both live tests use OS-assigned ports. Tidewater now rebinds a retained gameplay runtime to each activation-scoped Worker, clears transient bite/fight state on departure, and drops boat-step responses from the departed Worker generation. Tidewater runtime and behavior-hook checks cover re-entry, and the live signed-module WebGPU/WebGL gameplay test plus the App departure lifecycle test pass after this change. Event subscriptions are validated by client, source schema, and `worldd`. No world-behavior Wasm runtime is implemented. **Remaining:** exercise Tidewater vendor interaction through player controls; finish renderer parity checks separately. |
-| Registry-based, world-agnostic engine behavior and component installation | **73%** | `WorldBehaviorRegistry.js`, generic component envelopes, renderer-neutral traits, and registered installers exist. WebGL shore-query sampling now derives from generic terrain shore data in ElseMesh; Tidewater no longer declares a renderer-selection behavior for this surface. `App.installWorldComponents()` selects backend adapters from the generic registry. Tidewater now owns the `elsemesh.static-fish-props/1` component registration and its WebGPU and WebGL adapters; the engine no longer registers the component globally or imports either adapter at startup. Its WebGL adapter uses the generic batch-runtime lifecycle. `FishProps`, fish species presentation, and WebGL geometry expansion remain Tidewater-specific but engine-owned, so fish content is not yet renderer-neutral. Tidewater still registers its vegetation and reef WebGL batch adapters from its own component module; built-in WebGL loads registered batch components generically and updates their runtimes. The Tidewater wildlife simulation, species data, WebGPU presentation, and WebGL adapters/tests now live in the Tidewater repository. WebGL registers through the generic batch runtime and preserves the prior post-player frame order; `WebGLFallback` no longer creates wildlife or recognizes a wildlife-specific registry trait. These modules still import engine math/render APIs and Tidewater-owned layout data through the engine `WorldLayout` adapter. The WebGL reef renderer and adapter no longer live in `src/fallback`; built-in reef and vegetation placement URLs now share the generic package asset index. Its WebGL village-material decoder and role-based material application now register as a Tidewater-owned component adapter; the generic fallback applies registered component presentation hooks to loaded and streamed model LODs without naming village material types. Tidewater's fish-prop, vegetation-placement, and village material asset decoders register through `WorldComponentAssetCodecRegistry.js`. World package material adapters now register by component type; `WorldPackage.js` no longer imports or names Tidewater's village material profile, decoder, or shader builder. Reusable `BoatController` no longer imports Tidewater's berth and requires the caller to pass a world-authored initial position. Tidewater's vendor locations, lanterns, and fishing habitat areas come from registered behavior data; its fishing game and WebGL adapter share one habitat calculation and no longer read engine `WorldLayout.js`. `src/main.js` supplies a lazy default-package loader, and `App.init()` requests it only without a world link, so hosted and local-provider launches do not evaluate Tidewater's default package module. The default package now supplies the layout consumed by App and WebGLFallback; neither selects IslandDefinition directly. A separate Vite world-provider registry inspects manifest component/behavior IDs and dynamically loads only matching provider implementations; the Tidewater provider owns its component type metadata and registration. The external production build keeps default-world data in a separate dynamic chunk. Hosted WebGL skips `IslandWorldState` construction and uses the active package's colliders. Linked WebGPU launches now enter `initHostedPackageWorld()` before `initializeIslandWorldState()`; `test/hosted-webgpu-routing.mjs` checks that route. `Terrain` no longer imports `WorldLayout`; the `surfaceProfile` on Tidewater's signed terrain component supplies swell and reef shader inputs, and a GPU terrain harness rendered the authored profile successfully. This removes one direct engine dependency, but the terrain material still encodes island-specific presentation. **Remaining runtime coupling:** `App.js` now dynamically imports built-in WebGPU presentation only after choosing the built-in route; the production build emits it as `BuiltinWorldPresentation` separate chunk. The WebGL fallback still has renderer-specific world presentation. Tidewater layout data now lives in `worlds/tidewater/IslandDefinition.js`; the legacy `WorldLayout.js` adapter still imports it for several procedural modules; `TerrainData`, `Rocks`, `Pier`, `PierSurface`, `Reef`, and `FishSchools` now receive package layout explicitly. Generic `Player` and `SoundScape` no longer import `WorldLayout`; callers pass optional layout data, with built-in launchers supplying it. `Player` also no longer imports Tidewater `BoatSpecs`; it uses the vehicle design's helm position, and Tidewater's CPU gameplay fixture supplies its world layout explicitly. The source-boundary checks pass in `test/world-component-backend-registry.mjs`; focused Player, hosted handoff, audio, and WebGL backend checks also pass (2026-11-04). The Tidewater WebGL vegetation adapter and species presentation now live in the Tidewater repository; `PlantGeometry.js`, WebGPU vegetation, fish-prop classes, terrain, reef, ocean, and other built-in renderer paths remain coupled to Tidewater content. A Tidewater-independent runtime is not yet proven. A hosted Tidewater WebGPU browser probe now reaches package activation and renders the authored pier, fish stand, terrain, and ocean after cold shader startup; a Dawn test reproduces and guards the lazy-resource render-pass fix. The probe reported no browser-console errors after Worker startup was extended. This does not prove matched visuals or hardware performance: the capture used software-backed headless Chromium and the settled scene reported about 12 FPS. Tidewater's WebGPU/WebGL fish-prop checks only verify construction/resource cleanup, not pixels or FPS. Tidewater's terrain, vegetation, reef, wildlife WebGPU, whale, village material, and boat installers still live in `worlds/tidewater/component-installers.js`; the wildlife package has moved out of `src/world/wildlife`, but Tidewater runtime modules still import `src/world/IslandDefinition.js` and other engine APIs. **Still incomplete:** migrate Tidewater static fish content to the generic `elsemesh.static-model-instance-set/1` package without losing species appearance, per-item culling, shadow handling, or distance LOD; separate dynamic fish gameplay presentation from engine fish geometry/material code; extract remaining Tidewater-specific rendering and backend-specific behavior hooks from generic launch/render paths; then capture synchronized settled hosted renders in WebGPU and WebGL against the pre-split baseline. |
+| Registry-based, world-agnostic engine behavior and component installation | **83%** | Generic behavior/component registries and backend adapters are established. Tidewater owns its component registrations, fishing behavior, wildlife runtime, both WebGL and WebGPU vegetation renderers, WebGL reef renderer, village-material adapter, WebGPU/WebGL fish-prop adapters, and now its procedural terrain generator plus authored ridge, sea-stack, and footpath data. The built-in package provides layout and runtime state through presentation factories; App no longer imports a world-specific state or terrain generator. Tidewater's renderer-neutral CPU terrain feeds the engine's generic terrain render path. Tidewater supplies both its fish-school species behavior and ordered population/zone profile through world registries; ElseMesh retains the generic simulation, placement algorithm, and renderer. The seeded 63-group population snapshot matches exactly, Tidewater terrain/vegetation/reef/player checks pass, the full client suite passes, and the external production build succeeds. **Remaining:** terrain/reef/ocean presentation, whale, and several installers remain engine-owned; static fish content has not moved to the generic static-model LOD package; simulation modes and other Tidewater behavior data remain in engine modules; independent-world runtime and renderer parity are not fully proven. The latest hosted Tidewater WebGPU probe used software-backed Chromium at about 12 FPS and does not establish matched visuals or hardware performance. |
 | World packages remain renderer-neutral; ElseMesh selects WebGPU or WebGL | **54%** | `elsemesh.water-body/1` and `elsemesh.static-model-instance-set/1` now have engine-owned adapters selected by the backend registry. The static model format validates signed GLB references, and both renderers consume the same frustum/LOD/fade/shadow selection and transform data. The shared planner supports projected-radius or scale-normalized distance LOD, authored transition widths, world-space draw limits, and draw-range fades, with shadow selection independent. A generated GLB fixture builds and updates both backends and renders 128 non-background pixels in isolated WebGPU and WebGL checks; WebGL compiles its color and shadow programs with no GL errors. This proves the generic component path, not real Tidewater output or FPS. Tidewater has not exported its fish-stand models to this format; its current engine-owned fish-prop adapters implement a specialized component and therefore do not count as renderer-neutral migration. The shoreline query adapter now belongs to ElseMesh and reads the same packaged shore field as WebGPU; Tidewater no longer selects it through a WebGL behavior hook. WebGL breaker-spray samples now derive from the active heightfield for both built-in and hosted worlds, without an IslandDefinition beach rectangle. Other backend-specific installers remain, and hosted WebGL presentation paths still contain world-specific behavior. Acceptance requires migrating real Tidewater content and checking matched output and gameplay in both renderers. |
 | Tidewater gameplay and content parity: WebGPU baseline, WebGL aligned | **82%** | Tidewater has deterministic pre-split WebGPU cast, bite, fight, and boat traces plus WebGPU/WebGL fishing and fish-stand/boat checks in its own repository. The 171-frame WebGPU cast trace matches a golden executed from pre-split `FishingRod.js` at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`. A paired headless full-cycle trace now drives both renderer game paths through cast, authored bite schedule, hook, catch, and sale (519 bite frames, 1,199 fight frames). The paired renderer trace uses an in-process test extension and synthetic water query. A live Chromium/worldd test now drives both renderer game paths through cast input, bite, catch, inventory, and sale with separate Workers running the signed module. Its water query is synthetic, so it does not prove production water-query or rendered visual parity. The production-style isolated comparison is pinned to pre-split ElseMesh `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e` and uses packaged Tidewater terrain. On 13 shore/dock samples, WebGL query height MAE is 0.0094 m (max 0.0504 m), normal-component MAE 0.0045, and terrain-floor MAE 1.8e-7 m. The corrected CPU shore profile matches direct WebGPU displacement at 0.000013 m mean / 0.000056 m max; its Eulerian shore hook differs from WebGPU shore-only query by 0.0003 m mean / 0.0008 m max. A controlled 18-second moving-boat trace (production FFT and packaged shore, fixed 1/60 s input lead, no interactive wake/collisions) now ends 0.103 m apart, with max speed delta 0.012 m/s. Same-position water height along that trace differs by 0.0065 m mean / 0.0150 m max; FFT-only error is 0.0059 m mean / 0.0145 m max. The isolated correctness harness substitutes synchronous pixel readback and is not production async-readback or FPS evidence. Earlier direct WebGPU renders against the same pre-split commit were pixel-identical for four ocean views; six static island/pier views differed by at most 0.00543 RGB MAE, but neither is a live cross-renderer comparison. WebGL visible water now samples the shared FFT; hosted WebGL also converts the signed package's 512×512 shore field and derives a high-resolution shore patch from terrain sand/height data. A live isolated hosted WebGL capture confirms both water meshes load with no unsupported components. Hosted WebGPU and WebGL captures now show the same signed Tidewater world at 1280×720 from the authored spawn. The first hosted captures were not valid for color comparison because the loading/tour overlay remained visible; the 2026-11-06 controlled comparison below supersedes them. Dynamic WebGPU auto-exposure and post-grading still need a separate parity check. A fresh isolated 1280×720 headless WebGL2 capture at the signed authored spawn after ACES restoration reaches Ready. It shows the same major visual gaps; one resource request returned 404 (URL not identified), with no JavaScript exception. The start overlay was hidden only for the screenshot. See [current ACES WebGL capture](docs/images/hosted-tidewater-webgl-aces-2026-11-04.png). A fresh local WebGPU pairing is unavailable on this host: Chromium reports adapter limits of 16 sampled textures and 4 storage textures per shader stage, below the renderer's requirements of 21 and 5. The captures are software-backed and not a synchronized comparison against pre-split WebGPU; their displayed FPS values are not hardware performance measurements. The WebGL console in the earlier capture had nonfatal GLTF accessor min/max warnings and presence-rate-limit errors. See [hosted WebGPU capture](docs/images/hosted-tidewater-webgpu-2026-11-04.png), [earlier hosted WebGL capture](docs/images/hosted-tidewater-webgl-2026-11-04.png), and [invalid Reinhard WebGL experiment](docs/images/hosted-tidewater-webgl-reinhard-2026-11-04.png). **Current gap:** align WebGL sky/lighting, water, shoreline, terrain, and wood with pre-split WebGPU; synchronize animation phases and test on supported hardware, then compare production GPU water queries, boat behavior with wake/collisions, boarding, and hardware FPS.
 
@@ -53,11 +53,14 @@ component, so these generic renders do not prove real-world parity.
 
 The configurable default-package binding is a partial boundary. `App.init()`
 loads the default package only for a launch without a world link. Hosted WebGL
-and linked WebGPU both skip `IslandWorldState` construction; the WebGPU route
-is checked by `test/hosted-webgpu-routing.mjs`. However, `App.js` now imports `BuiltinWorldPresentation.js` only after the
+and linked WebGPU both skip the built-in package's world-state factory; the
+WebGPU route is checked by `test/hosted-webgpu-routing.mjs`. `App.js` imports
+`BuiltinWorldPresentation.js` only after the
 built-in WebGPU route; the production build emits it as a separate chunk. The
-default package supplies the layout to App and WebGLFallback, while engine
-`WorldLayout` and procedural presentation modules still depend on Tidewater.
+default package supplies layout to App and WebGLFallback. App obtains built-in
+vegetation from a package presentation hook; Tidewater owns both backend
+implementations. The Tidewater-shaped `WorldLayout.js` and
+`createWorldLayout.js` adapters have been removed from the engine.
 A hosted WebGPU browser probe now reaches package activation and renders the
 world after cold shader startup. A Dawn regression check covers lazy resource
 creation before render passes. The start overlay was dismissed for the settled capture; the browser was
@@ -66,23 +69,59 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-06: Tidewater's 26 fish-school species behavior records now live in
+  `worlds/tidewater/FishSchoolProfile.js` and are exposed through its registered
+  fish profile. The engine validates the generic school descriptors and reads
+  them from the active profile; the fish-school simulation, movement modes, and
+  renderer remain engine-owned. The Tidewater fish and reef headless rendering
+  probes now live in the Tidewater repository. A direct comparison confirms every expanded
+  descriptor is identical to the pre-change catalog. Fish-profile and fish
+  runtime checks pass, as does the external production build. Population layout
+  is still authored in `src/world/Fish.js`, so this removes one content table
+  without claiming full fish-system separation. The registry-based estimate
+  moves from 77% to 78%; renderer and gameplay parity percentages do not change.
+
+- 2026-11-06: Tidewater's procedural terrain generator, ridge/stack/path data,
+  and built-in runtime-state factory now live in the Tidewater world package.
+  App obtains runtime state from the package presentation contract; the generic
+  terrain renderer still consumes the world's generated CPU terrain. Tidewater
+  reef placement, terrain/debris render probes, and the terrain-dependent life
+  harness now reference the Tidewater-owned generator. The full client suite and
+  external production build pass. The registry-based estimate moves from 80% to
+  83%; renderer neutrality and gameplay visual parity do not change. The same
+  suite exposed and fixed stale world-provider fixtures plus an incomplete WebGL
+  render fixture. It also exposed per-frame camera-uniform allocation; frame
+  matrices and vectors now retain their values, reducing avoidable churn.
+
+- 2026-11-06: Tidewater's ordered fish population recipe now lives in
+  `worlds/tidewater/FishSchoolPopulation.js` and registers independently from
+  fish appearance. ElseMesh resolves generic reef, circle, drop-off, pier-end,
+  pier-pile, and point zones, then uses the existing seeded `pickSpot()` and
+  group creation path. A deterministic synthetic-habitat snapshot matches the
+  pre-extraction 63 groups and 2,066 fish exactly. Tidewater's headless fish
+  rendering probe passes with the new registry input, and the external build
+  succeeds. World-specific group counts, beach coordinates, pier offsets, and
+  pile-spacing parameters have left `src/world/Fish.js`; generic school
+  simulation modes, habitat sampling, and GPU presentation remain there. The
+  registry-based estimate moves from 78% to 80%; renderer and gameplay parity
+  estimates do not change.
+
 - 2026-11-06: `TerrainData` and `Rocks` no longer import the Tidewater
   `WorldLayout` adapter or read its module-global island values. `App` passes
   the layout supplied by the default world package through `IslandWorldState`
   and into `Rocks`; Tidewater tools and rendering fixtures pass their own
   layout explicitly.
-  The generic vector adapter now lives in `src/world/createWorldLayout.js`,
-  while Tidewater owns `worlds/tidewater/layout.js`. The external production
-  build passes; tests were not run. The procedural engine modules listed below
-  still use the legacy `WorldLayout` adapter, so this is one removed dependency,
+  Tidewater owns both `worlds/tidewater/IslandDefinition.js` and the vector
+  adaptation in `worlds/tidewater/layout.js`. The external production build
+  passes. The procedural engine modules listed below still contain
+  Tidewater-specific presentation, so this is one removed data dependency,
   not completion of the world boundary. The percentage remains 73%.
 
 - 2026-11-06: `pierWalkableHeightAt()` now receives the active world layout
   from the WebGL fallback, and the Tidewater-owned fixture supplies Tidewater's
   layout explicitly. `PierSurface.js` no longer imports `IslandDefinition`.
-  The remaining static import through the legacy adapter is vegetation scatter.
-  No progress
-  percentage changed; the external production build passes. Tests were not run.
+  The remaining direct layout dependency at that point was vegetation scatter.
+  No progress percentage changed; the external production build passes.
 
 - 2026-11-06: Tidewater pier geometry no longer reads a module-global layout.
   `App` passes the package layout through `Village` to `buildPier`, and Tidewater
@@ -415,11 +454,12 @@ parity is complete.
   specific implementation gap is closed. Matched visual parity remains open
   and the estimate stays 82%.
 
-The default world package is dynamically loaded only for built-in play. The
-build emits the default package and `IslandWorldState` as separate dynamic
-chunks. An isolated Chromium WebGL fixture rendered 128 non-background pixels
-with no GL errors. Hosted WebGL and WebGPU skip `IslandWorldState`
-construction; a focused route check covers WebGPU. An isolated hosted WebGPU
+The default world package is dynamically loaded only for built-in play. Its
+presentation factory dynamically loads Tidewater's `WorldState`, which now
+owns the procedural CPU terrain generator; ElseMesh still renders that data
+through its generic terrain path. An isolated Chromium WebGL fixture rendered
+128 non-background pixels with no GL errors. Hosted WebGL and WebGPU skip the
+built-in package's world-state factory; a focused route check covers WebGPU. An isolated hosted WebGPU
 run now renders the pier, fish stand, terrain, and ocean after shader warm-up,
 with no console errors. The renderer test reproduces the former nested mipmap
 pass and confirms lazy resource preparation happens before the render pass.
@@ -512,14 +552,15 @@ static placement helpers were removed. WebGPU/WebGL rendering code remains in
 ElseMesh, and the WebGL mesh expansion/LOD gap is unchanged.
 
 The current signed stand asset contains 78 placements across 18 kind/species
-geometry groups. Each record also carries curl, sag, jaw, pattern seed, and
-wet/dried/blood/cloudy-eye values that affect the existing mesh or material.
-The generic static-model instance-set currently accepts only a model reference
-and transform per instance. A valid migration therefore needs a generic,
-renderer-neutral way to represent those per-instance model/material inputs (or
-authored model variants) while retaining instancing, per-item culling, LOD, and
-shadows. The existing asset cannot be converted by mapping only its positions
-and rotations.
+geometry groups. A fresh decode of the checked-in asset found 71 distinct
+kind/species/curl/sag/jaw combinations, 60 lengths, and 24 distinct material
+flag tuples. Each record also carries pattern seed and wet/dried/blood/cloudy-eye
+values that affect the existing mesh or material. The generic static-model
+instance-set currently accepts only a model reference and transform per
+instance. A valid migration therefore needs a generic, renderer-neutral way to
+represent those per-instance model/material inputs (or authored model variants)
+while retaining instancing, per-item culling, LOD, and shadows. The existing
+asset cannot be converted by mapping only its positions and rotations.
 
 Village material profile names, roles, and map metadata now register in the
 generic `WorldMaterialProfileRegistry`. Tidewater owns the packaged map schema
@@ -1094,3 +1135,47 @@ finding changes them.
   loading Tidewater's provider. Raised registry-based separation from 68% to
   69%. Fish geometry/material code remains engine-owned, and this specialized
   placement format has not yet migrated to generic static-model LOD assets.
+
+- 2026-11-06: removed the vegetation scatterer's final direct `WorldLayout`
+  import. Tidewater now authors its bay region, protected plant-free corridor,
+  and fallback boardwalk path in `IslandDefinition.js`; the engine receives
+  those values through `worldLayout`. Updated built-in, Tidewater-provider,
+  export, and fixture callers. This removes a remaining data dependency, but
+  procedural plant geometry and WebGPU presentation remain Tidewater-specific
+  engine code, so the registry-separation estimate remains 73%. Tidewater
+  vegetation parity and the source-boundary check pass, and the external
+  production build succeeds. The unrelated dirty `RefractionPass.js` change
+  was excluded from this slice.
+
+- 2026-11-06: moved the island-layout vector conversion from the engine's
+  `createWorldLayout.js` into Tidewater's `layout.js`, then removed the
+  Tidewater-shaped adapter from `src/world`. Tidewater now owns its layout
+  definition and its conversion to the engine math types; the engine has no
+  layout adapter with island-specific fields. The registry-separation estimate
+  remained 73% at this point because renderer and gameplay content still reside in engine
+  modules. Tidewater placement parity and the backend-registry boundary check
+  pass, and the external production build succeeds.
+
+- 2026-11-06: moved the complete Tidewater WebGPU vegetation implementation
+  (placement, species geometry, materials, LOD, impostors, and grass) into the
+  Tidewater repository. Built-in App now asks its injected world package for
+  the renderer, and Tidewater hosted component installation uses the same
+  owner-side module; WebGL presentation and geometry are also world-owned.
+  Moved the vegetation headless fixtures into Tidewater. Module import, source
+  placement parity, component registry, WebGPU headless vegetation build, and
+  default-package asset checks pass. Raising registry-based separation from
+  73% to 77%. Matched rendered visuals and device performance remain unverified.
+
+- 2026-11-06: added `?simtime=<seconds>` to hold simulation-driven animation
+  at a repeatable time for renderer comparisons. Fixed hosted WebGPU advancing
+  the shared frame-time uniform twice; WebGPU, WebGL, and ocean FFT now use the
+  same fixed clock when requested. Focused clock/routing checks, the full
+  client suite, and external production build pass. Matched captures using
+  this clock remain pending, so parity estimates do not change.
+
+- 2026-11-06: checked the migrated fish behavior against the last committed
+  pre-extraction `Fish.js` (`c32a293d`). All 26 effective species profiles
+  match its normalized snapshot exactly. Barracuda did not define `flee`; it
+  inherited the shared 3.5 m reaction distance. Tidewater's owned parity test
+  now asserts both the full profile hash and that value. The 63-group seeded
+  population snapshot passes; no estimate changes.

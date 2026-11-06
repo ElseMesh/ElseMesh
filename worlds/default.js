@@ -21,9 +21,17 @@ export const defaultWorldPackage = Object.freeze( {
 	source,
 	presentation: Object.freeze( {
 		layout: defaultLayout,
+		createWorldState: async options => {
+			const { WorldState } = await import( './tidewater/WorldState.js' );
+			return new WorldState( options );
+		},
 		createWildlife: async options => {
 			const { Wildlife } = await import( './tidewater/wildlife/Wildlife.js' );
 			return new Wildlife( options );
+		},
+		createVegetation: async options => {
+			const { Vegetation } = await import( './tidewater/renderers/WebGPUVegetation.js' );
+			return new Vegetation( options );
 		},
 	} ),
 	assets: Object.freeze( {

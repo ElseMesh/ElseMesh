@@ -4,7 +4,7 @@ const profiles = new Map();
 
 export function registerWorldFishPresentation( behaviorId, profile ) {
 	if ( typeof behaviorId !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( behaviorId ) || profiles.has( behaviorId ) ) throw new Error( 'Invalid or duplicate world fish-presentation registration' );
-	if ( ! profile || typeof profile !== 'object' || Array.isArray( profile ) || ! profile.PATTERN || ! profile.SPECIES || ! profile.SKIN || Object.keys( profile ).some( key => ! [ 'PATTERN', 'SPECIES', 'SKIN', 'PLACEMENT' ].includes( key ) ) ) throw new Error( 'Invalid world fish-presentation profile' );
+	if ( ! profile || typeof profile !== 'object' || Array.isArray( profile ) || ! profile.PATTERN || ! profile.SPECIES || ! profile.SKIN || Object.keys( profile ).some( key => ! [ 'PATTERN', 'SPECIES', 'SKIN', 'PLACEMENT', 'SCHOOLS' ].includes( key ) ) ) throw new Error( 'Invalid world fish-presentation profile' );
 	if ( profile.PLACEMENT && ( typeof profile.PLACEMENT !== 'object' || Array.isArray( profile.PLACEMENT ) || Object.keys( profile.PLACEMENT ).some( key => ! [ 'restHeightScale', 'tailAnchor', 'gillAnchor' ].includes( key ) ) || ! [ 'restHeightScale', 'tailAnchor', 'gillAnchor' ].every( key => profile.PLACEMENT[ key ] && typeof profile.PLACEMENT[ key ] === 'object' && ! Array.isArray( profile.PLACEMENT[ key ] ) ) ) ) throw new Error( 'Invalid world fish-presentation placement data' );
 	if ( profile.PLACEMENT && Object.values( profile.PLACEMENT.restHeightScale ).some( value => ! Number.isFinite( value ) || value <= 0 ) ) throw new Error( 'Invalid world fish-presentation rest-height data' );
 	if ( profile.PLACEMENT && [ ...Object.values( profile.PLACEMENT.tailAnchor ), ...Object.values( profile.PLACEMENT.gillAnchor ) ].some( anchor => ! Array.isArray( anchor ) || anchor.length !== 3 || anchor.some( value => ! Number.isFinite( value ) ) ) ) throw new Error( 'Invalid world fish-presentation anchor data' );
@@ -12,6 +12,17 @@ export function registerWorldFishPresentation( behaviorId, profile ) {
 	if ( ! names.length || names.length > 64 || names.some( name => ! Object.hasOwn( profile.SPECIES, name ) || ! Object.hasOwn( profile.SKIN, name ) ) || Object.keys( profile.SPECIES ).length !== names.length || Object.keys( profile.SKIN ).length !== names.length ) throw new Error( 'Invalid world fish-presentation profile tables' );
 	const ids = names.map( name => profile.PATTERN[ name ] );
 	if ( ids.some( id => ! Number.isInteger( id ) || id < 0 || id >= names.length ) || new Set( ids ).size !== ids.length || names.some( name => profile.SPECIES[ name ].pattern !== profile.PATTERN[ name ] ) ) throw new Error( 'Invalid world fish-presentation pattern table' );
+	if ( profile.SCHOOLS !== undefined ) {
+		const modes = new Set( [ 'bait', 'school', 'hover', 'mill', 'forage', 'pair', 'lurk', 'solo', 'patrol', 'cruise', 'glide', 'turtle', 'surface', 'jumper', 'fry', 'pile', 'escort', 'remora' ] );
+		if ( ! profile.SCHOOLS || typeof profile.SCHOOLS !== 'object' || Array.isArray( profile.SCHOOLS ) ) throw new Error( 'Invalid world fish-school profile' );
+		const entries = Object.entries( profile.SCHOOLS );
+		if ( ! entries.length || entries.length > 128 || entries.some( ( [ name, school ] ) =>
+			typeof name !== 'string' || ! school || typeof school !== 'object' || Array.isArray( school ) ||
+			! ( Object.hasOwn( profile.SPECIES, school.model ) || [ 'stingray', 'eagleRay', 'turtle' ].includes( school.model ) ) || ! modes.has( school.mode ) ||
+			! [ school.length, school.depth, school.freq, school.band ].every( pair => Array.isArray( pair ) && pair.length === 2 && pair.every( Number.isFinite ) ) ||
+			school.length[ 0 ] <= 0 || school.length[ 1 ] < school.length[ 0 ] || school.band[ 0 ] < 0 || school.band[ 1 ] < school.band[ 0 ]
+		) ) throw new Error( 'Invalid world fish-school profile' );
+	}
 	profiles.set( behaviorId, profile );
 }
 

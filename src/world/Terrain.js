@@ -53,7 +53,7 @@ export class Terrain {
 		// Morph toward the view camera in every pass: the shadow passes render the same surface
 		// (with the pass camera they would morph toward the light camera instead).
 		this.uViewPos = { value: new Vector3() };
-		// travelling gust field offset (the same integration as Vegetation's vegGustOffset)
+		// travelling gust field offset (the same integration used by the vegetation shader)
 		this.gustOffset = new Vector2();
 
 		const mat = this.material = standard( {

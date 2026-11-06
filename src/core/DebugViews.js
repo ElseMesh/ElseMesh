@@ -57,6 +57,17 @@ export function cameraPoseFromSearch( search ) {
 
 }
 
+// `?simtime=<seconds>` freezes simulation-driven animation for repeatable
+// renderer captures. It is independent of the time-of-day camera pose.
+export function simulationTimeFromSearch( search ) {
+
+	const value = new URLSearchParams( search ).get( 'simtime' );
+	if ( value === null ) return null;
+	const seconds = Number( value );
+	return Number.isFinite( seconds ) && seconds >= 0 && seconds <= 1e6 ? seconds : null;
+
+}
+
 function applyCameraPose( app, pose ) {
 
 	if ( pose.time !== undefined ) app.settings.timeOfDay = pose.time;

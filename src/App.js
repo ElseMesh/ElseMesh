@@ -10,7 +10,7 @@ import { G } from './core/Globals.js';
 import { Profiler } from './core/Profiler.js';
 import { SceneRenderer, LAYERS } from './core/SceneRenderer.js';
 import { DEPTH_FORMAT } from './engine/render/SceneRenderer.js';
-import { installDebugViews } from './core/DebugViews.js';
+import { installDebugViews, simulationTimeFromSearch } from './core/DebugViews.js';
 
 import { Atmosphere, SUN_ILLUMINANCE } from './sky/Atmosphere.js';
 import { Sky, sunDirectionFromTime } from './sky/Sky.js';
@@ -52,10 +52,10 @@ import { Colliders } from './world/Colliders.js';
 import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
-import { Vegetation } from './world/Vegetation.js';
 import { worldComponentAssetIDs, worldComponentDescriptor } from './network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
 import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
+import { worldFishPopulationFor } from './network/WorldFishPopulation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
@@ -131,6 +131,7 @@ export class App {
 	constructor( { worldPackage = null, loadDefaultWorldPackage = null, loadWorldProviders = null } = {} ) {
 
 		this.qs = new URLSearchParams( location.search );
+		this.fixedSimulationTime = simulationTimeFromSearch( location.search );
 		this.worldPackage = worldPackage;
 		this.worldExtensionGeneration = 0;
 		this.loadDefaultWorldPackage = loadDefaultWorldPackage;
@@ -138,6 +139,7 @@ export class App {
 		this.hostedQueries = new WeakMap();
 		this.localWorldExperience = worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
+		this.fishPopulation = worldFishPopulationFor( this.localWorldExperience );
 		const platform = navigator.userAgentData?.platform || navigator.platform || '';
 		this.isLinuxDesktop = /linux/i.test( platform ) && ! /android/i.test( navigator.userAgent );
 		const savedGraphicsPriority = readGraphicsPriority();
@@ -251,6 +253,7 @@ export class App {
 		if ( ! worldLink ) await loadWorldPackageProviders( this.worldPackage, this.loadWorldProviders );
 		this.localWorldExperience = this.worldPackage?.source?.experience || null;
 		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
+		this.fishPopulation = worldFishPopulationFor( this.localWorldExperience );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
 		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
@@ -292,7 +295,7 @@ export class App {
 			return this;
 
 		}
-		await progress( 0.02, worldLink ? 'Preparing the world runtime…' : 'Preparing the island state…', undefined, 'terrain' );
+		await progress( 0.02, 'Preparing the world runtime…', undefined, 'terrain' );
 		// Hosted package collision state belongs to the active world package, not
 		// the built-in island's backend-neutral state.
 		this.hostedColliders = new Colliders();
@@ -311,7 +314,7 @@ export class App {
 			this.worldLayout = this.worldPackage.presentation?.layout || null;
 			if ( ! this.worldLayout ) throw new Error( 'The default world package must provide its layout' );
 		}
-		if ( engine.backend !== 'webgl' || ! worldLink ) await this.initializeIslandWorldState();
+		if ( engine.backend !== 'webgl' || ! worldLink ) await this.initializeWorldState();
 		if ( engine.backend === 'webgl' ) {
 
 			// WebGL uses the fallback game loop, so it must own the same audio
@@ -381,7 +384,9 @@ export class App {
 		if ( this.vegetationEnabled ) {
 
 			await progress( 0.14, 'Planting the island…', undefined, 'vegetation' );
-			this.vegetation = new Vegetation( { scene, terrain: this.terrainData, village: this.village } );
+			const createVegetation = this.worldPackage?.presentation?.createVegetation;
+			if ( typeof createVegetation !== 'function' ) throw new Error( 'The default world package must provide its vegetation renderer' );
+			this.vegetation = await createVegetation( { scene, terrain: this.terrainData, village: this.village, worldLayout: this.worldLayout } );
 			useStaticVelocity( this.vegetation.group );
 
 		}
@@ -401,7 +406,7 @@ export class App {
 		this.rocks.material.appliesHillShadow = true;
 
 		await progress( 0.23, 'Growing the reef…', undefined, 'reef' );
-		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
+		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation, fishPopulation: this.fishPopulation } );
 
 		this.boat = new BoatModel();
 		scene.add( this.boat.group );
@@ -708,10 +713,11 @@ export class App {
 
 	}
 
-	async initializeIslandWorldState() {
+	async initializeWorldState() {
 
-		const { IslandWorldState } = await import( './world/IslandWorldState.js' );
-		this.worldState = new IslandWorldState( { worldLayout: this.worldLayout } );
+		const createWorldState = this.worldPackage?.presentation?.createWorldState;
+		if ( typeof createWorldState !== 'function' ) throw new Error( 'The default world package must provide its runtime state' );
+		this.worldState = await createWorldState( { worldLayout: this.worldLayout } );
 		this.terrainData = this.worldState.terrain;
 		this.colliders = this.worldState.colliders;
 
@@ -924,6 +930,9 @@ export class App {
 
 	hostedPackageFrame( dt ) {
 
+		// G.time aliases FrameUniforms.fields.time, so update the simulation clock only once.
+		if ( this.fixedSimulationTime === null ) G.time.value += dt;
+		else { G.time.value = this.fixedSimulationTime; dt = 0; }
 		const t0 = performance.now();
 		GPU.beginFrame();
 		this.frameWorkMeter?.begin();
@@ -931,9 +940,7 @@ export class App {
 		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs, cpuMs: this.cpuMs, gpuMs: this.frameWorkMeter?.gpuMilliseconds() } );
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		FrameUniforms.fields.dt.value = dt;
-		FrameUniforms.fields.time.value += dt;
 		G.dt.value = dt;
-		G.time.value += dt;
 		G.exposure.value = this.settings.exposure;
 		this.updateSun();
 		this.atmosphere.update( dt, this.camera.position.y );
@@ -941,7 +948,7 @@ export class App {
 		if ( this.clouds ) this.clouds.update( dt, this.camera );
 		this.environment.update( dt );
 		if ( this.player.hostedSeaLevel !== null ) {
-			this.fft.update( dt );
+			this.fft.update( dt, this.fixedSimulationTime );
 			this.seaDetail.update( dt );
 			updateHostedShoreWetness( this.linkedWorldRoot );
 			this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
@@ -1269,6 +1276,8 @@ export class App {
 
 	frame( dt ) {
 
+		if ( this.fixedSimulationTime === null ) G.time.value += dt;
+		else { G.time.value = this.fixedSimulationTime; dt = 0; }
 		const t0 = performance.now();
 		this.frameWorkMeter?.begin();
 		this._frame( dt );
@@ -1997,7 +2006,6 @@ export class App {
 		const s = this.settings;
 		this.updateFPS();
 		G.dt.value = dt;
-		G.time.value += dt;
 		if ( s.timeSpeed !== 0 ) s.timeOfDay = ( s.timeOfDay + dt * s.timeSpeed + 24 ) % 24;
 
 		// ---- player / boat (boat physics first so the cameras follow this frame's pose)
@@ -2024,7 +2032,7 @@ export class App {
 				deckPos: this.player.deckPos.clone(), deckYaw: this.player.deckYaw,
 			} : null;
 			if ( this.player.hostedSeaLevel !== null ) {
-				this.fft.update( dt );
+				this.fft.update( dt, this.fixedSimulationTime );
 				this.seaDetail.update( dt );
 				this.hostedQuery.setCamera( this.camera.position.x, this.camera.position.z );
 				this.hostedQuery.setPoint( this.player.slot, this.player.position.x, this.player.position.z );
@@ -2083,7 +2091,7 @@ export class App {
 		} else {
 
 			// ---- water simulation
-			this.fft.update( dt );
+			this.fft.update( dt, this.fixedSimulationTime );
 			this.seaDetail.update( dt );
 			this.boatCtl.queueQueries();
 			updateWorldOceanFrame( {

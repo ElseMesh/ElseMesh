@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { VIEWS, cameraPoseFromSearch, installDebugViews } from '../src/core/DebugViews.js';
+import { VIEWS, cameraPoseFromSearch, simulationTimeFromSearch, installDebugViews } from '../src/core/DebugViews.js';
 
 assert.deepEqual( cameraPoseFromSearch( '?view=tValley' ), VIEWS.tValley, 'named mountain valley camera can be selected by URL' );
 assert.equal( cameraPoseFromSearch( '?view=missing' ), null, 'unknown named cameras are ignored' );
@@ -7,6 +7,9 @@ assert.deepEqual( cameraPoseFromSearch( `?pose=${ encodeURIComponent( JSON.strin
 assert.equal( cameraPoseFromSearch( '?pose=%7Bbad-json' ), null, 'malformed poses are ignored' );
 assert.equal( cameraPoseFromSearch( `?pose=${ encodeURIComponent( JSON.stringify( { p: [ 1, 2, Infinity ], yaw: 0, pitch: 0 } ) ) }` ), null, 'non-finite camera coordinates are rejected' );
 assert.equal( cameraPoseFromSearch( `?pose=${ encodeURIComponent( JSON.stringify( { p: [ 1, 2, 3 ], yaw: 0, pitch: 2 } ) ) }` ), null, 'out-of-range camera pitch is rejected' );
+assert.equal( simulationTimeFromSearch( '?view=beach&simtime=4.25' ), 4.25, 'renderer review can freeze the simulation clock independently of its named time-of-day pose' );
+assert.equal( simulationTimeFromSearch( '?simtime=-1' ), null, 'negative fixed simulation times are rejected' );
+assert.equal( simulationTimeFromSearch( '?simtime=1e99' ), null, 'unbounded fixed simulation times are rejected' );
 
 const originalWindow = globalThis.window;
 const originalLocation = globalThis.location;

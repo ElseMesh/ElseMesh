@@ -2218,11 +2218,14 @@ export class WebGLFallback {
 	_frame() {
 
 		this.engine.rafCallbacks ++;
-		const now = performance.now(), dt = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
+		const now = performance.now(), elapsed = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
+		const fixedSimulationTime = this.app.fixedSimulationTime;
+		const dt = fixedSimulationTime === null || fixedSimulationTime === undefined ? elapsed : 0;
 		this.app.updateFPS();
 		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, cpuMs: this.app.cpuMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
 		G.dt.value = dt;
-		G.time.value += dt;
+		if ( fixedSimulationTime === null || fixedSimulationTime === undefined ) G.time.value += dt;
+		else G.time.value = fixedSimulationTime;
 		const simulationTime = G.time.value;
 		this.lastFrame = now;
 		if ( this.shoreWetness ) {

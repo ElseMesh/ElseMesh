@@ -26,7 +26,7 @@ export async function terrainData() {
 
 	if ( ! _terrain ) {
 
-		const { TerrainData } = await import( '../src/world/TerrainData.js' );
+		const { TerrainData } = await import( '../worlds/tidewater/terrain/TerrainData.js' );
 		_terrain = new TerrainData( { worldLayout: TIDEWATER_LAYOUT } );
 
 	}
