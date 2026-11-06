@@ -1,7 +1,6 @@
 import * as THREE from '../engine/index.js';
 import { Noise2D, mulberry32, smoothstep as sstep } from '../util/Noise.js';
 import { standard } from '../materials/Materials.js';
-import { WORLD } from './WorldLayout.js';
 import { buildRockGeometry, ROCK_STYLES } from './terrain/RockGeometry.js';
 import { rot2, srgb, terrainShadingModule } from './terrain/TerrainShading.js';
 import { lodFadeModule, bandFade } from '../materials/LODFade.js';
@@ -23,9 +22,12 @@ export class Rocks {
 
 	// castShadow: the near LOD (rocks within ~60-80 m) casts shadow-map shadows; far rocks never do.
 	// sunShadow: receive the terrain's heightfield sun shadow (false if SceneLighting applies it).
-	constructor( { scene, terrain, village = null, colliders = null, seed = 4242, castShadow = true, sunShadow = true } ) {
+	constructor( { scene, terrain, worldLayout, village = null, colliders = null, seed = 4242, castShadow = true, sunShadow = true } ) {
+
+		if ( ! worldLayout ) throw new Error( 'Rocks requires the active world package layout' );
 
 		this.scene = scene;
+		this.worldLayout = worldLayout;
 		this.terrainData = terrain.data || terrain; // Terrain instance or TerrainData
 		this.terrainGPU = terrain.gpu || null;
 		this.village = village;
@@ -146,7 +148,7 @@ export class Rocks {
 
 		// keep-out zones
 		const foot = this.village && this.village.getFootprints ? this.village.getFootprints() : [];
-		const pier = WORLD.pier, spawn = WORLD.spawn.position, reef = WORLD.reef;
+		const pier = this.worldLayout.pier, spawn = this.worldLayout.spawn.position, reef = this.worldLayout.reef;
 		const walk = [ [ 55, - 65 ], [ 54.6, - 72 ], [ 52.4, - 82 ], [ 48.4, - 92 ], [ 44.8, - 100.5 ], [ 42.6, - 107.2 ] ];
 		const segDist = ( pts, x, z ) => {
 

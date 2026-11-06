@@ -29,7 +29,7 @@ if ( process.argv.includes( '--wet' ) ) {
 	terrain.finalizeMaterial();
 
 }
-const rocks = process.argv.includes( '--no-rocks' ) ? null : new Rocks( { scene: H.scene, terrain, colliders: new Colliders() } );
+const rocks = process.argv.includes( '--no-rocks' ) ? null : new Rocks( { scene: H.scene, terrain, worldLayout: TIDEWATER_LAYOUT, colliders: new Colliders() } );
 if ( rocks ) rocks.material.appliesHillShadow = true;
 if ( rocks ) console.log( 'rocks', rocks.stats().rocks, rocks.timings );
 H.before.push( ( cam ) => { terrain.update( cam ); if ( rocks ) rocks.update( cam ); } );
