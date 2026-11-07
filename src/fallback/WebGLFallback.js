@@ -1770,10 +1770,13 @@ export class WebGLFallback {
 		}
 		await this._loadBuiltinBatchComponents();
 		const start = WORLD.start || WORLD.spawn;
-		this.spawn = { position: [ start.position[ 0 ], this.terrain.heightAt( start.position[ 0 ], start.position[ 2 ] ) + 1.7, start.position[ 2 ] ], yaw: start.yaw, pitch: - 0.05 };
-		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( start.position[ 0 ], 0, start.position[ 2 ] ) } );
+		const startX = start.position.x ?? start.position[ 0 ];
+		const startZ = start.position.z ?? start.position[ 2 ];
+		if ( ! Number.isFinite( startX ) || ! Number.isFinite( startZ ) ) throw new Error( 'The built-in world layout must provide a finite start position' );
+		this.spawn = { position: [ startX, this.terrain.heightAt( startX, startZ ) + 1.7, startZ ], yaw: start.yaw, pitch: - 0.05 };
+		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( startX, 0, startZ ) } );
 		this.scene.add( this.grass );
-		this.grassCenter = new T.Vector2( start.position[ 0 ], start.position[ 2 ] );
+		this.grassCenter = new T.Vector2( startX, startZ );
 		progress( 0.9, 'Starting the WebGL island…' );
 
 	}

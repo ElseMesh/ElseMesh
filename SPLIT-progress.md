@@ -69,6 +69,16 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-07: isolated Weston review found two independent WebGL startup faults.
+  The start-screen control markup referenced an out-of-scope arrow-key layout;
+  after that UI crash was fixed, the built-in WebGL fallback still produced a
+  black frame because it indexed Tidewater's `Vector3` start position as an
+  array. WebGL now reads either vector properties or array coordinates. A live
+  Weston capture confirms finite spawn/camera coordinates and visible island,
+  pier, and ocean. This is a built-in WebGL startup repair, not a matched
+  WebGPU/WebGL visual or hardware-FPS parity result; the external production
+  build passes and estimates remain unchanged.
+
 - 2026-11-07: portal admission now intersects destination avatar allowlists with
   its explicit avatar/vehicle pair allowlist, then substitutes a locally
   supported profile when the visitor's current one is not accepted. The boat
