@@ -3170,12 +3170,21 @@ export class UI {
 		g.stroke();
 		g.setLineDash( [] );
 		if ( data.length < 2 ) return;
+		// Smooth three 100 ms samples for the trace; the numeric gap still exposes individual hitches.
+		const traceData = data.map( ( _, i ) => {
+
+			const start = Math.max( 0, i - 2 );
+			let sum = 0;
+			for ( let j = start; j <= i; j ++ ) sum += data[ j ];
+			return sum / ( i - start + 1 );
+
+		} );
 
 		const rgb = this._lvl === 'bad' ? '255, 122, 133' : this._lvl === 'warn' ? '255, 184, 107' : '95, 227, 212';
 		const trace = () => {
 
 			g.beginPath();
-			data.forEach( ( v, i ) => ( i ? g.lineTo( X( i ), Y( v ) ) : g.moveTo( X( i ), Y( v ) ) ) );
+			traceData.forEach( ( v, i ) => ( i ? g.lineTo( X( i ), Y( v ) ) : g.moveTo( X( i ), Y( v ) ) ) );
 
 		};
 
@@ -3195,10 +3204,10 @@ export class UI {
 		g.lineJoin = 'round';
 		g.stroke();
 
-		const last = data.length - 1;
+		const last = traceData.length - 1;
 		g.fillStyle = `rgb(${ rgb })`;
 		g.beginPath();
-		g.arc( X( last ), Y( data[ last ] ), 1.8, 0, TAU );
+		g.arc( X( last ), Y( traceData[ last ] ), 1.8, 0, TAU );
 		g.fill();
 
 	}
