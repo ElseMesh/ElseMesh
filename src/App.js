@@ -1890,11 +1890,12 @@ export class App {
 
 	portalTransferStatus( destinationConnector, appearance = this.worldPresence?.appearance || loadAppearance() ) {
 		const policy = avatarPolicy( destinationConnector.manifest.rules );
-		const admittedAppearance = appearanceForAllowedProfiles( appearance, policy.allowedProfiles );
-		if ( ! admittedAppearance ) return { allowed: false, reason: 'This ThruHold does not accept any avatar profile available here' };
-		const profileId = avatarProfileId( admittedAppearance );
-		if ( ! [ 'boat', 'deck' ].includes( this.player.mode ) ) return { allowed: true, appearance: admittedAppearance, substituted: profileId !== avatarProfileId( appearance ) };
-		if ( profileId !== avatarProfileId( appearance ) ) return { allowed: false, reason: 'Leave the vehicle before entering this ThruHold with its required avatar' };
+		const profileId = avatarProfileId( appearance );
+		if ( ! [ 'boat', 'deck' ].includes( this.player.mode ) ) {
+			const admittedAppearance = appearanceForAllowedProfiles( appearance, policy.allowedProfiles );
+			if ( ! admittedAppearance ) return { allowed: false, reason: 'This ThruHold does not accept any avatar profile available here' };
+			return avatarProfileId( admittedAppearance ) === profileId ? { allowed: true } : { allowed: true, appearance: admittedAppearance, substituted: true };
+		}
 		const sourceController = this.activeHostedBoat?.boat.controller;
 		if ( ! sourceController ) return { allowed: false, reason: 'The current vehicle cannot be transferred' };
 		if ( ! this.activeHostedVehicleType ) return { allowed: false, reason: 'The current vehicle has no registered transfer type' };
@@ -1903,10 +1904,17 @@ export class App {
 		const vehicleComponent = destinationConnector.manifest.components.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
 		if ( ! vehicleComponent ) return { allowed: false, reason: 'This ThruHold has no compatible vehicle berth' };
 		if ( vehicleComponent.type !== this.activeHostedVehicleType ) return { allowed: false, reason: 'This ThruHold does not support the current vehicle type' };
-		if ( acceptedVehicles.allowedCombinations && ! acceptedVehicles.allowedCombinations.some( pair => pair.avatarProfileId === profileId && pair.vehicleType === vehicleComponent.type ) ) return { allowed: false, reason: 'This ThruHold does not accept this avatar and vehicle combination' };
+		let allowedProfiles = policy.allowedProfiles;
+		if ( acceptedVehicles.allowedCombinations ) {
+			const pairedProfiles = acceptedVehicles.allowedCombinations.filter( pair => pair.vehicleType === vehicleComponent.type ).map( pair => pair.avatarProfileId );
+			allowedProfiles = allowedProfiles === null ? pairedProfiles : pairedProfiles.filter( id => allowedProfiles.includes( id ) );
+		}
+		const admittedAppearance = appearanceForAllowedProfiles( appearance, allowedProfiles );
+		if ( ! admittedAppearance ) return { allowed: false, reason: 'This ThruHold does not accept an available avatar and vehicle combination' };
+		const admittedProfileId = avatarProfileId( admittedAppearance );
 		const combinedComplexity = destinationConnector.manifest.rules.avatarComplexity + worldComponentDescriptor( vehicleComponent.type ).complexityTriangles;
 		if ( combinedComplexity > acceptedVehicles.maxCombinedComplexity ) return { allowed: false, reason: 'This vehicle exceeds the ThruHold complexity limit' };
-		return { allowed: true, maxSpeed: acceptedVehicles.maxSpeed };
+		return admittedProfileId === profileId ? { allowed: true, maxSpeed: acceptedVehicles.maxSpeed } : { allowed: true, maxSpeed: acceptedVehicles.maxSpeed, appearance: admittedAppearance, substituted: true };
 	}
 
 	clearPortalView() {

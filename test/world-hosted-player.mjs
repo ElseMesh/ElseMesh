@@ -176,10 +176,12 @@ const vehicleGate = Object.assign( Object.create( App.prototype ), {
 const acceptingWorld = { manifest: { rules: { avatarComplexity: 200, vehiclePolicy: { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000 } }, components: [ { type: 'elsemesh.downeast-boat/1' } ] } };
 assert.deepEqual( vehicleGate.portalTransferStatus( acceptingWorld ), { allowed: true, maxSpeed: 8 }, 'destination accepts a vehicle within the combined triangle budget' );
 acceptingWorld.manifest.rules.avatarPolicy = { allowedProfiles: [ 'elsemesh.avatar.stock-female/1' ] };
-assert.equal( vehicleGate.portalTransferStatus( acceptingWorld ).allowed, false, 'destination can moderate avatar profiles' );
+const substitutedVehicleVisitor = vehicleGate.portalTransferStatus( acceptingWorld );
+assert.equal( substitutedVehicleVisitor.allowed, true, 'destination accepts a supported replacement profile for the visitor and boat' );
+assert.equal( substitutedVehicleVisitor.appearance.style, 'female', 'vehicle handoff uses the destination-allowed avatar profile' );
 acceptingWorld.manifest.rules.avatarPolicy.allowedProfiles = [ 'elsemesh.avatar.stock-male/1' ];
 acceptingWorld.manifest.rules.vehiclePolicy.allowedCombinations = [ { avatarProfileId: 'elsemesh.avatar.stock-female/1', vehicleType: 'elsemesh.downeast-boat/1' } ];
-assert.equal( vehicleGate.portalTransferStatus( acceptingWorld ).allowed, false, 'destination can moderate exact avatar and vehicle pairs' );
+assert.equal( vehicleGate.portalTransferStatus( acceptingWorld ).allowed, false, 'avatar policy and vehicle-pair policy must both permit the substituted profile' );
 acceptingWorld.manifest.rules.vehiclePolicy.allowedCombinations = [ { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } ];
 assert.deepEqual( vehicleGate.portalTransferStatus( acceptingWorld ), { allowed: true, maxSpeed: 8 }, 'allowed avatar and vehicle pair crosses' );
 acceptingWorld.manifest.rules.vehiclePolicy.maxCombinedComplexity = 47044;

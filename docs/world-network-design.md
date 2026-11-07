@@ -607,19 +607,19 @@ The browser checks the destination policy before showing a traversal-ready
 portal or switching worlds. A walking visitor whose selected profile is denied
 is admitted with the first locally supported profile in the destination's
 allowlist, preserving their other appearance colors and notifying them after
-arrival. If no supported profile is allowed, the crossing is blocked. A visitor
-in a vehicle must disembark before this substitution; incompatible vehicle and
-avatar/vehicle pairs remain blocked. The owner applies the same profile, pair,
-speed, and resource limits when admitting presence. These checks govern sharing
-and admission, while ElseMesh selects the local WebGPU or WebGL presentation
-for the same approved profile. Worlds describe policy and approved content
-without choosing a renderer.
+arrival. The same substitution applies while aboard a vehicle only when the
+destination's allowed avatar/vehicle pair includes the replacement profile. If
+no supported profile or pair is allowed, the crossing is blocked. The owner
+applies the same profile, pair, speed, and resource limits when admitting
+presence. These checks govern sharing and admission, while ElseMesh selects the
+local WebGPU or WebGL presentation for the same approved profile. Worlds
+describe policy and approved content without choosing a renderer.
 
 The current implementation establishes signed allowlists and stable presence
 identities, but runtime selection still exposes only two stock avatar profiles
 and one bundled boat. A reusable vehicle registry, profile-specific complexity
-metadata, and avatar substitution while aboard a vehicle remain future work;
-the current world-wide avatar cap and avatar-plus-boat budget are the limits the
+metadata, and catalogs beyond these stock profiles remain future work; the
+current world-wide avatar cap and avatar-plus-boat budget are the limits the
 engine can measure consistently.
 
 ## What the code supports today
