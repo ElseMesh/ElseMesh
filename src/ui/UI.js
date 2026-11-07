@@ -3180,7 +3180,7 @@ export class UI {
 		};
 
 		const grad = g.createLinearGradient( 0, 0, 0, hh );
-		grad.addColorStop( 0, `rgba(${ rgb }, 0.16)` );
+		grad.addColorStop( 0, `rgba(${ rgb }, 0.04)` );
 		grad.addColorStop( 1, `rgba(${ rgb }, 0)` );
 		trace();
 		g.lineTo( X( data.length - 1 ), hh );
