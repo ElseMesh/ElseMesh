@@ -4,7 +4,6 @@ import { InstancedProps } from './Props.js';
 import { LAYERS } from '../core/SceneRenderer.js';
 import { createNatureMaterial } from './debris/NatureMaterial.js';
 import { PebbleField } from './debris/PebbleField.js';
-import { KIND } from './debris/DebrisShapes.js';
 import { ScannedDebris } from './debris/ScannedDebris.js';
 
 // Ground clutter and debris: the shoreline wrack line (driftwood, seaweed, coconuts, shells,
@@ -15,7 +14,7 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 //
 // Placement comes from the active world's provider; this renderer consumes the generated batches
 // and mask without selecting a world-specific placement algorithm.
-// Geometry: debris/DebrisShapes and the village prop emitters, merged per material.
+// Geometry arrives through the world placement provider and is merged per material.
 //
 // Draw calls: 5 + 3 shadow = 8.
 //   wood (village wood material: driftwood, boards, crates, traps, barrels' staves)
@@ -31,9 +30,10 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 
 export class Debris {
 
-	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createPlacer, seed = 5150 } ) {
+	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createPlacer, isShadowCaster, seed = 5150 } ) {
 
 		if ( typeof createPlacer !== 'function' ) throw new Error( 'Debris rendering requires the active world placement provider' );
+		if ( typeof isShadowCaster !== 'function' ) throw new Error( 'Debris rendering requires the active world shadow policy' );
 
 		this.scene = scene;
 		this.terrainData = terrain.data || terrain;
@@ -50,7 +50,7 @@ export class Debris {
 		this.newColliders = placer.newColliders;
 		const t1 = performance.now();
 
-		this._assemble( B, village );
+		this._assemble( B, village, isShadowCaster );
 		const t2 = performance.now();
 
 		this.pebbles = new PebbleField( { terrain: this.terrainData, gpu: this.gpu, mask: placer.mask } );
@@ -63,7 +63,7 @@ export class Debris {
 
 	}
 
-	_assemble( B, village ) {
+	_assemble( B, village, isShadowCaster ) {
 
 		const take = ( key ) => {
 
@@ -90,8 +90,7 @@ export class Debris {
 			for ( let t = 0; t < I.length; t += 3 ) {
 
 				const v = I[ t ] * 4;
-				const kind = D[ v + 1 ], size = D[ v + 3 ];
-				const caster = ( kind === KIND.STONE && size >= 0.2 ) || ( kind === KIND.DRIFT && size >= 0.1 ) || ( kind === KIND.CORAL && size >= 0.15 && D[ v + 2 ] >= 2 );
+				const caster = isShadowCaster( { kind: D[ v + 1 ], parameter: D[ v + 2 ], size: D[ v + 3 ] } ) === true;
 				( caster ? cast : small ).push( I[ t ], I[ t + 1 ], I[ t + 2 ] );
 
 			}

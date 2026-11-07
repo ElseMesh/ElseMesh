@@ -40,11 +40,11 @@ export const defaultWorldPackage = Object.freeze( {
 			return new Vegetation( options );
 		},
 		createDebris: async options => {
-			const [ { Debris }, { DebrisPlacer } ] = await Promise.all( [
+			const [ { Debris }, { DebrisPlacer, debrisCastsShadow } ] = await Promise.all( [
 				import( '../src/world/Debris.js' ),
 				import( './tidewater/DebrisPlacement.js' ),
 			] );
-			return new Debris( { ...options, createPlacer: placement => new DebrisPlacer( placement ) } );
+			return new Debris( { ...options, createPlacer: placement => new DebrisPlacer( placement ), isShadowCaster: debrisCastsShadow } );
 		},
 	} ),
 	assets: Object.freeze( {
