@@ -71,7 +71,7 @@ import { appearanceForAllowedProfiles, avatarProfileId, AVATAR_STYLES, loadAppea
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -870,7 +870,7 @@ export class App {
 				onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
 				onAsset: async ( assetId, bytes, progressive ) => {
 					const progressiveTextures = progressive?.textures ? { textures: progressive.textures } : null;
-					if ( progressiveTextures ) this.linkedWorldRoot.userData.worldPackage.progressiveAssets.set( assetId, progressiveTextures );
+					if ( progressiveTextures ) setWorldPackageProgressiveAsset( this.linkedWorldRoot, assetId, progressiveTextures );
 					const objectIDs = objectIDsByAsset.get( assetId );
 					if ( objectIDs ) await appendWorldPackageAssets( connector, this.linkedWorldRoot, new Map( [ [ assetId, bytes ] ] ), { objectIDs, progressiveAsset: progressiveTextures } );
 				},

@@ -2,7 +2,7 @@ import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js'
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
-import { loadWorldPackageModelAsset, registerStaticModelTextureDemand } from './WorldPackage.js';
+import { loadWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset } from './WorldPackage.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
@@ -19,7 +19,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	let unregisterTextureDemand = null;
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const getScene = async ( assetId, bytes, progressive ) => {
-		if ( progressive?.textures ) root.userData.worldPackage?.progressiveAssets?.set( assetId, { textures: progressive.textures } );
+		if ( progressive?.textures ) setWorldPackageProgressiveAsset( root, assetId, { textures: progressive.textures } );
 		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { bytes } ) );
 		return sceneCache.get( assetId );
 	};

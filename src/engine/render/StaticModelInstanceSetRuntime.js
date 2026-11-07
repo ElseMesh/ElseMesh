@@ -57,6 +57,7 @@ export class StaticModelInstanceSetRuntime {
 		this._cameraStateValid = false;
 		this._plannerDirty = true;
 		this.viewRevision = 0;
+		this.plannerRevisionListeners = null;
 		this._nextLODCheckAt = Infinity;
 		this.loadLOD = loadLOD;
 		this.loadController = new AbortController();
@@ -78,10 +79,19 @@ export class StaticModelInstanceSetRuntime {
 		} );
 	}
 
+	// Camera changes are tracked by consumers; notify them when planner data
+	// changes independently, such as after an LOD finishes loading.
+	addPlannerRevisionListener( listener ) {
+		if ( typeof listener !== 'function' ) throw new Error( 'Static model planner revision listener must be a function' );
+		( this.plannerRevisionListeners ||= new Set() ).add( listener );
+		return () => this.plannerRevisionListeners?.delete( listener );
+	}
+
 	update( _dt, camera, _player, renderLoadBias = 0 ) {
 		if ( this.disposed ) return;
 		const now = performance.now();
 		const cameraChanged = this.#cameraChanged( camera, renderLoadBias );
+		const plannerWasDirty = this._plannerDirty;
 		const plannerChanged = cameraChanged || this._plannerDirty;
 		if ( plannerChanged ) {
 			this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias, includeInstance: index => {
@@ -90,6 +100,7 @@ export class StaticModelInstanceSetRuntime {
 			} } );
 			this._plannerDirty = false;
 			this.viewRevision ++;
+			if ( plannerWasDirty && ! cameraChanged && this.plannerRevisionListeners ) for ( const listener of this.plannerRevisionListeners ) listener( this.viewRevision );
 		}
 		if ( plannerChanged || now >= this._nextLODCheckAt ) {
 			this.#requestVisibleLODs( plannerChanged );
@@ -214,6 +225,7 @@ export class StaticModelInstanceSetRuntime {
 		this.disposed = true;
 		this.loadController.abort( new DOMException( 'World unloaded', 'AbortError' ) );
 		this.pendingLods.clear();
+		this.plannerRevisionListeners?.clear();
 		if ( this.placementOwners ) for ( const claim of this.placementClaims ) {
 			if ( ! claim ) continue;
 			const owners = this.placementOwners.get( claim.id );

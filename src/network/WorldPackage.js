@@ -40,6 +40,7 @@ const PORTAL_FRAME_STYLES = Object.freeze( {
 	stone: { color: 0x77766f, roughness: 0.96, metalness: 0 },
 	metal: { color: 0x56636a, roughness: 0.42, metalness: 0.72 },
 } );
+const TEXTURE_LOD_RETRY_MS = 5000;
 
 export async function loadWorldPackage( connector, { signal, assets: preloadedAssets, objectIDs, materialContext, progressiveAssets } = {} ) {
 
@@ -99,7 +100,7 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 		}
 		const bytes = assets.get( object.assetId );
 		if ( ! bytes ) continue;
-		if ( progressiveAsset ) state.progressiveAssets.set( object.assetId, progressiveAsset );
+		if ( progressiveAsset ) setWorldPackageProgressiveAsset( root, object.assetId, progressiveAsset );
 		let gltf = state.parsed.get( object.assetId );
 		if ( ! gltf ) {
 			gltf = await buildGLTF( parseGLB( bytes ), state, signal, object.assetId );
@@ -176,15 +177,26 @@ async function prepareWorldPackageMaterialAdapters( connector, root, signal, obj
 
 export function updateWorldPackageLOD( root, camera, loadBias = 0, now = performance.now() ) {
 	for ( const controller of root?.userData?.worldPackage?.lodControllers?.values() || [] ) controller.update( camera, now, loadBias );
-	updateWorldPackageTextureLOD( root, camera, loadBias );
+	updateWorldPackageTextureLOD( root, camera, loadBias, now );
 }
 
-function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
+export function setWorldPackageProgressiveAsset( root, assetId, progressiveAsset ) {
+	const state = root?.userData?.worldPackage;
+	if ( ! state || state.disposed ) return;
+	( state.progressiveAssets ||= new Map() ).set( assetId, progressiveAsset );
+	invalidateTextureAssetFractions( state, [ assetId ] );
+}
+
+function updateWorldPackageTextureLOD( root, camera, loadBias = 0, now = performance.now() ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
 	const bias = Number.isFinite( loadBias ) ? Math.max( 0, Math.min( 2, loadBias ) ) : 0;
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
-	const textureProjectionRevision = textureCameraProjectionRevision( state, camera, bias );
+	const textureProjectionRevision = textureCameraProjectionRevision( state, camera, bias, viewHeight );
+	if ( state.textureLODScheduleDirty !== true && state.textureLODScheduleRevision === textureProjectionRevision && now < ( state.textureLODNextRetryAt ?? Infinity ) ) return;
+	state.textureLODScheduleDirty = false;
+	state.textureLODScheduleRevision = textureProjectionRevision;
+	state.textureLODNextRetryAt = Infinity;
 	const requests = [];
 	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
 		if ( state.progressiveTextureJobs.has( targetID ) ) continue;
@@ -194,6 +206,10 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
 			screenFraction = Math.max( screenFraction, assetFraction );
 		}
 		if ( ! screenFraction ) continue;
+		if ( now < ( target.retryAfter || 0 ) ) {
+			state.textureLODNextRetryAt = Math.min( state.textureLODNextRetryAt, target.retryAfter );
+			continue;
+		}
 		// A positive workload bias chooses coarser texture levels for every streamed
 		// package, matching the mesh-LOD bias above without lowering render resolution.
 		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 / ( 2 ** bias ) );
@@ -235,9 +251,16 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
 				if ( state.disposed || state.progressiveTextureTargets.get( request.targetID ) !== request.target ) throw new DOMException( 'World texture target unloaded', 'AbortError' );
 				await installProgressiveTextureLevel( request.target, level );
 			}
+			request.target.retryAfter = 0;
 		} ).catch( error => {
-			if ( error?.name !== 'AbortError' && ! state.disposed ) console.warn( 'World texture mip upgrade failed', request.assetId, error );
-		} ).finally( () => state.progressiveTextureJobs.delete( request.targetID ) );
+			if ( error?.name !== 'AbortError' && ! state.disposed && state.progressiveTextureTargets.get( request.targetID ) === request.target ) {
+				request.target.retryAfter = performance.now() + TEXTURE_LOD_RETRY_MS;
+				console.warn( 'World texture mip upgrade failed', request.assetId, error );
+			}
+		} ).finally( () => {
+			state.progressiveTextureJobs.delete( request.targetID );
+			state.textureLODScheduleDirty = true;
+		} );
 	}
 }
 
@@ -259,7 +282,10 @@ export function registerStaticModelTextureDemand( root, runtime ) {
 			registered.push( [ assetId, entry ] );
 		}
 	}
+	const runtimeAssetIDs = [ ...new Set( registered.map( ( [ assetId ] ) => assetId ) ) ];
+	const unsubscribePlannerRevision = runtime.addPlannerRevisionListener?.( () => invalidateWorldPackageTextureProjection( root, runtimeAssetIDs ) );
 	return () => {
+		unsubscribePlannerRevision?.();
 		for ( const [ assetId, entry ] of registered ) {
 			const entries = demands.get( assetId );
 			entries?.delete( entry );
@@ -271,12 +297,20 @@ export function registerStaticModelTextureDemand( root, runtime ) {
 
 const _staticTextureObject = { transform: { position: null, rotation: null }, scale: null, streamingBounds: null };
 
-function textureCameraProjectionRevision( state, camera, loadBias ) {
+function textureCameraProjectionRevision( state, camera, loadBias, viewHeight ) {
 	const view = state.textureCameraProjection || ( state.textureCameraProjection = new Float64Array( 32 ) );
 	const viewMatrix = camera.matrixWorldInverse.elements;
 	const projection = camera.projectionMatrix.elements;
-	let changed = state.textureCameraProjectionValid !== true || state.textureCameraLoadBias !== loadBias;
+	const effectiveFov = camera.getEffectiveFOV?.() ?? null;
+	const coordinateSystem = camera.coordinateSystem ?? null;
+	const reversedDepth = Boolean( camera.reversedDepth );
+	let changed = state.textureCameraProjectionValid !== true || state.textureCameraLoadBias !== loadBias || state.textureCameraViewHeight !== viewHeight
+		|| state.textureCameraEffectiveFov !== effectiveFov || state.textureCameraCoordinateSystem !== coordinateSystem || state.textureCameraReversedDepth !== reversedDepth;
 	state.textureCameraLoadBias = loadBias;
+	state.textureCameraViewHeight = viewHeight;
+	state.textureCameraEffectiveFov = effectiveFov;
+	state.textureCameraCoordinateSystem = coordinateSystem;
+	state.textureCameraReversedDepth = reversedDepth;
 	for ( let index = 0; index < 16; index ++ ) {
 		if ( view[ index ] !== viewMatrix[ index ] || view[ index + 16 ] !== projection[ index ] ) changed = true;
 		view[ index ] = viewMatrix[ index ];
@@ -321,6 +355,8 @@ export function invalidateWorldPackageTextureProjection( root, assetIDs = null )
 }
 
 function invalidateTextureAssetFractions( state, assetIDs = null ) {
+	if ( ! state ) return;
+	state.textureLODScheduleDirty = true;
 	const cache = state?.textureAssetScreenFractions;
 	if ( ! cache ) return;
 	if ( assetIDs === null ) cache.clear();
@@ -776,6 +812,7 @@ function disposeParsedWorldAsset( state, assetID ) {
 		target?.sourceAssets?.delete( assetID );
 		if ( ! target?.sourceAssets?.size ) state?.progressiveTextureTargets?.delete( targetID );
 	}
+	if ( targets?.size ) state.textureLODScheduleDirty = true;
 	state?.progressiveTextureTargetsByAsset?.delete( assetID );
 }
 
@@ -1044,8 +1081,10 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 					sourceAssets: new Map(),
 				};
 				packageState.progressiveTextureTargets.set( progressiveTargetID, target );
+				packageState.textureLODScheduleDirty = true;
 			}
 			target.sourceAssets.set( sourceAssetId, progressiveImage.imageIndices );
+			packageState.textureLODScheduleDirty = true;
 			let targets = packageState.progressiveTextureTargetsByAsset.get( sourceAssetId );
 			if ( ! targets ) packageState.progressiveTextureTargetsByAsset.set( sourceAssetId, targets = new Map() );
 			targets.set( progressiveTargetID, target );

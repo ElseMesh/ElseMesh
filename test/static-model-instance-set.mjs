@@ -235,6 +235,8 @@ const retryRuntime = new StaticModelInstanceSetRuntime( runtimeDocument, {
 		if ( retryLoads === 1 ) throw new Error( 'temporary LOD miss' );
 	},
 } );
+let retryPlannerNotices = 0;
+retryRuntime.addPlannerRevisionListener( () => retryPlannerNotices ++ );
 retryRuntime.planner.update = () => {
 	for ( const group of retryRuntime.planner.groups ) group.count = 0;
 	retryRuntime.planner._groupsByModel[ 0 ][ 2 ].count = 1;
@@ -256,10 +258,13 @@ try {
 	retryRuntime.update( 1 / 60, runtimeCamera );
 	await new Promise( resolve => setImmediate( resolve ) );
 	assert.equal( retryLoads, 2, 'a due retry runs without requiring another camera move' );
+	retryRuntime.update( 1 / 60, runtimeCamera );
+	assert.equal( retryPlannerNotices, 1, 'a completed LOD load notifies texture prioritization without camera movement' );
 } finally {
 	console.warn = originalWarn;
 	retryRuntime.dispose();
 }
+assert.equal( retryRuntime.plannerRevisionListeners.size, 0, 'disposing the runtime releases planner revision listeners' );
 
 // A provider may report the same placement in several overlapping cells.
 // Ownership follows the installed runtimes, including when an owner is evicted.
