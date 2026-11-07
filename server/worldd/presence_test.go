@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -103,25 +104,33 @@ func TestPresenceGhostLifecycle(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
 	session, err := newPresenceSession()
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	update := gatewayMessage{Type: "presence.update", Pose: presenceTestPose()}
 	bindPresenceRequest(&update, d.host.ID().String(), session)
-	if _, err := d.presenceRequest(update, now); err != nil { t.Fatal(err) }
+	if _, err := d.presenceRequest(update, now); err != nil {
+		t.Fatal(err)
+	}
 	// A separate, never-admitted session can request a snapshot with a leave.
 	observer := gatewayMessage{Type: "presence.leave"}
 	bindPresenceRequest(&observer, "observer", session)
 	check := func(at time.Time, expectedCount int, ghost bool) {
 		t.Helper()
 		reply, err := d.presenceRequest(observer, at)
-		if err != nil { t.Fatal(err) }
-		if len(reply.Players) != expectedCount { t.Fatalf("at %s got %d players; expected %d", at.Sub(now), len(reply.Players), expectedCount) }
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reply.Players) != expectedCount {
+			t.Fatalf("at %s got %d players; expected %d", at.Sub(now), len(reply.Players), expectedCount)
+		}
 		if expectedCount == 1 && reply.Players[0].Ghost != ghost {
 			t.Fatalf("at %s ghost = %v; expected %v", at.Sub(now), reply.Players[0].Ghost, ghost)
 		}
 	}
-	check(now.Add(9999 * time.Millisecond), 1, false)
+	check(now.Add(9999*time.Millisecond), 1, false)
 	check(now.Add(presenceGhostAfter), 1, true)
-	check(now.Add(119 * time.Second), 1, true)
+	check(now.Add(119*time.Second), 1, true)
 	check(now.Add(presenceTTL), 0, false)
 }
 
@@ -133,14 +142,18 @@ func TestPresenceGhostRevivalAndNonblockingAdmission(t *testing.T) {
 	join := func(gateway string, sequence uint64, at time.Time) (gatewayMessage, peerResponse) {
 		t.Helper()
 		session, err := newPresenceSession()
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		p := presenceTestPose()
 		p.Sequence = sequence
 		p.Position = []float64{0, 1.38, 8}
 		request := gatewayMessage{Type: "presence.update", Pose: p, SpawnCandidates: [][]float64{{0, 1.38, 8}}}
 		bindPresenceRequest(&request, gateway, session)
 		reply, err := d.presenceRequest(request, at)
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		return request, reply
 	}
 	first, one := join("one", 0, now)
@@ -154,14 +167,18 @@ func TestPresenceGhostRevivalAndNonblockingAdmission(t *testing.T) {
 	// A ghost cannot steal capacity from an active visitor if its slot was reused.
 	first.Pose.Sequence = 1
 	first.SpawnCandidates = nil
-	if _, err := d.presenceRequest(first, now.Add(11 * time.Second)); err == nil || err.Error() != "presence_full" {
+	if _, err := d.presenceRequest(first, now.Add(11*time.Second)); err == nil || err.Error() != "presence_full" {
 		t.Fatalf("ghost revival must respect active visitor limit: %v", err)
 	}
 	// Once the active visitor intentionally leaves, the ghost can resume.
 	secondRequest.Type = "presence.leave"
-	if _, err := d.presenceRequest(secondRequest, now.Add(11*time.Second)); err != nil { t.Fatal(err) }
-	recovered, err := d.presenceRequest(first, now.Add(11 * time.Second))
-	if err != nil { t.Fatalf("ghost revival rejected: %v", err) }
+	if _, err := d.presenceRequest(secondRequest, now.Add(11*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := d.presenceRequest(first, now.Add(11*time.Second))
+	if err != nil {
+		t.Fatalf("ghost revival rejected: %v", err)
+	}
 	if presenceForPlayer(recovered.Players, one.PlayerID).Ghost {
 		t.Fatal("accepted update should restore opaque active presence")
 	}
@@ -170,13 +187,14 @@ func TestPresenceGhostRevivalAndNonblockingAdmission(t *testing.T) {
 func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
+	vehicleType := "elsemesh.test-sailboat/2"
 	update := func(mode string, sequence uint64) error {
 		pose := presenceTestPose()
 		pose.Mode = mode
 		if mode == "boat" || mode == "deck" {
 			speed := 0.0
 			pose.VehicleSpeed = &speed
-			pose.VehicleType = "elsemesh.downeast-boat/1"
+			pose.VehicleType = vehicleType
 		}
 		pose.Sequence = sequence
 		request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
@@ -198,22 +216,26 @@ func TestPresenceEnforcesSignedVehicleAdmissionPolicy(t *testing.T) {
 	if err := update("deck", 2); err == nil || err.Error() != "vehicle_unsupported" {
 		t.Fatalf("world without a compatible berth should reject vehicle mode, got %v", err)
 	}
-	d.world.Components = []worldComponent{{Type: "elsemesh.downeast-boat/1"}}
+	d.world.Components = []worldComponent{{Type: vehicleType}}
+	if err := update("boat", 3); err == nil || err.Error() != "vehicle_unsupported" {
+		t.Fatalf("vehicle without complexity metadata should be rejected, got %v", err)
+	}
+	d.world.Components = []worldComponent{{Type: vehicleType, Data: json.RawMessage(`{"complexityTriangles":46845}`)}}
 	if err := update("boat", 3); err == nil || err.Error() != "vehicle_complexity_exceeded" {
 		t.Fatalf("vehicle above signed complexity budget should be rejected, got %v", err)
 	}
 	maxComplexity = 66845
-	d.world.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-female/1", VehicleType: "elsemesh.downeast-boat/1"}}
+	d.world.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-female/1", VehicleType: vehicleType}}
 	if err := update("boat", 4); err == nil || err.Error() != "vehicle_combination_not_allowed" {
 		t.Fatalf("unlisted avatar/vehicle combination should be rejected, got %v", err)
 	}
-	d.world.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-male/1", VehicleType: "elsemesh.downeast-boat/1"}}
+	d.world.Rules.VehiclePolicy.AllowedCombinations = []vehicleCombination{{AvatarProfileID: "elsemesh.avatar.stock-male/1", VehicleType: vehicleType}}
 	if err := update("boat", 4); err != nil {
 		t.Fatalf("vehicle at signed complexity budget should be admitted: %v", err)
 	}
 	tooFast := presenceTestPose()
 	tooFast.Mode = "boat"
-	tooFast.VehicleType = "elsemesh.downeast-boat/1"
+	tooFast.VehicleType = vehicleType
 	tooFast.AvatarProfileID = "elsemesh.avatar.stock-male/1"
 	tooFast.VehicleSpeed = new(float64)
 	*tooFast.VehicleSpeed = maxSpeed + 0.02
@@ -385,13 +407,21 @@ func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 	count := len(owner.players)
 	seen := owner.players[two.PlayerID]
 	owner.presenceMu.Unlock()
-	if count != 1 { t.Fatalf("disconnection should preserve one session, got %d", count) }
-	observer := gatewayMessage{Type:"presence.leave"}
+	if count != 1 {
+		t.Fatalf("disconnection should preserve one session, got %d", count)
+	}
+	observer := gatewayMessage{Type: "presence.leave"}
 	observerSession, err := newPresenceSession()
-	if err != nil { t.Fatal(err) }
-	bindPresenceRequest(&observer,"observer",observerSession)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindPresenceRequest(&observer, "observer", observerSession)
 	ghost, err := owner.presenceRequest(observer, seen.updated.Add(presenceGhostAfter))
-	if err != nil || len(ghost.Players)!=1 || !ghost.Players[0].Ghost {t.Fatalf("missing disconnected ghost: %+v %v",ghost,err)}
+	if err != nil || len(ghost.Players) != 1 || !ghost.Players[0].Ghost {
+		t.Fatalf("missing disconnected ghost: %+v %v", ghost, err)
+	}
 	expired, err := owner.presenceRequest(observer, seen.updated.Add(presenceTTL))
-	if err != nil || len(expired.Players)!=0 {t.Fatalf("disconnected presence not expired: %+v %v",expired,err)}
+	if err != nil || len(expired.Players) != 0 {
+		t.Fatalf("disconnected presence not expired: %+v %v", expired, err)
+	}
 }

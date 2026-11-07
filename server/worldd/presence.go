@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math"
 	"regexp"
@@ -21,7 +22,6 @@ const presenceTTL = 120 * time.Second
 const presencePlayerRadius = 0.3
 const presencePlayerHeight = 1.75
 const playerEyeHeight = 1.62
-const downeastBoatTriangles = 46845 // elsemesh.downeast-boat/1 complexity contract
 
 var presenceSessionPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var presenceColorPattern = regexp.MustCompile(`^#[0-9a-f]{6}$`)
@@ -53,8 +53,8 @@ type playerPresence struct {
 	playerPose
 	UpdatedAt int64 `json:"updatedAt"`
 	// Ghost is computed by the owner, never taken from a client pose.
-	Ghost     bool `json:"ghost,omitempty"`
-	updated   time.Time
+	Ghost   bool `json:"ghost,omitempty"`
+	updated time.Time
 }
 
 func newPresenceSession() (string, error) {
@@ -134,17 +134,8 @@ func (d *daemon) validatePresenceAdmission(p *playerPose) error {
 	if *p.VehicleSpeed > *policy.MaxSpeed+0.01 {
 		return errors.New("vehicle_speed_exceeded")
 	}
-	hasBoat := false
-	for _, component := range d.world.Components {
-		if component.Type == "elsemesh.downeast-boat/1" {
-			hasBoat = true
-			break
-		}
-	}
-	if !hasBoat {
-		return errors.New("vehicle_unsupported")
-	}
-	if p.VehicleType != "elsemesh.downeast-boat/1" {
+	vehicleComplexity, supported := signedVehicleComplexity(d.world.Components, p.VehicleType)
+	if !supported {
 		return errors.New("vehicle_unsupported")
 	}
 	if policy.AllowedCombinations != nil {
@@ -159,10 +150,26 @@ func (d *daemon) validatePresenceAdmission(p *playerPose) error {
 			return errors.New("vehicle_combination_not_allowed")
 		}
 	}
-	if uint64(d.world.Rules.AvatarComplexity)+downeastBoatTriangles > uint64(*policy.MaxCombinedComplexity) {
+	if uint64(d.world.Rules.AvatarComplexity)+uint64(vehicleComplexity) > uint64(*policy.MaxCombinedComplexity) {
 		return errors.New("vehicle_complexity_exceeded")
 	}
 	return nil
+}
+
+func signedVehicleComplexity(components []worldComponent, vehicleType string) (uint32, bool) {
+	for _, component := range components {
+		if component.Type != vehicleType {
+			continue
+		}
+		var data struct {
+			ComplexityTriangles *uint32 `json:"complexityTriangles"`
+		}
+		if json.Unmarshal(component.Data, &data) != nil || data.ComplexityTriangles == nil || *data.ComplexityTriangles == 0 || *data.ComplexityTriangles > 10_000_000 {
+			return 0, false
+		}
+		return *data.ComplexityTriangles, true
+	}
+	return 0, false
 }
 
 func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerResponse, error) {
@@ -215,12 +222,14 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		}
 		active := 0
 		for _, visitor := range d.players {
-			if now.Sub(visitor.updated) < presenceGhostAfter { active++ }
+			if now.Sub(visitor.updated) < presenceGhostAfter {
+				active++
+			}
 		}
 		// A returning ghost is an active admission again. It cannot exceed
 		// the owner's live visitor cap if its former slot was reused.
-		if ( !exists && len(d.players) >= maxPresencePlayers ) ||
-			( (!exists || now.Sub(old.updated) >= presenceGhostAfter) && active >= int(d.world.Rules.MaxVisitors) ) {
+		if (!exists && len(d.players) >= maxPresencePlayers) ||
+			((!exists || now.Sub(old.updated) >= presenceGhostAfter) && active >= int(d.world.Rules.MaxVisitors)) {
 			return peerResponse{}, errors.New("presence_full")
 		}
 		if exists && len(request.SpawnCandidates) > 0 {

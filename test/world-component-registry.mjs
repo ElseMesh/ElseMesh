@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { registerWorldComponent, registeredWorldComponents, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
 import { decodeWorldComponentAsset, registerWorldComponentAssetDecoder } from '../src/network/WorldComponentAssetCodecRegistry.js';
+import { validateWorldRequirements } from '../src/network/WorldRules.js';
 await import( '../worlds/tidewater/register-components.js' );
 
 assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, true );
@@ -17,6 +18,9 @@ registerWorldComponent( 'elsemesh.vehicle-fixture/1', { vehicle: true, complexit
 assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).vehicle, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).complexityTriangles, 12 );
 assert.equal( worldComponentDescriptor( 'elsemesh.vehicle-fixture/1' ).install, installer );
+const vehicleManifest = { rules: { gravity: 1, avatarComplexity: 1000, physicsProfile: 'default', maxVisitors: 1, spawnRadius: 0 }, components: [ { type: 'elsemesh.vehicle-fixture/1', data: { complexityTriangles: 12 } } ] };
+assert.equal( validateWorldRequirements( vehicleManifest ), vehicleManifest, 'signed vehicle component complexity matches its registered engine contract' );
+assert.throws( () => validateWorldRequirements( { ...vehicleManifest, components: [ { type: 'elsemesh.vehicle-fixture/1', data: { complexityTriangles: 13 } } ] } ), /complexity does not match/, 'vehicle metadata cannot diverge from the backend registry contract' );
 assert.equal( worldComponentDescriptor( 'elsemesh.static-vegetation/1' ).vegetation, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.static-fish-props/1' ).install, null, 'fish-props rendering is selected by the engine backend registry' );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.static-reef/1' ).install, 'function' );

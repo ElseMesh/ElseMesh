@@ -33,6 +33,7 @@ export function validateWorldRequirements( manifest ) {
 	movementParameters( rules );
 	vehiclePolicy( rules );
 	avatarPolicy( rules );
+	validateVehicleComplexityContracts( manifest.components );
 	validateWorldPackageBudget( manifest );
 	const required = rules.requiredFeatures ?? [];
 	if ( ! Array.isArray( required ) || required.length > 64 ) throw new Error( 'World manifest contains an invalid requiredFeatures list' );
@@ -43,6 +44,15 @@ export function validateWorldRequirements( manifest ) {
 		seen.add( feature );
 	}
 	return manifest;
+}
+
+function validateVehicleComplexityContracts( components ) {
+	if ( ! Array.isArray( components ) ) return;
+	for ( const component of components || [] ) {
+		const descriptor = worldComponentDescriptor( component?.type );
+		if ( descriptor?.vehicle !== true ) continue;
+		if ( component.data?.complexityTriangles !== descriptor.complexityTriangles ) throw new Error( `Vehicle component ${component.type} complexity does not match its registered contract` );
+	}
 }
 
 export function visitorRules( rules ) {
