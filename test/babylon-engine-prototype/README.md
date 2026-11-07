@@ -35,6 +35,11 @@ observed 17 FPS was one noisy sample with other rendering work on the host.
 The completed Great Hall load showed about 7–8 FPS with 2,788 Babylon meshes
 for 1,202 placements. This prototype creates separate nodes for each
 placement, and it has not been optimized or benchmarked under controlled load.
+Babylon's KTX2 loader currently uses its default remote decoder module URL;
+this prototype does not bundle that decoder yet. An earlier run logged a
+resource 404 while the scene still showed some textured geometry. Confirm the
+exact decoder response and package or deliberately configure the decoder
+before treating KTX2 support as verified or using the prototype offline.
 
 For a meaningful comparison, use the same camera pose, world data, resolution,
 and GPU in this page and the production ElseMesh page. Record first-visible

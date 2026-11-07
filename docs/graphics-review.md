@@ -26,6 +26,9 @@ Next evaluation should add or adapt Tidewater's required presentation
 components to Babylon, then compare both production backends and Babylon at
 matched camera poses, resolution, GPU, and host load. Record first-visible
 time, CPU/GPU frame time, memory, draw submissions, and transferred bytes.
+Also bundle or explicitly configure Babylon's KTX2 decoder: its default URL is
+remote, and an earlier prototype run logged a 404, so compressed-texture support
+is not yet verified as self-contained.
 
 ## 2026-11-04 WebGL tone-mapping correction
 
