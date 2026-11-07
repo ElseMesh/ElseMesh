@@ -9,6 +9,7 @@ const profiles = [
 const source = ( instanceIndex, x ) => ( {
 	componentPath: '/Game/GreatHall/SM_Table.Component0',
 	staticMeshPath: '/Game/GreatHall/SM_Table',
+	materialOverrideKey: '',
 	isSplineMesh: false,
 	instanceIndex,
 	instanceTransformCount: 2,
@@ -31,6 +32,15 @@ assert.notEqual( colocated.document.instances[ 0 ].placementId, colocated.docume
 const otherComponent = { ...source( 0, 0 ), componentPath: '/Game/GreatHall/Other.Component0' };
 const otherSet = localRegionStaticModelSets( { ...cell, visualInstances: [ otherComponent ] }, options )[ 0 ];
 assert.notEqual( sets[ 0 ].document.instances[ 0 ].placementId, otherSet.document.instances[ 0 ].placementId, 'distinct source components remain distinct at identical transforms' );
+const duplicateMeshComponents = [ source( 0, 0 ), { ...source( 0, 4 ), componentPath: '/Game/GreatHall/Other.Component0' } ];
+const deduplicated = localRegionStaticModelSets( { ...cell, visualInstances: duplicateMeshComponents }, options )[ 0 ];
+assert.equal( deduplicated.document.models.length, 1, 'components using the same mesh and material overrides share one per-cell LOD asset group' );
+assert.equal( deduplicated.document.instances.length, 2, 'sharing mesh assets retains both authored placements' );
+assert.notEqual( deduplicated.document.instances[ 0 ].placementId, deduplicated.document.instances[ 1 ].placementId, 'shared mesh assets do not merge distinct placed components' );
+const materialVariant = { ...source( 0, 4 ), componentPath: '/Game/GreatHall/Other.Component0', materialOverrideKey: '0=/Game/Materials/Blue' };
+const materialVariants = localRegionStaticModelSets( { ...cell, visualInstances: [ source( 0, 0 ), materialVariant ] }, options )[ 0 ];
+assert.equal( materialVariants.document.models.length, 2, 'different authored material overrides retain separate mesh assets' );
+assert.equal( new Set( materialVariants.document.models.flatMap( model => model.lods.map( lod => lod.assetId ) ) ).size, 6, 'different material overrides never alias the same source mesh LOD assets' );
 assert.deepEqual( sets[ 0 ].document.models[ 0 ].lodThresholds, [ 0.05985, 0.1794 ], 'Unreal authored ScreenSize thresholds are ordered coarse-to-fine' );
 assert.match( sets[ 0 ].document.models[ 0 ].lods[ 0 ].assetId, /:2$/, 'the coarsest usable Unreal LOD loads first' );
 assert.equal( sets[ 0 ].component.assets.length, 4, 'the component declares its descriptor and each independent mesh LOD' );

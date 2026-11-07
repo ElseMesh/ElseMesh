@@ -79,6 +79,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 	for ( const source of cell.visualInstances ) {
 		if ( source?.isSplineMesh !== false || typeof source.componentPath !== 'string' || source.componentPath.length === 0 || source.componentPath.length > ID_PART_LIMIT
 			|| typeof source.staticMeshPath !== 'string' || ! finiteVector( source.transform?.position, 3 ) || ! finiteVector( source.transform?.rotation, 4 )
+			|| typeof source.materialOverrideKey !== 'string' || source.materialOverrideKey.length > ID_PART_LIMIT
 			|| ! finiteVector( source.transform?.scale, 3 ) || source.transform.scale.some( value => value === 0 )
 			|| ! finiteVector( source.boundsMeters?.min, 3 ) || ! finiteVector( source.boundsMeters?.max, 3 )
 			|| source.boundsMeters.min.some( ( value, axis ) => value > source.boundsMeters.max[ axis ] )
@@ -88,7 +89,8 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		if ( ! mirrored ) return null;
 		const lods = profiles.get( source.staticMeshPath );
 		if ( ! lods ) return null;
-		const groupKey = `${ source.componentPath }\u001f${ mirrored.geometryMirrorX ? 'mirror-x' : 'identity' }`;
+		// Share reusable mesh LODs across placed components only when both the source mesh and resolved material overrides match.
+		const groupKey = JSON.stringify( [ source.staticMeshPath, source.materialOverrideKey, mirrored.geometryMirrorX ? 'mirror-x' : 'identity' ] );
 		let model = groups.get( groupKey );
 		if ( ! model ) {
 			const usable = lods.filter( lod => lod?.usable === true && Number.isSafeInteger( lod.index ) && lod.index >= 0 && Number.isFinite( lod.screenSize ) && lod.screenSize > 0 && lod.screenSize <= 1 )
@@ -101,9 +103,12 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				// Keep adjacent cross-fades inside the game-authored screen-size gap.
 				lodFadeFraction = Math.min( lodFadeFraction, ( thresholds[ index ] - thresholds[ index - 1 ] ) / thresholds[ index ] * 0.5 );
 			}
-			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, geometryMirrorX: mirrored.geometryMirrorX, sourceLods: usable, lodFadeFraction, radius: 0, instances: [], bounds: { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] } };
+			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, materialOverrideKey: source.materialOverrideKey, geometryMirrorX: mirrored.geometryMirrorX, sourceLods: usable, lodFadeFraction, radius: 0, instances: [], bounds: { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] } };
 			groups.set( groupKey, model );
-		} else if ( model.staticMeshPath !== source.staticMeshPath ) return null;
+		} else {
+			if ( model.staticMeshPath !== source.staticMeshPath || model.materialOverrideKey !== source.materialOverrideKey ) return null;
+			if ( source.componentPath.localeCompare( model.componentPath ) < 0 ) model.componentPath = source.componentPath;
+		}
 		const scaleFloor = Math.min( ...mirrored.transform.scale );
 		if ( scaleFloor <= 0 ) return null;
 		let instanceRadius = 0;

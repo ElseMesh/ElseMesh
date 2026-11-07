@@ -129,6 +129,7 @@ async function waitForDiskWriteQueue( connector ) {
 const staticVisualInstance = {
 	componentPath: '/Game/GreatHall/SM_Table.Component0',
 	staticMeshPath: '/Game/GreatHall/SM_Table',
+	materialOverrideKey: '',
 	isSplineMesh: false,
 	instanceIndex: null,
 	instanceTransformCount: 1,
