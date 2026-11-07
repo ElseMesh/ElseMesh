@@ -28,6 +28,26 @@ remain open.
 
 ![ElseMesh hosted WebGL beach](images/elsemesh-hosted-webgl-beach-2026-11-07.png)
 
+## 2026-11-07 WebGL HDR scene-color water correction
+
+The original Tidewater main WebGPU image above remains the appearance baseline.
+In the split WebGL path, enabling the HDR post-processing target changed
+`uSceneColor` from the old sRGB framebuffer copy to a linear `NoColorSpace`
+texture. The water shader still decoded both samples as sRGB, darkening its
+refraction and screen-space reflections. The shader now decodes only the legacy
+framebuffer path; the HDR path samples linear color directly.
+
+The isolated WebGL2 review reached the named beach pose
+(`[15, 2.823, -58]`, yaw `3.14`, pitch `-0.08`), reported
+`uSceneColorSRGB=0`, and had no GL error. At 1588×780, mean RGB in the same
+`(550,350)-(1000,425)` sea crop rose from `(49.1,76.5,88.5)` before the fix to
+`(62.7,94.6,107.4)` after it; the original Tidewater main image measures
+`(87.6,118.2,127.8)`. These regional means are diagnostic only: the player
+camera is 0.177 m lower than the original free camera, and wave phase is not
+synchronized. Water color and broader material parity remain open.
+
+![ElseMesh split WebGL beach after linear scene-color fix](images/elsemesh-webgl-water-colorspace-fix-2026-11-07.png)
+
 ## 2026-11-07 engine-wide Babylon.js WebGPU prototype
 
 The isolated prototype lives in

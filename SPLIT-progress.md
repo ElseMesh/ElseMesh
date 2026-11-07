@@ -1230,3 +1230,14 @@ finding changes them.
   [matched beach captures](docs/graphics-review.md#2026-11-07-tidewater-main-beach-grit-baseline).
   Overall parity remains 84%; water, lighting, terrain, wood, synchronized
   pixels, and supported-hardware performance remain open.
+- 2026-11-07: compared the split WebGL beach at the named pose against the
+  authoritative original `tidewater/main` WebGPU capture (`4811ba48`). The
+  post-processing HDR target exposed an sRGB decode still being applied to
+  linear screen color in the WebGL water shader. Making that decode conditional
+  raised the same sea crop's mean RGB from (49.1, 76.5, 88.5) to (62.7, 94.6,
+  107.4), toward the original's (87.6, 118.2, 127.8). The live WebGL2 shader
+  reports no GL error. The camera remains 0.177 m lower and wave phase is not
+  synchronized; this is a targeted fix, not full visual parity. The exposure
+  meter now follows the original 1/16 bloom level. Gameplay/content parity
+  remains 84%; water color and broader visual, gameplay, and hardware gates
+  remain open. See the [review evidence](docs/graphics-review.md#2026-11-07-webgl-hdr-scene-color-water-correction).

@@ -1044,7 +1044,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -1336,6 +1336,7 @@ export class WebGLFallback {
 				uniform float uCloudsEnabled;
 				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
+				uniform float uSceneColorSRGB;
 				uniform mat4 uViewProjection;
 				uniform vec2 uViewport;
 				uniform sampler2D uTerrainColor;
@@ -1366,6 +1367,9 @@ export class WebGLFallback {
 				${ WEBGL_WAKE_READER_GLSL }
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
+				}
+				vec3 sceneColorToLinear( vec3 color ) {
+					return mix( color, screenColorToLinear( color ), uSceneColorSRGB );
 				}
 				float waterFresnelDielectric( float cosI ) {
 					float c = clamp( cosI, 0.0, 1.0 );
@@ -1431,7 +1435,7 @@ export class WebGLFallback {
 					}
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
-					vec3 sceneColor = screenColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
+					vec3 sceneColor = sceneColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
 					vec3 refractedBed = mix( seabedColor, sceneColor, 0.1 ) * vec3( 0.58, 0.86, 0.96 );
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					float ndv = max( dot( normal, viewDirection ), 1e-4 );
@@ -1465,7 +1469,7 @@ export class WebGLFallback {
 					float reflectedOnScreen = step( 0.015, reflectionDirection.y ) * step( 0.001, reflectedClip.w )
 						* step( 0.001, reflectedUv.x ) * step( reflectedUv.x, 0.999 )
 						* step( 0.001, reflectedUv.y ) * step( reflectedUv.y, 0.999 );
-					vec3 screenReflection = screenColorToLinear( texture2D( uSceneColor, reflectedUv ).rgb );
+					vec3 screenReflection = sceneColorToLinear( texture2D( uSceneColor, reflectedUv ).rgb );
 					sky = mix( sky, screenReflection, reflectedOnScreen * 0.72 );
 					float ripple = 0.5 + 0.5 * sin( a * 3.1 + sin( b * 2.6 + c * 1.7 ) );
 					float micro = fineNoise.r * 0.65 + fineNoise.g * 0.35;
