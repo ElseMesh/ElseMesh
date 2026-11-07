@@ -14,7 +14,7 @@ const worldPackage = { source: { experience: { behaviors: {} } }, assets: { exte
 const injected = new App( { worldPackage } );
 if ( injected.worldPackage !== worldPackage || injected.localWorldExperience !== worldPackage.source.experience ) throw new Error( 'App should use the world package supplied by its entry point' );
 const linux = new App();
-if ( linux.graphicsPriority !== 'fps' || ! linux.desktopAdaptiveScale || linux.settings.renderScale !== 0.75 || linux.desktopCanvasScale !== 0.7 || linux.desktopFrameRateLimit !== 24 || linux.desktopAntiAliasingMode !== 'none' || linux.desktopRefractionScale !== 0.35 ) throw new Error( 'Linux desktop should default to FPS priority with adaptive scaling and a 24 fps GPU budget' );
+if ( linux.graphicsPriority !== 'fps' || ! linux.desktopAdaptiveScale || linux.settings.renderScale !== 1 || linux.desktopCanvasScale !== 0.7 || linux.desktopFrameRateLimit !== 24 || linux.desktopAntiAliasingMode !== 'none' || linux.desktopRefractionScale !== 0.35 ) throw new Error( 'Linux desktop should default to full-resolution FPS priority with adaptive LOD and a 24 fps GPU budget' );
 
 const webgpuDefault = new App();
 let hostedFrameRateLimit = null;
@@ -45,7 +45,7 @@ quality.refraction = { scale: 0.5 };
 quality.scene = { traverse( callback ) { callback( { material: waterMaterial } ); } };
 quality.renderLoadLOD = { bias: 2, cpuOverload: 1, gpuOverload: 1, cpuHeadroom: 1, gpuHeadroom: 1 };
 quality.setGraphicsPriority( 'fps' );
-if ( quality.desktopFrameRateLimit !== 24 || frameRateLimit !== 24 || quality.settings.renderScale !== 0.75 || quality.autoScale !== true || quality.post.aaMode !== 'none' || quality.shadows.enabled || waterMaterial.params.ssr.value !== 0 || quality.refraction.scale !== 0.35 || stored.get( 'elsemesh.graphics-priority' ) !== 'fps' ) throw new Error( 'Switching to FPS should apply and persist the responsive profile' );
+if ( quality.desktopFrameRateLimit !== 24 || frameRateLimit !== 24 || quality.settings.renderScale !== 1 || quality.autoScale !== true || quality.post.aaMode !== 'none' || quality.shadows.enabled || waterMaterial.params.ssr.value !== 0 || quality.refraction.scale !== 0.35 || stored.get( 'elsemesh.graphics-priority' ) !== 'fps' ) throw new Error( 'Switching to FPS should start at full resolution and apply the responsive profile' );
 quality.setGraphicsPriority( 'quality' );
 if ( quality.desktopFrameRateLimit !== 0 || frameRateLimit !== 0 || quality.settings.renderScale !== 1 || quality.autoScale || quality.post.aaMode !== 'taa' || ! quality.shadows.enabled || waterMaterial.params.ssr.value !== 1 || quality.refraction.scale !== 0.5 || quality.renderLoadBias !== 0 || quality.renderLoadLOD.bias !== 0 || stored.get( 'elsemesh.graphics-priority' ) !== 'quality' ) throw new Error( 'Switching to Visual Quality should restore defaults, disable automatic detail reductions, and persist the choice' );
 
