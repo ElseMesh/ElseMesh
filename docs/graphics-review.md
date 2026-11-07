@@ -18,11 +18,16 @@ asset and created 2,169 debris instances. The image now shows fine scattered
 beach grit instead of the oversized isolated stones from the prior built-in
 WebGL fallback capture.
 
-This closes the obvious pebble-scale/layout mismatch, not complete material
-parity: WebGL still uses its own low-poly geometry and color approximation,
-and the capture pair has not been synchronized for wave phase or compared by
-pixels. Sky, water, shoreline, terrain, wood, and supported-hardware FPS gates
-remain open.
+The source audit used this Tidewater `main` commit as the authority. Its
+`PebbleField.js` matches the current WebGPU field implementation except that
+ElseMesh supplies its packaged terrain detail texture. The WebGL field is still
+an approximation: it renders every category with one `IcosahedronGeometry` and
+a flat-shaded color material, while Tidewater `main` uses category-specific
+stone and shell-chip geometry plus the terrain detail and wet-stone shading.
+Matching the slot layout therefore does not establish matching pebble
+appearance. A matched pixel comparison of the beach-grit region remains open,
+with the upstream image above as the reference. Sky, water, shoreline, terrain,
+wood, and supported-hardware FPS gates also remain open.
 
 ![Original Tidewater main WebGPU beach](images/tidewater-main-webgpu-beach-2026-11-07.png)
 

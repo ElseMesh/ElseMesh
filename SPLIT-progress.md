@@ -584,6 +584,17 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-07 pebble source audit: compared Tidewater `main` at
+  `4811ba48d795197de5621985f404e765c0b7c0ef` directly with the split source.
+  WebGPU's `PebbleField` matches the upstream implementation except for passing
+  ElseMesh's packaged terrain detail texture. The hosted WebGL adapter still
+  approximates every category with one icosahedron geometry and flat colors,
+  while the authoritative Tidewater field uses category-specific stone/chip
+  geometry and textured wet-stone shading. The existing hosted WebGL image is
+  therefore not evidence of pebble appearance parity. No percentage changed;
+  the matched beach-grit comparison remains open against the upstream Tidewater
+  `main` WebGPU capture. See [`graphics-review.md`](docs/graphics-review.md).
+
 - 2026-11-04: moved the Tidewater fish-prop WebGPU and WebGL backend adapters
   into ElseMesh and registered their component in the engine. The Tidewater
   WebGPU/WebGL adapter-construction checks and source-to-manifest test pass.
