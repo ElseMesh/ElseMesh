@@ -761,9 +761,9 @@ function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
 			const axis = new Vector3( 0, 1, 0 ).applyQuaternion( worldRotation );
 			const worldCenter = node.localToWorld( center );
 			const scale = node.getWorldScale( new Vector3() );
-			const maxScale = Math.max( Math.abs( scale.x ), Math.abs( scale.y ), Math.abs( scale.z ) );
-			const radius = Math.max( ...radii ) * maxScale;
-			const halfLength = capsule.length * maxScale * 0.5 + radius;
+			const radiusScale = Math.max( Math.abs( scale.x ), Math.abs( scale.z ) );
+			const radius = Math.max( ...radii ) * radiusScale;
+			const halfLength = capsule.length * Math.abs( scale.y ) * 0.5 + radius;
 			if ( Math.abs( axis.y ) > 0.95 ) {
 				registered.push( { kind: 'cylinder', collider: colliders.addCylinder( worldCenter.x, worldCenter.z, radius, worldCenter.y - halfLength, worldCenter.y + halfLength, { tag: `world:${objectId}:body-setup` } ) } );
 			} else addBounds( center, new Vector3( radius, halfLength, radius ), rotation );
