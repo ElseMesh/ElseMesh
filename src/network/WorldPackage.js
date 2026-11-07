@@ -852,7 +852,7 @@ function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
 			const min = new Vector3( Infinity, Infinity, Infinity ), max = new Vector3( - Infinity, - Infinity, - Infinity );
 			const local = new Vector3();
 			for ( const x of [ - 1, 1 ] ) for ( const y of [ - 1, 1 ] ) for ( const z of [ - 1, 1 ] ) {
-				local.set( center.x + half.x * x, center.y + half.y * y, center.z + half.z * z ).applyQuaternion( rotation );
+				local.set( half.x * x, half.y * y, half.z * z ).applyQuaternion( rotation ).add( center );
 				node.localToWorld( local );
 				min.min( local ); max.max( local );
 			}
