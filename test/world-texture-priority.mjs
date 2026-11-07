@@ -23,4 +23,13 @@ state.progressiveTextureJobs.delete( 'near' ); state.textureLODQueue.active = 0;
 state.objectsByAsset.get( 'near' ).values().next().value.transform.position[ 2 ] = -40;
 updateWorldPackageLOD( root, camera );
 assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'middle' ], 'the next admission uses current visibility and priority' );
-console.log( 'Texture jobs are admitted by current priority without FIFO backlog.' );
+
+const biasedTarget = state.progressiveTextureTargets.get( 'near' );
+state.objectsByAsset.get( 'near' ).values().next().value.transform.position[ 2 ] = -4;
+state.progressiveTextureJobs.clear(); state.textureLODQueue.active = 0;
+updateWorldPackageLOD( root, camera, 0 );
+const distanceLOD = biasedTarget.desiredLevel;
+state.progressiveTextureJobs.clear(); state.textureLODQueue.active = 0;
+updateWorldPackageLOD( root, camera, 2 );
+assert.ok( biasedTarget.desiredLevel > distanceLOD, 'workload bias selects a coarser texture mip' );
+console.log( 'Texture mip detail follows workload bias; jobs use current priority without FIFO backlog.' );
