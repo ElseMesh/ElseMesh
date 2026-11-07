@@ -112,6 +112,12 @@ function readGraphicsPriority() {
 	}
 }
 
+function renderScaleOverride( search ) {
+	if ( ! search.has( 'scale' ) ) return null;
+	const requested = Number( search.get( 'scale' ) ) || 1;
+	return MathUtils.clamp( Math.round( requested * 20 ) / 20, 0.35, 1 );
+}
+
 function saveGraphicsPriority( value ) {
 	try {
 		globalThis.localStorage?.setItem( GRAPHICS_PRIORITY_KEY, value );
@@ -132,6 +138,7 @@ export class App {
 	constructor( { worldPackage = null, loadDefaultWorldPackage = null, loadWorldProviders = null } = {} ) {
 
 		this.qs = new URLSearchParams( location.search );
+		this.renderScaleOverride = renderScaleOverride( this.qs );
 		this.fixedSimulationTime = simulationTimeFromSearch( location.search );
 		this.worldPackage = worldPackage;
 		this.worldExtensionGeneration = 0;
@@ -171,7 +178,7 @@ export class App {
 			sunAzimuth: 0, // degrees: turns the sun's daily path about the vertical
 			timeSpeed: 0, // hours per real second
 			exposure: 0.55,
-			renderScale: this.desktopAdaptiveScale ? 0.75 : 1, // Linux starts lighter; adaptive scale targets 24 fps
+			renderScale: this.renderScaleOverride ?? ( this.desktopAdaptiveScale ? 0.75 : 1 ), // Linux starts lighter; adaptive scale targets 24 fps
 		};
 		this.renderLoadLOD = new RenderLoadLOD();
 		this.renderLoadWarmup = 0;
@@ -196,7 +203,7 @@ export class App {
 		this.desktopAntiAliasingMode = fpsMode ? 'none' : null;
 		this.desktopRefractionScale = fpsMode ? 0.35 : 0.5;
 		this.autoScale = fpsMode && ! this.qs.has( 'scale' );
-		if ( this.settings ) this.settings.renderScale = fpsMode ? 0.75 : 1;
+		if ( this.settings ) this.settings.renderScale = this.renderScaleOverride ?? ( fpsMode ? 0.75 : 1 );
 		if ( persist && this.isLinuxDesktop ) saveGraphicsPriority( this.graphicsPriority );
 
 		if ( this.engine ) this.engine.setFrameRateLimit( this.desktopFrameRateLimit );
@@ -579,7 +586,6 @@ export class App {
 		this.post = new PostFX( renderer, { sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater, clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze } );
 		if ( this.desktopAntiAliasingMode ) this.post.aaMode = this.desktopAntiAliasingMode;
 		G.exposure.value = this.settings.exposure;
-		if ( qs.has( 'scale' ) ) this.settings.renderScale = Number( qs.get( 'scale' ) ) || 1;
 		this.setRenderScale( this.settings.renderScale );
 
 		// ---------------------------------------------------------------- audio

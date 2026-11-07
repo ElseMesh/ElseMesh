@@ -90,7 +90,10 @@ if ( scales.engine !== 0.7 || Math.abs( scales.post - 0.5 / 0.7 ) > 1e-6 || Math
 
 globalThis.location.search = '?scale=0.5';
 const manual = new App();
-if ( manual.autoScale ) throw new Error( '?scale must disable automatic render-scale changes' );
+if ( manual.autoScale || manual.settings.renderScale !== 0.5 ) throw new Error( '?scale must disable automatic changes and initialize the selected scale' );
+globalThis.location.search = '?renderer=webgl&scale=1';
+const fullResolution = new App();
+if ( fullResolution.autoScale || fullResolution.settings.renderScale !== 1 ) throw new Error( 'WebGL scale=1 must initialize at full resolution' );
 
 const changes = [];
 const app = {
