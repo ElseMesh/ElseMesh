@@ -28,3 +28,9 @@ export function selectLocalRegionEntryObjects( connector, manifest, startupObjec
 
 	return startupObjects.filter( object => ! object.regionCell || object.collisionPayload || visibleVisualIDs.has( object.id ) );
 }
+
+export function selectLocalRegionStreamingObjects( connector, manifest, camera ) {
+	return selectWorldObjectsForView( manifest, camera, {
+		maxDistance: connector.maxViewDistanceMeters,
+	} ).filter( object => ! object.collisionPayload );
+}

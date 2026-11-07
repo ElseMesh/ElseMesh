@@ -9,6 +9,7 @@ import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './
 import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 import { PriorityRequestQueue } from './PriorityRequestQueue.js';
+import { worldViewCellCoordinates } from './WorldViewCells.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES = 768 * 1024 * 1024;
@@ -349,6 +350,21 @@ export class LocalRegionConnector {
 		candidates.sort( ( a, b ) => distanceSquared( a ) - distanceSquared( b ) );
 		const requested = new Set( [ ...frontier, ...candidates.map( cell => cell.join( ',' ) ) ] );
 		return this.ensureCells( [ ...requested ].map( cell => cell.split( ',' ).map( Number ) ) );
+	}
+
+	ensureCellsForCamera( camera, { signal } = {} ) {
+		if ( ! this.cellSizeMeters || ! this.manifest ) return Promise.resolve( this.manifest );
+		const cells = worldViewCellCoordinates( camera, this.cellSizeMeters, this.maxViewDistanceMeters );
+		if ( cells.length === 0 ) return Promise.resolve( this.manifest );
+		const previousKnownCells = this.knownCells.size;
+		return this.ensureCells( cells, { signal } ).then( manifest => {
+			const indexedCells = this.knownCells.size - previousKnownCells;
+			if ( indexedCells > 0 && this.regionDiagnostics ) console.info( 'ElseMesh local-region camera cells indexed:', JSON.stringify( {
+				frustumCells: cells.length, newlyIndexedCells: indexedCells,
+				cellSizeMeters: this.cellSizeMeters, maxViewDistanceMeters: this.maxViewDistanceMeters,
+			} ) );
+			return manifest;
+		} );
 	}
 
 	#installCellIndex( sourceRegion, cellIndex ) {

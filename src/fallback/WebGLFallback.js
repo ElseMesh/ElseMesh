@@ -1852,6 +1852,7 @@ export class WebGLFallback {
 			this.camera.position.set( ...localSpawn.position );
 			this.camera.rotation.order = 'YXZ';
 			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
+			await this.connector.ensureCellsForCamera?.( this.camera );
 			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjects = selectLocalRegionEntryObjects( this.connector, manifest, selectedObjects, this.camera );
 			const initialComponents = selectWorldComponentsForView( manifest, this.camera, { maxPriority: 'nearby' } );
@@ -2413,6 +2414,16 @@ export class WebGLFallback {
 			}
 		}
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath && this.player ) {
+			if ( connector.ensureCellsForCamera && ! this.hostedViewCellsPending
+				&& performance.now() - ( this.hostedViewCellsLastRequestedAt || 0 ) >= 400 ) {
+				this.hostedViewCellsLastRequestedAt = performance.now();
+				const pending = Promise.resolve().then( () => connector.ensureCellsForCamera( this.camera ) ).catch( error => {
+					if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region camera cell query failed:', error );
+				} ).finally( () => {
+					if ( this.hostedViewCellsPending === pending ) this.hostedViewCellsPending = null;
+				} );
+				this.hostedViewCellsPending = pending;
+			}
 			const position = this.player.position;
 			const axes = this.input.moveAxes();
 			const direction = new this.THREE.Vector3( - Math.sin( this.player.yaw ), 0, - Math.cos( this.player.yaw ) );

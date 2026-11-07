@@ -63,7 +63,7 @@ import { Group } from './engine/scene/Group.js';
 import { WorldConnector, worldLinkFromLocation } from './network/WorldConnector.js';
 import { loadWorldPackageProviders } from './network/WorldProviderLoader.js';
 import { LocalRegionConnector } from './network/LocalRegionConnector.js';
-import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from './network/LocalRegionStartup.js';
+import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects, selectLocalRegionStreamingObjects } from './network/LocalRegionStartup.js';
 import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { avatarPolicy, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
@@ -814,6 +814,7 @@ export class App {
 		this.player.yaw = spawn.yaw;
 		this.player.pitch = spawn.pitch;
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
+		if ( connector.localOnly ) await connector.ensureCellsForCamera?.( this.camera );
 
 		await progress( 0.34, 'Loading the starting area…', 0.82, 'world' );
 		const selectedObjects = connector.localOnly
@@ -1315,7 +1316,7 @@ export class App {
 		this.worldBackgroundLoads.get( connector.worldId )?.abort();
 		const controller = new AbortController();
 		this.worldBackgroundLoads.set( connector.worldId, controller );
-		this.worldStreamState.set( connector.worldId, { connector, root, controller, lastUpdate: 0, loading: false, loadingController: null, loadingObjectIDs: new Set(), loadingComponentIDs: new Set(), loadingRank: Infinity } );
+		this.worldStreamState.set( connector.worldId, { connector, root, controller, lastUpdate: 0, loading: false, loadingController: null, loadingObjectIDs: new Set(), loadingComponentIDs: new Set(), loadingRank: Infinity, viewCellsPending: false } );
 
 	}
 
@@ -1547,6 +1548,12 @@ export class App {
 		if ( ! this.remoteWorldActive || ! state || state.root !== root || state.controller.signal.aborted || performance.now() - state.lastUpdate < 400 ) return;
 		state.lastUpdate = performance.now();
 		const loaded = root.userData.worldPackage?.loadedObjects || new Set();
+		if ( connector.localOnly && connector.ensureCellsForCamera && ! state.viewCellsPending ) {
+			state.viewCellsPending = true;
+			connector.ensureCellsForCamera( this.camera ).catch( error => {
+				if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region view-cell query failed:', error );
+			} ).finally( () => { state.viewCellsPending = false; } );
+		}
 		if ( connector.localOnly ) {
 			const releaseObjectIDs = new Set();
 			const center = new Vector3();
@@ -1567,7 +1574,10 @@ export class App {
 			if ( dx * dx + dy * dy + dz * dz > ( maxDistance * 1.1 ) ** 2 ) releaseComponentIDs.add( component.id );
 		}
 		if ( releaseComponentIDs.size ) unloadWorldPackageComponents( root, connector, releaseComponentIDs );
-		const objects = selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500 } ).filter( ( object ) => ! loaded.has( object.id ) );
+		const objects = ( connector.localOnly
+			? selectLocalRegionStreamingObjects( connector, connector.manifest, this.camera )
+			: selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: 500 } )
+		).filter( ( object ) => ! loaded.has( object.id ) );
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath ) {
 			const flying = this.freeCam;
 			const position = flying ? this.camera.position.clone().setY( this.camera.position.y - 1.62 ) : this.player.position.clone();
