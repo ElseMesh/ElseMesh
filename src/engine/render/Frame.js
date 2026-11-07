@@ -119,8 +119,6 @@ export const GRAVITY = 9.81;
 const _m = new Matrix4();
 const _vp = new Matrix4();
 const _vpj = new Matrix4();
-const _invProj = new Matrix4();
-const _invViewProj = new Matrix4();
 
 // Write the camera state for a draw. `jitter` in pixels (internal resolution).
 export function setFrameCamera( camera, width, height, { jitterX = 0, jitterY = 0, prevViewProj = null, prevCameraPos = null, block = FrameUniforms } = {} ) {
@@ -130,27 +128,27 @@ export function setFrameCamera( camera, width, height, { jitterX = 0, jitterY = 
 	if ( camera.matrixWorldInverse ) camera.matrixWorldInverse.copy( camera.matrixWorld ).invert();
 	const view = camera.matrixWorldInverse;
 	const proj = camera.projectionMatrix;
-	F.view.value.copy( view );
-	F.proj.value.copy( proj );
+	F.view.value = view.clone();
+	F.proj.value = proj.clone();
 	const vp = _vp.multiplyMatrices( proj, view );
-	F.viewProjNoJitter.value.copy( vp );
+	F.viewProjNoJitter.value = vp.clone();
 	// jitter: translate clip xy by 2 * px / size (times w, so a pre-multiplied translation)
 	const jx = 2 * jitterX / width, jy = 2 * jitterY / height;
 	_m.makeTranslation( jx, jy, 0 );
 	const vpj = _vpj.multiplyMatrices( _m, vp );
-	F.viewProj.value.copy( vpj );
-	F.invView.value.copy( camera.matrixWorld );
-	F.invProj.value.copy( _invProj.copy( proj ).invert() );
-	F.invViewProj.value.copy( _invViewProj.copy( vpj ).invert() );
-	F.prevViewProjNoJitter.value.copy( prevViewProj || vp );
-	F.cameraPos.value.setFromMatrixPosition( camera.matrixWorld );
-	F.prevCameraPos.value.copy( prevCameraPos || F.cameraPos.value );
+	F.viewProj.value = vpj.clone();
+	F.invView.value = camera.matrixWorld.clone();
+	F.invProj.value = proj.clone().invert();
+	F.invViewProj.value = vpj.clone().invert();
+	F.prevViewProjNoJitter.value = prevViewProj ? prevViewProj.clone() : vp.clone();
+	F.cameraPos.value = new Vector3().setFromMatrixPosition( camera.matrixWorld );
+	F.prevCameraPos.value = prevCameraPos ? prevCameraPos.clone() : F.cameraPos.value.clone();
 	F.near.value = camera.near;
 	F.far.value = camera.far;
-	F.resolution.value.set( width, height );
-	F.invResolution.value.set( 1 / width, 1 / height );
-	F.prevJitter.value.copy( F.jitter.value );
-	F.jitter.value.set( jx, jy );
+	F.resolution.value = new Vector2( width, height );
+	F.invResolution.value = new Vector2( 1 / width, 1 / height );
+	F.prevJitter.value = F.jitter.value ? F.jitter.value.clone() : new Vector2();
+	F.jitter.value = new Vector2( jx, jy );
 	F.reversedDepth.value = camera.reversedDepth === false ? 0 : 1;
 
 }
