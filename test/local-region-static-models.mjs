@@ -32,6 +32,9 @@ assert.notEqual( colocated.document.instances[ 0 ].placementId, colocated.docume
 const otherComponent = { ...source( 0, 0 ), componentPath: '/Game/GreatHall/Other.Component0' };
 const otherSet = localRegionStaticModelSets( { ...cell, visualInstances: [ otherComponent ] }, options )[ 0 ];
 assert.notEqual( sets[ 0 ].document.instances[ 0 ].placementId, otherSet.document.instances[ 0 ].placementId, 'distinct source components remain distinct at identical transforms' );
+assert.deepEqual( otherSet.document.models[ 0 ].lods, sets[ 0 ].document.models[ 0 ].lods, 'same source mesh and material overrides reuse LOD asset IDs across components' );
+const otherRegion = localRegionStaticModelSets( cell, { ...options, regionID: 'b'.repeat( 64 ), coordinates: [ 9, 9, 9 ] } )[ 0 ];
+assert.deepEqual( otherRegion.document.models[ 0 ].lods, sets[ 0 ].document.models[ 0 ].lods, 'source mesh LOD IDs are independent of region and cell placement' );
 const duplicateMeshComponents = [ source( 0, 0 ), { ...source( 0, 4 ), componentPath: '/Game/GreatHall/Other.Component0' } ];
 const deduplicated = localRegionStaticModelSets( { ...cell, visualInstances: duplicateMeshComponents }, options )[ 0 ];
 assert.equal( deduplicated.document.models.length, 1, 'components using the same mesh and material overrides share one per-cell LOD asset group' );
@@ -52,6 +55,7 @@ const mixedScale = { ...source( 2, 8 ), transform: { ...source( 2, 8 ).transform
 const mixedScaleSets = localRegionStaticModelSets( { ...cell, visualInstances: [ source( 0, 0 ), mixedScale ] }, options );
 assert.equal( mixedScaleSets.length, 1, 'mirrored transforms remain eligible for per-mesh LOD sets' );
 assert.equal( mixedScaleSets[ 0 ].document.models.length, 2, 'instances split into identity and mirrored geometry batches' );
+assert.deepEqual( mixedScaleSets[ 0 ].document.models[ 0 ].lods, mixedScaleSets[ 0 ].document.models[ 1 ].lods, 'geometry mirroring does not duplicate unchanged source mesh bytes' );
 const mirroredModel = mixedScaleSets[ 0 ].document.models.find( model => model.geometryMirrorX );
 const mirroredInstance = mixedScaleSets[ 0 ].document.instances.find( instance => instance.model === mirroredModel.id );
 assert.deepEqual( mirroredInstance.scale, [ 1, 1, 1 ], 'negative source scale is represented through geometry and rotation transforms' );

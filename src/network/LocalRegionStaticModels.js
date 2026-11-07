@@ -78,7 +78,8 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 	const groups = new Map();
 	for ( const source of cell.visualInstances ) {
 		if ( source?.isSplineMesh !== false || typeof source.componentPath !== 'string' || source.componentPath.length === 0 || source.componentPath.length > ID_PART_LIMIT
-			|| typeof source.staticMeshPath !== 'string' || ! finiteVector( source.transform?.position, 3 ) || ! finiteVector( source.transform?.rotation, 4 )
+			|| typeof source.staticMeshPath !== 'string' || source.staticMeshPath.length === 0 || source.staticMeshPath.length > ID_PART_LIMIT
+			|| ! finiteVector( source.transform?.position, 3 ) || ! finiteVector( source.transform?.rotation, 4 )
 			|| typeof source.materialOverrideKey !== 'string' || source.materialOverrideKey.length > ID_PART_LIMIT
 			|| ! finiteVector( source.transform?.scale, 3 ) || source.transform.scale.some( value => value === 0 )
 			|| ! finiteVector( source.boundsMeters?.min, 3 ) || ! finiteVector( source.boundsMeters?.max, 3 )
@@ -144,7 +145,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				id: ids.get( model ),
 				geometryMirrorX: model.geometryMirrorX,
 				bounds: { center: [ 0, 0, 0 ], radius: model.radius },
-				lods: model.sourceLods.map( lod => ( { assetId: localMeshLODAssetID( regionID, model.componentPath, lod.index ) } ) ),
+				lods: model.sourceLods.map( lod => ( { assetId: localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index ) } ) ),
 				lodThresholds: model.sourceLods.slice( 1 ).map( lod => lod.screenSize ),
 				lodMetric: 'projected-radius',
 				// Provisional cross-fade width; it is a rendering choice, not game-authored data.
@@ -166,7 +167,8 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		const descriptorAssetID = localStaticModelSetAssetID( regionID, cellSizeMeters, coordinates, chunk );
 		const assetReferences = [ { assetId: descriptorAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ];
 		for ( const model of modelChunk ) for ( const lod of model.sourceLods ) {
-			const assetId = localMeshLODAssetID( regionID, model.componentPath, lod.index );
+			const assetId = localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index );
+			if ( assetId.length > 8192 ) return null;
 			if ( ! assetReferences.some( reference => reference.assetId === assetId ) ) assetReferences.push( { assetId, kind: 'glb' } );
 		}
 		if ( assetReferences.length > 256 ) return null;
@@ -182,7 +184,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 			descriptorAssetID,
 			document,
 			modelAssets: modelChunk.flatMap( model => model.sourceLods.map( lod => ( {
-				assetId: localMeshLODAssetID( regionID, model.componentPath, lod.index ),
+				assetId: localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index ),
 				componentPath: model.componentPath,
 				lodIndex: lod.index,
 			} ) ) ),
@@ -191,8 +193,8 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 	return result;
 }
 
-export function localMeshLODAssetID( regionID, componentPath, lodIndex ) {
-	return `local-mesh-lod:${regionID}:${encodeURIComponent( componentPath )}:${lodIndex}`;
+export function localMeshLODAssetID( staticMeshPath, materialOverrideKey, lodIndex ) {
+	return `local-mesh-lod:${encodeURIComponent( staticMeshPath )}:${encodeURIComponent( materialOverrideKey )}:${lodIndex}`;
 }
 
 export function localStaticModelSetAssetID( regionID, cellSizeMeters, coordinates, chunk ) {
