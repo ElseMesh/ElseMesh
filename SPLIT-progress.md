@@ -69,6 +69,18 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-07: Tidewater's WebGL bird renderer now prepares wing-joint and leg
+  transforms once per bird pose and writes posed normals directly, matching the
+  shared WebGPU deformation instead of recomputing triangle normals each frame.
+  Golden moving-pose checks cover body, tail, wing, and leg vertices for all five
+  species. Tidewater's `test:renderer-parity` and `test:wildlife` suites pass,
+  including the pre-split WebGPU fishing reference. In an isolated Weston view,
+  the active WebGL world at render scale 1 measured 38.6 FPS, 11.8 ms CPU, and
+  12.6 ms GPU with 54 visible birds; the player was idle, so this is not a
+  fishing/boat stress or cross-renderer visual-parity result. The renderer is
+  still Tidewater-owned, so this does not close the engine/world renderer
+  boundary. Estimates remain unchanged.
+
 - 2026-11-07: isolated Weston review found two independent WebGL startup faults.
   The start-screen control markup referenced an out-of-scope arrow-key layout;
   after that UI crash was fixed, the built-in WebGL fallback still produced a
