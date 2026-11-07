@@ -184,26 +184,13 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
 	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
 	const bias = Number.isFinite( loadBias ) ? Math.max( 0, Math.min( 2, loadBias ) ) : 0;
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
-	const textureProjectionRevision = textureCameraProjectionRevision( state, camera );
+	const textureProjectionRevision = textureCameraProjectionRevision( state, camera, bias );
 	const requests = [];
-	const assetScreenFractions = new Map();
 	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
 		if ( state.progressiveTextureJobs.has( targetID ) ) continue;
 		let screenFraction = 0;
 		for ( const assetId of target.sourceAssets.keys() ) {
-			let assetFraction = assetScreenFractions.get( assetId );
-			if ( assetFraction === undefined ) {
-				assetFraction = 0;
-				for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
-					const fraction = cachedProjectedBoundsScreenFraction( state, object, camera, textureProjectionRevision );
-					if ( fraction !== null ) assetFraction = Math.max( assetFraction, fraction );
-				}
-				for ( const demand of state.staticModelTextureDemand?.get( assetId ) || [] ) {
-					const fraction = staticModelTextureScreenFraction( demand, camera );
-					if ( fraction !== null ) assetFraction = Math.max( assetFraction, fraction );
-				}
-				assetScreenFractions.set( assetId, assetFraction );
-			}
+			const assetFraction = textureAssetScreenFraction( state, assetId, camera, textureProjectionRevision );
 			screenFraction = Math.max( screenFraction, assetFraction );
 		}
 		if ( ! screenFraction ) continue;
@@ -268,6 +255,7 @@ export function registerStaticModelTextureDemand( root, runtime ) {
 			if ( ! entries ) demands.set( assetId, entries = new Set() );
 			const entry = { runtime, modelIndex, lodIndex };
 			entries.add( entry );
+			invalidateWorldPackageTextureProjection( root, [ assetId ] );
 			registered.push( [ assetId, entry ] );
 		}
 	}
@@ -276,17 +264,19 @@ export function registerStaticModelTextureDemand( root, runtime ) {
 			const entries = demands.get( assetId );
 			entries?.delete( entry );
 			if ( entries?.size === 0 ) demands.delete( assetId );
+			invalidateWorldPackageTextureProjection( root, [ assetId ] );
 		}
 	};
 }
 
 const _staticTextureObject = { transform: { position: null, rotation: null }, scale: null, streamingBounds: null };
 
-function textureCameraProjectionRevision( state, camera ) {
+function textureCameraProjectionRevision( state, camera, loadBias ) {
 	const view = state.textureCameraProjection || ( state.textureCameraProjection = new Float64Array( 32 ) );
 	const viewMatrix = camera.matrixWorldInverse.elements;
 	const projection = camera.projectionMatrix.elements;
-	let changed = state.textureCameraProjectionValid !== true;
+	let changed = state.textureCameraProjectionValid !== true || state.textureCameraLoadBias !== loadBias;
+	state.textureCameraLoadBias = loadBias;
 	for ( let index = 0; index < 16; index ++ ) {
 		if ( view[ index ] !== viewMatrix[ index ] || view[ index + 16 ] !== projection[ index ] ) changed = true;
 		view[ index ] = viewMatrix[ index ];
@@ -297,6 +287,44 @@ function textureCameraProjectionRevision( state, camera ) {
 		state.textureProjectionRevision = ( state.textureProjectionRevision || 0 ) + 1;
 	}
 	return state.textureProjectionRevision;
+}
+
+function textureAssetScreenFraction( state, assetId, camera, viewRevision ) {
+	const cache = state.textureAssetScreenFractions || ( state.textureAssetScreenFractions = new Map() );
+	const cached = cache.get( assetId );
+	const demands = state.staticModelTextureDemand?.get( assetId ) || [];
+	const cachedDemands = cached?.demandViews;
+	let demandsMatch = cachedDemands?.length === demands.size;
+	let demandIndex = 0;
+	for ( const demand of demands ) {
+		const cachedDemand = cachedDemands?.[ demandIndex ++ ];
+		if ( cachedDemand?.runtime !== demand.runtime || cachedDemand.viewRevision !== ( demand.runtime.viewRevision ?? 0 ) ) demandsMatch = false;
+	}
+	if ( cached?.viewRevision === viewRevision && demandsMatch ) return cached.fraction;
+	let fraction = 0;
+	for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
+		const projected = cachedProjectedBoundsScreenFraction( state, object, camera, viewRevision );
+		if ( projected !== null ) fraction = Math.max( fraction, projected );
+	}
+	const demandViews = [];
+	for ( const demand of demands ) {
+		const projected = staticModelTextureScreenFraction( demand, camera );
+		if ( projected !== null ) fraction = Math.max( fraction, projected );
+		demandViews.push( { runtime: demand.runtime, viewRevision: demand.runtime.viewRevision ?? 0 } );
+	}
+	cache.set( assetId, { viewRevision, fraction, demandViews } );
+	return fraction;
+}
+
+export function invalidateWorldPackageTextureProjection( root, assetIDs = null ) {
+	invalidateTextureAssetFractions( root?.userData?.worldPackage, assetIDs );
+}
+
+function invalidateTextureAssetFractions( state, assetIDs = null ) {
+	const cache = state?.textureAssetScreenFractions;
+	if ( ! cache ) return;
+	if ( assetIDs === null ) cache.clear();
+	else for ( const assetID of assetIDs ) cache.delete( assetID );
 }
 
 function cachedProjectedBoundsScreenFraction( state, object, camera, viewRevision ) {
@@ -360,6 +388,7 @@ function indexPackageObjectByAsset( state, object ) {
 		let byAsset = state.objectsByAsset.get( assetID );
 		if ( ! byAsset ) state.objectsByAsset.set( assetID, byAsset = new Set() );
 		byAsset.add( object );
+		invalidateTextureAssetFractions( state, [ assetID ] );
 	}
 }
 
@@ -649,6 +678,7 @@ export function unloadWorldPackageObjects( root, connector, colliders, objectIDs
 			const byAsset = state.objectsByAsset?.get( assetID );
 			byAsset?.delete( object );
 			if ( byAsset?.size === 0 ) state.objectsByAsset.delete( assetID );
+			invalidateTextureAssetFractions( state, [ assetID ] );
 		}
 		state.lodControllers?.get( objectID )?.dispose();
 		state.lodControllers?.delete( objectID );
@@ -920,6 +950,7 @@ export function disposeWorldPackage( root ) {
 	state?.progressiveTextureTargets?.clear();
 	state?.progressiveTextureTargetsByAsset?.clear();
 	state?.progressiveTextureJobs?.clear();
+	state?.textureAssetScreenFractions?.clear();
 	state?.objectsByAsset?.clear();
 	state?.staticModelTextureDemand?.clear();
 }

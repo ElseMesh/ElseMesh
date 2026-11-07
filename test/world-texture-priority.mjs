@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
-import { updateWorldPackageLOD } from '../src/network/WorldPackage.js';
+import { invalidateWorldPackageTextureProjection, updateWorldPackageLOD } from '../src/network/WorldPackage.js';
 
 globalThis.innerHeight = 800;
 const camera = new PerspectiveCamera( 60, 1, 0.1, 100 ); camera.updateMatrixWorld( true );
@@ -8,6 +8,8 @@ const header = new Uint8Array( 80 + 3 * 24 );
 for ( let level = 0; level < 3; level ++ ) new DataView( header.buffer ).setBigUint64( 80 + level * 24 + 8, 64n, true );
 const state = { progressiveAssets: new Map(), progressiveTextureTargets: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
 const root = { userData: { worldPackage: state } };
+const staticModelRuntime = { disposed: true, viewRevision: 0 };
+state.staticModelTextureDemand = new Map( [ [ 'near', new Set( [ { runtime: staticModelRuntime } ] ) ] ] );
 for ( const [ id, distance ] of [ [ 'near', 4 ], [ 'far', 20 ], [ 'middle', 10 ] ] ) {
  const image = { imageIndices: [ 0 ], levelCount: 3 };
  state.progressiveAssets.set( id, { textures: [ image ] } );
@@ -20,14 +22,22 @@ updateWorldPackageLOD( root, camera );
 assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'near' ], 'only the highest-priority candidate enters the queue' );
 const nearObject = state.objectsByAsset.get( 'near' ).values().next().value;
 const stableProjection = state.textureObjectProjectionCache.get( nearObject );
+const stableAssetFraction = state.textureAssetScreenFractions.get( 'near' );
 updateWorldPackageLOD( root, camera );
 assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'near' ], 'a busy queue does not accumulate stale requests' );
 assert.strictEqual( state.textureObjectProjectionCache.get( nearObject ), stableProjection, 'a stable camera and object reuse the projected bounds' );
+assert.strictEqual( state.textureAssetScreenFractions.get( 'near' ), stableAssetFraction, 'a stable camera reuses the per-asset projected fraction' );
 state.progressiveTextureJobs.delete( 'near' ); state.textureLODQueue.active = 0;
 nearObject.transform.position[ 2 ] = -40;
+invalidateWorldPackageTextureProjection( root, [ 'near' ] );
 updateWorldPackageLOD( root, camera );
 assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'middle' ], 'the next admission uses current visibility and priority' );
 assert.notStrictEqual( state.textureObjectProjectionCache.get( nearObject ), stableProjection, 'moving an object refreshes its cached projected bounds' );
+assert.notStrictEqual( state.textureAssetScreenFractions.get( 'near' ), stableAssetFraction, 'object invalidation refreshes the per-asset projected fraction' );
+const currentAssetFraction = state.textureAssetScreenFractions.get( 'near' );
+staticModelRuntime.viewRevision ++;
+updateWorldPackageLOD( root, camera );
+assert.notStrictEqual( state.textureAssetScreenFractions.get( 'near' ), currentAssetFraction, 'a static-model planner revision refreshes the per-asset projected fraction' );
 const stableViewRevision = state.textureProjectionRevision;
 camera.position.set( 0.1, 0, 0 ); camera.lookAt( 0, 0, -1 ); camera.updateMatrixWorld( true );
 updateWorldPackageLOD( root, camera );
@@ -35,6 +45,7 @@ assert.ok( state.textureProjectionRevision > stableViewRevision, 'camera movemen
 
 const biasedTarget = state.progressiveTextureTargets.get( 'near' );
 state.objectsByAsset.get( 'near' ).values().next().value.transform.position[ 2 ] = -4;
+invalidateWorldPackageTextureProjection( root, [ 'near' ] );
 state.progressiveTextureJobs.clear(); state.textureLODQueue.active = 0;
 updateWorldPackageLOD( root, camera, 0 );
 const distanceLOD = biasedTarget.desiredLevel;
