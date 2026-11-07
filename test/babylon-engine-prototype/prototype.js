@@ -7,6 +7,7 @@ import { Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader.js';
+import { EngineInstrumentation } from '@babylonjs/core/Instrumentation/engineInstrumentation.js';
 import glslangJS from '@babylonjs/core/assets/glslang/glslang.js?url';
 import glslangWasm from '@babylonjs/core/assets/glslang/glslang.wasm?url';
 import twgslJS from '@babylonjs/core/assets/twgsl/twgsl.js?url';
@@ -17,7 +18,7 @@ import { WorldConnector, worldLinkFromLocation } from '../../src/network/WorldCo
 import { loadStaticModelInstanceSetAssets } from '../../src/network/StaticModelInstanceSetAssets.js';
 
 const MAX_INSTANCE_RADIUS_METERS = 36;
-const MAX_INSTANCES = 1200;
+const MAX_INSTANCES = 10000;
 const status = document.querySelector( '#status' );
 const canvas = document.querySelector( '#render-canvas' );
 const params = new URLSearchParams( location.search );
@@ -40,13 +41,51 @@ function worldPosition( object ) {
 	return object.transform?.position || [ 0, 0, 0 ];
 }
 
+function cameraPose( manifest ) {
+	const fallback = { position: manifest.spawn?.position || [ 0, 0, 0 ], yaw: manifest.spawn?.yaw || 0, pitch: manifest.spawn?.pitch || 0 };
+	const encoded = params.get( 'pose' );
+	if ( ! encoded ) return fallback;
+	try {
+		const pose = JSON.parse( encoded );
+		if ( Array.isArray( pose.p ) && pose.p.length === 3 && pose.p.every( Number.isFinite ) && Number.isFinite( pose.yaw ) && Number.isFinite( pose.pitch ) && Math.abs( pose.pitch ) <= Math.PI / 2 ) {
+			return { position: pose.p, yaw: pose.yaw, pitch: pose.pitch };
+		}
+	} catch { /* Use the provider-authored spawn if the review pose is invalid. */ }
+	return fallback;
+}
+
+function renderSelection() {
+	const injected = globalThis.__elsemeshRendererSelection;
+	if ( injected && Array.isArray( injected.objects ) && Array.isArray( injected.components ) ) return {
+		objects: new Set( injected.objects.filter( value => typeof value === 'string' ) ),
+		components: new Set( injected.components.filter( value => typeof value === 'string' ) ),
+	};
+	const encoded = params.get( 'selection' );
+	if ( ! encoded ) return null;
+	try {
+		const selection = JSON.parse( encoded );
+		if ( Array.isArray( selection.objects ) && Array.isArray( selection.components ) ) return {
+			objects: new Set( selection.objects.filter( value => typeof value === 'string' ) ),
+			components: new Set( selection.components.filter( value => typeof value === 'string' ) ),
+		};
+	} catch { /* Fall back to the prototype's view selection when the snapshot is invalid. */ }
+	return null;
+}
+
 function withinPrototypeRadius( position, spawn ) {
 	return distance( position, spawn ) <= MAX_INSTANCE_RADIUS_METERS;
 }
 
 async function createRenderer() {
 	if ( ! navigator.gpu ) throw new Error( 'This browser does not expose WebGPU.' );
-	const engine = new WebGPUEngine( canvas, { antialias: true, adaptToDeviceRatio: true } );
+	const adapter = await navigator.gpu.requestAdapter();
+	if ( ! adapter ) throw new Error( 'This browser could not provide a WebGPU adapter.' );
+	const requiredFeatures = adapter.features.has( 'timestamp-query' ) ? [ 'timestamp-query' ] : [];
+	const engine = new WebGPUEngine( canvas, {
+		antialias: true,
+		adaptToDeviceRatio: true,
+		deviceDescriptor: { requiredFeatures },
+	} );
 	await engine.initAsync( { jsPath: glslangJS, wasmPath: glslangWasm }, { jsPath: twgslJS, wasmPath: twgslWasm } );
 	return engine;
 }
@@ -151,20 +190,26 @@ async function loadAssetContainer( scene, connector, bytes, label ) {
 	const blobURL = URL.createObjectURL( new Blob( [ compatibleBytes ], { type: 'model/gltf-binary' } ) );
 	try {
 		const container = await SceneLoader.LoadAssetContainerAsync( '', blobURL, scene, undefined, '.glb' );
-		if ( ! container.meshes.some( mesh => mesh.getTotalVertices() > 0 ) ) throw new Error( `GLB ${ label } contains no renderable geometry.` );
+		if ( ! container.meshes.some( mesh => mesh.getTotalVertices() > 0 ) ) {
+			container.dispose();
+			console.info( `[Babylon engine prototype] skipped empty visual GLB ${ label }` );
+			return null;
+		}
 		return container;
 	} finally {
 		URL.revokeObjectURL( blobURL );
 	}
 }
 
-async function collectRenderableItems( connector, manifest, spawn ) {
+async function collectRenderableItems( connector, manifest, spawn, selection ) {
 	const assetRecords = new Map( ( manifest.assets || [] ).map( asset => [ asset.id, asset ] ) );
 	const items = new Map();
 	let instanceCount = 0;
 	for ( const object of manifest.objects || [] ) {
 		const asset = assetRecords.get( object.assetId );
-		if ( object.kind !== 'asset-instance' || ! asset || ! [ 'glb', 'model/gltf-binary' ].includes( asset.kind ) || ! withinPrototypeRadius( worldPosition( object ), spawn ) ) continue;
+		if ( object.kind !== 'asset-instance' || object.collisionPayload || ! asset || ! [ 'glb', 'model/gltf-binary' ].includes( asset.kind )
+			|| selection && ! selection.objects.has( object.id )
+			|| ! selection && ! withinPrototypeRadius( worldPosition( object ), spawn ) ) continue;
 		let item = items.get( object.assetId );
 		if ( ! item ) items.set( object.assetId, item = { assetId: object.assetId, transforms: [], load: () => connector.getAsset( object.assetId ) } );
 		item.transforms.push( object.transform || {} );
@@ -174,12 +219,13 @@ async function collectRenderableItems( connector, manifest, spawn ) {
 
 	for ( const component of manifest.components || [] ) {
 		if ( instanceCount >= MAX_INSTANCES ) break;
-		if ( component.type !== 'elsemesh.static-model-instance-set/1' || ! component.streamingBounds
-			|| ! withinPrototypeRadius( component.streamingBounds.center, spawn ) ) continue;
+		if ( component.type !== 'elsemesh.static-model-instance-set/1'
+			|| selection && ! selection.components.has( component.id )
+			|| ! selection && ( ! component.streamingBounds || ! withinPrototypeRadius( component.streamingBounds.center, spawn ) ) ) continue;
 		const assets = await loadStaticModelInstanceSetAssets( connector, component );
 		const models = new Map( assets.document.models.map( ( model, index ) => [ model.id, { ...model, index } ] ) );
 		for ( const model of models.values() ) {
-			const transforms = assets.document.instances.filter( instance => instance.model === model.id && withinPrototypeRadius( instance.position, spawn ) ).map( instance => ( {
+			const transforms = assets.document.instances.filter( instance => instance.model === model.id && ( selection || withinPrototypeRadius( instance.position, spawn ) ) ).map( instance => ( {
 				position: instance.position, rotation: instance.rotation, scale: instance.scale,
 			} ) );
 			if ( transforms.length === 0 ) continue;
@@ -219,14 +265,22 @@ function attachTransform( scene, roots, transform, index, geometryMirrorX ) {
 async function main() {
 	const connector = openConnector();
 	const manifest = await connector.getManifest();
-	const spawn = manifest.spawn?.position || [ 0, 0, 0 ];
+	const pose = cameraPose( manifest );
+	const selection = renderSelection();
+	const spawn = pose.position;
 	const engine = await createRenderer();
 	const scene = new Scene( engine );
+	const instrumentation = new EngineInstrumentation( engine );
+	instrumentation.captureGPUFrameTime = true;
 	scene.useRightHandedSystem = true;
 	scene.clearColor = new Color4( 0.055, 0.06, 0.075, 1 );
 	const camera = new FreeCamera( 'inspection-camera', toVector3( spawn ), scene );
-	const yaw = manifest.spawn?.yaw || 0;
-	camera.setTarget( new Vector3( spawn[ 0 ] + Math.sin( yaw ), spawn[ 1 ], spawn[ 2 ] - Math.cos( yaw ) ) );
+	const yaw = pose.yaw;
+	const pitch = pose.pitch;
+	camera.fov = 50 * Math.PI / 180;
+	camera.minZ = 0.1;
+	camera.maxZ = 2000;
+	camera.setTarget( new Vector3( spawn[ 0 ] + Math.sin( yaw ) * Math.cos( pitch ), spawn[ 1 ] + Math.sin( pitch ), spawn[ 2 ] - Math.cos( yaw ) * Math.cos( pitch ) ) );
 	camera.speed = 0.35;
 	camera.angularSensibility = 2200;
 	camera.keysUp = [ 87 ]; camera.keysDown = [ 83 ]; camera.keysLeft = [ 65 ]; camera.keysRight = [ 68 ];
@@ -234,23 +288,44 @@ async function main() {
 	camera.attachControl( canvas, true );
 	new HemisphericLight( 'world-fill', new Vector3( 0, 1, 0 ), scene ).intensity = 0.7;
 	new DirectionalLight( 'world-key', new Vector3( - 0.3, - 0.8, - 0.4 ), scene ).intensity = 1.1;
-	engine.runRenderLoop( () => scene.render() );
+	let cpuRenderMs = 0;
+	engine.runRenderLoop( () => {
+		const startedAt = performance.now();
+		scene.render();
+		cpuRenderMs = performance.now() - startedAt;
+	} );
 
 	const unsupportedComponents = new Set( ( manifest.components || [] ).map( component => component.type ).filter( type => type !== 'elsemesh.static-model-instance-set/1' ) );
-	const { items, instanceCount } = await collectRenderableItems( connector, manifest, spawn );
+	const { items, instanceCount } = await collectRenderableItems( connector, manifest, spawn, selection );
 	report( `${ manifest.title || manifest.worldId } · WebGPU · ${ items.length } shared models · ${ instanceCount } placements · loading…` );
 	const containers = [];
 	const instanceRoots = [];
+	const emptyVisualAssets = [];
 	let geometryBytes = 0;
 	let installedInstances = 0;
-	window.__elsemeshBabylonPrototype = { scene, camera, manifest, connector, items, instanceRoots, containers, get stats() { return { geometryBytes, installedInstances, targetInstances: instanceCount }; } };
+	window.__elsemeshBabylonPrototype = { scene, camera, manifest, connector, items, instanceRoots, containers, instrumentation, get stats() { return {
+		geometryBytes, installedInstances, targetInstances: instanceCount, cpuRenderMs, fps: engine.getFps(),
+		gpuRenderMs: instrumentation.gpuFrameTimeCounter.current / 1e6,
+		gpuAverageMs: instrumentation.gpuFrameTimeCounter.lastSecAverage / 1e6,
+		gpuTimingAvailable: engine.getCaps().timerQuery !== undefined,
+		selectedObjectCount: selection?.objects.size ?? null,
+		selectedComponentCount: selection?.components.size ?? null,
+		meshes: scene.meshes.length,
+		instancedMeshes: scene.meshes.filter( mesh => mesh.getClassName() === 'InstancedMesh' ).length,
+		emptyVisualAssets: emptyVisualAssets.length,
+	}; } };
 	for ( const item of items ) {
 		const bytes = await item.load();
 		geometryBytes += bytes.byteLength;
 		const container = await loadAssetContainer( scene, connector, bytes, item.assetId );
+		if ( ! container ) {
+			emptyVisualAssets.push( item.assetId );
+			item.release?.();
+			continue;
+		}
 		containers.push( container );
 		for ( const [ index, transform ] of item.transforms.entries() ) {
-			const instance = container.instantiateModelsToScene( nodeName => `${ item.assetId.slice( 0, 18 ) }-${ installedInstances }-${ nodeName }`, false );
+			const instance = container.instantiateModelsToScene( nodeName => `${ item.assetId.slice( 0, 18 ) }-${ installedInstances }-${ nodeName }`, false, { doNotInstantiate: false } );
 			instanceRoots.push( attachTransform( scene, instance.rootNodes, transform, installedInstances, item.geometryMirrorX ) );
 			instanceRoots.push( ...instance.rootNodes );
 			installedInstances ++;

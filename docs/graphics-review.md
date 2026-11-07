@@ -57,11 +57,10 @@ Babylon's WebGPU engine, glTF loader, and the existing world connector. It can
 select either Hogwarts's local bridge provider or a hosted world's signed
 manifest and registered provider modules.
 
-The Hogwarts Great Hall path rendered through Babylon using 1,202 placements
-and 1.3 MiB of GLBs; a completed load showed about 7–8 FPS in this Weston
-review session. The prototype creates separate Babylon nodes for each imported
-placement, and this has not been optimized or benchmarked under controlled
-load. The initial Tidewater path
+The first Hogwarts result rendered through Babylon using separate clones for
+each placement. Its 7–8 FPS result was not a renderer comparison: it used a
+different loaded snapshot and was not measured under controlled load. The
+initial Tidewater path
 successfully validated its signed manifest and loaded 29 nearby GLB placements
 (2.8 MiB), but the view was mostly empty: required terrain, vegetation, and
 village-material presentation are not ported. Its single 17 FPS sample is not
@@ -69,6 +68,39 @@ comparable to the Hogwarts sample because scene complexity and competing host
 load differed. These runs show that the shared data boundary can feed Babylon;
 they do not establish renderer parity, a performance gain, or a Tidewater
 migration.
+
+### Matched Great Hall WebGPU run
+
+On 2026-11-07, the production ElseMesh WebGPU path and Babylon WebGPU prototype
+were compared sequentially in the same maximized Weston Chromium process. Both
+used the same local Hogwarts provider and browser cache, the same pose
+(`[0, 8.62, 90]`, yaw `3.14159`, pitch `-0.1`, time `16.2`), the same
+1588×780 canvas at DPR 1, and the same GPU. Production streaming was stopped
+after a settled snapshot of 72 loaded object IDs and 77 installed component
+IDs; that exact selection was then supplied to Babylon. Babylon was warmed for
+30 seconds before sampling. Each sample window lasted 45 seconds and collected
+180 readings at 250 ms intervals.
+
+| Renderer | Median FPS | Median CPU render | P90 CPU render | Median GPU time | P90 GPU time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ElseMesh WebGPU | 13.47 | 10.0 ms | 15.3 ms | 34.08 ms | 36.04 ms |
+| Babylon WebGPU | about 15* | 8.6 ms | 12.3 ms | 24.31 ms | 26.15 ms |
+
+\* Babylon's displayed FPS is rounded to a whole number; its 180 readings had a
+median of 15 and P90 of 16. Both GPU measurements used WebGPU timestamp queries
+and are reported in milliseconds. This is stronger evidence than the earlier
+uncontrolled 7–8 FPS observation: Babylon was faster in this particular run,
+with lower CPU and GPU times. It does not isolate engine cost completely.
+
+The prototype installed 815 visible placements out of 823 selected placements;
+8 selected GLBs had no renderable geometry and were skipped. Babylon still does
+not reproduce ElseMesh's world-specific lighting, post-processing, atmosphere,
+component behavior, or complete texture path. Thus the object/component IDs,
+pose, viewport, and GPU were matched, but the final draw and shading workloads
+were not pixel- or feature-identical. Treat the result as evidence to continue
+the Babylon prototype, not as a production migration decision. A stronger
+engine-level result requires porting the missing presentation features and
+comparing equivalent visible geometry and material effects.
 
 Next evaluation should add or adapt Tidewater's required presentation
 components to Babylon, then compare both production backends and Babylon at

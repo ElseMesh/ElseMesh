@@ -14,9 +14,11 @@ external build tree with Vite. Open this page with either:
 - Hogwarts: `?source=hogwarts&localProvider=http://127.0.0.1:<bridge-port>&localMap=SUB_GreatHall_Int`
 - A hosted world: `?source=world&worldId=<world-id>&gateway=http://127.0.0.1:<worldd-port>`
 
-The first pass renders ordinary GLB-backed world objects and
+The ordinary first pass renders GLB-backed world objects and
 `elsemesh.static-model-instance-set/1` components in a 36 m radius, capped at
-1,200 placements. Babylon handles GLB scene/material import, WebGPU submission,
+10,000 placements. A review-only injected ID selection can replay the exact
+objects and components from a production snapshot. Babylon handles GLB
+scene/material import, WebGPU submission,
 and KTX2 decoding; a narrow glTF loader extension resolves ElseMesh's external
 texture-asset references through the active connector. Hosted-world manifests
 are validated with the same registered world-provider modules as the main
@@ -32,9 +34,12 @@ presentation components are not implemented here. This confirms connector,
 provider validation, and GLB integration only; it does not show that Babylon
 can render Tidewater as a complete world or establish a performance win. Its
 observed 17 FPS was one noisy sample with other rendering work on the host.
-The completed Great Hall load showed about 7–8 FPS with 2,788 Babylon meshes
-for 1,202 placements. This prototype creates separate nodes for each
-placement, and it has not been optimized or benchmarked under controlled load.
+The initial completed Great Hall load showed about 7–8 FPS with separate
+placement clones. That was not a fair comparison with production. A later
+matched run is documented in ElseMesh's
+[graphics review](../../docs/graphics-review.md#matched-great-hall-webgpu-run).
+The prototype now asks Babylon to instance repeated geometry and can use the
+production snapshot's object/component IDs and camera pose.
 Babylon's KTX2 loader currently uses its default remote decoder module URL;
 this prototype does not bundle that decoder yet. An earlier run logged a
 resource 404 while the scene still showed some textured geometry. Confirm the
