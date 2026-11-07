@@ -269,10 +269,12 @@ try {
 	assert.equal( invalidIDConnector.assetCacheBudgetBytes + invalidIDConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'browsers without a reported RAM hint use the conservative default cache budget' );
 	const visualPriorityConnector = new LocalRegionConnector( link );
 	visualPriorityConnector.manifest = {
-		assets: [ 'near-prop', 'far-wall', 'collision' ].map( id => ( { id, kind: 'application/json' } ) ),
+		assets: [ 'near-prop', 'far-wall', 'near-large', 'near-small', 'collision' ].map( id => ( { id, kind: 'application/json' } ) ),
 		objects: [
 			{ id: 'near-prop-object', assetId: 'near-prop', regionCell: true, streamingBounds: { center: [ 2, 0, 0 ], radius: 0 } },
 			{ id: 'far-wall-object', assetId: 'far-wall', regionCell: true, streamingBounds: { center: [ 0, 0, 20 ], radius: 0 } },
+			{ id: 'near-large-object', assetId: 'near-large', regionCell: true, streamingBounds: { center: [ 2, 0, 0 ], radius: 0 } },
+			{ id: 'near-small-object', assetId: 'near-small', regionCell: true, streamingBounds: { center: [ 2, 0, 0 ], radius: 0 } },
 			{ id: 'collision-object', assetId: 'collision', regionCell: true, streamingBounds: { center: [ 1, 0, 0 ], radius: 0 } },
 		],
 		components: [],
@@ -281,10 +283,10 @@ try {
 	const visualPriorityFetches = [];
 	visualPriorityConnector.getAsset = async id => { visualPriorityFetches.push( id ); return new Uint8Array( [ 1 ] ); };
 	await visualPriorityConnector.preload( {
-		assetIDs: [ 'near-prop', 'far-wall', 'collision' ], position: [ 0, 0, 0 ],
-		viewPriorityByAsset: new Map( [ [ 'near-prop', 0.05 ], [ 'far-wall', 0.4 ] ] ),
+		assetIDs: [ 'near-prop', 'far-wall', 'near-large', 'near-small', 'collision' ], position: [ 0, 0, 0 ],
+		viewPriorityByAsset: new Map( [ [ 'near-prop', 0.05 ], [ 'far-wall', 0.4 ], [ 'near-large', 0.4 ], [ 'near-small', 0.05 ] ] ),
 	} );
-	assert.deepEqual( visualPriorityFetches, [ 'collision', 'far-wall', 'near-prop' ], 'collision remains first, then larger on-screen content can outrank a closer prop' );
+	assert.deepEqual( visualPriorityFetches, [ 'collision', 'near-large', 'near-prop', 'near-small', 'far-wall' ], 'collision is first; nearby opaque content precedes distant assets; projected size breaks distance ties' );
 	await assert.rejects( visualPriorityConnector.preload( { assetIDs: [], viewPriorityByAsset: new Map( [ [ 'invalid', Number.NaN ] ] ) } ), /priority map is invalid/ );
 	for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) {
 		descriptorWorldId = worldId;
