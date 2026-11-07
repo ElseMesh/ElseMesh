@@ -1877,6 +1877,7 @@ export class UI {
 		this._photo = false;
 		this._help = false;
 		this._start = false;
+		this._startDismissed = false;
 		this._overUI = false;
 		this._drag = 0;
 		this._menu = null;
@@ -3348,6 +3349,7 @@ export class UI {
 		if ( this._startPromise ) return this._startPromise;
 		const el = this.startEl;
 		this._start = true;
+		this._startDismissed = false;
 		this.root.classList.add( 'is-starting' );
 		el.hidden = false;
 		void el.offsetWidth;
@@ -3380,6 +3382,7 @@ export class UI {
 				el.removeEventListener( 'click', go );
 				window.removeEventListener( 'keydown', go, true );
 				this._start = false;
+				this._startDismissed = true;
 				this._startPromise = null;
 				this.root.classList.remove( 'is-starting' );
 				el.classList.remove( 'is-on' );

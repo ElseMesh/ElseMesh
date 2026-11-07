@@ -69,6 +69,16 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-07: aligned Tidewater's WebGL first-play guide with WebGPU. The
+  engine UI now reports when the start overlay has been dismissed, so WebGL
+  initialization frames cannot show the guide over the start screen or advance
+  one-time tips before play begins. The WebGL adapter updates the shared guide
+  with its live player/boat state, Tidewater vendor locations, and minimap; the
+  isolated Weston review confirmed the clean start screen and the guide after
+  starting. This closes a WebGL-only tutorial-content gap, but does not change
+  the 84% parity estimate because rendered vendor interaction, visual matching,
+  and supported-hardware performance remain open.
+
 - 2026-11-07: moved the WebGL fish-prop renderer and both component backend
   adapters from Tidewater into ElseMesh. The world now registers only the
   signed fish-prop placement decoder and component contract; ElseMesh selects
