@@ -176,12 +176,13 @@ async function prepareWorldPackageMaterialAdapters( connector, root, signal, obj
 
 export function updateWorldPackageLOD( root, camera, loadBias = 0, now = performance.now() ) {
 	for ( const controller of root?.userData?.worldPackage?.lodControllers?.values() || [] ) controller.update( camera, now, loadBias );
-	updateWorldPackageTextureLOD( root, camera );
+	updateWorldPackageTextureLOD( root, camera, loadBias );
 }
 
-function updateWorldPackageTextureLOD( root, camera ) {
+function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
+	const bias = Number.isFinite( loadBias ) ? Math.max( 0, Math.min( 2, loadBias ) ) : 0;
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
 	const requests = [];
 	const assetScreenFractions = new Map();
@@ -205,7 +206,9 @@ function updateWorldPackageTextureLOD( root, camera ) {
 			screenFraction = Math.max( screenFraction, assetFraction );
 		}
 		if ( ! screenFraction ) continue;
-		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 );
+		// A positive workload bias chooses coarser texture levels for every streamed
+		// package, matching the mesh-LOD bias above without lowering render resolution.
+		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 / ( 2 ** bias ) );
 		const textureDiameter = Math.max( target.baseWidth, target.baseHeight );
 		const texelRatio = textureDiameter / pixelDiameter;
 		let desiredLevel = Math.min( target.levelCount - 1, Math.max( 0, Math.floor( Math.log2( texelRatio ) ) ) );
