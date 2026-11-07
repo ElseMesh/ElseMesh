@@ -3,7 +3,7 @@ import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 
 const indexedStartupCell = [ 0, 0, 5 ];
 const descriptor = {
-	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', worldId: 'elsemesh:test', regions: '/v1/regions',
+	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', cacheRevision: 'test-revision:converter-1', worldId: 'elsemesh:test', regions: '/v1/regions',
 	entrySelection: {
 		entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ],
