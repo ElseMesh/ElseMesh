@@ -5,7 +5,7 @@ import { WOOD, HARD, C, lin, mulc, buoy } from '../Props.js';
 
 export { hash1, vnoise3 };
 
-// Geometry emitters for the shoreline wrack and the village clutter (DebrisPlacement decides
+// Geometry emitters for shoreline wrack and village clutter (the world placement provider decides
 // where). Everything is written into a GeoBuilder with the village material keys (wood, hard,
 // rope, net) plus 'nature' (NatureMaterial: stones, coconuts, seaweed, shells, coral, fronds).
 //
