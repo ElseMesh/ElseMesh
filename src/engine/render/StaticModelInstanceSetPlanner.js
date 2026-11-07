@@ -82,7 +82,6 @@ export class StaticModelInstanceSetPlanner {
 				continue;
 			}
 			for ( let axis = 0; axis < 4; axis ++ ) this._normalizedPlanes[ offset + axis ] = plane[ axis ] / length;
-			for ( let axis = 0; axis < 4; axis ++ ) this._normalizedPlanes[ offset + axis ] = plane[ axis ] / length;
 		}
 		for ( const group of this.groups ) group.count = 0;
 		if ( includeShadows || this._shadowGroupsActive ) for ( const group of this.shadowGroups ) group.count = 0;
