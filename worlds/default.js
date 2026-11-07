@@ -4,15 +4,19 @@ import fishingRulesExtension from './tidewater/extensions/fishing-game-rules.js?
 import terrainLOD from './tidewater/lod-source/terrain-full.glb?url';
 import villageLOD from './tidewater/lod-source/village-full.glb?url';
 import vegetationPlacements from './tidewater/lod-source/vegetation-placements.bin?url';
+import fishPropsPlacements from './tidewater/assets/11f5ea7d9ccaf1a3d7931bfc46a34d71f133e0df23225e8b86904c47137f0fcf?url';
 import { DEFAULT_REEF_PLACEMENT_ASSETS as reefPlacementAssets } from './tidewater/default-reef-assets.js';
 import { TIDEWATER_LAYOUT as defaultLayout } from './tidewater/layout.js';
 
 const vegetation = source.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
 const vegetationPlacementAssetId = vegetation?.data?.placementAssetId;
 const vegetationAsset = vegetation?.assets.find( asset => asset.assetId === vegetationPlacementAssetId );
+const fishProps = source.components.find( component => component.type === 'elsemesh.static-fish-props/1' );
+const fishPropsAsset = fishProps?.assets.find( asset => asset.assetId === fishProps?.data?.placementAssetId );
 const assetURLs = {
 	...reefPlacementAssets,
 	...( vegetationAsset ? { [ vegetationAsset.assetId ]: vegetationPlacements } : {} ),
+	...( fishPropsAsset ? { [ fishPropsAsset.assetId ]: fishPropsPlacements } : {} ),
 };
 
 // Deployment binding for the built-in world. The renderer consumes this

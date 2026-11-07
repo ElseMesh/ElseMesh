@@ -11,9 +11,9 @@ try {
 	const { defaultWorldPackage } = await server.ssrLoadModule( '/worlds/default.js' );
 	const { source, assets, presentation } = defaultWorldPackage;
 	assert.equal( typeof presentation.createVegetation, 'function', 'the default world supplies its vegetation renderer through the package presentation interface' );
-	for ( const component of source.components.filter( candidate => [ 'elsemesh.static-reef/1', 'elsemesh.static-vegetation/1' ].includes( candidate.type ) ) ) {
+	for ( const component of source.components.filter( candidate => [ 'elsemesh.static-reef/1', 'elsemesh.static-vegetation/1', 'elsemesh.static-fish-props/1' ].includes( candidate.type ) ) ) {
 		for ( const reference of component.assets || [] ) {
-			if ( reference.kind === 'reef-placement/1' || reference.kind === 'vegetation-placement/1' ) {
+			if ( [ 'reef-placement/1', 'vegetation-placement/1', 'fish-props-placement/1' ].includes( reference.kind ) ) {
 				assert.equal( typeof assets.assetURLs[ reference.assetId ], 'string', `${component.type} asset ${reference.assetId} has a URL in the generic package asset index` );
 			}
 		}
