@@ -10,7 +10,7 @@ export class FrameWorkMeter {
   this.webglTimerExtension = this.webgl?.getExtension?.('EXT_disjoint_timer_query_webgl2') || null;
   this.webglMode = !!this.webgl;
   this.enabled = this.webglMode ? !!this.webglTimerExtension : !!gpu.hasTimestamp;
-  this.lastStart = -Infinity; this.latest = null; this.lastConsumedAt = null; this.active = null; this.disposed = false;
+  this.lastStart = -Infinity; this.lastPoll = -Infinity; this.latest = null; this.lastConsumedAt = null; this.active = null; this.disposed = false;
   this.slots = [];
   if (!this.enabled) return;
   if (this.webglMode) {
@@ -89,16 +89,11 @@ export class FrameWorkMeter {
  beginWebGL() {
   if (!this.enabled || this.disposed || this.active) return false;
   const now = this.clock();
-  this.pollWebGL();
+  if (this.pollWebGL()) return false;
   if (now - this.lastStart < this.intervalMs) return false;
   const slot = this.slots.find(candidate => !candidate.busy);
   if (!slot) return false;
   try {
-   // Reading the disjoint flag clears a previous event before starting this sample.
-   if (this.webgl.getParameter(this.webglTimerExtension.GPU_DISJOINT_EXT)) {
-    this.latest = null;
-    return false;
-   }
    this.webgl.beginQuery(this.webglTimerExtension.TIME_ELAPSED_EXT, slot.query);
    slot.busy = true;
    slot.started = now;
@@ -112,18 +107,21 @@ export class FrameWorkMeter {
   }
  }
  pollWebGL() {
-  if (!this.enabled || this.disposed || this.active) return;
+  if (!this.enabled || this.disposed || this.active) return false;
+  const now = this.clock();
+  if (now - this.lastPoll < this.intervalMs) return false;
+  this.lastPoll = now;
   const gl = this.webgl, extension = this.webglTimerExtension;
   if (gl.isContextLost?.()) {
    this.latest = null;
    for (const slot of this.slots) slot.busy = slot.pending = false;
-   return;
+   return false;
   }
   try {
    if (gl.getParameter(extension.GPU_DISJOINT_EXT)) {
     this.latest = null;
     for (const slot of this.slots) slot.busy = slot.pending = false;
-    return;
+    return true;
    }
    for (const slot of this.slots) {
     if (!slot.pending) continue;
@@ -137,10 +135,12 @@ export class FrameWorkMeter {
     slot.pending = false;
     slot.busy = false;
    }
+   return false;
   } catch {
    this.enabled = false;
    this.latest = null;
    for (const slot of this.slots) slot.busy = slot.pending = false;
+   return false;
   }
  }
  dispose() {

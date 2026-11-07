@@ -40,6 +40,7 @@ meter.dispose();
 assert.ok( readBuffers.length >= 3 );
 
 let webglClock = 0, disjoint = false, activeQuery = null, resultReads = 0, deletedQueries = 0;
+let parameterReads = 0;
 let nextQuery = 0;
 const webglExtension = { TIME_ELAPSED_EXT: 11, GPU_DISJOINT_EXT: 12 };
 const gl = {
@@ -48,7 +49,7 @@ const gl = {
 	getExtension: name => name === 'EXT_disjoint_timer_query_webgl2' ? webglExtension : null,
 	createQuery: () => ( { id: ++ nextQuery, available: false } ),
 	deleteQuery: () => { deletedQueries ++; },
-	getParameter: name => name === webglExtension.GPU_DISJOINT_EXT ? disjoint : null,
+	getParameter: name => ( parameterReads ++, name === webglExtension.GPU_DISJOINT_EXT ? disjoint : null ),
 	beginQuery: ( target, query ) => { assert.equal( target, webglExtension.TIME_ELAPSED_EXT ); activeQuery = query; },
 	endQuery: target => { assert.equal( target, webglExtension.TIME_ELAPSED_EXT ); activeQuery = null; },
 	getQueryParameter: ( query, name ) => {
@@ -77,6 +78,31 @@ assert.equal( webglMeter.gpuMilliseconds(), null, 'disjoint WebGL timer queries 
 disjoint = false;
 webglMeter.dispose();
 assert.equal( deletedQueries, 3, 'WebGL query objects are released on dispose' );
+
+let throttledClock = 0, throttledParameterReads = 0;
+const throttledQuery = { available: false };
+const throttledGL = {
+	QUERY_RESULT_AVAILABLE: 13, QUERY_RESULT: 14,
+	getExtension: () => webglExtension,
+	createQuery: () => throttledQuery,
+	deleteQuery() {},
+	getParameter: () => ( throttledParameterReads ++, false ),
+	beginQuery() {}, endQuery() {},
+	getQueryParameter: ( _query, name ) => name === 13 ? throttledQuery.available : 2_000_000,
+};
+const throttledMeter = new FrameWorkMeter( { webglRenderer: { getContext: () => throttledGL }, clock: () => throttledClock, intervalMs: 250 } );
+assert.equal( throttledMeter.begin(), true );
+throttledMeter.end();
+assert.equal( throttledParameterReads, 1, 'WebGL timer state is checked once when a sample starts' );
+throttledQuery.available = true;
+throttledClock = 100;
+throttledMeter.gpuMilliseconds();
+throttledMeter.gpuMilliseconds();
+assert.equal( throttledParameterReads, 1, 'repeated HUD reads do not poll GL state every frame' );
+throttledClock = 250;
+assert.equal( throttledMeter.gpuMilliseconds(), 2, 'pending results are polled at the configured interval' );
+assert.equal( throttledParameterReads, 2 );
+throttledMeter.dispose();
 
 const unsupportedMeter = new FrameWorkMeter( { webglRenderer: { getContext: () => ( { getExtension: () => null } ) } } );
 assert.equal( unsupportedMeter.begin(), false, 'missing WebGL timer-query support leaves timing unavailable' );
