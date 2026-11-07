@@ -22,8 +22,9 @@
 
 ## Shared-file commits
 
-- If a commit includes edits from another agent in a shared file, that is allowed. Mention both the requested change and the other agent's change in the commit message.
-- Always commit every file containing changes related to the current goal. If a file mixes goal-related and unrelated edits, keep the related change committed and mention any included concurrent edit in the commit message; leave unrelated files untouched. Tidewater split and parity work is always commit-worthy.
+- Keep commits focused on the active goal. A change being important or commit-worthy for another goal does not make it part of the current goal.
+- If a shared file contains an edit required by the active goal alongside another agent's edit, do not discard or split that other edit just to make the commit appear single-purpose. Commit the shared file and describe both edits in the commit message.
+- Leave files unrelated to the active goal untouched. Commit Tidewater split or parity work when it is the active goal, or when that work shares a file that the active goal already needs to change.
 
 ## Hogwarts bridge build output
 
