@@ -439,7 +439,8 @@ export class MeshRenderer {
 			if ( ! o.visible && ! all ) return;
 			if ( o.isMesh && o.material && o.geometry && ( o.layers.mask & layerMask ) !== 0 && ( ! filter || filter( o ) ) && ( kind === 'depth' ? o.castShadow : ! o.userData.shadowOnly ) ) {
 
-				if ( all || ! cull || ! camera || o.frustumCulled === false || this._inFrustum( o ) ) {
+				const instances = o.isInstancedMesh ? o.count : o.geometry.instanceCount ?? 1;
+				if ( instances !== 0 && ( all || ! cull || ! camera || o.frustumCulled === false || this._inFrustum( o ) ) ) {
 
 					// ported systems use this for their own LOD / culling (called per pass, as three does)
 					if ( o.onBeforeRender ) o.onBeforeRender( null, null, camera, o.geometry, o.material, null );
