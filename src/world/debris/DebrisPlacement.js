@@ -1006,7 +1006,7 @@ export class DebrisPlacer {
 				if ( ! this.clear( x, z, 0.12, { path: 0.15, spacing: 0.9 } ) ) continue;
 				coconut( B, g, x, z, rand, { age: rand() < 0.3 ? rand() * 0.3 : 0.35 + rand() * 0.65 } );
 				this.take( x, z, 0.11 );
-				this.count( 'coconut' );
+				this.count( 'coconut', 1, x, z );
 
 			}
 
@@ -1017,7 +1017,7 @@ export class DebrisPlacer {
 				if ( this.clear( x, z, 0.1, { path: 0.15 } ) ) {
 
 					husk( B, g, x, z, rand );
-					this.count( 'husk' );
+						this.count( 'husk', 1, x, z );
 
 				}
 
@@ -1225,8 +1225,8 @@ export class DebrisPlacer {
 
 			}
 
-			case 'coconut': coconut( B, g, x, z, rand, { age: 0.4 + rand() * 0.6 } ); this.take( x, z, 0.12 ); break;
-			case 'husk': husk( B, g, x, z, rand ); this.take( x, z, 0.1 ); break;
+			case 'coconut': coconut( B, g, x, z, rand, { age: 0.4 + rand() * 0.6 } ); this.take( x, z, 0.12 ); this.count( 'coconut', 1, x, z ); break;
+			case 'husk': husk( B, g, x, z, rand ); this.take( x, z, 0.1 ); this.count( 'husk', 1, x, z ); break;
 			case 'rope': ropeScrap( B, g, x, z, rand, { tangle: rand() < 0.3 } ); this.take( x, z, 0.3 ); break;
 			case 'net': netScrap( B, g, x, z, rand ); this.take( x, z, 0.7 ); break;
 			case 'float': this._float( x, z ); this.take( x, z, 0.2 ); break;

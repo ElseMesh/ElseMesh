@@ -14,7 +14,7 @@ const tests = [
 	'test/world-portals.mjs', 'test/portal-sides.mjs', 'test/portal-back-contract.mjs', 'test/portal-link.mjs',
 	'test/world-launcher.mjs', 'test/world-directory.mjs', 'cloudflare/world-resolver/test.mjs', 'test/world-streaming.mjs',
 	'test/world-object-lod.mjs', 'test/world-object-lod-contract.mjs', 'worlds/tidewater/test/lod-package.mjs', 'worlds/tidewater/test/webgl-whale-package.mjs', 'test/webgl-spray.mjs',
-	'test/world-source-manifest.mjs', 'worlds/tidewater/test/world-source-manifest.mjs', 'worlds/tidewater/test/village-materials.mjs', 'test/world-proposal.mjs',
+	'test/world-source-manifest.mjs', 'worlds/tidewater/test/world-source-manifest.mjs', 'worlds/tidewater/test/coconut-preservation.mjs', 'worlds/tidewater/test/village-materials.mjs', 'test/world-proposal.mjs',
 	'test/ai-edit-worker.mjs', 'test/ai-edit-mcp.mjs', 'test/ai-edit-review-html.mjs', 'test/prepare-ai-edit-publication.mjs',
 	'test/ai-edit-worker-runtime.mjs', 'worlds/tidewater/test/world-export.mjs', 'test/world-ocean-frame.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'test/world-audio.mjs',
 	'worlds/tidewater/test/boat-lod-runtime.mjs', 'worlds/tidewater/test/webgl-pier-collision.mjs',
