@@ -178,7 +178,7 @@ export class App {
 			sunAzimuth: 0, // degrees: turns the sun's daily path about the vertical
 			timeSpeed: 0, // hours per real second
 			exposure: 0.55,
-			renderScale: this.renderScaleOverride ?? ( this.desktopAdaptiveScale ? 0.75 : 1 ), // Linux starts lighter; adaptive scale targets 24 fps
+			renderScale: this.renderScaleOverride ?? 1, // Start at full resolution; adaptive detail is the first response to sustained load.
 		};
 		this.renderLoadLOD = new RenderLoadLOD();
 		this.renderLoadWarmup = 0;
@@ -203,7 +203,7 @@ export class App {
 		this.desktopAntiAliasingMode = fpsMode ? 'none' : null;
 		this.desktopRefractionScale = fpsMode ? 0.35 : 0.5;
 		this.autoScale = fpsMode && ! this.qs.has( 'scale' );
-		if ( this.settings ) this.settings.renderScale = this.renderScaleOverride ?? ( fpsMode ? 0.75 : 1 );
+		if ( this.settings ) this.settings.renderScale = this.renderScaleOverride ?? 1;
 		if ( persist && this.isLinuxDesktop ) saveGraphicsPriority( this.graphicsPriority );
 
 		if ( this.engine ) this.engine.setFrameRateLimit( this.desktopFrameRateLimit );
