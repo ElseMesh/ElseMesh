@@ -1,42 +1,23 @@
 import assert from 'node:assert/strict';
-import { WebGLWake, WEBGL_WAKE_GLSL, WEBGL_WAKE_SAMPLE_INTERVAL } from '../src/fallback/WebGLWake.js';
+import { WebGLWakeSim, WEBGL_WAKE_READER_GLSL } from '../src/ocean/WebGLWakeSim.js';
 import { WebGLFallback } from '../src/fallback/WebGLFallback.js';
+import { WebGLWaterQuery } from '../src/fallback/WebGLWaterQuery.js';
 
-class Vector4 {
-	set( x, y, z, w ) { Object.assign( this, { x, y, z, w } ); return this; }
-}
+assert.match( WEBGL_WAKE_READER_GLSL, /webglWakeHeight\(vec2 xz\)/ );
+assert.match( WEBGL_WAKE_READER_GLSL, /webglWakeSample\(vec2 xz\)/ );
+assert.match( WEBGL_WAKE_READER_GLSL, /webglWakeFragment\(vec2 xz\)/ );
+assert.match( WebGLFallback.prototype._createWebGLWake.toString(), /new WebGLWakeSim/ );
+assert.match( WebGLFallback.prototype._createWebGLWake.toString(), /setWakeReader\( this\.wake\.readerUniforms \)/,
+	'WebGL boat water queries receive the shared simulated wake reader' );
+assert.match( WebGLWaterQuery.prototype.setWakeReader.toString(), /Object\.assign\( this\.material\.uniforms, uniforms \)/ );
+assert.match( WebGLFallback.prototype._bindWakeToWater.toString(), /readerUniforms/,
+	'visible WebGL water receives the same wake textures and uniforms as the boat query' );
+assert.match( WebGLFallback.prototype._frame.toString(), /this\.wake\?\.update\( dt, simulationTime \)/,
+	'the simulation advances by elapsed simulation delta' );
+const frameSource = WebGLFallback.prototype._frame.toString();
+assert( frameSource.indexOf( 'this.boat?.update( dt )' ) < frameSource.indexOf( 'this.wake?.update( dt, simulationTime )' ),
+	'WakeSim consumes the boat state after the controller update, matching WebGPU ordering' );
+assert.match( WebGLWakeSim.prototype.update.toString(), /Number\.isFinite\(\s*simulationTime\s*\)\s*\?\s*simulationTime\s*:\s*this\.time\s*\+\s*dt/,
+	'fixed simulation time drives wake noise without changing the solver delta' );
 
-const boat = {
-	position: { x: 0, z: 0 }, velocity: { x: 0, z: 2 },
-	quaternion: { x: 0, y: 0, z: 0, w: 1 },
-};
-const wake = new WebGLWake( boat, { Vector4 } );
-wake.update( 1 );
-assert.equal( wake.sources.length, 1, 'moving boat emits a wake source' );
-boat.position.z = 0.5;
-wake.update( 1 + WEBGL_WAKE_SAMPLE_INTERVAL );
-assert.equal( wake.sources.length, 2, 'moving boat adds sources at the fixed sample interval' );
-assert.ok( Math.abs( wake.heightAt( 0, - 2, 1.5 ) ) > 1e-4, 'wake displaces water behind the boat' );
-assert.equal( wake.heightAt( 0, 2, 1.5 ), 0, 'wake does not displace water ahead of the boat' );
-assert.ok( wake.foamAt( 0, - 2, 1.5 ) > 0, 'wake foam follows its diverging arms' );
-
-const frameBoat = { position: { x: 0, z: 0 }, velocity: { x: 7, z: 0 }, quaternion: { x: 0, y: 0, z: 0, w: 1 } };
-const frameWake = new WebGLWake( frameBoat, { Vector4 } );
-for ( let frame = 1; frame <= 60; frame ++ ) {
-	frameBoat.position.x = frame * 7 / 60;
-	frameWake.update( frame / 60 );
-}
-assert.ok( frameWake.sources.length >= 3, 'frame-paced movement emits repeated wake sources at 60 FPS' );
-
-assert.match( WEBGL_WAKE_GLSL, /webglWakeHeight/ );
-assert.match( WEBGL_WAKE_GLSL, /webglWakeFoam/ );
-assert.match( WebGLFallback.prototype._createWebGLWake.toString(), /setSurfaceOffsetSampler\( 'wake'/, 'boat wake height feeds WebGL boat water queries' );
-assert.match( WebGLFallback.prototype._bindWakeToWater.toString(), /uWakeSources/, 'the wake source trail feeds the shared WebGL water shader' );
-assert.match( WebGLFallback.prototype._frame.toString(), /this\.wake\?\.update\( simulationTime \)/, 'the wake trail advances from engine simulation time' );
-boat.velocity.x = boat.velocity.z = 0;
-wake.update( 20 );
-assert.equal( wake.sources.length, 0, 'expired wake sources are discarded' );
-wake.dispose();
-assert.equal( wake.uniforms.uWakeEnabled.value, 0, 'dispose disables wake shader uniforms' );
-
-console.log( 'WebGL interactive wake model: ok' );
+console.log( 'WebGL wake reader integration: ok' );

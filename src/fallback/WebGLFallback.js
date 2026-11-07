@@ -19,7 +19,7 @@ import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
-import { WebGLWake, WEBGL_WAKE_GLSL } from './WebGLWake.js';
+import { WebGLWakeSim, WEBGL_WAKE_READER_GLSL } from '../ocean/WebGLWakeSim.js';
 import { createWebGLShoreSurfaceOffset } from './WebGLShoreSurface.js';
 import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
@@ -550,7 +550,9 @@ function webglTerrainWaterTexture( T, terrain ) {
 
 function webglShoreFieldTexture( T, terrain, seaLevel, worldDefinition ) {
 
-	const swellLength = Math.hypot( ...worldDefinition.swellDir ), swell = worldDefinition.swellDir.map( value => value / swellLength );
+	const authoredSwell = worldDefinition.swellDir;
+	const swellDirection = Array.isArray( authoredSwell ) ? authoredSwell : [ authoredSwell.x, authoredSwell.y ];
+	const swellLength = Math.hypot( ...swellDirection ), swell = swellDirection.map( value => value / swellLength );
 	const field = computeShoreField( terrain, { res: 512, swellDir: swell, seaLevel } );
 	const encoded = encodeWebGLShoreField( T, field, swell );
 	return encoded ? { ...encoded, field } : null;
@@ -1038,7 +1040,6 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
-				uWakeSources: { value: Array.from( { length: 24 }, () => new T.Vector4() ) }, uWakeCount: { value: 0 }, uWakeEnabled: { value: 0 },
 				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
@@ -1079,7 +1080,7 @@ export class WebGLFallback {
 				varying float vSwashFront;
 				varying float vSwashLevel;
 				varying float vSwashFoam;
-				varying float vWakeFoam;
+				${ WEBGL_WAKE_READER_GLSL }
 				vec3 oceanDisplacementCascade( vec2 xz, int cascade ) {
 					vec2 g = fract( xz / uOceanSizes[ cascade ] ) * 256.0 - 0.5;
 					// Keep hardware bilinear filtering inside the selected 256x256 cascade
@@ -1098,7 +1099,6 @@ export class WebGLFallback {
 					}
 					return displacement;
 				}
-				${WEBGL_WAKE_GLSL}
 				${ webglShoreWobbleGLSL }
 				struct WebGLShoreBreak {
 					float b; float Ash; float p; float meanP; float crestPeak; float H;
@@ -1199,7 +1199,6 @@ export class WebGLFallback {
 					vSwashFront = -1.0;
 					vSwashLevel = uSeaLevel;
 					vSwashFoam = 0.0;
-					vWakeFoam = 0.0;
 					float vertexGroundHeight = uHeightRange.x;
 					float vertexSandCoverage = 0.0;
 					float shoreWaveHeight = 0.0;
@@ -1266,8 +1265,7 @@ export class WebGLFallback {
 						world.xz += ocean.xz;
 						vWaveHeight = ocean.y + shoreWaveHeight;
 					}
-					vWaveHeight += webglWakeHeight( p, uTime );
-					vWakeFoam = webglWakeFoam( p, uTime );
+					vWaveHeight += webglWakeHeight( p );
 					if ( uShoreFieldSize > 0.0 && uSwashTimeRange.y > uSwashTimeRange.x && uSeaLevel - vertexGroundHeight < 26.0 && vertexSandCoverage > 0.05 ) {
 						vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
 						vec4 shore = texture2D( uShoreField, shoreUv );
@@ -1361,7 +1359,7 @@ export class WebGLFallback {
 				varying float vSwashFront;
 				varying float vSwashLevel;
 				varying float vSwashFoam;
-				varying float vWakeFoam;
+				${ WEBGL_WAKE_READER_GLSL }
 				vec3 screenColorToLinear( vec3 color ) {
 					return mix( color / 12.92, pow( ( color + 0.055 ) / 1.055, vec3( 2.4 ) ), step( vec3( 0.04045 ), color ) );
 				}
@@ -1402,6 +1400,8 @@ export class WebGLFallback {
 					vec3 geometricNormal = normalize( cross( dFdx( vWorldPosition ), dFdy( vWorldPosition ) ) );
 					if ( geometricNormal.y < 0.0 ) geometricNormal = -geometricNormal;
 					vec2 slope = vec2( -geometricNormal.x, -geometricNormal.z ) / max( geometricNormal.y, 0.05 );
+					WebGLWakeFragment wakeField = webglWakeFragment( vRestPosition );
+					slope += wakeField.slopes;
 					vec2 fineStep = vec2( 0.0012, 0.0 );
 					float fineSlopeX = texture2D( uCloudNoise, fineUv + fineStep ).r - texture2D( uCloudNoise, fineUv - fineStep ).r;
 					float fineSlopeY = texture2D( uCloudNoise, fineUv + fineStep.yx ).r - texture2D( uCloudNoise, fineUv - fineStep.yx ).r;
@@ -1435,7 +1435,7 @@ export class WebGLFallback {
 					float footprint = max( length( dFdx( vWorldPosition ) ), length( dFdy( vWorldPosition ) ) );
 					float unresolved = clamp( log2( max( 110.0 * footprint / 3.14159265359, 1e-4 ) ) / 9.0, 0.0, 1.0 );
 					float mss = 0.003 + uWindSpeed * 0.00512;
-					float alpha2 = ${ ( WATER_ROUGHNESS * WATER_ROUGHNESS ).toFixed( 6 ) } + mss * 2.0 * unresolved + vShoreFoam * 0.2;
+					float alpha2 = ${ ( WATER_ROUGHNESS * WATER_ROUGHNESS ).toFixed( 6 ) } + mss * 2.0 * unresolved + vShoreFoam * 0.2 + wakeField.aeration * 0.03;
 					float sigmaUnresolved = sqrt( mss * unresolved );
 					vec3 reflectionRaw = reflect( -viewDirection, normal );
 					float reflectedY = max( reflectionRaw.y, 0.004 ) + sigmaUnresolved * 1.3 * ( 1.0 - max( reflectionRaw.y, 0.0 ) );
@@ -1469,7 +1469,7 @@ export class WebGLFallback {
 					vec3 refractedView = refract( -viewDirection, normal, 1.0 / ${ WATER_IOR.toFixed( 3 ) } );
 					vec3 waterView = normalize( vec3( refractedView.x, min( refractedView.y, -0.08 ), refractedView.z ) );
 					float waterPath = clamp( depth / max( -waterView.y, 0.04 ), 0.0, 80.0 );
-					vec3 sigmaA = uWaterAbsorption, sigmaS = uWaterScattering, sigmaT = sigmaA + sigmaS;
+					vec3 sigmaA = uWaterAbsorption, sigmaS = uWaterScattering + vec3( wakeField.aeration * 1.6 ), sigmaT = sigmaA + sigmaS;
 					vec3 waterTransmittance = exp( -sigmaT * waterPath );
 					vec3 refractedSun = -refract( -lightDirection, vec3( 0.0, 1.0, 0.0 ), 1.0 / ${ WATER_IOR.toFixed( 3 ) } );
 					float muSun = max( refractedSun.y, 0.1 ), muView = max( -waterView.y, 0.15 );
@@ -1498,7 +1498,7 @@ export class WebGLFallback {
 					breakerFoam *= mix( laceMat, 1.0, smoothstep( 0.55, 0.92, breakerFoam ) );
 					breakerFoam = max( breakerFoam, laceBubbles * smoothstep( 0.12, 0.5, breakerFoam ) * 0.48 );
 				reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), vShoreFace * 0.55 );
-					float foam = max( max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), vSwashFoam ), vWakeFoam );
+					float foam = max( max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), vSwashFoam ), wakeField.foam );
 					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
@@ -1553,8 +1553,12 @@ export class WebGLFallback {
 
 		if ( ! this.boat?.controller || ! this.waterQuery ) return;
 		this.wake?.dispose();
-		this.wake = new WebGLWake( this.boat.controller, this.THREE );
-		this.waterQuery.setSurfaceOffsetSampler( 'wake', ( x, z, time ) => this.wake?.heightAt( x, z, time ) || 0 );
+		const terrain = this.terrain || this.hostedTerrainData;
+		const colliders = this.worldLink ? this.app.hostedColliders : this.app.worldState.colliders;
+		this.wake = new WebGLWakeSim( this.THREE, this.renderer, {
+			terrain, boat: this.boat.controller, colliders, seaLevel: this.worldSeaLevel,
+		} );
+		this.waterQuery.setWakeReader( this.wake.readerUniforms );
 		this._bindWakeToWater();
 
 	}
@@ -1565,10 +1569,8 @@ export class WebGLFallback {
 		for ( const water of this.waterScene.children ) {
 
 			const uniforms = water.material?.uniforms;
-			if ( ! uniforms?.uWakeSources ) continue;
-			uniforms.uWakeSources.value = this.wake.uniforms.uWakeSources.value;
-			uniforms.uWakeCount.value = this.wake.uniforms.uWakeCount.value;
-			uniforms.uWakeEnabled.value = this.wake.uniforms.uWakeEnabled.value;
+			if ( ! uniforms ) continue;
+			Object.assign( uniforms, this.wake.readerUniforms );
 
 		}
 
@@ -2273,14 +2275,14 @@ export class WebGLFallback {
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player, simulationTime );
 		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player, simulationTime );
+		this.boat?.update( dt );
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
 			this.boat?.controller?.queueQueries();
-			this.wake?.update( simulationTime );
+			this.wake?.update( dt, simulationTime );
 			this._bindWakeToWater();
 			this.waterQuery.update( dt, simulationTime );
 		}
-		this.boat?.update( dt );
 		this.boatSpray?.update( dt );
 		for ( const whale of this.whales || [] ) whale.update( dt, this.camera );
 		this.spray?.update( dt );

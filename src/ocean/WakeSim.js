@@ -140,9 +140,9 @@ export class WakeSim {
 		this.aerOut = U.aerOut;
 
 		// (h, dh/dx, dh/dz, foam), sampled linear / repeat (smpLinearRepeat)
-		this.display = new Texture( { label: 'wakeDisplay', width: N, height: N, format: 'rgba16float', usage: [ 'sample', 'storage' ], sampler: 'linearRepeat' } );
+		this.display = new Texture( { label: 'wakeDisplay', width: N, height: N, format: 'rgba16float', usage: [ 'sample', 'storage', 'copySrc' ], sampler: 'linearRepeat' } );
 		// read with textureLoad: no sampler binding
-		this.aerTex = new Texture( { label: 'wakeAeration', width: N, height: N, format: 'rgba16float', usage: [ 'sample', 'storage' ], sampler: 'nearestRepeat' } );
+		this.aerTex = new Texture( { label: 'wakeAeration', width: N, height: N, format: 'rgba16float', usage: [ 'sample', 'storage', 'copySrc' ], sampler: 'nearestRepeat' } );
 
 		// The boat must not feel its own steady wave pattern through the water queries (the
 		// controller models its hydrodynamics already, and the 1-3 frame query latency turns that

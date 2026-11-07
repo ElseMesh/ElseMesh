@@ -1,4 +1,5 @@
 import { WebGLOceanFFT } from '../ocean/WebGLOceanFFT.js';
+import { WEBGL_WAKE_READER_GLSL } from '../ocean/WebGLWakeSim.js';
 
 const MAX_QUERIES = 64;
 const QUERY_SIZE = 8;
@@ -19,6 +20,7 @@ uniform vec2 uTerrainOrigin;
 uniform float uTerrainTexel;
 uniform float uSeaLevel;
 uniform vec4 uSizes;
+${ WEBGL_WAKE_READER_GLSL.replaceAll( 'texture2D(', 'texture(' ) }
 layout(location = 0) out vec4 outResult;
 
 float terrainHeightAt( vec2 xz ) {
@@ -74,7 +76,7 @@ float waterHeightAt( vec2 p ) {
 	float depth = uSeaLevel - terrainHeightAt( p );
 	vec2 x0 = p;
 	for ( int i = 0; i < 2; i ++ ) x0 = p - displacementAt( x0, depth ).xz;
-	return uSeaLevel + displacementAt( x0, depth ).y;
+	return uSeaLevel + displacementAt( x0, depth ).y + webglWakeHeight( x0 );
 }
 
 void main() {
@@ -137,6 +139,10 @@ export class WebGLWaterQuery {
 				uTerrainOrigin: { value: terrain ? new THREE.Vector2( terrain.origin, terrain.origin ) : new THREE.Vector2() },
 				uTerrainTexel: { value: terrain?.texel || 1 }, uSeaLevel: { value: seaLevel },
 				uSizes: { value: new THREE.Vector4( ...this.fft.parameters.sizes ) },
+				uWakeDisplay: { value: null }, uWakeAeration: { value: null }, uWakeNearField: { value: null },
+				uWakeCenter: { value: new THREE.Vector2() }, uWakeBoatPos: { value: new THREE.Vector2() },
+				uWakeBoatRot: { value: new THREE.Vector2( 1, 0 ) }, uWakeAmount: { value: 0 }, uWakeAmplitude: { value: 1 },
+				uWakeAerOut: { value: 0.3 }, uWakeDead: { value: new THREE.Vector2( 0.03, 0.08 ) },
 			},
 			depthTest: false, depthWrite: false, blending: THREE.NoBlending, toneMapped: false,
 		} );
@@ -163,6 +169,13 @@ export class WebGLWaterQuery {
 		if ( typeof name !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( name ) || sampler !== null && typeof sampler !== 'function' ) throw new TypeError( 'Water surface sampler requires a stable name and a function or null' );
 		if ( sampler === null ) this.surfaceOffsetSamplers.delete( name );
 		else this.surfaceOffsetSamplers.set( name, sampler );
+
+	}
+
+	setWakeReader( uniforms ) {
+
+		if ( ! uniforms || typeof uniforms !== 'object' ) throw new TypeError( 'WebGL water wake reader requires its uniforms' );
+		Object.assign( this.material.uniforms, uniforms );
 
 	}
 
