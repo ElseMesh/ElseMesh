@@ -14,6 +14,14 @@ export function avatarProfileId(appearance) {
 	validateAppearance(appearance);
 	return AVATAR_STYLES[ appearance.style ].profileId;
 }
+export function appearanceForAllowedProfiles( appearance, allowedProfiles ) {
+	const current = { ...validateAppearance( appearance ) };
+	if ( allowedProfiles === null || allowedProfiles === undefined || allowedProfiles.includes( avatarProfileId( current ) ) ) return current;
+	for ( const [ style, profile ] of Object.entries( AVATAR_STYLES ) ) {
+		if ( allowedProfiles.includes( profile.profileId ) ) return { ...current, style };
+	}
+	return null;
+}
 export function loadAppearance(storage) {
 	try { return { ...validateAppearance(JSON.parse((storage || globalThis.localStorage).getItem('elsemesh.avatar.v1'))) }; }
 	catch { return { ...DEFAULT_APPEARANCE }; }
