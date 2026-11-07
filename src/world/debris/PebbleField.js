@@ -5,7 +5,7 @@ import { commonModule } from '../../engine/render/wgsl/common.js';
 import { standard } from '../../materials/Materials.js';
 import { srgb, terrainShadingModule } from '../terrain/TerrainShading.js';
 import { stoneSurfaceModule } from './NatureMaterial.js';
-import { stonePart } from './DebrisShapes.js';
+import { chipPart, stonePart } from '../../engine/render/GroundDetailGeometry.js';
 
 // Camera-following ground clutter: pebbles, cobbles and shell / coral grit on the beaches,
 // rocky shores and paths (one draw call, no shadow casting).
@@ -58,68 +58,6 @@ function blueNoise( rand, n, size, k = 12 ) {
 	}
 
 	return pts;
-
-}
-
-// flat, slightly domed fragment with a ragged outline (shell / coral grit), unit radius
-function chipPart( v ) {
-
-	const p = [ 0, 0.3, 0 ], idx = [];
-	const m = 6;
-	for ( let k = 0; k < m; k ++ ) {
-
-		const a = ( k + ( ( v * 7 + k * 3 ) % 5 ) * 0.12 ) / m * Math.PI * 2;
-		const r = 0.65 + ( ( v * 13 + k * 7 ) % 9 ) / 9 * 0.45;
-		p.push( Math.cos( a ) * r, 0, Math.sin( a ) * r );
-
-	}
-
-	for ( let k = 0; k < m; k ++ ) idx.push( 0, 1 + ( k + 1 ) % m, 1 + k );
-	const n = new Array( p.length ).fill( 0 );
-	for ( let t = 0; t < idx.length; t += 3 ) {
-
-		const a = idx[ t ] * 3, b = idx[ t + 1 ] * 3, c = idx[ t + 2 ] * 3;
-		const ux = p[ b ] - p[ a ], uy = p[ b + 1 ] - p[ a + 1 ], uz = p[ b + 2 ] - p[ a + 2 ];
-		const vx = p[ c ] - p[ a ], vy = p[ c + 1 ] - p[ a + 1 ], vz = p[ c + 2 ] - p[ a + 2 ];
-		const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-		for ( const o of [ a, b, c ] ) {
-
-			n[ o ] += nx; n[ o + 1 ] += ny; n[ o + 2 ] += nz;
-
-		}
-
-	}
-
-	for ( let i = 0; i < n.length; i += 3 ) {
-
-		if ( n[ i + 1 ] < 0 ) {
-
-			n[ i ] = - n[ i ]; n[ i + 1 ] = - n[ i + 1 ]; n[ i + 2 ] = - n[ i + 2 ];
-
-		}
-
-		n[ i + 1 ] += 0.6; // rounded edges read softer
-		const l = Math.hypot( n[ i ], n[ i + 1 ], n[ i + 2 ] );
-		n[ i ] /= l; n[ i + 1 ] /= l; n[ i + 2 ] /= l;
-
-	}
-
-	// faces up
-	for ( let t = 0; t < idx.length; t += 3 ) {
-
-		const a = idx[ t ] * 3, b = idx[ t + 1 ] * 3, c = idx[ t + 2 ] * 3;
-		const ux = p[ b ] - p[ a ], uz = p[ b + 2 ] - p[ a + 2 ], vx = p[ c ] - p[ a ], vz = p[ c + 2 ] - p[ a + 2 ];
-		if ( uz * vx - ux * vz < 0 ) {
-
-			const s = idx[ t + 1 ];
-			idx[ t + 1 ] = idx[ t + 2 ];
-			idx[ t + 2 ] = s;
-
-		}
-
-	}
-
-	return { p, n, idx };
 
 }
 

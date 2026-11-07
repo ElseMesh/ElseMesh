@@ -1,6 +1,9 @@
 import { Vector3, Matrix4 } from '../../engine/index.js';
+import { hash1, vnoise3 } from '../../engine/render/GroundDetailGeometry.js';
 import { Part, mat4, fixWinding, slabPart, CAP_U } from '../village/GeoBuilder.js';
 import { WOOD, HARD, C, lin, mulc, buoy } from '../Props.js';
+
+export { hash1, vnoise3 };
 
 // Geometry emitters for the shoreline wrack and the village clutter (DebrisPlacement decides
 // where). Everything is written into a GeoBuilder with the village material keys (wood, hard,
@@ -23,38 +26,6 @@ const IDENT = new Matrix4();
 
 // ---------------------------------------------------------------------------
 // noise helpers
-
-export function hash1( n ) {
-
-	const s = Math.sin( n * 127.1 + 311.7 ) * 43758.5453;
-	return s - Math.floor( s );
-
-}
-
-function hash3( i, j, k, s ) {
-
-	let h = ( i * 374761393 + j * 668265263 + k * 1440662683 + s * 2147483647 ) | 0;
-	h = Math.imul( h ^ ( h >>> 13 ), 1274126177 );
-	h ^= h >>> 16;
-	return ( h >>> 0 ) / 4294967296;
-
-}
-
-// smooth 3D value noise in [-1, 1]
-export function vnoise3( x, y, z, s = 0 ) {
-
-	const i = Math.floor( x ), j = Math.floor( y ), k = Math.floor( z );
-	const fx = x - i, fy = y - j, fz = z - k;
-	const ux = fx * fx * ( 3 - 2 * fx ), uy = fy * fy * ( 3 - 2 * fy ), uz = fz * fz * ( 3 - 2 * fz );
-	const l = ( a, b, t ) => a + ( b - a ) * t;
-	const h = ( a, b, c ) => hash3( i + a, j + b, k + c, s );
-	return l(
-		l( l( h( 0, 0, 0 ), h( 1, 0, 0 ), ux ), l( h( 0, 1, 0 ), h( 1, 1, 0 ), ux ), uy ),
-		l( l( h( 0, 0, 1 ), h( 1, 0, 1 ), ux ), l( h( 0, 1, 1 ), h( 1, 1, 1 ), ux ), uy ),
-		uz
-	) * 2 - 1;
-
-}
 
 // ---------------------------------------------------------------------------
 // mesh helpers

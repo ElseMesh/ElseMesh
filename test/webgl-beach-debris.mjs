@@ -1,8 +1,19 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { webglBeachDebris } from '../src/fallback/WebGLBeachDebris.js';
+import { stonePart as tidewaterStonePart } from '../src/world/debris/DebrisShapes.js';
+import { stonePart as groundDetailStonePart } from '../src/engine/render/GroundDetailGeometry.js';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import '../src/fallback/WebGLGroundDetailFieldAdapter.js';
+
+for ( const variant of [ [ 20, 0, 0.8 ], [ 21, 0, 0.1 ], [ 30, 1, 0.05 ], [ 31, 1, 0.5 ], [ 35, 1, 0.5 ] ] ) {
+	const expected = tidewaterStonePart( ...variant ), actual = groundDetailStonePart( ...variant );
+	assert.deepEqual( actual.idx, expected.idx, 'ground-detail stone topology matches Tidewater geometry' );
+	for ( const key of [ 'p', 'n', 'uv' ] ) {
+		assert.equal( actual[ key ].length, expected[ key ].length );
+		for ( let i = 0; i < actual[ key ].length; i ++ ) assert( Math.abs( actual[ key ][ i ] - expected[ key ][ i ] ) < 1e-6, `ground-detail ${key}[${i}] matches Tidewater geometry` );
+	}
+}
 
 const res = 64, size = 64, origin = - size / 2;
 const heights = new Float32Array( res * res ).fill( 1 );
@@ -15,7 +26,8 @@ const terrain = {
 const camera = { position: { x: 0, z: 0 } };
 const debris = webglBeachDebris( THREE, terrain, camera, null, 0 );
 
-assert( debris.isInstancedMesh, 'packaged terrain receives the WebGL beach debris mesh' );
+assert( debris.isMesh, 'packaged terrain receives the WebGL beach debris mesh' );
+assert.equal( debris.isInstancedMesh, undefined, 'ground detail batches to one merged draw mesh' );
 assert( debris.count > 0, 'the packaged sand mask places camera-local pebble detail' );
 debris.geometry.dispose();
 debris.material.dispose();
@@ -29,6 +41,14 @@ densityMask.data.fill( 255 );
 const authoredField = webglBeachDebris( THREE, terrain, camera, null, 0, densityMask );
 assert( authoredField.count > 0, 'authored RGBA densities place camera-local WebGL ground details' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.ground-detail-field/1' ), 'function' );
+assert.equal( authoredField.material.roughness, 0.8, 'ground-detail stones use the Tidewater field base roughness' );
+assert.equal( authoredField.material.flatShading, false, 'ground-detail stones use smooth vertex normals' );
+const wetTerrain = { ...terrain, heightAt: () => 0.2 };
+const wetField = webglBeachDebris( THREE, wetTerrain, camera, null, 0, densityMask );
+assert.equal( wetField.count, authoredField.count, 'wetness changes shading without changing authored placement' );
+assert( Math.max( ...wetField.geometry.attributes.color.array.slice( 0, 3 ) ) < Math.max( ...authoredField.geometry.attributes.color.array.slice( 0, 3 ) ), 'nearshore detail darkens its ground-detail colors' );
 authoredField.geometry.dispose();
 authoredField.material.dispose();
+wetField.geometry.dispose();
+wetField.material.dispose();
 console.log( 'WebGL ground-detail field consumes authored density data' );

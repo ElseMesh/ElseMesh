@@ -587,13 +587,21 @@ finding changes them.
 - 2026-11-07 pebble source audit: compared Tidewater `main` at
   `4811ba48d795197de5621985f404e765c0b7c0ef` directly with the split source.
   WebGPU's `PebbleField` matches the upstream implementation except for passing
-  ElseMesh's packaged terrain detail texture. The hosted WebGL adapter still
-  approximates every category with one icosahedron geometry and flat colors,
-  while the authoritative Tidewater field uses category-specific stone/chip
-  geometry and textured wet-stone shading. The existing hosted WebGL image is
-  therefore not evidence of pebble appearance parity. No percentage changed;
-  the matched beach-grit comparison remains open against the upstream Tidewater
-  `main` WebGPU capture. See [`graphics-review.md`](docs/graphics-review.md).
+  ElseMesh's packaged terrain detail texture. The WebGL adapter now follows the
+  source's region-dependent palette proportions and albedo ramps, shell color
+  families, nearshore darkening, and 0.8 base roughness. WebGPU and WebGL now
+  call the same engine-owned stone/chip geometry generator; the Tidewater source
+  comparison test checks topology exactly and vertex data within Float32
+  precision. A live hosted WebGL view loaded all 39 components and merged 2,169
+  details into one mesh (25,083 vertices, 39,438 triangles), captured at the
+  named beach pose after dismissing the start overlay; see
+  [`graphics-review.md`](docs/graphics-review.md). WebGL still lacks the terrain
+  detail texture, per-pixel normal/roughness variation, wet roughness response,
+  and shell glass/pumice variants. The focused `test/webgl-beach-debris.mjs`
+  passes. The HUD showed 3–4 FPS and long frame gaps in this review; without a
+  controlled repeated run this is not a supported-hardware FPS result. No
+  percentage changed; a matched beach-grit pixel comparison against original
+  Tidewater `main` remains open.
 
 - 2026-11-04: moved the Tidewater fish-prop WebGPU and WebGL backend adapters
   into ElseMesh and registered their component in the engine. The Tidewater

@@ -1,6 +1,9 @@
+import { chipPart, stonePart } from '../engine/render/GroundDetailGeometry.js';
+
 const DETAIL_PATCH_SIZE = 4;
 const DETAIL_PATCH_COUNTS = { cobble: 18, chip: 44, small: 150 };
 let detailPatchSlots = null;
+const FALLBACK_PALETTE_COLORS = [ 0xc5b99d, 0x9e927a, 0xd4cbb5, 0x8b7561, 0xb5a88f ];
 
 function sampleGroundDetail( terrain, mask, x, z, channelIndex ) {
 
@@ -20,14 +23,35 @@ function sampleGroundDetail( terrain, mask, x, z, channelIndex ) {
 
 }
 
-function groundDetailColor( tone, palette ) {
+function smoothstep( a, b, value ) {
 
-	const darkThreshold = 0.72 * ( 1 - palette ) + 0.24 * palette;
-	const greyThreshold = 0.26 * ( 1 - palette ) + 0.30 * palette;
-	const dark = palette < 0.5 ? 0x4c4641 : 0x71695f;
-	const middle = palette < 0.5 ? 0x777a7b : 0x9a9287;
-	const pale = palette < 0.5 ? 0xb9b3a6 : 0xd4c9b0;
-	return tone < darkThreshold ? dark : tone < darkThreshold + greyThreshold ? middle : pale;
+	const t = Math.max( 0, Math.min( 1, ( value - a ) / ( b - a ) ) );
+	return t * t * ( 3 - 2 * t );
+
+}
+
+function groundDetailColor( target, tone, palette, selector, category, seed, colors ) {
+
+	if ( category === 2 ) {
+
+		const hue = ( seed * 7.13 ) % 1;
+		target.copy( colors.shell[ 0 ] ).lerp( colors.shell[ 1 ], smoothstep( 0.3, 0.45, hue ) );
+		target.lerp( colors.shell[ 2 ], smoothstep( 0.58, 0.66, hue ) );
+		target.lerp( colors.shell[ 3 ], smoothstep( 0.76, 0.82, hue ) );
+		target.lerp( colors.shell[ 4 ], smoothstep( 0.9, 0.95, hue ) );
+		return target;
+
+	}
+
+	// Match PebbleField's palette selection and linear albedo ramps. The alpha
+	// density channel shifts the proportions from dark rocky shore to pale beach.
+	const dark = 0.72 * ( 1 - palette ) + 0.24 * palette;
+	const grey = 0.26 * ( 1 - palette ) + 0.30 * palette;
+	const surfacePalette = selector < dark ? 0.02 + 0.28 * tone : selector < dark + grey ? 0.32 + 0.24 * tone : 0.6 + 0.37 * tone;
+	target.copy( colors.stone[ 0 ] ).lerp( colors.stone[ 1 ], smoothstep( 0.12, 0.42, surfacePalette ) );
+	target.lerp( colors.stone[ 2 ], smoothstep( 0.5, 0.72, surfacePalette ) );
+	target.lerp( colors.stone[ 3 ], smoothstep( 0.88, 0.97, surfacePalette ) );
+	return target;
 
 }
 
@@ -57,7 +81,7 @@ function getDetailPatchSlots() {
 			}
 		}
 		const category = i < DETAIL_PATCH_COUNTS.cobble ? 1 : i < DETAIL_PATCH_COUNTS.cobble + DETAIL_PATCH_COUNTS.chip ? 2 : 0;
-		points.push( { ...best, category } );
+		points.push( { ...best, category, shapeIndex: i } );
 	}
 	detailPatchSlots = points;
 	return detailPatchSlots;
@@ -112,7 +136,7 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 				const scaleZ = stoneRadius * fade;
 				samples.push( {
 					x, z, height: terrain.heightAt( x, z ), category: slot.category, palette: details.palette,
-					random: [ h2, h2, h3 ], scale: [ scaleX, scaleY, scaleZ ],
+					random: [ h2, h2, h3, h4 ], shapeIndex: slot.shapeIndex, scale: [ scaleX, scaleY, scaleZ ],
 					tilt: ( h5 - 0.5 ) * ( isChip ? 0.5 : 0.9 ), yaw: h3 * Math.PI * 2,
 					lift: scaleY * ( isChip ? 0.35 : 0.15 ),
 				} );
@@ -143,46 +167,70 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 			const detail = ( 0.06 + shore * 0.34 ) * ( 0.5 + patch * 0.9 ) * ( 0.55 + ( 1 - T.MathUtils.smoothstep( d, 12, 23 ) ) * 0.45 );
 			if ( random( 4 ) > detail ) continue;
 		}
-		samples.push( { x, z, height, random: [ random( 5 ), random( 6 ), random( 7 ) ], category, palette } );
+		samples.push( { x, z, height, random: [ random( 5 ), random( 6 ), random( 7 ) ], category, palette, shapeIndex: Math.floor( random( 8 ) * 7 ) } );
 	}
-	const capacity = Math.max( 8192, 2 ** Math.ceil( Math.log2( Math.max( samples.length, 1 ) ) ) );
-	let mesh = previous;
-	if ( ! mesh || mesh.instanceMatrix.count < capacity ) {
-		const old = mesh;
-		mesh = new T.InstancedMesh(
-			new T.IcosahedronGeometry( 1, 0 ),
-			new T.MeshStandardMaterial( { color: 0xffffff, roughness: 0.94, metalness: 0, flatShading: true } ),
-			capacity,
-		);
-		if ( old ) {
-			const parent = old.parent;
-			parent?.add( mesh );
-			parent?.remove( old );
-			old.geometry.dispose(); old.material.dispose();
-		}
-	}
-	const matrix = new T.Matrix4(), position = new T.Vector3(), rotation = new T.Quaternion(), scale = new T.Vector3(), euler = new T.Euler(), color = new T.Color();
-	const paletteColors = [ 0xc5b99d, 0x9e927a, 0xd4cbb5, 0x8b7561, 0xb5a88f ];
-	for ( let i = 0; i < samples.length; i ++ ) {
-		const sample = samples[ i ], [ size, tone, yaw ] = sample.random;
+	const positions = [], normals = [], vertexColors = [], indices = [];
+	const color = new T.Color();
+	const colors = {
+		stone: [ 0x262523, 0x66615a, 0xc2b8a1, 0x8c6647 ].map( hex => new T.Color( hex ) ),
+		shell: [ 0xf0eae0, 0xdbbd8f, 0xe6998f, 0x946647, 0x5c5470 ].map( hex => new T.Color( hex ) ),
+	};
+	for ( const sample of samples ) {
+
+		const [ size, tone, yaw, selector = tone ] = sample.random;
 		const r = 0.008 + size * size * 0.014;
-		position.set( sample.x, sample.height + ( sample.lift ?? r * 0.12 ), sample.z );
+		const shapeIndex = sample.shapeIndex ?? Math.floor( tone * 7 );
+		const isChip = sample.category === 2;
+		const part = isChip ? chipPart( shapeIndex % 7 ) : sample.category === 1
+			? stonePart( 30 + shapeIndex % 6, 1, shapeIndex % 2 ? 0.5 : 0.05 )
+			: stonePart( 20 + shapeIndex % 7, 0, shapeIndex % 3 === 0 ? 0.8 : 0.1 );
+		const scaleX = sample.scale?.[ 0 ] ?? r * ( 1 + 0.55 * tone );
+		const scaleY = sample.scale?.[ 1 ] ?? r * ( 0.42 + size * 0.38 );
+		const scaleZ = sample.scale?.[ 2 ] ?? r;
+		const tilt = sample.tilt ?? ( tone - 0.5 ) * 0.9;
+		const stoneYaw = sample.yaw ?? yaw * Math.PI * 2;
+		const cTilt = Math.cos( tilt ), sTilt = Math.sin( tilt ), cYaw = Math.cos( stoneYaw ), sYaw = Math.sin( stoneYaw );
+		const lift = sample.lift ?? r * 0.12;
 		if ( sample.scale ) {
-			euler.set( sample.tilt, sample.yaw, 0, 'YXZ' ); rotation.setFromEuler( euler );
-			scale.set( ...sample.scale );
-		} else {
-			euler.set( ( tone - 0.5 ) * 0.9, yaw * Math.PI * 2, 0, 'YXZ' ); rotation.setFromEuler( euler );
-			const vertical = 0.42 + size * 0.38;
-			scale.set( r * ( 1 + 0.55 * tone ), r * vertical, r );
+			groundDetailColor( color, tone, sample.palette, selector, sample.category, size + yaw, colors );
+			const wet = 1 - smoothstep( 0.4, 1.0, sample.height + lift );
+			color.multiplyScalar( 1 - wet * 0.45 );
+		} else color.setHex( FALLBACK_PALETTE_COLORS[ Math.floor( tone * 5 ) ] );
+		const base = positions.length / 3;
+		for ( let v = 0; v < part.p.length; v += 3 ) {
+
+			const px = part.p[ v ] * scaleX, py = part.p[ v + 1 ] * scaleY, pz = part.p[ v + 2 ] * scaleZ;
+			const qy = py * cTilt - pz * sTilt, qz = py * sTilt + pz * cTilt;
+			positions.push( sample.x + px * cYaw + qz * sYaw, sample.height + lift + qy, sample.z + qz * cYaw - px * sYaw );
+			const nx = part.n[ v ] / scaleX, ny = part.n[ v + 1 ] / scaleY, nz = part.n[ v + 2 ] / scaleZ;
+			const nTiltY = ny * cTilt - nz * sTilt, nTiltZ = ny * sTilt + nz * cTilt;
+			const nl = Math.hypot( nx, nTiltY, nTiltZ ) || 1;
+			normals.push( ( nx * cYaw + nTiltZ * sYaw ) / nl, nTiltY / nl, ( nTiltZ * cYaw - nx * sYaw ) / nl );
+			vertexColors.push( color.r, color.g, color.b );
+
 		}
-		mesh.setMatrixAt( i, matrix.compose( position, rotation, scale ) );
-		color.setHex( sample.scale ? groundDetailColor( tone, sample.palette ) : paletteColors[ Math.floor( tone * paletteColors.length ) ] );
-		mesh.setColorAt( i, color );
+		for ( const index of part.idx ) indices.push( base + index );
+
+	}
+	const geometry = new T.BufferGeometry();
+	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
+	geometry.setAttribute( 'normal', new T.Float32BufferAttribute( normals, 3 ) );
+	geometry.setAttribute( 'color', new T.Float32BufferAttribute( vertexColors, 3 ) );
+	geometry.setIndex( indices );
+	geometry.computeBoundingSphere();
+	let mesh = previous;
+	if ( ! mesh || mesh.isInstancedMesh ) {
+		const parent = mesh?.parent;
+		const old = mesh;
+		mesh = new T.Mesh( geometry, new T.MeshStandardMaterial( { color: 0xffffff, vertexColors: true, roughness: 0.8, metalness: 0 } ) );
+		if ( old ) { parent?.add( mesh ); parent?.remove( old ); old.geometry.dispose(); old.material.dispose(); }
+	} else {
+		mesh.geometry.dispose();
+		mesh.geometry = geometry;
 	}
 	mesh.count = samples.length;
-	mesh.instanceMatrix.setUsage( T.DynamicDrawUsage ); mesh.instanceMatrix.needsUpdate = true;
-	if ( mesh.instanceColor ) mesh.instanceColor.needsUpdate = true;
 	mesh.name = 'WebGL camera-following beach debris'; mesh.frustumCulled = false; mesh.renderOrder = 2;
+	mesh.castShadow = false; mesh.receiveShadow = true;
 	return mesh;
 
 }
