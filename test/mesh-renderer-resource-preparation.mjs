@@ -78,8 +78,9 @@ assert.deepEqual( errors, [], `lazy texture mip generation stays outside the ren
 camera.position.z = 4;
 GPU.beginFrame();
 setFrameCamera( camera, W, H );
-for ( const name of cameraMatrixNames ) assert.strictEqual( FrameUniforms.fields[ name ].value, cameraMatrices.get( name ), `${name} uniform matrix is reused` );
-assert.strictEqual( FrameUniforms.fields.cameraPos.value, cameraPosition, 'camera position uniform vector is reused' );
+for ( const name of cameraMatrixNames ) assert.notStrictEqual( FrameUniforms.fields[ name ].value, cameraMatrices.get( name ), `${name} camera snapshot is replaced for the new frame` );
+assert.notStrictEqual( FrameUniforms.fields.cameraPos.value, cameraPosition, 'camera position snapshot is replaced for the new frame' );
+assert.deepEqual( Array.from( cameraMatrices.get( 'view' ).elements ), firstView, 'the prior frame view snapshot remains unchanged after camera movement' );
 assert.notDeepEqual( Array.from( FrameUniforms.fields.view.value.elements ), firstView, 'reused view matrix refreshes after camera movement' );
 renderer.render( scene, {
 	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,

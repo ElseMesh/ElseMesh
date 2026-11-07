@@ -3,6 +3,7 @@ import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from 
 import './WebGLWaterComponentAdapters.js';
 import './WebGLStaticModelInstanceSetAdapter.js';
 import './WebGLGroundDetailFieldAdapter.js';
+import './WebGLFishPropsComponentAdapter.js';
 
 // Return the solid, authored boxes in either supported manifest collision shape.
 // Compound records carry solidity and walkability on each box, not on the parent.

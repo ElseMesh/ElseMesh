@@ -31,6 +31,7 @@ try {
 		lighting: { keyDirection: new THREE.Vector3( 0.2, 0.9, 0.1 ).normalize(), keyColor: new THREE.Color( 1, 1, 1 ), keyIntensity: 1 },
 		worldEnvironment: { sky: true }, cloudsEnabled: true,
 		cloudLayer: { userData: { cloudNoise: texture } }, sceneColorTexture: sceneColor,
+		postFX: { enabled: false },
 		terrainColorTexture: null,
 	} );
 	const water = fallback._makeWater( new THREE.PlaneGeometry( 120, 120, 128, 128 ), 0, null );

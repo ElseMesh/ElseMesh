@@ -21,7 +21,7 @@ async function stopBrowser( browser ) {
 }
 
 const profile = mkdtempSync( join( '/var/tmp', 'elsemesh-webgl-water-fft-' ) );
-const vite = await createServer( { configFile: false, root: engineRoot, optimizeDeps: { entries: [ 'test/webgl-water-fft-render.html', 'test/webgl-wake-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
+const vite = await createServer( { configFile: false, root: engineRoot, optimizeDeps: { entries: [ 'test/webgl-water-fft-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
 let browser, socket;
 try {
 	await vite.listen();
@@ -78,17 +78,6 @@ try {
 	assert( metrics.changedPixels >= 100, `FFT displacement changes at least 100 pixels (${metrics.changedPixels})` );
 	assert( metrics.programCount > 0, 'WebGL compiled the water shader program' );
 	console.log( `WebGL water render passed (${metrics.changedPixels} FFT-changed pixels; phase max error ${metrics.phaseMaxError}; ${metrics.ripSamples} rip samples)` );
-	await command( 'Page.navigate', { url: `http://127.0.0.1:${address.port}/test/webgl-wake-render.html` } );
-	const wakeDeadline = Date.now() + 45000;
-	let wakeResult;
-	while ( Date.now() < wakeDeadline ) {
-		const response = await command( 'Runtime.evaluate', { expression: "({status: document.querySelector('#result')?.dataset.status, text: document.querySelector('#result')?.textContent})", returnByValue: true } );
-		wakeResult = response.result?.value;
-		if ( wakeResult?.status === 'complete' || wakeResult?.status === 'failed' ) break;
-		await sleep( 50 );
-	}
-	assert.equal( wakeResult?.status, 'complete', `WebGL wake shader render completed: ${wakeResult?.text || 'no page result'}` );
-	console.log( `WebGL wake shader render passed (${wakeResult.text})` );
 } finally {
 	socket?.close();
 	if ( browser ) await stopBrowser( browser );

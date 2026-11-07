@@ -7,6 +7,7 @@ import { ShoreWaves } from '../ocean/ShoreWaves.js';
 import { applyWaterBodyProfile } from '../ocean/WaterProfiles.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import './WebGPUStaticModelInstanceSetAdapter.js';
+import './WebGPUFishPropsComponentAdapter.js';
 import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js';
 import { GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js';
 import { PebbleField } from '../world/debris/PebbleField.js';

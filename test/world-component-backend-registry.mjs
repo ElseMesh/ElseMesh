@@ -62,10 +62,10 @@ assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-mo
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGL static-model adapter' );
 const tidewaterFishProps = 'elsemesh.static-fish-props/1';
 assert.equal( worldComponentDescriptor( tidewaterFishProps ), null, 'the engine does not register Tidewater fish content globally' );
-assert.equal( worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), null, 'the engine does not install a Tidewater fish renderer globally' );
-assert.equal( worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), null, 'the engine does not install a Tidewater WebGL fish renderer globally' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGPU renderer for its generic static fish-prop component' );
+assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGL renderer for its generic static fish-prop component' );
 await import( '../worlds/tidewater/register-components.js' );
-assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'the Tidewater provider registers its own fish component contract' );
-assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'the Tidewater provider registers its WebGPU renderer' );
-assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'the Tidewater provider registers its WebGL batch renderer' );
+assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'the Tidewater provider registers the world component contract' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'the engine renderer is available after the world registers its contract' );
+assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'the engine batch renderer is available after the world registers its contract' );
 console.log( 'World component backend registry selects engine adapters by backend and component type' );

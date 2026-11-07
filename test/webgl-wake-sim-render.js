@@ -4,7 +4,7 @@ import { WebGLWaterQuery } from '../src/fallback/WebGLWaterQuery.js';
 
 const result=document.querySelector('#result');
 let renderer,wake,query;
-const readPixels=(target)=>{const pixels=new Float32Array(target.width*target.height*4);renderer.readRenderTargetPixels(target,0,0,target.width,target.height,pixels);return pixels;};
+const readPixels=(target)=>{const count=target.width*target.height*4;if(target.texture.type===THREE.HalfFloatType){const half=new Uint16Array(count);renderer.readRenderTargetPixels(target,0,0,target.width,target.height,half);return Float32Array.from(half,THREE.DataUtils.fromHalfFloat);}const pixels=new Float32Array(count);renderer.readRenderTargetPixels(target,0,0,target.width,target.height,pixels);return pixels;};
 const channelMax=(pixels,channel)=>{let max=0;for(let i=channel;i<pixels.length;i+=4)max=Math.max(max,Math.abs(pixels[i]));return max;};
 const seedState=(expression)=>{
 	const material=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,vertexShader:'in vec3 position;void main(){gl_Position=vec4(position,1.0);}',fragmentShader:`precision highp float;layout(location=0) out vec4 outValue;void main(){float x=gl_FragCoord.x;outValue=${expression};}`});
