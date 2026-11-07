@@ -18,9 +18,6 @@ export const DEFAULT_VEHICLE_POLICY = Object.freeze( { enabled: false } );
 export const DEFAULT_AVATAR_POLICY = Object.freeze( { allowedProfiles: null } );
 export const MAX_WORLD_VISITORS = 128;
 export const MAX_WORLD_SPAWN_RADIUS = 100;
-// Fixed complexity contract for elsemesh.downeast-boat/1. Keep synchronized
-// with BoatModel.triangleCount and the worldd validator.
-export const DOWNEAST_BOAT_TRIANGLES = 46845;
 export const MAX_WORLD_PACKAGE_BYTES = 16 * 1024 * 1024 * 1024;
 
 const FEATURE_ID = /^elsemesh\.[a-z0-9.-]+\/\d+$/;

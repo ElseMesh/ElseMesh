@@ -79,6 +79,14 @@ parity is complete.
   still world-specific engine code, so renderer-neutral world content and
   matched visual parity remain open; estimates remain unchanged.
 
+- 2026-11-07: removed the engine's fixed Downeast boat triangle constant.
+  Tidewater's registered vehicle component is now the source of its complexity
+  budget, and the Tidewater check compares that budget with the actual model's
+  triangle count. The engine's portal admission already reads the registered
+  descriptor, so no vehicle-specific value remains in `WorldRules.js`.
+  Arbitrary vehicle and avatar catalogs, profile-specific complexity, and
+  authoritative vehicle simulation remain open; estimates remain unchanged.
+
 - 2026-11-07: Tidewater's WebGL bird renderer now prepares wing-joint and leg
   transforms once per bird pose and writes posed normals directly, matching the
   shared WebGPU deformation instead of recomputing triangle normals each frame.
