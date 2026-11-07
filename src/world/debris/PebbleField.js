@@ -12,7 +12,7 @@ import { chipPart, stonePart } from '../../engine/render/GroundDetailGeometry.js
 //
 // The ground is divided into PCELL x PCELL cells; every visible cell near the camera draws one
 // instance of a patch of blue-noise slots (small pebbles, cobbles, flat shell / coral chips).
-// In the vertex shader each slot looks up its density in the debris mask (DebrisPlacement: R
+// In the vertex shader each slot looks up its density in the world-provided debris mask (R
 // pebbles, G cobbles, B grit, A stone palette), picks its size, shape, yaw from hashes of its
 // world position (stable while the camera moves), sits on the terrain (TerrainGPU.heightAt) and
 // shrinks to nothing with distance (small grit before cobbles): no popping. Empty cells are

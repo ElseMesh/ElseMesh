@@ -2,7 +2,6 @@ import { Group, BufferGeometry, Mesh } from '../engine/index.js';
 import { Builder, Batch } from './village/GeoBuilder.js';
 import { InstancedProps } from './Props.js';
 import { LAYERS } from '../core/SceneRenderer.js';
-import { DebrisPlacer } from './debris/DebrisPlacement.js';
 import { createNatureMaterial } from './debris/NatureMaterial.js';
 import { PebbleField } from './debris/PebbleField.js';
 import { KIND } from './debris/DebrisShapes.js';
@@ -14,8 +13,8 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 // buckets, boards, firewood, skiffs, a wheelbarrow, dry-stone walls),
 // plus a camera-following field of pebbles, cobbles and shell grit (debris/PebbleField).
 //
-// Placement: debris/DebrisPlacement (keeps clear of boardwalks, the pier, paths, doorways, the
-// spawn point, colliders, plant trunks and rocks; adds colliders for the larger items).
+// Placement comes from the active world's provider; this renderer consumes the generated batches
+// and mask without selecting a world-specific placement algorithm.
 // Geometry: debris/DebrisShapes and the village prop emitters, merged per material.
 //
 // Draw calls: 5 + 3 shadow = 8.
@@ -32,7 +31,9 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 
 export class Debris {
 
-	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, seed = 5150 } ) {
+	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createPlacer, seed = 5150 } ) {
+
+		if ( typeof createPlacer !== 'function' ) throw new Error( 'Debris rendering requires the active world placement provider' );
 
 		this.scene = scene;
 		this.terrainData = terrain.data || terrain;
@@ -44,7 +45,7 @@ export class Debris {
 
 		const B = new Builder();
 		const inst = new InstancedProps( B );
-		const placer = new DebrisPlacer( { B, inst, terrain: this.terrainData, village, vegetation, rocks, colliders, worldLayout, seed } ).run();
+		const placer = createPlacer( { B, inst, terrain: this.terrainData, village, vegetation, rocks, colliders, worldLayout, seed } ).run();
 		this.counts = placer.counts;
 		this.newColliders = placer.newColliders;
 		const t1 = performance.now();

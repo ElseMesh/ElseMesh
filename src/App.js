@@ -384,7 +384,7 @@ export class App {
 		// data is derived (shore field, GPU textures, meshes)
 		// Hosted launches have already returned through their package-only path. Keep
 			// built-in world presentation out of the shared App import graph.
-		const { Village, Reef, BoatModel, Rocks, Debris, Whale } = await import( './world/BuiltinWorldPresentation.js' );
+		const { Village, Reef, BoatModel, Rocks, Whale } = await import( './world/BuiltinWorldPresentation.js' );
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
 		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
@@ -408,7 +408,9 @@ export class App {
 		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, surfaceProfile: terrainSurfaceProfile, renderer } );
 		this.rocks = new Rocks( { scene, terrain: this.terrain, worldLayout: this.worldLayout, village: this.village, colliders: this.colliders } );
 		// driftwood (CC0 photoscans), wrack, pebbles and village clutter
-		this.debris = new Debris( { scene, terrain: this.terrain, village: this.village, vegetation: this.vegetation, rocks: this.rocks, colliders: this.colliders, worldLayout: this.worldLayout } );
+		const createDebris = this.worldPackage?.presentation?.createDebris;
+		if ( typeof createDebris !== 'function' ) throw new Error( 'The default world package must provide its debris placement provider' );
+		this.debris = await createDebris( { scene, terrain: this.terrain, village: this.village, vegetation: this.vegetation, rocks: this.rocks, colliders: this.colliders, worldLayout: this.worldLayout } );
 		// these apply the heightfield sun shadow in their own lighting model (see UnderwaterLighting)
 		this.terrain.mesh.material.appliesHillShadow = true;
 		this.rocks.material.appliesHillShadow = true;

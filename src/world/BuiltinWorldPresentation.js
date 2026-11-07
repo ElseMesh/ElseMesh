@@ -4,5 +4,4 @@ export { Village } from './Village.js';
 export { Reef } from './Reef.js';
 export { BoatModel } from './BoatModel.js';
 export { Rocks } from './Rocks.js';
-export { Debris } from './Debris.js';
 export { Whale } from './marine/Whale.js';
