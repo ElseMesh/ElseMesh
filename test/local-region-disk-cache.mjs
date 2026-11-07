@@ -46,7 +46,7 @@ Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { s
 try {
 	const bytes = new TextEncoder().encode( 'validated local region bytes' );
 	const digest = Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' );
-	const cache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-1' } );
+	const cache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', cacheRevision: 'revision-1' } );
 	openedCaches.push( cache );
 	assert.ok( cache, 'OPFS cache opens when storage APIs are available' );
 	assert.equal( await cache.put( 'cell-1:visual', bytes, digest ), true );
@@ -54,7 +54,7 @@ try {
 	await new Promise( resolve => setTimeout( resolve, 1100 ) );
 	assert.ok( files.has( 'index.json' ), 'cache writes a compact metadata index after content is stored' );
 	const readsBeforeIndexedOpen = metadataFileReads;
-	const indexedCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-3' } );
+	const indexedCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', cacheRevision: 'revision-3' } );
 	openedCaches.push( indexedCache );
 	await indexedCache.ready;
 	assert.equal( metadataFileReads, readsBeforeIndexedOpen, 'a valid cache index avoids reading every per-entry metadata file on startup' );
@@ -73,7 +73,7 @@ try {
 	files.set( `${deltaId}.bin`, deltaBytes );
 	files.set( `${deltaId}.meta`, new TextEncoder().encode( JSON.stringify( { schema: 1, id: deltaId, bytes: deltaBytes.byteLength, digest: null, lastUsed: Date.now() } ) ) );
 	const readsBeforeDeltaOpen = metadataFileReads;
-	const recoveredCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-1' } );
+	const recoveredCache = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', cacheRevision: 'revision-1' } );
 	openedCaches.push( recoveredCache );
 	await recoveredCache.ready;
 	assert.equal( metadataFileReads, readsBeforeDeltaOpen + 2, 'startup reads only metadata added after the saved index' );
@@ -81,9 +81,9 @@ try {
 	files.delete( `${deltaId}.bin` );
 	files.delete( `${deltaId}.meta` );
 
-	const changedRevision = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', sourceRevision: 'revision-2' } );
+	const changedRevision = await LocalRegionDiskCache.open( { worldId: 'elsemesh:hogwarts', cacheRevision: 'revision-2' } );
 	openedCaches.push( changedRevision );
-	assert.equal( await changedRevision.get( 'cell-1:visual' ), null, 'source revisions do not share cached bytes' );
+	assert.equal( await changedRevision.get( 'cell-1:visual' ), null, 'cache revisions do not share cached bytes' );
 
 	const dataName = [ ...files.keys() ].find( name => name.endsWith( '.bin' ) );
 	files.set( dataName, new TextEncoder().encode( 'corrupt data' ) );

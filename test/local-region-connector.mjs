@@ -157,7 +157,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	}
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
 		schema: 'elsemesh.dynamic-region-provider/1', worldId: descriptorWorldId, title: 'Hogwarts Legacy',
-		sourceRevision: 'test-revision', readOnly: true, regions: '/v1/regions',
+		sourceRevision: 'test-revision', cacheRevision: 'test-revision:converter-1', readOnly: true, regions: '/v1/regions',
 		entrySelection: {
 			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
 			entryPointPrompt: 'Which Hogwarts house will you join?',
@@ -293,6 +293,8 @@ try {
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
+	assert.equal( connector.sourceRevision, 'test-revision', 'source-derived texture IDs retain the game content revision' );
+	assert.equal( connector.cacheRevision, 'test-revision:converter-1', 'browser disk cache uses the provider conversion revision separately' );
 	assert.equal( cellInventoryRequests[ 0 ], '1', 'the first bounded cell-index batch requests the global collision inventory' );
 	assert.ok( cellInventoryRequests.slice( 1 ).every( value => value === '0' ), 'later cell-index batches omit the already received global inventory' );
 	assert.equal( manifest.components.length, 1, 'complete provider placements and LOD profiles publish a static-model instance-set component' );

@@ -36,17 +36,21 @@ Treat `WorldContentProvider` as an additive engine boundary, not a new
 world-specific code path. The existing signed-package provider remains the
 default implementation and must retain its manifest signature, per-asset hash,
 startup, and browser-cache semantics. A region provider supplies a signed world
-descriptor, source revision, stable region IDs and bounds, and requests for
-bounded render and simulation data. Requests carry cancellation and subscriber
-lifetimes; identical in-flight requests are coalesced. A provider may prepare
-regions ahead of time or convert them on demand; either way, conversion stays
+descriptor, source revision, cache revision, stable region IDs and bounds, and
+requests for bounded render and simulation data. Requests carry cancellation
+and subscriber lifetimes; identical in-flight requests are coalesced. A provider
+may prepare regions ahead of time or convert them on demand; either way, conversion stays
 off the renderer frame path and the host serves one shared result to every
 visitor. Responses are checked against a content digest and declared limits
 before installation. The host owns the shared bounded RAM and optional disk
 cache for all visitors, keyed by world ID, source revision, converter version,
-and region ID. Active reads stay pinned; unused entries are evicted by LRU
-policy. Clients separately release decoded CPU objects and GPU buffers/textures
-when a region leaves their active set.
+and region ID. `sourceRevision` identifies source content; `cacheRevision`
+identifies the generated response set and includes both source and converter
+identity. Browser OPFS caches scope asset IDs by world ID and `cacheRevision`,
+so converter changes cannot reuse stale derived GLBs while source-derived
+texture IDs remain tied to the source revision. Active reads stay pinned;
+unused entries are evicted by LRU policy. Clients separately release decoded
+CPU objects and GPU buffers/textures when a region leaves their active set.
 
 Dynamic-provider entry metadata uses the generic
 `elsemesh.world-entry-selection/1` schema. Provider titles are optional; without

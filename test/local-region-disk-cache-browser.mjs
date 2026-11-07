@@ -140,7 +140,7 @@ async function checkCache( base, mode ) {
 		assert.deepEqual( pageState.result?.value, { href: base, origin: new URL( base ).origin, readyState: 'complete' }, `loopback page did not finish loading: ${JSON.stringify( pageState )}; requests=${requests.join( ',' )}` );
 		const result = await browser.evaluate( `(async () => {
 			const { LocalRegionDiskCache } = await import(${JSON.stringify( `${base}LocalRegionDiskCache.js` )});
-			const cache = await LocalRegionDiskCache.open({ worldId: 'elsemesh:opfs-browser-test', sourceRevision: 'browser-restart-1' });
+			const cache = await LocalRegionDiskCache.open({ worldId: 'elsemesh:opfs-browser-test', cacheRevision: 'browser-restart-1' });
 			if (!cache) throw new Error('OPFS unavailable');
 			const bytes = new TextEncoder().encode('Hogwarts local-region persistence check');
 			const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('');

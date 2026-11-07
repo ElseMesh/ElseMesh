@@ -38,13 +38,14 @@ async function writeFile( directory, name, contents ) {
 }
 
 export class LocalRegionDiskCache {
-	static async open( { worldId, sourceRevision, onError = () => {}, onMetric = () => {} } ) {
+	static async open( { worldId, cacheRevision, onError = () => {}, onMetric = () => {} } ) {
 		const storage = globalThis.navigator?.storage;
 		if ( ! globalThis.crypto?.subtle || typeof storage?.getDirectory !== 'function' ) return null;
+		if ( typeof worldId !== 'string' || ! worldId || typeof cacheRevision !== 'string' || ! cacheRevision ) return null;
 		try {
 			const root = await storage.getDirectory();
 			const directory = await root.getDirectoryHandle( DIRECTORY_NAME, { create: true } );
-			const cache = new LocalRegionDiskCache( { directory, storage, worldId, sourceRevision, onError, onMetric } );
+			const cache = new LocalRegionDiskCache( { directory, storage, worldId, cacheRevision, onError, onMetric } );
 			cache.ready = cache.#exclusive( async () => {
 				await cache.#indexExistingEntries();
 				await cache.#refreshBudget();
@@ -56,10 +57,10 @@ export class LocalRegionDiskCache {
 		}
 	}
 
-	constructor( { directory, storage, worldId, sourceRevision, onError, onMetric } ) {
+	constructor( { directory, storage, worldId, cacheRevision, onError, onMetric } ) {
 		this.directory = directory;
 		this.storage = storage;
-		this.scope = `${worldId}\0${sourceRevision}`;
+		this.scope = `${worldId}\0${cacheRevision}`;
 		this.onError = onError;
 		this.onMetric = onMetric;
 		this.entries = new Map();
