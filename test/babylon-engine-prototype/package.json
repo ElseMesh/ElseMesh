@@ -1,0 +1,9 @@
+{
+	"name": "elsemesh-babylon-webgpu-prototype",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@babylonjs/core": "9.35.0",
+		"@babylonjs/loaders": "9.35.0"
+	}
+}

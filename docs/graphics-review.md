@@ -1,5 +1,32 @@
 # Reproducible graphics review
 
+## 2026-11-07 engine-wide Babylon.js WebGPU prototype
+
+The isolated prototype lives in
+[`test/babylon-engine-prototype`](../test/babylon-engine-prototype/README.md),
+under ElseMesh rather than a world repository. Its common rendering path uses
+Babylon's WebGPU engine, glTF loader, and the existing world connector. It can
+select either Hogwarts's local bridge provider or a hosted world's signed
+manifest and registered provider modules.
+
+The Hogwarts Great Hall path rendered through Babylon using 1,202 placements
+and 1.3 MiB of GLBs; a completed load showed about 7–8 FPS in this Weston
+review session. The prototype creates separate Babylon nodes for each imported
+placement, and this has not been optimized or benchmarked under controlled
+load. The initial Tidewater path
+successfully validated its signed manifest and loaded 29 nearby GLB placements
+(2.8 MiB), but the view was mostly empty: required terrain, vegetation, and
+village-material presentation are not ported. Its single 17 FPS sample is not
+comparable to the Hogwarts sample because scene complexity and competing host
+load differed. These runs show that the shared data boundary can feed Babylon;
+they do not establish renderer parity, a performance gain, or a Tidewater
+migration.
+
+Next evaluation should add or adapt Tidewater's required presentation
+components to Babylon, then compare both production backends and Babylon at
+matched camera poses, resolution, GPU, and host load. Record first-visible
+time, CPU/GPU frame time, memory, draw submissions, and transferred bytes.
+
 ## 2026-11-04 WebGL tone-mapping correction
 
 The Reinhard change and its associated capture were based on an incorrect

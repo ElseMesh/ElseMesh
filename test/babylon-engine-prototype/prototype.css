@@ -1,0 +1,29 @@
+html, body {
+	margin: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: #101114;
+	color: #f3ead8;
+	font: 14px system-ui, sans-serif;
+}
+
+#render-canvas {
+	width: 100%;
+	height: 100%;
+	display: block;
+	touch-action: none;
+}
+
+#status, #instructions {
+	position: fixed;
+	left: 12px;
+	padding: 8px 10px;
+	border: 1px solid #6d5a3c;
+	border-radius: 5px;
+	background: #15151add;
+	max-width: min(760px, calc(100vw - 48px));
+}
+
+#status { top: 12px; }
+#instructions { bottom: 12px; color: #ded3bd; }
