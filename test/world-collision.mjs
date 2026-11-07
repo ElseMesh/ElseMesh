@@ -135,6 +135,11 @@ const streamedCollisionObject = {
 	transform: { position: [ 10, 2, 30 ], yaw: Math.PI / 2 }, scale: [ 2, 1, 1 ],
 };
 const streamedColliders = new Colliders();
+const tiltedCapsule = { source: 'fixture', coordinateSystem: 'elsemesh-y-up-meters/1', boxes: [], spheres: [], convexes: [], taperedCapsules: [], capsules: [ { center: [ 0, 0, 0 ], radius: 1, length: 2, rotation: [ 0, 0, Math.SQRT1_2, Math.SQRT1_2 ] } ] };
+const tiltedColliders = new Colliders();
+registerWorldPackageCollisionPayload( bodySetupGLB( { elsemeshCollision: tiltedCapsule } ), { id: 'tilted', transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 2, 1, 3 ] }, tiltedColliders );
+assert.equal( tiltedColliders.boxes.length, 1, 'tilted capsule uses a conservative box' );
+assert.ok( tiltedColliders.boxes[ 0 ].half.distanceTo( new Vector3( 4, 3, 3 ) ) < 1e-6, 'tilted capsule dimensions are scaled once in world space' );
 const streamedShapes = registerWorldPackageCollisionPayload( bodySetupGLB( { elsemeshCollision: bodySetupMetadata } ), streamedCollisionObject, streamedColliders );
 assert.equal( streamedShapes.length, 4, 'streamed collision GLB registers its box, sphere, capsule, and convex hull' );
 assert.equal( streamedColliders.boxes.length, 1, 'streamed collision GLB registers its BodySetup box' );

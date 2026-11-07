@@ -893,7 +893,18 @@ function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
 			const halfLength = capsule.length * Math.abs( scale.y ) * 0.5 + radius;
 			if ( Math.abs( axis.y ) > 0.95 ) {
 				registered.push( { kind: 'cylinder', collider: colliders.addCylinder( worldCenter.x, worldCenter.z, radius, worldCenter.y - halfLength, worldCenter.y + halfLength, { tag: `world:${objectId}:body-setup` } ) } );
-			} else addBounds( center, new Vector3( radius, halfLength, radius ), rotation );
+			} else {
+				// Radius and halfLength are already in world units; applying node's
+				// transform again would scale the tilted collider a second time.
+				const min = new Vector3( Infinity, Infinity, Infinity );
+				const max = new Vector3( -Infinity, -Infinity, -Infinity );
+				for ( const x of [ -1, 1 ] ) for ( const y of [ -1, 1 ] ) for ( const z of [ -1, 1 ] ) {
+					const corner = new Vector3( radius * x, halfLength * y, radius * z ).applyQuaternion( worldRotation ).add( worldCenter );
+					min.min( corner ); max.max( corner );
+				}
+				const collider = colliders.addBox( min.clone().add( max ).multiplyScalar( 0.5 ), max.clone().sub( min ).multiplyScalar( 0.5 ), 0, { walkable: false, solid: true, tag: `world:${objectId}:body-setup` } );
+				registered.push( { kind: 'box', collider } );
+			}
 		}
 		for ( const convex of checkCount( source.convexes || [] ) ) {
 			if ( ! Array.isArray( convex.vertices ) || convex.vertices.length < 4 || convex.vertices.length > 65536 ) throw new Error( `World object ${objectId} has invalid embedded convex collision vertices` );
