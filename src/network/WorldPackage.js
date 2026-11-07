@@ -184,6 +184,7 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
 	if ( ! state || state.disposed || ! state.progressiveAssets?.size ) return;
 	const bias = Number.isFinite( loadBias ) ? Math.max( 0, Math.min( 2, loadBias ) ) : 0;
 	const viewHeight = GPU.canvas?.height || globalThis.innerHeight || 1;
+	const textureProjectionRevision = textureCameraProjectionRevision( state, camera );
 	const requests = [];
 	const assetScreenFractions = new Map();
 	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
@@ -194,7 +195,7 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0 ) {
 			if ( assetFraction === undefined ) {
 				assetFraction = 0;
 				for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
-					const fraction = projectedBoundsScreenFraction( object, camera );
+					const fraction = cachedProjectedBoundsScreenFraction( state, object, camera, textureProjectionRevision );
 					if ( fraction !== null ) assetFraction = Math.max( assetFraction, fraction );
 				}
 				for ( const demand of state.staticModelTextureDemand?.get( assetId ) || [] ) {
@@ -280,6 +281,57 @@ export function registerStaticModelTextureDemand( root, runtime ) {
 }
 
 const _staticTextureObject = { transform: { position: null, rotation: null }, scale: null, streamingBounds: null };
+
+function textureCameraProjectionRevision( state, camera ) {
+	const view = state.textureCameraProjection || ( state.textureCameraProjection = new Float64Array( 32 ) );
+	const viewMatrix = camera.matrixWorldInverse.elements;
+	const projection = camera.projectionMatrix.elements;
+	let changed = state.textureCameraProjectionValid !== true;
+	for ( let index = 0; index < 16; index ++ ) {
+		if ( view[ index ] !== viewMatrix[ index ] || view[ index + 16 ] !== projection[ index ] ) changed = true;
+		view[ index ] = viewMatrix[ index ];
+		view[ index + 16 ] = projection[ index ];
+	}
+	if ( changed ) {
+		state.textureCameraProjectionValid = true;
+		state.textureProjectionRevision = ( state.textureProjectionRevision || 0 ) + 1;
+	}
+	return state.textureProjectionRevision;
+}
+
+function cachedProjectedBoundsScreenFraction( state, object, camera, viewRevision ) {
+	if ( ! object.transform?.position ) return null;
+	const cache = state.textureObjectProjectionCache || ( state.textureObjectProjectionCache = new WeakMap() );
+	const cached = cache.get( object );
+	const position = object.transform.position;
+	const rotation = object.transform.rotation;
+	const scale = object.scale || [ 1, 1, 1 ];
+	const center = object.streamingBounds.center;
+	const radius = object.streamingBounds.radius;
+	const values = cached?.values;
+	if ( cached?.viewRevision === viewRevision && values
+		&& values[ 0 ] === position[ 0 ] && values[ 1 ] === position[ 1 ] && values[ 2 ] === position[ 2 ]
+		&& values[ 3 ] === ( rotation ? 1 : 0 )
+		&& values[ 4 ] === ( rotation ? rotation[ 0 ] : object.transform.yaw || 0 )
+		&& values[ 5 ] === ( rotation ? rotation[ 1 ] : 0 )
+		&& values[ 6 ] === ( rotation ? rotation[ 2 ] : 0 )
+		&& values[ 7 ] === ( rotation ? rotation[ 3 ] : 0 )
+		&& values[ 8 ] === scale[ 0 ] && values[ 9 ] === scale[ 1 ] && values[ 10 ] === scale[ 2 ]
+		&& values[ 11 ] === center[ 0 ] && values[ 12 ] === center[ 1 ] && values[ 13 ] === center[ 2 ]
+		&& values[ 14 ] === radius ) return cached.fraction;
+
+	const fraction = projectedBoundsScreenFraction( object, camera );
+	const nextValues = new Float64Array( 15 );
+	nextValues[ 0 ] = position[ 0 ]; nextValues[ 1 ] = position[ 1 ]; nextValues[ 2 ] = position[ 2 ];
+	nextValues[ 3 ] = rotation ? 1 : 0;
+	nextValues[ 4 ] = rotation ? rotation[ 0 ] : object.transform.yaw || 0;
+	nextValues[ 5 ] = rotation?.[ 1 ] || 0; nextValues[ 6 ] = rotation?.[ 2 ] || 0; nextValues[ 7 ] = rotation?.[ 3 ] || 0;
+	nextValues[ 8 ] = scale[ 0 ]; nextValues[ 9 ] = scale[ 1 ]; nextValues[ 10 ] = scale[ 2 ];
+	nextValues[ 11 ] = center[ 0 ]; nextValues[ 12 ] = center[ 1 ]; nextValues[ 13 ] = center[ 2 ]; nextValues[ 14 ] = radius;
+	cache.set( object, { viewRevision, values: nextValues, fraction } );
+	return fraction;
+}
+
 export function staticModelTextureScreenFraction( { runtime, modelIndex, lodIndex }, camera ) {
 	if ( runtime.disposed ) return null;
 	const viewRevision = runtime.viewRevision ?? 0;
