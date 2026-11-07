@@ -3,7 +3,6 @@ import { Material } from '../../engine/render/Material.js';
 import { ShaderModule } from '../../engine/gpu/Shader.js';
 import { LAYERS } from '../../core/SceneRenderer.js';
 import { SPRAY } from '../../fx/Spray.js';
-import { WhaleBrain } from './WhaleBrain.js';
 import { decodePNG, loadTextureBytes } from './WhaleTextures.js';
 
 // Humpback whale (Megaptera novaeangliae), ~14.5 m.
@@ -11,7 +10,7 @@ import { decodePNG, loadTextureBytes } from './WhaleTextures.js';
 // Geometry: generated offline (anatomy tables -> parametric lofts), baked to public/models/whale:
 // three levels of detail, one draw call each, one shared material.
 // Rig: a chain of K spine frames from the snout to the fluke tips plus a joint per flipper,
-// posed on the CPU every frame (WhaleBrain: route, surfacing, blows, fluke-up dive) and
+// posed on the CPU every frame from the world's route/surfacing simulation, and
 // applied in the vertex shader (each vertex follows the frame at its rest axial position).
 // The shader poses every vertex twice (this frame and the last) for exact motion vectors.
 // Skin: procedural (dark slate back, mottled white throat and belly, ventral grooves,
@@ -36,7 +35,7 @@ const _t = new THREE.Vector3();
 
 export class Whale {
 
-	constructor( { scene, terrain, query = null, queryName = 'whale', spray = null, THREE: renderer = THREE, webgl = false, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile, seaLevel = 0 } ) {
+	constructor( { scene, terrain, query = null, queryName = 'whale', spray = null, THREE: renderer = THREE, webgl = false, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile, createBrain, seaLevel = 0 } ) {
 
 		this.THREE = renderer;
 		this.webgl = webgl;
@@ -46,10 +45,12 @@ export class Whale {
 		this.spray = spray;
 		this.url = url;
 		this.profile = profile;
+		if ( typeof createBrain !== 'function' ) throw new Error( 'A whale world behavior factory must be registered for this component' );
 		this.ready = false;
 		this.group = new this.THREE.Group();
 		this.group.name = 'Whale';
-		this.brain = new WhaleBrain( { terrain, query, queryName, ...profile, seaLevel } );
+		this.brain = createBrain( { THREE: this.THREE, terrain, query, queryName, ...profile, seaLevel } );
+		if ( ! this.brain || typeof this.brain.update !== 'function' || ! this.brain.position || ! this.brain.quaternion ) throw new Error( 'The whale world behavior factory returned an invalid simulation' );
 		this.frames = null;
 		this.meshes = [];
 		this.lod = - 1;

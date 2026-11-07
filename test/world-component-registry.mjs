@@ -25,6 +25,7 @@ assert.equal( worldComponentDescriptor( 'elsemesh.static-vegetation/1' ).vegetat
 assert.equal( worldComponentDescriptor( 'elsemesh.static-fish-props/1' ).install, null, 'fish-props rendering is selected by the engine backend registry' );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.static-reef/1' ).install, 'function' );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).vehicle, true );
+assert.equal( typeof worldComponentDescriptor( 'elsemesh.humpback-whale/1' ).createSimulation, 'function', 'the Tidewater package registers humpback simulation behavior' );
 assert.equal( worldComponentDescriptor( 'elsemesh.example-island-wildlife/1' ).wildlifeSimulation, undefined );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).complexityTriangles, 46845 );
 assert.throws( () => registerWorldComponent( 'elsemesh.vehicle-without-complexity/1', { vehicle: true } ), /Invalid/ );

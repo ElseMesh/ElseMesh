@@ -35,7 +35,7 @@ import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
-import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
 import { pierWalkableHeightAt } from '../world/PierSurface.js';
@@ -985,6 +985,7 @@ export class WebGLFallback {
 				seed: component.seed, route: component.route, surfaceAt: component.surfaceAt,
 				cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed,
 			},
+			createBrain: worldComponentDescriptor( component.type )?.createSimulation,
 		} );
 		try {
 			if ( assets ) await whale.loadPackage( assets );
