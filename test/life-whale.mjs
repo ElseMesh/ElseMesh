@@ -18,9 +18,10 @@ globalThis.fetch = async ( url ) => {
 
 const L = await setupLife( { W, H, water: true } );
 const { Whale } = await import( '../src/world/marine/Whale.js' );
+const { TIDEWATER_WHALE_PROFILE } = await import( '../worlds/tidewater/WhaleProfile.js' );
 let emitted = 0;
 const spray = { emit( p, v, n ) { emitted += n; } };
-const whale = new Whale( { scene: L.scene, terrain: L.terrain, spray } );
+const whale = new Whale( { scene: L.scene, terrain: L.terrain, spray, profile: TIDEWATER_WHALE_PROFILE } );
 const t0 = performance.now();
 await whale.load();
 console.log( 'loaded in', ( performance.now() - t0 ).toFixed( 0 ), 'ms; lods', whale.meshes.map( ( m ) => m.geometry.index.count / 3 ) );

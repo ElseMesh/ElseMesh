@@ -3,7 +3,7 @@ import { Material } from '../../engine/render/Material.js';
 import { ShaderModule } from '../../engine/gpu/Shader.js';
 import { LAYERS } from '../../core/SceneRenderer.js';
 import { SPRAY } from '../../fx/Spray.js';
-import { WhaleBrain, EXAMPLE_ISLAND_WHALE_PROFILE } from './WhaleBrain.js';
+import { WhaleBrain } from './WhaleBrain.js';
 import { decodePNG, loadTextureBytes } from './WhaleTextures.js';
 
 // Humpback whale (Megaptera novaeangliae), ~14.5 m.
@@ -36,7 +36,7 @@ const _t = new THREE.Vector3();
 
 export class Whale {
 
-	constructor( { scene, terrain, query = null, queryName = 'whale', spray = null, THREE: renderer = THREE, webgl = false, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile = EXAMPLE_ISLAND_WHALE_PROFILE, seaLevel = 0 } ) {
+	constructor( { scene, terrain, query = null, queryName = 'whale', spray = null, THREE: renderer = THREE, webgl = false, url = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/whale/', profile, seaLevel = 0 } ) {
 
 		this.THREE = renderer;
 		this.webgl = webgl;

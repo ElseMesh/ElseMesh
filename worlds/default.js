@@ -7,6 +7,7 @@ import vegetationPlacements from './tidewater/lod-source/vegetation-placements.b
 import fishPropsPlacements from './tidewater/assets/11f5ea7d9ccaf1a3d7931bfc46a34d71f133e0df23225e8b86904c47137f0fcf?url';
 import { DEFAULT_REEF_PLACEMENT_ASSETS as reefPlacementAssets } from './tidewater/default-reef-assets.js';
 import { TIDEWATER_LAYOUT as defaultLayout } from './tidewater/layout.js';
+import { TIDEWATER_WHALE_PROFILE } from './tidewater/WhaleProfile.js';
 
 const vegetation = source.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
 const vegetationPlacementAssetId = vegetation?.data?.placementAssetId;
@@ -25,6 +26,7 @@ export const defaultWorldPackage = Object.freeze( {
 	source,
 	presentation: Object.freeze( {
 		layout: defaultLayout,
+		whaleProfile: TIDEWATER_WHALE_PROFILE,
 		createWorldState: async options => {
 			const { WorldState } = await import( './tidewater/WorldState.js' );
 			return new WorldState( options );

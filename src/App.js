@@ -543,7 +543,7 @@ export class App {
 		this.boatCtl.model = this.boat;
 		this.boatSpray = new BoatSpray( { boat: this.boatCtl, spray: this.spray } );
 		// humpback cruising the deep water around the island (model fetched from public/models/whale)
-		this.whale = new Whale( { scene, terrain: this.terrainData, query: this.query, spray: this.spray } );
+		this.whale = new Whale( { scene, terrain: this.terrainData, query: this.query, spray: this.spray, profile: this.worldPackage.presentation.whaleProfile } );
 		try {
 
 			await this.whale.load();

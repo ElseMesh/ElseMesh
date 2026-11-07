@@ -8,15 +8,6 @@ import * as THREE from '../../engine/index.js';
 // (the body follows the route), stroke phase / amplitude, arch, head pitch, flipper rotations,
 // and events: blow intensity (0..1) and fluke-lift (drips).
 
-// route (x, z) through the bay, checked against TerrainData
-// passes ~130 m off the beach and ~65 m from the pier head; >= 8.8 m of water everywhere
-export const EXAMPLE_ISLAND_WHALE_PROFILE = Object.freeze( {
-	seed: 1,
-	route: [ [ 70, 300 ], [ 60, 200 ], [ 35, 120 ], [ 5, 88 ], [ - 25, 100 ], [ - 52, 128 ], [ - 75, 178 ], [ - 52, 262 ], [ - 10, 330 ] ],
-	surfaceAt: 0.25,
-	cruiseSpeed: 2.6,
-	surfaceSpeed: 1.5,
-} );
 const TAU = Math.PI * 2;
 
 const _e = new THREE.Euler();
@@ -25,7 +16,7 @@ const _p = new THREE.Vector3();
 
 export class WhaleBrain {
 
-	constructor( { terrain, query = null, queryName = 'whale', seed = 1, route = EXAMPLE_ISLAND_WHALE_PROFILE.route, surfaceAt = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceAt, cruiseSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.cruiseSpeed, surfaceSpeed = EXAMPLE_ISLAND_WHALE_PROFILE.surfaceSpeed, seaLevel = 0 } ) {
+	constructor( { terrain, query = null, queryName = 'whale', seed, route, surfaceAt, cruiseSpeed, surfaceSpeed, seaLevel = 0 } ) {
 
 		this.terrain = terrain;
 		this.query = query;

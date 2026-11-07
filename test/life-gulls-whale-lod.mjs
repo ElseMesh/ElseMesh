@@ -55,7 +55,8 @@ gulls.mesh.visible = false;
 
 // whale LODs
 const { Whale } = await import( '../src/world/marine/Whale.js' );
-const whale = new Whale( { scene: L.scene, terrain: L.terrain } );
+const { TIDEWATER_WHALE_PROFILE } = await import( '../worlds/tidewater/WhaleProfile.js' );
+const whale = new Whale( { scene: L.scene, terrain: L.terrain, profile: TIDEWATER_WHALE_PROFILE } );
 await whale.load();
 const b = whale.brain;
 for ( let t = 0; t < 600; t += 0.1 ) {
