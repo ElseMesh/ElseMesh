@@ -965,7 +965,7 @@ export class WebGLFallback {
 		this.beachDebrisTerrain = this.terrain || this.hostedTerrainData;
 		this.beachDebrisSeaLevel = this.worldLink ? this.hostedSeaLevel ?? 0 : this.worldSeaLevel;
 		if ( this.beachDebrisTerrain ) {
-			this.beachDebris = webglBeachDebris( T, this.beachDebrisTerrain, this.camera, null, this.beachDebrisSeaLevel, this.hostedGroundDetailDensity || null );
+			this.beachDebris = webglBeachDebris( T, this.beachDebrisTerrain, this.camera, null, this.beachDebrisSeaLevel, this.hostedGroundDetailDensity || null, this.beachDetailTexture || null );
 			this.scene.add( this.beachDebris );
 			this.debrisCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 		}
@@ -1717,6 +1717,7 @@ export class WebGLFallback {
 			const terrainMaterial = webglTerrainMaterial( T, this.terrain, null, { seaLevel: this.worldSeaLevel } );
 			this.terrainMaterial = terrainMaterial;
 			this.terrainColorTexture = terrainMaterial.userData.terrainTextures[ 0 ];
+			this.beachDetailTexture = terrainMaterial.userData.terrainTextures[ 1 ];
 			model.scene.traverse( object => {
 				if ( ! object.isMesh ) return;
 				object.receiveShadow = true;
@@ -1971,6 +1972,7 @@ export class WebGLFallback {
 				if ( ! this.shoreWetness && hostedTerrainMaterial.userData.shoreWetnessSource.shore ) this._initShoreWetness( hostedTerrainMaterial, this.hostedTerrainData, hostedTerrainMaterial.userData.shoreWetnessSource.shore, manifest.rules.seaLevel ?? 0 );
 				applyHostedTerrainMaterial( base, hostedTerrainMaterial );
 				this.terrainColorTexture = hostedTerrainMaterial.userData.terrainTextures[ 0 ];
+				this.beachDetailTexture = hostedTerrainMaterial.userData.terrainTextures[ 1 ];
 				hostedTerrainVisualReady = true;
 			}
 			prepareWebGLLODFade( base );
@@ -2332,7 +2334,7 @@ export class WebGLFallback {
 		if ( this.beachDebris && this.beachDebrisTerrain ) {
 			const dx = this.camera.position.x - this.debrisCenter.x, dz = this.camera.position.z - this.debrisCenter.y;
 			if ( dx * dx + dz * dz > 36 ) {
-				this.beachDebris = webglBeachDebris( T, this.beachDebrisTerrain, this.camera, this.beachDebris, this.beachDebrisSeaLevel, this.hostedGroundDetailDensity || null );
+				this.beachDebris = webglBeachDebris( T, this.beachDebrisTerrain, this.camera, this.beachDebris, this.beachDebrisSeaLevel, this.hostedGroundDetailDensity || null, this.beachDetailTexture || null );
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
@@ -2362,6 +2364,7 @@ export class WebGLFallback {
 			this.frameWorkMeter.end();
 		}
 		this.app.cpuMs = performance.now() - now;
+		this.app.updateNavigationHUD( this.camera, this.player, experience );
 		this.input.endFrame();
 
 	}

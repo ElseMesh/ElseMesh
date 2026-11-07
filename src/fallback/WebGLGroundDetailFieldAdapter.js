@@ -20,7 +20,7 @@ async function installGroundDetailField( { fallback, terrain, assets }, componen
 	fallback.hostedGroundDetailDensity = density;
 	const updateExistingMesh = mask => {
 		if ( ! fallback.beachDebris || fallback.beachDebrisTerrain !== terrain ) return;
-		fallback.beachDebris = webglBeachDebris( fallback.THREE, terrain, fallback.camera, fallback.beachDebris, fallback.beachDebrisSeaLevel ?? 0, mask );
+		fallback.beachDebris = webglBeachDebris( fallback.THREE, terrain, fallback.camera, fallback.beachDebris, fallback.beachDebrisSeaLevel ?? 0, mask, fallback.beachDetailTexture || null );
 		fallback.debrisCenter?.set( fallback.camera.position.x, fallback.camera.position.z );
 	};
 	updateExistingMesh( density );

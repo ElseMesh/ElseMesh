@@ -32,6 +32,12 @@ const markupText = '<script>alert(1)</script>';
 assert.equal( validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, tips: [ markupText ] } ).tips[ 0 ], markupText, 'authored text remains data for the UI text renderer, never HTML' );
 const themed = validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, theme: { logo: { src: '/world/logo.svg', alt: 'World logo' }, colors: { accent: '#c6a664', button: '#302d35' } } } );
 assert.equal( themed.theme.logo.src, '/world/logo.svg', 'world-owned logo assets can be declared by path' );
+const navigation = validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, navigation: { compass: { north: 'N', east: 'E', south: 'S', west: 'W' }, map: { src: '/world/minimap.png', alt: 'World minimap', bounds: { minX: -20, maxX: 20, minZ: -30, maxZ: 30 } } } } );
+assert.equal( navigation.navigation.compass.west, 'W', 'worlds own the compass cardinal labels' );
+assert.equal( navigation.navigation.map.bounds.maxZ, 30, 'world-authored minimap bounds are retained' );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, navigation: { compass: { north: 'N', east: 'E', south: 'S' } } } ), /compass labels/ );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, navigation: { map: { src: 'javascript:alert(1)', alt: 'bad', bounds: { minX: 0, maxX: 1, minZ: 0, maxZ: 1 } } } } ), /minimap source/ );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, navigation: { map: { src: '/world/minimap.png', alt: 'bad', bounds: { minX: 1, maxX: 1, minZ: 0, maxZ: 1 } } } } ), /minimap source/ );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, theme: { colors: { accent: 'red' } } } ), /theme colors/ );
 assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, theme: { logo: { src: 'javascript:alert(1)', alt: 'bad' } } } ), /loading logo/ );
 

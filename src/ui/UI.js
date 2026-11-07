@@ -1,5 +1,6 @@
 import { icon, brandMark } from './icons.js';
 import { builtInWorldURL, clearHomeWorld, getHomeWorld, listVisitedWorlds, parseWorldInviteURL, setHomeWorld } from '../network/WorldLauncher.js';
+import { navigationMapPosition, normalizeNavigationHeading } from './NavigationMap.js';
 
 // ElseMesh UI: settings panel (tabs → folders → controls), HUD, help,
 // photo mode, start overlay and loader. Plain DOM, no dependencies.
@@ -1973,14 +1974,81 @@ export class UI {
 			</div>`;
 		this.depthCanvas = this.depthEl.querySelector( '.em-depth-tape' );
 		this.depthNum = this.depthEl.querySelector( '.em-depth-num' );
+		this.navigationEl = this._buildNavigation();
 
-		hud.append( tl, this.toastsEl, this.promptEl, this.boatEl, this.depthEl );
+		hud.append( tl, this.toastsEl, this.promptEl, this.boatEl, this.depthEl, this.navigationEl );
 
 		// the one element that survives photo mode
 		this.photoHint = h( 'div', 'em-photo-hint' );
 		this.photoHint.innerHTML = '<kbd>P</kbd><span>Exit photo mode</span>';
 
 		this.root.append( hud, this.photoHint );
+
+	}
+
+	_buildNavigation() {
+
+		const el = h( 'div', 'em-navigation', { 'aria-hidden': 'true' } );
+		const map = this.navigationMap = h( 'div', 'em-nav-map' );
+		this.navigationMapImage = h( 'img', 'em-nav-map-image', { alt: '', draggable: 'false' } );
+		this.navigationMapMarker = h( 'span', 'em-nav-player', { 'aria-hidden': 'true' } );
+		map.append( this.navigationMapImage, this.navigationMapMarker );
+
+		const compass = this.navigationCompass = h( 'div', 'em-nav-compass' );
+		compass.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="em-nav-ring" cx="50" cy="50" r="47"/><g class="em-nav-card"><text class="em-nav-n" x="50" y="13">N</text><text class="em-nav-e" x="87" y="53">E</text><text class="em-nav-s" x="50" y="93">S</text><text class="em-nav-w" x="13" y="53">W</text></g><path class="em-nav-pointer" d="M50 17 44 34 50 30 56 34Z"/></svg><div class="em-nav-readout"><span class="em-nav-degrees">000°</span><span class="em-nav-cardinal">N</span></div>`;
+		this.navigationCard = compass.querySelector( '.em-nav-card' );
+		this.navigationLabels = [ '.em-nav-n', '.em-nav-e', '.em-nav-s', '.em-nav-w' ].map( selector => compass.querySelector( selector ) );
+		this.navigationDegrees = compass.querySelector( '.em-nav-degrees' );
+		this.navigationCardinal = compass.querySelector( '.em-nav-cardinal' );
+		el.append( map, compass );
+		return el;
+
+	}
+
+	setNavigationHUD( { navigation, theme, position, heading = 0 } = {} ) {
+
+		const compass = navigation?.compass;
+		const map = navigation?.map;
+		const visible = !! ( compass || map );
+		this.navigationEl.classList.toggle( 'is-on', visible );
+		this.navigationEl.setAttribute( 'aria-hidden', visible ? 'false' : 'true' );
+		if ( ! visible ) return;
+
+		if ( navigation !== this._navigationConfig || theme !== this._navigationTheme ) {
+			this._navigationConfig = navigation;
+			this._navigationTheme = theme;
+			this.navigationMap.hidden = ! map;
+			this.navigationCompass.hidden = ! compass;
+			this.navigationLabels.forEach( ( label, index ) => { label.textContent = compass ? compass[ [ 'north', 'east', 'south', 'west' ][ index ] ] : ''; } );
+			if ( map ) {
+				this.navigationMapImage.alt = map.alt;
+				if ( this.navigationMapImage.src !== map.src ) this.navigationMapImage.src = map.src;
+			} else this.navigationMapImage.removeAttribute( 'src' );
+			const colors = theme?.colors || {};
+			this.navigationEl.style.setProperty( '--em-nav-bg', colors.background || '#11131a' );
+			this.navigationEl.style.setProperty( '--em-nav-surface', colors.surface || '#20212a' );
+			this.navigationEl.style.setProperty( '--em-nav-accent', colors.accent || '#5fe3d4' );
+			this.navigationEl.style.setProperty( '--em-nav-text', colors.text || '#eef6f8' );
+			this.navigationEl.style.setProperty( '--em-nav-muted', colors.muted || '#a8b7bd' );
+			this.navigationEl.style.setProperty( '--em-nav-border', colors.border || '#627178' );
+		}
+
+		const degrees = normalizeNavigationHeading( heading );
+		if ( compass ) {
+			this.navigationCard.setAttribute( 'transform', `rotate(${ - degrees } 50 50)` );
+			this.navigationDegrees.textContent = `${ String( Math.round( degrees ) % 360 ).padStart( 3, '0' ) }°`;
+			this.navigationCardinal.textContent = compass[ [ 'north', 'east', 'south', 'west' ][ Math.round( degrees / 90 ) % 4 ] ];
+		}
+		if ( map ) {
+			const projected = navigationMapPosition( map.bounds, position, this.navigationMapImage.naturalWidth, this.navigationMapImage.naturalHeight );
+			const markerVisible = !! projected?.visible;
+			this.navigationMapMarker.hidden = ! markerVisible;
+			if ( markerVisible ) {
+				this.navigationMapMarker.style.left = `${ ( projected.x * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapMarker.style.top = `${ ( projected.y * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapMarker.style.transform = `translate(-50%, -50%) rotate(${ degrees }deg)`;
+			}
+		}
 
 	}
 

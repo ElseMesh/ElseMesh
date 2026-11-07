@@ -9,7 +9,7 @@ const descriptor = {
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ],
 		experience: {
 			genre: 'The Great Hall', tagline: 'Choose your house.', loadingNote: 'Preparing the Hall.', tips: [ 'Nearby rooms load as you explore.' ],
-			stages: { world: 'Loading the starting area…' }, theme: { logo: { src: '/v1/presentation/logo.svg', alt: 'Castle mark' }, colors: { accent: '#c6a664' } },
+			stages: { world: 'Loading the starting area…' }, navigation: { compass: { north: 'N', east: 'E', south: 'S', west: 'W' }, map: { src: '/v1/presentation/minimap.png', alt: 'Great Hall minimap', bounds: { minX: -20, maxX: 20, minZ: 50, maxZ: 120 } } }, theme: { logo: { src: '/v1/presentation/logo.svg', alt: 'Castle mark' }, colors: { accent: '#c6a664' } },
 		},
 		previewSpawn: { position: [ 0, 8.62, 90 ], yaw: 0 },
 		previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32 },
@@ -47,6 +47,7 @@ try {
 	assert.equal( connector.emptyCollisionCellsAreVerified, true, 'complete per-layer inventories prove absent cells are empty' );
 	assert.equal( manifest.experience.genre, 'The Great Hall', 'the local world controls its loading copy' );
 	assert.equal( manifest.experience.theme.logo.src, 'http://127.0.0.1:4179/v1/presentation/logo.svg', 'world logo paths resolve against the local content provider' );
+	assert.equal( manifest.experience.navigation.map.src, 'http://127.0.0.1:4179/v1/presentation/minimap.png', 'world minimap paths resolve against the local content provider' );
 	assert.equal( manifest.objects.filter( object => object.priority === 'visible' && object.regionCell && object.collisionPayload ).length, 1, 'indexed startup collision cells receive the required-load priority' );
 	assert.equal( manifest.objects.filter( object => object.regionCell && object.collisionPayload ).length, 1, 'unindexed empty cells do not create synthetic collision assets' );
 	assert.equal( connector.isCollisionPathReady( [ 17, 1, 81 ], [ 18, 1, 81 ], { loadedObjects: new Set() } ), true, 'a path through an absent cell is open when every layer has complete collision coverage' );

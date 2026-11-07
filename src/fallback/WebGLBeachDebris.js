@@ -55,6 +55,119 @@ function groundDetailColor( target, tone, palette, selector, category, seed, col
 
 }
 
+function beachDetailMaterial( T, terrainDetailTexture ) {
+
+	const material = new T.MeshStandardMaterial( { color: 0xffffff, vertexColors: true, roughness: 0.8, metalness: 0 } );
+	material.userData.beachTerrainDetailTexture = terrainDetailTexture;
+	material.onBeforeCompile = shader => {
+
+		shader.uniforms.uBeachTerrainDetail = { value: material.userData.beachTerrainDetailTexture };
+		shader.uniforms.uBeachTerrainDetailEnabled = { value: Boolean( material.userData.beachTerrainDetailTexture ) };
+		material.userData.beachTerrainDetailUniforms = shader.uniforms;
+		shader.vertexShader = shader.vertexShader.replace( '#include <common>', `#include <common>
+attribute float aGroundDetailKind;
+attribute float aGroundDetailRadius;
+attribute float aGroundDetailSeed;
+attribute float aGroundDetailGroundY;
+attribute float aGroundDetailPalette;
+varying vec3 vGroundDetailWorldPosition;
+varying vec3 vGroundDetailWorldNormal;
+varying float vGroundDetailKind;
+varying float vGroundDetailRadius;
+varying float vGroundDetailSeed;
+varying float vGroundDetailGroundY;
+varying float vGroundDetailPalette;` );
+		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>
+vGroundDetailWorldPosition = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+vGroundDetailWorldNormal = normalize( mat3( modelMatrix ) * normal );
+vGroundDetailKind = aGroundDetailKind;
+vGroundDetailRadius = aGroundDetailRadius;
+vGroundDetailSeed = aGroundDetailSeed;
+vGroundDetailGroundY = aGroundDetailGroundY;
+vGroundDetailPalette = aGroundDetailPalette;` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>
+uniform sampler2D uBeachTerrainDetail;
+uniform bool uBeachTerrainDetailEnabled;
+varying vec3 vGroundDetailWorldPosition;
+varying vec3 vGroundDetailWorldNormal;
+varying float vGroundDetailKind;
+varying float vGroundDetailRadius;
+varying float vGroundDetailSeed;
+varying float vGroundDetailGroundY;
+varying float vGroundDetailPalette;` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <color_fragment>', `#include <color_fragment>
+float beachDetailWet = 1.0 - smoothstep( 0.4, 1.0, vGroundDetailWorldPosition.y );
+float beachDetailChip = step( 1.5, vGroundDetailKind );
+float beachDetailTile = clamp( vGroundDetailRadius * 4.0, 0.03, 0.3 );
+float beachDetailContact = 1.0 - smoothstep( 0.0, max( vGroundDetailRadius * 0.7, 0.006 ), vGroundDetailWorldPosition.y - vGroundDetailGroundY );
+vec4 beachSurfaceDetail = vec4( 0.5 );
+if ( uBeachTerrainDetailEnabled ) {
+	vec3 beachNormal = normalize( vGroundDetailWorldNormal );
+	vec3 beachWeights = pow( abs( beachNormal ), vec3( 4.0 ) );
+	beachWeights /= max( dot( beachWeights, vec3( 1.0 ) ), 0.0001 );
+	vec3 beachPosition = vGroundDetailWorldPosition;
+	vec4 beachA = texture2D( uBeachTerrainDetail, beachPosition.zy / beachDetailTile );
+	vec4 beachB = texture2D( uBeachTerrainDetail, beachPosition.xz / beachDetailTile + 0.37 );
+	vec4 beachC = texture2D( uBeachTerrainDetail, beachPosition.xy / beachDetailTile + 0.71 );
+	beachSurfaceDetail = beachA * beachWeights.x + beachB * beachWeights.y + beachC * beachWeights.z;
+}
+float beachDetailSeed = vGroundDetailSeed;
+float beachDetailPits = smoothstep( 0.62, 0.85, beachSurfaceDetail.b ) * smoothstep( 0.45, 0.8, vGroundDetailPalette );
+vec3 beachStoneAlbedo = diffuseColor.rgb;
+beachStoneAlbedo *= ( ( beachSurfaceDetail.b - 0.5 ) * 0.5 + 1.0 ) * ( ( beachSurfaceDetail.a - 0.5 ) * 0.6 + 1.0 );
+beachStoneAlbedo *= fract( sin( beachDetailSeed * 91.345 + 1.7 ) * 47453.5453 ) * 0.3 + 0.85;
+beachStoneAlbedo = mix( beachStoneAlbedo, beachStoneAlbedo * 0.55, beachDetailPits * 0.6 );
+float beachPumice = step( 0.93, fract( beachDetailSeed * 5.17 ) ) * ( 1.0 - beachDetailChip );
+float beachGlass = step( 0.955, fract( beachDetailSeed * 3.71 ) ) * beachDetailChip;
+float beachGlassHue = fract( beachDetailSeed * 13.3 );
+vec3 beachGlassColor = mix( mix( vec3( 0.6038, 0.6654, 0.6383 ), vec3( 0.2358, 0.0953, 0.0272 ), 1.0 - step( 0.75, beachGlassHue ) ), vec3( 0.1441, 0.3372, 0.1714 ), 1.0 - step( 0.45, beachGlassHue ) );
+vec3 beachChipColor = diffuseColor.rgb * ( ( beachSurfaceDetail.a - 0.5 ) * 0.5 + 1.0 ) * ( sin( ( vGroundDetailWorldPosition.x + vGroundDetailWorldPosition.z ) * 900.0 ) * 0.06 + 0.97 );
+vec3 beachPumiceColor = vec3( 0.394, 0.367, 0.319 ) * ( 1.0 - smoothstep( 0.55, 0.8, beachSurfaceDetail.b ) * 0.45 );
+vec3 beachAlbedo = mix( mix( beachStoneAlbedo, beachPumiceColor, beachPumice ), beachChipColor, beachDetailChip );
+beachAlbedo = mix( beachAlbedo, beachGlassColor, beachGlass );
+float beachGroundDust = beachDetailContact * smoothstep( 0.8, 1.6, vGroundDetailGroundY ) * 0.35;
+beachAlbedo = mix( beachAlbedo, vec3( 0.57, 0.45, 0.27 ), beachGroundDust );
+diffuseColor.rgb = beachAlbedo * ( 1.0 - beachDetailWet * 0.45 );` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+float beachBaseRoughness = mix( mix( 0.74 + beachSurfaceDetail.b * 0.12, 0.95, beachPumice ), mix( 0.5, 0.12, beachGlass ), beachDetailChip );
+roughnessFactor = beachBaseRoughness;
+roughnessFactor = mix( roughnessFactor, 0.22, beachDetailWet * 0.85 );` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+float beachBumpHeight = ( beachSurfaceDetail.r * 0.6 + beachSurfaceDetail.b * 0.3 ) * beachDetailTile * 0.06 * ( 1.0 - beachDetailChip );
+vec3 beachBumpP = -vViewPosition;
+vec3 beachBumpDx = dFdx( beachBumpP ), beachBumpDy = dFdy( beachBumpP );
+float beachBumpHdx = dFdx( beachBumpHeight ), beachBumpHdy = dFdy( beachBumpHeight );
+vec3 beachBumpR1 = cross( beachBumpDy, normal ), beachBumpR2 = cross( normal, beachBumpDx );
+float beachBumpDet = dot( beachBumpDx, beachBumpR1 ), beachBumpAbsDet = abs( beachBumpDet );
+float beachBumpArea = length( cross( beachBumpDx, beachBumpDy ) );
+float beachBumpFr = beachBumpArea / max( length( beachBumpDx ) * length( beachBumpDy ), 1e-20 );
+float beachBumpFacet = beachBumpAbsDet / max( beachBumpArea, 1e-20 );
+float beachBumpK = smoothstep( 0.12, 0.35, beachBumpFr ) * smoothstep( 0.3, 0.6, beachBumpFacet );
+vec3 beachBumpGrad = ( beachBumpR1 * beachBumpHdx + beachBumpR2 * beachBumpHdy ) * sign( beachBumpDet );
+beachBumpGrad *= min( 1.0, beachBumpAbsDet * 1.4 / max( length( beachBumpGrad ), 1e-20 ) ) * beachBumpK;
+normal = normalize( normal * max( beachBumpAbsDet, 1e-20 ) - beachBumpGrad );` );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <aomap_fragment>', `#include <aomap_fragment>
+float beachDetailAO = 1.0 - beachDetailContact * 0.5;
+reflectedLight.indirectDiffuse *= beachDetailAO;
+reflectedLight.indirectSpecular *= beachDetailAO;` );
+
+	};
+	material.customProgramCacheKey = () => 'elsemesh-ground-detail-v2-terrain-texture';
+	return material;
+
+}
+
+function setBeachDetailTexture( material, terrainDetailTexture ) {
+
+	material.userData.beachTerrainDetailTexture = terrainDetailTexture;
+	const uniforms = material.userData.beachTerrainDetailUniforms;
+	if ( uniforms ) {
+		uniforms.uBeachTerrainDetail.value = terrainDetailTexture;
+		uniforms.uBeachTerrainDetailEnabled.value = Boolean( terrainDetailTexture );
+	}
+
+}
+
 function getDetailPatchSlots() {
 	if ( detailPatchSlots ) return detailPatchSlots;
 	let state = 1234567;
@@ -92,7 +205,7 @@ function hash12( x, z ) {
 	return value - Math.floor( value );
 }
 
-export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, densityField = null ) {
+export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, densityField = null, terrainDetailTexture = null ) {
 
 	const radius = 25, spacing = 0.62;
 	const firstX = Math.floor( ( camera.position.x - radius ) / spacing ), firstZ = Math.floor( ( camera.position.z - radius ) / spacing );
@@ -136,7 +249,7 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 				const scaleZ = stoneRadius * fade;
 				samples.push( {
 					x, z, height: terrain.heightAt( x, z ), category: slot.category, palette: details.palette,
-					random: [ h2, h2, h3, h4 ], shapeIndex: slot.shapeIndex, scale: [ scaleX, scaleY, scaleZ ],
+					random: [ h2, h2, h3, h4 ], shapeIndex: slot.shapeIndex, radius: stoneRadius, scale: [ scaleX, scaleY, scaleZ ],
 					tilt: ( h5 - 0.5 ) * ( isChip ? 0.5 : 0.9 ), yaw: h3 * Math.PI * 2,
 					lift: scaleY * ( isChip ? 0.35 : 0.15 ),
 				} );
@@ -169,7 +282,7 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 		}
 		samples.push( { x, z, height, random: [ random( 5 ), random( 6 ), random( 7 ) ], category, palette, shapeIndex: Math.floor( random( 8 ) * 7 ) } );
 	}
-	const positions = [], normals = [], vertexColors = [], indices = [];
+	const positions = [], normals = [], vertexColors = [], vertexKinds = [], vertexRadii = [], vertexSeeds = [], vertexGroundY = [], vertexPalettes = [], indices = [];
 	const color = new T.Color();
 	const colors = {
 		stone: [ 0x262523, 0x66615a, 0xc2b8a1, 0x8c6647 ].map( hex => new T.Color( hex ) ),
@@ -193,9 +306,8 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 		const lift = sample.lift ?? r * 0.12;
 		if ( sample.scale ) {
 			groundDetailColor( color, tone, sample.palette, selector, sample.category, size + yaw, colors );
-			const wet = 1 - smoothstep( 0.4, 1.0, sample.height + lift );
-			color.multiplyScalar( 1 - wet * 0.45 );
 		} else color.setHex( FALLBACK_PALETTE_COLORS[ Math.floor( tone * 5 ) ] );
+		const radiusAtSample = sample.radius ?? r;
 		const base = positions.length / 3;
 		for ( let v = 0; v < part.p.length; v += 3 ) {
 
@@ -207,6 +319,11 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 			const nl = Math.hypot( nx, nTiltY, nTiltZ ) || 1;
 			normals.push( ( nx * cYaw + nTiltZ * sYaw ) / nl, nTiltY / nl, ( nTiltZ * cYaw - nx * sYaw ) / nl );
 			vertexColors.push( color.r, color.g, color.b );
+			vertexKinds.push( sample.category || 0 );
+			vertexRadii.push( radiusAtSample );
+			vertexSeeds.push( sample.random ? sample.random[ 0 ] + ( sample.random[ 2 ] || 0 ) : 0 );
+			vertexGroundY.push( sample.height );
+			vertexPalettes.push( sample.palette ?? 0.5 );
 
 		}
 		for ( const index of part.idx ) indices.push( base + index );
@@ -216,17 +333,23 @@ export function webglBeachDebris( T, terrain, camera, previous, seaLevel = 0, de
 	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
 	geometry.setAttribute( 'normal', new T.Float32BufferAttribute( normals, 3 ) );
 	geometry.setAttribute( 'color', new T.Float32BufferAttribute( vertexColors, 3 ) );
+	geometry.setAttribute( 'aGroundDetailKind', new T.Float32BufferAttribute( vertexKinds, 1 ) );
+	geometry.setAttribute( 'aGroundDetailRadius', new T.Float32BufferAttribute( vertexRadii, 1 ) );
+	geometry.setAttribute( 'aGroundDetailSeed', new T.Float32BufferAttribute( vertexSeeds, 1 ) );
+	geometry.setAttribute( 'aGroundDetailGroundY', new T.Float32BufferAttribute( vertexGroundY, 1 ) );
+	geometry.setAttribute( 'aGroundDetailPalette', new T.Float32BufferAttribute( vertexPalettes, 1 ) );
 	geometry.setIndex( indices );
 	geometry.computeBoundingSphere();
 	let mesh = previous;
 	if ( ! mesh || mesh.isInstancedMesh ) {
 		const parent = mesh?.parent;
 		const old = mesh;
-		mesh = new T.Mesh( geometry, new T.MeshStandardMaterial( { color: 0xffffff, vertexColors: true, roughness: 0.8, metalness: 0 } ) );
+		mesh = new T.Mesh( geometry, beachDetailMaterial( T, terrainDetailTexture ) );
 		if ( old ) { parent?.add( mesh ); parent?.remove( old ); old.geometry.dispose(); old.material.dispose(); }
 	} else {
 		mesh.geometry.dispose();
 		mesh.geometry = geometry;
+		setBeachDetailTexture( mesh.material, terrainDetailTexture );
 	}
 	mesh.count = samples.length;
 	mesh.name = 'WebGL camera-following beach debris'; mesh.frustumCulled = false; mesh.renderOrder = 2;

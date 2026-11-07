@@ -595,11 +595,14 @@ finding changes them.
   precision. A live hosted WebGL view loaded all 39 components and merged 2,169
   details into one mesh (25,083 vertices, 39,438 triangles), captured at the
   named beach pose after dismissing the start overlay; see
-  [`graphics-review.md`](docs/graphics-review.md). WebGL still lacks the terrain
-  detail texture, per-pixel normal/roughness variation, wet roughness response,
-  and shell glass/pumice variants. The focused `test/webgl-beach-debris.mjs`
-  passes. The HUD showed 3–4 FPS and long frame gaps in this review; without a
-  controlled repeated run this is not a supported-hardware FPS result. No
+  [`graphics-review.md`](docs/graphics-review.md). Hosted WebGL now consumes the
+  same packaged 512×512 terrain detail texture and uses Tidewater's triplanar
+  coordinates/weights, detail modulation, bump, and wet roughness response. The
+  live shader has the terrain-detail and wet-roughness code, linked successfully
+  with an empty program log. Source-specific pits, veins, contact dusting/AO,
+  and shell glass/pumice variants remain approximate. The focused
+  `test/webgl-beach-debris.mjs` passes. The HUD showed 5 FPS and long frame gaps
+  in this review; this is not a controlled supported-hardware FPS result. No
   percentage changed; a matched beach-grit pixel comparison against original
   Tidewater `main` remains open.
 

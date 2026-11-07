@@ -1,7 +1,7 @@
 import { worldBehaviorsFor } from './WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_MAX_BYTES } from './WorldJavaScriptExtension.js';
 
-const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'environment', 'behaviors', 'extensions' ];
+const EXPERIENCE_FIELDS = [ 'genre', 'tagline', 'loadingNote', 'tips', 'stages', 'theme', 'environment', 'navigation', 'behaviors', 'extensions' ];
 const MAX_LOADING_STAGES = 12;
 const LOADING_STAGE_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
 const THEME_COLORS = [ 'background', 'surface', 'accent', 'text', 'muted', 'button', 'buttonText', 'border' ];
@@ -68,6 +68,24 @@ export function validateWorldExperience( experience, assets, options = {} ) {
 		if ( environment.sky !== undefined && ! SKY_MODES.has( environment.sky ) ) throw new Error( 'Invalid ThruHold sky mode' );
 		if ( environment.clouds !== undefined && ! CLOUD_MODES.has( environment.clouds ) ) throw new Error( 'Invalid ThruHold cloud mode' );
 		if ( environment.clouds === 'procedural' && environment.sky !== 'atmosphere' ) throw new Error( 'Procedural clouds require the atmospheric sky' );
+	}
+	if ( experience.navigation !== undefined ) {
+		const navigation = experience.navigation;
+		if ( ! navigation || typeof navigation !== 'object' || Array.isArray( navigation ) || Object.keys( navigation ).some( key => ! [ 'compass', 'map' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold navigation presentation' );
+		if ( navigation.compass !== undefined ) {
+			const compass = navigation.compass;
+			if ( ! compass || typeof compass !== 'object' || Array.isArray( compass ) || Object.keys( compass ).some( key => ! [ 'north', 'east', 'south', 'west' ].includes( key ) ) || [ compass.north, compass.east, compass.south, compass.west ].some( label => typeof label !== 'string' || ! label.trim() || label.length > 8 ) ) throw new Error( 'Invalid ThruHold compass labels' );
+		}
+		if ( navigation.map !== undefined ) {
+			const map = navigation.map;
+			const bounds = map?.bounds;
+			let safeURL = typeof map?.src === 'string' && map.src.length <= 500 && typeof map.alt === 'string' && map.alt.trim() && map.alt.length <= 160;
+			if ( safeURL && map.src.startsWith( '/' ) ) safeURL = ! map.src.startsWith( '//' ) && ! map.src.split( '/' ).includes( '..' );
+			else if ( safeURL ) {
+				try { const url = new URL( map.src ); safeURL = url.protocol === 'https:' && ! url.username && ! url.password; } catch { safeURL = false; }
+			}
+			if ( ! safeURL || Object.keys( map ).some( key => ! [ 'src', 'alt', 'bounds' ].includes( key ) ) || ! bounds || typeof bounds !== 'object' || Array.isArray( bounds ) || Object.keys( bounds ).some( key => ! [ 'minX', 'maxX', 'minZ', 'maxZ' ].includes( key ) ) || ! [ bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ ].every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) || bounds.minX >= bounds.maxX || bounds.minZ >= bounds.maxZ ) throw new Error( 'Invalid ThruHold minimap source or world bounds' );
+		}
 	}
 	return experience;
 }

@@ -27,12 +27,16 @@ positions, normals, UVs, and indices within Float32 precision. The hosted
 WebGL beach uses the same authored categories/variants, density selection,
 region-dependent stone palette, shell hues, nearshore darkening, and 0.8 base
 roughness; its live field merged 2,169 details into one 25,083-vertex mesh.
-WebGL still lacks the Tidewater terrain detail texture, per-pixel normal and
-roughness changes, wet roughness response, and shell glass/pumice variants. The
-capture below shows the geometry/material update, but a matched pixel comparison
-of the beach-grit region remains open against the upstream image above. Sky,
-water, shoreline, terrain, wood, and supported-hardware FPS gates also remain
-open.
+Hosted WebGL now samples the exact packaged 512×512 terrain detail texture with
+the source's triplanar coordinates and weights, then applies its base stone
+roughness, detail modulation, bump, wet darkening, and wet roughness response.
+The live program contains those shader paths, links successfully, and reports no
+program info log. The render still approximates source-specific pits, veins,
+contact dusting/AO, and shell glass/pumice variants. The two hosted captures
+show the successive geometry and detail-texture passes; a matched pixel
+comparison of the beach-grit region remains open against the upstream image
+above. Sky, water, shoreline, terrain, wood, and supported-hardware FPS gates
+also remain open.
 
 ![Original Tidewater main WebGPU beach](images/tidewater-main-webgpu-beach-2026-11-07.png)
 
@@ -40,8 +44,10 @@ open.
 
 ![ElseMesh hosted WebGL beach after matching the Tidewater pebble palette](images/elsemesh-hosted-webgl-beach-pebble-material-2026-11-07.png)
 
+![ElseMesh hosted WebGL beach using the packaged terrain detail texture](images/elsemesh-hosted-webgl-beach-terrain-detail-2026-11-07.png)
+
 The lower-right `61c122a1` badge is the reused Vite server's startup revision;
-the pebble changes in this capture were later committed as `12154940`.
+the review page served the newer source working tree.
 
 ## 2026-11-07 WebGL HDR scene-color water correction
 

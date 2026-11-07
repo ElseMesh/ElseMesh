@@ -85,6 +85,7 @@ import { FrameWorkMeter } from './core/FrameWorkMeter.js';
 import { GENERIC_WORLD_EXPERIENCE, worldEnvironmentSettings } from './network/WorldExperience.js';
 
 const _up = new Vector3( 0, 1, 0 );
+const _navigationForward = new Vector3();
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
 const _componentPriorityBounds = { transform: { position: [ 0, 0, 0 ] }, streamingBounds: null };
 
@@ -1002,6 +1003,7 @@ export class App {
 		GPU.submit();
 		this.input.endFrame();
 		this.audio && this.updateAudio( dt );
+		this.updateNavigationHUD( this.camera, this.player, this.activeHostedExperience || this.worldConnector?.manifest?.experience || this.localWorldExperience );
 		this.updateRenderLoadBias( dt, t0 );
 
 	}
@@ -1180,6 +1182,19 @@ export class App {
 		if ( this.hostedPackageWorld ) return this.engine.start( ( dt ) => this.hostedPackageFrame( dt ), this.desktopFrameRateLimit );
 
 		this.engine.start( ( dt, t ) => this.frame( dt, t ), this.desktopFrameRateLimit );
+	}
+
+	updateNavigationHUD( camera, player, experience ) {
+
+		if ( ! this.hud || ! camera ) return;
+		camera.getWorldDirection( _navigationForward );
+		this.hud.setNavigationHUD( {
+			navigation: experience?.navigation,
+			theme: experience?.theme,
+			position: player?.position,
+			heading: MathUtils.radToDeg( Math.atan2( _navigationForward.x, - _navigationForward.z ) ),
+		} );
+
 	}
 
 	updateFPS() {
@@ -2170,6 +2185,7 @@ export class App {
 		this.profiler.update( dt );
 
 		this.updateAudio( dt );
+		this.updateNavigationHUD( this.camera, this.player, this.activeHostedExperience || this.worldConnector?.manifest?.experience || this.localWorldExperience );
 		if ( this.ui ) this.ui.update( dt );
 		this.input.endFrame();
 
