@@ -107,6 +107,7 @@ App.prototype.adaptRenderScale.call( app, 23 );
 App.prototype.adaptRenderScale.call( app, 23 );
 if ( changes.length !== 0 ) throw new Error( 'resolution changed before the workload-driven LOD bias was exhausted' );
 app.renderLoadBias = 2;
+app.renderLoadLOD.gpuFiltered = 1.2;
 App.prototype.adaptRenderScale.call( app, 23 );
 if ( changes.length !== 0 ) throw new Error( 'resolution changed before a sustained low-FPS sample' );
 App.prototype.adaptRenderScale.call( app, 23 );
@@ -116,19 +117,32 @@ for ( let i = 0; i < 16; i ++ ) App.prototype.adaptRenderScale.call( app, 38 );
 if ( changes.at( - 1 ) !== 0.75 ) throw new Error( 'scale did not recover slowly above 36 fps' );
 
 app.desktopFrameRateLimit = 24;
-app.renderLoadBias = 0;
-app.renderLoadLOD.cpuHeadroom = app.renderLoadLOD.recoverySeconds;
+app.renderLoadBias = 2;
+app.renderLoadLOD.gpuFiltered = 0.5;
+app.renderLoadLOD.gpuHeadroom = app.renderLoadLOD.recoverySeconds;
 app.settings.renderScale = 0.7;
 for ( let i = 0; i < 16; i ++ ) App.prototype.adaptRenderScale.call( app, 24 );
 if ( changes.at( - 1 ) !== 0.75 ) throw new Error( 'resolution should recover from measured workload headroom while the frame rate is capped' );
 
+app.settings.renderScale = 0.5;
+app.renderLoadLOD.gpuFiltered = 0.58;
+app.renderLoadLOD.gpuHeadroom = 0;
+changes.length = 0;
+for ( let i = 0; i < 20; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );
+if ( changes.length !== 0 ) throw new Error( 'CPU-bound low FPS should not reduce resolution without measured GPU overload' );
+app.renderLoadLOD.gpuHeadroom = app.renderLoadLOD.recoverySeconds;
+for ( let i = 0; i < 32; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );
+if ( Math.abs( changes.at( - 1 ) - 0.6 ) > 1e-9 ) throw new Error( 'GPU headroom should restore resolution even when CPU-bound FPS is low' );
+
 app.autoScale = false;
 for ( let i = 0; i < 20; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );
-if ( changes.length !== 3 ) throw new Error( 'manual scale should disable automatic changes' );
+if ( changes.length !== 2 ) throw new Error( 'manual scale should disable automatic changes' );
 
 app.autoScale = true;
 app.settings.renderScale = 0.5;
 app.renderLoadBias = 2;
+app.renderLoadLOD.gpuFiltered = 1.2;
+app.renderLoadLOD.gpuHeadroom = 0;
 app._scaleBelowTarget = 0;
 changes.length = 0;
 for ( let i = 0; i < 20; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );

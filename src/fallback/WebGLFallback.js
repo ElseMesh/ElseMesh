@@ -2367,6 +2367,7 @@ export class WebGLFallback {
 			this.frameWorkMeter.end();
 		}
 		this.app.cpuMs = performance.now() - now;
+		this.app.updateRenderLoadBias( dt, now, this.frameWorkMeter );
 		this.app.updateNavigationHUD( this.camera, this.player, experience );
 		this.input.endFrame();
 

@@ -23,6 +23,20 @@ assert.equal( sampled.length, 1, 'GPU and CPU samples reach the shared load poli
 assert.equal( sampled[ 0 ].gpuMs, 45 );
 assert.equal( sampled[ 0 ].budgetMs, 1000 / 24 );
 
+const fallbackSamples = [];
+const fallbackApp = Object.assign( Object.create( App.prototype ), {
+	isLinuxDesktop: true,
+	graphicsPriority: 'fps',
+	desktopFrameRateLimit: 24,
+	renderLoadWarmup: 8,
+	renderLoadLOD: { sample: input => ( fallbackSamples.push( input ), 2 ) },
+	renderLoadBias: 0,
+} );
+const webglFrameMeter = { takeGPUSample: () => ( { gpuMs: 30, elapsedSeconds: 0.25 } ) };
+fallbackApp.updateRenderLoadBias( 0.1, performance.now() - 40, webglFrameMeter );
+assert.equal( fallbackApp.renderLoadBias, 2, 'WebGL fallback frames feed their own GPU timing into the shared LOD policy' );
+assert.equal( fallbackSamples[ 0 ].gpuMs, 30 );
+
 const forwarded = [];
 app.updateWorldComponents( {
 	userData: {

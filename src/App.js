@@ -1257,19 +1257,39 @@ export class App {
 
 	}
 
-	// Linux desktop integrated GPUs can be starved by the game's full-resolution post chain.
-	// Lower only the internal render scale when sustained FPS misses 24; recover slowly above 36
-	// so resolution changes do not flap. Android keeps the existing full-quality path.
+	// In Linux FPS mode, apply workload-driven LOD before changing resolution. Resolution
+	// affects GPU work, so only reduce it after sustained measured GPU overload and restore
+	// it from GPU headroom. Android keeps the existing full-quality path.
 	adaptRenderScale( fps ) {
 
 		if ( ! this.autoScale ) return;
+		const lod = this.renderLoadLOD;
+		const gpuHasHeadroom = lod && lod.gpuFiltered !== null && lod.gpuFiltered < 0.75 && lod.gpuHeadroom >= lod.recoverySeconds;
+		const cappedHeadroom = this.desktopFrameRateLimit > 0 && gpuHasHeadroom;
+		if ( cappedHeadroom ) {
+
+			if ( this.settings.renderScale >= 1 ) {
+				this._scaleAboveTarget = 0;
+				return;
+			}
+			// Resolution only changes GPU work. Recover it from measured GPU headroom,
+			// even when CPU load keeps FPS below the cap or prevents LOD bias recovery.
+			this._scaleBelowTarget = 0;
+			this._scaleAboveTarget += 0.5;
+			if ( this._scaleAboveTarget >= 8 ) {
+				this._scaleAboveTarget = 0;
+				this.setRenderScale( this.settings.renderScale + 0.05 );
+			}
+			return;
+
+		}
 		if ( fps < 24 ) {
 
 			this._scaleAboveTarget = 0;
 			// Let the workload-driven object/avatar LOD reach its supported bias before
 			// reducing the whole image. The 24 fps cap makes FPS itself a poor recovery
 			// signal, so resolution is the last resort when detail reduction is exhausted.
-			if ( this.renderLoadBias < 2 ) {
+			if ( this.renderLoadBias < 2 || ! lod || lod.gpuFiltered === null || lod.gpuFiltered <= 1.1 ) {
 				this._scaleBelowTarget = 0;
 				return;
 			}
@@ -1283,12 +1303,7 @@ export class App {
 
 		}
 		this._scaleBelowTarget = 0;
-		const lod = this.renderLoadLOD;
-		const hasWorkloadHeadroom = lod && lod.cpuHeadroom >= lod.recoverySeconds &&
-			( lod.gpuFiltered === null || lod.gpuHeadroom >= lod.recoverySeconds );
-		const cappedHeadroom = this.desktopFrameRateLimit > 0 && fps >= this.desktopFrameRateLimit * 0.95 &&
-			this.renderLoadBias === 0 && hasWorkloadHeadroom;
-		if ( fps > 36 || cappedHeadroom ) {
+		if ( fps > 36 && this.settings.renderScale < 1 ) {
 
 			this._scaleAboveTarget += 0.5;
 			if ( this._scaleAboveTarget >= 8 ) {
@@ -1328,12 +1343,12 @@ export class App {
 
 	}
 
-	updateRenderLoadBias( dt, startedAt ) {
+	updateRenderLoadBias( dt, startedAt, frameWorkMeter = this.frameWorkMeter ) {
 
 		const ms = performance.now() - startedAt;
 		this.cpuMs = ms;
 		this.renderLoadWarmup += Math.min( dt, 0.1 );
-		const gpuSample = this.frameWorkMeter?.takeGPUSample();
+		const gpuSample = frameWorkMeter?.takeGPUSample();
 		this.renderLoadBias = ! this.isLinuxDesktop || this.graphicsPriority === 'fps' ? ( this.renderLoadWarmup < 8 ? 0 : this.renderLoadLOD.sample( { cpuMs: ms, gpuMs: gpuSample?.gpuMs ?? null, gpuElapsedSeconds: gpuSample?.elapsedSeconds, budgetMs: 1000 / ( this.desktopFrameRateLimit || 60 ), elapsedSeconds: dt } ) ) : 0;
 
 	}
