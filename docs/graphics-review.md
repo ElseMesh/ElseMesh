@@ -40,6 +40,9 @@ open.
 
 ![ElseMesh hosted WebGL beach after matching the Tidewater pebble palette](images/elsemesh-hosted-webgl-beach-pebble-material-2026-11-07.png)
 
+The lower-right `61c122a1` badge is the reused Vite server's startup revision;
+the pebble changes in this capture were later committed as `12154940`.
+
 ## 2026-11-07 WebGL HDR scene-color water correction
 
 The original Tidewater main WebGPU image above remains the appearance baseline.
