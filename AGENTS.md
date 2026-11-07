@@ -24,7 +24,7 @@
 
 - Keep commits focused on the active goal. A change being important or commit-worthy for another goal does not make it part of the current goal.
 - If a shared file contains an edit required by the active goal alongside another agent's edit, do not discard or split that other edit just to make the commit appear single-purpose. Commit the shared file and describe both edits in the commit message.
-- Leave files unrelated to the active goal untouched. Commit work for another goal when it is the active goal, or when that work shares a file the active goal already needs to change.
+- Leave files unrelated to the active goal untouched. Commit work when that work shares a file the active goal already needs to change.
 
 ## Hogwarts bridge build output
 
