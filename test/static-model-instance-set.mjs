@@ -192,9 +192,17 @@ runtimeCamera.lookAt( 0, 0, - 1 );
 let runtimePlannerUpdates = 0;
 const updateRuntimePlanner = runtime.planner.update.bind( runtime.planner );
 runtime.planner.update = ( ...args ) => { runtimePlannerUpdates ++; return updateRuntimePlanner( ...args ); };
+let lodStateReads = 0;
+runtime.planner._groupsByModel = new Proxy( runtime.planner._groupsByModel, {
+	get( target, property, receiver ) {
+		if ( /^\d+$/.test( String( property ) ) ) lodStateReads ++;
+		return Reflect.get( target, property, receiver );
+	},
+} );
 runtime.update( 1 / 60, runtimeCamera );
 const activeRuntimeBatch = runtime.batches.find( group => group[ 0 ].mesh.count > 0 )[ 0 ];
 assert.equal( runtimePlannerUpdates, 1 );
+const initialLODStateReads = lodStateReads;
 assert.equal( activeRuntimeBatch.matrixAttribute.array[ 14 ], - 5, 'shared runtime compacts world transforms into renderer instance buffers' );
 assert.equal( activeRuntimeBatch.fadeAttribute.array[ 0 ], 1 );
 assert.equal( activeRuntimeBatch.fadeAttribute.array[ 2 ], 1 );
@@ -205,15 +213,53 @@ activeRuntimeBatch.fadeAttribute.needsUpdate = false;
 runtime.update( 1 / 60, runtimeCamera );
 assert.deepEqual( runtime._batchAttributeGroups, cachedBatchAttributes, 'unchanged LOD groups reuse their cached batch attributes' );
 assert.equal( runtimePlannerUpdates, 1, 'unchanged camera and projection skip static model LOD planning' );
+assert.equal( lodStateReads, initialLODStateReads, 'unchanged views skip rescanning model LOD request state' );
 assert.equal( activeRuntimeBatch.matrixAttribute.needsUpdate, false, 'unchanged view does not rewrite static model transforms' );
 assert.equal( activeRuntimeBatch.fadeAttribute.needsUpdate, false, 'unchanged view does not rewrite static model fades' );
 runtimeCamera.position.x = 0.25;
 runtime.update( 1 / 60, runtimeCamera );
 assert.equal( runtimePlannerUpdates, 2, 'camera movement refreshes static model LOD planning' );
+assert.ok( lodStateReads > initialLODStateReads, 'camera movement rechecks visible model LOD requests' );
 runtime.update( 1 / 60, runtimeCamera, undefined, 1 );
 assert.equal( runtimePlannerUpdates, 3, 'render-load bias changes refresh static model LOD planning' );
 runtime.dispose();
 assert.equal( disposedRuntime, true );
+
+let retryLoads = 0;
+const retryPlanner = new StaticModelInstanceSetPlanner( runtimeDocument );
+const retryRuntime = new StaticModelInstanceSetRuntime( runtimeDocument, {
+	batches: retryPlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: retryPlanner.shadowGroups.map( () => [ makeRuntimeBatch() ] ),
+	loadLOD: async () => {
+		retryLoads ++;
+		if ( retryLoads === 1 ) throw new Error( 'temporary LOD miss' );
+	},
+} );
+retryRuntime.planner.update = () => {
+	for ( const group of retryRuntime.planner.groups ) group.count = 0;
+	retryRuntime.planner._groupsByModel[ 0 ][ 2 ].count = 1;
+};
+const originalWarn = console.warn;
+console.warn = () => {};
+try {
+	retryRuntime.update( 1 / 60, runtimeCamera );
+	for ( let attempt = 0; attempt < 10 && ( retryRuntime.retryAfter.size === 0 || retryRuntime.pendingLods.size !== 0 ); attempt ++ ) await new Promise( resolve => setImmediate( resolve ) );
+	assert.equal( retryLoads, 1, 'first visible LOD request is attempted' );
+	assert.equal( retryRuntime.retryAfter.size, 1, 'a failed LOD request schedules its retry' );
+	assert.equal( retryRuntime.desiredLods[ 0 ], 2, 'the desired fine LOD is retained while its placement falls back to coarse geometry' );
+	assert.equal( retryRuntime.planner._groupsByModel[ 0 ][ 2 ].count, 0, 'the unavailable fine LOD is removed from the active draw group' );
+	retryRuntime.update( 1 / 60, runtimeCamera );
+	assert.equal( retryLoads, 1, 'unchanged view does not retry before its scheduled time' );
+	const retryKey = [ ...retryRuntime.retryAfter.keys() ][ 0 ];
+	retryRuntime.retryAfter.set( retryKey, performance.now() - 1 );
+	retryRuntime._nextLODCheckAt = performance.now() - 1;
+	retryRuntime.update( 1 / 60, runtimeCamera );
+	await new Promise( resolve => setImmediate( resolve ) );
+	assert.equal( retryLoads, 2, 'a due retry runs without requiring another camera move' );
+} finally {
+	console.warn = originalWarn;
+	retryRuntime.dispose();
+}
 
 // A provider may report the same placement in several overlapping cells.
 // Ownership follows the installed runtimes, including when an owner is evicted.

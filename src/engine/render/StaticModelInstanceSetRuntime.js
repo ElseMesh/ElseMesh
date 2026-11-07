@@ -56,9 +56,12 @@ export class StaticModelInstanceSetRuntime {
 		this._cameraState = new Float64Array( 37 );
 		this._cameraStateValid = false;
 		this._plannerDirty = true;
+		this.viewRevision = 0;
+		this._nextLODCheckAt = Infinity;
 		this.loadLOD = loadLOD;
 		this.loadController = new AbortController();
 		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
+		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
 		this.pendingLods = new Map();
 		this.retryAfter = new Map();
 		this.disposeBatches = dispose;
@@ -77,6 +80,7 @@ export class StaticModelInstanceSetRuntime {
 
 	update( _dt, camera, _player, renderLoadBias = 0 ) {
 		if ( this.disposed ) return;
+		const now = performance.now();
 		const cameraChanged = this.#cameraChanged( camera, renderLoadBias );
 		const plannerChanged = cameraChanged || this._plannerDirty;
 		if ( plannerChanged ) {
@@ -85,8 +89,12 @@ export class StaticModelInstanceSetRuntime {
 				return ! claim || this.placementOwners.get( claim.id )?.values().next().value === claim;
 			} } );
 			this._plannerDirty = false;
+			this.viewRevision ++;
 		}
-		this.#requestVisibleLODs();
+		if ( plannerChanged || now >= this._nextLODCheckAt ) {
+			this.#requestVisibleLODs( plannerChanged );
+			this._nextLODCheckAt = Math.min( Infinity, ...this.retryAfter.values() );
+		}
 		if ( plannerChanged || this._batchRefreshPending ) {
 			this._updateBatches( this.planner.groups, this.batches, this._batchAttributeGroups );
 			if ( this.usesShadowBatches ) this._updateBatches( this.planner.shadowGroups, this.shadowBatches, this._shadowBatchAttributeGroups );
@@ -113,26 +121,35 @@ export class StaticModelInstanceSetRuntime {
 		return changed;
 	}
 
-	#requestVisibleLODs() {
+	#requestVisibleLODs( refreshDesired ) {
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
 			const groups = this.planner._groupsByModel[ modelIndex ];
-			let desiredLevel = -1;
-			for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
+			if ( refreshDesired ) {
+				let desiredLevel = -1;
+				for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
+				this.desiredLods[ modelIndex ] = desiredLevel;
+			}
+			const desiredLevel = this.desiredLods[ modelIndex ];
 			const loaded = this.loadedLods[ modelIndex ];
 			const loadedMax = Math.max( ...loaded );
+			const level = loadedMax + 1;
+			const key = `${ modelIndex }:${ level }`;
+			if ( desiredLevel < level ) this.retryAfter.delete( key );
 			if ( desiredLevel > loadedMax && this.loadLOD ) {
-				const level = loadedMax + 1;
-				const key = `${ modelIndex }:${ level }`;
 				if ( ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
+					this.retryAfter.delete( key );
 					const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {
 						if ( ! this.disposed ) {
 							loaded.add( level );
 							this._plannerDirty = true;
 							this._batchRefreshPending = true;
 						}
+						this._nextLODCheckAt = Math.min( Infinity, ...this.retryAfter.values() );
 					} ).catch( error => {
 						if ( ! this.disposed ) {
-							this.retryAfter.set( key, performance.now() + 5000 );
+							const retryAt = performance.now() + 5000;
+							this.retryAfter.set( key, retryAt );
+							this._nextLODCheckAt = Math.min( this._nextLODCheckAt, retryAt );
 							console.warn( `Static model LOD ${ level } unavailable for ${ this.document.models[ modelIndex ].id }`, error );
 						}
 					} ).finally( () => this.pendingLods.delete( key ) );

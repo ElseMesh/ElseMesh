@@ -279,6 +279,10 @@ export function registerStaticModelTextureDemand( root, runtime ) {
 const _staticTextureObject = { transform: { position: null, rotation: null }, scale: null, streamingBounds: null };
 export function staticModelTextureScreenFraction( { runtime, modelIndex, lodIndex }, camera ) {
 	if ( runtime.disposed ) return null;
+	const viewRevision = runtime.viewRevision ?? 0;
+	const key = `${ modelIndex }:${ lodIndex }`;
+	const cached = runtime.textureScreenFractionCache?.get( key );
+	if ( cached?.viewRevision === viewRevision ) return cached.fraction;
 	const model = runtime.document.models[ modelIndex ];
 	const group = runtime.planner._groupsByModel[ modelIndex ][ lodIndex ];
 	let maximum = null;
@@ -291,6 +295,7 @@ export function staticModelTextureScreenFraction( { runtime, modelIndex, lodInde
 		const fraction = projectedBoundsScreenFraction( _staticTextureObject, camera );
 		if ( fraction !== null ) maximum = Math.max( maximum ?? 0, fraction );
 	}
+	( runtime.textureScreenFractionCache ||= new Map() ).set( key, { viewRevision, fraction: maximum } );
 	return maximum;
 }
 
