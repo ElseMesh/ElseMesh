@@ -310,7 +310,9 @@ export class WebGLWakeSim {
 		this.THREE=THREE; this.renderer=renderer; this.terrain=terrain; this.boat=boat; this.seaLevel=seaLevel;
 		this.lines=boat.design.lines; this.destroyed=false; this.center={x:0,y:0}; this.hasWindow=false; this.sleeping=true; this.idleTime=1e9; this.primed=false; this.stepCount=0; this.settleTime=40; this.time=0;
 		this.uniforms=this._uniforms();
-		this.targets={state:this._target(N,N),physical:this._target(N,N),spectrum:this._target(N,N),display:this._target(N,N,{linear:true}),aeration:this._target(N,N,{linear:true}),aerationNext:this._target(N,N,{linear:true}),nearA:this._target(32,88,{repeat:false}),nearB:this._target(32,88,{repeat:false})};
+		// Match the WebGPU reader textures' rgba16float precision. State, physical, and
+		// spectrum remain 32-bit to match the WebGPU storage buffers.
+		this.targets={state:this._target(N,N),physical:this._target(N,N),spectrum:this._target(N,N),display:this._target(N,N,{linear:true,halfFloat:true}),aeration:this._target(N,N,{linear:true,halfFloat:true}),aerationNext:this._target(N,N,{linear:true,halfFloat:true}),nearA:this._target(32,88,{repeat:false,halfFloat:true}),nearB:this._target(32,88,{repeat:false,halfFloat:true})};
 		this.fft=new WebGLRadix2FFT(THREE,renderer,{size:N});
 		this._staticTextures(colliders);
 		this.materials={physics:this._material(physicsShader),spectrum:this._material(spectrumShader),operator:this._material(operatorShader),step:this._material(stepShader),display:this._material(displayShader),near:this._material(nearShader),aeration:this._material(aerationShader)};
@@ -329,7 +331,7 @@ export class WebGLWakeSim {
 		this.nearFieldTexture=this.targets.nearA.texture;
 	}
 
-	_target(width,height,{linear=false,repeat=true}={}){const T=this.THREE;return new T.WebGLRenderTarget(width,height,{format:T.RGBAFormat,type:T.FloatType,internalFormat:'RGBA32F',minFilter:linear?T.LinearFilter:T.NearestFilter,magFilter:linear?T.LinearFilter:T.NearestFilter,wrapS:repeat?T.RepeatWrapping:T.ClampToEdgeWrapping,wrapT:repeat?T.RepeatWrapping:T.ClampToEdgeWrapping,depthBuffer:false,stencilBuffer:false});}
+	_target(width,height,{linear=false,repeat=true,halfFloat=false}={}){const T=this.THREE;return new T.WebGLRenderTarget(width,height,{format:T.RGBAFormat,type:halfFloat?T.HalfFloatType:T.FloatType,internalFormat:halfFloat?'RGBA16F':'RGBA32F',minFilter:linear?T.LinearFilter:T.NearestFilter,magFilter:linear?T.LinearFilter:T.NearestFilter,wrapS:repeat?T.RepeatWrapping:T.ClampToEdgeWrapping,wrapT:repeat?T.RepeatWrapping:T.ClampToEdgeWrapping,depthBuffer:false,stencilBuffer:false});}
 	_material(fragmentShader){return new this.THREE.RawShaderMaterial({glslVersion:this.THREE.GLSL3,vertexShader,fragmentShader:fragmentShader.replaceAll('texture2D(','texture('),uniforms:this.uniforms,depthTest:false,depthWrite:false,blending:this.THREE.NoBlending,toneMapped:false});}
 	_uniforms(){const T=this.THREE;const val=(v)=>({value:v});return {uFFTSource:val(null),uNearSource:val(null),uState:val(null),uAeration:val(null),uTerrain:val(null),uHull:val(null),uPiles:val(null),uOrigin:val(new T.Vector2()),uPrevOrigin:val(new T.Vector2()),uBoatPos:val(new T.Vector2()),uBoatRot:val(new T.Vector2(1,0)),uTrim:val(new T.Vector3()),uPileBox:val(new T.Vector4(0,0,1,1)),uHullBox:val(new T.Vector4()),uTerrainBox:val(new T.Vector4()),uTerrainRes:val(1),uSeaLevel:val(this.seaLevel),uTime:val(0),uDt:val(1/60),uReset:val(1),uSpeed:val(0),uAmount:val(0),uPressureGain:val(0.72),uWash:val(0),uBow:val(0),uWashW:val(0.7),uDyn:val(0),uHollow:val(1),uHollowK:val(0),uFoamGain:val(0.35),uAerGain:val(1),uVisc:val(0.006),uBoil:val(1.2),uNearRate:val(1),uNearRange:val(new T.Vector2(-1.6,1.6)),uNearBoat:val(new T.Vector2()),uNearRot:val(new T.Vector2(1,0)),uNearReset:val(1),uPass:val(0)};}
 	_staticTextures(colliders){
