@@ -32,6 +32,7 @@ import { webglShoreWobbleGLSL } from './WebGLShoreWaveMath.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
+import { WebGLPostFX } from './WebGLPostFX.js';
 import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
@@ -803,12 +804,15 @@ export class WebGLFallback {
 		this.THREE = engine.THREE;
 		this.renderer = engine.renderer;
 		this.frameWorkMeter = new FrameWorkMeter( { webglRenderer: this.renderer } );
+		this.postFX = new WebGLPostFX( this.THREE, this.renderer, { autoExposure: ! app.qs?.has( 'noAutoExposure' ) } );
 		this.scene = new this.THREE.Scene();
 		this.waterScene = new this.THREE.Scene();
 		this.oceanLODs = new Set();
-		this.sceneColorTexture = new this.THREE.FramebufferTexture( 1, 1 );
-		this.sceneColorTexture.magFilter = this.THREE.LinearFilter;
-		this.sceneColorTexture.minFilter = this.THREE.LinearFilter;
+		this.sceneColorTexture = this.postFX.enabled ? this.postFX.sceneColorTexture : new this.THREE.FramebufferTexture( 1, 1 );
+		if ( ! this.postFX.enabled ) {
+			this.sceneColorTexture.magFilter = this.THREE.LinearFilter;
+			this.sceneColorTexture.minFilter = this.THREE.LinearFilter;
+		}
 		this.terrainColorTexture = null;
 		this.scene.background = new this.THREE.Color( 0x172b42 );
 		this.camera = new this.THREE.PerspectiveCamera( 62, 1, 0.1, 5000 );
@@ -968,7 +972,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
 	}
@@ -2214,9 +2218,12 @@ export class WebGLFallback {
 			this.renderer.setPixelRatio( Math.min( window.devicePixelRatio || 1, 1.5 ) * scale );
 			this.renderer.setSize( w, h );
 			const size = this.renderer.getDrawingBufferSize( new this.THREE.Vector2() );
-			this.sceneColorTexture.image.width = size.x;
-			this.sceneColorTexture.image.height = size.y;
-			this.sceneColorTexture.needsUpdate = true;
+			if ( this.postFX.enabled ) this.postFX.resize( size.x, size.y );
+			else {
+				this.sceneColorTexture.image.width = size.x;
+				this.sceneColorTexture.image.height = size.y;
+				this.sceneColorTexture.needsUpdate = true;
+			}
 			for ( const water of this.waterScene.children ) water.material.uniforms.uViewport?.value.copy( size );
 		};
 		this.setRenderScale = scale => {
@@ -2330,16 +2337,23 @@ export class WebGLFallback {
 		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
 		this._updateAudio( dt );
 		this.renderer.toneMappingExposure = this.app.settings.exposure;
+		if ( this.postFX.enabled ) this.postFX.beginScene();
 		this.renderer.autoClear = true;
 		this.frameWorkMeter.begin();
 		try {
 			this.renderer.render( this.scene, this.camera );
 			if ( this.waterScene.children.length && ! this.debugNoWater ) {
-				this.renderer.copyFramebufferToTexture( this.sceneColorTexture );
+				if ( this.postFX.enabled ) this.postFX.copySceneForWater();
+				else this.renderer.copyFramebufferToTexture( this.sceneColorTexture );
 				this.renderer.autoClear = false;
 				this.renderer.render( this.waterScene, this.camera );
 			}
+			if ( this.postFX.enabled ) {
+				const night = this.THREE.MathUtils.smoothstep( - this.sunDirection.y, 0.02, 0.18 );
+				this.postFX.render( { dt, exposure: this.app.settings.exposure, night } );
+			}
 		} finally {
+			this.renderer.setRenderTarget( null );
 			this.renderer.autoClear = true;
 			this.frameWorkMeter.end();
 		}
