@@ -54,7 +54,9 @@ export class RefractionPass {
 		this.guard = REFRACTION_GUARD;
 		// the wider view: the main camera with the guard applied to its projection (culling uses it),
 		// drawn with its own frame block
-		this._camera = Object.create( camera );
+		// A camera must be a real Camera instance: its Object3D matrix update uses
+		// private state, which Object.create(camera) does not initialize.
+		this._camera = camera.clone();
 		this._camera.projectionMatrix = new Matrix4();
 		this.block = createViewUniforms( 'refraction' );
 		this.target = new RenderTarget( 1, 1, { colors: [ 'rgba16float' ], depth: DEPTH_FORMAT, label: 'refraction' } );
@@ -145,6 +147,7 @@ export class RefractionPass {
 		// through the guard band
 		const F = FrameUniforms.fields;
 		const cam = this._camera;
+		cam.copy( this.camera );
 		cam.projectionMatrix.multiplyMatrices( _guard, this.camera.projectionMatrix );
 		_prevVP.multiplyMatrices( _guard, F.prevViewProjNoJitter.value );
 		setFrameCamera( cam, w, h, {
