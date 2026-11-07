@@ -379,6 +379,12 @@ body {
 	-webkit-tap-highlight-color: transparent;
 }
 
+/* A world-owned UI subtree participates in the engine root's overlay order. */
+.em-root.em-world-ui {
+	position: absolute;
+	z-index: auto;
+}
+
 .em-root *,
 .em-root *::before,
 .em-root *::after {
