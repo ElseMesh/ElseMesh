@@ -75,6 +75,9 @@ parity is complete.
   imports the world shape module. The exact coconut/husk/frond placement hash,
   15,368-triangle shadow selection, and deterministic hosted package export pass.
   Tidewater's WebGL debris geometry comparison test now lives in the world repo.
+  The headless WebGPU debris smoke now loads photoscanned assets on Linux and
+  retains the same shadow-triangle count; its capture still needs comparison
+  against the pre-split browser render and does not establish WebGL parity.
   The engine still owns the natural material shader, pebble field, scanned asset
   loader, and debris renderer; the live visual comparison remains open. The
   registry-based separation estimate moves from 87% to 88%.
