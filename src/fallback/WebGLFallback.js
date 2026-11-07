@@ -2197,7 +2197,7 @@ export class WebGLFallback {
 		Object.assign( hint.style, { position: 'fixed', left: '16px', bottom: '16px', zIndex: 30, padding: '10px 12px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '13px/1.5 system-ui', pointerEvents: 'none' } );
 		hint.textContent = 'WASD move · mouse look · Shift run · E use portal';
 		const style = document.createElement( 'style' );
-		style.textContent = '@media (hover:none), (pointer:coarse) { .elsemesh-webgl-hint { bottom:150px !important; } }';
+		style.textContent = '@media (hover:none), (pointer:coarse) { .elsemesh-webgl-hint { bottom:150px !important; } } body:has(.em-root.is-starting) .elsemesh-webgl-hint { visibility: hidden; }';
 		document.head.appendChild( style );
 		document.body.append( hint );
 		this.hud = [ badge, hint, style ];

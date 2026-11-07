@@ -2754,6 +2754,27 @@ body {
 	gap: var(--em-2);
 }
 
+.em-look-inputs {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--em-2);
+}
+
+.em-look-arrows {
+	display: inline-grid;
+	grid-template-columns: repeat(3, auto);
+	gap: calc(2 * var(--em-u));
+}
+
+.em-look-arrows kbd {
+	grid-row: 2;
+}
+
+.em-look-arrows kbd:first-child {
+	grid-row: 1;
+	grid-column: 2;
+}
+
 .em-start-touch-hint {
 	display: none;
 	color: var(--em-ink-2);

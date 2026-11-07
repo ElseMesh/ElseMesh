@@ -2281,8 +2281,7 @@ export class UI {
 				<div class="em-start-touch-hint">Left stick moves · right stick looks · tap action prompts</div>
 				<div class="em-start-keys">
 					<span><span class="em-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</span>
-					<span><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd>Look</span>
-					<span><kbd class="em-kbd-ico">${ icon( 'mouse' ) }</kbd>Look</span>
+					<span><span class="em-look-inputs"><span class="em-look-arrows"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><kbd class="em-kbd-ico">${ icon( 'mouse' ) }</kbd></span>Look</span>
 					<span><kbd>E</kbd>Interact</span>
 					<span><kbd>H</kbd>Settings</span>
 					<span><kbd>F1</kbd>All controls</span>
