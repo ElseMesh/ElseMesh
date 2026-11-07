@@ -41,15 +41,15 @@ descriptors plus current simulation state.
 
 ## Renderer-free reef placement contract
 
-The stable type order and model-variant counts for
-`elsemesh.reef-placement/1` live in `src/network/ReefPlacementTypes.js`.
-The placement codec consumes only that registry; `Reef.js` verifies its
-renderer definitions against it. This keeps reef content serialization
-independent of engine, GPU-batch, material, and fish-simulation imports. The
-WebGL fallback now presents signed static placements in built-in and hosted
-worlds through the canonical geometry and distance-LOD catalog. Its materials
-and LOD transitions are simplified; flex animation, shadows, fish, reef
-collision, and matched visual parity remain open.
+The stable type order, model-variant counts, and codec for
+`elsemesh.reef-placement/1` live in `worlds/tidewater/ReefPlacementTypes.js`
+and `worlds/tidewater/ReefPlacements.js`. The Tidewater provider registers the
+asset decoder; `Reef.js` validates decoded names and variants against its own
+renderer catalog without importing the Tidewater wire table. The WebGL
+fallback presents signed static placements in built-in and hosted worlds
+through the canonical geometry and distance-LOD catalog. Its materials and
+LOD transitions are simplified; flex animation, shadows, fish, reef collision,
+and matched visual parity remain open.
 
 ## Migration order
 

@@ -6,9 +6,6 @@ import { createReefMaterials, createReefView, SURFACE, packColor } from './reef/
 import { bandFade } from '../materials/LODFade.js';
 import { createNoiseVolume } from './reef/ReefNoise.js';
 import { FishSchools } from './Fish.js';
-import { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacementTypes.js';
-
-export { REEF_TYPE_NAMES, REEF_TYPE_VARIANT_COUNTS } from '../network/ReefPlacementTypes.js';
 
 // Caribbean fringing reef around the authored reef center, 1.5 - 12 m deep.
 //
@@ -209,11 +206,10 @@ const TYPES = {
 		c1: [ 0x8a6a2a, 0x9a7a32, 0x7a5e26, 0xa08036, 0x806228 ], c2: [ 0x6a5a26 ] },
 };
 
-// Keep the runtime renderer definitions aligned with the renderer-free placement registry.
-const rendererTypeNames = Object.keys( TYPES );
-if ( rendererTypeNames.length !== REEF_TYPE_NAMES.length || rendererTypeNames.some( ( name, index ) => name !== REEF_TYPE_NAMES[ index ] ) ) throw new Error( 'Reef renderer type order does not match elsemesh.reef-placement/1' );
-for ( const name of REEF_TYPE_NAMES ) {
-	if ( MODELS[ TYPES[ name ].model ].variants !== REEF_TYPE_VARIANT_COUNTS[ name ] ) throw new Error( `Reef renderer variant count does not match elsemesh.reef-placement/1 for ${name}` );
+// The renderer validates placed type names and variants against its own catalog
+// when placements load. The world's codec and numeric type table stay world-owned.
+for ( const [ name, type ] of Object.entries( TYPES ) ) {
+	if ( ! MODELS[ type.model ]?.variants ) throw new Error( `Reef renderer type ${name} has no geometry catalog` );
 }
 
 // Relative abundance of each type per zone and layer:

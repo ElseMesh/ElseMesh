@@ -69,6 +69,16 @@ parity is complete.
 
 ## Current work and next gates
 
+- 2026-11-07: moved the Tidewater reef placement type table, codec, exporter
+  dependency, and reef-specific render fixture into the Tidewater repository.
+  The Tidewater provider now registers its own decoder, while the engine reef
+  renderer validates decoded names and variants against its local renderer
+  catalog without importing the world's numeric wire table. This removes a
+  Tidewater serialization dependency from `src/network` and keeps its renderer
+  fixture with Tidewater tests. The reef renderer geometry/material system is
+  still world-specific engine code, so renderer-neutral world content and
+  matched visual parity remain open; estimates remain unchanged.
+
 - 2026-11-07: Tidewater's WebGL bird renderer now prepares wing-joint and leg
   transforms once per bird pose and writes posed normals directly, matching the
   shared WebGPU deformation instead of recomputing triangle normals each frame.
