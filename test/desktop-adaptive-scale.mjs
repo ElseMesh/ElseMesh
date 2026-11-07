@@ -96,25 +96,39 @@ const changes = [];
 const app = {
 	autoScale: true,
 	settings: { renderScale: 0.75 },
+	renderLoadBias: 0,
+	renderLoadLOD: { recoverySeconds: 6, cpuHeadroom: 0, gpuFiltered: null, gpuHeadroom: 0 },
 	_scaleBelowTarget: 0,
 	_scaleAboveTarget: 0,
 	setRenderScale( scale ) { changes.push( scale ); this.settings.renderScale = scale; },
 };
 
 App.prototype.adaptRenderScale.call( app, 23 );
-if ( changes.length !== 0 ) throw new Error( 'scale changed before a sustained low-FPS sample' );
+App.prototype.adaptRenderScale.call( app, 23 );
+if ( changes.length !== 0 ) throw new Error( 'resolution changed before the workload-driven LOD bias was exhausted' );
+app.renderLoadBias = 2;
+App.prototype.adaptRenderScale.call( app, 23 );
+if ( changes.length !== 0 ) throw new Error( 'resolution changed before a sustained low-FPS sample' );
 App.prototype.adaptRenderScale.call( app, 23 );
 if ( changes.at( - 1 ) !== 0.7 ) throw new Error( 'scale did not step down below 24 fps' );
 
 for ( let i = 0; i < 16; i ++ ) App.prototype.adaptRenderScale.call( app, 38 );
 if ( changes.at( - 1 ) !== 0.75 ) throw new Error( 'scale did not recover slowly above 36 fps' );
 
+app.desktopFrameRateLimit = 24;
+app.renderLoadBias = 0;
+app.renderLoadLOD.cpuHeadroom = app.renderLoadLOD.recoverySeconds;
+app.settings.renderScale = 0.7;
+for ( let i = 0; i < 16; i ++ ) App.prototype.adaptRenderScale.call( app, 24 );
+if ( changes.at( - 1 ) !== 0.75 ) throw new Error( 'resolution should recover from measured workload headroom while the frame rate is capped' );
+
 app.autoScale = false;
 for ( let i = 0; i < 20; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );
-if ( changes.length !== 2 ) throw new Error( 'manual scale should disable automatic changes' );
+if ( changes.length !== 3 ) throw new Error( 'manual scale should disable automatic changes' );
 
 app.autoScale = true;
 app.settings.renderScale = 0.5;
+app.renderLoadBias = 2;
 app._scaleBelowTarget = 0;
 changes.length = 0;
 for ( let i = 0; i < 20; i ++ ) App.prototype.adaptRenderScale.call( app, 10 );

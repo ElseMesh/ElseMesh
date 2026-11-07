@@ -1266,6 +1266,13 @@ export class App {
 		if ( fps < 24 ) {
 
 			this._scaleAboveTarget = 0;
+			// Let the workload-driven object/avatar LOD reach its supported bias before
+			// reducing the whole image. The 24 fps cap makes FPS itself a poor recovery
+			// signal, so resolution is the last resort when detail reduction is exhausted.
+			if ( this.renderLoadBias < 2 ) {
+				this._scaleBelowTarget = 0;
+				return;
+			}
 			this._scaleBelowTarget += 0.5;
 			if ( this._scaleBelowTarget >= 1 ) {
 				this._scaleBelowTarget = 0;
@@ -1276,7 +1283,12 @@ export class App {
 
 		}
 		this._scaleBelowTarget = 0;
-		if ( fps > 36 ) {
+		const lod = this.renderLoadLOD;
+		const hasWorkloadHeadroom = lod && lod.cpuHeadroom >= lod.recoverySeconds &&
+			( lod.gpuFiltered === null || lod.gpuHeadroom >= lod.recoverySeconds );
+		const cappedHeadroom = this.desktopFrameRateLimit > 0 && fps >= this.desktopFrameRateLimit * 0.95 &&
+			this.renderLoadBias === 0 && hasWorkloadHeadroom;
+		if ( fps > 36 || cappedHeadroom ) {
 
 			this._scaleAboveTarget += 0.5;
 			if ( this._scaleAboveTarget >= 8 ) {
