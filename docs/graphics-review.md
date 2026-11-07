@@ -1,5 +1,33 @@
 # Reproducible graphics review
 
+## 2026-11-07 Tidewater main beach-grit baseline
+
+The baseline was rendered from the original `tidewater/main` ref at
+`4811ba48d795197de5621985f404e765c0b7c0ef`, with WebGPU. The ElseMesh image is
+the signed `elsemesh:example-island` package rendered through hosted WebGL. Both
+use the named `beach` camera (`[15, 3, -58]`, yaw `3.14`, pitch `-0.08`) and
+time `16.2`, at 1588×867. Hosted WebGL's player grounding moved its camera to
+`y=2.823`, so the pair differs by 0.177 m vertically; the pose is close but
+not exact.
+
+The original `PebbleField` uses 4 m blue-noise patches with 18 cobble, 44 chip,
+and 150 small-pebble slots. Hosted WebGL now uses that same slot layout,
+category-specific signed density channels, hash inputs, size ranges, and
+distance fades. The live hosted session loaded the 1024×1024 authored density
+asset and created 2,169 debris instances. The image now shows fine scattered
+beach grit instead of the oversized isolated stones from the prior built-in
+WebGL fallback capture.
+
+This closes the obvious pebble-scale/layout mismatch, not complete material
+parity: WebGL still uses its own low-poly geometry and color approximation,
+and the capture pair has not been synchronized for wave phase or compared by
+pixels. Sky, water, shoreline, terrain, wood, and supported-hardware FPS gates
+remain open.
+
+![Original Tidewater main WebGPU beach](images/tidewater-main-webgpu-beach-2026-11-07.png)
+
+![ElseMesh hosted WebGL beach](images/elsemesh-hosted-webgl-beach-2026-11-07.png)
+
 ## 2026-11-07 engine-wide Babylon.js WebGPU prototype
 
 The isolated prototype lives in
