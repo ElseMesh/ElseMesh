@@ -20,7 +20,7 @@ const tests = [
 	'worlds/tidewater/test/boat-lod-runtime.mjs', 'worlds/tidewater/test/webgl-pier-collision.mjs',
 	'test/world-collision.mjs', 'test/world-package-emissive-texture.mjs', 'test/world-hosted-player.mjs', 'test/world-hosted-lifecycle.mjs', 'test/player-presence.mjs', 'test/world-presence-session.mjs',
 	'test/remote-avatar.mjs', 'test/avatar-lod-assets.mjs', 'test/account-client.mjs', 'test/serve-world-profile-options.mjs', 'test/ktx2-browser.mjs',
-	'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/local-region-connector.mjs', 'test/local-region-disk-cache.mjs', 'test/local-region-disk-cache-browser.mjs', 'test/collision-frontier.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
+	'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/local-region-connector.mjs', 'test/local-region-disk-cache.mjs', 'test/local-region-disk-cache-browser.mjs', 'worlds/Hogwarts/tests/network-shaping-proxy.mjs', 'test/collision-frontier.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
 	'test/priority-request-queue.mjs', 'test/local-region-request-budget.mjs', 'test/world-streaming-incremental-components.mjs', 'test/static-model-texture-demand.mjs', 'test/webgl-static-texture-lod.mjs', 'test/world-texture-priority.mjs',
 ];
 const dawnTests = new Set( [
