@@ -2197,6 +2197,7 @@ export class UI {
 		const k = ( ...keys ) => keys.map( ( x ) => `<kbd>${ x }</kbd>` ).join( '' );
 		const row = ( keys, text ) => `<div class="em-help-row"><span class="em-keys">${ keys }</span><span class="em-help-text">${ text }</span></div>`;
 		const wasd = '<span class="em-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>';
+		const arrowKeys = '<span class="em-look-arrows" aria-label="Arrow keys"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span>';
 		const mouse = `<kbd class="em-kbd-ico" aria-label="Mouse">${ icon( 'mouse' ) }</kbd>`;
 
 		const el = this.helpEl = h( 'div', 'em-help em-interactive', { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'em-help-title', hidden: true } );
@@ -2214,7 +2215,7 @@ export class UI {
 					<section>
 						<h3>Move</h3>
 						${ row( wasd, 'Move' ) }
-						${ row( k( '↑', '←', '↓', '→' ), 'Look around' ) }
+						${ row( arrowKeys, 'Look around' ) }
 						${ row( mouse, 'Look around<small>Click to capture</small>' ) }
 						${ row( k( 'Shift' ), 'Sprint, boat boost' ) }
 						${ row( k( 'Space' ), 'Jump, swim up' ) }
@@ -2282,7 +2283,7 @@ export class UI {
 				<div class="em-start-touch-hint">Left stick moves · right stick looks · tap action prompts</div>
 				<div class="em-start-keys">
 					<span><span class="em-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</span>
-					<span><span class="em-look-inputs"><span class="em-look-arrows"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><kbd class="em-kbd-ico">${ icon( 'mouse' ) }</kbd></span>Look</span>
+					<span><span class="em-look-inputs">${ arrowKeys }<kbd class="em-kbd-ico">${ icon( 'mouse' ) }</kbd></span>Look</span>
 					<span><kbd>E</kbd>Interact</span>
 					<span><kbd>H</kbd>Settings</span>
 					<span><kbd>F1</kbd>All controls</span>
