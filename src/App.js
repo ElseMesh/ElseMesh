@@ -383,7 +383,7 @@ export class App {
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
 		// Hosted launches have already returned through their package-only path. Keep
-		// built-in Tidewater presentation out of the shared App import graph.
+			// built-in world presentation out of the shared App import graph.
 		const { Village, Reef, BoatModel, Rocks, Debris, Whale } = await import( './world/BuiltinWorldPresentation.js' );
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
 		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
