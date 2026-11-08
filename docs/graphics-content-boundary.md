@@ -94,11 +94,11 @@ asks installed world component runtimes to resolve a profile. The new
 `elsemesh.material-graph/1` path uses the ElseMesh-owned compiler registry for
 both backends. Migrate legacy profiles to signed, renderer-neutral data and the
 engine registry; world modules must not register backend material compilers.
-Tidewater's village net, thatch, fabric, stone, and roof metal now use the
-graph path, including wind, coverage, seeded stone/plaster sampling, roof rust
-and replacement panels, and shared surface inputs in both backends. Two legacy
-village roles remain. Retire
-both legacy resolution paths as profiles migrate.
+Tidewater's village net, hard surfaces and rope, thatch, fabric, stone, and
+roof metal now use the graph path, including wind, coverage, seeded
+stone/plaster sampling, roof rust and replacement panels, rope normals, and
+shoreline wetness in both backends. Only wood remains on the legacy village
+profile path. Retire both legacy resolution paths after wood migrates.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable

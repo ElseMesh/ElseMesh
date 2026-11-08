@@ -103,10 +103,10 @@ material so deformed geometry can keep its shadow shape.
 
 The graph compiler and pixel fixture live in ElseMesh. The fixture checks
 the same signed GLB through both static-model adapters. Tidewater's signed
-village net, thatch, fabric, stone, and roof-metal materials now use this
-format; their package renders prove compilation and visible output, not matched image
-parity. Tidewater has not yet migrated its live fish-prop component or species
-material to this format.
+village net, hard-surface and rope, thatch, fabric, stone, and roof-metal
+materials now use this format; their package renders prove compilation and
+visible output, not matched image parity. Tidewater has not yet migrated its
+live fish-prop component or species material to this format.
 
 ## Current limits and migration gate
 
@@ -114,9 +114,9 @@ Format `/1` samples only the five standard glTF material texture slots; it does
 not define material-specific texture bundles. The graph inputs otherwise
 include vertex/instance data, and the standard glTF base-color, normal, and
 emissive textures are applied by the engine around the graph. Tidewater's
-remaining legacy village roles still use multiple packed maps and material
-parameters; verify the standard slots and bounded graph can carry each role's
-inputs before removing its legacy presenter.
+remaining legacy wood role still uses multiple packed maps and material
+parameters; verify the standard slots and bounded graph can carry its inputs
+before removing its legacy presenter.
 
 Do not move that shader or its role-specific compiler into ElseMesh as a
 shortcut. Either use these bounded glTF texture inputs in a renderer-neutral
