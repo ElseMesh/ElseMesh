@@ -2,6 +2,7 @@ import { WORLD_MATERIAL_GRAPH_INPUT_TYPES, validateWorldMaterialGraph, worldMate
 
 const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
+	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
 	normal: { builtin: true, wgsl: 'v.normal', glsl: 'normal' },
 	uv: { builtin: true, wgsl: 'v.uv', glsl: 'uv' },
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
@@ -68,13 +69,14 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
 	if ( graph.nodes.some( node => node.op === 'textureSample' && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph textures can only be sampled by fragment outputs' );
+	if ( graph.nodes.some( node => node.op === 'input' && node.name === 'worldPosition' && vertexRequired.has( node.id ) ) ) throw new Error( 'World position is only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
 	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && node.op === 'textureSample' ).map( node => node.slot ) ) ];
 	const attributes = {}, varyings = {};
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];
 		if ( source.attribute ) attributes[ source.attribute ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
-		varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
+		if ( ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
 	}
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
 	const emitNodes = ( stage, required ) => {
@@ -82,7 +84,11 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		for ( const node of graph.nodes ) {
 			if ( ! required.has( node.id ) ) continue;
 			if ( node.op === 'input' ) {
-				names.set( node.id, stage === 'vertex' ? INPUT_SOURCES[ node.name ][ backend === 'webgpu' ? 'wgsl' : 'glsl' ] : backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
+				const source = INPUT_SOURCES[ node.name ];
+				const expression = stage === 'vertex'
+					? source[ backend === 'webgpu' ? 'wgsl' : 'glsl' ]
+					: source[ backend === 'webgpu' ? 'fragmentWGSL' : 'fragmentGLSL' ] || ( backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
+				names.set( node.id, expression );
 				continue;
 			}
 			const name = `emg_${node.id}`;
@@ -93,7 +99,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		return { names, code: lines.join( '\n' ) };
 	};
 	const vertex = emitNodes( 'vertex', vertexRequired ), fragment = emitNodes( 'fragment', fragmentRequired );
-	const vertexAssignments = usedInputs.map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
+	const vertexAssignments = usedInputs.filter( name => ! INPUT_SOURCES[ name ].fragmentOnly ).map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
 	const vertexOutputs = [];
 	for ( const [ output, target ] of [ [ 'vertexPosition', 'position' ], [ 'vertexNormal', 'normal' ] ] ) {
 		const id = graph.outputs[ output ];
@@ -122,6 +128,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		glsl: Object.freeze( {
 			attributes: Object.entries( attributes ).map( ( [ name, type ] ) => `attribute ${type} ${name};` ).join( '\n' ),
 			declarations: glslVaryings,
+			worldPosition: usedInputs.includes( 'worldPosition' ),
 			vertex: commonVertex,
 			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ) ) ].filter( Boolean ).join( '\n' ),
 		} ),

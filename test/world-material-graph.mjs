@@ -90,4 +90,22 @@ webGPUTextureMaterial.dispose();
 webGLTextureMaterial.material.dispose();
 testTexture.dispose();
 
+const worldPositionGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
+		{ id: 'height', op: 'y', args: [ 'worldPosition' ] },
+	],
+	outputs: { roughness: 'height' },
+};
+const worldPositionWebGPU = compileWorldMaterialGraph( worldPositionGraph, 'webgpu' );
+const worldPositionWebGL = compileWorldMaterialGraph( worldPositionGraph, 'webgl' );
+assert.match( worldPositionWebGPU.surface, /s\.roughness = in\.P\.y/ );
+assert.equal( Object.hasOwn( worldPositionWebGPU.varyings, 'emg_worldPosition' ), false, 'WebGPU uses the engine fragment world-position input directly' );
+assert.equal( worldPositionWebGL.glsl.worldPosition, true, 'WebGL populates world position after the instance transform' );
+assert.doesNotMatch( worldPositionWebGL.vertex, /vEmg_worldPosition/ );
+assert.match( worldPositionWebGL.glsl.fragment, /roughnessFactor = vEmg_worldPosition\.y/ );
+assert.match( worldPositionWebGL.glsl.declarations, /varying vec3 vEmg_worldPosition/ );
+assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs: { vertexPosition: 'worldPosition' } }, 'webgpu' ), /fragment outputs/ );
+
 console.log( 'Renderer-neutral material graph validation passed' );

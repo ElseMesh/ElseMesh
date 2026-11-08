@@ -58,6 +58,11 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 		shader.vertexShader = insert( shader.vertexShader, '#include <common>', vertexDecl );
 		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${graphVertex}` );
+		if ( fragment && compiled.glsl.worldPosition ) {
+			const marker = '#include <worldpos_vertex>';
+			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
+			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldPosition = worldPosition.xyz;` );
+		}
 		if ( fragment ) {
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', compiled.glsl.declarations );
 			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );

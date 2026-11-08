@@ -28,6 +28,7 @@ Input nodes use these engine-defined semantics and types:
 | Input | Type | Meaning |
 | --- | --- | --- |
 | `position` | vec3 | Local vertex position |
+| `worldPosition` | vec3 | Final world-space position, available in fragment outputs |
 | `normal` | vec3 | Local vertex normal |
 | `uv` | vec2 | First texture coordinate |
 | `color` | vec4 | glTF `COLOR_0` |

@@ -18,7 +18,20 @@ try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
 	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
 	const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = await hash( glbBytes );
-	const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'u', op: 'x', args: [ 'position' ] }, { id: 'v', op: 'y', args: [ 'position' ] }, { id: 'uv', op: 'vec2', args: [ 'u', 'v' ] }, { id: 'baseMap', op: 'textureSample', slot: 'baseColor', uv: 'uv' }, { id: 'albedo', op: 'rgb', args: [ 'baseMap' ] } ], outputs: { baseColor: 'albedo' } };
+	const graph = {
+		format: 'elsemesh.material-graph/1',
+		nodes: [
+			{ id: 'position', op: 'input', name: 'position' },
+			{ id: 'u', op: 'x', args: [ 'position' ] },
+			{ id: 'v', op: 'y', args: [ 'position' ] },
+			{ id: 'uv', op: 'vec2', args: [ 'u', 'v' ] },
+			{ id: 'baseMap', op: 'textureSample', slot: 'baseColor', uv: 'uv' },
+			{ id: 'albedo', op: 'rgb', args: [ 'baseMap' ] },
+			{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
+			{ id: 'roughness', op: 'y', args: [ 'worldPosition' ] },
+		],
+		outputs: { baseColor: 'albedo', roughness: 'roughness' },
+	};
 	const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } }, materialTexture: true } ), graphAssetID = await hash( graphGLB );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,

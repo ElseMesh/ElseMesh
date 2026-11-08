@@ -6,6 +6,7 @@ export const WORLD_MATERIAL_GRAPH_MAX_NODES = 512;
 
 const INPUT_TYPES = Object.freeze( {
 	position: 'vec3',
+	worldPosition: 'vec3',
 	normal: 'vec3',
 	uv: 'vec2',
 	color: 'vec4',
