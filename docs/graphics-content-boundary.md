@@ -96,6 +96,23 @@ both backends. Migrate legacy profiles to signed, renderer-neutral data and the
 engine registry; world modules must not register backend material compilers.
 Retire both legacy resolution paths as profiles migrate.
 
+Do not move a world's bespoke shader or material implementation into ElseMesh
+verbatim just to remove renderer APIs from the world. First choose a portable
+representation: bake world-specific appearance into ordinary glTF/PBR assets
+during world export, or express it in a material/effect contract that is useful
+across worlds. Only the contract and its WebGPU/WebGL compilers belong in the
+engine. The world keeps the authored textures, parameters, and other content
+inputs; it does not register either backend implementation. If neither portable
+representation can preserve the required appearance, treat the feature as an
+unresolved migration instead of relocating its custom shader into the engine.
+
+Before moving a feature, write down its renderer-neutral inputs and outputs and
+check that both engine backends consume the same contract. Then migrate the
+complete feature once, including asset decoding, both presenters, and removal
+of world-side backend registrations. This avoids making the world renderer
+aware to compensate for an incomplete engine path, or making the engine
+world-specific to compensate for a non-portable world implementation.
+
 ## Renderer-free reef placement contract
 
 The stable type order, model-variant counts, and codec for
