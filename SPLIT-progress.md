@@ -74,6 +74,14 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: Tidewater now has a WebGPU material profile for generic static
+  fish-prop instances. It maps `_ELSEMESH_VDATA`, uses the generic transform and
+  eight opaque material values for jaw/curl/sag, and reuses the fish color and
+  fin-mask shaders. Its signed-profile fixture rendered 128 non-background
+  pixels with both color and shadow pipelines compiling. The exporter tags the
+  experimental LOD GLBs with this world profile, but does not yet place the
+  instance set in the signed package; WebGL profile rendering is still open.
+  Percentages remain unchanged.
 - 2026-11-08: extended the generic WebGL static-model profile path to preserve
   world-provided color and depth shader hooks, per-instance material data, and
   engine LOD fades in shadow rendering. The adapter test and isolated profiled
