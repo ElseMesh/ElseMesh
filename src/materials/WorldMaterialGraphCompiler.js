@@ -23,6 +23,11 @@ function literal( value, type, backend ) {
 function expression( node, names, backend ) {
 	if ( node.op === 'input' ) return names.get( node.id );
 	if ( node.op === 'constant' ) return literal( node.value, Array.isArray( node.value ) ? `vec${node.value.length}` : 'scalar', backend );
+	if ( node.op === 'textureSample' ) {
+		const texture = `emgTexture_${node.slot}`;
+		const uv = names.get( node.uv );
+		return backend === 'webgpu' ? `textureSample( ${texture}, smpAnisoRepeat, ${uv} )` : `texture2D( ${texture}, ${uv} )`;
+	}
 	const args = node.args.map( id => names.get( id ) );
 	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', sqrt: 'sqrt', sign: 'sign', exp: 'exp', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep', step: 'step' }[ node.op ];
 	if ( [ 'x', 'y', 'z', 'w', 'xy', 'xyz', 'rgb' ].includes( node.op ) ) return `${args[ 0 ]}.${node.op}`;
@@ -39,12 +44,32 @@ function expression( node, names, backend ) {
 	return `( ${args[ 0 ]} ${op} ${args[ 1 ]} )`;
 }
 
+function dependencyIDs( graph, roots ) {
+	const nodes = new Map( graph.nodes.map( node => [ node.id, node ] ) );
+	const required = new Set();
+	const visit = id => {
+		if ( required.has( id ) ) return;
+		required.add( id );
+		const node = nodes.get( id );
+		for ( const input of node.op === 'textureSample' ? [ node.uv ] : node.args || [] ) visit( input );
+	};
+	for ( const root of roots ) if ( root ) visit( root );
+	return required;
+}
+
 // Compile one validated graph to engine-owned WGSL and GLSL snippets.
 export function compileWorldMaterialGraph( graph, backend ) {
 	validateWorldMaterialGraph( graph );
 	if ( ! [ 'webgpu', 'webgl' ].includes( backend ) ) throw new Error( `Unsupported material graph backend: ${backend}` );
 	const inputTypes = WORLD_MATERIAL_GRAPH_INPUT_TYPES;
+	const vertexRoots = [ graph.outputs.vertexPosition, graph.outputs.vertexNormal ];
+	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive ];
+	const vertexRequired = dependencyIDs( graph, vertexRoots );
+	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
+	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
+	if ( graph.nodes.some( node => node.op === 'textureSample' && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph textures can only be sampled by fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
+	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && node.op === 'textureSample' ).map( node => node.slot ) ) ];
 	const attributes = {}, varyings = {};
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];
@@ -52,9 +77,10 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
 	}
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
-	const emitNodes = stage => {
+	const emitNodes = ( stage, required ) => {
 		const names = new Map(), lines = [];
 		for ( const node of graph.nodes ) {
+			if ( ! required.has( node.id ) ) continue;
 			if ( node.op === 'input' ) {
 				names.set( node.id, stage === 'vertex' ? INPUT_SOURCES[ node.name ][ backend === 'webgpu' ? 'wgsl' : 'glsl' ] : backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
 				continue;
@@ -66,7 +92,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		}
 		return { names, code: lines.join( '\n' ) };
 	};
-	const vertex = emitNodes( 'vertex' ), fragment = emitNodes( 'fragment' );
+	const vertex = emitNodes( 'vertex', vertexRequired ), fragment = emitNodes( 'fragment', fragmentRequired );
 	const vertexAssignments = usedInputs.map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
 	const vertexOutputs = [];
 	for ( const [ output, target ] of [ [ 'vertexPosition', 'position' ], [ 'vertexNormal', 'normal' ] ] ) {
@@ -86,6 +112,8 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	return Object.freeze( {
 		backend,
 		inputs: Object.freeze( usedInputs ),
+		textureSlots: Object.freeze( textureSlots ),
+		samplesBaseColorForBaseColor: graph.nodes.some( node => node.op === 'textureSample' && node.slot === 'baseColor' && baseColorRequired.has( node.id ) ),
 		hasVertexOutput: graph.outputs.vertexPosition !== undefined || graph.outputs.vertexNormal !== undefined,
 		attributes: Object.freeze( attributes ),
 		varyings: Object.freeze( varyings ),

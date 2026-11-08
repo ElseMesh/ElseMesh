@@ -15,6 +15,7 @@ import { Texture, generateMipmaps } from '../engine/webgpu.js';
 import { Color } from '../engine/math/Color.js';
 import { LinearSRGBColorSpace } from '../engine/constants.js';
 import { standard } from '../materials/Materials.js';
+import { compileWorldMaterialGraph } from '../materials/WorldMaterialGraphCompiler.js';
 import { Vector3 } from '../engine/math/Vector3.js';
 import { Matrix4 } from '../engine/math/Matrix4.js';
 import { Quaternion } from '../engine/math/Quaternion.js';
@@ -1119,8 +1120,23 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 				const albedo = await loadTexture( pbr.baseColorTexture, 'albedo' );
 				const normalMap = await loadTexture( source.normalTexture, 'normal', 'rgba8unorm' );
 				const emissiveMap = await loadTexture( source.emissiveTexture, 'emissive' );
+				const graph = worldMaterialGraph( source );
+				const graphSlots = compileWorldMaterialGraph( graph, 'webgpu' ).textureSlots;
+				const graphTextureInfo = {
+					baseColor: pbr.baseColorTexture,
+					metallicRoughness: pbr.metallicRoughnessTexture,
+					normal: source.normalTexture,
+					occlusion: source.occlusionTexture,
+					emissive: source.emissiveTexture,
+				};
+				const graphTextureFormats = { baseColor: 'rgba8unorm-srgb', metallicRoughness: 'rgba8unorm', normal: 'rgba8unorm', occlusion: 'rgba8unorm', emissive: 'rgba8unorm-srgb' };
+				const graphTextures = {};
+				for ( const slot of graphSlots ) {
+					if ( ! graphTextureInfo[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
+					graphTextures[ slot ] = slot === 'baseColor' ? albedo : slot === 'normal' ? normalMap : slot === 'emissive' ? emissiveMap : await loadTexture( graphTextureInfo[ slot ], `graph-${slot}`, graphTextureFormats[ slot ] );
+				}
 				resolvedMaterials.push( compileWorldMaterialProfile( source.extras.elsemeshMaterial.profile, 'webgpu', {
-					source, graph: worldMaterialGraph( source ), textures: { albedo, normalMap, emissiveMap },
+					source, graph, textures: { albedo, normalMap, emissiveMap, graphTextures },
 				} ) );
 				materialHooks.push( null );
 				continue;

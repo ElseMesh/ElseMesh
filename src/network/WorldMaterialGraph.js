@@ -14,6 +14,7 @@ const INPUT_TYPES = Object.freeze( {
 	instanceMaterial1: 'vec4',
 } );
 export const WORLD_MATERIAL_GRAPH_INPUT_TYPES = INPUT_TYPES;
+export const WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS = Object.freeze( [ 'baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive' ] );
 
 const OUTPUT_TYPES = Object.freeze( {
 	baseColor: 'vec3',
@@ -38,6 +39,7 @@ function nodeType( node, types ) {
 	const argTypes = node.args?.map( id => types.get( id ) );
 	if ( node.op === 'input' ) return INPUT_TYPES[ node.name ] || null;
 	if ( node.op === 'constant' ) return constantType( node.value );
+	if ( node.op === 'textureSample' ) return WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS.includes( node.slot ) && types.get( node.uv ) === 'vec2' ? 'vec4' : null;
 	if ( ! Array.isArray( node.args ) || argTypes.some( type => ! type ) ) return null;
 	const same = count => argTypes.length === count && argTypes.every( type => type === argTypes[ 0 ] );
 	const vector = type => /^vec[234]$/.test( type );
@@ -95,6 +97,8 @@ export function validateWorldMaterialGraph( graph ) {
 			if ( ! exactKeys( node, [ 'id', 'op', 'name' ] ) || ! Object.hasOwn( INPUT_TYPES, node.name ) ) throw new Error( `Unsupported world material graph input: ${node.name}` );
 		} else if ( node.op === 'constant' ) {
 			if ( ! exactKeys( node, [ 'id', 'op', 'value' ] ) || ! constantType( node.value ) ) throw new Error( `Invalid world material graph constant: ${node.id}` );
+		} else if ( node.op === 'textureSample' ) {
+			if ( ! exactKeys( node, [ 'id', 'op', 'slot', 'uv' ] ) || ! WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS.includes( node.slot ) || ! validID( node.uv ) || ! types.has( node.uv ) ) throw new Error( `Invalid world material graph texture sample: ${node.id}` );
 		} else {
 			if ( ! exactKeys( node, [ 'id', 'op', 'args' ] ) || ! Array.isArray( node.args ) || node.args.some( id => ! validID( id ) || ! types.has( id ) ) ) throw new Error( `Invalid or forward-referencing world material graph node: ${node.id}` );
 		}

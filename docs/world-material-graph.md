@@ -39,6 +39,25 @@ Nodes are ordered: each operation may reference only earlier node IDs. Graphs
 support at most 512 nodes. Constants are finite scalars or vectors with 2–4
 components, each in the range -1,000,000 to 1,000,000.
 
+`textureSample` nodes sample a signed glTF material texture in the fragment
+stage at the graph-provided UV coordinate and return a `vec4`:
+
+```json
+{ "id": "wood", "op": "textureSample", "slot": "baseColor", "uv": "uv" }
+```
+
+The `uv` field references an earlier `vec2` node. Supported slots are
+`baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive`; each
+resolves to the matching standard glTF material texture slot. Color slots use
+the texture's linearized sample, while data slots preserve their linear channel
+values. Texture samples cannot feed vertex outputs. The graph chooses its
+coordinates explicitly, so authors can scale or offset the `uv` input with
+ordinary graph nodes before sampling. If the `baseColor` output uses a sample
+from the `baseColor` slot, the engine does not multiply that texture into the
+surface a second time; the graph output still multiplies the glTF base-color
+factor. Sampling that slot for another output leaves the ordinary base-color
+texture path intact.
+
 Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`, `sqrt`,
 `sign`, `exp`, `normalize`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
@@ -46,7 +65,8 @@ Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,
 `select`, `step`, and `atan2`. Operations are type checked before the engine
 generates shader code. Comparisons currently accept scalar inputs and produce a
-boolean for `select` and logical operations.
+boolean for `select` and logical operations. `textureSample` is validated
+against its slot and UV input before shader generation.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `vertexPosition` (vec3), and
@@ -62,15 +82,17 @@ contract alone does not establish fish appearance parity.
 
 ## Current limits and migration gate
 
-Format `/1` does not expose texture samples as graph inputs or define signed
-material-specific texture bundles. Its graph inputs are vertex/instance data;
-the standard glTF base-color, normal, and emissive textures are applied by the
-engine around the graph. This is not enough to represent Tidewater's current
-village shader, which uses several packed maps and material parameters.
+Format `/1` samples only the five standard glTF material texture slots; it does
+not define material-specific texture bundles. The graph inputs otherwise
+include vertex/instance data, and the standard glTF base-color, normal, and
+emissive textures are applied by the engine around the graph. Tidewater's
+current village shader uses several packed maps and material parameters, so
+verify that these standard slots can carry all required inputs before choosing
+the graph path.
 
 Do not move that shader or its role-specific compiler into ElseMesh as a
-shortcut. Either extend the renderer-neutral material format with bounded,
-signed texture references and explicit sampling semantics implemented by both
-engine compilers, or bake the appearance into ordinary glTF/PBR maps during
-world export. Verify the same authored material through WebGPU and WebGL before
-removing the current world-side renderer implementations.
+shortcut. Either use these bounded glTF texture inputs in a renderer-neutral
+graph, extend the contract only if more portable inputs are required, or bake
+the appearance into ordinary glTF/PBR maps during world export. Verify the same
+authored material through WebGPU and WebGL before removing the current
+world-side renderer implementations.

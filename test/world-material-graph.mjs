@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { validateWorldMaterialGraph, worldMaterialGraph } from '../src/network/WorldMaterialGraph.js';
 import { compileWorldMaterialGraph } from '../src/materials/WorldMaterialGraphCompiler.js';
+import { createWebGLMaterialGraph, createWebGPUMaterialGraph } from '../src/materials/WorldMaterialGraph.js';
 import { worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
 
 const graph = {
@@ -51,5 +53,41 @@ assert.throws( () => validateWorldMaterialGraph( { ...graph, nodes: [ ...graph.n
 assert.throws( () => validateWorldMaterialGraph( { ...graph, outputs: { roughness: 'result' } } ), /output/ );
 assert.throws( () => validateWorldMaterialGraph( { ...graph, nodes: [ ...graph.nodes, { id: 'injection', op: 'sin; discard', args: [ 'rough' ] } ], outputs: { baseColor: 'result', roughness: 'injection' } } ), /operation/ );
 assert.throws( () => worldMaterialRole( { extras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph' } } } ), /malformed/ );
+
+const textureGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'uv', op: 'input', name: 'uv' },
+		{ id: 'baseMap', op: 'textureSample', slot: 'baseColor', uv: 'uv' },
+		{ id: 'sampledColor', op: 'rgb', args: [ 'baseMap' ] },
+	],
+	outputs: { baseColor: 'sampledColor' },
+};
+const textureWebGPU = compileWorldMaterialGraph( textureGraph, 'webgpu' );
+const textureWebGL = compileWorldMaterialGraph( textureGraph, 'webgl' );
+assert.deepEqual( textureWebGPU.textureSlots, [ 'baseColor' ] );
+assert.match( textureWebGPU.surface, /textureSample\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv \)/ );
+assert.doesNotMatch( textureWebGPU.vertex, /textureSample/ );
+assert.match( textureWebGL.glsl.fragment, /texture2D\( emgTexture_baseColor, vEmg_uv \)/ );
+assert.throws( () => validateWorldMaterialGraph( { ...textureGraph, nodes: [ textureGraph.nodes[ 0 ], { ...textureGraph.nodes[ 1 ], slot: 'privateSampler' }, textureGraph.nodes[ 2 ] ] } ), /texture sample/ );
+const vertexTextureGraph = { ...textureGraph, outputs: { vertexPosition: 'sampledColor' } };
+assert.throws( () => compileWorldMaterialGraph( vertexTextureGraph, 'webgpu' ), /fragment outputs/ );
+
+const testTexture = new THREE.DataTexture( new Uint8Array( [ 255, 255, 255, 255 ] ), 1, 1 );
+const webGPUTextureMaterial = createWebGPUMaterialGraph( {}, textureGraph, { graphTextures: { baseColor: testTexture } } );
+assert.equal( webGPUTextureMaterial.bindings.emgTexture_baseColor.texture, testTexture, 'WebGPU binds the graph texture slot to its signed material texture' );
+const webGLTextureMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial( { map: testTexture } ), textureGraph );
+const shader = {
+	vertexShader: '#include <common>\n#include <begin_vertex>',
+	fragmentShader: '#include <common>\n#include <lights_physical_fragment>',
+	uniforms: {},
+};
+webGLTextureMaterial.material.onBeforeCompile( shader );
+assert.match( shader.fragmentShader, /uniform sampler2D emgTexture_baseColor/ );
+assert.match( shader.fragmentShader, /texture2D\( emgTexture_baseColor, vEmg_uv \)/ );
+assert.equal( shader.uniforms.emgTexture_baseColor.value, testTexture, 'WebGL binds the same graph texture slot' );
+webGPUTextureMaterial.dispose();
+webGLTextureMaterial.material.dispose();
+testTexture.dispose();
 
 console.log( 'Renderer-neutral material graph validation passed' );

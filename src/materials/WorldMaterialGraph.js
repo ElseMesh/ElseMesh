@@ -2,8 +2,10 @@ import { Color } from '../engine/math/Color.js';
 import { standard } from './Materials.js';
 import { compileWorldMaterialGraph } from './WorldMaterialGraphCompiler.js';
 
-export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null } = {} ) {
+export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgpu' );
+	for ( const slot of compiled.textureSlots ) if ( ! graphTextures[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
+	const useBaseColorMap = Boolean( albedo && ! compiled.samplesBaseColorForBaseColor );
 	const pbr = gltfMaterial.pbrMetallicRoughness || {};
 	const base = pbr.baseColorFactor || [ 1, 1, 1, 1 ];
 	const emissive = gltfMaterial.emissiveFactor || [ 0, 0, 0 ];
@@ -31,14 +33,19 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 		side: gltfMaterial.doubleSided ? 'double' : 'front',
 		vertexColors: compiled.inputs.includes( 'color' ),
 		emissiveIntensity: gltfMaterial.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1,
-		textures: { ...( albedo ? { worldGraphAlbedoMap: albedo } : {} ), ...( normalMap ? { worldGraphNormalMap: normalMap } : {} ), ...( emissiveMap ? { worldGraphEmissiveMap: emissiveMap } : {} ) },
-		defines: { WORLD_HAS_ALBEDO: albedo ? 1 : 0, WORLD_HAS_NORMAL: normalMap ? 1 : 0, WORLD_HAS_EMISSIVE: emissiveMap ? 1 : 0 },
+		textures: {
+			...( useBaseColorMap ? { worldGraphAlbedoMap: albedo } : {} ),
+			...( normalMap ? { worldGraphNormalMap: normalMap } : {} ),
+			...( emissiveMap ? { worldGraphEmissiveMap: emissiveMap } : {} ),
+			...Object.fromEntries( compiled.textureSlots.map( slot => [ `emgTexture_${slot}`, graphTextures[ slot ] ] ) ),
+		},
+		defines: { WORLD_HAS_ALBEDO: useBaseColorMap ? 1 : 0, WORLD_HAS_NORMAL: normalMap ? 1 : 0, WORLD_HAS_EMISSIVE: emissiveMap ? 1 : 0 },
 		attributes: compiled.attributes, varyings: compiled.varyings,
 		vertex: compiled.vertex, surface: mapSurface + compiled.surface,
 	} );
 }
 
-function installWebGLGraph( T, material, compiled, graphKey, { fragment = true } = {} ) {
+function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, textureBindings = {} } = {} ) {
 	const originalCompile = material.onBeforeCompile;
 	const originalKey = material.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
@@ -53,7 +60,10 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true }
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${graphVertex}` );
 		if ( fragment ) {
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', compiled.glsl.declarations );
+			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
+			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', compiled.glsl.fragment );
+			for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
 		}
 	};
 	material.customProgramCacheKey = () => `${originalKey?.call( material ) || ''}|elsemesh-material-graph-1:${graphKey}:${fragment ? 'color' : 'depth'}`;
@@ -64,8 +74,18 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true }
 
 export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgl' );
+	const textureBindings = {
+		baseColor: sourceMaterial.map,
+		metallicRoughness: sourceMaterial.metalnessMap || sourceMaterial.roughnessMap,
+		normal: sourceMaterial.normalMap,
+		occlusion: sourceMaterial.aoMap,
+		emissive: sourceMaterial.emissiveMap,
+	};
+	for ( const slot of compiled.textureSlots ) if ( ! textureBindings[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const graphKey = JSON.stringify( graph );
-	const material = installWebGLGraph( T, sourceMaterial.clone(), compiled, graphKey );
+	const materialSource = sourceMaterial.clone();
+	if ( compiled.samplesBaseColorForBaseColor ) materialSource.map = null;
+	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings } );
 	const depthMaterial = compiled.hasVertexOutput
 		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: compiled.inputs.includes( 'color' ) } ), compiled, graphKey, { fragment: false } )
 		: null;
