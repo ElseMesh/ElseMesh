@@ -95,6 +95,7 @@ const externalMeshBytes = makeExternalTextureGlb( externalTextureAssetID );
 const externalMeshHash = Buffer.from( await crypto.subtle.digest( 'SHA-256', externalMeshBytes ) ).toString( 'hex' );
 let serveExternalMesh = false;
 const externalTextureRangeRequests = [];
+const externalTextureRangeHeaders = [];
 const originalFetch = globalThis.fetch;
 const originalNavigator = Object.getOwnPropertyDescriptor( globalThis, 'navigator' );
 let cellFetches = 0;
@@ -147,7 +148,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		createdRegionLeaseQuery = new URLSearchParams( url.searchParams );
 		return Response.json( { leaseId: 'a'.repeat( 32 ), expiresInSeconds: 30 } );
 	}
-	if ( url.pathname === `/v1/leases/${ 'a'.repeat( 32 ) }` && options.method === 'DELETE' ) {
+	if ( url.pathname === `/v1/leases/${ 'a'.repeat( 32 ) }/release` && options.method === 'POST' ) {
 		leaseReleases++;
 		return new Response( null, { status: 204 } );
 	}
@@ -191,6 +192,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		if ( url.searchParams.has( 'texture' ) ) {
 			assert.equal( url.searchParams.get( 'texture' ), externalTextureAssetID, 'external KTX2 range requests use the content hash declared by the mesh GLB' );
 			externalTextureRangeRequests.push( new URLSearchParams( url.searchParams ) );
+			externalTextureRangeHeaders.push( new Headers( options.headers ) );
 			const [ start, requestedEnd ] = ranges[ 0 ], end = Math.min( requestedEnd, externalTextureBytes.byteLength - 1 );
 			const body = externalTextureBytes.slice( start, end + 1 );
 			return new Response( body, { status: 206, headers: {
@@ -353,6 +355,8 @@ try {
 		start: 0, end: 31, etag: `"sha256-${externalTextureHash}"`, totalLength: externalTextureBytes.byteLength,
 	} );
 	assert.deepEqual( externalTextureRange.bytes, externalTextureBytes.slice( 0, 32 ), 'an independently addressed texture range is fetched after the GLB declares it' );
+	assert.equal( externalTextureRangeHeaders[ 0 ].get( 'Range' ), 'bytes=0-31', 'a single range is sent as a CORS-safelisted header' );
+	assert.equal( externalTextureRangeHeaders[ 0 ].has( 'If-Range' ), false, 'the response ETag is validated without an If-Range preflight header' );
 	assert.equal( externalTextureRangeRequests.length, 1, 'the connector sends the texture hash on a parent mesh and LOD lease URL' );
 	assert.equal( externalTextureRangeRequests[ 0 ].get( 'mesh' ), createdRegionLeaseQuery?.get( 'mesh' ), 'the texture byte-range request remains bounded by the declared mesh LOD lease' );
 	assert.equal( externalTextureRangeRequests[ 0 ].get( 'lod' ), createdRegionLeaseQuery?.get( 'lod' ), 'the texture byte-range request remains bounded by the declared LOD lease' );
