@@ -100,7 +100,7 @@ const worldPositionGraph = {
 };
 const worldPositionWebGPU = compileWorldMaterialGraph( worldPositionGraph, 'webgpu' );
 const worldPositionWebGL = compileWorldMaterialGraph( worldPositionGraph, 'webgl' );
-assert.match( worldPositionWebGPU.surface, /s\.roughness = in\.P\.y/ );
+assert.match( worldPositionWebGPU.surface, /let emg_height: f32 = in\.P\.y/ );
 assert.equal( Object.hasOwn( worldPositionWebGPU.varyings, 'emg_worldPosition' ), false, 'WebGPU uses the engine fragment world-position input directly' );
 assert.equal( worldPositionWebGL.glsl.worldPosition, true, 'WebGL populates world position after the instance transform' );
 assert.doesNotMatch( worldPositionWebGL.vertex, /vEmg_worldPosition/ );

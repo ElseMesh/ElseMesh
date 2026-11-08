@@ -111,7 +111,7 @@ try {
 	assert.ok( graphMaterial?.bindings.emgTexture_baseColor?.texture?.isTexture, 'signed GLB base-color texture is bound to graph sampling' );
 	assert.equal( graphMaterial.defines.WORLD_HAS_ALBEDO, 0, 'graph-sampled base color is not applied twice' );
 	assert.match( graphMaterial.surface, /textureSample\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv \)/ );
-	assert.match( graphMaterial.surface, /s\.roughness = in\.P\.y/ );
+	assert.match( graphMaterial.surface, /let emg_height: f32 = in\.P\.y/ );
 	const graphShader = buildMeshShader( graphMaterial, [ { name: 'position', wgsl: 'vec3f', location: 0 } ], { kind: 'depth' } );
 	const graphComposed = composeShader( { modules: graphShader.modules, bindings: graphShader.bindings, code: graphShader.code, defines: graphShader.defines, stage: 'render', label: graphMaterial.name } );
 	const graphCompilation = await GPU.device.createShaderModule( { code: graphComposed.code, label: 'world-material-graph-texture-test' } ).getCompilationInfo();
