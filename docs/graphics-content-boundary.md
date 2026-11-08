@@ -66,6 +66,15 @@ parallel Tidewater WebGL shader adapter. Replace or remove the prototype as
 part of implementing the shared description and verify both compiled outputs
 against the same fish-prop fixture.
 
+The current profile resolution has two world-controlled paths: WebGPU resolves
+materials through `WorldPackageMaterialAdapterRegistry`, while WebGL asks
+installed world component runtimes to resolve a profile. This is the structural
+reason renderer logic keeps moving between repositories. The target is one
+ElseMesh-owned material-profile registry: world packages register only signed,
+renderer-neutral profile data; the engine registry selects the WebGPU or WebGL
+compiler for the active backend. World modules must not register backend
+material compilers. Retire both current resolution paths as profiles migrate.
+
 ## Renderer-free reef placement contract
 
 The stable type order, model-variant counts, and codec for
