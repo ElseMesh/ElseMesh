@@ -3152,7 +3152,7 @@ export class UI {
 		// Keep the same frame-time scale in WebGL and WebGPU. Autoscaling to the
 		// worst recent frame makes a consistently slow GPU trace fill the chart,
 		// hiding variation and making the two renderers hard to compare.
-		const top = 200;
+		const top = 100;
 		const Y = ( ms ) => hh - 1.5 - ( Math.min( ms, top ) / top ) * ( hh - 4 );
 		const X = ( i ) => w - 2 - ( data.length - 1 - i ) * ( ( w - 4 ) / 59 );
 
