@@ -24,7 +24,7 @@ registerWorldPackageMaterialAdapter( materialAdapterType, {
 	resolve: ( { profileRole, context } ) => profileRole === 'tint' ? { material: context.material } : null,
 } );
 const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = hash( glbBytes );
-const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'albedo', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'roughness', op: 'constant', value: 0.35 } ], outputs: { baseColor: 'albedo', roughness: 'roughness' } };
+const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'normal', op: 'input', name: 'normal' }, { id: 'lift', op: 'constant', value: [ 0, 0.15, 0 ] }, { id: 'bentPosition', op: 'add', args: [ 'position', 'lift' ] }, { id: 'albedo', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'roughness', op: 'constant', value: 0.35 } ], outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'bentPosition', vertexNormal: 'normal' } };
 const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } } ), graphAssetID = hash( graphGLB );
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,

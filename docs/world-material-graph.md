@@ -48,10 +48,10 @@ Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `vertexPosition` (vec3), and
 `vertexNormal` (vec3). glTF PBR factors and the engine's existing base-color,
 normal, and emissive texture inputs remain the starting surface values; graph
-outputs modify those values. Vertex outputs are also applied in the WebGL depth
-material so deformed geometry keeps matching shadows.
+outputs modify those values. Vertex outputs also feed the WebGL depth material
+so deformed geometry can keep its shadow shape.
 
-The graph compiler and pixel fixture live in ElseMesh. The first fixture checks
+The graph compiler and pixel fixture live in ElseMesh. The fixture checks
 the same signed GLB through both static-model adapters. Tidewater has not yet
 migrated its live fish-prop component or species material to this format; this
 contract alone does not establish fish appearance parity.
