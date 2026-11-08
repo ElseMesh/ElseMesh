@@ -56,6 +56,7 @@ export class StaticModelInstanceSetPlanner {
 			this._shadowsByModel.push( shadowGroup );
 		}
 		this._normalizedPlanes = new Float64Array( 24 );
+		this._projectedRadiusByInstance = new Float32Array( document.instances.length );
 		this._shadowGroupsActive = false;
 	}
 
@@ -68,6 +69,7 @@ export class StaticModelInstanceSetPlanner {
 		if ( ! Number.isInteger( renderLoadBias ) || renderLoadBias < 0 || renderLoadBias > 2 ) throw new Error( `Invalid static model planner render-load bias: ${ typeof renderLoadBias } ${ String( renderLoadBias ) }` );
 		const tanHalfFov = Math.tan( camera.verticalFovRadians * 0.5 );
 		const loadScale = 2 ** renderLoadBias;
+		this._projectedRadiusByInstance.fill( 0 );
 		for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
 			const plane = camera.frustumPlanes[ planeIndex ];
 			if ( ! Array.isArray( plane ) || plane.length !== 4 || ! plane.every( Number.isFinite ) ) throw new Error( 'Invalid static model planner frustum plane' );
@@ -117,6 +119,7 @@ export class StaticModelInstanceSetPlanner {
 			const baseLodMeasure = model.lodMetric === 'projected-radius'
 				? radius / ( Math.max( distance, 1e-6 ) * tanHalfFov )
 				: distance / Math.max( sx, sy, sz );
+			this._projectedRadiusByInstance[ instanceIndex ] = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
 			// Sustained render overload shifts demand toward coarser authored LODs.
 			const lodMeasure = model.lodMetric === 'projected-radius' ? baseLodMeasure / loadScale : baseLodMeasure * loadScale;
 			const drawFade = model.drawFadeStartDistance < model.drawMaxDistance

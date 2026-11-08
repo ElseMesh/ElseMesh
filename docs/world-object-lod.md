@@ -64,6 +64,13 @@ combining their cache entries or delaying entry for high-detail data. The world
 provides bounds, traversal semantics, and valid coarse/fine tiers; the shared
 engine owns selection, ordering, gating, and both renderer implementations.
 
+After the barrier opens, queue mesh upgrades by the largest projected radius
+among visible instances that need the next level. This promotes prominent
+nearby geometry before small distant props even when the distant model appears
+earlier in descriptor order. Keep upgrades sequential per model so a finer
+level is not requested before its preceding level is available; use a stable
+model-ID tie break.
+
 ### Texture mip streaming and cache identity
 
 Geometry LODs must not require a separate copy of the same texture at each

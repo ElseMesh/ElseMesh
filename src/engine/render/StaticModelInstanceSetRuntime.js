@@ -80,6 +80,7 @@ export class StaticModelInstanceSetRuntime {
 		this.loadController = new AbortController();
 		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
 		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
+		this.desiredLodPriorities = new Float32Array( document.models.length );
 		this.pendingLods = new Map();
 		this.retryAfter = new Map();
 		this.disposeBatches = dispose;
@@ -151,15 +152,20 @@ export class StaticModelInstanceSetRuntime {
 
 	#requestVisibleLODs( refreshDesired ) {
 		const canRefine = ! this.canRefine || this.canRefine();
-		if ( ! canRefine ) {
-			this._nextLODCheckAt = performance.now() + 100;
-		}
+		const candidates = [];
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
 			const groups = this.planner._groupsByModel[ modelIndex ];
 			if ( refreshDesired ) {
 				let desiredLevel = -1;
 				for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
 				this.desiredLods[ modelIndex ] = desiredLevel;
+				let priority = 0;
+				const loadedMax = Math.max( ...this.loadedLods[ modelIndex ] );
+				for ( let visibleLevel = loadedMax + 1; visibleLevel <= desiredLevel; visibleLevel ++ ) {
+					const group = groups[ visibleLevel ];
+					for ( let index = 0; index < group.count; index ++ ) priority = Math.max( priority, this.planner._projectedRadiusByInstance[ group.indices[ index ] ] );
+				}
+				this.desiredLodPriorities[ modelIndex ] = priority;
 			}
 			const desiredLevel = this.desiredLods[ modelIndex ];
 			const loaded = this.loadedLods[ modelIndex ];
@@ -167,28 +173,37 @@ export class StaticModelInstanceSetRuntime {
 			const level = loadedMax + 1;
 			const key = `${ modelIndex }:${ level }`;
 			if ( desiredLevel < level ) this.retryAfter.delete( key );
-			if ( canRefine && desiredLevel > loadedMax && this.loadLOD ) {
-				if ( ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
-					this.retryAfter.delete( key );
-					const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {
-						if ( ! this.disposed ) {
-							loaded.add( level );
-							this._plannerDirty = true;
-							this._batchRefreshPending = true;
-						}
-						this._nextLODCheckAt = Math.min( Infinity, ...this.retryAfter.values() );
-					} ).catch( error => {
-						if ( ! this.disposed ) {
-							const retryAt = performance.now() + 5000;
-							this.retryAfter.set( key, retryAt );
-							this._nextLODCheckAt = Math.min( this._nextLODCheckAt, retryAt );
-							console.warn( `Static model LOD ${ level } unavailable for ${ this.document.models[ modelIndex ].id }`, error );
-						}
-					} ).finally( () => this.pendingLods.delete( key ) );
-					this.pendingLods.set( key, pending );
-				}
+			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
+				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ] } );
 			}
 			for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
+		}
+		if ( ! canRefine ) {
+			this._nextLODCheckAt = Math.min( this._nextLODCheckAt, performance.now() + 100 );
+			return;
+		}
+		if ( ! this.loadLOD ) return;
+		// Refine the most screen-prominent visible geometry first. Model and asset
+		// descriptor order is unrelated to what the player notices in the view.
+		candidates.sort( ( a, b ) => b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
+		for ( const { modelIndex, level, key, loaded } of candidates ) {
+			this.retryAfter.delete( key );
+			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {
+				if ( ! this.disposed ) {
+					loaded.add( level );
+					this._plannerDirty = true;
+					this._batchRefreshPending = true;
+				}
+				this._nextLODCheckAt = Math.min( Infinity, ...this.retryAfter.values() );
+			} ).catch( error => {
+				if ( ! this.disposed ) {
+					const retryAt = performance.now() + 5000;
+					this.retryAfter.set( key, retryAt );
+					this._nextLODCheckAt = Math.min( this._nextLODCheckAt, retryAt );
+					console.warn( `Static model LOD ${ level } unavailable for ${ this.document.models[ modelIndex ].id }`, error );
+				}
+			} ).finally( () => this.pendingLods.delete( key ) );
+			this.pendingLods.set( key, pending );
 		}
 	}
 

@@ -180,8 +180,7 @@ assert.deepEqual( staticModelInstanceCamera( infiniteFarCamera ).frustumPlanes[ 
 
 const runtimeDocument = { ...valid, instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, - 5 ], materialData: [ 11, 12, 13, 14, 21, 22, 23, 24 ] } ] };
 const runtimePlanner = new StaticModelInstanceSetPlanner( runtimeDocument );
-const makeRuntimeBatch = () => {
-	const capacity = 1;
+const makeRuntimeBatch = ( capacity = 1 ) => {
 	return {
 		mesh: { count: 0, visible: false },
 		matrixAttribute: { array: new Float32Array( capacity * 16 ), needsUpdate: false },
@@ -208,6 +207,29 @@ gatedRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
 assert.deepEqual( gatedLODRequests, [ [ 0, 1 ] ], 'mesh refinement resumes after the shared coverage gate opens' );
 gatedRuntime.dispose();
+
+const priorityDocument = {
+	...valid,
+	models: [ 'far-furniture', 'near-bench' ].map( id => ( { ...valid.models[ 0 ], id } ) ),
+	instances: [
+		{ ...valid.instances[ 0 ], model: 'far-furniture', position: [ 0, 0, - 18 ] },
+		{ ...valid.instances[ 0 ], model: 'near-bench', position: [ 0, 0, - 4 ] },
+	],
+};
+const priorityPlanner = new StaticModelInstanceSetPlanner( priorityDocument );
+const priorityRequests = [];
+const priorityRuntime = new StaticModelInstanceSetRuntime( priorityDocument, {
+	batches: priorityPlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: null,
+	loadLOD: async ( modelIndex, lodIndex ) => { priorityRequests.push( [ priorityDocument.models[ modelIndex ].id, lodIndex ] ); },
+} );
+const priorityCamera = new PerspectiveCamera( 60, 1, 0.1, 100 );
+priorityCamera.lookAt( 0, 0, - 1 );
+priorityRuntime.update( 1 / 60, priorityCamera );
+await new Promise( resolve => setImmediate( resolve ) );
+assert.deepEqual( priorityRequests, [ [ 'near-bench', 1 ], [ 'far-furniture', 1 ] ], 'visible mesh refinement prioritizes the larger nearby view before distant detail, independent of model descriptor order' );
+priorityRuntime.dispose();
+
 let disposedRuntime = false;
 const runtime = new StaticModelInstanceSetRuntime( runtimeDocument, {
 	batches: runtimePlanner.groups.map( () => [ makeRuntimeBatch() ] ),
