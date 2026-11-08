@@ -49,7 +49,8 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true }
 		};
 		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations ].filter( Boolean ).join( '\n' );
 		shader.vertexShader = insert( shader.vertexShader, '#include <common>', vertexDecl );
-		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${compiled.glsl.vertex}` );
+		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
+		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${graphVertex}` );
 		if ( fragment ) {
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', compiled.glsl.declarations );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', compiled.glsl.fragment );
