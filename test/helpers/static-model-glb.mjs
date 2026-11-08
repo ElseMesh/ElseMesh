@@ -1,4 +1,4 @@
-export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false } = {} ) {
+export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false, doubleSided = false } = {} ) {
 	const binary = new ArrayBuffer( 80 ), data = new DataView( binary );
 	const positions = [ - 0.5, 0, 0, 0.5, 0, 0, 0, 1, 0 ];
 	const normals = [ 0, 0, 1, 0, 0, 1, 0, 0, 1 ];
@@ -6,6 +6,7 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 	normals.forEach( ( value, index ) => data.setFloat32( 36 + index * 4, value, true ) );
 	data.setUint16( 72, 0, true ); data.setUint16( 74, 1, true ); data.setUint16( 76, 2, true );
 	const material = {
+		...( doubleSided ? { doubleSided: true } : {} ),
 		...( materialExtras ? { extras: materialExtras } : {} ),
 		...( materialAlpha < 1 ? { alphaMode: 'BLEND' } : {} ),
 		pbrMetallicRoughness: { baseColorFactor: [ 0.8, 0.4, 0.2, materialAlpha ], metallicFactor: 0, roughnessFactor: 0.8 },

@@ -68,7 +68,7 @@ try {
 		],
 		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
 	};
-	const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } }, materialTexture: true } ), graphAssetID = await hash( graphGLB );
+	const graphGLB = staticModelGLB( { doubleSided: true, materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } }, materialTexture: true } ), graphAssetID = await hash( graphGLB );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 		models: [
