@@ -77,8 +77,10 @@ WebGPU visual parity remain incomplete.
   WebGL's fishing gate with WebGPU while photo mode is active. The focused test
   verifies transition inputs, cue and catch-presentation ordering, and
   photo-mode behavior; renderer cast/fishing/sale traces and the pre-split
-  WebGPU bite/fight baselines pass. Vendor UI and rendered gameplay/visual
-  parity remain open.
+  WebGPU bite/fight baselines pass. A live worldd-backed signed-module browser
+  check also passes through both adapters, including fish-buyer and upgrade
+  interactions plus WebGPU Worker activation, departure, and re-entry. Vendor
+  UI and rendered gameplay/visual parity remain open.
 
 - 2026-11-08: Removed a reverse dependency in Tidewater debris placement: the
   world now owns scanned-log/shell IDs and measured dimensions, and provides
