@@ -87,6 +87,11 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			if ( ! read ) throw new Error( `WebGL material graph uses unsupported frame input ${name}` );
 			shader.uniforms[ name ] = { get value() { return read(); } };
 		}
+		if ( fragment && compiled.glsl.viewportSize ) {
+			if ( typeof renderer?.getDrawingBufferSize !== 'function' ) throw new Error( 'WebGL material graph pixelPosition requires drawing-buffer size access' );
+			const size = new T.Vector2();
+			shader.uniforms.emgViewportSize = { get value() { return renderer.getDrawingBufferSize( size ); } };
+		}
 		if ( fragment ) for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
 	};
 	material.customProgramCacheKey = () => `${originalKey?.call( material ) || ''}|elsemesh-material-graph-1:${graphKey}:${fragment ? 'color' : 'depth'}`;

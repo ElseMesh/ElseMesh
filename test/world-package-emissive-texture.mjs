@@ -102,6 +102,7 @@ try {
 			{ id: 'graphColor', op: 'rgb', args: [ 'sample' ] },
 			{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
 			{ id: 'worldNormal', op: 'input', name: 'worldNormal' },
+			{ id: 'pixelPosition', op: 'input', name: 'pixelPosition' },
 			{ id: 'height', op: 'y', args: [ 'worldPosition' ] },
 			{ id: 'uvWidth', op: 'fwidth', args: [ 'uv' ] },
 			{ id: 'uvWidthX', op: 'x', args: [ 'uvWidth' ] },
@@ -120,8 +121,12 @@ try {
 			{ id: 'normalTint', op: 'constant', value: [ 0.9, 1, 0.7 ] },
 			{ id: 'tiltedNormal', op: 'multiply', args: [ 'worldNormal', 'normalTint' ] },
 			{ id: 'surfaceNormal', op: 'normalize', args: [ 'tiltedNormal' ] },
+			{ id: 'pixelX', op: 'x', args: [ 'pixelPosition' ] },
+			{ id: 'pixelScale', op: 'constant', value: 0.0001 },
+			{ id: 'pixelDetail', op: 'multiply', args: [ 'pixelX', 'pixelScale' ] },
+			{ id: 'roughnessWithPixel', op: 'add', args: [ 'roughness', 'pixelDetail' ] },
 		],
-		outputs: { baseColor: 'graphColor', roughness: 'roughness', surfaceNormal: 'surfaceNormal' },
+		outputs: { baseColor: 'graphColor', roughness: 'roughnessWithPixel', surfaceNormal: 'surfaceNormal' },
 	};
 	const graphBytes = makeGLB( Buffer.from( [ 0 ] ), 'image/png', null, { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } );
 	graphRoot = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', graphBytes ] ] ) } );

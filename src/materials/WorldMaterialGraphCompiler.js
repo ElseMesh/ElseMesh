@@ -5,6 +5,7 @@ const INPUT_SOURCES = Object.freeze( {
 	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
 	worldNormal: { fragmentOnly: true, fragmentWGSL: 'in.N', fragmentGLSL: 'vEmg_worldNormal' },
 	frontFacing: { fragmentOnly: true, builtinFragment: true, fragmentWGSL: 'in.front', fragmentGLSL: 'gl_FrontFacing' },
+	pixelPosition: { fragmentOnly: true, builtinFragment: true, fragmentWGSL: 'in.pixel', fragmentGLSL: 'vec2( gl_FragCoord.x, emgViewportSize.y - gl_FragCoord.y )' },
 	normal: { builtin: true, wgsl: 'v.normal', glsl: 'normal' },
 	uv: { builtin: true, wgsl: 'v.uv', glsl: 'uv' },
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
@@ -125,7 +126,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	}
 	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].builtinFragment ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
-	const glslUniforms = glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ).join( '\n' );
+	const glslUniforms = [ ...glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ), ...( usedInputs.includes( 'pixelPosition' ) ? [ 'uniform vec2 emgViewportSize;' ] : [] ) ].join( '\n' );
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
 	return Object.freeze( {
@@ -145,6 +146,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 			uniformInputs: Object.freeze( glslUniformInputs.map( name => INPUT_SOURCES[ name ].glsl ) ),
 			worldPosition: usedInputs.includes( 'worldPosition' ),
 			worldNormal: usedInputs.includes( 'worldNormal' ),
+			viewportSize: usedInputs.includes( 'pixelPosition' ),
 			vertex: commonVertex,
 			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) ) ].filter( Boolean ).join( '\n' ),
 		} ),

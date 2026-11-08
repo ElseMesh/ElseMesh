@@ -31,6 +31,7 @@ Input nodes use these engine-defined semantics and types:
 | `worldPosition` | vec3 | Final world-space position, available in fragment outputs |
 | `worldNormal` | vec3 | Interpolated world-space surface normal, available in fragment outputs |
 | `frontFacing` | bool | Whether the fragment belongs to a front-facing primitive |
+| `pixelPosition` | vec2 | Fragment-center pixel coordinate from the viewport's top-left corner |
 | `normal` | vec3 | Local vertex normal |
 | `uv` | vec2 | First texture coordinate |
 | `color` | vec4 | glTF `COLOR_0` |

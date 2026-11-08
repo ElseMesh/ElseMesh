@@ -152,6 +152,29 @@ const frontFacingGraph = {
 assert.match( compileWorldMaterialGraph( frontFacingGraph, 'webgpu' ).surface, /select\( emg_backValue, emg_frontValue, in\.front \)/ );
 assert.match( compileWorldMaterialGraph( frontFacingGraph, 'webgl' ).glsl.fragment, /gl_FrontFacing/ );
 assert.doesNotMatch( compileWorldMaterialGraph( frontFacingGraph, 'webgl' ).glsl.declarations, /frontFacing/ );
+
+const pixelPositionGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'pixelPosition', op: 'input', name: 'pixelPosition' },
+		{ id: 'pixelX', op: 'x', args: [ 'pixelPosition' ] },
+	],
+	outputs: { roughness: 'pixelX' },
+};
+const pixelPositionWebGPU = compileWorldMaterialGraph( pixelPositionGraph, 'webgpu' );
+const pixelPositionWebGL = compileWorldMaterialGraph( pixelPositionGraph, 'webgl' );
+assert.match( pixelPositionWebGPU.surface, /in\.pixel/ );
+assert.match( pixelPositionWebGL.glsl.fragment, /gl_FragCoord\.x, emgViewportSize\.y - gl_FragCoord\.y/ );
+assert.match( pixelPositionWebGL.glsl.uniforms, /uniform vec2 emgViewportSize/ );
+assert.doesNotMatch( pixelPositionWebGL.glsl.declarations, /pixelPosition/ );
+const pixelPositionMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), pixelPositionGraph );
+let viewportHeight = 144;
+const pixelPositionShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+pixelPositionMaterial.material.onBeforeCompile( pixelPositionShader, { getDrawingBufferSize: target => target.set( 192, viewportHeight ) } );
+assert.deepEqual( [ pixelPositionShader.uniforms.emgViewportSize.value.x, pixelPositionShader.uniforms.emgViewportSize.value.y ], [ 192, 144 ] );
+viewportHeight = 96;
+assert.deepEqual( [ pixelPositionShader.uniforms.emgViewportSize.value.x, pixelPositionShader.uniforms.emgViewportSize.value.y ], [ 192, 96 ], 'WebGL graph tracks the current drawing-buffer size' );
+pixelPositionMaterial.material.dispose();
 graphNormalMaterial.material.dispose();
 
 const derivativeGraph = {
