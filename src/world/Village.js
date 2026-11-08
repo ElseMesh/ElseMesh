@@ -1,8 +1,6 @@
 import { BufferGeometry, Color, Euler, Group, Mesh, Vector3 } from '../engine/index.js';
 import { mulberry32 } from '../util/Noise.js';
 import { Builder, Batch } from './village/GeoBuilder.js';
-import { createVillageMaterials } from './village/VillageMaterials.js';
-import { VillageTextures } from './village/TextureBaker.js';
 import { buildHouse, buildBoathouse, buildMarketStall, buildShed } from './village/Buildings.js';
 import { buildBoardwalk } from './village/Boardwalk.js';
 import { buildPier } from './Pier.js';
@@ -20,7 +18,7 @@ import {
 // (wood + glass, hard + rope, roof metal, thatch, stone, fabric). The opaque materials
 // share one vertex / index buffer; the wood mesh is the only shadow caster and covers all
 // opaque geometry in the shadow passes (see _assemble). Surface detail comes from GPU-baked
-// PBR texture sets (village/TextureBaker.js, 43 MB) sampled with metre-scale uvs.
+// PBR texture sets supplied by the active world package and sampled with metre-scale uvs.
 
 const PASTELS = {
 	turquoise: lin( 0x5dbcb0 ),
@@ -61,7 +59,7 @@ const _lanternEuler = new Euler();
 
 export class Village {
 
-	constructor( { scene, terrain, colliders, worldLayout, fishPresentation = null } ) {
+	constructor( { scene, terrain, colliders, worldLayout, fishPresentation = null, createMaterialContext } ) {
 
 		if ( ! worldLayout ) throw new Error( 'Village construction requires the active world package layout' );
 
@@ -78,9 +76,11 @@ export class Village {
 
 		const rand = new Rand( mulberry32( 90210 ) );
 		this.rand = rand;
-		// tileable PBR texture sets, baked on the GPU the first time a village material renders
-		this.textures = new VillageTextures();
-		this.materials = createVillageMaterials( this.textures );
+		if ( typeof createMaterialContext !== 'function' ) throw new Error( 'Village construction requires a world-provided material context factory' );
+		const materialContext = createMaterialContext();
+		if ( ! materialContext?.textures || ! materialContext?.materials ) throw new Error( 'World village material context is incomplete' );
+		this.textures = materialContext.textures;
+		this.materials = materialContext.materials;
 		// one builder: everything static merges into a single mesh per material
 		this.B = new Builder();
 		this.B.fishPresentation = fishPresentation;

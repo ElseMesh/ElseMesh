@@ -37,8 +37,11 @@ export const defaultWorldPackage = Object.freeze( {
 			return new WorldState( options );
 		},
 		createVillage: async options => {
-			const { Village } = await import( '../src/world/Village.js' );
-			return new Village( options );
+			const [ { Village }, { createVillageMaterialContext } ] = await Promise.all( [
+				import( '../src/world/Village.js' ),
+				import( './tidewater/renderers/webgpu-village/VillageMaterialContext.js' ),
+			] );
+			return new Village( { ...options, createMaterialContext: createVillageMaterialContext } );
 		},
 		createRocks: async options => {
 			const { Rocks } = await import( '../src/world/Rocks.js' );
