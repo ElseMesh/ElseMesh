@@ -97,6 +97,8 @@ try {
 		format: 'elsemesh.material-graph/1',
 		nodes: [
 			{ id: 'uv', op: 'input', name: 'uv' },
+			{ id: 'night', op: 'input', name: 'night' },
+			{ id: 'nightColor', op: 'vec3', args: [ 'night', 'night', 'night' ] },
 			{ id: 'lodUvWidth', op: 'fwidth', args: [ 'uv' ] },
 			{ id: 'lodUvWidthX', op: 'x', args: [ 'lodUvWidth' ] },
 			{ id: 'lodScale', op: 'constant', value: 1024 },
@@ -131,7 +133,7 @@ try {
 			{ id: 'pixelDetail', op: 'multiply', args: [ 'pixelX', 'pixelScale' ] },
 			{ id: 'roughnessWithPixel', op: 'add', args: [ 'roughness', 'pixelDetail' ] },
 		],
-		outputs: { baseColor: 'graphColor', roughness: 'roughnessWithPixel', surfaceNormal: 'surfaceNormal' },
+		outputs: { baseColor: 'graphColor', roughness: 'roughnessWithPixel', surfaceNormal: 'surfaceNormal', emissive: 'nightColor' },
 	};
 	const graphBytes = makeGLB( Buffer.from( [ 0 ] ), 'image/png', null, { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } );
 	graphRoot = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', graphBytes ] ] ) } );
@@ -146,6 +148,7 @@ try {
 	assert.match( graphMaterial.surface, /frame\.time/ );
 	assert.match( graphMaterial.surface, /frame\.windDir/ );
 	assert.match( graphMaterial.surface, /frame\.windSpeed/ );
+	assert.match( graphMaterial.surface, /frame\.night/ );
 	const graphShader = buildMeshShader( graphMaterial, [ { name: 'position', wgsl: 'vec3f', location: 0 } ], { kind: 'depth' } );
 	const graphComposed = composeShader( { modules: graphShader.modules, bindings: graphShader.bindings, code: graphShader.code, defines: graphShader.defines, stage: 'render', label: graphMaterial.name } );
 	const graphCompilation = await GPU.device.createShaderModule( { code: graphComposed.code, label: 'world-material-graph-texture-test' } ).getCompilationInfo();
