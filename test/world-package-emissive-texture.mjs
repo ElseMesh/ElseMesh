@@ -7,7 +7,7 @@ import { loadWorldPackage, disposeWorldPackage } from '../src/network/WorldPacka
 
 await import('./headless.mjs');
 
-function makeGLB( image, mimeType = 'image/png', assetId = null ) {
+function makeGLB( image, mimeType = 'image/png', assetId = null, materialExtras = undefined ) {
 	const positions = new Float32Array( [ 0, 0, 0, 1, 0, 0, 0, 1, 0 ] );
 	const embeddedImageBytes = assetId ? 0 : image.length;
 	const binary = Buffer.alloc( Math.ceil( ( positions.byteLength + embeddedImageBytes ) / 4 ) * 4 );
@@ -26,6 +26,7 @@ function makeGLB( image, mimeType = 'image/png', assetId = null ) {
 			: { bufferView: 1, mimeType } ],
 		textures: [ mimeType === 'image/ktx2' ? { extensions: { KHR_texture_basisu: { source: 0 } } } : { source: 0 } ],
 		materials: [ {
+			...( materialExtras ? { extras: materialExtras } : {} ),
 			emissiveFactor: [ 1, 0.1, 0 ], emissiveTexture: { index: 0 }, normalTexture: { index: 0, scale: 0.75 },
 			pbrMetallicRoughness: { baseColorFactor: [ 0.5, 0.25, 0.1, 1 ], baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: 1 },
 		} ],
@@ -54,6 +55,7 @@ function makeGLB( image, mimeType = 'image/png', assetId = null ) {
 
 await GPU.init( { headless: true } );
 let root;
+let graphRoot;
 let ktx2Root;
 let referencedKtx2Root;
 const previousAssetImage = globalThis.__assetImage;
@@ -91,6 +93,26 @@ try {
 	const compilation = await shaderModule.getCompilationInfo();
 	const errors = compilation.messages.filter( message => message.type === 'error' );
 	assert.deepEqual( errors, [], errors.map( message => message.message ).join( '\n' ) );
+	const graph = {
+		format: 'elsemesh.material-graph/1',
+		nodes: [
+			{ id: 'uv', op: 'input', name: 'uv' },
+			{ id: 'sample', op: 'textureSample', slot: 'baseColor', uv: 'uv' },
+			{ id: 'graphColor', op: 'rgb', args: [ 'sample' ] },
+		],
+		outputs: { baseColor: 'graphColor' },
+	};
+	const graphBytes = makeGLB( Buffer.from( [ 0 ] ), 'image/png', null, { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } );
+	graphRoot = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', graphBytes ] ] ) } );
+	let graphMaterial;
+	graphRoot.traverse( node => { if ( node.isMesh ) graphMaterial = node.material; } );
+	assert.ok( graphMaterial?.bindings.emgTexture_baseColor?.texture?.isTexture, 'signed GLB base-color texture is bound to graph sampling' );
+	assert.equal( graphMaterial.defines.WORLD_HAS_ALBEDO, 0, 'graph-sampled base color is not applied twice' );
+	assert.match( graphMaterial.surface, /textureSample\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv \)/ );
+	const graphShader = buildMeshShader( graphMaterial, [ { name: 'position', wgsl: 'vec3f', location: 0 } ], { kind: 'depth' } );
+	const graphComposed = composeShader( { modules: graphShader.modules, bindings: graphShader.bindings, code: graphShader.code, defines: graphShader.defines, stage: 'render', label: graphMaterial.name } );
+	const graphCompilation = await GPU.device.createShaderModule( { code: graphComposed.code, label: 'world-material-graph-texture-test' } ).getCompilationInfo();
+	assert.deepEqual( graphCompilation.messages.filter( message => message.type === 'error' ), [], 'WebGPU compiles graph texture samples from package-loaded GLB textures' );
 	let decodedKTX2Bytes;
 	globalThis.__assetKTX2 = async bytes => {
 		decodedKTX2Bytes = bytes;
@@ -138,6 +160,7 @@ try {
 	console.log( 'World package: normal/emissive textures, linear color factors, and material WGSL verified' );
 } finally {
 	if ( root ) disposeWorldPackage( root );
+	if ( graphRoot ) disposeWorldPackage( graphRoot );
 	if ( ktx2Root ) disposeWorldPackage( ktx2Root );
 	if ( referencedKtx2Root ) disposeWorldPackage( referencedKtx2Root );
 	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;

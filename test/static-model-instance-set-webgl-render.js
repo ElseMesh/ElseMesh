@@ -18,8 +18,8 @@ try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
 	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
 	const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = await hash( glbBytes );
-	const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'normal', op: 'input', name: 'normal' }, { id: 'z', op: 'z', args: [ 'position' ] }, { id: 'threshold', op: 'constant', value: 0.2 }, { id: 'above', op: 'greaterThan', args: [ 'z', 'threshold' ] }, { id: 'highColor', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'lowColor', op: 'constant', value: [ 0.1, 0.25, 0.8 ] }, { id: 'albedo', op: 'select', args: [ 'above', 'highColor', 'lowColor' ] }, { id: 'roughness', op: 'constant', value: 0.35 }, { id: 'lift', op: 'constant', value: [ 0, 0.15, 0 ] }, { id: 'bentPosition', op: 'add', args: [ 'position', 'lift' ] } ], outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'bentPosition', vertexNormal: 'normal' } };
-	const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } } ), graphAssetID = await hash( graphGLB );
+	const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'u', op: 'x', args: [ 'position' ] }, { id: 'v', op: 'y', args: [ 'position' ] }, { id: 'uv', op: 'vec2', args: [ 'u', 'v' ] }, { id: 'baseMap', op: 'textureSample', slot: 'baseColor', uv: 'uv' }, { id: 'albedo', op: 'rgb', args: [ 'baseMap' ] } ], outputs: { baseColor: 'albedo' } };
+	const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } }, materialTexture: true } ), graphAssetID = await hash( graphGLB );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 		models: [
@@ -83,6 +83,7 @@ try {
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
 	if ( ! profileGeometryPrepared || ! mesh.geometry.getAttribute( 'fixtureProfileData' ) ) throw new Error( 'WebGL static model profile did not prepare its custom geometry attributes' );
 	if ( ! graphMesh.material.customProgramCacheKey().includes( 'elsemesh-material-graph-1' ) ) throw new Error( 'WebGL static models must compile the signed renderer-neutral material graph' );
+	if ( graphMesh.material.map !== null ) throw new Error( 'WebGL graph sampling must not apply the base-color texture twice' );
 	if ( ! runtime.sharedMaterials.includes( profileMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile material' );
 	if ( ! runtime.sharedMaterials.includes( profileDepthMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile depth material' );
 	const colorShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\nvoid main() {}' };

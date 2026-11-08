@@ -1,15 +1,25 @@
-export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1 } = {} ) {
+export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false } = {} ) {
 	const binary = new ArrayBuffer( 80 ), data = new DataView( binary );
 	const positions = [ - 0.5, 0, 0, 0.5, 0, 0, 0, 1, 0 ];
 	const normals = [ 0, 0, 1, 0, 0, 1, 0, 0, 1 ];
 	positions.forEach( ( value, index ) => data.setFloat32( index * 4, value, true ) );
 	normals.forEach( ( value, index ) => data.setFloat32( 36 + index * 4, value, true ) );
 	data.setUint16( 72, 0, true ); data.setUint16( 74, 1, true ); data.setUint16( 76, 2, true );
+	const material = {
+		...( materialExtras ? { extras: materialExtras } : {} ),
+		...( materialAlpha < 1 ? { alphaMode: 'BLEND' } : {} ),
+		pbrMetallicRoughness: { baseColorFactor: [ 0.8, 0.4, 0.2, materialAlpha ], metallicFactor: 0, roughnessFactor: 0.8 },
+	};
+	if ( materialTexture ) material.pbrMetallicRoughness.baseColorTexture = { index: 0 };
 	const json = {
 		asset: { version: '2.0' }, scene: 0, scenes: [ { nodes: [ 0 ] } ],
 		nodes: [ { name: 'translated-triangle', mesh: 0, translation: [ 2, 0, 0 ], scale: nodeScale } ],
 		meshes: [ { primitives: [ { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 } ] } ],
-		materials: [ { ...( materialExtras ? { extras: materialExtras } : {} ), ...( materialAlpha < 1 ? { alphaMode: 'BLEND' } : {} ), pbrMetallicRoughness: { baseColorFactor: [ 0.8, 0.4, 0.2, materialAlpha ], metallicFactor: 0, roughnessFactor: 0.8 } } ],
+		materials: [ material ],
+		...( materialTexture ? {
+			images: [ { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j7uoAAAAASUVORK5CYII=' } ],
+			textures: [ { source: 0 } ],
+		} : {} ),
 		buffers: [ { byteLength: binary.byteLength } ],
 		bufferViews: [ { buffer: 0, byteOffset: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 36 }, { buffer: 0, byteOffset: 72, byteLength: 6 } ],
 		accessors: [
