@@ -12,6 +12,13 @@
 - Whenever changing an existing implementation or API, always consider whether it should be redesigned. Prefer the clearest architecture for the intended product, and update callers, tests, and documentation together when changing an unstable interface.
 - Refer to the sole world-server daemon and executable as `worldd`. A ThruHold is a hosted world, not a daemon. `server/worldd` is an internal source/package path.
 
+## Renderer and world ownership
+
+- Renderer neutrality is a fixed architecture requirement. World repositories own authored world data, renderer-independent simulation, and portable asset inputs. They must not own production WebGPU/WebGL presenters, backend shader code, renderer-specific component adapters, or backend material compilers.
+- ElseMesh owns renderer selection and translates the same world-authored contract into WebGPU and WebGL presentation. Do not migrate a feature one backend at a time or move an existing backend implementation into a world as an intermediate step.
+- Before migrating a presentation feature, define the renderer-neutral inputs and outputs and implement the contract in both ElseMesh backends with a shared conformance fixture. World-specific appearance belongs in portable assets or data for that contract; backend shader source is not a translation format. If the contract cannot yet preserve the required appearance, leave the feature on its current path and record the missing contract or parity evidence. Do not create a second world-owned renderer path to fill the gap.
+- Treat existing world-owned backend presentation code as migration debt, not as precedent for new work. The complete boundary and migration gate are documented in `docs/graphics-content-boundary.md` and `docs/world-material-graph.md`.
+
 ## Persistent artifacts
 
 - Use `/var/tmp` only for disposable or reproducible scratch, caches, and build output. Never keep the only copy of a source file, deliverable, or evidence that must survive cleanup there; put repository material in Git and other retained user data in an appropriate persistent location outside temporary storage.
