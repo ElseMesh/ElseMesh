@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
+import { registerWorldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
 import '../src/fallback/WebGLStaticModelInstanceSetAdapter.js';
 
 const result = document.querySelector( '#result' );
@@ -12,8 +13,11 @@ const hash = async bytes => {
 };
 
 let runtime, renderer;
+let profileMaterial;
 try {
-	const glbBytes = staticModelGLB(), modelAssetID = await hash( glbBytes );
+	const profile = 'elsemesh.fixture-static-model-material/1';
+	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
+	const glbBytes = staticModelGLB( { materialExtras: { profile, role: 'tint' } } ), modelAssetID = await hash( glbBytes );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 		models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
@@ -39,12 +43,21 @@ try {
 	scene.background = new THREE.Color( 0x101820 );
 	const camera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 100 );
 	camera.position.set( 2, 1, 4 ); camera.lookAt( 2, 0.5, - 5 ); camera.updateProjectionMatrix();
-	const fallback = { THREE, connector, loader: new GLTFLoader(), scene };
+	profileMaterial = new THREE.MeshStandardMaterial( { color: 0x35d8ff, roughness: 0.4 } );
+	const fallback = {
+		THREE, connector, loader: new GLTFLoader(), scene,
+		hostedComponentRuntimes: new Map( [ [ 'fixture-material', {
+			sharedMaterials: [ profileMaterial ],
+			resolveWorldMaterialProfile: request => request.profile === profile && request.role === 'tint' ? profileMaterial : null,
+		} ] ] ),
+	};
 	const install = worldComponentBackendAdapter( 'webgl', component.type );
 	const installed = await install( { fallback }, component );
 	if ( ! installed?.installed ) throw new Error( 'WebGL static-model adapter did not install the component' );
 	runtime = installed.runtime;
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
+	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( 'WebGL static models did not resolve the registered world material profile' );
+	if ( ! runtime.sharedMaterials.includes( profileMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile material' );
 	if ( mesh.frustumCulled !== true ) throw new Error( 'Instanced draws do not use view-frustum culling when conservative bounds exist' );
 	if ( ! mesh.boundingSphere?.containsPoint( new THREE.Vector3( 81.5, 0.5, - 5 ) ) ) throw new Error( 'Draw bounds omit the scaled outer extent of the farthest instance' );
 	runtime.update( 1 / 60, camera );
@@ -72,5 +85,6 @@ try {
 	result.dataset.status = 'failed';
 } finally {
 	runtime?.dispose();
+	profileMaterial?.dispose();
 	renderer?.dispose();
 }

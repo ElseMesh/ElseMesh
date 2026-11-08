@@ -4,6 +4,7 @@ import { registerWorldComponentBackendAdapter } from '../network/WorldComponentB
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 import { WebGLProgressiveStaticTextures } from './WebGLProgressiveStaticTextures.js';
+import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installStaticModelInstanceSet );
@@ -62,7 +63,7 @@ function releaseParsedModelSource( fallback, assetId ) {
 async function installStaticModelInstanceSet( { fallback }, component ) {
 	const connector = fallback.connector;
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
-	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
+	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	if ( fallback.hostedStaticTextureLOD?.connector !== connector ) fallback.hostedStaticTextureLOD = new WebGLProgressiveStaticTextures( fallback, connector );
@@ -107,7 +108,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
 			pendingTextureRegistrations.push( [ modelIndex, 0, model.lods[ 0 ].assetId, coarseSource, coarse.progressive ] );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( T, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX ) );
+			mainBatches.push( createModelDraws( T, fallback, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 		}
 		runtime = new StaticModelInstanceSetRuntime( document, {
@@ -125,13 +126,14 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( T, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX );
+				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
 			} ),
 			dispose: disposeOwned,
 		} );
+		runtime.sharedMaterials = [ ...sharedProfileMaterials ];
 		for ( const args of pendingTextureRegistrations ) textureLOD.register( runtime, ...args );
 		// WebGLFallback's component runtime contract uses the fourth update
 		// argument for elapsed simulation time. Static model planning uses render
@@ -177,7 +179,7 @@ function staticModelInstanceBoundsSphere( T, document, modelIndex ) {
 	return new T.Sphere( new T.Vector3( ...sphereCenter ), sphereRadius );
 }
 
-function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ownedMaterials, instanceBoundsSphere, geometryMirrorX ) {
+function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
@@ -191,7 +193,8 @@ function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ow
 		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
 		geometry.computeBoundingSphere();
-		const sourceMaterial = object.material;
+		const sourceMaterial = resolveStaticModelMaterial( fallback, object.material );
+		if ( sourceMaterial !== object.material ) sharedProfileMaterials.add( sourceMaterial );
 		const cacheKey = sourceMaterial.uuid;
 		let material = materialCache.get( cacheKey );
 		if ( ! material ) {
@@ -212,6 +215,17 @@ function createModelDraws( T, source, capacity, materialCache, ownedGeometry, ow
 	} );
 	if ( draws.length === 0 ) throw new Error( 'Static model instance GLB contains no triangle meshes' );
 	return draws;
+}
+
+function resolveStaticModelMaterial( fallback, sourceMaterial ) {
+	const profile = sourceMaterial.userData?.elsemeshMaterial;
+	const role = worldMaterialRole( { extras: { elsemeshMaterial: profile } } );
+	if ( ! role ) return sourceMaterial;
+	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
+		const material = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );
+		if ( material ) return material;
+	}
+	throw new Error( `WebGL static model has no installed renderer for material profile ${profile.profile}/${role}` );
 }
 
 function staticFadeMaterial( T, source ) {

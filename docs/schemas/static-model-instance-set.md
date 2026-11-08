@@ -111,6 +111,12 @@ and positive scale.
 The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 
+GLB materials may use standard glTF PBR or a registered ElseMesh material
+profile. When a profile is present, the active renderer resolves it through an
+installed world material runtime; a missing profile renderer is an installation
+error rather than a silent fallback to ordinary PBR. The component data still
+contains no backend selector.
+
 The component's streaming bounds enclose the transformed model bounds. A
 bounded component is an engine-owned streaming unit: it is installed when
 selected for the view, retained while within its authored maximum distance,
