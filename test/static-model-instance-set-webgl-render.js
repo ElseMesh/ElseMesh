@@ -17,7 +17,7 @@ let profileMaterial;
 try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
 	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
-	const glbBytes = staticModelGLB( { materialExtras: { profile, role: 'tint' } } ), modelAssetID = await hash( glbBytes );
+	const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = await hash( glbBytes );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 		models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
@@ -56,7 +56,7 @@ try {
 	if ( ! installed?.installed ) throw new Error( 'WebGL static-model adapter did not install the component' );
 	runtime = installed.runtime;
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
-	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( 'WebGL static models did not resolve the registered world material profile' );
+	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
 	if ( ! runtime.sharedMaterials.includes( profileMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile material' );
 	if ( mesh.frustumCulled !== true ) throw new Error( 'Instanced draws do not use view-frustum culling when conservative bounds exist' );
 	if ( ! mesh.boundingSphere?.containsPoint( new THREE.Vector3( 81.5, 0.5, - 5 ) ) ) throw new Error( 'Draw bounds omit the scaled outer extent of the farthest instance' );

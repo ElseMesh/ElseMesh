@@ -4,15 +4,26 @@ import { setupLife } from './life-harness.mjs';
 import { readTexture } from '../src/engine/gpu/Readback.js';
 import { Group } from '../src/engine/scene/Group.js';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
+import { registerWorldPackageMaterialAdapter } from '../src/network/WorldPackageMaterialAdapterRegistry.js';
+import { registerWorldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
 import { disposeWorldPackage } from '../src/network/WorldPackage.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
 import { GPU } from '../src/engine/gpu/GPU.js';
+import { standard } from '../src/materials/Materials.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
 
 const hash = bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`;
-const glbBytes = staticModelGLB(), modelAssetID = hash( glbBytes );
+const profile = 'elsemesh.fixture-static-model-material/1', materialAdapterType = 'elsemesh.fixture-static-model-materials/1';
+registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
+const profileMaterial = standard( { name: 'fixture-profile', color: 0x35d8ff, roughness: 0.4, metalness: 0 } );
+profileMaterial.userData.borrowedWorldMaterial = true;
+registerWorldPackageMaterialAdapter( materialAdapterType, {
+	prepare: async () => ( { context: { material: profileMaterial } } ),
+	resolve: ( { profileRole, context } ) => profileRole === 'tint' ? { material: context.material } : null,
+} );
+const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = hash( glbBytes );
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
@@ -21,7 +32,7 @@ const document = {
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
 const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' } ] };
 const connector = {
-	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' } ] },
+	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' } ], components: [ { type: materialAdapterType } ] },
 	assets: new Map( [ [ setAssetID, setBytes ] ] ),
 	getAsset: async () => glbBytes,
 };
@@ -31,10 +42,13 @@ let runtime;
 try {
 	GPU.device.addEventListener( 'uncapturederror', event => errors.push( event.error?.message || 'unknown GPU error' ) );
 	const root = new Group();
-	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, materialAdapterContexts: new Map() };
+	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, materialAdapterContexts: new Map( [ [ materialAdapterType, { context: { material: profileMaterial } } ] ] ) };
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const result = await install( { root, connector }, component );
 	runtime = result.runtime;
+	let renderedProfileMaterial = null;
+	root.traverse( node => { if ( node.isMesh ) renderedProfileMaterial = node.material; } );
+	assert.equal( renderedProfileMaterial?.name, profileMaterial.name, 'WebGPU static models resolve the registered world material profile' );
 	L.scene.add( root );
 	L.camera.position.set( 2, 1, 4 );
 	L.camera.lookAt( 2, 0.5, - 5 );
@@ -53,6 +67,7 @@ try {
 	console.log( `generic WebGPU static-model render passed (${changedPixels} non-background pixels; color and shadow pipelines compiled)` );
 } finally {
 	runtime?.dispose();
+	profileMaterial.dispose();
 	GPU.device?.destroy();
 }
 await new Promise( resolve => setTimeout( resolve, 200 ) );
