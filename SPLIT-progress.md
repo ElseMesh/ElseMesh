@@ -77,7 +77,7 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
-- 2026-11-08: Tidewater's signed village net now renders through the package graph path on both backends: 45 visible WebGPU pixels and 74 WebGL pixels; WebGL compiles two programs with no GL errors. These renderer-specific captures prove execution, not matched image parity. The WebGL render exposed that graph worldPosition failed when Three.js omitted its conditional local; the engine now computes it from transformed vertices with batching and instancing transforms. Deterministic export and both direct package renders pass; external build verification is pending.
+- 2026-11-08: Tidewater's signed village net now renders through the package graph path on both backends: 45 visible WebGPU pixels and 74 WebGL pixels; WebGL compiles two programs with no GL errors. These renderer-specific captures prove execution, not matched image parity. The WebGL render exposed that graph worldPosition failed when Three.js omitted its conditional local; the engine now computes it from transformed vertices with batching and instancing transforms. Deterministic export, the external production build, and both direct package renders pass.
 
 
 - 2026-11-08: added renderer-neutral material-graph inputs for simulation time,
