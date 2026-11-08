@@ -74,6 +74,13 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: verified the world-authored `playerCapsule` rule is used by
+  first-person collision and hosted spawn candidate checks, including the
+  collision objects selected around a spawn. The external-build checks for
+  boat collision, spawn placement, local region connectors, and hosted player
+  movement pass. Avatar/vehicle portal acceptance remains 70%: registry-backed
+  arbitrary profiles, profile complexity contracts, and authoritative vehicle
+  simulation are still open.
 - 2026-11-08: expanded Tidewater's matched fish-prop render fixture to 14
   deterministic records, including chromis, sergeant, and angel detail probes;
   both backends use the same camera and rendered background. The latest
