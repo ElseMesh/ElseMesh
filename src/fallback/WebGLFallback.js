@@ -25,6 +25,7 @@ import { createWebGLShoreSurfaceOffset } from './WebGLShoreSurface.js';
 import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
+import { applyWebGLWorldMaterialGraphs } from './WebGLWorldMaterialGraphs.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLSpray } from './WebGLSpray.js';
@@ -91,6 +92,7 @@ function disposeHostedWebGLModel( model ) {
 	const geometries = new Set(), materials = new Set(), textures = new Set();
 	model?.scene?.traverse( object => {
 		if ( object.geometry?.dispose ) geometries.add( object.geometry );
+		if ( object.customDepthMaterial ) materials.add( object.customDepthMaterial );
 		for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
 			if ( ! material ) continue;
 			materials.add( material );
@@ -2144,6 +2146,7 @@ export class WebGLFallback {
 
 	_applyHostedWorldObjectPresentations( object, visual ) {
 
+		applyWebGLWorldMaterialGraphs( this.THREE, visual );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.applyObject?.( object, visual );
 
 	}
@@ -2382,6 +2385,7 @@ export class WebGLFallback {
 				if ( root ) {
 					const sharedMaterials = new Set( [ ...( this.hostedComponentRuntimes?.values?.() || [] ) ].flatMap( runtime => runtime.sharedMaterials || [] ) );
 					root.traverse( node => {
+						if ( node.customDepthMaterial && ! sharedMaterials.has( node.customDepthMaterial ) ) node.customDepthMaterial.dispose?.();
 						for ( const material of Array.isArray( node.material ) ? node.material : [ node.material ] ) {
 							if ( material && ! sharedMaterials.has( material ) ) material.dispose?.();
 						}

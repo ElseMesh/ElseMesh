@@ -4,6 +4,7 @@ import { staticModelGLB } from './helpers/static-model-glb.mjs';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
 import { registerWorldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
+import { applyWebGLWorldMaterialGraphs } from '../src/fallback/WebGLWorldMaterialGraphs.js';
 import '../src/fallback/WebGLStaticModelInstanceSetAdapter.js';
 
 const result = document.querySelector( '#result' );
@@ -12,7 +13,7 @@ const hash = async bytes => {
 	return `sha256:${ Array.from( digest, value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' ) }`;
 };
 
-let runtime, renderer, profileGeometryPrepared = false;
+let runtime, renderer, profileGeometryPrepared = false, hostedGraphMesh, hostedGraphMaterial;
 let profileMaterial, profileDepthMaterial;
 try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
@@ -126,6 +127,25 @@ try {
 	const installed = await install( { fallback }, component );
 	if ( ! installed?.installed ) throw new Error( 'WebGL static-model adapter did not install the component' );
 	runtime = installed.runtime;
+	hostedGraphMaterial = new THREE.MeshStandardMaterial();
+	hostedGraphMaterial.userData.elsemeshMaterial = {
+		profile: 'elsemesh.material-graph/1', role: 'graph', graph: {
+			format: 'elsemesh.material-graph/1',
+			nodes: [
+				{ id: 'position', op: 'input', name: 'position' },
+				{ id: 'offset', op: 'constant', value: [ 0, 0.15, 0 ] },
+				{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
+				{ id: 'color', op: 'constant', value: [ 0.8, 0.4, 0.2 ] },
+			],
+			outputs: { vertexPosition: 'moved', baseColor: 'color' },
+		},
+	};
+	const hostedGraphGeometry = new THREE.ConeGeometry( 0.45, 0.9, 4 );
+	hostedGraphMesh = new THREE.Mesh( hostedGraphGeometry, hostedGraphMaterial );
+	hostedGraphMesh.position.set( 2.8, 0, - 5 );
+	hostedGraphMesh.castShadow = true;
+	if ( applyWebGLWorldMaterialGraphs( THREE, hostedGraphMesh ) !== 1 || ! hostedGraphMesh.customDepthMaterial ) throw new Error( 'ElseMesh hosted GLB graph material did not use the engine compiler and shadow path' );
+	scene.add( hostedGraphMesh );
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
 	const graphMesh = runtime.batches[ 1 ][ 0 ].mesh;
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
@@ -167,6 +187,10 @@ try {
 	result.dataset.status = 'failed';
 } finally {
 	runtime?.dispose();
+	hostedGraphMesh?.material?.dispose?.();
+	hostedGraphMesh?.customDepthMaterial?.dispose?.();
+	hostedGraphMesh?.geometry?.dispose?.();
+	hostedGraphMaterial?.dispose?.();
 	profileMaterial?.dispose();
 	profileDepthMaterial?.dispose();
 	renderer?.dispose();
