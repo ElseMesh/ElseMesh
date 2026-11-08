@@ -78,6 +78,13 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: added renderer-neutral material-graph inputs for simulation time,
+  wind direction, and wind speed. WebGPU graphs read shared frame fields;
+  WebGL graph uniforms read the same live engine values. Unit and package shader
+  checks pass, and the WebGL pixel test renders graph-driven vertex sway (249
+  non-background pixels, four programs, no GL errors). The production build
+  passes. Tidewater has not converted its fabric or village shader, so renderer-
+  neutral content remains 63% and gameplay/content parity remains 87%.
 - 2026-11-08: added explicit-LOD texture sampling to the bounded graph format.
   Type validation checks its texture slot, UV, and scalar LOD; the WebGPU
   package shader compiles and the WebGL static-model pixel test renders with
