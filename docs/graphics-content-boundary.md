@@ -39,6 +39,33 @@ Content descriptors should be ordinary data and stable across backend changes.
 Presentation objects should be disposable and rebuildable from those
 descriptors plus current simulation state.
 
+## Renderer-neutral material contract
+
+World packages describe materials and effects as data. They must not ship or
+register a WebGPU or WebGL implementation. ElseMesh owns backend selection,
+resource creation, and compilation of those descriptions to WGSL or the WebGL
+shader path. A world may define domain-specific roles and parameters, but the
+role identifies authored intent; it does not select a renderer adapter.
+
+The portable baseline is glTF PBR material data and textures. Features beyond
+that baseline must use a versioned, bounded material/effect description whose
+operations and inputs are defined independently of either graphics API. Each
+operation supported by the engine must have WebGPU and WebGL implementations
+with a shared conformance fixture. The engine may report a feature unsupported
+when a backend cannot implement it; worlds must not silently substitute a
+backend-specific shader. Raw WGSL and GLSL are not a portable contract and
+cannot be translated reliably in general.
+
+This is the fixed ownership boundary for material work: do not move shader
+code between a world and ElseMesh as a backend-by-backend port. Extend the
+renderer-neutral description and both engine compilers together, or represent
+the appearance with portable assets. The Tidewater fish-prop material profile
+currently constructs a Tidewater WGSL material in the world package adapter;
+it is a transitional prototype and does not meet this contract. Do not add a
+parallel Tidewater WebGL shader adapter. Replace or remove the prototype as
+part of implementing the shared description and verify both compiled outputs
+against the same fish-prop fixture.
+
 ## Renderer-free reef placement contract
 
 The stable type order, model-variant counts, and codec for
