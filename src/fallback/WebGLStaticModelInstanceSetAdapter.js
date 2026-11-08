@@ -2,6 +2,7 @@ import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstance
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
+import { worldPackageMeshLODQueue } from '../network/WorldPackage.js';
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 import { WebGLProgressiveStaticTextures } from './WebGLProgressiveStaticTextures.js';
 import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
@@ -65,7 +66,9 @@ function releaseParsedModelSource( fallback, assetId ) {
 async function installStaticModelInstanceSet( { fallback }, component ) {
 	const connector = fallback.connector;
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
-	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
+	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set(), mainBatches = [];
+	const root = fallback.app?.linkedWorldRoot;
+	const lodQueue = root?.userData?.worldPackage ? worldPackageMeshLODQueue( root ) : ( fallback.hostedStaticModelLODQueue ||= new LODLoadQueue( 1, { deferStart: true } ) );
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
@@ -122,7 +125,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			// their material has colorWrite disabled. Let each selected color LOD
 			// cast its own shadow instead of adding a duplicate draw per primitive.
 			shadowBatches: null,
-			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
+			loadLOD: ( modelIndex, lodIndex, signal, priority ) => lodQueue.run( signal, async () => {
 				const { bytes, webGLBytes, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
 				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
@@ -134,7 +137,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
-			} ),
+			}, priority ),
 			dispose: disposeOwned,
 		} );
 		runtime.sharedMaterials = [ ...sharedProfileMaterials ];

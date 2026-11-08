@@ -78,22 +78,29 @@ export class WorldObjectLOD {
 
 // Bound simultaneous variant fetch/decode work across one package.
 export class LODLoadQueue {
- constructor(limit = 2) { this.limit = limit; this.active = 0; this.waiting = []; }
- run(signal, task) {
+ constructor(limit = 2, { deferStart = false } = {}) { this.limit = limit; this.deferStart = deferStart; this.active = 0; this.waiting = []; this.sequence = 0; this.pumpScheduled = false; }
+ run(signal, task, priority = 0) {
   return new Promise((resolve,reject) => {
    if (signal.aborted) { reject(signal.reason); return; }
-   const entry = {signal,task,resolve,reject};
+   const entry = {signal,task,resolve,reject,priority:Number.isFinite(priority) ? priority : 0,sequence:this.sequence++};
    entry.abort = () => { const index = this.waiting.indexOf(entry); if (index >= 0) { this.waiting.splice(index,1); reject(signal.reason); } };
    signal.addEventListener('abort',entry.abort,{once:true});
-   this.waiting.push(entry); this.pump();
+   this.waiting.push(entry); this.schedulePump();
   });
  }
+ schedulePump() {
+  if ( ! this.deferStart ) { this.pump(); return; }
+  if ( this.pumpScheduled ) return;
+  this.pumpScheduled = true;
+  queueMicrotask(() => { this.pumpScheduled = false; this.pump(); });
+ }
  pump() {
+  this.waiting.sort((a,b) => b.priority - a.priority || a.sequence - b.sequence);
   while (this.active < this.limit && this.waiting.length) {
    const entry = this.waiting.shift(); entry.signal.removeEventListener('abort',entry.abort);
    if (entry.signal.aborted) {entry.reject(entry.signal.reason);continue;}
    this.active++;
-   Promise.resolve().then(() => entry.task()).then(entry.resolve,entry.reject).finally(() => {this.active--;this.pump();});
+   Promise.resolve().then(() => entry.task()).then(entry.resolve,entry.reject).finally(() => {this.active--;this.schedulePump();});
   }
  }
 }

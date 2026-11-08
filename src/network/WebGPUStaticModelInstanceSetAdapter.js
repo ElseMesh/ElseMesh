@@ -2,11 +2,10 @@ import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js'
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
-import { loadWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset } from './WorldPackage.js';
+import { loadWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset, worldPackageMeshLODQueue } from './WorldPackage.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
-import { LODLoadQueue } from './WorldObjectLOD.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installStaticModelInstanceSet );
@@ -15,7 +14,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
-	const materialCache = new Map(), sceneCache = new Map(), lodQueue = new LODLoadQueue( 2 );
+	const materialCache = new Map(), sceneCache = new Map(), lodQueue = worldPackageMeshLODQueue( root );
 	let unregisterTextureDemand = null;
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
@@ -56,7 +55,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 			canRefine: () => root.userData.worldPackage?.coarseCoverageReady !== false,
 			batches: mainBatches,
 			shadowBatches,
-			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
+			loadLOD: ( modelIndex, lodIndex, signal, priority ) => lodQueue.run( signal, async () => {
 				const { bytes, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
@@ -67,7 +66,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( root, [ draws ] );
-			} ),
+			}, priority ),
 			dispose: disposeOwned,
 		} );
 		unregisterTextureDemand = registerStaticModelTextureDemand( root, runtime );

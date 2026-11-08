@@ -69,7 +69,10 @@ among visible instances that need the next level. This promotes prominent
 nearby geometry before small distant props even when the distant model appears
 earlier in descriptor order. Keep upgrades sequential per model so a finer
 level is not requested before its preceding level is available; use a stable
-model-ID tie break.
+model-ID tie break. All static-model components in one world package share a
+deferred, single-active priority queue. Deferring its first dispatch lets the
+engine collect requests from every component updated in the frame before it
+starts the highest-priority mesh upgrade.
 
 ### Texture mip streaming and cache identity
 

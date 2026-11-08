@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { LODLoadQueue, WorldObjectLOD, selectObjectLOD } from '../src/network/WorldObjectLOD.js';
-import { loadWorldPackage, updateWorldPackageLOD, disposeWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects } from '../src/network/WorldPackage.js';
+import { loadWorldPackage, updateWorldPackageLOD, disposeWorldPackage, registerWorldPackageCollisions, unloadWorldPackageObjects, worldPackageMeshLODQueue } from '../src/network/WorldPackage.js';
 import { Colliders } from '../src/world/Colliders.js';
 import { Group } from '../src/engine/scene/Group.js';
 import { GPU } from '../src/engine/gpu/GPU.js';
@@ -164,3 +164,17 @@ cancelledSignal.abort(new DOMException('World unloaded','AbortError')); await re
 assert.equal(queue.active,1); assert.deepEqual(release,[]);
 releaseFirst(); await firstTask; await lastTask; assert.deepEqual(release,['last']);
 console.log('LOD acquisition concurrency and queued cancellation passed');
+
+const sharedQueueRoot = new Group();
+sharedQueueRoot.userData.worldPackage = {};
+const sharedMeshQueue = worldPackageMeshLODQueue( sharedQueueRoot );
+assert.strictEqual( worldPackageMeshLODQueue( sharedQueueRoot ), sharedMeshQueue, 'all static-model components in a world package share one mesh-refinement queue' );
+assert.equal( sharedMeshQueue.limit, 1, 'world-package mesh refinement completes one globally highest-priority upgrade at a time' );
+const refinementOrder = [];
+const refinementSignal = new AbortController();
+const distantRefinement = sharedMeshQueue.run( refinementSignal.signal, () => refinementOrder.push( 'distant furniture' ), 0.03 );
+const nearbyRefinement = sharedMeshQueue.run( refinementSignal.signal, () => refinementOrder.push( 'near bench' ), 0.15 );
+await Promise.all( [ distantRefinement, nearbyRefinement ] );
+assert.deepEqual( refinementOrder, [ 'near bench', 'distant furniture' ], 'the deferred shared queue gathers cross-component demand and completes the larger projected object first' );
+disposeWorldPackage( sharedQueueRoot );
+console.log('Shared mesh-refinement queue prioritizes nearby projected geometry across components');

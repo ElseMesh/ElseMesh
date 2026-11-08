@@ -186,9 +186,9 @@ export class StaticModelInstanceSetRuntime {
 		// Refine the most screen-prominent visible geometry first. Model and asset
 		// descriptor order is unrelated to what the player notices in the view.
 		candidates.sort( ( a, b ) => b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
-		for ( const { modelIndex, level, key, loaded } of candidates ) {
+		for ( const { modelIndex, level, key, loaded, projectedRadius } of candidates ) {
 			this.retryAfter.delete( key );
-			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {
+			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal, projectedRadius ) ).then( () => {
 				if ( ! this.disposed ) {
 					loaded.add( level );
 					this._plannerDirty = true;

@@ -184,6 +184,12 @@ export function updateWorldPackageLOD( root, camera, loadBias = 0, now = perform
 	updateWorldPackageTextureLOD( root, camera, loadBias, now );
 }
 
+export function worldPackageMeshLODQueue( root ) {
+	const state = root?.userData?.worldPackage;
+	if ( ! state || state.disposed ) throw new Error( 'Static model refinement requires an active world package' );
+	return state.meshLODQueue ||= new LODLoadQueue( 1, { deferStart: true } );
+}
+
 export function setWorldPackageProgressiveAsset( root, assetId, progressiveAsset ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! state || state.disposed ) return;
