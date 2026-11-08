@@ -18,19 +18,25 @@ try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
 	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
 	const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = await hash( glbBytes );
+	const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'albedo', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'roughness', op: 'constant', value: 0.35 } ], outputs: { baseColor: 'albedo', roughness: 'roughness' } };
+	const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } } ), graphAssetID = await hash( graphGLB );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-		models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+		models: [
+			{ id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 },
+			{ id: 'render-graph-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: graphAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 },
+		],
 		instances: [
 			{ model: 'render-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] },
 			{ model: 'render-triangle', position: [ 80, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 2, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] },
+			{ model: 'render-graph-triangle', position: [ 1.5, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] },
 		],
 	};
 	const setBytes = new TextEncoder().encode( JSON.stringify( packageDocument ) ), setAssetID = await hash( setBytes );
-	const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' } ] };
-	const assetBytes = new Map( [ [ setAssetID, setBytes ], [ modelAssetID, glbBytes ] ] );
+	const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: graphAssetID, kind: 'glb' } ] };
+	const assetBytes = new Map( [ [ setAssetID, setBytes ], [ modelAssetID, glbBytes ], [ graphAssetID, graphGLB ] ] );
 	const connector = {
-		manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' } ] },
+		manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: graphAssetID, kind: 'glb' } ] },
 		assets: new Map( [ [ setAssetID, setBytes ] ] ),
 		getAsset: async id => assetBytes.get( id ),
 	};
@@ -73,8 +79,10 @@ try {
 	if ( ! installed?.installed ) throw new Error( 'WebGL static-model adapter did not install the component' );
 	runtime = installed.runtime;
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
+	const graphMesh = runtime.batches[ 1 ][ 0 ].mesh;
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
 	if ( ! profileGeometryPrepared || ! mesh.geometry.getAttribute( 'fixtureProfileData' ) ) throw new Error( 'WebGL static model profile did not prepare its custom geometry attributes' );
+	if ( ! graphMesh.material.customProgramCacheKey().includes( 'elsemesh-material-graph-1' ) ) throw new Error( 'WebGL static models must compile the signed renderer-neutral material graph' );
 	if ( ! runtime.sharedMaterials.includes( profileMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile material' );
 	if ( ! runtime.sharedMaterials.includes( profileDepthMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile depth material' );
 	const colorShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\nvoid main() {}' };

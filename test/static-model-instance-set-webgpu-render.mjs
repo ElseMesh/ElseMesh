@@ -24,17 +24,25 @@ registerWorldPackageMaterialAdapter( materialAdapterType, {
 	resolve: ( { profileRole, context } ) => profileRole === 'tint' ? { material: context.material } : null,
 } );
 const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = hash( glbBytes );
+const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'albedo', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'roughness', op: 'constant', value: 0.35 } ], outputs: { baseColor: 'albedo', roughness: 'roughness' } };
+const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } } ), graphAssetID = hash( graphGLB );
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-	models: [ { id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
-	instances: [ { model: 'render-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] } ],
+	models: [
+		{ id: 'render-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: true, lods: [ { assetId: modelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 },
+		{ id: 'render-graph-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: graphAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 },
+	],
+	instances: [
+		{ model: 'render-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] },
+		{ model: 'render-graph-triangle', position: [ 1.5, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] },
+	],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
-const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' } ] };
+const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: graphAssetID, kind: 'glb' } ] };
 const connector = {
-	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' } ], components: [ { type: materialAdapterType } ] },
+	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: graphAssetID, kind: 'glb' } ], components: [ { type: materialAdapterType } ] },
 	assets: new Map( [ [ setAssetID, setBytes ] ] ),
-	getAsset: async () => glbBytes,
+	getAsset: async id => id === graphAssetID ? graphGLB : glbBytes,
 };
 const errors = [];
 const L = await setupLife( { W: 192, H: 144, shadowSplits: [ 12 ] } );
@@ -46,9 +54,10 @@ try {
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const result = await install( { root, connector }, component );
 	runtime = result.runtime;
-	let renderedProfileMaterial = null;
-	root.traverse( node => { if ( node.isMesh ) renderedProfileMaterial = node.material; } );
-	assert.equal( renderedProfileMaterial?.name, profileMaterial.name, 'WebGPU static models resolve the registered world material profile' );
+	const renderedMaterials = [];
+	root.traverse( node => { if ( node.isMesh ) renderedMaterials.push( node.material ); } );
+	assert.ok( renderedMaterials.some( material => material.name === profileMaterial.name ), 'WebGPU static models resolve the registered world material profile' );
+	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= vec3f( 0.15, 0.8, 0.35 )' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
 	L.scene.add( root );
 	L.camera.position.set( 2, 1, 4 );
 	L.camera.lookAt( 2, 0.5, - 5 );

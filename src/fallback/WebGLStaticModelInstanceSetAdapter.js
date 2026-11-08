@@ -5,6 +5,8 @@ import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime
 import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 import { WebGLProgressiveStaticTextures } from './WebGLProgressiveStaticTextures.js';
 import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
+import { worldMaterialGraph } from '../network/WorldMaterialGraph.js';
+import { createWebGLMaterialGraph } from '../materials/WorldMaterialGraph.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installStaticModelInstanceSet );
@@ -232,8 +234,10 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 
 function resolveStaticModelMaterial( fallback, sourceMaterial ) {
 	const profile = sourceMaterial.userData?.elsemeshMaterial;
-	const role = worldMaterialRole( { extras: { elsemeshMaterial: profile } } );
+	const material = { extras: { elsemeshMaterial: profile } };
+	const role = worldMaterialRole( material );
 	if ( ! role ) return sourceMaterial;
+	if ( role === 'graph' ) return createWebGLMaterialGraph( fallback.THREE, sourceMaterial, worldMaterialGraph( material ) );
 	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
 		const resolution = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );
 		if ( resolution ) return resolution;

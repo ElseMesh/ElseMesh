@@ -13,6 +13,7 @@ const INPUT_TYPES = Object.freeze( {
 	instanceMaterial0: 'vec4',
 	instanceMaterial1: 'vec4',
 } );
+export const WORLD_MATERIAL_GRAPH_INPUT_TYPES = INPUT_TYPES;
 
 const OUTPUT_TYPES = Object.freeze( {
 	baseColor: 'vec3',
@@ -27,7 +28,6 @@ const OUTPUT_TYPES = Object.freeze( {
 const isRecord = value => !! value && typeof value === 'object' && ! Array.isArray( value );
 const exactKeys = ( value, keys ) => isRecord( value ) && Object.keys( value ).length === keys.length && Object.keys( value ).every( key => keys.includes( key ) );
 const validID = value => typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test( value );
-
 function constantType( value ) {
 	if ( typeof value === 'number' && Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) return 'scalar';
 	if ( Array.isArray( value ) && value.length >= 2 && value.length <= 4 && value.every( item => typeof item === 'number' && Number.isFinite( item ) && Math.abs( item ) <= 1e6 ) ) return `vec${value.length}`;
@@ -86,6 +86,13 @@ export function validateWorldMaterialGraph( graph ) {
 		if ( ! validID( id ) || ! types.has( id ) || types.get( id ) !== OUTPUT_TYPES[ output ] ) throw new Error( `Invalid world material graph output: ${output}` );
 	}
 	return graph;
+}
+
+export function worldMaterialGraphNodeTypes( graph ) {
+	validateWorldMaterialGraph( graph );
+	const types = new Map();
+	for ( const node of graph.nodes ) types.set( node.id, nodeType( node, types ) );
+	return types;
 }
 
 export function worldMaterialGraph( material ) {

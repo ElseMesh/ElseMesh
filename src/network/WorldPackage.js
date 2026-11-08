@@ -22,6 +22,8 @@ import { UniformBlock } from '../engine/gpu/Uniforms.js';
 import { Vector2 } from '../engine/math/Vector2.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { worldMaterialRole } from './WorldMaterialProfileRegistry.js';
+import { worldMaterialGraph } from './WorldMaterialGraph.js';
+import { createWebGPUMaterialGraph } from '../materials/WorldMaterialGraph.js';
 import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
 import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
 import { transformBoundsCenter } from './WorldStreaming.js';
@@ -1113,6 +1115,11 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		const pbr = source.pbrMetallicRoughness || {};
 		const profileRole = worldMaterialRole( source );
 		if ( profileRole ) {
+			if ( profileRole === 'graph' ) {
+				resolvedMaterials.push( createWebGPUMaterialGraph( source, worldMaterialGraph( source ) ) );
+				materialHooks.push( null );
+				continue;
+			}
 			let resolution = null;
 			for ( const adapter of registeredWorldPackageMaterialAdapters() ) {
 				const context = packageState?.materialAdapterContexts?.get( adapter.componentType )?.context || packageState?.materialContext || null;
