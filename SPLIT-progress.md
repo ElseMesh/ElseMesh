@@ -78,6 +78,13 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: added explicit-LOD texture sampling to the bounded graph format.
+  Type validation checks its texture slot, UV, and scalar LOD; the WebGPU
+  package shader compiles and the WebGL static-model pixel test renders with
+  `textureLod` (251 non-background pixels, four programs, no GL errors). The
+  external production build passes. This supplies the wood shader's explicit
+  end-grain sampling primitive, but Tidewater still uses its own shader, so
+  renderer-neutral content remains 63% and gameplay/content parity 87%.
 - 2026-11-08: added fragment-only `dpdx`, `dpdy`, and `fwidth` material-graph
   operations with scalar/vector type validation and WGSL/GLSL translations.
   Package-loaded WebGPU shader compilation, the WebGL pixel render (251
