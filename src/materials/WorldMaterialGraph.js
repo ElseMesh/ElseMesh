@@ -91,6 +91,7 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
+			if ( compiled.glsl.occlusion ) shader.fragmentShader = insert( shader.fragmentShader, '#include <aomap_fragment>', compiled.glsl.occlusion );
 		}
 		for ( const name of compiled.glsl.uniformInputs ) {
 			const read = FRAME_UNIFORM_VALUES[ name ];

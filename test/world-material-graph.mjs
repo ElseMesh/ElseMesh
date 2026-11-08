@@ -64,6 +64,22 @@ const textureGraph = {
 	],
 	outputs: { baseColor: 'sampledColor' },
 };
+
+const occlusionGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [ { id: 'ambient', op: 'constant', value: 0.6 } ],
+	outputs: { occlusion: 'ambient' },
+};
+assert.match( compileWorldMaterialGraph( occlusionGraph, 'webgpu' ).surface, /s\.ao \*= emg_ambient/ );
+assert.match( compileWorldMaterialGraph( occlusionGraph, 'webgl' ).glsl.occlusion, /reflectedLight\.indirectDiffuse \*= emg_ambient/ );
+assert.match( compileWorldMaterialGraph( occlusionGraph, 'webgl' ).glsl.occlusion, /reflectedLight\.indirectSpecular \*= emg_ambient/ );
+assert.doesNotMatch( compileWorldMaterialGraph( occlusionGraph, 'webgl' ).glsl.fragment, /s\.ao/ );
+const occlusionMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), occlusionGraph );
+const occlusionShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>\n#include <aomap_fragment>', uniforms: {} };
+occlusionMaterial.material.onBeforeCompile( occlusionShader );
+assert.match( occlusionShader.fragmentShader, /reflectedLight\.indirectDiffuse \*= emg_ambient;[\s\S]*#include <aomap_fragment>/ );
+occlusionMaterial.material.dispose();
+
 const textureWebGPU = compileWorldMaterialGraph( textureGraph, 'webgpu' );
 const textureWebGL = compileWorldMaterialGraph( textureGraph, 'webgl' );
 assert.deepEqual( textureWebGPU.textureSlots, [ 'baseColor' ] );

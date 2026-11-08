@@ -89,8 +89,10 @@ then applies that slope in the UV tangent frame and returns a world-space
 normal. ElseMesh compiles the same derivative frame to WGSL and GLSL.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
-`opacity` (scalar), `emissive` (vec3), `surfaceNormal` (vec3 world-space),
-`vertexPosition` (vec3), and `vertexNormal` (vec3). `surfaceNormal` replaces
+`opacity` (scalar), `emissive` (vec3), `occlusion` (scalar),
+`surfaceNormal` (vec3 world-space), `vertexPosition` (vec3), and
+`vertexNormal` (vec3). `occlusion` multiplies indirect diffuse and specular
+lighting in both backends. `surfaceNormal` replaces
 the current surface normal after the standard glTF normal map is applied; the
 backend compiler converts its world-space value into that renderer's
 coordinate space. glTF PBR factors and the engine's existing base-color,

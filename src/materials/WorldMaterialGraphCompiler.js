@@ -78,7 +78,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	if ( ! [ 'webgpu', 'webgl' ].includes( backend ) ) throw new Error( `Unsupported material graph backend: ${backend}` );
 	const inputTypes = WORLD_MATERIAL_GRAPH_INPUT_TYPES;
 	const vertexRoots = [ graph.outputs.vertexPosition, graph.outputs.vertexNormal ];
-	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive, graph.outputs.surfaceNormal ];
+	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal ];
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
@@ -125,7 +125,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 		vertexOutputs.push( backend === 'webgpu' ? `v.${target} = ${value};` : `${target === 'position' ? 'transformed' : 'objectNormal'} = ${value};` );
 	}
 	const surfaceLines = [];
-	for ( const [ output, target, operator ] of [ [ 'baseColor', 's.albedo', '*=' ], [ 'roughness', 's.roughness', '=' ], [ 'metalness', 's.metalness', '=' ], [ 'opacity', 's.alpha', '*=' ], [ 'emissive', 's.emissive', '+=' ], [ 'surfaceNormal', 's.normal', '=' ] ] ) {
+	for ( const [ output, target, operator ] of [ [ 'baseColor', 's.albedo', '*=' ], [ 'roughness', 's.roughness', '=' ], [ 'metalness', 's.metalness', '=' ], [ 'opacity', 's.alpha', '*=' ], [ 'emissive', 's.emissive', '+=' ], [ 'occlusion', 's.ao', '*=' ], [ 'surfaceNormal', 's.normal', '=' ] ] ) {
 		const id = graph.outputs[ output ];
 		if ( id ) surfaceLines.push( `${target} ${operator} ${output === 'surfaceNormal' ? `normalize( ${fragment.names.get( id )} )` : fragment.names.get( id )};` );
 	}
@@ -145,6 +145,7 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 }` : '';
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
+	const occlusionID = graph.outputs.occlusion;
 	return Object.freeze( {
 		backend,
 		inputs: Object.freeze( usedInputs ),
@@ -165,7 +166,8 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 			viewportSize: usedInputs.includes( 'pixelPosition' ),
 			fragmentHelpers: glslFragmentHelpers,
 			vertex: commonVertex,
-			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) ) ].filter( Boolean ).join( '\n' ),
+			fragment: [ fragment.code, ...surfaceLines.filter( line => ! line.startsWith( 's.ao *=' ) ).map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) ) ].filter( Boolean ).join( '\n' ),
+			occlusion: occlusionID ? `reflectedLight.indirectDiffuse *= ${fragment.names.get( occlusionID )};\nreflectedLight.indirectSpecular *= ${fragment.names.get( occlusionID )};` : '',
 		} ),
 	} );
 }
