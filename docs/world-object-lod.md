@@ -58,7 +58,8 @@ break ties. Collision remains an independent earlier request class.
 
 Do not start new mesh or mip upgrades while this current-view coarse set is
 incomplete. Re-evaluate it when the camera moves enough to expose new content;
-resume refinements once the newly visible coarse coverage is installed. This
+resume refinements immediately when the coverage gate opens, even if the camera
+has not moved. This
 barrier coordinates the already independent mesh and texture selectors without
 combining their cache entries or delaying entry for high-detail data. The world
 provides bounds, traversal semantics, and valid coarse/fine tiers; the shared

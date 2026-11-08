@@ -202,10 +202,9 @@ gatedCamera.lookAt( 0, 0, - 1 );
 gatedRuntime.update( 1 / 60, gatedCamera );
 assert.deepEqual( gatedLODRequests, [], 'static model meshes do not refine before the current view is covered coarsely' );
 allowRefinement = true;
-gatedCamera.position.x = 0.01;
 gatedRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( gatedLODRequests, [ [ 0, 1 ] ], 'mesh refinement resumes after the shared coverage gate opens' );
+assert.deepEqual( gatedLODRequests, [ [ 0, 1 ] ], 'mesh refinement resumes as soon as the shared coverage gate opens, without requiring camera movement' );
 gatedRuntime.dispose();
 
 const priorityDocument = {

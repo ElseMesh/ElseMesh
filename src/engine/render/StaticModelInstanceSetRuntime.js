@@ -75,6 +75,7 @@ export class StaticModelInstanceSetRuntime {
 		this.viewRevision = 0;
 		this.plannerRevisionListeners = null;
 		this._nextLODCheckAt = Infinity;
+		this._lastCanRefine = null;
 		this.loadLOD = loadLOD;
 		this.canRefine = canRefine;
 		this.loadController = new AbortController();
@@ -108,6 +109,9 @@ export class StaticModelInstanceSetRuntime {
 	update( _dt, camera, _player, renderLoadBias = 0, cameraWorldUpdated = false ) {
 		if ( this.disposed ) return;
 		const now = performance.now();
+		const canRefine = ! this.canRefine || this.canRefine();
+		const refinementGateOpened = this._lastCanRefine === false && canRefine;
+		this._lastCanRefine = canRefine;
 		const cameraChanged = this.#cameraChanged( camera, renderLoadBias, cameraWorldUpdated );
 		const plannerWasDirty = this._plannerDirty;
 		const plannerChanged = cameraChanged || this._plannerDirty;
@@ -120,10 +124,7 @@ export class StaticModelInstanceSetRuntime {
 			this.viewRevision ++;
 			if ( plannerWasDirty && ! cameraChanged && this.plannerRevisionListeners ) for ( const listener of this.plannerRevisionListeners ) listener( this.viewRevision );
 		}
-		if ( plannerChanged || now >= this._nextLODCheckAt ) {
-			this.#requestVisibleLODs( plannerChanged );
-			this._nextLODCheckAt = Math.min( Infinity, ...this.retryAfter.values() );
-		}
+		if ( plannerChanged || refinementGateOpened || now >= this._nextLODCheckAt ) this.#requestVisibleLODs( plannerChanged, canRefine );
 		if ( plannerChanged || this._batchRefreshPending ) {
 			this._updateBatches( this.planner.groups, this.batches, this._batchAttributeGroups );
 			if ( this.usesShadowBatches ) this._updateBatches( this.planner.shadowGroups, this.shadowBatches, this._shadowBatchAttributeGroups );
@@ -150,8 +151,7 @@ export class StaticModelInstanceSetRuntime {
 		return changed;
 	}
 
-	#requestVisibleLODs( refreshDesired ) {
-		const canRefine = ! this.canRefine || this.canRefine();
+	#requestVisibleLODs( refreshDesired, canRefine ) {
 		const candidates = [];
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
 			const groups = this.planner._groupsByModel[ modelIndex ];
@@ -205,6 +205,7 @@ export class StaticModelInstanceSetRuntime {
 			} ).finally( () => this.pendingLods.delete( key ) );
 			this.pendingLods.set( key, pending );
 		}
+		this._nextLODCheckAt = Math.min( Infinity, ...this.retryAfter.values() );
 	}
 
 	#moveToLoadedCoarseLevel( source, destination ) {
