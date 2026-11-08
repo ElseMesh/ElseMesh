@@ -87,6 +87,13 @@ WebGPU visual parity remain incomplete.
   errors) pass. These role-specific captures prove execution, not matched
   appearance; full-scene parity remains open. Renderer-neutral content moves
   from 66% to 67%.
+- 2026-11-08: attempted a matched Tidewater beach review in the checked-in
+  Weston display. Weston selected AMD OpenGL, but Chromium's Vulkan device was
+  llvmpipe and `vulkaninfo` reported permission denied opening
+  `/dev/dri/renderD128`; the page reported no WebGPU adapter. This is an
+  environment access failure, not visual-parity evidence, so gameplay/content
+  progress remains 87% and no full-scene comparison is claimed. The review
+  browser, preview server, and Weston compositor were stopped afterward.
 
 - 2026-11-08: Tidewater's signed village net now renders through the package graph path on both backends: 45 visible WebGPU pixels and 74 WebGL pixels; WebGL compiles two programs with no GL errors. These renderer-specific captures prove execution, not matched image parity. The WebGL render exposed that graph worldPosition failed when Three.js omitted its conditional local; the engine now computes it from transformed vertices with batching and instancing transforms. Deterministic export, the external production build, and both direct package renders pass.
 
