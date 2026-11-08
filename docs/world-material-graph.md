@@ -59,3 +59,18 @@ The graph compiler and pixel fixture live in ElseMesh. The fixture checks
 the same signed GLB through both static-model adapters. Tidewater has not yet
 migrated its live fish-prop component or species material to this format; this
 contract alone does not establish fish appearance parity.
+
+## Current limits and migration gate
+
+Format `/1` does not expose texture samples as graph inputs or define signed
+material-specific texture bundles. Its graph inputs are vertex/instance data;
+the standard glTF base-color, normal, and emissive textures are applied by the
+engine around the graph. This is not enough to represent Tidewater's current
+village shader, which uses several packed maps and material parameters.
+
+Do not move that shader or its role-specific compiler into ElseMesh as a
+shortcut. Either extend the renderer-neutral material format with bounded,
+signed texture references and explicit sampling semantics implemented by both
+engine compilers, or bake the appearance into ordinary glTF/PBR maps during
+world export. Verify the same authored material through WebGPU and WebGL before
+removing the current world-side renderer implementations.
