@@ -32,6 +32,7 @@ const browser = spawn(chromium, [
   '--ignore-gpu-blocklist',
   '--no-first-run',
   '--no-default-browser-check',
+  '--disable-session-crashed-bubble',
   '--disable-background-networking',
   '--disable-sync',
   '--disable-translate',
