@@ -277,6 +277,7 @@ const frameGraph = {
 	nodes: [
 		{ id: 'position', op: 'input', name: 'position' },
 		{ id: 'time', op: 'input', name: 'time' },
+		{ id: 'night', op: 'input', name: 'night' },
 		{ id: 'windDirection', op: 'input', name: 'windDirection' },
 		{ id: 'windSpeed', op: 'input', name: 'windSpeed' },
 		{ id: 'oscillation', op: 'sin', args: [ 'time' ] },
@@ -289,39 +290,46 @@ const frameGraph = {
 		{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'offsetZ' ] },
 		{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
 	],
-	outputs: { vertexPosition: 'moved' },
+	outputs: { vertexPosition: 'moved', roughness: 'night' },
 };
 const frameWebGPU = compileWorldMaterialGraph( frameGraph, 'webgpu' );
 const frameWebGL = compileWorldMaterialGraph( frameGraph, 'webgl' );
 assert.match( frameWebGPU.vertex, /frame\.time/ );
+assert.match( frameWebGPU.surface, /frame\.night/ );
 assert.match( frameWebGPU.vertex, /frame\.windDir/ );
 assert.match( frameWebGPU.vertex, /frame\.windSpeed/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform float emgFrameTime/ );
+assert.match( frameWebGL.glsl.uniforms, /uniform float emgNight/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform vec2 emgWindDirection/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform float emgWindSpeed/ );
 assert.doesNotMatch( frameWebGL.glsl.declarations, /vEmg_(time|windDirection|windSpeed)/ );
 
-const previousFrame = { time: G.time.value, windX: G.windDir.value.x, windY: G.windDir.value.y, speed: G.windSpeed.value };
+const previousFrame = { time: G.time.value, night: G.night.value, windX: G.windDir.value.x, windY: G.windDir.value.y, speed: G.windSpeed.value };
 try {
 	G.time.value = 4.25;
+	G.night.value = 0.75;
 	G.windDir.value.set( 0.6, 0.8 );
 	G.windSpeed.value = 12;
 	const frameMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), frameGraph );
 	const frameShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
 	frameMaterial.material.onBeforeCompile( frameShader );
 	assert.equal( frameShader.uniforms.emgFrameTime.value, 4.25 );
+	assert.equal( frameShader.uniforms.emgNight.value, 0.75 );
 	assert.deepEqual( [ frameShader.uniforms.emgWindDirection.value.x, frameShader.uniforms.emgWindDirection.value.y ], [ 0.6, 0.8 ] );
 	assert.equal( frameShader.uniforms.emgWindSpeed.value, 12 );
 	G.time.value = 7.5;
+	G.night.value = 0.1;
 	G.windDir.value.set( - 1, 0 );
 	G.windSpeed.value = 3;
 	assert.equal( frameShader.uniforms.emgFrameTime.value, 7.5, 'WebGL graph reads the current shared frame time' );
+	assert.equal( frameShader.uniforms.emgNight.value, 0.1, 'WebGL graph reads the current shared night level' );
 	assert.deepEqual( [ frameShader.uniforms.emgWindDirection.value.x, frameShader.uniforms.emgWindDirection.value.y ], [ - 1, 0 ] );
 	assert.equal( frameShader.uniforms.emgWindSpeed.value, 3, 'WebGL graph reads the current shared wind speed' );
 	frameMaterial.material.dispose();
 	frameMaterial.depthMaterial?.dispose();
 } finally {
 	G.time.value = previousFrame.time;
+	G.night.value = previousFrame.night;
 	G.windDir.value.set( previousFrame.windX, previousFrame.windY );
 	G.windSpeed.value = previousFrame.speed;
 }

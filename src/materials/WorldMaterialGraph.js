@@ -5,6 +5,7 @@ import { compileWorldMaterialGraph } from './WorldMaterialGraphCompiler.js';
 
 const FRAME_UNIFORM_VALUES = Object.freeze( {
 	emgFrameTime: () => G.time.value,
+	emgNight: () => G.night.value,
 	emgWindDirection: () => G.windDir.value,
 	emgWindSpeed: () => G.windSpeed.value,
 } );
