@@ -107,6 +107,12 @@ assert.equal( worldPositionWebGL.glsl.worldPosition, true, 'WebGL populates worl
 assert.doesNotMatch( worldPositionWebGL.vertex, /vEmg_worldPosition/ );
 assert.match( worldPositionWebGL.glsl.fragment, /float emg_height = vEmg_worldPosition\.y/ );
 assert.match( worldPositionWebGL.glsl.declarations, /varying vec3 vEmg_worldPosition/ );
+const worldPositionMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), worldPositionGraph );
+const worldPositionShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+worldPositionMaterial.material.onBeforeCompile( worldPositionShader );
+assert.match( worldPositionShader.vertexShader, /vec4 emgWorldPosition = vec4\( transformed, 1\.0 \)/ );
+assert.match( worldPositionShader.vertexShader, /#ifdef USE_BATCHING[\s\S]*batchingMatrix[\s\S]*#endif[\s\S]*#ifdef USE_INSTANCING[\s\S]*instanceMatrix[\s\S]*#endif[\s\S]*modelMatrix/ );
+worldPositionMaterial.material.dispose();
 assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs: { vertexPosition: 'worldPosition' } }, 'webgpu' ), /fragment outputs/ );
 
 const surfaceNormalGraph = {

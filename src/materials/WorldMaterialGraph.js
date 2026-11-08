@@ -69,7 +69,16 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 		if ( fragment && compiled.glsl.worldPosition ) {
 			const marker = '#include <worldpos_vertex>';
 			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
-			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldPosition = worldPosition.xyz;` );
+			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}
+vec4 emgWorldPosition = vec4( transformed, 1.0 );
+#ifdef USE_BATCHING
+emgWorldPosition = batchingMatrix * emgWorldPosition;
+#endif
+#ifdef USE_INSTANCING
+emgWorldPosition = instanceMatrix * emgWorldPosition;
+#endif
+emgWorldPosition = modelMatrix * emgWorldPosition;
+vEmg_worldPosition = emgWorldPosition.xyz;` );
 		}
 		if ( fragment && compiled.glsl.worldNormal ) {
 			const marker = '#include <defaultnormal_vertex>';
