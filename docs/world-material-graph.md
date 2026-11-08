@@ -38,6 +38,7 @@ Input nodes use these engine-defined semantics and types:
 | `colorRGB` | vec3 | RGB channels of glTF `COLOR_0` |
 | `vdata` | vec4 | glTF `_ELSEMESH_VDATA` |
 | `time` | scalar | Shared simulation time in seconds |
+| `night` | scalar | Shared environment night level (0 = day, 1 = full night) |
 | `windDirection` | vec2 | Shared world-space XZ wind direction |
 | `windSpeed` | scalar | Shared wind speed in metres per second |
 | `instanceMaterial0` | vec4 | First per-instance material vector |
