@@ -103,9 +103,9 @@ material so deformed geometry can keep its shadow shape.
 
 The graph compiler and pixel fixture live in ElseMesh. The fixture checks
 the same signed GLB through both static-model adapters. Tidewater's signed
-village net, thatch, and fabric materials now use this format; their package
-renders prove compilation and visible output, not matched image parity.
-Tidewater has not yet migrated its live fish-prop component or species
+village net, thatch, fabric, and stone materials now use this format; their
+package renders prove compilation and visible output, not matched image
+parity. Tidewater has not yet migrated its live fish-prop component or species
 material to this format.
 
 ## Current limits and migration gate
