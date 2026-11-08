@@ -382,11 +382,10 @@ export class App {
 		await progress( 0.06, 'Shaping the island…', undefined, 'terrain' );
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
-		// Hosted launches have already returned through their package-only path. Keep
-			// built-in world presentation out of the shared App import graph.
-		const { Village, Reef, BoatModel, Rocks, Whale } = await import( './world/BuiltinWorldPresentation.js' );
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
-		this.village = new Village( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
+		const createVillage = this.worldPackage?.presentation?.createVillage;
+		if ( typeof createVillage !== 'function' ) throw new Error( 'The default world package must provide its village presentation' );
+		this.village = await createVillage( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
 		this.vegetationEnabled = ! qs.has( 'noVeg' );
 		if ( this.vegetationEnabled ) {
@@ -406,7 +405,9 @@ export class App {
 		this.terrainGPU = new TerrainGPU( this.terrainData, this.shoreField );
 		// terrain and rocks apply the heightfield sun shadow (long hill shadows) in their own lighting
 		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, surfaceProfile: terrainSurfaceProfile, renderer } );
-		this.rocks = new Rocks( { scene, terrain: this.terrain, worldLayout: this.worldLayout, village: this.village, colliders: this.colliders } );
+		const createRocks = this.worldPackage?.presentation?.createRocks;
+		if ( typeof createRocks !== 'function' ) throw new Error( 'The default world package must provide its rock presentation' );
+		this.rocks = await createRocks( { scene, terrain: this.terrain, worldLayout: this.worldLayout, village: this.village, colliders: this.colliders } );
 		// driftwood (CC0 photoscans), wrack, pebbles and village clutter
 		const createDebris = this.worldPackage?.presentation?.createDebris;
 		if ( typeof createDebris !== 'function' ) throw new Error( 'The default world package must provide its debris placement provider' );
@@ -416,9 +417,13 @@ export class App {
 		this.rocks.material.appliesHillShadow = true;
 
 		await progress( 0.23, 'Growing the reef…', undefined, 'reef' );
-		this.reef = new Reef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation, fishPopulation: this.fishPopulation } );
+		const createReef = this.worldPackage?.presentation?.createReef;
+		if ( typeof createReef !== 'function' ) throw new Error( 'The default world package must provide its reef presentation' );
+		this.reef = await createReef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation, fishPopulation: this.fishPopulation } );
 
-		this.boat = new BoatModel();
+		const createBoatModel = this.worldPackage?.presentation?.createBoatModel;
+		if ( typeof createBoatModel !== 'function' ) throw new Error( 'The default world package must provide its boat model' );
+		this.boat = await createBoatModel();
 		scene.add( this.boat.group );
 		this.boat.group.position.copy( this.worldLayout.boatDock.position );
 		this.boat.group.rotation.y = this.worldLayout.boatDock.heading;
@@ -545,7 +550,9 @@ export class App {
 		this.boatCtl.model = this.boat;
 		this.boatSpray = new BoatSpray( { boat: this.boatCtl, spray: this.spray } );
 		// humpback cruising the deep water around the island (model fetched from public/models/whale)
-		this.whale = new Whale( {
+		const createWhale = this.worldPackage.presentation?.createWhale;
+		if ( typeof createWhale !== 'function' ) throw new Error( 'The default world package must provide its whale presentation' );
+		this.whale = await createWhale( {
 			scene, terrain: this.terrainData, query: this.query, spray: this.spray,
 			profile: this.worldPackage.presentation.whaleProfile,
 			createBrain: worldComponentDescriptor( 'elsemesh.humpback-whale/1' )?.createSimulation,

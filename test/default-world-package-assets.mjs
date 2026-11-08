@@ -11,6 +11,9 @@ try {
 	const { defaultWorldPackage } = await server.ssrLoadModule( '/worlds/default.js' );
 	const { source, assets, presentation } = defaultWorldPackage;
 	assert.equal( typeof presentation.createVegetation, 'function', 'the default world supplies its vegetation renderer through the package presentation interface' );
+	for ( const factory of [ 'createVillage', 'createRocks', 'createReef', 'createBoatModel', 'createWhale' ] ) {
+		assert.equal( typeof presentation[ factory ], 'function', `the default world supplies ${ factory } through its package presentation interface` );
+	}
 	for ( const component of source.components.filter( candidate => [ 'elsemesh.static-reef/1', 'elsemesh.static-vegetation/1', 'elsemesh.static-fish-props/1' ].includes( candidate.type ) ) ) {
 		for ( const reference of component.assets || [] ) {
 			if ( [ 'reef-placement/1', 'vegetation-placement/1', 'fish-props-placement/1' ].includes( reference.kind ) ) {

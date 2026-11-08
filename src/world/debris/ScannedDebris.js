@@ -21,13 +21,8 @@ import { parseGLB } from './GLB.js';
 // Instances are re-bucketed into the LODs (and distance culled) on the CPU when the camera moves.
 // The .glb files are read by the minimal parser in GLB.js (three's GLTFLoader is gone).
 
-export const SCAN_ASSETS = [ 'dead_quiver_trunk', 'dead_quiver_branch_02', 'dead_quiver_branch_01', 'lambis_shell' ];
-export const SCAN = { TRUNK: 0, BRANCH_A: 1, BRANCH_B: 2, SHELL: 3 };
-// size (m) of each asset after orientation (long axis x, up y), from the Blender export
-export const SCAN_SIZE = [ [ 1.994, 0.306, 0.268 ], [ 0.526, 0.287, 0.201 ], [ 0.439, 0.255, 0.227 ], [ 0.139, 0.047, 0.075 ] ];
 const LOD_DIST = [ 22, 70, 260 ]; // m (+ 6 x instance size): LOD0 | LOD1 | LOD2 | faded out
 const BAND = 0.12; // cross-fade band (Bayer screen-door, see LODFade), share of the switch distance
-const BASE = ( ( import.meta.env && import.meta.env.BASE_URL ) || '/' ) + 'models/debris/';
 
 // bytes of a file (fetch relative to the page). The headless test runner may provide a reader.
 async function loadBytes( url ) {
@@ -56,12 +51,17 @@ async function loadPixels( url ) {
 export class ScannedDebris {
 
 	// instances: [ { asset, x, y, z, yaw, pitch, roll, sx, sy, sz, rnd } ]
-	constructor( { gpu, instances, parent } ) {
+	constructor( { gpu, instances = [], parent, assets = [] } ) {
+
+		if ( ! Array.isArray( assets ) || assets.length > 4 || assets.some( asset => typeof asset?.id !== 'string' || ! Array.isArray( asset.size ) || asset.size.length !== 3 || asset.size.some( value => ! Number.isFinite( value ) || value <= 0 ) || typeof asset.geometryURL !== 'string' || ! asset.textureURLs || [ 'albedo', 'normal', 'arm' ].some( map => typeof asset.textureURLs[ map ] !== 'string' ) ) ) throw new Error( 'ScannedDebris requires valid world asset descriptors' );
+		if ( instances.length > 0 && assets.length === 0 ) throw new Error( 'ScannedDebris instances require world asset descriptors' );
 
 		this.gpu = gpu;
 		this.instances = instances;
+		this.assets = assets;
 		this.parent = parent;
 		this.meshes = [];
+		this.levels = [];
 		this.ready = false;
 		this._lastCam = new Vector3( 1e9, 0, 0 );
 		this._lastQuat = new Quaternion();
@@ -73,25 +73,26 @@ export class ScannedDebris {
 
 			const q = new Quaternion().setFromEuler( new Euler( r.roll || 0, r.yaw, r.pitch || 0, 'YXZ' ) );
 			r.matrix = new Matrix4().compose( new Vector3( r.x, r.y, r.z ), q, new Vector3( r.sx, r.sy, r.sz ) );
-			const s = SCAN_SIZE[ r.asset ];
+			const s = assets[ r.asset ]?.size;
+			if ( ! s ) throw new Error( `ScannedDebris instance references an unknown world asset: ${r.asset}` );
 			r.radius = Math.hypot( s[ 0 ] * r.sx, s[ 1 ] * r.sy, s[ 2 ] * r.sz ) / 2;
 
 		}
 
-		this.promise = this._load().catch( ( e ) => console.error( 'ScannedDebris: load failed', e ) );
+		this.promise = instances.length ? this._load().catch( ( e ) => console.error( 'ScannedDebris: load failed', e ) ) : Promise.resolve().then( () => { this.ready = true; } );
 
 	}
 
 	async _load() {
 
 		const t0 = performance.now();
-		const glbs = await Promise.all( SCAN_ASSETS.map( async ( id ) => parseGLB( await loadBytes( BASE + id + '.glb' ) ) ) );
+		const glbs = await Promise.all( this.assets.map( async ( asset ) => parseGLB( await loadBytes( asset.geometryURL ) ) ) );
 		// 2 x 2 atlas per map
 		const maps = [ 'albedo', 'normal', 'arm' ];
 		const atlases = {};
 		await Promise.all( maps.map( async ( m ) => {
 
-			const tiles = await Promise.all( SCAN_ASSETS.map( ( id ) => loadPixels( BASE + id + '_' + m + '.jpg' ) ) );
+			const tiles = await Promise.all( this.assets.map( asset => loadPixels( asset.textureURLs[ m ] ) ) );
 			const T = tiles[ 0 ].width;
 			const data = new Uint8Array( T * 2 * T * 2 * 4 );
 			tiles.forEach( ( t, k ) => {

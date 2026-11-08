@@ -30,7 +30,7 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 
 export class Debris {
 
-	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createPlacer, isShadowCaster, seed = 5150 } ) {
+	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createPlacer, isShadowCaster, scannedAssets, seed = 5150 } ) {
 
 		if ( typeof createPlacer !== 'function' ) throw new Error( 'Debris rendering requires the active world placement provider' );
 		if ( typeof isShadowCaster !== 'function' ) throw new Error( 'Debris rendering requires the active world shadow policy' );
@@ -57,7 +57,7 @@ export class Debris {
 		this.group.add( this.pebbles.mesh );
 		this.meshes.push( this.pebbles.mesh );
 		// photoscanned logs, branches and shells (loaded asynchronously, added when ready)
-		this.scanned = new ScannedDebris( { gpu: this.gpu, instances: placer.scanned, parent: this.group } );
+		this.scanned = new ScannedDebris( { gpu: this.gpu, instances: placer.scanned, parent: this.group, assets: scannedAssets } );
 		this.timings = { place: t1 - t0, ...placer.timings, assemble: t2 - t1, pebbles: performance.now() - t2, total: performance.now() - t0 };
 		scene.add( this.group );
 

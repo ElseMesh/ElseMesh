@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-07. Percentages are rough completion estimates for the
+Last assessed: 2026-11-08. Percentages are rough completion estimates for the
 active engine/world-separation and Tidewater parity goal. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -68,6 +68,16 @@ software-backed, so matched pixels and device performance remain unverified. Nei
 parity is complete.
 
 ## Current work and next gates
+
+- 2026-11-08: Removed a reverse dependency in Tidewater debris placement: the
+  world now owns scanned-log/shell IDs and measured dimensions, and provides
+  explicit model/texture URLs to ElseMesh's generic scanned-asset renderer.
+  Placement logic and its seeded random sequence are unchanged. App also now
+  obtains the built-in Village, Rocks, Reef, boat, and whale constructors from
+  the default world's presentation factories. The coconut placement hash,
+  world export, and rendered debris checks pass. This advances the registry
+  boundary, while the engine still owns the generic scanned renderer and full
+  WebGPU/WebGL parity remains open.
 
 - 2026-11-07: Tidewater now owns both its debris placement algorithm and shape
   catalogue, including the authored kind IDs. The default-world package passes
