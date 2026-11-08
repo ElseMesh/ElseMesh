@@ -3181,45 +3181,48 @@ export class UI {
 		g.stroke();
 		g.setLineDash( [] );
 		if ( data.length < 2 ) return;
-		// Keep the chart focused on the same frame-gap trace used by the original
-		// WebGL HUD. CPU and GPU measurements remain available in the readouts.
-		const traceData = data.map( sample => Number.isFinite( sample.gap ) ? sample.gap : null );
-		const rgb = this._lvl === 'bad' ? '255, 122, 133' : this._lvl === 'warn' ? '255, 184, 107' : '95, 227, 212';
-		const trace = () => {
+		// Keep the WebGL HUD's three comparable timing traces in the shared HUD:
+		// elapsed frame gap, browser CPU work, and measured GPU execution.
+		const series = [
+			{ key: 'gap', rgb: '95, 227, 212' },
+			{ key: 'cpu', rgb: '255, 184, 107' },
+			{ key: 'gpu', rgb: '176, 156, 255' },
+		];
 
-			g.beginPath();
-			traceData.forEach( ( value, i ) => {
+		for ( const { key, rgb } of series ) {
 
-				if ( value === null ) return;
-				if ( i === 0 || traceData[ i - 1 ] === null ) g.moveTo( X( i ), Y( value ) );
-				else g.lineTo( X( i ), Y( value ) );
+			const traceData = data.map( ( _, i ) => {
+
+				const values = data.slice( Math.max( 0, i - 2 ), i + 1 )
+					.map( sample => sample[ key ] )
+					.filter( Number.isFinite );
+				return values.length ? values.reduce( ( sum, value ) => sum + value, 0 ) / values.length : null;
 
 			} );
-
-		};
-		const grad = g.createLinearGradient( 0, 0, 0, hh );
-		grad.addColorStop( 0, `rgba(${ rgb }, 0.04)` );
-		grad.addColorStop( 1, `rgba(${ rgb }, 0)` );
-		trace();
-		g.lineTo( X( data.length - 1 ), hh );
-		g.lineTo( X( 0 ), hh );
-		g.closePath();
-		g.fillStyle = grad;
-		g.fill();
-
-		trace();
-		g.strokeStyle = `rgba(${ rgb }, 0.95)`;
-		g.lineWidth = 1.25;
-		g.lineJoin = 'round';
-		g.stroke();
-
-		const latest = traceData.findLastIndex( value => value !== null );
-		if ( latest >= 0 ) {
-
-			g.fillStyle = `rgb(${ rgb })`;
 			g.beginPath();
-			g.arc( X( latest ), Y( traceData[ latest ] ), 1.8, 0, TAU );
-			g.fill();
+			let last = - 1;
+			traceData.forEach( ( value, i ) => {
+
+				if ( value === null ) { last = - 1; return; }
+				if ( last < 0 ) g.moveTo( X( i ), Y( value ) );
+				else g.lineTo( X( i ), Y( value ) );
+				last = i;
+
+			} );
+			g.strokeStyle = `rgba(${ rgb }, 0.95)`;
+			g.lineWidth = 1.4;
+			g.lineJoin = 'round';
+			g.stroke();
+
+			const latest = traceData.findLastIndex( value => value !== null );
+			if ( latest >= 0 ) {
+
+				g.fillStyle = `rgb(${ rgb })`;
+				g.beginPath();
+				g.arc( X( latest ), Y( traceData[ latest ] ), 1.8, 0, TAU );
+				g.fill();
+
+			}
 
 		}
 
