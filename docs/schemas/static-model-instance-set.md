@@ -125,6 +125,13 @@ installed world material runtime; a missing profile renderer is an installation
 error rather than a silent fallback to ordinary PBR. The component data still
 contains no backend selector.
 
+For WebGL, a profile runtime may return its material directly or return
+`{ material, prepareGeometry }`. The optional `prepareGeometry(geometry,
+sourceMesh)` hook can map supported custom GLB attributes to the profile's
+renderer-specific geometry inputs before the generic instance attributes are
+drawn. The instance-set adapter does not assign domain-specific meanings to
+those attributes.
+
 The component's streaming bounds enclose the transformed model bounds. A
 bounded component is an engine-owned streaming unit: it is installed when
 selected for the view, retained while within its authored maximum distance,
