@@ -145,7 +145,7 @@ const lodGraph = {
 	outputs: { baseColor: 'color' },
 };
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgpu' ).surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
-assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /textureLod\( emgTexture_baseColor, vEmg_uv, 2\.0 \)/ );
+assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /textureLod\( emgTexture_baseColor, vEmg_uv, emg_lod \)/ );
 assert.throws( () => validateWorldMaterialGraph( { ...lodGraph, nodes: [ lodGraph.nodes[ 0 ], lodGraph.nodes[ 1 ], { ...lodGraph.nodes[ 2 ], lod: 'uv' }, lodGraph.nodes[ 3 ] ] } ), /textureSampleLevel/ );
 
 console.log( 'Renderer-neutral material graph validation passed' );
