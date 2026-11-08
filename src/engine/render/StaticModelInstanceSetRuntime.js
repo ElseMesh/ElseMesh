@@ -43,6 +43,22 @@ export function writeStaticModelInstanceFades( group, target ) {
 	return group.count;
 }
 
+// Opaque material data is interpreted by a GLB's registered material profile.
+// Keeping the two vec4 attributes generic lets world profiles vary instanced
+// appearance without making the engine know their domain-specific meanings.
+export function writeStaticModelInstanceMaterialData( document, group, target0, target1 ) {
+	if ( ! target0 || ! target1 || target0.length < group.count * 4 || target1.length < group.count * 4 ) throw new Error( 'Static model instance material-data output is too small' );
+	for ( let index = 0; index < group.count; index ++ ) {
+		const data = document.instances[ group.indices[ index ] ].materialData;
+		const offset = index * 4;
+		for ( let component = 0; component < 4; component ++ ) {
+			target0[ offset + component ] = data?.[ component ] ?? 0;
+			target1[ offset + component ] = data?.[ component + 4 ] ?? 0;
+		}
+	}
+	return group.count;
+}
+
 /** Shared visibility/LOD update for backend-owned static model draw batches. */
 export class StaticModelInstanceSetRuntime {
 	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null } = {} ) {
@@ -198,12 +214,13 @@ export class StaticModelInstanceSetRuntime {
 			if ( groupBatches.length === 0 ) continue;
 			let attributes = attributeGroups[ groupIndex ];
 			if ( ! attributes || attributes.batches !== groupBatches ) {
-				const matrices = [], fades = [];
+				const matrices = [], fades = [], materialData = [];
 				for ( const batch of groupBatches ) {
 					if ( ! matrices.includes( batch.matrixAttribute ) ) matrices.push( batch.matrixAttribute );
 					if ( ! fades.includes( batch.fadeAttribute ) ) fades.push( batch.fadeAttribute );
+					if ( batch.materialData0Attribute && ! materialData.some( attributes => attributes[ 0 ] === batch.materialData0Attribute ) ) materialData.push( [ batch.materialData0Attribute, batch.materialData1Attribute ] );
 				}
-				attributes = attributeGroups[ groupIndex ] = { batches: groupBatches, matrices, fades };
+				attributes = attributeGroups[ groupIndex ] = { batches: groupBatches, matrices, fades, materialData };
 			}
 			for ( const attribute of attributes.matrices ) {
 				writeStaticModelInstanceMatrices( this.document, group, attribute.array );
@@ -212,6 +229,11 @@ export class StaticModelInstanceSetRuntime {
 			for ( const attribute of attributes.fades ) {
 				writeStaticModelInstanceFades( group, attribute.array );
 				attribute.needsUpdate = true;
+			}
+			for ( const [ attribute0, attribute1 ] of attributes.materialData ) {
+				writeStaticModelInstanceMaterialData( this.document, group, attribute0.array, attribute1.array );
+				attribute0.needsUpdate = true;
+				attribute1.needsUpdate = true;
 			}
 			for ( const batch of groupBatches ) {
 				batch.mesh.count = group.count;

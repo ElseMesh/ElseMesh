@@ -17,7 +17,7 @@ const glbBytes = staticModelGLB( { nodeScale: [ -1, 1, 1 ] } ), modelAssetID = h
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: modelAssetID }, { assetId: fineModelAssetID } ], lodThresholds: [ 0.001 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
-	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
+	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] } ],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
 const component = { id: 'fixture-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: fineModelAssetID, kind: 'glb' } ] };
@@ -67,6 +67,10 @@ assert.deepEqual( [ webgpuMain.geometry.getIndex().getX( 0 ), webgpuMain.geometr
 assert.deepEqual( [ webgpuShadow.geometry.getIndex().getX( 0 ), webgpuShadow.geometry.getIndex().getX( 1 ), webgpuShadow.geometry.getIndex().getX( 2 ) ], [ 0, 2, 1 ], 'WebGPU shadow geometry uses the corrected reflected winding' );
 assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
 assert.equal( webgpuMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'shared adapter fade data carries LOD and draw-distance fades' );
+assert.deepEqual( Array.from( webgpuMain.geometry.getAttribute( 'iStaticMaterialData0' ).array ), [ 0.25, 0.5, 0.75, 1 ], 'WebGPU exposes opaque material-profile data in the first instanced vec4' );
+assert.deepEqual( Array.from( webgpuMain.geometry.getAttribute( 'iStaticMaterialData1' ).array ), [ 2, 3, 4, 5 ], 'WebGPU exposes opaque material-profile data in the second instanced vec4' );
+assert.equal( webgpuMain.material.attributes.iStaticMaterialData0, 'vec4f', 'WebGPU material profiles can bind opaque per-instance data' );
+assert.match( webgpuMain.material.vertex, /v\.iStaticMaterialData0/ );
 assert.equal( webgpuShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0, 'shadow-only instances remain fully visible with complementary fade enabled' );
 webgpuResult.runtime.dispose();
 disposeWorldPackage( webgpuRoot );
@@ -100,6 +104,9 @@ assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 2.5, 'the
 assert.deepEqual( [ webglMain.geometry.getIndex().getX( 0 ), webglMain.geometry.getIndex().getX( 1 ), webglMain.geometry.getIndex().getX( 2 ) ], [ 0, 2, 1 ], 'baking a negative-scale GLB node reverses winding for the WebGL rasterizer' );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'WebGL uses the shared four-channel fade policy' );
+assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialData0' ).array ), [ 0.25, 0.5, 0.75, 1 ], 'WebGL exposes the same opaque material-profile data as WebGPU' );
+assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialData1' ).array ), [ 2, 3, 4, 5 ], 'WebGL exposes the second material-profile vec4' );
+assert.match( webglMain.material.customProgramCacheKey(), /static-instance-data-v1/ );
 webglResult.runtime.dispose();
 assert.equal( webglFallback.scene.children.length, 0 );
 

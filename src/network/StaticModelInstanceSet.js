@@ -56,7 +56,12 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 	}
 
 	for ( const instance of document.instances ) {
-		if ( ! ( hasExactKeys( instance, [ 'model', 'position', 'rotation', 'scale' ] ) || hasExactKeys( instance, [ 'model', 'position', 'rotation', 'scale', 'placementId' ] ) && typeof instance.placementId === 'string' && instance.placementId.length > 0 && instance.placementId.length <= 8192 ) || typeof instance.model !== 'string' || ! modelIDs.has( instance.model ) || ! validVector( instance.position, 3, 1e6 ) || ! validVector( instance.rotation, 4, 1.001 ) || ! validVector( instance.scale, 3, 1e4 ) || instance.scale.some( value => value <= 0 ) ) throw new Error( 'Invalid static model instance transform' );
+		const requiredKeys = [ 'model', 'position', 'rotation', 'scale' ];
+		const allowedKeys = [ ...requiredKeys, 'placementId', 'materialData' ];
+		if ( ! isRecord( instance ) || ! requiredKeys.every( key => Object.hasOwn( instance, key ) ) || Object.keys( instance ).some( key => ! allowedKeys.includes( key ) )
+			|| Object.hasOwn( instance, 'placementId' ) && ( typeof instance.placementId !== 'string' || instance.placementId.length === 0 || instance.placementId.length > 8192 )
+			|| Object.hasOwn( instance, 'materialData' ) && ( ! Array.isArray( instance.materialData ) || instance.materialData.length !== 8 || ! instance.materialData.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) )
+			|| typeof instance.model !== 'string' || ! modelIDs.has( instance.model ) || ! validVector( instance.position, 3, 1e6 ) || ! validVector( instance.rotation, 4, 1.001 ) || ! validVector( instance.scale, 3, 1e4 ) || instance.scale.some( value => value <= 0 ) ) throw new Error( 'Invalid static model instance transform or material data' );
 		const quaternionLength = Math.hypot( ...instance.rotation );
 		if ( Math.abs( quaternionLength - 1 ) > 0.002 ) throw new Error( 'Static model instance rotation must be a normalized quaternion' );
 	}

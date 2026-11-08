@@ -69,7 +69,8 @@ not a replacement for content-addressed package assets.
       "model": "market-table",
       "position": [1, 2, 3],
       "rotation": [0, 0, 0, 1],
-      "scale": [1, 1, 1]
+      "scale": [1, 1, 1],
+      "materialData": [0, 0, 0, 0, 0, 0, 0, 0]
     }
   ]
 }
@@ -78,6 +79,13 @@ not a replacement for content-addressed package assets.
 Each model asset is a static GLB using the core glTF feature subset supported by
 both renderers and local-space geometry. Skins, animation, morph targets,
 non-triangle primitives, and unsupported vertex attributes are rejected.
+An instance may include eight finite `materialData` numbers. The engine passes
+these as two instanced `vec4` values (`vStaticMaterialData0` and
+`vStaticMaterialData1`) to registered material profiles in both renderers; it
+does not assign domain-specific meanings to the values. Omitted data is passed
+as zeroes. The attributes are allocated only when the component uses this
+field. This supports authored per-placement appearance while keeping the model
+set and draw batching renderer-neutral.
 `geometryMirrorX` records an odd-parity source reflection. The loader reflects
 the LOD geometry across local X, reverses triangle winding, and adjusts tangent
 handedness. The corresponding instance rotations absorb the source scale-sign

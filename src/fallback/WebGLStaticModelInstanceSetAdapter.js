@@ -66,6 +66,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set(), mainBatches = [], lodQueue = new LODLoadQueue( 2 );
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
+	const hasMaterialData = document.instances.some( instance => instance.materialData );
 	if ( fallback.hostedStaticTextureLOD?.connector !== connector ) fallback.hostedStaticTextureLOD = new WebGLProgressiveStaticTextures( fallback, connector );
 	const textureLOD = fallback.hostedStaticTextureLOD;
 	let runtime = null;
@@ -108,7 +109,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
 			pendingTextureRegistrations.push( [ modelIndex, 0, model.lods[ 0 ].assetId, coarseSource, coarse.progressive ] );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( T, fallback, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX ) );
+			mainBatches.push( createModelDraws( T, fallback, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX, hasMaterialData ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 		}
 		runtime = new StaticModelInstanceSetRuntime( document, {
@@ -126,7 +127,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX );
+				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
@@ -179,9 +180,11 @@ function staticModelInstanceBoundsSphere( T, document, modelIndex ) {
 	return new T.Sphere( new T.Vector3( ...sphereCenter ), sphereRadius );
 }
 
-function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX ) {
+function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX, hasMaterialData ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
+	const materialData0Attribute = hasMaterialData ? new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
+	const materialData1Attribute = hasMaterialData ? new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
 	const draws = [];
 	source.updateMatrixWorld( true );
 	source.traverse( object => {
@@ -192,13 +195,17 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		if ( object.matrixWorld.determinant() < 0 ) correctStaticModelGeometryReflection( geometry );
 		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
+		if ( hasMaterialData ) {
+			geometry.setAttribute( 'iStaticMaterialData0', materialData0Attribute );
+			geometry.setAttribute( 'iStaticMaterialData1', materialData1Attribute );
+		}
 		geometry.computeBoundingSphere();
 		const sourceMaterial = resolveStaticModelMaterial( fallback, object.material );
 		if ( sourceMaterial !== object.material ) sharedProfileMaterials.add( sourceMaterial );
 		const cacheKey = sourceMaterial.uuid;
 		let material = materialCache.get( cacheKey );
 		if ( ! material ) {
-			material = staticFadeMaterial( T, sourceMaterial );
+			material = staticFadeMaterial( T, sourceMaterial, hasMaterialData );
 			materialCache.set( cacheKey, material );
 			ownedMaterials.add( material );
 		}
@@ -211,7 +218,7 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		mesh.receiveShadow = true;
 		mesh.customDepthMaterial = staticFadeDepthMaterial( T, sourceMaterial );
 		ownedGeometry.add( geometry );
-		draws.push( { mesh, matrixAttribute, fadeAttribute } );
+		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
 	} );
 	if ( draws.length === 0 ) throw new Error( 'Static model instance GLB contains no triangle meshes' );
 	return draws;
@@ -228,19 +235,22 @@ function resolveStaticModelMaterial( fallback, sourceMaterial ) {
 	throw new Error( `WebGL static model has no installed renderer for material profile ${profile.profile}/${role}` );
 }
 
-function staticFadeMaterial( T, source ) {
+function staticFadeMaterial( T, source, hasMaterialData ) {
 	const material = source.clone();
 	const originalCompile = material.onBeforeCompile, originalKey = material.customProgramCacheKey?.bind( material );
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.( shader, renderer );
+		const materialAttributes = hasMaterialData ? '\nattribute vec4 iStaticMaterialData0;\nattribute vec4 iStaticMaterialData1;' : '';
+		const materialVaryings = hasMaterialData ? '\nvarying vec4 vStaticMaterialData0;\nvarying vec4 vStaticMaterialData1;' : '';
+		const materialAssignments = hasMaterialData ? 'vStaticMaterialData0 = iStaticMaterialData0;\nvStaticMaterialData1 = iStaticMaterialData1;\n' : '';
 		shader.vertexShader = shader.vertexShader
-			.replace( '#include <common>', '#include <common>\nattribute vec4 iStaticFade;\nvarying vec4 vStaticFade;' )
-			.replace( '#include <begin_vertex>', 'vStaticFade = iStaticFade;\n#include <begin_vertex>' );
+			.replace( '#include <common>', `#include <common>\nattribute vec4 iStaticFade;\nvarying vec4 vStaticFade;${ materialAttributes }${ materialVaryings }` )
+			.replace( '#include <begin_vertex>', `vStaticFade = iStaticFade;\n${ materialAssignments }#include <begin_vertex>` );
 		shader.fragmentShader = shader.fragmentShader
-			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;` )
+			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;${ materialVaryings }` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
-	material.customProgramCacheKey = () => `${ originalKey?.() || '' }|elsemesh-static-instance-fade-v1`;
+	material.customProgramCacheKey = () => `${ originalKey?.() || '' }|elsemesh-static-instance-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
 	return material;
 }
 

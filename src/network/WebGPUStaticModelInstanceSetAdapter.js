@@ -17,6 +17,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
 	const materialCache = new Map(), sceneCache = new Map(), lodQueue = new LODLoadQueue( 2 );
 	let unregisterTextureDemand = null;
+	const hasMaterialData = document.instances.some( instance => instance.materialData );
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const getScene = async ( assetId, bytes, progressive ) => {
 		if ( progressive?.textures ) setWorldPackageProgressiveAsset( root, assetId, { textures: progressive.textures } );
@@ -44,10 +45,10 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 			const { bytes, progressive } = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await getScene( model.lods[ 0 ].assetId, bytes, progressive );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], model.geometryMirrorX, false, materialCache, ownedGeometry, ownedMaterials ) );
+			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], model.geometryMirrorX, false, hasMaterialData, materialCache, ownedGeometry, ownedMaterials ) );
 			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
 			const shadowSource = coarseSource;
-			shadowBatches.push( createModelDraws( shadowSource, modelCapacity[ modelIndex ], model.geometryMirrorX, true, materialCache, ownedGeometry, ownedMaterials ) );
+			shadowBatches.push( createModelDraws( shadowSource, modelCapacity[ modelIndex ], model.geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials ) );
 		}
 		if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 		const runtime = new StaticModelInstanceSetRuntime( document, {
@@ -61,7 +62,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				const source = await getScene( assetId, bytes, progressive );
 				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, false, materialCache, ownedGeometry, ownedMaterials );
+				const draws = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, false, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( root, [ draws ] );
@@ -78,9 +79,11 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	}
 }
 
-function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, materialCache, ownedGeometry, ownedMaterials ) {
+function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, hasMaterialData, materialCache, ownedGeometry, ownedMaterials ) {
 	const matrixAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
+	const materialData0Attribute = hasMaterialData ? new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
+	const materialData1Attribute = hasMaterialData ? new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
 	const draws = [];
 	source.updateMatrixWorld( true );
 	source.traverse( object => {
@@ -92,12 +95,16 @@ function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, materi
 		if ( object.matrixWorld.determinant() < 0 ) correctStaticModelGeometryReflection( geometry );
 		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
 		geometry.setAttribute( 'iStaticFade', fadeAttribute );
+		if ( hasMaterialData ) {
+			geometry.setAttribute( 'iStaticMaterialData0', materialData0Attribute );
+			geometry.setAttribute( 'iStaticMaterialData1', materialData1Attribute );
+		}
 		geometry.computeBoundingSphere();
 		const sourceMaterial = object.material;
 		const cacheKey = `${ sourceMaterial.id }:${ shadowOnly ? 'shadow' : 'main' }`;
 		let material = materialCache.get( cacheKey );
 		if ( ! material ) {
-			material = staticFadeMaterial( sourceMaterial, shadowOnly );
+			material = staticFadeMaterial( sourceMaterial, shadowOnly, hasMaterialData );
 			materialCache.set( cacheKey, material );
 			ownedMaterials.add( material );
 		}
@@ -109,22 +116,26 @@ function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, materi
 		mesh.receiveShadow = ! shadowOnly;
 		mesh.userData.shadowOnly = shadowOnly;
 		ownedGeometry.add( geometry );
-		draws.push( { mesh, matrixAttribute, fadeAttribute } );
+		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
 	} );
 	if ( draws.length === 0 ) throw new Error( 'Static model instance GLB contains no triangle meshes' );
 	return draws;
 }
 
-function staticFadeMaterial( source, shadowOnly ) {
+function staticFadeMaterial( source, shadowOnly, hasMaterialData ) {
 	const material = source.clone();
 	const attributes = { ...material.attributes, iStaticFade: 'vec4f' };
 	const varyings = { ...material.varyings, vStaticFade: 'vec4f' };
+	if ( hasMaterialData ) {
+		Object.assign( attributes, { iStaticMaterialData0: 'vec4f', iStaticMaterialData1: 'vec4f' } );
+		Object.assign( varyings, { vStaticMaterialData0: 'vec4f', vStaticMaterialData1: 'vec4f' } );
+	}
 	const fadeVisible = '( ! lodFadeVisible( in.pixel, in.vs.vStaticFade.x, in.vs.vStaticFade.y > 0.5 ) || ( in.vs.vStaticFade.w > 0.5 && ! lodFadeVisible( in.pixel + vec2f( 2.0, 1.0 ), in.vs.vStaticFade.z, false ) ) )';
 	const fadeGuard = `if ( ${fadeVisible} ) { return false; }`;
 	material.attributes = attributes;
 	material.varyings = varyings;
 	material.modules = [ ...material.modules, lodFadeModule ];
-	material.vertex = `${ material.vertex }\no.vStaticFade = v.iStaticFade;`;
+	material.vertex = `${ material.vertex }\no.vStaticFade = v.iStaticFade;${ hasMaterialData ? '\no.vStaticMaterialData0 = v.iStaticMaterialData0;\no.vStaticMaterialData1 = v.iStaticMaterialData1;' : '' }`;
 	if ( ! shadowOnly ) material.surface = `if ( ${fadeVisible} ) { discard; }\n${ material.surface }`;
 	material.shadow = material.shadow
 		? `${ fadeGuard }\n${ material.shadow }`

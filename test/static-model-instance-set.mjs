@@ -52,6 +52,8 @@ assert.throws( () => validateStaticModelInstanceSet( { ...valid, renderer: 'webg
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], geometryMirrorX: 1 } ] } ), /static model record/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], rotation: [ 0, 0, 0, 0 ] } ] } ), /normalized quaternion/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], materialData: [ 1, 2, 3 ] } ] } ), /material data/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], materialData: [ 1, 2, 3, 4, 5, 6, 7, Infinity ] } ] } ), /material data/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.018, 0.004 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawMaxDistance: 0 } ] } ), /draw distance/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodMetric: 'scaled-distance', lodThresholds: [ 28, 26 ] } ] } ), /overlapping LOD/ );
@@ -175,11 +177,17 @@ infiniteFarCamera.infiniteFar = true;
 infiniteFarCamera.updateProjectionMatrix();
 assert.deepEqual( staticModelInstanceCamera( infiniteFarCamera ).frustumPlanes[ 5 ], [ 0, 0, 0, 1 ], 'an infinite far plane does not reject visible instances' );
 
-const runtimeDocument = { ...valid, instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, - 5 ] } ] };
+const runtimeDocument = { ...valid, instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, - 5 ], materialData: [ 11, 12, 13, 14, 21, 22, 23, 24 ] } ] };
 const runtimePlanner = new StaticModelInstanceSetPlanner( runtimeDocument );
 const makeRuntimeBatch = () => {
 	const capacity = 1;
-	return { mesh: { count: 0, visible: false }, matrixAttribute: { array: new Float32Array( capacity * 16 ), needsUpdate: false }, fadeAttribute: { array: new Float32Array( capacity * 4 ), needsUpdate: false } };
+	return {
+		mesh: { count: 0, visible: false },
+		matrixAttribute: { array: new Float32Array( capacity * 16 ), needsUpdate: false },
+		fadeAttribute: { array: new Float32Array( capacity * 4 ), needsUpdate: false },
+		materialData0Attribute: { array: new Float32Array( capacity * 4 ), needsUpdate: false },
+		materialData1Attribute: { array: new Float32Array( capacity * 4 ), needsUpdate: false },
+	};
 };
 let disposedRuntime = false;
 const runtime = new StaticModelInstanceSetRuntime( runtimeDocument, {
@@ -207,15 +215,20 @@ assert.equal( activeRuntimeBatch.matrixAttribute.array[ 14 ], - 5, 'shared runti
 assert.equal( activeRuntimeBatch.fadeAttribute.array[ 0 ], 1 );
 assert.equal( activeRuntimeBatch.fadeAttribute.array[ 2 ], 1 );
 assert.equal( activeRuntimeBatch.fadeAttribute.array[ 3 ], 0 );
+assert.deepEqual( Array.from( activeRuntimeBatch.materialData0Attribute.array ), [ 11, 12, 13, 14 ], 'runtime compacts the first material-data vec4 in visible-instance order' );
+assert.deepEqual( Array.from( activeRuntimeBatch.materialData1Attribute.array ), [ 21, 22, 23, 24 ], 'runtime compacts the second material-data vec4 in visible-instance order' );
 const cachedBatchAttributes = runtime._batchAttributeGroups.slice();
 activeRuntimeBatch.matrixAttribute.needsUpdate = false;
 activeRuntimeBatch.fadeAttribute.needsUpdate = false;
+activeRuntimeBatch.materialData0Attribute.needsUpdate = false;
+activeRuntimeBatch.materialData1Attribute.needsUpdate = false;
 runtime.update( 1 / 60, runtimeCamera );
 assert.deepEqual( runtime._batchAttributeGroups, cachedBatchAttributes, 'unchanged LOD groups reuse their cached batch attributes' );
 assert.equal( runtimePlannerUpdates, 1, 'unchanged camera and projection skip static model LOD planning' );
 assert.equal( lodStateReads, initialLODStateReads, 'unchanged views skip rescanning model LOD request state' );
 assert.equal( activeRuntimeBatch.matrixAttribute.needsUpdate, false, 'unchanged view does not rewrite static model transforms' );
 assert.equal( activeRuntimeBatch.fadeAttribute.needsUpdate, false, 'unchanged view does not rewrite static model fades' );
+assert.equal( activeRuntimeBatch.materialData0Attribute.needsUpdate, false, 'unchanged view does not rewrite static model material data' );
 runtimeCamera.position.x = 0.25;
 runtime.update( 1 / 60, runtimeCamera );
 assert.equal( runtimePlannerUpdates, 2, 'camera movement refreshes static model LOD planning' );
