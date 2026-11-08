@@ -12,7 +12,7 @@ const hash = async bytes => {
 	return `sha256:${ Array.from( digest, value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' ) }`;
 };
 
-let runtime, renderer;
+let runtime, renderer, profileGeometryPrepared = false;
 let profileMaterial;
 try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
@@ -48,7 +48,13 @@ try {
 		THREE, connector, loader: new GLTFLoader(), scene,
 		hostedComponentRuntimes: new Map( [ [ 'fixture-material', {
 			sharedMaterials: [ profileMaterial ],
-			resolveWorldMaterialProfile: request => request.profile === profile && request.role === 'tint' ? profileMaterial : null,
+			resolveWorldMaterialProfile: request => request.profile === profile && request.role === 'tint' ? {
+				material: profileMaterial,
+				prepareGeometry( geometry ) {
+					geometry.setAttribute( 'fixtureProfileData', new THREE.Float32BufferAttribute( new Float32Array( geometry.getAttribute( 'position' ).count ).fill( 1 ), 1 ) );
+					profileGeometryPrepared = true;
+				},
+			} : null,
 		} ] ] ),
 	};
 	const install = worldComponentBackendAdapter( 'webgl', component.type );
@@ -57,6 +63,7 @@ try {
 	runtime = installed.runtime;
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
+	if ( ! profileGeometryPrepared || ! mesh.geometry.getAttribute( 'fixtureProfileData' ) ) throw new Error( 'WebGL static model profile did not prepare its custom geometry attributes' );
 	if ( ! runtime.sharedMaterials.includes( profileMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile material' );
 	if ( mesh.frustumCulled !== true ) throw new Error( 'Instanced draws do not use view-frustum culling when conservative bounds exist' );
 	if ( ! mesh.boundingSphere?.containsPoint( new THREE.Vector3( 81.5, 0.5, - 5 ) ) ) throw new Error( 'Draw bounds omit the scaled outer extent of the farthest instance' );
