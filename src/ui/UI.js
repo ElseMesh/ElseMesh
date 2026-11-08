@@ -1885,7 +1885,7 @@ export class UI {
 		this._menuAnchor = null;
 		this._toasts = [];
 		this._spark = [];
-		this._sparkAcc = 0;
+		this._sparkAcc = { gap: 0, cpu: null, gpu: null };
 		this._sparkT = 0;
 		this._statsT = 0;
 		this._lvl = 'good';
@@ -1932,7 +1932,7 @@ export class UI {
 			<div class="em-stats-main"><span class="em-fps">--</span><span class="em-fps-unit">fps</span></div>
 			<canvas class="em-spark"></canvas>
 			<div class="em-stats-sub">
-				<span class="em-kv"><span class="em-k" title="Elapsed time between successive app-frame updates, including browser scheduling pauses">gap</span><span class="em-v em-ms">--</span></span>
+				<span class="em-kv em-kv-gap"><span class="em-k" title="Elapsed time between successive app-frame updates, including browser scheduling pauses">gap</span><span class="em-v em-ms">--</span></span>
 				<span class="em-kv em-kv-cpu" hidden><span class="em-k" title="Browser-side CPU time for a frame">cpu</span><span class="em-v em-cpu">--</span></span>
 				<span class="em-kv em-kv-gpu" hidden><span class="em-k" title="Measured GPU execution time">gpu</span><span class="em-v em-gpu">--</span></span>
 			</div>`;
@@ -3098,15 +3098,17 @@ export class UI {
 		if ( ! ( fps > 0 ) && frameMs > 0 ) fps = 1000 / frameMs;
 		if ( ! ( frameMs > 0 ) && fps > 0 ) frameMs = 1000 / fps;
 
-		// sparkline: worst frame per 100 ms bucket, so hitches stay visible
+		// Keep the worst sample in each 100 ms bucket so short hitches remain visible.
 		const now = performance.now();
-		if ( frameMs > 0 ) this._sparkAcc = Math.max( this._sparkAcc, frameMs );
-		if ( now - this._sparkT >= 100 && this._sparkAcc > 0 ) {
+		if ( frameMs > 0 ) this._sparkAcc.gap = Math.max( this._sparkAcc.gap, frameMs );
+		if ( cpuMs >= 0 ) this._sparkAcc.cpu = Math.max( this._sparkAcc.cpu ?? 0, cpuMs );
+		if ( gpuMs >= 0 ) this._sparkAcc.gpu = Math.max( this._sparkAcc.gpu ?? 0, gpuMs );
+		if ( now - this._sparkT >= 100 && this._sparkAcc.gap > 0 ) {
 
 			this._sparkT = now;
 			this._spark.push( this._sparkAcc );
 			if ( this._spark.length > 60 ) this._spark.shift();
-			this._sparkAcc = 0;
+			this._sparkAcc = { gap: 0, cpu: null, gpu: null };
 			this._drawSpark();
 
 		}
@@ -3170,45 +3172,50 @@ export class UI {
 		g.stroke();
 		g.setLineDash( [] );
 		if ( data.length < 2 ) return;
-		// Smooth three 100 ms samples for the trace; the numeric gap still exposes individual hitches.
-		const traceData = data.map( ( _, i ) => {
+		// FPS is already shown as the large health-colored number. Plot its three
+		// millisecond contributors instead of adding a redundant fourth series.
+		const series = [
+			{ key: 'gap', rgb: '95, 227, 212' },
+			{ key: 'cpu', rgb: '255, 184, 107' },
+			{ key: 'gpu', rgb: '176, 156, 255' },
+		];
 
-			const start = Math.max( 0, i - 2 );
-			let sum = 0;
-			for ( let j = start; j <= i; j ++ ) sum += data[ j ];
-			return sum / ( i - start + 1 );
+		for ( const { key, rgb } of series ) {
 
-		} );
+			const traceData = data.map( ( sample, i ) => {
 
-		const rgb = this._lvl === 'bad' ? '255, 122, 133' : this._lvl === 'warn' ? '255, 184, 107' : '95, 227, 212';
-		const trace = () => {
+				const values = data.slice( Math.max( 0, i - 2 ), i + 1 )
+					.map( point => point[ key ] )
+					.filter( Number.isFinite );
+				return values.length ? values.reduce( ( sum, value ) => sum + value, 0 ) / values.length : null;
 
+			} );
 			g.beginPath();
-			traceData.forEach( ( v, i ) => ( i ? g.lineTo( X( i ), Y( v ) ) : g.moveTo( X( i ), Y( v ) ) ) );
+			let last = - 1;
+			traceData.forEach( ( value, i ) => {
 
-		};
+				if ( value === null ) { last = - 1; return; }
+				if ( last < 0 ) g.moveTo( X( i ), Y( value ) );
+				else g.lineTo( X( i ), Y( value ) );
+				last = i;
 
-		const grad = g.createLinearGradient( 0, 0, 0, hh );
-		grad.addColorStop( 0, `rgba(${ rgb }, 0.04)` );
-		grad.addColorStop( 1, `rgba(${ rgb }, 0)` );
-		trace();
-		g.lineTo( X( data.length - 1 ), hh );
-		g.lineTo( X( 0 ), hh );
-		g.closePath();
-		g.fillStyle = grad;
-		g.fill();
+			} );
+			g.strokeStyle = `rgba(${ rgb }, 0.95)`;
+			g.lineWidth = 1.4;
+			g.lineJoin = 'round';
+			g.stroke();
 
-		trace();
-		g.strokeStyle = `rgba(${ rgb }, 0.95)`;
-		g.lineWidth = 1.25;
-		g.lineJoin = 'round';
-		g.stroke();
+			const latest = traceData.findLastIndex( value => value !== null );
+			if ( latest >= 0 ) {
 
-		const last = traceData.length - 1;
-		g.fillStyle = `rgb(${ rgb })`;
-		g.beginPath();
-		g.arc( X( last ), Y( traceData[ last ] ), 1.8, 0, TAU );
-		g.fill();
+				g.fillStyle = `rgb(${ rgb })`;
+				g.beginPath();
+				g.arc( X( latest ), Y( traceData[ latest ] ), 1.8, 0, TAU );
+				g.fill();
+
+			}
+
+		}
 
 	}
 

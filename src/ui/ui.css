@@ -655,6 +655,9 @@ body {
 	-webkit-backdrop-filter: blur(12px) saturate(1.5);
 	backdrop-filter: blur(12px) saturate(1.5);
 	--em-level: var(--em-aqua);
+	--em-gap: #5fe3d4;
+	--em-cpu: #ffb86b;
+	--em-gpu: #b09cff;
 }
 
 .em-stats[data-level='warn'] { --em-level: var(--em-sun); }
@@ -708,6 +711,15 @@ body {
 .em-k {
 	color: var(--em-ink-3);
 }
+
+.em-kv-gap .em-k,
+.em-kv-gap .em-v { color: var(--em-gap); }
+
+.em-kv-cpu .em-k,
+.em-kv-cpu .em-v { color: var(--em-cpu); }
+
+.em-kv-gpu .em-k,
+.em-kv-gpu .em-v { color: var(--em-gpu); }
 
 .em-v {
 	font-family: var(--em-mono);
