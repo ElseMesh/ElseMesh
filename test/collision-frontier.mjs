@@ -5,6 +5,7 @@ const from = [ 7.5, 0, 1 ];
 const to = [ 8.5, 0, 1 ];
 const cells = sweptCollisionCellKeys( from, to, { cellSizeMeters: 8 } );
 assert.deepEqual( [ ...cells ].sort(), [ '0,0,0', '1,0,0' ], 'the player capsule spans cells on both sides of the boundary' );
+assert.deepEqual( [ ...sweptCollisionCellKeys( [ 15.65, 0, 1 ], [ 15.65, 0, 1 ], { cellSizeMeters: 16, radius: 0.42, height: 1.76 } ) ].sort(), [ '0,0,0', '1,0,0' ], 'the world-authored capsule includes collision cells touched across a spawn or movement frontier edge' );
 
 const objectIDsByCell = new Map( [
 	[ '0,0,0', new Set( [ 'collision-a' ] ) ],

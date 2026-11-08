@@ -85,10 +85,12 @@ function cellCoordinate( position, sizeMeters ) {
 	return coordinate;
 }
 
-function deriveStartupCells( position, previewRegion ) {
+function deriveStartupCells( position, previewRegion, playerCapsule ) {
 	const { cellSizeMeters } = previewRegion;
 	const spawnFoot = [ position[ 0 ], position[ 1 ] - PLAYER_EYE_HEIGHT, position[ 2 ] ];
-	return [ ...sweptCollisionCellKeys( spawnFoot, spawnFoot, { cellSizeMeters } ) ]
+	return [ ...sweptCollisionCellKeys( spawnFoot, spawnFoot, {
+		cellSizeMeters, radius: playerCapsule.radiusMeters, height: playerCapsule.heightMeters,
+	} ) ]
 		.map( key => key.split( ',' ).map( Number ) );
 }
 
@@ -215,13 +217,13 @@ export class LocalRegionConnector {
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
 		requireValue( Number.isFinite( previewRegion.maxViewDistanceMeters ) && previewRegion.maxViewDistanceMeters > 0 && previewRegion.maxViewDistanceMeters <= 10000, 'Local provider has no valid world-authored cell view distance' );
-		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion );
+		const playerCapsule = playerCapsuleParameters( { playerCapsule: selection.playerCapsule } );
+		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion, playerCapsule );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
 			requireValue( support?.status === 'provisional' && typeof support.basis === 'string' && support.basis.length <= 500 && Array.isArray( support.position ) && support.position.length === 3 && support.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( support.halfExtents ) && support.halfExtents.length === 3 && support.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) && ( support.yaw === undefined || Number.isFinite( support.yaw ) && Math.abs( support.yaw ) <= 360 ), 'Local provider has invalid provisional preview support' );
 		}
 		const experience = selection.experience ? structuredClone( validateWorldExperience( selection.experience ) ) : null;
-		const playerCapsule = playerCapsuleParameters( { playerCapsule: selection.playerCapsule } );
 		if ( experience?.theme?.logo?.src.startsWith( '/' ) ) experience.theme.logo.src = new URL( experience.theme.logo.src, `${base}/` ).href;
 		if ( experience?.navigation?.map?.src.startsWith( '/' ) ) experience.navigation.map.src = new URL( experience.navigation.map.src, `${base}/` ).href;
 		const catalog = await fetchJSON( new URL( descriptor.regions, `${base}/descriptor` ), signal );
@@ -344,7 +346,9 @@ export class LocalRegionConnector {
 		if ( ! cellSize || ! this.manifest ) return Promise.resolve( this.manifest );
 		const center = Array.isArray( from ) ? from : [ from.x, from.y, from.z ];
 		const centerCell = center.map( value => cellCoordinate( value, cellSize ) );
-		const frontier = sweptCollisionCellKeys( from, to, { cellSizeMeters: cellSize } );
+		const frontier = sweptCollisionCellKeys( from, to, {
+			cellSizeMeters: cellSize, radius: this.playerCapsule.radiusMeters, height: this.playerCapsule.heightMeters,
+		} );
 		const candidates = [];
 		for ( let x = - LOCAL_REGION_PREFETCH_RADIUS_CELLS; x <= LOCAL_REGION_PREFETCH_RADIUS_CELLS; x ++ ) for ( let y = - LOCAL_REGION_PREFETCH_RADIUS_CELLS; y <= LOCAL_REGION_PREFETCH_RADIUS_CELLS; y ++ ) for ( let z = - LOCAL_REGION_PREFETCH_RADIUS_CELLS; z <= LOCAL_REGION_PREFETCH_RADIUS_CELLS; z ++ ) {
 			if ( x * x + y * y + z * z > LOCAL_REGION_PREFETCH_RADIUS_CELLS ** 2 ) continue;
