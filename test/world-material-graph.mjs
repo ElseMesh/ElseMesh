@@ -29,6 +29,23 @@ assert.match( webgl.glsl.fragment, /diffuseColor\.rgb \*= emg_result/ );
 assert.match( compileWorldMaterialGraph( { ...graph, nodes: [ ...graph.nodes, { id: 'data', op: 'input', name: 'vdata' } ] }, 'webgl' ).glsl.attributes, /attribute vec4 vdata/ );
 assert.throws( () => compileWorldMaterialGraph( graph, 'wasm' ), /backend/ );
 
+const conditionalGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'position', op: 'input', name: 'position' },
+		{ id: 'height', op: 'z', args: [ 'position' ] },
+		{ id: 'threshold', op: 'constant', value: 0.2 },
+		{ id: 'above', op: 'greaterThan', args: [ 'height', 'threshold' ] },
+		{ id: 'green', op: 'constant', value: [ 0.1, 0.8, 0.2 ] },
+		{ id: 'blue', op: 'constant', value: [ 0.1, 0.2, 0.8 ] },
+		{ id: 'colorOut', op: 'select', args: [ 'above', 'green', 'blue' ] },
+	],
+	outputs: { baseColor: 'colorOut' },
+};
+assert.match( compileWorldMaterialGraph( conditionalGraph, 'webgpu' ).surface, /let emg_above: bool/ );
+assert.match( compileWorldMaterialGraph( conditionalGraph, 'webgpu' ).surface, /select\( emg_blue, emg_green, emg_above \)/ );
+assert.match( compileWorldMaterialGraph( conditionalGraph, 'webgl' ).glsl.fragment, /emg_colorOut = \( emg_above \? emg_green : emg_blue \)/ );
+
 assert.throws( () => validateWorldMaterialGraph( { ...graph, source: 'shader text' } ), /Invalid or unsupported/ );
 assert.throws( () => validateWorldMaterialGraph( { ...graph, nodes: [ ...graph.nodes, { id: 'forward', op: 'multiply', args: [ 'later', 'base' ] }, { id: 'later', op: 'constant', value: 1 } ] } ), /forward-referencing/ );
 assert.throws( () => validateWorldMaterialGraph( { ...graph, outputs: { roughness: 'result' } } ), /output/ );

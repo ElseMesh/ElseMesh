@@ -40,9 +40,13 @@ support at most 512 nodes. Constants are finite scalars or vectors with 2–4
 components, each in the range -1,000,000 to 1,000,000.
 
 Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
-`divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`,
-`normalize`, `rgb`, `length`, `dot`, `mix`, `clamp`, and `smoothstep`. Operations
-are type checked before the engine generates shader code.
+`divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`, `sqrt`,
+`sign`, `exp`, `normalize`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
+`vec3`, `vec4`, `length`, `dot`, `mix`, `clamp`, `smoothstep`, `lessThan`,
+`lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,
+`select`, `step`, and `atan2`. Operations are type checked before the engine
+generates shader code. Comparisons currently accept scalar inputs and produce a
+boolean for `select` and logical operations.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `vertexPosition` (vec3), and

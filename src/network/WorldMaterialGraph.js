@@ -42,10 +42,30 @@ function nodeType( node, types ) {
 	const same = count => argTypes.length === count && argTypes.every( type => type === argTypes[ 0 ] );
 	const vector = type => /^vec[234]$/.test( type );
 	switch ( node.op ) {
-		case 'add': case 'subtract': case 'multiply': case 'divide': case 'min': case 'max': case 'pow':
+		case 'add': case 'subtract': case 'min': case 'max': case 'pow':
 			return same( 2 ) ? argTypes[ 0 ] : null;
-		case 'abs': case 'sin': case 'cos': case 'floor': case 'fract':
+		case 'multiply': case 'divide':
+			if ( same( 2 ) ) return argTypes[ 0 ];
+			if ( argTypes.length === 2 && vector( argTypes[ 0 ] ) && argTypes[ 1 ] === 'scalar' ) return argTypes[ 0 ];
+			return null;
+		case 'abs': case 'sin': case 'cos': case 'floor': case 'fract': case 'sqrt': case 'sign': case 'exp':
 			return argTypes.length === 1 && ( argTypes[ 0 ] === 'scalar' || vector( argTypes[ 0 ] ) ) ? argTypes[ 0 ] : null;
+		case 'x': case 'y': case 'z': case 'w':
+			return argTypes.length === 1 && vector( argTypes[ 0 ] ) && 'xyzw'.indexOf( node.op ) < Number( argTypes[ 0 ].slice( 3 ) ) ? 'scalar' : null;
+		case 'xy': case 'xyz':
+			return argTypes.length === 1 && vector( argTypes[ 0 ] ) && Number( argTypes[ 0 ].slice( 3 ) ) >= node.op.length ? `vec${node.op.length}` : null;
+		case 'vec2': case 'vec3': case 'vec4':
+			return argTypes.length === Number( node.op.slice( 3 ) ) && argTypes.every( type => type === 'scalar' ) ? node.op : null;
+		case 'lessThan': case 'lessEqual': case 'greaterThan': case 'greaterEqual': case 'equal':
+			return same( 2 ) && argTypes[ 0 ] === 'scalar' ? 'bool' : null;
+		case 'not':
+			return argTypes.length === 1 && argTypes[ 0 ] === 'bool' ? 'bool' : null;
+		case 'and': case 'or':
+			return same( 2 ) && argTypes[ 0 ] === 'bool' ? 'bool' : null;
+		case 'select':
+			return argTypes.length === 3 && argTypes[ 0 ] === 'bool' && argTypes[ 1 ] === argTypes[ 2 ] ? argTypes[ 1 ] : null;
+		case 'step': case 'atan2':
+			return same( 2 ) && argTypes[ 0 ] === 'scalar' ? 'scalar' : null;
 		case 'normalize':
 			return argTypes.length === 1 && vector( argTypes[ 0 ] ) ? argTypes[ 0 ] : null;
 		case 'rgb':

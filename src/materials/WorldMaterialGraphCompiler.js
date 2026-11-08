@@ -10,7 +10,7 @@ const INPUT_SOURCES = Object.freeze( {
 	instanceMaterial1: { attribute: 'iStaticMaterialData1', wgsl: 'v.iStaticMaterialData1', glsl: 'iStaticMaterialData1' },
 } );
 
-const wgslType = type => type === 'scalar' ? 'f32' : `${type}f`;
+const wgslType = type => type === 'scalar' ? 'f32' : type === 'bool' ? 'bool' : `${type}f`;
 const glslType = type => type === 'scalar' ? 'float' : type;
 const scalarLiteral = value => Number.isInteger( value ) ? `${value}.0` : String( value );
 
@@ -24,8 +24,16 @@ function expression( node, names, backend ) {
 	if ( node.op === 'input' ) return names.get( node.id );
 	if ( node.op === 'constant' ) return literal( node.value, Array.isArray( node.value ) ? `vec${node.value.length}` : 'scalar', backend );
 	const args = node.args.map( id => names.get( id ) );
-	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep' }[ node.op ];
-	if ( node.op === 'rgb' ) return `${args[ 0 ]}.rgb`;
+	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', sqrt: 'sqrt', sign: 'sign', exp: 'exp', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep', step: 'step' }[ node.op ];
+	if ( [ 'x', 'y', 'z', 'w', 'xy', 'xyz', 'rgb' ].includes( node.op ) ) return `${args[ 0 ]}.${node.op}`;
+	if ( [ 'vec2', 'vec3', 'vec4' ].includes( node.op ) ) return `${backend === 'webgpu' ? `${node.op}f` : node.op}( ${args.join( ', ' )} )`;
+	if ( node.op === 'select' ) return backend === 'webgpu' ? `select( ${args[ 2 ]}, ${args[ 1 ]}, ${args[ 0 ]} )` : `( ${args[ 0 ]} ? ${args[ 1 ]} : ${args[ 2 ]} )`;
+	if ( node.op === 'not' ) return `!${args[ 0 ]}`;
+	if ( node.op === 'and' ) return `( ${args[ 0 ]} && ${args[ 1 ]} )`;
+	if ( node.op === 'or' ) return `( ${args[ 0 ]} || ${args[ 1 ]} )`;
+	if ( node.op === 'atan2' ) return backend === 'webgpu' ? `atan2( ${args.join( ', ' )} )` : `atan( ${args.join( ', ' )} )`;
+	const comparison = { lessThan: '<', lessEqual: '<=', greaterThan: '>', greaterEqual: '>=', equal: '==' }[ node.op ];
+	if ( comparison ) return `( ${args[ 0 ]} ${comparison} ${args[ 1 ]} )`;
 	if ( call ) return `${call}( ${args.join( ', ' )} )`;
 	const op = { add: '+', subtract: '-', multiply: '*', divide: '/' }[ node.op ];
 	return `( ${args[ 0 ]} ${op} ${args[ 1 ]} )`;
