@@ -83,11 +83,10 @@ cannot be translated reliably in general.
 This is the fixed ownership boundary for material work: do not move shader
 code between a world and ElseMesh as a backend-by-backend port. Extend the
 renderer-neutral description and both engine compilers together, or represent
-the appearance with portable assets. The Tidewater fish-prop material profile
-is a transitional WebGPU-only prototype used by an unconnected exporter
-sidecar fixture; it does not meet this contract. Do not add a parallel
-Tidewater WebGL shader adapter. Replace or remove the prototype when the live
-fish-prop content is migrated to the graph or portable assets.
+the appearance with portable assets. The unused Tidewater-specific fish
+sidecar profile has been removed; its unconnected geometry sidecar now uses
+ordinary glTF PBR and remains outside the signed runtime package. That sidecar
+does not establish fish appearance parity.
 
 Legacy custom profile resolution still has two world-controlled paths: WebGPU
 resolves materials through `WorldPackageMaterialAdapterRegistry`, while WebGL

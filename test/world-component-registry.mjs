@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { registerWorldComponent, registeredWorldComponents, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
 import { decodeWorldComponentAsset, registerWorldComponentAssetDecoder } from '../src/network/WorldComponentAssetCodecRegistry.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
+import { worldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
 await import( '../worlds/tidewater/register-components.js' );
 
 assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, true );
@@ -23,6 +24,7 @@ assert.equal( validateWorldRequirements( vehicleManifest ), vehicleManifest, 'si
 assert.throws( () => validateWorldRequirements( { ...vehicleManifest, components: [ { type: 'elsemesh.vehicle-fixture/1', data: { complexityTriangles: 13 } } ] } ), /complexity does not match/, 'vehicle metadata cannot diverge from the backend registry contract' );
 assert.equal( worldComponentDescriptor( 'elsemesh.static-vegetation/1' ).vegetation, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.static-fish-props/1' ).install, null, 'the generic fish-props feature selects an engine backend adapter' );
+assert.equal( worldMaterialProfile( 'elsemesh.tidewater-fish-props/1' ), null, 'Tidewater does not register an unused backend-specific fish sidecar profile' );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.static-reef/1' ).install, 'function' );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).vehicle, true );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.humpback-whale/1' ).createSimulation, 'function', 'the Tidewater package registers humpback simulation behavior' );
