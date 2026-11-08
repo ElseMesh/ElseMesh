@@ -57,7 +57,7 @@ try {
 	const renderedMaterials = [];
 	root.traverse( node => { if ( node.isMesh ) renderedMaterials.push( node.material ); } );
 	assert.ok( renderedMaterials.some( material => material.name === profileMaterial.name ), 'WebGPU static models resolve the registered world material profile' );
-	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= vec3f( 0.15, 0.8, 0.35 )' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
+	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= emg_albedo' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
 	L.scene.add( root );
 	L.camera.position.set( 2, 1, 4 );
 	L.camera.lookAt( 2, 0.5, - 5 );
