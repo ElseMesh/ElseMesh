@@ -22,7 +22,7 @@ const vehicleManifest = { rules: { gravity: 1, avatarComplexity: 1000, physicsPr
 assert.equal( validateWorldRequirements( vehicleManifest ), vehicleManifest, 'signed vehicle component complexity matches its registered engine contract' );
 assert.throws( () => validateWorldRequirements( { ...vehicleManifest, components: [ { type: 'elsemesh.vehicle-fixture/1', data: { complexityTriangles: 13 } } ] } ), /complexity does not match/, 'vehicle metadata cannot diverge from the backend registry contract' );
 assert.equal( worldComponentDescriptor( 'elsemesh.static-vegetation/1' ).vegetation, true );
-assert.equal( worldComponentDescriptor( 'elsemesh.static-fish-props/1' ).install, null, 'fish-props rendering is selected by the engine backend registry' );
+assert.equal( worldComponentDescriptor( 'elsemesh.static-fish-props/1' ).install, null, 'Tidewater fish-props rendering is selected by its registered backend adapters' );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.static-reef/1' ).install, 'function' );
 assert.equal( worldComponentDescriptor( 'elsemesh.downeast-boat/1' ).vehicle, true );
 assert.equal( typeof worldComponentDescriptor( 'elsemesh.humpback-whale/1' ).createSimulation, 'function', 'the Tidewater package registers humpback simulation behavior' );
