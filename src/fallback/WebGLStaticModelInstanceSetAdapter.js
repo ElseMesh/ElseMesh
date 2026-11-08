@@ -243,9 +243,11 @@ function resolveStaticModelMaterial( fallback, sourceMaterial ) {
 
 function staticFadeMaterial( T, source, hasMaterialData ) {
 	const material = source.clone();
-	const originalCompile = material.onBeforeCompile, originalKey = material.customProgramCacheKey?.bind( material );
+	// Three.js Material.copy() does not copy shader hooks. Keep the world profile's
+	// hooks explicitly when cloning so the engine's fade wrapper composes with them.
+	const originalCompile = source.onBeforeCompile, originalKey = source.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
-		originalCompile?.( shader, renderer );
+		originalCompile?.call( material, shader, renderer );
 		const materialAttributes = hasMaterialData ? '\nattribute vec4 iStaticMaterialData0;\nattribute vec4 iStaticMaterialData1;' : '';
 		const materialVaryings = hasMaterialData ? '\nvarying vec4 vStaticMaterialData0;\nvarying vec4 vStaticMaterialData1;' : '';
 		const materialAssignments = hasMaterialData ? 'vStaticMaterialData0 = iStaticMaterialData0;\nvStaticMaterialData1 = iStaticMaterialData1;\n' : '';
@@ -256,7 +258,7 @@ function staticFadeMaterial( T, source, hasMaterialData ) {
 			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;${ materialVaryings }` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
-	material.customProgramCacheKey = () => `${ originalKey?.() || '' }|elsemesh-static-instance-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
+	material.customProgramCacheKey = () => `${ originalKey?.call( material ) || '' }|elsemesh-static-instance-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
 	return material;
 }
 
@@ -271,9 +273,10 @@ function staticFadeDepthMaterial( T, source, hasMaterialData, profileDepthMateri
 			side: source.side,
 		} );
 	material.depthPacking = T.RGBADepthPacking;
-	const originalCompile = material.onBeforeCompile, originalKey = material.customProgramCacheKey?.bind( material );
+	const originalCompile = profileDepthMaterial ? source.onBeforeCompile : material.onBeforeCompile;
+	const originalKey = profileDepthMaterial ? source.customProgramCacheKey : material.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
-		originalCompile?.( shader, renderer );
+		originalCompile?.call( material, shader, renderer );
 		const materialAttributes = hasMaterialData ? '\nattribute vec4 iStaticMaterialData0;\nattribute vec4 iStaticMaterialData1;' : '';
 		const materialVaryings = hasMaterialData ? '\nvarying vec4 vStaticMaterialData0;\nvarying vec4 vStaticMaterialData1;' : '';
 		const materialAssignments = hasMaterialData ? 'vStaticMaterialData0 = iStaticMaterialData0;\nvStaticMaterialData1 = iStaticMaterialData1;\n' : '';
@@ -284,7 +287,7 @@ function staticFadeDepthMaterial( T, source, hasMaterialData, profileDepthMateri
 			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;${ materialVaryings }` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
-	material.customProgramCacheKey = () => `${ originalKey?.() || '' }|elsemesh-static-instance-shadow-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
+	material.customProgramCacheKey = () => `${ originalKey?.call( material ) || '' }|elsemesh-static-instance-shadow-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
 	return material;
 }
 
