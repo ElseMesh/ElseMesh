@@ -78,6 +78,14 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: extended ElseMesh's renderer-neutral material graph with bounded
+  texture-sample nodes for the five standard glTF material slots. The WebGPU
+  package test loads a glTF base-color texture and compiles the graph shader;
+  the headless WebGL pixel test renders the same graph path with 251
+  non-background pixels, four programs, and no GL errors. The external
+  production build passes. This proves the generic engine path, but Tidewater
+  still uses its world-owned village material implementation, so renderer-
+  neutral content remains 63% and gameplay/content parity remains 87%.
 - 2026-11-08: Tidewater now has a WebGPU material profile for generic static
   fish-prop instances. It maps `_ELSEMESH_VDATA`, uses the generic transform and
   eight opaque material values for jaw/curl/sag, and reuses the fish color and
