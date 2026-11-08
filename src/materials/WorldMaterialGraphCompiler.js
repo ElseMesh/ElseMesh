@@ -24,10 +24,12 @@ function literal( value, type, backend ) {
 function expression( node, names, backend ) {
 	if ( node.op === 'input' ) return names.get( node.id );
 	if ( node.op === 'constant' ) return literal( node.value, Array.isArray( node.value ) ? `vec${node.value.length}` : 'scalar', backend );
-	if ( node.op === 'textureSample' ) {
+	if ( node.op === 'textureSample' || node.op === 'textureSampleLevel' ) {
 		const texture = `emgTexture_${node.slot}`;
 		const uv = names.get( node.uv );
-		return backend === 'webgpu' ? `textureSample( ${texture}, smpAnisoRepeat, ${uv} )` : `texture2D( ${texture}, ${uv} )`;
+		const lod = node.op === 'textureSampleLevel' ? names.get( node.lod ) : null;
+		if ( backend === 'webgpu' ) return node.op === 'textureSampleLevel' ? `textureSampleLevel( ${texture}, smpAnisoRepeat, ${uv}, ${lod} )` : `textureSample( ${texture}, smpAnisoRepeat, ${uv} )`;
+		return node.op === 'textureSampleLevel' ? `textureLod( ${texture}, ${uv}, ${lod} )` : `texture2D( ${texture}, ${uv} )`;
 	}
 	const args = node.args.map( id => names.get( id ) );
 	const derivative = { dpdx: backend === 'webgpu' ? 'dpdx' : 'dFdx', dpdy: backend === 'webgpu' ? 'dpdy' : 'dFdy', fwidth: 'fwidth' }[ node.op ];
@@ -54,7 +56,7 @@ function dependencyIDs( graph, roots ) {
 		if ( required.has( id ) ) return;
 		required.add( id );
 		const node = nodes.get( id );
-		for ( const input of node.op === 'textureSample' ? [ node.uv ] : node.args || [] ) visit( input );
+		for ( const input of node.op === 'textureSample' ? [ node.uv ] : node.op === 'textureSampleLevel' ? [ node.uv, node.lod ] : node.args || [] ) visit( input );
 	};
 	for ( const root of roots ) if ( root ) visit( root );
 	return required;
@@ -70,10 +72,10 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
-	if ( graph.nodes.some( node => [ 'textureSample', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph sampling and derivatives are only available to fragment outputs' );
+	if ( graph.nodes.some( node => [ 'textureSample', 'textureSampleLevel', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph sampling and derivatives are only available to fragment outputs' );
 	if ( graph.nodes.some( node => node.op === 'input' && node.name === 'worldPosition' && vertexRequired.has( node.id ) ) ) throw new Error( 'World position is only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
-	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && node.op === 'textureSample' ).map( node => node.slot ) ) ];
+	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) ).map( node => node.slot ) ) ];
 	const attributes = {}, varyings = {};
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];
@@ -121,7 +123,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		backend,
 		inputs: Object.freeze( usedInputs ),
 		textureSlots: Object.freeze( textureSlots ),
-		samplesBaseColorForBaseColor: graph.nodes.some( node => node.op === 'textureSample' && node.slot === 'baseColor' && baseColorRequired.has( node.id ) ),
+		samplesBaseColorForBaseColor: graph.nodes.some( node => [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) && node.slot === 'baseColor' && baseColorRequired.has( node.id ) ),
 		hasVertexOutput: graph.outputs.vertexPosition !== undefined || graph.outputs.vertexNormal !== undefined,
 		attributes: Object.freeze( attributes ),
 		varyings: Object.freeze( varyings ),

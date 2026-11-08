@@ -47,6 +47,10 @@ stage at the graph-provided UV coordinate and return a `vec4`:
 { "id": "wood", "op": "textureSample", "slot": "baseColor", "uv": "uv" }
 ```
 
+`textureSampleLevel` has the same `slot` and `uv` fields plus an earlier scalar
+`lod` node. It requests an explicit mip level, which is useful for authored
+material effects that choose texture detail themselves.
+
 The `uv` field references an earlier `vec2` node. Supported slots are
 `baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive`; each
 resolves to the matching standard glTF material texture slot. Color slots use
@@ -66,8 +70,9 @@ Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,
 `select`, `step`, and `atan2`. Operations are type checked before the engine
 generates shader code. Comparisons currently accept scalar inputs and produce a
-boolean for `select` and logical operations. `textureSample` is validated
-against its slot and UV input before shader generation. Fragment-only
+boolean for `select` and logical operations. Texture samples are validated
+against their slot, UV, and (for explicit LOD) scalar input before shader
+generation. Fragment-only
 `dpdx`, `dpdy`, and `fwidth` compute screen-space derivatives for scalar and
 vector inputs; ElseMesh emits WGSL derivatives or the corresponding GLSL
 functions for the selected backend.

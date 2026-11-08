@@ -134,4 +134,18 @@ assert.match( derivativeWebGL.glsl.fragment, /fwidth\( vEmg_uv \)/ );
 const vertexDerivativeGraph = { ...derivativeGraph, nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'dx', op: 'dpdx', args: [ 'position' ] } ], outputs: { vertexPosition: 'dx' } };
 assert.throws( () => compileWorldMaterialGraph( vertexDerivativeGraph, 'webgpu' ), /fragment outputs/ );
 
+const lodGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'uv', op: 'input', name: 'uv' },
+		{ id: 'lod', op: 'constant', value: 2 },
+		{ id: 'sample', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'lod' },
+		{ id: 'color', op: 'rgb', args: [ 'sample' ] },
+	],
+	outputs: { baseColor: 'color' },
+};
+assert.match( compileWorldMaterialGraph( lodGraph, 'webgpu' ).surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
+assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /textureLod\( emgTexture_baseColor, vEmg_uv, 2\.0 \)/ );
+assert.throws( () => validateWorldMaterialGraph( { ...lodGraph, nodes: [ lodGraph.nodes[ 0 ], lodGraph.nodes[ 1 ], { ...lodGraph.nodes[ 2 ], lod: 'uv' }, lodGraph.nodes[ 3 ] ] } ), /textureSampleLevel/ );
+
 console.log( 'Renderer-neutral material graph validation passed' );

@@ -97,7 +97,8 @@ try {
 		format: 'elsemesh.material-graph/1',
 		nodes: [
 			{ id: 'uv', op: 'input', name: 'uv' },
-			{ id: 'sample', op: 'textureSample', slot: 'baseColor', uv: 'uv' },
+			{ id: 'lod', op: 'constant', value: 0 },
+			{ id: 'sample', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'lod' },
 			{ id: 'graphColor', op: 'rgb', args: [ 'sample' ] },
 			{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
 			{ id: 'height', op: 'y', args: [ 'worldPosition' ] },
@@ -113,7 +114,7 @@ try {
 	graphRoot.traverse( node => { if ( node.isMesh ) graphMaterial = node.material; } );
 	assert.ok( graphMaterial?.bindings.emgTexture_baseColor?.texture?.isTexture, 'signed GLB base-color texture is bound to graph sampling' );
 	assert.equal( graphMaterial.defines.WORLD_HAS_ALBEDO, 0, 'graph-sampled base color is not applied twice' );
-	assert.match( graphMaterial.surface, /textureSample\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv \)/ );
+	assert.match( graphMaterial.surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
 	assert.match( graphMaterial.surface, /let emg_height: f32 = in\.P\.y/ );
 	assert.match( graphMaterial.surface, /fwidth\( in\.vs\.emg_uv \)/ );
 	const graphShader = buildMeshShader( graphMaterial, [ { name: 'position', wgsl: 'vec3f', location: 0 } ], { kind: 'depth' } );
