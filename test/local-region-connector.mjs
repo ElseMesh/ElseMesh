@@ -104,6 +104,7 @@ let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let omitCacheRevision = false;
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
+let previewVisualComponentPathExclusions = {};
 const payloadFetchOrder = [];
 const cellIndexRequests = [];
 const cellIndexRequestQueryLengths = [];
@@ -166,7 +167,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 			playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
 			entryPointPrompt: 'Which Hogwarts house will you join?',
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
-			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32 },
+			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, visualComponentPathExclusionsByMap: previewVisualComponentPathExclusions },
 			previewSupport: { status: 'provisional', position: [ 0, 6.75, 8 ], halfExtents: [ 2, 0.25, 3 ], basis: 'synthetic rendered floor bounds' },
 			choices: descriptorChoices,
 		},
@@ -513,12 +514,15 @@ try {
 	} } } );
 	const diskCacheConnector = new LocalRegionConnector( link );
 	assert.equal( diskCacheConnector.assetCacheBudgetBytes + diskCacheConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'the encoded RAM cache scales down on a low-memory device hint' );
+	const cellIndexFetchesBeforeDiskCache = cellIndexRequests.length;
 	const diskCacheManifest = await diskCacheConnector.getManifest();
+	assert.ok( cellIndexRequests.length > cellIndexFetchesBeforeDiskCache, 'the first provider session downloads its cell-index batches' );
 	const visualAssetID = diskCacheManifest.assets.find( asset => asset.id === 'local-region:great-hall:16:0,0,0:collision' ).id;
 	const providerFetchesBeforeDiskCache = cellFetches;
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'first request gets bytes from the local provider' );
 	await waitForDiskWriteQueue( diskCacheConnector );
+	const cellIndexFetchesAfterDiskCache = cellIndexRequests.length;
 	assert.equal( diskCacheConnector.releaseAsset( visualAssetID ), true, 'unloading evicts the response from browser RAM' );
 	assert.equal( diskCacheConnector.assets.has( visualAssetID ), false, 'unloaded response is no longer held in the connector memory cache' );
 	assert.deepEqual( await diskCacheConnector.getAsset( visualAssetID ), bytes, 'the unloaded response is promoted back from the persistent browser disk cache' );
@@ -531,10 +535,19 @@ try {
 	diskCacheConnector.close();
 	const diskCacheReloadedConnector = new LocalRegionConnector( link );
 	const diskCacheReloadedManifest = await diskCacheReloadedConnector.getManifest();
+	assert.equal( cellIndexRequests.length, cellIndexFetchesAfterDiskCache, 'a new connector reuses cell-index batches from the persistent browser disk cache' );
+	assert.equal( diskCacheReloadedConnector.collisionSourceInventories.has( 'great-hall' ), true, 'the cached first cell-index batch restores the per-region collision inventory' );
 	const reloadedVisualAssetID = diskCacheReloadedManifest.assets.find( asset => asset.id === visualAssetID ).id;
 	assert.deepEqual( await diskCacheReloadedConnector.getAsset( reloadedVisualAssetID ), bytes );
 	assert.equal( cellFetches, providerFetchesBeforeDiskCache + 1, 'a new connector reuses the persistent cache without a provider request' );
 	diskCacheReloadedConnector.close();
+	const cachedCellIndexRequestCount = cellIndexRequests.length;
+	previewVisualComponentPathExclusions = { 'test-map': [ 'new-visual-exclusion' ] };
+	const changedCellIndexIdentityConnector = new LocalRegionConnector( link );
+	await changedCellIndexIdentityConnector.getManifest();
+	assert.ok( cellIndexRequests.length > cachedCellIndexRequestCount, 'changed world visual exclusions do not reuse stale cached cell-index responses' );
+	changedCellIndexIdentityConnector.close();
+	previewVisualComponentPathExclusions = {};
 	const rangeCacheConnector = new LocalRegionConnector( link );
 	const rangeCacheManifest = await rangeCacheConnector.getManifest();
 	const rangeAssetID = rangeCacheManifest.components[ 0 ].assets.find( reference => reference.kind === 'glb' ).assetId;

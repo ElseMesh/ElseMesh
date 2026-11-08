@@ -113,6 +113,13 @@ async function fetchJSON( url, signal ) {
 	return response.json();
 }
 
+async function fetchJSONBytes( url, signal ) {
+	const response = await fetch( url, { credentials: 'omit', cache: 'no-store', signal } );
+	if ( ! response.ok ) throw new Error( `Local region provider returned HTTP ${response.status}` );
+	const bytes = new Uint8Array( await response.arrayBuffer() );
+	return { bytes, value: JSON.parse( new TextDecoder().decode( bytes ) ) };
+}
+
 function findBytes( haystack, needle, start = 0 ) {
 	for ( let index = start; index <= haystack.byteLength - needle.byteLength; index ++ ) {
 		let match = true;
@@ -327,10 +334,39 @@ export class LocalRegionConnector {
 				requireValue( batch.length > 0, 'Local provider cell coordinate exceeds the request URL limit' );
 				const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
 				cellIndexURL.search = params.toString();
-				const cellIndex = await fetchJSON( cellIndexURL, signal );
-				requireValue( cellIndex.sourceRevision === this.sourceRevision && cellIndex.cellSizeMeters === cellSize && Array.isArray( cellIndex.cells ) && cellIndex.cells.length <= batch.length, 'Local provider returned an invalid cell response' );
+				const includesSourceInventory = ! this.collisionSourceInventories.has( sourceRegion.id );
+				const cacheKey = `cell-index\0${sourceRegion.id}\0${cellSize}\0${JSON.stringify( this.previewRegion )}\0${includesSourceInventory ? 1 : 0}\0${batch.join( ';' )}`;
+				let cellIndex = null;
+				let responseBytes = null;
+				try {
+					responseBytes = await this.diskCache?.get( cacheKey ) || null;
+					if ( responseBytes ) cellIndex = JSON.parse( new TextDecoder().decode( responseBytes ) );
+				} catch ( error ) {
+					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region cell-index disk cache read failed:', error );
+					cellIndex = null;
+					responseBytes = null;
+				}
 				const requestedSet = new Set( batch );
-				for ( const cell of cellIndex.cells ) requireValue( requestedSet.has( `${cell?.x},${cell?.y},${cell?.z}` ), 'Local provider returned an unrequested cell' );
+				const validateCellIndex = value => {
+					requireValue( value?.sourceRevision === this.sourceRevision && value.cellSizeMeters === cellSize && Array.isArray( value.cells ) && value.cells.length <= batch.length && ( includesSourceInventory ? value.collisionSourceInventory && typeof value.collisionSourceInventory === 'object' : value.collisionSourceInventory == null ), 'Local provider returned an invalid cell response' );
+					for ( const cell of value.cells ) requireValue( requestedSet.has( `${cell?.x},${cell?.y},${cell?.z}` ), 'Local provider returned an unrequested cell' );
+				};
+				if ( cellIndex ) {
+					try { validateCellIndex( cellIndex ); } catch ( error ) {
+						if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region cached cell index is stale:', error );
+						cellIndex = null;
+						responseBytes = null;
+					}
+				}
+				if ( ! cellIndex ) {
+					const fetched = await fetchJSONBytes( cellIndexURL, signal );
+					cellIndex = fetched.value;
+					responseBytes = fetched.bytes;
+					validateCellIndex( cellIndex );
+					// Cell-index responses are immutable for the provider cache revision. Skip
+					// hashing these potentially large JSON bodies; scope and key identify them.
+					this.#persistDiskEntries( [ { assetId: cacheKey, bytes: responseBytes, digest: null } ], 'cell index' );
+				}
 				this.#installCellIndex( sourceRegion, cellIndex );
 				for ( const cell of batch ) queried.add( cell );
 				offset += batch.length;
