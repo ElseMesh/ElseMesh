@@ -10,7 +10,7 @@ const FRAME_UNIFORM_VALUES = Object.freeze( {
 } );
 
 export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {
-	const compiled = compileWorldMaterialGraph( graph, 'webgpu' );
+	const compiled = compileWorldMaterialGraph( graph, 'webgpu', { doubleSided: Boolean( gltfMaterial.doubleSided ) } );
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
 	for ( const slot of compiled.textureSlots ) if ( ! graphTextures[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const useBaseColorMap = Boolean( albedo && ! compiled.samplesBaseColorForBaseColor );
@@ -102,7 +102,7 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 }
 
 export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
-	const compiled = compileWorldMaterialGraph( graph, 'webgl' );
+	const compiled = compileWorldMaterialGraph( graph, 'webgl', { doubleSided: sourceMaterial.side === T.DoubleSide } );
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
 	const textureBindings = {
 		baseColor: sourceMaterial.map,

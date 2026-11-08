@@ -73,7 +73,7 @@ function dependencyIDs( graph, roots ) {
 }
 
 // Compile one validated graph to engine-owned WGSL and GLSL snippets.
-export function compileWorldMaterialGraph( graph, backend ) {
+export function compileWorldMaterialGraph( graph, backend, { doubleSided = false } = {} ) {
 	validateWorldMaterialGraph( graph );
 	if ( ! [ 'webgpu', 'webgl' ].includes( backend ) ) throw new Error( `Unsupported material graph backend: ${backend}` );
 	const inputTypes = WORLD_MATERIAL_GRAPH_INPUT_TYPES;
@@ -99,11 +99,12 @@ export function compileWorldMaterialGraph( graph, backend ) {
 			if ( ! required.has( node.id ) ) continue;
 			if ( node.op === 'input' ) {
 				const source = INPUT_SOURCES[ node.name ];
-				const expression = source.uniform
+				let expression = source.uniform
 					? source[ backend === 'webgpu' ? 'wgsl' : 'glsl' ]
 					: stage === 'vertex'
 					? source[ backend === 'webgpu' ? 'wgsl' : 'glsl' ]
 					: source[ backend === 'webgpu' ? 'fragmentWGSL' : 'fragmentGLSL' ] || ( backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
+				if ( node.name === 'worldNormal' && backend === 'webgl' && doubleSided && stage === 'fragment' ) expression = `( ${expression} * ( gl_FrontFacing ? 1.0 : -1.0 ) )`;
 				names.set( node.id, expression );
 				continue;
 			}

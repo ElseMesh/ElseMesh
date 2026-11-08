@@ -189,6 +189,7 @@ const slopeGraph = {
 assert.match( compileWorldMaterialGraph( slopeGraph, 'webgpu' ).surface, /perturbNormalByMap\( in\.P, in\.N, in\.vs\.emg_uv, normalize\( vec3f\( emg_slope, 1\.0 \) \) \)/ );
 assert.match( compileWorldMaterialGraph( slopeGraph, 'webgl' ).glsl.fragment, /emgNormalFromSlope\( vEmg_worldPosition, vEmg_worldNormal, vEmg_uv, emg_slope \)/ );
 assert.match( compileWorldMaterialGraph( slopeGraph, 'webgl' ).glsl.fragmentHelpers, /dFdx\( P \).*dFdy\( P \)/s );
+assert.match( compileWorldMaterialGraph( slopeGraph, 'webgl', { doubleSided: true } ).glsl.fragment, /vEmg_worldNormal \* \( gl_FrontFacing \? 1\.0 : -1\.0 \)/ );
 const colorRGBGraph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'tint', op: 'input', name: 'colorRGB' } ], outputs: { baseColor: 'tint' } };
 const colorRGBWebGPU = createWebGPUMaterialGraph( {}, colorRGBGraph );
 const colorRGBWebGL = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), colorRGBGraph );
