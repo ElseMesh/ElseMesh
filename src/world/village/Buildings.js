@@ -1,5 +1,6 @@
 import { Color, Matrix4, Vector3 } from '../../engine/index.js';
-import { slabPart, quad01Part, gridPart } from './GeoBuilder.js';
+import { quad01Part, gridPart } from './GeoBuilder.js';
+import { slabPart } from '../../engine/geometry/ProceduralGeometry.js';
 import {
 	WOOD, HARD, C, lin, wallLantern, lantern, buoyString, waterTank, woodpile, rowboat, oar, flagPole,
 	bucket, fish, iceBed, bananaLeaf, lobster, fishTwine, sHook, Rand,

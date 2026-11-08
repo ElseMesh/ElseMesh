@@ -1,5 +1,6 @@
 import { Color, Matrix4, Vector3 } from '../engine/index.js';
-import { Builder, mat4, gridPart, slabPart, sagPoints } from './village/GeoBuilder.js';
+import { Builder, gridPart, sagPoints } from './village/GeoBuilder.js';
+import { mat4, slabPart } from '../engine/geometry/ProceduralGeometry.js';
 import { FishProps } from './fish/FishProps.js';
 import { mulberry32 } from '../util/Noise.js';
 
