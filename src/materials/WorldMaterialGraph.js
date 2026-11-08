@@ -1,6 +1,13 @@
 import { Color } from '../engine/math/Color.js';
+import { G } from '../engine/render/Frame.js';
 import { standard } from './Materials.js';
 import { compileWorldMaterialGraph } from './WorldMaterialGraphCompiler.js';
+
+const FRAME_UNIFORM_VALUES = Object.freeze( {
+	emgFrameTime: () => G.time.value,
+	emgWindDirection: () => G.windDir.value,
+	emgWindSpeed: () => G.windSpeed.value,
+} );
 
 export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgpu' );
@@ -54,7 +61,7 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			if ( ! source.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			return source.replace( marker, `${code}\n${marker}` );
 		};
-		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations ].filter( Boolean ).join( '\n' );
+		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations, compiled.glsl.uniforms ].filter( Boolean ).join( '\n' );
 		shader.vertexShader = insert( shader.vertexShader, '#include <common>', vertexDecl );
 		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${graphVertex}` );
@@ -64,12 +71,17 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldPosition = worldPosition.xyz;` );
 		}
 		if ( fragment ) {
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', compiled.glsl.declarations );
+			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms ].filter( Boolean ).join( '\n' ) );
 			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', compiled.glsl.fragment );
-			for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
 		}
+		for ( const name of compiled.glsl.uniformInputs ) {
+			const read = FRAME_UNIFORM_VALUES[ name ];
+			if ( ! read ) throw new Error( `WebGL material graph uses unsupported frame input ${name}` );
+			shader.uniforms[ name ] = { get value() { return read(); } };
+		}
+		if ( fragment ) for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
 	};
 	material.customProgramCacheKey = () => `${originalKey?.call( material ) || ''}|elsemesh-material-graph-1:${graphKey}:${fragment ? 'color' : 'depth'}`;
 	material.userData ||= {};

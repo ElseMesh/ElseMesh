@@ -7,6 +7,9 @@ const INPUT_SOURCES = Object.freeze( {
 	uv: { builtin: true, wgsl: 'v.uv', glsl: 'uv' },
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
 	vdata: { attribute: 'vdata', wgsl: 'v.vdata', glsl: 'vdata' },
+	time: { uniform: true, wgsl: 'frame.time', glsl: 'emgFrameTime' },
+	windDirection: { uniform: true, wgsl: 'frame.windDir', glsl: 'emgWindDirection' },
+	windSpeed: { uniform: true, wgsl: 'frame.windSpeed', glsl: 'emgWindSpeed' },
 	instanceMaterial0: { attribute: 'iStaticMaterialData0', wgsl: 'v.iStaticMaterialData0', glsl: 'iStaticMaterialData0' },
 	instanceMaterial1: { attribute: 'iStaticMaterialData1', wgsl: 'v.iStaticMaterialData1', glsl: 'iStaticMaterialData1' },
 } );
@@ -80,7 +83,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];
 		if ( source.attribute ) attributes[ source.attribute ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
-		if ( ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
+		if ( ! source.uniform && ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
 	}
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
 	const emitNodes = ( stage, required ) => {
@@ -89,7 +92,9 @@ export function compileWorldMaterialGraph( graph, backend ) {
 			if ( ! required.has( node.id ) ) continue;
 			if ( node.op === 'input' ) {
 				const source = INPUT_SOURCES[ node.name ];
-				const expression = stage === 'vertex'
+				const expression = source.uniform
+					? source[ backend === 'webgpu' ? 'wgsl' : 'glsl' ]
+					: stage === 'vertex'
 					? source[ backend === 'webgpu' ? 'wgsl' : 'glsl' ]
 					: source[ backend === 'webgpu' ? 'fragmentWGSL' : 'fragmentGLSL' ] || ( backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
 				names.set( node.id, expression );
@@ -103,7 +108,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		return { names, code: lines.join( '\n' ) };
 	};
 	const vertex = emitNodes( 'vertex', vertexRequired ), fragment = emitNodes( 'fragment', fragmentRequired );
-	const vertexAssignments = usedInputs.filter( name => ! INPUT_SOURCES[ name ].fragmentOnly ).map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
+	const vertexAssignments = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].fragmentOnly ).map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
 	const vertexOutputs = [];
 	for ( const [ output, target ] of [ [ 'vertexPosition', 'position' ], [ 'vertexNormal', 'normal' ] ] ) {
 		const id = graph.outputs[ output ];
@@ -116,7 +121,9 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		const id = graph.outputs[ output ];
 		if ( id ) surfaceLines.push( `${target} ${operator} ${fragment.names.get( id )};` );
 	}
-	const glslVaryings = usedInputs.map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
+	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
+	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
+	const glslUniforms = glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ).join( '\n' );
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
 	return Object.freeze( {
@@ -132,6 +139,8 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		glsl: Object.freeze( {
 			attributes: Object.entries( attributes ).map( ( [ name, type ] ) => `attribute ${type} ${name};` ).join( '\n' ),
 			declarations: glslVaryings,
+			uniforms: glslUniforms,
+			uniformInputs: Object.freeze( glslUniformInputs.map( name => INPUT_SOURCES[ name ].glsl ) ),
 			worldPosition: usedInputs.includes( 'worldPosition' ),
 			vertex: commonVertex,
 			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ) ) ].filter( Boolean ).join( '\n' ),

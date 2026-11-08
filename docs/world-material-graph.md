@@ -33,6 +33,9 @@ Input nodes use these engine-defined semantics and types:
 | `uv` | vec2 | First texture coordinate |
 | `color` | vec4 | glTF `COLOR_0` |
 | `vdata` | vec4 | glTF `_ELSEMESH_VDATA` |
+| `time` | scalar | Shared simulation time in seconds |
+| `windDirection` | vec2 | Shared world-space XZ wind direction |
+| `windSpeed` | scalar | Shared wind speed in metres per second |
 | `instanceMaterial0` | vec4 | First per-instance material vector |
 | `instanceMaterial1` | vec4 | Second per-instance material vector |
 

@@ -102,11 +102,22 @@ try {
 			{ id: 'graphColor', op: 'rgb', args: [ 'sample' ] },
 			{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
 			{ id: 'height', op: 'y', args: [ 'worldPosition' ] },
-		{ id: 'uvWidth', op: 'fwidth', args: [ 'uv' ] },
-		{ id: 'uvWidthX', op: 'x', args: [ 'uvWidth' ] },
-		{ id: 'roughness', op: 'add', args: [ 'height', 'uvWidthX' ] },
+			{ id: 'uvWidth', op: 'fwidth', args: [ 'uv' ] },
+			{ id: 'uvWidthX', op: 'x', args: [ 'uvWidth' ] },
+			{ id: 'time', op: 'input', name: 'time' },
+			{ id: 'windDirection', op: 'input', name: 'windDirection' },
+			{ id: 'windSpeed', op: 'input', name: 'windSpeed' },
+			{ id: 'windMagnitude', op: 'length', args: [ 'windDirection' ] },
+			{ id: 'windStrength', op: 'multiply', args: [ 'windMagnitude', 'windSpeed' ] },
+			{ id: 'scale', op: 'constant', value: 0.001 },
+			{ id: 'windDetail', op: 'multiply', args: [ 'windStrength', 'scale' ] },
+			{ id: 'timeWave', op: 'sin', args: [ 'time' ] },
+			{ id: 'timeDetail', op: 'multiply', args: [ 'timeWave', 'scale' ] },
+			{ id: 'roughnessBase', op: 'add', args: [ 'height', 'uvWidthX' ] },
+			{ id: 'roughnessDetail', op: 'add', args: [ 'windDetail', 'timeDetail' ] },
+			{ id: 'roughness', op: 'add', args: [ 'roughnessBase', 'roughnessDetail' ] },
 		],
-	outputs: { baseColor: 'graphColor', roughness: 'roughness' },
+		outputs: { baseColor: 'graphColor', roughness: 'roughness' },
 	};
 	const graphBytes = makeGLB( Buffer.from( [ 0 ] ), 'image/png', null, { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } );
 	graphRoot = await loadWorldPackage( connector, { assets: new Map( [ [ 'asset', graphBytes ] ] ) } );
@@ -117,6 +128,9 @@ try {
 	assert.match( graphMaterial.surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
 	assert.match( graphMaterial.surface, /let emg_height: f32 = in\.P\.y/ );
 	assert.match( graphMaterial.surface, /fwidth\( in\.vs\.emg_uv \)/ );
+	assert.match( graphMaterial.surface, /frame\.time/ );
+	assert.match( graphMaterial.surface, /frame\.windDir/ );
+	assert.match( graphMaterial.surface, /frame\.windSpeed/ );
 	const graphShader = buildMeshShader( graphMaterial, [ { name: 'position', wgsl: 'vec3f', location: 0 } ], { kind: 'depth' } );
 	const graphComposed = composeShader( { modules: graphShader.modules, bindings: graphShader.bindings, code: graphShader.code, defines: graphShader.defines, stage: 'render', label: graphMaterial.name } );
 	const graphCompilation = await GPU.device.createShaderModule( { code: graphComposed.code, label: 'world-material-graph-texture-test' } ).getCompilationInfo();

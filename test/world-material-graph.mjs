@@ -4,6 +4,7 @@ import { validateWorldMaterialGraph, worldMaterialGraph } from '../src/network/W
 import { compileWorldMaterialGraph } from '../src/materials/WorldMaterialGraphCompiler.js';
 import { createWebGLMaterialGraph, createWebGPUMaterialGraph } from '../src/materials/WorldMaterialGraph.js';
 import { worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
+import { G } from '../src/engine/render/Frame.js';
 
 const graph = {
 	format: 'elsemesh.material-graph/1',
@@ -147,5 +148,59 @@ const lodGraph = {
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgpu' ).surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /textureLod\( emgTexture_baseColor, vEmg_uv, emg_lod \)/ );
 assert.throws( () => validateWorldMaterialGraph( { ...lodGraph, nodes: [ lodGraph.nodes[ 0 ], lodGraph.nodes[ 1 ], { ...lodGraph.nodes[ 2 ], lod: 'uv' }, lodGraph.nodes[ 3 ] ] } ), /textureSampleLevel/ );
+
+const frameGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'position', op: 'input', name: 'position' },
+		{ id: 'time', op: 'input', name: 'time' },
+		{ id: 'windDirection', op: 'input', name: 'windDirection' },
+		{ id: 'windSpeed', op: 'input', name: 'windSpeed' },
+		{ id: 'oscillation', op: 'sin', args: [ 'time' ] },
+		{ id: 'gust', op: 'multiply', args: [ 'oscillation', 'windSpeed' ] },
+		{ id: 'windX', op: 'x', args: [ 'windDirection' ] },
+		{ id: 'windZ', op: 'y', args: [ 'windDirection' ] },
+		{ id: 'offsetX', op: 'multiply', args: [ 'windX', 'gust' ] },
+		{ id: 'offsetZ', op: 'multiply', args: [ 'windZ', 'gust' ] },
+		{ id: 'zero', op: 'constant', value: 0 },
+		{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'offsetZ' ] },
+		{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
+	],
+	outputs: { vertexPosition: 'moved' },
+};
+const frameWebGPU = compileWorldMaterialGraph( frameGraph, 'webgpu' );
+const frameWebGL = compileWorldMaterialGraph( frameGraph, 'webgl' );
+assert.match( frameWebGPU.vertex, /frame\.time/ );
+assert.match( frameWebGPU.vertex, /frame\.windDir/ );
+assert.match( frameWebGPU.vertex, /frame\.windSpeed/ );
+assert.match( frameWebGL.glsl.uniforms, /uniform float emgFrameTime/ );
+assert.match( frameWebGL.glsl.uniforms, /uniform vec2 emgWindDirection/ );
+assert.match( frameWebGL.glsl.uniforms, /uniform float emgWindSpeed/ );
+assert.doesNotMatch( frameWebGL.glsl.declarations, /vEmg_(time|windDirection|windSpeed)/ );
+
+const previousFrame = { time: G.time.value, windX: G.windDir.value.x, windY: G.windDir.value.y, speed: G.windSpeed.value };
+try {
+	G.time.value = 4.25;
+	G.windDir.value.set( 0.6, 0.8 );
+	G.windSpeed.value = 12;
+	const frameMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), frameGraph );
+	const frameShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+	frameMaterial.material.onBeforeCompile( frameShader );
+	assert.equal( frameShader.uniforms.emgFrameTime.value, 4.25 );
+	assert.deepEqual( [ frameShader.uniforms.emgWindDirection.value.x, frameShader.uniforms.emgWindDirection.value.y ], [ 0.6, 0.8 ] );
+	assert.equal( frameShader.uniforms.emgWindSpeed.value, 12 );
+	G.time.value = 7.5;
+	G.windDir.value.set( - 1, 0 );
+	G.windSpeed.value = 3;
+	assert.equal( frameShader.uniforms.emgFrameTime.value, 7.5, 'WebGL graph reads the current shared frame time' );
+	assert.deepEqual( [ frameShader.uniforms.emgWindDirection.value.x, frameShader.uniforms.emgWindDirection.value.y ], [ - 1, 0 ] );
+	assert.equal( frameShader.uniforms.emgWindSpeed.value, 3, 'WebGL graph reads the current shared wind speed' );
+	frameMaterial.material.dispose();
+	frameMaterial.depthMaterial?.dispose();
+} finally {
+	G.time.value = previousFrame.time;
+	G.windDir.value.set( previousFrame.windX, previousFrame.windY );
+	G.windSpeed.value = previousFrame.speed;
+}
 
 console.log( 'Renderer-neutral material graph validation passed' );
