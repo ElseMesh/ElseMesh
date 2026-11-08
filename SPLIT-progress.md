@@ -78,6 +78,13 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: added fragment-only `dpdx`, `dpdy`, and `fwidth` material-graph
+  operations with scalar/vector type validation and WGSL/GLSL translations.
+  Package-loaded WebGPU shader compilation, the WebGL pixel render (251
+  non-background pixels, four programs, no GL errors), and the external
+  production build pass. These operations support world-authored anti-aliasing
+  and detail fades; Tidewater still uses its bespoke shader, so renderer-neutral
+  content remains 63% and gameplay/content parity remains 87%.
 - 2026-11-08: added a renderer-neutral fragment `worldPosition` material-graph
   input. WebGPU reads the engine's final fragment position; WebGL exports the
   position after the instance transform. Graph validation, package-loaded
