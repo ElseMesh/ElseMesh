@@ -2087,6 +2087,7 @@ export class App {
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		const s = this.settings;
 		this.updateFPS();
+		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs, cpuMs: this.cpuMs, gpuMs: this.frameWorkMeter?.gpuMilliseconds() } );
 		G.dt.value = dt;
 		if ( s.timeSpeed !== 0 ) s.timeOfDay = ( s.timeOfDay + dt * s.timeSpeed + 24 ) % 24;
 
