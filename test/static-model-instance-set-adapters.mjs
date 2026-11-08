@@ -106,7 +106,7 @@ assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'WebGL uses the shared four-channel fade policy' );
 assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialData0' ).array ), [ 0.25, 0.5, 0.75, 1 ], 'WebGL exposes the same opaque material-profile data as WebGPU' );
 assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialData1' ).array ), [ 2, 3, 4, 5 ], 'WebGL exposes the second material-profile vec4' );
-assert.match( webglMain.material.customProgramCacheKey(), /static-instance-data-v1/ );
+assert.match( webglMain.material.customProgramCacheKey(), /static-instance-fade-v1\+material-data-v1/ );
 webglResult.runtime.dispose();
 assert.equal( webglFallback.scene.children.length, 0 );
 
