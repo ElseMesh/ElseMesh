@@ -240,10 +240,16 @@ const updateCameraWorldMatrix = runtimeCamera.updateMatrixWorld.bind( runtimeCam
 let cameraMatrixRefreshes = 0;
 runtimeCamera.updateMatrixWorld = force => { cameraMatrixRefreshes ++; return updateCameraWorldMatrix( force ); };
 runtimeCamera.position.x = 0.5;
-updateWorldComponentRuntimes( [ runtime, {
-	update: ( _dt, _camera, _player, _argument, cameraWorldUpdated ) => assert.equal( cameraWorldUpdated, true ),
-} ], 1 / 60, runtimeCamera, undefined, 0 );
-assert.equal( cameraMatrixRefreshes, 1, 'a component batch refreshes camera matrices once and static-model runtimes reuse them' );
+let reusedCameraMatrixUpdates = 0;
+const otherComponentRuntimes = Array.from( { length: 535 }, () => ( {
+	update: ( _dt, _camera, _player, _argument, cameraWorldUpdated ) => {
+		assert.equal( cameraWorldUpdated, true );
+		reusedCameraMatrixUpdates ++;
+	},
+} ) );
+updateWorldComponentRuntimes( [ runtime, ...otherComponentRuntimes ], 1 / 60, runtimeCamera, undefined, 0 );
+assert.equal( cameraMatrixRefreshes, 1, 'a 536-runtime component batch refreshes camera matrices once' );
+assert.equal( reusedCameraMatrixUpdates, 535, 'all other components reuse the refreshed camera matrices' );
 assert.equal( runtimePlannerUpdates, 4, 'a moved camera replans after the shared matrix refresh' );
 runtimeCamera.updateMatrixWorld = updateCameraWorldMatrix;
 runtime.dispose();
