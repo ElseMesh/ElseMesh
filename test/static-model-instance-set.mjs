@@ -8,6 +8,7 @@ import { worldComponentAssetIDs } from '../src/network/WorldComponentRegistry.js
 import { WorldConnector } from '../src/network/WorldConnector.js';
 import { StaticModelInstanceSetRuntime } from '../src/engine/render/StaticModelInstanceSetRuntime.js';
 import { StaticModelInstanceSetPlanner, staticModelInstanceCamera } from '../src/engine/render/StaticModelInstanceSetPlanner.js';
+import { updateWorldComponentRuntimes } from '../src/engine/scene/WorldComponentUpdate.js';
 import {
 	decodeStaticModelInstanceSet,
 	STATIC_MODEL_INSTANCE_SET_ASSET_KIND,
@@ -235,6 +236,16 @@ assert.equal( runtimePlannerUpdates, 2, 'camera movement refreshes static model 
 assert.ok( lodStateReads > initialLODStateReads, 'camera movement rechecks visible model LOD requests' );
 runtime.update( 1 / 60, runtimeCamera, undefined, 1 );
 assert.equal( runtimePlannerUpdates, 3, 'render-load bias changes refresh static model LOD planning' );
+const updateCameraWorldMatrix = runtimeCamera.updateMatrixWorld.bind( runtimeCamera );
+let cameraMatrixRefreshes = 0;
+runtimeCamera.updateMatrixWorld = force => { cameraMatrixRefreshes ++; return updateCameraWorldMatrix( force ); };
+runtimeCamera.position.x = 0.5;
+updateWorldComponentRuntimes( [ runtime, {
+	update: ( _dt, _camera, _player, _argument, cameraWorldUpdated ) => assert.equal( cameraWorldUpdated, true ),
+} ], 1 / 60, runtimeCamera, undefined, 0 );
+assert.equal( cameraMatrixRefreshes, 1, 'a component batch refreshes camera matrices once and static-model runtimes reuse them' );
+assert.equal( runtimePlannerUpdates, 4, 'a moved camera replans after the shared matrix refresh' );
+runtimeCamera.updateMatrixWorld = updateCameraWorldMatrix;
 runtime.dispose();
 assert.equal( disposedRuntime, true );
 

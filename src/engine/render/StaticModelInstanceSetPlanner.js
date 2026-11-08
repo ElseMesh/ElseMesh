@@ -4,9 +4,9 @@ import { WebGLCoordinateSystem } from '../math/Matrix4.js';
 const finiteVector3 = value => Array.isArray( value ) && value.length === 3 && value.every( Number.isFinite );
 
 /** Convert an engine or Three.js perspective camera into the planner's backend-neutral view. */
-export function staticModelInstanceCamera( camera ) {
+export function staticModelInstanceCamera( camera, cameraWorldUpdated = false ) {
 	if ( ! camera?.projectionMatrix?.elements || ! camera?.matrixWorldInverse?.elements || ! camera?.matrixWorld?.elements || typeof camera.getEffectiveFOV !== 'function' ) throw new Error( 'Static model instance camera requires a perspective camera' );
-	camera.updateMatrixWorld( true );
+	if ( ! cameraWorldUpdated ) camera.updateMatrixWorld( true );
 	const a = camera.projectionMatrix.elements, b = camera.matrixWorldInverse.elements, viewProjection = new Float64Array( 16 );
 	for ( let column = 0; column < 4; column ++ ) for ( let row = 0; row < 4; row ++ ) {
 		let value = 0;

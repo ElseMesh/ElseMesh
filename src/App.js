@@ -2,6 +2,7 @@ import { Vector3, Euler, Color, MathUtils, Mesh } from './engine/index.js';
 import { GPU } from './engine/gpu/GPU.js';
 import { SunShadows } from './engine/render/Shadows.js';
 import { FrameUniforms } from './engine/render/Frame.js';
+import { updateWorldComponentRuntimes } from './engine/scene/WorldComponentUpdate.js';
 
 import { Engine } from './core/Engine.js';
 import { Input } from './core/Input.js';
@@ -1593,7 +1594,7 @@ export class App {
 
 	updateWorldComponents( root, dt, camera ) {
 		const components = root?.userData?.worldComponents || [];
-		for ( const component of components ) component.update?.( dt, camera, this.player, this.renderLoadBias );
+		updateWorldComponentRuntimes( components, dt, camera, this.player, this.renderLoadBias );
 	}
 
 	updateFreeCamera( dt ) {

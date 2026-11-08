@@ -103,14 +103,14 @@ export class StaticModelInstanceSetRuntime {
 		return () => this.plannerRevisionListeners?.delete( listener );
 	}
 
-	update( _dt, camera, _player, renderLoadBias = 0 ) {
+	update( _dt, camera, _player, renderLoadBias = 0, cameraWorldUpdated = false ) {
 		if ( this.disposed ) return;
 		const now = performance.now();
-		const cameraChanged = this.#cameraChanged( camera, renderLoadBias );
+		const cameraChanged = this.#cameraChanged( camera, renderLoadBias, cameraWorldUpdated );
 		const plannerWasDirty = this._plannerDirty;
 		const plannerChanged = cameraChanged || this._plannerDirty;
 		if ( plannerChanged ) {
-			this.planner.update( staticModelInstanceCamera( camera ), { includeShadows: this.usesShadowBatches, renderLoadBias, includeInstance: index => {
+			this.planner.update( staticModelInstanceCamera( camera, cameraWorldUpdated ), { includeShadows: this.usesShadowBatches, renderLoadBias, includeInstance: index => {
 				const claim = this.placementClaims[ index ];
 				return ! claim || this.placementOwners.get( claim.id )?.values().next().value === claim;
 			} } );
@@ -129,8 +129,8 @@ export class StaticModelInstanceSetRuntime {
 		}
 	}
 
-	#cameraChanged( camera, renderLoadBias ) {
-		camera.updateMatrixWorld( true );
+	#cameraChanged( camera, renderLoadBias, cameraWorldUpdated ) {
+		if ( ! cameraWorldUpdated ) camera.updateMatrixWorld( true );
 		const world = camera.matrixWorld.elements, projection = camera.projectionMatrix.elements;
 		let changed = ! this._cameraStateValid;
 		for ( let index = 0; index < 16; index ++ ) {

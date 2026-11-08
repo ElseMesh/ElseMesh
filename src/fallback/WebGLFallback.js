@@ -9,6 +9,7 @@ import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
 import { CDLOD } from '../core/CDLOD.js';
 import { Player } from '../player/Player.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
+import { updateWorldComponentRuntimes } from '../engine/scene/WorldComponentUpdate.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
@@ -2265,8 +2266,8 @@ export class WebGLFallback {
 		this.terrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		this.hostedTerrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
-		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player, simulationTime );
-		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.update?.( dt, this.camera, this.player, simulationTime );
+		updateWorldComponentRuntimes( this.hostedComponentRuntimes?.values?.(), dt, this.camera, this.player, simulationTime );
+		updateWorldComponentRuntimes( this.builtinComponentRuntimes?.values?.(), dt, this.camera, this.player, simulationTime, true );
 		this.boat?.update( dt );
 		if ( this.waterQuery ) {
 			this.waterQuery.setCamera( this.camera.position.x, this.camera.position.z );
