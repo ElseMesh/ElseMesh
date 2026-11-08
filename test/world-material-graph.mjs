@@ -80,6 +80,16 @@ occlusionMaterial.material.onBeforeCompile( occlusionShader );
 assert.match( occlusionShader.fragmentShader, /reflectedLight\.indirectDiffuse \*= emg_ambient;[\s\S]*#include <aomap_fragment>/ );
 occlusionMaterial.material.dispose();
 
+const opacityGraph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'coverage', op: 'constant', value: 0.4 } ], outputs: { opacity: 'coverage' } };
+const opacityWebGL = compileWorldMaterialGraph( opacityGraph, 'webgl' );
+assert.match( opacityWebGL.glsl.alphaFragment, /diffuseColor\.a \*= emgAlpha_coverage/ );
+assert.doesNotMatch( opacityWebGL.glsl.fragment, /diffuseColor\.a/ );
+const opacityMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial( { alphaTest: 0.5 } ), opacityGraph );
+const opacityShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <alphatest_fragment>\n#include <lights_physical_fragment>', uniforms: {} };
+opacityMaterial.material.onBeforeCompile( opacityShader );
+assert.match( opacityShader.fragmentShader, /diffuseColor\.a \*= emgAlpha_coverage;[\s\S]*#include <alphatest_fragment>/ );
+opacityMaterial.material.dispose();
+
 const textureWebGPU = compileWorldMaterialGraph( textureGraph, 'webgpu' );
 const textureWebGL = compileWorldMaterialGraph( textureGraph, 'webgl' );
 assert.deepEqual( textureWebGPU.textureSlots, [ 'baseColor' ] );

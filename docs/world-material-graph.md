@@ -92,7 +92,8 @@ Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `occlusion` (scalar),
 `surfaceNormal` (vec3 world-space), `vertexPosition` (vec3), and
 `vertexNormal` (vec3). `occlusion` multiplies indirect diffuse and specular
-lighting in both backends. `surfaceNormal` replaces
+lighting in both backends. `opacity` multiplies the surface alpha before the
+glTF alpha-mask test and blending. `surfaceNormal` replaces
 the current surface normal after the standard glTF normal map is applied; the
 backend compiler converts its world-space value into that renderer's
 coordinate space. glTF PBR factors and the engine's existing base-color,
@@ -101,9 +102,11 @@ graph outputs modify those values. Vertex outputs also feed the WebGL depth
 material so deformed geometry can keep its shadow shape.
 
 The graph compiler and pixel fixture live in ElseMesh. The fixture checks
-the same signed GLB through both static-model adapters. Tidewater has not yet
-migrated its live fish-prop component or species material to this format; this
-contract alone does not establish fish appearance parity.
+the same signed GLB through both static-model adapters. Tidewater's signed
+village net, thatch, and fabric materials now use this format; their package
+renders prove compilation and visible output, not matched image parity.
+Tidewater has not yet migrated its live fish-prop component or species
+material to this format.
 
 ## Current limits and migration gate
 
@@ -111,9 +114,9 @@ Format `/1` samples only the five standard glTF material texture slots; it does
 not define material-specific texture bundles. The graph inputs otherwise
 include vertex/instance data, and the standard glTF base-color, normal, and
 emissive textures are applied by the engine around the graph. Tidewater's
-current village shader uses several packed maps and material parameters, so
-verify that these standard slots can carry all required inputs before choosing
-the graph path.
+remaining legacy village roles still use multiple packed maps and material
+parameters; verify the standard slots and bounded graph can carry each role's
+inputs before removing its legacy presenter.
 
 Do not move that shader or its role-specific compiler into ElseMesh as a
 shortcut. Either use these bounded glTF texture inputs in a renderer-neutral

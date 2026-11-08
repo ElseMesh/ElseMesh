@@ -79,6 +79,9 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	const inputTypes = WORLD_MATERIAL_GRAPH_INPUT_TYPES;
 	const vertexRoots = [ graph.outputs.vertexPosition, graph.outputs.vertexNormal ];
 	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal ];
+	const lightingFragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal ];
+	const opacityRequired = dependencyIDs( graph, [ graph.outputs.opacity ] );
+	const lightingFragmentRequired = dependencyIDs( graph, lightingFragmentRoots );
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
@@ -93,7 +96,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 		if ( ! source.uniform && ! source.builtinFragment && ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
 	}
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
-	const emitNodes = ( stage, required ) => {
+	const emitNodes = ( stage, required, prefix = 'emg_' ) => {
 		const names = new Map(), lines = [];
 		for ( const node of graph.nodes ) {
 			if ( ! required.has( node.id ) ) continue;
@@ -108,7 +111,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 				names.set( node.id, expression );
 				continue;
 			}
-			const name = `emg_${node.id}`;
+			const name = `${prefix}${node.id}`;
 			const value = expression( node, names, backend );
 			lines.push( backend === 'webgpu' ? `let ${name}: ${wgslType( nodeTypes.get( node.id ) )} = ${value};` : `${glslType( nodeTypes.get( node.id ) )} ${name} = ${value};` );
 			names.set( node.id, name );
@@ -116,6 +119,8 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 		return { names, code: lines.join( '\n' ) };
 	};
 	const vertex = emitNodes( 'vertex', vertexRequired ), fragment = emitNodes( 'fragment', fragmentRequired );
+	const lightingFragment = backend === 'webgl' ? emitNodes( 'fragment', lightingFragmentRequired ) : null;
+	const opacityFragment = backend === 'webgl' && graph.outputs.opacity ? emitNodes( 'fragment', opacityRequired, 'emgAlpha_' ) : null;
 	const vertexAssignments = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].fragmentOnly ).map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
 	const vertexOutputs = [];
 	for ( const [ output, target ] of [ [ 'vertexPosition', 'position' ], [ 'vertexNormal', 'normal' ] ] ) {
@@ -145,6 +150,8 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 }` : '';
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
+	const webglLightingLines = surfaceLines.filter( line => ! line.startsWith( 's.ao *=' ) && ! line.startsWith( 's.alpha *=' ) ).map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) );
+	const opacityID = graph.outputs.opacity;
 	const occlusionID = graph.outputs.occlusion;
 	return Object.freeze( {
 		backend,
@@ -166,8 +173,9 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 			viewportSize: usedInputs.includes( 'pixelPosition' ),
 			fragmentHelpers: glslFragmentHelpers,
 			vertex: commonVertex,
-			fragment: [ fragment.code, ...surfaceLines.filter( line => ! line.startsWith( 's.ao *=' ) ).map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) ) ].filter( Boolean ).join( '\n' ),
-			occlusion: occlusionID ? `reflectedLight.indirectDiffuse *= ${fragment.names.get( occlusionID )};\nreflectedLight.indirectSpecular *= ${fragment.names.get( occlusionID )};` : '',
+			fragment: [ lightingFragment?.code, ...webglLightingLines ].filter( Boolean ).join( '\n' ),
+			alphaFragment: backend === 'webgl' && opacityID ? [ opacityFragment.code, `diffuseColor.a *= ${opacityFragment.names.get( opacityID )};` ].join( '\n' ) : '',
+			occlusion: backend === 'webgl' && occlusionID ? `reflectedLight.indirectDiffuse *= ${lightingFragment.names.get( occlusionID )};\nreflectedLight.indirectSpecular *= ${lightingFragment.names.get( occlusionID )};` : '',
 		} ),
 	} );
 }

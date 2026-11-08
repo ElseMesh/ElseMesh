@@ -89,6 +89,7 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers ].filter( Boolean ).join( '\n' ) );
 			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
+			if ( compiled.glsl.alphaFragment ) shader.fragmentShader = insert( shader.fragmentShader, '#include <alphatest_fragment>', compiled.glsl.alphaFragment );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
 			if ( compiled.glsl.occlusion ) shader.fragmentShader = insert( shader.fragmentShader, '#include <aomap_fragment>', compiled.glsl.occlusion );
