@@ -51,7 +51,7 @@ export class WebGLProgressiveStaticTextures {
   this.registrations.delete( runtime );
  }
  update( camera, frame ) {
-  if ( this.lastFrame === frame || this.inFlight || ! this.entries.size ) return;
+  if ( this.fallback.app?.linkedWorldRoot?.userData.worldPackage?.coarseCoverageReady === false || this.lastFrame === frame || this.inFlight || ! this.entries.size ) return;
   this.lastFrame = frame;
   let best = null;
   const viewportHeight = this.fallback.renderer.domElement.height || 1;
