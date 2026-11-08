@@ -195,6 +195,12 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		meshCount ++;
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Static model instance GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
+		const materialResolution = resolveStaticModelMaterial( fallback, object.material );
+		const sourceMaterial = materialResolution?.material || materialResolution || object.material;
+		if ( sourceMaterial.transparent && Number.isFinite( sourceMaterial.opacity ) && sourceMaterial.opacity <= 0 ) {
+			fullyTransparentMeshCount ++;
+			return;
+		}
 		const geometry = object.geometry.clone().applyMatrix4( object.matrixWorld );
 		if ( object.matrixWorld.determinant() < 0 ) correctStaticModelGeometryReflection( geometry );
 		if ( geometryMirrorX ) mirrorStaticModelGeometryX( geometry );
@@ -204,12 +210,6 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 			geometry.setAttribute( 'iStaticMaterialData1', materialData1Attribute );
 		}
 		geometry.computeBoundingSphere();
-		const materialResolution = resolveStaticModelMaterial( fallback, object.material );
-		const sourceMaterial = materialResolution?.material || materialResolution || object.material;
-		if ( sourceMaterial.transparent && Number.isFinite( sourceMaterial.opacity ) && sourceMaterial.opacity <= 0 ) {
-			fullyTransparentMeshCount ++;
-			return;
-		}
 		materialResolution?.prepareGeometry?.( geometry, object );
 		const profileDepthMaterial = materialResolution?.material ? materialResolution.depthMaterial || null : null;
 		if ( profileDepthMaterial && ! profileDepthMaterial.isMeshDepthMaterial ) throw new Error( 'World material profile depthMaterial must be a MeshDepthMaterial' );

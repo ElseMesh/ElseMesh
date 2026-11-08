@@ -110,4 +110,36 @@ assert.match( webglMain.material.customProgramCacheKey(), /static-instance-fade-
 webglResult.runtime.dispose();
 assert.equal( webglFallback.scene.children.length, 0 );
 
+const transparentModelBytes = staticModelGLB( { materialAlpha: 0 } );
+const transparentModelAssetID = hash( transparentModelBytes );
+const transparentDocumentBytes = new TextEncoder().encode( JSON.stringify( {
+	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
+	models: [ { id: 'transparent-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: transparentModelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+	instances: [ { model: 'transparent-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
+} ) );
+const transparentDocumentAssetID = hash( transparentDocumentBytes );
+const transparentComponent = {
+	id: 'fixture-transparent-static-model', type: component.type,
+	assets: [ { assetId: transparentDocumentAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: transparentModelAssetID, kind: 'glb' } ],
+};
+const transparentAssets = new Map( [ [ transparentDocumentAssetID, transparentDocumentBytes ], [ transparentModelAssetID, transparentModelBytes ] ] );
+const transparentConnector = {
+	manifest: { assets: transparentComponent.assets },
+	assets: new Map( [ [ transparentDocumentAssetID, transparentDocumentBytes ] ] ),
+	getAsset: async assetId => transparentAssets.get( assetId ),
+};
+const transparentWebGPU = new Group();
+transparentWebGPU.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector: transparentConnector, materialAdapterContexts: new Map() };
+const transparentWebGPUResult = await worldComponentBackendAdapter( 'webgpu', component.type )( { root: transparentWebGPU, connector: transparentConnector }, transparentComponent );
+assert.equal( transparentWebGPUResult.installed, true );
+assert.equal( transparentWebGPU.children.some( object => object.isInstancedMesh ), false, 'fully transparent WebGPU static meshes create neither color nor shadow draws' );
+transparentWebGPUResult.runtime.dispose();
+disposeWorldPackage( transparentWebGPU );
+
+const transparentWebGL = { THREE, connector: transparentConnector, loader: new GLTFLoader(), scene: new THREE.Scene(), app: { renderLoadBias: 0 } };
+const transparentWebGLResult = await worldComponentBackendAdapter( 'webgl', component.type )( { fallback: transparentWebGL }, transparentComponent );
+assert.equal( transparentWebGLResult.installed, true );
+assert.equal( transparentWebGL.scene.children.some( object => object.isInstancedMesh ), false, 'fully transparent WebGL static meshes create neither color nor shadow draws' );
+transparentWebGLResult.runtime.dispose();
+
 console.log( 'generic static model component installs and updates through WebGPU and WebGL adapters' );

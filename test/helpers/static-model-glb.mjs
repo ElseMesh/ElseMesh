@@ -1,4 +1,4 @@
-export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined } = {} ) {
+export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1 } = {} ) {
 	const binary = new ArrayBuffer( 80 ), data = new DataView( binary );
 	const positions = [ - 0.5, 0, 0, 0.5, 0, 0, 0, 1, 0 ];
 	const normals = [ 0, 0, 1, 0, 0, 1, 0, 0, 1 ];
@@ -9,7 +9,7 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 		asset: { version: '2.0' }, scene: 0, scenes: [ { nodes: [ 0 ] } ],
 		nodes: [ { name: 'translated-triangle', mesh: 0, translation: [ 2, 0, 0 ], scale: nodeScale } ],
 		meshes: [ { primitives: [ { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 } ] } ],
-		materials: [ { ...( materialExtras ? { extras: materialExtras } : {} ), pbrMetallicRoughness: { baseColorFactor: [ 0.8, 0.4, 0.2, 1 ], metallicFactor: 0, roughnessFactor: 0.8 } } ],
+		materials: [ { ...( materialExtras ? { extras: materialExtras } : {} ), ...( materialAlpha < 1 ? { alphaMode: 'BLEND' } : {} ), pbrMetallicRoughness: { baseColorFactor: [ 0.8, 0.4, 0.2, materialAlpha ], metallicFactor: 0, roughnessFactor: 0.8 } } ],
 		buffers: [ { byteLength: binary.byteLength } ],
 		bufferViews: [ { buffer: 0, byteOffset: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 36 }, { buffer: 0, byteOffset: 72, byteLength: 6 } ],
 		accessors: [

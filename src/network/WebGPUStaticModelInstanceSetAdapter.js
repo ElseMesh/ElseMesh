@@ -85,11 +85,17 @@ function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, hasMat
 	const materialData0Attribute = hasMaterialData ? new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
 	const materialData1Attribute = hasMaterialData ? new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
 	const draws = [];
+	let meshCount = 0, fullyTransparentMeshCount = 0;
 	source.updateMatrixWorld( true );
 	source.traverse( object => {
 		if ( ! object.isMesh ) return;
+		meshCount ++;
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Static model instance GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
+		if ( object.material.transparent && Number.isFinite( object.material.opacity ) && object.material.opacity <= 0 ) {
+			fullyTransparentMeshCount ++;
+			return;
+		}
 		const geometry = object.geometry.clone();
 		geometry.applyMatrix4( object.matrixWorld );
 		if ( object.matrixWorld.determinant() < 0 ) correctStaticModelGeometryReflection( geometry );
@@ -118,6 +124,7 @@ function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, hasMat
 		ownedGeometry.add( geometry );
 		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
 	} );
+	if ( draws.length === 0 && meshCount > 0 && fullyTransparentMeshCount === meshCount ) return [];
 	if ( draws.length === 0 ) throw new Error( 'Static model instance GLB contains no triangle meshes' );
 	return draws;
 }
