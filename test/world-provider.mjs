@@ -7,6 +7,7 @@ assert.doesNotMatch( viteConfig, /worlds\/tidewater/, 'the engine build does not
 assert.match( viteConfig, /readdirSync\( worldsPath[\s\S]*?world-provider\.js/, 'the build discovers provider descriptors from mounted world repositories' );
 
 assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.water-body/1' } ] } ), false, 'generic worlds do not load Tidewater runtime modules' );
+assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.static-fish-props/1' } ] } ), false, 'the engine-owned fish-props feature does not load Tidewater runtime modules' );
 assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.terrain-surface/1' } ] } ), true, 'Tidewater component manifests select the Tidewater provider' );
 assert.equal( supportsWorldManifest( { components: [], experience: { behaviors: { 'elsemesh.fishing-game/1': {} } } } ), true, 'Tidewater fishing behavior manifests select the Tidewater provider' );
 

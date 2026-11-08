@@ -77,6 +77,7 @@ import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapP
 import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
 import './network/WebGPUWorldComponentAdapters.js';
+import './network/WebGPUFishPropsComponentAdapter.js';
 import { ensureWebGPUHostedOceanEffects, updateHostedShoreWetness } from './ocean/WebGPUHostedOceanEffects.js';
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
