@@ -22,6 +22,7 @@ try {
 		format: 'elsemesh.material-graph/1',
 		nodes: [
 			{ id: 'position', op: 'input', name: 'position' },
+			{ id: 'worldNormal', op: 'input', name: 'worldNormal' },
 			{ id: 'u', op: 'x', args: [ 'position' ] },
 			{ id: 'v', op: 'y', args: [ 'position' ] },
 			{ id: 'uv', op: 'vec2', args: [ 'u', 'v' ] },
@@ -51,8 +52,11 @@ try {
 			{ id: 'zero', op: 'constant', value: 0 },
 			{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'offsetZ' ] },
 			{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
+			{ id: 'normalTint', op: 'constant', value: [ 0.9, 1, 0.7 ] },
+			{ id: 'tiltedNormal', op: 'multiply', args: [ 'worldNormal', 'normalTint' ] },
+			{ id: 'surfaceNormal', op: 'normalize', args: [ 'tiltedNormal' ] },
 		],
-		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved' },
+		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
 	};
 	const graphGLB = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } }, materialTexture: true } ), graphAssetID = await hash( graphGLB );
 	const packageDocument = {

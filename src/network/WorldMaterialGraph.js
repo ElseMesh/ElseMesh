@@ -7,6 +7,7 @@ export const WORLD_MATERIAL_GRAPH_MAX_NODES = 512;
 const INPUT_TYPES = Object.freeze( {
 	position: 'vec3',
 	worldPosition: 'vec3',
+	worldNormal: 'vec3',
 	normal: 'vec3',
 	uv: 'vec2',
 	color: 'vec4',
@@ -28,6 +29,7 @@ const OUTPUT_TYPES = Object.freeze( {
 	emissive: 'vec3',
 	vertexPosition: 'vec3',
 	vertexNormal: 'vec3',
+	surfaceNormal: 'vec3',
 } );
 
 const isRecord = value => !! value && typeof value === 'object' && ! Array.isArray( value );

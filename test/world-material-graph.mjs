@@ -109,6 +109,36 @@ assert.match( worldPositionWebGL.glsl.fragment, /float emg_height = vEmg_worldPo
 assert.match( worldPositionWebGL.glsl.declarations, /varying vec3 vEmg_worldPosition/ );
 assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs: { vertexPosition: 'worldPosition' } }, 'webgpu' ), /fragment outputs/ );
 
+const surfaceNormalGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'worldNormal', op: 'input', name: 'worldNormal' },
+		{ id: 'tilt', op: 'constant', value: [ 0.1, 1, 0 ] },
+		{ id: 'normal', op: 'normalize', args: [ 'tilt' ] },
+	],
+	outputs: { surfaceNormal: 'normal' },
+};
+const surfaceNormalWebGPU = compileWorldMaterialGraph( surfaceNormalGraph, 'webgpu' );
+const surfaceNormalWebGL = compileWorldMaterialGraph( surfaceNormalGraph, 'webgl' );
+assert.match( surfaceNormalWebGPU.surface, /s\.normal = normalize\( emg_normal \)/ );
+assert.match( surfaceNormalWebGL.glsl.fragment, /normal = normalize\( emg_normal \)/ );
+assert.match( surfaceNormalWebGL.glsl.declarations, /varying vec3 vEmg_worldNormal/ );
+assert.equal( surfaceNormalWebGL.glsl.worldNormal, true );
+const directSurfaceNormal = compileWorldMaterialGraph( { ...surfaceNormalGraph, nodes: [ surfaceNormalGraph.nodes[ 0 ] ], outputs: { surfaceNormal: 'worldNormal' } }, 'webgl' );
+assert.match( directSurfaceNormal.glsl.fragment, /^normal = normalize\( vEmg_worldNormal \);$/m, 'the graph compiler leaves a world-space output for the WebGL adapter to transform' );
+assert.throws( () => compileWorldMaterialGraph( { ...surfaceNormalGraph, outputs: { vertexNormal: 'worldNormal' } }, 'webgl' ), /fragment outputs/ );
+const graphNormalMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), surfaceNormalGraph );
+const graphNormalShader = { vertexShader: '#include <common>\n#include <defaultnormal_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+graphNormalMaterial.material.onBeforeCompile( graphNormalShader );
+assert.match( graphNormalShader.vertexShader, /vEmg_worldNormal = inverseTransformDirection\( normalize\( transformedNormal \), viewMatrix \)/ );
+assert.match( graphNormalShader.fragmentShader, /normal = normalize\( mat3\( viewMatrix \) \* emg_normal \)/ );
+const directNormalMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), { ...surfaceNormalGraph, nodes: [ surfaceNormalGraph.nodes[ 0 ] ], outputs: { surfaceNormal: 'worldNormal' } } );
+const directNormalShader = { vertexShader: '#include <common>\n#include <defaultnormal_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+directNormalMaterial.material.onBeforeCompile( directNormalShader );
+assert.match( directNormalShader.fragmentShader, /normal = normalize\( mat3\( viewMatrix \) \* vEmg_worldNormal \)/ );
+directNormalMaterial.material.dispose();
+graphNormalMaterial.material.dispose();
+
 const derivativeGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [

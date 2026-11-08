@@ -70,11 +70,17 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldPosition = worldPosition.xyz;` );
 		}
+		if ( fragment && compiled.glsl.worldNormal ) {
+			const marker = '#include <defaultnormal_vertex>';
+			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
+			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldNormal = inverseTransformDirection( normalize( transformedNormal ), viewMatrix );` );
+		}
 		if ( fragment ) {
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms ].filter( Boolean ).join( '\n' ) );
 			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', compiled.glsl.fragment );
+			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
+			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
 		}
 		for ( const name of compiled.glsl.uniformInputs ) {
 			const read = FRAME_UNIFORM_VALUES[ name ];

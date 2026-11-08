@@ -29,6 +29,7 @@ Input nodes use these engine-defined semantics and types:
 | --- | --- | --- |
 | `position` | vec3 | Local vertex position |
 | `worldPosition` | vec3 | Final world-space position, available in fragment outputs |
+| `worldNormal` | vec3 | Interpolated world-space surface normal, available in fragment outputs |
 | `normal` | vec3 | Local vertex normal |
 | `uv` | vec2 | First texture coordinate |
 | `color` | vec4 | glTF `COLOR_0` |
@@ -81,11 +82,14 @@ vector inputs; ElseMesh emits WGSL derivatives or the corresponding GLSL
 functions for the selected backend.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
-`opacity` (scalar), `emissive` (vec3), `vertexPosition` (vec3), and
-`vertexNormal` (vec3). glTF PBR factors and the engine's existing base-color,
-normal, and emissive texture inputs remain the starting surface values; graph
-outputs modify those values. Vertex outputs also feed the WebGL depth material
-so deformed geometry can keep its shadow shape.
+`opacity` (scalar), `emissive` (vec3), `surfaceNormal` (vec3 world-space),
+`vertexPosition` (vec3), and `vertexNormal` (vec3). `surfaceNormal` replaces
+the current surface normal after the standard glTF normal map is applied; the
+backend compiler converts its world-space value into that renderer's
+coordinate space. glTF PBR factors and the engine's existing base-color,
+normal, and emissive texture inputs remain the starting surface values; other
+graph outputs modify those values. Vertex outputs also feed the WebGL depth
+material so deformed geometry can keep its shadow shape.
 
 The graph compiler and pixel fixture live in ElseMesh. The fixture checks
 the same signed GLB through both static-model adapters. Tidewater has not yet

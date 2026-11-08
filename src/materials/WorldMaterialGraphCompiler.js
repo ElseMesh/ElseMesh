@@ -3,6 +3,7 @@ import { WORLD_MATERIAL_GRAPH_INPUT_TYPES, validateWorldMaterialGraph, worldMate
 const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
 	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
+	worldNormal: { fragmentOnly: true, fragmentWGSL: 'in.N', fragmentGLSL: 'vEmg_worldNormal' },
 	normal: { builtin: true, wgsl: 'v.normal', glsl: 'normal' },
 	uv: { builtin: true, wgsl: 'v.uv', glsl: 'uv' },
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
@@ -71,12 +72,12 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	if ( ! [ 'webgpu', 'webgl' ].includes( backend ) ) throw new Error( `Unsupported material graph backend: ${backend}` );
 	const inputTypes = WORLD_MATERIAL_GRAPH_INPUT_TYPES;
 	const vertexRoots = [ graph.outputs.vertexPosition, graph.outputs.vertexNormal ];
-	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive ];
+	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive, graph.outputs.surfaceNormal ];
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
 	if ( graph.nodes.some( node => [ 'textureSample', 'textureSampleLevel', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph sampling and derivatives are only available to fragment outputs' );
-	if ( graph.nodes.some( node => node.op === 'input' && node.name === 'worldPosition' && vertexRequired.has( node.id ) ) ) throw new Error( 'World position is only available to fragment outputs' );
+	if ( graph.nodes.some( node => node.op === 'input' && INPUT_SOURCES[ node.name ].fragmentOnly && vertexRequired.has( node.id ) ) ) throw new Error( 'World-space fragment inputs are only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
 	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) ).map( node => node.slot ) ) ];
 	const attributes = {}, varyings = {};
@@ -117,9 +118,9 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		vertexOutputs.push( backend === 'webgpu' ? `v.${target} = ${value};` : `${target === 'position' ? 'transformed' : 'objectNormal'} = ${value};` );
 	}
 	const surfaceLines = [];
-	for ( const [ output, target, operator ] of [ [ 'baseColor', 's.albedo', '*=' ], [ 'roughness', 's.roughness', '=' ], [ 'metalness', 's.metalness', '=' ], [ 'opacity', 's.alpha', '*=' ], [ 'emissive', 's.emissive', '+=' ] ] ) {
+	for ( const [ output, target, operator ] of [ [ 'baseColor', 's.albedo', '*=' ], [ 'roughness', 's.roughness', '=' ], [ 'metalness', 's.metalness', '=' ], [ 'opacity', 's.alpha', '*=' ], [ 'emissive', 's.emissive', '+=' ], [ 'surfaceNormal', 's.normal', '=' ] ] ) {
 		const id = graph.outputs[ output ];
-		if ( id ) surfaceLines.push( `${target} ${operator} ${fragment.names.get( id )};` );
+		if ( id ) surfaceLines.push( `${target} ${operator} ${output === 'surfaceNormal' ? `normalize( ${fragment.names.get( id )} )` : fragment.names.get( id )};` );
 	}
 	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
@@ -142,8 +143,9 @@ export function compileWorldMaterialGraph( graph, backend ) {
 			uniforms: glslUniforms,
 			uniformInputs: Object.freeze( glslUniformInputs.map( name => INPUT_SOURCES[ name ].glsl ) ),
 			worldPosition: usedInputs.includes( 'worldPosition' ),
+			worldNormal: usedInputs.includes( 'worldNormal' ),
 			vertex: commonVertex,
-			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ) ) ].filter( Boolean ).join( '\n' ),
+			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) ) ].filter( Boolean ).join( '\n' ),
 		} ),
 	} );
 }
