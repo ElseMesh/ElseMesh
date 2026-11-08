@@ -23,7 +23,7 @@ import { Vector2 } from '../engine/math/Vector2.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { worldMaterialRole } from './WorldMaterialProfileRegistry.js';
 import { worldMaterialGraph } from './WorldMaterialGraph.js';
-import { createWebGPUMaterialGraph } from '../materials/WorldMaterialGraph.js';
+import { compileWorldMaterialProfile, hasWorldMaterialProfileCompiler } from '../materials/WorldMaterialProfileCompilerRegistry.js';
 import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
 import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
 import { transformBoundsCenter } from './WorldStreaming.js';
@@ -1115,11 +1115,13 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		const pbr = source.pbrMetallicRoughness || {};
 		const profileRole = worldMaterialRole( source );
 		if ( profileRole ) {
-			if ( profileRole === 'graph' ) {
+			if ( hasWorldMaterialProfileCompiler( source.extras.elsemeshMaterial.profile, 'webgpu' ) ) {
 				const albedo = await loadTexture( pbr.baseColorTexture, 'albedo' );
 				const normalMap = await loadTexture( source.normalTexture, 'normal', 'rgba8unorm' );
 				const emissiveMap = await loadTexture( source.emissiveTexture, 'emissive' );
-				resolvedMaterials.push( createWebGPUMaterialGraph( source, worldMaterialGraph( source ), { albedo, normalMap, emissiveMap } ) );
+				resolvedMaterials.push( compileWorldMaterialProfile( source.extras.elsemeshMaterial.profile, 'webgpu', {
+					source, graph: worldMaterialGraph( source ), textures: { albedo, normalMap, emissiveMap },
+				} ) );
 				materialHooks.push( null );
 				continue;
 			}

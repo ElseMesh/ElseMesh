@@ -60,20 +60,18 @@ This is the fixed ownership boundary for material work: do not move shader
 code between a world and ElseMesh as a backend-by-backend port. Extend the
 renderer-neutral description and both engine compilers together, or represent
 the appearance with portable assets. The Tidewater fish-prop material profile
-currently constructs a Tidewater WGSL material in the world package adapter;
-it is a transitional prototype and does not meet this contract. Do not add a
-parallel Tidewater WebGL shader adapter. Replace or remove the prototype as
-part of implementing the shared description and verify both compiled outputs
-against the same fish-prop fixture.
+is a transitional WebGPU-only prototype used by an unconnected exporter
+sidecar fixture; it does not meet this contract. Do not add a parallel
+Tidewater WebGL shader adapter. Replace or remove the prototype when the live
+fish-prop content is migrated to the graph or portable assets.
 
-The current profile resolution has two world-controlled paths: WebGPU resolves
-materials through `WorldPackageMaterialAdapterRegistry`, while WebGL asks
-installed world component runtimes to resolve a profile. This is the structural
-reason renderer logic keeps moving between repositories. The target is one
-ElseMesh-owned material-profile registry: world packages register only signed,
-renderer-neutral profile data; the engine registry selects the WebGPU or WebGL
-compiler for the active backend. World modules must not register backend
-material compilers. Retire both current resolution paths as profiles migrate.
+Legacy custom profile resolution still has two world-controlled paths: WebGPU
+resolves materials through `WorldPackageMaterialAdapterRegistry`, while WebGL
+asks installed world component runtimes to resolve a profile. The new
+`elsemesh.material-graph/1` path uses the ElseMesh-owned compiler registry for
+both backends. Migrate legacy profiles to signed, renderer-neutral data and the
+engine registry; world modules must not register backend material compilers.
+Retire both legacy resolution paths as profiles migrate.
 
 ## Renderer-free reef placement contract
 

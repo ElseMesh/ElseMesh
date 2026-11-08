@@ -6,7 +6,7 @@ import { LODLoadQueue } from '../network/WorldObjectLOD.js';
 import { WebGLProgressiveStaticTextures } from './WebGLProgressiveStaticTextures.js';
 import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
 import { worldMaterialGraph } from '../network/WorldMaterialGraph.js';
-import { createWebGLMaterialGraph } from '../materials/WorldMaterialGraph.js';
+import { compileWorldMaterialProfile } from '../materials/WorldMaterialProfileCompilerRegistry.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installStaticModelInstanceSet );
@@ -188,9 +188,11 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 	const materialData0Attribute = hasMaterialData ? new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
 	const materialData1Attribute = hasMaterialData ? new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
 	const draws = [];
+	let meshCount = 0, fullyTransparentMeshCount = 0;
 	source.updateMatrixWorld( true );
 	source.traverse( object => {
 		if ( ! object.isMesh ) return;
+		meshCount ++;
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Static model instance GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
 		const geometry = object.geometry.clone().applyMatrix4( object.matrixWorld );
@@ -204,6 +206,10 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		geometry.computeBoundingSphere();
 		const materialResolution = resolveStaticModelMaterial( fallback, object.material );
 		const sourceMaterial = materialResolution?.material || materialResolution || object.material;
+		if ( sourceMaterial.transparent && Number.isFinite( sourceMaterial.opacity ) && sourceMaterial.opacity <= 0 ) {
+			fullyTransparentMeshCount ++;
+			return;
+		}
 		materialResolution?.prepareGeometry?.( geometry, object );
 		const profileDepthMaterial = materialResolution?.material ? materialResolution.depthMaterial || null : null;
 		if ( profileDepthMaterial && ! profileDepthMaterial.isMeshDepthMaterial ) throw new Error( 'World material profile depthMaterial must be a MeshDepthMaterial' );
@@ -228,6 +234,7 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		ownedGeometry.add( geometry );
 		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
 	} );
+	if ( draws.length === 0 && meshCount > 0 && fullyTransparentMeshCount === meshCount ) return [];
 	if ( draws.length === 0 ) throw new Error( 'Static model instance GLB contains no triangle meshes' );
 	return draws;
 }
@@ -237,7 +244,8 @@ function resolveStaticModelMaterial( fallback, sourceMaterial ) {
 	const material = { extras: { elsemeshMaterial: profile } };
 	const role = worldMaterialRole( material );
 	if ( ! role ) return sourceMaterial;
-	if ( role === 'graph' ) return createWebGLMaterialGraph( fallback.THREE, sourceMaterial, worldMaterialGraph( material ) );
+	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ) } );
+	if ( compiled ) return compiled;
 	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
 		const resolution = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );
 		if ( resolution ) return resolution;
