@@ -62,9 +62,8 @@ try {
 			{ id: 'zero', op: 'constant', value: 0 },
 			{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'offsetZ' ] },
 			{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
-			{ id: 'normalTint', op: 'constant', value: [ 0.9, 1, 0.7 ] },
-			{ id: 'tiltedNormal', op: 'multiply', args: [ 'worldNormal', 'normalTint' ] },
-			{ id: 'surfaceNormal', op: 'normalize', args: [ 'tiltedNormal' ] },
+			{ id: 'slope', op: 'constant', value: [ 0.08, - 0.04 ] },
+			{ id: 'surfaceNormal', op: 'normalFromSlope', args: [ 'worldPosition', 'worldNormal', 'uv', 'slope' ] },
 		],
 		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
 	};

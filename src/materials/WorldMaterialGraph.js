@@ -11,6 +11,7 @@ const FRAME_UNIFORM_VALUES = Object.freeze( {
 
 export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgpu' );
+	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
 	for ( const slot of compiled.textureSlots ) if ( ! graphTextures[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const useBaseColorMap = Boolean( albedo && ! compiled.samplesBaseColorForBaseColor );
 	const pbr = gltfMaterial.pbrMetallicRoughness || {};
@@ -38,7 +39,7 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 		emissive: new Color().setRGB( emissive[ 0 ], emissive[ 1 ], emissive[ 2 ] ),
 		transparent: alphaMode === 'BLEND', alphaTest: alphaMode === 'MASK' ? ( gltfMaterial.alphaCutoff ?? 0.5 ) : 0,
 		side: gltfMaterial.doubleSided ? 'double' : 'front',
-		vertexColors: compiled.inputs.includes( 'color' ),
+		vertexColors: usesVertexColors,
 		emissiveIntensity: gltfMaterial.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1,
 		textures: {
 			...( useBaseColorMap ? { worldGraphAlbedoMap: albedo } : {} ),
@@ -76,7 +77,7 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldNormal = inverseTransformDirection( normalize( transformedNormal ), viewMatrix );` );
 		}
 		if ( fragment ) {
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms ].filter( Boolean ).join( '\n' ) );
+			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers ].filter( Boolean ).join( '\n' ) );
 			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
@@ -102,6 +103,7 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 
 export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgl' );
+	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
 	const textureBindings = {
 		baseColor: sourceMaterial.map,
 		metallicRoughness: sourceMaterial.metalnessMap || sourceMaterial.roughnessMap,
@@ -112,10 +114,11 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	for ( const slot of compiled.textureSlots ) if ( ! textureBindings[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const graphKey = JSON.stringify( graph );
 	const materialSource = sourceMaterial.clone();
+	materialSource.vertexColors = usesVertexColors;
 	if ( compiled.samplesBaseColorForBaseColor ) materialSource.map = null;
 	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings } );
 	const depthMaterial = compiled.hasVertexOutput
-		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: compiled.inputs.includes( 'color' ) } ), compiled, graphKey, { fragment: false } )
+		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false } )
 		: null;
 	return {
 		material,

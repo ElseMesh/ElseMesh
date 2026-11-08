@@ -13,6 +13,7 @@ const INPUT_TYPES = Object.freeze( {
 	normal: 'vec3',
 	uv: 'vec2',
 	color: 'vec4',
+	colorRGB: 'vec3',
 	vdata: 'vec4',
 	time: 'scalar',
 	windDirection: 'vec2',
@@ -80,6 +81,8 @@ function nodeType( node, types ) {
 			return argTypes.length === 1 && ( argTypes[ 0 ] === 'scalar' || vector( argTypes[ 0 ] ) ) ? argTypes[ 0 ] : null;
 		case 'normalize':
 			return argTypes.length === 1 && vector( argTypes[ 0 ] ) ? argTypes[ 0 ] : null;
+		case 'normalFromSlope':
+			return argTypes.length === 4 && argTypes[ 0 ] === 'vec3' && argTypes[ 1 ] === 'vec3' && argTypes[ 2 ] === 'vec2' && argTypes[ 3 ] === 'vec2' ? 'vec3' : null;
 		case 'rgb':
 			return argTypes.length === 1 && argTypes[ 0 ] === 'vec4' ? 'vec3' : null;
 		case 'length':

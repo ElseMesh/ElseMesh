@@ -9,6 +9,7 @@ const INPUT_SOURCES = Object.freeze( {
 	normal: { builtin: true, wgsl: 'v.normal', glsl: 'normal' },
 	uv: { builtin: true, wgsl: 'v.uv', glsl: 'uv' },
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
+	colorRGB: { builtin: true, wgsl: 'v.color.rgb', glsl: 'color' },
 	vdata: { attribute: 'vdata', wgsl: 'v.vdata', glsl: 'vdata' },
 	time: { uniform: true, wgsl: 'frame.time', glsl: 'emgFrameTime' },
 	windDirection: { uniform: true, wgsl: 'frame.windDir', glsl: 'emgWindDirection' },
@@ -38,6 +39,9 @@ function expression( node, names, backend ) {
 		return node.op === 'textureSampleLevel' ? `textureLod( ${texture}, ${uv}, ${lod} )` : `texture2D( ${texture}, ${uv} )`;
 	}
 	const args = node.args.map( id => names.get( id ) );
+	if ( node.op === 'normalFromSlope' ) return backend === 'webgpu'
+		? `perturbNormalByMap( ${args[ 0 ]}, ${args[ 1 ]}, ${args[ 2 ]}, normalize( vec3f( ${args[ 3 ]}, 1.0 ) ) )`
+		: `emgNormalFromSlope( ${args.join( ', ' )} )`;
 	const derivative = { dpdx: backend === 'webgpu' ? 'dpdx' : 'dFdx', dpdy: backend === 'webgpu' ? 'dpdy' : 'dFdy', fwidth: 'fwidth' }[ node.op ];
 	if ( derivative ) return `${derivative}( ${args[ 0 ]} )`;
 	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', sqrt: 'sqrt', sign: 'sign', exp: 'exp', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep', step: 'step' }[ node.op ];
@@ -127,6 +131,17 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].builtinFragment ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
 	const glslUniforms = [ ...glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ), ...( usedInputs.includes( 'pixelPosition' ) ? [ 'uniform vec2 emgViewportSize;' ] : [] ) ].join( '\n' );
+	const needsNormalFromSlope = graph.nodes.some( node => node.op === 'normalFromSlope' && fragmentRequired.has( node.id ) );
+	const glslFragmentHelpers = needsNormalFromSlope ? `
+vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
+	vec3 dp1 = dFdx( P ); vec3 dp2 = dFdy( P );
+	vec2 duv1 = dFdx( uv ); vec2 duv2 = dFdy( uv );
+	vec3 dp2perp = cross( dp2, N ); vec3 dp1perp = cross( N, dp1 );
+	vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+	vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+	float invmax = inversesqrt( max( max( dot( T, T ), dot( B, B ) ), 1e-20 ) );
+	return normalize( mat3( T * invmax, B * invmax, N ) * normalize( vec3( slope, 1.0 ) ) );
+}` : '';
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
 	return Object.freeze( {
@@ -147,6 +162,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 			worldPosition: usedInputs.includes( 'worldPosition' ),
 			worldNormal: usedInputs.includes( 'worldNormal' ),
 			viewportSize: usedInputs.includes( 'pixelPosition' ),
+			fragmentHelpers: glslFragmentHelpers,
 			vertex: commonVertex,
 			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) ) ].filter( Boolean ).join( '\n' ),
 		} ),

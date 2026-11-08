@@ -175,6 +175,28 @@ assert.deepEqual( [ pixelPositionShader.uniforms.emgViewportSize.value.x, pixelP
 viewportHeight = 96;
 assert.deepEqual( [ pixelPositionShader.uniforms.emgViewportSize.value.x, pixelPositionShader.uniforms.emgViewportSize.value.y ], [ 192, 96 ], 'WebGL graph tracks the current drawing-buffer size' );
 pixelPositionMaterial.material.dispose();
+const slopeGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'position', op: 'input', name: 'worldPosition' },
+		{ id: 'normal', op: 'input', name: 'worldNormal' },
+		{ id: 'uv', op: 'input', name: 'uv' },
+		{ id: 'slope', op: 'constant', value: [ 0.04, - 0.02 ] },
+		{ id: 'perturbed', op: 'normalFromSlope', args: [ 'position', 'normal', 'uv', 'slope' ] },
+	],
+	outputs: { surfaceNormal: 'perturbed' },
+};
+assert.match( compileWorldMaterialGraph( slopeGraph, 'webgpu' ).surface, /perturbNormalByMap\( in\.P, in\.N, in\.vs\.emg_uv, normalize\( vec3f\( emg_slope, 1\.0 \) \) \)/ );
+assert.match( compileWorldMaterialGraph( slopeGraph, 'webgl' ).glsl.fragment, /emgNormalFromSlope\( vEmg_worldPosition, vEmg_worldNormal, vEmg_uv, emg_slope \)/ );
+assert.match( compileWorldMaterialGraph( slopeGraph, 'webgl' ).glsl.fragmentHelpers, /dFdx\( P \).*dFdy\( P \)/s );
+const colorRGBGraph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'tint', op: 'input', name: 'colorRGB' } ], outputs: { baseColor: 'tint' } };
+const colorRGBWebGPU = createWebGPUMaterialGraph( {}, colorRGBGraph );
+const colorRGBWebGL = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), colorRGBGraph );
+assert.equal( colorRGBWebGPU.vertexColors, true );
+assert.match( colorRGBWebGPU.vertex, /o\.emg_colorRGB = v\.color\.rgb/ );
+assert.equal( colorRGBWebGL.material.vertexColors, true );
+assert.match( compileWorldMaterialGraph( colorRGBGraph, 'webgl' ).glsl.vertex, /vEmg_colorRGB = color/ );
+colorRGBWebGL.material.dispose();
 graphNormalMaterial.material.dispose();
 
 const derivativeGraph = {

@@ -35,6 +35,7 @@ Input nodes use these engine-defined semantics and types:
 | `normal` | vec3 | Local vertex normal |
 | `uv` | vec2 | First texture coordinate |
 | `color` | vec4 | glTF `COLOR_0` |
+| `colorRGB` | vec3 | RGB channels of glTF `COLOR_0` |
 | `vdata` | vec4 | glTF `_ELSEMESH_VDATA` |
 | `time` | scalar | Shared simulation time in seconds |
 | `windDirection` | vec2 | Shared world-space XZ wind direction |
@@ -71,7 +72,7 @@ texture path intact.
 
 Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`, `sqrt`,
-`sign`, `exp`, `normalize`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
+`sign`, `exp`, `normalize`, `normalFromSlope`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
 `vec3`, `vec4`, `length`, `dot`, `mix`, `clamp`, `smoothstep`, `lessThan`,
 `lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,
 `select`, `step`, and `atan2`. Operations are type checked before the engine
@@ -82,6 +83,10 @@ generation. Fragment-only
 `dpdx`, `dpdy`, and `fwidth` compute screen-space derivatives for scalar and
 vector inputs; ElseMesh emits WGSL derivatives or the corresponding GLSL
 functions for the selected backend.
+
+`normalFromSlope` takes world position, world normal, UV, and a vec2 slope,
+then applies that slope in the UV tangent frame and returns a world-space
+normal. ElseMesh compiles the same derivative frame to WGSL and GLSL.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `surfaceNormal` (vec3 world-space),
