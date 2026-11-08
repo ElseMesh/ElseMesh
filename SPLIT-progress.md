@@ -86,8 +86,11 @@ WebGPU visual parity remain incomplete.
   continues to receive pier colliders from Tidewater's live village, so no
   duplicate volumes are introduced. Focused tests confirm the original counts
   and walkability, the built-in package boundary, renderer gameplay traces, and
-  the pre-split WebGPU fishing baseline. Registry-based separation moves from
-  88% to 89%; visual and supported-hardware parity remain open.
+  the pre-split WebGPU fishing baseline. A fresh WebGL shoreline/boat browser
+  rerun generated its WebGPU reference but remained pending in SwiftShader after
+  23 minutes and was stopped; it produced no new parity metrics. Registry-based
+  separation moves from 88% to 89%; visual and supported-hardware parity remain
+  open.
 
 - 2026-11-07: Tidewater now owns both its debris placement algorithm and shape
   catalogue, including the authored kind IDs. The default-world package passes
