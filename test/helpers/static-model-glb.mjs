@@ -17,7 +17,7 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 		meshes: [ { primitives: [ { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 } ] } ],
 		materials: [ material ],
 		...( materialTexture ? {
-			images: [ { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j7uoAAAAASUVORK5CYII=' } ],
+			images: [ { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' } ],
 			textures: [ { source: 0 } ],
 		} : {} ),
 		buffers: [ { byteLength: binary.byteLength } ],
