@@ -746,7 +746,7 @@ export class LocalRegionConnector {
 				this.#persistDiskEntries( [ { assetId: diskKey, bytes, digest: () => this.#rangeCacheDigest( assetId, bytes ) } ], 'local-region range' );
 			}
 			return result;
-		}, {}, { Range: `bytes=${start}-${end}`, ...( etag ? { 'If-Range': etag } : {} ) } );
+		}, {}, { Range: `bytes=${start}-${end}` } );
 	}
 
 	async getAssetRanges( assetId, ranges, { etag, totalLength, signal } = {} ) {
@@ -812,7 +812,7 @@ export class LocalRegionConnector {
 			}
 			this.#persistDiskEntries( diskEntries, 'local-region range batch' );
 			return results;
-		}, {}, { Range: `bytes=${missing.map( range => `${range.start}-${range.end}` ).join( ',' )}`, ...( etag ? { 'If-Range': etag } : {} ) } );
+		}, {}, { Range: `bytes=${missing.map( range => `${range.start}-${range.end}` ).join( ',' )}` } );
 	}
 
 	async #matchesSHA256( bytes, expected ) {
@@ -909,7 +909,8 @@ export class LocalRegionConnector {
 			signal?.removeEventListener( 'abort', abort );
 			phaseStartedAt = performance.now();
 			try {
-				await fetch( controlURL, { method: 'DELETE', credentials: 'omit', cache: 'no-store', keepalive: true } );
+				const releaseURL = new URL( `${controlURL.pathname}/release`, this.localProvider );
+				await fetch( releaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', keepalive: true } );
 			} catch { /* Lease expiry reclaims interest if the browser has gone away. */ }
 			phaseMs.providerLeaseRelease = performance.now() - phaseStartedAt;
 		}
