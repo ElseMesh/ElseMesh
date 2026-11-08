@@ -74,6 +74,16 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: added a Tidewater-owned matched fish-prop render fixture for the
+  native WebGPU material and Tidewater's WebGL adapter. Both use the same 11
+  deterministic records and camera; headless renders show 14,651 WebGPU and
+  14,415 WebGL non-background pixels, and WebGL reports one runnable program
+  with no GL errors. WebGL now bakes colors without per-vertex Three.js object
+  allocations and adds scale detail plus wetness-driven roughness/clearcoat.
+  Side-by-side inspection still shows missing/approximate species marks and
+  material details relative to WebGPU, so this is render evidence, not visual
+  parity. The Tidewater coconut-preservation check still verifies 72 crown
+  vertices and 133 coconuts, 43 husks, and 56 fronds. No percentage changes.
 - 2026-11-08: corrected the matched `beach` snapshots after finding that the first pre-split capture pinned `G.time` but left `OceanFFT.time` advancing. The replacement 1588×780 captures hold both clocks at 30, use the same `beach` camera and 16.2 time of day, set exposure to 0.55, and disable auto exposure; the pre-split revision predates the `simtime` URL option, so both of its clocks were pinned through CDP. The WebGPU and WebGL split captures use visual-quality mode. Scene differences remain visible between split and pre-split WebGPU, and WebGL still shows a substantial content-detail difference. These are single frames, not time-series wave/spray parity or an FPS benchmark; estimates remain 60% renderer-neutral and 87% gameplay/content parity. The top-left graph is shared by both backends; its color and trace height reflect each renderer's measured FPS and frame gaps. Captures: [split WebGPU](docs/images/tidewater-beach-split-webgpu-2026-11-08.png), [split WebGL](docs/images/tidewater-beach-split-webgl-2026-11-08.png), [pre-split WebGPU at 23c30bf](docs/images/tidewater-beach-presplit-webgpu-23c30bf-2026-11-08.png).
 - 2026-11-08: moved Tidewater's shoreline debris palette, packed wood/hard
   material data, and net-float geometry into the Tidewater package. The shape
