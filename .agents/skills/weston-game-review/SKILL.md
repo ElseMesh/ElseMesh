@@ -24,15 +24,29 @@ Use the checked-in display setup and browser helper; do not launch Weston with
    before launch and select the newly created Weston window afterward. Never
    rename the active window by assumption. Keep the windowed Weston display
    visible; do not mute the host audio or fullscreen the outer Weston window.
-3. Start Chromium with `tools/review-browser.mjs`, a dedicated
-   profile, and a maximized window. Use the intended Weston display environment
-   explicitly. Keep the address bar visible; the browser helper must not add
-   kiosk/fullscreen mode. Prefer hardware WebGPU for the standard review and
-   select WebGL only when that backend is the review target.
-4. Inspect the requested view and capture evidence from that Weston display.
+3. Start Chromium with `tools/review-browser.mjs`, a dedicated profile, and a
+   maximized window. Use the Weston Wayland socket directly (`WAYLAND_DISPLAY`
+   set to that display's socket and `CHROMIUM_OZONE_PLATFORM=wayland`). Do not
+   use Xwayland for GPU reviews: this Weston setup lacks DRI3 there, so
+   Chromium silently uses llvmpipe even when the render node is accessible.
+   The helper enables Chromium's GPU blocklist override for this verified AMD
+   review machine. Keep the address bar visible; do not use kiosk/fullscreen.
+4. Check `/dev/dri/renderD128` ownership and `id -G`. If the user's account
+   lacks the node's group, do a one-time system setup by adding that account to
+   the verified render-node group, then fully log out and back in to refresh the
+   desktop session. Do not use sudo to launch Chromium during routine reviews.
+   Never run Chromium as root or fall back to Xwayland when render-node access
+   is unavailable.
+5. Verify the actual adapter before accepting a performance or rendering
+   result. For WebGL, inspect `WEBGL_debug_renderer_info` and expect the AMD
+   Radeon via ANGLE. For WebGPU, inspect browser-level CDP `SystemInfo.getInfo`
+   and expect AMD Radeon Graphics (RADV RENOIR), with `webgpu` enabled. The
+   `navigator.gpu` API's adapter info can be empty, so do not use it alone.
+   Verify WebGL and WebGPU separately; a GPU flag is not proof of hardware use.
+6. Inspect the requested view and capture evidence from that Weston display.
    Distinguish a loading screen, a black application frame, and a host
    screensaver overlay before diagnosing rendering.
-5. Stop only the browser process started for this review as soon as inspection
+7. Stop only the browser process started for this review as soon as inspection
    is complete. Identify it by its dedicated profile or process group. Leave
    Weston running when the user is watching its output; stop only a Weston
    process started for this review when it is no longer needed.

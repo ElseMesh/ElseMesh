@@ -2175,15 +2175,7 @@ export class WebGLFallback {
 		this.fallbackBadge = badge;
 		Object.assign( badge.style, { position: 'fixed', top: '14px', right: '14px', zIndex: 30, maxWidth: 'min(440px, 80vw)', padding: '8px 11px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '12px/1.4 system-ui', pointerEvents: 'none' } );
 		document.body.appendChild( badge );
-		const hint = document.createElement( 'div' );
-		hint.className = 'elsemesh-webgl-hint';
-		Object.assign( hint.style, { position: 'fixed', left: '16px', bottom: '16px', zIndex: 30, padding: '10px 12px', borderRadius: '8px', color: '#f2f7f4', background: '#14201ddd', font: '13px/1.5 system-ui', pointerEvents: 'none' } );
-		hint.textContent = 'WASD move · mouse look · Shift run · E use portal';
-		const style = document.createElement( 'style' );
-		style.textContent = '@media (hover:none), (pointer:coarse) { .elsemesh-webgl-hint { bottom:150px !important; } } body:has(.em-root.is-starting) .elsemesh-webgl-hint { visibility: hidden; }';
-		document.head.appendChild( style );
-		document.body.append( hint );
-		this.hud = [ badge, hint, style ];
+		this.hud = [ badge ];
 		this.useButton = document.createElement( 'button' );
 		this.useButton.textContent = 'Use portal';
 		Object.assign( this.useButton.style, { display: 'none', position: 'fixed', left: '50%', bottom: '24px', transform: 'translateX(-50%)', zIndex: 31, padding: '12px 18px', border: '0', borderRadius: '10px', color: '#f2f7f4', background: '#14201ddd', font: 'bold 15px system-ui' } );

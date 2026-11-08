@@ -5,11 +5,11 @@ import { mkdir, readFile, unlink } from 'node:fs/promises';
 
 const [url, profile, portText] = process.argv.slice(2);
 const chromium = process.env.CHROMIUM_BIN ?? '/usr/bin/chromium';
-// Vulkan presentation was verified through Weston Xwayland; native Wayland
-// emitted Chromium's Vulkan/Ozone incompatibility warning in this setup.
-const ozonePlatform = process.env.CHROMIUM_OZONE_PLATFORM ?? 'x11';
-// A WebGL canvas was black in the current Weston capture with ANGLE Vulkan.
-// Use ANGLE GL for the WebGL fallback unless a review explicitly overrides it.
+// Native Wayland is required for Chromium to use the AMD GPU inside the
+// project's Weston display; its Xwayland server lacks DRI3 in this setup.
+const ozonePlatform = process.env.CHROMIUM_OZONE_PLATFORM ?? 'wayland';
+// ANGLE Vulkan is used for WebGPU. WebGL reviews use ANGLE GL because a prior
+// Vulkan-enabled Weston capture logged a vkAcquireNextImageKHR hang and loss.
 const requestedRenderer = url ? new URL(url).searchParams.get('renderer') : null;
 const angleBackend = process.env.CHROMIUM_ANGLE ?? ( requestedRenderer === 'webgl' ? 'gl' : 'vulkan' );
 // Keep explicit WebGL reviews on the GL compositor path. A prior Vulkan-enabled
@@ -29,6 +29,7 @@ const activePortFile = `${profile}/DevToolsActivePort`;
 if (port === 0) await unlink(activePortFile).catch(() => {});
 
 const browser = spawn(chromium, [
+  '--ignore-gpu-blocklist',
   '--no-first-run',
   '--no-default-browser-check',
   '--disable-background-networking',
