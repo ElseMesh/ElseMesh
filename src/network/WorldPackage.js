@@ -1116,7 +1116,10 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		const profileRole = worldMaterialRole( source );
 		if ( profileRole ) {
 			if ( profileRole === 'graph' ) {
-				resolvedMaterials.push( createWebGPUMaterialGraph( source, worldMaterialGraph( source ) ) );
+				const albedo = await loadTexture( pbr.baseColorTexture, 'albedo' );
+				const normalMap = await loadTexture( source.normalTexture, 'normal', 'rgba8unorm' );
+				const emissiveMap = await loadTexture( source.emissiveTexture, 'emissive' );
+				resolvedMaterials.push( createWebGPUMaterialGraph( source, worldMaterialGraph( source ), { albedo, normalMap, emissiveMap } ) );
 				materialHooks.push( null );
 				continue;
 			}
