@@ -203,8 +203,12 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		const materialResolution = resolveStaticModelMaterial( fallback, object.material );
 		const sourceMaterial = materialResolution?.material || materialResolution || object.material;
 		materialResolution?.prepareGeometry?.( geometry, object );
+		const profileDepthMaterial = materialResolution?.material ? materialResolution.depthMaterial || null : null;
+		if ( profileDepthMaterial && ! profileDepthMaterial.isMeshDepthMaterial ) throw new Error( 'World material profile depthMaterial must be a MeshDepthMaterial' );
 		if ( sourceMaterial !== object.material ) sharedProfileMaterials.add( sourceMaterial );
-		const cacheKey = sourceMaterial.uuid;
+		if ( profileDepthMaterial ) sharedProfileMaterials.add( profileDepthMaterial );
+		const depthSourceMaterial = profileDepthMaterial || sourceMaterial;
+		const cacheKey = `${ sourceMaterial.uuid }:${ depthSourceMaterial.uuid }`;
 		let material = materialCache.get( cacheKey );
 		if ( ! material ) {
 			material = staticFadeMaterial( T, sourceMaterial, hasMaterialData );
@@ -218,7 +222,7 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		mesh.boundingSphere = instanceBoundsSphere?.clone() || null;
 		mesh.castShadow = true;
 		mesh.receiveShadow = true;
-		mesh.customDepthMaterial = staticFadeDepthMaterial( T, sourceMaterial );
+		mesh.customDepthMaterial = staticFadeDepthMaterial( T, depthSourceMaterial, hasMaterialData, !! profileDepthMaterial );
 		ownedGeometry.add( geometry );
 		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
 	} );
@@ -256,25 +260,31 @@ function staticFadeMaterial( T, source, hasMaterialData ) {
 	return material;
 }
 
-function staticFadeDepthMaterial( T, source ) {
-	const material = new T.MeshDepthMaterial( {
-		depthPacking: T.RGBADepthPacking,
-		map: source.map || null,
-		alphaMap: source.alphaMap || null,
-		alphaTest: source.alphaTest || 0,
-		side: source.side,
-	} );
-	const originalCompile = material.onBeforeCompile;
+function staticFadeDepthMaterial( T, source, hasMaterialData, profileDepthMaterial ) {
+	const material = profileDepthMaterial
+		? source.clone()
+		: new T.MeshDepthMaterial( {
+			depthPacking: T.RGBADepthPacking,
+			map: source.map || null,
+			alphaMap: source.alphaMap || null,
+			alphaTest: source.alphaTest || 0,
+			side: source.side,
+		} );
+	material.depthPacking = T.RGBADepthPacking;
+	const originalCompile = material.onBeforeCompile, originalKey = material.customProgramCacheKey?.bind( material );
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.( shader, renderer );
+		const materialAttributes = hasMaterialData ? '\nattribute vec4 iStaticMaterialData0;\nattribute vec4 iStaticMaterialData1;' : '';
+		const materialVaryings = hasMaterialData ? '\nvarying vec4 vStaticMaterialData0;\nvarying vec4 vStaticMaterialData1;' : '';
+		const materialAssignments = hasMaterialData ? 'vStaticMaterialData0 = iStaticMaterialData0;\nvStaticMaterialData1 = iStaticMaterialData1;\n' : '';
 		shader.vertexShader = shader.vertexShader
-			.replace( '#include <common>', '#include <common>\nattribute vec4 iStaticFade;\nvarying vec4 vStaticFade;' )
-			.replace( '#include <begin_vertex>', 'vStaticFade = iStaticFade;\n#include <begin_vertex>' );
+			.replace( '#include <common>', `#include <common>\nattribute vec4 iStaticFade;\nvarying vec4 vStaticFade;${ materialAttributes }${ materialVaryings }` )
+			.replace( '#include <begin_vertex>', `vStaticFade = iStaticFade;\n${ materialAssignments }#include <begin_vertex>` );
 		shader.fragmentShader = shader.fragmentShader
-			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;` )
+			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;${ materialVaryings }` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
-	material.customProgramCacheKey = () => 'elsemesh-static-instance-shadow-fade-v1';
+	material.customProgramCacheKey = () => `${ originalKey?.() || '' }|elsemesh-static-instance-shadow-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
 	return material;
 }
 

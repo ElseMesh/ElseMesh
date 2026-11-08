@@ -86,6 +86,11 @@ does not assign domain-specific meanings to the values. Omitted data is passed
 as zeroes. The attributes are allocated only when the component uses this
 field. This supports authored per-placement appearance while keeping the model
 set and draw batching renderer-neutral.
+On WebGL, a world material-profile runtime may also return a Three.js
+`MeshDepthMaterial` alongside its color material. The static-model adapter
+clones and wraps that depth material with the same per-instance data varyings
+and LOD fade, allowing world-owned deformation and cutout logic to remain
+consistent in shadow maps.
 `geometryMirrorX` records an odd-parity source reflection. The loader reflects
 the LOD geometry across local X, reverses triangle winding, and adjusts tangent
 handedness. The corresponding instance rotations absorb the source scale-sign

@@ -13,7 +13,7 @@ const hash = async bytes => {
 };
 
 let runtime, renderer, profileGeometryPrepared = false;
-let profileMaterial;
+let profileMaterial, profileDepthMaterial;
 try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
 	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
@@ -44,12 +44,18 @@ try {
 	const camera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 100 );
 	camera.position.set( 2, 1, 4 ); camera.lookAt( 2, 0.5, - 5 ); camera.updateProjectionMatrix();
 	profileMaterial = new THREE.MeshStandardMaterial( { color: 0x35d8ff, roughness: 0.4 } );
+	profileDepthMaterial = new THREE.MeshDepthMaterial();
+	profileDepthMaterial.onBeforeCompile = shader => {
+		shader.vertexShader = shader.vertexShader.replace( '#include <common>', '#include <common>\nattribute vec4 fixtureDepthProfile;' );
+		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', '#include <common>\nfloat fixtureDepthProfileValue() { return 1.0; }' );
+	};
 	const fallback = {
 		THREE, connector, loader: new GLTFLoader(), scene,
 		hostedComponentRuntimes: new Map( [ [ 'fixture-material', {
-			sharedMaterials: [ profileMaterial ],
+			sharedMaterials: [ profileMaterial, profileDepthMaterial ],
 			resolveWorldMaterialProfile: request => request.profile === profile && request.role === 'tint' ? {
 				material: profileMaterial,
+				depthMaterial: profileDepthMaterial,
 				prepareGeometry( geometry ) {
 					geometry.setAttribute( 'fixtureProfileData', new THREE.Float32BufferAttribute( new Float32Array( geometry.getAttribute( 'position' ).count ).fill( 1 ), 1 ) );
 					profileGeometryPrepared = true;
@@ -65,6 +71,10 @@ try {
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
 	if ( ! profileGeometryPrepared || ! mesh.geometry.getAttribute( 'fixtureProfileData' ) ) throw new Error( 'WebGL static model profile did not prepare its custom geometry attributes' );
 	if ( ! runtime.sharedMaterials.includes( profileMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile material' );
+	if ( ! runtime.sharedMaterials.includes( profileDepthMaterial ) ) throw new Error( 'Static model runtime did not retain its shared world profile depth material' );
+	const depthShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\nvoid main() {}' };
+	mesh.customDepthMaterial.onBeforeCompile( depthShader, renderer );
+	if ( ! depthShader.vertexShader.includes( 'fixtureDepthProfile' ) || ! depthShader.vertexShader.includes( 'vStaticMaterialData0 = iStaticMaterialData0' ) || ! depthShader.fragmentShader.includes( 'vStaticMaterialData0' ) || ! depthShader.fragmentShader.includes( 'emStaticFadeVisible' ) ) throw new Error( 'WebGL profile depth material must retain world shader hooks, per-instance data, and engine LOD fade' );
 	if ( mesh.frustumCulled !== true ) throw new Error( 'Instanced draws do not use view-frustum culling when conservative bounds exist' );
 	if ( ! mesh.boundingSphere?.containsPoint( new THREE.Vector3( 81.5, 0.5, - 5 ) ) ) throw new Error( 'Draw bounds omit the scaled outer extent of the farthest instance' );
 	runtime.update( 1 / 60, camera );
@@ -93,5 +103,6 @@ try {
 } finally {
 	runtime?.dispose();
 	profileMaterial?.dispose();
+	profileDepthMaterial?.dispose();
 	renderer?.dispose();
 }
