@@ -55,8 +55,6 @@ import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
 import { worldComponentAssetIDs, worldComponentDescriptor } from './network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
-import { worldFishPresentationFor } from './network/WorldFishPresentation.js';
-import { worldFishPopulationFor } from './network/WorldFishPopulation.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
@@ -147,8 +145,6 @@ export class App {
 		this.loadWorldProviders = loadWorldProviders;
 		this.hostedQueries = new WeakMap();
 		this.localWorldExperience = worldPackage?.source?.experience || null;
-		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
-		this.fishPopulation = worldFishPopulationFor( this.localWorldExperience );
 		const platform = navigator.userAgentData?.platform || navigator.platform || '';
 		this.isLinuxDesktop = /linux/i.test( platform ) && ! /android/i.test( navigator.userAgent );
 		const savedGraphicsPriority = readGraphicsPriority();
@@ -261,8 +257,6 @@ export class App {
 		}
 		if ( ! worldLink ) await loadWorldPackageProviders( this.worldPackage, this.loadWorldProviders );
 		this.localWorldExperience = this.worldPackage?.source?.experience || null;
-		this.fishPresentation = worldFishPresentationFor( this.localWorldExperience );
-		this.fishPopulation = worldFishPopulationFor( this.localWorldExperience );
 		this.loadingExperience = worldLink?.localProvider ? null : GENERIC_WORLD_EXPERIENCE;
 		this.loadingTitle = worldLink?.localProvider ? 'Connecting to ThruHold' : worldLink ? 'ThruHold' : 'Example Island';
 		globalThis.__ui?.setLoadingPresentation( this.loadingTitle, this.loadingExperience );
@@ -386,7 +380,7 @@ export class App {
 		await progress( 0.12, 'Building the village…', undefined, 'village' );
 		const createVillage = this.worldPackage?.presentation?.createVillage;
 		if ( typeof createVillage !== 'function' ) throw new Error( 'The default world package must provide its village presentation' );
-		this.village = await createVillage( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation } );
+		this.village = await createVillage( { scene, terrain: this.terrainData, colliders: this.colliders, worldLayout: this.worldLayout } );
 		this.worldVillageMaterialContext = { materials: this.village.materials, textures: this.village.textures };
 		this.vegetationEnabled = ! qs.has( 'noVeg' );
 		if ( this.vegetationEnabled ) {
@@ -420,7 +414,7 @@ export class App {
 		await progress( 0.23, 'Growing the reef…', undefined, 'reef' );
 		const createReef = this.worldPackage?.presentation?.createReef;
 		if ( typeof createReef !== 'function' ) throw new Error( 'The default world package must provide its reef presentation' );
-		this.reef = await createReef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout, fishPresentation: this.fishPresentation, fishPopulation: this.fishPopulation } );
+		this.reef = await createReef( { scene, terrain: this.terrainData, shoreField: this.shoreField, worldLayout: this.worldLayout } );
 
 		const createBoatModel = this.worldPackage?.presentation?.createBoatModel;
 		if ( typeof createBoatModel !== 'function' ) throw new Error( 'The default world package must provide its boat model' );
@@ -432,7 +426,6 @@ export class App {
 		// ---------------------------------------------------------------- ocean
 		await progress( 0.3, 'Simulating the ocean…', undefined, 'simulation' );
 		this.fft = new OceanFFT( renderer );
-		if ( this.reef.setOcean ) this.reef.setOcean( this.fft ); // coral / sea fan sway follows the simulated swell
 		this.foamTexture = createFoamTexture( renderer );
 		this.oceanLOD = new CDLOD( { gridSize: Number( qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: - 25, maxY: 25 } );
 		this.surface = new WaterSurface( { fft: this.fft, cdlod: this.oceanLOD, foamTexture: this.foamTexture } );
@@ -536,7 +529,6 @@ export class App {
 		// spray.emit() / emitAlongPoints() for boat bow spray and splashes)
 		this.spray = new Spray( renderer, { query: this.query, terrain: this.terrainGPU, sceneCopy: this.sceneRenderer.opaqueCopy, clouds: this.clouds } );
 		scene.add( this.spray.mesh );
-		if ( this.reef.setSpray ) this.reef.setSpray( this.spray ); // splashes of leaping fish
 		this.breakers = new Breakers( renderer, {
 			surface: this.surface, shore: this.shore, terrainData: this.terrainData, sky: this.sky,
 			spray: this.spray, clouds: this.clouds,
@@ -561,14 +553,18 @@ export class App {
 		try {
 
 			await this.whale.load();
-			if ( this.reef && this.reef.setWhale ) this.reef.setWhale( this.whale ); // escort fish, foam and slick
-
 		} catch ( e ) {
 
 			console.warn( 'whale model failed to load', e );
 			this.whale = null;
 
 		}
+		this.worldPackage?.presentation?.connectRuntimeComponents?.( {
+			reef: this.reef,
+			ocean: this.fft,
+			spray: this.spray,
+			marineCreature: this.whale,
+		} );
 
 		// interactive wake around the boat (Kelvin pattern, bow/stern waves, prop wash foam)
 		this.wake = new WakeSim( renderer, { terrainGPU: this.terrainGPU, boat: this.boatCtl, colliders: this.colliders } );

@@ -37,16 +37,28 @@ export const defaultWorldPackage = Object.freeze( {
 			return new WorldState( options );
 		},
 		createVillage: async options => {
-			const { Village } = await import( './tidewater/Village.js' );
-			return new Village( options );
+			const [ { Village }, fishPresentation ] = await Promise.all( [
+				import( './tidewater/Village.js' ),
+				import( './tidewater/FishPresentation.js' ),
+			] );
+			return new Village( { ...options, fishPresentation } );
 		},
 		createRocks: async options => {
 			const { Rocks } = await import( '../src/world/Rocks.js' );
 			return new Rocks( options );
 		},
 		createReef: async options => {
-			const { Reef } = await import( '../src/world/Reef.js' );
-			return new Reef( options );
+			const [ { Reef }, fishPresentation, { FISH_SCHOOL_POPULATION } ] = await Promise.all( [
+				import( './tidewater/Reef.js' ),
+				import( './tidewater/FishPresentation.js' ),
+				import( './tidewater/FishSchoolPopulation.js' ),
+			] );
+			return new Reef( { ...options, fishPresentation, fishPopulation: FISH_SCHOOL_POPULATION } );
+		},
+		connectRuntimeComponents: ( { reef, ocean, spray, marineCreature } ) => {
+			reef?.setOcean?.( ocean );
+			reef?.setSpray?.( spray );
+			reef?.setWhale?.( marineCreature );
 		},
 		createBoatModel: async () => {
 			const { BoatModel } = await import( '../src/world/BoatModel.js' );
