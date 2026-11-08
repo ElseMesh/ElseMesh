@@ -1,6 +1,4 @@
 import { Group, BufferGeometry, Mesh } from '../engine/index.js';
-import { Builder, Batch } from './village/GeoBuilder.js';
-import { InstancedProps } from './Props.js';
 import { LAYERS } from '../core/SceneRenderer.js';
 import { createNatureMaterial } from './debris/NatureMaterial.js';
 import { PebbleField } from './debris/PebbleField.js';
@@ -30,10 +28,11 @@ import { ScannedDebris } from './debris/ScannedDebris.js';
 
 export class Debris {
 
-	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createPlacer, isShadowCaster, scannedAssets, seed = 5150 } ) {
+	constructor( { scene, terrain, village, vegetation = null, rocks = null, colliders = null, worldLayout, createBuilder, createBatch, createInstancedProps, createPlacer, isShadowCaster, scannedAssets, seed = 5150 } ) {
 
 		if ( typeof createPlacer !== 'function' ) throw new Error( 'Debris rendering requires the active world placement provider' );
 		if ( typeof isShadowCaster !== 'function' ) throw new Error( 'Debris rendering requires the active world shadow policy' );
+		if ( typeof createBuilder !== 'function' || typeof createBatch !== 'function' || typeof createInstancedProps !== 'function' ) throw new Error( 'Debris rendering requires the active world geometry factories' );
 
 		this.scene = scene;
 		this.terrainData = terrain.data || terrain;
@@ -43,14 +42,14 @@ export class Debris {
 		this.group.matrixAutoUpdate = false;
 		const t0 = performance.now();
 
-		const B = new Builder();
-		const inst = new InstancedProps( B );
+		const B = createBuilder();
+		const inst = createInstancedProps( B );
 		const placer = createPlacer( { B, inst, terrain: this.terrainData, village, vegetation, rocks, colliders, worldLayout, seed } ).run();
 		this.counts = placer.counts;
 		this.newColliders = placer.newColliders;
 		const t1 = performance.now();
 
-		this._assemble( B, village, isShadowCaster );
+		this._assemble( B, village, isShadowCaster, createBatch );
 		const t2 = performance.now();
 
 		this.pebbles = new PebbleField( { terrain: this.terrainData, gpu: this.gpu, mask: placer.mask } );
@@ -63,7 +62,7 @@ export class Debris {
 
 	}
 
-	_assemble( B, village, isShadowCaster ) {
+	_assemble( B, village, isShadowCaster, createBatch ) {
 
 		const take = ( key ) => {
 
@@ -76,7 +75,7 @@ export class Debris {
 		const wood = B.batch( 'wood' ), hard = B.batch( 'hard' ), nature = B.batch( 'nature' );
 		const rope = take( 'rope' ), net = take( 'net' );
 		if ( rope ) hard.append( rope, ( d ) => [ d[ 0 ], 0, 0, 2 + d[ 1 ] ] );
-		const fabric = new Batch();
+		const fabric = createBatch();
 		if ( net ) fabric.append( net, ( d ) => [ d[ 0 ], d[ 1 ], Math.max( 0.02, d[ 2 ] ), 0 ] );
 
 		// contact occlusion: darken what touches the ground (sides and undersides more than tops)
@@ -100,7 +99,7 @@ export class Debris {
 
 		}
 
-		const opaque = new Batch();
+		const opaque = createBatch();
 		const ranges = {};
 		for ( const key of [ 'wood', 'hard', 'nature' ] ) {
 

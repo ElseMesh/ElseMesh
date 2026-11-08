@@ -37,11 +37,8 @@ export const defaultWorldPackage = Object.freeze( {
 			return new WorldState( options );
 		},
 		createVillage: async options => {
-			const [ { Village }, { createVillageMaterialContext } ] = await Promise.all( [
-				import( '../src/world/Village.js' ),
-				import( './tidewater/renderers/webgpu-village/VillageMaterialContext.js' ),
-			] );
-			return new Village( { ...options, createMaterialContext: createVillageMaterialContext } );
+			const { Village } = await import( './tidewater/Village.js' );
+			return new Village( options );
 		},
 		createRocks: async options => {
 			const { Rocks } = await import( '../src/world/Rocks.js' );
@@ -68,11 +65,13 @@ export const defaultWorldPackage = Object.freeze( {
 			return new Vegetation( options );
 		},
 		createDebris: async options => {
-			const [ { Debris }, { DebrisPlacer, debrisCastsShadow } ] = await Promise.all( [
+			const [ { Debris }, { DebrisPlacer, debrisCastsShadow }, { Builder, Batch }, { InstancedProps } ] = await Promise.all( [
 				import( '../src/world/Debris.js' ),
 				import( './tidewater/DebrisPlacement.js' ),
+				import( './tidewater/village/GeoBuilder.js' ),
+				import( './tidewater/Props.js' ),
 			] );
-			return new Debris( { ...options, createPlacer: placement => new DebrisPlacer( placement ), isShadowCaster: debrisCastsShadow, scannedAssets } );
+			return new Debris( { ...options, createBuilder: () => new Builder(), createBatch: () => new Batch(), createInstancedProps: builder => new InstancedProps( builder ), createPlacer: placement => new DebrisPlacer( placement ), isShadowCaster: debrisCastsShadow, scannedAssets } );
 		},
 	} ),
 	assets: Object.freeze( {

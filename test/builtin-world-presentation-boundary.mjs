@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const app = await readFile( new URL( '../src/App.js', import.meta.url ), 'utf8' );
 const defaultWorld = await readFile( new URL( '../worlds/default.js', import.meta.url ), 'utf8' );
-const village = await readFile( new URL( '../src/world/Village.js', import.meta.url ), 'utf8' );
+const village = await readFile( new URL( '../worlds/tidewater/Village.js', import.meta.url ), 'utf8' );
 const debrisRenderer = await readFile( new URL( '../src/world/Debris.js', import.meta.url ), 'utf8' );
 const webglFallback = await readFile( new URL( '../src/fallback/WebGLFallback.js', import.meta.url ), 'utf8' );
 const hostedReturn = app.indexOf( "if ( engine.backend === 'webgpu' && worldLink ) return this.initHostedPackageWorld( progress );" );
@@ -17,9 +17,11 @@ assert.doesNotMatch( debrisRenderer, /DebrisShapes|KIND\./, 'the engine debris r
 assert.match( defaultWorld, /createDebris:[\s\S]*?import\( '\.\/tidewater\/DebrisPlacement\.js' \)[\s\S]*?isShadowCaster: debrisCastsShadow/, 'the Tidewater package provides its placer and shadow policy' );
 assert.match( defaultWorld, /createWildlife:[\s\S]*?import\( '\.\/tidewater\/wildlife\/Wildlife\.js' \)/, 'the Tidewater world package provides its wildlife runtime' );
 assert.match( defaultWorld, /installGameplayColliders: installPierGameplayColliders/, 'the Tidewater package provides built-in gameplay collider installation' );
-assert.match( defaultWorld, /createVillage:[\s\S]*?createMaterialContext: createVillageMaterialContext/, 'the default world package injects its village material implementation' );
-assert.match( village, /createMaterialContext/, 'the engine village receives a material context from its package' );
-assert.doesNotMatch( village, /VillageMaterials|TextureBaker/, 'the engine village does not import the world-owned village material implementation' );
+assert.match( defaultWorld, /createVillage:[\s\S]*?import\( '\.\/tidewater\/Village\.js' \)/, 'the default package loads village construction from Tidewater' );
+assert.match( village, /createVillageMaterialContext/, 'Tidewater creates its own village material context' );
+assert.match( defaultWorld, /createBuilder:[\s\S]*?createInstancedProps/, 'the default package supplies Tidewater geometry factories to the generic debris renderer' );
+assert.doesNotMatch( debrisRenderer, /from ['"].*(Props|GeoBuilder)\.js/, 'the generic debris renderer does not import Tidewater geometry content' );
+assert.match( debrisRenderer, /createInstancedProps/, 'the generic debris renderer consumes world-provided geometry factories' );
 assert.match( webglFallback, /defaultWorldPackage\?\.presentation\?\.installGameplayColliders/, 'the WebGL built-in asks the active package to install gameplay colliders' );
 assert.doesNotMatch( webglFallback, /pierWalkableHeightAt|pierStep|pierRail/, 'the engine fallback contains no Tidewater pier-collider recipe' );
 

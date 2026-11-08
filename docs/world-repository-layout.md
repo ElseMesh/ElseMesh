@@ -1,12 +1,15 @@
 # World content repository layout and file definitions
 
-World repositories contain authored data and immutable package assets. They
-are not ElseMesh applications: they do not compile or run by themselves. The
-ElseMesh engine owns exporters, validators, package schemas, networking, and
-rendering. A signed manifest can select a locally installed world provider for
-its registered component types; the provider loads only after the manifest
-signature is verified. Owner-signed JavaScript behavior modules run in
-dedicated browser Workers and do not receive renderer objects.
+World repositories contain authored data, immutable package assets, and
+world-specific behavior and presentation modules. They are not standalone
+applications: their code uses ElseMesh engine APIs and package contracts. The
+engine owns shared schemas, networking, renderer selection, and reusable
+backend implementations; world packages may provide content-specific
+procedural construction and renderer adapters. A signed manifest can select a
+locally installed world provider for its registered component types; the
+provider loads only after the manifest signature is verified. Owner-signed
+JavaScript behavior modules run in dedicated browser Workers and do not receive
+renderer objects.
 
 The current content repositories are [Tidewater](../worlds/tidewater/README.md)
 and the private [Hogwarts-World bridge repository](../worlds/Hogwarts/README.md).
@@ -55,13 +58,19 @@ view. Component payload formats and versioned behavior contracts are listed in
 
 ### Tidewater
 
-Tidewater is the Example Island source and package at `worlds/tidewater`.
+Tidewater is the Example Island source, package, and world-specific runtime at
+`worlds/tidewater`.
 Its root `world-source.json` contains the island's stable object and component
 records. `source/models/props/props.json` and `.bin` are the source glTF model
 and binary buffer for vendor props; `source/models/whale/humpback.json` and
 `.bin` are the whale model and buffer; the adjacent image files are source
 textures. `source/audio/` contains source OGG recordings and credits.
-`lod-source/` contains low-detail village and boat GLBs. See the
+`Village.js`, `Pier.js`, `Props.js`, and `village/` contain Tidewater's
+procedural village construction and geometry batching; `renderers/` contains
+Tidewater-specific WebGPU and WebGL presentation modules. The engine loads the
+default village through a package factory and supplies the generic debris
+renderer with world-owned geometry factories. `lod-source/` contains
+low-detail village and boat GLBs. See the
 [Tidewater README](../worlds/tidewater/README.md) and its [asset index](../worlds/tidewater/ASSET-INDEX.md).
 
 ### Hogwarts-World
