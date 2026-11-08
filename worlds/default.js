@@ -67,7 +67,7 @@ export const defaultWorldPackage = Object.freeze( {
 			return new BoatModel();
 		},
 		createWhale: async options => {
-			const { Whale } = await import( '../src/world/marine/Whale.js' );
+			const { Whale } = await import( './tidewater/marine/Whale.js' );
 			return new Whale( options );
 		},
 		createWildlife: async options => {

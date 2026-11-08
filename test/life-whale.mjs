@@ -17,7 +17,7 @@ globalThis.fetch = async ( url ) => {
 };
 
 const L = await setupLife( { W, H, water: true } );
-const { Whale } = await import( '../src/world/marine/Whale.js' );
+const { Whale } = await import( '../worlds/tidewater/marine/Whale.js' );
 const { TIDEWATER_WHALE_PROFILE } = await import( '../worlds/tidewater/WhaleProfile.js' );
 const { createHumpbackBrain } = await import( '../worlds/tidewater/marine/HumpbackBrain.js' );
 let emitted = 0;

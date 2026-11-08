@@ -54,7 +54,7 @@ for ( const [ name, offs ] of [ [ 'side', ( s ) => new E.Vector3( s.fwd.z * 2.2,
 gulls.mesh.visible = false;
 
 // whale LODs
-const { Whale } = await import( '../src/world/marine/Whale.js' );
+const { Whale } = await import( '../worlds/tidewater/marine/Whale.js' );
 const { TIDEWATER_WHALE_PROFILE } = await import( '../worlds/tidewater/WhaleProfile.js' );
 const { createHumpbackBrain } = await import( '../worlds/tidewater/marine/HumpbackBrain.js' );
 const whale = new Whale( { scene: L.scene, terrain: L.terrain, profile: TIDEWATER_WHALE_PROFILE, createBrain: createHumpbackBrain } );

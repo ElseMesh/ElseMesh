@@ -34,9 +34,8 @@ import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
-import { Whale } from '../world/marine/Whale.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
-import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
 import { mulberry32 } from '../util/Noise.js';
@@ -959,8 +958,8 @@ export class WebGLFallback {
 			}
 		}
 		if ( this.worldLink ) {
-			for ( const { component, assets } of this.hostedWhalePackages || [] ) {
-				if ( await this._loadWebGLWhale( component, assets, this.hostedTerrainData, this.hostedSeaLevel ?? 0 ) ) this.hostedSupportedComponents.add( component.id );
+			for ( const component of this.hostedWhaleComponents || [] ) {
+				if ( await this._loadWebGLWhale( component, this.connector?.assets, this.hostedTerrainData, this.hostedSeaLevel ?? 0 ) ) this.hostedSupportedComponents.add( component.id );
 			}
 			this._updateHostedWebGLStatus();
 		} else await this._loadIslandWhale();
@@ -981,22 +980,13 @@ export class WebGLFallback {
 
 	async _loadWebGLWhale( component, assets, terrain = null, seaLevel = 0 ) {
 
-		const whale = new Whale( {
-			THREE: this.THREE, webgl: true, scene: this.scene, terrain, query: this.waterQuery, spray: this.spray, queryName: `whale:${component.id}`,
-			seaLevel, profile: {
-				seed: component.seed, route: component.route, surfaceAt: component.surfaceAt,
-				cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed,
-			},
-			createBrain: worldComponentDescriptor( component.type )?.createSimulation,
-		} );
+		const adapter = worldComponentBackendAdapter( this.engine.backend, component.type );
+		if ( ! adapter ) return false;
 		try {
-			if ( assets ) await whale.loadPackage( assets );
-			else await whale.load();
-			this.whales ||= [];
-			this.whales.push( whale );
-			return true;
+			const result = await adapter( { fallback: this, manifest: this.connector?.manifest, assets, terrain, rules: { seaLevel } }, component );
+			if ( result?.runtime ) this.hostedComponentRuntimes.set( component.id, result.runtime );
+			return result === true || result?.installed === true;
 		} catch ( error ) {
-			whale.dispose();
 			console.warn( `WebGL whale component ${component.id} unavailable:`, error );
 			return false;
 		}
@@ -1006,7 +996,22 @@ export class WebGLFallback {
 	async _loadIslandWhale() {
 
 		try {
-			await this._loadWebGLWhale( this.islandWhaleComponent, null, this.terrain, this.defaultWorldSource.rules.seaLevel ?? 0 );
+			const component = this.islandWhaleComponent;
+			if ( ! component ) return;
+			const createWhale = this.defaultWorldPackage?.presentation?.createWhale;
+			if ( typeof createWhale !== 'function' ) throw new Error( 'The default world package must provide its whale presentation' );
+			const whale = await createWhale( {
+				THREE: this.THREE, webgl: true, scene: this.scene, terrain: this.terrain,
+				query: this.waterQuery, spray: this.spray, queryName: `whale:${component.id}`,
+				seaLevel: this.defaultWorldSource.rules.seaLevel ?? 0,
+				profile: {
+					seed: component.seed, route: component.route, surfaceAt: component.surfaceAt,
+					cruiseSpeed: component.cruiseSpeed, surfaceSpeed: component.surfaceSpeed,
+				},
+			} );
+			await whale.load();
+			this.whales ||= [];
+			this.whales.push( whale );
 		} catch ( error ) {
 			console.warn( 'WebGL island whale package unavailable:', error );
 		}
@@ -2018,7 +2023,7 @@ export class WebGLFallback {
 			staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
 		} ) );
 		await progress( 0.18, 'Preparing visible models…', 0.9 );
-		const backendComponentIDs = await this._installHostedBackendComponents( startupComponents, manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
+		const backendComponentIDs = await this._installHostedBackendComponents( startupComponents.filter( component => component.type !== 'elsemesh.humpback-whale/1' ), manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
 		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
 			components: backendComponentIDs.size,
 			elapsedMs: Math.round( performance.now() - backendInstallStarted ),
@@ -2046,11 +2051,7 @@ export class WebGLFallback {
 		this.hostedComponents = components;
 		this.hostedTitle = manifest.title || 'Hosted world';
 		this.hostedSupportedComponents = supportedComponents;
-		this.hostedWhalePackages = [];
-		for ( const component of components.filter( candidate => candidate.type === 'elsemesh.humpback-whale/1' ) ) {
-			const ids = [ component.modelAssetId, component.geometryAssetId, component.albedoAssetId, component.heightAssetId ];
-			if ( ids.every( id => assets.has( id ) ) ) this.hostedWhalePackages.push( { component, assets: { manifest: assets.get( ids[ 0 ] ), geometry: assets.get( ids[ 1 ] ), albedo: assets.get( ids[ 2 ] ), height: assets.get( ids[ 3 ] ) } } );
-		}
+		this.hostedWhaleComponents = components.filter( component => component.type === 'elsemesh.humpback-whale/1' );
 		this._updateHostedWebGLStatus();
 		progress( 0.9, 'Preparing hosted world…' );
 
