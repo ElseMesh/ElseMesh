@@ -48,7 +48,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		const names = new Map(), lines = [];
 		for ( const node of graph.nodes ) {
 			if ( node.op === 'input' ) {
-				names.set( node.id, stage === 'vertex' ? INPUT_SOURCES[ node.name ][ backend ] : backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
+				names.set( node.id, stage === 'vertex' ? INPUT_SOURCES[ node.name ][ backend === 'webgpu' ? 'wgsl' : 'glsl' ] : backend === 'webgpu' ? `in.vs.emg_${node.name}` : `vEmg_${node.name}` );
 				continue;
 			}
 			const name = `emg_${node.id}`;
