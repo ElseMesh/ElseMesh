@@ -1,4 +1,6 @@
-const profiles = new Map();
+import { validateWorldMaterialGraph } from './WorldMaterialGraph.js';
+
+const profiles = new Map( [ [ 'elsemesh.material-graph/1', Object.freeze( { roles: new Set( [ 'graph' ] ), maps: Object.freeze( [] ) } ) ] ] );
 
 
 export function registerWorldMaterialProfile( profile, descriptor ) {
@@ -21,10 +23,12 @@ export function worldMaterialRole( material ) {
 	const descriptor = material?.extras?.elsemeshMaterial;
 	if ( descriptor === undefined ) return null;
 	if ( ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) ||
-		Object.keys( descriptor ).some( key => key !== 'profile' && key !== 'role' ) ||
-		typeof descriptor.profile !== 'string' || ! profiles.get( descriptor.profile )?.roles.has( descriptor.role ) ) {
+		Object.keys( descriptor ).some( key => key !== 'profile' && key !== 'role' && key !== 'graph' ) ||
+		typeof descriptor.profile !== 'string' || ! profiles.get( descriptor.profile )?.roles.has( descriptor.role ) ||
+		descriptor.profile === 'elsemesh.material-graph/1' && descriptor.graph === undefined ) {
 		throw new Error( 'Unsupported or malformed world material profile' );
 	}
+	if ( descriptor.graph !== undefined ) validateWorldMaterialGraph( descriptor.graph );
 	return descriptor.role;
 }
 
