@@ -124,7 +124,7 @@ const transparentComponent = {
 };
 const transparentAssets = new Map( [ [ transparentDocumentAssetID, transparentDocumentBytes ], [ transparentModelAssetID, transparentModelBytes ] ] );
 const transparentConnector = {
-	manifest: { assets: transparentComponent.assets },
+	manifest: { assets: transparentComponent.assets.map( asset => ( { id: asset.assetId, kind: asset.kind } ) ) },
 	assets: new Map( [ [ transparentDocumentAssetID, transparentDocumentBytes ] ] ),
 	getAsset: async assetId => transparentAssets.get( assetId ),
 };
