@@ -367,7 +367,7 @@ export class WorldConnector {
 		return bytes;
 	}
 
-	async preload( { priorities = PRIORITY_ORDER, through = 'background', after = null, assetIDs, signal, concurrency } = {} ) {
+	async preload( { priorities = PRIORITY_ORDER, through = 'background', after = null, assetIDs, viewPriorityByAsset = null, signal, concurrency } = {} ) {
 		invariant( this.manifest, 'Load and verify the world manifest first' );
 		const ranks = new Map( priorities.map( ( priority, index ) => [ priority, index ] ) );
 		invariant( concurrency === undefined || Number.isInteger( concurrency ) && concurrency > 0 && concurrency <= 8, 'Invalid asset concurrency' );
@@ -375,6 +375,8 @@ export class WorldConnector {
 		const startRank = after === null ? 0 : ranks.get( after ) + 1;
 		invariant( endRank !== undefined && startRank !== undefined && startRank <= endRank + 1, 'Invalid asset priority range' );
 		const selected = assetIDs ? new Set( assetIDs ) : null;
+		invariant( viewPriorityByAsset === null || viewPriorityByAsset instanceof Map && [ ...viewPriorityByAsset.values() ].every( value => typeof value === 'number' && ! Number.isNaN( value ) && value >= 0 ), 'World visual priority map is invalid' );
+		const collisionAssetIDs = new Set( ( this.manifest.objects || [] ).filter( object => object.collisionPayload && object.assetId ).map( object => object.assetId ) );
 		const lazyModelAssets = new Set( ( this.manifest.components || [] )
 			.filter( component => component.type === 'elsemesh.static-model-instance-set/1' )
 			.flatMap( component => ( component.assets || [] ).filter( reference => reference.kind === 'glb' ).map( reference => reference.assetId ) ) );
@@ -386,7 +388,9 @@ export class WorldConnector {
 			.filter( ( entry ) => entry.rank >= startRank && entry.rank <= endRank
 				&& ( selected === null || selected.has( entry.asset.id ) )
 				&& ( ! lazyModelAssets.has( entry.asset.id ) || eagerlyReferencedAssets.has( entry.asset.id ) || selected?.has( entry.asset.id ) ) )
-			.sort( ( a, b ) => a.rank - b.rank || a.index - b.index );
+			.sort( ( a, b ) => viewPriorityByAsset?.size
+				? ( Number( collisionAssetIDs.has( b.asset.id ) ) - Number( collisionAssetIDs.has( a.asset.id ) ) || ( viewPriorityByAsset.get( b.asset.id ) ?? 0 ) - ( viewPriorityByAsset.get( a.asset.id ) ?? 0 ) || a.rank - b.rank || a.index - b.index )
+				: a.rank - b.rank || a.index - b.index );
 		const loaded = new Map();
 		const requestedConcurrency = concurrency;
 		for ( let start = 0; start < queue.length; ) {

@@ -289,9 +289,9 @@ try {
 	visualPriorityConnector.getAsset = async id => { visualPriorityFetches.push( id ); return new Uint8Array( [ 1 ] ); };
 	await visualPriorityConnector.preload( {
 		assetIDs: [ 'near-prop', 'far-wall', 'near-large', 'near-small', 'collision' ], position: [ 0, 0, 0 ],
-		viewPriorityByAsset: new Map( [ [ 'near-prop', 0.05 ], [ 'far-wall', 0.4 ], [ 'near-large', 0.4 ], [ 'near-small', 0.05 ] ] ),
+		viewPriorityByAsset: new Map( [ [ 'near-prop', 0.05 ], [ 'far-wall', 0.8 ], [ 'near-large', 0.4 ], [ 'near-small', 0.05 ] ] ),
 	} );
-	assert.deepEqual( visualPriorityFetches, [ 'collision', 'near-large', 'near-prop', 'near-small', 'far-wall' ], 'collision is first; nearby opaque content precedes distant assets; projected size breaks distance ties' );
+	assert.deepEqual( visualPriorityFetches, [ 'collision', 'far-wall', 'near-large', 'near-prop', 'near-small' ], 'collision is first; projected screen coverage outranks distance for visual assets' );
 	await assert.rejects( visualPriorityConnector.preload( { assetIDs: [], viewPriorityByAsset: new Map( [ [ 'invalid', Number.NaN ] ] ) } ), /priority map is invalid/ );
 	for ( const worldId of [ 'world:legacy', 'elsemesh-world:legacy', 'em-world:legacy' ] ) {
 		descriptorWorldId = worldId;

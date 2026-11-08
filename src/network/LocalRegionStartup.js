@@ -3,11 +3,10 @@ import { worldSpawnCollisionObjectIDs } from './WorldSpawn.js';
 import { selectWorldObjectsForView } from './WorldStreaming.js';
 
 export function selectLocalRegionStartupObjects( connector, manifest, camera, spawn ) {
-	const cellSize = connector.cellSizeMeters || 8;
 	const selectedIDs = new Set( selectWorldObjectsForView( manifest, camera, {
-		nearbyDistance: cellSize,
+		nearbyDistance: 0,
 		maxDistance: connector.maxViewDistanceMeters,
-		maxPriority: 'visible',
+		maxPriority: 'background',
 	} ).filter( object => ! object.collisionPayload ).map( object => object.id ) );
 	const spawnFoot = {
 		x: spawn.position[ 0 ],
@@ -21,9 +20,9 @@ export function selectLocalRegionStartupObjects( connector, manifest, camera, sp
 
 export function selectLocalRegionEntryObjects( connector, manifest, startupObjects, camera ) {
 	const visibleVisualIDs = new Set( selectWorldObjectsForView( manifest, camera, {
-		nearbyDistance: connector.cellSizeMeters || 8,
+		nearbyDistance: 0,
 		maxDistance: connector.maxViewDistanceMeters,
-		maxPriority: 'visible',
+		maxPriority: 'background',
 	} ).filter( object => ! object.collisionPayload ).map( object => object.id ) );
 
 	return startupObjects.filter( object => ! object.regionCell || object.collisionPayload || visibleVisualIDs.has( object.id ) );

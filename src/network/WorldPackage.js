@@ -179,6 +179,7 @@ async function prepareWorldPackageMaterialAdapters( connector, root, signal, obj
 }
 
 export function updateWorldPackageLOD( root, camera, loadBias = 0, now = performance.now() ) {
+	if ( root?.userData?.worldPackage?.coarseCoverageReady === false ) return;
 	for ( const controller of root?.userData?.worldPackage?.lodControllers?.values() || [] ) controller.update( camera, now, loadBias );
 	updateWorldPackageTextureLOD( root, camera, loadBias, now );
 }

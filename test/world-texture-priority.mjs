@@ -8,6 +8,8 @@ const header = new Uint8Array( 80 + 3 * 24 );
 for ( let level = 0; level < 3; level ++ ) new DataView( header.buffer ).setBigUint64( 80 + level * 24 + 8, 64n, true );
 const state = { progressiveAssets: new Map(), progressiveTextureTargets: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
 const root = { userData: { worldPackage: state } };
+let objectLODUpdates = 0;
+state.lodControllers = new Map( [ [ 'test', { update() { objectLODUpdates ++; } } ] ] );
 const staticModelRuntime = {
 	disposed: true,
 	viewRevision: 0,
@@ -30,7 +32,13 @@ let middleSourceReads = 0;
 Object.defineProperty( middleTarget, 'sourceAssets', { get() { middleSourceReads ++; return middleSources; } } );
 const pendingJobs = [];
 state.textureLODQueue = { limit: 1, active: 0, waiting: [], run() { this.active ++; return new Promise( resolve => pendingJobs.push( () => { this.active --; resolve(); } ) ); } };
+state.coarseCoverageReady = false;
 updateWorldPackageLOD( root, camera );
+assert.equal( objectLODUpdates, 0, 'mesh LOD scheduling waits for current-view coarse coverage' );
+assert.equal( state.progressiveTextureJobs.size, 0, 'texture mip scheduling waits for the same coarse coverage barrier' );
+state.coarseCoverageReady = true;
+updateWorldPackageLOD( root, camera );
+assert.equal( objectLODUpdates, 1 );
 assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'near' ], 'only the highest-priority candidate enters the queue' );
 assert.equal( state.textureLODScheduleDirty, false, 'the stable view is marked scheduled after planning' );
 const nearObject = state.objectsByAsset.get( 'near' ).values().next().value;

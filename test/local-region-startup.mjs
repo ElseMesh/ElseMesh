@@ -25,7 +25,7 @@ const manifest = {
 		{ id: 'off-view-visual', assetId: 'visual-off-view', priority: 'visible', transform: { position: [ 80, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 2 } },
 		{ id: 'nearby-collision', assetId: 'collision-nearby', priority: 'visible', collisionPayload: true, transform: { position: [ 0, 0, -6 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 2 } },
 		{ id: 'spawn-collision', assetId: 'collision-spawn', priority: 'background', collisionPayload: true, transform: { position: [ 80, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 2 } },
-		{ id: 'background-visual', assetId: 'visual-background', priority: 'background', transform: { position: [ 0, 0, -6 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 2 } },
+		{ id: 'background-visual', assetId: 'visual-background', priority: 'background', regionCell: true, transform: { position: [ 0, 0, -6 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 2 } },
 	],
 };
 const selected = selectLocalRegionStartupObjects( connector, manifest, camera, { position: [ 0, 1.62, 0 ] } );
@@ -37,13 +37,14 @@ assert.ok( selectedIDs.includes( 'visible-floor' ), 'visible startup geometry lo
 assert.ok( selectedIDs.includes( 'spawn-collision' ), 'collision intersecting the spawn capsule is selected even when outside the camera view' );
 assert.ok( ! selectedIDs.includes( 'nearby-collision' ), 'unneeded nearby collision does not delay initial rendering' );
 assert.ok( ! selectedIDs.includes( 'off-view-visual' ), 'off-view visuals do not delay startup' );
-assert.ok( ! selectedIDs.includes( 'background-visual' ), 'background-priority visuals remain deferred' );
+assert.ok( selectedIDs.includes( 'background-visual' ), 'in-view background-priority visuals load at coarse quality before refinement' );
 assert.equal( collisionPath.from.y, 0, 'initial collision frontier starts at the player feet, not the camera eye' );
 assert.deepEqual( collisionPath.from, collisionPath.to, 'initial collision request covers the spawn capsule position' );
 
 assert.ok( selectedIDs.includes( 'visible-far-cell' ), 'world streaming selection retains farther visible geometry for background loading' );
 assert.ok( entryIDs.includes( 'visible-floor' ), 'entry retains a visual cell intersecting the spawn neighborhood' );
 assert.ok( ! selectedIDs.includes( 'startup-roof' ) && ! entryIDs.includes( 'startup-roof' ), 'off-view visuals are not forced into startup by a world-specific cell list' );
+assert.ok( entryIDs.includes( 'background-visual' ), 'entry retains in-view background-priority geometry for the coarse coverage barrier' );
 assert.ok( entryIDs.includes( 'spawn-collision' ), 'spawn collision remains in the entry barrier' );
 assert.ok( entryIDs.includes( 'visible-far-cell' ), 'camera-visible cells remain in the entry barrier even when farther away' );
 console.log( 'ok local startup waits for visible geometry and spawn collision, while deferring off-view authored visuals' );

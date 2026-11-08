@@ -1026,10 +1026,10 @@ export class LocalRegionConnector {
 		selected.sort( ( a, b ) => {
 			const collisionOrder = Number( ! this.collisionAssetIDs.has( a ) ) - Number( ! this.collisionAssetIDs.has( b ) );
 			if ( collisionOrder ) return collisionOrder;
-			const distanceA = distanceByAsset.get( a ) ?? Infinity, distanceB = distanceByAsset.get( b ) ?? Infinity;
-			if ( distanceA !== distanceB ) return distanceA - distanceB;
 			const priorityA = viewPriorityByAsset.get( a ) ?? 0, priorityB = viewPriorityByAsset.get( b ) ?? 0;
 			if ( priorityA !== priorityB ) return priorityA > priorityB ? -1 : 1;
+			const distanceA = distanceByAsset.get( a ) ?? Infinity, distanceB = distanceByAsset.get( b ) ?? Infinity;
+			if ( distanceA !== distanceB ) return distanceA - distanceB;
 			return originalOrder.get( a ) - originalOrder.get( b );
 		} );
 		const loaded = new Map();

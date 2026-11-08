@@ -46,6 +46,24 @@ scheduler decides which regions and assets to request from world traversal
 reachability and expected arrival, then uses view size and proximity to choose
 the suitable variant. See [reachability-driven content scheduling](world-network-design.md#reachability-driven-content-scheduling).
 
+### Current-view coarse-coverage barrier
+
+Before starting mesh-LOD or texture-mip refinement, the engine must make sure
+every bounded visual candidate intersecting the current camera frustum has its
+coarse geometry and coarsest usable texture level installed. The coarse pass
+includes candidates from every authored priority tier; priority tiers must not
+hide in-view structure behind nearby props. Within that pass, order assets by
+projected screen coverage first, then use authored priority and distance to
+break ties. Collision remains an independent earlier request class.
+
+Do not start new mesh or mip upgrades while this current-view coarse set is
+incomplete. Re-evaluate it when the camera moves enough to expose new content;
+resume refinements once the newly visible coarse coverage is installed. This
+barrier coordinates the already independent mesh and texture selectors without
+combining their cache entries or delaying entry for high-detail data. The world
+provides bounds, traversal semantics, and valid coarse/fine tiers; the shared
+engine owns selection, ordering, gating, and both renderer implementations.
+
 ### Texture mip streaming and cache identity
 
 Geometry LODs must not require a separate copy of the same texture at each

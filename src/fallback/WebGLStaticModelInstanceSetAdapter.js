@@ -116,6 +116,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 		}
 		runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
+			canRefine: () => fallback.app?.linkedWorldRoot?.userData.worldPackage?.coarseCoverageReady !== false,
 			batches: mainBatches,
 			// Three.js submits scene-visible meshes in the color pass even when
 			// their material has colorWrite disabled. Let each selected color LOD

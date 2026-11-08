@@ -190,6 +190,24 @@ const makeRuntimeBatch = () => {
 		materialData1Attribute: { array: new Float32Array( capacity * 4 ), needsUpdate: false },
 	};
 };
+let allowRefinement = false;
+const gatedLODRequests = [];
+const gatedRuntime = new StaticModelInstanceSetRuntime( runtimeDocument, {
+	batches: runtimePlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: null,
+	canRefine: () => allowRefinement,
+	loadLOD: async ( modelIndex, lodIndex ) => { gatedLODRequests.push( [ modelIndex, lodIndex ] ); },
+} );
+const gatedCamera = new PerspectiveCamera( 60, 1, 0.1, 100 );
+gatedCamera.lookAt( 0, 0, - 1 );
+gatedRuntime.update( 1 / 60, gatedCamera );
+assert.deepEqual( gatedLODRequests, [], 'static model meshes do not refine before the current view is covered coarsely' );
+allowRefinement = true;
+gatedCamera.position.x = 0.01;
+gatedRuntime.update( 1 / 60, gatedCamera );
+await new Promise( resolve => setImmediate( resolve ) );
+assert.deepEqual( gatedLODRequests, [ [ 0, 1 ] ], 'mesh refinement resumes after the shared coverage gate opens' );
+gatedRuntime.dispose();
 let disposedRuntime = false;
 const runtime = new StaticModelInstanceSetRuntime( runtimeDocument, {
 	batches: runtimePlanner.groups.map( () => [ makeRuntimeBatch() ] ),

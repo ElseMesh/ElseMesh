@@ -61,7 +61,7 @@ export function writeStaticModelInstanceMaterialData( document, group, target0, 
 
 /** Shared visibility/LOD update for backend-owned static model draw batches. */
 export class StaticModelInstanceSetRuntime {
-	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null } = {} ) {
+	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null, canRefine = null } = {} ) {
 		this.document = document;
 		this.planner = new StaticModelInstanceSetPlanner( document );
 		this.batches = batches;
@@ -76,6 +76,7 @@ export class StaticModelInstanceSetRuntime {
 		this.plannerRevisionListeners = null;
 		this._nextLODCheckAt = Infinity;
 		this.loadLOD = loadLOD;
+		this.canRefine = canRefine;
 		this.loadController = new AbortController();
 		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
 		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
@@ -149,6 +150,10 @@ export class StaticModelInstanceSetRuntime {
 	}
 
 	#requestVisibleLODs( refreshDesired ) {
+		const canRefine = ! this.canRefine || this.canRefine();
+		if ( ! canRefine ) {
+			this._nextLODCheckAt = performance.now() + 100;
+		}
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
 			const groups = this.planner._groupsByModel[ modelIndex ];
 			if ( refreshDesired ) {
@@ -162,7 +167,7 @@ export class StaticModelInstanceSetRuntime {
 			const level = loadedMax + 1;
 			const key = `${ modelIndex }:${ level }`;
 			if ( desiredLevel < level ) this.retryAfter.delete( key );
-			if ( desiredLevel > loadedMax && this.loadLOD ) {
+			if ( canRefine && desiredLevel > loadedMax && this.loadLOD ) {
 				if ( ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
 					this.retryAfter.delete( key );
 					const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal ) ).then( () => {

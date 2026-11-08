@@ -20,6 +20,7 @@ assert.equal( assetConcurrencyForConnection( null, 200 * 1024 ), 1, 'measured sl
 assert.equal( assetConcurrencyForConnection( null, 2 * 1024 * 1024 ), 2, 'measured moderate transfer rate selects two concurrent downloads' );
 assert.equal( assetConcurrencyForConnection( null, 8 * 1024 * 1024 ), 3, 'measured fast transfer rate restores the three-request cap' );
 connector.manifest = { assets: priorities.flatMap( ( priority, index ) => [ { id: `sha256:${String( index * 2 + 1 ).padStart( 64, '0' )}`, priority }, { id: `sha256:${String( index * 2 + 2 ).padStart( 64, '0' )}`, priority } ] ) };
+connector.manifest.objects = [ { id: 'collision-object', assetId: connector.manifest.assets[ 3 ].id, collisionPayload: true } ];
 const requested = [];
 let active = 0, maxActive = 0;
 connector.getAsset = async ( id ) => {
@@ -39,6 +40,13 @@ assert.ok( maxActive <= 3 && maxActive > 1, 'same-tier requests run concurrently
 requested.length = 0;
 await connector.preload( { through: 'background', assetIDs: new Set( [ connector.manifest.assets[ 6 ].id ] ) } );
 assert.deepEqual( requested, [ connector.manifest.assets[ 6 ].id ], 'view-driven asset selection can request one asset without fetching unrelated tiers' );
+
+requested.length = 0;
+const projectedWall = connector.manifest.assets[ 7 ].id;
+const nearbyProp = connector.manifest.assets[ 0 ].id;
+const collisionAsset = connector.manifest.assets[ 3 ].id;
+await connector.preload( { assetIDs: [ nearbyProp, projectedWall, collisionAsset ], viewPriorityByAsset: new Map( [ [ nearbyProp, 0.05 ], [ projectedWall, 0.8 ] ] ), concurrency: 1 } );
+assert.deepEqual( requested, [ collisionAsset, projectedWall, nearbyProp ], 'collision remains first, then projected coverage orders coarse visuals ahead of authored priority and distance' );
 
 const getAssetMock = connector.getAsset;
 connector.getAsset = ( id, { signal } ) => new Promise( ( resolve, reject ) => signal.addEventListener( 'abort', () => reject( signal.reason ), { once: true } ) );

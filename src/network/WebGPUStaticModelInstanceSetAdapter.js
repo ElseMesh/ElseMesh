@@ -53,6 +53,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 		if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 		const runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
+			canRefine: () => root.userData.worldPackage?.coarseCoverageReady !== false,
 			batches: mainBatches,
 			shadowBatches,
 			loadLOD: ( modelIndex, lodIndex, signal ) => lodQueue.run( signal, async () => {
