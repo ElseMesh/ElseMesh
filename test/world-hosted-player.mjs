@@ -18,6 +18,12 @@ for ( let row = 0; row < 11; row ++ ) for ( let column = 0; column < 11; column 
 }
 const colliders = new Colliders();
 colliders.addHeightfield( positions, 11, 11, { position: new Vector3(), scale: new Vector3( 1, 1, 1 ) } );
+const capsuleCalls = [];
+const resolveCapsule = colliders.resolveCapsule.bind( colliders );
+colliders.resolveCapsule = ( position, radius, height, stepHeight ) => {
+	capsuleCalls.push( { radius, height } );
+	return resolveCapsule( position, radius, height, stepHeight );
+};
 let axes = { x: 0, y: 1, sprint: 0 };
 let jumpPressed = false;
 const input = {
@@ -33,7 +39,7 @@ const player = {
 	yaw: 0, pitch: 0, grounded: false, gravity: 9.81,
 };
 Object.setPrototypeOf( player, Player.prototype );
-Player.prototype.setWorldRules.call( player, { gravity: 1, movement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 } } );
+Player.prototype.setWorldRules.call( player, { gravity: 1, movement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 }, playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 } } );
 Player.prototype.setHostedWorldPose.call( player, new Vector3( 0, 1.62, 0 ), 0, 0 );
 assert.equal( player.position.y, 0 );
 for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( player, 1 / 60 );
@@ -42,6 +48,7 @@ assert.equal( player.position.y, 0, 'hosted player remains grounded on the activ
 assert.equal( player.grounded, true );
 assert.ok( camera.position.z < -1, 'camera follows the hosted player' );
 assert.ok( Math.abs( player.velocity.z + 1.5 ) < 0.01, 'hosted walk speed follows the signed world rule' );
+assert.ok( capsuleCalls.some( capsule => capsule.radius === 0.42 && capsule.height === 1.76 ), 'hosted movement uses the world-authored player capsule' );
 
 // Signed world terrain is a ground surface even when the package has no object
 // collider at the player's position (for example, open beach sand).
@@ -49,7 +56,7 @@ const terrainGroundPlayer = Object.assign( Object.create( Player.prototype ), {
 	camera: { position: new Vector3(), quaternion: new Quaternion() },
 	input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 0, y: 0, sprint: 0 } ), down: () => false, hit: () => false },
 	terrain: { heightAt: () => 1.2 }, colliders: new Colliders(),
-	position: new Vector3(), velocity: new Vector3(), _previousPosition: new Vector3(),
+	position: new Vector3(), velocity: new Vector3(), _previousPosition: new Vector3(), playerCapsule: { radiusMeters: 0.3, heightMeters: 1.75 },
 	yaw: 0, pitch: 0, grounded: false, gravity: 9.81, mode: 'walk', hostedSeaLevel: 0,
 	worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
 } );
@@ -72,7 +79,7 @@ assert.ok( player.velocity.y > 2.3 && player.velocity.y < 2.5, 'hosted jump impu
 // Exercise real swimming physics with combined mouse/arrow input while moving forward.
 const swimPlayer = Object.assign( Object.create( Player.prototype ), {
 	camera: { position: new Vector3( 0, 0.1, 0 ), quaternion: new Quaternion() },
-	input: { ...input }, colliders: new Colliders(), position: new Vector3( 0, - 1, 0 ),
+	input: { ...input }, colliders: new Colliders(), position: new Vector3( 0, - 1, 0 ), playerCapsule: { radiusMeters: 0.3, heightMeters: 1.75 },
 	velocity: new Vector3(), yaw: 0, pitch: 0, mode: 'swim', hostedSeaLevel: 0,
 	waterH: 0, waterMean: 0, floating: true, stepDist: 0, wasUnder: false,
 } );
@@ -193,7 +200,7 @@ assert.equal( vehicleGate.portalTransferStatus( acceptingWorld ).allowed, false,
 const vehiclePlayer = Object.assign( Object.create( Player.prototype ), {
 	camera: { position: new Vector3( 0, 2, 0 ), quaternion: new Quaternion() }, colliders,
 	position: new Vector3(), velocity: new Vector3( 0, 0, 3 ), yaw: 0.4, pitch: 0.1, mode: 'boat',
-	deckPos: new Vector3( 1, 0, 2 ), deckYaw: 0.2, audio: null,
+	deckPos: new Vector3( 1, 0, 2 ), deckYaw: 0.2, audio: null, playerCapsule: { radiusMeters: 0.3, heightMeters: 1.75 },
 } );
 const sourceVehicleController = {
 	transferState: () => ( { position: new Vector3( 2, 1, 3 ), quaternion: new Quaternion(), velocity: new Vector3( 0, 0, 7 ), angular: new Vector3( 0, 0.2, 0 ), throttle: 0.6, steer: 0.1, rpm: 0.7, driven: true } ),

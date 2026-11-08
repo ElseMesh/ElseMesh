@@ -3,6 +3,7 @@ import { Quaternion, Vector3 } from '../src/engine/math/index.js';
 import { Player } from '../src/player/Player.js';
 
 const player = Object.create( Player.prototype );
+player.playerCapsule = { radiusMeters: 0.3, heightMeters: 1.75 };
 player.boat = {
 	position: new Vector3(),
 	quaternion: new Quaternion(),

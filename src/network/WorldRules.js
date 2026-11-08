@@ -14,6 +14,7 @@ export const SUPPORTED_WORLD_FEATURES = new Set( [
 ] );
 export const SUPPORTED_PHYSICS_PROFILES = new Set( [ 'default', 'elsemesh-default' ] );
 export const DEFAULT_WORLD_MOVEMENT = Object.freeze( { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } );
+export const DEFAULT_PLAYER_CAPSULE = Object.freeze( { radiusMeters: 0.3, heightMeters: 1.75 } );
 export const DEFAULT_VEHICLE_POLICY = Object.freeze( { enabled: false } );
 export const DEFAULT_AVATAR_POLICY = Object.freeze( { allowedProfiles: null } );
 export const MAX_WORLD_VISITORS = 128;
@@ -31,6 +32,7 @@ export function validateWorldRequirements( manifest ) {
 	visitorRules( rules );
 	validateWorldLevels( rules );
 	movementParameters( rules );
+	playerCapsuleParameters( rules );
 	vehiclePolicy( rules );
 	avatarPolicy( rules );
 	validateVehicleComplexityContracts( manifest.components );
@@ -97,6 +99,15 @@ export function movementParameters( rules ) {
 		throw new Error( 'World movement speeds are outside the supported range' );
 	}
 	return { walkSpeed: movement.walkSpeed, sprintSpeed: movement.sprintSpeed, jumpSpeed: movement.jumpSpeed };
+}
+
+export function playerCapsuleParameters( rules ) {
+	const capsule = rules?.playerCapsule ?? DEFAULT_PLAYER_CAPSULE;
+	if ( ! capsule || ! Number.isFinite( capsule.radiusMeters ) || capsule.radiusMeters <= 0 || capsule.radiusMeters > 2
+		|| ! Number.isFinite( capsule.heightMeters ) || capsule.heightMeters < capsule.radiusMeters * 2 || capsule.heightMeters > 4 ) {
+		throw new Error( 'World player capsule dimensions are outside the supported range' );
+	}
+	return { radiusMeters: capsule.radiusMeters, heightMeters: capsule.heightMeters };
 }
 
 // Vehicle transfer is opt-in because a destination must explicitly accept the

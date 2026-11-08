@@ -1,13 +1,11 @@
 import * as THREE from '../engine/math/index.js';
-import { gravityAcceleration, movementParameters } from '../network/WorldRules.js';
+import { gravityAcceleration, movementParameters, playerCapsuleParameters } from '../network/WorldRules.js';
 import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
 
 const DEFAULT_HELM = { x: 0, z: 0 };
 
 const EYE = PLAYER_EYE_HEIGHT;
 const SWIM_EYE = EYE * 0.1; // eyes above the body's float point while swimming
-const RADIUS = 0.3;
-const HEIGHT = 1.75;
 // water depth (mean level over the feet) where you start swimming / find your feet again
 const SWIM_DEPTH = 1.35;
 const STAND_DEPTH = 1.1;
@@ -77,6 +75,7 @@ export class Player {
 		this.hostedSeaLevel = null;
 		this._previousPosition = new THREE.Vector3();
 		this.worldMovement = movementParameters( null );
+		this.playerCapsule = playerCapsuleParameters( null );
 		this.hostedCollisionGuard = null;
 
 		// boat cameras
@@ -104,6 +103,7 @@ export class Player {
 	setWorldRules( rules ) {
 		this.gravity = gravityAcceleration( rules );
 		this.worldMovement = movementParameters( rules );
+		this.playerCapsule = playerCapsuleParameters( rules );
 	}
 
 	setHostedWorldPose( eyePosition, yaw = this.yaw, pitch = this.pitch ) {
@@ -157,8 +157,8 @@ export class Player {
 			this.position.copy( this._previousPosition );
 			this.velocity.set( 0, 0, 0 );
 		}
-		this.colliders.resolveCapsule( this.position, RADIUS, HEIGHT, 0.4 );
-		this.resolveBoatCollision( this.position, HEIGHT );
+		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, 0.4 );
+		this.resolveBoatCollision( this.position, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;
 		// Hosted collision data includes object and deck colliders, while the signed
 		// terrain heightfield is the ground surface between them. Never sample the
@@ -312,8 +312,8 @@ export class Player {
 		const p = this.position;
 		const old = p.clone();
 		p.addScaledVector( this.velocity, dt );
-		this.colliders.resolveCapsule( p, RADIUS, HEIGHT, 0.4 );
-		this.resolveBoatCollision( p, HEIGHT );
+		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, 0.4 );
+		this.resolveBoatCollision( p, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );
 		if ( p.y <= g ) {
@@ -376,7 +376,7 @@ export class Player {
 			if ( ! c.solid ) continue;
 			const boxBottom = c.center.y - c.half.y, boxTop = c.center.y + c.half.y;
 			if ( local.y > boxTop || local.y + bodyHeight < boxBottom ) continue;
-			const ex = c.half.x + RADIUS, ez = c.half.z + RADIUS;
+			const ex = c.half.x + this.playerCapsule.radiusMeters, ez = c.half.z + this.playerCapsule.radiusMeters;
 			const dx = local.x - c.center.x, dz = local.z - c.center.z;
 			if ( Math.abs( dx ) >= ex || Math.abs( dz ) >= ez ) continue;
 			const px = ex - Math.abs( dx ), pz = ez - Math.abs( dz );
@@ -391,7 +391,7 @@ export class Player {
 			return;
 		}
 		if ( local.y < lines.deckY - 0.05 && local.z >= lines.zAft && local.z <= lines.wlEnd ) {
-			const beam = lines.halfBeamAt( local.z ) + RADIUS;
+			const beam = lines.halfBeamAt( local.z ) + this.playerCapsule.radiusMeters;
 			if ( Math.abs( local.x ) < beam ) local.x = ( Math.sign( local.x ) || 1 ) * beam;
 		}
 
@@ -417,7 +417,7 @@ export class Player {
 			if ( ! c.walkable ) continue;
 			const top = c.center.y + c.half.y;
 			if ( _boatPrevLocal.y < top - 0.03 || _boatLocal.y > top + 0.04 || _boatLocal.y < top - 0.35 ) continue;
-			if ( Math.abs( _boatLocal.x - c.center.x ) > c.half.x + RADIUS || Math.abs( _boatLocal.z - c.center.z ) > c.half.z + RADIUS ) continue;
+			if ( Math.abs( _boatLocal.x - c.center.x ) > c.half.x + this.playerCapsule.radiusMeters || Math.abs( _boatLocal.z - c.center.z ) > c.half.z + this.playerCapsule.radiusMeters ) continue;
 
 			_boatLocal.y = top;
 			this.boardBoat( _boatLocal );
@@ -483,7 +483,7 @@ export class Player {
 
 		p.addScaledVector( this.velocity, dt );
 		p.y = Math.min( p.y, surfaceY + 0.05 );
-		this.colliders.resolveCapsule( p, RADIUS, 1.0, 0 );
+		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, 1.0, 0 );
 		this.resolveBoatCollision( p, 1.0 );
 		const g = this.groundAt( p.x, p.z, p.y + 0.3 );
 		if ( p.y < g + 0.25 ) p.y = g + 0.25;
@@ -773,7 +773,7 @@ export class Player {
 
 			if ( ! c.solid ) continue;
 			const top = c.center.y + c.half.y, bot = c.center.y - c.half.y;
-			if ( top <= p.y + DECK_STEP || bot >= p.y + HEIGHT ) continue;
+			if ( top <= p.y + DECK_STEP || bot >= p.y + this.playerCapsule.heightMeters ) continue;
 			const ex = c.half.x + DECK_RADIUS, ez = c.half.z + DECK_RADIUS;
 			const dx = p.x - c.center.x, dz = p.z - c.center.z;
 			if ( Math.abs( dx ) >= ex || Math.abs( dz ) >= ez ) continue;

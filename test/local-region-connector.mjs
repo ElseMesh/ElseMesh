@@ -163,6 +163,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		sourceRevision: 'test-revision', ...( omitCacheRevision ? {} : { cacheRevision: 'test-revision:converter-1' } ), readOnly: true, regions: '/v1/regions',
 		entrySelection: {
 			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
+			playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
 			entryPointPrompt: 'Which Hogwarts house will you join?',
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
 			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32 },
@@ -380,6 +381,7 @@ try {
 	assert.equal( manifest.entryPointPrompt, 'Which Hogwarts house will you join?' );
 	assert.deepEqual( manifest.entryPoints.map( entry => entry.id ), [ 'gryffindor', 'hufflepuff' ] );
 	assert.equal( manifest.rules.physicsProfile, 'default' );
+	assert.deepEqual( manifest.rules.playerCapsule, { radiusMeters: 0.42, heightMeters: 1.76 }, 'local region world-authored capsule dimensions reach the runtime rules' );
 	assert.equal( 'seaLevel' in manifest.rules, false, 'local Hogwarts preview does not activate a default waterline' );
 	assert.equal( manifest.assets.length, 9, 'the complete Great Hall cell replaces its visual GLB with independently addressable mesh LOD assets' );
 	assert.equal( manifest.objects.length, 6, 'the instance-set cell has no duplicate whole-cell visual GLB object' );
@@ -407,6 +409,7 @@ try {
 	assert.equal( leaseReleases, payloadFetchOrder.length, 'each full or ranged fetch should release its temporary visitor lease' );
 	const collisionIDs = [ ...connector.collisionObjectIDsByCell.get( '0,0,0' ), ...connector.collisionObjectIDsByCell.get( '1,0,0' ) ];
 	const emptyCollisionID = [ ...connector.collisionObjectIDsByCell.get( '2,0,0' ) ][ 0 ];
+	assert.ok( connector.collisionObjectIDsAlongPath( [ 15.65, 0, 1 ], [ 15.65, 0, 1 ] ).has( collisionIDs[ 1 ] ), 'collision preload uses the world-authored 0.42 m capsule radius across a cell edge' );
 	assert.equal( connector.isCollisionPathReady( [ 1, 0, 1 ], [ 2, 0, 1 ], { loadedObjects: new Set( [ collisionIDs[ 0 ] ] ) } ), true, 'loaded collision with complete source coverage permits a local path' );
 	const originalConsoleInfo = console.info;
 	let movementDiagnostic;

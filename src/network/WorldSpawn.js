@@ -1,14 +1,13 @@
 // Invitation arrivals use a grid no coarser than the player's capsule diameter.
 // The ordered candidates let the owner gateway choose atomically around visitors.
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
+import { playerCapsuleParameters } from './WorldRules.js';
 
 export const WORLD_SPAWN_CANDIDATE_LIMIT = 1024;
 export const WORLD_SPAWN_GRID_STEP = 0.6;
-const PLAYER_RADIUS = 0.3;
-const PLAYER_HEIGHT = 1.75;
-
-export function worldSpawnCandidates( spawn, radius, colliders, { limit = WORLD_SPAWN_CANDIDATE_LIMIT } = {} ) {
+export function worldSpawnCandidates( spawn, radius, colliders, { limit = WORLD_SPAWN_CANDIDATE_LIMIT, playerCapsule } = {} ) {
 	if ( ! spawn || ! Array.isArray( spawn.position ) || spawn.position.length !== 3 || ! spawn.position.every( Number.isFinite ) || ! Number.isFinite( radius ) || radius < 0 || ! Number.isInteger( limit ) || limit < 1 || limit > WORLD_SPAWN_CANDIDATE_LIMIT || ! colliders?.groundHeightAt || ! colliders?.resolveCapsule ) throw new Error( 'Invalid world spawn search' );
+	const capsule = playerCapsuleParameters( { playerCapsule } );
 	const [ eyeX, eyeY, eyeZ ] = spawn.position;
 	const start = { x: eyeX, y: eyeY - PLAYER_EYE_HEIGHT, z: eyeZ };
 	const ringLimit = Math.ceil( radius / WORLD_SPAWN_GRID_STEP );
@@ -27,7 +26,7 @@ export function worldSpawnCandidates( spawn, radius, colliders, { limit = WORLD_
 			if ( Number.isFinite( ground ) && position.y < ground ) position.y = ground;
 			const distanceSq = ( position.x - start.x ) ** 2 + ( position.z - start.z ) ** 2;
 			if ( distanceSq > radius * radius + 1e-9 ) continue;
-			if ( colliders.resolveCapsule( { ...position }, PLAYER_RADIUS, PLAYER_HEIGHT, 0.001 ) ) continue;
+			if ( colliders.resolveCapsule( { ...position }, capsule.radiusMeters, capsule.heightMeters, 0.001 ) ) continue;
 			candidates.push( { position: [ position.x, position.y, position.z ], distanceSq } );
 		}
 		const farthestDistanceSq = candidates.reduce( ( farthest, candidate ) => Math.max( farthest, candidate.distanceSq ), 0 );
@@ -37,8 +36,9 @@ export function worldSpawnCandidates( spawn, radius, colliders, { limit = WORLD_
 	return candidates.slice( 0, limit ).map( ( candidate ) => candidate.position );
 }
 
-export function worldSpawnCollisionObjectIDs( manifest, spawn, radius ) {
+export function worldSpawnCollisionObjectIDs( manifest, spawn, radius, playerCapsule ) {
 	if ( ! Array.isArray( manifest?.objects ) || ! spawn?.position || spawn.position.length !== 3 || ! spawn.position.every( Number.isFinite ) || ! Number.isFinite( radius ) || radius < 0 ) throw new Error( 'Invalid world spawn collision query' );
+	const capsule = playerCapsuleParameters( { playerCapsule } );
 	const selected = new Set();
 	for ( const object of manifest.objects ) {
 		const collision = object.collision;
@@ -56,12 +56,12 @@ export function worldSpawnCollisionObjectIDs( manifest, spawn, radius ) {
 		if ( collision.shape === 'box' ) {
 			const center = centerFor( collision.center );
 			nearestCenter = Math.hypot( center[ 0 ] - spawn.position[ 0 ], center[ 2 ] - spawn.position[ 2 ] );
-			objectRadius = Math.hypot( collision.halfExtents[ 0 ] * scale[ 0 ], collision.halfExtents[ 2 ] * scale[ 2 ] ) + PLAYER_RADIUS;
+			objectRadius = Math.hypot( collision.halfExtents[ 0 ] * scale[ 0 ], collision.halfExtents[ 2 ] * scale[ 2 ] ) + capsule.radiusMeters;
 		} else if ( collision.shape === 'compound' ) {
 			for ( const box of collision.boxes ) {
 				const center = centerFor( box.center );
 				nearestCenter = Math.min( nearestCenter, Math.hypot( center[ 0 ] - spawn.position[ 0 ], center[ 2 ] - spawn.position[ 2 ] ) );
-				objectRadius = Math.max( objectRadius, Math.hypot( box.halfExtents[ 0 ] * scale[ 0 ], box.halfExtents[ 2 ] * scale[ 2 ] ) + PLAYER_RADIUS );
+				objectRadius = Math.max( objectRadius, Math.hypot( box.halfExtents[ 0 ] * scale[ 0 ], box.halfExtents[ 2 ] * scale[ 2 ] ) + capsule.radiusMeters );
 			}
 		}
 		if ( nearestCenter <= radius + objectRadius ) selected.add( object.id );

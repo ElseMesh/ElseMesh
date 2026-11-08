@@ -654,7 +654,7 @@ export class App {
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
 			if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 			if ( ! connector.localOnly ) {
-				for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+				for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius, connector.manifest.rules.playerCapsule ) ) initialObjectIDs.add( objectID );
 			}
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
 			const initialAssetIDs = new Set( connector.manifest.objects.filter( ( object ) => initialObjectIDs.has( object.id ) && object.assetId ).map( ( object ) => object.assetId ) );
@@ -674,7 +674,7 @@ export class App {
 			let admissionSession;
 			try {
 				if ( ! connector.localOnly ) {
-					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders );
+					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 					if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
 					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
 					const admitted = await admissionSession.admit( this.player, candidates );
@@ -842,7 +842,7 @@ export class App {
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
 		if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 		if ( ! connector.localOnly ) {
-			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius ) ) initialObjectIDs.add( objectID );
+			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius, connector.manifest.rules.playerCapsule ) ) initialObjectIDs.add( objectID );
 		}
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
 		const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { maxPriority: 'nearby' } );
@@ -904,7 +904,7 @@ export class App {
 		this.remoteWorlds.set( connector.worldId, { connector, root: this.linkedWorldRoot } );
 		let admissionSession;
 		if ( ! connector.localOnly ) {
-			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders );
+			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
 			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
 			const admitted = await admissionSession.admit( this.player, candidates );

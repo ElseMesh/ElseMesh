@@ -4,6 +4,7 @@ import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
+import { playerCapsuleParameters } from './WorldRules.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './LocalRegionStaticModels.js';
 import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
@@ -220,6 +221,7 @@ export class LocalRegionConnector {
 			requireValue( support?.status === 'provisional' && typeof support.basis === 'string' && support.basis.length <= 500 && Array.isArray( support.position ) && support.position.length === 3 && support.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( support.halfExtents ) && support.halfExtents.length === 3 && support.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) && ( support.yaw === undefined || Number.isFinite( support.yaw ) && Math.abs( support.yaw ) <= 360 ), 'Local provider has invalid provisional preview support' );
 		}
 		const experience = selection.experience ? structuredClone( validateWorldExperience( selection.experience ) ) : null;
+		const playerCapsule = playerCapsuleParameters( { playerCapsule: selection.playerCapsule } );
 		if ( experience?.theme?.logo?.src.startsWith( '/' ) ) experience.theme.logo.src = new URL( experience.theme.logo.src, `${base}/` ).href;
 		if ( experience?.navigation?.map?.src.startsWith( '/' ) ) experience.navigation.map.src = new URL( experience.navigation.map.src, `${base}/` ).href;
 		const catalog = await fetchJSON( new URL( descriptor.regions, `${base}/descriptor` ), signal );
@@ -254,7 +256,7 @@ export class LocalRegionConnector {
 			protocol: 'elsemesh.world/3', worldId: this.worldId, title: descriptor.title ? `${descriptor.title} · ${region.label}` : region.label,
 			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
 			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.
-			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0 },
+			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, playerCapsule },
 			spawn,
 			entryPointActionLabel: selection.entryPointActionLabel,
 			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ) } ) ),
@@ -262,6 +264,7 @@ export class LocalRegionConnector {
 		};
 		this.baseURL = base;
 		this.previewRegion = previewRegion;
+		this.playerCapsule = playerCapsule;
 		this.sourceRegions = regions;
 		this.queriedCellsByRegion = new Map( regions.map( item => [ item.id, new Set() ] ) );
 		this.collisionSourceInventories = new Map();
@@ -496,6 +499,7 @@ export class LocalRegionConnector {
 	isCollisionPathReady( from, to, { loadedObjects } = {} ) {
 		this.lastCollisionPathStatus = collisionPathStatus( {
 			from, to, cellSizeMeters: this.cellSizeMeters,
+			radius: this.playerCapsule.radiusMeters, height: this.playerCapsule.heightMeters,
 			objectIDsByCell: this.collisionObjectIDsByCell, loadedObjectIDs: loadedObjects,
 			unknownObjectIDs: this.unknownCollisionObjectIDs, unknownSourcesByCell: this.unknownSourcesByCell,
 			unknownSourcesCompleteByCell: this.unknownSourcesCompleteByCell, knownCells: this.knownCells, emptyCellsAreVerified: this.emptyCollisionCellsAreVerified,
@@ -516,7 +520,7 @@ export class LocalRegionConnector {
 
 	collisionObjectIDsAlongPath( from, to ) {
 		const objectIDs = new Set();
-		for ( const cellKey of sweptCollisionCellKeys( from, to, { cellSizeMeters: this.cellSizeMeters } ) ) {
+		for ( const cellKey of sweptCollisionCellKeys( from, to, { cellSizeMeters: this.cellSizeMeters, radius: this.playerCapsule.radiusMeters, height: this.playerCapsule.heightMeters } ) ) {
 			for ( const objectID of this.collisionObjectIDsByCell.get( cellKey ) || [] ) objectIDs.add( objectID );
 		}
 		return objectIDs;

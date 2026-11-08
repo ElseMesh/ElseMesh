@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 import { Colliders } from '../src/world/Colliders.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from '../src/network/WorldSpawn.js';
+import { playerCapsuleParameters } from '../src/network/WorldRules.js';
 
 const colliders = new Colliders();
 colliders.addBox( new Vector3( 0, 1, 0 ), new Vector3( 0.5, 1, 0.5 ), 0, { solid: true } );
@@ -13,6 +14,12 @@ assert.ok( candidates.every( ( [ x, , z ] ) => Math.hypot( x, z ) <= 2 + 1e-9 ),
 const free = worldSpawnCandidates( { ...spawn, position: [ 10, 2.62, 10 ] }, 0, colliders );
 assert.deepEqual( free, [ [ 10, 1, 10 ] ], 'zero radius keeps the exact preferred point and ground adjusts its feet height' );
 assert.throws( () => worldSpawnCandidates( spawn, -1, colliders ), /Invalid world spawn search/ );
+assert.deepEqual( playerCapsuleParameters( { playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 } } ), { radiusMeters: 0.42, heightMeters: 1.76 }, 'world-authored player capsule dimensions are preserved' );
+assert.throws( () => playerCapsuleParameters( { playerCapsule: { radiusMeters: 0.42, heightMeters: 0.8 } } ), /player capsule dimensions/ );
+const capsuleProbe = new Colliders();
+capsuleProbe.addBox( new Vector3( 0.39, 1.1, 0 ), new Vector3( 0.03, 0.1, 0.03 ), 0, { solid: true } );
+assert.equal( worldSpawnCandidates( spawn, 0, capsuleProbe ).length, 1, 'the shared 0.3 m radius clears the probe obstacle' );
+assert.equal( worldSpawnCandidates( spawn, 0, capsuleProbe, { playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 } } ).length, 0, 'a world-sized capsule rejects the probe obstacle' );
 const objectIDs = worldSpawnCollisionObjectIDs( { objects: [
 	{ id: 'elsemesh-object:near', transform: { position: [ 2, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
 	{ id: 'elsemesh-object:far', transform: { position: [ 50, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
@@ -20,4 +27,8 @@ const objectIDs = worldSpawnCollisionObjectIDs( { objects: [
 	{ id: 'elsemesh-object:decor', transform: { position: [ 0, 0, 0 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } },
 ] }, spawn, 2 );
 assert.deepEqual( [ ...objectIDs ].sort(), [ 'elsemesh-object:near', 'elsemesh-object:terrain' ], 'spawn loads every potentially intersecting collider and heightfield, but skips distant or noncolliding objects' );
+const capsuleObjectIDs = worldSpawnCollisionObjectIDs( { objects: [
+	{ id: 'elsemesh-object:capsule-edge', transform: { position: [ 0.45, 2.62, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.05, 1, 0.05 ] } },
+] }, spawn, 0, { radiusMeters: 0.42, heightMeters: 1.76 } );
+assert.deepEqual( [ ...capsuleObjectIDs ], [ 'elsemesh-object:capsule-edge' ], 'spawn preloads collision within the world-authored capsule radius' );
 console.log( 'world spawn placement invariants passed' );
