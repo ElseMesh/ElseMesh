@@ -45,7 +45,7 @@ function expression( node, names, backend ) {
 		: `emgNormalFromSlope( ${args.join( ', ' )} )`;
 	const derivative = { dpdx: backend === 'webgpu' ? 'dpdx' : 'dFdx', dpdy: backend === 'webgpu' ? 'dpdy' : 'dFdy', fwidth: 'fwidth' }[ node.op ];
 	if ( derivative ) return `${derivative}( ${args[ 0 ]} )`;
-	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', sqrt: 'sqrt', sign: 'sign', exp: 'exp', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep', step: 'step' }[ node.op ];
+	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', sqrt: 'sqrt', sign: 'sign', exp: 'exp', log2: 'log2', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep', step: 'step' }[ node.op ];
 	if ( [ 'x', 'y', 'z', 'w', 'xy', 'xyz', 'rgb' ].includes( node.op ) ) return `${args[ 0 ]}.${node.op}`;
 	if ( [ 'vec2', 'vec3', 'vec4' ].includes( node.op ) ) return `${backend === 'webgpu' ? `${node.op}f` : node.op}( ${args.join( ', ' )} )`;
 	if ( node.op === 'select' ) return backend === 'webgpu' ? `select( ${args[ 2 ]}, ${args[ 1 ]}, ${args[ 0 ]} )` : `( ${args[ 0 ]} ? ${args[ 1 ]} : ${args[ 2 ]} )`;

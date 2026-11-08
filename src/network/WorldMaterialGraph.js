@@ -61,7 +61,7 @@ function nodeType( node, types ) {
 			if ( same( 2 ) ) return argTypes[ 0 ];
 			if ( argTypes.length === 2 && vector( argTypes[ 0 ] ) && argTypes[ 1 ] === 'scalar' ) return argTypes[ 0 ];
 			return null;
-		case 'abs': case 'sin': case 'cos': case 'floor': case 'fract': case 'sqrt': case 'sign': case 'exp':
+		case 'abs': case 'sin': case 'cos': case 'floor': case 'fract': case 'sqrt': case 'sign': case 'exp': case 'log2':
 			return argTypes.length === 1 && ( argTypes[ 0 ] === 'scalar' || vector( argTypes[ 0 ] ) ) ? argTypes[ 0 ] : null;
 		case 'x': case 'y': case 'z': case 'w':
 			return argTypes.length === 1 && vector( argTypes[ 0 ] ) && 'xyzw'.indexOf( node.op ) < Number( argTypes[ 0 ].slice( 3 ) ) ? 'scalar' : null;

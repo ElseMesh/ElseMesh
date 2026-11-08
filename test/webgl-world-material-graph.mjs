@@ -8,8 +8,11 @@ const graph = {
 		{ id: 'position', op: 'input', name: 'position' },
 		{ id: 'data', op: 'input', name: 'vdata' },
 		{ id: 'seed', op: 'x', args: [ 'data' ] },
+		{ id: 'one', op: 'constant', value: 1 },
+		{ id: 'safeSeed', op: 'max', args: [ 'seed', 'one' ] },
+		{ id: 'logSeed', op: 'log2', args: [ 'safeSeed' ] },
 		{ id: 'scale', op: 'constant', value: 0.1 },
-		{ id: 'liftY', op: 'multiply', args: [ 'seed', 'scale' ] },
+		{ id: 'liftY', op: 'multiply', args: [ 'logSeed', 'scale' ] },
 		{ id: 'zero', op: 'constant', value: 0 },
 		{ id: 'offset', op: 'vec3', args: [ 'zero', 'liftY', 'zero' ] },
 		{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
@@ -34,6 +37,7 @@ assert.equal( applyWebGLWorldMaterialGraphs( THREE, root ), 0, 'graph installati
 const shader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
 mesh.material.onBeforeCompile( shader );
 assert.match( shader.vertexShader, /transformed = emg_moved/ );
+assert.match( shader.vertexShader, /float emg_logSeed = log2\( emg_safeSeed \)/ );
 
 mesh.material.dispose();
 mesh.customDepthMaterial.dispose();

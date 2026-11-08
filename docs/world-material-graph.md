@@ -73,7 +73,7 @@ texture path intact.
 
 Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`, `sqrt`,
-`sign`, `exp`, `normalize`, `normalFromSlope`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
+`sign`, `exp`, `log2`, `normalize`, `normalFromSlope`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
 `vec3`, `vec4`, `length`, `dot`, `mix`, `clamp`, `smoothstep`, `lessThan`,
 `lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,
 `select`, `step`, and `atan2`. Operations are type checked before the engine

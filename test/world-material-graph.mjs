@@ -262,15 +262,23 @@ const lodGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [
 		{ id: 'uv', op: 'input', name: 'uv' },
-		{ id: 'lod', op: 'constant', value: 2 },
+		{ id: 'uvWidth', op: 'fwidth', args: [ 'uv' ] },
+		{ id: 'uvWidthX', op: 'x', args: [ 'uvWidth' ] },
+		{ id: 'scale', op: 'constant', value: 1024 },
+		{ id: 'lodInput', op: 'multiply', args: [ 'uvWidthX', 'scale' ] },
+		{ id: 'minimum', op: 'constant', value: 1 },
+		{ id: 'lodClamped', op: 'max', args: [ 'lodInput', 'minimum' ] },
+		{ id: 'lod', op: 'log2', args: [ 'lodClamped' ] },
 		{ id: 'sample', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'lod' },
 		{ id: 'color', op: 'rgb', args: [ 'sample' ] },
 	],
 	outputs: { baseColor: 'color' },
 };
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgpu' ).surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
+assert.match( compileWorldMaterialGraph( lodGraph, 'webgpu' ).surface, /log2\( emg_lodClamped \)/ );
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /textureLod\( emgTexture_baseColor, vEmg_uv, emg_lod \)/ );
-assert.throws( () => validateWorldMaterialGraph( { ...lodGraph, nodes: [ lodGraph.nodes[ 0 ], lodGraph.nodes[ 1 ], { ...lodGraph.nodes[ 2 ], lod: 'uv' }, lodGraph.nodes[ 3 ] ] } ), /textureSampleLevel/ );
+assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /log2\( emg_lodClamped \)/ );
+assert.throws( () => validateWorldMaterialGraph( { ...lodGraph, nodes: [ ...lodGraph.nodes.slice( 0, - 2 ), { ...lodGraph.nodes[ 8 ], lod: 'uv' }, lodGraph.nodes[ 9 ] ] } ), /textureSampleLevel/ );
 
 const frameGraph = {
 	format: 'elsemesh.material-graph/1',

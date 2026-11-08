@@ -97,7 +97,13 @@ try {
 		format: 'elsemesh.material-graph/1',
 		nodes: [
 			{ id: 'uv', op: 'input', name: 'uv' },
-			{ id: 'lod', op: 'constant', value: 0 },
+			{ id: 'lodUvWidth', op: 'fwidth', args: [ 'uv' ] },
+			{ id: 'lodUvWidthX', op: 'x', args: [ 'lodUvWidth' ] },
+			{ id: 'lodScale', op: 'constant', value: 1024 },
+			{ id: 'lodWidth', op: 'multiply', args: [ 'lodUvWidthX', 'lodScale' ] },
+			{ id: 'lodMinimum', op: 'constant', value: 1 },
+			{ id: 'lodClamped', op: 'max', args: [ 'lodWidth', 'lodMinimum' ] },
+			{ id: 'lod', op: 'log2', args: [ 'lodClamped' ] },
 			{ id: 'sample', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'lod' },
 			{ id: 'graphColor', op: 'rgb', args: [ 'sample' ] },
 			{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
@@ -134,6 +140,7 @@ try {
 	assert.ok( graphMaterial?.bindings.emgTexture_baseColor?.texture?.isTexture, 'signed GLB base-color texture is bound to graph sampling' );
 	assert.equal( graphMaterial.defines.WORLD_HAS_ALBEDO, 0, 'graph-sampled base color is not applied twice' );
 	assert.match( graphMaterial.surface, /textureSampleLevel\( emgTexture_baseColor, smpAnisoRepeat, in\.vs\.emg_uv, emg_lod \)/ );
+	assert.match( graphMaterial.surface, /log2\( emg_lodClamped \)/ );
 	assert.match( graphMaterial.surface, /let emg_height: f32 = in\.P\.y/ );
 	assert.match( graphMaterial.surface, /fwidth\( in\.vs\.emg_uv \)/ );
 	assert.match( graphMaterial.surface, /frame\.time/ );
