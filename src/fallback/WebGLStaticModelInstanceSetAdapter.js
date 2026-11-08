@@ -200,7 +200,9 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 			geometry.setAttribute( 'iStaticMaterialData1', materialData1Attribute );
 		}
 		geometry.computeBoundingSphere();
-		const sourceMaterial = resolveStaticModelMaterial( fallback, object.material );
+		const materialResolution = resolveStaticModelMaterial( fallback, object.material );
+		const sourceMaterial = materialResolution?.material || materialResolution || object.material;
+		materialResolution?.prepareGeometry?.( geometry, object );
 		if ( sourceMaterial !== object.material ) sharedProfileMaterials.add( sourceMaterial );
 		const cacheKey = sourceMaterial.uuid;
 		let material = materialCache.get( cacheKey );
@@ -229,8 +231,8 @@ function resolveStaticModelMaterial( fallback, sourceMaterial ) {
 	const role = worldMaterialRole( { extras: { elsemeshMaterial: profile } } );
 	if ( ! role ) return sourceMaterial;
 	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
-		const material = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );
-		if ( material ) return material;
+		const resolution = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );
+		if ( resolution ) return resolution;
 	}
 	throw new Error( `WebGL static model has no installed renderer for material profile ${profile.profile}/${role}` );
 }
