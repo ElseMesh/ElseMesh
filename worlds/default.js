@@ -9,6 +9,7 @@ import { DEFAULT_REEF_PLACEMENT_ASSETS as reefPlacementAssets } from './tidewate
 import { TIDEWATER_LAYOUT as defaultLayout } from './tidewater/layout.js';
 import { TIDEWATER_WHALE_PROFILE } from './tidewater/WhaleProfile.js';
 import { scannedAssetRuntimeDescriptors } from './tidewater/debris/ScannedAssets.js';
+import { installPierGameplayColliders } from './tidewater/PierColliders.js';
 
 const scannedAssets = scannedAssetRuntimeDescriptors( `${import.meta.env.BASE_URL}models/debris/` );
 
@@ -30,6 +31,7 @@ export const defaultWorldPackage = Object.freeze( {
 	presentation: Object.freeze( {
 		layout: defaultLayout,
 		whaleProfile: TIDEWATER_WHALE_PROFILE,
+		installGameplayColliders: installPierGameplayColliders,
 		createWorldState: async options => {
 			const { WorldState } = await import( './tidewater/WorldState.js' );
 			return new WorldState( options );

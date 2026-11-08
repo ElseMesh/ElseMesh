@@ -38,7 +38,6 @@ import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehi
 import { worldComponentAssetIDs, worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
-import { pierWalkableHeightAt } from '../world/PierSurface.js';
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
@@ -902,7 +901,9 @@ export class WebGLFallback {
 			this.boat.controller.model = this.boat.model;
 			this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 			this._createWebGLWake();
-			this._addIslandGameplayColliders();
+			const installGameplayColliders = this.defaultWorldPackage?.presentation?.installGameplayColliders;
+			if ( typeof installGameplayColliders !== 'function' ) throw new Error( 'The default world package must provide its gameplay colliders' );
+			installGameplayColliders( { colliders: this.app.worldState.colliders, terrain: this.terrain, worldLayout: this.worldLayout } );
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout } );
 			this.player.yaw = this.spawn.yaw || 0;
 			this.player.pitch = this.spawn.pitch || 0;
@@ -1811,33 +1812,6 @@ export class WebGLFallback {
 		}
 
 	}
-
-	_addIslandGameplayColliders() {
-
-		const C = this.app.worldState.colliders, P = this.worldLayout.pier, y = P.deckHeight;
-		const box = ( x, cy, z, hx, hy, hz, tag, options = {} ) => C.addBox( new EngineVector3( x, cy, z ), new EngineVector3( hx, hy, hz ), 0, { tag, ...options } );
-		const stepGround = this.terrain.heightAt( P.x, P.zStart - 0.7 ), nSteps = Math.max( 2, Math.ceil( Math.max( 0, y - stepGround ) / 0.22 ) ), tread = 0.32;
-		for ( let k = 1; k < nSteps; k ++ ) {
-			const zc = P.zStart - ( k - 0.5 ) * tread, top = pierWalkableHeightAt( P.x, zc, ( px, pz ) => this.terrain.heightAt( px, pz ), this.worldLayout ), gb = this.terrain.heightAt( P.x, zc );
-			box( P.x, ( top + gb - 0.4 ) * 0.5, zc, P.width * 0.5, ( top - gb + 0.4 ) * 0.5, tread * 0.5 + 0.005, 'pierStep', { walkable: true } );
-		}
-		// Walkable pier deck and T-head.
-		box( P.x, y - 0.04, ( P.zStart + P.zEnd ) * 0.5, P.width * 0.5, 0.04, ( P.zEnd - P.zStart ) * 0.5, 'pierDeck', { walkable: true } );
-		box( P.x, y - 0.04, P.zEnd - P.headDepth * 0.5, P.headWidth * 0.5, 0.04, P.headDepth * 0.5, 'pierDeck', { walkable: true } );
-		// The ladder is on the outer (+X) T-head edge at z = 35.1. Its rungs
-		// are walkable, non-solid stepping surfaces for the shared swimmer.
-		const ladderX = P.x + P.headWidth * 0.5 + 0.07, ladderZ = 35.1;
-		for ( let rungY = - 0.15; rungY < y; rungY += 0.3 ) if ( rungY >= - 0.4 ) box( ladderX + 0.25, rungY - 0.15, ladderZ, 0.27, 0.15, 0.3, 'ladder', { walkable: true, solid: false } );
-		// Solid rail/hull boundaries, with a deliberate opening at the ladder.
-		const side = ( x, za, zb ) => box( x, ( y - 2 ) * 0.5, ( za + zb ) * 0.5, 0.22, ( y + 2 ) * 0.5, ( zb - za ) * 0.5, 'pierRail' );
-		side( P.x - P.width * 0.5 - 0.2, P.zStart + 3, P.zEnd + P.headDepth );
-		side( P.x + P.width * 0.5 + 0.2, P.zStart + 3, P.zEnd + P.headDepth );
-		side( P.x + P.headWidth * 0.5, P.zEnd - P.headDepth, ladderZ - 1 );
-		side( P.x + P.headWidth * 0.5, ladderZ + 1, P.zEnd );
-		side( P.x - P.headWidth * 0.5, P.zEnd - P.headDepth, P.zEnd );
-
-	}
-
 
 	async _loadHostedWorld( progress ) {
 
