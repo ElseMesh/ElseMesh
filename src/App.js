@@ -409,7 +409,6 @@ export class App {
 		this.debris = await createDebris( { scene, terrain: this.terrain, village: this.village, vegetation: this.vegetation, rocks: this.rocks, colliders: this.colliders, worldLayout: this.worldLayout } );
 		// these apply the heightfield sun shadow in their own lighting model (see UnderwaterLighting)
 		this.terrain.mesh.material.appliesHillShadow = true;
-		this.rocks.material.appliesHillShadow = true;
 
 		await progress( 0.23, 'Growing the reef…', undefined, 'reef' );
 		const createReef = this.worldPackage?.presentation?.createReef;

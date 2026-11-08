@@ -44,8 +44,10 @@ export const defaultWorldPackage = Object.freeze( {
 			return new Village( { ...options, fishPresentation } );
 		},
 		createRocks: async options => {
-			const { Rocks } = await import( '../src/world/Rocks.js' );
-			return new Rocks( options );
+			const { Rocks } = await import( './tidewater/Rocks.js' );
+			const rocks = new Rocks( options );
+			rocks.material.appliesHillShadow = true;
+			return rocks;
 		},
 		createReef: async options => {
 			const [ { Reef }, fishPresentation, { FISH_SCHOOL_POPULATION } ] = await Promise.all( [
