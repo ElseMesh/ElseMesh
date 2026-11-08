@@ -74,6 +74,13 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: extended the generic WebGL static-model profile path to preserve
+  world-provided color and depth shader hooks, per-instance material data, and
+  engine LOD fades in shadow rendering. The adapter test and isolated profiled
+  GLB renders pass on both backends (124 WebGPU pixels; 123 WebGL pixels, two
+  programs, no GL errors). This verifies the generic profile mechanism only;
+  Tidewater fish props are not yet signed or rendered by this path, so no
+  completion percentage changes.
 - 2026-11-08: verified the world-authored `playerCapsule` rule is used by
   first-person collision and hosted spawn candidate checks, including the
   collision objects selected around a spawn. The external-build checks for
