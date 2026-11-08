@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 
 const [url, profile, portText] = process.argv.slice(2);
 const chromium = process.env.CHROMIUM_BIN ?? '/usr/bin/chromium';
@@ -25,6 +25,21 @@ if (!url || !profile || ![ 'wayland', 'x11' ].includes( ozonePlatform ) || ![ 'g
 }
 
 await mkdir(profile, { recursive: true });
+const preferencesPath = `${profile}/Default/Preferences`;
+try {
+  const preferences = JSON.parse(await readFile(preferencesPath, 'utf8'));
+  // Chromium still shows Restore pages from this profile preference even when
+  // --disable-session-crashed-bubble is present. Reset only the dedicated
+  // review profile's abnormal-exit marker before opening the requested URL.
+  if (preferences.profile?.exit_type === 'Crashed') {
+    preferences.profile.exit_type = 'Normal';
+    const temporaryPreferencesPath = `${preferencesPath}.review-${process.pid}`;
+    await writeFile(temporaryPreferencesPath, JSON.stringify(preferences));
+    await rename(temporaryPreferencesPath, preferencesPath);
+  }
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
 const activePortFile = `${profile}/DevToolsActivePort`;
 if (port === 0) await unlink(activePortFile).catch(() => {});
 
