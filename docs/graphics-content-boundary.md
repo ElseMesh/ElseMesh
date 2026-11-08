@@ -23,14 +23,18 @@ backend independence.
 - **World and game content** own stable identities, placements, geometry or
   asset references, interaction/collision data, and mutable gameplay state.
   They do not import a renderer, graphics-engine scene node, GPU resource, or
-  backend shader.
+  backend shader. World packages contain authored data and renderer-neutral
+  simulation only; they do not contain production presentation adapters.
 - **Simulation** owns deterministic state transitions and consumes backend
   neutral inputs such as terrain queries and water samples. It publishes state
   for presentation; it does not create or update render objects.
-- **Presentation adapters** consume the same content and simulation state.
-  WebGPU and WebGL adapters may own different meshes, materials, shaders,
-  particles, lighting, and post effects, but cannot omit or redefine an entity
-  or gameplay behavior.
+- **ElseMesh presentation** owns backend selection, scene objects, GPU
+  resources, WebGPU/WebGL adapters, shaders, particles, lighting, and post
+  effects. Both adapters consume the same renderer-neutral content and
+  simulation state; they cannot omit or redefine an entity or gameplay
+  behavior. World packages may register component schemas, decoders, and
+  renderer-neutral simulation factories, but may not register backend
+  presenters or material compilers.
 - **Application orchestration** constructs the shared world/game runtime once,
   selects a presentation adapter, and sends the same updates to shared
   simulation regardless of backend.
@@ -38,6 +42,26 @@ backend independence.
 Content descriptors should be ordinary data and stable across backend changes.
 Presentation objects should be disposable and rebuildable from those
 descriptors plus current simulation state.
+
+## Migration rule
+
+This ownership is a fixed architecture decision, not a per-feature choice.
+Do not move a WebGPU implementation into a world and later add a WebGL copy
+there, or move only one backend back into ElseMesh. A world feature is migrated
+as one unit: define its renderer-neutral authored data and simulation contract,
+implement both backend presenters in ElseMesh, switch the world package to
+that contract, and remove its backend-specific presentation code in the same
+migration. Extend the engine's bounded material/effect contract when existing
+appearance cannot be expressed; do not preserve raw world shaders as an
+escape hatch. Keep a feature on the old path until the complete migration can
+be reviewed and verified, rather than creating another backend-specific port.
+
+The migration is complete for a feature only when its production world package
+has no renderer imports, backend adapter registration, WGSL/GLSL, or GPU
+resource creation, and both engine backends consume the same signed content
+and simulation outputs. A test fixture may exercise backend code, but should
+live beside the engine implementation unless it specifically validates
+renderer-neutral authored data.
 
 ## Renderer-neutral material contract
 
