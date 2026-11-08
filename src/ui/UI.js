@@ -1932,7 +1932,7 @@ export class UI {
 			<div class="em-stats-main"><span class="em-fps">--</span><span class="em-fps-unit">fps</span></div>
 			<canvas class="em-spark"></canvas>
 			<div class="em-stats-sub">
-				<span class="em-kv em-kv-gap"><span class="em-k" title="Elapsed time between successive app-frame updates, including browser scheduling pauses">gap</span><span class="em-v em-ms">--</span></span>
+				<span class="em-kv em-kv-gap"><span class="em-k" title="Smoothed elapsed time between successive app-frame updates, including browser scheduling pauses">gap</span><span class="em-v em-ms">--</span></span>
 				<span class="em-kv em-kv-cpu" hidden><span class="em-k" title="Browser-side CPU time for a frame">cpu</span><span class="em-v em-cpu">--</span></span>
 				<span class="em-kv em-kv-gpu" hidden><span class="em-k" title="Measured GPU execution time">gpu</span><span class="em-v em-gpu">--</span></span>
 			</div>`;
@@ -3098,8 +3098,8 @@ export class UI {
 		if ( ! ( fps > 0 ) && frameMs > 0 ) fps = 1000 / frameMs;
 		if ( ! ( frameMs > 0 ) && fps > 0 ) frameMs = 1000 / fps;
 
-		// Average each 100 ms bucket. The numeric readouts show the latest frame;
-		// plotting bucket maxima made the lines jump on isolated short hitches.
+		// Average each 100 ms bucket. The gap readout is updated from the same
+		// smoothed bucket value as the chart so both show the same measurement.
 		const now = performance.now();
 		if ( frameMs > 0 ) { this._sparkAcc.gapSum += frameMs; this._sparkAcc.gapCount ++; }
 		if ( cpuMs >= 0 ) { this._sparkAcc.cpuSum += cpuMs; this._sparkAcc.cpuCount ++; }
@@ -3107,13 +3107,18 @@ export class UI {
 		if ( now - this._sparkT >= 100 && this._sparkAcc.gapCount > 0 ) {
 
 			this._sparkT = now;
+			const gapRaw = this._sparkAcc.gapSum / this._sparkAcc.gapCount;
+			const recentGaps = [ ...this._spark.slice( - 2 ).map( sample => sample.gapRaw ), gapRaw ];
+			const gap = recentGaps.reduce( ( sum, value ) => sum + value, 0 ) / recentGaps.length;
 			this._spark.push( {
-				gap: this._sparkAcc.gapSum / this._sparkAcc.gapCount,
+				gapRaw,
+				gap,
 				cpu: this._sparkAcc.cpuCount ? this._sparkAcc.cpuSum / this._sparkAcc.cpuCount : null,
 				gpu: this._sparkAcc.gpuCount ? this._sparkAcc.gpuSum / this._sparkAcc.gpuCount : null,
 			} );
 			if ( this._spark.length > 60 ) this._spark.shift();
 			this._sparkAcc = { gapSum: 0, gapCount: 0, cpuSum: 0, cpuCount: 0, gpuSum: 0, gpuCount: 0 };
+			this.msEl.textContent = `${ gap.toFixed( 1 ) } ms`;
 			this._drawSpark();
 
 		}
@@ -3140,7 +3145,6 @@ export class UI {
 
 		}
 
-		if ( frameMs > 0 ) this.msEl.textContent = `${ frameMs.toFixed( 1 ) } ms`;
 		const hasCpu = cpuMs >= 0;
 		if ( this.cpuKv.hidden === hasCpu ) this.cpuKv.hidden = ! hasCpu;
 		if ( hasCpu ) this.cpuEl.textContent = `${ cpuMs.toFixed( 1 ) } ms`;
@@ -3179,14 +3183,7 @@ export class UI {
 		if ( data.length < 2 ) return;
 		// Keep the chart focused on the same frame-gap trace used by the original
 		// WebGL HUD. CPU and GPU measurements remain available in the readouts.
-		const traceData = data.map( ( _, i ) => {
-
-			const values = data.slice( Math.max( 0, i - 2 ), i + 1 )
-				.map( sample => sample.gap )
-				.filter( Number.isFinite );
-			return values.length ? values.reduce( ( sum, value ) => sum + value, 0 ) / values.length : null;
-
-		} );
+		const traceData = data.map( sample => Number.isFinite( sample.gap ) ? sample.gap : null );
 		const rgb = this._lvl === 'bad' ? '255, 122, 133' : this._lvl === 'warn' ? '255, 184, 107' : '95, 227, 212';
 		const trace = () => {
 
