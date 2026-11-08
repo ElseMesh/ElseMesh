@@ -4,6 +4,7 @@ const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
 	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
 	worldNormal: { fragmentOnly: true, fragmentWGSL: 'in.N', fragmentGLSL: 'vEmg_worldNormal' },
+	frontFacing: { fragmentOnly: true, builtinFragment: true, fragmentWGSL: 'in.front', fragmentGLSL: 'gl_FrontFacing' },
 	normal: { builtin: true, wgsl: 'v.normal', glsl: 'normal' },
 	uv: { builtin: true, wgsl: 'v.uv', glsl: 'uv' },
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
@@ -84,7 +85,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];
 		if ( source.attribute ) attributes[ source.attribute ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
-		if ( ! source.uniform && ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
+		if ( ! source.uniform && ! source.builtinFragment && ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
 	}
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
 	const emitNodes = ( stage, required ) => {
@@ -122,7 +123,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 		const id = graph.outputs[ output ];
 		if ( id ) surfaceLines.push( `${target} ${operator} ${output === 'surfaceNormal' ? `normalize( ${fragment.names.get( id )} )` : fragment.names.get( id )};` );
 	}
-	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
+	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].builtinFragment ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
 	const glslUniforms = glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ).join( '\n' );
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );

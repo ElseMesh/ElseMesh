@@ -137,6 +137,21 @@ const directNormalShader = { vertexShader: '#include <common>\n#include <default
 directNormalMaterial.material.onBeforeCompile( directNormalShader );
 assert.match( directNormalShader.fragmentShader, /normal = normalize\( mat3\( viewMatrix \) \* vEmg_worldNormal \)/ );
 directNormalMaterial.material.dispose();
+const frontFacingGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'frontFacing', op: 'input', name: 'frontFacing' },
+		{ id: 'frontValue', op: 'constant', value: 1 },
+		{ id: 'backValue', op: 'constant', value: - 1 },
+		{ id: 'orientation', op: 'select', args: [ 'frontFacing', 'frontValue', 'backValue' ] },
+		{ id: 'red', op: 'constant', value: [ 1, 0, 0 ] },
+		{ id: 'tint', op: 'multiply', args: [ 'red', 'orientation' ] },
+	],
+	outputs: { baseColor: 'tint' },
+};
+assert.match( compileWorldMaterialGraph( frontFacingGraph, 'webgpu' ).surface, /select\( emg_backValue, emg_frontValue, in\.front \)/ );
+assert.match( compileWorldMaterialGraph( frontFacingGraph, 'webgl' ).glsl.fragment, /gl_FrontFacing/ );
+assert.doesNotMatch( compileWorldMaterialGraph( frontFacingGraph, 'webgl' ).glsl.declarations, /frontFacing/ );
 graphNormalMaterial.material.dispose();
 
 const derivativeGraph = {
