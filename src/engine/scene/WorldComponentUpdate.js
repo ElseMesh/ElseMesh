@@ -6,6 +6,6 @@
 export function updateWorldComponentRuntimes( components, dt, camera, player, updateArgument, cameraWorldUpdated = false ) {
 	const hasCameraRefresh = typeof camera?.updateMatrixWorld === 'function';
 	if ( ! cameraWorldUpdated && hasCameraRefresh ) camera.updateMatrixWorld( true );
-	const matricesCurrent = cameraWorldUpdated || hasCameraRefresh;
+	const matricesCurrent = hasCameraRefresh;
 	for ( const component of components || [] ) component.update?.( dt, camera, player, updateArgument, matricesCurrent );
 }
