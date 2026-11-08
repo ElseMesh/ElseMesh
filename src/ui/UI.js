@@ -1885,7 +1885,7 @@ export class UI {
 		this._menuAnchor = null;
 		this._toasts = [];
 		this._spark = [];
-		this._sparkAcc = { gap: 0, cpu: null, gpu: null };
+		this._sparkAcc = { gapSum: 0, gapCount: 0, cpuSum: 0, cpuCount: 0, gpuSum: 0, gpuCount: 0 };
 		this._sparkT = 0;
 		this._statsT = 0;
 		this._lvl = 'good';
@@ -3098,17 +3098,22 @@ export class UI {
 		if ( ! ( fps > 0 ) && frameMs > 0 ) fps = 1000 / frameMs;
 		if ( ! ( frameMs > 0 ) && fps > 0 ) frameMs = 1000 / fps;
 
-		// Keep the worst sample in each 100 ms bucket so short hitches remain visible.
+		// Average each 100 ms bucket. The numeric readouts show the latest frame;
+		// plotting bucket maxima made the lines jump on isolated short hitches.
 		const now = performance.now();
-		if ( frameMs > 0 ) this._sparkAcc.gap = Math.max( this._sparkAcc.gap, frameMs );
-		if ( cpuMs >= 0 ) this._sparkAcc.cpu = Math.max( this._sparkAcc.cpu ?? 0, cpuMs );
-		if ( gpuMs >= 0 ) this._sparkAcc.gpu = Math.max( this._sparkAcc.gpu ?? 0, gpuMs );
-		if ( now - this._sparkT >= 100 && this._sparkAcc.gap > 0 ) {
+		if ( frameMs > 0 ) { this._sparkAcc.gapSum += frameMs; this._sparkAcc.gapCount ++; }
+		if ( cpuMs >= 0 ) { this._sparkAcc.cpuSum += cpuMs; this._sparkAcc.cpuCount ++; }
+		if ( gpuMs >= 0 ) { this._sparkAcc.gpuSum += gpuMs; this._sparkAcc.gpuCount ++; }
+		if ( now - this._sparkT >= 100 && this._sparkAcc.gapCount > 0 ) {
 
 			this._sparkT = now;
-			this._spark.push( this._sparkAcc );
+			this._spark.push( {
+				gap: this._sparkAcc.gapSum / this._sparkAcc.gapCount,
+				cpu: this._sparkAcc.cpuCount ? this._sparkAcc.cpuSum / this._sparkAcc.cpuCount : null,
+				gpu: this._sparkAcc.gpuCount ? this._sparkAcc.gpuSum / this._sparkAcc.gpuCount : null,
+			} );
 			if ( this._spark.length > 60 ) this._spark.shift();
-			this._sparkAcc = { gap: 0, cpu: null, gpu: null };
+			this._sparkAcc = { gapSum: 0, gapCount: 0, cpuSum: 0, cpuCount: 0, gpuSum: 0, gpuCount: 0 };
 			this._drawSpark();
 
 		}
