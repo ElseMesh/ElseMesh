@@ -78,6 +78,13 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-08: added a renderer-neutral fragment `worldPosition` material-graph
+  input. WebGPU reads the engine's final fragment position; WebGL exports the
+  position after the instance transform. Graph validation, package-loaded
+  WebGPU shader compilation, the WebGL pixel render (251 non-background pixels,
+  four programs, no GL errors), and the external production build pass. Tidewater
+  has not converted its village shader to graph data, so renderer-neutral
+  content remains 63% and gameplay/content parity remains 87%.
 - 2026-11-08: extended ElseMesh's renderer-neutral material graph with bounded
   texture-sample nodes for the five standard glTF material slots. The WebGPU
   package test loads a glTF base-color texture and compiles the graph shader;
