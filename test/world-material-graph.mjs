@@ -104,7 +104,7 @@ assert.match( worldPositionWebGPU.surface, /let emg_height: f32 = in\.P\.y/ );
 assert.equal( Object.hasOwn( worldPositionWebGPU.varyings, 'emg_worldPosition' ), false, 'WebGPU uses the engine fragment world-position input directly' );
 assert.equal( worldPositionWebGL.glsl.worldPosition, true, 'WebGL populates world position after the instance transform' );
 assert.doesNotMatch( worldPositionWebGL.vertex, /vEmg_worldPosition/ );
-assert.match( worldPositionWebGL.glsl.fragment, /roughnessFactor = vEmg_worldPosition\.y/ );
+assert.match( worldPositionWebGL.glsl.fragment, /float emg_height = vEmg_worldPosition\.y/ );
 assert.match( worldPositionWebGL.glsl.declarations, /varying vec3 vEmg_worldPosition/ );
 assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs: { vertexPosition: 'worldPosition' } }, 'webgpu' ), /fragment outputs/ );
 
