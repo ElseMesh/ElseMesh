@@ -67,7 +67,10 @@ Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `select`, `step`, and `atan2`. Operations are type checked before the engine
 generates shader code. Comparisons currently accept scalar inputs and produce a
 boolean for `select` and logical operations. `textureSample` is validated
-against its slot and UV input before shader generation.
+against its slot and UV input before shader generation. Fragment-only
+`dpdx`, `dpdy`, and `fwidth` compute screen-space derivatives for scalar and
+vector inputs; ElseMesh emits WGSL derivatives or the corresponding GLSL
+functions for the selected backend.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `vertexPosition` (vec3), and

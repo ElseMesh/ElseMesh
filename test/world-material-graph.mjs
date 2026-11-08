@@ -108,4 +108,30 @@ assert.match( worldPositionWebGL.glsl.fragment, /float emg_height = vEmg_worldPo
 assert.match( worldPositionWebGL.glsl.declarations, /varying vec3 vEmg_worldPosition/ );
 assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs: { vertexPosition: 'worldPosition' } }, 'webgpu' ), /fragment outputs/ );
 
+const derivativeGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'uv', op: 'input', name: 'uv' },
+		{ id: 'dx', op: 'dpdx', args: [ 'uv' ] },
+		{ id: 'dy', op: 'dpdy', args: [ 'uv' ] },
+		{ id: 'width', op: 'fwidth', args: [ 'uv' ] },
+		{ id: 'dxX', op: 'x', args: [ 'dx' ] },
+		{ id: 'dyX', op: 'x', args: [ 'dy' ] },
+		{ id: 'widthX', op: 'x', args: [ 'width' ] },
+		{ id: 'sum', op: 'add', args: [ 'dxX', 'dyX' ] },
+		{ id: 'roughness', op: 'add', args: [ 'sum', 'widthX' ] },
+	],
+	outputs: { roughness: 'roughness' },
+};
+const derivativeWebGPU = compileWorldMaterialGraph( derivativeGraph, 'webgpu' );
+const derivativeWebGL = compileWorldMaterialGraph( derivativeGraph, 'webgl' );
+assert.match( derivativeWebGPU.surface, /dpdx\( in\.vs\.emg_uv \)/ );
+assert.match( derivativeWebGPU.surface, /dpdy\( in\.vs\.emg_uv \)/ );
+assert.match( derivativeWebGPU.surface, /fwidth\( in\.vs\.emg_uv \)/ );
+assert.match( derivativeWebGL.glsl.fragment, /dFdx\( vEmg_uv \)/ );
+assert.match( derivativeWebGL.glsl.fragment, /dFdy\( vEmg_uv \)/ );
+assert.match( derivativeWebGL.glsl.fragment, /fwidth\( vEmg_uv \)/ );
+const vertexDerivativeGraph = { ...derivativeGraph, nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'dx', op: 'dpdx', args: [ 'position' ] } ], outputs: { vertexPosition: 'dx' } };
+assert.throws( () => compileWorldMaterialGraph( vertexDerivativeGraph, 'webgpu' ), /fragment outputs/ );
+
 console.log( 'Renderer-neutral material graph validation passed' );

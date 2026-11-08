@@ -30,6 +30,8 @@ function expression( node, names, backend ) {
 		return backend === 'webgpu' ? `textureSample( ${texture}, smpAnisoRepeat, ${uv} )` : `texture2D( ${texture}, ${uv} )`;
 	}
 	const args = node.args.map( id => names.get( id ) );
+	const derivative = { dpdx: backend === 'webgpu' ? 'dpdx' : 'dFdx', dpdy: backend === 'webgpu' ? 'dpdy' : 'dFdy', fwidth: 'fwidth' }[ node.op ];
+	if ( derivative ) return `${derivative}( ${args[ 0 ]} )`;
 	const call = { min: 'min', max: 'max', pow: 'pow', abs: 'abs', sin: 'sin', cos: 'cos', floor: 'floor', fract: 'fract', sqrt: 'sqrt', sign: 'sign', exp: 'exp', normalize: 'normalize', length: 'length', dot: 'dot', mix: 'mix', clamp: 'clamp', smoothstep: 'smoothstep', step: 'step' }[ node.op ];
 	if ( [ 'x', 'y', 'z', 'w', 'xy', 'xyz', 'rgb' ].includes( node.op ) ) return `${args[ 0 ]}.${node.op}`;
 	if ( [ 'vec2', 'vec3', 'vec4' ].includes( node.op ) ) return `${backend === 'webgpu' ? `${node.op}f` : node.op}( ${args.join( ', ' )} )`;
@@ -68,7 +70,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
-	if ( graph.nodes.some( node => node.op === 'textureSample' && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph textures can only be sampled by fragment outputs' );
+	if ( graph.nodes.some( node => [ 'textureSample', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph sampling and derivatives are only available to fragment outputs' );
 	if ( graph.nodes.some( node => node.op === 'input' && node.name === 'worldPosition' && vertexRequired.has( node.id ) ) ) throw new Error( 'World position is only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
 	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && node.op === 'textureSample' ).map( node => node.slot ) ) ];

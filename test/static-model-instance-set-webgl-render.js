@@ -27,8 +27,11 @@ try {
 			{ id: 'uv', op: 'vec2', args: [ 'u', 'v' ] },
 			{ id: 'baseMap', op: 'textureSample', slot: 'baseColor', uv: 'uv' },
 			{ id: 'albedo', op: 'rgb', args: [ 'baseMap' ] },
+			{ id: 'uvWidth', op: 'fwidth', args: [ 'uv' ] },
+			{ id: 'uvWidthX', op: 'x', args: [ 'uvWidth' ] },
 			{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
-			{ id: 'roughness', op: 'y', args: [ 'worldPosition' ] },
+			{ id: 'height', op: 'y', args: [ 'worldPosition' ] },
+			{ id: 'roughness', op: 'add', args: [ 'uvWidthX', 'height' ] },
 		],
 		outputs: { baseColor: 'albedo', roughness: 'roughness' },
 	};

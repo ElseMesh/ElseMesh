@@ -69,6 +69,8 @@ function nodeType( node, types ) {
 			return argTypes.length === 3 && argTypes[ 0 ] === 'bool' && argTypes[ 1 ] === argTypes[ 2 ] ? argTypes[ 1 ] : null;
 		case 'step': case 'atan2':
 			return same( 2 ) && argTypes[ 0 ] === 'scalar' ? 'scalar' : null;
+		case 'dpdx': case 'dpdy': case 'fwidth':
+			return argTypes.length === 1 && ( argTypes[ 0 ] === 'scalar' || vector( argTypes[ 0 ] ) ) ? argTypes[ 0 ] : null;
 		case 'normalize':
 			return argTypes.length === 1 && vector( argTypes[ 0 ] ) ? argTypes[ 0 ] : null;
 		case 'rgb':
