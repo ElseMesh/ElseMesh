@@ -87,7 +87,7 @@ export function compileWorldMaterialGraph( graph, backend ) {
 			attributes: Object.entries( attributes ).map( ( [ name, type ] ) => `attribute ${type} ${name};` ).join( '\n' ),
 			declarations: glslVaryings,
 			vertex: commonVertex,
-			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'material.roughness' ).replace( 's.metalness', 'material.metalness' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ) ) ].filter( Boolean ).join( '\n' ),
+			fragment: [ fragment.code, ...surfaceLines.map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.alpha', 'diffuseColor.a' ).replace( 's.emissive', 'totalEmissiveRadiance' ) ) ].filter( Boolean ).join( '\n' ),
 		} ),
 	} );
 }
