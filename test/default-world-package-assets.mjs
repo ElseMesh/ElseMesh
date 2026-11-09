@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createServer } from 'vite';
 
@@ -16,14 +18,18 @@ try {
 	}
 	for ( const component of source.components.filter( candidate => [ 'elsemesh.static-reef/1', 'elsemesh.static-vegetation/1', 'elsemesh.static-fish-props/1' ].includes( candidate.type ) ) ) {
 		for ( const reference of component.assets || [] ) {
-			if ( [ 'reef-placement/1', 'vegetation-placement/1', 'fish-props-placement/1' ].includes( reference.kind ) ) {
+			if ( [ 'reef-placement/1', 'vegetation-placement/1', 'grass-density/1', 'fish-props-placement/1' ].includes( reference.kind ) ) {
 				assert.equal( typeof assets.assetURLs[ reference.assetId ], 'string', `${component.type} asset ${reference.assetId} has a URL in the generic package asset index` );
 			}
 		}
 	}
+	const vegetation = source.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
+	const grassAsset = vegetation.assets.find( asset => asset.kind === 'grass-density/1' );
+	const grassBytes = await readFile( resolve( 'worlds/tidewater/assets', grassAsset.assetId.slice( 'sha256:'.length ) ) );
+	assert.equal( `sha256:${createHash( 'sha256' ).update( grassBytes ).digest( 'hex' )}`, grassAsset.assetId, 'the built-in WebGL density URL resolves to the exact owner-signed bytes' );
 	assert.equal( 'reefPlacements' in assets, false, 'the built-in package exposes one generic component asset URL index' );
 } finally {
 	await server.close();
 }
 
-console.log( 'Default world component placement assets resolve through the generic package URL index' );
+console.log( 'Default world component assets resolve through the generic package URL index' );

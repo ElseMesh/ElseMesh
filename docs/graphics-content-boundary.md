@@ -159,6 +159,9 @@ The shared `GroundCoverCellPlanner` now owns density-cell occupancy, terrain
 bounds, distance bands, and optional frustum filtering. Tidewater's WebGPU grass
 uses its per-band cell lists; the WebGL density-mask path uses the same active
 cell selection and per-band assignments, including for the built-in package.
+The built-in package indexes the signed `grass-density/1` asset, and the WebGL
+ground-cover renderer now requires that authored field and the engine planner;
+it no longer invents Tidewater grass by reading sand/rock/path terrain channels.
 WebGL now uses the shared 88 m range, thins blade counts by distance, and drops
 oats and creepers from its farther bands. Its candidate LOD uses deterministic
 screen-door selection in the planner's 12% transition zones. It still builds a

@@ -10,6 +10,7 @@ const density = { origin: terrain.origin, size: terrain.size, res: 64, data: den
 const planner = new GroundCoverCellPlanner( { terrain, density } );
 const camera = { position: new THREE.Vector3( 0, 2, 0 ) };
 
+assert.throws( () => webglGrassMesh( THREE, terrain, camera, null ), /requires a signed density field/, 'the WebGL renderer does not invent world grass from terrain fields' );
 const first = webglGrassMesh( THREE, terrain, camera, null, density, planner );
 const firstPositions = first.geometry.attributes.position.array;
 let minDistance = Infinity, maxDistance = 0;

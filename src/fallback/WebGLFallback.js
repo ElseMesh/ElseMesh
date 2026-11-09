@@ -733,13 +733,11 @@ function sampleGrassMask( mask, x, z ) {
 
 export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPlanner = null ) {
 
-	const radius = cellPlanner ? cellPlanner.levels.at( - 1 ).maxDistance : 42, spacing = 0.46, positions = [], colors = [], windWeights = [], indices = [];
+	if ( ! grassMask || ! cellPlanner ) throw new Error( 'WebGL ground cover requires a signed density field and its engine cell planner' );
+	const radius = cellPlanner.levels.at( - 1 ).maxDistance, spacing = 0.46, positions = [], colors = [], windWeights = [], indices = [];
 	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
-	let visibleCellLevels = null;
-	if ( cellPlanner ) {
-		visibleCellLevels = new Int8Array( cellPlanner.cellFlags.length ).fill( - 1 );
-		for ( const [ levelIndex, level ] of cellPlanner.update( { x: cx, z: cz } ).entries() ) for ( let index = 0; index < level.count; index ++ ) visibleCellLevels[ level.cells[ index ] ] = levelIndex;
-	}
+	const visibleCellLevels = new Int8Array( cellPlanner.cellFlags.length ).fill( - 1 );
+	for ( const [ levelIndex, level ] of cellPlanner.update( { x: cx, z: cz } ).entries() ) for ( let index = 0; index < level.count; index ++ ) visibleCellLevels[ level.cells[ index ] ] = levelIndex;
 	const hash = ( x, z ) => { let n = Math.imul( x, 0x1f123bb5 ) ^ Math.imul( z, 0x5f356495 ); n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b ); return ( n ^ n >>> 16 ) >>> 0; };
 	const addBlade = ( x, z, y, angle, height, width, color ) => {
 		const dx = Math.cos( angle ), dz = Math.sin( angle ), bend = 0.12 + height * 0.16, sx = - dz * width, sz = dx * width, base = positions.length / 3;
@@ -751,50 +749,30 @@ export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, 
 	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
 		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
 		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
-		let cellLevel = 0;
-		let detailLevel = 0;
-		if ( visibleCellLevels ) {
-			const i = Math.floor( ( x - terrain.origin ) / cellPlanner.cellSize ), j = Math.floor( ( z - terrain.origin ) / cellPlanner.cellSize );
-			if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide ) continue;
-			cellLevel = visibleCellLevels[ j * cellPlanner.cellsPerSide + i ];
-			if ( cellLevel < 0 ) continue;
-			detailLevel = cellPlanner.lodIndexAtDistance( d, rand( 40 ) );
-			if ( detailLevel < 0 ) continue;
-		}
-		const near = grassMask ? 1 : 1 - T.MathUtils.smoothstep( d, 14, 24 );
-		if ( d > radius || ( ! grassMask && rand( 3 ) > 0.32 + near * 0.68 ) ) continue;
+		const i = Math.floor( ( x - terrain.origin ) / cellPlanner.cellSize ), j = Math.floor( ( z - terrain.origin ) / cellPlanner.cellSize );
+		if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide ) continue;
+		if ( visibleCellLevels[ j * cellPlanner.cellsPerSide + i ] < 0 ) continue;
+		const detailLevel = cellPlanner.lodIndexAtDistance( d, rand( 40 ) );
+		if ( detailLevel < 0 || d > radius ) continue;
 		const h = terrain.heightAt( x, z );
-		if ( grassMask ) {
-			const mask = sampleGrassMask( grassMask, x, z );
-			const duneFraction = mask[ 0 ] / ( mask[ 0 ] + mask[ 1 ] + 1e-3 );
-			const meadowDensity = mask[ 1 ] * ( 1 - duneFraction ) + Math.min( mask[ 0 ] * 1.1, 1 ) * duneFraction;
-			const candidates = [
-				{ density: meadowDensity, salt: 4, height: 0.62 * duneFraction + ( 0.7 + rand( 6 ) * 0.6 ) * ( 1 - duneFraction ), color: [ 0.11, 0.27, 0.09 ] },
-				{ density: mask[ 2 ], salt: 20, height: 0.9 + rand( 21 ) * 0.6, color: [ 0.32, 0.34, 0.13 ] },
-				{ density: mask[ 3 ], salt: 30, height: 0.18 + rand( 31 ) * 0.22, color: [ 0.16, 0.31, 0.12 ] },
-			];
-			for ( const candidate of candidates ) {
-				if ( detailLevel === 2 && candidate.salt !== 4 ) continue;
-				if ( detailLevel === 1 && candidate.salt === 30 ) continue;
-				if ( rand( candidate.salt ) > candidate.density ) continue;
-				const baseAngle = rand( candidate.salt + 1 ) * Math.PI * 2, tone = rand( candidate.salt + 2 );
-				const color = candidate.color.map( ( channel, index ) => channel + tone * [ 0.06, 0.08, 0.035 ][ index ] );
-				const blades = candidate.salt === 20 ? ( detailLevel === 1 ? 1 : 2 ) : detailLevel === 0 ? 5 : detailLevel === 1 ? 3 : 2;
-				const widthScale = detailLevel === 0 ? 1 : detailLevel === 1 ? 1.35 : 1.8;
-				for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), ( candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009 ) * widthScale, color );
-			}
-			continue;
+		const mask = sampleGrassMask( grassMask, x, z );
+		const duneFraction = mask[ 0 ] / ( mask[ 0 ] + mask[ 1 ] + 1e-3 );
+		const meadowDensity = mask[ 1 ] * ( 1 - duneFraction ) + Math.min( mask[ 0 ] * 1.1, 1 ) * duneFraction;
+		const candidates = [
+			{ density: meadowDensity, salt: 4, height: 0.62 * duneFraction + ( 0.7 + rand( 6 ) * 0.6 ) * ( 1 - duneFraction ), color: [ 0.11, 0.27, 0.09 ] },
+			{ density: mask[ 2 ], salt: 20, height: 0.9 + rand( 21 ) * 0.6, color: [ 0.32, 0.34, 0.13 ] },
+			{ density: mask[ 3 ], salt: 30, height: 0.18 + rand( 31 ) * 0.22, color: [ 0.16, 0.31, 0.12 ] },
+		];
+		for ( const candidate of candidates ) {
+			if ( detailLevel === 2 && candidate.salt !== 4 ) continue;
+			if ( detailLevel === 1 && candidate.salt === 30 ) continue;
+			if ( rand( candidate.salt ) > candidate.density ) continue;
+			const baseAngle = rand( candidate.salt + 1 ) * Math.PI * 2, tone = rand( candidate.salt + 2 );
+			const color = candidate.color.map( ( channel, index ) => channel + tone * [ 0.06, 0.08, 0.035 ][ index ] );
+			const blades = candidate.salt === 20 ? ( detailLevel === 1 ? 1 : 2 ) : detailLevel === 0 ? 5 : detailLevel === 1 ? 3 : 2;
+			const widthScale = detailLevel === 0 ? 1 : detailLevel === 1 ? 1.35 : 1.8;
+			for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), ( candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009 ) * widthScale, color );
 		}
-		const terrainIndex = Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( z - terrain.origin ) / terrain.texel ) ) ) * terrain.res + Math.max( 0, Math.min( terrain.res - 1, Math.floor( ( x - terrain.origin ) / terrain.texel ) ) );
-		const sand = terrain.sand[ terrainIndex ], dune = sand > 86 && h > 2.15 && h < 6.5 && x > - 180 && x < 200 && z > - 260 && z < 0;
-		if ( h < ( dune ? 2.15 : 2.6 ) || h > ( dune ? 6.5 : 76 ) || terrain.rock[ terrainIndex ] > 0.42 || terrain.path[ terrainIndex ] > 72 || ( sand > 86 && ! dune ) ) continue;
-		const patch = dune ? terrain.noise2.noise( x / 4.2 + 5.5, z / 4.2 - 3.3 ) * 0.6 + terrain.noise.noise( x / 11 - 7.1, z / 11 + 1.9 ) * 0.4 : 1;
-		const clump = dune ? T.MathUtils.smoothstep( patch, - 0.45, 0.25 ) : 1;
-		const density = Math.min( 1, Math.max( 0.08, ( 1 - ( d / radius ) ** 3 ) * ( dune ? 0.95 * clump : 1.25 ) ));
-		if ( rand( 4 ) > density ) continue;
-		const baseAngle = rand( 5 ) * Math.PI * 2, height = dune ? 0.24 + rand( 6 ) * 0.38 : 0.38 + rand( 6 ) * 0.48, tone = rand( 7 ), blades = Math.round( 3 + near * 2 );
-		const color = [ 0.12 + tone * 0.07, 0.25 + tone * 0.1, 0.075 + tone * 0.035 ];
-		for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + 8 ) * 0.18, height * ( 0.82 + rand( blade + 11 ) * 0.32 ), 0.018 + rand( blade + 14 ) * 0.009, color );
 	}
 	const geometry = new T.BufferGeometry();
 	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
@@ -1823,9 +1801,13 @@ export class WebGLFallback {
 		const startZ = start.position.z ?? start.position[ 2 ];
 		if ( ! Number.isFinite( startX ) || ! Number.isFinite( startZ ) ) throw new Error( 'The built-in world layout must provide a finite start position' );
 		this.spawn = { position: [ startX, this.terrain.heightAt( startX, startZ ) + 1.7, startZ ], yaw: start.yaw, pitch: - 0.05 };
-		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( startX, 0, startZ ) }, null, this.hostedGrassMask || null, this.grassCellPlanner || null );
-		this.scene.add( this.grass );
-		this.grassCenter = new T.Vector2( startX, startZ );
+		const hasGroundCover = this.defaultWorldSource?.components.some( component => component.grassMaskAssetId );
+		if ( hasGroundCover ) {
+			if ( ! this.hostedGrassMask || ! this.grassCellPlanner ) throw new Error( 'Built-in world declares ground-cover density but its signed density asset was not installed' );
+			this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( startX, 0, startZ ) }, null, this.hostedGrassMask, this.grassCellPlanner );
+			this.scene.add( this.grass );
+			this.grassCenter = new T.Vector2( startX, startZ );
+		}
 		progress( 0.9, 'Starting the WebGL island…' );
 
 	}
