@@ -3181,27 +3181,21 @@ export class UI {
 		g.stroke();
 		g.setLineDash( [] );
 		if ( data.length < 2 ) return;
-		// Keep the WebGL HUD's three comparable timing traces in the shared HUD:
-		// elapsed frame gap, browser CPU work, and measured GPU execution.
-		const series = [
-			{ key: 'gap', rgb: '95, 227, 212' },
-			{ key: 'cpu', rgb: '255, 184, 107' },
-			{ key: 'gpu', rgb: '176, 156, 255' },
-		];
+		const smoothed = ( key ) => data.map( ( _, i ) => {
 
-		for ( const { key, rgb } of series ) {
+			const values = data.slice( Math.max( 0, i - 2 ), i + 1 )
+				.map( sample => sample[ key ] )
+				.filter( Number.isFinite );
+			return values.length ? values.reduce( ( sum, value ) => sum + value, 0 ) / values.length : null;
 
-			const traceData = data.map( ( _, i ) => {
+		} );
+		const gap = smoothed( 'gap' );
+		const gapRgb = this._lvl === 'bad' ? '255, 122, 133' : this._lvl === 'warn' ? '255, 184, 107' : '95, 227, 212';
+		const trace = ( values ) => {
 
-				const values = data.slice( Math.max( 0, i - 2 ), i + 1 )
-					.map( sample => sample[ key ] )
-					.filter( Number.isFinite );
-				return values.length ? values.reduce( ( sum, value ) => sum + value, 0 ) / values.length : null;
-
-			} );
 			g.beginPath();
 			let last = - 1;
-			traceData.forEach( ( value, i ) => {
+			values.forEach( ( value, i ) => {
 
 				if ( value === null ) { last = - 1; return; }
 				if ( last < 0 ) g.moveTo( X( i ), Y( value ) );
@@ -3209,20 +3203,49 @@ export class UI {
 				last = i;
 
 			} );
+
+		};
+
+		// Keep the frame-gap trace prominent, status-colored, and softly filled as
+		// in the WebGL HUD. CPU and GPU remain visible as supporting traces.
+		trace( gap );
+		g.lineTo( X( data.length - 1 ), hh );
+		g.lineTo( X( 0 ), hh );
+		g.closePath();
+		const gradient = g.createLinearGradient( 0, 0, 0, hh );
+		gradient.addColorStop( 0, `rgba(${ gapRgb }, 0.08)` );
+		gradient.addColorStop( 1, `rgba(${ gapRgb }, 0)` );
+		g.fillStyle = gradient;
+		g.fill();
+		trace( gap );
+		g.strokeStyle = `rgba(${ gapRgb }, 0.98)`;
+		g.lineWidth = 1.5;
+		g.lineJoin = 'round';
+		g.stroke();
+
+		for ( const { key, rgb } of [
+			{ key: 'cpu', rgb: '255, 184, 107' },
+			{ key: 'gpu', rgb: '176, 156, 255' },
+		] ) {
+
+			const traceData = smoothed( key );
+			trace( traceData );
 			g.strokeStyle = `rgba(${ rgb }, 0.95)`;
-			g.lineWidth = 1.4;
+			g.globalAlpha = 0.65;
+			g.lineWidth = 1;
 			g.lineJoin = 'round';
 			g.stroke();
+			g.globalAlpha = 1;
 
-			const latest = traceData.findLastIndex( value => value !== null );
-			if ( latest >= 0 ) {
+		}
 
-				g.fillStyle = `rgb(${ rgb })`;
-				g.beginPath();
-				g.arc( X( latest ), Y( traceData[ latest ] ), 1.8, 0, TAU );
-				g.fill();
+		const latest = gap.findLastIndex( value => value !== null );
+		if ( latest >= 0 ) {
 
-			}
+			g.fillStyle = `rgb(${ gapRgb })`;
+			g.beginPath();
+			g.arc( X( latest ), Y( gap[ latest ] ), 1.8, 0, TAU );
+			g.fill();
 
 		}
 
