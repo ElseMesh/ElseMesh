@@ -65,15 +65,17 @@ stage at the graph-provided UV coordinate and return a `vec4`:
 
 `textureSampleLevel` has the same `slot` and `uv` fields plus an earlier scalar
 `lod` node. It requests an explicit mip level, which is useful for authored
-material effects that choose texture detail themselves.
+material effects that choose texture detail themselves. It can feed vertex or
+fragment outputs; `textureSample` with implicit LOD remains fragment-only.
 
 The `uv` field references an earlier `vec2` node. Supported slots are
 `baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive`; each
 resolves to the matching standard glTF material texture slot. Color slots use
 the texture's linearized sample, while data slots preserve their linear channel
-values. Texture samples cannot feed vertex outputs. The graph chooses its
-coordinates explicitly, so authors can scale or offset the `uv` input with
-ordinary graph nodes before sampling. If the `baseColor` output uses a sample
+values. Explicit-LOD vertex reads let signed portable textures drive deformation
+without sending shader code. The graph chooses its coordinates explicitly, so
+authors can scale or offset the `uv` input with ordinary graph nodes before
+sampling. If the `baseColor` output uses a sample
 from the `baseColor` slot, the engine does not multiply that texture into the
 surface a second time; the graph output still multiplies the glTF base-color
 factor. Sampling that slot for another output leaves the ordinary base-color
@@ -123,9 +125,11 @@ this graph.
 ## Current limits and migration gate
 
 Format `/1` samples only the five standard glTF material texture slots; it does
-not define material-specific texture bundles. The graph inputs otherwise
-include vertex/instance data, and the standard glTF base-color, normal, and
-emissive textures are applied by the engine around the graph. The authored
+not define material-specific texture bundles. Vertex texture reads require an
+explicit LOD and are shared by color, depth, and shadow deformation paths. The
+graph inputs otherwise include vertex/instance data, and the standard glTF
+base-color, normal, and emissive textures are applied by the engine around the
+graph. The authored
 Tidewater wood maps now fit those standard slots; its maps are embedded in the
 signed village GLBs and no Tidewater runtime material resolver is required.
 

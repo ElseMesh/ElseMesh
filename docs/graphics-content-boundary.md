@@ -207,6 +207,12 @@ The material graph now accepts three semantic-neutral VEC4 streams from
 enough to carry the plant builder's vertex, material, and canopy-lobe parameters
 as signed GLB data while keeping their interpretation in world-authored graph
 data.
+`textureSampleLevel` can now also feed vertex outputs, with the same signed
+glTF texture bound in WebGPU, WebGL color, and WebGL depth/shadow materials.
+That still does not express Tidewater's complete traveling gust field: the
+graph has no world-space vertex-position input or shared integrated gust offset
+yet. Define those inputs generically and implement both backends before
+switching any palm presenter.
 ElseMesh then owns LOD selection, instance batching, wind translation, depth,
 and shadow presentation for both backends. Do not carry the current WGSL vertex
 attributes, WebGL adapters, or atlas-generation presenter into that contract.

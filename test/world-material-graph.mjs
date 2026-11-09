@@ -130,8 +130,8 @@ assert.match( textureWebGPU.surface, /textureSample\( emgTexture_baseColor, smpA
 assert.doesNotMatch( textureWebGPU.vertex, /textureSample/ );
 assert.match( textureWebGL.glsl.fragment, /texture2D\( emgTexture_baseColor, vEmg_uv \)/ );
 assert.throws( () => validateWorldMaterialGraph( { ...textureGraph, nodes: [ textureGraph.nodes[ 0 ], { ...textureGraph.nodes[ 1 ], slot: 'privateSampler' }, textureGraph.nodes[ 2 ] ] } ), /texture sample/ );
-const vertexTextureGraph = { ...textureGraph, outputs: { vertexPosition: 'sampledColor' } };
-assert.throws( () => compileWorldMaterialGraph( vertexTextureGraph, 'webgpu' ), /fragment outputs/ );
+const vertexImplicitTextureGraph = { ...textureGraph, nodes: [ ...textureGraph.nodes, { id: 'position', op: 'input', name: 'position' }, { id: 'deformed', op: 'add', args: [ 'position', 'sampledColor' ] } ], outputs: { vertexPosition: 'deformed' } };
+assert.throws( () => compileWorldMaterialGraph( vertexImplicitTextureGraph, 'webgpu' ), /Implicit texture sampling/ );
 
 const testTexture = new THREE.DataTexture( new Uint8Array( [ 255, 255, 255, 255 ] ), 1, 1 );
 const webGPUTextureMaterial = createWebGPUMaterialGraph( {}, textureGraph, { graphTextures: { baseColor: testTexture } } );
@@ -312,6 +312,42 @@ assert.match( compileWorldMaterialGraph( lodGraph, 'webgpu' ).surface, /log2\( e
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /textureLod\( emgTexture_baseColor, vEmg_uv, emg_lod \)/ );
 assert.match( compileWorldMaterialGraph( lodGraph, 'webgl' ).glsl.fragment, /log2\( emg_lodClamped \)/ );
 assert.throws( () => validateWorldMaterialGraph( { ...lodGraph, nodes: [ ...lodGraph.nodes.slice( 0, - 2 ), { ...lodGraph.nodes[ 8 ], lod: 'uv' }, lodGraph.nodes[ 9 ] ] } ), /textureSampleLevel/ );
+
+const vertexExplicitTextureGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'uv', op: 'input', name: 'uv' },
+		{ id: 'lod', op: 'constant', value: 0 },
+		{ id: 'sample', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'lod' },
+		{ id: 'color', op: 'rgb', args: [ 'sample' ] },
+		{ id: 'position', op: 'input', name: 'position' },
+		{ id: 'offset', op: 'multiply', args: [ 'color', 'lod' ] },
+		{ id: 'deformed', op: 'add', args: [ 'position', 'offset' ] },
+	],
+	outputs: { vertexPosition: 'deformed' },
+};
+const vertexTextureWebGPU = compileWorldMaterialGraph( vertexExplicitTextureGraph, 'webgpu' );
+const vertexTextureWebGL = compileWorldMaterialGraph( vertexExplicitTextureGraph, 'webgl' );
+assert.deepEqual( vertexTextureWebGPU.textureSlots, [ 'baseColor' ], 'vertex-stage texture reads are included in signed texture requirements' );
+assert.match( vertexTextureWebGPU.vertex, /textureSampleLevel\( emgTexture_baseColor/ );
+assert.match( vertexTextureWebGL.glsl.vertex, /textureLod\( emgTexture_baseColor/ );
+assert.throws( () => compileWorldMaterialGraph( { ...vertexExplicitTextureGraph, nodes: [ ...vertexExplicitTextureGraph.nodes.slice( 0, 2 ), { id: 'sample', op: 'textureSample', slot: 'baseColor', uv: 'uv' }, ...vertexExplicitTextureGraph.nodes.slice( 3 ) ] }, 'webgpu' ), /Implicit texture sampling/ );
+const vertexTexture = new THREE.Texture();
+const vertexTextureSource = new THREE.MeshStandardMaterial( { map: vertexTexture } );
+const vertexTextureMaterials = createWebGLMaterialGraph( THREE, vertexTextureSource, vertexExplicitTextureGraph );
+const vertexTextureShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+vertexTextureMaterials.material.onBeforeCompile( vertexTextureShader );
+assert.match( vertexTextureShader.vertexShader, /uniform sampler2D emgTexture_baseColor/ );
+assert.match( vertexTextureShader.vertexShader, /textureLod\( emgTexture_baseColor/ );
+assert.equal( vertexTextureShader.uniforms.emgTexture_baseColor.value, vertexTexture, 'WebGL binds signed graph textures used by vertex deformation' );
+const vertexTextureDepthShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>', uniforms: {} };
+vertexTextureMaterials.depthMaterial.onBeforeCompile( vertexTextureDepthShader );
+assert.match( vertexTextureDepthShader.vertexShader, /uniform sampler2D emgTexture_baseColor/ );
+assert.match( vertexTextureDepthShader.vertexShader, /textureLod\( emgTexture_baseColor/ );
+assert.equal( vertexTextureDepthShader.uniforms.emgTexture_baseColor.value, vertexTexture, 'WebGL depth pass uses the same signed graph texture as color deformation' );
+vertexTextureMaterials.material.dispose();
+vertexTextureMaterials.depthMaterial.dispose();
+vertexTexture.dispose();
 
 const frameGraph = {
 	format: 'elsemesh.material-graph/1',

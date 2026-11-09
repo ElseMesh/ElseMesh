@@ -69,6 +69,16 @@ try {
 		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
 	};
 	graph.nodes.push(
+		{ id: 'vertexLod', op: 'constant', value: 0 },
+		{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'vertexLod' },
+		{ id: 'vertexTextureGreen', op: 'y', args: [ 'vertexTexture' ] },
+		{ id: 'vertexTextureScale', op: 'constant', value: 0.02 },
+		{ id: 'vertexTextureLift', op: 'multiply', args: [ 'vertexTextureGreen', 'vertexTextureScale' ] },
+		{ id: 'vertexTextureOffset', op: 'vec3', args: [ 'zero', 'vertexTextureLift', 'zero' ] },
+		{ id: 'movedWithTexture', op: 'add', args: [ 'moved', 'vertexTextureOffset' ] },
+	);
+	graph.outputs.vertexPosition = 'movedWithTexture';
+	graph.nodes.push(
 		{ id: 'data1', op: 'input', name: 'vdata1' }, { id: 'data2', op: 'input', name: 'vdata2' },
 		{ id: 'dataX', op: 'x', args: [ 'data1' ] }, { id: 'dataY', op: 'y', args: [ 'data2' ] },
 		{ id: 'dataLift', op: 'add', args: [ 'dataX', 'dataY' ] }, { id: 'dataZero', op: 'constant', value: 0 },
@@ -78,6 +88,7 @@ try {
 	graph.outputs.vertexPosition = 'movedWithData';
 	const graphGLB = staticModelGLB( {
 		doubleSided: true,
+		materialTexture: true,
 		materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
 		materialTexture: true,
 		extraAttributes: {

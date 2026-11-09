@@ -23,6 +23,15 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 		if ( part.min ) { accessor.min = part.min; accessor.max = part.max; }
 		accessors.push( accessor );
 	}
+	let textureImageBufferView = null;
+	if ( materialTexture ) {
+		const png = Uint8Array.from( atob( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' ), character => character.charCodeAt( 0 ) );
+		const padding = ( 4 - byteLength % 4 ) % 4;
+		if ( padding ) { chunks.push( new Uint8Array( padding ) ); byteLength += padding; }
+		textureImageBufferView = bufferViews.length;
+		bufferViews.push( { buffer: 0, byteOffset: byteLength, byteLength: png.byteLength } );
+		chunks.push( png ); byteLength += png.byteLength;
+	}
 	const binary = new Uint8Array( byteLength );
 	let binaryOffset = 0;
 	for ( const chunk of chunks ) { binary.set( chunk, binaryOffset ); binaryOffset += chunk.byteLength; }
@@ -39,7 +48,7 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 		meshes: [ { primitives: [ { attributes: Object.fromEntries( parts.slice( 0, - 1 ).map( ( part, index ) => [ part.name, index ] ) ), indices: parts.length - 1, material: 0, mode: 4 } ] } ],
 		materials: [ material ],
 		...( materialTexture ? {
-			images: [ { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' } ],
+			images: [ { bufferView: textureImageBufferView, mimeType: 'image/png' } ],
 			textures: [ { source: 0 } ],
 		} : {} ),
 		buffers: [ { byteLength: binary.byteLength } ], bufferViews, accessors,

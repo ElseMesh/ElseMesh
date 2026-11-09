@@ -86,10 +86,11 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldNormal = inverseTransformDirection( normalize( transformedNormal ), viewMatrix );` );
 		}
+		const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
+		if ( textureUniforms ) shader.vertexShader = insert( shader.vertexShader, '#include <common>', textureUniforms );
 		if ( fragment ) {
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers ].filter( Boolean ).join( '\n' ) );
-			const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
+			if ( textureUniforms ) shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			if ( compiled.glsl.alphaFragment ) shader.fragmentShader = insert( shader.fragmentShader, '#include <alphatest_fragment>', compiled.glsl.alphaFragment );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
@@ -105,7 +106,7 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 			const size = new T.Vector2();
 			shader.uniforms.emgViewportSize = { get value() { return renderer.getDrawingBufferSize( size ); } };
 		}
-		if ( fragment ) for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
+		for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
 	};
 	material.customProgramCacheKey = () => `${originalKey?.call( material ) || ''}|elsemesh-material-graph-1:${graphKey}:${fragment ? 'color' : 'depth'}`;
 	material.userData ||= {};
@@ -130,7 +131,7 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	if ( compiled.samplesBaseColorForBaseColor ) materialSource.map = null;
 	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings } );
 	const depthMaterial = compiled.hasVertexOutput
-		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false } )
+		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false, textureBindings } )
 		: null;
 	return {
 		material,

@@ -88,10 +88,10 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
-	if ( graph.nodes.some( node => [ 'textureSample', 'textureSampleLevel', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'World material graph sampling and derivatives are only available to fragment outputs' );
+	if ( graph.nodes.some( node => [ 'textureSample', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'Implicit texture sampling and derivatives are only available to fragment outputs' );
 	if ( graph.nodes.some( node => node.op === 'input' && INPUT_SOURCES[ node.name ].fragmentOnly && vertexRequired.has( node.id ) ) ) throw new Error( 'World-space fragment inputs are only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
-	const textureSlots = [ ...new Set( graph.nodes.filter( node => fragmentRequired.has( node.id ) && [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) ).map( node => node.slot ) ) ];
+	const textureSlots = [ ...new Set( graph.nodes.filter( node => ( fragmentRequired.has( node.id ) || vertexRequired.has( node.id ) ) && [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) ).map( node => node.slot ) ) ];
 	const attributes = {}, varyings = {};
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];

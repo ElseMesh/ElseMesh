@@ -14,6 +14,9 @@ import { staticModelGLB } from './helpers/static-model-glb.mjs';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
 
+const previousAssetImageDecoder = globalThis.__assetImage;
+globalThis.__assetImage = async () => ( { data: Uint8Array.from( [ 128, 200, 100, 255 ] ), width: 1, height: 1 } );
+
 const hash = bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( 'hex' )}`;
 const profile = 'elsemesh.fixture-static-model-material/1', materialAdapterType = 'elsemesh.fixture-static-model-materials/1';
 registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
@@ -33,8 +36,19 @@ graph.nodes.push(
 	{ id: 'bentWithData', op: 'add', args: [ 'bentPosition', 'dataOffset' ] },
 );
 graph.outputs.vertexPosition = 'bentWithData';
+graph.nodes.push(
+	{ id: 'vertexLod', op: 'constant', value: 0 },
+	{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'vertexLod' },
+	{ id: 'vertexTextureGreen', op: 'y', args: [ 'vertexTexture' ] },
+	{ id: 'vertexTextureScale', op: 'constant', value: 0.02 },
+	{ id: 'vertexTextureLift', op: 'multiply', args: [ 'vertexTextureGreen', 'vertexTextureScale' ] },
+	{ id: 'vertexTextureOffset', op: 'vec3', args: [ 'zero', 'vertexTextureLift', 'zero' ] },
+	{ id: 'bentWithTexture', op: 'add', args: [ 'bentWithData', 'vertexTextureOffset' ] },
+);
+graph.outputs.vertexPosition = 'bentWithTexture';
 const graphGLB = staticModelGLB( {
 	doubleSided: true,
+	materialTexture: true,
 	materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
 	extraAttributes: {
 		_ELSEMESH_VDATA1: [ 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0 ],
@@ -102,5 +116,7 @@ try {
 	runtime?.dispose();
 	profileMaterial.dispose();
 	GPU.device?.destroy();
+	if ( previousAssetImageDecoder === undefined ) delete globalThis.__assetImage;
+	else globalThis.__assetImage = previousAssetImageDecoder;
 }
 await new Promise( resolve => setTimeout( resolve, 200 ) );
