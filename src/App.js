@@ -3,6 +3,7 @@ import { GPU } from './engine/gpu/GPU.js';
 import { SunShadows } from './engine/render/Shadows.js';
 import { FrameUniforms } from './engine/render/Frame.js';
 import { updateWorldComponentRuntimes } from './engine/scene/WorldComponentUpdate.js';
+import { advanceWorldWindField, setWorldWindFrame } from './engine/world/WorldWindField.js';
 
 import { Engine } from './core/Engine.js';
 import { Input } from './core/Input.js';
@@ -1035,6 +1036,9 @@ export class App {
 
 		}
 		this.post.beginFrame();
+		const windRoot = this.linkedWorldRoot || this.scene;
+		advanceWorldWindField( windRoot, dt, G.windDir.value, G.windSpeed.value );
+		setWorldWindFrame( windRoot, FrameUniforms.fields );
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
 		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera, this.renderLoadBias );
 		this.sceneRenderer.render();
@@ -2298,6 +2302,9 @@ export class App {
 		// uniforms (setFrameCamera); shadows then render with this frame's sun and camera
 		this.post.beginFrame();
 		this.underwater.updateCamera( this.camera );
+		const windRoot = this.linkedWorldRoot || this.scene;
+		advanceWorldWindField( windRoot, dt, G.windDir.value, G.windSpeed.value );
+		setWorldWindFrame( windRoot, FrameUniforms.fields );
 		this.shadows.render( this.scene, this.engine.meshRenderer, this.shadows.update( this.camera, G.sunDir.value ) );
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
 		if ( this.remoteWorldActive && portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera );

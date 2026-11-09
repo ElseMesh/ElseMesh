@@ -55,6 +55,8 @@ const FRAME_FIELDS = {
 	envIntensity: [ 'f32', 1 ],
 	// direction the wind blows toward
 	windDir: [ 'vec2f', new Vector2( ...DEFAULT_ENVIRONMENT.windDirection ) ],
+	windDirectionIntegral: [ 'vec2f', new Vector2() ], // per-world integral of wind heading over seconds
+	windVelocityIntegral: [ 'vec2f', new Vector2() ], // per-world integral of wind velocity over seconds
 	// 1 when the frame renders with reversed depth (always, except shadow maps)
 	reversedDepth: [ 'f32', 1 ],
 	pad0: [ 'f32', 0 ],
@@ -65,6 +67,7 @@ const FRAME_FIELDS = {
 
 const CAMERA_FIELDS = [ 'view', 'proj', 'viewProj', 'invView', 'invProj', 'invViewProj', 'viewProjNoJitter', 'prevViewProjNoJitter',
 	'cameraPos', 'near', 'prevCameraPos', 'far', 'resolution', 'invResolution', 'jitter', 'prevJitter', 'reversedDepth', 'portalClipPlane' ];
+const WORLD_WIND_FIELDS = new Set( [ 'windDirectionIntegral', 'windVelocityIntegral' ] );
 const MATRIX_FIELDS = [ 'view', 'proj', 'viewProj', 'invView', 'invProj', 'invViewProj', 'viewProjNoJitter', 'prevViewProjNoJitter' ];
 function initializeMatrices( block ) {
 	for ( const name of MATRIX_FIELDS ) block.fields[ name ].value = new Matrix4();
@@ -79,13 +82,13 @@ setFrameUniforms( FrameUniforms );
 // Extra views (shadow cascades, cube faces, reflection cameras): same struct, own buffer and own
 // camera fields; every other field follows the main block. A buffer can only hold one value per
 // submit, so each camera drawn in a frame needs its own view block.
-export function createViewUniforms( label ) {
+export function createViewUniforms( label, { worldWindLocal = false } = {} ) {
 
 	const block = new UniformBlock( 'Frame', FRAME_FIELDS, { label } );
 	initializeMatrices( block );
 	block.onBeforePack = () => {
 
-		for ( const k of FrameUniforms.order ) if ( ! CAMERA_FIELDS.includes( k ) ) block.fields[ k ].value = FrameUniforms.fields[ k ].value;
+		for ( const k of FrameUniforms.order ) if ( ! CAMERA_FIELDS.includes( k ) && ( ! worldWindLocal || ! WORLD_WIND_FIELDS.has( k ) ) ) block.fields[ k ].value = FrameUniforms.fields[ k ].value;
 
 	};
 	return block;
@@ -110,6 +113,8 @@ export const G = {
 	exposure: F.exposure,
 	windDir: F.windDir,
 	windSpeed: F.windSpeed,
+	windDirectionIntegral: F.windDirectionIntegral,
+	windVelocityIntegral: F.windVelocityIntegral,
 	night: F.night,
 	envIntensity: F.envIntensity,
 };

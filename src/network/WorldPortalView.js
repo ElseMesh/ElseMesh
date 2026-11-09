@@ -2,7 +2,8 @@ import { updateWorldPackageLOD } from './WorldPackage.js';
 import { PlaneGeometry } from '../engine/geometry/PrimitiveGeometries.js';
 import { RenderTarget } from '../engine/gpu/Texture.js';
 import { Material } from '../engine/render/Material.js';
-import { createViewUniforms, setFrameCamera } from '../engine/render/Frame.js';
+import { createViewUniforms, G, setFrameCamera } from '../engine/render/Frame.js';
+import { advanceWorldWindField, setWorldWindFrame } from '../engine/world/WorldWindField.js';
 import { DEPTH_FORMAT, SCENE_FORMATS } from '../engine/render/SceneRenderer.js';
 import { Mesh } from '../engine/scene/Mesh.js';
 import { Vector3 } from '../engine/math/Vector3.js';
@@ -21,7 +22,7 @@ export class WorldPortalView {
 		this.meshRenderer = meshRenderer;
 		this.sceneRenderer = sceneRenderer;
 		this.camera = camera.clone();
-		this.frameBlock = createViewUniforms( 'portal destination view' );
+		this.frameBlock = createViewUniforms( 'portal destination view', { worldWindLocal: true } );
 		this.target = new RenderTarget( 256, 512, { colors: SCENE_FORMATS, depth: DEPTH_FORMAT, label: 'portal destination view' } );
 		this.material = new Material( {
 			name: 'portal destination image', lit: false, side: 'front', receiveShadows: false,
@@ -58,7 +59,9 @@ export class WorldPortalView {
 		mapPortalCamera( sourceCamera, this.camera, portal.entry, portal.exit );
 		updateWorldPackageLOD( root, this.camera, loadBias );
 		setFrameCamera( this.camera, this.target.width, this.target.height, { block: this.frameBlock } );
-		updatePortalViewComponents( root.userData.worldComponents, now, this.lastRenderAt, this.camera, root === activeRoot );
+		const dt = updatePortalViewComponents( root.userData.worldComponents, now, this.lastRenderAt, this.camera, root === activeRoot );
+		advanceWorldWindField( root, dt, G.windDir.value, G.windSpeed.value );
+		setWorldWindFrame( root, this.frameBlock.fields );
 		this.frameBlock.fields.portalClipPlane.value.set( ...portalExitClipPlane( portal.exit ) );
 		this.meshRenderer.render( root, {
 			label: 'portal destination view', kind: 'main', camera: this.camera, frameBlock: this.frameBlock,

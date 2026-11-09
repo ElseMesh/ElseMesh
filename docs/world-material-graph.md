@@ -44,6 +44,8 @@ Input nodes use these engine-defined semantics and types:
 | `night` | scalar | Shared environment night level (0 = day, 1 = full night) |
 | `windDirection` | vec2 | Shared world-space XZ wind direction |
 | `windSpeed` | scalar | Shared wind speed in metres per second |
+| `windDirectionIntegral` | vec2 | This world's integrated wind heading over elapsed seconds |
+| `windVelocityIntegral` | vec2 | This world's integrated wind velocity over elapsed seconds |
 | `instanceMaterial0` | vec4 | First per-instance material vector |
 | `instanceMaterial1` | vec4 | Second per-instance material vector |
 

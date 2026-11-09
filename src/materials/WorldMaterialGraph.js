@@ -8,6 +8,8 @@ const FRAME_UNIFORM_VALUES = Object.freeze( {
 	emgNight: () => G.night.value,
 	emgWindDirection: () => G.windDir.value,
 	emgWindSpeed: () => G.windSpeed.value,
+	emgWindDirectionIntegral: () => G.windDirectionIntegral.value,
+	emgWindVelocityIntegral: () => G.windVelocityIntegral.value,
 } );
 
 export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {

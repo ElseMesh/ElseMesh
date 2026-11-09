@@ -22,6 +22,8 @@ const INPUT_TYPES = Object.freeze( {
 	night: 'scalar',
 	windDirection: 'vec2',
 	windSpeed: 'scalar',
+	windDirectionIntegral: 'vec2',
+	windVelocityIntegral: 'vec2',
 	instanceMaterial0: 'vec4',
 	instanceMaterial1: 'vec4',
 } );

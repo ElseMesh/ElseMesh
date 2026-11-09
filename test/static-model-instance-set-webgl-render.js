@@ -75,26 +75,32 @@ try {
 		{ id: 'worldVertexUV', op: 'vec2', args: [ 'worldVertexX', 'worldVertexZ' ] },
 	);
 	graph.nodes.push(
-		{ id: 'vertexLod', op: 'constant', value: 0 },
-		{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'worldVertexUV', lod: 'vertexLod' },
-		{ id: 'vertexTextureGreen', op: 'y', args: [ 'vertexTexture' ] },
-		{ id: 'vertexTextureScale', op: 'constant', value: 0.02 },
-		{ id: 'vertexTextureLift', op: 'multiply', args: [ 'vertexTextureGreen', 'vertexTextureScale' ] },
-		{ id: 'vertexTextureOffset', op: 'vec3', args: [ 'zero', 'vertexTextureLift', 'zero' ] },
-		{ id: 'movedWithTexture', op: 'add', args: [ 'moved', 'vertexTextureOffset' ] },
-	);
-	graph.outputs.vertexPosition = 'movedWithTexture';
-	graph.nodes.push(
 		{ id: 'data1', op: 'input', name: 'vdata1' }, { id: 'data2', op: 'input', name: 'vdata2' },
 		{ id: 'dataX', op: 'x', args: [ 'data1' ] }, { id: 'dataY', op: 'y', args: [ 'data2' ] },
 		{ id: 'dataLift', op: 'add', args: [ 'dataX', 'dataY' ] }, { id: 'dataZero', op: 'constant', value: 0 },
 		{ id: 'dataOffset', op: 'vec3', args: [ 'dataZero', 'dataLift', 'dataZero' ] },
 		{ id: 'movedWithData', op: 'add', args: [ 'moved', 'dataOffset' ] },
 	);
-	graph.outputs.vertexPosition = 'movedWithData';
+	graph.nodes.push(
+		{ id: 'windHeadingIntegral', op: 'input', name: 'windDirectionIntegral' },
+		{ id: 'windVelocityIntegral', op: 'input', name: 'windVelocityIntegral' },
+		{ id: 'windHeadingScale', op: 'constant', value: 1.5 },
+		{ id: 'windVelocityScale', op: 'constant', value: 0.7 },
+		{ id: 'windHeadingDrift', op: 'multiply', args: [ 'windHeadingIntegral', 'windHeadingScale' ] },
+		{ id: 'windVelocityDrift', op: 'multiply', args: [ 'windVelocityIntegral', 'windVelocityScale' ] },
+		{ id: 'windDrift', op: 'add', args: [ 'windHeadingDrift', 'windVelocityDrift' ] },
+		{ id: 'gustUV', op: 'subtract', args: [ 'worldVertexUV', 'windDrift' ] },
+		{ id: 'vertexLod', op: 'constant', value: 0 },
+		{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'gustUV', lod: 'vertexLod' },
+		{ id: 'vertexTextureGreen', op: 'y', args: [ 'vertexTexture' ] },
+		{ id: 'vertexTextureScale', op: 'constant', value: 0.02 },
+		{ id: 'vertexTextureLift', op: 'multiply', args: [ 'vertexTextureGreen', 'vertexTextureScale' ] },
+		{ id: 'vertexTextureOffset', op: 'vec3', args: [ 'zero', 'vertexTextureLift', 'zero' ] },
+		{ id: 'movedWithTexture', op: 'add', args: [ 'movedWithData', 'vertexTextureOffset' ] },
+	);
+	graph.outputs.vertexPosition = 'movedWithTexture';
 	const graphGLB = staticModelGLB( {
 		doubleSided: true,
-		materialTexture: true,
 		materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
 		materialTexture: true,
 		extraAttributes: {

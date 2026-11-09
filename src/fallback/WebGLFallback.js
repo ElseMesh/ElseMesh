@@ -52,6 +52,7 @@ import { worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
 import { WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 import { G } from '../engine/render/Frame.js';
+import { advanceWorldWindField, setWorldWindFrame } from '../engine/world/WorldWindField.js';
 import { GroundCoverCellPlanner } from '../engine/render/GroundCoverCellPlanner.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
@@ -2275,6 +2276,8 @@ export class WebGLFallback {
 		G.dt.value = dt;
 		if ( fixedSimulationTime === null || fixedSimulationTime === undefined ) G.time.value += dt;
 		else G.time.value = fixedSimulationTime;
+		advanceWorldWindField( this.scene, dt, G.windDir.value, G.windSpeed.value );
+		setWorldWindFrame( this.scene, G );
 		const simulationTime = G.time.value;
 		this.lastFrame = now;
 		if ( this.shoreWetness ) {

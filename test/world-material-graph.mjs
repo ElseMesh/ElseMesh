@@ -371,12 +371,28 @@ const frameGraph = {
 		{ id: 'night', op: 'input', name: 'night' },
 		{ id: 'windDirection', op: 'input', name: 'windDirection' },
 		{ id: 'windSpeed', op: 'input', name: 'windSpeed' },
+		{ id: 'windDirectionIntegral', op: 'input', name: 'windDirectionIntegral' },
+		{ id: 'windVelocityIntegral', op: 'input', name: 'windVelocityIntegral' },
 		{ id: 'oscillation', op: 'sin', args: [ 'time' ] },
 		{ id: 'gust', op: 'multiply', args: [ 'oscillation', 'windSpeed' ] },
 		{ id: 'windX', op: 'x', args: [ 'windDirection' ] },
 		{ id: 'windZ', op: 'y', args: [ 'windDirection' ] },
-		{ id: 'offsetX', op: 'multiply', args: [ 'windX', 'gust' ] },
-		{ id: 'offsetZ', op: 'multiply', args: [ 'windZ', 'gust' ] },
+		{ id: 'directionIntegralX', op: 'x', args: [ 'windDirectionIntegral' ] },
+		{ id: 'directionIntegralZ', op: 'y', args: [ 'windDirectionIntegral' ] },
+		{ id: 'velocityIntegralX', op: 'x', args: [ 'windVelocityIntegral' ] },
+		{ id: 'velocityIntegralZ', op: 'y', args: [ 'windVelocityIntegral' ] },
+		{ id: 'directionDrift', op: 'constant', value: 1.5 },
+		{ id: 'velocityDrift', op: 'constant', value: 0.7 },
+		{ id: 'directionOffsetX', op: 'multiply', args: [ 'directionIntegralX', 'directionDrift' ] },
+		{ id: 'directionOffsetZ', op: 'multiply', args: [ 'directionIntegralZ', 'directionDrift' ] },
+		{ id: 'velocityOffsetX', op: 'multiply', args: [ 'velocityIntegralX', 'velocityDrift' ] },
+		{ id: 'velocityOffsetZ', op: 'multiply', args: [ 'velocityIntegralZ', 'velocityDrift' ] },
+		{ id: 'gustOffsetX', op: 'add', args: [ 'directionOffsetX', 'velocityOffsetX' ] },
+		{ id: 'gustOffsetZ', op: 'add', args: [ 'directionOffsetZ', 'velocityOffsetZ' ] },
+		{ id: 'oscillationX', op: 'multiply', args: [ 'windX', 'gust' ] },
+		{ id: 'oscillationZ', op: 'multiply', args: [ 'windZ', 'gust' ] },
+		{ id: 'offsetX', op: 'add', args: [ 'gustOffsetX', 'oscillationX' ] },
+		{ id: 'offsetZ', op: 'add', args: [ 'gustOffsetZ', 'oscillationZ' ] },
 		{ id: 'zero', op: 'constant', value: 0 },
 		{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'offsetZ' ] },
 		{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
@@ -389,18 +405,24 @@ assert.match( frameWebGPU.vertex, /frame\.time/ );
 assert.match( frameWebGPU.surface, /frame\.night/ );
 assert.match( frameWebGPU.vertex, /frame\.windDir/ );
 assert.match( frameWebGPU.vertex, /frame\.windSpeed/ );
+assert.match( frameWebGPU.vertex, /frame\.windDirectionIntegral/ );
+assert.match( frameWebGPU.vertex, /frame\.windVelocityIntegral/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform float emgFrameTime/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform float emgNight/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform vec2 emgWindDirection/ );
 assert.match( frameWebGL.glsl.uniforms, /uniform float emgWindSpeed/ );
+assert.match( frameWebGL.glsl.uniforms, /uniform vec2 emgWindDirectionIntegral/ );
+assert.match( frameWebGL.glsl.uniforms, /uniform vec2 emgWindVelocityIntegral/ );
 assert.doesNotMatch( frameWebGL.glsl.declarations, /vEmg_(time|windDirection|windSpeed)/ );
 
-const previousFrame = { time: G.time.value, night: G.night.value, windX: G.windDir.value.x, windY: G.windDir.value.y, speed: G.windSpeed.value };
+const previousFrame = { time: G.time.value, night: G.night.value, windX: G.windDir.value.x, windY: G.windDir.value.y, speed: G.windSpeed.value, directionIntegralX: G.windDirectionIntegral.value.x, directionIntegralY: G.windDirectionIntegral.value.y, velocityIntegralX: G.windVelocityIntegral.value.x, velocityIntegralY: G.windVelocityIntegral.value.y };
 try {
 	G.time.value = 4.25;
 	G.night.value = 0.75;
 	G.windDir.value.set( 0.6, 0.8 );
 	G.windSpeed.value = 12;
+	G.windDirectionIntegral.value.set( 2, 3 );
+	G.windVelocityIntegral.value.set( 4, 5 );
 	const frameMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), frameGraph );
 	const frameShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
 	frameMaterial.material.onBeforeCompile( frameShader );
@@ -408,6 +430,8 @@ try {
 	assert.equal( frameShader.uniforms.emgNight.value, 0.75 );
 	assert.deepEqual( [ frameShader.uniforms.emgWindDirection.value.x, frameShader.uniforms.emgWindDirection.value.y ], [ 0.6, 0.8 ] );
 	assert.equal( frameShader.uniforms.emgWindSpeed.value, 12 );
+	assert.deepEqual( [ frameShader.uniforms.emgWindDirectionIntegral.value.x, frameShader.uniforms.emgWindDirectionIntegral.value.y ], [ 2, 3 ] );
+	assert.deepEqual( [ frameShader.uniforms.emgWindVelocityIntegral.value.x, frameShader.uniforms.emgWindVelocityIntegral.value.y ], [ 4, 5 ] );
 	G.time.value = 7.5;
 	G.night.value = 0.1;
 	G.windDir.value.set( - 1, 0 );
@@ -423,6 +447,8 @@ try {
 	G.night.value = previousFrame.night;
 	G.windDir.value.set( previousFrame.windX, previousFrame.windY );
 	G.windSpeed.value = previousFrame.speed;
+	G.windDirectionIntegral.value.set( previousFrame.directionIntegralX, previousFrame.directionIntegralY );
+	G.windVelocityIntegral.value.set( previousFrame.velocityIntegralX, previousFrame.velocityIntegralY );
 }
 
 console.log( 'Renderer-neutral material graph validation passed' );

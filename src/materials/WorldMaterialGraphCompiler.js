@@ -18,6 +18,8 @@ const INPUT_SOURCES = Object.freeze( {
 	night: { uniform: true, wgsl: 'frame.night', glsl: 'emgNight' },
 	windDirection: { uniform: true, wgsl: 'frame.windDir', glsl: 'emgWindDirection' },
 	windSpeed: { uniform: true, wgsl: 'frame.windSpeed', glsl: 'emgWindSpeed' },
+	windDirectionIntegral: { uniform: true, wgsl: 'frame.windDirectionIntegral', glsl: 'emgWindDirectionIntegral' },
+	windVelocityIntegral: { uniform: true, wgsl: 'frame.windVelocityIntegral', glsl: 'emgWindVelocityIntegral' },
 	instanceMaterial0: { attribute: 'iStaticMaterialData0', wgsl: 'v.iStaticMaterialData0', glsl: 'iStaticMaterialData0' },
 	instanceMaterial1: { attribute: 'iStaticMaterialData1', wgsl: 'v.iStaticMaterialData1', glsl: 'iStaticMaterialData1' },
 } );

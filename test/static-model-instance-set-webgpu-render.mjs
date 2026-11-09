@@ -37,8 +37,16 @@ graph.nodes.push(
 );
 graph.outputs.vertexPosition = 'bentWithData';
 graph.nodes.push(
+	{ id: 'windHeadingIntegral', op: 'input', name: 'windDirectionIntegral' },
+	{ id: 'windVelocityIntegral', op: 'input', name: 'windVelocityIntegral' },
+	{ id: 'windHeadingScale', op: 'constant', value: 1.5 },
+	{ id: 'windVelocityScale', op: 'constant', value: 0.7 },
+	{ id: 'windHeadingDrift', op: 'multiply', args: [ 'windHeadingIntegral', 'windHeadingScale' ] },
+	{ id: 'windVelocityDrift', op: 'multiply', args: [ 'windVelocityIntegral', 'windVelocityScale' ] },
+	{ id: 'windDrift', op: 'add', args: [ 'windHeadingDrift', 'windVelocityDrift' ] },
+	{ id: 'gustUV', op: 'subtract', args: [ 'worldVertexUV', 'windDrift' ] },
 	{ id: 'vertexLod', op: 'constant', value: 0 },
-	{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'worldVertexUV', lod: 'vertexLod' },
+	{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'gustUV', lod: 'vertexLod' },
 	{ id: 'vertexTextureGreen', op: 'y', args: [ 'vertexTexture' ] },
 	{ id: 'vertexTextureScale', op: 'constant', value: 0.02 },
 	{ id: 'vertexTextureLift', op: 'multiply', args: [ 'vertexTextureGreen', 'vertexTextureScale' ] },

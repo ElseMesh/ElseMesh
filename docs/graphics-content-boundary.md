@@ -211,9 +211,12 @@ data.
 glTF texture bound in WebGPU, WebGL color, and WebGL depth/shadow materials.
 The graph also exposes `worldVertexPosition`, computed after object and instance
 transforms but before graph deformation, so vertex texture coordinates can stay
-anchored across instances. The remaining wind gap is a shared, per-world
-integrated gust offset; design its ownership around portal rendering before
-switching any palm presenter.
+anchored across instances. ElseMesh now accumulates world-heading and wind-velocity
+integrals separately per world root, sends the active root's values to both
+backend graph compilers, and places the destination root's values in the portal
+view frame. These are generic inputs for a traveling wind field, but Tidewater
+has not yet authored graph data that consumes them. Its old presenters remain
+until the complete plant parity gate.
 ElseMesh then owns LOD selection, instance batching, wind translation, depth,
 and shadow presentation for both backends. Do not carry the current WGSL vertex
 attributes, WebGL adapters, or atlas-generation presenter into that contract.
