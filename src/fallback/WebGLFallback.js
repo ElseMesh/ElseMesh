@@ -731,14 +731,14 @@ function sampleGrassMask( mask, x, z ) {
 	return result;
 }
 
-function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPlanner = null ) {
+export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPlanner = null ) {
 
-	const radius = 42, spacing = 0.46, positions = [], colors = [], indices = [];
+	const radius = cellPlanner ? cellPlanner.levels.at( - 1 ).maxDistance : 42, spacing = 0.46, positions = [], colors = [], indices = [];
 	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
-	let visibleCells = null;
+	let visibleCellLevels = null;
 	if ( cellPlanner ) {
-		visibleCells = new Uint8Array( cellPlanner.cellFlags.length );
-		for ( const level of cellPlanner.update( { x: cx, z: cz } ) ) for ( let index = 0; index < level.count; index ++ ) visibleCells[ level.cells[ index ] ] = 1;
+		visibleCellLevels = new Int8Array( cellPlanner.cellFlags.length ).fill( - 1 );
+		for ( const [ levelIndex, level ] of cellPlanner.update( { x: cx, z: cz } ).entries() ) for ( let index = 0; index < level.count; index ++ ) visibleCellLevels[ level.cells[ index ] ] = levelIndex;
 	}
 	const hash = ( x, z ) => { let n = Math.imul( x, 0x1f123bb5 ) ^ Math.imul( z, 0x5f356495 ); n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b ); return ( n ^ n >>> 16 ) >>> 0; };
 	const addBlade = ( x, z, y, angle, height, width, color ) => {
@@ -750,9 +750,12 @@ function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPla
 	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
 		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
 		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
-		if ( visibleCells ) {
+		let cellLevel = 0;
+		if ( visibleCellLevels ) {
 			const i = Math.floor( ( x - terrain.origin ) / cellPlanner.cellSize ), j = Math.floor( ( z - terrain.origin ) / cellPlanner.cellSize );
-			if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide || ! visibleCells[ j * cellPlanner.cellsPerSide + i ] ) continue;
+			if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide ) continue;
+			cellLevel = visibleCellLevels[ j * cellPlanner.cellsPerSide + i ];
+			if ( cellLevel < 0 ) continue;
 		}
 		const near = grassMask ? 1 : 1 - T.MathUtils.smoothstep( d, 14, 24 );
 		if ( d > radius || ( ! grassMask && rand( 3 ) > 0.32 + near * 0.68 ) ) continue;
@@ -767,11 +770,14 @@ function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPla
 				{ density: mask[ 3 ], salt: 30, height: 0.18 + rand( 31 ) * 0.22, color: [ 0.16, 0.31, 0.12 ] },
 			];
 			for ( const candidate of candidates ) {
+				if ( cellLevel === 2 && candidate.salt !== 4 ) continue;
+				if ( cellLevel === 1 && candidate.salt === 30 ) continue;
 				if ( rand( candidate.salt ) > candidate.density ) continue;
 				const baseAngle = rand( candidate.salt + 1 ) * Math.PI * 2, tone = rand( candidate.salt + 2 );
 				const color = candidate.color.map( ( channel, index ) => channel + tone * [ 0.06, 0.08, 0.035 ][ index ] );
-				const blades = candidate.salt === 20 ? 2 : Math.round( 3 + near * 2 );
-				for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009, color );
+				const blades = candidate.salt === 20 ? ( cellLevel === 1 ? 1 : 2 ) : cellLevel === 0 ? 5 : cellLevel === 1 ? 3 : 2;
+				const widthScale = cellLevel === 0 ? 1 : cellLevel === 1 ? 1.35 : 1.8;
+				for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), ( candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009 ) * widthScale, color );
 			}
 			continue;
 		}
