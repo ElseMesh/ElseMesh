@@ -137,6 +137,9 @@ export class RefractionPass {
 
 	render( seaLevel ) {
 
+		// Hosted worlds that disable refraction must also skip its whole-scene draw-list traversal.
+		if ( ! this.enabled ) return;
+
 		const sr = this.sceneRenderer;
 		const g = this.guard;
 		const w = Math.max( 1, Math.round( sr.width * this.scale * g.sx ) ), h = Math.max( 1, Math.round( sr.height * this.scale * g.sy ) );
