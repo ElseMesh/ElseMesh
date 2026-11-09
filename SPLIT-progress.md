@@ -88,6 +88,15 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
+- 2026-11-09: extended the unregistered `elsemesh.ground-cover-field/1`
+  contract with bounded renderer-neutral density expressions over RGBA channels.
+  The engine can now evaluate Tidewater's dune/meadow population blend from
+  signed density data without hardcoded channel meanings; deterministic sampling
+  is checked against the source formula. This does not move either vegetation
+  presenter: the contract still describes GLB species, not Tidewater's procedural
+  blade/oat/vine geometry or full material response, and no paired field adapters
+  or matched render fixture exist. Renderer-neutral progress remains 71%.
+
 - 2026-11-08: migrated Tidewater's rubble and plaster stone material from its
   bespoke WebGPU shader and WebGL PBR approximation into a signed
   `elsemesh.material-graph/1` contract compiled by ElseMesh. The graph preserves

@@ -1,6 +1,7 @@
 import { GroundCoverCellPlanner } from './GroundCoverCellPlanner.js';
 import { GroundCoverFieldDrawPlanner } from './GroundCoverFieldDrawPlanner.js';
 import { validateGroundCoverField } from '../../network/GroundCoverField.js';
+import { compileGroundCoverDensityExpression } from '../../network/GroundCoverDensityExpression.js';
 import { bestCandidateBlueNoise } from '../../util/BlueNoise.js';
 import { mulberry32 } from '../../util/Noise.js';
 
@@ -17,6 +18,12 @@ function blueNoisePattern( seed, count, size ) {
 	return bestCandidateBlueNoise( mulberry32( seed ), count, size );
 }
 
+function speciesSalt( id ) {
+	let value = 0x811c9dc5;
+	for ( let index = 0; index < id.length; index ++ ) value = Math.imul( value ^ id.charCodeAt( index ), 0x01000193 );
+	return value >>> 0;
+}
+
 function sampleDensity( field, x, z, channel ) {
 	const texel = field.size / field.res;
 	const fx = ( x - field.origin ) / texel - 0.5, fz = ( z - field.origin ) / texel - 0.5;
@@ -26,6 +33,11 @@ function sampleDensity( field, x, z, channel ) {
 	const top = field.data[ index ] * ( 1 - tx ) + field.data[ index + 4 ] * tx;
 	const bottom = field.data[ index + row ] * ( 1 - tx ) + field.data[ index + row + 4 ] * tx;
 	return ( top * ( 1 - tz ) + bottom * tz ) / 255;
+}
+
+function sampleDensityChannels( field, x, z, channels, target ) {
+	for ( const channel of channels ) target[ channel ] = sampleDensity( field, x, z, channel );
+	return target;
 }
 
 /**
@@ -40,19 +52,22 @@ export class GroundCoverFieldRuntime {
 		this.data = data;
 		this.terrain = terrain;
 		this.density = density;
+		this.species = data.species.map( species => ( { ...species, density: compileGroundCoverDensityExpression( species.densityExpression ), salt: speciesSalt( species.id ) } ) );
+		this.densityChannels = [ ...new Set( this.species.flatMap( species => species.density.channels ) ) ];
 		this.planner = new GroundCoverCellPlanner( {
 			terrain,
 			density,
 			cellSize: data.cellSize,
 			levels: data.distanceBands.map( ( { maxDistance, cellCapacity } ) => ( { maxDistance, capacity: cellCapacity } ) ),
 			occupiedThreshold: Math.min( ...data.species.map( species => species.densityThreshold ) ),
-			densityChannels: data.species.map( species => species.densityChannel ),
+			densityChannels: this.densityChannels,
 		} );
 		this.pattern = blueNoisePattern( data.seed, data.pointsPerCell, data.cellSize );
 		this.drawPlanner = new GroundCoverFieldDrawPlanner();
 		this.recordsByCell = new Map();
 		this.instances = [];
 		this.cellOriginScratch = [ 0, 0 ];
+		this.densityScratch = new Float64Array( 4 );
 		this.disposed = false;
 	}
 
@@ -74,11 +89,12 @@ export class GroundCoverFieldRuntime {
 		const x = originX + ( ( rotatedX % this.data.cellSize ) + this.data.cellSize ) % this.data.cellSize;
 		const z = originZ + ( ( rotatedZ % this.data.cellSize ) + this.data.cellSize ) % this.data.cellSize;
 			const height = this.terrain.heightAt( x, z );
-			for ( const species of this.data.species ) {
-				const density = sampleDensity( this.density, x, z, species.densityChannel );
-				if ( density * 255 <= species.densityThreshold || random01( this.data.seed, cellX, cellZ, candidateIndex, species.densityChannel + 64 ) >= density ) continue;
-				const scaleRandom = random01( this.data.seed, cellX, cellZ, candidateIndex, species.densityChannel + 128 );
-				const yaw = random01( this.data.seed, cellX, cellZ, candidateIndex, species.densityChannel + 192 ) * Math.PI * 2;
+			sampleDensityChannels( this.density, x, z, this.densityChannels, this.densityScratch );
+			for ( const species of this.species ) {
+				const density = species.density.evaluate( this.densityScratch );
+				if ( density * 255 <= species.densityThreshold || random01( this.data.seed, cellX, cellZ, candidateIndex, species.salt + 64 ) >= density ) continue;
+				const scaleRandom = random01( this.data.seed, cellX, cellZ, candidateIndex, species.salt + 128 );
+				const yaw = random01( this.data.seed, cellX, cellZ, candidateIndex, species.salt + 192 ) * Math.PI * 2;
 				const scale = species.scaleRange[ 0 ] + ( species.scaleRange[ 1 ] - species.scaleRange[ 0 ] ) * scaleRandom;
 				records.push( {
 					speciesId: species.id,
@@ -98,7 +114,7 @@ export class GroundCoverFieldRuntime {
 					position: [ x, height, z ],
 					rotation: [ 0, Math.sin( yaw * 0.5 ), 0, Math.cos( yaw * 0.5 ) ],
 					scale: [ scale, scale, scale ],
-					seed: random01( this.data.seed, cellX, cellZ, candidateIndex, species.densityChannel + 256 ),
+					seed: random01( this.data.seed, cellX, cellZ, candidateIndex, species.salt + 256 ),
 				} );
 			}
 		}

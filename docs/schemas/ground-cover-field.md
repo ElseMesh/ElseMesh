@@ -29,7 +29,7 @@ assets select a backend or contain shader source.
     "species": [
       {
         "id": "meadow-grass",
-        "densityChannel": 1,
+        "densityExpression": { "op": "channel", "index": 1 },
         "densityThreshold": 8,
         "modelAssetIds": [ "sha256:<near-model-hash>", "sha256:<far-model-hash>" ],
         "bounds": { "center": [ 0, 0.5, 0 ], "radius": 0.8 },
@@ -49,15 +49,22 @@ assets select a backend or contain shader source.
 }
 ```
 
-`densityAssetId` must identify exactly one signed `grass-density/1` asset. Its
-four RGBA channels are assigned to at most four species by `densityChannel`;
-the meaning of each channel is data, not an engine enum. Each species references
-one to four signed static GLBs, ordered coarsest to finest, and must declare the
-same LOD metric and thresholds understood by the static-model contract. The
-asset references must also appear in the component's signed asset list. Its
-authored bounds and reflection parity use the same semantics as
-`elsemesh.static-model-instance-set/1`, allowing both field adapters to use the
-engine's shared visibility, LOD, transition, and shadow planner.
+`densityAssetId` must identify exactly one signed `grass-density/1` asset. Each
+species has a bounded `densityExpression` over the field's four normalized RGBA
+channels. Supported nodes are `channel` (index 0–3), `constant` (finite value),
+and binary `add`, `subtract`, `multiply`, `divide`, `min`, and `max`. Expressions
+are limited to 64 nodes and 12 levels; division by a value near zero returns
+zero, and the final density is clamped to 0–1. This lets a world describe blends
+such as Tidewater's dune/meadow grass density without giving the renderer
+Tidewater-specific channel meanings. Expressions affect candidate presence;
+species-specific appearance is carried by its model assets and material data.
+Each species references one to four signed static GLBs, ordered coarsest to
+finest, and must declare the same LOD metric and thresholds understood by the
+static-model contract. The asset references must also appear in the component's
+signed asset list. Its authored bounds and reflection parity use the same
+semantics as `elsemesh.static-model-instance-set/1`, allowing both field
+adapters to use the engine's shared visibility, LOD, transition, and shadow
+planner.
 
 `blue-noise/1` gives both renderers the same deterministic candidate positions
 for the signed `seed`, `cellSize`, and `pointsPerCell`. It creates one
@@ -67,12 +74,13 @@ samples by minimum toroidal squared distance, with the first sample winning
 ties. `pointsPerCell` is bounded to 1–4096 so the quadratic pattern generation
 has a fixed upper bound. It then applies a deterministic per-cell rotation and translation
 derived from the seed and cell coordinates.
-Each species samples its assigned RGBA channel bilinearly; a candidate is
-selected when its seeded value is below the channel density. Scale and yaw use
-separate seeded values, so changing the camera or selected LOD cannot move an
-instance. The engine uses the shared distance bands and cell capacities to
-maintain camera-centered coverage; backend frustum culling may reject
-additional cells but cannot change candidate placement or species selection.
+Each species evaluates its density expression over bilinearly sampled RGBA
+channels; a candidate is selected when its seeded value is below that density.
+Scale and yaw use separate ID-seeded values, so changing the camera or selected
+LOD cannot move an instance. The engine uses the shared distance bands and cell
+capacities to maintain camera-centered coverage; backend frustum culling may
+reject additional cells but cannot change candidate placement or species
+selection.
 
 Species GLBs use standard glTF materials or `elsemesh.material-graph/1` data.
 The graph may use the shared time, wind direction, and wind speed inputs for
@@ -80,9 +88,9 @@ vertex deformation. `windInfluence` scales that declared behavior per species;
 it does not select a renderer implementation. `castsShadow` and
 `shadowMaxDistance` are shared intent consumed by each backend's shadow path.
 
-The validator rejects unknown fields, duplicate species or channels, unsigned
-or undeclared assets, invalid LOD thresholds, out-of-range distances, and
-unbounded counts. The sum of distance-band capacities times candidate points
+The validator rejects unknown fields, duplicate species, malformed density
+expressions, unsigned or undeclared assets, invalid LOD thresholds,
+out-of-range distances, and unbounded counts. The sum of distance-band capacities times candidate points
 per cell times species count may not exceed one million visible candidate
 records. The runtime releases cached cell records once they leave its active
 camera coverage. Tidewater must not switch to this component until both engine

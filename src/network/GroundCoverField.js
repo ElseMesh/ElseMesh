@@ -1,4 +1,5 @@
 import { MAX_BLUE_NOISE_POINTS } from '../util/BlueNoise.js';
+import { compileGroundCoverDensityExpression } from './GroundCoverDensityExpression.js';
 
 export const GROUND_COVER_FIELD_COMPONENT_TYPE = 'elsemesh.ground-cover-field/1';
 export const GROUND_COVER_FIELD_DENSITY_ASSET_KIND = 'grass-density/1';
@@ -27,13 +28,12 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 		previousDistance = band.maxDistance;
 	}
 	if ( ! Array.isArray( data.species ) || data.species.length < 1 || data.species.length > MAX_SPECIES ) fail( `species must contain 1–${MAX_SPECIES} entries` );
-	const speciesIDs = new Set(), channels = new Set(), modelAssetIDs = new Set();
+	const speciesIDs = new Set(), modelAssetIDs = new Set();
 	for ( const species of data.species ) {
-		if ( ! record( species ) || ! allowed( species, [ 'id', 'densityChannel', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'drawMaxDistance', 'drawFadeStartDistance', 'scaleRange', 'windInfluence', 'castsShadow', 'shadowMaxDistance' ] ) ) fail( 'species entry has unknown fields' );
+		if ( ! record( species ) || ! allowed( species, [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'drawMaxDistance', 'drawFadeStartDistance', 'scaleRange', 'windInfluence', 'castsShadow', 'shadowMaxDistance' ] ) ) fail( 'species entry has unknown fields' );
 		if ( typeof species.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( species.id ) || speciesIDs.has( species.id ) ) fail( 'species ID is invalid or duplicated' );
 		speciesIDs.add( species.id );
-		if ( ! Number.isInteger( species.densityChannel ) || species.densityChannel < 0 || species.densityChannel > 3 || channels.has( species.densityChannel ) ) fail( 'density channels must be unique RGBA indices' );
-		channels.add( species.densityChannel );
+		try { compileGroundCoverDensityExpression( species.densityExpression ); } catch ( error ) { fail( `species ${species.id} has an invalid density expression (${error.message})` ); }
 		if ( ! Number.isInteger( species.densityThreshold ) || species.densityThreshold < 0 || species.densityThreshold > 255 ) fail( `species ${species.id} densityThreshold is invalid` );
 		if ( ! Array.isArray( species.modelAssetIds ) || species.modelAssetIds.length < 1 || species.modelAssetIds.length > MAX_MODEL_LODS || species.modelAssetIds.some( id => ! assetID( id ) ) || new Set( species.modelAssetIds ).size !== species.modelAssetIds.length ) fail( `species ${species.id} model assets are invalid` );
 		for ( const id of species.modelAssetIds ) modelAssetIDs.add( id );

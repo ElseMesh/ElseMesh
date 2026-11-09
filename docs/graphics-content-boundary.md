@@ -176,20 +176,19 @@ location as evidence that WebGL and WebGPU already share a neutral renderer.
 Keep Tidewater-owned scatter rules, placement records, density maps, species
 parameters, and authored model assets in Tidewater. Move all production
 geometry presentation, wind evaluation, grass patch generation, draw scheduling,
-and GPU resource creation to ElseMesh. The existing
-`elsemesh.static-model-instance-set/1` and `elsemesh.material-graph/1` contracts
-can cover much of the finite plant content, but the current custom
-`elsemesh.static-vegetation/1` payload is not itself a generic engine renderer,
-and `grass-density/1` does not specify how a renderer presents its channels.
-`StaticModelInstanceSetRuntime` also treats its instance list as fixed and sizes
-backend batches at installation, so it cannot directly supply Tidewater's
-camera-centered, continuously moving grass patches. Define a versioned
-renderer-neutral ground-cover field contract for density channels,
-species/model references, per-species parameters, deterministic cell placement,
-camera-centered coverage, wind inputs, LOD, and shadow intent. The engine needs
-a shared cell-selection/update runtime consumed by both backend adapters;
-renderer-specific choices such as patch meshes, shader code, batching, and GPU
-resources stay inside ElseMesh.
+and GPU resource creation to ElseMesh. The `elsemesh.ground-cover-field/1`
+contract now describes signed density/model assets, per-species parameters,
+deterministic placement, LOD, wind, and shadow intent. Its bounded density
+expressions let a world describe population blends over RGBA channels without
+assigning Tidewater meanings to those channels. `GroundCoverFieldRuntime` owns
+camera-centered candidate generation and `GroundCoverFieldDrawPlanner` owns
+shared visibility, LOD, transition, draw-fade, and shadow selection. The
+contract currently represents species as signed GLB model sets. Tidewater's
+WebGPU grass instead builds procedural blade patches and carries world-authored
+meadow/dune coloring, blade tiers, oats, creepers, gust response, and per-blade
+fades in its presenter. The field still needs a renderer-neutral way to
+represent that authored geometry/material behavior and paired engine WebGPU and
+WebGL adapters before it can replace the current vegetation paths.
 
 The shared `GroundCoverCellPlanner` now owns density-cell occupancy, terrain
 bounds, distance bands, and optional frustum filtering. Tidewater's WebGPU grass

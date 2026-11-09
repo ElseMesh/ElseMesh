@@ -8,7 +8,7 @@ const data = {
 	densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1',
 	distanceBands: [ { maxDistance: 4, cellCapacity: 8 }, { maxDistance: 24, cellCapacity: 16 } ],
 	species: [ {
-		id: 'meadow-grass', densityChannel: 1, densityThreshold: 8, modelAssetIds: [ modelAssetId ],
+		id: 'meadow-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 8, modelAssetIds: [ modelAssetId ],
 		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [], lodFadeFraction: 0.12,
 		drawMaxDistance: 24, drawFadeStartDistance: 20, scaleRange: [ 0.7, 1.3 ],
