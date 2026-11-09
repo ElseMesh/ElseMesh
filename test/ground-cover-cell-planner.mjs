@@ -16,6 +16,12 @@ assert.ok( levels[ 1 ].count > 0, 'middle-distance cells are selected' );
 assert.ok( levels[ 2 ].count > 0, 'far cells are selected' );
 const selected = levels.flatMap( level => Array.from( level.cells.subarray( 0, level.count ) ) );
 assert.equal( new Set( selected ).size, selected.length, 'each occupied cell is assigned to one LOD level' );
+assert.equal( planner.lodIndexAtDistance( 1 ), 0, 'near candidates use the highest detail' );
+assert.equal( planner.lodIndexAtDistance( 1.41, 0 ), 0, 'LOD transitions retain the near detail at their start' );
+assert.equal( planner.lodIndexAtDistance( 1.59, 1 ), 1, 'LOD transitions select the next band at their end' );
+assert.equal( planner.lodIndexAtDistance( 3.29, 0 ), 1, 'the middle band remains selected at its transition start' );
+assert.equal( planner.lodIndexAtDistance( 3.71, 1 ), 2, 'the far band is selected at its transition end' );
+assert.equal( planner.lodIndexAtDistance( 5.6 ), - 1, 'candidates beyond the final range are hidden' );
 
 const origin = [ 0, 0 ];
 planner.cellOrigin( 0, origin );

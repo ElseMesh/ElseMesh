@@ -751,11 +751,14 @@ export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, 
 		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
 		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
 		let cellLevel = 0;
+		let detailLevel = 0;
 		if ( visibleCellLevels ) {
 			const i = Math.floor( ( x - terrain.origin ) / cellPlanner.cellSize ), j = Math.floor( ( z - terrain.origin ) / cellPlanner.cellSize );
 			if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide ) continue;
 			cellLevel = visibleCellLevels[ j * cellPlanner.cellsPerSide + i ];
 			if ( cellLevel < 0 ) continue;
+			detailLevel = cellPlanner.lodIndexAtDistance( d, rand( 40 ) );
+			if ( detailLevel < 0 ) continue;
 		}
 		const near = grassMask ? 1 : 1 - T.MathUtils.smoothstep( d, 14, 24 );
 		if ( d > radius || ( ! grassMask && rand( 3 ) > 0.32 + near * 0.68 ) ) continue;
@@ -770,13 +773,13 @@ export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, 
 				{ density: mask[ 3 ], salt: 30, height: 0.18 + rand( 31 ) * 0.22, color: [ 0.16, 0.31, 0.12 ] },
 			];
 			for ( const candidate of candidates ) {
-				if ( cellLevel === 2 && candidate.salt !== 4 ) continue;
-				if ( cellLevel === 1 && candidate.salt === 30 ) continue;
+				if ( detailLevel === 2 && candidate.salt !== 4 ) continue;
+				if ( detailLevel === 1 && candidate.salt === 30 ) continue;
 				if ( rand( candidate.salt ) > candidate.density ) continue;
 				const baseAngle = rand( candidate.salt + 1 ) * Math.PI * 2, tone = rand( candidate.salt + 2 );
 				const color = candidate.color.map( ( channel, index ) => channel + tone * [ 0.06, 0.08, 0.035 ][ index ] );
-				const blades = candidate.salt === 20 ? ( cellLevel === 1 ? 1 : 2 ) : cellLevel === 0 ? 5 : cellLevel === 1 ? 3 : 2;
-				const widthScale = cellLevel === 0 ? 1 : cellLevel === 1 ? 1.35 : 1.8;
+				const blades = candidate.salt === 20 ? ( detailLevel === 1 ? 1 : 2 ) : detailLevel === 0 ? 5 : detailLevel === 1 ? 3 : 2;
+				const widthScale = detailLevel === 0 ? 1 : detailLevel === 1 ? 1.35 : 1.8;
 				for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), ( candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009 ) * widthScale, color );
 			}
 			continue;

@@ -6,15 +6,17 @@ const DEFAULT_LEVELS = Object.freeze( [
 
 /** Shared camera-centered density-field cell selection for ground-cover backends. */
 export class GroundCoverCellPlanner {
-	constructor( { terrain, density, cellSize = 8, levels = DEFAULT_LEVELS, occupiedThreshold = 8 } ) {
+	constructor( { terrain, density, cellSize = 8, levels = DEFAULT_LEVELS, occupiedThreshold = 8, transitionFraction = 0.12 } ) {
 		if ( ! terrain || ! Number.isInteger( terrain.res ) || terrain.res < 2 || ! Number.isFinite( terrain.size ) || terrain.size <= 0 || ! Number.isFinite( terrain.origin ) || ! Number.isFinite( terrain.texel ) || terrain.texel <= 0 || ! terrain.heights || terrain.heights.length !== terrain.res * terrain.res ) throw new Error( 'Ground-cover planner requires a valid heightfield' );
 		if ( ! density || ! Number.isInteger( density.res ) || density.res < 1 || ! Number.isFinite( density.size ) || density.size <= 0 || ! Number.isFinite( density.origin ) || ! density.data || density.data.length !== density.res * density.res * 4 ) throw new Error( 'Ground-cover planner requires an RGBA density field' );
 		if ( ! Number.isFinite( cellSize ) || cellSize <= 0 || ! Array.isArray( levels ) || levels.length === 0 || levels.some( ( level, index ) => ! Number.isFinite( level.maxDistance ) || level.maxDistance <= 0 || ! Number.isInteger( level.capacity ) || level.capacity <= 0 || index > 0 && level.maxDistance <= levels[ index - 1 ].maxDistance ) ) throw new Error( 'Ground-cover planner has invalid cell or LOD settings' );
 		if ( ! Number.isInteger( occupiedThreshold ) || occupiedThreshold < 0 || occupiedThreshold > 255 ) throw new Error( 'Ground-cover occupancy threshold must be a byte value' );
+		if ( ! Number.isFinite( transitionFraction ) || transitionFraction < 0 || transitionFraction > 0.5 ) throw new Error( 'Ground-cover LOD transition fraction must be between 0 and 0.5' );
 
 		this.terrain = terrain;
 		this.density = density;
 		this.cellSize = cellSize;
+		this.transitionFraction = transitionFraction;
 		this.levels = levels.map( level => ( { maxDistance: level.maxDistance, capacity: level.capacity, cells: new Int32Array( level.capacity ), count: 0 } ) );
 		this.cellsPerSide = Math.ceil( terrain.size / cellSize );
 		this.cellFlags = new Uint8Array( this.cellsPerSide * this.cellsPerSide );
@@ -56,6 +58,19 @@ export class GroundCoverCellPlanner {
 		target[ 0 ] = this.terrain.origin + i * this.cellSize;
 		target[ 1 ] = this.terrain.origin + j * this.cellSize;
 		return target;
+	}
+
+	/** Choose a deterministic LOD for a candidate using a screen-door style transition. */
+	lodIndexAtDistance( distance, randomValue = 0.5 ) {
+		if ( ! Number.isFinite( distance ) || distance < 0 || ! Number.isFinite( randomValue ) || randomValue < 0 || randomValue > 1 ) throw new Error( 'Ground-cover LOD selection requires a non-negative distance and a random value from 0 to 1' );
+		for ( let index = 0; index < this.levels.length - 1; index ++ ) {
+			const boundary = this.levels[ index ].maxDistance;
+			const start = boundary * ( 1 - this.transitionFraction * 0.5 );
+			const end = boundary * ( 1 + this.transitionFraction * 0.5 );
+			if ( distance < start ) return index;
+			if ( distance < end ) return randomValue < ( distance - start ) / ( end - start ) ? index + 1 : index;
+		}
+		return distance <= this.levels.at( - 1 ).maxDistance ? this.levels.length - 1 : - 1;
 	}
 
 	/** Update LOD cell lists. `isVisible` can apply a backend camera-frustum test. */
