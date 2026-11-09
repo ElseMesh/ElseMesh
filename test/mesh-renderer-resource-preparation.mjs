@@ -60,14 +60,21 @@ const cameraMatrices = new Map( cameraMatrixNames.map( name => [ name, FrameUnif
 const firstView = Array.from( FrameUniforms.fields.view.value.elements );
 const cameraPosition = FrameUniforms.fields.cameraPos.value;
 shadows.render( scene, renderer, shadows.update( camera, G.sunDir.value ) );
-renderer.render( scene, {
+const renderPass = {
 	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,
 	depthView: target.depthTexture.view(), depthFormat: 'depth32float', clearDepth: 0,
-} );
+};
+renderer.render( scene, renderPass );
 const scratch = renderer.renderScratch[ 0 ];
 const dynamicOffsets = renderer.dynamicOffsets;
 const firstItem = scratch.lists.opaque[ 0 ];
-const firstPreparedDraw = scratch.preparedOpaque[ 0 ];
+const mainPassKey = [ ...scratch.preparedByPass.keys() ].find( key => key.startsWith( 'main.0.' ) );
+const mainPrepared = scratch.preparedByPass.get( mainPassKey );
+const firstPreparedDraw = mainPrepared.opaque[ 0 ];
+renderer.render( scene, { ...renderPass, late: true, clearDepth: null } );
+const latePassKey = [ ...scratch.preparedByPass.keys() ].find( key => key.startsWith( 'main.1.' ) );
+const latePrepared = scratch.preparedByPass.get( latePassKey );
+const firstLatePreparedDraw = latePrepared.opaque[ 0 ];
 const firstDistance = firstItem.z;
 GPU.submit();
 await GPU.queue.onSubmittedWorkDone();
@@ -83,19 +90,18 @@ for ( const name of cameraMatrixNames ) assert.notStrictEqual( FrameUniforms.fie
 assert.notStrictEqual( FrameUniforms.fields.cameraPos.value, cameraPosition, 'camera position snapshot is replaced for the new frame' );
 assert.deepEqual( Array.from( cameraMatrices.get( 'view' ).elements ), firstView, 'the prior frame view snapshot remains unchanged after camera movement' );
 assert.notDeepEqual( Array.from( FrameUniforms.fields.view.value.elements ), firstView, 'reused view matrix refreshes after camera movement' );
-renderer.render( scene, {
-	camera, colorViews: target.textures.map( texture => texture.view() ), colorFormats: target.formats,
-	depthView: target.depthTexture.view(), depthFormat: 'depth32float', clearDepth: 0,
-} );
+renderer.render( scene, renderPass );
+renderer.render( scene, { ...renderPass, late: true, clearDepth: null } );
 GPU.submit();
 await GPU.queue.onSubmittedWorkDone();
 assert.equal( renderer.renderScratch[ 0 ], scratch, 'frame scratch storage is reused' );
 assert.equal( renderer.dynamicOffsets, dynamicOffsets, 'dynamic-offset storage is reused for every draw' );
 assert.equal( scratch.lists.opaque[ 0 ], firstItem, 'collected draw-item records are reused' );
-assert.strictEqual( scratch.preparedOpaque[ 0 ], firstPreparedDraw, 'prepared draw records are reused across stable frames' );
+assert.strictEqual( mainPrepared.opaque[ 0 ], firstPreparedDraw, 'opaque pass draw records are reused across stable frames' );
+assert.strictEqual( latePrepared.opaque[ 0 ], firstLatePreparedDraw, 'late pass draw records are not cleared by the main opaque pass' );
 assert.notEqual( firstItem.z, firstDistance, 'reused draw-item records refresh camera-dependent distance' );
-renderer._prepareItems( [ { object: {}, geometry: { attributes: {} }, material: {} } ], {}, scratch.preparedOpaque );
-assert.equal( scratch.preparedOpaque[ 0 ], null, 'skipped items clear their prior prepared draw record' );
+renderer._prepareItems( [ { object: {}, geometry: { attributes: {} }, material: {} } ], {}, mainPrepared.opaque );
+assert.equal( mainPrepared.opaque[ 0 ], null, 'skipped items clear their prior prepared draw record' );
 assert.deepEqual( errors, [], `reused renderer scratch stays valid: ${errors.join( '; ' )}` );
 console.log( 'MeshRenderer prepares lazy resources and reuses frame draw-list scratch' );
 GPU.device.destroy();

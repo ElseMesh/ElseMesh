@@ -45,8 +45,7 @@ function createRenderScratch() {
 	return {
 		lists: { opaque: [], transparent: [] },
 		itemRecords: new WeakMap(),
-		preparedOpaque: [],
-		preparedTransparent: [],
+		preparedByPass: new Map(),
 	};
 }
 
@@ -543,9 +542,11 @@ export class MeshRenderer {
 			};
 			pass.passKey = `${ pass.kind }.${ pass.late ? 1 : 0 }.${ pass.colorFormats.join( ',' ) }.${ pass.depthFormat }.${ pass.depthCompare }.${ pass.cullOverride || '' }.${ pass.defines ? JSON.stringify( pass.defines ) : '' }`;
 			const lists = pass.items || this._collectInto( scene, pass, scratch.lists, scratch.itemRecords );
+			let preparedLists = scratch.preparedByPass.get( pass.passKey );
+			if ( ! preparedLists ) scratch.preparedByPass.set( pass.passKey, preparedLists = { opaque: [], transparent: [] } );
 			const enc = GPU.getEncoder();
-			const opaque = this._prepareItems( lists.opaque, pass, scratch.preparedOpaque );
-			const transparent = this._prepareItems( lists.transparent, pass, scratch.preparedTransparent );
+			const opaque = this._prepareItems( lists.opaque, pass, preparedLists.opaque );
+			const transparent = this._prepareItems( lists.transparent, pass, preparedLists.transparent );
 			const colorAttachments = ( pass.colorViews || [] ).map( ( view, i ) => {
 
 				const clear = pass.clearColors ? pass.clearColors[ i ] : null;
