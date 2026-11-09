@@ -1,4 +1,5 @@
 import { GroundCoverCellPlanner } from './GroundCoverCellPlanner.js';
+import { GroundCoverFieldDrawPlanner } from './GroundCoverFieldDrawPlanner.js';
 import { validateGroundCoverField } from '../../network/GroundCoverField.js';
 import { mulberry32 } from '../../util/Noise.js';
 
@@ -62,6 +63,7 @@ export class GroundCoverFieldRuntime {
 			densityChannels: data.species.map( species => species.densityChannel ),
 		} );
 		this.pattern = blueNoisePattern( data.seed, data.pointsPerCell, data.cellSize );
+		this.drawPlanner = new GroundCoverFieldDrawPlanner();
 		this.recordsByCell = new Map();
 		this.instances = [];
 		this.cellOriginScratch = [ 0, 0 ];
@@ -136,6 +138,11 @@ export class GroundCoverFieldRuntime {
 		}
 		for ( const cellIndex of this.recordsByCell.keys() ) if ( ! activeCells.has( cellIndex ) ) this.recordsByCell.delete( cellIndex );
 		return this.instances;
+	}
+
+	planDraws( camera, renderLoadBias = 0 ) {
+		if ( this.disposed ) throw new Error( 'Ground-cover runtime is disposed' );
+		return this.drawPlanner.update( this.instances, camera, renderLoadBias );
 	}
 
 	dispose() {
