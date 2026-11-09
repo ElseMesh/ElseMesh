@@ -20,7 +20,7 @@ globalThis.fetch = async url => {
 	const path = new URL( url ).pathname;
 	const payload = path.endsWith( '/descriptor' ) ? descriptor : path === '/v1/regions' ? { regions: [ { id: 'hall', label: 'Great Hall', asset: '/v1/regions/hall' } ] } : { sourceRevision: 'test-revision', cellSizeMeters: 16, cells: [ { x: 0, y: 0, z: 5 } ] };
 	if ( path !== '/v1/descriptor' && path !== '/v1/regions' ) {
-		payload.collisionSourceInventory = {
+		if ( new URL( url ).searchParams.get( 'sourceInventory' ) !== '0' ) payload.collisionSourceInventory = {
 			staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0, unindexedOtherPrimitiveComponents: 0,
 			unindexedSpatialBoundsComponents: 0, unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false,
 			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0,
