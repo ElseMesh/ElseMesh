@@ -27,6 +27,7 @@ import { worldMaterialGraph } from './WorldMaterialGraph.js';
 import { compileWorldMaterialProfile, hasWorldMaterialProfileCompiler } from '../materials/WorldMaterialProfileCompilerRegistry.js';
 import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAdapterRegistry.js';
 import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
+import { STREAMING_DETAIL_HEADROOM } from '../engine/render/InstanceDrawPlannerMath.js';
 import { transformBoundsCenter } from './WorldStreaming.js';
 import { isValidWorldCollisionTag } from './WorldSource.js';
 
@@ -224,9 +225,10 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0, now = perform
 			state.textureLODNextRetryAt = Math.min( state.textureLODNextRetryAt, target.retryAfter );
 			continue;
 		}
-		// A positive workload bias chooses coarser texture levels for every streamed
-		// package, matching the mesh-LOD bias above without lowering render resolution.
-		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 / ( 2 ** bias ) );
+		// Retain one finer mip than the screen-size target for near-first refinement;
+		// sustained workload bias cancels this headroom before requesting more detail.
+		const effectiveBias = bias - STREAMING_DETAIL_HEADROOM;
+		const pixelDiameter = Math.max( 1, screenFraction * viewHeight * 2 / ( 2 ** effectiveBias ) );
 		const textureDiameter = Math.max( target.baseWidth, target.baseHeight );
 		const texelRatio = textureDiameter / pixelDiameter;
 		let desiredLevel = Math.min( target.levelCount - 1, Math.max( 0, Math.floor( Math.log2( texelRatio ) ) ) );
@@ -1227,7 +1229,7 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 
 		if ( primitive.mode !== 4 ) throw new Error( `GLB primitive mode ${primitive.mode} is not supported (triangle list required)` );
 		const geometry = new BufferGeometry();
-		for ( const [ gltfName, [ name, size ] ] of Object.entries( { ...COMPONENTS, _ELSEMESH_VDATA: [ 'vdata', 4 ] } ) ) {
+		for ( const [ gltfName, [ name, size ] ] of Object.entries( { ...COMPONENTS, _ELSEMESH_VDATA: [ 'vdata', 4 ], _ELSEMESH_VDATA1: [ 'vdata1', 4 ], _ELSEMESH_VDATA2: [ 'vdata2', 4 ] } ) ) {
 			const attribute = primitive.attributes[ gltfName ];
 			if ( ! attribute ) continue;
 			const values = floatAttribute( attribute );

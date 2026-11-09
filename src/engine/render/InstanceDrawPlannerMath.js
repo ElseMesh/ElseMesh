@@ -3,6 +3,11 @@ function smoothstep( start, end, value ) {
 	return t * t * ( 3 - 2 * t );
 }
 
+// Keep one authored detail step ahead of the screen-size target so the
+// nearest-first queues can refine nearby content before it is strictly needed.
+// Sustained-load bias cancels this headroom before requesting extra detail.
+export const STREAMING_DETAIL_HEADROOM = 1;
+
 /** Write a transformed model-space sphere into [centerX, centerY, centerZ, radius, maxScale]. */
 export function writeTransformedInstanceSphere( target, position, rotation, scale, bounds ) {
 	const [ sx, sy, sz ] = scale, [ qx, qy, qz, qw ] = rotation;

@@ -1,6 +1,6 @@
 import { validateStaticModelInstanceSet } from '../../network/StaticModelInstanceSet.js';
 import { WebGLCoordinateSystem } from '../math/Matrix4.js';
-import { writeInstanceDrawDistanceFade, writeInstanceLODSelection, writeTransformedInstanceSphere } from './InstanceDrawPlannerMath.js';
+import { STREAMING_DETAIL_HEADROOM, writeInstanceDrawDistanceFade, writeInstanceLODSelection, writeTransformedInstanceSphere } from './InstanceDrawPlannerMath.js';
 
 const finiteVector3 = value => Array.isArray( value ) && value.length === 3 && value.every( Number.isFinite );
 
@@ -122,7 +122,7 @@ export class StaticModelInstanceSetPlanner {
 			this._projectedRadiusByInstance[ instanceIndex ] = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
 			// Sustained render overload shifts demand toward coarser authored LODs.
 			const fade = writeInstanceDrawDistanceFade( this._drawFadeScratch, model.drawFadeStartDistance, model.drawMaxDistance, distance );
-			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, distance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias );
+			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, distance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias - STREAMING_DETAIL_HEADROOM );
 			const groups = this._groupsByModel[ modelIndex ];
 			const [ lodIndex, transition, incomingFade ] = selection;
 			if ( transition >= 0 ) {
