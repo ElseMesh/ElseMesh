@@ -67,6 +67,7 @@ renderer.render( scene, {
 const scratch = renderer.renderScratch[ 0 ];
 const dynamicOffsets = renderer.dynamicOffsets;
 const firstItem = scratch.lists.opaque[ 0 ];
+const firstPreparedDraw = scratch.preparedOpaque[ 0 ];
 const firstDistance = firstItem.z;
 GPU.submit();
 await GPU.queue.onSubmittedWorkDone();
@@ -91,7 +92,10 @@ await GPU.queue.onSubmittedWorkDone();
 assert.equal( renderer.renderScratch[ 0 ], scratch, 'frame scratch storage is reused' );
 assert.equal( renderer.dynamicOffsets, dynamicOffsets, 'dynamic-offset storage is reused for every draw' );
 assert.equal( scratch.lists.opaque[ 0 ], firstItem, 'collected draw-item records are reused' );
+assert.strictEqual( scratch.preparedOpaque[ 0 ], firstPreparedDraw, 'prepared draw records are reused across stable frames' );
 assert.notEqual( firstItem.z, firstDistance, 'reused draw-item records refresh camera-dependent distance' );
+renderer._prepareItems( [ { object: {}, geometry: { attributes: {} }, material: {} } ], {}, scratch.preparedOpaque );
+assert.equal( scratch.preparedOpaque[ 0 ], null, 'skipped items clear their prior prepared draw record' );
 assert.deepEqual( errors, [], `reused renderer scratch stays valid: ${errors.join( '; ' )}` );
 console.log( 'MeshRenderer prepares lazy resources and reuses frame draw-list scratch' );
 GPU.device.destroy();

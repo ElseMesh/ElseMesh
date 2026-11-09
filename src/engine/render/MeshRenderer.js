@@ -583,11 +583,10 @@ export class MeshRenderer {
 		let index = 0;
 		for ( const it of items ) {
 
-			prepared[ index ] = null;
-
 			const { object: o, geometry: geo, material } = it;
 			if ( ! geo.attributes.position && ! geo.vertexCount && ! geo.indirect ) {
 
+				prepared[ index ] = null;
 				index ++;
 				continue;
 
@@ -595,6 +594,7 @@ export class MeshRenderer {
 
 			if ( ( o.isInstancedMesh ? o.count : geo.instanceCount ?? 1 ) === 0 ) {
 
+				prepared[ index ] = null;
 				index ++;
 				continue;
 
@@ -610,11 +610,13 @@ export class MeshRenderer {
 
 				} catch ( e ) {
 
+					prepared[ index ] = null;
 					index ++;
 					continue;
 
 				}
 
+				prepared[ index ] = null;
 				index ++;
 				continue; // only the pipelines are wanted
 
@@ -625,11 +627,14 @@ export class MeshRenderer {
 			const pipeline = p.handle.pipeline || ( this.syncPipelines ? GPU.ready( p.handle ) : null );
 			if ( ! pipeline ) {
 
+				prepared[ index ] = null;
 				index ++;
 				continue; // still compiling
 
 			}
 			const group = p.bindings.getBindGroup( token );
+			// Keep the per-item record across frames. Clearing it at loop entry
+			// allocated one new object per visible draw on every prepared pass.
 			const draw = prepared[ index ] || ( prepared[ index ] = {} );
 			draw.vl = vl;
 			draw.p = p;
