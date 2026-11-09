@@ -31,6 +31,17 @@ unfinished runtime boundary or parity gate.
 
 ## Architecture assessment
 
+**Renderer ownership decision (2026-11-09):** Renderer code belongs to
+ElseMesh; world repositories own renderer-neutral authored data, portable
+assets, and simulation. Earlier moves of Tidewater presenters into
+`worlds/tidewater` are existing migration debt, not progress toward the final
+renderer-neutral boundary. Do not move those presenters back by themselves or
+add new world-owned WebGPU/WebGL presenters. Replace each affected feature only
+as a complete migration: define the neutral contract, implement both engine
+backends, prove the required parity, then remove the world presenter. The
+renderer-neutral progress percentage must not increase merely because code
+moved between repositories.
+
 The intended boundary is **not complete yet**. Registered world behavior code can call owner-signed JavaScript modules in dedicated Workers, and App's generic extension-event dispatcher sends world-activation events. Isolated Chromium verifies signed-asset download from `worldd`, `App.activateHostedWorld()` dispatch, and `App.deactivateHostedWorld()` teardown with a real Worker; a separate fixture checks the dispatcher with an in-memory signed package. Tidewater's live test also fetches its actual signed fishing module and exercises both renderer adapters, including buyer/shop interactions and Worker activation/departure/re-entry. Tidewater's browser-side runtime sends ordered fishing and boat simulation calls to that Worker, but input and frame hooks themselves still run through synchronous behavior implementations rather than a generic Worker event bridge. Arbitrary owner-defined results still need reusable world-side adapters to affect engine gameplay. Do not claim a complete autonomous Engine-managed world runtime yet.
 
 ElseMesh is partly

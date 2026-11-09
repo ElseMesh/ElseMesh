@@ -63,6 +63,26 @@ and simulation outputs. A test fixture may exercise backend code, but should
 live beside the engine implementation unless it specifically validates
 renderer-neutral authored data.
 
+This is also the rule for classifying existing code: a presenter under
+`worlds/<world>/renderers/`, or a world package registering WebGPU/WebGL
+adapters, is migration debt rather than the target boundary. Moving such code
+between repositories does not advance renderer separation. Do not move it back
+to ElseMesh as a location-only correction either. Leave the current path intact
+until the complete feature contract, both ElseMesh presenters, and parity gate
+can be delivered together; then replace the world-owned presenters in that one
+migration. New world features must enter through renderer-neutral data and
+simulation contracts from the outset.
+
+The engine registry is keyed by renderer-neutral component/material/effect
+contracts. Backend selection and the WebGPU/WebGL implementations for those
+contracts remain registered and owned by ElseMesh. A world may register its
+schema, decoder, authored assets, and simulation factory, but it must not
+register a backend presenter. If a feature needs richer appearance than glTF
+PBR can express, extend a bounded data contract and both engine compilers, or
+bake that appearance into portable assets. General translation of arbitrary
+WGSL/GLSL is not a viable boundary: shader source is backend-specific and
+cannot be reliably converted between APIs.
+
 ## Renderer-neutral material contract
 
 World packages describe materials and effects as data. They must not ship or
