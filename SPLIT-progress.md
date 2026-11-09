@@ -88,6 +88,16 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
+- 2026-11-09: clarified the full vegetation migration boundary after auditing
+  Tidewater's signed placements and presenters. `ground-cover-field/1` covers
+  dense grass only; the ten finite plant categories and tree/shrub canopy LODs
+  require world-exported signed GLB LODs referenced through the generic static
+  model component, with standard PBR or material-graph data. Tidewater keeps
+  scatter rules and placement-to-asset data; both renderer implementations,
+  instance batching, wind translation, and shadows belong in ElseMesh. The
+  existing source presenters remain migration debt, and parity is still required
+  before replacing them. Renderer-neutral progress remains 71%.
+
 - 2026-11-09: extended the unregistered `elsemesh.ground-cover-field/1`
   contract with bounded renderer-neutral density expressions over RGBA channels.
   The engine can now evaluate Tidewater's dune/meadow population blend from

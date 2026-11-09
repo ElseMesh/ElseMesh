@@ -192,6 +192,23 @@ fades in its presenter. The field still needs a renderer-neutral way to
 represent that authored geometry/material behavior and paired engine WebGPU and
 WebGL adapters before it can replace the current vegetation paths.
 
+The ground-cover field is only the dense-flora contract; it does not cover the
+finite vegetation set. Tidewater's placement asset has ten authored categories
+(palms, trees, bananas, shrubs, young palms, ferns, monsteras, elephant ears,
+heliconias, and strelitzias), while the WebGPU presenter merges several
+categories into custom geometry and creates tree/shrub canopy impostors. Keep
+the placement records, exclusion rules, and category-to-asset mapping in
+Tidewater. The world export pipeline should cook each finite plant and canopy
+LOD into signed, renderer-neutral GLB assets and reference them through
+`elsemesh.static-model-instance-set/1`; use standard glTF PBR or
+`elsemesh.material-graph/1` for authored appearance and shared wind inputs.
+ElseMesh then owns LOD selection, instance batching, wind translation, depth,
+and shadow presentation for both backends. Do not carry the current WGSL vertex
+attributes, WebGL adapters, or atlas-generation presenter into that contract.
+The migration is complete only when the signed package preserves every category
+and LOD, both engine renderers use those same assets and material data, and the
+matched visual gate passes against pre-split WebGPU.
+
 The shared `GroundCoverCellPlanner` now owns density-cell occupancy, terrain
 bounds, distance bands, and optional frustum filtering. Tidewater's WebGPU grass
 uses its per-band cell lists; the WebGL density-mask path uses the same active
