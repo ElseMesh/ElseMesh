@@ -52,6 +52,7 @@ import { worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
 import { WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 import { G } from '../engine/render/Frame.js';
+import { GroundCoverCellPlanner } from '../engine/render/GroundCoverCellPlanner.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
 
@@ -730,10 +731,15 @@ function sampleGrassMask( mask, x, z ) {
 	return result;
 }
 
-function webglGrassMesh( T, terrain, camera, previous, grassMask = null ) {
+function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPlanner = null ) {
 
 	const radius = 42, spacing = 0.46, positions = [], colors = [], indices = [];
 	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
+	let visibleCells = null;
+	if ( cellPlanner ) {
+		visibleCells = new Uint8Array( cellPlanner.cellFlags.length );
+		for ( const level of cellPlanner.update( { x: cx, z: cz } ) ) for ( let index = 0; index < level.count; index ++ ) visibleCells[ level.cells[ index ] ] = 1;
+	}
 	const hash = ( x, z ) => { let n = Math.imul( x, 0x1f123bb5 ) ^ Math.imul( z, 0x5f356495 ); n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b ); return ( n ^ n >>> 16 ) >>> 0; };
 	const addBlade = ( x, z, y, angle, height, width, color ) => {
 		const dx = Math.cos( angle ), dz = Math.sin( angle ), bend = 0.12 + height * 0.16, sx = - dz * width, sz = dx * width, base = positions.length / 3;
@@ -744,6 +750,10 @@ function webglGrassMesh( T, terrain, camera, previous, grassMask = null ) {
 	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
 		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
 		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
+		if ( visibleCells ) {
+			const i = Math.floor( ( x - terrain.origin ) / cellPlanner.cellSize ), j = Math.floor( ( z - terrain.origin ) / cellPlanner.cellSize );
+			if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide || ! visibleCells[ j * cellPlanner.cellsPerSide + i ] ) continue;
+		}
 		const near = grassMask ? 1 : 1 - T.MathUtils.smoothstep( d, 14, 24 );
 		if ( d > radius || ( ! grassMask && rand( 3 ) > 0.32 + near * 0.68 ) ) continue;
 		const h = terrain.heightAt( x, z );
@@ -943,7 +953,7 @@ export class WebGLFallback {
 				this.player.boat = this.boat.controller;
 			}
 			if ( this.hostedTerrainData && this.hostedGrassMask ) {
-				this.grass = webglGrassMesh( T, this.hostedTerrainData, this.camera, null, this.hostedGrassMask );
+				this.grass = webglGrassMesh( T, this.hostedTerrainData, this.camera, null, this.hostedGrassMask, this.grassCellPlanner );
 				this.scene.add( this.grass );
 				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
@@ -1784,7 +1794,7 @@ export class WebGLFallback {
 		const startZ = start.position.z ?? start.position[ 2 ];
 		if ( ! Number.isFinite( startX ) || ! Number.isFinite( startZ ) ) throw new Error( 'The built-in world layout must provide a finite start position' );
 		this.spawn = { position: [ startX, this.terrain.heightAt( startX, startZ ) + 1.7, startZ ], yaw: start.yaw, pitch: - 0.05 };
-		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( startX, 0, startZ ) } );
+		this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( startX, 0, startZ ) }, null, this.hostedGrassMask || null, this.grassCellPlanner || null );
 		this.scene.add( this.grass );
 		this.grassCenter = new T.Vector2( startX, startZ );
 		progress( 0.9, 'Starting the WebGL island…' );
@@ -2302,7 +2312,7 @@ export class WebGLFallback {
 		const grassDx = this.grassCenter ? this.camera.position.x - this.grassCenter.x : 0, grassDz = this.grassCenter ? this.camera.position.z - this.grassCenter.y : 0;
 		if ( this.grass && ( this.terrain || this.hostedTerrainData ) && grassDx * grassDx + grassDz * grassDz > 64 ) {
 			this.scene.remove( this.grass );
-			this.grass = webglGrassMesh( T, this.terrain || this.hostedTerrainData, this.camera, this.grass, this.hostedGrassMask || null );
+			this.grass = webglGrassMesh( T, this.terrain || this.hostedTerrainData, this.camera, this.grass, this.hostedGrassMask || null, this.grassCellPlanner || null );
 			this.scene.add( this.grass );
 			this.grassCenter.set( this.camera.position.x, this.camera.position.z );
 		}

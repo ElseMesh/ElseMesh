@@ -155,6 +155,14 @@ a shared cell-selection/update runtime consumed by both backend adapters;
 renderer-specific choices such as patch meshes, shader code, batching, and GPU
 resources stay inside ElseMesh.
 
+The shared `GroundCoverCellPlanner` now owns density-cell occupancy, terrain
+bounds, distance bands, and optional frustum filtering. Tidewater's WebGPU grass
+uses its per-band cell lists; the WebGL density-mask path uses the same active
+cell selection, including for the built-in package. WebGL still builds a
+different blade mesh, uses a 42 m draw radius, and does not consume the planner's
+per-band LOD assignments. This is a common runtime slice, not completion of the
+ground-cover contract or renderer parity.
+
 Do not switch Tidewater to that contract until both engine adapters consume the
 same signed package fixture. The fixture must verify species and placement
 counts, camera-following coverage, LOD transitions, wind response, shadows, and
