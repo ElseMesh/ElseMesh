@@ -31,7 +31,7 @@ globalThis.fetch = async input => {
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'hall', label: 'Hall', asset: '/v1/regions/hall' } ] } );
 	if ( url.pathname === '/v1/regions/hall/cells' ) {
 		requestedCells.push( ...url.searchParams.getAll( 'cell' ) );
-		return Response.json( { sourceRevision: 'source-1', cellSizeMeters: 8, collisionSourceInventory, cells: [] } );
+		return Response.json( { sourceRevision: 'source-1', cellSizeMeters: 8, collisionSourceInventory: url.searchParams.get( 'sourceInventory' ) === '0' ? null : collisionSourceInventory, cells: [] } );
 	}
 	throw new Error( `Unexpected provider request: ${url}` );
 };
