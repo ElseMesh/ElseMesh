@@ -109,15 +109,17 @@ const planner = new StaticModelInstanceSetPlanner( {
 	...valid,
 	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, geometryMirrorX: false, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 100, drawFadeStartDistance: 100 }, { id: 'short-range-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, geometryMirrorX: false, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 4, drawFadeStartDistance: 4 } ],
 	instances: [ ...placements, { model: 'single-lod-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] }, { model: 'short-range-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
-} ).update( {
+} );
+planner.update( {
 	position: [ 0, 0, 0 ],
 	verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 2 ], [ -1, 0, 0, 2 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 500 ], [ 0, 0, -1, 500 ] ],
-} );
+}, { renderLoadBias: 1 } );
 const [ coarseLod, middleLod, fineLod ] = planner.groups;
 assert.deepEqual( Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ), [ 3 ] );
 assert.deepEqual( Array.from( middleLod.indices.subarray( 0, middleLod.count ) ), [ 1, 2 ] );
 assert.deepEqual( Array.from( fineLod.indices.subarray( 0, fineLod.count ) ), [ 0, 1 ] );
+assert.ok( fineLod.count > 0, 'neutral-load headroom makes visible models eligible for one extra authored detail step' );
 const loadBiasedPlanner = new StaticModelInstanceSetPlanner( { ...valid, instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, 20 ] } ] } );
 loadBiasedPlanner.update( {
 	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
@@ -127,8 +129,8 @@ assert.equal( loadBiasedPlanner.groups[ 2 ].count, 1, 'the nearest LOD is select
 loadBiasedPlanner.update( {
 	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
-}, { renderLoadBias: 1 } );
-assert.equal( loadBiasedPlanner.groups[ 1 ].count, 1, 'sustained renderer load moves a projected-size model one authored LOD coarser' );
+}, { renderLoadBias: 2 } );
+assert.equal( loadBiasedPlanner.groups[ 1 ].count, 1, 'sustained renderer load cancels the neutral-load headroom before moving one authored LOD coarser' );
 assert.throws( () => loadBiasedPlanner.update( { position: [ 0, 0, 0 ], verticalFovRadians: 1, frustumPlanes: [ [ 1, 0, 0, 1 ], [ -1, 0, 0, 1 ], [ 0, 1, 0, 1 ], [ 0, -1, 0, 1 ], [ 0, 0, 1, 1 ], [ 0, 0, -1, 1 ] ] }, { renderLoadBias: 3 } ), /bias/ );
 const outgoingOffset = Array.from( middleLod.indices.subarray( 0, middleLod.count ) ).indexOf( 1 );
 const incomingOffset = Array.from( fineLod.indices.subarray( 0, fineLod.count ) ).indexOf( 1 );
@@ -148,15 +150,17 @@ assert.equal( planner.shadowGroups[ 2 ].indices[ 0 ], 8, 'shadow selection remai
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
 const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };
-const distancePlanner = new StaticModelInstanceSetPlanner( {
+const distanceDocument = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ distanceModel ],
 	instances: [ 24, 26.5, 30, 85 ].map( z => ( { model: distanceModel.id, position: [ 0, 0, z ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ) ),
-} ).update( {
+	};
+const distanceCamera = {
 	position: [ 0, 0, 0 ],
 	verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
-} );
+	};
+const distancePlanner = new StaticModelInstanceSetPlanner( distanceDocument ).update( distanceCamera, { renderLoadBias: 1 } );
 const [ distanceCoarse, distanceFine ] = distancePlanner.groups;
 assert.deepEqual( Array.from( distanceCoarse.indices.subarray( 0, distanceCoarse.count ) ), [ 2, 3 ], 'scaled-distance LOD starts coarse and keeps farther instances at lower detail' );
 assert.deepEqual( Array.from( distanceFine.indices.subarray( 0, distanceFine.count ) ), [ 0, 1, 2 ], 'closer instances refine as distance falls below the authored boundary' );
@@ -164,6 +168,8 @@ assert.ok( distanceFine.fade[ 2 ] > 0.4 && distanceFine.fade[ 2 ] < 0.6, 'distan
 assert.equal( distanceFine.drawFadeEnabled[ 0 ], 1 );
 assert.equal( distanceFine.drawFade[ 0 ], 1 );
 assert.ok( distanceCoarse.drawFade[ 1 ] > 0 && distanceCoarse.drawFade[ 1 ] < 1, 'draw range fades over an authored distance band' );
+const headroomDistancePlanner = new StaticModelInstanceSetPlanner( distanceDocument ).update( distanceCamera );
+assert.deepEqual( Array.from( headroomDistancePlanner.groups[ 0 ].indices.subarray( 0, headroomDistancePlanner.groups[ 0 ].count ) ), [ 3 ], 'neutral-load headroom refines the transition-distance model before its authored threshold requires it' );
 
 for ( const camera of [ new PerspectiveCamera( 60, 1, 0.1, 100 ), new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) ] ) {
 	camera.position.set( 0, 0, 0 );

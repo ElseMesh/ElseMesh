@@ -38,6 +38,31 @@ assert.match( webgpu.surface, /s\.albedo \*= emg_result/ );
 assert.match( webgl.glsl.declarations, /varying vec4 vEmg_color/ );
 assert.match( webgl.glsl.fragment, /diffuseColor\.rgb \*= emg_result/ );
 assert.match( compileWorldMaterialGraph( { ...graph, nodes: [ ...graph.nodes, { id: 'data', op: 'input', name: 'vdata' } ] }, 'webgl' ).glsl.attributes, /attribute vec4 vdata/ );
+const vertexDataGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'data1', op: 'input', name: 'vdata1' }, { id: 'data2', op: 'input', name: 'vdata2' },
+		{ id: 'x', op: 'x', args: [ 'data1' ] }, { id: 'y', op: 'y', args: [ 'data2' ] },
+		{ id: 'sum', op: 'add', args: [ 'x', 'y' ] },
+	],
+	outputs: { roughness: 'sum' },
+};
+const vertexDataWebGPU = compileWorldMaterialGraph( vertexDataGraph, 'webgpu' ), vertexDataWebGL = compileWorldMaterialGraph( vertexDataGraph, 'webgl' );
+assert.deepEqual( vertexDataWebGPU.attributes, { vdata1: 'vec4f', vdata2: 'vec4f' }, 'WebGPU declares both generic auxiliary vertex streams' );
+assert.match( vertexDataWebGPU.surface, /let emg_x: f32 = in\.vs\.emg_vdata1\.x/ );
+assert.match( vertexDataWebGPU.surface, /let emg_y: f32 = in\.vs\.emg_vdata2\.y/ );
+assert.match( vertexDataWebGL.glsl.attributes, /attribute vec4 vdata1;[\s\S]*attribute vec4 vdata2;/ );
+assert.match( vertexDataWebGL.glsl.fragment, /float emg_x = vEmg_vdata1\.x/ );
+assert.match( vertexDataWebGL.glsl.fragment, /float emg_y = vEmg_vdata2\.y/ );
+const vertexDataMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), vertexDataGraph );
+const vertexDataGeometry = new THREE.BufferGeometry();
+vertexDataGeometry.setAttribute( '_ELSEMESH_VDATA1', new THREE.Float32BufferAttribute( [ 1, 2, 3, 4 ], 4 ) );
+vertexDataGeometry.setAttribute( '_ELSEMESH_VDATA2', new THREE.Float32BufferAttribute( [ 5, 6, 7, 8 ], 4 ) );
+vertexDataMaterial.prepareGeometry( vertexDataGeometry );
+assert.equal( vertexDataGeometry.getAttribute( 'vdata1' ), vertexDataGeometry.getAttribute( '_ELSEMESH_VDATA1' ) );
+assert.equal( vertexDataGeometry.getAttribute( 'vdata2' ), vertexDataGeometry.getAttribute( '_ELSEMESH_VDATA2' ) );
+vertexDataMaterial.material.dispose();
+vertexDataGeometry.dispose();
 assert.throws( () => compileWorldMaterialGraph( graph, 'wasm' ), /backend/ );
 
 const conditionalGraph = {

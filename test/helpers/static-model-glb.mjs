@@ -1,10 +1,31 @@
-export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false, doubleSided = false } = {} ) {
-	const binary = new ArrayBuffer( 80 ), data = new DataView( binary );
+export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false, doubleSided = false, extraAttributes = {} } = {} ) {
 	const positions = [ - 0.5, 0, 0, 0.5, 0, 0, 0, 1, 0 ];
 	const normals = [ 0, 0, 1, 0, 0, 1, 0, 0, 1 ];
-	positions.forEach( ( value, index ) => data.setFloat32( index * 4, value, true ) );
-	normals.forEach( ( value, index ) => data.setFloat32( 36 + index * 4, value, true ) );
-	data.setUint16( 72, 0, true ); data.setUint16( 74, 1, true ); data.setUint16( 76, 2, true );
+	const parts = [
+		{ name: 'POSITION', values: Float32Array.from( positions ), target: 34962, componentType: 5126, type: 'VEC3', min: [ - 0.5, 0, 0 ], max: [ 0.5, 1, 0 ] },
+		{ name: 'NORMAL', values: Float32Array.from( normals ), target: 34962, componentType: 5126, type: 'VEC3' },
+		...Object.entries( extraAttributes ).map( ( [ name, values ] ) => {
+			if ( ! [ '_ELSEMESH_VDATA1', '_ELSEMESH_VDATA2' ].includes( name ) || ! Array.isArray( values ) || values.length !== 12 || values.some( value => ! Number.isFinite( value ) ) ) throw new Error( `Invalid static-model GLB fixture attribute: ${name}` );
+			return { name, values: Float32Array.from( values ), target: 34962, componentType: 5126, type: 'VEC4' };
+		} ),
+		{ name: 'INDICES', values: Uint16Array.from( [ 0, 1, 2 ] ), target: 34963, componentType: 5123, type: 'SCALAR' },
+	];
+	const chunks = [], bufferViews = [], accessors = [];
+	let byteLength = 0;
+	for ( const part of parts ) {
+		const padding = ( 4 - byteLength % 4 ) % 4;
+		if ( padding ) { chunks.push( new Uint8Array( padding ) ); byteLength += padding; }
+		const bytes = new Uint8Array( part.values.buffer, part.values.byteOffset, part.values.byteLength );
+		const bufferView = bufferViews.length;
+		bufferViews.push( { buffer: 0, byteOffset: byteLength, byteLength: bytes.byteLength, target: part.target } );
+		chunks.push( bytes ); byteLength += bytes.byteLength;
+		const accessor = { bufferView, componentType: part.componentType, count: part.values.length / ( part.type === 'SCALAR' ? 1 : Number( part.type.slice( 3 ) ) ), type: part.type };
+		if ( part.min ) { accessor.min = part.min; accessor.max = part.max; }
+		accessors.push( accessor );
+	}
+	const binary = new Uint8Array( byteLength );
+	let binaryOffset = 0;
+	for ( const chunk of chunks ) { binary.set( chunk, binaryOffset ); binaryOffset += chunk.byteLength; }
 	const material = {
 		...( doubleSided ? { doubleSided: true } : {} ),
 		...( materialExtras ? { extras: materialExtras } : {} ),
@@ -15,19 +36,13 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 	const json = {
 		asset: { version: '2.0' }, scene: 0, scenes: [ { nodes: [ 0 ] } ],
 		nodes: [ { name: 'translated-triangle', mesh: 0, translation: [ 2, 0, 0 ], scale: nodeScale } ],
-		meshes: [ { primitives: [ { attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 } ] } ],
+		meshes: [ { primitives: [ { attributes: Object.fromEntries( parts.slice( 0, - 1 ).map( ( part, index ) => [ part.name, index ] ) ), indices: parts.length - 1, material: 0, mode: 4 } ] } ],
 		materials: [ material ],
 		...( materialTexture ? {
 			images: [ { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' } ],
 			textures: [ { source: 0 } ],
 		} : {} ),
-		buffers: [ { byteLength: binary.byteLength } ],
-		bufferViews: [ { buffer: 0, byteOffset: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 36 }, { buffer: 0, byteOffset: 72, byteLength: 6 } ],
-		accessors: [
-			{ bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [ - 0.5, 0, 0 ], max: [ 0.5, 1, 0 ] },
-			{ bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
-			{ bufferView: 2, componentType: 5123, count: 3, type: 'SCALAR' },
-		],
+		buffers: [ { byteLength: binary.byteLength } ], bufferViews, accessors,
 	};
 	const jsonBytes = new TextEncoder().encode( JSON.stringify( json ) );
 	const paddedJSONLength = ( jsonBytes.byteLength + 3 ) & ~3;
@@ -38,6 +53,6 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 	output.fill( 0x20, 20, 20 + paddedJSONLength ); output.set( jsonBytes, 20 );
 	const binaryHeader = 20 + paddedJSONLength;
 	view.setUint32( binaryHeader, binary.byteLength, true ); view.setUint32( binaryHeader + 4, 0x004e4942, true );
-	output.set( new Uint8Array( binary ), binaryHeader + 8 );
+	output.set( binary, binaryHeader + 8 );
 	return output;
 }

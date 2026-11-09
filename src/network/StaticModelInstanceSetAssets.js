@@ -42,7 +42,7 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 			if ( ( gltf.skins || [] ).length || ( gltf.animations || [] ).length || ( gltf.nodes || [] ).some( node => node.skin !== undefined ) || ( gltf.meshes || [] ).some( mesh => mesh.primitives.some( primitive => primitive.targets?.length ) ) ) throw new Error( `Static model GLB cannot contain skins, animation, or morph targets: ${assetId}` );
 			for ( const mesh of gltf.meshes || [] ) for ( const primitive of mesh.primitives ) {
 				if ( ( primitive.mode ?? 4 ) !== 4 ) throw new Error( `Static model GLB must use triangle-list primitives: ${assetId}` );
-				if ( Object.keys( primitive.attributes ).some( name => ! [ 'POSITION', 'NORMAL', 'TEXCOORD_0', 'COLOR_0', '_ELSEMESH_VDATA' ].includes( name ) ) ) throw new Error( `Static model GLB has unsupported vertex attributes: ${assetId}` );
+				if ( Object.keys( primitive.attributes ).some( name => ! [ 'POSITION', 'NORMAL', 'TEXCOORD_0', 'COLOR_0', '_ELSEMESH_VDATA', '_ELSEMESH_VDATA1', '_ELSEMESH_VDATA2' ].includes( name ) ) ) throw new Error( `Static model GLB has unsupported vertex attributes: ${assetId}` );
 			}
 			modelAssets.set( assetId, bytes );
 			if ( webGLBytes ) modelWebGLAssets.set( assetId, webGLBytes );

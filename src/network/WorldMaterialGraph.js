@@ -15,6 +15,8 @@ const INPUT_TYPES = Object.freeze( {
 	color: 'vec4',
 	colorRGB: 'vec3',
 	vdata: 'vec4',
+	vdata1: 'vec4',
+	vdata2: 'vec4',
 	time: 'scalar',
 	night: 'scalar',
 	windDirection: 'vec2',

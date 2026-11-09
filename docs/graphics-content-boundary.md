@@ -202,6 +202,11 @@ Tidewater. The world export pipeline should cook each finite plant and canopy
 LOD into signed, renderer-neutral GLB assets and reference them through
 `elsemesh.static-model-instance-set/1`; use standard glTF PBR or
 `elsemesh.material-graph/1` for authored appearance and shared wind inputs.
+The material graph now accepts three semantic-neutral VEC4 streams from
+`_ELSEMESH_VDATA`, `_ELSEMESH_VDATA1`, and `_ELSEMESH_VDATA2` in both backends,
+enough to carry the plant builder's vertex, material, and canopy-lobe parameters
+as signed GLB data while keeping their interpretation in world-authored graph
+data.
 ElseMesh then owns LOD selection, instance batching, wind translation, depth,
 and shadow presentation for both backends. Do not carry the current WGSL vertex
 attributes, WebGL adapters, or atlas-generation presenter into that contract.

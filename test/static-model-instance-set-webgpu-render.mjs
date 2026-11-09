@@ -25,7 +25,22 @@ registerWorldPackageMaterialAdapter( materialAdapterType, {
 } );
 const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = hash( glbBytes );
 const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'normal', op: 'input', name: 'normal' }, { id: 'worldPosition', op: 'input', name: 'worldPosition' }, { id: 'worldNormal', op: 'input', name: 'worldNormal' }, { id: 'uv', op: 'input', name: 'uv' }, { id: 'frontFacing', op: 'input', name: 'frontFacing' }, { id: 'pixelPosition', op: 'input', name: 'pixelPosition' }, { id: 'pixelX', op: 'x', args: [ 'pixelPosition' ] }, { id: 'pixelScale', op: 'constant', value: 0.0001 }, { id: 'pixelDetail', op: 'multiply', args: [ 'pixelX', 'pixelScale' ] }, { id: 'z', op: 'z', args: [ 'position' ] }, { id: 'threshold', op: 'constant', value: 0.2 }, { id: 'above', op: 'greaterThan', args: [ 'z', 'threshold' ] }, { id: 'highColor', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'lowColor', op: 'constant', value: [ 0.1, 0.25, 0.8 ] }, { id: 'albedo', op: 'select', args: [ 'above', 'highColor', 'lowColor' ] }, { id: 'frontScale', op: 'constant', value: 1 }, { id: 'backScale', op: 'constant', value: 0.5 }, { id: 'faceScale', op: 'select', args: [ 'frontFacing', 'frontScale', 'backScale' ] }, { id: 'albedoFacing', op: 'multiply', args: [ 'albedo', 'faceScale' ] }, { id: 'roughness', op: 'add', args: [ 'pixelDetail', 'pixelScale' ] }, { id: 'lift', op: 'constant', value: [ 0, 0.15, 0 ] }, { id: 'bentPosition', op: 'add', args: [ 'position', 'lift' ] }, { id: 'slope', op: 'constant', value: [ 0.08, - 0.04 ] }, { id: 'surfaceNormal', op: 'normalFromSlope', args: [ 'worldPosition', 'worldNormal', 'uv', 'slope' ] } ], outputs: { baseColor: 'albedoFacing', roughness: 'roughness', vertexPosition: 'bentPosition', vertexNormal: 'normal', surfaceNormal: 'surfaceNormal' } };
-const graphGLB = staticModelGLB( { doubleSided: true, materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } } } ), graphAssetID = hash( graphGLB );
+graph.nodes.push(
+	{ id: 'data1', op: 'input', name: 'vdata1' }, { id: 'data2', op: 'input', name: 'vdata2' },
+	{ id: 'dataX', op: 'x', args: [ 'data1' ] }, { id: 'dataY', op: 'y', args: [ 'data2' ] },
+	{ id: 'dataLift', op: 'add', args: [ 'dataX', 'dataY' ] }, { id: 'zero', op: 'constant', value: 0 },
+	{ id: 'dataOffset', op: 'vec3', args: [ 'zero', 'dataLift', 'zero' ] },
+	{ id: 'bentWithData', op: 'add', args: [ 'bentPosition', 'dataOffset' ] },
+);
+graph.outputs.vertexPosition = 'bentWithData';
+const graphGLB = staticModelGLB( {
+	doubleSided: true,
+	materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
+	extraAttributes: {
+		_ELSEMESH_VDATA1: [ 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0 ],
+		_ELSEMESH_VDATA2: [ 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0 ],
+	},
+} ), graphAssetID = hash( graphGLB );
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [
@@ -65,6 +80,9 @@ try {
 	assert.equal( runtime.isCoarseReadyForView(), true, 'the current view reaches coarse coverage before the render check' );
 	const renderedMaterials = [];
 	root.traverse( node => { if ( node.isMesh ) renderedMaterials.push( node.material ); } );
+	const graphMesh = [];
+	root.traverse( node => { if ( node.isMesh && node.material?.name === 'world-material-graph' ) graphMesh.push( node ); } );
+	assert.ok( graphMesh.length > 0 && graphMesh.every( mesh => mesh.geometry.getAttribute( 'vdata1' ) && mesh.geometry.getAttribute( 'vdata2' ) ), 'WebGPU static GLB preparation maps both signed auxiliary vertex-data streams' );
 	assert.ok( renderedMaterials.some( material => material.name === profileMaterial.name ), 'WebGPU static models resolve the registered world material profile' );
 	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= emg_albedo' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
 	await L.run( 3, dt => runtime.update( dt, L.camera ) );

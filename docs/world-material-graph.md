@@ -37,12 +37,20 @@ Input nodes use these engine-defined semantics and types:
 | `color` | vec4 | glTF `COLOR_0` |
 | `colorRGB` | vec3 | RGB channels of glTF `COLOR_0` |
 | `vdata` | vec4 | glTF `_ELSEMESH_VDATA` |
+| `vdata1` | vec4 | glTF `_ELSEMESH_VDATA1` |
+| `vdata2` | vec4 | glTF `_ELSEMESH_VDATA2` |
 | `time` | scalar | Shared simulation time in seconds |
 | `night` | scalar | Shared environment night level (0 = day, 1 = full night) |
 | `windDirection` | vec2 | Shared world-space XZ wind direction |
 | `windSpeed` | scalar | Shared wind speed in metres per second |
 | `instanceMaterial0` | vec4 | First per-instance material vector |
 | `instanceMaterial1` | vec4 | Second per-instance material vector |
+
+The three `vdata` streams are semantic-neutral inputs. The signed world data
+defines their meaning in its material graph; ElseMesh only preserves and binds
+each VEC4 to the same WebGPU and WebGL graph inputs. A world can therefore bake
+several independent vertex parameters into portable GLBs without sending backend
+shader code or adding world-specific attributes to the engine.
 
 Nodes are ordered: each operation may reference only earlier node IDs. Graphs
 support at most 1,024 nodes. Constants are finite scalars or vectors with 2–4

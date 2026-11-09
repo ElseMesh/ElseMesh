@@ -68,7 +68,23 @@ try {
 		],
 		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
 	};
-	const graphGLB = staticModelGLB( { doubleSided: true, materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } }, materialTexture: true } ), graphAssetID = await hash( graphGLB );
+	graph.nodes.push(
+		{ id: 'data1', op: 'input', name: 'vdata1' }, { id: 'data2', op: 'input', name: 'vdata2' },
+		{ id: 'dataX', op: 'x', args: [ 'data1' ] }, { id: 'dataY', op: 'y', args: [ 'data2' ] },
+		{ id: 'dataLift', op: 'add', args: [ 'dataX', 'dataY' ] }, { id: 'dataZero', op: 'constant', value: 0 },
+		{ id: 'dataOffset', op: 'vec3', args: [ 'dataZero', 'dataLift', 'dataZero' ] },
+		{ id: 'movedWithData', op: 'add', args: [ 'moved', 'dataOffset' ] },
+	);
+	graph.outputs.vertexPosition = 'movedWithData';
+	const graphGLB = staticModelGLB( {
+		doubleSided: true,
+		materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
+		materialTexture: true,
+		extraAttributes: {
+			_ELSEMESH_VDATA1: [ 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0 ],
+			_ELSEMESH_VDATA2: [ 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0 ],
+		},
+	} ), graphAssetID = await hash( graphGLB );
 	const packageDocument = {
 		format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 		models: [
@@ -155,6 +171,7 @@ try {
 	scene.add( hostedGraphMesh );
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
 	const graphMesh = runtime.batches[ 1 ][ 0 ].mesh;
+	if ( ! graphMesh.geometry.getAttribute( 'vdata1' ) || ! graphMesh.geometry.getAttribute( 'vdata2' ) ) throw new Error( 'WebGL static-model GLBs must map both auxiliary material-graph streams' );
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
 	if ( ! profileGeometryPrepared || ! mesh.geometry.getAttribute( 'fixtureProfileData' ) ) throw new Error( 'WebGL static model profile did not prepare its custom geometry attributes' );
 	if ( ! graphMesh.material.customProgramCacheKey().includes( 'elsemesh-material-graph-1' ) ) throw new Error( 'WebGL static models must compile the signed renderer-neutral material graph' );

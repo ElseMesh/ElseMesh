@@ -88,6 +88,24 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
+- 2026-11-09: shared static-model and progressive-texture LOD selection now
+  keeps one authored detail step in reserve at neutral load. A render-load bias
+  cancels that lead first, then requests coarser mips and meshes; the shared
+  near-first queues still decide which eligible refinement loads next. Updated
+  static and texture fixtures cover both steps and their existing concurrency
+  gates pass. This improves streaming behavior without changing world-authored
+  thresholds; renderer-neutral progress remains 71%.
+
+- 2026-11-09: extended the signed static-GLB material path with two additional
+  semantic-neutral VEC4 vertex-data streams. `elsemesh.material-graph/1` now
+  exposes `_ELSEMESH_VDATA1` and `_ELSEMESH_VDATA2` alongside the existing
+  `_ELSEMESH_VDATA`, and the WebGPU package loader plus WebGL GLTF adapter bind
+  all three through the same graph contract. Graph tests and static-model
+  renders pass on WebGPU (248 visible pixels) and isolated WebGL (337 pixels,
+  six programs, no GL errors). This supplies a portable way to encode plant
+  geometry parameters in signed GLBs; Tidewater has not exported or switched
+  plant assets, so renderer-neutral progress remains 71%.
+
 - 2026-11-09: clarified the full vegetation migration boundary after auditing
   Tidewater's signed placements and presenters. `ground-cover-field/1` covers
   dense grass only; the ten finite plant categories and tree/shrub canopy LODs

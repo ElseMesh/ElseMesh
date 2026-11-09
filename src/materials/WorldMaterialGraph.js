@@ -137,9 +137,14 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 		depthMaterial,
 		prepareGeometry( geometry ) {
 			if ( compiled.inputs.includes( 'vdata' ) && ! geometry.getAttribute( 'vdata' ) ) {
-				const source = geometry.getAttribute( '_ELSEMESH_VDATA' ) || geometry.getAttribute( 'aData' );
+				const source = geometry.getAttribute( '_ELSEMESH_VDATA' ) || geometry.getAttribute( '_elsemesh_vdata' ) || geometry.getAttribute( 'aData' );
 				if ( ! source || source.itemSize !== 4 ) throw new Error( 'World material graph requires a VEC4 _ELSEMESH_VDATA attribute' );
 				geometry.setAttribute( 'vdata', source );
+			}
+			for ( const index of [ 1, 2 ] ) if ( compiled.inputs.includes( `vdata${index}` ) && ! geometry.getAttribute( `vdata${index}` ) ) {
+				const source = geometry.getAttribute( `_ELSEMESH_VDATA${index}` ) || geometry.getAttribute( `_elsemesh_vdata${index}` );
+				if ( ! source || source.itemSize !== 4 ) throw new Error( `World material graph requires a VEC4 _ELSEMESH_VDATA${index} attribute` );
+				geometry.setAttribute( `vdata${index}`, source );
 			}
 		},
 	};

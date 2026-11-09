@@ -11,6 +11,8 @@ const INPUT_SOURCES = Object.freeze( {
 	color: { builtin: true, wgsl: 'v.color', glsl: 'color' },
 	colorRGB: { builtin: true, wgsl: 'v.color.rgb', glsl: 'color' },
 	vdata: { attribute: 'vdata', wgsl: 'v.vdata', glsl: 'vdata' },
+	vdata1: { attribute: 'vdata1', wgsl: 'v.vdata1', glsl: 'vdata1' },
+	vdata2: { attribute: 'vdata2', wgsl: 'v.vdata2', glsl: 'vdata2' },
 	time: { uniform: true, wgsl: 'frame.time', glsl: 'emgFrameTime' },
 	night: { uniform: true, wgsl: 'frame.night', glsl: 'emgNight' },
 	windDirection: { uniform: true, wgsl: 'frame.windDir', glsl: 'emgWindDirection' },

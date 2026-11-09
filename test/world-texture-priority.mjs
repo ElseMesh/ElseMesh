@@ -81,12 +81,18 @@ pendingJobs.shift()();
 await new Promise( resolve => setImmediate( resolve ) );
 
 const biasedTarget = state.progressiveTextureTargets.get( 'near' );
+biasedTarget.baseWidth = 2048;
 state.objectsByAsset.get( 'near' ).values().next().value.transform.position[ 2 ] = -4;
 invalidateWorldPackageTextureProjection( root, [ 'near' ] );
 updateWorldPackageLOD( root, camera, 0 );
-const distanceLOD = biasedTarget.desiredLevel;
 pendingJobs.shift()();
 await new Promise( resolve => setImmediate( resolve ) );
+while ( state.progressiveTextureJobs.has( 'near' ) ) {
+	assert.ok( pendingJobs.length > 0, 'the active near texture job is represented by the test queue' );
+	pendingJobs.shift()();
+	await new Promise( resolve => setImmediate( resolve ) );
+}
+const distanceLOD = biasedTarget.desiredLevel;
 updateWorldPackageLOD( root, camera, 2 );
 assert.ok( biasedTarget.desiredLevel > distanceLOD, 'workload bias selects a coarser texture mip' );
 if ( pendingJobs.length ) { pendingJobs.shift()(); await new Promise( resolve => setImmediate( resolve ) ); }
