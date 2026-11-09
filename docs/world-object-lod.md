@@ -90,11 +90,14 @@ Queue order applies only to refinements selected by the per-model LOD rule; it
 does not guarantee that a physically nearer small model reaches a finer level
 before a larger, farther model. Source-authored projected-screen thresholds can
 select a finer level for the larger model while considering the nearer model
-sufficiently detailed. Preserve this screen-space behavior for parity unless a
-matched game comparison shows it is wrong. If the product requires strict
-near-first detail regardless of screen coverage, define a shared distance-aware
-LOD selection policy separately; changing the request queue alone cannot
-provide that behavior.
+sufficiently detailed. Texture mip demand has the same distinction: a farther
+surface with a larger projected texel footprint can request a finer mip. The
+queue orders eligible upgrades by proximity; it does not create upgrades that
+the screen-space selectors do not demand. Preserve this screen-space behavior
+for parity unless a matched game comparison shows it is wrong. If the product
+requires strict near-first detail regardless of screen coverage, define a
+shared distance-aware LOD selection policy separately; changing the request
+queue alone cannot provide that behavior.
 
 ### Texture mip streaming and cache identity
 
