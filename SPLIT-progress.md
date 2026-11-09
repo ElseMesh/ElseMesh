@@ -103,6 +103,12 @@ WebGPU visual parity remain incomplete.
   planner conformance, WebGPU (236 visible pixels), and isolated WebGL (347
   visible pixels, six programs, no errors) checks pass. This is adapter groundwork;
   no ground-cover backend adapter or vegetation parity gate has landed.
+- 2026-11-09: added `GroundCoverFieldBatchRuntime`, which converts shared field
+  selection into reusable per-species/LOD transform and fade buffers, including
+  independent shadow batches and clearing inactive batches. A focused fixture
+  verifies signed model references, packed output, shadow selection, camera
+  departure, and disposal. This is still backend-neutral runtime support: neither
+  renderer adapter consumes it yet, so the percentage remains 71%.
 
 - 2026-11-08: migrated Tidewater's rubble and plaster stone material from its
   bespoke WebGPU shader and WebGL PBR approximation into a signed

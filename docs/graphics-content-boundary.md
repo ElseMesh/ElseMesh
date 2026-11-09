@@ -181,8 +181,10 @@ contract now describes signed density/model assets, per-species parameters,
 deterministic placement, LOD, wind, and shadow intent. Its bounded density
 expressions let a world describe population blends over RGBA channels without
 assigning Tidewater meanings to those channels. `GroundCoverFieldRuntime` owns
-camera-centered candidate generation and `GroundCoverFieldDrawPlanner` owns
-shared visibility, LOD, transition, draw-fade, and shadow selection. The
+camera-centered candidate generation; `GroundCoverFieldDrawPlanner` owns
+shared visibility, LOD, transition, draw-fade, and shadow selection; and
+`GroundCoverFieldBatchRuntime` packs those selections into shared transform,
+fade, and shadow batches for backend upload. The
 contract currently represents species as signed GLB model sets. Tidewater's
 WebGPU grass instead builds procedural blade patches and carries world-authored
 meadow/dune coloring, blade tiers, oats, creepers, gust response, and per-blade
