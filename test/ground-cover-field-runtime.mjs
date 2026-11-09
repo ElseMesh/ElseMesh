@@ -31,9 +31,16 @@ assert.ok( firstView.every( record => record.speciesId === 'meadow-grass' && rec
 assert.ok( firstView.every( record => record.position[ 1 ] === record.position[ 0 ] * 0.01 + record.position[ 2 ] * 0.02 ), 'instance heights come from the shared terrain query' );
 assert.ok( firstView.every( record => record.position[ 0 ] >= 0 && record.position[ 0 ] <= terrain.size && record.position[ 2 ] >= 0 && record.position[ 2 ] <= terrain.size ), 'candidate transforms stay within their authored terrain cells' );
 assert.ok( firstView.some( record => record.cellLodIndex === 0 ) && firstView.some( record => record.cellLodIndex === 1 ), 'visible cells are assigned through the shared distance bands' );
+const drawPlan = first.planDraws( {
+	position: [ 3, 5, 3 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: Array.from( { length: 6 }, () => [ 0, 0, 0, 1 ] ),
+} );
+const drawCount = [ ...drawPlan.visibleGroups.values() ].flat().reduce( ( total, group ) => total + group.indices.length, 0 );
+assert.ok( drawCount > 0 && drawCount <= firstView.length, 'the engine draw planner selects renderer-neutral runtime instances for backend batches' );
 assert.deepEqual( new GroundCoverFieldRuntime( { data, componentAssets, terrain, density } ).update( { x: 3, z: 3 } ), firstView, 'separate runtimes produce identical candidate transforms' );
 assert.deepEqual( first.update( { x: 1000, z: 1000 } ), [], 'camera movement outside the authored field removes visible candidates' );
 first.dispose();
 assert.throws( () => first.update( { x: 3, z: 3 } ), /disposed/ );
+assert.throws( () => first.planDraws( { position: [ 0, 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /disposed/ );
 
 console.log( 'ground-cover shared placement runtime: ok' );
