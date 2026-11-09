@@ -9,6 +9,7 @@ const data = {
 	distanceBands: [ { maxDistance: 4, cellCapacity: 8 }, { maxDistance: 24, cellCapacity: 16 } ],
 	species: [ {
 		id: 'meadow-grass', densityChannel: 1, densityThreshold: 8, modelAssetIds: [ modelAssetId ],
+		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [], lodFadeFraction: 0.12,
 		drawMaxDistance: 24, drawFadeStartDistance: 20, scaleRange: [ 0.7, 1.3 ],
 		windInfluence: 1, castsShadow: false, shadowMaxDistance: 0,

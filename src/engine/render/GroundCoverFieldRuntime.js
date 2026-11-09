@@ -95,6 +95,8 @@ export class GroundCoverFieldRuntime {
 				records.push( {
 					speciesId: species.id,
 					modelAssetIds: species.modelAssetIds,
+					bounds: species.bounds,
+					geometryMirrorX: species.geometryMirrorX,
 					lodMetric: species.lodMetric,
 					lodThresholds: species.lodThresholds,
 					lodFadeFraction: species.lodFadeFraction,

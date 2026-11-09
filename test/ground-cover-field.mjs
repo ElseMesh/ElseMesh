@@ -18,6 +18,7 @@ const field = {
 	distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 	species: [ {
 		id: 'meadow-grass', densityChannel: 1, densityThreshold: 8, modelAssetIds: [ nearAssetId, farAssetId ],
+		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [ 46 ], lodFadeFraction: 0.12,
 		drawMaxDistance: 88, drawFadeStartDistance: 81, scaleRange: [ 0.7, 1.3 ],
 		windInfluence: 1, castsShadow: false, shadowMaxDistance: 0,

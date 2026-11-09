@@ -32,6 +32,8 @@ assets select a backend or contain shader source.
         "densityChannel": 1,
         "densityThreshold": 8,
         "modelAssetIds": [ "sha256:<near-model-hash>", "sha256:<far-model-hash>" ],
+        "bounds": { "center": [ 0, 0.5, 0 ], "radius": 0.8 },
+        "geometryMirrorX": false,
         "lodMetric": "scaled-distance",
         "lodThresholds": [ 46 ],
         "lodFadeFraction": 0.12,
@@ -52,7 +54,10 @@ four RGBA channels are assigned to at most four species by `densityChannel`;
 the meaning of each channel is data, not an engine enum. Each species references
 one to four signed static GLBs, ordered coarsest to finest, and must declare the
 same LOD metric and thresholds understood by the static-model contract. The
-asset references must also appear in the component's signed asset list.
+asset references must also appear in the component's signed asset list. Its
+authored bounds and reflection parity use the same semantics as
+`elsemesh.static-model-instance-set/1`, allowing both field adapters to use the
+engine's shared visibility, LOD, transition, and shadow planner.
 
 `blue-noise/1` gives both renderers the same deterministic candidate positions
 for the signed `seed`, `cellSize`, and `pointsPerCell`. It creates one
