@@ -1,4 +1,4 @@
-import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
+import { loadStaticModelInstanceSetAssets, staticModelInstanceSetLoadOrder } from '../network/StaticModelInstanceSetAssets.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
@@ -80,6 +80,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	const modelOffsets = [];
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
+	const coarseLoadOrder = staticModelInstanceSetLoadOrder( document, fallback.app?.camera?.position?.toArray() );
 	const disposeOwned = () => {
 		if ( runtime ) textureLOD.unregister( runtime );
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) {
@@ -104,18 +105,18 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			try { return await flight; }
 			finally { if ( sourceFlights.get( assetId ) === flight ) sourceFlights.delete( assetId ); }
 		};
-		for ( let modelIndex = 0; modelIndex < document.models.length; modelIndex ++ ) {
+		for ( const modelIndex of coarseLoadOrder ) {
 			const model = document.models[ modelIndex ];
 			if ( modelCapacity[ modelIndex ] === 0 ) {
-				for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
+				for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
 				continue;
 			}
 			const coarse = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
 			pendingTextureRegistrations.push( [ modelIndex, 0, model.lods[ 0 ].assetId, coarseSource, coarse.progressive ] );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( T, fallback, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX, hasMaterialData ) );
-			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
+			mainBatches[ modelOffsets[ modelIndex ] ] = createModelDraws( T, fallback, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX, hasMaterialData );
+			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
 		}
 		runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),

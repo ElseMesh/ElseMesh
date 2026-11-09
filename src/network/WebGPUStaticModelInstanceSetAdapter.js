@@ -1,7 +1,7 @@
 import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js';
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
-import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
+import { loadStaticModelInstanceSetAssets, staticModelInstanceSetLoadOrder } from './StaticModelInstanceSetAssets.js';
 import { loadWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset, worldPackageMeshLODQueue } from './WorldPackage.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
@@ -10,7 +10,7 @@ import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installStaticModelInstanceSet );
 
-async function installStaticModelInstanceSet( { root, connector }, component ) {
+async function installStaticModelInstanceSet( { app, root, connector }, component ) {
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
@@ -26,6 +26,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 	const modelOffsets = [];
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
+	const coarseLoadOrder = staticModelInstanceSetLoadOrder( document, app?.camera?.position?.toArray() );
 	const disposeOwned = () => {
 		unregisterTextureDemand?.();
 		unregisterTextureDemand = null;
@@ -34,20 +35,20 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 		for ( const material of ownedMaterials ) material.dispose();
 	};
 	try {
-		for ( let modelIndex = 0; modelIndex < document.models.length; modelIndex ++ ) {
+		for ( const modelIndex of coarseLoadOrder ) {
 			const model = document.models[ modelIndex ];
 			if ( modelCapacity[ modelIndex ] === 0 ) {
-				for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
-				shadowBatches.push( [] );
+				for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
+				shadowBatches[ modelIndex ] = [];
 				continue;
 			}
 			const { bytes, progressive } = await loadModelLOD( modelIndex, 0 );
 			const coarseSource = await getScene( model.lods[ 0 ].assetId, bytes, progressive );
 			releaseModelLOD( modelIndex, 0 );
-			mainBatches.push( createModelDraws( coarseSource, modelCapacity[ modelIndex ], model.geometryMirrorX, false, hasMaterialData, materialCache, ownedGeometry, ownedMaterials ) );
-			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches.push( [] );
+			mainBatches[ modelOffsets[ modelIndex ] ] = createModelDraws( coarseSource, modelCapacity[ modelIndex ], model.geometryMirrorX, false, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
+			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
 			const shadowSource = coarseSource;
-			shadowBatches.push( createModelDraws( shadowSource, modelCapacity[ modelIndex ], model.geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials ) );
+			shadowBatches[ modelIndex ] = createModelDraws( shadowSource, modelCapacity[ modelIndex ], model.geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
 		}
 		if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 		const runtime = new StaticModelInstanceSetRuntime( document, {

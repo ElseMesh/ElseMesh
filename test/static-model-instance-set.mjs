@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCodecRegistry.js';
-import { loadStaticModelInstanceSetAssets } from '../src/network/StaticModelInstanceSetAssets.js';
+import { loadStaticModelInstanceSetAssets, staticModelInstanceSetLoadOrder } from '../src/network/StaticModelInstanceSetAssets.js';
 import { worldComponentAssetIDs } from '../src/network/WorldComponentRegistry.js';
 import { WorldConnector } from '../src/network/WorldConnector.js';
 import { StaticModelInstanceSetRuntime } from '../src/engine/render/StaticModelInstanceSetRuntime.js';
@@ -37,6 +37,20 @@ const valid = {
 	} ],
 	instances: [ { model: 'market-table-fish', position: [ 1, 2, 3 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
+
+const coarseLoadDocument = {
+	...valid,
+	models: [
+		{ ...valid.models[ 0 ], id: 'far-furniture', bounds: { center: [ 0, 0.1, 0 ], radius: 6 } },
+		{ ...valid.models[ 0 ], id: 'near-bench' },
+	],
+	instances: [
+		{ ...valid.instances[ 0 ], model: 'far-furniture', position: [ 0, 2, -18 ] },
+		{ ...valid.instances[ 0 ], model: 'near-bench', position: [ 0, 2, -4 ] },
+	],
+};
+assert.deepEqual( staticModelInstanceSetLoadOrder( coarseLoadDocument, [ 0, 2, 0 ] ), [ 1, 0 ], 'coarse model downloads use nearest placed surface before source descriptor order' );
+assert.deepEqual( staticModelInstanceSetLoadOrder( coarseLoadDocument, null ), [ 0, 1 ], 'missing view position preserves deterministic descriptor order' );
 
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
