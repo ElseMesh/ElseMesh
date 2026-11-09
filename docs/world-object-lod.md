@@ -68,8 +68,10 @@ engine owns selection, ordering, gating, and both renderer implementations.
 For a static-model instance set, acquire its initial coarse GLBs in nearest
 placed-surface order, using each model's instances and bounds rather than the
 source descriptor order. Keep model and LOD array indices stable while doing so.
-This gives nearby geometry its first usable representation before distant props
-begin refining; it does not claim occlusion culling.
+This gives nearby models first access to coarse-asset bandwidth instead of
+source order. The current adapter still finishes loading the set's coarse
+models before exposing that set to the scene, so this is request ordering, not
+partial installation or occlusion culling.
 
 After the barrier opens, queue mesh and texture upgrades by the nearest visible
 surface that benefits from each request. Use projected screen coverage as the
