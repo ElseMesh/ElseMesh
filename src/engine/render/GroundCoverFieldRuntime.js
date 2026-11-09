@@ -1,6 +1,7 @@
 import { GroundCoverCellPlanner } from './GroundCoverCellPlanner.js';
 import { GroundCoverFieldDrawPlanner } from './GroundCoverFieldDrawPlanner.js';
 import { validateGroundCoverField } from '../../network/GroundCoverField.js';
+import { bestCandidateBlueNoise } from '../../util/BlueNoise.js';
 import { mulberry32 } from '../../util/Noise.js';
 
 function random01( seed, x, z, candidate, salt = 0 ) {
@@ -13,22 +14,7 @@ function random01( seed, x, z, candidate, salt = 0 ) {
 }
 
 function blueNoisePattern( seed, count, size ) {
-	const random = mulberry32( seed ), points = [];
-	for ( let index = 0; index < count; index ++ ) {
-		let best = null, bestDistance = - 1;
-		for ( let candidate = 0; candidate < ( index === 0 ? 1 : 10 ); candidate ++ ) {
-			const x = random() * size, z = random() * size;
-			let minimum = Infinity;
-			for ( const point of points ) {
-				let dx = Math.abs( point[ 0 ] - x ), dz = Math.abs( point[ 1 ] - z );
-				dx = Math.min( dx, size - dx ); dz = Math.min( dz, size - dz );
-				minimum = Math.min( minimum, dx * dx + dz * dz );
-			}
-			if ( minimum > bestDistance ) { bestDistance = minimum; best = [ x, z ]; }
-		}
-		points.push( best );
-	}
-	return points;
+	return bestCandidateBlueNoise( mulberry32( seed ), count, size );
 }
 
 function sampleDensity( field, x, z, channel ) {
