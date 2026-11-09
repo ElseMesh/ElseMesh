@@ -18,6 +18,8 @@ const selected = levels.flatMap( level => Array.from( level.cells.subarray( 0, l
 assert.equal( new Set( selected ).size, selected.length, 'each occupied cell is assigned to one LOD level' );
 assert.equal( planner.lodIndexAtDistance( 1 ), 0, 'near candidates use the highest detail' );
 assert.equal( planner.lodIndexAtDistance( 1.41, 0 ), 0, 'LOD transitions retain the near detail at their start' );
+assert.equal( planner.lodIndexAtDistance( 1.5, 0.49 ), 1, 'deterministic samples below the transition probability select middle detail' );
+assert.equal( planner.lodIndexAtDistance( 1.5, 0.51 ), 0, 'deterministic samples above the transition probability retain near detail' );
 assert.equal( planner.lodIndexAtDistance( 1.59, 1 ), 1, 'LOD transitions select the next band at their end' );
 assert.equal( planner.lodIndexAtDistance( 3.29, 0 ), 1, 'the middle band remains selected at its transition start' );
 assert.equal( planner.lodIndexAtDistance( 3.71, 1 ), 2, 'the far band is selected at its transition end' );
