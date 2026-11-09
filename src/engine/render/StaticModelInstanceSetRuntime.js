@@ -1,9 +1,5 @@
-import { Matrix4 } from '../math/Matrix4.js';
-import { Quaternion } from '../math/Quaternion.js';
-import { Vector3 } from '../math/Vector3.js';
 import { StaticModelInstanceSetPlanner, staticModelInstanceCamera } from './StaticModelInstanceSetPlanner.js';
-
-const _position = new Vector3(), _rotation = new Quaternion(), _scale = new Vector3(), _matrix = new Matrix4();
+import { writeInstanceFades, writeInstanceMaterialData, writeInstanceMatrices } from './InstanceBatchData.js';
 
 /** Freeze backend draw-batch transforms after their world matrices are calculated. */
 export function freezeStaticModelInstanceBatchTransforms( root, groups ) {
@@ -22,41 +18,18 @@ export function freezeStaticModelInstanceBatchTransforms( root, groups ) {
 // Write compacted transforms into a caller-owned instance-matrix array. The source
 // records and selection policy remain shared by both renderer implementations.
 export function writeStaticModelInstanceMatrices( document, group, target ) {
-	if ( ! target || target.length < group.count * 16 ) throw new Error( 'Static model instance matrix output is too small' );
-	for ( let index = 0; index < group.count; index ++ ) {
-		const instance = document.instances[ group.indices[ index ] ];
-		_position.fromArray( instance.position ); _rotation.fromArray( instance.rotation ); _scale.fromArray( instance.scale );
-		_matrix.compose( _position, _rotation, _scale ).toArray( target, index * 16 );
-	}
-	return group.count;
+	return writeInstanceMatrices( document.instances, group, target );
 }
 
 export function writeStaticModelInstanceFades( group, target ) {
-	if ( ! target || target.length < group.count * 4 ) throw new Error( 'Static model instance fade output is too small' );
-	for ( let index = 0; index < group.count; index ++ ) {
-		const offset = index * 4;
-		target[ offset ] = group.fade ? group.fade[ index ] : 1;
-		target[ offset + 1 ] = group.fade ? ( group.incoming[ index ] === 0 ? 1 : 0 ) : 0;
-		target[ offset + 2 ] = group.drawFade ? group.drawFade[ index ] : 1;
-		target[ offset + 3 ] = group.drawFadeEnabled ? group.drawFadeEnabled[ index ] : 0;
-	}
-	return group.count;
+	return writeInstanceFades( group, target );
 }
 
 // Opaque material data is interpreted by a GLB's registered material profile.
 // Keeping the two vec4 attributes generic lets world profiles vary instanced
 // appearance without making the engine know their domain-specific meanings.
 export function writeStaticModelInstanceMaterialData( document, group, target0, target1 ) {
-	if ( ! target0 || ! target1 || target0.length < group.count * 4 || target1.length < group.count * 4 ) throw new Error( 'Static model instance material-data output is too small' );
-	for ( let index = 0; index < group.count; index ++ ) {
-		const data = document.instances[ group.indices[ index ] ].materialData;
-		const offset = index * 4;
-		for ( let component = 0; component < 4; component ++ ) {
-			target0[ offset + component ] = data?.[ component ] ?? 0;
-			target1[ offset + component ] = data?.[ component + 4 ] ?? 0;
-		}
-	}
-	return group.count;
+	return writeInstanceMaterialData( document.instances, group, target0, target1 );
 }
 
 /** Shared visibility/LOD update for backend-owned static model draw batches. */

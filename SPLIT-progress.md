@@ -96,6 +96,13 @@ WebGPU visual parity remain incomplete.
   presenter: the contract still describes GLB species, not Tidewater's procedural
   blade/oat/vine geometry or full material response, and no paired field adapters
   or matched render fixture exist. Renderer-neutral progress remains 71%.
+- 2026-11-09: extracted shared matrix, LOD-fade, draw-fade, and optional
+  material-data packing for renderer-neutral instance records. The static-model
+  runtime now uses this shared engine helper, which dynamic ground-cover adapters
+  can consume without duplicating backend-independent transform logic. Unit,
+  planner conformance, WebGPU (236 visible pixels), and isolated WebGL (347
+  visible pixels, six programs, no errors) checks pass. This is adapter groundwork;
+  no ground-cover backend adapter or vegetation parity gate has landed.
 
 - 2026-11-08: migrated Tidewater's rubble and plaster stone material from its
   bespoke WebGPU shader and WebGL PBR approximation into a signed
