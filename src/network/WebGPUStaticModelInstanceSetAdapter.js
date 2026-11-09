@@ -1,7 +1,7 @@
 import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js';
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
-import { loadStaticModelInstanceSetAssets, staticModelInstanceSetLoadOrder } from './StaticModelInstanceSetAssets.js';
+import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
 import { loadWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset, worldPackageMeshLODQueue } from './WorldPackage.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
@@ -10,10 +10,10 @@ import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installStaticModelInstanceSet );
 
-async function installStaticModelInstanceSet( { app, root, connector }, component ) {
+async function installStaticModelInstanceSet( { root, connector }, component ) {
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
-	const ownedGeometry = new Set(), ownedMaterials = new Set(), mainBatches = [], shadowBatches = [];
+	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const materialCache = new Map(), sceneCache = new Map(), lodQueue = worldPackageMeshLODQueue( root );
 	let unregisterTextureDemand = null;
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
@@ -26,7 +26,9 @@ async function installStaticModelInstanceSet( { app, root, connector }, componen
 	const modelOffsets = [];
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
-	const coarseLoadOrder = staticModelInstanceSetLoadOrder( document, app?.camera?.position?.toArray() );
+	const mainBatches = Array.from( { length: batchOffset }, () => [] );
+	const shadowBatches = Array.from( { length: document.models.length }, () => [] );
+	const initialLoadedLods = modelCapacity.map( capacity => capacity === 0 ? [ 0 ] : [] );
 	const disposeOwned = () => {
 		unregisterTextureDemand?.();
 		unregisterTextureDemand = null;
@@ -35,27 +37,12 @@ async function installStaticModelInstanceSet( { app, root, connector }, componen
 		for ( const material of ownedMaterials ) material.dispose();
 	};
 	try {
-		for ( const modelIndex of coarseLoadOrder ) {
-			const model = document.models[ modelIndex ];
-			if ( modelCapacity[ modelIndex ] === 0 ) {
-				for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
-				shadowBatches[ modelIndex ] = [];
-				continue;
-			}
-			const { bytes, progressive } = await loadModelLOD( modelIndex, 0 );
-			const coarseSource = await getScene( model.lods[ 0 ].assetId, bytes, progressive );
-			releaseModelLOD( modelIndex, 0 );
-			mainBatches[ modelOffsets[ modelIndex ] ] = createModelDraws( coarseSource, modelCapacity[ modelIndex ], model.geometryMirrorX, false, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
-			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
-			const shadowSource = coarseSource;
-			shadowBatches[ modelIndex ] = createModelDraws( shadowSource, modelCapacity[ modelIndex ], model.geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
-		}
-		if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 		const runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
 			canRefine: () => root.userData.worldPackage?.coarseCoverageReady !== false,
 			batches: mainBatches,
 			shadowBatches,
+			initialLoadedLods,
 			loadLOD: ( modelIndex, lodIndex, signal, priority ) => lodQueue.run( signal, async () => {
 				const { bytes, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
@@ -66,7 +53,14 @@ async function installStaticModelInstanceSet( { app, root, connector }, componen
 				const draws = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, false, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
-				freezeStaticModelInstanceBatchTransforms( root, [ draws ] );
+				const groups = [ draws ];
+				if ( lodIndex === 0 ) {
+					const shadow = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
+					shadowBatches[ modelIndex ] = shadow;
+					for ( const draw of shadow ) root.add( draw.mesh );
+					groups.push( shadow );
+				}
+				freezeStaticModelInstanceBatchTransforms( root, groups );
 			}, priority ),
 			dispose: disposeOwned,
 		} );

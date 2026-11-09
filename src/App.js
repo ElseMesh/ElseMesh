@@ -689,7 +689,7 @@ export class App {
 			this.linkedWorldRoot.userData.worldPackage.coarseCoverageReady = false;
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
-			this.linkedWorldRoot.userData.worldPackage.coarseCoverageReady = true;
+			await this.waitForWorldCoarseCoverage( connector, this.linkedWorldRoot );
 			registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 			this.prepareHostedWorld( connector );
 			this.player.setHostedWorldPose( this.camera.position, this.player.yaw, this.player.pitch );
@@ -916,7 +916,7 @@ export class App {
 		}
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 		await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
-		this.linkedWorldRoot.userData.worldPackage.coarseCoverageReady = true;
+		await this.waitForWorldCoarseCoverage( connector, this.linkedWorldRoot );
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 		this.player.hostedCollisionGuard = typeof connector.isCollisionPathReady === 'function'
 			? ( from, to ) => connector.isCollisionPathReady( from, to, this.linkedWorldRoot?.userData?.worldPackage )
@@ -1417,15 +1417,38 @@ export class App {
 	updateWorldCoarseCoverage( connector, root, state ) {
 		const worldPackage = root.userData.worldPackage;
 		if ( ! worldPackage ) return;
+		worldPackage.coarseCoverageReady = ! state.viewCellsPending && this.hasWorldCoarseCoverage( connector, root );
+		state.coveragePose = this.coverageCameraPose();
+	}
+
+	hasWorldCoarseCoverage( connector, root ) {
+		const worldPackage = root.userData.worldPackage;
+		if ( ! worldPackage ) return false;
 		const maxDistance = connector.localOnly ? connector.maxViewDistanceMeters : 500;
 		const loaded = worldPackage.loadedObjects || new Set();
 		const visibleObjects = selectWorldObjectsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
-		const missingObject = visibleObjects.some( object => ! object.collisionPayload && object.assetId && ! loaded.has( object.id ) );
+		if ( visibleObjects.some( object => ! object.collisionPayload && object.assetId && ! loaded.has( object.id ) ) ) return false;
 		const visibleComponents = selectWorldComponentsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
 		const installed = root.userData.installedWorldComponentIDs || new Set();
-		const missingComponent = visibleComponents.some( component => component.streamingBounds && componentAssetIDs( component ).length && ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ! installed.has( component.id ) );
-		worldPackage.coarseCoverageReady = ! state.viewCellsPending && ! missingObject && ! missingComponent;
-		state.coveragePose = this.coverageCameraPose();
+		const runtimes = root.userData.worldComponentRuntimes || new Map();
+		return ! visibleComponents.some( component => {
+			if ( ! component.streamingBounds || ! componentAssetIDs( component ).length || ! ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) ) return false;
+			if ( ! installed.has( component.id ) ) return true;
+			return runtimes.get( component.id )?.isCoarseReadyForView?.() === false;
+		} );
+	}
+
+	async waitForWorldCoarseCoverage( connector, root ) {
+		const worldPackage = root.userData.worldPackage;
+		while ( this.linkedWorldRoot === root && ! worldPackage?.disposed ) {
+			this.updateWorldComponents( root, 0, this.camera );
+			if ( this.hasWorldCoarseCoverage( connector, root ) ) {
+				worldPackage.coarseCoverageReady = true;
+				return;
+			}
+			await new Promise( resolve => requestAnimationFrame( resolve ) );
+		}
+		throw new DOMException( 'World changed before visible coarse coverage was ready', 'AbortError' );
 	}
 
 	async installWorldComponents( root, connector, componentIDs = null ) {

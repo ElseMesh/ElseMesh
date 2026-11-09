@@ -127,6 +127,13 @@ try {
 	const installed = await install( { fallback }, component );
 	if ( ! installed?.installed ) throw new Error( 'WebGL static-model adapter did not install the component' );
 	runtime = installed.runtime;
+	const coarseDeadline = Date.now() + 5000;
+	while ( ! runtime.isCoarseReadyForView() && Date.now() < coarseDeadline ) {
+		runtime.update( 1 / 60, camera );
+		await new Promise( resolve => setTimeout( resolve, 10 ) );
+	}
+	if ( ! runtime.isCoarseReadyForView() ) throw new Error( 'Visible WebGL static models did not reach coarse coverage' );
+	runtime.update( 1 / 60, camera );
 	hostedGraphMaterial = new THREE.MeshStandardMaterial();
 	hostedGraphMaterial.userData.elsemeshMaterial = {
 		profile: 'elsemesh.material-graph/1', role: 'graph', graph: {

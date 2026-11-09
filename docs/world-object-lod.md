@@ -65,13 +65,13 @@ combining their cache entries or delaying entry for high-detail data. The world
 provides bounds, traversal semantics, and valid coarse/fine tiers; the shared
 engine owns selection, ordering, gating, and both renderer implementations.
 
-For a static-model instance set, acquire its initial coarse GLBs in nearest
-placed-surface order, using each model's instances and bounds rather than the
-source descriptor order. Keep model and LOD array indices stable while doing so.
-This gives nearby models first access to coarse-asset bandwidth instead of
-source order. The current adapter still finishes loading the set's coarse
-models before exposing that set to the scene, so this is request ordering, not
-partial installation or occlusion culling.
+For a static-model instance set, request coarse GLBs on demand for models with
+instances in the current view. Share the near-first mesh queue across sets and
+rank each model by its nearest visible placed surface, not descriptor order.
+Keep model and LOD array indices stable as individual models arrive. The
+current-view coverage gate remains closed until every visible model has its
+coarse level; then finer upgrades can begin. Offscreen models wait until the
+view reaches them. This is frustum-based coverage, not occlusion culling.
 
 After the barrier opens, queue mesh and texture upgrades by the nearest visible
 surface that benefits from each request. Use projected screen coverage as the

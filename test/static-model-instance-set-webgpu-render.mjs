@@ -54,13 +54,19 @@ try {
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const result = await install( { root, connector }, component );
 	runtime = result.runtime;
+	L.scene.add( root );
+	L.camera.position.set( 2, 1, 4 );
+	L.camera.lookAt( 2, 0.5, - 5 );
+	const coarseDeadline = Date.now() + 3000;
+	while ( ! runtime.isCoarseReadyForView() && Date.now() < coarseDeadline ) {
+		await L.run( 1, dt => runtime.update( dt, L.camera ) );
+		await new Promise( resolve => setTimeout( resolve, 10 ) );
+	}
+	assert.equal( runtime.isCoarseReadyForView(), true, 'the current view reaches coarse coverage before the render check' );
 	const renderedMaterials = [];
 	root.traverse( node => { if ( node.isMesh ) renderedMaterials.push( node.material ); } );
 	assert.ok( renderedMaterials.some( material => material.name === profileMaterial.name ), 'WebGPU static models resolve the registered world material profile' );
 	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= emg_albedo' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
-	L.scene.add( root );
-	L.camera.position.set( 2, 1, 4 );
-	L.camera.lookAt( 2, 0.5, - 5 );
 	await L.run( 3, dt => runtime.update( dt, L.camera ) );
 	assert.equal( runtime.planner.groups[ 0 ].count, 1, 'the shared planner retains the fixture in view' );
 	const rendered = await readTexture( L.ldr.texture );

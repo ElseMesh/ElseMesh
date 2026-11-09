@@ -61,7 +61,7 @@ export function writeStaticModelInstanceMaterialData( document, group, target0, 
 
 /** Shared visibility/LOD update for backend-owned static model draw batches. */
 export class StaticModelInstanceSetRuntime {
-	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null, canRefine = null } = {} ) {
+	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null, canRefine = null, initialLoadedLods = null } = {} ) {
 		this.document = document;
 		this.planner = new StaticModelInstanceSetPlanner( document );
 		this.batches = batches;
@@ -79,7 +79,10 @@ export class StaticModelInstanceSetRuntime {
 		this.loadLOD = loadLOD;
 		this.canRefine = canRefine;
 		this.loadController = new AbortController();
-		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
+		if ( initialLoadedLods !== null && ( ! Array.isArray( initialLoadedLods ) || initialLoadedLods.length !== document.models.length || initialLoadedLods.some( ( levels, modelIndex ) => ! Array.isArray( levels ) || levels.some( level => ! Number.isInteger( level ) || level < 0 || level >= document.models[ modelIndex ].lods.length ) ) ) ) throw new Error( 'Initial static-model LOD residency is invalid' );
+		this.loadedLods = initialLoadedLods === null
+			? document.models.map( () => new Set( [ 0 ] ) )
+			: initialLoadedLods.map( levels => new Set( levels ) );
 		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
 		this.desiredLodPriorities = new Float32Array( document.models.length );
 		this.desiredLodDistances = new Float32Array( document.models.length ).fill( Infinity );
@@ -97,6 +100,15 @@ export class StaticModelInstanceSetRuntime {
 			owners.add( claim );
 			return claim;
 		} );
+	}
+
+	isCoarseReadyForView() {
+		if ( ! this._cameraStateValid ) return this.loadedLods.every( loaded => loaded.has( 0 ) );
+		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
+			if ( ! this.planner._groupsByModel[ modelIndex ].some( group => group.count > 0 ) ) continue;
+			if ( ! this.loadedLods[ modelIndex ].has( 0 ) ) return false;
+		}
+		return true;
 	}
 
 	// Camera changes are tracked by consumers; notify them when planner data
@@ -156,6 +168,19 @@ export class StaticModelInstanceSetRuntime {
 		const candidates = [];
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
 			const groups = this.planner._groupsByModel[ modelIndex ];
+			const loaded = this.loadedLods[ modelIndex ];
+			if ( ! loaded.has( 0 ) ) {
+				let projectedRadius = 0, distanceMeters = Infinity, visible = false;
+				for ( const group of groups ) for ( let index = 0; index < group.count; index ++ ) {
+					visible = true;
+					const instanceIndex = group.indices[ index ];
+					projectedRadius = Math.max( projectedRadius, this.planner._projectedRadiusByInstance[ instanceIndex ] );
+					distanceMeters = Math.min( distanceMeters, this.planner._viewDistanceByInstance[ instanceIndex ] );
+				}
+				const key = `${ modelIndex }:0`;
+				if ( visible && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: 0, key, loaded, projectedRadius, distanceMeters } );
+				continue;
+			}
 			if ( refreshDesired ) {
 				let desiredLevel = -1;
 				for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
@@ -174,7 +199,6 @@ export class StaticModelInstanceSetRuntime {
 				this.desiredLodDistances[ modelIndex ] = distanceMeters;
 			}
 			const desiredLevel = this.desiredLods[ modelIndex ];
-			const loaded = this.loadedLods[ modelIndex ];
 			const loadedMax = Math.max( ...loaded );
 			const level = loadedMax + 1;
 			const key = `${ modelIndex }:${ level }`;
@@ -182,11 +206,11 @@ export class StaticModelInstanceSetRuntime {
 			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
 				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ], distanceMeters: this.desiredLodDistances[ modelIndex ] } );
 			}
-			for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
+			if ( loadedMax >= 0 ) for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
 		}
 		if ( ! canRefine ) {
+			for ( let index = candidates.length - 1; index >= 0; index -- ) if ( candidates[ index ].level !== 0 ) candidates.splice( index, 1 );
 			this._nextLODCheckAt = Math.min( this._nextLODCheckAt, performance.now() + 100 );
-			return;
 		}
 		if ( ! this.loadLOD ) return;
 		// Upgrade the closest visible surfaces first. Projected size then favors

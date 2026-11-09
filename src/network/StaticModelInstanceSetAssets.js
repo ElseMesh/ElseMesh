@@ -60,28 +60,3 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 	};
 	return { document, modelAssets, parsedModels, loadModelLOD, releaseModelLOD };
 }
-
-// Coarse GLBs are the first visible representation of a static set. Their
-// descriptor order comes from the source package, so use placement bounds to
-// fetch the models nearest the current view first on both renderer backends.
-export function staticModelInstanceSetLoadOrder( document, position ) {
-	if ( ! Array.isArray( position ) || position.length !== 3 || ! position.every( Number.isFinite ) ) return document.models.map( ( _model, index ) => index );
-	const modelIndexByID = new Map( document.models.map( ( model, index ) => [ model.id, index ] ) );
-	const nearest = new Float64Array( document.models.length ).fill( Infinity );
-	for ( const instance of document.instances ) {
-		const modelIndex = modelIndexByID.get( instance.model );
-		const model = document.models[ modelIndex ];
-		const [ sx, sy, sz ] = instance.scale;
-		const [ qx, qy, qz, qw ] = instance.rotation;
-		const [ cx, cy, cz ] = model.bounds.center;
-		const x = cx * sx, y = cy * sy, z = cz * sz;
-		const tx = 2 * ( qy * z - qz * y ), ty = 2 * ( qz * x - qx * z ), tz = 2 * ( qx * y - qy * x );
-		const centerX = instance.position[ 0 ] + x + qw * tx + ( qy * tz - qz * ty );
-		const centerY = instance.position[ 1 ] + y + qw * ty + ( qz * tx - qx * tz );
-		const centerZ = instance.position[ 2 ] + z + qw * tz + ( qx * ty - qy * tx );
-		const radius = model.bounds.radius * Math.max( sx, sy, sz );
-		const dx = centerX - position[ 0 ], dy = centerY - position[ 1 ], dz = centerZ - position[ 2 ];
-		nearest[ modelIndex ] = Math.min( nearest[ modelIndex ], Math.max( 0, Math.hypot( dx, dy, dz ) - radius ) );
-	}
-	return document.models.map( ( _model, index ) => index ).sort( ( a, b ) => nearest[ a ] - nearest[ b ] || a - b );
-}

@@ -1,4 +1,4 @@
-import { loadStaticModelInstanceSetAssets, staticModelInstanceSetLoadOrder } from '../network/StaticModelInstanceSetAssets.js';
+import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
@@ -66,7 +66,7 @@ function releaseParsedModelSource( fallback, assetId ) {
 async function installStaticModelInstanceSet( { fallback }, component ) {
 	const connector = fallback.connector;
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
-	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set(), mainBatches = [];
+	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set();
 	const root = fallback.app?.linkedWorldRoot;
 	const lodQueue = root?.userData?.worldPackage ? worldPackageMeshLODQueue( root ) : ( fallback.hostedStaticModelLODQueue ||= new LODLoadQueue( 1, { deferStart: true } ) );
 	const retainedSourceIDs = new Set();
@@ -75,12 +75,12 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	if ( fallback.hostedStaticTextureLOD?.connector !== connector ) fallback.hostedStaticTextureLOD = new WebGLProgressiveStaticTextures( fallback, connector );
 	const textureLOD = fallback.hostedStaticTextureLOD;
 	let runtime = null;
-	const pendingTextureRegistrations = [];
 	const modelBoundsSpheres = document.models.map( ( _model, modelIndex ) => staticModelInstanceBoundsSphere( T, document, modelIndex ) );
 	const modelOffsets = [];
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
-	const coarseLoadOrder = staticModelInstanceSetLoadOrder( document, fallback.app?.camera?.position?.toArray() );
+	const mainBatches = Array.from( { length: batchOffset }, () => [] );
+	const initialLoadedLods = modelCapacity.map( capacity => capacity === 0 ? [ 0 ] : [] );
 	const disposeOwned = () => {
 		if ( runtime ) textureLOD.unregister( runtime );
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) {
@@ -105,23 +105,11 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			try { return await flight; }
 			finally { if ( sourceFlights.get( assetId ) === flight ) sourceFlights.delete( assetId ); }
 		};
-		for ( const modelIndex of coarseLoadOrder ) {
-			const model = document.models[ modelIndex ];
-			if ( modelCapacity[ modelIndex ] === 0 ) {
-				for ( let lodIndex = 0; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
-				continue;
-			}
-			const coarse = await loadModelLOD( modelIndex, 0 );
-			const coarseSource = await parseModel( model.lods[ 0 ].assetId, coarse.webGLBytes || coarse.bytes );
-			pendingTextureRegistrations.push( [ modelIndex, 0, model.lods[ 0 ].assetId, coarseSource, coarse.progressive ] );
-			releaseModelLOD( modelIndex, 0 );
-			mainBatches[ modelOffsets[ modelIndex ] ] = createModelDraws( T, fallback, coarseSource.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], model.geometryMirrorX, hasMaterialData );
-			for ( let lodIndex = 1; lodIndex < model.lods.length; lodIndex ++ ) mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = [];
-		}
 		runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
 			canRefine: () => fallback.app?.linkedWorldRoot?.userData.worldPackage?.coarseCoverageReady !== false,
 			batches: mainBatches,
+			initialLoadedLods,
 			// Three.js submits scene-visible meshes in the color pass even when
 			// their material has colorWrite disabled. Let each selected color LOD
 			// cast its own shadow instead of adding a duplicate draw per primitive.
@@ -135,14 +123,13 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
 				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData );
+				runtime.sharedMaterials = [ ...sharedProfileMaterials ];
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
 			}, priority ),
 			dispose: disposeOwned,
 		} );
-		runtime.sharedMaterials = [ ...sharedProfileMaterials ];
-		for ( const args of pendingTextureRegistrations ) textureLOD.register( runtime, ...args );
 		// WebGLFallback's component runtime contract uses the fourth update
 		// argument for elapsed simulation time. Static model planning uses render
 		// load bias there, so translate at this backend boundary instead of letting
@@ -150,7 +137,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 		const updateRuntime = runtime.update.bind( runtime );
 		runtime.update = ( dt, camera, player, elapsed, cameraWorldUpdated = false ) => {
 			updateRuntime( dt, camera, player, fallback.app?.renderLoadBias ?? 0, cameraWorldUpdated );
-			textureLOD.update( camera, elapsed );
+			if ( fallback.app?.linkedWorldRoot?.userData.worldPackage?.coarseCoverageReady !== false ) textureLOD.update( camera, elapsed );
 		};
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
 		freezeStaticModelInstanceBatchTransforms( fallback.scene, mainBatches );

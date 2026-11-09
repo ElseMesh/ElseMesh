@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCodecRegistry.js';
-import { loadStaticModelInstanceSetAssets, staticModelInstanceSetLoadOrder } from '../src/network/StaticModelInstanceSetAssets.js';
+import { loadStaticModelInstanceSetAssets } from '../src/network/StaticModelInstanceSetAssets.js';
 import { worldComponentAssetIDs } from '../src/network/WorldComponentRegistry.js';
 import { WorldConnector } from '../src/network/WorldConnector.js';
 import { StaticModelInstanceSetRuntime } from '../src/engine/render/StaticModelInstanceSetRuntime.js';
@@ -37,20 +37,6 @@ const valid = {
 	} ],
 	instances: [ { model: 'market-table-fish', position: [ 1, 2, 3 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 };
-
-const coarseLoadDocument = {
-	...valid,
-	models: [
-		{ ...valid.models[ 0 ], id: 'far-furniture', bounds: { center: [ 0, 0.1, 0 ], radius: 6 } },
-		{ ...valid.models[ 0 ], id: 'near-bench' },
-	],
-	instances: [
-		{ ...valid.instances[ 0 ], model: 'far-furniture', position: [ 0, 2, -18 ] },
-		{ ...valid.instances[ 0 ], model: 'near-bench', position: [ 0, 2, -4 ] },
-	],
-};
-assert.deepEqual( staticModelInstanceSetLoadOrder( coarseLoadDocument, [ 0, 2, 0 ] ), [ 1, 0 ], 'coarse model downloads use nearest placed surface before source descriptor order' );
-assert.deepEqual( staticModelInstanceSetLoadOrder( coarseLoadDocument, null ), [ 0, 1 ], 'missing view position preserves deterministic descriptor order' );
 
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
@@ -221,6 +207,29 @@ await new Promise( resolve => setImmediate( resolve ) );
 assert.deepEqual( gatedLODRequests, [ [ 0, 1 ] ], 'mesh refinement resumes as soon as the shared coverage gate opens, without requiring camera movement' );
 gatedRuntime.dispose();
 
+const initialBaseRequests = [];
+let finishInitialBase;
+const initialBaseRuntime = new StaticModelInstanceSetRuntime( runtimeDocument, {
+	batches: runtimePlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: null,
+	initialLoadedLods: [ [] ],
+	canRefine: () => false,
+	loadLOD: async ( modelIndex, lodIndex ) => {
+		initialBaseRequests.push( [ modelIndex, lodIndex ] );
+		await new Promise( resolve => { finishInitialBase = resolve; } );
+	},
+} );
+initialBaseRuntime.update( 1 / 60, gatedCamera );
+await new Promise( resolve => setImmediate( resolve ) );
+assert.deepEqual( initialBaseRequests, [ [ 0, 0 ] ], 'an unloaded visible model requests only its coarse base level while refinement is gated' );
+assert.equal( initialBaseRuntime.isCoarseReadyForView(), false, 'the view coverage gate stays closed until its visible base mesh is installed' );
+finishInitialBase();
+await new Promise( resolve => setImmediate( resolve ) );
+assert.equal( initialBaseRuntime.isCoarseReadyForView(), true, 'the view coverage gate opens as soon as the visible base mesh arrives' );
+initialBaseRuntime.update( 1 / 60, gatedCamera );
+assert.deepEqual( initialBaseRequests, [ [ 0, 0 ] ], 'fine LOD requests remain blocked until the shared view gate opens' );
+initialBaseRuntime.dispose();
+
 const priorityDocument = {
 	...valid,
 	models: [
@@ -232,6 +241,20 @@ const priorityDocument = {
 		{ ...valid.instances[ 0 ], model: 'near-bench', position: [ 0, 0, - 4 ] },
 	],
 };
+const coarsePriorityDocument = new StaticModelInstanceSetPlanner( priorityDocument );
+const coarsePriorityRequests = [];
+const coarsePriorityRuntime = new StaticModelInstanceSetRuntime( priorityDocument, {
+	batches: coarsePriorityDocument.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: null,
+	initialLoadedLods: [ [], [] ],
+	canRefine: () => false,
+	loadLOD: async ( modelIndex, lodIndex ) => { coarsePriorityRequests.push( [ priorityDocument.models[ modelIndex ].id, lodIndex ] ); },
+} );
+coarsePriorityRuntime.update( 1 / 60, gatedCamera );
+await new Promise( resolve => setImmediate( resolve ) );
+assert.deepEqual( coarsePriorityRequests, [ [ 'near-bench', 0 ], [ 'far-furniture', 0 ] ], 'visible coarse models request nearest surface first even when far furniture appears first in the descriptor' );
+coarsePriorityRuntime.dispose();
+
 const priorityPlanner = new StaticModelInstanceSetPlanner( priorityDocument );
 const priorityRequests = [];
 const priorityRuntime = new StaticModelInstanceSetRuntime( priorityDocument, {
