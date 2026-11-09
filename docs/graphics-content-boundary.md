@@ -162,10 +162,11 @@ cell selection and per-band assignments, including for the built-in package.
 WebGL now uses the shared 88 m range, thins blade counts by distance, and drops
 oats and creepers from its farther bands. Its candidate LOD uses deterministic
 screen-door selection in the planner's 12% transition zones. It still builds a
-different blade mesh and does not match WebGPU's blade deformation/fade policy;
-the output has not been visually compared against the pre-split WebGPU field.
-This is a common runtime slice, not completion of the ground-cover contract or
-renderer parity.
+different blade mesh and applies only a basic vertex sway driven by shared time,
+wind direction, and speed. It does not match WebGPU's per-species deformation,
+gust, or blade fade policy; the output has not been visually compared against the
+pre-split WebGPU field. This is a common runtime slice, not completion of the
+ground-cover contract or renderer parity.
 
 Do not switch Tidewater to that contract until both engine adapters consume the
 same signed package fixture. The fixture must verify species and placement

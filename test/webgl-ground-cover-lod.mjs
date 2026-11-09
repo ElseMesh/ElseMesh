@@ -21,6 +21,12 @@ for ( let index = 0; index < firstPositions.length; index += 3 ) {
 assert.ok( minDistance < 18, 'near ground cover is generated' );
 assert.ok( maxDistance > 46, 'far LOD cells extend beyond the former 42 m WebGL limit' );
 assert.ok( maxDistance <= 89, 'ground-cover blades remain inside the 88 m planner range plus blade extent' );
+assert.equal( first.geometry.attributes.aGroundCoverWindWeight.count, first.geometry.attributes.position.count, 'every generated blade vertex has a wind weight' );
+const shader = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>' };
+first.material.onBeforeCompile( shader );
+assert.match( shader.vertexShader, /aGroundCoverWindWeight/ );
+assert.match( shader.vertexShader, /groundCoverWindSway/ );
+assert.ok( shader.uniforms.uGroundCoverWindDirection && shader.uniforms.uGroundCoverWindStrength && shader.uniforms.uGroundCoverTime, 'WebGL ground cover shader receives shared time and wind uniforms' );
 
 const second = webglGrassMesh( THREE, terrain, camera, null, density, planner );
 assert.deepEqual( second.geometry.attributes.position.array, firstPositions, 'WebGL ground-cover geometry is deterministic across cell-planner updates' );

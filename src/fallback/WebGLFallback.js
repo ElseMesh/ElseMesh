@@ -733,7 +733,7 @@ function sampleGrassMask( mask, x, z ) {
 
 export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPlanner = null ) {
 
-	const radius = cellPlanner ? cellPlanner.levels.at( - 1 ).maxDistance : 42, spacing = 0.46, positions = [], colors = [], indices = [];
+	const radius = cellPlanner ? cellPlanner.levels.at( - 1 ).maxDistance : 42, spacing = 0.46, positions = [], colors = [], windWeights = [], indices = [];
 	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
 	let visibleCellLevels = null;
 	if ( cellPlanner ) {
@@ -744,6 +744,7 @@ export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, 
 	const addBlade = ( x, z, y, angle, height, width, color ) => {
 		const dx = Math.cos( angle ), dz = Math.sin( angle ), bend = 0.12 + height * 0.16, sx = - dz * width, sz = dx * width, base = positions.length / 3;
 		positions.push( x - sx, y, z - sz, x + sx, y, z + sz, x + dx * bend - sx * 0.3, y + height * 0.72, z + dz * bend + sz * 0.3, x + dx * bend + sx * 0.3, y + height * 0.72, z + dz * bend - sz * 0.3, x + dx * bend * 1.8, y + height, z + dz * bend * 1.8 );
+		windWeights.push( 0, 0, 0.72, 0.72, 1 );
 		for ( let v = 0; v < 5; v ++ ) { const f = v === 4 ? 1.18 : v < 2 ? 0.76 : 1.08; colors.push( color[ 0 ] * f, color[ 1 ] * f, color[ 2 ] * f ); }
 		indices.push( base, base + 1, base + 2, base + 1, base + 3, base + 2, base + 2, base + 3, base + 4 );
 	};
@@ -798,12 +799,31 @@ export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, 
 	const geometry = new T.BufferGeometry();
 	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
 	geometry.setAttribute( 'color', new T.Float32BufferAttribute( colors, 3 ) );
+	geometry.setAttribute( 'aGroundCoverWindWeight', new T.Float32BufferAttribute( windWeights, 1 ) );
 	geometry.setIndex( indices ); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
-	const mesh = new T.Mesh( geometry, new T.MeshLambertMaterial( { vertexColors: true, side: T.DoubleSide } ) );
+	const material = new T.MeshLambertMaterial( { vertexColors: true, side: T.DoubleSide } );
+	material.onBeforeCompile = shader => {
+		shader.uniforms.uGroundCoverTime = { value: 0 };
+		shader.uniforms.uGroundCoverWindDirection = { value: new T.Vector2( 1, 0 ) };
+		shader.uniforms.uGroundCoverWindStrength = { value: 0 };
+		shader.vertexShader = shader.vertexShader.replace( '#include <common>', '#include <common>\nattribute float aGroundCoverWindWeight;\nuniform float uGroundCoverTime;\nuniform vec2 uGroundCoverWindDirection;\nuniform float uGroundCoverWindStrength;' );
+		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', '#include <begin_vertex>\nfloat groundCoverWindPhase = uGroundCoverTime * ( 1.1 + uGroundCoverWindStrength * 0.16 ) + dot( position.xz, uGroundCoverWindDirection ) * 0.19;\nfloat groundCoverWindSway = sin( groundCoverWindPhase ) * ( 0.012 + uGroundCoverWindStrength * 0.035 ) * aGroundCoverWindWeight;\ntransformed.xz += uGroundCoverWindDirection * groundCoverWindSway;' );
+		material.userData.groundCoverWindUniforms = shader.uniforms;
+	};
+	const mesh = new T.Mesh( geometry, material );
 	mesh.name = 'WebGL camera-following grass'; mesh.frustumCulled = false; mesh.renderOrder = 1;
 	if ( previous ) { previous.geometry.dispose(); previous.material.dispose(); }
 	return mesh;
 
+}
+
+function updateWebGLGrassWind( grass, time ) {
+	const uniforms = grass?.material?.userData?.groundCoverWindUniforms;
+	if ( ! uniforms ) return;
+	const direction = G.windDir.value, speed = G.windSpeed.value;
+	uniforms.uGroundCoverTime.value = time;
+	uniforms.uGroundCoverWindDirection.value.set( direction.x, direction.y ).normalize();
+	uniforms.uGroundCoverWindStrength.value = Math.max( 0, Math.min( 2.5, speed * 0.1 ) );
 }
 
 export class WebGLFallback {
@@ -2332,6 +2352,7 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
+		updateWebGLGrassWind( this.grass, simulationTime );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
 		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
