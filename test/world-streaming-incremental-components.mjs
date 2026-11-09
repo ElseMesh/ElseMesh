@@ -20,7 +20,7 @@ const connector = {
 		return new Map();
 	},
 };
-const state = { root, controller: new AbortController(), lastUpdate: - 1000, loading: false };
+const state = { root, controller: new AbortController(), lastUpdate: - 1000, loading: false, coveragePose: [ 0, 0, 0, 0, 0, 0, 1 ] };
 const app = Object.assign( Object.create( App.prototype ), {
 	worldConnector: connector, linkedWorldRoot: root, worldStreamState: new Map( [ [ 'test', state ] ] ),
 	remoteWorldActive: true, camera: new PerspectiveCamera(), vegetationEnabled: true,
