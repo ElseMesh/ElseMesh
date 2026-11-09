@@ -86,6 +86,7 @@ export class StaticModelInstanceSetRuntime {
 		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
 		this.desiredLodPriorities = new Float32Array( document.models.length );
 		this.desiredLodDistances = new Float32Array( document.models.length ).fill( Infinity );
+		this.desiredLodCenterDistances = new Float32Array( document.models.length ).fill( Infinity );
 		this.pendingLods = new Map();
 		this.retryAfter = new Map();
 		this.disposeBatches = dispose;
@@ -170,33 +171,44 @@ export class StaticModelInstanceSetRuntime {
 			const groups = this.planner._groupsByModel[ modelIndex ];
 			const loaded = this.loadedLods[ modelIndex ];
 			if ( ! loaded.has( 0 ) ) {
-				let projectedRadius = 0, distanceMeters = Infinity, visible = false;
+				let projectedRadius = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity, visible = false;
 				for ( const group of groups ) for ( let index = 0; index < group.count; index ++ ) {
 					visible = true;
 					const instanceIndex = group.indices[ index ];
 					projectedRadius = Math.max( projectedRadius, this.planner._projectedRadiusByInstance[ instanceIndex ] );
-					distanceMeters = Math.min( distanceMeters, this.planner._viewDistanceByInstance[ instanceIndex ] );
+					const surfaceDistance = this.planner._viewDistanceByInstance[ instanceIndex ];
+					const centerDistance = this.planner._viewCenterDistanceByInstance[ instanceIndex ];
+					if ( surfaceDistance < distanceMeters || surfaceDistance === distanceMeters && centerDistance < centerDistanceMeters ) {
+						distanceMeters = surfaceDistance;
+						centerDistanceMeters = centerDistance;
+					}
 				}
 				const key = `${ modelIndex }:0`;
-				if ( visible && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: 0, key, loaded, projectedRadius, distanceMeters } );
+				if ( visible && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: 0, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } );
 				continue;
 			}
 			if ( refreshDesired ) {
 				let desiredLevel = -1;
 				for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
 				this.desiredLods[ modelIndex ] = desiredLevel;
-				let priority = 0, distanceMeters = Infinity;
+				let priority = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity;
 				const loadedMax = Math.max( ...this.loadedLods[ modelIndex ] );
 				for ( let visibleLevel = loadedMax + 1; visibleLevel <= desiredLevel; visibleLevel ++ ) {
 					const group = groups[ visibleLevel ];
 					for ( let index = 0; index < group.count; index ++ ) {
 						const instanceIndex = group.indices[ index ];
 						priority = Math.max( priority, this.planner._projectedRadiusByInstance[ instanceIndex ] );
-						distanceMeters = Math.min( distanceMeters, this.planner._viewDistanceByInstance[ instanceIndex ] );
+						const surfaceDistance = this.planner._viewDistanceByInstance[ instanceIndex ];
+						const centerDistance = this.planner._viewCenterDistanceByInstance[ instanceIndex ];
+						if ( surfaceDistance < distanceMeters || surfaceDistance === distanceMeters && centerDistance < centerDistanceMeters ) {
+							distanceMeters = surfaceDistance;
+							centerDistanceMeters = centerDistance;
+						}
 					}
 				}
 				this.desiredLodPriorities[ modelIndex ] = priority;
 				this.desiredLodDistances[ modelIndex ] = distanceMeters;
+				this.desiredLodCenterDistances[ modelIndex ] = centerDistanceMeters;
 			}
 			const desiredLevel = this.desiredLods[ modelIndex ];
 			const loadedMax = Math.max( ...loaded );
@@ -204,7 +216,7 @@ export class StaticModelInstanceSetRuntime {
 			const key = `${ modelIndex }:${ level }`;
 			if ( desiredLevel < level ) this.retryAfter.delete( key );
 			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
-				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ], distanceMeters: this.desiredLodDistances[ modelIndex ] } );
+				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ], distanceMeters: this.desiredLodDistances[ modelIndex ], centerDistanceMeters: this.desiredLodCenterDistances[ modelIndex ] } );
 			}
 			if ( loadedMax >= 0 ) for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
 		}
@@ -213,13 +225,13 @@ export class StaticModelInstanceSetRuntime {
 			this._nextLODCheckAt = Math.min( this._nextLODCheckAt, performance.now() + 100 );
 		}
 		if ( ! this.loadLOD ) return;
-		// Upgrade the closest visible surfaces first. Projected size then favors
-		// the most noticeable geometry at similar distances; descriptor order is
-		// unrelated to the player's immediate view.
-		candidates.sort( ( a, b ) => a.distanceMeters - b.distanceMeters || b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
-		for ( const { modelIndex, level, key, loaded, projectedRadius, distanceMeters } of candidates ) {
+		// Upgrade the closest visible surfaces first. When large bounds make
+		// surface distances equal, their centers break the tie before projected
+		// size; descriptor order never outranks the current view.
+		candidates.sort( ( a, b ) => a.distanceMeters - b.distanceMeters || a.centerDistanceMeters - b.centerDistanceMeters || b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
+		for ( const { modelIndex, level, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } of candidates ) {
 			this.retryAfter.delete( key );
-			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal, { distanceMeters, screenBenefit: projectedRadius } ) ).then( () => {
+			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal, { distanceMeters, centerDistanceMeters, screenBenefit: projectedRadius } ) ).then( () => {
 				if ( ! this.disposed ) {
 					loaded.add( level );
 					this._plannerDirty = true;

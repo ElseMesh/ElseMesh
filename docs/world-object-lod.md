@@ -74,12 +74,13 @@ coarse level; then finer upgrades can begin. Offscreen models wait until the
 view reaches them. This is frustum-based coverage, not occlusion culling.
 
 After the barrier opens, queue mesh and texture upgrades by the nearest visible
-surface that benefits from each request. Use projected screen coverage as the
-next ranking key (and screen benefit per transfer byte for texture mips), then
-stable asset/model identity. This favors close detail such as benches before
-far-wall furniture even when the distant bound is larger or appears earlier in
-descriptor order. Keep mesh upgrades sequential per model so a finer level is
-not requested before its preceding level is available. All static-model
+surface that benefits from each request. If large bounds make both surface gaps
+zero, use bound-center distance to break that tie before projected screen
+coverage (and screen benefit per transfer byte for texture mips), then stable
+asset/model identity. This keeps a large far-wall bound from outranking a
+nearby bench merely because both bounds overlap the camera. Keep mesh upgrades
+sequential per model so a finer level is not requested before its preceding
+level is available. All static-model
 components in one world package share a deferred, single-active mesh queue;
 texture mips use a separate queue with the same near-first rule. Deferring the
 mesh queue's first dispatch lets the engine collect requests from every

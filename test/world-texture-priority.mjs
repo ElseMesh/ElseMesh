@@ -92,6 +92,18 @@ assert.ok( biasedTarget.desiredLevel > distanceLOD, 'workload bias selects a coa
 if ( pendingJobs.length ) { pendingJobs.shift()(); await new Promise( resolve => setImmediate( resolve ) ); }
 unregisterStaticModelTextureDemand();
 
+const overlappingBoundsState = { progressiveAssets: new Map(), progressiveTextureTargets: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
+const overlappingBoundsRoot = { userData: { worldPackage: overlappingBoundsState } };
+const overlappingBoundsCamera = new PerspectiveCamera( 60, 1, 0.1, 100 ); overlappingBoundsCamera.updateMatrixWorld( true );
+for ( const [ id, distance ] of [ [ 'far-bound', 18 ], [ 'near-bound', 4 ] ] ) {
+	setWorldPackageProgressiveAsset( overlappingBoundsRoot, id, { textures: [ { imageIndices: [ 0 ], levelCount: 3 } ] } );
+	overlappingBoundsState.objectsByAsset.set( id, new Set( [ { transform: { position: [ 0, 0, - distance ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: distance + 1 } } ] ) );
+	overlappingBoundsState.progressiveTextureTargets.set( id, { sourceAssets: new Map( [ [ id, [ 0 ] ] ] ), baseWidth: 512, baseHeight: 512, levelCount: 3, headerAndIndex: header, levels: new Map( [ [ 2, {} ] ] ) } );
+}
+overlappingBoundsState.textureLODQueue = { limit: 1, active: 0, waiting: [], run() { this.active ++; return new Promise( () => {} ); } };
+updateWorldPackageLOD( { userData: { worldPackage: overlappingBoundsState } }, overlappingBoundsCamera );
+assert.deepEqual( [ ...overlappingBoundsState.progressiveTextureJobs.keys() ], [ 'near-bound' ], 'center distance breaks zero-surface-distance ties for texture mips before projected size' );
+
 // A failed high-priority request must not starve other visible textures.
 const retryState = { progressiveAssets: new Map(), progressiveTextureTargets: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
 const retryRoot = { userData: { worldPackage: retryState } };

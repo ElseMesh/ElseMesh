@@ -178,3 +178,11 @@ await Promise.all( [ distantRefinement, nearbyRefinement ] );
 assert.deepEqual( refinementOrder, [ 'near bench', 'distant furniture' ], 'the deferred shared queue gathers cross-component demand and completes the nearer surface before a larger distant one' );
 disposeWorldPackage( sharedQueueRoot );
 console.log('Shared mesh-refinement queue prioritizes nearby projected geometry across components');
+
+const overlappingBoundsQueue = new LODLoadQueue( 1, { deferStart: true } ), overlappingOrder = [];
+const overlappingSignal = new AbortController();
+const farContainingBound = overlappingBoundsQueue.run( overlappingSignal.signal, () => overlappingOrder.push( 'far wall furniture' ), { distanceMeters: 0, centerDistanceMeters: 18, screenBenefit: 9 } );
+const nearContainingBound = overlappingBoundsQueue.run( overlappingSignal.signal, () => overlappingOrder.push( 'near bench' ), { distanceMeters: 0, centerDistanceMeters: 4, screenBenefit: 1 } );
+await Promise.all( [ farContainingBound, nearContainingBound ] );
+assert.deepEqual( overlappingOrder, [ 'near bench', 'far wall furniture' ], 'center distance breaks ties when overlapping coarse bounds both have zero surface distance' );
+console.log('LOD queue breaks clamped surface-distance ties by bound-center distance');

@@ -106,16 +106,19 @@ export class LODLoadQueue {
 }
 
 function normalizePriority(priority) {
- if ( Number.isFinite(priority) ) return { distanceMeters: Infinity, screenBenefit: priority };
+ if ( Number.isFinite(priority) ) return { distanceMeters: Infinity, centerDistanceMeters: Infinity, screenBenefit: priority };
  if ( priority && typeof priority === 'object' ) return {
   distanceMeters: Number.isFinite(priority.distanceMeters) ? Math.max(0, priority.distanceMeters) : Infinity,
+  centerDistanceMeters: Number.isFinite(priority.centerDistanceMeters) ? Math.max(0, priority.centerDistanceMeters) : Infinity,
   screenBenefit: Number.isFinite(priority.screenBenefit) ? priority.screenBenefit : 0,
  };
- return 0;
+ return { distanceMeters: Infinity, centerDistanceMeters: Infinity, screenBenefit: 0 };
 }
 
 function comparePriority(a,b) {
  if ( a.distanceMeters < b.distanceMeters ) return -1;
  if ( a.distanceMeters > b.distanceMeters ) return 1;
+ if ( a.centerDistanceMeters < b.centerDistanceMeters ) return -1;
+ if ( a.centerDistanceMeters > b.centerDistanceMeters ) return 1;
  return b.screenBenefit - a.screenBenefit;
 }

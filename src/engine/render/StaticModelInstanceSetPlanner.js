@@ -58,6 +58,7 @@ export class StaticModelInstanceSetPlanner {
 		this._normalizedPlanes = new Float64Array( 24 );
 		this._projectedRadiusByInstance = new Float32Array( document.instances.length );
 		this._viewDistanceByInstance = new Float32Array( document.instances.length );
+		this._viewCenterDistanceByInstance = new Float32Array( document.instances.length );
 		this._shadowGroupsActive = false;
 	}
 
@@ -72,6 +73,7 @@ export class StaticModelInstanceSetPlanner {
 		const loadScale = 2 ** renderLoadBias;
 		this._projectedRadiusByInstance.fill( 0 );
 		this._viewDistanceByInstance.fill( Infinity );
+		this._viewCenterDistanceByInstance.fill( Infinity );
 		for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
 			const plane = camera.frustumPlanes[ planeIndex ];
 			if ( ! Array.isArray( plane ) || plane.length !== 4 || ! plane.every( Number.isFinite ) ) throw new Error( 'Invalid static model planner frustum plane' );
@@ -106,6 +108,7 @@ export class StaticModelInstanceSetPlanner {
 			const radius = model.bounds.radius * Math.max( sx, sy, sz );
 			const dx = centerX - camera.position[ 0 ], dy = centerY - camera.position[ 1 ], dz = centerZ - camera.position[ 2 ];
 			const distance = Math.hypot( dx, dy, dz );
+			this._viewCenterDistanceByInstance[ instanceIndex ] = distance;
 			this._viewDistanceByInstance[ instanceIndex ] = Math.max( 0, distance - radius );
 			if ( includeShadows && distance <= model.shadowMaxDistance ) {
 				const shadowGroup = this._shadowsByModel[ modelIndex ];

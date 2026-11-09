@@ -210,11 +210,14 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0, now = perform
 	const requests = [];
 	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
 		if ( state.progressiveTextureJobs.has( targetID ) ) continue;
-		let screenFraction = 0, distanceMeters = Infinity;
+		let screenFraction = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity;
 		for ( const assetId of target.sourceAssets.keys() ) {
 			const view = textureAssetViewDemand( state, assetId, camera, textureProjectionRevision );
 			screenFraction = Math.max( screenFraction, view.fraction );
-			distanceMeters = Math.min( distanceMeters, view.distanceMeters );
+			if ( view.distanceMeters < distanceMeters || view.distanceMeters === distanceMeters && view.centerDistanceMeters < centerDistanceMeters ) {
+				distanceMeters = view.distanceMeters;
+				centerDistanceMeters = view.centerDistanceMeters;
+			}
 		}
 		if ( ! screenFraction ) continue;
 		if ( now < ( target.retryAfter || 0 ) ) {
@@ -245,9 +248,9 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0, now = perform
 		if ( ! source ) continue;
 		const offset = 80 + nextLevelIndex * 24;
 		const bytes = Number( new DataView( target.headerAndIndex.buffer, target.headerAndIndex.byteOffset, target.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
-		requests.push( { targetID, target, ...source, levelIndex: nextLevelIndex, priority: { distanceMeters, screenBenefit: screenFraction * screenFraction / Math.max( 1, bytes ) } } );
+		requests.push( { targetID, target, ...source, levelIndex: nextLevelIndex, priority: { distanceMeters, centerDistanceMeters, screenBenefit: screenFraction * screenFraction / Math.max( 1, bytes ) } } );
 	}
-	requests.sort( ( a, b ) => a.priority.distanceMeters - b.priority.distanceMeters || b.priority.screenBenefit - a.priority.screenBenefit );
+	requests.sort( ( a, b ) => a.priority.distanceMeters - b.priority.distanceMeters || a.priority.centerDistanceMeters - b.priority.centerDistanceMeters || b.priority.screenBenefit - a.priority.screenBenefit );
 	if ( ! requests.length ) return;
 	state.textureLODQueue ||= new LODLoadQueue( 1 );
 	// Re-evaluate visibility and priority before admitting the next job. Enqueuing
@@ -346,12 +349,16 @@ function textureAssetViewDemand( state, assetId, camera, viewRevision ) {
 		if ( cachedDemand?.runtime !== demand.runtime || cachedDemand.viewRevision !== ( demand.runtime.viewRevision ?? 0 ) ) demandsMatch = false;
 	}
 	if ( cached?.viewRevision === viewRevision && demandsMatch ) return cached;
-	let fraction = 0, distanceMeters = Infinity;
+	let fraction = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity;
 	for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
 		const projected = cachedProjectedBoundsScreenFraction( state, object, camera, viewRevision );
 		if ( projected !== null ) {
 			fraction = Math.max( fraction, projected );
-			distanceMeters = Math.min( distanceMeters, textureBoundsSurfaceDistance( object, camera ) );
+			const distance = textureBoundsViewDistance( object, camera );
+			if ( distance.distanceMeters < distanceMeters || distance.distanceMeters === distanceMeters && distance.centerDistanceMeters < centerDistanceMeters ) {
+				distanceMeters = distance.distanceMeters;
+				centerDistanceMeters = distance.centerDistanceMeters;
+			}
 		}
 	}
 	const demandViews = [];
@@ -359,11 +366,14 @@ function textureAssetViewDemand( state, assetId, camera, viewRevision ) {
 		const projected = staticModelTextureViewDemand( demand, camera );
 		if ( projected.fraction !== null ) {
 			fraction = Math.max( fraction, projected.fraction );
-			distanceMeters = Math.min( distanceMeters, projected.distanceMeters );
+			if ( projected.distanceMeters < distanceMeters || projected.distanceMeters === distanceMeters && projected.centerDistanceMeters < centerDistanceMeters ) {
+				distanceMeters = projected.distanceMeters;
+				centerDistanceMeters = projected.centerDistanceMeters;
+			}
 		}
 		demandViews.push( { runtime: demand.runtime, viewRevision: demand.runtime.viewRevision ?? 0 } );
 	}
-	const result = { viewRevision, fraction, distanceMeters, demandViews };
+	const result = { viewRevision, fraction, distanceMeters, centerDistanceMeters, demandViews };
 	cache.set( assetId, result );
 	return result;
 }
@@ -419,14 +429,14 @@ export function staticModelTextureScreenFraction( { runtime, modelIndex, lodInde
 }
 
 function staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera ) {
-	if ( runtime.disposed ) return { fraction: null, distanceMeters: Infinity };
+	if ( runtime.disposed ) return { fraction: null, distanceMeters: Infinity, centerDistanceMeters: Infinity };
 	const viewRevision = runtime.viewRevision ?? 0;
 	const key = `${ modelIndex }:${ lodIndex }`;
 	const cached = runtime.textureScreenFractionCache?.get( key );
 	if ( cached?.viewRevision === viewRevision ) return cached;
 	const model = runtime.document.models[ modelIndex ];
 	const group = runtime.planner._groupsByModel[ modelIndex ][ lodIndex ];
-	let maximum = null, distanceMeters = Infinity;
+	let maximum = null, distanceMeters = Infinity, centerDistanceMeters = Infinity;
 	_staticTextureObject.streamingBounds = model.bounds;
 	for ( let i = 0; i < group.count; i ++ ) {
 		const instance = runtime.document.instances[ group.indices[ i ] ];
@@ -436,19 +446,28 @@ function staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera
 		const fraction = projectedBoundsScreenFraction( _staticTextureObject, camera );
 		if ( fraction !== null ) {
 			maximum = Math.max( maximum ?? 0, fraction );
-			const plannedDistance = runtime.planner._viewDistanceByInstance?.[ group.indices[ i ] ];
-			distanceMeters = Math.min( distanceMeters, Number.isFinite( plannedDistance ) ? plannedDistance : textureBoundsSurfaceDistance( _staticTextureObject, camera ) );
+			const instanceIndex = group.indices[ i ];
+			const plannedDistance = runtime.planner._viewDistanceByInstance?.[ instanceIndex ];
+			const plannedCenterDistance = runtime.planner._viewCenterDistanceByInstance?.[ instanceIndex ];
+			const boundsDistance = textureBoundsViewDistance( _staticTextureObject, camera );
+			const surfaceDistance = Number.isFinite( plannedDistance ) ? plannedDistance : boundsDistance.distanceMeters;
+			const centerDistance = Number.isFinite( plannedCenterDistance ) ? plannedCenterDistance : boundsDistance.centerDistanceMeters;
+			if ( surfaceDistance < distanceMeters || surfaceDistance === distanceMeters && centerDistance < centerDistanceMeters ) {
+				distanceMeters = surfaceDistance;
+				centerDistanceMeters = centerDistance;
+			}
 		}
 	}
-	const result = { viewRevision, fraction: maximum, distanceMeters };
+	const result = { viewRevision, fraction: maximum, distanceMeters, centerDistanceMeters };
 	( runtime.textureScreenFractionCache ||= new Map() ).set( key, result );
 	return result;
 }
 
-function textureBoundsSurfaceDistance( object, camera ) {
+function textureBoundsViewDistance( object, camera ) {
 	transformBoundsCenter( object, object.streamingBounds.center, _textureBoundsCenter );
 	const radius = object.streamingBounds.radius * Math.max( ...( object.scale || [ 1, 1, 1 ] ).map( Math.abs ) );
-	return Math.max( 0, camera.position.distanceTo( _textureBoundsCenter ) - radius );
+	const centerDistanceMeters = camera.position.distanceTo( _textureBoundsCenter );
+	return { distanceMeters: Math.max( 0, centerDistanceMeters - radius ), centerDistanceMeters };
 }
 
 function indexPackageObjectByAsset( state, object ) {

@@ -255,6 +255,24 @@ await new Promise( resolve => setImmediate( resolve ) );
 assert.deepEqual( coarsePriorityRequests, [ [ 'near-bench', 0 ], [ 'far-furniture', 0 ] ], 'visible coarse models request nearest surface first even when far furniture appears first in the descriptor' );
 coarsePriorityRuntime.dispose();
 
+const overlappingBoundsDocument = {
+	...priorityDocument,
+	models: priorityDocument.models.map( ( model, index ) => ( { ...model, bounds: { ...model.bounds, radius: index === 0 ? 30 : 5 } } ) ),
+};
+const overlappingBoundsPlanner = new StaticModelInstanceSetPlanner( overlappingBoundsDocument );
+const overlappingBoundsRequests = [];
+const overlappingBoundsRuntime = new StaticModelInstanceSetRuntime( overlappingBoundsDocument, {
+	batches: overlappingBoundsPlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: null,
+	initialLoadedLods: [ [], [] ],
+	canRefine: () => false,
+	loadLOD: async ( modelIndex, lodIndex ) => { overlappingBoundsRequests.push( [ overlappingBoundsDocument.models[ modelIndex ].id, lodIndex ] ); },
+} );
+overlappingBoundsRuntime.update( 1 / 60, gatedCamera );
+await new Promise( resolve => setImmediate( resolve ) );
+assert.deepEqual( overlappingBoundsRequests, [ [ 'near-bench', 0 ], [ 'far-furniture', 0 ] ], 'center distance breaks ties when both static bounds clamp surface distance to zero, before projected radius' );
+overlappingBoundsRuntime.dispose();
+
 const priorityPlanner = new StaticModelInstanceSetPlanner( priorityDocument );
 const priorityRequests = [];
 const priorityRuntime = new StaticModelInstanceSetRuntime( priorityDocument, {
