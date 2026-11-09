@@ -71,7 +71,10 @@ const firstItem = scratch.lists.opaque[ 0 ];
 const mainPassKey = [ ...scratch.preparedByPass.keys() ].find( key => key.startsWith( 'main.0.' ) );
 const mainPrepared = scratch.preparedByPass.get( mainPassKey );
 const firstPreparedDraw = mainPrepared.opaque[ 0 ];
-renderer.render( scene, { ...renderPass, late: true, clearDepth: null } );
+const getPipeline = renderer._pipeline;
+renderer._pipeline = () => firstPreparedDraw.p;
+try { renderer.render( scene, { ...renderPass, late: true, clearDepth: null } ); }
+finally { renderer._pipeline = getPipeline; }
 const latePassKey = [ ...scratch.preparedByPass.keys() ].find( key => key.startsWith( 'main.1.' ) );
 const latePrepared = scratch.preparedByPass.get( latePassKey );
 const firstLatePreparedDraw = latePrepared.opaque[ 0 ];
@@ -91,7 +94,9 @@ assert.notStrictEqual( FrameUniforms.fields.cameraPos.value, cameraPosition, 'ca
 assert.deepEqual( Array.from( cameraMatrices.get( 'view' ).elements ), firstView, 'the prior frame view snapshot remains unchanged after camera movement' );
 assert.notDeepEqual( Array.from( FrameUniforms.fields.view.value.elements ), firstView, 'reused view matrix refreshes after camera movement' );
 renderer.render( scene, renderPass );
-renderer.render( scene, { ...renderPass, late: true, clearDepth: null } );
+renderer._pipeline = () => firstPreparedDraw.p;
+try { renderer.render( scene, { ...renderPass, late: true, clearDepth: null } ); }
+finally { renderer._pipeline = getPipeline; }
 GPU.submit();
 await GPU.queue.onSubmittedWorkDone();
 assert.equal( renderer.renderScratch[ 0 ], scratch, 'frame scratch storage is reused' );
