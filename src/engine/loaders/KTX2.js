@@ -10,6 +10,7 @@ import {
 import { GPU } from '../gpu/GPU.js';
 
 const BASIS_TRANSCODER_PATH = `${ import.meta.env?.BASE_URL || '/' }basis/`;
+const KTX2_IDENTIFIER = [ 0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a ];
 
 let webGPUDecoder;
 let webGPUDecoderSupportsBC = false;
@@ -22,7 +23,28 @@ function createLoader() {
 }
 
 export function createWebGLKTX2Loader( renderer ) {
-	return createLoader().detectSupport( renderer );
+	const loader = createLoader().detectSupport( renderer );
+	const rgbaLoader = createLoader().detectSupport( { extensions: { has: () => false, get: () => null } } );
+	const parse = loader.parse.bind( loader );
+	const dispose = loader.dispose.bind( loader );
+	loader.parse = ( buffer, onLoad, onError ) => {
+		const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array( buffer );
+		if ( bytes.byteLength >= 80 && KTX2_IDENTIFIER.every( ( value, index ) => bytes[ index ] === value ) ) {
+			const header = new DataView( bytes.buffer, bytes.byteOffset, bytes.byteLength );
+			const width = header.getUint32( 20, true ), height = header.getUint32( 24, true );
+			// Three warns that Basis textures with mipmaps need block-aligned base
+			// dimensions; the live Hogwarts WebGL path reported INVALID_VALUE during
+			// compressed mip uploads. Decode unaligned images to RGBA, while aligned
+			// textures keep the compressed GPU path.
+			if ( width > 0 && height > 0 && ( width % 4 !== 0 || height % 4 !== 0 ) ) return rgbaLoader.parse( buffer, onLoad, onError );
+		}
+		return parse( buffer, onLoad, onError );
+	};
+	loader.dispose = () => {
+		dispose();
+		rgbaLoader.dispose();
+	};
+	return loader;
 }
 
 export function canUploadBCTexture( width, height ) {
