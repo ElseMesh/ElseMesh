@@ -45,7 +45,7 @@ Input nodes use these engine-defined semantics and types:
 | `instanceMaterial1` | vec4 | Second per-instance material vector |
 
 Nodes are ordered: each operation may reference only earlier node IDs. Graphs
-support at most 512 nodes. Constants are finite scalars or vectors with 2–4
+support at most 1,024 nodes. Constants are finite scalars or vectors with 2–4
 components, each in the range -1,000,000 to 1,000,000.
 
 `textureSample` nodes sample a signed glTF material texture in the fragment
@@ -102,26 +102,26 @@ normal, and emissive texture inputs remain the starting surface values; other
 graph outputs modify those values. Vertex outputs also feed the WebGL depth
 material so deformed geometry can keep its shadow shape.
 
-The graph compiler and pixel fixture live in ElseMesh. The fixture checks
-the same signed GLB through both static-model adapters. Tidewater's signed
-village net, glass, hard-surface and rope, thatch, fabric, stone, and roof-metal
-materials now use this format; their package renders prove compilation and
-visible output, not matched image parity. Tidewater has not yet migrated its
-live fish-prop component or species material to this format.
+The graph compiler and pixel fixture live in ElseMesh. The fixture checks the
+same signed GLB through both static-model adapters. Tidewater's signed village
+wood, net, glass, hard-surface and rope, thatch, fabric, stone, and roof-metal
+materials use this format. The 768-node wood graph expresses the complete
+authored material behavior using the existing bounded operations and four
+standard glTF texture slots. The exported-package fixtures render the graph in
+WebGPU and WebGL; they do not prove matched image parity against the pre-split
+game. Tidewater's live fish-prop component and species material remain outside
+this graph.
 
 ## Current limits and migration gate
 
 Format `/1` samples only the five standard glTF material texture slots; it does
 not define material-specific texture bundles. The graph inputs otherwise
 include vertex/instance data, and the standard glTF base-color, normal, and
-emissive textures are applied by the engine around the graph. Tidewater's
-remaining legacy wood role still uses multiple packed maps and material
-parameters; verify the standard slots and bounded graph can carry its inputs
-before removing its legacy presenter.
+emissive textures are applied by the engine around the graph. The authored
+Tidewater wood maps now fit those standard slots; its maps are embedded in the
+signed village GLBs and no Tidewater runtime material resolver is required.
 
-Do not move that shader or its role-specific compiler into ElseMesh as a
-shortcut. Either use these bounded glTF texture inputs in a renderer-neutral
-graph, extend the contract only if more portable inputs are required, or bake
-the appearance into ordinary glTF/PBR maps during world export. Verify the same
-authored material through WebGPU and WebGL before removing the current
-world-side renderer implementations.
+Keep material behavior in graph data or portable glTF/PBR assets. If a future
+material needs more inputs, extend the renderer-neutral contract and both
+compilers together. Verify package appearance against its authoritative world
+baseline before claiming visual parity.

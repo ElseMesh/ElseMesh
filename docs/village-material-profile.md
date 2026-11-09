@@ -1,17 +1,30 @@
 # Portable original village materials
 
-The example island's village GLB carries the original geometry and material inputs rather than flattening them into plain vertex colors. This retains the original timber grain, paint wear, roof corrosion, stone details, ropes, window glass and fabric shading.
+The signed Tidewater village GLBs carry authored material appearance as
+`elsemesh.material-graph/1` data and ordinary glTF textures. The final runtime
+package does not use a Tidewater material profile, backend adapter, or material
+component. `extras.elsemeshWorld.materialRole` preserves the authored batch
+identity for diagnostics; it does not select a renderer implementation.
 
-Each material declares `extras.elsemeshMaterial` with exactly two fields:
+The eight authored roles are `wood`, `glass`, `hard`, `roofMetal`, `thatch`,
+`stone`, `fabric`, and `net`. The same signed graph data is compiled by ElseMesh
+for WebGPU and WebGL. Wood uses four ordinary texture slots: `baseColor` for
+weathered albedo and paint chips, `metallicRoughness` for the wood normal and
+roughness map, `normal` for painted timber detail, and `emissive` for linear
+weathering data. The authored graph outputs the wood albedo, roughness,
+occlusion, and surface normal; the emissive factor stays zero.
 
-```json
-{ "profile": "elsemesh.village/1", "role": "wood" }
-```
+Each primitive retains `COLOR_0` as linear RGB tint and
+`_ELSEMESH_VDATA` as a four-component material parameter. UVs keep the
+meter-based coordinates and end-grain/cap markers. The exporter keeps glass in
+its own graph material, folds rope into hard and cloth and flags into fabric,
+and keeps nets separate. Low-detail wood triangles are split by the authored
+glass marker.
 
-The role vocabulary is `wood`, `glass`, `hard`, `roofMetal`, `thatch`, `stone`, `fabric`, and `net`. `glass`, `hard`, `roofMetal`, `thatch`, `stone`, `fabric`, and `net` use signed `elsemesh.material-graph/1` data compiled by ElseMesh for both backends. Only `wood` still uses the Tidewater-owned legacy WebGPU and WebGL material adapters. No world supplies backend shader code. Unknown profiles, roles, or additional profile fields are rejected. Ordinary GLB materials without a profile or graph retain normal PBR handling.
-
-For each profiled primitive, `COLOR_0` is the original linear RGB `tint` attribute and `_ELSEMESH_VDATA` is a four-component float attribute carrying the original material parameters. The loader aliases the imported `COLOR_0` buffer as both generic `color` and shader-facing `tint`; the original village shaders read `tint`, so omitting this alias leaves their tint input at zero and makes hosted wood nearly black. UVs retain the original meter-based coordinates and end-grain/cap markers. The exporter keeps glass in its own graph material, folds rope into hard and cloth and flags into fabric, and keeps nets separate. It splits low-detail wood triangles by the authored per-vertex glass marker. Sign geometry retains its original wood/hard material roles.
-
-Tidewater's remaining legacy wood material binds these attributes to its WebGPU shader and WebGL adapter, using the same packaged `VillageTextures`. The migrated roles carry their data graphs and standard glTF texture slots in the signed village GLB. These versioned material semantics are specific to Tidewater's visual vocabulary; they are not a replacement for general portable PBR materials or Blender authoring.
-
-Check an export before publishing with `node test/world-village-material.mjs PATH_TO_EXPORTED_WORLD`. Tidewater's `worlds/tidewater/test/world-export.mjs` additionally checks deterministic source and asset identity against the checked-in package.
+The wood graph contains 768 reachable nodes, below the engine's 1,024-node
+limit. It carries the source pattern relief, paint chips, end grain, deck wear,
+rain and rust streaks, bird marks, and tidal wetness through the shared graph
+operations. Exported-package rendering passes in hosted WebGPU and WebGL; these
+checks establish backend execution, not matched visual parity against the
+pre-split game. The built-in procedural village still uses Tidewater's WebGPU
+texture baker to generate its source maps and remains renderer-boundary debt.

@@ -571,7 +571,7 @@ The signed `elsemesh.terrain-surface/1` component now carries the deterministic 
 
 ## Village texture package
 
-The Example Island package now includes the GPU-baked village PBR maps in its own content-addressed `elsemesh.village-materials/2` asset. This removes the prior omission of baked wood, roof, thatch, stone, metal, grime, rope, and net texture inputs. The client regenerates only mip levels from the packaged level-zero bytes and uses the trusted original village shader profile. A matched-camera review of the packaged village against upstream and the Flip7 is still required before claiming visual parity; see [the village material asset contract](../worlds/tidewater/docs/schemas/village-materials.md).
+The Example Island village GLBs now embed the portable material textures in signed standard glTF slots. All eight material roles, including wood, use signed `elsemesh.material-graph/1` data compiled by ElseMesh for both backends; the Tidewater material component, profile resolver, and WebGL material adapter have been removed. The 768-node wood graph rendered in the hosted WebGPU and isolated WebGL package fixtures. Matched-camera review against upstream and the Flip7 remains required before claiming visual parity; see [the village material contract](village-material-profile.md).
 
 ## WebGL fallback check, 2026-10-10
 

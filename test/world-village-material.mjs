@@ -7,28 +7,28 @@ import { worldMaterialProfile, worldMaterialRole } from '../src/network/WorldMat
 import { VILLAGE_MATERIAL_PROFILE, VILLAGE_MATERIAL_ROLES } from '../worlds/tidewater/VillageMaterialProfile.js';
 
 assert.equal( worldMaterialRole( {} ), null );
-assert.deepEqual( worldMaterialProfile( VILLAGE_MATERIAL_PROFILE ).roles, VILLAGE_MATERIAL_ROLES );
-assert.equal( worldMaterialProfile( VILLAGE_MATERIAL_PROFILE ).maps.length, 14 );
-for ( const role of VILLAGE_MATERIAL_ROLES ) {
-	assert.equal( worldMaterialRole( { extras: { elsemeshMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role } } } ), role );
-}
-for ( const profile of [ null, [], { profile: 'unknown', role: 'wood' }, { profile: VILLAGE_MATERIAL_PROFILE, role: 'rope' }, { profile: VILLAGE_MATERIAL_PROFILE, role: 'wood', shader: 'untrusted' } ] ) {
-	assert.throws( () => worldMaterialRole( { extras: { elsemeshMaterial: profile } } ), /material profile/ );
-}
+assert.equal( worldMaterialProfile( VILLAGE_MATERIAL_PROFILE ), null, 'Tidewater registers no renderer-specific material profile' );
+assert.deepEqual( worldMaterialProfile( 'elsemesh.material-graph/1' ).roles, [ 'graph' ], 'the engine owns the generic graph profile' );
+assert.throws( () => worldMaterialRole( { extras: { elsemeshMaterial: { profile: VILLAGE_MATERIAL_PROFILE, role: 'wood' } } } ), /material profile/ );
+assert.throws( () => worldMaterialRole( { extras: { elsemeshMaterial: { profile: 'unknown', role: 'wood' } } } ), /material profile/ );
+assert.throws( () => worldMaterialRole( { extras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', shader: 'untrusted' } } } ), /material profile/ );
 
-// Accept an independently generated export so callers can check before publishing it.
+// Accept an independently generated export and require every village batch to
+// use the engine-owned graph contract with the world-authored role in metadata.
 if ( process.argv[ 2 ] ) {
 	const directory = path.resolve( process.argv[ 2 ] );
 	const source = JSON.parse( await readFile( path.join( directory, 'world-source.json' ) ) );
-	const village = source.objects.find( ( object ) => object.id === 'elsemesh-object:island-village' );
+	const village = source.objects.find( object => object.id === 'elsemesh-object:island-village' );
 	const gltf = parseGLB( await readFile( path.join( directory, 'assets', village.assetId.slice( 7 ) ) ) );
+	const roles = new Set();
 	for ( const primitives of gltf.meshes ) for ( const primitive of primitives ) {
-		assert.ok( worldMaterialRole( gltf.materials[ primitive.material ] ) );
+		const material = gltf.materials[ primitive.material ];
+		assert.equal( worldMaterialRole( material ), 'graph' );
 		assert.equal( primitive.attributes._ELSEMESH_VDATA.itemSize, 4 );
 		assert.equal( primitive.attributes._ELSEMESH_VDATA.array.length / 4, primitive.attributes.POSITION.array.length / 3 );
 		assert.equal( primitive.attributes.COLOR_0.itemSize, 3 );
+		roles.add( material.extras?.elsemeshWorld?.materialRole );
 	}
-	assert.ok( gltf.materials.some( ( material ) => worldMaterialRole( material ) === 'fabric' ) );
-	assert.ok( gltf.materials.some( ( material ) => worldMaterialRole( material ) === 'net' ) );
+	assert.deepEqual( roles, new Set( VILLAGE_MATERIAL_ROLES ) );
 }
-console.log( 'World village material profile checks passed' );
+console.log( 'World village material graph boundary checks passed' );

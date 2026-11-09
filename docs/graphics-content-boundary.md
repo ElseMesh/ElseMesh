@@ -88,17 +88,14 @@ sidecar profile has been removed; its unconnected geometry sidecar now uses
 ordinary glTF PBR and remains outside the signed runtime package. That sidecar
 does not establish fish appearance parity.
 
-Legacy custom profile resolution still has two world-controlled paths: WebGPU
-resolves materials through `WorldPackageMaterialAdapterRegistry`, while WebGL
-asks installed world component runtimes to resolve a profile. The new
-`elsemesh.material-graph/1` path uses the ElseMesh-owned compiler registry for
-both backends. Migrate legacy profiles to signed, renderer-neutral data and the
-engine registry; world modules must not register backend material compilers.
-Tidewater's village net, glass, hard surfaces and rope, thatch, fabric, stone, and
-roof metal now use the graph path, including wind, coverage, seeded
-stone/plaster sampling, roof rust and replacement panels, rope normals, and
-shoreline wetness in both backends. Only wood remains on the legacy village
-profile path. Retire both legacy resolution paths after wood migrates.
+The Example Island village now carries all material maps in its signed GLBs and
+describes the full wood, glass, hard-surface, net, thatch, fabric, stone, and
+roof-metal appearance with `elsemesh.material-graph/1`. Tidewater no longer
+registers a village material profile, package material adapter, or WebGL
+material component adapter. ElseMesh compiles the same graph data for WebGPU
+and WebGL. This removes the world-owned village shader and profile-resolution
+paths; the built-in procedural village still generates its portable source maps
+through Tidewater's WebGPU texture baker and remains migration debt.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable

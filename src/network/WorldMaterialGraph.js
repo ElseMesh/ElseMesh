@@ -2,7 +2,7 @@
 // The graph contains no shader source and names only inputs understood by the engine.
 
 export const WORLD_MATERIAL_GRAPH_FORMAT = 'elsemesh.material-graph/1';
-export const WORLD_MATERIAL_GRAPH_MAX_NODES = 512;
+export const WORLD_MATERIAL_GRAPH_MAX_NODES = 1024;
 
 const INPUT_TYPES = Object.freeze( {
 	position: 'vec3',

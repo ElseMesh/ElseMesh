@@ -6,6 +6,14 @@ import { createWebGLMaterialGraph, createWebGPUMaterialGraph } from '../src/mate
 import { worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
 import { G } from '../src/engine/render/Frame.js';
 
+const graphAtNodeLimit = {
+	format: 'elsemesh.material-graph/1',
+	nodes: Array.from( { length: 1024 }, ( _, index ) => ( { id: `limit${index}`, op: 'constant', value: index } ) ),
+	outputs: { roughness: 'limit1023' },
+};
+assert.equal( validateWorldMaterialGraph( graphAtNodeLimit ).nodes.length, 1024, 'bounded material graphs accept the raised limit needed for faithful authored materials' );
+assert.throws( () => validateWorldMaterialGraph( { ...graphAtNodeLimit, nodes: [ ...graphAtNodeLimit.nodes, { id: 'overLimit', op: 'constant', value: 0 } ] } ), /Invalid or unsupported/, 'material graphs remain bounded above 1,024 nodes' );
+
 const graph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [

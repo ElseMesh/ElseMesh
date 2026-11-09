@@ -315,8 +315,9 @@ proof and heartbeat, and has a visitor fetch the signed manifest and asset
 bytes through the gateway; it is part of `npm test`. The separate
 `world-gateway-e2e.mjs` test covers the secure WSS proxy path. The frontend
 build, full npm test suite, Go `worldd` tests, and loopback WSS gateway test
-passed for the current implementation. Go validation also covers the Example
-Island's `village-materials/2` component.
+passed for the current implementation. The current Example Island package
+embeds village textures in its signed GLBs and requires no village-specific
+material component.
 
 `deploy/systemd/elsemesh-gateway.service.example` and
 `deploy/caddy/elsemesh-gateway.Caddyfile.example` now provide a concrete
