@@ -145,11 +145,15 @@ and GPU resource creation to ElseMesh. The existing
 can cover much of the finite plant content, but the current custom
 `elsemesh.static-vegetation/1` payload is not itself a generic engine renderer,
 and `grass-density/1` does not specify how a renderer presents its channels.
-Define a versioned renderer-neutral ground-cover field contract for density
-channels, species/model references, per-species parameters, deterministic
-placement, camera-centered coverage, wind inputs, LOD, and shadow intent. Keep
+`StaticModelInstanceSetRuntime` also treats its instance list as fixed and sizes
+backend batches at installation, so it cannot directly supply Tidewater's
+camera-centered, continuously moving grass patches. Define a versioned
+renderer-neutral ground-cover field contract for density channels,
+species/model references, per-species parameters, deterministic cell placement,
+camera-centered coverage, wind inputs, LOD, and shadow intent. The engine needs
+a shared cell-selection/update runtime consumed by both backend adapters;
 renderer-specific choices such as patch meshes, shader code, batching, and GPU
-resources inside the matching ElseMesh WebGPU and WebGL adapters.
+resources stay inside ElseMesh.
 
 Do not switch Tidewater to that contract until both engine adapters consume the
 same signed package fixture. The fixture must verify species and placement
