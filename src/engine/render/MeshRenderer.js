@@ -417,7 +417,7 @@ export class MeshRenderer {
 
 	}
 
-	_collectInto( scene, { camera, layerMask = 0xffffffff, filter = null, kind = 'main', cull = true }, lists, itemRecords ) {
+	_collectInto( scene, { camera, layerMask = 0xffffffff, filter = null, kind = 'main', cull = true, matrixWorldUpdated = false }, lists, itemRecords ) {
 
 		const { opaque, transparent } = lists;
 		opaque.length = 0;
@@ -453,7 +453,7 @@ export class MeshRenderer {
 
 		};
 
-		scene.updateMatrixWorld();
+		if ( ! matrixWorldUpdated ) scene.updateMatrixWorld();
 		visit( scene );
 		opaque.sort( sortOpaqueItems );
 		transparent.sort( sortTransparentItems );

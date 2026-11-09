@@ -145,7 +145,10 @@ export class SceneRenderer {
 		if ( this.onBeforeWater ) this.onBeforeWater();
 
 		// 4. water + transparents
-		mr.render( scene, { ...common, label: 'water + transparent', late: true, layerMask: ( 1 << LAYERS.WATER ) | ( 1 << LAYERS.TRANSPARENT ) } );
+		// The opaque pass already updated scene matrices. Refraction, when present,
+		// also renders the same scene before the late pass; neither pass changes
+		// world transforms, so avoid walking the large static scene a second time.
+		mr.render( scene, { ...common, label: 'water + transparent', late: true, layerMask: ( 1 << LAYERS.WATER ) | ( 1 << LAYERS.TRANSPARENT ), matrixWorldUpdated: true } );
 
 	}
 
