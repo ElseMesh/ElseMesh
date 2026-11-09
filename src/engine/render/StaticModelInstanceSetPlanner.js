@@ -1,5 +1,6 @@
 import { validateStaticModelInstanceSet } from '../../network/StaticModelInstanceSet.js';
 import { WebGLCoordinateSystem } from '../math/Matrix4.js';
+import { writeInstanceDrawDistanceFade, writeInstanceLODSelection, writeTransformedInstanceSphere } from './InstanceDrawPlannerMath.js';
 
 const finiteVector3 = value => Array.isArray( value ) && value.length === 3 && value.every( Number.isFinite );
 
@@ -59,6 +60,9 @@ export class StaticModelInstanceSetPlanner {
 		this._projectedRadiusByInstance = new Float32Array( document.instances.length );
 		this._viewDistanceByInstance = new Float32Array( document.instances.length );
 		this._viewCenterDistanceByInstance = new Float32Array( document.instances.length );
+		this._sphereScratch = new Float64Array( 5 );
+		this._lodScratch = new Float64Array( 4 );
+		this._drawFadeScratch = new Float64Array( 2 );
 		this._shadowGroupsActive = false;
 	}
 
@@ -70,7 +74,6 @@ export class StaticModelInstanceSetPlanner {
 		if ( ! camera || ! finiteVector3( camera.position ) || ! Number.isFinite( camera.verticalFovRadians ) || camera.verticalFovRadians <= 0 || camera.verticalFovRadians >= Math.PI || ! Array.isArray( camera.frustumPlanes ) || camera.frustumPlanes.length !== 6 ) throw new Error( 'Invalid static model planner camera' );
 		if ( ! Number.isInteger( renderLoadBias ) || renderLoadBias < 0 || renderLoadBias > 2 ) throw new Error( `Invalid static model planner render-load bias: ${ typeof renderLoadBias } ${ String( renderLoadBias ) }` );
 		const tanHalfFov = Math.tan( camera.verticalFovRadians * 0.5 );
-		const loadScale = 2 ** renderLoadBias;
 		this._projectedRadiusByInstance.fill( 0 );
 		this._viewDistanceByInstance.fill( Infinity );
 		this._viewCenterDistanceByInstance.fill( Infinity );
@@ -98,14 +101,8 @@ export class StaticModelInstanceSetPlanner {
 			if ( includeInstance && ! includeInstance( instanceIndex ) ) continue;
 			const modelIndex = this._instanceModelIndices[ instanceIndex ];
 			const model = this.document.models[ modelIndex ];
-			const [ sx, sy, sz ] = instance.scale;
-			const [ qx, qy, qz, qw ] = instance.rotation;
-			const localX = model.bounds.center[ 0 ] * sx, localY = model.bounds.center[ 1 ] * sy, localZ = model.bounds.center[ 2 ] * sz;
-			const tx = 2 * ( qy * localZ - qz * localY ), ty = 2 * ( qz * localX - qx * localZ ), tz = 2 * ( qx * localY - qy * localX );
-			const centerX = instance.position[ 0 ] + localX + qw * tx + ( qy * tz - qz * ty );
-			const centerY = instance.position[ 1 ] + localY + qw * ty + ( qz * tx - qx * tz );
-			const centerZ = instance.position[ 2 ] + localZ + qw * tz + ( qx * ty - qy * tx );
-			const radius = model.bounds.radius * Math.max( sx, sy, sz );
+			const sphere = writeTransformedInstanceSphere( this._sphereScratch, instance.position, instance.rotation, instance.scale, model.bounds );
+			const [ centerX, centerY, centerZ, radius, maxScale ] = sphere;
 			const dx = centerX - camera.position[ 0 ], dy = centerY - camera.position[ 1 ], dz = centerZ - camera.position[ 2 ];
 			const distance = Math.hypot( dx, dy, dz );
 			this._viewCenterDistanceByInstance[ instanceIndex ] = distance;
@@ -122,35 +119,17 @@ export class StaticModelInstanceSetPlanner {
 			}
 			if ( ! visible ) continue;
 
-			const baseLodMeasure = model.lodMetric === 'projected-radius'
-				? radius / ( Math.max( distance, 1e-6 ) * tanHalfFov )
-				: distance / Math.max( sx, sy, sz );
 			this._projectedRadiusByInstance[ instanceIndex ] = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
 			// Sustained render overload shifts demand toward coarser authored LODs.
-			const lodMeasure = model.lodMetric === 'projected-radius' ? baseLodMeasure / loadScale : baseLodMeasure * loadScale;
-			const drawFade = model.drawFadeStartDistance < model.drawMaxDistance
-				? 1 - smoothstep( model.drawFadeStartDistance, model.drawMaxDistance, distance )
-				: 1;
-			const drawFadeEnabled = model.drawFadeStartDistance < model.drawMaxDistance ? 1 : 0;
+			const fade = writeInstanceDrawDistanceFade( this._drawFadeScratch, model.drawFadeStartDistance, model.drawMaxDistance, distance );
+			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, distance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias );
 			const groups = this._groupsByModel[ modelIndex ];
-			let transition = -1;
-			for ( let thresholdIndex = 0; thresholdIndex < model.lodThresholds.length; thresholdIndex ++ ) {
-				const threshold = model.lodThresholds[ thresholdIndex ];
-				const fadeStart = threshold * ( 1 - model.lodFadeFraction );
-				if ( model.lodMetric === 'projected-radius' ? lodMeasure < threshold && lodMeasure >= fadeStart : lodMeasure >= threshold && lodMeasure < threshold / ( 1 - model.lodFadeFraction ) ) { transition = thresholdIndex; break; }
-			}
+			const [ lodIndex, transition, incomingFade ] = selection;
 			if ( transition >= 0 ) {
-				const threshold = model.lodThresholds[ transition ];
-				const fadeStart = model.lodMetric === 'projected-radius' ? threshold * ( 1 - model.lodFadeFraction ) : threshold / ( 1 - model.lodFadeFraction );
-				const incomingFade = model.lodMetric === 'projected-radius'
-					? ( lodMeasure - fadeStart ) / ( threshold - fadeStart )
-					: ( fadeStart - lodMeasure ) / ( fadeStart - threshold );
-				this._append( groups[ transition ], instanceIndex, incomingFade, 0, drawFade, drawFadeEnabled );
-				this._append( groups[ transition + 1 ], instanceIndex, incomingFade, 1, drawFade, drawFadeEnabled );
+				this._append( groups[ transition ], instanceIndex, incomingFade, 0, fade[ 0 ], fade[ 1 ] );
+				this._append( groups[ transition + 1 ], instanceIndex, incomingFade, 1, fade[ 0 ], fade[ 1 ] );
 			} else {
-				let lodIndex = 0;
-				while ( lodIndex < model.lodThresholds.length && ( model.lodMetric === 'projected-radius' ? lodMeasure >= model.lodThresholds[ lodIndex ] : lodMeasure < model.lodThresholds[ lodIndex ] ) ) lodIndex ++;
-				this._append( groups[ lodIndex ], instanceIndex, 1, 2, drawFade, drawFadeEnabled ); // 2 = steady, 0/1 = outgoing/incoming transition sides
+				this._append( groups[ lodIndex ], instanceIndex, 1, 2, fade[ 0 ], fade[ 1 ] ); // 2 = steady, 0/1 = outgoing/incoming transition sides
 			}
 		}
 		return this;
@@ -168,9 +147,4 @@ export class StaticModelInstanceSetPlanner {
 
 function createGroup( modelIndex, modelId, lodIndex, capacity ) {
 	return { modelIndex, modelId, lodIndex, indices: new Uint32Array( capacity ), fade: new Float32Array( capacity ), incoming: new Uint8Array( capacity ), drawFade: new Float32Array( capacity ), drawFadeEnabled: new Uint8Array( capacity ), count: 0 };
-}
-
-function smoothstep( start, end, value ) {
-	const t = Math.max( 0, Math.min( 1, ( value - start ) / ( end - start ) ) );
-	return t * t * ( 3 - 2 * t );
 }
