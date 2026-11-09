@@ -164,6 +164,15 @@ different LOD, wind, and grass behavior. Their location in the Tidewater
 repository does not satisfy renderer neutrality, and moving either presenter
 alone would repeat the backend-by-backend migration that this document forbids.
 
+There is a third, separate path: `src/fallback/WebGLFallback.js` builds
+camera-following WebGL grass in `webglGrassMesh()`. It is engine-owned code but
+is not yet a world-agnostic translation: it assumes Tidewater's RGBA meanings
+(dune, meadow, oats, creeper) and hard-codes Tidewater blade colors, dimensions,
+and distance thinning. The Tidewater WebGL vegetation component adapter builds
+the other plant categories but does not install this grass mesh itself. Keep
+this fallback path inside the same complete migration; do not treat its engine
+location as evidence that WebGL and WebGPU already share a neutral renderer.
+
 Keep Tidewater-owned scatter rules, placement records, density maps, species
 parameters, and authored model assets in Tidewater. Move all production
 geometry presentation, wind evaluation, grass patch generation, draw scheduling,
