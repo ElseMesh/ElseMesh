@@ -22,9 +22,10 @@ function createLoader() {
 		.setWorkerLimit( 1 );
 }
 
-export function createWebGLKTX2Loader( renderer ) {
-	const loader = createLoader().detectSupport( renderer );
+export function createWebGLKTX2Loader( renderer, { forceRGBA = false } = {} ) {
 	const rgbaLoader = createLoader().detectSupport( { extensions: { has: () => false, get: () => null } } );
+	if ( forceRGBA ) return rgbaLoader;
+	const loader = createLoader().detectSupport( renderer );
 	const parse = loader.parse.bind( loader );
 	const dispose = loader.dispose.bind( loader );
 	loader.parse = ( buffer, onLoad, onError ) => {

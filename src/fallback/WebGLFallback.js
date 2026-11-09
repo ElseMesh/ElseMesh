@@ -875,7 +875,9 @@ export class WebGLFallback {
 		this.reviewPose = cameraPoseFromSearch( location.search );
 		if ( this.reviewPose?.time !== undefined ) this.app.settings.timeOfDay = this.reviewPose.time;
 		this.renderer.toneMapping = T.ACESFilmicToneMapping;
-		this.ktx2Loader ||= createWebGLKTX2Loader( this.renderer );
+		// The local installed-game KTX2 stream produced repeated compressed
+		// subimage errors on this WebGL path; keep its decoded texels in RGBA.
+		this.ktx2Loader ||= createWebGLKTX2Loader( this.renderer, { forceRGBA: Boolean( this.worldLink?.localProvider ) } );
 		this.loader.setKTX2Loader( this.ktx2Loader );
 		this.renderer.toneMappingExposure = this.app.settings.exposure;
 		this.renderer.shadowMap.enabled = true;
