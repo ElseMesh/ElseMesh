@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { bestCandidateBlueNoise } from '../src/util/BlueNoise.js';
+import { bestCandidateBlueNoise, MAX_BLUE_NOISE_POINTS } from '../src/util/BlueNoise.js';
 import { mulberry32 } from '../src/util/Noise.js';
 
 const points = bestCandidateBlueNoise( mulberry32( 8 ), 4, 8 );
@@ -12,5 +12,6 @@ assert.deepEqual( points, [
 assert.deepEqual( bestCandidateBlueNoise( mulberry32( 8 ), 4, 8 ), points, 'a seeded generator produces repeatable toroidal placement' );
 assert.throws( () => bestCandidateBlueNoise( null, 4, 8 ), /settings/ );
 assert.throws( () => bestCandidateBlueNoise( Math.random, - 1, 8 ), /settings/ );
+assert.throws( () => bestCandidateBlueNoise( Math.random, MAX_BLUE_NOISE_POINTS + 1, 8 ), /settings/ );
 
 console.log( 'shared deterministic blue-noise placement: ok' );

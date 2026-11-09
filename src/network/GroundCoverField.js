@@ -1,3 +1,5 @@
+import { MAX_BLUE_NOISE_POINTS } from '../util/BlueNoise.js';
+
 export const GROUND_COVER_FIELD_COMPONENT_TYPE = 'elsemesh.ground-cover-field/1';
 export const GROUND_COVER_FIELD_DENSITY_ASSET_KIND = 'grass-density/1';
 const MAX_SPECIES = 4;
@@ -14,7 +16,7 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 	const allowed = ( value, keys ) => Object.keys( value ).every( key => keys.includes( key ) );
 	if ( ! record( data ) || ! allowed( data, [ 'densityAssetId', 'seed', 'cellSize', 'pointsPerCell', 'placementAlgorithm', 'distanceBands', 'species' ] ) ) fail( 'component data has unknown fields' );
 	if ( ! assetID( data.densityAssetId ) || ! Number.isInteger( data.seed ) || data.seed < 0 || data.seed > 0xffffffff ) fail( 'density asset ID or seed is invalid' );
-	if ( ! finite( data.cellSize ) || data.cellSize < 0.25 || data.cellSize > 128 || ! Number.isInteger( data.pointsPerCell ) || data.pointsPerCell < 1 || data.pointsPerCell > 4096 || data.placementAlgorithm !== 'blue-noise/1' ) fail( 'cell placement settings are invalid' );
+	if ( ! finite( data.cellSize ) || data.cellSize < 0.25 || data.cellSize > 128 || ! Number.isInteger( data.pointsPerCell ) || data.pointsPerCell < 1 || data.pointsPerCell > MAX_BLUE_NOISE_POINTS || data.placementAlgorithm !== 'blue-noise/1' ) fail( 'cell placement settings are invalid' );
 	if ( ! Array.isArray( componentAssets ) ) fail( 'component asset list is invalid' );
 	const densityAssets = componentAssets.filter( asset => asset?.kind === GROUND_COVER_FIELD_DENSITY_ASSET_KIND );
 	if ( densityAssets.length !== 1 || densityAssets[ 0 ].assetId !== data.densityAssetId ) fail( 'must reference exactly one signed grass-density/1 asset' );

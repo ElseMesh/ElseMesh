@@ -1,6 +1,8 @@
 /** Mitchell best-candidate blue noise on a square torus. */
+export const MAX_BLUE_NOISE_POINTS = 4096;
+
 export function bestCandidateBlueNoise( random, count, size, candidatesPerPoint = 10 ) {
-	if ( typeof random !== 'function' || ! Number.isInteger( count ) || count < 0 || count > 16384 || ! Number.isFinite( size ) || size <= 0 || ! Number.isInteger( candidatesPerPoint ) || candidatesPerPoint < 1 || candidatesPerPoint > 64 ) throw new Error( 'Invalid blue-noise placement settings' );
+	if ( typeof random !== 'function' || ! Number.isInteger( count ) || count < 0 || count > MAX_BLUE_NOISE_POINTS || ! Number.isFinite( size ) || size <= 0 || ! Number.isInteger( candidatesPerPoint ) || candidatesPerPoint < 1 || candidatesPerPoint > 64 ) throw new Error( 'Invalid blue-noise placement settings' );
 	const points = [];
 	for ( let index = 0; index < count; index ++ ) {
 		let best = null, bestDistance = - 1;

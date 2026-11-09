@@ -64,7 +64,8 @@ for the signed `seed`, `cellSize`, and `pointsPerCell`. It creates one
 Mitchell-best-candidate pattern using the engine's `mulberry32/1` integer
 sequence: candidate 0 uses one sample; each later point takes the best of ten
 samples by minimum toroidal squared distance, with the first sample winning
-ties. It then applies a deterministic per-cell rotation and translation
+ties. `pointsPerCell` is bounded to 1–4096 so the quadratic pattern generation
+has a fixed upper bound. It then applies a deterministic per-cell rotation and translation
 derived from the seed and cell coordinates.
 Each species samples its assigned RGBA channel bilinearly; a candidate is
 selected when its seeded value is below the channel density. Scale and yaw use
