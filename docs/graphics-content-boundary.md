@@ -126,6 +126,41 @@ through the canonical geometry and distance-LOD catalog. Its materials and
 LOD transitions are simplified; flex animation, shadows, fish, reef collision,
 and matched visual parity remain open.
 
+## Vegetation migration gate
+
+Tidewater's current vegetation path is still world-owned presentation code:
+`worlds/tidewater/component-installers.js` constructs
+`renderers/WebGPUVegetation.js`, `register-components.js` loads
+`renderers/WebGLVegetationComponentAdapter.js`, and the built-in `App` path calls
+the world's `presentation.createVegetation` factory. These paths implement
+different LOD, wind, and grass behavior. Their location in the Tidewater
+repository does not satisfy renderer neutrality, and moving either presenter
+alone would repeat the backend-by-backend migration that this document forbids.
+
+Keep Tidewater-owned scatter rules, placement records, density maps, species
+parameters, and authored model assets in Tidewater. Move all production
+geometry presentation, wind evaluation, grass patch generation, draw scheduling,
+and GPU resource creation to ElseMesh. The existing
+`elsemesh.static-model-instance-set/1` and `elsemesh.material-graph/1` contracts
+can cover much of the finite plant content, but the current custom
+`elsemesh.static-vegetation/1` payload is not itself a generic engine renderer,
+and `grass-density/1` does not specify how a renderer presents its channels.
+Define a versioned renderer-neutral ground-cover field contract for density
+channels, species/model references, per-species parameters, deterministic
+placement, camera-centered coverage, wind inputs, LOD, and shadow intent. Keep
+renderer-specific choices such as patch meshes, shader code, batching, and GPU
+resources inside the matching ElseMesh WebGPU and WebGL adapters.
+
+Do not switch Tidewater to that contract until both engine adapters consume the
+same signed package fixture. The fixture must verify species and placement
+counts, camera-following coverage, LOD transitions, wind response, shadows, and
+matched views against the pre-split WebGPU vegetation at the same camera, time,
+viewport, and render scale. Preserve the WebGPU baseline; the current simplified
+WebGL presenter is not an acceptable source for the migrated appearance. Remove
+the Tidewater production presenters and their registration only in that complete
+migration. Until then, keep the existing path and report renderer-neutral
+vegetation as incomplete.
+
 ## Migration order
 
 1. Introduce a backend-neutral world runtime and explicit content/state
