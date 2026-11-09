@@ -55,11 +55,18 @@ same LOD metric and thresholds understood by the static-model contract. The
 asset references must also appear in the component's signed asset list.
 
 `blue-noise/1` gives both renderers the same deterministic candidate positions
-for the signed `seed`, `cellSize`, and `pointsPerCell`. Density sampling decides
-which candidates exist. The engine uses the shared distance bands and cell
-capacities to maintain camera-centered coverage; backend frustum culling may
-reject additional cells but cannot change candidate placement or species
-selection.
+for the signed `seed`, `cellSize`, and `pointsPerCell`. It creates one
+Mitchell-best-candidate pattern using the engine's `mulberry32/1` integer
+sequence: candidate 0 uses one sample; each later point takes the best of ten
+samples by minimum toroidal squared distance, with the first sample winning
+ties. It then applies a deterministic per-cell rotation and translation
+derived from the seed and cell coordinates.
+Each species samples its assigned RGBA channel bilinearly; a candidate is
+selected when its seeded value is below the channel density. Scale and yaw use
+separate seeded values, so changing the camera or selected LOD cannot move an
+instance. The engine uses the shared distance bands and cell capacities to
+maintain camera-centered coverage; backend frustum culling may reject
+additional cells but cannot change candidate placement or species selection.
 
 Species GLBs use standard glTF materials or `elsemesh.material-graph/1` data.
 The graph may use the shared time, wind direction, and wind speed inputs for
@@ -69,6 +76,9 @@ it does not select a renderer implementation. `castsShadow` and
 
 The validator rejects unknown fields, duplicate species or channels, unsigned
 or undeclared assets, invalid LOD thresholds, out-of-range distances, and
-unbounded counts. Tidewater must not switch to this component until both engine
+unbounded counts. The sum of distance-band capacities times candidate points
+per cell times species count may not exceed one million visible candidate
+records. The runtime releases cached cell records once they leave its active
+camera coverage. Tidewater must not switch to this component until both engine
 backends consume one signed fixture and matched images preserve the pre-split
 WebGPU vegetation at identical camera, time, viewport, and render scale.

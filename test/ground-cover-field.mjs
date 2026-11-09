@@ -30,9 +30,10 @@ for ( const invalid of [
 	{ ...field, densityAssetId: farAssetId },
 	{ ...field, distanceBands: [ ...field.distanceBands, { maxDistance: 87, cellCapacity: 1 } ] },
 	{ ...field, species: [ ...field.species, { ...field.species[ 0 ], id: 'duplicate' } ] },
-	{ ...field, species: [ { ...field.species[ 0 ], modelAssetIds: [ `sha256:${'d'.repeat( 64 )}` ] } ] },
+	{ ...field, species: [ { ...field.species[ 0 ], modelAssetIds: [ `sha256:${'d'.repeat( 64 )}` ], lodThresholds: [] } ] },
 	{ ...field, species: [ { ...field.species[ 0 ], lodThresholds: [ 0, 46 ] } ] },
 	{ ...field, species: [ { ...field.species[ 0 ], castsShadow: false, shadowMaxDistance: 20 } ] },
+	{ ...field, pointsPerCell: 4096, distanceBands: [ { maxDistance: 100, cellCapacity: 8192 } ] },
 ] ) assert.throws( () => validateGroundCoverField( invalid, assets ), /Invalid ground-cover field/ );
 
 console.log( 'renderer-neutral ground-cover field contract: ok' );

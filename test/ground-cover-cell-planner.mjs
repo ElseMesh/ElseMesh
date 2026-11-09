@@ -39,4 +39,9 @@ const empty = new GroundCoverCellPlanner( {
 } );
 assert.deepEqual( empty.update( { x: 0, z: 0 } ).map( level => level.count ), [ 0, 0, 0 ], 'empty density fields allocate no visible cells' );
 
-console.log( 'ground-cover cell planner selection, LOD partition, origin, culling, and empty-field checks passed' );
+const unreferencedChannel = new Uint8Array( density.data.length );
+for ( let offset = 3; offset < unreferencedChannel.length; offset += 4 ) unreferencedChannel[ offset ] = 255;
+const channelFiltered = new GroundCoverCellPlanner( { terrain, density: { ...density, data: unreferencedChannel }, cellSize: 2, densityChannels: [ 0 ] } );
+assert.deepEqual( channelFiltered.update( { x: 0, z: 0 } ).map( level => level.count ), [ 0, 0, 0 ], 'unreferenced density channels do not create candidate cells' );
+
+console.log( 'ground-cover cell planner selection, LOD partition, origin, channel filtering, culling, and empty-field checks passed' );

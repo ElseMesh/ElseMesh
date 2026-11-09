@@ -6,17 +6,19 @@ const DEFAULT_LEVELS = Object.freeze( [
 
 /** Shared camera-centered density-field cell selection for ground-cover backends. */
 export class GroundCoverCellPlanner {
-	constructor( { terrain, density, cellSize = 8, levels = DEFAULT_LEVELS, occupiedThreshold = 8, transitionFraction = 0.12 } ) {
+	constructor( { terrain, density, cellSize = 8, levels = DEFAULT_LEVELS, occupiedThreshold = 8, transitionFraction = 0.12, densityChannels = [ 0, 1, 2, 3 ] } ) {
 		if ( ! terrain || ! Number.isInteger( terrain.res ) || terrain.res < 2 || ! Number.isFinite( terrain.size ) || terrain.size <= 0 || ! Number.isFinite( terrain.origin ) || ! Number.isFinite( terrain.texel ) || terrain.texel <= 0 || ! terrain.heights || terrain.heights.length !== terrain.res * terrain.res ) throw new Error( 'Ground-cover planner requires a valid heightfield' );
 		if ( ! density || ! Number.isInteger( density.res ) || density.res < 1 || ! Number.isFinite( density.size ) || density.size <= 0 || ! Number.isFinite( density.origin ) || ! density.data || density.data.length !== density.res * density.res * 4 ) throw new Error( 'Ground-cover planner requires an RGBA density field' );
 		if ( ! Number.isFinite( cellSize ) || cellSize <= 0 || ! Array.isArray( levels ) || levels.length === 0 || levels.some( ( level, index ) => ! Number.isFinite( level.maxDistance ) || level.maxDistance <= 0 || ! Number.isInteger( level.capacity ) || level.capacity <= 0 || index > 0 && level.maxDistance <= levels[ index - 1 ].maxDistance ) ) throw new Error( 'Ground-cover planner has invalid cell or LOD settings' );
 		if ( ! Number.isInteger( occupiedThreshold ) || occupiedThreshold < 0 || occupiedThreshold > 255 ) throw new Error( 'Ground-cover occupancy threshold must be a byte value' );
 		if ( ! Number.isFinite( transitionFraction ) || transitionFraction < 0 || transitionFraction > 0.5 ) throw new Error( 'Ground-cover LOD transition fraction must be between 0 and 0.5' );
+		if ( ! Array.isArray( densityChannels ) || densityChannels.length < 1 || densityChannels.length > 4 || densityChannels.some( channel => ! Number.isInteger( channel ) || channel < 0 || channel > 3 ) || new Set( densityChannels ).size !== densityChannels.length ) throw new Error( 'Ground-cover density channels must be unique RGBA indices' );
 
 		this.terrain = terrain;
 		this.density = density;
 		this.cellSize = cellSize;
 		this.transitionFraction = transitionFraction;
+		this.densityChannels = [ ...densityChannels ];
 		this.levels = levels.map( level => ( { maxDistance: level.maxDistance, capacity: level.capacity, cells: new Int32Array( level.capacity ), count: 0 } ) );
 		this.cellsPerSide = Math.ceil( terrain.size / cellSize );
 		this.cellFlags = new Uint8Array( this.cellsPerSide * this.cellsPerSide );
@@ -26,7 +28,7 @@ export class GroundCoverCellPlanner {
 	}
 
 	#buildCells( threshold ) {
-		const { terrain, density, cellSize, cellsPerSide } = this;
+		const { terrain, density, cellSize, cellsPerSide, densityChannels } = this;
 		const maskPerCell = cellSize / ( density.size / density.res );
 		const heightsPerCell = cellSize / terrain.texel;
 		for ( let j = 0; j < cellsPerSide; j ++ ) for ( let i = 0; i < cellsPerSide; i ++ ) {
@@ -35,7 +37,8 @@ export class GroundCoverCellPlanner {
 			const z0 = Math.max( 0, Math.floor( j * maskPerCell ) - 1 ), z1 = Math.min( density.res - 1, Math.ceil( ( j + 1 ) * maskPerCell ) + 1 );
 			for ( let z = z0; z <= z1 && ! occupied; z ++ ) for ( let x = x0; x <= x1; x ++ ) {
 				const offset = ( z * density.res + x ) * 4;
-				if ( density.data[ offset ] > threshold || density.data[ offset + 1 ] > threshold || density.data[ offset + 2 ] > threshold || density.data[ offset + 3 ] > threshold ) { occupied = true; break; }
+				for ( const channel of densityChannels ) if ( density.data[ offset + channel ] > threshold ) { occupied = true; break; }
+				if ( occupied ) break;
 			}
 			const index = j * cellsPerSide + i;
 			if ( ! occupied ) continue;

@@ -2,6 +2,7 @@ export const GROUND_COVER_FIELD_COMPONENT_TYPE = 'elsemesh.ground-cover-field/1'
 export const GROUND_COVER_FIELD_DENSITY_ASSET_KIND = 'grass-density/1';
 const MAX_SPECIES = 4;
 const MAX_MODEL_LODS = 4;
+export const MAX_GROUND_COVER_FIELD_RECORDS = 1_000_000;
 
 /** Validate renderer-neutral ground-cover field settings against signed component assets. */
 export function validateGroundCoverField( data, componentAssets = [] ) {
@@ -41,6 +42,8 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 		if ( ! finite( species.windInfluence ) || species.windInfluence < 0 || species.windInfluence > 4 || typeof species.castsShadow !== 'boolean' || ! finite( species.shadowMaxDistance ) || species.shadowMaxDistance < 0 || species.shadowMaxDistance > 10000 ) fail( `species ${species.id} wind or shadow settings are invalid` );
 		if ( ! species.castsShadow && species.shadowMaxDistance !== 0 ) fail( `species ${species.id} cannot have a shadow distance when shadows are disabled` );
 	}
+	const maxCandidates = data.distanceBands.reduce( ( total, band ) => total + band.cellCapacity, 0 ) * data.pointsPerCell * data.species.length;
+	if ( maxCandidates > MAX_GROUND_COVER_FIELD_RECORDS ) fail( `visible candidate bound exceeds ${MAX_GROUND_COVER_FIELD_RECORDS}` );
 	const declaredModels = new Set( componentAssets.filter( asset => asset?.kind === 'glb' ).map( asset => asset.assetId ) );
 	for ( const id of modelAssetIDs ) if ( ! declaredModels.has( id ) ) fail( `model asset ${id} is not declared as a signed glb` );
 	return data;
