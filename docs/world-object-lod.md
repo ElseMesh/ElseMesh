@@ -86,6 +86,16 @@ texture mips use a separate queue with the same near-first rule. Deferring the
 mesh queue's first dispatch lets the engine collect requests from every
 component updated in the frame before it starts the highest-priority upgrade.
 
+Queue order applies only to refinements selected by the per-model LOD rule; it
+does not guarantee that a physically nearer small model reaches a finer level
+before a larger, farther model. Source-authored projected-screen thresholds can
+select a finer level for the larger model while considering the nearer model
+sufficiently detailed. Preserve this screen-space behavior for parity unless a
+matched game comparison shows it is wrong. If the product requires strict
+near-first detail regardless of screen coverage, define a shared distance-aware
+LOD selection policy separately; changing the request queue alone cannot
+provide that behavior.
+
 ### Texture mip streaming and cache identity
 
 Geometry LODs must not require a separate copy of the same texture at each
