@@ -1,12 +1,14 @@
 {
-  "description": "Existing Tidewater production modules that contain backend renderer code or directly depend on ElseMesh rendering APIs. This is migration debt, not an approved ownership pattern. Remove entries only as complete renderer-neutral feature migrations land.",
+  "description": "Existing production world modules that contain backend renderer code or depend directly or transitively on ElseMesh rendering APIs. This is migration debt, not an approved ownership pattern. Remove entries only as complete renderer-neutral feature migrations land.",
   "files": [
+    "worlds/default.js",
     "worlds/tidewater/DebrisPlacement.js",
     "worlds/tidewater/Pier.js",
     "worlds/tidewater/Props.js",
     "worlds/tidewater/Reef.js",
     "worlds/tidewater/Rocks.js",
     "worlds/tidewater/Village.js",
+    "worlds/tidewater/browser-behavior.js",
     "worlds/tidewater/component-installers.js",
     "worlds/tidewater/debris/DebrisShapes.js",
     "worlds/tidewater/fish/CreatureGeometry.js",
@@ -17,6 +19,7 @@
     "worlds/tidewater/game/FishStand.js",
     "worlds/tidewater/game/FishStandContent.js",
     "worlds/tidewater/game/FishingRod.js",
+    "worlds/tidewater/game/GameHUD.js",
     "worlds/tidewater/game/Game.js",
     "worlds/tidewater/game/GameMaterials.js",
     "worlds/tidewater/game/StallKit.js",
@@ -62,6 +65,8 @@
     "worlds/tidewater/wildlife/CritterShapes.js",
     "worlds/tidewater/wildlife/Kit.js",
     "worlds/tidewater/wildlife/ShadowBlobs.js",
-    "worlds/tidewater/wildlife/SwashProbe.js"
+    "worlds/tidewater/wildlife/SwashProbe.js",
+    "worlds/tidewater/wildlife/Wildlife.js",
+    "worlds/tidewater/world-provider.js"
   ]
 }

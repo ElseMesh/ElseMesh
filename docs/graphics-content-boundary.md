@@ -75,10 +75,10 @@ simulation contracts from the outset.
 
 `docs/renderer-boundary-debt.json` and
 `test/world-renderer-boundary-debt.mjs` track the current Tidewater exception
-set and fail when a new production world module introduces a renderer import,
-backend adapter registration, or renderer module. Remove entries as complete
-feature migrations land; do not add entries to normalize a new backend-specific
-world implementation.
+set and fail when a new production world module introduces or transitively
+depends on a renderer import, backend adapter registration, or renderer module.
+Remove entries as complete feature migrations land; do not add entries to
+normalize a new backend-specific world implementation.
 
 The engine registry is keyed by renderer-neutral component/material/effect
 contracts. Backend selection and the WebGPU/WebGL implementations for those
