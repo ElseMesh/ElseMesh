@@ -82,7 +82,7 @@ export class LODLoadQueue {
  run(signal, task, priority = 0) {
   return new Promise((resolve,reject) => {
    if (signal.aborted) { reject(signal.reason); return; }
-   const entry = {signal,task,resolve,reject,priority:Number.isFinite(priority) ? priority : 0,sequence:this.sequence++};
+   const entry = {signal,task,resolve,reject,priority:normalizePriority(priority),sequence:this.sequence++};
    entry.abort = () => { const index = this.waiting.indexOf(entry); if (index >= 0) { this.waiting.splice(index,1); reject(signal.reason); } };
    signal.addEventListener('abort',entry.abort,{once:true});
    this.waiting.push(entry); this.schedulePump();
@@ -95,7 +95,7 @@ export class LODLoadQueue {
   queueMicrotask(() => { this.pumpScheduled = false; this.pump(); });
  }
  pump() {
-  this.waiting.sort((a,b) => b.priority - a.priority || a.sequence - b.sequence);
+  this.waiting.sort((a,b) => comparePriority(a.priority,b.priority) || a.sequence - b.sequence);
   while (this.active < this.limit && this.waiting.length) {
    const entry = this.waiting.shift(); entry.signal.removeEventListener('abort',entry.abort);
    if (entry.signal.aborted) {entry.reject(entry.signal.reason);continue;}
@@ -103,4 +103,19 @@ export class LODLoadQueue {
    Promise.resolve().then(() => entry.task()).then(entry.resolve,entry.reject).finally(() => {this.active--;this.schedulePump();});
   }
  }
+}
+
+function normalizePriority(priority) {
+ if ( Number.isFinite(priority) ) return { distanceMeters: Infinity, screenBenefit: priority };
+ if ( priority && typeof priority === 'object' ) return {
+  distanceMeters: Number.isFinite(priority.distanceMeters) ? Math.max(0, priority.distanceMeters) : Infinity,
+  screenBenefit: Number.isFinite(priority.screenBenefit) ? priority.screenBenefit : 0,
+ };
+ return 0;
+}
+
+function comparePriority(a,b) {
+ if ( a.distanceMeters < b.distanceMeters ) return -1;
+ if ( a.distanceMeters > b.distanceMeters ) return 1;
+ return b.screenBenefit - a.screenBenefit;
 }

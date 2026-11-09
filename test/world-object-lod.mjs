@@ -172,9 +172,9 @@ assert.strictEqual( worldPackageMeshLODQueue( sharedQueueRoot ), sharedMeshQueue
 assert.equal( sharedMeshQueue.limit, 1, 'world-package mesh refinement completes one globally highest-priority upgrade at a time' );
 const refinementOrder = [];
 const refinementSignal = new AbortController();
-const distantRefinement = sharedMeshQueue.run( refinementSignal.signal, () => refinementOrder.push( 'distant furniture' ), 0.03 );
-const nearbyRefinement = sharedMeshQueue.run( refinementSignal.signal, () => refinementOrder.push( 'near bench' ), 0.15 );
+const distantRefinement = sharedMeshQueue.run( refinementSignal.signal, () => refinementOrder.push( 'distant furniture' ), { distanceMeters: 18, screenBenefit: 1 } );
+const nearbyRefinement = sharedMeshQueue.run( refinementSignal.signal, () => refinementOrder.push( 'near bench' ), { distanceMeters: 4, screenBenefit: 0.1 } );
 await Promise.all( [ distantRefinement, nearbyRefinement ] );
-assert.deepEqual( refinementOrder, [ 'near bench', 'distant furniture' ], 'the deferred shared queue gathers cross-component demand and completes the larger projected object first' );
+assert.deepEqual( refinementOrder, [ 'near bench', 'distant furniture' ], 'the deferred shared queue gathers cross-component demand and completes the nearer surface before a larger distant one' );
 disposeWorldPackage( sharedQueueRoot );
 console.log('Shared mesh-refinement queue prioritizes nearby projected geometry across components');

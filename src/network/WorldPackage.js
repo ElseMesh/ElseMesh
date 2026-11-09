@@ -210,10 +210,11 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0, now = perform
 	const requests = [];
 	for ( const [ targetID, target ] of state.progressiveTextureTargets ) {
 		if ( state.progressiveTextureJobs.has( targetID ) ) continue;
-		let screenFraction = 0;
+		let screenFraction = 0, distanceMeters = Infinity;
 		for ( const assetId of target.sourceAssets.keys() ) {
-			const assetFraction = textureAssetScreenFraction( state, assetId, camera, textureProjectionRevision );
-			screenFraction = Math.max( screenFraction, assetFraction );
+			const view = textureAssetViewDemand( state, assetId, camera, textureProjectionRevision );
+			screenFraction = Math.max( screenFraction, view.fraction );
+			distanceMeters = Math.min( distanceMeters, view.distanceMeters );
 		}
 		if ( ! screenFraction ) continue;
 		if ( now < ( target.retryAfter || 0 ) ) {
@@ -244,9 +245,9 @@ function updateWorldPackageTextureLOD( root, camera, loadBias = 0, now = perform
 		if ( ! source ) continue;
 		const offset = 80 + nextLevelIndex * 24;
 		const bytes = Number( new DataView( target.headerAndIndex.buffer, target.headerAndIndex.byteOffset, target.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
-		requests.push( { targetID, target, ...source, levelIndex: nextLevelIndex, priority: screenFraction * screenFraction / Math.max( 1, bytes ) } );
+		requests.push( { targetID, target, ...source, levelIndex: nextLevelIndex, priority: { distanceMeters, screenBenefit: screenFraction * screenFraction / Math.max( 1, bytes ) } } );
 	}
-	requests.sort( ( a, b ) => b.priority - a.priority );
+	requests.sort( ( a, b ) => a.priority.distanceMeters - b.priority.distanceMeters || b.priority.screenBenefit - a.priority.screenBenefit );
 	if ( ! requests.length ) return;
 	state.textureLODQueue ||= new LODLoadQueue( 1 );
 	// Re-evaluate visibility and priority before admitting the next job. Enqueuing
@@ -333,7 +334,7 @@ function textureCameraProjectionRevision( state, camera, loadBias, viewHeight ) 
 	return state.textureProjectionRevision;
 }
 
-function textureAssetScreenFraction( state, assetId, camera, viewRevision ) {
+function textureAssetViewDemand( state, assetId, camera, viewRevision ) {
 	const cache = state.textureAssetScreenFractions || ( state.textureAssetScreenFractions = new Map() );
 	const cached = cache.get( assetId );
 	const demands = state.staticModelTextureDemand?.get( assetId ) || [];
@@ -344,20 +345,27 @@ function textureAssetScreenFraction( state, assetId, camera, viewRevision ) {
 		const cachedDemand = cachedDemands?.[ demandIndex ++ ];
 		if ( cachedDemand?.runtime !== demand.runtime || cachedDemand.viewRevision !== ( demand.runtime.viewRevision ?? 0 ) ) demandsMatch = false;
 	}
-	if ( cached?.viewRevision === viewRevision && demandsMatch ) return cached.fraction;
-	let fraction = 0;
+	if ( cached?.viewRevision === viewRevision && demandsMatch ) return cached;
+	let fraction = 0, distanceMeters = Infinity;
 	for ( const object of state.objectsByAsset.get( assetId ) || [] ) {
 		const projected = cachedProjectedBoundsScreenFraction( state, object, camera, viewRevision );
-		if ( projected !== null ) fraction = Math.max( fraction, projected );
+		if ( projected !== null ) {
+			fraction = Math.max( fraction, projected );
+			distanceMeters = Math.min( distanceMeters, textureBoundsSurfaceDistance( object, camera ) );
+		}
 	}
 	const demandViews = [];
 	for ( const demand of demands ) {
-		const projected = staticModelTextureScreenFraction( demand, camera );
-		if ( projected !== null ) fraction = Math.max( fraction, projected );
+		const projected = staticModelTextureViewDemand( demand, camera );
+		if ( projected.fraction !== null ) {
+			fraction = Math.max( fraction, projected.fraction );
+			distanceMeters = Math.min( distanceMeters, projected.distanceMeters );
+		}
 		demandViews.push( { runtime: demand.runtime, viewRevision: demand.runtime.viewRevision ?? 0 } );
 	}
-	cache.set( assetId, { viewRevision, fraction, demandViews } );
-	return fraction;
+	const result = { viewRevision, fraction, distanceMeters, demandViews };
+	cache.set( assetId, result );
+	return result;
 }
 
 export function invalidateWorldPackageTextureProjection( root, assetIDs = null ) {
@@ -407,14 +415,18 @@ function cachedProjectedBoundsScreenFraction( state, object, camera, viewRevisio
 }
 
 export function staticModelTextureScreenFraction( { runtime, modelIndex, lodIndex }, camera ) {
-	if ( runtime.disposed ) return null;
+	return staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera ).fraction;
+}
+
+function staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera ) {
+	if ( runtime.disposed ) return { fraction: null, distanceMeters: Infinity };
 	const viewRevision = runtime.viewRevision ?? 0;
 	const key = `${ modelIndex }:${ lodIndex }`;
 	const cached = runtime.textureScreenFractionCache?.get( key );
-	if ( cached?.viewRevision === viewRevision ) return cached.fraction;
+	if ( cached?.viewRevision === viewRevision ) return cached;
 	const model = runtime.document.models[ modelIndex ];
 	const group = runtime.planner._groupsByModel[ modelIndex ][ lodIndex ];
-	let maximum = null;
+	let maximum = null, distanceMeters = Infinity;
 	_staticTextureObject.streamingBounds = model.bounds;
 	for ( let i = 0; i < group.count; i ++ ) {
 		const instance = runtime.document.instances[ group.indices[ i ] ];
@@ -422,10 +434,21 @@ export function staticModelTextureScreenFraction( { runtime, modelIndex, lodInde
 		_staticTextureObject.transform.rotation = instance.rotation;
 		_staticTextureObject.scale = instance.scale;
 		const fraction = projectedBoundsScreenFraction( _staticTextureObject, camera );
-		if ( fraction !== null ) maximum = Math.max( maximum ?? 0, fraction );
+		if ( fraction !== null ) {
+			maximum = Math.max( maximum ?? 0, fraction );
+			const plannedDistance = runtime.planner._viewDistanceByInstance?.[ group.indices[ i ] ];
+			distanceMeters = Math.min( distanceMeters, Number.isFinite( plannedDistance ) ? plannedDistance : textureBoundsSurfaceDistance( _staticTextureObject, camera ) );
+		}
 	}
-	( runtime.textureScreenFractionCache ||= new Map() ).set( key, { viewRevision, fraction: maximum } );
-	return maximum;
+	const result = { viewRevision, fraction: maximum, distanceMeters };
+	( runtime.textureScreenFractionCache ||= new Map() ).set( key, result );
+	return result;
+}
+
+function textureBoundsSurfaceDistance( object, camera ) {
+	transformBoundsCenter( object, object.streamingBounds.center, _textureBoundsCenter );
+	const radius = object.streamingBounds.radius * Math.max( ...( object.scale || [ 1, 1, 1 ] ).map( Math.abs ) );
+	return Math.max( 0, camera.position.distanceTo( _textureBoundsCenter ) - radius );
 }
 
 function indexPackageObjectByAsset( state, object ) {

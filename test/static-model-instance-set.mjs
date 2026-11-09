@@ -209,7 +209,10 @@ gatedRuntime.dispose();
 
 const priorityDocument = {
 	...valid,
-	models: [ 'far-furniture', 'near-bench' ].map( id => ( { ...valid.models[ 0 ], id } ) ),
+	models: [
+		{ ...valid.models[ 0 ], id: 'far-furniture', bounds: { ...valid.models[ 0 ].bounds, radius: 6 } },
+		{ ...valid.models[ 0 ], id: 'near-bench' },
+	],
 	instances: [
 		{ ...valid.instances[ 0 ], model: 'far-furniture', position: [ 0, 0, - 18 ] },
 		{ ...valid.instances[ 0 ], model: 'near-bench', position: [ 0, 0, - 4 ] },
@@ -226,7 +229,7 @@ const priorityCamera = new PerspectiveCamera( 60, 1, 0.1, 100 );
 priorityCamera.lookAt( 0, 0, - 1 );
 priorityRuntime.update( 1 / 60, priorityCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( priorityRequests, [ [ 'near-bench', 1 ], [ 'far-furniture', 1 ] ], 'visible mesh refinement prioritizes the larger nearby view before distant detail, independent of model descriptor order' );
+assert.deepEqual( priorityRequests, [ [ 'near-bench', 1 ], [ 'far-furniture', 1 ] ], 'visible mesh refinement prioritizes the closer surface before a larger distant bound, independent of model descriptor order' );
 priorityRuntime.dispose();
 
 let disposedRuntime = false;

@@ -82,6 +82,7 @@ export class StaticModelInstanceSetRuntime {
 		this.loadedLods = document.models.map( () => new Set( [ 0 ] ) );
 		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
 		this.desiredLodPriorities = new Float32Array( document.models.length );
+		this.desiredLodDistances = new Float32Array( document.models.length ).fill( Infinity );
 		this.pendingLods = new Map();
 		this.retryAfter = new Map();
 		this.disposeBatches = dispose;
@@ -159,13 +160,18 @@ export class StaticModelInstanceSetRuntime {
 				let desiredLevel = -1;
 				for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
 				this.desiredLods[ modelIndex ] = desiredLevel;
-				let priority = 0;
+				let priority = 0, distanceMeters = Infinity;
 				const loadedMax = Math.max( ...this.loadedLods[ modelIndex ] );
 				for ( let visibleLevel = loadedMax + 1; visibleLevel <= desiredLevel; visibleLevel ++ ) {
 					const group = groups[ visibleLevel ];
-					for ( let index = 0; index < group.count; index ++ ) priority = Math.max( priority, this.planner._projectedRadiusByInstance[ group.indices[ index ] ] );
+					for ( let index = 0; index < group.count; index ++ ) {
+						const instanceIndex = group.indices[ index ];
+						priority = Math.max( priority, this.planner._projectedRadiusByInstance[ instanceIndex ] );
+						distanceMeters = Math.min( distanceMeters, this.planner._viewDistanceByInstance[ instanceIndex ] );
+					}
 				}
 				this.desiredLodPriorities[ modelIndex ] = priority;
+				this.desiredLodDistances[ modelIndex ] = distanceMeters;
 			}
 			const desiredLevel = this.desiredLods[ modelIndex ];
 			const loaded = this.loadedLods[ modelIndex ];
@@ -174,7 +180,7 @@ export class StaticModelInstanceSetRuntime {
 			const key = `${ modelIndex }:${ level }`;
 			if ( desiredLevel < level ) this.retryAfter.delete( key );
 			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
-				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ] } );
+				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ], distanceMeters: this.desiredLodDistances[ modelIndex ] } );
 			}
 			for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
 		}
@@ -183,12 +189,13 @@ export class StaticModelInstanceSetRuntime {
 			return;
 		}
 		if ( ! this.loadLOD ) return;
-		// Refine the most screen-prominent visible geometry first. Model and asset
-		// descriptor order is unrelated to what the player notices in the view.
-		candidates.sort( ( a, b ) => b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
-		for ( const { modelIndex, level, key, loaded, projectedRadius } of candidates ) {
+		// Upgrade the closest visible surfaces first. Projected size then favors
+		// the most noticeable geometry at similar distances; descriptor order is
+		// unrelated to the player's immediate view.
+		candidates.sort( ( a, b ) => a.distanceMeters - b.distanceMeters || b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
+		for ( const { modelIndex, level, key, loaded, projectedRadius, distanceMeters } of candidates ) {
 			this.retryAfter.delete( key );
-			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal, projectedRadius ) ).then( () => {
+			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal, { distanceMeters, screenBenefit: projectedRadius } ) ).then( () => {
 				if ( ! this.disposed ) {
 					loaded.add( level );
 					this._plannerDirty = true;

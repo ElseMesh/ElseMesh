@@ -22,7 +22,7 @@ const unregisterStaticModelTextureDemand = registerStaticModelTextureDemand( roo
 for ( const [ id, distance ] of [ [ 'near', 4 ], [ 'far', 20 ], [ 'middle', 10 ] ] ) {
  const image = { imageIndices: [ 0 ], levelCount: 3 };
  setWorldPackageProgressiveAsset( root, id, { textures: [ image ] } );
- const object = { transform: { position: [ 0, 0, -distance ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } };
+ const object = { transform: { position: [ 0, 0, -distance ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: id === 'far' ? 6 : 1 } };
  state.objectsByAsset.set( id, new Set( [ object ] ) );
  state.progressiveTextureTargets.set( id, { sourceAssets: new Map( [ [ id, [ 0 ] ] ] ), baseWidth: 512, baseHeight: 512, levelCount: 3, headerAndIndex: header, levels: new Map( [ [ 2, {} ] ] ) } );
 }
@@ -39,7 +39,7 @@ assert.equal( state.progressiveTextureJobs.size, 0, 'texture mip scheduling wait
 state.coarseCoverageReady = true;
 updateWorldPackageLOD( root, camera );
 assert.equal( objectLODUpdates, 1 );
-assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'near' ], 'only the highest-priority candidate enters the queue' );
+assert.deepEqual( [ ...state.progressiveTextureJobs.keys() ], [ 'near' ], 'near texture refinement wins even when the farther candidate has a much larger bound' );
 assert.equal( state.textureLODScheduleDirty, false, 'the stable view is marked scheduled after planning' );
 const nearObject = state.objectsByAsset.get( 'near' ).values().next().value;
 const stableProjection = state.textureObjectProjectionCache.get( nearObject );
@@ -97,7 +97,7 @@ const retryState = { progressiveAssets: new Map(), progressiveTextureTargets: ne
 const retryRoot = { userData: { worldPackage: retryState } };
 for ( const [ id, distance ] of [ [ 'near', 4 ], [ 'far', 20 ] ] ) {
  setWorldPackageProgressiveAsset( retryRoot, id, { textures: [ { imageIndices: [ 0 ], levelCount: 3 } ] } );
- retryState.objectsByAsset.set( id, new Set( [ { transform: { position: [ 0, 0, -distance ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 1 } } ] ) );
+ retryState.objectsByAsset.set( id, new Set( [ { transform: { position: [ 0, 0, -distance ] }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: id === 'far' ? 6 : 1 } } ] ) );
  retryState.progressiveTextureTargets.set( id, { sourceAssets: new Map( [ [ id, [ 0 ] ] ] ), baseWidth: 512, baseHeight: 512, levelCount: 3, headerAndIndex: header, levels: new Map( [ [ 2, {} ] ] ) } );
 }
 const retryJobs = [];
