@@ -2,6 +2,7 @@ import { WORLD_MATERIAL_GRAPH_INPUT_TYPES, validateWorldMaterialGraph, worldMate
 
 const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
+	worldVertexPosition: { wgsl: '( v.model * vec4f( v.position, 1.0 ) ).xyz', glsl: 'emgWorldVertexPosition.xyz' },
 	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
 	worldNormal: { fragmentOnly: true, fragmentWGSL: 'in.N', fragmentGLSL: 'vEmg_worldNormal' },
 	frontFacing: { fragmentOnly: true, builtinFragment: true, fragmentWGSL: 'in.front', fragmentGLSL: 'gl_FrontFacing' },
@@ -91,12 +92,13 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	if ( graph.nodes.some( node => [ 'textureSample', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'Implicit texture sampling and derivatives are only available to fragment outputs' );
 	if ( graph.nodes.some( node => node.op === 'input' && INPUT_SOURCES[ node.name ].fragmentOnly && vertexRequired.has( node.id ) ) ) throw new Error( 'World-space fragment inputs are only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
+	const fragmentInputs = new Set( graph.nodes.filter( node => node.op === 'input' && fragmentRequired.has( node.id ) ).map( node => node.name ) );
 	const textureSlots = [ ...new Set( graph.nodes.filter( node => ( fragmentRequired.has( node.id ) || vertexRequired.has( node.id ) ) && [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) ).map( node => node.slot ) ) ];
 	const attributes = {}, varyings = {};
 	for ( const name of usedInputs ) {
 		const source = INPUT_SOURCES[ name ];
 		if ( source.attribute ) attributes[ source.attribute ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
-		if ( ! source.uniform && ! source.builtinFragment && ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
+		if ( fragmentInputs.has( name ) && ! source.uniform && ! source.builtinFragment && ! ( backend === 'webgpu' && source.fragmentOnly ) ) varyings[ `emg_${name}` ] = backend === 'webgpu' ? wgslType( inputTypes[ name ] ) : glslType( inputTypes[ name ] );
 	}
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
 	const emitNodes = ( stage, required, prefix = 'emg_' ) => {
@@ -124,7 +126,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	const vertex = emitNodes( 'vertex', vertexRequired ), fragment = emitNodes( 'fragment', fragmentRequired );
 	const lightingFragment = backend === 'webgl' ? emitNodes( 'fragment', lightingFragmentRequired ) : null;
 	const opacityFragment = backend === 'webgl' && graph.outputs.opacity ? emitNodes( 'fragment', opacityRequired, 'emgAlpha_' ) : null;
-	const vertexAssignments = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].fragmentOnly ).map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
+	const vertexAssignments = usedInputs.filter( name => fragmentInputs.has( name ) && ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].fragmentOnly ).map( name => backend === 'webgpu' ? `o.emg_${name} = ${INPUT_SOURCES[ name ].wgsl};` : `vEmg_${name} = ${INPUT_SOURCES[ name ].glsl};` );
 	const vertexOutputs = [];
 	for ( const [ output, target ] of [ [ 'vertexPosition', 'position' ], [ 'vertexNormal', 'normal' ] ] ) {
 		const id = graph.outputs[ output ];
@@ -137,7 +139,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 		const id = graph.outputs[ output ];
 		if ( id ) surfaceLines.push( `${target} ${operator} ${output === 'surfaceNormal' ? `normalize( ${fragment.names.get( id )} )` : fragment.names.get( id )};` );
 	}
-	const glslVaryings = usedInputs.filter( name => ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].builtinFragment ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
+	const glslVaryings = usedInputs.filter( name => fragmentInputs.has( name ) && ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].builtinFragment ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
 	const glslUniforms = [ ...glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ), ...( usedInputs.includes( 'pixelPosition' ) ? [ 'uniform vec2 emgViewportSize;' ] : [] ) ].join( '\n' );
 	const needsNormalFromSlope = graph.nodes.some( node => node.op === 'normalFromSlope' && fragmentRequired.has( node.id ) );
@@ -171,9 +173,9 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 			declarations: glslVaryings,
 			uniforms: glslUniforms,
 			uniformInputs: Object.freeze( glslUniformInputs.map( name => INPUT_SOURCES[ name ].glsl ) ),
-			worldPosition: usedInputs.includes( 'worldPosition' ),
-			worldNormal: usedInputs.includes( 'worldNormal' ),
-			viewportSize: usedInputs.includes( 'pixelPosition' ),
+			worldPosition: fragmentInputs.has( 'worldPosition' ),
+			worldNormal: fragmentInputs.has( 'worldNormal' ),
+			viewportSize: fragmentInputs.has( 'pixelPosition' ),
 			fragmentHelpers: glslFragmentHelpers,
 			vertex: commonVertex,
 			fragment: [ lightingFragment?.code, ...webglLightingLines ].filter( Boolean ).join( '\n' ),

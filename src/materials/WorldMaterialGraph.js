@@ -66,7 +66,16 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations, compiled.glsl.uniforms ].filter( Boolean ).join( '\n' );
 		shader.vertexShader = insert( shader.vertexShader, '#include <common>', vertexDecl );
 		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
-		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${graphVertex}` );
+		const worldVertexPosition = compiled.inputs.includes( 'worldVertexPosition' ) ? `
+vec4 emgWorldVertexPosition = vec4( transformed, 1.0 );
+#ifdef USE_BATCHING
+emgWorldVertexPosition = batchingMatrix * emgWorldVertexPosition;
+#endif
+#ifdef USE_INSTANCING
+emgWorldVertexPosition = instanceMatrix * emgWorldVertexPosition;
+#endif
+emgWorldVertexPosition = modelMatrix * emgWorldVertexPosition;` : '';
+		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${worldVertexPosition}\n${graphVertex}` );
 		if ( fragment && compiled.glsl.worldPosition ) {
 			const marker = '#include <worldpos_vertex>';
 			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );

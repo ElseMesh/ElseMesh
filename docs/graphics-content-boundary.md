@@ -209,9 +209,10 @@ as signed GLB data while keeping their interpretation in world-authored graph
 data.
 `textureSampleLevel` can now also feed vertex outputs, with the same signed
 glTF texture bound in WebGPU, WebGL color, and WebGL depth/shadow materials.
-That still does not express Tidewater's complete traveling gust field: the
-graph has no world-space vertex-position input or shared integrated gust offset
-yet. Define those inputs generically and implement both backends before
+The graph also exposes `worldVertexPosition`, computed after object and instance
+transforms but before graph deformation, so vertex texture coordinates can stay
+anchored across instances. The remaining wind gap is a shared, per-world
+integrated gust offset; design its ownership around portal rendering before
 switching any palm presenter.
 ElseMesh then owns LOD selection, instance batching, wind translation, depth,
 and shadow presentation for both backends. Do not carry the current WGSL vertex

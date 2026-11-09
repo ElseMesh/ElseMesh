@@ -69,8 +69,14 @@ try {
 		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
 	};
 	graph.nodes.push(
+		{ id: 'worldVertexPosition', op: 'input', name: 'worldVertexPosition' },
+		{ id: 'worldVertexX', op: 'x', args: [ 'worldVertexPosition' ] },
+		{ id: 'worldVertexZ', op: 'z', args: [ 'worldVertexPosition' ] },
+		{ id: 'worldVertexUV', op: 'vec2', args: [ 'worldVertexX', 'worldVertexZ' ] },
+	);
+	graph.nodes.push(
 		{ id: 'vertexLod', op: 'constant', value: 0 },
-		{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'uv', lod: 'vertexLod' },
+		{ id: 'vertexTexture', op: 'textureSampleLevel', slot: 'baseColor', uv: 'worldVertexUV', lod: 'vertexLod' },
 		{ id: 'vertexTextureGreen', op: 'y', args: [ 'vertexTexture' ] },
 		{ id: 'vertexTextureScale', op: 'constant', value: 0.02 },
 		{ id: 'vertexTextureLift', op: 'multiply', args: [ 'vertexTextureGreen', 'vertexTextureScale' ] },

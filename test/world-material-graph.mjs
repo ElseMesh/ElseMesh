@@ -47,6 +47,24 @@ const vertexDataGraph = {
 	],
 	outputs: { roughness: 'sum' },
 };
+
+const worldVertexPositionGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'position', op: 'input', name: 'position' },
+		{ id: 'worldVertexPosition', op: 'input', name: 'worldVertexPosition' },
+	],
+	outputs: { baseColor: 'worldVertexPosition', vertexPosition: 'position' },
+};
+const worldVertexPositionWebGPU = compileWorldMaterialGraph( worldVertexPositionGraph, 'webgpu' );
+const worldVertexPositionWebGL = compileWorldMaterialGraph( worldVertexPositionGraph, 'webgl' );
+assert.match( worldVertexPositionWebGPU.vertex, /o\.emg_worldVertexPosition = \( v\.model \* vec4f\( v\.position, 1\.0 \) \)\.xyz/ );
+assert.match( worldVertexPositionWebGPU.surface, /in\.vs\.emg_worldVertexPosition/ );
+assert.match( worldVertexPositionWebGL.glsl.vertex, /vEmg_worldVertexPosition = emgWorldVertexPosition\.xyz/ );
+assert.match( worldVertexPositionWebGL.glsl.fragment, /diffuseColor\.rgb \*= vEmg_worldVertexPosition/ );
+const worldVertexOnly = compileWorldMaterialGraph( { ...worldVertexPositionGraph, outputs: { vertexPosition: 'position' } }, 'webgpu' );
+assert.equal( Object.hasOwn( worldVertexOnly.varyings, 'emg_worldVertexPosition' ), false, 'vertex-only world coordinates do not add an unused varying' );
+assert.doesNotMatch( worldVertexOnly.vertex, /o\.emg_worldVertexPosition/ );
 const vertexDataWebGPU = compileWorldMaterialGraph( vertexDataGraph, 'webgpu' ), vertexDataWebGL = compileWorldMaterialGraph( vertexDataGraph, 'webgl' );
 assert.deepEqual( vertexDataWebGPU.attributes, { vdata1: 'vec4f', vdata2: 'vec4f' }, 'WebGPU declares both generic auxiliary vertex streams' );
 assert.match( vertexDataWebGPU.surface, /let emg_x: f32 = in\.vs\.emg_vdata1\.x/ );
@@ -177,7 +195,6 @@ assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs
 const surfaceNormalGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [
-		{ id: 'worldNormal', op: 'input', name: 'worldNormal' },
 		{ id: 'tilt', op: 'constant', value: [ 0.1, 1, 0 ] },
 		{ id: 'normal', op: 'normalize', args: [ 'tilt' ] },
 	],
@@ -187,19 +204,17 @@ const surfaceNormalWebGPU = compileWorldMaterialGraph( surfaceNormalGraph, 'webg
 const surfaceNormalWebGL = compileWorldMaterialGraph( surfaceNormalGraph, 'webgl' );
 assert.match( surfaceNormalWebGPU.surface, /s\.normal = normalize\( emg_normal \)/ );
 assert.match( surfaceNormalWebGL.glsl.fragment, /normal = normalize\( emg_normal \)/ );
-assert.match( surfaceNormalWebGL.glsl.declarations, /varying vec3 vEmg_worldNormal/ );
-assert.equal( surfaceNormalWebGL.glsl.worldNormal, true );
-const directSurfaceNormal = compileWorldMaterialGraph( { ...surfaceNormalGraph, nodes: [ surfaceNormalGraph.nodes[ 0 ] ], outputs: { surfaceNormal: 'worldNormal' } }, 'webgl' );
+assert.equal( surfaceNormalWebGL.glsl.declarations, '', 'unused world-position inputs do not create varyings' );
+assert.equal( surfaceNormalWebGL.glsl.worldNormal, false );
+const directSurfaceNormalGraph = { ...surfaceNormalGraph, nodes: [ { id: 'worldNormal', op: 'input', name: 'worldNormal' } ], outputs: { surfaceNormal: 'worldNormal' } };
+const directSurfaceNormal = compileWorldMaterialGraph( directSurfaceNormalGraph, 'webgl' );
 assert.match( directSurfaceNormal.glsl.fragment, /^normal = normalize\( vEmg_worldNormal \);$/m, 'the graph compiler leaves a world-space output for the WebGL adapter to transform' );
-assert.throws( () => compileWorldMaterialGraph( { ...surfaceNormalGraph, outputs: { vertexNormal: 'worldNormal' } }, 'webgl' ), /fragment outputs/ );
-const graphNormalMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), surfaceNormalGraph );
-const graphNormalShader = { vertexShader: '#include <common>\n#include <defaultnormal_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
-graphNormalMaterial.material.onBeforeCompile( graphNormalShader );
-assert.match( graphNormalShader.vertexShader, /vEmg_worldNormal = inverseTransformDirection\( normalize\( transformedNormal \), viewMatrix \)/ );
-assert.match( graphNormalShader.fragmentShader, /normal = normalize\( mat3\( viewMatrix \) \* emg_normal \)/ );
-const directNormalMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), { ...surfaceNormalGraph, nodes: [ surfaceNormalGraph.nodes[ 0 ] ], outputs: { surfaceNormal: 'worldNormal' } } );
+assert.equal( directSurfaceNormal.glsl.worldNormal, true );
+assert.throws( () => compileWorldMaterialGraph( { ...directSurfaceNormalGraph, outputs: { vertexNormal: 'worldNormal' } }, 'webgl' ), /fragment outputs/ );
+const directNormalMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), directSurfaceNormalGraph );
 const directNormalShader = { vertexShader: '#include <common>\n#include <defaultnormal_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
 directNormalMaterial.material.onBeforeCompile( directNormalShader );
+assert.match( directNormalShader.vertexShader, /vEmg_worldNormal = inverseTransformDirection\( normalize\( transformedNormal \), viewMatrix \)/ );
 assert.match( directNormalShader.fragmentShader, /normal = normalize\( mat3\( viewMatrix \) \* vEmg_worldNormal \)/ );
 directNormalMaterial.material.dispose();
 const frontFacingGraph = {
@@ -263,7 +278,6 @@ assert.match( colorRGBWebGPU.vertex, /o\.emg_colorRGB = v\.color\.rgb/ );
 assert.equal( colorRGBWebGL.material.vertexColors, true );
 assert.match( compileWorldMaterialGraph( colorRGBGraph, 'webgl' ).glsl.vertex, /vEmg_colorRGB = color/ );
 colorRGBWebGL.material.dispose();
-graphNormalMaterial.material.dispose();
 
 const derivativeGraph = {
 	format: 'elsemesh.material-graph/1',
