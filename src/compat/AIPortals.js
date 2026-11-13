@@ -161,6 +161,7 @@ export async function launchAIPortals() {
 		}
 		if ( engine ) {
 			engine.settings.speed = 0;
+			engine.speed = 0;
 			const keyLookX = Number( keys.has( 'ArrowRight' ) ) - Number( keys.has( 'ArrowLeft' ) );
 			const keyLookY = Number( keys.has( 'ArrowDown' ) ) - Number( keys.has( 'ArrowUp' ) );
 			lookYaw -= keyLookX * LOOK_RATE * dt;
