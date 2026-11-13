@@ -27,7 +27,7 @@ function aiPortalsThreeCompatibility() {
 			if ( ! importer ) return null;
 			const cleanImporter = importer.split( '?' )[ 0 ];
 			if ( cleanImporter !== aiPortalsRoot && ! cleanImporter.startsWith( `${ aiPortalsRoot }${ sep }` ) ) return null;
-			if ( source === 'three' ) return resolve( aiPortalsRoot, 'vendor/three/three.module.min.js' );
+			if ( source === 'three' ) return resolve( 'src/compat/ai-three.js' );
 			if ( source.startsWith( 'three/addons/' ) ) return resolve( aiPortalsRoot, 'vendor', source );
 			return null;
 		},
