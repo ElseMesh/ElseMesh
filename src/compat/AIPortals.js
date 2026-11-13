@@ -63,7 +63,7 @@ function makePanel( root ) {
 	status.textContent = 'Choose a world to load it at the start of its camera path.';
 	const controls = document.createElement( 'p' );
 	controls.className = 'ai-portal-controls';
-	controls.textContent = 'Xbox: left stick move · right stick look · triggers rise/fall · LB faster · A pause · B return. Keyboard: WASD move · mouse look · Space/Ctrl rise/fall · Shift faster · Esc return.';
+	controls.textContent = 'Xbox: left stick move · right stick look · triggers rise/fall · LB faster · A pause · B return. Keyboard: WASD move · mouse/arrows look · Space/Ctrl rise/fall · Shift faster · Esc return.';
 	const actions = document.createElement( 'div' );
 	actions.className = 'ai-portal-actions';
 	const enter = document.createElement( 'button' );
@@ -123,11 +123,12 @@ export async function launchAIPortals() {
 		location.assign( next );
 	} );
 	window.addEventListener( 'keydown', event => {
+		if ( event.code.startsWith( 'Arrow' ) && event.target?.closest?.( '.ai-portal-panel' ) ) return;
 		if ( event.code === 'Escape' ) returnToElseMesh();
 		if ( event.code === 'Space' && engine && ! event.repeat ) engine.settings.paused = ! engine.settings.paused;
-		if ( [ 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight' ].includes( event.code ) ) {
+		if ( [ 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight' ].includes( event.code ) ) {
 			keys.add( event.code );
-			if ( event.code === 'Space' ) event.preventDefault();
+			event.preventDefault();
 		}
 	} );
 	window.addEventListener( 'keyup', event => keys.delete( event.code ) );
@@ -160,6 +161,10 @@ export async function launchAIPortals() {
 		}
 		if ( engine ) {
 			engine.settings.speed = 0;
+			const keyLookX = Number( keys.has( 'ArrowRight' ) ) - Number( keys.has( 'ArrowLeft' ) );
+			const keyLookY = Number( keys.has( 'ArrowDown' ) ) - Number( keys.has( 'ArrowUp' ) );
+			lookYaw -= keyLookX * LOOK_RATE * dt;
+			lookPitch = Math.max( -PITCH_LIMIT, Math.min( PITCH_LIMIT, lookPitch - keyLookY * LOOK_RATE * dt ) );
 			if ( engine.cur ) {
 				const moveForward = ( Number( keys.has( 'KeyW' ) ) - Number( keys.has( 'KeyS' ) ) ) - axis( pad?.axes?.[ 1 ] );
 				const moveRight = ( Number( keys.has( 'KeyD' ) ) - Number( keys.has( 'KeyA' ) ) ) + axis( pad?.axes?.[ 0 ] );
