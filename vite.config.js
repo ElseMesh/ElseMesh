@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createReadStream, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { appendFile, mkdir, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { defineConfig } from 'vite';
 
 // Builds run from a separate .build worktree whose per-worktree HEAD can lag
@@ -17,6 +17,22 @@ const basisFiles = new Map( [
 	[ 'basis_transcoder.js', 'text/javascript; charset=utf-8' ],
 	[ 'basis_transcoder.wasm', 'application/wasm' ],
 ].map( ( [ name, mimeType ] ) => [ name, { mimeType, bytes: readFileSync( resolve( basisDirectory, name ) ) } ] ) );
+const aiPortalsRoot = resolve( 'worlds/ai-portals' );
+
+function aiPortalsThreeCompatibility() {
+	return {
+		name: 'elsemesh-ai-portals-three-compatibility',
+		enforce: 'pre',
+		resolveId( source, importer ) {
+			if ( ! importer ) return null;
+			const cleanImporter = importer.split( '?' )[ 0 ];
+			if ( cleanImporter !== aiPortalsRoot && ! cleanImporter.startsWith( `${ aiPortalsRoot }${ sep }` ) ) return null;
+			if ( source === 'three' ) return resolve( aiPortalsRoot, 'vendor/three/three.module.min.js' );
+			if ( source.startsWith( 'three/addons/' ) ) return resolve( aiPortalsRoot, 'vendor', source );
+			return null;
+		},
+	};
+}
 
 function basisTranscoderAssets() {
 	return {
@@ -197,7 +213,7 @@ export default defineConfig( {
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), basisTranscoderAssets(), {
+	plugins: [ aiPortalsThreeCompatibility(), defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), basisTranscoderAssets(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html, context ) {
 			if ( context.filename !== resolve( 'index.html' ) ) return;

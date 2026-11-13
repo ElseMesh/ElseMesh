@@ -12,11 +12,14 @@ try {
 	console.warn( 'Optional ElseMesh account configuration is unavailable:', error.message );
 }
 
-const localWorldURL = await discoverLocalWorldURL();
-if ( localWorldURL ) history.replaceState( null, '', localWorldURL );
-const homeWorldURL = localWorldURL ? null : defaultHomeWorldURL();
-if ( homeWorldURL ) location.replace( homeWorldURL );
-else {
+if ( new URLSearchParams( location.search ).has( 'aiPortals' ) || new URLSearchParams( location.search ).has( 'aiPortal' ) ) {
+	await ( await import( './compat/AIPortals.js' ) ).launchAIPortals();
+} else {
+	const localWorldURL = await discoverLocalWorldURL();
+	if ( localWorldURL ) history.replaceState( null, '', localWorldURL );
+	const homeWorldURL = localWorldURL ? null : defaultHomeWorldURL();
+	if ( homeWorldURL ) location.replace( homeWorldURL );
+	else {
 
 // ?bench runs in background tabs too (automation): rAF does not fire in a hidden page
 if ( /[?&]bench\b/.test( location.search ) ) {
@@ -24,6 +27,8 @@ if ( /[?&]bench\b/.test( location.search ) ) {
 	const raf = window.requestAnimationFrame.bind( window ), caf = window.cancelAnimationFrame.bind( window );
 	window.requestAnimationFrame = ( cb ) => document.visibilityState === 'hidden' ? setTimeout( () => cb( performance.now() ), 16 ) : raf( cb );
 	window.cancelAnimationFrame = ( id ) => ( clearTimeout( id ), caf( id ) );
+
+}
 
 }
 
