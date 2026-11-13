@@ -63,7 +63,7 @@ function makePanel( root ) {
 	status.textContent = 'Choose a world to load it at the start of its camera path.';
 	const controls = document.createElement( 'p' );
 	controls.className = 'ai-portal-controls';
-	controls.textContent = 'Xbox: left stick move · right stick look · triggers rise/fall · LB faster · A pause · B return. Keyboard: WASD move · mouse/arrows look · Space/Ctrl rise/fall · Shift faster · Esc return.';
+	controls.textContent = 'Fly through the portal at the end of the path to enter another AI world. Xbox: left stick move · right stick look · triggers rise/fall · LB faster · A pause · B return. Keyboard: WASD move · mouse/arrows look · Space/Ctrl rise/fall · Shift faster · Esc return.';
 	const actions = document.createElement( 'div' );
 	actions.className = 'ai-portal-actions';
 	const enter = document.createElement( 'button' );
@@ -114,6 +114,13 @@ export async function launchAIPortals() {
 	const forward = new THREE.Vector3();
 	const right = new THREE.Vector3();
 	const movement = new THREE.Vector3();
+	const portalLocal = new THREE.Vector3();
+	const worldOffset = new THREE.Vector3();
+	const worldMapping = new THREE.Matrix4();
+	const worldTurn = new THREE.Quaternion();
+	const worldScale = new THREE.Vector3();
+	let previousPortalWorld = null;
+	let previousPortalSide = null;
 
 	const returnToElseMesh = () => { location.href = location.pathname; };
 	ui.exit.addEventListener( 'click', returnToElseMesh );
@@ -179,7 +186,14 @@ export async function launchAIPortals() {
 				freePosition.addScaledVector( movement, FLY_SPEED * ( sprint ? 2.5 : 1 ) * dt );
 				const world = engine.cur;
 				const nearest = world.path.nearestXZ( freePosition.x, freePosition.z );
-				world.dist = nearest.u * world.path.length;
+				world.dist = Math.min( nearest.u * world.path.length, world.path.length - 0.5 );
+				portalLocal.copy( freePosition ).applyMatrix4( world.exitInv );
+				const portal = world.portal;
+				const crossedPortal = previousPortalWorld === world && previousPortalSide > 0 && portalLocal.z <= 0
+					&& Math.abs( portalLocal.x ) <= portal.hx * 0.92 && Math.abs( portalLocal.y ) <= portal.hy * 0.92;
+				if ( crossedPortal ) world.dist = world.path.length;
+				previousPortalSide = portalLocal.z;
+				previousPortalWorld = world;
 			}
 			if ( engine.cur && now - lastStatusUpdate >= 250 ) {
 				lastStatusUpdate = now;
@@ -197,7 +211,7 @@ export async function launchAIPortals() {
 	ui.select.value = selected.id;
 	ui.enter.disabled = true;
 	try {
-		engine = new Engine( canvas, [ selected ], { single: true, fixedSeed: 20261113, quality: 'high' } );
+		engine = new Engine( canvas, WORLDS, { fixedSeed: 20261113, quality: 'high' } );
 		const pose = engine._pose;
 		let spawned = false;
 		engine._pose = function ( world, distance, position, quaternion ) {
@@ -213,12 +227,22 @@ export async function launchAIPortals() {
 			quaternion.copy( baseOrientation ).multiply( yaw ).multiply( pitch );
 			return quaternion;
 		};
-		engine.events.world = world => { ui.status.textContent = `${ world.def.name } · ${ Math.round( world.path.length ) } m camera path`; };
+		engine.events.world = world => {
+			if ( previousPortalWorld && previousPortalWorld !== world ) {
+				worldMapping.multiplyMatrices( world.entry, previousPortalWorld.exitInv );
+				worldMapping.decompose( worldOffset, worldTurn, worldScale );
+				freePosition.applyMatrix4( worldMapping );
+				baseOrientation.premultiply( worldTurn );
+			}
+			previousPortalWorld = world;
+			previousPortalSide = null;
+			ui.status.textContent = `${ world.def.name } · ${ Math.round( world.path.length ) } m camera path`;
+		};
 		engine.events.status = event => {
 			if ( event?.error ) ui.status.textContent = `World error: ${ event.error }`;
 			else if ( event?.lost ) ui.status.textContent = 'WebGL context lost.';
 		};
-		const world = await engine.start( selected, null );
+		const world = await engine.start( selected );
 		world.dist = 0;
 		engine.speed = 0;
 		engine.settings.speed = 0;
