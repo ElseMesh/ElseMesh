@@ -236,6 +236,7 @@ export async function launchAIPortals() {
 			}
 			previousPortalWorld = world;
 			previousPortalSide = null;
+			ui.select.value = world.def.id;
 			ui.status.textContent = `${ world.def.name } · ${ Math.round( world.path.length ) } m camera path`;
 		};
 		engine.events.status = event => {
