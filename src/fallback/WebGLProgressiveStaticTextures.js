@@ -1,5 +1,5 @@
 import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
-import { staticModelTextureScreenFraction } from '../network/WorldPackage.js';
+import { staticModelTextureViewDemand } from '../network/WorldPackage.js';
 
 // Track actual source textures shared by instanced draws, without constructing
 // scene objects for texture demand. One global flight bounds fetch and decode.
@@ -55,29 +55,49 @@ export class WebGLProgressiveStaticTextures {
   this.lastFrame = frame;
   let best = null;
   const viewportHeight = this.fallback.renderer.domElement.height || 1;
-  const fractions = new Map();
+  const demandsByRuntime = new Map();
   for ( const entry of this.entries.values() ) {
    if ( performance.now() < entry.retryAfter ) continue;
-   let fraction = 0;
+   let desired = entry.image.levelCount - 1;
+   const demands = [];
    for ( const registration of entry.registrations ) {
-    let runtimeFractions = fractions.get( registration.runtime );
-    if ( ! runtimeFractions ) fractions.set( registration.runtime, runtimeFractions = new Map() );
+    let runtimeDemands = demandsByRuntime.get( registration.runtime );
+    if ( ! runtimeDemands ) demandsByRuntime.set( registration.runtime, runtimeDemands = new Map() );
     const key = `${registration.modelIndex}:${registration.lodIndex}`;
-    let value = runtimeFractions.get( key );
+    let value = runtimeDemands.get( key );
     if ( value === undefined ) {
-     value = staticModelTextureScreenFraction( registration, camera ) || 0;
-     runtimeFractions.set( key, value );
+     value = staticModelTextureViewDemand( registration, camera );
+     runtimeDemands.set( key, value );
     }
-    fraction = Math.max( fraction, value );
+    if ( value.fraction !== null ) {
+     const pixels = Math.max( 1, value.fraction * viewportHeight * 2 );
+     const level = Math.min( entry.image.levelCount - 1, Math.max( 0, Math.floor( Math.log2( Math.max( entry.image.baseWidth, entry.image.baseHeight ) / pixels ) ) ) );
+     desired = Math.min( desired, level );
+     demands.push( { ...value, level } );
+    }
    }
-   if ( ! fraction ) continue;
-   const pixels = Math.max( 1, fraction * viewportHeight * 2 );
-   const desired = Math.min( entry.image.levelCount - 1, Math.max( 0, Math.floor( Math.log2( Math.max( entry.image.baseWidth, entry.image.baseHeight ) / pixels ) ) ) );
+   if ( ! demands.length ) continue;
    if ( entry.level === desired ) continue;
    const next = entry.level > desired ? entry.level - 1 : desired, offset = 80 + next * 24;
    const bytes = Number( new DataView( entry.image.headerAndIndex.buffer, entry.image.headerAndIndex.byteOffset, entry.image.headerAndIndex.byteLength ).getBigUint64( offset + 8, true ) );
-   const priority = fraction * fraction / Math.max( 1, bytes );
-   if ( ! best || priority > best.priority ) best = { entry, next, priority };
+   // Shared textures can serve near and far placements. Only placements that
+   // need this next mip tier compete for its fetch; distance leads and projected
+   // benefit per byte breaks ties.
+   const nextDemanders = entry.level > desired ? demands.filter( demand => demand.level <= next ) : demands;
+   let distanceMeters = Infinity, centerDistanceMeters = Infinity, fraction = 0;
+   for ( const demand of nextDemanders ) {
+    fraction = Math.max( fraction, demand.fraction );
+    if ( demand.distanceMeters < distanceMeters || demand.distanceMeters === distanceMeters && demand.centerDistanceMeters < centerDistanceMeters ) {
+     distanceMeters = demand.distanceMeters;
+     centerDistanceMeters = demand.centerDistanceMeters;
+    }
+   }
+   const screenBenefit = fraction * fraction / Math.max( 1, bytes );
+   if ( ! best || distanceMeters < best.distanceMeters
+    || distanceMeters === best.distanceMeters && centerDistanceMeters < best.centerDistanceMeters
+    || distanceMeters === best.distanceMeters && centerDistanceMeters === best.centerDistanceMeters && screenBenefit > best.screenBenefit ) {
+    best = { entry, next, distanceMeters, centerDistanceMeters, screenBenefit };
+   }
   }
   if ( ! best ) return;
   const { entry, next } = best;

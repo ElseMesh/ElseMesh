@@ -426,11 +426,7 @@ function cachedProjectedBoundsScreenFraction( state, object, camera, viewRevisio
 	return fraction;
 }
 
-export function staticModelTextureScreenFraction( { runtime, modelIndex, lodIndex }, camera ) {
-	return staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera ).fraction;
-}
-
-function staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera ) {
+export function staticModelTextureViewDemand( { runtime, modelIndex, lodIndex }, camera ) {
 	if ( runtime.disposed ) return { fraction: null, distanceMeters: Infinity, centerDistanceMeters: Infinity };
 	const viewRevision = runtime.viewRevision ?? 0;
 	const key = `${ modelIndex }:${ lodIndex }`;
