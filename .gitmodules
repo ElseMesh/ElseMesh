@@ -7,3 +7,6 @@
 [submodule "third_party/basis_universal"]
 	path = third_party/basis_universal
 	url = https://github.com/BinomialLLC/basis_universal.git
+[submodule "worlds/ai-portals"]
+	path = worlds/ai-portals
+	url = git@github.com:rebroad/ai-portals.git
