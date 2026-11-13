@@ -3,9 +3,11 @@ import * as THREE from '../../worlds/ai-portals/vendor/three/three.module.min.js
 import { WORLDS } from '../../worlds/ai-portals/src/worlds/index.js';
 
 const DEAD_ZONE = 0.14;
-const SPEED_RANGE = 1.6;
 const LOOK_RATE = 1.35;
 const PITCH_LIMIT = 1.15;
+const FLY_SPEED = 10;
+const Y_AXIS = new THREE.Vector3( 0, 1, 0 );
+const X_AXIS = new THREE.Vector3( 1, 0, 0 );
 
 function axis( value ) {
 	if ( ! Number.isFinite( value ) || Math.abs( value ) <= DEAD_ZONE ) return 0;
@@ -61,7 +63,7 @@ function makePanel( root ) {
 	status.textContent = 'Choose a world to load it at the start of its camera path.';
 	const controls = document.createElement( 'p' );
 	controls.className = 'ai-portal-controls';
-	controls.textContent = 'Xbox: left stick travel speed · right stick look · A pause · B return. Keyboard: ↑/↓ speed · Space pause · Esc return.';
+	controls.textContent = 'Xbox: left stick move · right stick look · triggers rise/fall · LB faster · A pause · B return. Keyboard: WASD move · mouse look · Space/Ctrl rise/fall · Shift faster · Esc return.';
 	const actions = document.createElement( 'div' );
 	actions.className = 'ai-portal-actions';
 	const enter = document.createElement( 'button' );
@@ -101,8 +103,17 @@ export async function launchAIPortals() {
 	let lookPitch = 0;
 	let previousButtons = new Set();
 	let previousTime = performance.now();
-	let requestedSpeed = 1;
+	let lastStatusUpdate = 0;
 	let destroyed = false;
+	const keys = new Set();
+	const freePosition = new THREE.Vector3();
+	const baseOrientation = new THREE.Quaternion();
+	const yaw = new THREE.Quaternion();
+	const pitch = new THREE.Quaternion();
+	const worldUp = new THREE.Vector3( 0, 1, 0 );
+	const forward = new THREE.Vector3();
+	const right = new THREE.Vector3();
+	const movement = new THREE.Vector3();
 
 	const returnToElseMesh = () => { location.href = location.pathname; };
 	ui.exit.addEventListener( 'click', returnToElseMesh );
@@ -113,9 +124,20 @@ export async function launchAIPortals() {
 	} );
 	window.addEventListener( 'keydown', event => {
 		if ( event.code === 'Escape' ) returnToElseMesh();
-		if ( event.code === 'Space' && engine ) engine.settings.paused = ! engine.settings.paused;
-		if ( event.code === 'ArrowUp' ) requestedSpeed = Math.min( 2.6, requestedSpeed + 0.15 );
-		if ( event.code === 'ArrowDown' ) requestedSpeed = Math.max( 0.1, requestedSpeed - 0.15 );
+		if ( event.code === 'Space' && engine && ! event.repeat ) engine.settings.paused = ! engine.settings.paused;
+		if ( [ 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight' ].includes( event.code ) ) {
+			keys.add( event.code );
+			if ( event.code === 'Space' ) event.preventDefault();
+		}
+	} );
+	window.addEventListener( 'keyup', event => keys.delete( event.code ) );
+	window.addEventListener( 'blur', () => keys.clear() );
+	canvas.addEventListener( 'click', () => canvas.requestPointerLock?.()?.catch?.( () => {} ) );
+	canvas.addEventListener( 'contextmenu', event => event.preventDefault() );
+	document.addEventListener( 'mousemove', event => {
+		if ( document.pointerLockElement !== canvas ) return;
+		lookYaw -= event.movementX * 0.002;
+		lookPitch = Math.max( -PITCH_LIMIT, Math.min( PITCH_LIMIT, lookPitch - event.movementY * 0.002 ) );
 	} );
 
 	function controlsFrame( now ) {
@@ -124,10 +146,8 @@ export async function launchAIPortals() {
 		previousTime = now;
 		const pad = connectedPad();
 		if ( pad && engine ) {
-			const moveY = axis( pad.axes?.[ 1 ] );
 			const lookX = axis( pad.axes?.[ 2 ] );
 			const lookY = axis( pad.axes?.[ 3 ] );
-			requestedSpeed = Math.min( 2.6, Math.max( 0.1, 1 - moveY * SPEED_RANGE ) );
 			lookYaw -= lookX * LOOK_RATE * dt;
 			lookPitch = Math.max( -PITCH_LIMIT, Math.min( PITCH_LIMIT, lookPitch - lookY * LOOK_RATE * dt ) );
 			const pressed = index => pad.buttons?.[ index ]?.pressed === true || ( pad.buttons?.[ index ]?.value || 0 ) > 0.5;
@@ -137,7 +157,31 @@ export async function launchAIPortals() {
 			if ( buttons.has( 'pause' ) && ! previousButtons.has( 'pause' ) ) engine.settings.paused = ! engine.settings.paused;
 			if ( buttons.has( 'exit' ) && ! previousButtons.has( 'exit' ) ) returnToElseMesh();
 			previousButtons = buttons;
-			engine.settings.speed = requestedSpeed;
+		}
+		if ( engine ) {
+			engine.settings.speed = 0;
+			if ( engine.cur ) {
+				const moveForward = ( Number( keys.has( 'KeyW' ) ) - Number( keys.has( 'KeyS' ) ) ) - axis( pad?.axes?.[ 1 ] );
+				const moveRight = ( Number( keys.has( 'KeyD' ) ) - Number( keys.has( 'KeyA' ) ) ) + axis( pad?.axes?.[ 0 ] );
+				const moveUp = Number( keys.has( 'Space' ) ) - Number( keys.has( 'ControlLeft' ) || keys.has( 'ControlRight' ) )
+					+ Number( ( pad?.buttons?.[ 6 ]?.value || 0 ) > 0.5 ) - Number( ( pad?.buttons?.[ 7 ]?.value || 0 ) > 0.5 );
+				forward.set( 0, 0, -1 ).applyQuaternion( engine.camera.quaternion );
+				right.set( 1, 0, 0 ).applyQuaternion( engine.camera.quaternion );
+				movement.set( 0, 0, 0 ).addScaledVector( forward, moveForward ).addScaledVector( right, moveRight ).addScaledVector( worldUp, moveUp );
+				if ( movement.lengthSq() > 1 ) movement.normalize();
+				const sprint = keys.has( 'ShiftLeft' ) || keys.has( 'ShiftRight' ) || ( pad?.buttons?.[ 4 ]?.pressed === true );
+				freePosition.addScaledVector( movement, FLY_SPEED * ( sprint ? 2.5 : 1 ) * dt );
+				const world = engine.cur;
+				const nearest = world.path.nearestXZ( freePosition.x, freePosition.z );
+				world.dist = nearest.u * world.path.length;
+			}
+			if ( engine.cur && now - lastStatusUpdate >= 250 ) {
+				lastStatusUpdate = now;
+				const world = engine.cur;
+				const mode = engine.settings.paused ? 'simulation paused' : 'manual flight';
+				const position = `${ freePosition.x.toFixed( 1 ) }, ${ freePosition.y.toFixed( 1 ) }, ${ freePosition.z.toFixed( 1 ) } m`;
+				ui.status.textContent = `${ world.def.name } · ${ mode } · ${ position }${ pad ? ' · Xbox connected' : '' }`;
+			}
 		}
 		requestAnimationFrame( controlsFrame );
 	}
@@ -149,13 +193,18 @@ export async function launchAIPortals() {
 	try {
 		engine = new Engine( canvas, [ selected ], { single: true, fixedSeed: 20261113, quality: 'high' } );
 		const pose = engine._pose;
-		const yaw = new THREE.Quaternion();
-		const pitch = new THREE.Quaternion();
+		let spawned = false;
 		engine._pose = function ( world, distance, position, quaternion ) {
 			pose.call( this, world, distance, position, quaternion );
-			yaw.setFromAxisAngle( new THREE.Vector3( 0, 1, 0 ), lookYaw );
-			pitch.setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), lookPitch );
-			quaternion.premultiply( yaw ).multiply( pitch );
+			if ( ! spawned ) {
+				freePosition.copy( position );
+				baseOrientation.copy( quaternion );
+				spawned = true;
+			}
+			position.copy( freePosition );
+				yaw.setFromAxisAngle( Y_AXIS, lookYaw );
+				pitch.setFromAxisAngle( X_AXIS, lookPitch );
+			quaternion.copy( baseOrientation ).multiply( yaw ).multiply( pitch );
 			return quaternion;
 		};
 		engine.events.world = world => { ui.status.textContent = `${ world.def.name } · ${ Math.round( world.path.length ) } m camera path`; };
@@ -166,8 +215,8 @@ export async function launchAIPortals() {
 		const world = await engine.start( selected, null );
 		world.dist = 0;
 		engine.speed = 0;
-		engine.settings.speed = requestedSpeed;
-		ui.status.textContent = `${ selected.name } · spawned at the start of its ${ Math.round( world.path.length ) } m camera path`;
+		engine.settings.speed = 0;
+		ui.status.textContent = `${ selected.name } · standing at camera-path start; waiting for input`;
 		ui.enter.disabled = false;
 		requestAnimationFrame( controlsFrame );
 	} catch ( error ) {
