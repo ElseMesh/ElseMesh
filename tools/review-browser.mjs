@@ -134,7 +134,7 @@ try {
     const reportedDiagnostics = new Set();
     const fetchSummary = { count: 0, bytes: 0, elapsedMs: 0, phaseMs: {} };
     const diskCacheSummary = { indexRuns: 0, indexEntries: 0, indexBytes: 0, sumIndexElapsedMs: 0, maxIndexElapsedMs: 0, snapshotWrites: 0, snapshotEntries: 0, snapshotBytes: 0, sumSnapshotElapsedMs: 0, maxSnapshotElapsedMs: 0, batches: 0, entries: 0, bytes: 0, failedBatches: 0, skippedBatches: 0, readHits: 0, readHitBytes: 0, sumBatchElapsedMs: 0, maxBatchElapsedMs: 0 };
-    const regionNetworkSummary = { requests: 0, responses: 0, failed: 0, encodedBytes: 0, sumRequestElapsedMs: 0, byKind: {} };
+    const regionNetworkSummary = { requests: 0, responses: 0, failed: 0, encodedBytes: 0, sumRequestElapsedMs: 0, byKind: {}, priorityTrace: [] };
     const regionRequests = new Map();
     let cpuProfileActive = false;
     let cpuProfileCompleted = false;
@@ -252,11 +252,16 @@ try {
           regionNetworkSummary.requests += 1;
           kindSummary.requests += 1;
           kindSummary.methods[ method ] = ( kindSummary.methods[ method ] || 0 ) + 1;
+          const priorityTrace = [ 'mesh-lod', 'texture-range' ].includes( kind ) && regionNetworkSummary.priorityTrace.length < 1024
+            ? { sequence: regionNetworkSummary.priorityTrace.length, kind, method, url: message.params.request.url, startedAt: message.params.timestamp, status: null, bytes: null, elapsedMs: null }
+            : null;
+          if ( priorityTrace ) regionNetworkSummary.priorityTrace.push( priorityTrace );
           regionRequests.set(message.params.requestId, {
             startedAt: message.params.timestamp,
             kind,
             method,
             url: message.params.request.url,
+            priorityTrace,
             status: null,
             correlationId: null,
             cached: false,
@@ -265,6 +270,7 @@ try {
       } else if (message.method === 'Network.responseReceived' && regionRequests.has(message.params.requestId)) {
         const request = regionRequests.get(message.params.requestId);
         request.status = message.params.response.status;
+        if ( request.priorityTrace ) request.priorityTrace.status = message.params.response.status;
         const correlationHeader = Object.entries(message.params.response.headers || {})
           .find(([ name ]) => name.toLowerCase() === 'x-elsemesh-request-id');
         request.correlationId = correlationHeader?.[ 1 ] ?? null;
@@ -273,6 +279,10 @@ try {
         const request = regionRequests.get(message.params.requestId);
         const elapsedMs = Math.max(0, (message.params.timestamp - request.startedAt) * 1000);
         const bytes = message.params.encodedDataLength || 0;
+        if ( request.priorityTrace ) {
+          request.priorityTrace.bytes = bytes;
+          request.priorityTrace.elapsedMs = elapsedMs;
+        }
         regionNetworkSummary.responses += 1;
         regionNetworkSummary.encodedBytes += bytes;
         regionNetworkSummary.sumRequestElapsedMs += elapsedMs;
@@ -292,6 +302,7 @@ try {
         kind.failed = ( kind.failed || 0 ) + 1;
         regionNetworkSummary.failed += 1;
         const reason = message.params.errorText || ( message.params.canceled ? 'canceled' : 'unknown' );
+        if ( request.priorityTrace ) request.priorityTrace.failure = reason;
         kind.failureReasons[ reason ] = ( kind.failureReasons[ reason ] || 0 ) + 1;
         regionRequests.delete(message.params.requestId);
       }
