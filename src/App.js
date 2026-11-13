@@ -2154,6 +2154,7 @@ export class App {
 
 	_frame( dt ) {
 
+		this.input.beginFrame();
 		GPU.beginFrame();
 		FrameUniforms.fields.frameIndex.value = GPU.frame;
 		const s = this.settings;

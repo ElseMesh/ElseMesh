@@ -20,6 +20,11 @@ export class Input {
 		this.look = { x: 0, y: 0 };
 		this.moveStick = { x: 0, y: 0 };
 		this.lookStick = { x: 0, y: 0 };
+		this.gamepadMove = { x: 0, y: 0 };
+		this.gamepadLook = { x: 0, y: 0 };
+		this.gamepadButtons = new Set();
+		this.previousGamepadButtons = new Set();
+		this.gamepadConnected = false;
 		this.wheel = 0;
 		this.mouseDown = false;
 		this.rightDown = false;
@@ -95,6 +100,39 @@ export class Input {
 		if ( userGesture ) this.lockSuppressed = false;
 		if ( this.lockSuppressed ) return;
 		if ( ! this.locked ) this.dom.requestPointerLock?.()?.catch?.( () => {} );
+
+	}
+
+	beginFrame() {
+
+		const pads = globalThis.navigator?.getGamepads?.() || [];
+		const pad = Array.from( pads ).find( candidate => candidate?.connected && candidate.mapping === 'standard' );
+		this.gamepadConnected = !! pad;
+		this.gamepadMove.x = pad ? this._gamepadAxis( pad.axes?.[ 0 ] ) : 0;
+		this.gamepadMove.y = pad ? - this._gamepadAxis( pad.axes?.[ 1 ] ) : 0;
+		this.gamepadLook.x = pad ? this._gamepadAxis( pad.axes?.[ 2 ] ) : 0;
+		this.gamepadLook.y = pad ? this._gamepadAxis( pad.axes?.[ 3 ] ) : 0;
+
+		const buttons = new Set();
+		if ( pad ) {
+			const pressed = index => pad.buttons?.[ index ]?.pressed === true || ( pad.buttons?.[ index ]?.value || 0 ) > 0.5;
+			for ( const [ index, code ] of [ [ 0, 'Space' ], [ 1, 'Escape' ], [ 2, 'KeyE' ], [ 3, 'KeyI' ], [ 8, 'Tab' ], [ 9, 'Escape' ] ] ) {
+				if ( pressed( index ) ) buttons.add( code );
+			}
+			if ( pressed( 4 ) || pressed( 10 ) ) buttons.add( 'ShiftLeft' );
+		}
+		for ( const code of buttons ) if ( ! this.previousGamepadButtons.has( code ) ) this.pressed.add( code );
+		this.previousGamepadButtons = buttons;
+		this.gamepadButtons = buttons;
+
+	}
+
+	_gamepadAxis( value ) {
+
+		if ( ! Number.isFinite( value ) ) return 0;
+		const magnitude = Math.abs( value );
+		if ( magnitude <= 0.14 ) return 0;
+		return Math.sign( value ) * ( ( magnitude - 0.14 ) / 0.86 ) ** 1.7;
 
 	}
 
@@ -186,6 +224,10 @@ export class Input {
 		this.look.x = this.look.y = 0;
 		this.moveStick.x = this.moveStick.y = 0;
 		this.lookStick.x = this.lookStick.y = 0;
+		this.gamepadMove.x = this.gamepadMove.y = 0;
+		this.gamepadLook.x = this.gamepadLook.y = 0;
+		this.gamepadButtons.clear();
+		this.previousGamepadButtons.clear();
 		for ( const reset of this._touchStickResetters || [] ) reset();
 
 	}
@@ -210,7 +252,8 @@ export class Input {
 
 	moveAxes() {
 
-		const { x, y } = this.moveStick;
+		const stick = this.gamepadConnected ? this.gamepadMove : this.moveStick;
+		const { x, y } = stick;
 		const length = Math.hypot( x, y );
 		let sx = 0, sy = 0;
 		if ( length > 1 ) {
@@ -235,7 +278,7 @@ export class Input {
 		return {
 			x: this._moveAxis( 'KeyA', 'KeyD', sx ),
 			y: this._moveAxis( 'KeyS', 'KeyW', sy ),
-			sprint: Math.max( 0, Math.min( length - 1, 1 ) ),
+			sprint: this.down( 'ShiftLeft' ) ? 1 : Math.max( 0, Math.min( length - 1, 1 ) ),
 		};
 
 	}
@@ -244,7 +287,8 @@ export class Input {
 
 		if ( ! this.enabled ) return false;
 		if ( this.keys.has( code ) ) return true;
-		const { x, y } = this.moveStick;
+		if ( this.gamepadButtons.has( code ) ) return true;
+		const { x, y } = this.gamepadConnected ? this.gamepadMove : this.moveStick;
 		if ( code === 'KeyW' ) return y > 0.18;
 		if ( code === 'KeyS' ) return y < - 0.18;
 		if ( code === 'KeyD' ) return x > 0.18;
@@ -268,7 +312,8 @@ export class Input {
 
 	consumeLook( dt = 1 / 60 ) {
 
-		const { x, y } = this.lookStick;
+		const x = this.lookStick.x + this.gamepadLook.x;
+		const y = this.lookStick.y + this.gamepadLook.y;
 		const length = Math.hypot( x, y );
 		let sx = 0, sy = 0;
 		if ( length > 0.04 ) {

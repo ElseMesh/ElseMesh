@@ -2208,6 +2208,7 @@ export class UI {
 						<h2 id="em-help-title">Controls</h2>
 						<p>Click the view to capture the mouse. Esc releases it.</p>
 						<p class="em-help-touch-hint">On a touch screen, use the left stick to move and the right stick to look. Tap an action prompt to interact.</p>
+						<p class="em-help-controller-hint">Xbox controller: left stick moves, right stick looks, A jumps, X interacts, Y opens inventory, and LB sprints.</p>
 					</div>
 					<button type="button" class="em-icon-btn em-help-close" aria-label="Close" data-tip="Close (F1)">${ icon( 'close' ) }</button>
 				</header>
@@ -2281,6 +2282,7 @@ export class UI {
 					<button type="button" class="em-world-picker-close">Done</button>
 				</section>
 				<div class="em-start-touch-hint">Left stick moves · right stick looks · tap action prompts</div>
+				<div class="em-start-controller-hint">Xbox: left stick moves · right stick looks · A jump · X interact · LB sprint</div>
 				<div class="em-start-keys">
 					<span><span class="em-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</span>
 					<span><span class="em-look-inputs">${ ARROW_KEY_LAYOUT }<kbd class="em-kbd-ico">${ icon( 'mouse' ) }</kbd></span>Look</span>

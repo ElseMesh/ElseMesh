@@ -2606,6 +2606,12 @@ body {
 	display: none;
 }
 
+.em-help-controller-hint {
+	margin: calc(4 * var(--em-u)) 0 0;
+	font-size: var(--em-fs-md);
+	color: var(--em-ink-3);
+}
+
 .em-help-grid {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2794,6 +2800,12 @@ body {
 	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
+.em-start-controller-hint {
+	color: var(--em-ink-2);
+	font-size: var(--em-fs-sm);
+	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
 .em-start-world-toggle,
 .em-world-picker-close {
 	padding: 8px 12px;
@@ -2941,7 +2953,7 @@ body {
 		display: none;
 	}
 
-	.em-help-head p:not(.em-help-touch-hint) {
+	.em-help-head p:not(.em-help-touch-hint):not(.em-help-controller-hint) {
 		display: none;
 	}
 

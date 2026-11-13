@@ -2267,6 +2267,7 @@ export class WebGLFallback {
 
 	_frame() {
 
+		this.input.beginFrame();
 		this.engine.rafCallbacks ++;
 		const now = performance.now(), elapsed = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
 		const fixedSimulationTime = this.app.fixedSimulationTime;
