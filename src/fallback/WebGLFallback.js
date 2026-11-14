@@ -34,6 +34,7 @@ import { webglShoreBreakGLSL, webglShoreSwashGLSL, webglShoreWobbleGLSL } from '
 import { surfFoamGLSL } from '../ocean/SurfFoamGLSL.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
+import { installWebGLSceneMaterialLighting } from './WebGLMaterialLighting.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
 import { WebGLRefractionPass } from './WebGLRefractionPass.js';
@@ -920,6 +921,7 @@ export class WebGLFallback {
 		this._updateLighting();
 		this.webglEnvironment = this.worldEnvironment.sky ? new WebGLSkyEnvironment( T, this.renderer, this.cloudLayer ) : null;
 		if ( this.webglEnvironment?.texture ) this.scene.environment = this.webglEnvironment.texture;
+		installWebGLSceneMaterialLighting( T, this.scene, this.webglAtmosphere );
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
@@ -1657,6 +1659,7 @@ export class WebGLFallback {
 
 		const T = this.THREE, lighting = webglLightingForTime( T, this.app.settings.timeOfDay );
 		this.lighting = lighting;
+		G.night.value = lighting.night;
 		this.sunDirection.copy( lighting.sunDirection );
 		this.sunLight.position.copy( lighting.keyDirection ).multiplyScalar( 500 );
 		this.sunLight.color.copy( lighting.keyColor );
