@@ -1,4 +1,4 @@
-import { writeInstanceDrawDistanceFade, writeInstanceLODSelection, writeTransformedInstanceSphere } from './InstanceDrawPlannerMath.js';
+import { STREAMING_DETAIL_HEADROOM, writeInstanceDrawDistanceFade, writeInstanceLODSelection, writeTransformedInstanceSphere } from './InstanceDrawPlannerMath.js';
 
 const isVector3 = value => Array.isArray( value ) && value.length === 3 && value.every( Number.isFinite );
 
@@ -58,7 +58,7 @@ export class GroundCoverFieldDrawPlanner {
 			if ( ! visible ) continue;
 
 			const fade = writeInstanceDrawDistanceFade( this.fadeScratch, record.drawFadeStartDistance, record.drawMaxDistance, distance );
-			const selection = writeInstanceLODSelection( this.lodScratch, record.lodMetric, distance, radius, maxScale, tanHalfFov, record.lodThresholds, record.lodFadeFraction, renderLoadBias );
+			const selection = writeInstanceLODSelection( this.lodScratch, record.lodMetric, distance, radius, maxScale, tanHalfFov, record.lodThresholds, record.lodFadeFraction, renderLoadBias - STREAMING_DETAIL_HEADROOM );
 			const groups = groupsFor( visibleGroups, record );
 			const [ lodIndex, transition, incomingFade ] = selection;
 			if ( transition >= 0 ) {
