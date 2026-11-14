@@ -9,12 +9,35 @@ village and rowboat meshes without their authored paint in the shared material
 graphs. Tidewater's `Batch.build()` now publishes those same values as
 `color`; its internal tint buffer remains available to the GLB exporter. The
 Tidewater material test checks the emitted RGB values and compiles the shared
-graphs for both WebGPU and WebGL. An isolated AMD WebGPU runtime check confirms
-the procedural meshes now carry `color` and the hulls are no longer uniformly
-pale. The new live capture was 2560×1267, while the prior matched-baseline
-capture was 1588×780 and had a different overall color balance, so the boat
-hues still need a matched capture before this closes any visual-parity gate.
-Live WebGL appearance also remains to be checked.
+graphs for both WebGPU and WebGL. A live AMD WebGPU check confirmed that the
+procedural meshes now carry `color` and the rowboat paint is restored.
+
+A second issue was the shoreline runup default: commit `15279077` changed the
+shared coefficient from the pre-split WebGPU value `1.0` to `0.65` while
+aligning hosted WebGL. The swash shader multiplies its runup by this coefficient,
+so the split swash sheet receded during later wave phases. Restoring `1.0`
+returns both renderer paths to the pre-split value. The
+[`ocean-shore-runup-contract`](../test/ocean-shore-runup-contract.mjs) test
+checks that WebGPU and WebGL consume the shared value.
+
+The corrected split build was compared with pre-split ElseMesh
+`23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e` in the same browser on AMD Radeon
+Graphics (RADV RENOIR). Both used WebGPU, 2560×1267 raw render-target captures,
+the same beach and `swashAbove` poses at time of day 16.2, 64 settling frames,
+then two samples 30 frames apart at `dt=0.5`. RGB MAE over the full images,
+scaled to 8-bit channel values, was `0.12, 0.14, 0.19` for the three beach
+phases and `0.40, 0.70, 0.44` for the three `swashAbove` phases. The matched
+[phase-2 beach comparison](images/tidewater-presplit-split-webgpu-beach-phase2-2026-11-14.png)
+shows the swash sheet, and the
+[boat comparison](images/tidewater-presplit-split-webgpu-boats-phase0-2026-11-14.png)
+shows the restored painted hulls.
+
+Tidewater's WebGL/WebGPU shoreline query and production boat harness also
+passes: 13 terrain samples have 0.0094 m height MAE (0.0504 m max); the
+18-second production boat trace ends 0.103 m apart, and the wake-enabled trace
+stays within 0.084 m. This harness checks query and gameplay behavior, not live
+WebGL image parity. Other views/materials, live WebGL appearance, and
+supported-hardware FPS remain open.
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 
