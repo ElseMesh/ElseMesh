@@ -1,11 +1,12 @@
 import { SHORE_DEFAULT_PERIOD, SHORE_SWASH_DOWN, SHORE_SWASH_UP } from '../ocean/ShoreSwash.js';
+import { webglShoreAmplitudeGLSL, webglShoreBreakGLSL, webglShoreWobbleGLSL } from './WebGLShoreWaveMath.js';
 
 // Persistent shoreline foam, wetness, residue, and flow state for WebGL.
 // The shore renderer supplies its run-up function so water and terrain share
 // one analytic shoreline. Encoded inputs have less precision than WebGPU state.
 export class WebGLShoreState {
 
-	constructor( THREE, renderer, { terrain, shore, seaLevel = 0, coverageSource, shoreDeclarations, center = [ 10, - 25 ], size = 380, res = 768 } ) {
+	constructor( THREE, renderer, { terrain, shore, foamLace, seaLevel = 0, coverageSource, shoreDeclarations, center = [ 10, - 25 ], size = 380, res = 768 } ) {
 
 		if ( ! renderer.extensions.has( 'EXT_color_buffer_float' ) || ! renderer.extensions.has( 'OES_texture_float_linear' ) ) throw new Error( 'Persistent shore state requires float render targets and linear filtering' );
 		this.renderer = renderer;
@@ -35,6 +36,8 @@ export class WebGLShoreState {
 			uTerrainShoreField: { value: shore.texture }, uTerrainSwashField: { value: shore.swashTexture },
 			uTerrainSwashTimeRange: { value: shore.swashTimeRange },
 			uTerrainShoreOrigin: { value: shore.origin }, uTerrainShoreSize: { value: shore.size },
+			uTerrainArrivalField: { value: shore.arrivalTexture }, uTerrainTimeRange: { value: shore.timeRange },
+			uFoamLace: { value: foamLace },
 		};
 		this.material = new THREE.ShaderMaterial( {
 			uniforms: this.uniforms, depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.NoBlending,
@@ -48,8 +51,14 @@ uniform sampler2D uHeight;
 uniform float uHeightRes, uHeightOrigin, uHeightSize;
 uniform vec2 uMin;
 uniform float uSize, uResolution, uDt;
+uniform sampler2D uTerrainArrivalField;
+uniform vec2 uTerrainTimeRange;
+uniform sampler2D uFoamLace;
 ${shoreDeclarations}
 ${coverageSource}
+${webglShoreWobbleGLSL}
+${webglShoreAmplitudeGLSL}
+${webglShoreBreakGLSL}
 float terrainHeight(vec2 p) {
 	vec2 f = (p - vec2(uHeightOrigin)) / uHeightSize * uHeightRes - 0.5;
 	if (any(lessThan(f, vec2(0.0))) || any(greaterThan(f, vec2(uHeightRes - 1.0)))) return -90.0;
@@ -80,19 +89,45 @@ void main() {
 	bool isUprush = tau < ${SHORE_SWASH_UP.toFixed( 2 )};
 	float dRdt = (isUprush ? pow(1.0 - su, 0.5) * (1.5 / ${SHORE_SWASH_UP.toFixed( 2 )}) : pow(max(sb, 1e-3), 0.6) * (-1.6 / ${SHORE_SWASH_DOWN.toFixed( 2 )})) * rhMax / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )};
 	float relativeRunup = clamp(inland / max(runupHeight, 0.5), 0.0, 1.0);
-	float flowSpeed = clamp(dRdt * (isUprush ? clamp((inland + 3.0) / (runupHeight + 3.0), 0.15, 1.0) : (1.0 - relativeRunup) * 0.6 + 0.9), -2.5, 4.0);
-	if (coverage <= 0.5 && depth <= 0.02) flowSpeed = 0.0;
+	float uSwash = dRdt * (isUprush ? clamp((inland + 3.0) / (runupHeight + 3.0), 0.15, 1.0) : (1.0 - relativeRunup) * 0.6 + 0.9);
+	vec2 shoreUv = (p - vec2(uTerrainShoreOrigin)) / uTerrainShoreSize;
+	vec4 shoreSample = texture2D(uTerrainShoreField, shoreUv);
+	vec2 alongDirection = normalize(shoreSample.rg * 2.0 - 1.0);
+	float along = dot(p, vec2(-alongDirection.y, alongDirection.x));
+	vec2 arrivalEncoded = texture2D(uTerrainArrivalField, shoreUv).rg;
+	float arrivalFraction = (arrivalEncoded.x * 255.0 * 256.0 + arrivalEncoded.y * 255.0) / 65535.0;
+	float arrival = mix(uTerrainTimeRange.x, uTerrainTimeRange.y, arrivalFraction);
+	float phase = (uTerrainTime - arrival) / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )} + webglShoreWobble(along);
+	float waveIndex = floor(phase + 0.5);
+	float waveU = phase - waveIndex;
+	float amplitudeBlend = smoothstep(0.32, 0.5, abs(waveU)) * 0.5;
+	float amplitude = mix(webglShoreAmp(waveIndex, along), webglShoreAmp(waveIndex + sign(waveU), along), amplitudeBlend);
+	float waveSpeed = sqrt(clamp(depth, 0.3, 25.0) * 9.81);
+	float wavelength = waveSpeed * ${SHORE_DEFAULT_PERIOD.toFixed( 1 )};
+	float crestDepth = uTerrainSeaLevel - terrainHeight(p + alongDirection * (waveU * wavelength));
+	crestDepth = mix(crestDepth, depth, smoothstep(0.3, 0.5, abs(waveU)));
+	WebGLShoreBreak breaker = webglShoreBreakParams(amplitude, crestDepth);
+	float environment = smoothstep(26.0, 13.0, depth) * smoothstep(-0.25, 0.05, depth) * clamp(shoreSample.b * 1.4, 0.0, 1.0);
+	WebGLShoreProfile waveProfile = webglShoreProfile(waveU, wavelength, breaker);
+	WebGLShoreProfile worldProfile = webglShoreProfile(waveU + waveProfile.x * environment / max(wavelength, 1e-3), wavelength, breaker);
+	float eta = worldProfile.y * environment;
+	float uWave = clamp(waveSpeed * eta / (max(depth, 0.0) + max(eta, depth * -0.8) + 0.15), -2.5, 4.0);
+	float swashWeight = smoothstep(0.3, 0.05, depth);
+	float flowSpeed = clamp(mix(uWave, uSwash, swashWeight) * ((coverage > 0.5 || depth > 0.02) ? 1.0 : 0.0), -2.5, 4.0);
 	vec2 backUv = clamp(vUv - direction * flowSpeed * uDt / uSize, vec2(0.0), vec2(1.0));
 	vec4 previous = uInitialized ? texture2D(uPrevious, backUv) : vec4(0.0);
-	float uprush = 1.0 - smoothstep(0.32, 0.46, tau);
-	float swashFoam = (1.0 - smoothstep(0.0, 0.8, front)) * smoothstep(-0.05, 0.05, front) * uprush * 0.9;
+	float swashFoam = (1.0 - smoothstep(0.0, 0.8, front)) * smoothstep(-0.05, 0.05, front) * (1.0 - smoothstep(0.32, 0.46, tau)) * smoothstep(0.0, 1.0, runupHeight) * 0.9;
 	float swashy = 1.0 - smoothstep(0.05, 0.35, depth);
 	float laceLife = mix(2.6, 4.5, swashy);
 	float life = mix(0.7, mix(laceLife, 0.8, smoothstep(0.3, 0.8, previous.r)), coverage);
 	float aheadSpeed = uInitialized ? texture2D(uPrevious, clamp(vUv + direction / uResolution, vec2(0.0), vec2(1.0))).a : 0.0;
 	float behindSpeed = uInitialized ? texture2D(uPrevious, clamp(vUv - direction / uResolution, vec2(0.0), vec2(1.0))).a : 0.0;
 	float spreadRate = max((aheadSpeed - behindSpeed) / (2.0 * cellSize), 0.0);
-	float foam = min(previous.r * exp(-uDt * (1.0 / life + spreadRate)) + swashFoam * 1.4 * coverage * uDt, 1.0);
+	float mottledLace = texture2D(uFoamLace, p / 15.05, -2.0).b;
+	float patchK = smoothstep(0.25, 0.75, mottledLace) * 0.8 + 0.35;
+	float breakerFoam = webglShoreWhitewater(-waveU * wavelength, wavelength, breaker) * environment;
+	float generation = (breakerFoam * 2.2 + swashFoam * 1.4) * patchK * coverage;
+	float foam = min(previous.r * exp(-uDt * (1.0 / life + spreadRate)) + generation * uDt, 1.0);
 	float wet = max(here.g * exp(-uDt / 28.0), coverage);
 	float stranded = min(here.r * 2.4, 1.0) * (1.0 - coverage);
 	float residue = max(here.b * mix(exp(-uDt / 5.0), 0.85, coverage), stranded);

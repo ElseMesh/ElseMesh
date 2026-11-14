@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { webglTerrainMaterial } from '../src/fallback/WebGLFallback.js';
 import { WebGLShoreState } from '../src/fallback/WebGLShoreState.js';
 import { WebGLSkyEnvironment } from '../src/fallback/WebGLSkyEnvironment.js';
+import { makeFoamLaceData } from '../src/ocean/FoamLaceData.js';
 
 const result = document.querySelector( '#result' );
 try {
@@ -94,8 +95,15 @@ try {
 	if ( error !== renderer.getContext().NO_ERROR ) throw new Error( `WebGL error ${error}` );
 	const wetness = new WebGLShoreState( THREE, renderer, {
 		terrain, shore: material.userData.shoreWetnessSource.shore, seaLevel: 0,
+		foamLace: (() => {
+			const size = 512;
+			const texture = new THREE.DataTexture( makeFoamLaceData( size ), size, size, THREE.RGBAFormat, THREE.UnsignedByteType );
+			texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+			texture.magFilter = THREE.LinearFilter; texture.minFilter = THREE.LinearMipmapLinearFilter; texture.generateMipmaps = true; texture.needsUpdate = true;
+			return texture;
+		})(),
 		center: [ 0, 0 ], size: 1, res: 4,
-		shoreDeclarations: 'uniform float uTerrainTime, uTerrainSeaLevel;',
+		shoreDeclarations: 'uniform float uTerrainTime, uTerrainSeaLevel; uniform sampler2D uTerrainShoreField, uTerrainSwashField; uniform vec2 uTerrainSwashTimeRange; uniform float uTerrainShoreOrigin, uTerrainShoreSize;',
 		coverageSource: 'float shoreRunupState(vec2 p, float ground, float time, out float tau, out vec2 direction, out float rhMax, out float runupHeight, out float inland) { tau = fract(time); direction = vec2(1.0, 0.0); rhMax = 1.0; runupHeight = 0.2 + time * 4.0; inland = 0.0; return runupHeight; } float shoreRunupFront(vec2 p, float ground) { float tau, rhMax, runupHeight, inland; vec2 direction; return shoreRunupState(p, ground, uTerrainTime, tau, direction, rhMax, runupHeight, inland); } float shoreCoverage(vec2 p, float ground, float cellSize) { return uTerrainTime < 0.5 ? 1.0 : 0.0; }',
 	} );
 	wetness.update( 1 / 60, 0 );
@@ -121,7 +129,7 @@ try {
 	const wetAfterTwoSeconds = pixel[ 1 ] / 255, residueAfterTwoSeconds = pixel[ 2 ] / 255;
 	if ( Math.abs( wetAfterTwoSeconds - Math.exp( - 2 / 28 ) ) > 0.035 ) throw new Error( `wetness did not dry over time: ${wetAfterTwoSeconds}` );
 	if ( residueAfterTwoSeconds <= 0 ) throw new Error( `shore foam did not strand as residue when coverage drained: ${residueAfterTwoSeconds}` );
-	wetness.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
+	wetness.dispose(); wetness.uniforms.uFoamLace.value.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
 	result.dataset.status = 'complete';
 	result.textContent = JSON.stringify( { changes, initialState: initial, wetAfterTwoSeconds, residueAfterTwoSeconds, environmentChange, roughnessResponse, programCount: renderer.info.programs.length } );
 	skyEnvironment.dispose(); skyLayer.geometry.dispose(); skyLayer.material.dispose();
