@@ -988,6 +988,15 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-14: Re-ran Tidewater's `test:webgl-shore-query-parity` against the
+  pre-split WebGPU water-query source. All 13 packaged-terrain samples passed
+  (WebGL height MAE 0.0094 m, maximum 0.0504 m; normal MAE 0.0045). The
+  18-second production boat traces passed with maximum position/speed deltas of
+  0.103 m / 0.012 m/s without interactive wake and 0.084 m / 0.011 m/s with
+  WakeSim; same-position water-height MAE was 0.0065 m. This verifies the
+  production query and boat path within that controlled harness, not full
+  fishing interaction on live water or rendered-scene parity.
+
 - 2026-11-14: Re-ran Tidewater's `test:renderer-parity` and
   `test:live-fishing-extension-browser` from the external build tree. Before
   running them, compared every tracked Tidewater file between the source
