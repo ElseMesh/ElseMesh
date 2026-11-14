@@ -1500,7 +1500,7 @@ export class App {
 		const components = root.userData.worldComponents || [];
 		const terrain = components.find( ( component ) => component.terrainSurface && component.terrainGPU );
 		const runtime = components.find( ( component ) => component.hostedBoat );
-		this.activeHostedOcean = components.some( ( component ) => component.islandOcean );
+		this.activeHostedOcean = components.some( ( component ) => component.isWorldOcean );
 		this.activeHostedBoat = runtime || null;
 		if ( this.activeHostedOcean && ! this.spray ) {
 			this.spray = new Spray( this.renderer, {

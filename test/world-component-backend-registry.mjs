@@ -26,6 +26,8 @@ assert.throws( () => registerWorldComponentBackendAdapter( 'canvas', 'elsemesh.i
 await import( '../src/App.js' );
 await import( '../src/fallback/WebGLFallback.js' );
 const appSource = await readFile( new URL( '../src/App.js', import.meta.url ), 'utf8' );
+assert.match( appSource, /this\.activeHostedOcean = components\.some\( \( component \) => component\.isWorldOcean \)/, 'App detects the generic world-ocean runtime capability' );
+assert.doesNotMatch( appSource, /component\.islandOcean/, 'App does not depend on a Tidewater-specific ocean runtime flag' );
 const fallbackSource = await readFile( new URL( '../src/fallback/WebGLFallback.js', import.meta.url ), 'utf8' );
 const playerSource = await readFile( new URL( '../src/player/Player.js', import.meta.url ), 'utf8' );
 const soundScapeSource = await readFile( new URL( '../src/audio/SoundScape.js', import.meta.url ), 'utf8' );
