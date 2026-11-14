@@ -65,8 +65,9 @@ try {
 			{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
 			{ id: 'slope', op: 'constant', value: [ 0.08, - 0.04 ] },
 			{ id: 'surfaceNormal', op: 'normalFromSlope', args: [ 'worldPosition', 'worldNormal', 'uv', 'slope' ] },
+			{ id: 'thinTint', op: 'constant', value: [ 0.18, 0.32, 0.07 ] },
 		],
-		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal' },
+		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal', thinTransmission: 'thinTint' },
 	};
 	graph.nodes.push(
 		{ id: 'worldVertexPosition', op: 'input', name: 'worldVertexPosition' },
