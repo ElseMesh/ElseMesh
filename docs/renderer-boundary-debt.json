@@ -1,5 +1,11 @@
 {
-  "description": "Existing production world modules that contain backend renderer code or depend directly or transitively on ElseMesh rendering APIs. This is migration debt, not an approved ownership pattern. Remove entries only as complete renderer-neutral feature migrations land.",
+  "description": "Existing ElseMesh-owned production world modules that contain backend renderer code or depend directly or transitively on ElseMesh rendering APIs. This is migration debt, not an approved ownership pattern. Remove entries only as complete renderer-neutral feature migrations land.",
+  "reviewedExternalRoots": [
+    {
+      "path": "worlds/ai-portals",
+      "reason": "Read-only source-backed compatibility input for AI Portals' unchanged Three.js format; its legacy render code is isolated from ElseMesh-owned world modules."
+    }
+  ],
   "files": [
     "worlds/default.js",
     "worlds/tidewater/DebrisPlacement.js",

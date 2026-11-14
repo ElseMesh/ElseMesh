@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const worldRoot = path.join( root, 'worlds' );
 const debt = JSON.parse( await readFile( path.join( root, 'docs/renderer-boundary-debt.json' ), 'utf8' ) );
+const reviewedExternalRoots = new Set( ( debt.reviewedExternalRoots || [] ).map( entry => entry.path ) );
 const importReferences = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)[\s]*['"]([^'"]+)['"]/g;
 const rendererImport = /(?:from\s*|import\s*)['"][^'"]*(?:src\/engine\/(?:gpu|scene|index)|WebGPU|WebGL|three)[^'"]*['"]/i;
 const adapterRegistration = /registerWorldComponentBackend(?:Batch)?Adapter\s*\(/;
@@ -19,7 +20,10 @@ async function walk( directory ) {
 	for ( const entry of await readdir( directory, { withFileTypes: true } ) ) {
 		if ( entry.isDirectory() ) {
 			if ( excludedDirectories.has( entry.name ) ) continue;
-			await walk( path.join( directory, entry.name ) );
+			const child = path.join( directory, entry.name );
+			const relative = path.relative( root, child ).split( path.sep ).join( '/' );
+			if ( reviewedExternalRoots.has( relative ) ) continue;
+			await walk( child );
 			continue;
 		}
 
@@ -72,4 +76,4 @@ assert.deepEqual( found, expected, [
 	'Remove migrated files from docs/renderer-boundary-debt.json only after the complete neutral contract and both engine backends are in place.',
 ].join( '\n' ) );
 
-console.log( `ok renderer-boundary debt inventory (${found.length} existing Tidewater modules; no new violations)` );
+console.log( `ok renderer-boundary debt inventory (${found.length} ElseMesh-owned modules; reviewed external roots excluded)` );
