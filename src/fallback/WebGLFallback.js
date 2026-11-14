@@ -22,7 +22,6 @@ import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
 import { WebGLWaterQuery } from './WebGLWaterQuery.js';
 import { WebGLWakeSim, WEBGL_WAKE_READER_GLSL } from '../ocean/WebGLWakeSim.js';
-import { createWebGLShoreSurfaceOffset } from './WebGLShoreSurface.js';
 import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
@@ -1522,11 +1521,7 @@ export class WebGLFallback {
 	}
 
 	_bindShoreSurfaceToWater() {
-		this.waterQuery?.setSurfaceOffsetSampler( 'shore', createWebGLShoreSurfaceOffset( {
-			terrain: this.terrain || this.hostedTerrainData,
-			seaLevel: this.worldSeaLevel,
-			field: this.shoreField || this.hostedTerrainSurface?.shoreField || null,
-		} ) );
+		this.waterQuery?.setShoreField( this.shoreField || this.hostedTerrainSurface?.shoreField || null );
 	}
 
 	_createWebGLWake() {

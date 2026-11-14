@@ -1,5 +1,7 @@
 import { WebGLOceanFFT } from '../ocean/WebGLOceanFFT.js';
 import { WEBGL_WAKE_READER_GLSL } from '../ocean/WebGLWakeSim.js';
+import { SHORE_DEFAULT_PERIOD } from '../ocean/ShoreSwash.js';
+import { webglShoreAmplitudeGLSL, webglShoreBreakGLSL, webglShoreWobbleGLSL } from './WebGLShoreWaveMath.js';
 
 const MAX_QUERIES = 64;
 const QUERY_SIZE = 8;
@@ -12,23 +14,35 @@ const queryShader = /* glsl */`precision highp float;
 precision highp int;
 uniform sampler2D uInputs;
 uniform sampler2D uTerrain;
+uniform sampler2D uShoreField;
 uniform sampler2D uDisplacement;
 uniform int uHasTerrain;
+uniform int uShoreResolution;
 uniform int uCount;
 uniform int uResolution;
 uniform vec2 uTerrainOrigin;
-uniform float uTerrainTexel;
+uniform vec2 uShoreOrigin;
+uniform float uTerrainSize;
+uniform float uShoreSize;
 uniform float uSeaLevel;
+uniform float uTime;
+uniform float uShorePeriod;
+uniform float uShoreEnabled;
+uniform float uOceanAmplitude;
 uniform vec4 uSizes;
 ${ WEBGL_WAKE_READER_GLSL.replaceAll( 'texture2D(', 'texture(' ) }
+${ webglShoreWobbleGLSL }
+${ webglShoreAmplitudeGLSL }
+${ webglShoreBreakGLSL }
 layout(location = 0) out vec4 outResult;
 
 float terrainHeightAt( vec2 xz ) {
 	if ( uHasTerrain == 0 ) return -500.0;
-	vec2 f = ( xz - uTerrainOrigin ) / uTerrainTexel - 0.5;
-	if ( f.x < 0.0 || f.y < 0.0 || f.x >= float( uResolution - 1 ) || f.y >= float( uResolution - 1 ) ) return -90.0;
-	ivec2 p = ivec2( floor( f ) );
-	vec2 t = fract( f );
+	vec2 f = ( xz - uTerrainOrigin ) / uTerrainSize * float( uResolution ) - 0.5;
+	vec2 fc = clamp( f, vec2( 0.0 ), vec2( float( uResolution ) - 1.001 ) );
+	if ( f.x < 0.0 || f.y < 0.0 || f.x > float( uResolution - 1 ) || f.y > float( uResolution - 1 ) ) return -90.0;
+	ivec2 p = ivec2( floor( fc ) );
+	vec2 t = fract( fc );
 	float a = texelFetch( uTerrain, p, 0 ).r;
 	float b = texelFetch( uTerrain, p + ivec2( 1, 0 ), 0 ).r;
 	float c = texelFetch( uTerrain, p + ivec2( 0, 1 ), 0 ).r;
@@ -69,14 +83,53 @@ vec3 displacementAt( vec2 x0, float depth ) {
 		int lod = c == 3 ? 2 : 0;
 		d += sampleCascade( x0, c, lod ) * cascadeAttenuation( c, depth );
 	}
-	return d;
+	return d * uOceanAmplitude;
+}
+
+vec4 shoreFieldAt( vec2 xz ) {
+	float res = float( uShoreResolution );
+	vec2 f = ( xz - uShoreOrigin ) / uShoreSize * res - 0.5;
+	vec2 fc = clamp( f, vec2( 0.0 ), vec2( max( res - 1.001, 0.0 ) ) );
+	ivec2 p = ivec2( floor( fc ) );
+	vec2 t = fract( fc );
+	ivec2 mx = ivec2( max( uShoreResolution - 1, 0 ) );
+	vec4 a = texelFetch( uShoreField, p, 0 );
+	vec4 b = texelFetch( uShoreField, min( p + ivec2( 1, 0 ), mx ), 0 );
+	vec4 c = texelFetch( uShoreField, min( p + ivec2( 0, 1 ), mx ), 0 );
+	vec4 d = texelFetch( uShoreField, min( p + ivec2( 1, 1 ), mx ), 0 );
+	return mix( mix( a, b, t.x ), mix( c, d, t.x ), t.y );
+}
+
+vec3 shoreDisplacementAt( vec2 xz, float depth ) {
+	if ( uShoreEnabled <= 0.0 || uShoreSize <= 0.0 || depth <= -0.25 || depth >= 26.0 ) return vec3( 0.0 );
+	vec4 sh = shoreFieldAt( xz );
+	float exposure = length( sh.yz );
+	vec2 dir = sh.yz / max( exposure, 1e-4 );
+	float along = dot( xz, vec2( - dir.y, dir.x ) );
+	float phase = ( uTime - sh.x ) / uShorePeriod + webglShoreWobble( along );
+	float wave = floor( phase + 0.5 );
+	float u = phase - wave;
+	float blend = smoothstep( 0.32, 0.5, abs( u ) ) * 0.5;
+	float amplitude = mix( webglShoreAmp( wave, along ), webglShoreAmp( wave + sign( u ), along ), blend );
+	float lambda = sqrt( clamp( depth, 0.3, 25.0 ) * 9.81 ) * uShorePeriod;
+	vec2 crest = xz + dir * ( u * lambda );
+	float depthAtCrest = uSeaLevel - terrainHeightAt( crest );
+	depthAtCrest = mix( depthAtCrest, depth, smoothstep( 0.3, 0.5, abs( u ) ) );
+	WebGLShoreBreak breaker = webglShoreBreakParams( amplitude, depthAtCrest );
+	WebGLShoreProfile profile = webglShoreProfile( u, lambda, breaker );
+	float env = smoothstep( 26.0, 13.0, depth ) * smoothstep( -0.25, 0.05, depth ) * clamp( exposure * 1.4, 0.0, 1.0 ) * uShoreEnabled;
+	return vec3( dir.x * profile.x, profile.y, dir.y * profile.x ) * env;
+}
+
+vec3 surfaceDisplacementAt( vec2 xz, float depth ) {
+	return displacementAt( xz, depth ) + shoreDisplacementAt( xz, depth );
 }
 
 float waterHeightAt( vec2 p ) {
 	float depth = uSeaLevel - terrainHeightAt( p );
 	vec2 x0 = p;
-	for ( int i = 0; i < 2; i ++ ) x0 = p - displacementAt( x0, depth ).xz;
-	return uSeaLevel + displacementAt( x0, depth ).y + webglWakeHeight( x0 );
+	for ( int i = 0; i < 2; i ++ ) x0 = p - surfaceDisplacementAt( x0, depth ).xz;
+	return uSeaLevel + surfaceDisplacementAt( x0, depth ).y + webglWakeHeight( x0 );
 }
 
 void main() {
@@ -103,7 +156,9 @@ export class WebGLWaterQuery {
 		this.renderer = renderer;
 		this.terrain = terrain;
 		this.seaLevel = seaLevel;
-		this.surfaceOffsetSamplers = new Map();
+		this.shoreField = null;
+		this.shoreFieldTexture = null;
+		this.oceanAmplitude = 1;
 		this.inputs = new Float32Array( MAX_QUERIES * 4 );
 		this.cpu = new Float32Array( MAX_QUERIES * 4 );
 		this.resultInputs = new Float32Array( MAX_QUERIES * 4 );
@@ -134,10 +189,12 @@ export class WebGLWaterQuery {
 			glslVersion: THREE.GLSL3, vertexShader, fragmentShader: queryShader,
 			uniforms: {
 				uInputs: { value: this.inputTexture }, uTerrain: { value: this.terrainTexture || this.inputTexture },
+				uShoreField: { value: this.inputTexture },
 				uDisplacement: { value: this.fft.displacementTarget.texture }, uHasTerrain: { value: this.terrainTexture ? 1 : 0 },
-				uCount: { value: 1 }, uResolution: { value: terrain?.res || 0 },
+				uCount: { value: 1 }, uResolution: { value: terrain?.res || 0 }, uShoreResolution: { value: 0 },
 				uTerrainOrigin: { value: terrain ? new THREE.Vector2( terrain.origin, terrain.origin ) : new THREE.Vector2() },
-				uTerrainTexel: { value: terrain?.texel || 1 }, uSeaLevel: { value: seaLevel },
+				uShoreOrigin: { value: new THREE.Vector2() }, uTerrainSize: { value: terrain?.size || 0 }, uShoreSize: { value: 0 },
+				uSeaLevel: { value: seaLevel }, uTime: { value: 0 }, uShorePeriod: { value: SHORE_DEFAULT_PERIOD }, uShoreEnabled: { value: 0 }, uOceanAmplitude: { value: 1 },
 				uSizes: { value: new THREE.Vector4( ...this.fft.parameters.sizes ) },
 				uWakeDisplay: { value: null }, uWakeAeration: { value: null }, uWakeNearField: { value: null },
 				uWakeCenter: { value: new THREE.Vector2() }, uWakeBoatPos: { value: new THREE.Vector2() },
@@ -164,11 +221,18 @@ export class WebGLWaterQuery {
 
 	}
 
-	setSurfaceOffsetSampler( name, sampler ) {
+	setShoreField( field ) {
 
-		if ( typeof name !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( name ) || sampler !== null && typeof sampler !== 'function' ) throw new TypeError( 'Water surface sampler requires a stable name and a function or null' );
-		if ( sampler === null ) this.surfaceOffsetSamplers.delete( name );
-		else this.surfaceOffsetSamplers.set( name, sampler );
+		if ( field !== null && ( ! Number.isFinite( field?.origin ) || ! Number.isFinite( field?.size ) || field.size <= 0 || ! Number.isInteger( field?.res ) || field.res < 2 || field.data?.length !== field.res * field.res * 4 ) ) throw new TypeError( 'WebGL water query shore field is invalid' );
+		this.shoreFieldTexture?.dispose();
+		this.shoreField = field;
+		this.shoreFieldTexture = field ? this._dataTexture( field.data, field.res, field.res ) : null;
+		const uniforms = this.material.uniforms;
+		uniforms.uShoreField.value = this.shoreFieldTexture || this.inputTexture;
+		uniforms.uShoreResolution.value = field?.res || 0;
+		uniforms.uShoreOrigin.value.set( field?.origin || 0, field?.origin || 0 );
+		uniforms.uShoreSize.value = field?.size || 0;
+		uniforms.uShoreEnabled.value = field ? 1 : 0;
 
 	}
 
@@ -176,20 +240,6 @@ export class WebGLWaterQuery {
 
 		if ( ! uniforms || typeof uniforms !== 'object' ) throw new TypeError( 'WebGL water wake reader requires its uniforms' );
 		Object.assign( this.material.uniforms, uniforms );
-
-	}
-
-	getSurfaceOffsetSampler( name ) {
-
-		return this.surfaceOffsetSamplers.get( name ) || null;
-
-	}
-
-	sampleSurfaceOffset( x, z, time ) {
-
-		let offset = 0;
-		for ( const sampler of this.surfaceOffsetSamplers.values() ) offset += sampler( x, z, time ) || 0;
-		return offset;
 
 	}
 
@@ -228,28 +278,6 @@ export class WebGLWaterQuery {
 
 	}
 
-	_updateOffset( data, points, time ) {
-
-		if ( ! this.surfaceOffsetSamplers.size ) return;
-		const e = 0.35;
-		for ( let i = 0; i < this.count; i ++ ) {
-
-			const k = i * 4, x = points[ k ], z = points[ k + 1 ];
-			const offset = this.sampleSurfaceOffset( x, z, time );
-			const gx = - data[ k + 1 ] / Math.sqrt( Math.max( 1 - data[ k + 1 ] ** 2 - data[ k + 2 ] ** 2, 0.05 ) )
-				+ ( this.sampleSurfaceOffset( x + e, z, time ) - offset ) / e;
-			const gz = - data[ k + 2 ] / Math.sqrt( Math.max( 1 - data[ k + 1 ] ** 2 - data[ k + 2 ] ** 2, 0.05 ) )
-				+ ( this.sampleSurfaceOffset( x, z + e, time ) - offset ) / e;
-			const h = data[ k ] + offset;
-			const n = Math.sqrt( gx * gx + gz * gz + 1 );
-			data[ k ] = h;
-			data[ k + 1 ] = - gx / n;
-			data[ k + 2 ] = - gz / n;
-
-		}
-
-	}
-
 	update( dt, simulationTime = null ) {
 
 		if ( this.destroyed ) throw new Error( 'WebGLWaterQuery has been destroyed' );
@@ -258,6 +286,8 @@ export class WebGLWaterQuery {
 		this.inputTexture.needsUpdate = true;
 		this.material.uniforms.uCount.value = this.count;
 		this.material.uniforms.uSeaLevel.value = this.seaLevel;
+		this.material.uniforms.uTime.value = this.time;
+		this.material.uniforms.uOceanAmplitude.value = this.oceanAmplitude;
 		const renderer = this.renderer, previousTarget = renderer.getRenderTarget();
 		renderer.setRenderTarget( this.target );
 		renderer.render( this.scene, this.camera );
@@ -271,7 +301,6 @@ export class WebGLWaterQuery {
 		renderer.readRenderTargetPixelsAsync( this.target, 0, 0, QUERY_SIZE, QUERY_SIZE, this._readback )
 			.then( data => {
 				this.cpu.set( data );
-				this._updateOffset( this.cpu, this._issueInputs, issuedAt );
 				this.resultInputs.set( this._issueInputs );
 				this.resultTime = issuedAt;
 				this.latency += ( Math.min( ( performance.now() - startedAt ) / 1000, 0.25 ) - this.latency ) * 0.2;
@@ -290,6 +319,7 @@ export class WebGLWaterQuery {
 		this.fft.dispose();
 		this.inputTexture.dispose();
 		this.terrainTexture?.dispose();
+		this.shoreFieldTexture?.dispose();
 		this.target.dispose();
 		this.material.dispose();
 		this.mesh.geometry.dispose();
