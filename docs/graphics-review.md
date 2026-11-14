@@ -183,6 +183,36 @@ The temporary lighting probes were not saved as accepted output and did not
 modify source. No parity gate or percentage changed; Tidewater parity remains
 90%.
 
+### Atmosphere diffuse translation follow-up
+
+The engine now feeds WebGL standard/physical and diffuse-only materials the
+atmosphere sky-irradiance and horizon outputs used by the WebGPU lighting hook.
+The WebGL sky PMREM remains responsible for reflected radiance; its diffuse IBL
+contribution is replaced, so this does not add a second ambient fill. The engine
+composes the adapter with existing material shader hooks and applies it as
+streamed scene nodes are added. A focused fixture checks the WebGL shader
+translation, preservation of PMREM reflections, hook composition, and late
+material additions. The production build and focused lighting tests pass.
+
+The follow-up was captured on the same AMD Weston setup at `swashAbove`, fixed
+simulation time 1000 s, and a 1600×813 canvas. WebGL reported AMD Radeon via
+ANGLE/RadeonSI; browser-level WebGPU `SystemInfo` reported AMD Radeon Graphics
+via RADV/Vulkan with `webgpu` enabled. Against the earlier WebGL capture, the
+four diagnostic RGB crops moved from 122.5/141.8/111.0 to 124.8/147.2/121.4
+for sea, 224.4/213.2/192.2 to 225.0/215.6/198.8 for swash,
+204.8/182.5/139.4 to 206.4/189.2/159.1 for dry sand, and
+97.5/88.5/66.8 to 99.2/93.8/76.2 for upper-right vegetation. The current
+WebGPU crops are 133.7/171.4/151.8, 227.3/218.4/200.5,
+222.2/209.6/185.8, and 155.1/148.0/115.6, respectively. The diffuse change
+brightened those WebGL regions, but vegetation and sand remain visibly darker
+than WebGPU; this does not close renderer parity. The captures are compositor
+screenshots with different backend color pipelines, so the crop values are
+diagnostic rather than a pixel-exact conformance result.
+
+[Current WebGL capture](images/tidewater-split-webgl-amd-atmosphere-diffuse-2026-11-14.png),
+[current WebGPU capture](images/tidewater-split-webgpu-amd-atmosphere-diffuse-2026-11-14.png).
+No parity gate or percentage changed; Tidewater parity remains 90%.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
