@@ -66,6 +66,25 @@ try {
 	if ( water.material.uniforms.uOceanEnabled.value !== 1 || water.material.uniforms.uOceanDisplacement.value !== query.fft.displacementTarget.texture || water.material.uniforms.uOceanDerivatives.value !== query.fft.displacementTarget.textures[ 1 ] ) throw new Error( 'Water mesh was not bound to its WebGL FFT displacement and derivative textures' );
 	if ( ! water.material.fragmentShader.includes( 'oceanSurfaceSlopes( vRestPosition, depth )' ) || water.material.fragmentShader.includes( 'geometricNormal = normalize( cross( dFdx( vWorldPosition )' ) ) throw new Error( 'WebGL water normals must use FFT derivatives instead of the coarse triangle normal' );
 	query.update( 1 / 60, 4.25 );
+	const fftSize = query.fft.size, fftCascades = query.fft.cascades;
+	const displacementPixels = new Float32Array( fftSize * fftSize * fftCascades * 4 );
+	const derivativePixels = new Float32Array( displacementPixels.length );
+	await renderer.readRenderTargetPixelsAsync( query.fft.displacementTarget, 0, 0, fftSize, fftSize * fftCascades, displacementPixels );
+	await renderer.readRenderTargetPixelsAsync( query.fft.displacementTarget, 0, 0, fftSize, fftSize * fftCascades, derivativePixels, 0, 1 );
+	let derivativeError = 0, derivativeMagnitude = 0, derivativeSamples = 0;
+	for ( let cascade = 0; cascade < fftCascades; cascade ++ ) {
+		const texelWorld = query.fft.parameters.sizes[ cascade ] / fftSize;
+		for ( let y = 2; y < fftSize - 2; y += 17 ) for ( let x = 2; x < fftSize - 2; x += 17 ) {
+			const index = ( yy, xx, channel ) => ( cascade * fftSize * fftSize + yy * fftSize + xx ) * 4 + channel;
+			const derivative = derivativePixels[ index( y, x, 0 ) ];
+			const finiteDifference = ( displacementPixels[ index( y, x + 1, 1 ) ] - displacementPixels[ index( y, x - 1, 1 ) ] ) / ( 2 * texelWorld );
+			derivativeError += Math.abs( derivative - finiteDifference );
+			derivativeMagnitude += Math.abs( derivative );
+			derivativeSamples ++;
+		}
+	}
+	const derivativeMae = derivativeError / derivativeSamples, derivativeMeanMagnitude = derivativeMagnitude / derivativeSamples;
+	if ( derivativeMeanMagnitude < 0.01 || derivativeMae > 0.12 ) throw new Error( `WebGL FFT derivatives do not match surface height slopes: ${JSON.stringify( { derivativeMae, derivativeMeanMagnitude } )}` );
 	const errorsAfterFFT = [];
 	for ( let error = glErrorValue( renderer ); error !== 0; error = glErrorValue( renderer ) ) errorsAfterFFT.push( error );
 	const camera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 500 );
@@ -113,7 +132,7 @@ try {
 	if ( errorsAfterFFT.length || fftRender.renderError !== gl.NO_ERROR || noFFTRender.renderError !== gl.NO_ERROR ) throw new Error( `WebGL errors after FFT ${errorsAfterFFT}, FFT render 0x${fftRender.renderError.toString(16)}, no-FFT render 0x${noFFTRender.renderError.toString(16)}` );
 	if ( visiblePixels < 100 ) throw new Error( `Water rendered too few visible pixels: ${visiblePixels}; FFT delta ${changedPixels}` );
 	if ( changedPixels < 100 ) throw new Error( `FFT displacement changed too few rendered pixels: ${changedPixels}; visible ${visiblePixels}` );
-	result.textContent = JSON.stringify( { status: 'complete', changedPixels, visiblePixels, programCount: programs.length, phaseMaxError, ripSamples } );
+	result.textContent = JSON.stringify( { status: 'complete', changedPixels, visiblePixels, programCount: programs.length, phaseMaxError, ripSamples, derivativeMae, derivativeMeanMagnitude } );
 	result.dataset.status = 'complete';
 } catch ( error ) {
 	result.textContent = `FAIL ${error.stack || error}`;

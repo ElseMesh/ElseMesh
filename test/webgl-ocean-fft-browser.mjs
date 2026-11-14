@@ -33,15 +33,12 @@ try {
 	webgl.update( time );
 	const webglPixels = new Float32Array( size * size * cascades * 4 );
 	await renderer.readRenderTargetPixelsAsync( webgl.displacementTarget, 0, 0, size, size * cascades, webglPixels );
-	const derivativePixels = new Float32Array( size * size * cascades * 4 );
-	await renderer.readRenderTargetPixelsAsync( webgl.displacementTarget, 0, 0, size, size * cascades, derivativePixels, 0, 1 );
 
 	let totalError = 0, compared = 0, maxError = 0, nonFinite = 0;
 	const cascadeError = Array.from( { length: cascades }, () => ( { sum: 0, count: 0, max: 0 } ) );
 	const orientationError = { direct: 0, flipX: 0, flipY: 0, flipXY: 0 };
 	const signError = { direct: 0, negate: 0, checker: 0, x: 0, y: 0 };
 	const channelStats = Array.from( { length: 3 }, () => ( { glMin: Infinity, glMax: - Infinity, gpuMin: Infinity, gpuMax: - Infinity, sum: 0, count: 0 } ) );
-	let derivativeError = 0, derivativeSamples = 0, derivativeMagnitude = 0;
 	let maxAt = null;
 	for ( let cascade = 0; cascade < cascades; cascade ++ ) {
 		const view = new DataView( webgpuReference, headerBytes + cascade * size * size * 8, size * size * 8 );
@@ -75,15 +72,6 @@ try {
 				signError.y += Math.abs( ( y & 1 ? - webglValue : webglValue ) - webgpuValue );
 			}
 		}
-		const texelWorld = webgl.parameters.sizes[ cascade ] / size;
-		for ( let y = 2; y < size - 2; y += 17 ) for ( let x = 2; x < size - 2; x += 17 ) {
-			const at = ( yy, xx, channel = 0 ) => webglPixels[ ( cascade * size * size + yy * size + xx ) * 4 + channel ];
-			const deriv = derivativePixels[ ( cascade * size * size + y * size + x ) * 4 ];
-			const finiteDifference = ( at( y, x + 1, 1 ) - at( y, x - 1, 1 ) ) / ( 2 * texelWorld );
-			derivativeError += Math.abs( deriv - finiteDifference );
-			derivativeMagnitude += Math.abs( deriv );
-			derivativeSamples ++;
-		}
 	}
 	const mae = totalError / compared;
 	orientationError.direct = totalError;
@@ -93,10 +81,7 @@ try {
 	for ( const stats of channelStats ) stats.mae = stats.sum / stats.count;
 	if ( nonFinite !== 0 ) throw new Error( `non-finite displacement samples: ${ nonFinite }` );
 	if ( mae > 0.01 || maxError > 0.15 ) throw new Error( `WebGL/WebGPU FFT mismatch: ${ JSON.stringify( { mae, maxError, maxAt, cascades: cascadeError.map( item => ( { mae: item.sum / item.count, max: item.max } ) ), channels: channelStats, orientations: orientationError, signs: signError } ) }` );
-	const derivativeMae = derivativeError / derivativeSamples;
-	const derivativeMeanMagnitude = derivativeMagnitude / derivativeSamples;
-	if ( derivativeMeanMagnitude < 0.01 || derivativeMae > 0.12 ) throw new Error( `WebGL ocean derivatives are not usable: ${JSON.stringify( { derivativeMae, derivativeMeanMagnitude } )}` );
-	result.textContent = `PASS WebGL/WebGPU displacement: ${compared} channels, MAE ${mae.toExponential(2)}, max ${maxError.toExponential(2)}; FFT slope finite-difference MAE ${derivativeMae.toExponential(2)}`;
+	result.textContent = `PASS WebGL/WebGPU displacement: ${compared} channels, MAE ${mae.toExponential(2)}, max ${maxError.toExponential(2)}`;
 	result.dataset.status = 'passed';
 } catch ( error ) {
 	result.textContent = `FAIL ${error.stack || error}`;
