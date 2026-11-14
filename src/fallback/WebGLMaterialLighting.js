@@ -34,11 +34,11 @@ export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvi
 			shader.fragmentShader = shader.fragmentShader.replace( '#include <lights_fragment_maps>', chunk.replace( DIFFUSE_IBL_CALL, replacement ) );
 		} else {
 			const chunk = THREE.ShaderChunk?.lights_fragment_begin;
-			const marker = '\t#endif\n\n#if defined( RE_IndirectSpecular )';
+			const marker = '\t#endif\n#endif\n#if defined( RE_IndirectSpecular )';
 			if ( typeof chunk !== 'string' || ! chunk.includes( marker ) ) {
 				throw new Error( 'ElseMesh WebGL atmosphere lighting does not match the installed Three.js diffuse chunk' );
 			}
-			const replacement = `\t\t${ worldNormalDeclaration }\n\t\t${ irradiance.split( '\n' ).join( '\n\t\t' ) }\n\t\tirradiance += emAtmosphereDiffuse;\n\t#endif\n\n#if defined( RE_IndirectSpecular )`;
+			const replacement = `\t#endif\n\t${ worldNormalDeclaration }\n\t${ irradiance.split( '\n' ).join( '\n\t' ) }\n\tirradiance += emAtmosphereDiffuse;\n#endif\n#if defined( RE_IndirectSpecular )`;
 			shader.fragmentShader = shader.fragmentShader.replace( '#include <lights_fragment_begin>', chunk.replace( marker, replacement ) );
 		}
 		shader.uniforms.emAtmosphereSkyIrradianceTexture = { value: atmosphere.skyIrradianceTexture };
