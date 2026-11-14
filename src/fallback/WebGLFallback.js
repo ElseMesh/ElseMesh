@@ -2291,7 +2291,9 @@ export class WebGLFallback {
 		}
 		this.terrainMaterial?.userData.updateTerrainTime?.( simulationTime );
 		this.hostedTerrainMaterial?.userData.updateTerrainTime?.( simulationTime );
-		for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
+		if ( ! this.worldLink || this.hostedCoarseCoverageReady !== false ) {
+			for ( const lod of this.worldLODs?.values() || [] ) lod.update( this.camera, now );
+		}
 		updateWorldComponentRuntimes( this.hostedComponentRuntimes?.values?.(), dt, this.camera, this.player, simulationTime );
 		updateWorldComponentRuntimes( this.builtinComponentRuntimes?.values?.(), dt, this.camera, this.player, simulationTime, true );
 		this.boat?.update( dt );
