@@ -1863,6 +1863,7 @@ export class WebGLFallback {
 		let assets;
 		const components = manifest.components || [];
 		let startupComponents = components;
+		let startupLODObjectAssetIDs = new Set();
 		const T = this.THREE, cache = new Map(), lodQueue = new LODLoadQueue();
 		this.hostedModelCache = cache;
 		this.worldLODs = new Map();
@@ -1876,13 +1877,20 @@ export class WebGLFallback {
 			await this.connector.ensureCellsForCamera?.( this.camera );
 			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjects = selectLocalRegionEntryObjects( this.connector, manifest, selectedObjects, this.camera );
-			const initialComponents = selectWorldComponentsForView( manifest, this.camera, { maxPriority: 'nearby' } );
+			const initialComponents = selectWorldComponentsForView( manifest, this.camera, {
+				nearbyDistance: 0,
+				maxDistance: this.connector.maxViewDistanceMeters,
+				maxPriority: 'background',
+			} ).filter( component => this.app.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialComponentIDs = new Set( initialComponents.map( component => component.id ) );
+			const collisionStartupObjects = initialObjects.filter( object => object.collisionPayload );
+			startupLODObjectAssetIDs = new Set( initialObjects.filter( object => ! object.collisionPayload && object.lods?.length ).map( object => object.assetId ).filter( Boolean ) );
 			// Keep world setup components available at entry; only spatial static-model
 			// sets should wait for view-driven streaming.
 			startupComponents = components.filter( component => component.type !== 'elsemesh.static-model-instance-set/1' || initialComponentIDs.has( component.id ) );
-			const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
-			const assetIDs = new Set( manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
+			// Fetch spawn collision and visible component descriptors first. Individual
+			// visual object GLBs stay deferred until their visible component set has LOD0.
+			const assetIDs = new Set( collisionStartupObjects.map( object => object.assetId ).filter( Boolean ) );
 			const retainAssetIDs = new Set( startupComponents.flatMap( worldComponentAssetIDs ) );
 			for ( const assetId of retainAssetIDs ) assetIDs.add( assetId );
 			for ( const extension of manifest.experience?.extensions || [] ) {
@@ -1891,17 +1899,17 @@ export class WebGLFallback {
 			}
 			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh local-region startup selection:', JSON.stringify( {
 				selectedObjects: selectedObjects.length,
-				entryObjects: initialObjects.length,
+				entryCollisionObjects: collisionStartupObjects.length,
+				deferredVisualObjects: initialObjects.length - collisionStartupObjects.length,
 				entryAssets: assetIDs.size,
 				collisionAssets: [ ...assetIDs ].filter( assetId => this.connector.collisionAssetIDs.has( assetId ) ).length,
-				visualAssets: [ ...assetIDs ].filter( assetId => ! this.connector.collisionAssetIDs.has( assetId ) && this.connector.regionAssets.has( assetId ) ).length,
 				components: startupComponents.length,
 				staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
 				staticModelComponentsAvailable: components.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
 				componentAssets: retainAssetIDs.size,
 			} ) );
 			const objectsByAsset = new Map();
-			for ( const object of initialObjects ) {
+			for ( const object of collisionStartupObjects ) {
 				if ( ! object.assetId ) continue;
 				const objects = objectsByAsset.get( object.assetId ) || [];
 				objects.push( object );
@@ -1950,7 +1958,7 @@ export class WebGLFallback {
 				},
 				onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
 			} );
-			for ( const object of initialObjects ) if ( object.assetId && ! this.connector.regionAssets.has( object.assetId ) && assets.has( object.assetId ) ) this.localLoadedObjectIDs.add( object.id );
+			for ( const object of collisionStartupObjects ) if ( object.assetId && assets.has( object.assetId ) ) this.localLoadedObjectIDs.add( object.id );
 		} else {
 			assets = await this.connector.preload( { through: 'visible' } );
 			this.localLoadedObjectIDs = new Set( manifest.objects.filter( object => object.assetId && assets.has( object.assetId ) ).map( object => object.id ) );
@@ -1963,6 +1971,33 @@ export class WebGLFallback {
 			terrainSurface = await decodeTerrainSurfaceAsset( asBytes( terrainBytes ) );
 			this.hostedTerrainSurface = terrainSurface;
 			this.hostedTerrainData = new HeightfieldTerrainData( { size: terrainSurface.size, origin: terrainSurface.origin, resolution: terrainSurface.resolution, heights: terrainSurface.heights, splat: terrainSurface.splat } );
+		}
+		let backendComponentIDs = new Set();
+		if ( this.connector.localOnly ) {
+			const backendInstallStarted = performance.now();
+			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation start:', JSON.stringify( {
+				components: startupComponents.length,
+				staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
+			} ) );
+			await progress( 0.18, 'Loading visible coarse geometry…', 0.9 );
+			backendComponentIDs = await this._installHostedBackendComponents( startupComponents.filter( component => component.type !== 'elsemesh.humpback-whale/1' ), manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
+			this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
+			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
+				components: backendComponentIDs.size,
+				elapsedMs: Math.round( performance.now() - backendInstallStarted ),
+				modelSourcesParsed: this.hostedStaticModelSourceStats?.parsed || 0,
+				modelSourcesReused: this.hostedStaticModelSourceStats?.reused || 0,
+			} ) );
+			await this._waitForHostedCoarseCoverage();
+			if ( startupLODObjectAssetIDs.size ) {
+				const variants = await this.connector.preload( {
+					assetIDs: startupLODObjectAssetIDs,
+					position: localSpawn.position,
+					concurrency: 1,
+					onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
+				} );
+				for ( const [ assetId, bytes ] of variants ) assets.set( assetId, bytes );
+			}
 		}
 		for ( const object of manifest.objects || [] ) {
 
@@ -2045,25 +2080,27 @@ export class WebGLFallback {
 		this.portals = ( manifest.portals || [] ).filter( portal => portal.enabled || portal.back?.enabled );
 		for ( const portal of this.portals ) this._addPortalMarker( portal );
 		this._collectManifestBlockers( manifest.objects || [] );
-		const backendInstallStarted = performance.now();
-		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation start:', JSON.stringify( {
-			components: startupComponents.length,
-			staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
-		} ) );
-		await progress( 0.18, 'Preparing visible models…', 0.9 );
-		const backendComponentIDs = await this._installHostedBackendComponents( startupComponents.filter( component => component.type !== 'elsemesh.humpback-whale/1' ), manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
-		if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
-			components: backendComponentIDs.size,
-			elapsedMs: Math.round( performance.now() - backendInstallStarted ),
-			modelSourcesParsed: this.hostedStaticModelSourceStats?.parsed || 0,
-			modelSourcesReused: this.hostedStaticModelSourceStats?.reused || 0,
-		} ) );
+		if ( ! this.connector.localOnly ) {
+			const backendInstallStarted = performance.now();
+			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation start:', JSON.stringify( {
+				components: startupComponents.length,
+				staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
+			} ) );
+			await progress( 0.18, 'Preparing visible models…', 0.9 );
+			backendComponentIDs = await this._installHostedBackendComponents( startupComponents.filter( component => component.type !== 'elsemesh.humpback-whale/1' ), manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
+			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
+				components: backendComponentIDs.size,
+				elapsedMs: Math.round( performance.now() - backendInstallStarted ),
+				modelSourcesParsed: this.hostedStaticModelSourceStats?.parsed || 0,
+				modelSourcesReused: this.hostedStaticModelSourceStats?.reused || 0,
+			} ) );
+			this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
+		}
 		this.hostedVehicleSpec = resolveHostedWebGLVehicleSpec( components, manifest.objects || [], this.hostedObjectRoots );
 		const supportedComponents = initialHostedWebGLSupport( components, {
 			vehicleComponentId: this.hostedVehicleSpec?.component.id,
 		} );
 		for ( const id of backendComponentIDs ) supportedComponents.add( id );
-		this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
 		if ( terrainComponent && hostedTerrainVisualReady ) supportedComponents.add( terrainComponent.id );
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
@@ -2485,15 +2522,28 @@ export class WebGLFallback {
 			}
 		}
 		const wanted = objects.filter( object => ! loaded.has( object.id ) );
-		if ( wanted.length === 0 ) {
-			if ( connector.localOnly ) this._streamHostedWorldComponents( manifest );
+		if ( connector.localOnly ) {
+			const collisionWanted = wanted.filter( object => object.collisionPayload );
+			if ( collisionWanted.length ) {
+				const center = new this.THREE.Vector3();
+				collisionWanted.sort( ( a, b ) => {
+					transformBoundsCenter( a, a.streamingBounds.center, center );
+					const aDistance = this.camera.position.distanceToSquared( center );
+					transformBoundsCenter( b, b.streamingBounds.center, center );
+					return aDistance - this.camera.position.distanceToSquared( center );
+				} );
+				collisionWanted.length = Math.min( collisionWanted.length, LOCAL_REGION_STREAM_BATCH_SIZE );
+				this._loadHostedObjects( collisionWanted, loaded, connector );
+				return;
+			}
+			if ( this._streamHostedWorldComponents( manifest ) ) return;
+			if ( wanted.length === 0 ) return;
+		} else if ( wanted.length === 0 ) {
 			return;
 		}
 		if ( connector.localOnly ) {
 			const center = new this.THREE.Vector3();
 			wanted.sort( ( a, b ) => {
-				const aCollision = a.collisionPayload ? 0 : 1, bCollision = b.collisionPayload ? 0 : 1;
-				if ( aCollision !== bCollision ) return aCollision - bCollision;
 				transformBoundsCenter( a, a.streamingBounds.center, center );
 				const aDistance = this.camera.position.distanceToSquared( center );
 				transformBoundsCenter( b, b.streamingBounds.center, center );
@@ -2501,6 +2551,12 @@ export class WebGLFallback {
 			} );
 			wanted.length = Math.min( wanted.length, LOCAL_REGION_STREAM_BATCH_SIZE );
 		}
+		this._loadHostedObjects( wanted, loaded, connector );
+
+	}
+
+	_loadHostedObjects( wanted, loaded, connector ) {
+
 		const assetIDs = new Set( wanted.map( object => object.assetId ).filter( Boolean ) );
 		this.hostedWorldStreaming = true;
 		connector.preload( { assetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined, concurrency: 1 } ).then( async assets => {
@@ -2539,6 +2595,7 @@ export class WebGLFallback {
 				}
 				loaded.add( object.id );
 			}
+			hideReplacedWorldObjects( connector.manifest?.objects || [], this.hostedObjectRoots );
 		} ).catch( error => {
 			console.warn( `WebGL hosted-world streaming failed for ${connector.worldId}`, error );
 		} ).finally( () => { this.hostedWorldStreaming = false; } );
@@ -2582,10 +2639,23 @@ export class WebGLFallback {
 
 	}
 
+	async _waitForHostedCoarseCoverage() {
+
+		const connector = this.connector;
+		while ( connector === this.connector && ! connector.closed && ! this.hostedCoarseCoverageReady ) {
+			this._updateHostedCoarseCoverage();
+			updateWorldComponentRuntimes( this.hostedComponentRuntimes?.values?.(), 0, this.camera, this.player, 0 );
+			if ( this.hostedCoarseCoverageReady ) return;
+			await new Promise( resolve => requestAnimationFrame( resolve ) );
+		}
+		if ( ! this.hostedCoarseCoverageReady ) throw new DOMException( 'Hosted WebGL world closed before visible coarse coverage was ready', 'AbortError' );
+
+	}
+
 	_streamHostedWorldComponents( manifest ) {
 
 		const connector = this.connector;
-		if ( this.hostedCollisionCellsPending ) return;
+		if ( this.hostedCollisionCellsPending ) return false;
 		const installed = this.hostedInstalledComponentIDs || ( this.hostedInstalledComponentIDs = new Set() );
 		const staticType = 'elsemesh.static-model-instance-set/1';
 		const maxDistance = Number.isFinite( connector.maxViewDistanceMeters ) ? connector.maxViewDistanceMeters : 500;
@@ -2625,7 +2695,7 @@ export class WebGLFallback {
 			maxDistance,
 			maxPriority: 'background',
 		} ).filter( component => component.type === staticType && ! installed.has( component.id ) && worldComponentBackendAdapter( this.engine.backend, component.type ) );
-		if ( candidates.length === 0 ) return;
+		if ( candidates.length === 0 ) return false;
 		const component = candidates[ 0 ];
 		const assetIDs = new Set( worldComponentAssetIDs( component ) );
 		this.hostedWorldStreaming = true;
@@ -2639,11 +2709,13 @@ export class WebGLFallback {
 			if ( this.connector !== connector || installed.has( component.id ) ) return;
 			const installedIDs = await this._installHostedBackendComponents( [ component ], manifest, assets );
 			for ( const id of installedIDs ) this.hostedSupportedComponents?.add( id );
+			hideReplacedWorldObjects( manifest.objects || [], this.hostedObjectRoots );
 			if ( connector.regionDiagnostics ) console.info( 'ElseMesh local-region component streamed:', JSON.stringify( { componentID: component.id, installed: installedIDs.has( component.id ) } ) );
 			this._updateHostedWebGLStatus();
 		} ).catch( error => {
 			if ( error?.name !== 'AbortError' ) console.warn( `WebGL hosted-world component streaming failed for ${connector.worldId}`, error );
 		} ).finally( () => { this.hostedWorldStreaming = false; } );
+		return true;
 
 	}
 
