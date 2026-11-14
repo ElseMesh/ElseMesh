@@ -198,10 +198,13 @@ export class StaticModelInstanceSetRuntime {
 			this._nextLODCheckAt = Math.min( this._nextLODCheckAt, performance.now() + 100 );
 		}
 		if ( ! this.loadLOD ) return;
-		// Upgrade the closest visible surfaces first. When large bounds make
-		// surface distances equal, their centers break the tie before projected
-		// size; descriptor order never outranks the current view.
-		candidates.sort( ( a, b ) => a.distanceMeters - b.distanceMeters || a.centerDistanceMeters - b.centerDistanceMeters || b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id ) );
+		// Coarse coverage first favors the largest current-view footprint, so
+		// structural silhouettes can close visible gaps before detail work. Once
+		// coverage is ready, refinements favor the nearest visible surface.
+		candidates.sort( ( a, b ) => {
+			if ( a.level === 0 && b.level === 0 && a.projectedRadius !== b.projectedRadius ) return b.projectedRadius > a.projectedRadius ? 1 : - 1;
+			return a.distanceMeters - b.distanceMeters || a.centerDistanceMeters - b.centerDistanceMeters || b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id );
+		} );
 		for ( const { modelIndex, level, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } of candidates ) {
 			this.retryAfter.delete( key );
 			const pending = Promise.resolve().then( () => this.loadLOD( modelIndex, level, this.loadController.signal, { distanceMeters, centerDistanceMeters, screenBenefit: projectedRadius } ) ).then( () => {

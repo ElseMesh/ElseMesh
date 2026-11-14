@@ -165,6 +165,24 @@ assert.equal(queue.active,1); assert.deepEqual(release,[]);
 releaseFirst(); await firstTask; await lastTask; assert.deepEqual(release,['last']);
 console.log('LOD acquisition concurrency and queued cancellation passed');
 
+const objectLODQueue = new LODLoadQueue( 1, { deferStart: true } ), objectLODOrder = [];
+const objectLODCamera = new PerspectiveCamera( 60, 1, 0.1, 100 );
+objectLODCamera.updateMatrixWorld( true );
+const farLODObject = { id: 'far-furniture', transform: { position: [ 0, 0, -20 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 2 }, lods: [ { assetId: 'far-low', maxScreenFraction: 0.2 } ] };
+const nearLODObject = { id: 'near-bench', transform: { position: [ 0, 0, -4 ], yaw: 0 }, scale: [ 1, 1, 1 ], streamingBounds: { center: [ 0, 0, 0 ], radius: 0.5 }, lods: [ { assetId: 'near-low', maxScreenFraction: 0.5 } ] };
+const makeQueuedObjectLOD = object => new WorldObjectLOD( {
+ object,
+ loadLevel: ( level, signal, priority ) => objectLODQueue.run( signal, () => objectLODOrder.push( object.id ), priority ),
+ showLevel: () => {},
+} );
+const farLODController = makeQueuedObjectLOD( farLODObject ), nearLODController = makeQueuedObjectLOD( nearLODObject );
+farLODController.update( objectLODCamera );
+nearLODController.update( objectLODCamera );
+await Promise.all( [ farLODController.pending.get( 1 ), nearLODController.pending.get( 1 ) ] );
+assert.deepEqual( objectLODOrder, [ 'near-bench', 'far-furniture' ], 'shared ordinary-object LOD requests use nearest visible bound priority instead of component discovery order' );
+farLODController.dispose(); nearLODController.dispose();
+console.log( 'Shared ordinary-object LOD requests prioritize nearby visible bounds' );
+
 const sharedQueueRoot = new Group();
 sharedQueueRoot.userData.worldPackage = {};
 const sharedMeshQueue = worldPackageMeshLODQueue( sharedQueueRoot );

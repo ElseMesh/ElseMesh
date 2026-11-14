@@ -528,10 +528,10 @@ function installObjectLOD( connector, root, instance, object ) {
 	instance.add( base ); levels.set( 0, base );
 	instance.userData.collisionRoot = base;
 	state.lodControllers ||= new Map();
-	state.lodQueue ||= new LODLoadQueue();
+	state.lodQueue ||= new LODLoadQueue( 2, { deferStart: true } );
 	state.lodControllers.set( object.id, new WorldObjectLOD( {
 		object,
-		loadLevel: ( level, signal ) => state.lodQueue.run( signal, async () => {
+		loadLevel: ( level, signal, priority ) => state.lodQueue.run( signal, async () => {
 			const assetId = object.lods[ level - 1 ].assetId;
 			const bytes = await connector.getAsset( assetId, { signal } );
 			if ( signal.aborted || state.disposed ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
@@ -545,7 +545,7 @@ function installObjectLOD( connector, root, instance, object ) {
 			}
 			const visual = cloneScene( source ); prepareObjectLODVisual( visual ); visual.visible = false;
 			instance.add( visual ); levels.set( level, visual );
-		} ),
+		}, priority ),
 		showLevel: level => {
 			for ( const [ index, visual ] of levels ) {
 				visual.visible = index === level;

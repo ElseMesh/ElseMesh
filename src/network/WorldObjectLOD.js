@@ -20,6 +20,22 @@ export function selectObjectLOD(object, camera, previous = 0, loadBias = 0) {
  return level;
 }
 
+function objectLODRequestPriority( object, camera ) {
+ if ( ! object.streamingBounds ) return { distanceMeters: Infinity, centerDistanceMeters: Infinity, screenBenefit: 0 };
+ transformBoundsCenter( object, object.streamingBounds.center, center );
+ const scale = object.scale || [ 1, 1, 1 ];
+ const radius = object.streamingBounds.radius * Math.max( Math.abs( scale[ 0 ] ), Math.abs( scale[ 1 ] ), Math.abs( scale[ 2 ] ) );
+ const centerDistanceMeters = camera.position.distanceTo( center );
+ const projectedRadius = centerDistanceMeters <= radius
+  ? Infinity
+  : radius * Math.abs( camera.projectionMatrix.elements[ 5 ] ) / Math.sqrt( centerDistanceMeters * centerDistanceMeters - radius * radius );
+ return {
+  distanceMeters: Math.max( 0, centerDistanceMeters - radius ),
+  centerDistanceMeters,
+  screenBenefit: projectedRadius,
+ };
+}
+
 export class WorldObjectLOD {
  constructor({object, loadLevel, showLevel, showTransition = null, fadeDuration = 200, onError = error => console.warn('Object LOD unavailable', error)}) {
   this.object = object; this.loadLevel = loadLevel; this.showLevel = showLevel; this.onError = onError;
@@ -37,7 +53,8 @@ export class WorldObjectLOD {
   }
   if (this.transition) this.#updateVisibleLevel(this.transition.to, now);
   if (this.pending.has(level) || now < (this.retryAfter.get(level) || 0)) return;
-  const pending = Promise.resolve().then(() => this.loadLevel(level, this.controller.signal)).then(() => {
+  const priority = objectLODRequestPriority( this.object, camera );
+  const pending = Promise.resolve().then(() => this.loadLevel(level, this.controller.signal, priority)).then(() => {
    if (!this.disposed) this.loaded.add(level);
    // Visibility changes only in update(), using that render pass's camera.
   }).catch(error => {

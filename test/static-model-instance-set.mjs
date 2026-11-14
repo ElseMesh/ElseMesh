@@ -258,7 +258,7 @@ const coarsePriorityRuntime = new StaticModelInstanceSetRuntime( priorityDocumen
 } );
 coarsePriorityRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( coarsePriorityRequests, [ [ 'near-bench', 0 ], [ 'far-furniture', 0 ] ], 'visible coarse models request nearest surface first even when far furniture appears first in the descriptor' );
+assert.deepEqual( coarsePriorityRequests, [ [ 'far-furniture', 0 ], [ 'near-bench', 0 ] ], 'visible coarse models request the largest projected coverage first even when it is farther and appears first in the descriptor' );
 coarsePriorityRuntime.dispose();
 
 const overlappingBoundsDocument = {
@@ -276,7 +276,7 @@ const overlappingBoundsRuntime = new StaticModelInstanceSetRuntime( overlappingB
 } );
 overlappingBoundsRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( overlappingBoundsRequests, [ [ 'near-bench', 0 ], [ 'far-furniture', 0 ] ], 'center distance breaks ties when both static bounds clamp surface distance to zero, before projected radius' );
+assert.deepEqual( overlappingBoundsRequests, [ [ 'far-furniture', 0 ], [ 'near-bench', 0 ] ], 'the larger projected coarse footprint wins even when its bound contains the camera' );
 overlappingBoundsRuntime.dispose();
 
 const priorityPlanner = new StaticModelInstanceSetPlanner( priorityDocument );

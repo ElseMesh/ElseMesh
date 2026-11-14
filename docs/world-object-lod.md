@@ -56,6 +56,16 @@ hide in-view structure behind nearby props. Within that pass, order assets by
 projected screen coverage first, then use authored priority and distance to
 break ties. Collision remains an independent earlier request class.
 
+Do not require a world to label a view "indoors" before enforcing this
+barrier. When a world provides validated room or visibility-zone data, the
+engine may use it to extend candidate discovery through open portals and
+identify the opaque shell whose absence would expose the sky. The world owns
+those zone and portal facts; the engine owns the query and scheduling policy.
+A zone label alone does not prove occlusion or complete geometry. Without
+validated zone data, use the complete bounded frustum candidate set and keep
+coverage unverified if its authored bounds or streamed layers are incomplete.
+Never release a coverage gate merely because indoor metadata is unavailable.
+
 Do not start new mesh or mip upgrades while this current-view coarse set is
 incomplete. Re-evaluate it when the camera moves enough to expose new content;
 resume refinements immediately when the coverage gate opens, even if the camera
@@ -66,12 +76,13 @@ provides bounds, traversal semantics, and valid coarse/fine tiers; the shared
 engine owns selection, ordering, gating, and both renderer implementations.
 
 For a static-model instance set, request coarse GLBs on demand for models with
-instances in the current view. Share the near-first mesh queue across sets and
-rank each model by its nearest visible placed surface, not descriptor order.
-Keep model and LOD array indices stable as individual models arrive. The
-current-view coverage gate remains closed until every visible model has its
-coarse level; then finer upgrades can begin. Offscreen models wait until the
-view reaches them. This is frustum-based coverage, not occlusion culling.
+instances in the current view. Rank coarse candidates by projected screen
+coverage, then distance; this lets large wall, window,
+and ceiling silhouettes arrive before fine prop work. Keep model and LOD array
+indices stable as individual models arrive. The current-view coverage gate
+remains closed until every visible model has its coarse level; then finer
+upgrades can begin. Offscreen models wait until the view reaches them. This is
+frustum-based coverage, not occlusion culling.
 
 After the barrier opens, queue mesh and texture upgrades by the nearest visible
 surface that benefits from each request. If large bounds make both surface gaps
@@ -85,6 +96,9 @@ components in one world package share a deferred, single-active mesh queue;
 texture mips use a separate queue with the same near-first rule. Deferring the
 mesh queue's first dispatch lets the engine collect requests from every
 component updated in the frame before it starts the highest-priority upgrade.
+Ordinary world-object variants also use a deferred shared queue and rank
+eligible loads by nearest visible bound, so component discovery order does not
+let farther objects jump ahead of nearer ones.
 
 At neutral render load, keep one authored refinement step ahead of the
 screen-size target for visible static models and progressive textures. This
