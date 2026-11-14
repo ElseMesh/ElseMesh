@@ -126,6 +126,10 @@ export class WebGLProgressiveStaticTextures {
 
 function copyTexturePixels( target, source ) {
  if ( Boolean( target.isCompressedTexture ) !== Boolean( source.isCompressedTexture ) || Boolean( target.isDataTexture ) !== Boolean( source.isDataTexture ) ) throw new Error( 'Progressive KTX2 texture representation changed' );
+ // Three.js allocates WebGL texture storage on first upload. Progressive KTX2
+ // levels change the base dimensions, so retaining that allocation makes the
+ // next upload use texSubImage2D against storage sized for the previous level.
+ target.dispose?.();
  target.image = source.image;
  target.mipmaps = source.mipmaps;
  target.format = source.format;
