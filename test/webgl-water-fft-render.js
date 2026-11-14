@@ -63,7 +63,8 @@ try {
 	query = new WebGLWaterQuery( THREE, renderer, null, 0 );
 	fallback.waterQuery = query;
 	fallback._bindOceanFFTToWater();
-	if ( water.material.uniforms.uOceanEnabled.value !== 1 || water.material.uniforms.uOceanDisplacement.value !== query.fft.displacementTarget.texture ) throw new Error( 'Water mesh was not bound to its WebGL FFT displacement texture' );
+	if ( water.material.uniforms.uOceanEnabled.value !== 1 || water.material.uniforms.uOceanDisplacement.value !== query.fft.displacementTarget.texture || water.material.uniforms.uOceanDerivatives.value !== query.fft.displacementTarget.textures[ 1 ] ) throw new Error( 'Water mesh was not bound to its WebGL FFT displacement and derivative textures' );
+	if ( ! water.material.fragmentShader.includes( 'oceanSurfaceSlopes( vRestPosition, depth )' ) || water.material.fragmentShader.includes( 'dFdx( vWorldPosition )' ) ) throw new Error( 'WebGL water normals must use FFT derivatives instead of the coarse triangle normal' );
 	query.update( 1 / 60, 4.25 );
 	const errorsAfterFFT = [];
 	for ( let error = glErrorValue( renderer ); error !== 0; error = glErrorValue( renderer ) ) errorsAfterFFT.push( error );

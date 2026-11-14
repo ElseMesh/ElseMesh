@@ -91,13 +91,17 @@ void main() {
 const displacementShader = /* glsl */`precision highp float;
 precision highp int;
 uniform sampler2D uSourceA;
+uniform sampler2D uSourceB;
 uniform float uChoppiness;
 layout(location = 0) out vec4 outDisplacement;
+layout(location = 1) out vec4 outDerivatives;
 void main() {
     ivec2 pixel = ivec2( gl_FragCoord.xy );
     vec4 packed = texelFetch( uSourceA, pixel, 0 );
+    vec4 derivative = texelFetch( uSourceB, pixel, 0 );
     float sign = ( ( pixel.x + pixel.y % 256 ) & 1 ) == 0 ? 1.0 : -1.0;
     outDisplacement = vec4( packed.x * uChoppiness, packed.z, packed.y * uChoppiness, 1.0 ) * vec4( sign, sign, sign, 1.0 );
+    outDerivatives = vec4( derivative.xy, derivative.zw * uChoppiness ) * sign;
 }
 `;
 
@@ -127,7 +131,7 @@ export class WebGLOceanFFT {
         this.h0 = this._dataTexture( spectrum.h0 );
         this.waveData = this._dataTexture( spectrum.waveData );
         this.targets = [ this._target( 2 ), this._target( 2 ) ];
-        this.displacementTarget = this._target( 1, true );
+        this.displacementTarget = this._target( 2, true );
         this._setupDraw();
 
     }
@@ -175,7 +179,7 @@ export class WebGLOceanFFT {
             uStage: { value: 0 }, uAxis: { value: 0 }, uReverseAxis: { value: false },
         } );
         this.displacementMaterial = makeMaterial( displacementShader, {
-            uSourceA: { value: null }, uChoppiness: { value: this.choppiness },
+            uSourceA: { value: null }, uSourceB: { value: null }, uChoppiness: { value: this.choppiness },
         } );
         this.mesh = new T.Mesh( new T.PlaneGeometry( 2, 2 ), this.initialMaterial );
         this.scene.add( this.mesh );
@@ -227,6 +231,7 @@ export class WebGLOceanFFT {
         }
 
         this.displacementMaterial.uniforms.uSourceA.value = read.textures[ 0 ];
+        this.displacementMaterial.uniforms.uSourceB.value = read.textures[ 1 ];
         this._draw( this.displacementTarget, this.displacementMaterial );
         return this.displacementTarget.texture;
 

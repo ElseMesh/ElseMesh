@@ -1080,6 +1080,7 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
+				uOceanDerivatives: { value: null },
 				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
@@ -1373,6 +1374,9 @@ export class WebGLFallback {
 				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
 				uniform float uSceneColorSRGB;
+				uniform sampler2D uOceanDerivatives;
+				uniform vec4 uOceanSizes;
+				uniform int uOceanEnabled;
 				uniform mat4 uViewProjection;
 				uniform vec2 uViewport;
 				uniform sampler2D uTerrainColor;
@@ -1428,6 +1432,24 @@ export class WebGLFallback {
 					float gl = ndv * sqrt( ndl * ndl * ( 1.0 - alpha2 ) + alpha2 );
 					return 0.5 / max( gv + gl, 1e-5 );
 				}
+				vec4 oceanDerivativeCascade( vec2 xz, int cascade ) {
+					vec2 g = fract( xz / uOceanSizes[ cascade ] ) * 256.0 - 0.5;
+					g = clamp( g, vec2( 0.0 ), vec2( 255.0 ) );
+					vec2 atlasPixel = vec2( g.x, float( cascade * 256 ) + g.y );
+					return texture2D( uOceanDerivatives, ( atlasPixel + 0.5 ) / vec2( 256.0, 1024.0 ) );
+				}
+				vec2 oceanSurfaceSlopes( vec2 xz, float depth ) {
+					vec4 derivatives = vec4( 0.0 );
+					if ( uOceanEnabled == 1 ) {
+						for ( int cascade = 0; cascade < 4; cascade ++ ) {
+							float d0 = min( 40.0, uOceanSizes[ cascade ] * 0.08 );
+							float floorAmount = cascade == 0 ? 0.0 : cascade == 1 ? 0.05 : cascade == 2 ? 0.25 : 0.5;
+							float attenuation = mix( floorAmount * smoothstep( 0.0, 0.6, depth ), 1.0, smoothstep( 0.0, d0, depth ) );
+							derivatives += oceanDerivativeCascade( xz, cascade ) * attenuation;
+						}
+					}
+					return vec2( derivatives.x / max( derivatives.z + 1.0, 0.2 ), derivatives.y / max( derivatives.w + 1.0, 0.2 ) );
+				}
 				${ webglAtmosphereSkyLookupGLSL }
 				void main() {
 					vec2 p = vWorldPosition.xz;
@@ -1441,17 +1463,6 @@ export class WebGLFallback {
 					vec4 waterNoise = texture2D( uCloudNoise, waterUv );
 					vec2 fineUv = p * 0.19 + vec2( -uTime * 0.0021, uTime * 0.0015 );
 					vec4 fineNoise = texture2D( uCloudNoise, fineUv );
-					vec3 geometricNormal = normalize( cross( dFdx( vWorldPosition ), dFdy( vWorldPosition ) ) );
-					if ( geometricNormal.y < 0.0 ) geometricNormal = -geometricNormal;
-					vec2 slope = vec2( -geometricNormal.x, -geometricNormal.z ) / max( geometricNormal.y, 0.05 );
-					WebGLWakeFragment wakeField = webglWakeFragment( vRestPosition );
-					slope += wakeField.slopes;
-					vec2 fineStep = vec2( 0.0012, 0.0 );
-					float fineSlopeX = texture2D( uCloudNoise, fineUv + fineStep ).r - texture2D( uCloudNoise, fineUv - fineStep ).r;
-					float fineSlopeY = texture2D( uCloudNoise, fineUv + fineStep.yx ).r - texture2D( uCloudNoise, fineUv - fineStep.yx ).r;
-					slope += ( waterNoise.rg - 0.5 ) * 0.11 + vec2( fineSlopeX, fineSlopeY ) * 0.52;
-					slope += vShoreDirection * vShoreSlope;
-					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
 					vec3 seabedColor = vec3( 0.31, 0.27, 0.19 );
 					if ( uTerrainSize > 0.0 ) {
@@ -1465,6 +1476,15 @@ export class WebGLFallback {
 							sandCoverage = terrain.b;
 						}
 					}
+					vec2 slope = oceanSurfaceSlopes( vRestPosition, depth );
+					WebGLWakeFragment wakeField = webglWakeFragment( vRestPosition );
+					slope += wakeField.slopes;
+					vec2 fineStep = vec2( 0.0012, 0.0 );
+					float fineSlopeX = texture2D( uCloudNoise, fineUv + fineStep ).r - texture2D( uCloudNoise, fineUv - fineStep ).r;
+					float fineSlopeY = texture2D( uCloudNoise, fineUv + fineStep.yx ).r - texture2D( uCloudNoise, fineUv - fineStep.yx ).r;
+					slope += ( waterNoise.rg - 0.5 ) * 0.11 + vec2( fineSlopeX, fineSlopeY ) * 0.52;
+					slope += vShoreDirection * vShoreSlope;
+					vec3 normal = normalize( vec3( -slope.x, 1.0, -slope.y ) );
 					if ( uBeachPatchMode == 1 && groundHeight > uSeaLevel ) discard;
 					if ( ( uBeachPatchMode == 2 || ${oceanLOD ? 'true' : 'false'} ) && groundHeight > uSeaLevel ) {
 						if ( sandCoverage <= 0.05 || vSwashFront <= 0.0 ) discard;
@@ -1579,6 +1599,7 @@ export class WebGLFallback {
 			const uniforms = water.material?.uniforms;
 			if ( ! uniforms?.uOceanDisplacement ) continue;
 			uniforms.uOceanDisplacement.value = fft.displacementTarget.texture;
+			uniforms.uOceanDerivatives.value = fft.displacementTarget.textures[ 1 ];
 			uniforms.uOceanSizes.value.set( ...fft.parameters.sizes );
 			uniforms.uOceanEnabled.value = 1;
 		}
