@@ -99,6 +99,19 @@ These ROI numbers are diagnostic screen captures, not pixel-exact backend
 proof. [Latest AMD WebGL capture](images/tidewater-split-webgl-swash-above-sky-ibl-foam-lit-2026-11-14.png).
 Other views/materials and supported-hardware FPS remain open.
 
+### WebGL surf-foam pattern port, 2026-11-14
+
+The WebGL water shader now uses the same world-space, dual-phase lace lookup
+and coverage breakup as WebGPU `SurfFoam`, instead of a single scrolling lace
+sample. It feeds the fallback's analytic breaker and swash values into that
+shader path. The WebGL path still has no persistent `ShoreSim` texture or
+per-pixel shore-flow state, so flow transport currently uses an explicitly
+approximate shallow-water speed estimate. The focused WebGL water render test
+compiled and executed this shader, and the external production build passed.
+This host currently has no `/dev/dri` device, so I could not verify the AMD
+renderer or capture the matched `swashAbove` view; no appearance improvement
+is claimed from the shader compile alone. The parity estimate remains 90%.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
