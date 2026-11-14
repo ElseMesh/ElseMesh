@@ -211,7 +211,12 @@ export async function launchAIPortals() {
 	ui.select.value = selected.id;
 	ui.enter.disabled = true;
 	try {
-		engine = new Engine( canvas, WORLDS, { fixedSeed: 20261113, quality: 'high' } );
+		const selectedIndex = WORLDS.indexOf( selected );
+		const portalTour = selectedIndex < 0 ? [] : [
+			...WORLDS.slice( selectedIndex + 1 ),
+			...WORLDS.slice( 0, selectedIndex ),
+		].map( world => world.id );
+		engine = new Engine( canvas, WORLDS, { fixedSeed: 20261113, quality: 'high', tour: portalTour } );
 		const pose = engine._pose;
 		let spawned = false;
 		engine._pose = function ( world, distance, position, quaternion ) {
