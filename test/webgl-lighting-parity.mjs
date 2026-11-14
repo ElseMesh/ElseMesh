@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
 import { webglLightingForTime } from '../src/fallback/WebGLLighting.js';
+
+const fallbackSource = await readFile( new URL( '../src/fallback/WebGLFallback.js', import.meta.url ), 'utf8' );
+assert.match( fallbackSource, /this\.hemisphereLight\.intensity = this\.webglEnvironment\?\.texture \? 0 : lighting\.ambientIntensity/, 'the fallback does not add a separate hemisphere fill when its sky PMREM already supplies diffuse IBL' );
 
 const noon = webglLightingForTime( THREE, 12 );
 assert.ok( noon.night < 0.01, 'noon remains fully day lit' );

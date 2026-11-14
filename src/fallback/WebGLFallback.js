@@ -1724,7 +1724,9 @@ export class WebGLFallback {
 		this.sunLight.position.copy( lighting.keyDirection ).multiplyScalar( 500 );
 		this.sunLight.color.copy( lighting.keyColor );
 		this.sunLight.intensity = lighting.keyIntensity;
-		this.hemisphereLight.intensity = lighting.ambientIntensity;
+		// The sky PMREM contributes indirect diffuse, matching WebGPU's sky irradiance. Keep the
+		// hemisphere fill only when there is no sky environment, so lit worlds do not count it twice.
+		this.hemisphereLight.intensity = this.webglEnvironment?.texture ? 0 : lighting.ambientIntensity;
 		this.cloudLayer.material.uniforms.uSunDirection.value.copy( this.sunDirection );
 		for ( const water of this.waterScene.children ) {
 			const uniforms = water.material.uniforms;
