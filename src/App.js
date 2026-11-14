@@ -78,6 +78,7 @@ import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapP
 import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
 import './network/WebGPUWorldComponentAdapters.js';
+import './network/WebGPUTerrainSurfaceAdapter.js';
 import './network/WebGPUFishPropsComponentAdapter.js';
 import { ensureWebGPUHostedOceanEffects, updateHostedShoreWetness } from './ocean/WebGPUHostedOceanEffects.js';
 import { WorldPortalView } from './network/WorldPortalView.js';
@@ -1497,7 +1498,7 @@ export class App {
 		// render water only through their own declared world components.
 		if ( this.ocean ) this.ocean.visible = false;
 		const components = root.userData.worldComponents || [];
-		const terrain = components.find( ( component ) => component.islandTerrain && component.terrainGPU );
+		const terrain = components.find( ( component ) => component.terrainSurface && component.terrainGPU );
 		const runtime = components.find( ( component ) => component.hostedBoat );
 		this.activeHostedOcean = components.some( ( component ) => component.islandOcean );
 		this.activeHostedBoat = runtime || null;

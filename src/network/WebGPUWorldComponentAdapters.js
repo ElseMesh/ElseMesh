@@ -16,7 +16,7 @@ registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.ground-detail-field/1'
 
 async function installGroundDetailField( { app, root, connector, installed }, component ) {
 
-	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
+	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU );
 	if ( ! terrain || ! root.userData.terrainData ) throw new Error( `Ground-detail field ${component.id} requires an installed terrain surface` );
 	const references = ( component.assets || [] ).filter( asset => asset.kind === GROUND_DETAIL_DENSITY_ASSET_KIND );
 	if ( references.length !== 1 ) throw new Error( `Ground-detail field ${component.id} must reference exactly one density asset` );
@@ -45,7 +45,7 @@ function installWaterBody( { app, root, connector, installed }, component ) {
 		center: { x: component.center[ 0 ] - extent, z: component.center[ 1 ] - extent, size: extent * 2 },
 	} );
 	const surface = new WaterSurface( { fft: app.fft, cdlod: lod, foamTexture: app.foamTexture, seaLevel: connector.manifest.rules.seaLevel } );
-	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.islandTerrain && candidate.terrainGPU );
+	const terrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU );
 	if ( terrain ) {
 		terrain.shore ||= new ShoreWaves( terrain.terrainGPU );
 		surface.terrain = terrain.terrainGPU;

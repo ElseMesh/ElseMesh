@@ -8,7 +8,7 @@ assert.match( viteConfig, /readdirSync\( worldsPath[\s\S]*?world-provider\.js/, 
 
 assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.water-body/1' } ] } ), false, 'generic worlds do not load Tidewater runtime modules' );
 assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.static-fish-props/1' } ] } ), false, 'the engine-owned fish-props feature does not load Tidewater runtime modules' );
-assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.terrain-surface/1' } ] } ), true, 'Tidewater component manifests select the Tidewater provider' );
+assert.equal( supportsWorldManifest( { components: [ { type: 'elsemesh.terrain-surface/1' } ] } ), false, 'the generic terrain surface contract does not load Tidewater runtime modules' );
 assert.equal( supportsWorldManifest( { components: [], experience: { behaviors: { 'elsemesh.fishing-game/1': {} } } } ), true, 'Tidewater fishing behavior manifests select the Tidewater provider' );
 
 await loadWorldProvider();
@@ -16,7 +16,10 @@ const { worldComponentDescriptor } = await import( '../src/network/WorldComponen
 const { hasWorldBehavior } = await import( '../src/network/WorldBehaviorRegistry.js' );
 const { verifySignedWorldManifest } = await import( '../src/network/WorldConnector.js' );
 const source = JSON.parse( await readFile( new URL( '../worlds/tidewater/world-source.json', import.meta.url ), 'utf8' ) );
-assert.equal( typeof worldComponentDescriptor( 'elsemesh.terrain-surface/1' )?.install, 'function', 'loading the provider registers its component installers' );
+assert.equal( worldComponentDescriptor( 'elsemesh.terrain-surface/1' )?.install, null, 'the generic terrain surface has no world-owned installer' );
+const { worldComponentBackendAdapter } = await import( '../src/network/WorldComponentBackendRegistry.js' );
+await import( '../src/network/WebGPUTerrainSurfaceAdapter.js' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.terrain-surface/1' ), 'function', 'ElseMesh owns the WebGPU terrain surface adapter' );
 assert.equal( hasWorldBehavior( source.experience, 'elsemesh.fishing-game/1' ), true, 'loading the provider registers its world-authored fishing behavior and extension' );
 let untrustedProviderCalls = 0;
 await assert.rejects( verifySignedWorldManifest( {}, { loadWorldProviders: async () => { untrustedProviderCalls ++; } } ), /Invalid signed world document/ );

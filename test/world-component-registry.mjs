@@ -7,6 +7,7 @@ await import( '../worlds/tidewater/register-components.js' );
 
 assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.ambient-audio/1' ).waterSurface, false );
+assert.equal( worldComponentDescriptor( 'elsemesh.terrain-surface/1' ).installRank, 0, 'terrain surface installation precedes components which depend on terrain' );
 assert.equal( worldComponentDescriptor( 'elsemesh.unregistered/1' ), null );
 
 const type = 'elsemesh.registry-fixture/1';

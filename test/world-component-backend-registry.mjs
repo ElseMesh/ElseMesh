@@ -56,6 +56,7 @@ assert.doesNotMatch( appSource, /IslandWorldState|world\/TerrainData\.js/, 'App 
 assert.match( appSource, /if \( engine\.backend !== 'webgl' \|\| ! worldLink \) await this\.initializeWorldState\(\)/, 'built-in runtime state is not created for hosted WebGL startup' );
 assert.match( appSource, /async initializeWorldState\(\)[\s\S]*?presentation\?\.createWorldState/, 'built-in world state is created through the package presentation boundary' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1' ), 'function', 'App registers the WebGPU water-body adapter' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.terrain-surface/1' ), 'function', 'ElseMesh registers the WebGPU terrain-surface adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1' ), 'function', 'WebGLFallback registers the WebGL water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGPU static-model adapter' );
