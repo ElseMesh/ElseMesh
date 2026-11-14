@@ -46,7 +46,7 @@ export function collisionPathStatus( { from, to, cellSizeMeters, radius = 0.3, h
 					const bounds = source.bounds;
 					if ( bounds[ 0 ] <= sweepBounds[ 3 ] && bounds[ 3 ] >= sweepBounds[ 0 ]
 						&& bounds[ 1 ] <= sweepBounds[ 4 ] && bounds[ 4 ] >= sweepBounds[ 1 ]
-						&& bounds[ 2 ] <= sweepBounds[ 5 ] && bounds[ 5 ] >= sweepBounds[ 2 ] ) return { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey, objectID, source: { assetPath: source.assetPath ?? null, componentPath: source.componentPath ?? null, collisionType: source.collisionType ?? null, bounds: [ ...bounds ] } };
+						&& bounds[ 2 ] <= sweepBounds[ 5 ] && bounds[ 5 ] >= sweepBounds[ 2 ] ) return { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey, objectID, source: { assetPath: source.assetPath ?? null, componentPath: source.componentPath ?? null, collisionType: source.collisionType ?? null, boundsSource: source.boundsSource ?? null, bounds: [ ...bounds ] } };
 				}
 			}
 			if ( ! loadedObjectIDs.has( objectID ) ) return { ready: false, reason: 'collision-object-not-loaded', cellKey, objectID };
