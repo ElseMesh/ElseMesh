@@ -121,11 +121,27 @@ the same run-up-speed equation as WebGPU's swash solver; the water shader
 consumes that state and the terrain reads wetness from the green channel. The `webgl`
 terrain GPU fixture verifies initial foam/wetness/flow, wetness decay to 0.941
 after two seconds against the expected 0.931, and nonzero stranded residue.
-The WebGL water shader render and external production build also pass. This is
-not yet the full WebGPU `ShoreSim`: wave particle flow, breaker foam generation,
-spray deposits, and `SurfFoam` relief lighting remain unmatched.
-The host has no `/dev/dri` device, so the updated scene has not been checked on
-AMD and no visual parity improvement is claimed. Tidewater parity remains 90%.
+The WebGL water shader render and external production build also pass. WebGL
+now shares the breaker profile, wave arrival and amplitude inputs, depth-blended
+particle flow, and mottled breaker/swash foam generation with WebGPU. Spray
+deposits and `SurfFoam` relief lighting remain unmatched.
+
+The earlier note that `/dev/dri` was unavailable was incorrect: the AMD render
+node is accessible when Chromium is launched in the named Weston Wayland
+session. Fresh captures from source revision `63d08782` verify WebGL on AMD
+Radeon via ANGLE/GL and WebGPU on AMD Radeon Graphics (RADV RENOIR) via
+ANGLE/Vulkan. Both use the `swashAbove` pose, 16.2 time of day, and 1600×813
+canvas. Each run advanced for about five seconds after starting at simulation
+time 1000 s so the persistent shoreline state could initialize. The separate
+runs were not phase-locked, so the screen measurements are diagnostic, not a
+pixel-parity result. Rec. 709 ROI means for open sea, swash, and dry sand are
+94.6, 181.0, and 150.7 in WebGL, versus 122.3, 190.7, and 182.3 in WebGPU.
+WebGL still shows a substantial sea and sand color gap and darker vegetation;
+parity remains incomplete.
+[WebGL capture](images/tidewater-split-webgl-shore-state-amd-2026-11-14.png),
+[WebGPU capture](images/tidewater-split-webgpu-shore-state-amd-2026-11-14.png).
+The images include instantaneous FPS overlays and are not controlled
+performance benchmarks. Tidewater parity remains 90%.
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 
