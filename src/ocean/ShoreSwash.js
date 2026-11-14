@@ -7,7 +7,7 @@ export const SHORE_SWASH_OVERSHOOT = 1.2;
 export const SHORE_DEFAULT_PERIOD = 9;
 export const SHORE_DEFAULT_AMPLITUDE = 0.34;
 export const SHORE_DEFAULT_VARIATION = 0.55;
-export const SHORE_DEFAULT_RUNUP = 0.65;
+export const SHORE_DEFAULT_RUNUP = 1.0;
 
 const sat = x => Math.max( 0, Math.min( 1, x ) );
 const smoothstep = ( a, b, x ) => {
