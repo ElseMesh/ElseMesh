@@ -51,7 +51,7 @@ import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 import { movementParameters, worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
-import { WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
+import { SHORE_WATER_TURBIDITY, WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 import { G } from '../engine/render/Frame.js';
 import { advanceWorldWindField, setWorldWindFrame } from '../engine/world/WorldWindField.js';
 import { GroundCoverCellPlanner } from '../engine/render/GroundCoverCellPlanner.js';
@@ -1081,7 +1081,7 @@ export class WebGLFallback {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
 				uOceanDerivatives: { value: null },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uShoreTurbidity: { value: SHORE_WATER_TURBIDITY }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
@@ -1326,6 +1326,7 @@ export class WebGLFallback {
 				uniform float uAtmosphereEnabled;
 				uniform vec3 uWaterAbsorption;
 				uniform vec3 uWaterScattering;
+				uniform float uShoreTurbidity;
 				uniform float uWindSpeed;
 				uniform float uCloudsEnabled;
 				uniform sampler2D uFoamLace;
@@ -1420,7 +1421,7 @@ export class WebGLFallback {
 					vec4 waterNoise = texture2D( uCloudNoise, waterUv );
 					vec2 fineUv = p * 0.19 + vec2( -uTime * 0.0021, uTime * 0.0015 );
 					vec4 fineNoise = texture2D( uCloudNoise, fineUv );
-					float groundHeight = uHeightRange.x, depth = 100.0, sandCoverage = 0.0;
+					float groundHeight = uHeightRange.x, signedDepth = 100.0, depth = 100.0, sandCoverage = 0.0;
 					vec3 seabedColor = vec3( 0.31, 0.27, 0.19 );
 					if ( uTerrainSize > 0.0 ) {
 						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
@@ -1429,7 +1430,8 @@ export class WebGLFallback {
 							seabedColor = texture2D( uTerrainColor, terrainUv ).rgb;
 							float encodedHeight = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
 							groundHeight = mix( uHeightRange.x, uHeightRange.y, encodedHeight );
-							depth = max( 0.0, uSeaLevel + vWaveHeight - groundHeight );
+							signedDepth = uSeaLevel + vWaveHeight - groundHeight;
+							depth = max( 0.0, signedDepth );
 							sandCoverage = terrain.b;
 						}
 					}
@@ -1494,7 +1496,15 @@ export class WebGLFallback {
 					vec3 refractedView = refract( -viewDirection, normal, 1.0 / ${ WATER_IOR.toFixed( 3 ) } );
 					vec3 waterView = normalize( vec3( refractedView.x, min( refractedView.y, -0.08 ), refractedView.z ) );
 					float waterPath = clamp( depth / max( -waterView.y, 0.04 ), 0.0, 80.0 );
-					vec3 sigmaA = uWaterAbsorption, sigmaS = uWaterScattering + vec3( wakeField.aeration * 1.6 ), sigmaT = sigmaA + sigmaS;
+					float shoreMedium = 0.0;
+					if ( signedDepth < 4.5 && signedDepth > -0.2 && uShoreFieldSize > 0.0 ) {
+						vec2 shoreUv = ( p - vec2( uShoreFieldOrigin ) ) / uShoreFieldSize;
+						float exposure = texture2D( uShoreField, shoreUv ).b;
+						shoreMedium = smoothstep( 4.5, 1.2, signedDepth ) * smoothstep( -0.2, 0.15, signedDepth ) * exposure * uShoreTurbidity;
+					}
+					vec3 sigmaA = uWaterAbsorption + vec3( 0.1, 0.2, 0.62 ) * shoreMedium;
+					vec3 sigmaS = uWaterScattering + vec3( 0.9, 1.0, 0.85 ) * shoreMedium + vec3( wakeField.aeration * 1.6 );
+					vec3 sigmaT = sigmaA + sigmaS;
 					vec3 waterTransmittance = exp( -sigmaT * waterPath );
 					vec3 refractedSun = -refract( -lightDirection, vec3( 0.0, 1.0, 0.0 ), 1.0 / ${ WATER_IOR.toFixed( 3 ) } );
 					float muSun = max( refractedSun.y, 0.1 ), muView = max( -waterView.y, 0.15 );

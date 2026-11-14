@@ -2,6 +2,7 @@ import { Vector2 } from '../engine/math/index.js';
 import { Texture, UniformBlock, ShaderModule, commonModule } from '../engine/webgpu.js';
 import { G, GRAVITY } from '../engine/render/Frame.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_RUNUP } from './ShoreSwash.js';
+import { SHORE_WATER_TURBIDITY } from './WaterDefaults.js';
 
 // Depth-aware shoreline waves.
 //
@@ -184,7 +185,7 @@ export class ShoreWaves {
 			curl: [ 'f32', 1.0 ],
 			runup: [ 'f32', SHORE_DEFAULT_RUNUP ],
 			enabled: [ 'f32', 1.0 ],
-			turbidity: [ 'f32', 0.16 ], // sediment + bubble scattering in the surf zone (1/m)
+			turbidity: [ 'f32', SHORE_WATER_TURBIDITY ], // sediment + bubble scattering in the surf zone (1/m)
 			// direction texture region (buildDirTexture); dirOn = 0 until it exists
 			dirMin: [ 'vec2f', new Vector2() ],
 			dirSize: [ 'f32', 1 ],

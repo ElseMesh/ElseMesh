@@ -5,3 +5,4 @@ export const WATER_SCATTERING = Object.freeze( [ 0.012, 0.018, 0.024 ] );
 export const WATER_BACKSCATTER = 0.035;
 export const WATER_ROUGHNESS = 0.035;
 export const WATER_REFLECTION_STRENGTH = 1.0;
+export const SHORE_WATER_TURBIDITY = 0.16;
