@@ -13,6 +13,7 @@ function touchLook( x, y ) {
 	input.keys = new Set();
 	input.look = { x: 0, y: 0 };
 	input.lookStick = { x, y };
+	input.gamepadLook = { x: 0, y: 0 };
 	return input.consumeLook( 1 / 60 );
 }
 
