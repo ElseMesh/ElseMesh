@@ -1,5 +1,21 @@
 # Reproducible graphics review
 
+## 2026-11-14 Tidewater procedural vertex-color correction
+
+The split Tidewater geometry builder emitted authored vertex colors as a custom
+`tint` attribute, while the shared `elsemesh.material-graph/1` `colorRGB` input
+reads the standard `color` attribute. That contract mismatch left procedural
+village and rowboat meshes without their authored paint in the shared material
+graphs. Tidewater's `Batch.build()` now publishes those same values as
+`color`; its internal tint buffer remains available to the GLB exporter. The
+Tidewater material test checks the emitted RGB values and compiles the shared
+graphs for both WebGPU and WebGL. An isolated AMD WebGPU runtime check confirms
+the procedural meshes now carry `color` and the hulls are no longer uniformly
+pale. The new live capture was 2560×1267, while the prior matched-baseline
+capture was 1588×780 and had a different overall color balance, so the boat
+hues still need a matched capture before this closes any visual-parity gate.
+Live WebGL appearance also remains to be checked.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
