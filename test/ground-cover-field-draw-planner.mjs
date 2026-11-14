@@ -16,12 +16,12 @@ const camera = {
 const planner = new GroundCoverFieldDrawPlanner();
 const result = planner.update( [ record( 5 ), record( 11 ), record( 20 ) ], camera );
 const groups = result.visibleGroups.get( 'grass' );
-assert.equal( groups[ 0 ].indices.length, 1, 'farther visible instances use the coarse model LOD' );
+assert.equal( groups[ 0 ].indices.length, 0, 'neutral-load headroom keeps visible ground cover on the fine model LOD before the authored threshold requires it' );
 assert.equal( groups[ 1 ].indices.length, 2, 'near and transitioning instances use the fine model LOD' );
-assert.deepEqual( groups[ 0 ].indices, [ 1 ], 'the transition adds the same instance to its outgoing model LOD' );
+assert.deepEqual( groups[ 0 ].indices, [], 'the detail headroom avoids a premature transition to the outgoing coarse LOD' );
 assert.deepEqual( groups[ 1 ].indices, [ 0, 1 ], 'visible records are indexed consistently across backend batches' );
 assert.deepEqual( result.shadowGroups.get( 'grass' )[ 0 ].indices, [ 0, 1, 2 ], 'shadow selection remains independent of view frustum culling' );
-assert.ok( groups[ 0 ].drawFade[ 0 ] < 1, 'draw distance fade is included in shared records' );
+assert.ok( groups[ 1 ].drawFade[ 1 ] < 1, 'draw distance fade is included in shared records' );
 
 const biased = planner.update( [ record( 5 ) ], { ...camera, frustumPlanes: camera.frustumPlanes.map( plane => [ ...plane ] ) }, 2 );
 assert.equal( biased.visibleGroups.get( 'grass' )[ 0 ].indices.length, 1, 'render-load bias shifts demand toward coarser authored LODs' );
