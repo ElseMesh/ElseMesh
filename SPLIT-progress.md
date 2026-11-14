@@ -106,6 +106,16 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
+- 2026-11-14: removed Tidewater's WebGPU installer for the signed
+  `elsemesh.terrain-surface/1` component. ElseMesh now registers that component
+  and installs its packaged terrain through an engine-owned WebGPU adapter;
+  hosted WebGL still decodes and presents the same contract inside
+  `WebGLFallback`. The production build, registry/provider checks, terrain data
+  checks, WebGL component-support check, and a headless WebGPU install/dispose
+  smoke using Tidewater's packaged asset pass. This is not a paired renderer
+  migration or matched visual fixture, so registry separation remains 98%,
+  renderer-neutral content 71%, and Tidewater gameplay/content parity 87%.
+
 - 2026-11-09: shared static-model and progressive-texture LOD selection now
   keeps one authored detail step in reserve at neutral load. A render-load bias
   cancels that lead first, then requests coarser mips and meshes; the shared
