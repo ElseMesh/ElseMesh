@@ -866,6 +866,10 @@ export class WebGLFallback {
 	async init( onProgress = () => {} ) {
 
 		const T = this.THREE;
+		// Startup cell selection must use the same viewport projection as the
+		// first rendered frame; _resize() runs again after world loading.
+		this.camera.aspect = window.innerWidth / Math.max( 1, window.innerHeight );
+		this.camera.updateProjectionMatrix();
 		let experience = this.app.localWorldExperience;
 		if ( this.worldLink ) {
 			const manifestResult = await this.app.worldManifestPromise;
