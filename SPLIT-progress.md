@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-13. Percentages are rough completion estimates for the
+Last assessed: 2026-11-14. Percentages are rough completion estimates for the
 active engine/world-separation, Tidewater parity, and AI Portals hosting goals. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -987,6 +987,17 @@ gameplay. Update the estimates above only when a gate is newly supported or a
 finding changes them.
 
 ## Verification record
+
+- 2026-11-14: Re-ran Tidewater's `test:renderer-parity` and
+  `test:live-fishing-extension-browser` from the external build tree. Before
+  running them, compared every tracked Tidewater file between the source
+  submodule at `5c32b97` and the build copy: all 421 matched. Shared gameplay,
+  WebGPU/WebGL cast-to-sale, and the 171-frame cast traces passed; the pre-split
+  WebGPU fight and bite traces passed for 987 and 2,400 frames. The live signed
+  Worker check passed WebGPU/WebGL vendor interactions and the authored-start
+  walk to Joe (25 frames, 1.18 m). This test still uses synthetic water and HUD
+  fixtures, so it does not close production water-query or rendered-scene
+  parity.
 
 - 2026-11-08: Tidewater's fabric material now uses a signed
   `elsemesh.material-graph/1` graph shared by the built-in WebGPU material and
