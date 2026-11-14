@@ -96,7 +96,7 @@ try {
 		terrain, shore: material.userData.shoreWetnessSource.shore, seaLevel: 0,
 		center: [ 0, 0 ], size: 1, res: 4,
 		shoreDeclarations: 'uniform float uTerrainTime, uTerrainSeaLevel;',
-		coverageSource: 'float shoreRunupState(vec2 p, float ground, float time, out float tau, out vec2 direction) { tau = fract(time); direction = vec2(1.0, 0.0); return time < 0.5 ? 0.2 : -0.2; } float shoreRunupFront(vec2 p, float ground) { float tau; vec2 direction; return shoreRunupState(p, ground, uTerrainTime, tau, direction); } float shoreCoverage(vec2 p, float ground, float cellSize) { return uTerrainTime < 0.5 ? 1.0 : 0.0; }',
+		coverageSource: 'float shoreRunupState(vec2 p, float ground, float time, out float tau, out vec2 direction) { tau = fract(time); direction = vec2(1.0, 0.0); return 0.2 + time * 4.0; } float shoreRunupFront(vec2 p, float ground) { float tau; vec2 direction; return shoreRunupState(p, ground, uTerrainTime, tau, direction); } float shoreCoverage(vec2 p, float ground, float cellSize) { return uTerrainTime < 0.5 ? 1.0 : 0.0; }',
 	} );
 	wetness.update( 1 / 60, 0 );
 	if ( renderer.getRenderTarget() !== target ) throw new Error( 'wetness pass did not restore render target' );
