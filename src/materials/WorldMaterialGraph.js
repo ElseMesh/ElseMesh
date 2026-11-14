@@ -100,11 +100,21 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 		const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 		if ( textureUniforms ) shader.vertexShader = insert( shader.vertexShader, '#include <common>', textureUniforms );
 		if ( fragment ) {
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers ].filter( Boolean ).join( '\n' ) );
+			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers, compiled.glsl.thinTransmission ? `vec3 emgThinTransmission;${compiled.glsl.uniformInputs.includes( 'emgNight' ) ? '' : '\nuniform float emgNight;'}` : '' ].filter( Boolean ).join( '\n' ) );
 			if ( textureUniforms ) shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			if ( compiled.glsl.alphaFragment ) shader.fragmentShader = insert( shader.fragmentShader, '#include <alphatest_fragment>', compiled.glsl.alphaFragment );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
 			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
+			if ( compiled.glsl.thinTransmission ) {
+				const marker = '#include <lights_physical_pars_fragment>';
+				const source = T.ShaderChunk?.lights_physical_pars_fragment;
+				const directDiffuse = 'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );';
+				if ( ! shader.fragmentShader.includes( marker ) || typeof source !== 'string' || ! source.includes( directDiffuse ) ) throw new Error( 'WebGL standard shader cannot install the thin-transmission lighting hook' );
+				const transmittedDiffuse = `${directDiffuse}\n\tfloat emgBacklight = max( dot( -geometryNormal, directLight.direction ), 0.0 );\n\tfloat emgForwardLight = pow( max( dot( -geometryViewDir, directLight.direction ), 0.0 ), 3.0 ) * 0.7 + 0.3;\n\treflectedLight.directDiffuse += emgThinTransmission * directLight.color * emgBacklight * emgForwardLight * ( 1.0 - emgNight );`;
+				shader.fragmentShader = shader.fragmentShader.replace( marker, source.replace( directDiffuse, transmittedDiffuse ) );
+				if ( ! compiled.glsl.uniformInputs.includes( 'emgNight' ) ) shader.uniforms.emgNight = { get value() { return FRAME_UNIFORM_VALUES.emgNight(); } };
+				shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', compiled.glsl.thinTransmission );
+			}
 			if ( compiled.glsl.occlusion ) shader.fragmentShader = insert( shader.fragmentShader, '#include <aomap_fragment>', compiled.glsl.occlusion );
 		}
 		for ( const name of compiled.glsl.uniformInputs ) {

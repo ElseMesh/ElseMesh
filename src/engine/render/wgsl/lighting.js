@@ -266,6 +266,7 @@ struct Surface {
 	emissive: vec3f,
 	metalness: f32,
 	translucency: vec3f, // fraction of the direct light transmitted through thin foliage (x lightColor)
+	thinTransmission: vec3f, // authored thin-material tint and strength; the engine applies backlighting
 	ao: f32,
 	sheenColor: vec3f,
 	specularIntensity: f32,
@@ -280,7 +281,7 @@ struct Surface {
 fn defaultSurface( N: vec3f ) -> Surface {
 	var s: Surface;
 	s.albedo = vec3f( 1.0 ); s.alpha = 1.0; s.normal = N; s.roughness = 1.0; s.metalness = 0.0;
-	s.emissive = vec3f( 0.0 ); s.translucency = vec3f( 0.0 ); s.ao = 1.0; s.sheenColor = vec3f( 0.0 );
+	s.emissive = vec3f( 0.0 ); s.translucency = vec3f( 0.0 ); s.thinTransmission = vec3f( 0.0 ); s.ao = 1.0; s.sheenColor = vec3f( 0.0 );
 	s.specularIntensity = 1.0; s.clearcoat = 0.0; s.clearcoatRoughness = 0.0; s.sheenRoughness = 1.0;
 	s.ior = 1.5; s.clearcoatNormal = N; s.envIntensity = 1.0;
 	return s;
@@ -400,7 +401,7 @@ fn shadeSurface( s: Surface, P: vec3f, V: vec3f, pixel: vec2f ) -> vec3f {
 	// (clouds, hill shadow, caustics) and the shadow filters only run for the rest, and the filters
 	// only where the hooks left light (their derivatives are taken ahead: lightDPdx / lightDPdy)
 	var lightColor = vec3f( 0.0 );
-	if ( dotNL > 0.0 || any( s.translucency > vec3f( 0.0 ) ) ) {
+	if ( dotNL > 0.0 || any( s.translucency > vec3f( 0.0 ) ) || any( s.thinTransmission > vec3f( 0.0 ) ) ) {
 		lightColor = frame.sunColor * hookDirectModulation( P, N );
 #if MATERIAL_SUN_MODULATION
 		// per-material key-light multiplier (the former TerrainLightingModel: heightfield hill shadow)
@@ -427,6 +428,9 @@ fn shadeSurface( s: Surface, P: vec3f, V: vec3f, pixel: vec2f ) -> vec3f {
 #endif
 	// thin-surface transmission (foliage): lit from behind as well
 	acc.directDiffuse += s.translucency * lightColor;
+	let transmissionBack = sat( dot( -N, L ) );
+	let transmissionForward = pow( sat( dot( -V, L ) ), 3.0 ) * 0.7 + 0.3;
+	acc.directDiffuse += s.thinTransmission * lightColor * transmissionBack * transmissionForward * ( 1.0 - frame.night );
 #if CLEARCOAT
 	let ccN = s.clearcoatNormal;
 	let ccNL = sat( dot( ccN, L ) );

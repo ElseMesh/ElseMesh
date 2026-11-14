@@ -37,6 +37,7 @@ const OUTPUT_TYPES = Object.freeze( {
 	opacity: 'scalar',
 	emissive: 'vec3',
 	occlusion: 'scalar',
+	thinTransmission: 'vec3',
 	vertexPosition: 'vec3',
 	vertexNormal: 'vec3',
 	surfaceNormal: 'vec3',

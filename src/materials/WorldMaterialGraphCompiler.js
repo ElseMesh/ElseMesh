@@ -84,8 +84,8 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	if ( ! [ 'webgpu', 'webgl' ].includes( backend ) ) throw new Error( `Unsupported material graph backend: ${backend}` );
 	const inputTypes = WORLD_MATERIAL_GRAPH_INPUT_TYPES;
 	const vertexRoots = [ graph.outputs.vertexPosition, graph.outputs.vertexNormal ];
-	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal ];
-	const lightingFragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal ];
+	const fragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.opacity, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal, graph.outputs.thinTransmission ];
+	const lightingFragmentRoots = [ graph.outputs.baseColor, graph.outputs.roughness, graph.outputs.metalness, graph.outputs.emissive, graph.outputs.occlusion, graph.outputs.surfaceNormal, graph.outputs.thinTransmission ];
 	const opacityRequired = dependencyIDs( graph, [ graph.outputs.opacity ] );
 	const lightingFragmentRequired = dependencyIDs( graph, lightingFragmentRoots );
 	const vertexRequired = dependencyIDs( graph, vertexRoots );
@@ -137,7 +137,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 		vertexOutputs.push( backend === 'webgpu' ? `v.${target} = ${value};` : `${target === 'position' ? 'transformed' : 'objectNormal'} = ${value};` );
 	}
 	const surfaceLines = [];
-	for ( const [ output, target, operator ] of [ [ 'baseColor', 's.albedo', '*=' ], [ 'roughness', 's.roughness', '=' ], [ 'metalness', 's.metalness', '=' ], [ 'opacity', 's.alpha', '*=' ], [ 'emissive', 's.emissive', '+=' ], [ 'occlusion', 's.ao', '*=' ], [ 'surfaceNormal', 's.normal', '=' ] ] ) {
+	for ( const [ output, target, operator ] of [ [ 'baseColor', 's.albedo', '*=' ], [ 'roughness', 's.roughness', '=' ], [ 'metalness', 's.metalness', '=' ], [ 'opacity', 's.alpha', '*=' ], [ 'emissive', 's.emissive', '+=' ], [ 'occlusion', 's.ao', '*=' ], [ 'surfaceNormal', 's.normal', '=' ], [ 'thinTransmission', 's.thinTransmission', '=' ] ] ) {
 		const id = graph.outputs[ output ];
 		if ( id ) surfaceLines.push( `${target} ${operator} ${output === 'surfaceNormal' ? `normalize( ${fragment.names.get( id )} )` : fragment.names.get( id )};` );
 	}
@@ -157,7 +157,8 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 }` : '';
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
-	const webglLightingLines = surfaceLines.filter( line => ! line.startsWith( 's.ao *=' ) && ! line.startsWith( 's.alpha *=' ) ).map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) );
+	const transmissionID = graph.outputs.thinTransmission;
+	const webglLightingLines = surfaceLines.filter( line => ! line.startsWith( 's.ao *=' ) && ! line.startsWith( 's.alpha *=' ) && ! line.startsWith( 's.thinTransmission =' ) ).map( line => line.replace( 's.albedo', 'diffuseColor.rgb' ).replace( 's.roughness', 'roughnessFactor' ).replace( 's.metalness', 'metalnessFactor' ).replace( 's.emissive', 'totalEmissiveRadiance' ).replace( 's.normal', 'normal' ) );
 	const opacityID = graph.outputs.opacity;
 	const occlusionID = graph.outputs.occlusion;
 	return Object.freeze( {
@@ -183,6 +184,7 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 			fragment: [ lightingFragment?.code, ...webglLightingLines ].filter( Boolean ).join( '\n' ),
 			alphaFragment: backend === 'webgl' && opacityID ? [ opacityFragment.code, `diffuseColor.a *= ${opacityFragment.names.get( opacityID )};` ].join( '\n' ) : '',
 			occlusion: backend === 'webgl' && occlusionID ? `reflectedLight.indirectDiffuse *= ${lightingFragment.names.get( occlusionID )};\nreflectedLight.indirectSpecular *= ${lightingFragment.names.get( occlusionID )};` : '',
+			thinTransmission: backend === 'webgl' && transmissionID ? `emgThinTransmission = ${lightingFragment.names.get( transmissionID )};` : '',
 		} ),
 	} );
 }

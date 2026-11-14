@@ -110,6 +110,13 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
+- 2026-11-15: added the renderer-neutral `thinTransmission` material-graph
+  output to the engine's WebGPU and WebGL lighting compilers. Both paths apply
+  back-lighting, view response, direct-light shadowing, and night attenuation
+  from the same graph value. Tidewater's authored vegetation materials do not
+  use the graph yet, and no matched plant render was captured; renderer-neutral
+  content remains 71% and Tidewater parity remains 90%.
+
 - 2026-11-14: removed Tidewater's WebGPU installer for the signed
   `elsemesh.terrain-surface/1` component. ElseMesh now registers that component
   and installs its packaged terrain through an engine-owned WebGPU adapter;

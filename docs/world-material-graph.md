@@ -104,6 +104,7 @@ normal. ElseMesh compiles the same derivative frame to WGSL and GLSL.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `occlusion` (scalar),
+`thinTransmission` (vec3),
 `surfaceNormal` (vec3 world-space), `vertexPosition` (vec3), and
 `vertexNormal` (vec3). `occlusion` multiplies indirect diffuse and specular
 lighting in both backends. `opacity` multiplies the surface alpha before the
@@ -114,6 +115,12 @@ coordinate space. glTF PBR factors and the engine's existing base-color,
 normal, and emissive texture inputs remain the starting surface values; other
 graph outputs modify those values. Vertex outputs also feed the WebGL depth
 material so deformed geometry can keep its shadow shape.
+
+`thinTransmission` is the linear RGB tint and strength for thin-surface direct
+light transmission. The engine applies the same back-light cosine,
+view-forward factor, shadowed direct-light color, and night attenuation in
+WebGPU and WebGL; the graph contains no backend shader code or duplicated
+lighting implementation.
 
 The graph compiler and pixel fixture live in ElseMesh. The fixture checks the
 same signed GLB through both static-model adapters. Tidewater's signed village

@@ -217,6 +217,28 @@ directNormalMaterial.material.onBeforeCompile( directNormalShader );
 assert.match( directNormalShader.vertexShader, /vEmg_worldNormal = inverseTransformDirection\( normalize\( transformedNormal \), viewMatrix \)/ );
 assert.match( directNormalShader.fragmentShader, /normal = normalize\( mat3\( viewMatrix \) \* vEmg_worldNormal \)/ );
 directNormalMaterial.material.dispose();
+
+const thinTransmissionGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [ { id: 'leafTint', op: 'constant', value: [ 0.2, 0.35, 0.08 ] } ],
+	outputs: { thinTransmission: 'leafTint' },
+};
+assert.match( compileWorldMaterialGraph( thinTransmissionGraph, 'webgpu' ).surface, /s\.thinTransmission = emg_leafTint/ );
+const thinTransmissionWebGL = compileWorldMaterialGraph( thinTransmissionGraph, 'webgl' );
+assert.match( thinTransmissionWebGL.glsl.thinTransmission, /emgThinTransmission = emg_leafTint/ );
+assert.throws( () => validateWorldMaterialGraph( { ...thinTransmissionGraph, outputs: { thinTransmission: 'missing' } } ), /output/ );
+const thinTransmissionMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), thinTransmissionGraph );
+const thinTransmissionShader = {
+	vertexShader: '#include <common>\n#include <begin_vertex>',
+	fragmentShader: '#include <common>\n#include <lights_physical_pars_fragment>\n#include <lights_physical_fragment>',
+	uniforms: {},
+};
+thinTransmissionMaterial.material.onBeforeCompile( thinTransmissionShader );
+assert.match( thinTransmissionShader.fragmentShader, /emgThinTransmission = emg_leafTint/ );
+assert.match( thinTransmissionShader.fragmentShader, /emgThinTransmission \* directLight\.color \* emgBacklight \* emgForwardLight \* \( 1\.0 - emgNight \)/ );
+assert.equal( thinTransmissionShader.uniforms.emgNight.value, G.night.value, 'WebGL thin transmission shares the engine night level' );
+thinTransmissionMaterial.material.dispose();
+
 const frontFacingGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [
