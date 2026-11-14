@@ -1082,7 +1082,6 @@ export class WebGLFallback {
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
 				uOceanDerivatives: { value: null },
 				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uShoreTurbidity: { value: SHORE_WATER_TURBIDITY }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
-				uTerrainColor: { value: this.terrainColorTexture },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
 				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreArrivalField: { value: terrainWater?.shore?.arrivalTexture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
@@ -1337,7 +1336,6 @@ export class WebGLFallback {
 				uniform int uOceanEnabled;
 				uniform mat4 uViewProjection;
 				uniform vec2 uViewport;
-				uniform sampler2D uTerrainColor;
 				uniform sampler2D uTerrainHeight;
 				uniform sampler2D uShoreField;
 				uniform sampler2D uShoreArrivalField;
@@ -1422,12 +1420,10 @@ export class WebGLFallback {
 					vec2 fineUv = p * 0.19 + vec2( -uTime * 0.0021, uTime * 0.0015 );
 					vec4 fineNoise = texture2D( uCloudNoise, fineUv );
 					float groundHeight = uHeightRange.x, signedDepth = 100.0, depth = 100.0, sandCoverage = 0.0;
-					vec3 seabedColor = vec3( 0.31, 0.27, 0.19 );
 					if ( uTerrainSize > 0.0 ) {
 						vec2 terrainUv = ( p - vec2( uTerrainOrigin ) ) / uTerrainSize;
 						if ( all( greaterThanEqual( terrainUv, vec2( 0.0 ) ) ) && all( lessThanEqual( terrainUv, vec2( 1.0 ) ) ) ) {
 							vec4 terrain = texture2D( uTerrainHeight, terrainUv );
-							seabedColor = texture2D( uTerrainColor, terrainUv ).rgb;
 							float encodedHeight = ( terrain.r * 255.0 * 256.0 + terrain.g * 255.0 ) / 65535.0;
 							groundHeight = mix( uHeightRange.x, uHeightRange.y, encodedHeight );
 							signedDepth = uSeaLevel + vWaveHeight - groundHeight;
@@ -1455,7 +1451,7 @@ export class WebGLFallback {
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
 					vec3 sceneColor = sceneColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
-					vec3 refractedBed = mix( seabedColor, sceneColor, 0.1 ) * vec3( 0.58, 0.86, 0.96 );
+					vec3 refractedBed = sceneColor;
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					float ndv = max( dot( normal, viewDirection ), 1e-4 );
 					float fresnel = waterFresnelDielectric( ndv );

@@ -23,5 +23,7 @@ assert.match( webglSource, /shoreMedium = smoothstep\( 4\.5, 1\.2, signedDepth \
 assert.match( webglSource, /\* exposure \* uShoreTurbidity/, 'WebGL uses the authored shoreline exposure directly, matching WebGPU' );
 assert.match( webglSource, /uWaterAbsorption \+ vec3\( 0\.1, 0\.2, 0\.62 \) \* shoreMedium/, 'WebGL adds the WebGPU surf absorption coefficients' );
 assert.match( webglSource, /uWaterScattering \+ vec3\( 0\.9, 1\.0, 0\.85 \) \* shoreMedium/, 'WebGL adds the WebGPU surf scattering coefficients' );
+assert.match( webglSource, /vec3 refractedBed = sceneColor;/, 'WebGL water transmits the rendered refraction sample like the WebGPU water path' );
+assert.doesNotMatch( webglSource, /vec3\( 0\.58, 0\.86, 0\.96 \)/, 'WebGL does not apply an extra hard-coded seabed tint to transmitted water' );
 
 console.log( 'WebGL uses shared per-fragment swash state and surf-medium coefficients' );
