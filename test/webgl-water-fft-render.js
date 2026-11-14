@@ -36,6 +36,7 @@ try {
 	} );
 	const water = fallback._makeWater( new THREE.PlaneGeometry( 120, 120, 128, 128 ), 0, null );
 	if ( ! water.material.vertexShader.includes( 'webglShoreWobble( along )' ) ) throw new Error( 'Water does not use the shared shore phase' );
+	if ( ! water.material.fragmentShader.includes( 'surfFoamFlowLace( vec2 q, vec2 flow, float salt )' ) || ! water.material.fragmentShader.includes( 'surfFoamMask( foamCoverage' ) ) throw new Error( 'WebGL water does not use the shared world-space surf-foam contract' );
 	fallback.waterScene.add( water );
 	// Render the actual GLSL phase function and compare it with the shared CPU
 	// reference at ordinary shore locations and inside rip channels.

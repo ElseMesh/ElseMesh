@@ -32,6 +32,7 @@ import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField }
 import { WebGLSpray } from './WebGLSpray.js';
 import { WebGLShoreWetness } from './WebGLShoreWetness.js';
 import { webglShoreSwashGLSL, webglShoreWobbleGLSL } from './WebGLShoreWaveMath.js';
+import { surfFoamGLSL } from '../ocean/SurfFoamGLSL.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
@@ -1350,6 +1351,7 @@ export class WebGLFallback {
 				uniform float uTerrainSize;
 				uniform vec2 uHeightRange;
 				uniform float uSeaLevel;
+				${ surfFoamGLSL }
 				uniform int uBeachPatchMode;
 				uniform vec4 uBeachPatchBounds;
 				varying vec3 vWorldPosition;
@@ -1524,18 +1526,12 @@ export class WebGLFallback {
 					vec3 sunSpecular = uKeyLightRadiance * min( specular, 400.0 );
 					vec3 reflected = mix( waterBody, sky, fresnel ) + sunSpecular;
 					float foamNoise = texture2D( uCloudNoise, p * 0.09 + vec2( -uTime * 0.00031, uTime * 0.00017 ) ).b;
-					float shoreDetail = foamNoise * 0.62 + micro * 0.38;
-					vec4 foamLaceData = texture2D( uFoamLace, p / 3.5 + vec2( -uTime * 0.0008, uTime * 0.00057 ) );
-					float foamLace = 1.0 - smoothstep( 0.42, 0.72, foamLaceData.r );
-				float breakerFoam = vShoreFoam * ( 0.7 + 0.3 * smoothstep( 0.14, 0.58, shoreDetail ) );
-					float laceWidth = clamp( pow( breakerFoam, 1.4 ) * ( 0.7 + foamLaceData.b * 0.2 ), 0.0, 0.78 );
-					float laceMat = 1.0 - smoothstep( laceWidth - 0.035, laceWidth + 0.035, foamLaceData.r );
-					float laceBubbles = foamLaceData.g * smoothstep( laceWidth + 0.22, laceWidth, foamLaceData.r );
-					breakerFoam *= mix( laceMat, 1.0, smoothstep( 0.55, 0.92, breakerFoam ) );
-					breakerFoam = max( breakerFoam, laceBubbles * smoothstep( 0.12, 0.5, breakerFoam ) * 0.48 );
+					float breakerFoam = vShoreFoam * ( 0.7 + 0.3 * smoothstep( 0.14, 0.58, foamNoise ) );
 				reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), vShoreFace * 0.55 );
 					float swashFoam = webglShoreSwashFoam( swashFront, swashTau );
-					float foam = max( max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), swashFoam ), wakeField.foam );
+					float offshoreFoam = sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro );
+					float foamCoverage = max( max( offshoreFoam, breakerFoam * 0.88 ), max( swashFoam, wakeField.foam ) );
+					float foam = surfFoamMask( foamCoverage, offshoreFoam, breakerFoam, max( swashFoam, wakeField.foam ), depth, footprint, vWorldPosition, vShoreDirection );
 					float whitewater = smoothstep( 0.45, 0.8, breakerFoam );
 					float foamWrap = mix( 0.45, 0.12, whitewater );
 					float foamDiffuse = clamp( dot( normal, lightDirection ) * ( 1.0 - foamWrap ) + foamWrap, 0.0, 1.0 );
