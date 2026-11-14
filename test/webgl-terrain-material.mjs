@@ -33,8 +33,8 @@ assert.match( shader.fragmentShader, /float rillK = smoothstep\( 0\.2, 0\.9, wet
 assert.match( shader.fragmentShader, /terrainLuminance = dot\( terrainDryAlbedo \* uTerrainWetDarken, vec3\( 0\.2126, 0\.7152, 0\.0722 \) \)/ );
 assert.match( shader.fragmentShader, /uTerrainSwashField/ );
 assert.match( shader.fragmentShader, /float swashArrival = mix\( uTerrainSwashTimeRange/ );
-assert.match( shader.fragmentShader, /float runupFront =/ );
-assert.match( shader.fragmentShader, /runupMax = amp \* 2\.1 \* 0\.65 \*/, 'WebGL uses the reduced shared run-up scale for a tighter wet-sand front' );
+assert.match( shader.fragmentShader, /float runup = \( tau < 0\.4/ );
+assert.match( shader.fragmentShader, /rhMax = amp \* 2\.1 \* 1\.00 \* clamp\( exposure \* 1\.4/, 'WebGL terrain preserves the shared full-scale run-up used by WebGPU' );
 assert.match( shader.fragmentShader, /wet = max\( wet, swashWet \)/, 'WebGL feeds its analytic swash estimate through the shared wet-surface blend' );
 assert.doesNotMatch( shader.fragmentShader, /0\.36;/, 'WebGL no longer substitutes a fixed midpoint for WebGPU static dampness' );
 assert.match( shader.fragmentShader, /terrainPixelWorld = max\( length\( dFdx\( terrainXZ \) \), length\( dFdy\( terrainXZ \) \) \)/, 'high-frequency sand detail fades with the projected pixel footprint instead of forming distant bands' );
