@@ -82,6 +82,23 @@ is visual smoke evidence, not a performance result. Underwater lighting,
 wet-terrain appearance, other views, and supported-hardware FPS parity remain
 open.
 
+### WebGL sky fill and foam lighting follow-up
+
+The WebGL terrain used both a sky PMREM and a full-strength hemisphere light
+for diffuse fill. The WebGPU terrain gets diffuse sky irradiance through its
+shared lighting path, so WebGL was counting ambient sky twice. WebGL now keeps
+the hemisphere light only when no sky PMREM is available. At the matched
+`swashAbove` pose, open-sea and dry-sand Rec. 709 means moved from 145.0 and
+199.9 to 131.2 and 184.3, close to pre-split WebGPU's 129.5 and 181.9. WebGL
+swash foam also now receives wrapped directional sun and sky lighting instead
+of a constant pale color. The latest capture measures 133.2 open sea, 214.3
+swash, and 184.3 dry sand; WebGPU remains at 129.5, 195.4, and 181.9. The foam
+change does not close the swash gap: Tidewater's WebGPU path also uses the
+stateful `SurfFoam` lighting model, while WebGL still shades a scalar foam mask.
+These ROI numbers are diagnostic screen captures, not pixel-exact backend
+proof. [Latest AMD WebGL capture](images/tidewater-split-webgl-swash-above-sky-ibl-foam-lit-2026-11-14.png).
+Other views/materials and supported-hardware FPS remain open.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
