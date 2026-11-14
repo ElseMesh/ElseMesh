@@ -107,7 +107,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 		};
 		runtime = new StaticModelInstanceSetRuntime( document, {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
-			canRefine: () => fallback.app?.linkedWorldRoot?.userData.worldPackage?.coarseCoverageReady !== false,
+			canRefine: () => fallback.hostedCoarseCoverageReady !== false,
 			batches: mainBatches,
 			initialLoadedLods,
 			// Three.js submits scene-visible meshes in the color pass even when
@@ -137,7 +137,7 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 		const updateRuntime = runtime.update.bind( runtime );
 		runtime.update = ( dt, camera, player, elapsed, cameraWorldUpdated = false ) => {
 			updateRuntime( dt, camera, player, fallback.app?.renderLoadBias ?? 0, cameraWorldUpdated );
-			if ( fallback.app?.linkedWorldRoot?.userData.worldPackage?.coarseCoverageReady !== false ) textureLOD.update( camera, elapsed );
+			if ( fallback.hostedCoarseCoverageReady !== false ) textureLOD.update( camera, elapsed );
 		};
 		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
 		freezeStaticModelInstanceBatchTransforms( fallback.scene, mainBatches );

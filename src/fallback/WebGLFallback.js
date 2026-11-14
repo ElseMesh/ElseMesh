@@ -42,7 +42,7 @@ import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSH
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
-import { selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
+import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js';
@@ -1848,6 +1848,8 @@ export class WebGLFallback {
 	async _loadHostedWorld( progress ) {
 
 		this.connector = this.app.worldConnector || new WorldConnector( this.worldLink );
+		this.hostedCoarseCoverageReady = false;
+		this.hostedCoveragePose = null;
 		progress( 0.12, 'Connecting to hosted world…' );
 		let manifest;
 		if ( this.app.worldManifestPromise ) {
@@ -2281,6 +2283,7 @@ export class WebGLFallback {
 		setWorldWindFrame( this.scene, G );
 		const simulationTime = G.time.value;
 		this.lastFrame = now;
+		if ( this.worldLink ) this._updateHostedCoarseCoverage();
 		if ( this.shoreWetness ) {
 			this.shoreWetness.update( dt, simulationTime );
 			const material = this.hostedTerrainMaterial || this.terrainMaterial;
@@ -2537,6 +2540,43 @@ export class WebGLFallback {
 		} ).catch( error => {
 			console.warn( `WebGL hosted-world streaming failed for ${connector.worldId}`, error );
 		} ).finally( () => { this.hostedWorldStreaming = false; } );
+
+	}
+
+	_updateHostedCoarseCoverage() {
+
+		const connector = this.connector;
+		if ( ! connector?.manifest ) {
+			this.hostedCoarseCoverageReady = false;
+			return;
+		}
+		if ( this.hostedViewCellsPending ) {
+			this.hostedCoarseCoverageReady = false;
+			return;
+		}
+		const { position, quaternion } = this.camera;
+		const currentPose = [ position.x, position.y, position.z, quaternion.x, quaternion.y, quaternion.z, quaternion.w ];
+		const previousPose = this.hostedCoveragePose;
+		if ( ! previousPose || currentPose.some( ( value, index ) => index < 3 ? Math.abs( value - previousPose[ index ] ) > 0.25 : Math.abs( value - previousPose[ index ] ) > 0.015 ) ) {
+			this.hostedCoveragePose = currentPose;
+			this.hostedCoarseCoverageReady = false;
+			return;
+		}
+		const visible = selectWorldComponentsForView( connector.manifest, this.camera, {
+			nearbyDistance: 0,
+			maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
+			maxPriority: 'background',
+		} ).filter( component => this.app.vegetationEnabled || ! isVegetationWorldComponent( component ) );
+		const installed = this.hostedInstalledComponentIDs || new Set();
+		const runtimes = this.hostedComponentRuntimes || new Map();
+		this.hostedCoarseCoverageReady = ! visible.some( component => {
+			if ( ! worldComponentAssetIDs( component ).length ) return false;
+			if ( ! worldComponentBackendAdapter( this.engine.backend, component.type ) && ! worldComponentBackendBatchAdapter( this.engine.backend, component.type ) ) return false;
+			if ( ! installed.has( component.id ) ) return true;
+			const runtime = runtimes.get( component.id );
+			if ( component.type === 'elsemesh.static-model-instance-set/1' ) return runtime?.isCoarseReadyForView?.() !== true;
+			return runtime?.isCoarseReadyForView?.() === false;
+		} );
 
 	}
 
