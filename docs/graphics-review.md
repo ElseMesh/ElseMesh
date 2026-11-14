@@ -39,6 +39,23 @@ stays within 0.084 m. This harness checks query and gameplay behavior, not live
 WebGL image parity. Other views/materials, live WebGL appearance, and
 supported-hardware FPS remain open.
 
+### WebGL surf-medium follow-up
+
+WebGPU adds shallow-water sediment and bubble scattering from the authored
+shore exposure; WebGL had omitted that optical term. WebGL now uses the same
+depth fade, exposure channel, shared turbidity default, and absorption/scattering
+coefficients. The focused contract, WebGL FFT shader render, and external
+production build pass. A live AMD ANGLE GL capture at `swashAbove`, simulation
+time 1000 s, and a 1600×813 canvas showed Rec. 709 means of 113.0 in open sea,
+215.0 in the swash, and 199.9 on dry sand, versus 129.5, 195.4, and 181.9 in
+the pre-split WebGPU capture. Relative to the prior WebGL capture, open-sea
+luminance rose from 108.9 to 113.0, while swash and dry-sand means were
+unchanged. These screen captures include each backend's color pipeline, so the
+measurements are diagnostic rather than pixel-exact. The coefficient path is
+now present, but the visual gap remains: investigate water reflection/lighting
+and the terrain wet-sand/material path before calling WebGL parity complete.
+[Current live WebGL capture](images/tidewater-split-webgl-swash-above-surf-medium-2026-11-14.png).
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
