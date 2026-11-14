@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
-import { registerStaticModelTextureDemand, staticModelTextureScreenFraction } from '../src/network/WorldPackage.js';
+import { registerStaticModelTextureDemand, staticModelTextureViewDemand } from '../src/network/WorldPackage.js';
 
 const root = { userData: { worldPackage: {} } };
 const camera = new PerspectiveCamera( 60, 1, 0.1, 100 );
@@ -12,13 +12,13 @@ const runtime = {
 const unregister = registerStaticModelTextureDemand( root, runtime );
 const demands = root.userData.worldPackage.staticModelTextureDemand;
 const coarseDemand = [ ...demands.get( 'coarse' ) ][ 0 ];
-const visibleFraction = staticModelTextureScreenFraction( coarseDemand, camera );
+const visibleFraction = staticModelTextureViewDemand( coarseDemand, camera ).fraction;
 assert.ok( visibleFraction > 0 );
-assert.equal( staticModelTextureScreenFraction( [ ...demands.get( 'fine' ) ][ 0 ], camera ), null );
+assert.equal( staticModelTextureViewDemand( [ ...demands.get( 'fine' ) ][ 0 ], camera ).fraction, null );
 runtime.planner._groupsByModel[ 0 ][ 0 ].count = 0;
-assert.equal( staticModelTextureScreenFraction( coarseDemand, camera ), visibleFraction, 'a stable view reuses its projected texture visibility' );
+assert.equal( staticModelTextureViewDemand( coarseDemand, camera ).fraction, visibleFraction, 'a stable view reuses its projected texture visibility' );
 runtime.viewRevision ++;
-assert.equal( staticModelTextureScreenFraction( coarseDemand, camera ), null, 'a changed planner view invalidates the cached texture visibility' );
+assert.equal( staticModelTextureViewDemand( coarseDemand, camera ).fraction, null, 'a changed planner view invalidates the cached texture visibility' );
 unregister();
 assert.equal( demands.size, 0 );
 console.log( 'Static model texture demand follows active visible instances and unregisters.' );
