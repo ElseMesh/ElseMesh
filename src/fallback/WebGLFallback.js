@@ -36,6 +36,7 @@ import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
+import { WebGLRefractionPass } from './WebGLRefractionPass.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
@@ -837,6 +838,7 @@ export class WebGLFallback {
 		this.scene.background = new this.THREE.Color( 0x172b42 );
 		this.camera = new this.THREE.PerspectiveCamera( 62, 1, 0.1, 5000 );
 		this.camera.rotation.order = 'YXZ';
+		this.refractionPass = new WebGLRefractionPass( this.THREE, this.renderer, this.scene, this.camera );
 		this.keys = new Set();
 		this.velocityY = 0;
 		this.sequence = 0;
@@ -1001,7 +1003,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		this.renderer.setAnimationLoop( () => this._frame() );
 		this._startPresence();
 	}
@@ -1081,7 +1083,7 @@ export class WebGLFallback {
 				uTime: { value: 0 }, uCameraPosition: { value: new T.Vector3() }, uSunDirection: { value: this.sunDirection.clone() },
 				uOceanDisplacement: { value: null }, uOceanSizes: { value: new T.Vector4() }, uOceanEnabled: { value: 0 },
 				uOceanDerivatives: { value: null },
-				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uShoreTurbidity: { value: SHORE_WATER_TURBIDITY }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
+				uCloudNoise: { value: this.cloudLayer.userData.cloudNoise }, uSkyEnabled: { value: this.worldEnvironment.sky ? 1 : 0 }, uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uSkyIrradiance: { value: this.webglAtmosphere?.skyIrradianceTexture || webglWaterSkyIrradianceTexture( T ) }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 }, uKeyLightDirection: { value: this.lighting.keyDirection.clone() }, uKeyLightRadiance: { value: new T.Vector3( this.lighting.keyColor.r, this.lighting.keyColor.g, this.lighting.keyColor.b ).multiplyScalar( this.lighting.keyIntensity ) }, uWaterAbsorption: { value: new T.Vector3( ...WATER_ABSORPTION ) }, uWaterScattering: { value: new T.Vector3( ...WATER_SCATTERING ) }, uShoreTurbidity: { value: SHORE_WATER_TURBIDITY }, uWindSpeed: { value: DEFAULT_ENVIRONMENT.windSpeed }, uCloudsEnabled: { value: this.cloudsEnabled ? 1 : 0 }, uFoamLace: { value: webglFoamLaceTexture( T ) }, uSceneColor: { value: this.sceneColorTexture }, uWaterRefraction: { value: this.refractionPass.texture }, uSceneColorSRGB: { value: this.postFX.enabled ? 0 : 1 }, uViewProjection: { value: new T.Matrix4() }, uViewport: { value: new T.Vector2( 1, 1 ) },
 				uTerrainHeight: { value: terrainWater?.texture || null }, uTerrainOrigin: { value: terrainWater?.origin || 0 }, uTerrainSize: { value: terrainWater?.size || 0 },
 				uHeightRange: { value: new T.Vector2( terrainWater?.minHeight ?? - 512, terrainWater?.maxHeight ?? 1536 ) }, uSeaLevel: { value: seaLevel },
 				uShoreField: { value: terrainWater?.shore?.texture || null }, uShoreArrivalField: { value: terrainWater?.shore?.arrivalTexture || null }, uShoreFieldOrigin: { value: terrainWater?.shore?.origin || 0 }, uShoreFieldSize: { value: terrainWater?.shore?.size || 0 },
@@ -1330,6 +1332,7 @@ export class WebGLFallback {
 				uniform float uCloudsEnabled;
 				uniform sampler2D uFoamLace;
 				uniform sampler2D uSceneColor;
+				uniform sampler2D uWaterRefraction;
 				uniform float uSceneColorSRGB;
 				uniform sampler2D uOceanDerivatives;
 				uniform vec4 uOceanSizes;
@@ -1451,6 +1454,8 @@ export class WebGLFallback {
 					vec2 screenUv = gl_FragCoord.xy / uViewport;
 					vec2 refractedUv = clamp( screenUv + slope * min( depth, 24.0 ) * 0.0007, vec2( 0.001 ), vec2( 0.999 ) );
 					vec3 sceneColor = sceneColorToLinear( texture2D( uSceneColor, refractedUv ).rgb );
+					vec4 underwaterScene = texture2D( uWaterRefraction, refractedUv );
+					sceneColor = mix( sceneColor, underwaterScene.rgb, underwaterScene.a );
 					vec3 refractedBed = sceneColor;
 					vec3 viewDirection = normalize( uCameraPosition - vWorldPosition );
 					float ndv = max( dot( normal, viewDirection ), 1e-4 );
@@ -2265,6 +2270,7 @@ export class WebGLFallback {
 			this.renderer.setPixelRatio( Math.min( window.devicePixelRatio || 1, 1.5 ) * scale );
 			this.renderer.setSize( w, h );
 			const size = this.renderer.getDrawingBufferSize( new this.THREE.Vector2() );
+			this.refractionPass.resize( size.x, size.y );
 			if ( this.postFX.enabled ) this.postFX.resize( size.x, size.y );
 			else {
 				this.sceneColorTexture.image.width = size.x;
@@ -2397,6 +2403,7 @@ export class WebGLFallback {
 		try {
 			this.renderer.render( this.scene, this.camera );
 			if ( this.waterScene.children.length && ! this.debugNoWater ) {
+				this.refractionPass.render( this.worldSeaLevel );
 				if ( this.postFX.enabled ) this.postFX.copySceneForWater();
 				else this.renderer.copyFramebufferToTexture( this.sceneColorTexture );
 				this.renderer.autoClear = false;

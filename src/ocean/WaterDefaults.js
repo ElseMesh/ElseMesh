@@ -6,3 +6,4 @@ export const WATER_BACKSCATTER = 0.035;
 export const WATER_ROUGHNESS = 0.035;
 export const WATER_REFLECTION_STRENGTH = 1.0;
 export const SHORE_WATER_TURBIDITY = 0.16;
+export const WATER_REFRACTION_CLIP_MARGIN = 0.4;

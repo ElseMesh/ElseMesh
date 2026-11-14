@@ -2,6 +2,7 @@ import { RenderTarget } from '../engine/gpu/Texture.js';
 import { LAYERS, DEPTH_FORMAT } from '../engine/render/SceneRenderer.js';
 import { FrameUniforms, createViewUniforms, setFrameCamera } from '../engine/render/Frame.js';
 import { Box3, Matrix4, Vector3 } from '../engine/math/index.js';
+import { WATER_REFRACTION_CLIP_MARGIN } from './WaterDefaults.js';
 
 // Refraction source for the water: the scene below the water surface only, rendered right after the
 // opaque pass (same jittered camera, so the temporal resolve treats it like the scene) at a fraction
@@ -24,7 +25,7 @@ import { Box3, Matrix4, Vector3 } from '../engine/math/index.js';
 // GUARD: the extra view in NDC units (1 = half the screen) on each side; the target grows with it so
 // the pixel density stays the same. REFRACTION_GUARD: clip-space scale (sx, sy) and centre (cx, cy):
 // ndc_refraction = ( ndc_screen - c ) / s (WaterMaterial maps its lookups the same way).
-const CLIP_MARGIN = 0.4; // m above sea level (wave troughs and crests move the real surface around it)
+const CLIP_MARGIN = WATER_REFRACTION_CLIP_MARGIN; // wave troughs and crests move the real surface around it
 const GUARD = { left: 0.15, right: 0.15, bottom: 0.6, top: 0.0 };
 export const REFRACTION_GUARD = {
 	cx: ( GUARD.right - GUARD.left ) / 2, cy: ( GUARD.top - GUARD.bottom ) / 2,
