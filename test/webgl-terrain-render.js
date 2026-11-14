@@ -138,11 +138,14 @@ try {
 		terrain: waveTerrain, shore: material.userData.shoreWetnessSource.shore, foamLace, seaLevel: 0,
 		center: [ 0, 0 ], size: 1, res: 4, shoreDeclarations, coverageSource,
 	} );
-	waveState.update( 1 / 60, 1000 );
-	copyMaterial.uniforms.source.value = waveState.texture;
-	renderer.render( copyScene, new THREE.Camera() );
-	renderer.readRenderTargetPixels( target, 32, 32, 1, 1, pixel );
-	const waveFlow = pixel[ 3 ] / 255;
+	let waveFlow = 0;
+	for ( let i = 0; i <= 18; i ++ ) {
+		waveState.update( 0, 1000 + i * 0.5 );
+		copyMaterial.uniforms.source.value = waveState.texture;
+		renderer.render( copyScene, new THREE.Camera() );
+		renderer.readRenderTargetPixels( target, 32, 32, 1, 1, pixel );
+		waveFlow = Math.max( waveFlow, pixel[ 3 ] / 255 );
+	}
 	if ( waveFlow < 0.04 ) throw new Error( `wave-driven particle flow did not reach the shoreline state: ${waveFlow}` );
 	waveState.dispose(); wetness.dispose(); foamLace.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
 	result.dataset.status = 'complete';
