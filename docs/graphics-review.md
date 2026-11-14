@@ -56,6 +56,21 @@ now present, but the visual gap remains: investigate water reflection/lighting
 and the terrain wet-sand/material path before calling WebGL parity complete.
 [Current live WebGL capture](images/tidewater-split-webgl-swash-above-surf-medium-2026-11-14.png).
 
+### WebGL refraction-source follow-up
+
+The original WebGPU water samples a separate below-water-only refraction pass.
+WebGL had instead built transmitted light mostly from a flat seabed-color map
+with a fixed blue-green tint. WebGL now transmits its rendered refraction sample
+and no longer binds that seabed-color map to the water shader. This restores
+visible underwater stones and seabed detail. The matched AMD ANGLE GL capture
+at the same pose, time, and canvas measured 144.9 open-sea, 219.3 swash, and
+199.9 dry-sand Rec. 709 means, versus 129.5, 195.4, and 181.9 in the pre-split
+WebGPU capture. The sea and swash now overshoot luminance, and the dry-sand gap
+is unchanged. Screen captures include backend color pipelines, so these means
+are diagnostic. WebGL still samples the full scene copy rather than a guarded,
+below-water-only scene; underwater lighting and wet-terrain parity remain open.
+[Current refraction capture](images/tidewater-split-webgl-swash-above-refracted-scene-2026-11-14.png).
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
