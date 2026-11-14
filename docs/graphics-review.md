@@ -93,10 +93,12 @@ the hemisphere light only when no sky PMREM is available. At the matched
 swash foam also now receives wrapped directional sun and sky lighting instead
 of a constant pale color. The latest capture measures 133.2 open sea, 214.3
 swash, and 184.3 dry sand; WebGPU remains at 129.5, 195.4, and 181.9. The foam
-change does not close the swash gap: Tidewater's WebGPU path also uses the
-stateful `SurfFoam` lighting model, while WebGL still shades a scalar foam mask.
+change did not close the swash gap. Tidewater's WebGPU path uses the stateful
+`SurfFoam` lighting model with relief normals, self-shadowed bubbles, and
+forward-scattered thin edges. The last AMD capture predates the WebGL shore-state
+port below, so it is not current evidence for that implementation.
 These ROI numbers are diagnostic screen captures, not pixel-exact backend
-proof. [Latest AMD WebGL capture](images/tidewater-split-webgl-swash-above-sky-ibl-foam-lit-2026-11-14.png).
+proof. [Last confirmed AMD WebGL capture](images/tidewater-split-webgl-swash-above-sky-ibl-foam-lit-2026-11-14.png).
 Other views/materials and supported-hardware FPS remain open.
 
 ### WebGL surf-foam pattern port, 2026-11-14
@@ -108,9 +110,22 @@ shader path. The WebGL path still has no persistent `ShoreSim` texture or
 per-pixel shore-flow state, so flow transport currently uses an explicitly
 approximate shallow-water speed estimate. The focused WebGL water render test
 compiled and executed this shader, and the external production build passed.
-This host currently has no `/dev/dri` device, so I could not verify the AMD
-renderer or capture the matched `swashAbove` view; no appearance improvement
-is claimed from the shader compile alone. The parity estimate remains 90%.
+The state-port follow-up below replaces that speed estimate with a persistent
+shore-state texture.
+
+### WebGL persistent shore-state port, 2026-11-14
+
+WebGL now maintains an RGBA ping-pong shoreline field: foam, wetness, stranded
+residue, and flow speed. Foam advects by the analytic shoreline direction and
+a finite-difference estimate of run-up-front speed; the water shader consumes
+that state and the terrain reads wetness from the green channel. The `webgl`
+terrain GPU fixture verifies initial foam/wetness/flow, wetness decay to 0.941
+after two seconds against the expected 0.931, and nonzero stranded residue.
+The WebGL water shader render and external production build also pass. This is
+not yet the full WebGPU `ShoreSim`: breaker foam generation, spray deposits,
+flow from the shore solver, and `SurfFoam` relief lighting remain unmatched.
+The host has no `/dev/dri` device, so the updated scene has not been checked on
+AMD and no visual parity improvement is claimed. Tidewater parity remains 90%.
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 

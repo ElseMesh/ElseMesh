@@ -123,7 +123,7 @@ try {
 	if ( residueAfterTwoSeconds <= 0 ) throw new Error( `shore foam did not strand as residue when coverage drained: ${residueAfterTwoSeconds}` );
 	wetness.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
 	result.dataset.status = 'complete';
-	result.textContent = JSON.stringify( { changes, wetAfterTwoSeconds, environmentChange, roughnessResponse, programCount: renderer.info.programs.length } );
+	result.textContent = JSON.stringify( { changes, initialState: initial, wetAfterTwoSeconds, residueAfterTwoSeconds, environmentChange, roughnessResponse, programCount: renderer.info.programs.length } );
 	skyEnvironment.dispose(); skyLayer.geometry.dispose(); skyLayer.material.dispose();
 	target.dispose(); reflectionGeometry.dispose(); reflectionMaterial.dispose(); geometry.dispose(); material.dispose();
 	for ( const texture of material.userData.terrainTextures ) texture.dispose();
