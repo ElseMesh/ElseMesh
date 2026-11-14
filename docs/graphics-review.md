@@ -143,6 +143,46 @@ parity remains incomplete.
 The images include instantaneous FPS overlays and are not controlled
 performance benchmarks. Tidewater parity remains 90%.
 
+## 2026-11-14 matched AMD diffuse-light diagnosis
+
+Fresh captures from ElseMesh engine source `b980b40f` and Tidewater source
+`fdb5a98d9f4b` use the `swashAbove` camera, fixed simulation time 1000 s, the
+same 1600×813 page viewport, and separate WebGL and WebGPU Chromium sessions in
+the named Weston display. The WebGL page reported
+`ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)`; browser
+`SystemInfo` for WebGPU reported
+`ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon Graphics (RADV RENOIR)), radv-26.1.6)`
+with `webgpu` enabled. Both browser sessions used the AMD render node. These
+are compositor screenshots, so the following channel means are diagnostic and
+not pixel-exact renderer comparisons.
+
+Mean RGB values in four fixed screen crops (WebGL vs WebGPU) were:
+
+| Region | WebGL RGB | WebGPU RGB |
+| --- | --- | --- |
+| Sea (100,300)–(500,700) | 122.5, 141.8, 111.0 | 133.7, 171.4, 151.8 |
+| Swash (760,180)–(980,480) | 224.4, 213.2, 192.2 | 227.3, 218.4, 200.5 |
+| Dry sand (1180,420)–(1400,620) | 204.8, 182.5, 139.4 | 222.2, 209.7, 185.8 |
+| Upper-right vegetation (1100,50)–(1500,200) | 97.5, 88.5, 66.8 | 155.1, 148.1, 115.6 |
+
+The WebGL runtime had exposure 0.55, auto-exposure 1.0, and a sky environment
+texture; its hemisphere fill was set to zero. A disposable page-only probe
+held the existing hemisphere light at 1.5. This raised dry-sand means to
+213.4, 199.0, 166.8 and vegetation means to 106.4, 105.0, 80.1, while the
+vegetation still remained much darker than WebGPU. This confirms ambient fill
+contributes to the gap, but simply restoring the old fill is not a complete
+parity fix. The source paths still differ: WebGPU's shared material hook uses
+atmosphere-derived sky irradiance and horizon color, while WebGL standard
+materials depend on a sky-cubemap PMREM. Water has a separate atmosphere path.
+The next renderer change should align those engine-owned lighting inputs and
+verify the resulting materials, instead of changing Tidewater albedo data.
+
+[Matched WebGL capture](images/tidewater-split-webgl-amd-dark-scene-2026-11-14.png),
+[matched WebGPU capture](images/tidewater-split-webgpu-amd-dark-scene-2026-11-14.png).
+The temporary lighting probes were not saved as accepted output and did not
+modify source. No parity gate or percentage changed; Tidewater parity remains
+90%.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
