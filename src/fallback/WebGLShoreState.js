@@ -1,11 +1,11 @@
-// Persistent shore wetness for the WebGL terrain renderer. The coverage function
-// is supplied by the shore renderer so the water and terrain share its run-up.
-// Encoded shore inputs have less precision than WebGPU's float shore field.
-export class WebGLShoreWetness {
+// Persistent shoreline foam, wetness, residue, and flow state for WebGL.
+// The shore renderer supplies its run-up function so water and terrain share
+// one analytic shoreline. Encoded inputs have less precision than WebGPU state.
+export class WebGLShoreState {
 
 	constructor( THREE, renderer, { terrain, shore, seaLevel = 0, coverageSource, shoreDeclarations, center = [ 10, - 25 ], size = 380, res = 768 } ) {
 
-		if ( ! renderer.extensions.has( 'EXT_color_buffer_float' ) ) throw new Error( 'Persistent shore wetness requires EXT_color_buffer_float' );
+		if ( ! renderer.extensions.has( 'EXT_color_buffer_float' ) || ! renderer.extensions.has( 'OES_texture_float_linear' ) ) throw new Error( 'Persistent shore state requires float render targets and linear filtering' );
 		this.renderer = renderer;
 		this.min = new THREE.Vector2( center[ 0 ] - size / 2, center[ 1 ] - size / 2 );
 		this.size = size;
@@ -19,7 +19,7 @@ export class WebGLShoreWetness {
 		this.height.needsUpdate = true;
 		const makeTarget = () => new THREE.WebGLRenderTarget( res, res, {
 			format: THREE.RGBAFormat, type: THREE.HalfFloatType,
-			minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+			minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
 			depthBuffer: false, stencilBuffer: false,
 		} );
 		this.targets = [ makeTarget(), makeTarget() ];
@@ -64,13 +64,35 @@ void main() {
 	vec2 p = uMin + vUv * uSize;
 	float ground = terrainHeight(p);
 	float depth = uTerrainSeaLevel - ground;
-	float previous = uInitialized ? texture2D(uPrevious, vUv).r : 0.0;
-	float wet = previous * exp(-uDt / 28.0);
-	if (depth <= 7.0 && ground <= 3.2) {
-		float coverage = depth > 0.03 ? 1.0 : shoreCoverage(p, ground, uSize / uResolution);
-		wet = max(wet, coverage);
+	vec4 here = uInitialized ? texture2D(uPrevious, vUv) : vec4(0.0);
+	if (depth > 7.0 || ground > 3.2) {
+		gl_FragColor = vec4(here.r * exp(-uDt / 2.0), here.g * exp(-uDt / 28.0), here.b * exp(-uDt / 5.0), 0.0);
+		return;
 	}
-	gl_FragColor = vec4(wet, 0.0, 0.0, 1.0);
+	float cellSize = uSize / uResolution;
+	float coverage = depth > 0.03 ? 1.0 : shoreCoverage(p, ground, cellSize);
+	float tau; vec2 direction;
+	float front = shoreRunupState(p, ground, uTerrainTime, tau, direction);
+	float dtProbe = 0.05, tauProbe; vec2 directionProbe;
+	float frontAhead = shoreRunupState(p, ground, uTerrainTime + dtProbe, tauProbe, directionProbe);
+	float frontBehind = shoreRunupState(p, ground, uTerrainTime - dtProbe, tauProbe, directionProbe);
+	float flowSpeed = clamp((frontAhead - frontBehind) / (2.0 * dtProbe), -2.5, 4.0);
+	if (coverage <= 0.5 && depth <= 0.02) flowSpeed = 0.0;
+	vec2 backUv = clamp(vUv - direction * flowSpeed * uDt / uSize, vec2(0.0), vec2(1.0));
+	vec4 previous = uInitialized ? texture2D(uPrevious, backUv) : vec4(0.0);
+	float uprush = 1.0 - smoothstep(0.32, 0.46, tau);
+	float swashFoam = (1.0 - smoothstep(0.0, 0.8, front)) * smoothstep(-0.05, 0.05, front) * uprush * 0.9;
+	float swashy = 1.0 - smoothstep(0.05, 0.35, depth);
+	float laceLife = mix(2.6, 4.5, swashy);
+	float life = mix(0.7, mix(laceLife, 0.8, smoothstep(0.3, 0.8, previous.r)), coverage);
+	float aheadSpeed = uInitialized ? texture2D(uPrevious, clamp(vUv + direction / uResolution, vec2(0.0), vec2(1.0))).a : 0.0;
+	float behindSpeed = uInitialized ? texture2D(uPrevious, clamp(vUv - direction / uResolution, vec2(0.0), vec2(1.0))).a : 0.0;
+	float spreadRate = max((aheadSpeed - behindSpeed) / (2.0 * cellSize), 0.0);
+	float foam = min(previous.r * exp(-uDt * (1.0 / life + spreadRate)) + swashFoam * 1.4 * coverage * uDt, 1.0);
+	float wet = max(here.g * exp(-uDt / 28.0), coverage);
+	float stranded = min(here.r * 2.4, 1.0) * (1.0 - coverage);
+	float residue = max(here.b * mix(exp(-uDt / 5.0), 0.85, coverage), stranded);
+	gl_FragColor = vec4(foam, wet, residue, flowSpeed);
 }`,
 		} );
 		this.geometry = new THREE.PlaneGeometry( 2, 2 );

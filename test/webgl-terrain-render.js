@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { webglTerrainMaterial } from '../src/fallback/WebGLFallback.js';
-import { WebGLShoreWetness } from '../src/fallback/WebGLShoreWetness.js';
+import { WebGLShoreState } from '../src/fallback/WebGLShoreState.js';
 import { WebGLSkyEnvironment } from '../src/fallback/WebGLSkyEnvironment.js';
 
 const result = document.querySelector( '#result' );
@@ -92,19 +92,18 @@ try {
 	}
 	const error = renderer.getContext().getError();
 	if ( error !== renderer.getContext().NO_ERROR ) throw new Error( `WebGL error ${error}` );
-	const wetness = new WebGLShoreWetness( THREE, renderer, {
+	const wetness = new WebGLShoreState( THREE, renderer, {
 		terrain, shore: material.userData.shoreWetnessSource.shore, seaLevel: 0,
 		center: [ 0, 0 ], size: 1, res: 4,
 		shoreDeclarations: 'uniform float uTerrainTime, uTerrainSeaLevel;',
-		coverageSource: 'float shoreCoverage(vec2 p, float ground, float cellSize) { return uTerrainTime < 0.5 ? 1.0 : 0.0; }',
+		coverageSource: 'float shoreRunupState(vec2 p, float ground, float time, out float tau, out vec2 direction) { tau = fract(time); direction = vec2(1.0, 0.0); return time < 0.5 ? 0.2 : -0.2; } float shoreRunupFront(vec2 p, float ground) { float tau; vec2 direction; return shoreRunupState(p, ground, uTerrainTime, tau, direction); } float shoreCoverage(vec2 p, float ground, float cellSize) { return uTerrainTime < 0.5 ? 1.0 : 0.0; }',
 	} );
 	wetness.update( 1 / 60, 0 );
-	for ( let i = 0; i < 120; i ++ ) wetness.update( 1 / 60, 1 + i / 60 );
 	if ( renderer.getRenderTarget() !== target ) throw new Error( 'wetness pass did not restore render target' );
 	const copyMaterial = new THREE.ShaderMaterial( {
 		uniforms: { source: { value: wetness.texture } },
 		vertexShader: 'varying vec2 v; void main() { v = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-		fragmentShader: 'varying vec2 v; uniform sampler2D source; void main() { gl_FragColor = vec4(texture2D(source, v).rrr, 1.0); }',
+		fragmentShader: 'varying vec2 v; uniform sampler2D source; void main() { gl_FragColor = texture2D(source, v); }',
 		depthTest: false, depthWrite: false,
 	} );
 	const copyGeometry = new THREE.PlaneGeometry( 2, 2 ), copyScene = new THREE.Scene();
@@ -113,8 +112,15 @@ try {
 	if ( shaderError ) throw new Error( shaderError );
 	const pixel = new Uint8Array( 4 );
 	renderer.readRenderTargetPixels( target, 32, 32, 1, 1, pixel );
-	const wetAfterTwoSeconds = pixel[ 0 ] / 255;
+	const initial = [ ...pixel ];
+	if ( initial[ 0 ] === 0 || initial[ 1 ] === 0 || initial[ 3 ] === 0 ) throw new Error( `shore state did not initialize foam, wetness, and flow: ${initial}` );
+	for ( let i = 0; i < 120; i ++ ) wetness.update( 1 / 60, 1 + i / 60 );
+	copyMaterial.uniforms.source.value = wetness.texture;
+	renderer.render( copyScene, new THREE.Camera() );
+	renderer.readRenderTargetPixels( target, 32, 32, 1, 1, pixel );
+	const wetAfterTwoSeconds = pixel[ 1 ] / 255, residueAfterTwoSeconds = pixel[ 2 ] / 255;
 	if ( Math.abs( wetAfterTwoSeconds - Math.exp( - 2 / 28 ) ) > 0.035 ) throw new Error( `wetness did not dry over time: ${wetAfterTwoSeconds}` );
+	if ( residueAfterTwoSeconds <= 0 ) throw new Error( `shore foam did not strand as residue when coverage drained: ${residueAfterTwoSeconds}` );
 	wetness.dispose(); copyGeometry.dispose(); copyMaterial.dispose();
 	result.dataset.status = 'complete';
 	result.textContent = JSON.stringify( { changes, wetAfterTwoSeconds, environmentChange, roughnessResponse, programCount: renderer.info.programs.length } );

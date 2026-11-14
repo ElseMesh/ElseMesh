@@ -1,7 +1,11 @@
 // GLSL translation of the world-space lace and coverage portion of SurfFoam.
-// The WebGL water path supplies analytic shore foam in place of ShoreSim state;
-// callers keep that distinction explicit in the sim/fresh inputs.
+// The WebGL path supplies its shore-state texture through the same semantic
+// inputs as WebGPU; source-specific generation still belongs to each backend.
 export const surfFoamGLSL = /* glsl */`
+uniform sampler2D uShoreSimState;
+uniform vec2 uShoreSimMin;
+uniform float uShoreSimSize;
+
 float surfFoamHash11( float x ) {
 	return fract( sin( x * 91.7 + 17.3 ) * 43758.5453 );
 }
@@ -22,18 +26,21 @@ vec4 surfFoamFlowLace( vec2 q, vec2 flow, float salt ) {
 	return pattern;
 }
 
+vec4 surfFoamStateAt( vec2 position ) {
+	if ( uShoreSimSize <= 0.0 ) return vec4( 0.0 );
+	vec2 uv = ( position - uShoreSimMin ) / uShoreSimSize;
+	if ( any( lessThan( uv, vec2( 0.0 ) ) ) || any( greaterThan( uv, vec2( 1.0 ) ) ) ) return vec4( 0.0 );
+	return texture2D( uShoreSimState, uv );
+}
+
 float surfFoamMask( float coverage, float offshoreFoam, float fresh, float sim,
-	float depth, float footprint, vec3 position, vec2 shoreDirection ) {
+	float flowSpeed, float depth, float footprint, vec3 position, vec2 shoreDirection ) {
 	float inside = step( 0.5, uShoreFieldSize );
 	float surf = ( 1.0 - smoothstep( 3.0, 7.0, depth ) ) * inside;
 	if ( surf <= 0.0 || coverage <= 0.04 ) return offshoreFoam;
 
-	// The WebGPU path uses ShoreSim's depth-averaged velocity. WebGL currently
-	// has only the analytic shore direction, so use the shallow-water speed bound
-	// as a visible-pattern transport estimate until the state field is ported.
-	float flowSpeed = min( sqrt( 9.81 * max( depth, 0.03 ) ) * 0.35, 2.5 );
 	vec2 direction = length( shoreDirection ) > 0.001 ? normalize( shoreDirection ) : vec2( 0.0 );
-	vec2 flow = direction * flowSpeed;
+	vec2 flow = direction * clamp( flowSpeed, -2.5, 4.0 );
 	float ww = clamp( fresh * 1.4, 0.0, 1.0 );
 	vec4 lace = surfFoamFlowLace( position.xz, flow, 0.0 );
 	float lumps = sqrt( surfFoamFlowLace( position.xz / 6.0, flow / 6.0, 2.0 ).r ) * 0.6
