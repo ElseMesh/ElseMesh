@@ -68,8 +68,19 @@ at the same pose, time, and canvas measured 144.9 open-sea, 219.3 swash, and
 WebGPU capture. The sea and swash now overshoot luminance, and the dry-sand gap
 is unchanged. Screen captures include backend color pipelines, so these means
 are diagnostic. WebGL still samples the full scene copy rather than a guarded,
-below-water-only scene; underwater lighting and wet-terrain parity remain open.
+below-water-only scene; underwater lighting and wet-terrain parity remained open at that capture.
 [Current refraction capture](images/tidewater-split-webgl-swash-above-refracted-scene-2026-11-14.png).
+
+The follow-up now adds an engine-owned half-resolution WebGL below-water
+refraction pass using the same shared 0.4 m clip margin as WebGPU. The focused
+render fixture verifies above-water objects are omitted, intersecting geometry
+is clipped, submerged coverage remains, and renderer/scene state is restored.
+A live AMD capture at the same `swashAbove` pose after this pass measured 145.0,
+219.3, and 199.9 for the same regions. This confirms the pass runs but does not
+close the color gap. The [current capture](images/tidewater-split-webgl-swash-above-refraction-pass-2026-11-14.png)
+is visual smoke evidence, not a performance result. Underwater lighting,
+wet-terrain appearance, other views, and supported-hardware FPS parity remain
+open.
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 
