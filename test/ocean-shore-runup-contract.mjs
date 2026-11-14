@@ -27,7 +27,7 @@ assert.match( webglSource, /uWaterAbsorption \+ vec3\( 0\.1, 0\.2, 0\.62 \) \* s
 assert.match( webglSource, /uWaterScattering \+ vec3\( 0\.9, 1\.0, 0\.85 \) \* shoreMedium/, 'WebGL adds the WebGPU surf scattering coefficients' );
 assert.match( webglSource, /vec3 refractedBed = sceneColor;/, 'WebGL water transmits the rendered refraction sample like the WebGPU water path' );
 assert.doesNotMatch( webglSource, /vec3\( 0\.58, 0\.86, 0\.96 \)/, 'WebGL does not apply an extra hard-coded seabed tint to transmitted water' );
-assert.match( webglSource, /uWaterRefraction: \{ value: this\.refractionPass\.texture \}/, 'WebGL binds its below-water refraction target into the water shader' );
+assert.match( webglSource, /uWaterRefraction: \{ value: this\.refractionPass\?\.texture \|\| this\.sceneColorTexture \}/, 'WebGL binds its below-water refraction target into the water shader' );
 assert.match( webglSource, /sceneColor = mix\( sceneColor, underwaterScene\.rgb, underwaterScene\.a \)/, 'WebGL falls back to the opaque scene where the underwater pass has no coverage' );
 assert.match( refractionSource, /renderer\.clippingPlanes = \[ this\.clipPlane \]/, 'WebGL refraction clips geometry at the water plane' );
 assert.match( refractionSource, /this\.clipY = seaLevel \+ WATER_REFRACTION_CLIP_MARGIN/, 'WebGL refraction uses the shared water-surface clip margin' );
