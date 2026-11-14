@@ -8,6 +8,7 @@ import { Input } from '../core/Input.js';
 import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
 import { CDLOD } from '../core/CDLOD.js';
 import { Player } from '../player/Player.js';
+import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { updateWorldComponentRuntimes } from '../engine/scene/WorldComponentUpdate.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
@@ -48,7 +49,7 @@ import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '
 import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
-import { worldHasWater } from '../network/WorldRules.js';
+import { movementParameters, worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
 import { WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 import { G } from '../engine/render/Frame.js';
@@ -947,6 +948,7 @@ export class WebGLFallback {
 				this._bindShoreSurfaceToWater();
 			}
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
+			this.player.setWorldRules( this.connector.manifest.rules );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
@@ -1874,6 +1876,14 @@ export class WebGLFallback {
 			this.camera.position.set( ...localSpawn.position );
 			this.camera.rotation.order = 'YXZ';
 			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
+			const spawnFoot = new T.Vector3( localSpawn.position[ 0 ], localSpawn.position[ 1 ] - PLAYER_EYE_HEIGHT, localSpawn.position[ 2 ] );
+			const cellSize = this.connector.cellSizeMeters;
+			if ( Number.isInteger( cellSize ) && cellSize > 0 ) {
+				const lookahead = collisionLookaheadDistance( movementParameters( manifest.rules ).walkSpeed, this.connector.collisionLoadLatencyMs || 2000, cellSize );
+				const forward = new T.Vector3( - Math.sin( localSpawn.yaw ), 0, - Math.cos( localSpawn.yaw ) );
+				const walkFrontier = spawnFoot.clone().addScaledVector( forward, lookahead );
+				await this.connector.ensureCellsForView?.( spawnFoot, walkFrontier );
+			}
 			await this.connector.ensureCellsForCamera?.( this.camera );
 			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjects = selectLocalRegionEntryObjects( this.connector, manifest, selectedObjects, this.camera );
