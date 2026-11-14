@@ -12,10 +12,10 @@ void main() { gl_Position = vec4( position, 1.0 ); }
 
 const queryShader = /* glsl */`precision highp float;
 precision highp int;
-uniform sampler2D uInputs;
-uniform sampler2D uTerrain;
-uniform sampler2D uShoreField;
-uniform sampler2D uDisplacement;
+uniform highp sampler2D uInputs;
+uniform highp sampler2D uTerrain;
+uniform highp sampler2D uShoreField;
+uniform highp sampler2D uDisplacement;
 uniform int uHasTerrain;
 uniform int uShoreResolution;
 uniform int uCount;
@@ -30,7 +30,7 @@ uniform float uShorePeriod;
 uniform float uShoreEnabled;
 uniform float uOceanAmplitude;
 uniform vec4 uSizes;
-${ WEBGL_WAKE_READER_GLSL.replaceAll( 'texture2D(', 'texture(' ) }
+${ WEBGL_WAKE_READER_GLSL.replaceAll( 'uniform sampler2D uTerrain;', 'uniform highp sampler2D uTerrain;' ).replaceAll( 'texture2D(', 'texture(' ) }
 ${ webglShoreWobbleGLSL }
 ${ webglShoreAmplitudeGLSL }
 ${ webglShoreBreakGLSL }
