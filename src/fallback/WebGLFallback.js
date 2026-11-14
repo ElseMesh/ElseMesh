@@ -1536,7 +1536,11 @@ export class WebGLFallback {
 				reflected = mix( reflected, vec3( 0.02, 0.34, 0.34 ), vShoreFace * 0.55 );
 					float swashFoam = webglShoreSwashFoam( swashFront, swashTau );
 					float foam = max( max( max( sandCoverage * ( 1.0 - smoothstep( 0.05, 0.75, depth ) ) * ( 0.025 + 0.08 * ripple + 0.03 * micro ), breakerFoam * 0.88 ), swashFoam ), wakeField.foam );
-					reflected = mix( reflected, vec3( 0.86, 0.94, 0.93 ), foam );
+					float whitewater = smoothstep( 0.45, 0.8, breakerFoam );
+					float foamWrap = mix( 0.45, 0.12, whitewater );
+					float foamDiffuse = clamp( dot( normal, lightDirection ) * ( 1.0 - foamWrap ) + foamWrap, 0.0, 1.0 );
+					vec3 foamLight = ( uKeyLightRadiance * ( foamDiffuse / 3.14159265359 ) + skyIrradiance * 0.95 ) * 0.85;
+					reflected = mix( reflected, foamLight + sunSpecular * 0.05, foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
 					#include <colorspace_fragment>

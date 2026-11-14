@@ -25,6 +25,8 @@ assert.match( webglSource, /shoreMedium = smoothstep\( 4\.5, 1\.2, signedDepth \
 assert.match( webglSource, /\* exposure \* uShoreTurbidity/, 'WebGL uses the authored shoreline exposure directly, matching WebGPU' );
 assert.match( webglSource, /uWaterAbsorption \+ vec3\( 0\.1, 0\.2, 0\.62 \) \* shoreMedium/, 'WebGL adds the WebGPU surf absorption coefficients' );
 assert.match( webglSource, /uWaterScattering \+ vec3\( 0\.9, 1\.0, 0\.85 \) \* shoreMedium/, 'WebGL adds the WebGPU surf scattering coefficients' );
+assert.match( webglSource, /float foamDiffuse = clamp\( dot\( normal, lightDirection \)/, 'WebGL foam uses the same wrapped diffuse sun lighting rather than a constant unlit color' );
+assert.doesNotMatch( webglSource, /reflected = mix\( reflected, vec3\( 0\.86, 0\.94, 0\.93 \), foam \)/, 'WebGL foam does not bypass directional and sky lighting' );
 assert.match( webglSource, /vec3 refractedBed = sceneColor;/, 'WebGL water transmits the rendered refraction sample like the WebGPU water path' );
 assert.doesNotMatch( webglSource, /vec3\( 0\.58, 0\.86, 0\.96 \)/, 'WebGL does not apply an extra hard-coded seabed tint to transmitted water' );
 assert.match( webglSource, /uWaterRefraction: \{ value: this\.refractionPass\?\.texture \|\| this\.sceneColorTexture \}/, 'WebGL binds its below-water refraction target into the water shader' );
