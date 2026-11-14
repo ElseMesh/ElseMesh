@@ -29,7 +29,20 @@ const unknownOverlap = {
 	unknownSourcesCompleteByCell: new Map( [ [ '0,0,0', true ] ] ),
 	unknownSourcesByCell: new Map( [ [ '0,0,0', [ { assetPath: '/Game/Hall', componentPath: 'Wall_1', collisionType: 'unknown', bounds: [ 0, 0, 0, 3, 3, 3 ] } ] ] ] ),
 };
-assert.deepEqual( collisionPathStatus( unknownOverlap ), { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey: '0,0,0', objectID: 'unknown', source: { assetPath: '/Game/Hall', componentPath: 'Wall_1', collisionType: 'unknown', bounds: [ 0, 0, 0, 3, 3, 3 ] } }, 'an unknown source overlapping the swept capsule reports its source and bounds' );
+assert.deepEqual( collisionPathStatus( unknownOverlap ), { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey: '0,0,0', objectID: 'unknown', source: { assetPath: '/Game/Hall', componentPath: 'Wall_1', collisionType: 'unknown', boundsSource: null, bounds: [ 0, 0, 0, 3, 3, 3 ] } }, 'an unknown source overlapping the swept capsule reports its source and bounds' );
+const providerSourceOverlap = {
+	...unknownOverlap,
+	unknownSourcesByCell: new Map( [ [ '0,0,0', [ { objectPath: '/Game/Hall:PersistentLevel.RenderSettingsVolume.BrushComponent0', status: 'other-primitive-collision-unknown', boundsSource: 'source-geometry', bounds: [ 0, 0, 0, 3, 3, 3 ] } ] ] ] ),
+};
+assert.deepEqual( collisionPathStatus( providerSourceOverlap ).source, {
+	assetPath: null,
+	componentPath: null,
+	collisionType: null,
+	objectPath: '/Game/Hall:PersistentLevel.RenderSettingsVolume.BrushComponent0',
+	status: 'other-primitive-collision-unknown',
+	boundsSource: 'source-geometry',
+	bounds: [ 0, 0, 0, 3, 3, 3 ],
+}, 'a provider source using objectPath and status retains its identity in the movement rejection' );
 assert.throws( () => sweptCollisionCellKeys( [ 0, 0 ], to, { cellSizeMeters: 8 } ), /three finite coordinates/ );
 
 const walkLookahead = collisionLookaheadDistance( 3, 2000, 8 );
