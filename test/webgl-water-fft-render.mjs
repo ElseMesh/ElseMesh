@@ -77,7 +77,7 @@ try {
 	const metrics = JSON.parse( value.text );
 	assert( metrics.changedPixels >= 100, `FFT displacement changes at least 100 pixels (${metrics.changedPixels})` );
 	assert( metrics.programCount > 0, 'WebGL compiled the water shader program' );
-	console.log( `WebGL water render passed (${metrics.changedPixels} FFT-changed pixels; phase max error ${metrics.phaseMaxError}; ${metrics.ripSamples} rip samples)` );
+	console.log( `WebGL water render passed (${metrics.changedPixels} FFT-changed pixels; phase max error ${metrics.phaseMaxError}; ${metrics.ripSamples} rip samples; FFT slope finite-difference MAE ${metrics.derivativeMae.toFixed( 5 )}, mean magnitude ${metrics.derivativeMeanMagnitude.toFixed( 4 )})` );
 } finally {
 	socket?.close();
 	if ( browser ) await stopBrowser( browser );
