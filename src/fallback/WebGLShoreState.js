@@ -1,3 +1,5 @@
+import { SHORE_DEFAULT_PERIOD, SHORE_SWASH_DOWN, SHORE_SWASH_UP } from '../ocean/ShoreSwash.js';
+
 // Persistent shoreline foam, wetness, residue, and flow state for WebGL.
 // The shore renderer supplies its run-up function so water and terrain share
 // one analytic shoreline. Encoded inputs have less precision than WebGPU state.
@@ -71,12 +73,14 @@ void main() {
 	}
 	float cellSize = uSize / uResolution;
 	float coverage = depth > 0.03 ? 1.0 : shoreCoverage(p, ground, cellSize);
-	float tau; vec2 direction;
-	float front = shoreRunupState(p, ground, uTerrainTime, tau, direction);
-	float dtProbe = 0.05, tauProbe; vec2 directionProbe;
-	float frontAhead = shoreRunupState(p, ground, uTerrainTime + dtProbe, tauProbe, directionProbe);
-	float frontBehind = shoreRunupState(p, ground, uTerrainTime - dtProbe, tauProbe, directionProbe);
-	float flowSpeed = clamp((frontAhead - frontBehind) / (2.0 * dtProbe), -2.5, 4.0);
+	float tau, rhMax, runupHeight, inland; vec2 direction;
+	float front = shoreRunupState(p, ground, uTerrainTime, tau, direction, rhMax, runupHeight, inland);
+	float su = clamp(tau / ${SHORE_SWASH_UP.toFixed( 2 )}, 0.0, 1.0);
+	float sb = clamp((tau - ${SHORE_SWASH_UP.toFixed( 2 )}) / ${SHORE_SWASH_DOWN.toFixed( 2 )}, 0.0, 1.0);
+	bool isUprush = tau < ${SHORE_SWASH_UP.toFixed( 2 )};
+	float dRdt = (isUprush ? pow(1.0 - su, 0.5) * (1.5 / ${SHORE_SWASH_UP.toFixed( 2 )}) : pow(max(sb, 1e-3), 0.6) * (-1.6 / ${SHORE_SWASH_DOWN.toFixed( 2 )})) * rhMax / ${SHORE_DEFAULT_PERIOD.toFixed( 1 )};
+	float relativeRunup = clamp(inland / max(runupHeight, 0.5), 0.0, 1.0);
+	float flowSpeed = clamp(dRdt * (isUprush ? clamp((inland + 3.0) / (runupHeight + 3.0), 0.15, 1.0) : (1.0 - relativeRunup) * 0.6 + 0.9), -2.5, 4.0);
 	if (coverage <= 0.5 && depth <= 0.02) flowSpeed = 0.0;
 	vec2 backUv = clamp(vUv - direction * flowSpeed * uDt / uSize, vec2(0.0), vec2(1.0));
 	vec4 previous = uInitialized ? texture2D(uPrevious, backUv) : vec4(0.0);

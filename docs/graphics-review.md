@@ -117,13 +117,13 @@ shore-state texture.
 
 WebGL now maintains an RGBA ping-pong shoreline field: foam, wetness, stranded
 residue, and flow speed. Foam advects by the analytic shoreline direction and
-a finite-difference estimate of run-up-front speed; the water shader consumes
-that state and the terrain reads wetness from the green channel. The `webgl`
+the same run-up-speed equation as WebGPU's swash solver; the water shader
+consumes that state and the terrain reads wetness from the green channel. The `webgl`
 terrain GPU fixture verifies initial foam/wetness/flow, wetness decay to 0.941
 after two seconds against the expected 0.931, and nonzero stranded residue.
 The WebGL water shader render and external production build also pass. This is
-not yet the full WebGPU `ShoreSim`: breaker foam generation, spray deposits,
-flow from the shore solver, and `SurfFoam` relief lighting remain unmatched.
+not yet the full WebGPU `ShoreSim`: wave particle flow, breaker foam generation,
+spray deposits, and `SurfFoam` relief lighting remain unmatched.
 The host has no `/dev/dri` device, so the updated scene has not been checked on
 AMD and no visual parity improvement is claimed. Tidewater parity remains 90%.
 
