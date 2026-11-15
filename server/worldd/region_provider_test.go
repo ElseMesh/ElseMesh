@@ -241,6 +241,8 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 			_, _ = w.Write([]byte(`{"leaseId":"0123456789abcdef0123456789abcdef","expiresInSeconds":30}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/leases/0123456789abcdef0123456789abcdef":
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/leases/0123456789abcdef0123456789abcdef/release":
+			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/leases/0123456789abcdef0123456789abcdef":
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -290,6 +292,7 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		}{
 			{method: http.MethodPost, path: "/v1/regions/SUB_GreatHall_Int/leases", status: http.StatusCreated},
 			{method: http.MethodPost, path: "/v1/leases/0123456789abcdef0123456789abcdef", status: http.StatusNoContent},
+			{method: http.MethodPost, path: "/v1/leases/0123456789abcdef0123456789abcdef/release", status: http.StatusNoContent},
 			{method: http.MethodDelete, path: "/v1/leases/0123456789abcdef0123456789abcdef", status: http.StatusNoContent},
 		} {
 			request := httptest.NewRequest(test.method, test.path, nil)

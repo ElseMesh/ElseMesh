@@ -32,13 +32,13 @@ type dynamicRegionProviderDescriptor struct {
 }
 
 type regionProviderEntrySelection struct {
-	PlayerCapsule          *playerCapsule      `json:"playerCapsule"`
-	MovementProfiles       *movementProfiles   `json:"movementProfiles"`
-	AvatarOptions          []worldAvatarOption `json:"avatarOptions"`
-	PreviewSpawn           *worldSpawn         `json:"previewSpawn"`
-	EntryPointPrompt       string              `json:"entryPointPrompt"`
-	EntryPointActionLabel  string              `json:"entryPointActionLabel"`
-	Experience             *worldExperience    `json:"experience"`
+	PlayerCapsule         *playerCapsule      `json:"playerCapsule"`
+	MovementProfiles      *movementProfiles   `json:"movementProfiles"`
+	AvatarOptions         []worldAvatarOption `json:"avatarOptions"`
+	PreviewSpawn          *worldSpawn         `json:"previewSpawn"`
+	EntryPointPrompt      string              `json:"entryPointPrompt"`
+	EntryPointActionLabel string              `json:"entryPointActionLabel"`
+	Experience            *worldExperience    `json:"experience"`
 }
 
 type authoritativeMovementSweepRequest struct {
@@ -448,7 +448,7 @@ func regionProviderMethodAllowed(method, path string) bool {
 	case http.MethodGet, http.MethodHead:
 		return true
 	case http.MethodPost:
-		return validRegionLeasePath(path) || validRegionLeaseCreationPath(path)
+		return validRegionLeasePath(path) || strings.HasSuffix(path, "/release") && validRegionLeasePath(strings.TrimSuffix(path, "/release")) || validRegionLeaseCreationPath(path)
 	case http.MethodDelete:
 		return validRegionLeasePath(path)
 	default:
