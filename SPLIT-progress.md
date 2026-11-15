@@ -116,9 +116,10 @@ WebGPU visual parity remain incomplete.
   check covers hashes and placement mapping. ElseMesh now supports
   scale-independent world-distance LOD, and the palm asset expresses the
   source handoff band's distances. The artifact remains unsigned and inactive;
-  its transition curve, shadows, and material do not yet match WebGPU, and
-  trees/shrubs still need view-dependent impostor support. No completion
-  percentage changes on this evidence.
+  its graph covers basic material color/roughness/transmission but omits source
+  bark relief, full frond variation, wind deformation, and shadow behavior.
+  Trees/shrubs still need view-dependent impostor support, and no matched AMD
+  render exists. No completion percentage changes on this evidence.
 
 - 2026-11-15: added the renderer-neutral `thinTransmission` material-graph
   output to the engine's WebGPU and WebGL lighting compilers. Both paths apply
