@@ -110,6 +110,14 @@ factories improved the import boundary; world runtime extraction and hosted
 WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
+- 2026-11-15: corrected the WebGL atmosphere hook's diffuse destination.
+  Three.js diffuse materials consume the `irradiance` accumulator from
+  `lights_fragment_begin`; the previous hook modified the separate
+  `iblIrradiance` multiscatter/specular input. The adapter now adds atmosphere
+  sky/horizon light to the diffuse accumulator and preserves PMREM. The focused
+  hook test passes, but no live AMD capture has verified the visual effect;
+  Tidewater parity remains 90%.
+
 - 2026-11-15: Tidewater now exports an inactive generic static-model sidecar
   for coconut palms, including its source near/far GLBs, post-scatter
   placements, and three VEC4 vertex streams. The deterministic world-export

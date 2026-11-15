@@ -213,6 +213,18 @@ diagnostic rather than a pixel-exact conformance result.
 [current WebGPU capture](images/tidewater-split-webgpu-amd-atmosphere-diffuse-2026-11-14.png).
 No parity gate or percentage changed; Tidewater parity remains 90%.
 
+### WebGL diffuse accumulator correction, 2026-11-15
+
+Reviewing Three.js's installed lighting chunks exposed a routing error in the
+first atmosphere hook: it replaced `iblIrradiance`, which feeds physical
+material multi-scattering/specular, while diffuse albedo is lit from the
+separate `irradiance` accumulator. The adapter now adds atmosphere sky/horizon
+irradiance after `lights_fragment_begin` and leaves the PMREM map stage intact.
+The focused hook test verifies this destination and confirms the Three.js PMREM
+stage remains. This corrects the shader route; no AMD scene capture has been
+made for this revision, so the vegetation/sand parity gap and 90% estimate
+remain open pending a live render.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
