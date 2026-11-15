@@ -804,6 +804,9 @@ export class App {
 		this.shadows.enabled = false;
 		this.shadows.update( camera, new Vector3( 0, 1, 0 ) );
 		this.sceneRenderer = new SceneRenderer( engine.meshRenderer, scene, camera );
+		// Keep hosted water on the same below-water refraction path as the built-in renderer.
+		this.refraction = new RefractionPass( { meshRenderer: engine.meshRenderer, scene, camera, sceneRenderer: this.sceneRenderer, scale: this.desktopRefractionScale } );
+		this.sceneRenderer.onBeforeWater = () => this.refraction.render( G.seaLevel.value );
 		if ( this.worldEnvironment.sky && this.sky.background ) this.sceneRenderer.background = this.sky.background;
 		this.sceneRenderer.clearColor = [ 0.018, 0.022, 0.03, 1 ];
 		this.sceneRenderer.setSize( engine.width, engine.height );
@@ -820,7 +823,7 @@ export class App {
 		if ( this.caustics ) this.caustics.detail = this.seaDetail;
 		this.waterMaterial = new WaterMaterial( {
 			surface: this.surface, sky: this.sky, sceneCopy: this.sceneRenderer.opaqueCopy,
-			sceneDepthHalf: this.sceneRenderer.opaqueDepthHalf.texture,
+			sceneDepthHalf: this.sceneRenderer.opaqueDepthHalf.texture, refraction: this.refraction,
 		} );
 		this.waterMaterial.clouds = this.clouds;
 		this.hostedWaterSurface = this.surface;
