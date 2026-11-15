@@ -35,7 +35,7 @@ assert.equal(state.players.size, 0, 'Own session is excluded');
 for (const appearance of [{ ...DEFAULT_APPEARANCE, style: 'url' }, { ...DEFAULT_APPEARANCE, shirt: '#ABCDEF' }, { ...DEFAULT_APPEARANCE, model: '/evil.glb' }]) assert.throws(() => validatePresencePose({ ...pose(1), appearance }));
 assert.throws(() => validatePresencePose({ ...pose(1), position: [Infinity, 0, 0] }));
 assert.throws(() => validatePresencePose({ ...pose(1), pitch: 2 }));
-assert.throws(() => validatePresencePose({ ...pose(1), mode: 'boat' }), /Invalid presence vehicle identity or speed/, 'vehicle presence requires type and speed in protocol v3');
+assert.throws(() => validatePresencePose({ ...pose(1), mode: 'boat' }), /Invalid presence vehicle identity or speed/, 'vehicle presence requires type and speed in protocol v4');
 assert.throws(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/3' }), /Invalid presence sequence or protocol/, 'previous presence protocol versions are rejected');
 assert.throws(() => validatePresencePose({ ...pose(1), avatarProfileId: 'elsemesh.avatar.stock-female/1' }), /Invalid presence avatar profile/, 'avatar profile ID must match its validated appearance style');
 assert.throws(() => validatePresencePose({ ...pose(1), avatarOptionId: 'Invalid Option' }), /Invalid presence avatar option/);

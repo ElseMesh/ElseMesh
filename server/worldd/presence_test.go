@@ -376,6 +376,39 @@ func TestPresenceEnforcesWorldAvatarAndEntrySelection(t *testing.T) {
 	}
 }
 
+func TestPresenceCannotChangeWorldAvatarSelectionMidSession(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-male/1"}}
+	red := "#8b1c2b"
+	blue := "#243b6b"
+	d.world.AvatarOptions = []worldAvatarOption{
+		{ID: "red-uniform", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Red uniform", Palette: &worldAvatarPalette{Shirt: &red}},
+		{ID: "blue-uniform", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Blue uniform", Palette: &worldAvatarPalette{Shirt: &blue}},
+	}
+	d.world.EntryPoints = []worldEntryPoint{
+		{ID: "red-start", Label: "Red house", Position: []float64{1, 2, 3}, AvatarOptionID: "red-uniform"},
+		{ID: "blue-start", Label: "Blue house", Position: []float64{1, 2, 3}, AvatarOptionID: "blue-uniform"},
+	}
+	pose := presenceTestPose()
+	pose.AvatarOptionID = "red-uniform"
+	pose.EntryPointID = "red-start"
+	pose.Appearance.Shirt = red
+	request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindPresenceRequest(&request, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(request, time.Now()); err != nil {
+		t.Fatalf("valid initial world avatar selection was rejected: %v", err)
+	}
+
+	request.Pose = &playerPose{Protocol: playerPresenceProtocol, Sequence: 2, Position: []float64{1.1, 2, 3}, Mode: "walk", AvatarProfileID: "elsemesh.avatar.stock-male/1", AvatarOptionID: "blue-uniform", EntryPointID: "blue-start", Appearance: avatarAppearance{Style: "male", Shirt: blue, Trousers: "#27313d", Skin: "#c68c67", Hair: "#33251c"}}
+	if _, err := d.presenceRequest(request, time.Now().Add(time.Second)); err == nil || err.Error() != "presence_avatar_selection_changed" {
+		t.Fatalf("visitor changed signed house selection during one presence session: %v", err)
+	}
+}
+
 func TestPresenceEnforcesWorldVisitorLimit(t *testing.T) {
 	d := presenceTestDaemon(t)
 	d.world.Rules.MaxVisitors = 1
