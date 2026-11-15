@@ -390,6 +390,24 @@ func TestPresenceEnforcesWorldAvatarAndEntrySelection(t *testing.T) {
 	}
 }
 
+func TestPresenceAllowsDefaultAvatarWithoutWorldEntryChoice(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-male/1", "elsemesh.avatar.stock-female/1"}}
+	d.world.AvatarOptions = []worldAvatarOption{
+		{ID: "short-hair", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Short hair"},
+		{ID: "ponytail", ProfileID: "elsemesh.avatar.stock-female/1", Label: "Ponytail"},
+	}
+	if err := d.validatePresenceAdmission(presenceTestPose()); err != nil {
+		t.Fatalf("world default avatar was rejected without an entry chooser: %v", err)
+	}
+
+	shirt := "#8b1c2b"
+	d.world.AvatarOptions[0].Palette = &worldAvatarPalette{Shirt: &shirt}
+	if err := d.validatePresenceAdmission(presenceTestPose()); err == nil || err.Error() != "avatar_option_required" {
+		t.Fatalf("palette-enforced avatar catalog accepted an unselected appearance: %v", err)
+	}
+}
+
 func TestPresenceCannotChangeWorldAvatarSelectionMidSession(t *testing.T) {
 	d := presenceTestDaemon(t)
 	d.world.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-male/1"}}
