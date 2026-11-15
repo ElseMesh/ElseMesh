@@ -25,6 +25,9 @@ assert.match( shader.fragmentShader, /iblIrradiance = emAtmosphereDiffuse;(?=\n#
 assert.doesNotMatch( shader.fragmentShader, /irradiance \+= emAtmosphereDiffuse;/, 'physical materials do not double-count atmosphere in the Lambert accumulator' );
 assert.match( THREE.ShaderChunk.lights_fragment_maps, /getIBLIrradiance\( geometryNormal \)/, 'Three.js PMREM diffuse is replaced after its map stage' );
 assert.match( THREE.ShaderChunk.lights_fragment_maps, /getIBLRadiance\( geometryViewDir, geometryNormal, material\.roughness \)/, 'Three.js PMREM specular radiance remains intact' );
+assert.match( THREE.ShaderChunk.lights_fragment_end, /RE_IndirectDiffuse\( irradiance,/, 'Three.js resolves the plain irradiance accumulator through indirect diffuse' );
+assert.match( THREE.ShaderChunk.lights_fragment_end, /RE_IndirectSpecular\( radiance, iblIrradiance,/, 'physical materials resolve IBL irradiance through the multiscatter path' );
+assert.match( THREE.ShaderChunk.lights_physical_pars_fragment, /reflectedLight\.indirectDiffuse \+= diffuse \* cosineWeightedIrradiance/, 'physical IBL irradiance contributes compensated indirect diffuse' );
 assert.match( shader.fragmentShader, /prior material hook/, 'existing material hooks still run' );
 assert.equal( shader.uniforms.emAtmosphereSkyIrradianceTexture.value, skyIrradianceTexture );
 assert.equal( shader.uniforms.emAtmosphereHorizonTexture.value, horizonTexture );

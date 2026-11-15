@@ -3,7 +3,8 @@ import { G } from '../engine/render/Frame.js';
 const LIGHTING_KEY = 'elsemesh-atmosphere-diffuse-v3';
 
 // Keep Three's sky PMREM for specular reflections. Physical materials use
-// Three's IBL diffuse accumulator, while Lambert and Phong use irradiance.
+// IBL irradiance for their multiscatter-compensated diffuse; Lambert and Phong
+// use the plain irradiance accumulator.
 export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvironmentIntensity = () => 1 ) {
 
 	const standard = material?.isMeshStandardMaterial;

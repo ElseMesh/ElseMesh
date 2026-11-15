@@ -213,44 +213,45 @@ diagnostic rather than a pixel-exact conformance result.
 [current WebGPU capture](images/tidewater-split-webgpu-amd-atmosphere-diffuse-2026-11-14.png).
 No parity gate or percentage changed; Tidewater parity remains 90%.
 
-### WebGL diffuse accumulator correction, 2026-11-15
+### WebGL atmosphere lighting route, 2026-11-15
 
-Reviewing Three.js's installed lighting chunks exposed a routing error in the
-first atmosphere hook: it replaced `iblIrradiance`, which feeds physical
-material multi-scattering/specular, while diffuse albedo is lit from the
-separate `irradiance` accumulator. The adapter now adds atmosphere sky/horizon
-irradiance after `lights_fragment_begin` and leaves the PMREM map stage intact.
-The focused hook test verifies this destination and confirms the Three.js PMREM
-stage remains. This corrects the shader route; no AMD scene capture has been
-made for this revision, so the vegetation/sand parity gap and 90% estimate
-remain open pending a live render. On 2026-11-15 the review setup was confirmed
-on AMD Radeon Renoir: Chromium used the named Weston Wayland socket, ANGLE GL,
-and `/dev/dri/renderD128`; CDP reported the AMD RadeonSI renderer and a 1600×813
-WebGL canvas. Chromium exited in attempts using the CTA's normal pointer-lock
-request, while the Weston compositor and preview server remained healthy. The
-idle page stayed alive for over two minutes. In a separate run, overriding
-`HTMLCanvasElement.prototype.requestPointerLock` in the review page before
-clicking the CTA let the browser enter the scene; this workaround only disables
-mouse capture for the diagnostic.
+The first live material-lighting patch added atmosphere light to Three.js's
+plain `irradiance` accumulator. A closer read of the installed Three.js 0.180
+chunks showed that this is the path used by Lambert/Phong, while physical
+materials resolve `iblIrradiance` through `RE_IndirectSpecular`; that physical
+function uses its IBL irradiance for both multiscatter-compensated indirect
+diffuse and specular. The WebGPU physical material uses the same compensated
+environment diffuse model. WebGL now supplies atmosphere irradiance through
+`iblIrradiance` for Standard/Physical materials and through plain `irradiance`
+for Lambert/Phong, retaining PMREM radiance for reflections. The new test
+asserts those installed Three.js shader relationships and PMREM separation.
 
-The captured `swashAbove` frame at simulation time 1000 s has the same 1600×813
-canvas and crop coordinates as the earlier AMD comparison. Its Rec. 709
-diagnostic RGB means (WebGL vs pre-split WebGPU) are:
+The WebGL atmosphere also now renders its horizon LUT during construction.
+Previously that target was only updated after a sun-direction change, leaving
+the initial horizon sample uninitialized when startup used the existing sun
+direction. Focused material-lighting and LUT-initialization checks pass, as does
+the external production build.
 
-| Region | WebGL | WebGPU reference |
+A fresh production capture used the named Weston Wayland display, Chromium's
+native Wayland path, ANGLE/RadeonSI (`AMD Radeon Graphics (radeonsi renoir
+ACO)`), and `/dev/dri/renderD128`. It shows the `swashAbove` view at simulation
+time 1000 s on a 1600×813 canvas. The live scene confirms that 261 meshes,
+including the WebGL palm/tree batches, received the engine hook; the hemisphere
+fill is zero and the atmosphere is enabled. Its
+four fixed crop means (WebGL vs pre-split WebGPU) were:
+
+| Region | WebGL RGB | WebGPU reference RGB |
 | --- | --- | --- |
-| Sea | 125.5, 148.0, 122.2 | 133.7, 171.4, 151.8 |
-| Swash | 225.3, 216.0, 199.5 | 227.3, 218.4, 200.5 |
-| Dry sand | 207.0, 190.2, 160.5 | 222.2, 209.7, 185.8 |
-| Vegetation | 99.9, 94.9, 76.9 | 155.1, 148.0, 115.6 |
+| Sea | 124.9, 147.3, 121.5 | 133.7, 171.4, 151.8 |
+| Swash | 225.0, 215.6, 198.9 | 227.3, 218.4, 200.5 |
+| Dry sand | 206.4, 189.5, 159.2 | 222.2, 209.7, 185.8 |
+| Vegetation | 99.7, 95.8, 76.6 | 155.1, 148.0, 115.6 |
 
-Compared with the previous WebGL capture, all four crops changed by at most
-1.3 RGB points. The corrected diffuse accumulator therefore does not close the
-visible vegetation and sand gap. These compositor crop means are diagnostic,
-not pixel-exact renderer conformance or performance results. The capture is
-available at
-[the current AMD WebGL frame](images/tidewater-split-webgl-amd-diffuse-corrected-2026-11-15.png).
-Tidewater parity remains 90%.
+The corrected physical IBL route does not materially change these screen
+regions, and the vegetation and sand gaps remain. This capture verifies the
+AMD review configuration and current output; it does not establish parity or
+performance. Tidewater parity remains 90%.
+[AMD WebGL capture](images/tidewater-split-webgl-amd-atmosphere-physical-ibl-2026-11-15.png).
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 
