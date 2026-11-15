@@ -217,8 +217,8 @@ export class Colliders {
 			const d2 = dx * dx + dz * dz;
 			if ( d2 >= radius * radius ) continue;
 			// Keep a shallow downward contact error on walkable geometry vertical.
-			// The Hogwarts Great Hall start reproduced a 0.0981 m penetration on
-			// the first gravity frame; 0.3 capsule radii gives that measured case
+			// A live start reproduced a 0.0981 m penetration on the first gravity
+			// frame; 0.3 capsule radii gives that measured case
 			// a small margin. This is contact correction, not step-up capability:
 			// step-up distance remains owned by the active movement profile.
 			if ( b.walkable && b.top - pos.y <= Math.max( 0.05, radius * 0.3 ) ) {
