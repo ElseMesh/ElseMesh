@@ -10,6 +10,19 @@ Use the checked-in display setup and browser helper; do not launch Weston with
 
 ## Review procedure
 
+### Keep the user's desktop input out of the test
+
+- Configure the review so the user's mouse and keyboard cannot control the
+  game or browser, even if the Weston window is visible or focused. Keep Weston
+  input disabled (`--no-input`) for the whole review; never enable its input
+  seat as a convenience.
+- Do not ask the user to click or type into the test window. Drive required
+  browser input through the isolated DevTools session or another controlled
+  test-only input path. If that path is unavailable, stop and set one up before
+  proceeding.
+- Keep the user's normal browser and desktop input untouched. Do not move focus
+  to a test window in a way that could capture or redirect their input.
+
 1. Inspect relevant Weston, game, Vite, and Chromium processes with an escalated
    shell. Reuse an existing review session only when its purpose and owner are
    clear. Never stop a user's or another agent's process.
