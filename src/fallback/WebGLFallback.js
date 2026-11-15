@@ -2281,7 +2281,7 @@ export class WebGLFallback {
 
 		this.input.beginFrame();
 		this.engine.rafCallbacks ++;
-		const now = performance.now(), elapsed = Math.min( 0.1, Math.max( 0, ( now - ( this.lastFrame || now ) ) / 1000 ) );
+		const now = performance.now(), rawFrameGapMs = Math.max( 0, now - ( this.lastFrame || now ) ), elapsed = Math.min( 0.1, rawFrameGapMs / 1000 );
 		const fixedSimulationTime = this.app.fixedSimulationTime;
 		const dt = fixedSimulationTime === null || fixedSimulationTime === undefined ? elapsed : 0;
 		this.app.updateFPS();
@@ -2390,6 +2390,22 @@ export class WebGLFallback {
 			this.frameWorkMeter.end();
 		}
 		this.app.cpuMs = performance.now() - now;
+		if ( this.connector?.regionDiagnostics && rawFrameGapMs >= 120 ) {
+			const textureLOD = this.hostedStaticTextureLOD;
+			const modelLODQueue = this.hostedStaticModelLODQueue;
+			const gpuSample = this.frameWorkMeter.latest;
+			console.warn( 'ElseMesh WebGL hosted slow frame:', JSON.stringify( {
+				frameGapMs: rawFrameGapMs,
+				cpuMs: this.app.cpuMs,
+				gpuMs: this.frameWorkMeter.gpuMilliseconds(),
+				gpuSampleAgeMs: gpuSample ? performance.now() - gpuSample.started : null,
+				modelLODQueue: { active: modelLODQueue?.active ?? 0, waiting: modelLODQueue?.waiting?.length ?? 0 },
+				textureMipBusy: Boolean( textureLOD?.inFlight ),
+				lastTextureMip: textureLOD?.lastUpgrade ? { ...textureLOD.lastUpgrade, ageMs: performance.now() - textureLOD.lastUpgrade.completedAt } : null,
+				browserAssetCache: this.connector.assets?.size ?? null,
+				browserRangeCache: this.connector.assetRanges?.size ?? null,
+			} ) );
+		}
 		this.app.updateRenderLoadBias( dt, now, this.frameWorkMeter );
 		this.app.updateNavigationHUD( this.camera, this.player, experience );
 		this.input.endFrame();

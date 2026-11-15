@@ -12,6 +12,7 @@ export class WebGLProgressiveStaticTextures {
   this.registrations = new Map();
   this.inFlight = null;
   this.lastFrame = null;
+  this.lastUpgrade = null;
  }
  register( runtime, modelIndex, lodIndex, assetId, source, progressive ) {
   if ( ! progressive?.textures?.length ) return;
@@ -104,18 +105,29 @@ export class WebGLProgressiveStaticTextures {
   const source = entry.registrations.values().next().value;
   const controller = entry.abortController = new AbortController();
   this.inFlight = ( async () => {
+   const startedAt = performance.now();
+   const fetchStartedAt = startedAt;
    const levels = await this.fetchLevel( this.connector, source.assetId, source.progressive, { imageIndices: source.image.imageIndices, levelIndex: next, signal: controller.signal } );
+   const fetchMs = performance.now() - fetchStartedAt;
    if ( levels.length !== 1 ) throw new Error( 'Expected one progressive WebGL texture level' );
    const bytes = levels[ 0 ].bytes;
    const input = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
+   const decodeStartedAt = performance.now();
    const decoded = await new Promise( ( resolve, reject ) => this.fallback.ktx2Loader.parse( input, resolve, reject ) );
+   const decodeMs = performance.now() - decodeStartedAt;
    if ( this.entries.get( entry.key ) !== entry ) { decoded.dispose(); return; }
+   const replaceStartedAt = performance.now();
    try {
     for ( const registration of entry.registrations ) for ( const texture of registration.textures ) copyTexturePixels( texture, decoded );
    } catch ( error ) { decoded.dispose(); throw error; }
    entry.decoded?.dispose();
    entry.decoded = decoded;
    entry.level = next;
+   const replaceMs = performance.now() - replaceStartedAt;
+   this.lastUpgrade = { assetId: source.assetId, levelIndex: next, bytes: bytes.byteLength, fetchMs, decodeMs, replaceMs, completedAt: performance.now() };
+   if ( this.connector.regionDiagnostics && Math.max( fetchMs, decodeMs, replaceMs ) >= 16 ) {
+    console.info( 'ElseMesh WebGL texture mip timing:', JSON.stringify( { ...this.lastUpgrade, totalMs: this.lastUpgrade.completedAt - startedAt } ) );
+   }
   } )().catch( error => {
    if ( error?.name === 'AbortError' ) return;
    entry.retryAfter = performance.now() + 5000;
