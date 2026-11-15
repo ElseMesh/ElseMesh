@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-14. Percentages are rough completion estimates for the
+Last assessed: 2026-11-15. Percentages are rough completion estimates for the
 active engine/world-separation, Tidewater parity, and AI Portals hosting goals. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -117,6 +117,15 @@ WebGPU visual parity remain incomplete.
   sky/horizon light to the diffuse accumulator and preserves PMREM. The focused
   hook test passes, but no live AMD capture has verified the visual effect;
   Tidewater parity remains 90%.
+
+- 2026-11-15: verified the AMD browser-review route with a dedicated Weston
+  session, private mode-0700 runtime directory, native Wayland, ANGLE GL, and
+  `/dev/dri/renderD128`. CDP reported `ANGLE (AMD, AMD Radeon Graphics
+  (radeonsi renoir ACO), OpenGL ES 3.2)` and a 1600x813 WebGL canvas. The
+  captured page remained on the start overlay; Chromium exited while entering
+  the world (63 CPU seconds, 1.51 GB peak memory), before a matched playable
+  view could be captured. This confirms AMD availability and the review setup,
+  not the diffuse fix or visual parity. Tidewater parity remains 90%.
 
 - 2026-11-15: Tidewater now exports an inactive generic static-model sidecar
   for coconut palms, including its source near/far GLBs, post-scatter

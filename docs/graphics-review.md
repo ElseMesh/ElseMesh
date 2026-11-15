@@ -223,7 +223,12 @@ irradiance after `lights_fragment_begin` and leaves the PMREM map stage intact.
 The focused hook test verifies this destination and confirms the Three.js PMREM
 stage remains. This corrects the shader route; no AMD scene capture has been
 made for this revision, so the vegetation/sand parity gap and 90% estimate
-remain open pending a live render.
+remain open pending a live render. On 2026-11-15 the review setup was confirmed
+on AMD Radeon Renoir: Chromium used the named Weston Wayland socket, ANGLE GL,
+and `/dev/dri/renderD128`; CDP reported the AMD RadeonSI renderer and a 1600×813
+WebGL canvas. The captured browser was still on the start overlay. Chromium
+exited while the overlay was being dismissed, before a matched playable view
+could be captured. The renderer setup is verified; the diffuse change is not.
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 
