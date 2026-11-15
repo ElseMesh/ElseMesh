@@ -58,4 +58,4 @@ assert.match( grassShader.fragmentShader, /#include <lights_fragment_begin>/, 't
 
 skyIrradianceTexture.dispose();
 horizonTexture.dispose();
-console.log( 'WebGL atmosphere material hook targets diffuse irradiance and preserves PMREM' );
+console.log( 'WebGL atmosphere hook targets physical IBL diffuse and preserves PMREM radiance' );
