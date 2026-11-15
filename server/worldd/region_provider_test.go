@@ -1,16 +1,89 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 )
+
+func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Server, *regionProviderGateway, *atomic.Int32) {
+	t.Helper()
+	const worldID = "elsemesh:hogwarts-legacy"
+	const sourceRevision = "installed-source:bridge-revision"
+	const cacheRevision = sourceRevision + ":cache"
+	var internalRequests atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/authority/movement-sweep" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		internalRequests.Add(1)
+		if r.Header.Get("Origin") != "" {
+			t.Errorf("internal movement request carried browser Origin %q", r.Header.Get("Origin"))
+		}
+		w.Header().Set("X-ElseMesh-World-ID", worldID)
+		w.Header().Set("X-ElseMesh-Source-Revision", sourceRevision)
+		w.Header().Set("X-ElseMesh-Cache-Revision", cacheRevision)
+		var request authoritativeMovementSweepRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode movement request: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if request.WorldID != worldID || request.SourceRevision != sourceRevision || request.RadiusMeters != 0.42 || request.HeightMeters != 1.76 {
+			t.Errorf("movement request did not carry pinned world and capsule: %+v", request)
+		}
+		result := authoritativeMovementSweepResponse{WorldID: worldID, SourceRevision: sourceRevision, Ready: ready.Load(), Reason: "clear"}
+		if !result.Ready {
+			result.Reason = "collision_bounds_block_path"
+			result.ComponentPath = "SM_TestWall"
+		}
+		_ = json.NewEncoder(w).Encode(result)
+	}))
+	gateway, err := newRegionProviderGateway(upstream.URL, "", nil)
+	if err != nil {
+		upstream.Close()
+		t.Fatalf("new region provider gateway: %v", err)
+	}
+	gateway.worldID = worldID
+	gateway.sourceRevision = sourceRevision
+	gateway.cacheRevision = cacheRevision
+	gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+	t.Cleanup(upstream.Close)
+	return upstream, gateway, &internalRequests
+}
+
+func TestRegionProviderMovementAuthorityIsInternalAndRevisionPinned(t *testing.T) {
+	var ready atomic.Bool
+	ready.Store(true)
+	_, gateway, requests := movementAuthorityFixture(t, &ready)
+	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6); err != nil {
+		t.Fatalf("clear owner sweep rejected: %v", err)
+	}
+	if requests.Load() != 1 {
+		t.Fatalf("owner sweep requests = %d, want 1", requests.Load())
+	}
+	ready.Store(false)
+	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6); err == nil || !strings.Contains(err.Error(), "movement_blocked:collision_bounds_block_path:SM_TestWall") {
+		t.Fatalf("blocked owner sweep error = %v", err)
+	}
+	public := httptest.NewRecorder()
+	gateway.ServeHTTP(public, httptest.NewRequest(http.MethodPost, "/v1/authority/movement-sweep", strings.NewReader(`{}`)))
+	if public.Code != http.StatusNotFound {
+		t.Fatalf("browser-facing authority endpoint status = %d, want 404", public.Code)
+	}
+	if requests.Load() != 2 {
+		t.Fatalf("public proxy reached internal sweep endpoint: upstream requests = %d", requests.Load())
+	}
+}
 
 func TestParseRegionProviderURL(t *testing.T) {
 	tests := []struct {
