@@ -66,7 +66,9 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/descriptor":
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			_ = json.NewEncoder(w).Encode(dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, SourceRevision: sourceRevision, CacheRevision: cacheRevision, ReadOnly: true})
+			descriptor := dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, SourceRevision: sourceRevision, CacheRevision: cacheRevision, ReadOnly: true}
+			descriptor.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+			_ = json.NewEncoder(w).Encode(descriptor)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/regions":
 			if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
 				t.Errorf("credentials were forwarded: headers=%v", r.Header)
@@ -103,6 +105,9 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 	gotWorldID, err := gateway.discoverWorldID()
 	if err != nil || gotWorldID != worldID {
 		t.Fatalf("discoverWorldID() = %q, %v", gotWorldID, err)
+	}
+	if gateway.playerCapsule == nil || gateway.playerCapsule.RadiusMeters != 0.42 || gateway.playerCapsule.HeightMeters != 1.76 {
+		t.Fatalf("provider player capsule = %+v, want radius 0.42 m and height 1.76 m", gateway.playerCapsule)
 	}
 	gateway.worldID = gotWorldID
 
@@ -230,6 +235,19 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 			if err := gateway.validateProviderResponse(response); err == nil {
 				t.Errorf("provider response without %s was accepted", header)
 			}
+		}
+	})
+
+	t.Run("provider capsule is pinned", func(t *testing.T) {
+		gateway.worldID = worldID
+		gateway.sourceRevision = sourceRevision
+		gateway.cacheRevision = cacheRevision
+		gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.5, HeightMeters: 1.8}
+		request := httptest.NewRequest(http.MethodGet, "/v1/descriptor", nil)
+		response := httptest.NewRecorder()
+		gateway.ServeHTTP(response, request)
+		if response.Code != http.StatusBadGateway {
+			t.Fatalf("changed provider capsule status = %d, want %d", response.Code, http.StatusBadGateway)
 		}
 	})
 

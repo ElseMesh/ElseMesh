@@ -351,7 +351,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				lastDistanceSq = distanceSq
 				occupied := false
 				for _, visitor := range d.players {
-					if now.Sub(visitor.updated) < presenceGhostAfter && presenceCapsulesOverlap(candidate, visitor.Position) {
+					if now.Sub(visitor.updated) < presenceGhostAfter && d.presenceCapsulesOverlap(candidate, visitor.Position) {
 						occupied = true
 						break
 					}
@@ -374,7 +374,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				return peerResponse{}, errors.New("spawn_outside_radius")
 			}
 			for _, visitor := range d.players {
-				if now.Sub(visitor.updated) < presenceGhostAfter && presenceCapsulesOverlap(request.Pose.Position, visitor.Position) {
+				if now.Sub(visitor.updated) < presenceGhostAfter && d.presenceCapsulesOverlap(request.Pose.Position, visitor.Position) {
 					return peerResponse{}, errors.New("spawn_unavailable")
 				}
 			}
@@ -440,12 +440,20 @@ func (d *daemon) maintainPresenceExpiry(ctx context.Context) {
 	}
 }
 
-func presenceCapsulesOverlap(a, b []float64) bool {
-	if len(a) != 3 || len(b) != 3 || math.Abs(a[1]-b[1]) >= presencePlayerHeight {
+func (d *daemon) presenceCapsulesOverlap(a, b []float64) bool {
+	radius, height := presencePlayerRadius, presencePlayerHeight
+	if d.world.Rules.PlayerCapsule != nil {
+		radius = d.world.Rules.PlayerCapsule.RadiusMeters
+		height = d.world.Rules.PlayerCapsule.HeightMeters
+	} else if d.regionProvider != nil && d.regionProvider.playerCapsule != nil {
+		radius = d.regionProvider.playerCapsule.RadiusMeters
+		height = d.regionProvider.playerCapsule.HeightMeters
+	}
+	if len(a) != 3 || len(b) != 3 || math.Abs(a[1]-b[1]) >= height {
 		return false
 	}
 	dx, dz := a[0]-b[0], a[2]-b[2]
-	diameter := presencePlayerRadius * 2
+	diameter := radius * 2
 	return dx*dx+dz*dz < diameter*diameter
 }
 

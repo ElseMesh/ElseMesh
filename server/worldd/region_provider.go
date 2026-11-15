@@ -27,6 +27,9 @@ type dynamicRegionProviderDescriptor struct {
 	SourceRevision string `json:"sourceRevision"`
 	CacheRevision  string `json:"cacheRevision"`
 	ReadOnly       bool   `json:"readOnly"`
+	EntrySelection struct {
+		PlayerCapsule *playerCapsule `json:"playerCapsule"`
+	} `json:"entrySelection"`
 }
 
 type regionProviderGateway struct {
@@ -34,6 +37,7 @@ type regionProviderGateway struct {
 	worldID           string
 	sourceRevision    string
 	cacheRevision     string
+	playerCapsule     *playerCapsule
 	allowedOrigins    map[string]struct{}
 	regionDiagnostics bool
 	requestSequence   atomic.Uint64
@@ -159,9 +163,20 @@ func (gateway *regionProviderGateway) discoverWorldID() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if !validPlayerCapsule(descriptor.EntrySelection.PlayerCapsule) {
+		return "", errors.New("descriptor has invalid player capsule dimensions")
+	}
 	gateway.sourceRevision = descriptor.SourceRevision
 	gateway.cacheRevision = descriptor.CacheRevision
+	gateway.playerCapsule = descriptor.EntrySelection.PlayerCapsule
 	return descriptor.WorldID, nil
+}
+
+func samePlayerCapsule(a, b *playerCapsule) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.RadiusMeters == b.RadiusMeters && a.HeightMeters == b.HeightMeters
 }
 
 func readRegionProviderDescriptor(reader io.Reader) (string, error) {
@@ -237,6 +252,12 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	}
 	if gateway.cacheRevision != "" && descriptor.CacheRevision != gateway.cacheRevision {
 		return errors.New("provider cache revision changed after worldd startup")
+	}
+	if !validPlayerCapsule(descriptor.EntrySelection.PlayerCapsule) {
+		return errors.New("provider descriptor has invalid player capsule dimensions")
+	}
+	if gateway.worldID != "" && !samePlayerCapsule(descriptor.EntrySelection.PlayerCapsule, gateway.playerCapsule) {
+		return errors.New("provider player capsule changed after worldd startup")
 	}
 	response.Body = io.NopCloser(bytes.NewReader(data))
 	response.ContentLength = int64(len(data))

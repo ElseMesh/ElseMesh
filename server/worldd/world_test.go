@@ -776,6 +776,34 @@ func TestWorldManifestValidatesEnabledObjectCollisionBounds(t *testing.T) {
 	}
 }
 
+func TestWorldManifestValidatesPlayerCapsuleDimensions(t *testing.T) {
+	key, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID, err := peer.IDFromPublicKey(key.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := newStarterManifest("Capsule", ownerID.String())
+	manifest.WorldID = "elsemesh:capsule"
+	manifest.Rules.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid authored player capsule rejected: %v", err)
+	}
+	for _, capsule := range []*playerCapsule{
+		{RadiusMeters: 0, HeightMeters: 1.76},
+		{RadiusMeters: math.NaN(), HeightMeters: 1.76},
+		{RadiusMeters: 0.5, HeightMeters: 0.9},
+		{RadiusMeters: 0.5, HeightMeters: 4.1},
+	} {
+		manifest.Rules.PlayerCapsule = capsule
+		if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+			t.Errorf("invalid player capsule accepted: %+v", capsule)
+		}
+	}
+}
+
 func TestTemporaryFailoverAuthorityRequiresOwnerWindow(t *testing.T) {
 	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

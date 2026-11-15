@@ -595,6 +595,10 @@ func run() error {
 	if regionProvider != nil && world.WorldID != regionProviderWorldID {
 		return fmt.Errorf("region provider world ID %q does not match ThruHold profile world ID %q", regionProviderWorldID, world.WorldID)
 	}
+	if regionProvider != nil && regionProvider.playerCapsule != nil && world.Rules.PlayerCapsule != nil &&
+		(regionProvider.playerCapsule.RadiusMeters != world.Rules.PlayerCapsule.RadiusMeters || regionProvider.playerCapsule.HeightMeters != world.Rules.PlayerCapsule.HeightMeters) {
+		return errors.New("region provider player capsule does not match the owner-signed world rules")
+	}
 	if worldDirectory != "" {
 		log.Printf("Serving %s (%s) from %s", world.Title, world.WorldID, worldDirectory)
 	}

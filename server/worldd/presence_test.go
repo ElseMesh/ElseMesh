@@ -167,6 +167,20 @@ func TestPresenceRejectsInitialPoseOutsideSpawnRadius(t *testing.T) {
 	}
 }
 
+func TestPresenceCapsuleOverlapUsesWorldDimensions(t *testing.T) {
+	d := presenceTestDaemon(t)
+	if d.presenceCapsulesOverlap([]float64{0, 0, 0}, []float64{0.75, 0, 0}) {
+		t.Fatal("default 0.3 m radius unexpectedly overlaps at 0.75 m separation")
+	}
+	d.world.Rules.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+	if !d.presenceCapsulesOverlap([]float64{0, 0, 0}, []float64{0.75, 0, 0}) {
+		t.Fatal("world-authored 0.42 m radius did not overlap at 0.75 m separation")
+	}
+	if d.presenceCapsulesOverlap([]float64{0, 0, 0}, []float64{0, 1.8, 0}) {
+		t.Fatal("world-authored 1.76 m capsule overlapped with a 1.8 m vertical gap")
+	}
+}
+
 func TestPresenceGhostLifecycle(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()

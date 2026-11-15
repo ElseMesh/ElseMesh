@@ -339,6 +339,7 @@ type worldRules struct {
 	Gravity          float64           `json:"gravity"`
 	MaxVisitors      uint32            `json:"maxVisitors"`
 	SpawnRadius      float64           `json:"spawnRadius"`
+	PlayerCapsule    *playerCapsule    `json:"playerCapsule,omitempty"`
 	SeaLevel         *float64          `json:"seaLevel,omitempty"`
 	AtmosphereLevel  *float64          `json:"atmosphereLevel,omitempty"`
 	AvatarComplexity uint32            `json:"avatarComplexity"`
@@ -350,6 +351,17 @@ type worldRules struct {
 	MaxPackageBytes  *int64            `json:"maxPackageBytes,omitempty"`
 	StyleGuide       string            `json:"styleGuide,omitempty"`
 	RequiredFeatures []string          `json:"requiredFeatures,omitempty"`
+}
+
+type playerCapsule struct {
+	RadiusMeters float64 `json:"radiusMeters"`
+	HeightMeters float64 `json:"heightMeters"`
+}
+
+func validPlayerCapsule(capsule *playerCapsule) bool {
+	return capsule == nil ||
+		(!math.IsNaN(capsule.RadiusMeters) && !math.IsInf(capsule.RadiusMeters, 0) && capsule.RadiusMeters > 0 && capsule.RadiusMeters <= 2 &&
+			!math.IsNaN(capsule.HeightMeters) && !math.IsInf(capsule.HeightMeters, 0) && capsule.HeightMeters >= capsule.RadiusMeters*2 && capsule.HeightMeters <= 4)
 }
 
 type vehiclePolicy struct {
@@ -780,6 +792,9 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	}
 	if manifest.Rules.MaxVisitors < 1 || manifest.Rules.MaxVisitors > 128 || math.IsNaN(manifest.Rules.SpawnRadius) || math.IsInf(manifest.Rules.SpawnRadius, 0) || manifest.Rules.SpawnRadius < 0 || manifest.Rules.SpawnRadius > 100 {
 		return errors.New("world visitor limit or spawn radius is outside the supported range")
+	}
+	if !validPlayerCapsule(manifest.Rules.PlayerCapsule) {
+		return errors.New("world player capsule dimensions are outside the supported range")
 	}
 	for name, level := range map[string]*float64{"sea level": manifest.Rules.SeaLevel, "atmosphere level": manifest.Rules.AtmosphereLevel} {
 		if level != nil && (math.IsNaN(*level) || math.IsInf(*level, 0) || math.Abs(*level) > 1e6) {
