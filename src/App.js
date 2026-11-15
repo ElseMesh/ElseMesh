@@ -66,7 +66,7 @@ import { LocalRegionConnector } from './network/LocalRegionConnector.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects, selectLocalRegionStreamingObjects } from './network/LocalRegionStartup.js';
 import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
-import { avatarPolicy, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
+import { avatarPolicy, movementProfileSelection, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
 import { appearanceForAllowedProfiles, avatarProfileId, AVATAR_STYLES, loadAppearance } from './player/AvatarAppearance.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
@@ -90,11 +90,6 @@ const _up = new Vector3( 0, 1, 0 );
 const _navigationForward = new Vector3();
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
 const _componentPriorityBounds = { transform: { position: [ 0, 0, 0 ] }, streamingBounds: null };
-
-function movementProfileSelection( manifest, appearance ) {
-	const vehicle = manifest?.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
-	return { avatarProfileId: avatarProfileId( appearance ), vehicleType: vehicle?.type ?? null };
-}
 
 function worldViewPriorityByAsset( objects, components, camera ) {
 	const priorities = new Map();
@@ -595,7 +590,7 @@ export class App {
 		this.surface.wake = this.wake;
 		replaceWorldSourceCollisions( this.worldPackage.source, this.colliders );
 		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, query: this.query, boat: this.boatCtl, reef: this.reef, worldLayout: this.worldLayout } );
-		this.player.setWorldRules( this.worldPackage.source.rules, movementProfileSelection( this.worldPackage.source, loadAppearance() ) );
+		this.player.setWorldRules( this.worldPackage.source.rules, movementProfileSelection( this.worldPackage.source, avatarProfileId( loadAppearance() ) ) );
 		this.localPlayerEnvironment = { terrain: this.player.terrain, colliders: this.player.colliders, query: this.player.query, slot: this.player.slot, reef: this.player.reef, boat: this.player.boat, hostedSeaLevel: null };
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
 		this.wildlife = await this.worldPackage.presentation?.createWildlife?.( {
@@ -665,7 +660,7 @@ export class App {
 			if ( manifestResult.error ) throw manifestResult.error;
 			const entrySelection = await chooseWorldEntryPoint( connector.manifest );
 			const entryAppearance = selectedWorldEntryAppearance( entrySelection );
-			this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, entryAppearance ) );
+			this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, avatarProfileId( entryAppearance ) ) );
 			G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
 			const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
 			this.camera.position.set( ...spawn.position );
@@ -858,7 +853,7 @@ export class App {
 		const entrySelection = await chooseWorldEntryPoint( connector.manifest );
 		const entryAppearance = selectedWorldEntryAppearance( entrySelection );
 		const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
-		this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, entryAppearance ) );
+		this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, avatarProfileId( entryAppearance ) ) );
 		this.camera.position.set( ...spawn.position );
 		this.player.yaw = spawn.yaw;
 		this.player.pitch = spawn.pitch;
@@ -2116,7 +2111,7 @@ export class App {
 		registerWorldPackageCollisions( destinationRoot, this.hostedColliders );
 		this.scene.add( destinationRoot );
 		this.worldConnector = destinationConnector;
-		this.player.setWorldRules( destinationConnector.manifest.rules, movementProfileSelection( destinationConnector.manifest, arrivalAppearance ) );
+		this.player.setWorldRules( destinationConnector.manifest.rules, movementProfileSelection( destinationConnector.manifest, avatarProfileId( arrivalAppearance ) ) );
 		G.seaLevel.value = worldSeaLevel( destinationConnector.manifest.rules ) ?? 0;
 		this.player.setHostedWorldPose( arrival.position, arrival.yaw, arrival.pitch );
 		this.activateHostedWorld( destinationRoot, destinationConnector, admissionSession );

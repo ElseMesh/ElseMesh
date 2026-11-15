@@ -61,6 +61,8 @@ the private [Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md).
 
 The normative JSON Schema is [`schemas/world-source.schema.json`](schemas/world-source.schema.json).
 
+`rules.movementProfiles` can declare bounded `stepHeightMeters` capabilities under `avatars` (stable avatar-profile IDs) and `vehicles` (registered vehicle component IDs). ElseMesh applies the selected avatar profile while walking and the world vehicle profile to its vehicle controls in both renderers. Missing profile entries mean no automatic step-up; worlds own these movement capabilities and the engine interprets them.
+
 Worlds with named entry choices define `entryPointActionLabel` for the first button, `entryPointPrompt` for the question, and bounded `entryPoints` with stable IDs, labels, spawn poses, and optional uniform palettes. The client shows the world-owned action before revealing the choices; every operational choice must include a validated pose.
  The browser-side structural checks are in `src/network/WorldSource.js`; Blender import/export is provided by [`../tools/blender/world_source.py`](../tools/blender/world_source.py). The `elsemesh.ambient-audio/1` authored shape and runtime behavior are specified in [`schemas/ambient-audio.md`](schemas/ambient-audio.md).
 

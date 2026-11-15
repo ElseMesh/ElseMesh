@@ -3,7 +3,7 @@ import { createWebGLKTX2Loader } from '../engine/loaders/KTX2.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { makePresencePose } from '../network/WorldPresenceSession.js';
-import { DEFAULT_APPEARANCE } from '../player/AvatarAppearance.js';
+import { avatarProfileId, DEFAULT_APPEARANCE, loadAppearance } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
 import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
 import { CDLOD } from '../core/CDLOD.js';
@@ -51,7 +51,7 @@ import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '
 import { registerWorldPackageCollisionPayload, replaceWorldSourceCollisions } from '../network/WorldPackage.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
-import { movementParameters, worldHasWater } from '../network/WorldRules.js';
+import { movementParameters, movementProfileSelection, worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
 import { SHORE_WATER_TURBIDITY, WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 import { G } from '../engine/render/Frame.js';
@@ -952,6 +952,7 @@ export class WebGLFallback {
 			this._createWebGLWake();
 			replaceWorldSourceCollisions( this.defaultWorldPackage.source, this.app.worldState.colliders );
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout } );
+			this.player.setWorldRules( this.defaultWorldSource.rules, movementProfileSelection( this.defaultWorldSource, avatarProfileId( loadAppearance() ) ) );
 			this.player.yaw = this.spawn.yaw || 0;
 			this.player.pitch = this.spawn.pitch || 0;
 			this.player.position.set( this.spawn.position[ 0 ], this.spawn.position[ 1 ] - 1.62, this.spawn.position[ 2 ] );
@@ -972,7 +973,8 @@ export class WebGLFallback {
 				this._bindShoreSurfaceToWater();
 			}
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
-			this.player.setWorldRules( this.connector.manifest.rules );
+			const appearance = this.app.worldPresence?.appearance || loadAppearance();
+			this.player.setWorldRules( this.connector.manifest.rules, movementProfileSelection( this.connector.manifest, avatarProfileId( appearance ) ) );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => {
 				const ready = this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );

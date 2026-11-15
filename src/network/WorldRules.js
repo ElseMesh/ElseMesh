@@ -129,6 +129,15 @@ export function movementProfileParameters( rules ) {
 	return result;
 }
 
+export function movementProfileSelection( manifest, avatarProfileId, vehicleType = null ) {
+	if ( typeof avatarProfileId !== 'string' || ! AVATAR_PROFILE_ID.test( avatarProfileId ) ) throw new Error( 'World movement profile selection has an invalid avatar profile' );
+	const vehicleTypes = new Set( ( Array.isArray( manifest?.components ) ? manifest.components : [] )
+		.filter( component => worldComponentDescriptor( component?.type )?.vehicle === true )
+		.map( component => component.type ) );
+	const selectedVehicleType = vehicleType ?? ( vehicleTypes.size === 1 ? vehicleTypes.values().next().value : null );
+	return { avatarProfileId, vehicleType: selectedVehicleType && vehicleTypes.has( selectedVehicleType ) ? selectedVehicleType : null };
+}
+
 // Vehicle transfer is opt-in because a destination must explicitly accept the
 // bundled vehicle simulation and its resource budget.
 export function vehiclePolicy( rules ) {
