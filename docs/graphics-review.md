@@ -253,6 +253,33 @@ AMD review configuration and current output; it does not establish parity or
 performance. Tidewater parity remains 90%.
 [AMD WebGL capture](images/tidewater-split-webgl-amd-atmosphere-physical-ibl-2026-11-15.png).
 
+### Rendered vendor interaction check, 2026-11-15
+
+The production build stamped `3de22a1b` was opened at its ordinary Tidewater
+spawn, without a named review camera or fixed simulation time. Both checks used
+the same isolated Weston Wayland display, 1600×813 canvas, and AMD device.
+Chromium reported ANGLE/RadeonSI for WebGL and browser-level ANGLE/Vulkan
+`AMD Radeon Graphics (RADV RENOIR)` with WebGPU enabled for WebGPU.
+
+In both renderers, actual arrow-key look, WASD movement, and the E interaction
+key walked the player from the authored start into Joe's range; his rendered
+fish-buyer panel opened. The player then crossed the rendered scene to Marta;
+her upgrade list opened in both. At interaction, Joe was 1.60 m away in WebGL
+and 1.45 m in WebGPU; Marta was 1.56 m away in WebGL and 2.13 m in WebGPU.
+The WebGL run showed about 16–27 FPS and WebGPU about 7–14 FPS during these
+interactions. These changing HUD readings are observations, not a controlled
+performance comparison. The cooler was empty, so this run did not catch or sell
+a fish or buy an upgrade. Existing signed-Worker browser coverage still tests
+those gameplay actions with synthetic water and a HUD fixture.
+
+The two captures confirm that the fish stand, chandlery, and their panels are
+present and usable in the fully rendered scene on both backends. The shoreline,
+vegetation, building materials, and performance still differ visibly, and the
+two sequential captures are not a pixel-matched comparison against the
+pre-split WebGPU baseline. Tidewater parity remains 90%.
+[WebGL Marta shop](images/tidewater-rendered-webgl-marta-shop-amd-2026-11-15.png),
+[WebGPU Marta shop](images/tidewater-rendered-webgpu-marta-shop-amd-2026-11-15.png).
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
