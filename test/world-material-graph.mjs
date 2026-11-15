@@ -5,6 +5,7 @@ import { compileWorldMaterialGraph } from '../src/materials/WorldMaterialGraphCo
 import { createWebGLMaterialGraph, createWebGPUMaterialGraph } from '../src/materials/WorldMaterialGraph.js';
 import { worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
 import { G } from '../src/engine/render/Frame.js';
+import { buildMeshShader } from '../src/engine/render/MeshShader.js';
 
 const graphAtNodeLimit = {
 	format: 'elsemesh.material-graph/1',
@@ -296,9 +297,17 @@ const colorRGBGraph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'tin
 const colorRGBWebGPU = createWebGPUMaterialGraph( {}, colorRGBGraph );
 const colorRGBWebGL = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), colorRGBGraph );
 assert.equal( colorRGBWebGPU.vertexColors, true );
+assert.equal( colorRGBWebGPU.vertexColorAlbedo, false, 'graph base color owns COLOR_0 so the default surface does not apply it twice' );
 assert.match( colorRGBWebGPU.vertex, /o\.emg_colorRGB = v\.color\.rgb/ );
+const colorRGBWGSL = buildMeshShader( colorRGBWebGPU, [ { name: 'position', location: 0, wgsl: 'vec3f' }, { name: 'color', location: 1, wgsl: 'vec4f' } ], { kind: 'main' } );
+assert.equal( colorRGBWGSL.defines.VERTEX_COLOR_ALBEDO, 0 );
+assert.match( colorRGBWGSL.code, /#if VERTEX_COLOR_ALBEDO\s+s\.albedo = mat\.color \* in\.color\.rgb;\s+#else\s+s\.albedo = mat\.color;/ );
 assert.equal( colorRGBWebGL.material.vertexColors, true );
 assert.match( compileWorldMaterialGraph( colorRGBGraph, 'webgl' ).glsl.vertex, /vEmg_colorRGB = color/ );
+const colorRGBShader = { vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
+colorRGBWebGL.material.onBeforeCompile( colorRGBShader, null );
+assert.doesNotMatch( colorRGBShader.fragmentShader, /diffuseColor\.rgb \*= vColor/, 'WebGL leaves COLOR_0 RGB modulation to the graph' );
+assert.match( colorRGBShader.fragmentShader, /diffuseColor\.rgb \*= vEmg_colorRGB/, 'WebGL graph applies the authored color once' );
 colorRGBWebGL.material.dispose();
 
 const derivativeGraph = {

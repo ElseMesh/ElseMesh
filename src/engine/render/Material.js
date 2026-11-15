@@ -77,6 +77,10 @@ export class Material {
 		this.topology = o.topology || 'triangle-list';
 		this.visible = o.visible ?? true;
 		this.vertexColors = !! o.vertexColors;
+		// Graph materials can read COLOR_0 and include it in their own base-color
+		// expression. Keep the attribute bound, but avoid multiplying that tint a
+		// second time in the renderer's default surface color.
+		this.vertexColorAlbedo = o.vertexColorAlbedo ?? this.vertexColors;
 		// velocity weight in the late (blended) pass: 1 = own motion, 0 = keep what is behind (glass)
 		this.velocityWeight = o.velocityWeight ?? 1;
 		// per-material lighting switches (see SceneLighting hooks)
@@ -167,9 +171,9 @@ export class Material {
 			&& state.depthWrite === this.depthWrite && state.depthTest === this.depthTest && state.depthCompare === this.depthCompare && state.colorWrite === this.colorWrite
 			&& state.topology === this.topology && state.alphaTest === ( this.alphaTest > 0 ) && state.underwaterLighting === this.underwaterLighting
 			&& state.appliesHillShadow === this.appliesHillShadow && state.localLightsCheap === this.localLightsCheap && state.receiveShadows === this.receiveShadows
-			&& state.depthBias === this.depthBias && state.depthBiasSlopeScale === this.depthBiasSlopeScale && state.vertexColors === this.vertexColors ) return state.key;
+			&& state.depthBias === this.depthBias && state.depthBiasSlopeScale === this.depthBiasSlopeScale && state.vertexColors === this.vertexColors && state.vertexColorAlbedo === this.vertexColorAlbedo ) return state.key;
 
-		const key = `${ this.id }.${ this.version }.${ this.side }.${ this.transparent }.${ blending }.${ this.depthWrite }.${ this.depthTest }.${ this.depthCompare }.${ this.colorWrite }.${ this.topology }.${ this.alphaTest > 0 }.${ this.underwaterLighting }.${ this.appliesHillShadow }.${ this.localLightsCheap }.${ this.receiveShadows }.${ this.depthBias }.${ this.depthBiasSlopeScale }.${ this.vertexColors }`;
+		const key = `${ this.id }.${ this.version }.${ this.side }.${ this.transparent }.${ blending }.${ this.depthWrite }.${ this.depthTest }.${ this.depthCompare }.${ this.colorWrite }.${ this.topology }.${ this.alphaTest > 0 }.${ this.underwaterLighting }.${ this.appliesHillShadow }.${ this.localLightsCheap }.${ this.receiveShadows }.${ this.depthBias }.${ this.depthBiasSlopeScale }.${ this.vertexColors }.${ this.vertexColorAlbedo }`;
 		if ( ! state ) state = this._pipelineKeyState = {};
 		state.id = this.id;
 		state.version = this.version;
@@ -189,6 +193,7 @@ export class Material {
 		state.depthBias = this.depthBias;
 		state.depthBiasSlopeScale = this.depthBiasSlopeScale;
 		state.vertexColors = this.vertexColors;
+		state.vertexColorAlbedo = this.vertexColorAlbedo;
 		state.key = key;
 		return key;
 

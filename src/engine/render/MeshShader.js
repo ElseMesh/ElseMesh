@@ -51,6 +51,7 @@ export function buildMeshShader( material, layout, pass ) {
 	defs.PASS_COLOR = kind === 'color' ? 1 : 0;
 	defs.PASS_LATE = pass.late ? 1 : 0;
 	defs.LIT = material.lit ? 1 : 0;
+	defs.VERTEX_COLOR_ALBEDO = material.vertexColorAlbedo ? 1 : 0;
 	defs.INSTANCED = has.has( 'instanceMatrix0' ) ? 1 : 0;
 	defs.INSTANCE_COLOR = has.has( 'instanceColor' ) ? 1 : 0;
 	Object.assign( defs, pass.defines || {} );
@@ -259,7 +260,11 @@ fn fragInput( vs: VSOut, front: bool ) -> FragInput {
 
 fn surfaceOf( in: FragInput ) -> Surface {
 	var s = defaultSurface( in.N );
+	#if VERTEX_COLOR_ALBEDO
 	s.albedo = mat.color * in.color.rgb;
+	#else
+	s.albedo = mat.color;
+	#endif
 	s.alpha = mat.opacity * in.color.a;
 	s.roughness = mat.roughness;
 	s.metalness = mat.metalness;

@@ -15,6 +15,7 @@ const FRAME_UNIFORM_VALUES = Object.freeze( {
 export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgpu', { doubleSided: Boolean( gltfMaterial.doubleSided ) } );
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
+	const graphUsesVertexColorForAlbedo = Boolean( graph.outputs.baseColor && usesVertexColors );
 	for ( const slot of compiled.textureSlots ) if ( ! graphTextures[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const useBaseColorMap = Boolean( albedo && ! compiled.samplesBaseColorForBaseColor );
 	const pbr = gltfMaterial.pbrMetallicRoughness || {};
@@ -43,6 +44,7 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 		transparent: alphaMode === 'BLEND', alphaTest: alphaMode === 'MASK' ? ( gltfMaterial.alphaCutoff ?? 0.5 ) : 0,
 		side: gltfMaterial.doubleSided ? 'double' : 'front',
 		vertexColors: usesVertexColors,
+		vertexColorAlbedo: ! graphUsesVertexColorForAlbedo,
 		emissiveIntensity: gltfMaterial.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1,
 		textures: {
 			...( useBaseColorMap ? { worldGraphAlbedoMap: albedo } : {} ),
@@ -56,11 +58,17 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 	} );
 }
 
-function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, textureBindings = {} } = {} ) {
+function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, textureBindings = {}, graphUsesVertexColorForAlbedo = false } = {} ) {
 	const originalCompile = material.onBeforeCompile;
 	const originalKey = material.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.call( material, shader, renderer );
+		if ( fragment && graphUsesVertexColorForAlbedo ) {
+			const colorChunk = '#include <color_fragment>';
+			if ( ! shader.fragmentShader.includes( colorChunk ) ) throw new Error( 'WebGL material graph hook is missing #include <color_fragment>' );
+			// Preserve COLOR_0 alpha while leaving RGB multiplication to the graph.
+			shader.fragmentShader = shader.fragmentShader.replace( colorChunk, '#if defined( USE_COLOR_ALPHA )\n\tdiffuseColor.a *= vColor.a;\n#endif' );
+		}
 		const insert = ( source, marker, code ) => {
 			if ( ! source.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			return source.replace( marker, `${code}\n${marker}` );
@@ -138,6 +146,7 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgl', { doubleSided: sourceMaterial.side === T.DoubleSide } );
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
+	const graphUsesVertexColorForAlbedo = Boolean( graph.outputs.baseColor && usesVertexColors );
 	const textureBindings = {
 		baseColor: sourceMaterial.map,
 		metallicRoughness: sourceMaterial.metalnessMap || sourceMaterial.roughnessMap,
@@ -150,7 +159,7 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	const materialSource = sourceMaterial.clone();
 	materialSource.vertexColors = usesVertexColors;
 	if ( compiled.samplesBaseColorForBaseColor ) materialSource.map = null;
-	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings } );
+	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings, graphUsesVertexColorForAlbedo } );
 	const depthMaterial = compiled.hasVertexOutput
 		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false, textureBindings } )
 		: null;
