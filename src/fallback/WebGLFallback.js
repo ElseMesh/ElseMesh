@@ -871,6 +871,18 @@ export class WebGLFallback {
 
 	}
 
+	requestLock() {
+
+		if ( typeof this.input?.requestLock === 'function' ) {
+
+			this.input.requestLock();
+			return;
+
+		}
+		return this.engine.canvas.requestPointerLock?.();
+
+	}
+
 	async init( onProgress = () => {} ) {
 
 		const T = this.THREE;
@@ -2227,8 +2239,7 @@ export class WebGLFallback {
 		};
 		// Capture key events before UI descendants can stop them from reaching the fallback.
 		window.addEventListener( 'keydown', this._keyDown, true );
-		this.requestLock = () => this.input?.requestLock?.() || this.engine.canvas.requestPointerLock?.();
-		this.engine.canvas.addEventListener( 'click', this.requestLock );
+		this.engine.canvas.addEventListener( 'click', () => this.requestLock() );
 
 	}
 

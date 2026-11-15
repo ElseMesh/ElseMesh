@@ -39,18 +39,25 @@ starts. One retry disabled both `Input.requestLock()` and the separate
 then terminated with the same SIGSEGV: fault address `0x8`, instruction offset
 `0xd698ec0` in `/usr/lib/chromium/chromium`. The crash dumps identify each
 dedicated review profile. Kernel logs show no OOM kill or AMD GPU reset, and
-Weston continued running on AMD. The installed Chromium binary is stripped, so
-the dump did not yield a symbolized call stack. The cause remains unresolved;
-the live WebGL fishing, sale, and upgrade path was not reached, and no WebGL
-gameplay parity conclusion is drawn.
+Weston continued running on AMD.
 
 Inspecting the five retained minidumps confirms the same exception site and
-main-thread frame chain in every run. Each context has `R11=0`; disassembly of
-Chromium 156.0.8078.79 at `0xd698ec0` is `push 0x8(%r11)`, which faults at
-address `0x8`. The first captured return offsets are `0x726a5fd`, `0x6e905c1`,
-`0x70a21d9`, `0x867b755`, and `0x70941f6`. These unsymbolized frames do not
-identify which start-callback operation triggers the browser fault. AMD device
-selection is verified independently and is not the missing prerequisite here.
+main-thread frame chain in every run. Matching Debian debug symbols resolve the
+fault to `views::DesktopWindowTreeHostLinux::LockMouse(aura::Window*)`, called
+through Chromium's `RenderWidgetHostViewEventHandler::LockPointer` and
+`PointerLockController::RequestToLockPointer`. Each context has `R11=0`; the
+faulting instruction is `push 0x8(%r11)` at Chromium 156.0.8078.79 offset
+`0xd698ec0`. This confirms that the crash occurs in Chromium's native pointer-
+lock path, while the Weston compositor and AMD renderer remain alive.
+
+Source inspection found that `WebGLFallback.requestLock()` called
+`Input.requestLock() || canvas.requestPointerLock()`. `Input.requestLock()`
+returns no value after issuing its request, so WebGL immediately issued a
+second native request. The fallback now makes one request through `Input` and
+uses the canvas request only when `Input` is absent; a focused regression check
+covers both cases. The next AMD review must verify that this removes the crash
+and reaches live WebGL gameplay before the WebGL parity gate can close. AMD
+device selection was already verified and was not the missing prerequisite.
 
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
