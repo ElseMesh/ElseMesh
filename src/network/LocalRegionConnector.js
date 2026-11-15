@@ -12,6 +12,7 @@ import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STAT
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 import { PriorityRequestQueue } from './PriorityRequestQueue.js';
 import { worldViewCellCoordinates } from './WorldViewCells.js';
+import { WorldConnector } from './WorldConnector.js';
 
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES = 768 * 1024 * 1024;
@@ -63,6 +64,12 @@ function createEmptyGlb() {
 
 function requireValue( value, message ) {
 	if ( ! value ) throw new Error( message );
+}
+
+function canonicalJSON( value ) {
+	if ( Array.isArray( value ) ) return `[${value.map( canonicalJSON ).join( ',' )}]`;
+	if ( value && typeof value === 'object' ) return `{${Object.keys( value ).sort().map( key => `${JSON.stringify( key )}:${canonicalJSON( value[ key ] )}` ).join( ',' )}}`;
+	return JSON.stringify( value );
 }
 
 function isSpatialBoundsArray( bounds ) {
@@ -188,16 +195,20 @@ async function parseByteRangeResponse( response ) {
 }
 
 export class LocalRegionConnector {
-	constructor( { localProvider, localMap, regionDiagnostics = false } ) {
+	constructor( { localProvider, localMap, regionDiagnostics = false, worldId = '', nodeId = '', gateway = '', directory = '', createWorldConnector = options => new WorldConnector( options ) } ) {
 		this.localOnly = true;
+		this.presenceEnabled = Boolean( worldId );
 		this.dynamicRegions = true;
 		this.localProvider = new URL( localProvider ).origin;
 		this.localMap = localMap;
 		this.regionDiagnostics = regionDiagnostics;
+		this.presenceWorldId = worldId;
+		this.presenceNodeId = nodeId;
+		this.gateway = gateway || this.localProvider;
+		this.directory = directory;
+		this.createWorldConnector = createWorldConnector;
 		this.worldId = '';
 		this.nodeId = '';
-		this.gateway = this.localProvider;
-		this.directory = '';
 		this.providers = [];
 		const memoryCacheBudgetBytes = localRegionCacheBudgetBytes();
 		this.assets = new Map();
@@ -239,6 +250,7 @@ export class LocalRegionConnector {
 		const base = `${this.localProvider}/v1`;
 		const descriptor = await fetchJSON( `${base}/descriptor`, signal );
 		requireValue( descriptor.schema === 'elsemesh.dynamic-region-provider/1' && descriptor.readOnly === true && typeof descriptor.sourceRevision === 'string' && isWorldID( descriptor.worldId ) && ( descriptor.title === undefined || typeof descriptor.title === 'string' && descriptor.title.trim() && descriptor.title.length <= 160 ), 'Local provider returned an unsupported descriptor' );
+		requireValue( ! this.presenceEnabled || this.presenceWorldId === descriptor.worldId, 'Local region provider and worldd route identify different worlds' );
 		const cacheRevision = descriptor.cacheRevision;
 		requireValue( typeof cacheRevision === 'string' && cacheRevision.trim() && cacheRevision.length <= 512, 'Local provider returned an invalid cache revision' );
 		const selection = descriptor.entrySelection;
@@ -256,10 +268,37 @@ export class LocalRegionConnector {
 			const support = selection.previewSupport;
 			requireValue( support?.status === 'provisional' && typeof support.basis === 'string' && support.basis.length <= 500 && Array.isArray( support.position ) && support.position.length === 3 && support.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( support.halfExtents ) && support.halfExtents.length === 3 && support.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) && ( support.yaw === undefined || Number.isFinite( support.yaw ) && Math.abs( support.yaw ) <= 360 ), 'Local provider has invalid provisional preview support' );
 		}
-		const experience = selection.experience ? structuredClone( validateWorldExperience( selection.experience ) ) : null;
-		if ( experience?.theme?.logo?.src.startsWith( '/' ) ) experience.theme.logo.src = new URL( experience.theme.logo.src, `${base}/` ).href;
+		const providerExperience = selection.experience ? structuredClone( validateWorldExperience( selection.experience ) ) : null;
+		let ownerManifest = null;
+		if ( this.presenceEnabled ) {
+			const ownerConnector = this.createWorldConnector( {
+				worldId: this.presenceWorldId,
+				...( this.presenceNodeId ? { nodeId: this.presenceNodeId } : {} ),
+				gateway: this.gateway,
+				directory: this.directory,
+			} );
+			try {
+				ownerManifest = await ownerConnector.getManifest( { signal } );
+			} finally {
+				ownerConnector.close();
+			}
+			const expectedEntryPoints = selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ), ...( choice.avatarOptionId ? { avatarOptionId: choice.avatarOptionId } : {} ) } ) );
+			requireValue( ownerManifest.worldId === descriptor.worldId
+				&& canonicalJSON( ownerManifest.spawn ) === canonicalJSON( selection.previewSpawn )
+				&& canonicalJSON( ownerManifest.rules.playerCapsule ) === canonicalJSON( selection.playerCapsule )
+				&& canonicalJSON( ownerManifest.rules.movementProfiles ) === canonicalJSON( selection.movementProfiles )
+				&& canonicalJSON( ownerManifest.avatarOptions || [] ) === canonicalJSON( avatarOptions )
+				&& canonicalJSON( ownerManifest.entryPoints || [] ) === canonicalJSON( expectedEntryPoints )
+				&& canonicalJSON( ownerManifest.experience || null ) === canonicalJSON( providerExperience )
+				&& ownerManifest.entryPointPrompt === selection.entryPointPrompt
+				&& ownerManifest.entryPointActionLabel === selection.entryPointActionLabel
+				&& ownerManifest.ownerPeerId, 'Signed worldd entry contract does not match the dynamic region provider' );
+		}
+		const experience = ownerManifest?.experience ? structuredClone( validateWorldExperience( ownerManifest.experience ) ) : providerExperience;
+		const experienceBase = ownerManifest ? `${this.gateway}/v1` : base;
+		if ( experience?.theme?.logo?.src.startsWith( '/' ) ) experience.theme.logo.src = new URL( experience.theme.logo.src, `${experienceBase}/` ).href;
 		const map = experience?.navigation?.map;
-		const resolveMapAsset = layer => { if ( layer.src.startsWith( '/' ) ) layer.src = new URL( layer.src, `${base}/` ).href; };
+		const resolveMapAsset = layer => { if ( layer.src.startsWith( '/' ) ) layer.src = new URL( layer.src, `${experienceBase}/` ).href; };
 		if ( map ) map.layers.forEach( resolveMapAsset );
 		const catalog = await fetchJSON( new URL( descriptor.regions, `${base}/descriptor` ), signal );
 		requireValue( Array.isArray( catalog.regions ) && catalog.regions.length <= 10000, 'Local provider returned an invalid region catalog' );
@@ -290,14 +329,16 @@ export class LocalRegionConnector {
 		this.initialStartupCellKeys = startupCellKeys;
 		const spawn = selection.previewSpawn;
 		this.manifest = {
-			protocol: 'elsemesh.world/3', worldId: this.worldId, title: descriptor.title ? `${descriptor.title} · ${region.label}` : region.label,
-			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
+			...( ownerManifest || {} ),
+			protocol: ownerManifest?.protocol || 'elsemesh.world/3', worldId: this.worldId, title: ownerManifest?.title || ( descriptor.title ? `${descriptor.title} · ${region.label}` : region.label ),
+			experience, ownerPeerId: ownerManifest?.ownerPeerId || '', authorityEpoch: ownerManifest?.authorityEpoch || 1,
+			assets: [], objects: [], components: [], portals: ownerManifest?.portals || [],
 			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.
-			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, playerCapsule, movementProfiles },
-			spawn,
+			rules: ownerManifest?.rules || { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, playerCapsule, movementProfiles },
+			spawn: ownerManifest?.spawn || spawn,
 			entryPointActionLabel: selection.entryPointActionLabel,
-			avatarOptions,
-			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ), ...( choice.avatarOptionId ? { avatarOptionId: choice.avatarOptionId } : {} ) } ) ),
+			avatarOptions: ownerManifest?.avatarOptions || avatarOptions,
+			entryPoints: ownerManifest?.entryPoints || selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ), ...( choice.avatarOptionId ? { avatarOptionId: choice.avatarOptionId } : {} ) } ) ),
 			entryPointPrompt: selection.entryPointPrompt, sourceRevision: this.sourceRevision,
 		};
 		this.baseURL = base;

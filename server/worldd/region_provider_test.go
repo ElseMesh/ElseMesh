@@ -496,6 +496,8 @@ func TestLoadWorldManifestUsesRegionProviderWorldContract(t *testing.T) {
 		{ID: "short-hair", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Short hair"},
 		{ID: "ponytail", ProfileID: "elsemesh.avatar.stock-female/1", Label: "Ponytail"},
 	}
+	provider.EntrySelection.EntryPointPrompt = "Which house will you join?"
+	provider.EntrySelection.EntryPointActionLabel = "Choose your house"
 	provider.EntrySelection.Experience = &worldExperience{
 		Genre: "The Great Hall", Tagline: "Step into the Great Hall.", LoadingNote: "Preparing the castle.",
 		Tips: []string{"You start in the Great Hall."}, Stages: map[string]string{"world": "Loading the Great Hall."},
@@ -523,6 +525,9 @@ func TestLoadWorldManifestUsesRegionProviderWorldContract(t *testing.T) {
 	}
 	if len(manifest.AvatarOptions) != 2 || manifest.Rules.AvatarPolicy == nil || len(manifest.Rules.AvatarPolicy.AllowedProfiles) != 2 {
 		t.Fatalf("world avatar contract = options:%+v policy:%+v", manifest.AvatarOptions, manifest.Rules.AvatarPolicy)
+	}
+	if manifest.EntryPointPrompt != provider.EntrySelection.EntryPointPrompt || manifest.EntryPointActionLabel != provider.EntrySelection.EntryPointActionLabel {
+		t.Fatalf("world entry UI = (%q, %q), want provider-authored (%q, %q)", manifest.EntryPointPrompt, manifest.EntryPointActionLabel, provider.EntrySelection.EntryPointPrompt, provider.EntrySelection.EntryPointActionLabel)
 	}
 	if manifest.Experience == nil || string(manifest.Experience.Navigation) != string(provider.EntrySelection.Experience.Navigation) || string(manifest.Experience.Theme) != string(provider.EntrySelection.Experience.Theme) {
 		t.Fatalf("world experience presentation was not preserved: %+v", manifest.Experience)

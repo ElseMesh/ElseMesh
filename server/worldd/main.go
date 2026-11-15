@@ -908,6 +908,8 @@ func applyRegionProviderSelection(manifest *worldManifest, descriptor *dynamicRe
 	manifest.Rules.PlayerCapsule = selection.PlayerCapsule
 	manifest.Rules.MovementProfiles = selection.MovementProfiles
 	manifest.AvatarOptions = append([]worldAvatarOption(nil), selection.AvatarOptions...)
+	manifest.EntryPointPrompt = selection.EntryPointPrompt
+	manifest.EntryPointActionLabel = selection.EntryPointActionLabel
 	manifest.Experience = selection.Experience
 	if len(selection.AvatarOptions) > 0 {
 		profiles := make([]string, 0, len(selection.AvatarOptions))

@@ -44,16 +44,28 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	const localMap = params.get( 'localMap' ) || configuredLocalWorld?.map;
 	if ( localProvider || localMap ) {
 		invariant( localProvider && localMap, 'A local provider URL and map name must be supplied together' );
-		invariant( ! params.has( 'worldId' ) && ! params.has( 'ztNodeId' ) && ! params.has( 'nodeId' ) && ! params.has( 'gateway' ), 'Local preview cannot be combined with a remote world invite' );
+		invariant( ! params.has( 'ztNodeId' ) && params.getAll( 'worldId' ).length <= 1 && params.getAll( 'nodeId' ).length <= 1 && params.getAll( 'gateway' ).length <= 1, 'Local region links accept only one worldd owner route' );
 		const provider = new URL( localProvider );
 		const loopback = ( hostname ) => [ 'localhost', '127.0.0.1', '[::1]' ].includes( hostname );
 		invariant( [ 'http:', 'https:' ].includes( provider.protocol ) && loopback( provider.hostname ) && ! provider.username && ! provider.password && ( provider.pathname === '' || provider.pathname === '/' ) && ! provider.search && ! provider.hash, 'Local region provider must be a loopback HTTP(S) origin' );
 		const page = new URL( location.href );
 		invariant( [ 'http:', 'https:' ].includes( page.protocol ) && loopback( page.hostname ), 'Local region preview is available only from a loopback browser page' );
 		invariant( localMap.length <= 256 && /^[\w .()/-]+$/.test( localMap ), 'Invalid local map selector' );
+		const worldId = params.get( 'worldId' ) || '';
+		const nodeId = params.get( 'nodeId' ) || '';
+		const gateway = params.get( 'gateway' ) || '';
+		invariant( ! worldId && ! nodeId && ! gateway || isWorldID( worldId ) && ( ! nodeId || /^[A-Za-z0-9]{20,256}$/.test( nodeId ) ) && gateway, 'A hosted local-region session requires a valid world ID and gateway, with an optional owner PeerID' );
+		if ( gateway ) {
+			const ownerGateway = new URL( gateway );
+			invariant( [ 'http:', 'https:' ].includes( ownerGateway.protocol ) && loopback( ownerGateway.hostname ) && ! ownerGateway.username && ! ownerGateway.password && ( ownerGateway.pathname === '' || ownerGateway.pathname === '/' ) && ! ownerGateway.search && ! ownerGateway.hash, 'Local region owner gateway must be a loopback HTTP(S) origin' );
+		}
 		return {
 			localProvider: provider.origin,
 			localMap,
+			worldId,
+			nodeId,
+			gateway: gateway ? new URL( gateway ).origin : '',
+			directory: params.get( 'directory' ) || globalThis.ELSEMESH_CONFIG?.worldResolver || '',
 			regionDiagnostics: params.get( 'regionDiagnostics' ) === '1',
 		};
 	}
@@ -109,6 +121,7 @@ export class WorldConnector {
 		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && directory, 'ZeroTier lookup requires a valid node ID, network ID, and HTTPS resolver' );
 		this.worldId = worldId;
 		this.localOnly = false;
+		this.presenceEnabled = true;
 		this.dynamicRegions = false;
 		this.zeroTierNodeId = zeroTierNodeId;
 		this.zeroTierNetworkId = zeroTierNetworkId;

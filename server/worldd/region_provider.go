@@ -32,11 +32,13 @@ type dynamicRegionProviderDescriptor struct {
 }
 
 type regionProviderEntrySelection struct {
-	PlayerCapsule    *playerCapsule      `json:"playerCapsule"`
-	MovementProfiles *movementProfiles   `json:"movementProfiles"`
-	AvatarOptions    []worldAvatarOption `json:"avatarOptions"`
-	PreviewSpawn     *worldSpawn         `json:"previewSpawn"`
-	Experience       *worldExperience    `json:"experience"`
+	PlayerCapsule          *playerCapsule      `json:"playerCapsule"`
+	MovementProfiles       *movementProfiles   `json:"movementProfiles"`
+	AvatarOptions          []worldAvatarOption `json:"avatarOptions"`
+	PreviewSpawn           *worldSpawn         `json:"previewSpawn"`
+	EntryPointPrompt       string              `json:"entryPointPrompt"`
+	EntryPointActionLabel  string              `json:"entryPointActionLabel"`
+	Experience             *worldExperience    `json:"experience"`
 }
 
 type authoritativeMovementSweepRequest struct {

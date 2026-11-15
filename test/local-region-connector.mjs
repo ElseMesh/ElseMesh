@@ -10,6 +10,7 @@ assert.equal( localPreviewCapabilities.localOnly, true );
 assert.equal( localPreviewCapabilities.dynamicRegions, true );
 const hostedStaticCapabilities = new WorldConnector( { worldId: 'elsemesh:connector-capabilities', gateway: 'https://gateway.example' } );
 assert.equal( hostedStaticCapabilities.localOnly, false );
+assert.equal( hostedStaticCapabilities.presenceEnabled, true );
 assert.equal( hostedStaticCapabilities.dynamicRegions, false );
 hostedStaticCapabilities.close();
 
@@ -269,7 +270,7 @@ try {
 		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall',
 		href: 'http://127.0.0.1:5189/?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall',
 	} );
-	assert.deepEqual( link, { localProvider: 'http://127.0.0.1:4179', localMap: 'Great Hall', regionDiagnostics: false } );
+	assert.deepEqual( link, { localProvider: 'http://127.0.0.1:4179', localMap: 'Great Hall', worldId: '', nodeId: '', gateway: '', directory: '', regionDiagnostics: false } );
 	const localPage = 'http://127.0.0.1:5189/?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall';
 	assert.equal( await discoverLocalWorldURL( { pageURL: localPage, fetchImpl: () => { throw new Error( 'must not query the default world for a local bridge link' ); } } ), null );
 	assert.equal( defaultHomeWorldURL( { pageURL: localPage, storage: { getItem: () => '{"worldId":"elsemesh:example-island"}' } } ), null );
@@ -280,7 +281,12 @@ try {
 	assert.throws( () => worldLinkFromLocation( {
 		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=elsemesh%3Atidewater',
 		href: 'http://127.0.0.1:5189/',
-	} ), /cannot be combined/ );
+	} ), /world ID and gateway/ );
+	const hostedLocalLink = worldLinkFromLocation( {
+		search: '?localProvider=http%3A%2F%2F127.0.0.1%3A4179&localMap=Great%20Hall&worldId=elsemesh%3Ahogwarts-legacy-local&nodeId=12345678901234567890&gateway=http%3A%2F%2F127.0.0.1%3A4190',
+		href: 'http://127.0.0.1:5189/',
+	} );
+	assert.deepEqual( [ hostedLocalLink.worldId, hostedLocalLink.nodeId, hostedLocalLink.gateway ], [ 'elsemesh:hogwarts-legacy-local', '12345678901234567890', 'http://127.0.0.1:4190' ], 'local dynamic regions can be paired with the owner-authenticated worldd presence route' );
 	const invalidIDConnector = new LocalRegionConnector( link );
 	assert.equal( invalidIDConnector.assetCacheBudgetBytes + invalidIDConnector.assetRangeCacheBudgetBytes, 128 * 1024 * 1024, 'browsers without a reported RAM hint use the conservative default cache budget' );
 	const visualPriorityConnector = new LocalRegionConnector( link );
@@ -398,6 +404,28 @@ try {
 	assert.deepEqual( manifest.rules.playerCapsule, { radiusMeters: 0.42, heightMeters: 1.76 }, 'local region world-authored capsule dimensions reach the runtime rules' );
 	assert.equal( manifest.rules.movementProfiles.avatars[ 'elsemesh.avatar.stock-male/1' ].stepHeightMeters, 0.6, 'local region avatar step capability comes from world-authored entry metadata' );
 	assert.equal( 'seaLevel' in manifest.rules, false, 'local Hogwarts preview does not activate a default waterline' );
+	const signedEntryContract = {
+		worldId: descriptorWorldId, ownerPeerId: '12345678901234567890', authorityEpoch: 1,
+		title: 'Hogwarts Legacy', spawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: -0.1 },
+		rules: { playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 }, movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 } } }, maxVisitors: 8, spawnRadius: 8, avatarPolicy: { allowedProfiles: [ 'elsemesh.avatar.stock-male/1' ] } },
+		avatarOptions: descriptorAvatarOptions,
+		entryPoints: [ { id: 'gryffindor', label: 'Gryffindor', avatarOptionId: 'short-hair' }, { id: 'hufflepuff', label: 'Hufflepuff' } ],
+		entryPointPrompt: 'Which Hogwarts house will you join?', entryPointActionLabel: 'Choose your house', experience: null,
+	};
+	const hostedRegionConnector = new LocalRegionConnector( { ...link, worldId: descriptorWorldId, nodeId: '12345678901234567890', gateway: 'http://127.0.0.1:4190', createWorldConnector: options => ( {
+		getManifest: async () => { assert.deepEqual( options, { worldId: descriptorWorldId, nodeId: '12345678901234567890', gateway: 'http://127.0.0.1:4190', directory: '' } ); return signedEntryContract; },
+		close() {},
+	} ) } );
+	const hostedRegionManifest = await hostedRegionConnector.getManifest();
+	assert.equal( hostedRegionConnector.localOnly, true, 'hosted dynamic regions retain the local renderer and asset path' );
+	assert.equal( hostedRegionConnector.presenceEnabled, true, 'the owner-signed worldd route enables multi-user presence' );
+	assert.equal( hostedRegionManifest.ownerPeerId, signedEntryContract.ownerPeerId );
+	assert.equal( hostedRegionManifest.rules.spawnRadius, 8, 'hosted admission uses the owner-signed spawn policy' );
+	assert.equal( hostedRegionManifest.rules.maxVisitors, 8, 'hosted admission uses the owner-signed visitor limit' );
+	assert.equal( hostedRegionManifest.entryPointActionLabel, 'Choose your house' );
+	const mismatchedSignedContract = { ...signedEntryContract, spawn: { ...signedEntryContract.spawn, position: [ 2, 8.62, 9 ] } };
+	const mismatchedRegionConnector = new LocalRegionConnector( { ...link, worldId: descriptorWorldId, gateway: 'http://127.0.0.1:4190', createWorldConnector: () => ( { getManifest: async () => mismatchedSignedContract, close() {} } ) } );
+	await assert.rejects( mismatchedRegionConnector.getManifest(), /does not match the dynamic region provider/, 'presence refuses an owner manifest whose signed spawn differs from the live provider' );
 	assert.equal( manifest.assets.length, 9, 'the complete Great Hall cell replaces its visual GLB with independently addressable mesh LOD assets' );
 	assert.equal( manifest.objects.length, 6, 'the instance-set cell has no duplicate whole-cell visual GLB object' );
 	assert.equal( manifest.assets[ 0 ].id, 'local-region:great-hall:16:0,0,0:collision' );

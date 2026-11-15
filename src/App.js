@@ -703,7 +703,7 @@ export class App {
 			this.player.setHostedWorldPose( this.camera.position, this.player.yaw, this.player.pitch );
 			let admissionSession;
 			try {
-				if ( ! connector.localOnly ) {
+				if ( connector.presenceEnabled ) {
 					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 					if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
 					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
@@ -728,7 +728,7 @@ export class App {
 			this.activateHostedWorld( this.linkedWorldRoot, connector, admissionSession );
 			this.refraction.enabled = false;
 			this.portalPreviousPosition = this.camera.position.clone();
-			if ( ! connector.localOnly ) rememberWorldVisit( {
+			if ( connector.presenceEnabled ) rememberWorldVisit( {
 				pageURL: location.href,
 				worldId: connector.worldId,
 				nodeId: connector.nodeId,
@@ -943,7 +943,7 @@ export class App {
 		this.remoteWorldActive = true;
 		this.remoteWorlds.set( connector.worldId, { connector, root: this.linkedWorldRoot } );
 		let admissionSession;
-		if ( ! connector.localOnly ) {
+		if ( connector.presenceEnabled ) {
 			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
 			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
@@ -1617,7 +1617,7 @@ export class App {
 	}
 
 	startWorldPresence( root, connector ) {
-		if ( connector.localOnly ) return;
+		if ( ! connector.presenceEnabled ) return;
 		this.worldPresence = new WorldPresenceSession( { connector, parent: root } );
 	}
 
