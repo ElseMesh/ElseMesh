@@ -198,6 +198,10 @@ Each ThruHold may provide loading-screen copy, environment choices, navigation H
 
 The checked-in Example Island package demonstrates per-world presentation. Change its `presentation.json` file, then run the world exporter before validating or publishing the updated source.
 
+### Large-map delivery requirement
+
+The current HUD map source is a whole image per layer. Large maps must move to spatial tile responses instead of downloading an entire floor image. The world provider supplies source-derived tile metadata and serves only requested tile payloads; the engine schedules tiles intersecting the minimap view first, then preloads nearby tiles along reachable paths through its shared cancellable streaming queue and cache. Tile requests must be authorized by the same reachable-region lease rules as world content, so the browser cannot select arbitrary map coordinates. This tile contract and scheduler integration are not implemented yet.
+
 ## Initial arrival pose
 
 Set optional top-level `spawn` in `world-source.json` before publishing:
