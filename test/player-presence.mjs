@@ -36,8 +36,10 @@ for (const appearance of [{ ...DEFAULT_APPEARANCE, style: 'url' }, { ...DEFAULT_
 assert.throws(() => validatePresencePose({ ...pose(1), position: [Infinity, 0, 0] }));
 assert.throws(() => validatePresencePose({ ...pose(1), pitch: 2 }));
 assert.throws(() => validatePresencePose({ ...pose(1), mode: 'boat' }), /Invalid presence vehicle identity or speed/, 'vehicle presence requires type and speed in protocol v3');
-assert.throws(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/2' }), /Invalid presence sequence or protocol/, 'unsupported previous presence protocol versions are rejected');
+assert.throws(() => validatePresencePose({ ...pose(1), protocol: 'elsemesh.player-presence/3' }), /Invalid presence sequence or protocol/, 'previous presence protocol versions are rejected');
 assert.throws(() => validatePresencePose({ ...pose(1), avatarProfileId: 'elsemesh.avatar.stock-female/1' }), /Invalid presence avatar profile/, 'avatar profile ID must match its validated appearance style');
+assert.throws(() => validatePresencePose({ ...pose(1), avatarOptionId: 'Invalid Option' }), /Invalid presence avatar option/);
+assert.throws(() => validatePresencePose({ ...pose(1), entryPointId: 'Invalid Entry' }), /Invalid presence entry point/);
 let key, value;
 const storage = { setItem(k, v) { key = k; value = v; }, getItem() { return value; } };
 assert.equal(saveAppearance(DEFAULT_APPEARANCE, storage), true);

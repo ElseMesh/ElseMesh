@@ -1,7 +1,7 @@
 import { avatarProfileId, validateAppearance } from '../player/AvatarAppearance.js';
 import { isWorldID } from './WorldIdentity.js';
 
-export const PLAYER_PRESENCE_PROTOCOL = 'elsemesh.player-presence/3';
+export const PLAYER_PRESENCE_PROTOCOL = 'elsemesh.player-presence/4';
 const playerID = /^player:[0-9a-f]{64}$/;
 export function validatePresencePose(pose) {
 	if (!pose || pose.protocol !== PLAYER_PRESENCE_PROTOCOL || !Number.isSafeInteger(pose.sequence) || pose.sequence < 0) throw new Error('Invalid presence sequence or protocol');
@@ -12,6 +12,8 @@ export function validatePresencePose(pose) {
 	} else if ( pose.vehicleSpeed !== undefined || pose.vehicleType !== undefined ) throw new Error( 'Unexpected presence vehicle identity' );
 	validateAppearance(pose.appearance);
 	if ( pose.avatarProfileId !== avatarProfileId( pose.appearance ) ) throw new Error( 'Invalid presence avatar profile' );
+	if ( pose.avatarOptionId !== undefined && ( typeof pose.avatarOptionId !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}$/.test( pose.avatarOptionId ) ) ) throw new Error( 'Invalid presence avatar option' );
+	if ( pose.entryPointId !== undefined && ( typeof pose.entryPointId !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}$/.test( pose.entryPointId ) ) ) throw new Error( 'Invalid presence entry point' );
 	return pose;
 }
 

@@ -337,6 +337,45 @@ func TestPresenceEnforcesSignedAvatarAllowlist(t *testing.T) {
 	}
 }
 
+func TestPresenceEnforcesWorldAvatarAndEntrySelection(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-male/1", "elsemesh.avatar.stock-female/1"}}
+	shirt := "#8b1c2b"
+	trousers := "#3e2434"
+	d.world.AvatarOptions = []worldAvatarOption{{ID: "gryffindor", ProfileID: "elsemesh.avatar.stock-female/1", Label: "Gryffindor uniform", Palette: &worldAvatarPalette{Shirt: &shirt}}}
+	d.world.EntryPoints = []worldEntryPoint{{ID: "gryffindor-start", Label: "Gryffindor", Position: []float64{1, 2, 3}, AvatarOptionID: "gryffindor", Uniform: &worldUniform{Shirt: shirt, Trousers: trousers}}}
+
+	pose := presenceTestPose()
+	pose.AvatarProfileID = "elsemesh.avatar.stock-female/1"
+	pose.AvatarOptionID = "gryffindor"
+	pose.EntryPointID = "gryffindor-start"
+	pose.Appearance = avatarAppearance{Style: "female", Shirt: shirt, Trousers: trousers, Skin: "#c68c67", Hair: "#33251c"}
+	if err := d.validatePresenceAdmission(pose); err != nil {
+		t.Fatalf("world-authored avatar choice was rejected: %v", err)
+	}
+
+	missingOption := *pose
+	missingOption.AvatarOptionID = ""
+	if err := d.validatePresenceAdmission(&missingOption); err == nil || err.Error() != "avatar_option_required" {
+		t.Fatalf("visitor without the signed avatar option was accepted: %v", err)
+	}
+	wrongPalette := *pose
+	wrongPalette.Appearance.Shirt = "#ffffff"
+	if err := d.validatePresenceAdmission(&wrongPalette); err == nil || err.Error() != "avatar_option_palette_mismatch" {
+		t.Fatalf("visitor-selected shirt override bypassed the signed avatar palette: %v", err)
+	}
+	wrongEntry := *pose
+	wrongEntry.EntryPointID = "unknown-start"
+	if err := d.validatePresenceAdmission(&wrongEntry); err == nil || err.Error() != "entry_point_required" {
+		t.Fatalf("unknown world entry point was accepted: %v", err)
+	}
+	wrongUniform := *pose
+	wrongUniform.Appearance.Trousers = "#ffffff"
+	if err := d.validatePresenceAdmission(&wrongUniform); err == nil || err.Error() != "entry_point_uniform_mismatch" {
+		t.Fatalf("visitor-selected trousers bypassed the signed entry uniform: %v", err)
+	}
+}
+
 func TestPresenceEnforcesWorldVisitorLimit(t *testing.T) {
 	d := presenceTestDaemon(t)
 	d.world.Rules.MaxVisitors = 1

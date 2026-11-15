@@ -213,10 +213,12 @@ owner resynchronization, and read-only portal traversal are future behavior.
 
 ## Current presence limits and checks
 
-The presence protocol is `elsemesh.player-presence/3`; other protocol versions
+The presence protocol is `elsemesh.player-presence/4`; other protocol versions
 are rejected. A pose includes monotonic per-session sequence, bounded
-position/orientation, mode, avatar profile identity, appearance and optional
-vehicle type and speed. Position is
+position/orientation, mode, avatar profile identity, appearance, optional
+world-authored entry and avatar-option IDs, and optional vehicle type and
+speed. The owner validates the selected IDs and palette against its signed
+manifest and keeps that selection fixed for the presence session. Position is
 limited to ±100,000 m; yaw to ±1,000 radians; pitch to ±1.5 radians. Appearance
 is selected from built-in male/female styles and four hex colors; no arbitrary
 URLs, shaders, or executable code are accepted.

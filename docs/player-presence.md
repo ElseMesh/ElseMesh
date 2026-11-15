@@ -38,20 +38,27 @@ for the normal ghost-and-expiry grace period. A new transport session gets a new
 
 An update request contains `type: "presence.update"` and `pose`:
 
+Protocol `/4` carries the selected world entry and avatar option when the signed
+manifest defines them. The owner checks that the option, avatar profile, and
+world-authored uniform palette match, and rejects changing the entry or option
+after admission.
+
 ```json
 {
-  "protocol": "elsemesh.player-presence/3",
+  "protocol": "elsemesh.player-presence/4",
   "sequence": 1,
   "position": [1, 2, 3],
   "yaw": 0.3,
   "pitch": -0.2,
   "moving": false,
   "mode": "walk",
-  "avatarProfileId": "elsemesh.avatar.stock-male/1",
+  "avatarProfileId": "elsemesh.avatar.stock-female/1",
+  "entryPointId": "great-hall",
+  "avatarOptionId": "gryffindor-uniform",
   "appearance": {
-    "style": "male",
-    "shirt": "#7194aa",
-    "trousers": "#27313d",
+    "style": "female",
+    "shirt": "#8b1c2b",
+    "trousers": "#3e2434",
     "skin": "#c68c67",
     "hair": "#33251c"
   }

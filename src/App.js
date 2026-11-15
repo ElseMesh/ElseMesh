@@ -706,7 +706,7 @@ export class App {
 				if ( ! connector.localOnly ) {
 					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 					if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance } );
+					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
 					const admitted = await admissionSession.admit( this.player, candidates );
 					this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 					this.camera.position.copy( this.player.camera.position );
@@ -943,7 +943,7 @@ export class App {
 		if ( ! connector.localOnly ) {
 			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance } );
+			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
 			const admitted = await admissionSession.admit( this.player, candidates );
 			this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 			this.camera.position.copy( this.player.camera.position );
@@ -2105,7 +2105,7 @@ export class App {
 		this.holdPlayerAtPortal( previous );
 		const arrivalPlayer = { ...this.player, position: new Vector3( arrival.position.x, arrival.position.y - 1.62, arrival.position.z ), yaw: arrival.yaw, pitch: arrival.pitch };
 		const arrivalAppearance = admittedAppearance || selectedWorldEntryAppearance( entrySelection, destinationConnector.manifest );
-		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot, appearance: arrivalAppearance } );
+		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot, appearance: arrivalAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
 		try {
 			await admissionSession.admit( arrivalPlayer, undefined, { yaw: arrival.yaw } );
 		} catch ( error ) {

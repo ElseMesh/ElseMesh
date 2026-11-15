@@ -52,6 +52,18 @@ assert.equal(restrictedSession.appearance.hair,houseUniform.hair,'profile substi
 assert.equal(restrictedSession.appearanceSubstituted,true,'the session exposes when the world profile policy changed the saved preference');
 assert.equal(makePresencePose(player,0,restrictedSession.appearance).avatarProfileId,'elsemesh.avatar.stock-female/1','initial presence carries the world-allowed profile with the selected house uniform');
 restrictedSession.dispose();
+const houseManifest = { ...connector.manifest,
+ rules: { ...connector.manifest.rules, avatarPolicy: { allowedProfiles: ['elsemesh.avatar.stock-female/1'] } },
+ avatarOptions: [{ id: 'gryffindor', profileId: 'elsemesh.avatar.stock-female/1', label: 'Gryffindor uniform', palette: { shirt: '#8b1c2b' } }],
+ entryPoints: [{ id: 'gryffindor-start', label: 'Gryffindor', position: [1, 2, 3], yaw: 0, avatarOptionId: 'gryffindor', uniform: { shirt: '#8b1c2b', trousers: '#3e2434' } }],
+};
+const houseWorld = { ...connector, manifest: houseManifest };
+const houseSession = new WorldPresenceSession({ connector: houseWorld, parent: { add() {} }, appearance: { ...houseUniform, style: 'female' }, avatarOptionId: 'gryffindor', entryPointId: 'gryffindor-start', createConnector() { return { close() {} }; } });
+const housePose = makePresencePose(player, 0, houseSession.appearance, undefined, { avatarOptionId: houseSession.avatarOptionId, entryPointId: houseSession.entryPointId });
+assert.equal(housePose.avatarOptionId, 'gryffindor', 'presence carries the world-authored avatar option selected at entry');
+assert.equal(housePose.entryPointId, 'gryffindor-start', 'presence carries the world-authored entry point selected by the visitor');
+assert.throws(() => new WorldPresenceSession({ connector: houseWorld, parent: { add() {} }, appearance: { ...houseUniform, style: 'female' }, avatarOptionId: 'gryffindor', entryPointId: 'wrong-entry', createConnector() { throw new Error('must reject a mismatched entry before transport setup'); } }), /selected world entry point/);
+houseSession.dispose();
 assert.throws(()=>new WorldPresenceSession({connector:{...connector,manifest:{...connector.manifest,rules:{...connector.manifest.rules,
  avatarPolicy:{allowedProfiles:[]}}}},parent:{add(){}},appearance:houseUniform,createConnector(){throw new Error('must reject before creating a transport')}}),
  /does not permit any supported avatar profile/,'an empty world avatar profile policy rejects admission before transport setup');

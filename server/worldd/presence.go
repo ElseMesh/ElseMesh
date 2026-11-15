@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const playerPresenceProtocol = "elsemesh.player-presence/3"
+const playerPresenceProtocol = "elsemesh.player-presence/4"
 const maxPresencePlayers = 128
 const maxSpawnCandidates = 1024
 const presenceGhostAfter = 10 * time.Second
@@ -49,6 +49,8 @@ type playerPose struct {
 	Moving          bool             `json:"moving"`
 	Mode            string           `json:"mode"`
 	AvatarProfileID string           `json:"avatarProfileId"`
+	AvatarOptionID  string           `json:"avatarOptionId,omitempty"`
+	EntryPointID    string           `json:"entryPointId,omitempty"`
 	VehicleType     string           `json:"vehicleType,omitempty"`
 	VehicleSpeed    *float64         `json:"vehicleSpeed,omitempty"`
 	Appearance      avatarAppearance `json:"appearance"`
@@ -106,6 +108,12 @@ func validatePlayerPose(p *playerPose) error {
 	if !avatarProfilePattern.MatchString(p.AvatarProfileID) || p.AvatarProfileID != expectedProfile {
 		return errors.New("invalid_avatar_profile")
 	}
+	if p.AvatarOptionID != "" && !entryPointIDPattern.MatchString(p.AvatarOptionID) {
+		return errors.New("invalid_avatar_option")
+	}
+	if p.EntryPointID != "" && !entryPointIDPattern.MatchString(p.EntryPointID) {
+		return errors.New("invalid_entry_point")
+	}
 	for _, color := range []string{p.Appearance.Shirt, p.Appearance.Trousers, p.Appearance.Skin, p.Appearance.Hair} {
 		if !presenceColorPattern.MatchString(color) {
 			return errors.New("invalid_avatar_color")
@@ -126,6 +134,9 @@ func (d *daemon) validatePresenceAdmission(p *playerPose) error {
 		if !allowed {
 			return errors.New("avatar_not_allowed")
 		}
+	}
+	if err := d.validatePresenceAvatarSelection(p); err != nil {
+		return err
 	}
 	if p.Mode != "boat" && p.Mode != "deck" {
 		return nil
@@ -158,6 +169,56 @@ func (d *daemon) validatePresenceAdmission(p *playerPose) error {
 	}
 	if uint64(d.world.Rules.AvatarComplexity)+uint64(vehicleComplexity) > uint64(*policy.MaxCombinedComplexity) {
 		return errors.New("vehicle_complexity_exceeded")
+	}
+	return nil
+}
+
+func (d *daemon) validatePresenceAvatarSelection(p *playerPose) error {
+	var selected *worldAvatarOption
+	for i := range d.world.AvatarOptions {
+		option := &d.world.AvatarOptions[i]
+		if option.ID == p.AvatarOptionID {
+			selected = option
+			break
+		}
+	}
+	if len(d.world.AvatarOptions) > 0 && selected == nil {
+		return errors.New("avatar_option_required")
+	}
+	if p.AvatarOptionID != "" && selected == nil {
+		return errors.New("avatar_option_unknown")
+	}
+	if selected != nil {
+		if selected.ProfileID != p.AvatarProfileID {
+			return errors.New("avatar_option_profile_mismatch")
+		}
+		if palette := selected.Palette; palette != nil {
+			if palette.Shirt != nil && *palette.Shirt != p.Appearance.Shirt || palette.Trousers != nil && *palette.Trousers != p.Appearance.Trousers {
+				return errors.New("avatar_option_palette_mismatch")
+			}
+		}
+	}
+	var entry *worldEntryPoint
+	for i := range d.world.EntryPoints {
+		candidate := &d.world.EntryPoints[i]
+		if candidate.ID == p.EntryPointID {
+			entry = candidate
+			break
+		}
+	}
+	if len(d.world.EntryPoints) > 0 && entry == nil {
+		return errors.New("entry_point_required")
+	}
+	if p.EntryPointID != "" && entry == nil {
+		return errors.New("entry_point_unknown")
+	}
+	if entry != nil {
+		if entry.AvatarOptionID != p.AvatarOptionID {
+			return errors.New("entry_point_avatar_option_mismatch")
+		}
+		if entry.Uniform != nil && (entry.Uniform.Shirt != p.Appearance.Shirt || entry.Uniform.Trousers != p.Appearance.Trousers) {
+			return errors.New("entry_point_uniform_mismatch")
+		}
 	}
 	return nil
 }
@@ -258,6 +319,9 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		old, exists := d.players[request.presenceKey]
 		if exists && request.Pose.Sequence <= old.Sequence {
 			return peerResponse{}, errors.New("stale_presence_sequence")
+		}
+		if exists && (request.Pose.AvatarOptionID != old.AvatarOptionID || request.Pose.EntryPointID != old.EntryPointID) {
+			return peerResponse{}, errors.New("presence_avatar_selection_changed")
 		}
 		active := 0
 		for _, visitor := range d.players {

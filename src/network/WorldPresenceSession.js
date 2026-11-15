@@ -5,7 +5,7 @@ import { RemoteAvatar } from '../player/RemoteAvatar.js';
 import { worldComponentDescriptor } from './WorldComponentRegistry.js';
 import { avatarPolicy } from './WorldRules.js';
 
-export function makePresencePose(player, sequence, appearance, vehicleType = player.vehicleType) {
+export function makePresencePose(player, sequence, appearance, vehicleType = player.vehicleType, { avatarOptionId = '', entryPointId = '' } = {}) {
  const boat = player.mode === 'boat' ? player.boat : null;
  const vehicle = player.mode === 'boat' || player.mode === 'deck';
  if ( vehicle && ( typeof vehicleType !== 'string' || ! vehicleType ) ) throw new Error( 'Vehicle presence requires a registered vehicle type' );
@@ -18,6 +18,7 @@ export function makePresencePose(player, sequence, appearance, vehicleType = pla
   pitch: boat ? player.helmPitch || 0 : player.pitch,
   moving: player.mode !== 'boat' && (velocity?.lengthSq() || 0) > 0.12,
   mode: player.mode, appearance: {...appearance}, avatarProfileId: avatarProfileId( appearance ),
+  ...( avatarOptionId ? { avatarOptionId } : {} ), ...( entryPointId ? { entryPointId } : {} ),
   ...(vehicle ? { vehicleType, vehicleSpeed: player.boat?.speed ?? 0 } : {}),
  };
 }
@@ -25,17 +26,28 @@ export function makePresencePose(player, sequence, appearance, vehicleType = pla
 // Entry admission is the first operation that registers a visitor. Asset loading
 // and portal previews never publish a visitor into a destination.
 export class WorldPresenceSession {
- constructor({connector, parent, appearance = loadAppearance(),
+ constructor({connector, parent, appearance = loadAppearance(), avatarOptionId = '', entryPointId = '',
   createConnector = options => new WorldConnector(options),
   createAvatar = options => new RemoteAvatar(options),
   onError = error => console.warn('Player presence unavailable', error), clock = () => performance.now()}) {
   const allowedProfiles = avatarPolicy(connector.manifest.rules).allowedProfiles;
   const admittedAppearance = appearanceForAllowedProfiles(appearance, allowedProfiles);
   if ( ! admittedAppearance ) throw new Error( 'This world does not permit any supported avatar profile' );
+  const entryPoint = entryPointId && connector.manifest.entryPoints?.find( value => value.id === entryPointId );
+  if ( connector.manifest.entryPoints?.length && ! entryPoint ) throw new Error( 'World presence requires the selected world entry point' );
+  if ( entryPoint && ( entryPoint.avatarOptionId || '' ) !== avatarOptionId ) throw new Error( 'Selected avatar option does not match the world entry point' );
+  const avatarOption = avatarOptionId && connector.manifest.avatarOptions?.find( value => value.id === avatarOptionId );
+  if ( connector.manifest.avatarOptions?.length && ! avatarOption ) throw new Error( 'World presence requires a world-authored avatar option' );
+  if ( avatarOption && avatarOption.profileId !== avatarProfileId( admittedAppearance ) ) throw new Error( 'Selected avatar option does not match the admitted avatar profile' );
+  for ( const [ field, color ] of Object.entries( { ...avatarOption?.palette, ...entryPoint?.uniform } ) ) {
+   if ( admittedAppearance[ field ] !== color ) throw new Error( 'Selected avatar appearance does not match the world-authored palette' );
+  }
   this.connector = createConnector({worldId: connector.worldId,
    nodeId: connector.manifest.ownerPeerId, gateway: connector.gateway, directory: connector.directory});
   this.parent = parent;
   this.appearance = {...admittedAppearance};
+  this.avatarOptionId = avatarOptionId;
+  this.entryPointId = entryPointId;
   this.appearanceSubstituted = avatarProfileId(appearance) !== avatarProfileId(admittedAppearance);
   this.vehicleType = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true )?.type || null;
   this.maxComplexity = connector.manifest.rules.avatarComplexity;
@@ -54,7 +66,7 @@ export class WorldPresenceSession {
  }
  async admit(player, spawnCandidates, {yaw = null} = {}) {
   if (this.disposed || this.admitted || spawnCandidates !== undefined && (!Array.isArray(spawnCandidates) || !spawnCandidates.length)) throw new Error('Invalid world presence admission');
-  const pose = makePresencePose(player, this.sequence, this.appearance, this.vehicleType);
+  const pose = makePresencePose(player, this.sequence, this.appearance, this.vehicleType, { avatarOptionId: this.avatarOptionId, entryPointId: this.entryPointId });
   if (Number.isFinite(yaw)) pose.yaw = yaw;
   return this.admitPose(pose, spawnCandidates);
  }
@@ -88,7 +100,7 @@ export class WorldPresenceSession {
   }
   if (this.pending || now < this.nextSend) return;
   this.nextSend = now + 100;
-  const pose = makePresencePose(player, ++this.sequence, this.appearance, this.vehicleType);
+  const pose = makePresencePose(player, ++this.sequence, this.appearance, this.vehicleType, { avatarOptionId: this.avatarOptionId, entryPointId: this.entryPointId });
   this.pending = this.connector.updatePresence(pose,{signal:this.controller.signal})
    .then(snapshot => {
     if (this.disposed) return;
