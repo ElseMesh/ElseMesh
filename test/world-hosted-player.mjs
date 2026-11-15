@@ -50,6 +50,22 @@ assert.ok( camera.position.z < -1, 'camera follows the hosted player' );
 assert.ok( Math.abs( player.velocity.z + 1.5 ) < 0.01, 'hosted walk speed follows the signed world rule' );
 assert.ok( capsuleCalls.some( capsule => capsule.radius === 0.42 && capsule.height === 1.76 ), 'hosted movement uses the world-authored player capsule' );
 
+// A blocked axis must not cancel a clear tangent segment of diagonal movement.
+const gatedPlayer = Object.assign( Object.create( Player.prototype ), {
+	camera: { position: new Vector3(), quaternion: new Quaternion() },
+	input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 1, y: 1, sprint: 0 } ), down: () => false, hit: () => false },
+	colliders: new Colliders(), terrain: { heightAt: () => 0 }, position: new Vector3(), velocity: new Vector3(),
+	_previousPosition: new Vector3(), playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
+	worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
+	yaw: 0, pitch: 0, grounded: true, gravity: 9.81, hostedSeaLevel: null,
+	hostedCollisionGuard: ( from, to ) => from.x === to.x,
+} );
+Player.prototype.setHostedWorldPose.call( gatedPlayer, new Vector3( 0, 1.62, 0 ), 0, 0 );
+gatedPlayer.grounded = true;
+Player.prototype.updateHostedWorld.call( gatedPlayer, 1 / 60 );
+assert.equal( gatedPlayer.position.x, 0, 'the collision gate still rejects movement into its blocked axis' );
+assert.ok( gatedPlayer.position.z < 0, 'the collision gate permits clear tangent movement during diagonal input' );
+
 // Signed world terrain is a ground surface even when the package has no object
 // collider at the player's position (for example, open beach sand).
 const terrainGroundPlayer = Object.assign( Object.create( Player.prototype ), {
