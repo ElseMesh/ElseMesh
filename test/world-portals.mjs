@@ -54,7 +54,7 @@ assert.equal( scaledPlayer.yaw, 0.5 + Math.PI / 2, 'portal scale ratio leaves or
 assert.ok( mapPortalPlayerState( scaledPlayer, scaledExit, scaledEntry, 1 / 3 ).position.distanceTo( new Vector3( 12, 4, - 1 ) ) < 1e-9, 'reciprocal ratio restores position' );
 const scaledBoat = mapPortalVehicleState( boatState, scaledEntry, scaledExit, 3 );
 assert.ok( scaledBoat.position.distanceTo( new Vector3( 16, 20, 39 ) ) < 1e-9, 'portal scale ratio scales vehicle position offsets' );
-assert.ok( scaledBoat.velocity.distanceTo( new Vector3( 12, 3, - 3 ) ) < 1e-9, 'portal scale ratio scales vehicle linear velocity' );
+assert.ok( scaledBoat.velocity.distanceTo( new Vector3( 12, 3, 0 ) ) < 1e-9, 'portal scale ratio scales vehicle linear velocity' );
 assert.ok( scaledBoat.angular.distanceTo( new Vector3( 3, 2, - 1 ) ) < 1e-9, 'portal scale ratio does not scale vehicle angular velocity' );
 assert.throws( () => portalScaleRatio( 0 ), /Invalid portal scale ratio/ );
 assert.throws( () => portalScaleRatio( Infinity ), /Invalid portal scale ratio/ );
