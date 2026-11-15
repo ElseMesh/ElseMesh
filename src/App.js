@@ -91,6 +91,11 @@ const _navigationForward = new Vector3();
 const GRAPHICS_PRIORITY_KEY = 'elsemesh.graphics-priority';
 const _componentPriorityBounds = { transform: { position: [ 0, 0, 0 ] }, streamingBounds: null };
 
+function movementProfileSelection( manifest, appearance ) {
+	const vehicle = manifest?.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true );
+	return { avatarProfileId: avatarProfileId( appearance ), vehicleType: vehicle?.type ?? null };
+}
+
 function worldViewPriorityByAsset( objects, components, camera ) {
 	const priorities = new Map();
 	const add = ( assetIDs, fraction ) => {
@@ -590,6 +595,7 @@ export class App {
 		this.surface.wake = this.wake;
 		replaceWorldSourceCollisions( this.worldPackage.source, this.colliders );
 		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, query: this.query, boat: this.boatCtl, reef: this.reef, worldLayout: this.worldLayout } );
+		this.player.setWorldRules( this.worldPackage.source.rules, movementProfileSelection( this.worldPackage.source, loadAppearance() ) );
 		this.localPlayerEnvironment = { terrain: this.player.terrain, colliders: this.player.colliders, query: this.player.query, slot: this.player.slot, reef: this.player.reef, boat: this.player.boat, hostedSeaLevel: null };
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
 		this.wildlife = await this.worldPackage.presentation?.createWildlife?.( {
@@ -658,7 +664,8 @@ export class App {
 			const manifestResult = await this.worldManifestPromise;
 			if ( manifestResult.error ) throw manifestResult.error;
 			const entrySelection = await chooseWorldEntryPoint( connector.manifest );
-			this.player.setWorldRules( connector.manifest.rules );
+			const entryAppearance = selectedWorldEntryAppearance( entrySelection );
+			this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, entryAppearance ) );
 			G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
 			const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
 			this.camera.position.set( ...spawn.position );
@@ -701,7 +708,7 @@ export class App {
 				if ( ! connector.localOnly ) {
 					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 					if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
+					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance } );
 					const admitted = await admissionSession.admit( this.player, candidates );
 					this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 					this.camera.position.copy( this.player.camera.position );
@@ -849,8 +856,9 @@ export class App {
 		const connector = this.worldConnector;
 		G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
 		const entrySelection = await chooseWorldEntryPoint( connector.manifest );
+		const entryAppearance = selectedWorldEntryAppearance( entrySelection );
 		const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
-		this.player.setWorldRules( connector.manifest.rules );
+		this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, entryAppearance ) );
 		this.camera.position.set( ...spawn.position );
 		this.player.yaw = spawn.yaw;
 		this.player.pitch = spawn.pitch;
@@ -936,7 +944,7 @@ export class App {
 		if ( ! connector.localOnly ) {
 			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: selectedWorldEntryAppearance( entrySelection ) } );
+			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance } );
 			const admitted = await admissionSession.admit( this.player, candidates );
 			this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 			this.camera.position.copy( this.player.camera.position );
@@ -2108,7 +2116,7 @@ export class App {
 		registerWorldPackageCollisions( destinationRoot, this.hostedColliders );
 		this.scene.add( destinationRoot );
 		this.worldConnector = destinationConnector;
-		this.player.setWorldRules( destinationConnector.manifest.rules );
+		this.player.setWorldRules( destinationConnector.manifest.rules, movementProfileSelection( destinationConnector.manifest, arrivalAppearance ) );
 		G.seaLevel.value = worldSeaLevel( destinationConnector.manifest.rules ) ?? 0;
 		this.player.setHostedWorldPose( arrival.position, arrival.yaw, arrival.pitch );
 		this.activateHostedWorld( destinationRoot, destinationConnector, admissionSession );

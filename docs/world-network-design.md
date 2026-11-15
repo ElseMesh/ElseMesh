@@ -75,6 +75,15 @@ camera/view information; it does not authoritatively set position. World data
 defines permitted movement profiles, while the engine/server validates them;
 unknown speeds or collision do not grant extra movement.
 
+Automatic step-up is a movement capability selected from the active avatar or
+vehicle, not an engine-wide constant. World rules may declare bounded
+`movementProfiles.avatars` and `movementProfiles.vehicles` maps keyed by stable
+profile/type IDs. The engine uses the active avatar profile while walking and
+the active vehicle profile while aboard; a missing profile means zero
+automatic step-up. This keeps distinct bodies and vehicles from inheriting one
+another's traversal capability and gives the authoritative movement validator
+the same explicit contract.
+
 Authorize visual-region leases from the server's current accepted pose and
 bounded view, then include only visible regions and the minimal content
 dependencies needed to render them. Collision and safety-prefetch may cover

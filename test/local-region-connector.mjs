@@ -165,6 +165,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		entrySelection: {
 			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
 			playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
+			movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 } } },
 			entryPointPrompt: 'Which Hogwarts house will you join?',
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
 			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, visualComponentPathExclusionsByMap: previewVisualComponentPathExclusions },
@@ -383,6 +384,7 @@ try {
 	assert.deepEqual( manifest.entryPoints.map( entry => entry.id ), [ 'gryffindor', 'hufflepuff' ] );
 	assert.equal( manifest.rules.physicsProfile, 'default' );
 	assert.deepEqual( manifest.rules.playerCapsule, { radiusMeters: 0.42, heightMeters: 1.76 }, 'local region world-authored capsule dimensions reach the runtime rules' );
+	assert.equal( manifest.rules.movementProfiles.avatars[ 'elsemesh.avatar.stock-male/1' ].stepHeightMeters, 0.6, 'local region avatar step capability comes from world-authored entry metadata' );
 	assert.equal( 'seaLevel' in manifest.rules, false, 'local Hogwarts preview does not activate a default waterline' );
 	assert.equal( manifest.assets.length, 9, 'the complete Great Hall cell replaces its visual GLB with independently addressable mesh LOD assets' );
 	assert.equal( manifest.objects.length, 6, 'the instance-set cell has no duplicate whole-cell visual GLB object' );

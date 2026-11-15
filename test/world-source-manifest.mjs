@@ -26,6 +26,7 @@ try {
 	source.rules.requiredFeatures = [ 'elsemesh.static-glb/1' ];
 	source.rules.avatarPolicy = { allowedProfiles: [ 'elsemesh.avatar.stock-male/1' ] };
 	source.rules.vehiclePolicy = { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000, allowedCombinations: [ { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } ] };
+	source.rules.movementProfiles = { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.45 } }, vehicles: { 'elsemesh.downeast-boat/1': { stepHeightMeters: 0.3 } } };
 	source.experience = { ...GENERIC_WORLD_EXPERIENCE, behaviors: { 'elsemesh.fixture-world-behavior/1': { ownerData: true } } };
 	source.components = [ {
 		id: 'elsemesh-component:opaque-fixture',
@@ -55,8 +56,11 @@ try {
 	assert.doesNotThrow( () => validateWorldRequirements( manifest ) );
 	assert.deepEqual( manifest.rules.avatarPolicy, source.rules.avatarPolicy, 'avatar allowlist survives deterministic manifest conversion' );
 	assert.deepEqual( manifest.rules.vehiclePolicy, source.rules.vehiclePolicy, 'vehicle pair moderation survives deterministic manifest conversion' );
+	assert.deepEqual( manifest.rules.movementProfiles, source.rules.movementProfiles, 'avatar and vehicle step capabilities survive deterministic manifest conversion' );
 	assert.throws( () => validateWorldSource( { ...source, rules: { ...source.rules, avatarPolicy: { allowedProfiles: [ 'elsemesh.avatar.stock-male/1', 'elsemesh.avatar.stock-male/1' ] } } }, { allowUnregisteredBehaviors: true } ), /avatar policy/, 'source rejects duplicate avatar profile rules' );
 	assert.throws( () => validateWorldRequirements( { ...manifest, rules: { ...manifest.rules, vehiclePolicy: { ...manifest.rules.vehiclePolicy, allowedCombinations: [ ...manifest.rules.vehiclePolicy.allowedCombinations, ...manifest.rules.vehiclePolicy.allowedCombinations ] } } } ), /duplicate/, 'manifest rejects duplicate avatar and vehicle pairs' );
+	assert.throws( () => validateWorldRequirements( { ...manifest, rules: { ...manifest.rules, movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 1.6 } } } } } ), /movement profile/, 'manifest rejects excessive avatar step capability' );
+	assert.throws( () => validateWorldRequirements( { ...manifest, rules: { ...manifest.rules, movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.4, extra: true } } } } } ), /movement profile/, 'manifest rejects undeclared movement capability fields' );
 	assert.doesNotThrow( () => validateWorldComponents( manifest.components, manifest.rules, new Set(), manifest.assets, manifest.objects ) );
 	console.log( 'ok generic source-to-manifest conversion' );
 } finally {

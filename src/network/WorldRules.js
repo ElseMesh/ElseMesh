@@ -33,6 +33,7 @@ export function validateWorldRequirements( manifest ) {
 	validateWorldLevels( rules );
 	movementParameters( rules );
 	playerCapsuleParameters( rules );
+	movementProfileParameters( rules );
 	vehiclePolicy( rules );
 	avatarPolicy( rules );
 	validateVehicleComplexityContracts( manifest.components );
@@ -108,6 +109,24 @@ export function playerCapsuleParameters( rules ) {
 		throw new Error( 'World player capsule dimensions are outside the supported range' );
 	}
 	return { radiusMeters: capsule.radiusMeters, heightMeters: capsule.heightMeters };
+}
+
+// Step height is an authored capability of an avatar or vehicle profile. Missing
+// entries deliberately mean no automatic step-up; the engine invents no value.
+export function movementProfileParameters( rules ) {
+	const profiles = rules?.movementProfiles ?? {};
+	if ( ! profiles || typeof profiles !== 'object' || Array.isArray( profiles ) || Object.keys( profiles ).some( key => ! [ 'avatars', 'vehicles' ].includes( key ) ) ) throw new Error( 'World movement profiles are invalid' );
+	const result = { avatars: {}, vehicles: {} };
+	for ( const category of [ 'avatars', 'vehicles' ] ) {
+		const entries = profiles[ category ] ?? {};
+		const idPattern = category === 'avatars' ? AVATAR_PROFILE_ID : FEATURE_ID;
+		if ( ! entries || typeof entries !== 'object' || Array.isArray( entries ) || Object.keys( entries ).length > 128 ) throw new Error( `World ${category} movement profiles are invalid` );
+		for ( const [ id, profile ] of Object.entries( entries ) ) {
+			if ( ! idPattern.test( id ) || ! profile || typeof profile !== 'object' || Array.isArray( profile ) || Object.keys( profile ).length !== 1 || ! Object.hasOwn( profile, 'stepHeightMeters' ) || ! Number.isFinite( profile.stepHeightMeters ) || profile.stepHeightMeters < 0 || profile.stepHeightMeters > 1.5 ) throw new Error( `World ${category} movement profile is invalid` );
+			result[ category ][ id ] = { stepHeightMeters: profile.stepHeightMeters };
+		}
+	}
+	return result;
 }
 
 // Vehicle transfer is opt-in because a destination must explicitly accept the

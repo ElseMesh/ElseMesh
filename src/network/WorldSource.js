@@ -1,5 +1,5 @@
 import { validatePortalBack } from './PortalSideContract.js';
-import { MAX_WORLD_PACKAGE_BYTES, movementParameters, SUPPORTED_PHYSICS_PROFILES, validateWorldLevels, avatarPolicy, vehiclePolicy, visitorRules } from './WorldRules.js';
+import { MAX_WORLD_PACKAGE_BYTES, movementParameters, movementProfileParameters, SUPPORTED_PHYSICS_PROFILES, validateWorldLevels, avatarPolicy, vehiclePolicy, visitorRules } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
 import { WORLD_ID_PREFIX, isWorldID } from './WorldIdentity.js';
 
@@ -56,6 +56,7 @@ export function validateWorldSource( source, { allowUnregisteredBehaviors = fals
 	try { validateWorldLevels( source.rules ); } catch { throw new Error( 'Invalid world sea or atmosphere level' ); }
 	try { visitorRules( source.rules ); } catch { throw new Error( 'Invalid or missing world visitor limit or spawn radius' ); }
 	try { movementParameters( source.rules ); } catch { throw new Error( 'Invalid or unsupported world movement rules' ); }
+	try { movementProfileParameters( source.rules ); } catch { throw new Error( 'Invalid or unsupported world movement profiles' ); }
 	try { vehiclePolicy( source.rules ); } catch { throw new Error( 'Invalid or unsupported world vehicle policy' ); }
 	try { avatarPolicy( source.rules ); } catch { throw new Error( 'Invalid or unsupported world avatar policy' ); }
 	if ( source.rules.maxPackageBytes !== undefined && ( ! Number.isSafeInteger( source.rules.maxPackageBytes ) || source.rules.maxPackageBytes < 1 || source.rules.maxPackageBytes > MAX_WORLD_PACKAGE_BYTES ) ) throw new Error( 'Invalid world package byte budget' );

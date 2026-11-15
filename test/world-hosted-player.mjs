@@ -39,7 +39,22 @@ const player = {
 	yaw: 0, pitch: 0, grounded: false, gravity: 9.81,
 };
 Object.setPrototypeOf( player, Player.prototype );
-Player.prototype.setWorldRules.call( player, { gravity: 1, movement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 }, playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 } } );
+const movementRules = {
+	gravity: 1, movement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 }, playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
+	movementProfiles: {
+		avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 }, 'elsemesh.avatar.stock-female/1': { stepHeightMeters: 0.2 } },
+		vehicles: { 'elsemesh.downeast-boat/1': { stepHeightMeters: 0.36 } },
+	},
+};
+Player.prototype.setWorldRules.call( player, movementRules, { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } );
+assert.equal( player.avatarStepHeightMeters, 0.6, 'walking step capability follows the active avatar profile' );
+assert.equal( player.vehicleStepHeightMeters, 0.36, 'deck step capability follows the active vehicle profile' );
+Player.prototype.setWorldRules.call( player, movementRules, { avatarProfileId: 'elsemesh.avatar.stock-female/1', vehicleType: null } );
+assert.equal( player.avatarStepHeightMeters, 0.2, 'a different avatar can carry a different authored step capability' );
+assert.equal( player.vehicleStepHeightMeters, 0, 'a walking avatar does not inherit the vehicle step capability' );
+Player.prototype.setWorldRules.call( player, { gravity: 1 }, { avatarProfileId: 'elsemesh.avatar.stock-female/1', vehicleType: null } );
+assert.equal( player.avatarStepHeightMeters, 0, 'an omitted avatar capability fails closed to no automatic step-up' );
+Player.prototype.setWorldRules.call( player, movementRules, { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } );
 Player.prototype.setHostedWorldPose.call( player, new Vector3( 0, 1.62, 0 ), 0, 0 );
 assert.equal( player.position.y, 0 );
 for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( player, 1 / 60 );
@@ -66,7 +81,7 @@ Player.prototype.updateHostedWorld.call( gatedPlayer, 1 / 60 );
 assert.equal( gatedPlayer.position.x, 0, 'the collision gate still rejects movement into its blocked axis' );
 assert.ok( gatedPlayer.position.z < 0, 'the collision gate permits clear tangent movement during diagonal input' );
 
-function makeHostedStepPlayer( allowRise ) {
+function makeHostedStepPlayer( allowRise, avatarStepHeightMeters = 0.6 ) {
 	const stepColliders = new Colliders();
 	stepColliders.addBox( new Vector3( 0, - 0.25, 0 ), new Vector3( 2, 0.25, 2 ), 0, { walkable: true, solid: true } );
 	stepColliders.addBox( new Vector3( 0, 0.289, - 0.5 ), new Vector3( 1, 0.289, 0.5 ), 0, { walkable: true, solid: true } );
@@ -76,6 +91,7 @@ function makeHostedStepPlayer( allowRise ) {
 		input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 0, y: 1, sprint: 0 } ), down: () => false, hit: () => false },
 		colliders: stepColliders, terrain: { heightAt: () => 0 }, position: new Vector3(), velocity: new Vector3(),
 		_previousPosition: new Vector3(), playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
+		avatarStepHeightMeters,
 		worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
 		yaw: 0, pitch: 0, grounded: true, gravity: 9.81, hostedSeaLevel: null,
 		hostedCollisionGuard: ( from, to ) => {
@@ -96,6 +112,9 @@ assert.ok( stepPlayer.guardPaths.some( ( [ fromY, toY ] ) => toY > fromY ), 'hos
 const blockedStepPlayer = makeHostedStepPlayer( false );
 for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( blockedStepPlayer, 1 / 30 );
 assert.equal( blockedStepPlayer.position.y, 0, 'hosted movement does not step when the collision frontier rejects the rise' );
+const incapableAvatar = makeHostedStepPlayer( true, 0.2 );
+for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( incapableAvatar, 1 / 30 );
+assert.equal( incapableAvatar.position.y, 0, 'an avatar whose world profile is shorter than the riser cannot step onto it' );
 
 // Signed world terrain is a ground surface even when the package has no object
 // collider at the player's position (for example, open beach sand).

@@ -320,19 +320,20 @@ type hostingGrant struct {
 }
 
 type worldRules struct {
-	Gravity          float64        `json:"gravity"`
-	MaxVisitors      uint32         `json:"maxVisitors"`
-	SpawnRadius      float64        `json:"spawnRadius"`
-	SeaLevel         *float64       `json:"seaLevel,omitempty"`
-	AtmosphereLevel  *float64       `json:"atmosphereLevel,omitempty"`
-	AvatarComplexity uint32         `json:"avatarComplexity"`
-	PhysicsProfile   string         `json:"physicsProfile"`
-	Movement         *movementRules `json:"movement,omitempty"`
-	AvatarPolicy     *avatarPolicy  `json:"avatarPolicy,omitempty"`
-	VehiclePolicy    *vehiclePolicy `json:"vehiclePolicy,omitempty"`
-	MaxPackageBytes  *int64         `json:"maxPackageBytes,omitempty"`
-	StyleGuide       string         `json:"styleGuide,omitempty"`
-	RequiredFeatures []string       `json:"requiredFeatures,omitempty"`
+	Gravity          float64           `json:"gravity"`
+	MaxVisitors      uint32            `json:"maxVisitors"`
+	SpawnRadius      float64           `json:"spawnRadius"`
+	SeaLevel         *float64          `json:"seaLevel,omitempty"`
+	AtmosphereLevel  *float64          `json:"atmosphereLevel,omitempty"`
+	AvatarComplexity uint32            `json:"avatarComplexity"`
+	PhysicsProfile   string            `json:"physicsProfile"`
+	Movement         *movementRules    `json:"movement,omitempty"`
+	MovementProfiles *movementProfiles `json:"movementProfiles,omitempty"`
+	AvatarPolicy     *avatarPolicy     `json:"avatarPolicy,omitempty"`
+	VehiclePolicy    *vehiclePolicy    `json:"vehiclePolicy,omitempty"`
+	MaxPackageBytes  *int64            `json:"maxPackageBytes,omitempty"`
+	StyleGuide       string            `json:"styleGuide,omitempty"`
+	RequiredFeatures []string          `json:"requiredFeatures,omitempty"`
 }
 
 type vehiclePolicy struct {
@@ -418,6 +419,15 @@ type movementRules struct {
 	WalkSpeed   float64 `json:"walkSpeed"`
 	SprintSpeed float64 `json:"sprintSpeed"`
 	JumpSpeed   float64 `json:"jumpSpeed"`
+}
+
+type movementProfiles struct {
+	Avatars  map[string]movementProfile `json:"avatars,omitempty"`
+	Vehicles map[string]movementProfile `json:"vehicles,omitempty"`
+}
+
+type movementProfile struct {
+	StepHeightMeters float64 `json:"stepHeightMeters"`
 }
 
 type worldSpawn struct {
@@ -667,6 +677,21 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	if movement := manifest.Rules.Movement; movement != nil {
 		if math.IsNaN(movement.WalkSpeed) || math.IsInf(movement.WalkSpeed, 0) || movement.WalkSpeed < 0.5 || movement.WalkSpeed > 10 || math.IsNaN(movement.SprintSpeed) || math.IsInf(movement.SprintSpeed, 0) || movement.SprintSpeed < movement.WalkSpeed || movement.SprintSpeed > 15 || math.IsNaN(movement.JumpSpeed) || math.IsInf(movement.JumpSpeed, 0) || movement.JumpSpeed < 0 || movement.JumpSpeed > 10 {
 			return errors.New("world movement speeds are outside the supported range")
+		}
+	}
+	if profiles := manifest.Rules.MovementProfiles; profiles != nil {
+		if len(profiles.Avatars) > 128 || len(profiles.Vehicles) > 128 {
+			return errors.New("world has too many movement profiles")
+		}
+		for id, profile := range profiles.Avatars {
+			if len(id) > 96 || !avatarProfilePattern.MatchString(id) || math.IsNaN(profile.StepHeightMeters) || math.IsInf(profile.StepHeightMeters, 0) || profile.StepHeightMeters < 0 || profile.StepHeightMeters > 1.5 {
+				return errors.New("invalid avatar movement profile")
+			}
+		}
+		for id, profile := range profiles.Vehicles {
+			if len(id) > 96 || !vehicleTypePattern.MatchString(id) || math.IsNaN(profile.StepHeightMeters) || math.IsInf(profile.StepHeightMeters, 0) || profile.StepHeightMeters < 0 || profile.StepHeightMeters > 1.5 {
+				return errors.New("invalid vehicle movement profile")
+			}
 		}
 	}
 	if policy := manifest.Rules.AvatarPolicy; policy != nil {

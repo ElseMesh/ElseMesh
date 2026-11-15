@@ -4,7 +4,7 @@ import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
-import { playerCapsuleParameters } from './WorldRules.js';
+import { movementProfileParameters, playerCapsuleParameters } from './WorldRules.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './LocalRegionStaticModels.js';
 import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
@@ -240,6 +240,7 @@ export class LocalRegionConnector {
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
 		requireValue( Number.isFinite( previewRegion.maxViewDistanceMeters ) && previewRegion.maxViewDistanceMeters > 0 && previewRegion.maxViewDistanceMeters <= 10000, 'Local provider has no valid world-authored cell view distance' );
 		const playerCapsule = playerCapsuleParameters( { playerCapsule: selection.playerCapsule } );
+		const movementProfiles = movementProfileParameters( { movementProfiles: selection.movementProfiles } );
 		const startupCells = deriveStartupCells( selection.previewSpawn.position, previewRegion, playerCapsule );
 		if ( selection.previewSupport !== undefined ) {
 			const support = selection.previewSupport;
@@ -280,7 +281,7 @@ export class LocalRegionConnector {
 			protocol: 'elsemesh.world/3', worldId: this.worldId, title: descriptor.title ? `${descriptor.title} · ${region.label}` : region.label,
 			experience, ownerPeerId: '', authorityEpoch: 1, assets: [], objects: [], components: [], portals: [],
 			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.
-			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, playerCapsule },
+			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, playerCapsule, movementProfiles },
 			spawn,
 			entryPointActionLabel: selection.entryPointActionLabel,
 			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ) } ) ),

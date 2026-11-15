@@ -356,6 +356,39 @@
           },
           "additionalProperties": false
         },
+        "movementProfiles": {
+          "type": "object",
+          "properties": {
+            "avatars": {
+              "type": "object",
+              "maxProperties": 128,
+              "patternProperties": {
+                "^elsemesh\\.avatar\\.[a-z0-9.-]+/\\d+$": {
+                  "type": "object",
+                  "required": [ "stepHeightMeters" ],
+                  "properties": { "stepHeightMeters": { "type": "number", "minimum": 0, "maximum": 1.5 } },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "vehicles": {
+              "type": "object",
+              "maxProperties": 128,
+              "patternProperties": {
+                "^elsemesh\\.[a-z0-9.-]+/\\d+$": {
+                  "type": "object",
+                  "required": [ "stepHeightMeters" ],
+                  "properties": { "stepHeightMeters": { "type": "number", "minimum": 0, "maximum": 1.5 } },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "description": "Optional step-up capabilities keyed by stable avatar profile or vehicle type ID. Missing entries grant no automatic step-up."
+        },
         "vehiclePolicy": {
           "type": "object",
           "required": [

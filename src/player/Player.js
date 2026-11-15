@@ -1,5 +1,5 @@
 import * as THREE from '../engine/math/index.js';
-import { gravityAcceleration, movementParameters, playerCapsuleParameters } from '../network/WorldRules.js';
+import { gravityAcceleration, movementParameters, movementProfileParameters, playerCapsuleParameters } from '../network/WorldRules.js';
 import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
 
 const DEFAULT_HELM = { x: 0, z: 0 };
@@ -9,11 +9,6 @@ const SWIM_EYE = EYE * 0.1; // eyes above the body's float point while swimming
 // water depth (mean level over the feet) where you start swimming / find your feet again
 const SWIM_DEPTH = 1.35;
 const STAND_DEPTH = 1.1;
-// The Great Hall's measured floor-end collision rises 0.578 m above the aisle.
-// This threshold includes 2.2 cm for collider sampling; it is not a claim about
-// Unreal's native MaxStepHeight.
-const PLAYER_STEP_HEIGHT_METERS = 0.6;
-
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
@@ -34,7 +29,6 @@ const _boatInvQ = new THREE.Quaternion();
 const _boatRelativeVelocity = new THREE.Vector3();
 // walking on the boat
 const DECK_RADIUS = 0.24;
-const DECK_STEP = 0.36; // highest ledge you step up onto
 const HELM_REACH = 0.75; // m from the helm seat to take the wheel
 
 // First-person walker / swimmer / boat captain.
@@ -85,6 +79,9 @@ export class Player {
 		this._previousPosition = new THREE.Vector3();
 		this.worldMovement = movementParameters( null );
 		this.playerCapsule = playerCapsuleParameters( null );
+		this.avatarProfileId = 'elsemesh.avatar.stock-male/1';
+		this.vehicleType = null;
+		this.movementProfiles = movementProfileParameters( null );
 		this.hostedCollisionGuard = null;
 
 		// boat cameras
@@ -109,10 +106,15 @@ export class Player {
 
 	}
 
-	setWorldRules( rules ) {
+	setWorldRules( rules, { avatarProfileId = this.avatarProfileId, vehicleType = this.vehicleType } = {} ) {
 		this.gravity = gravityAcceleration( rules );
 		this.worldMovement = movementParameters( rules );
 		this.playerCapsule = playerCapsuleParameters( rules );
+		this.movementProfiles = movementProfileParameters( rules );
+		this.avatarProfileId = avatarProfileId;
+		this.vehicleType = vehicleType;
+		this.avatarStepHeightMeters = this.movementProfiles.avatars[ avatarProfileId ]?.stepHeightMeters ?? 0;
+		this.vehicleStepHeightMeters = this.movementProfiles.vehicles[ vehicleType ]?.stepHeightMeters ?? 0;
 	}
 
 	setHostedWorldPose( eyePosition, yaw = this.yaw, pitch = this.pitch ) {
@@ -179,7 +181,7 @@ export class Player {
 			this.position.copy( _hostedTarget );
 		}
 		if ( wasGrounded && this.velocity.y <= 0 && this.colliders?.stepCapsuleToSurface ) {
-			const stepY = this.colliders.stepCapsuleToSurface( this.position, this._previousPosition, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
+			const stepY = this.colliders.stepCapsuleToSurface( this.position, this._previousPosition, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarStepHeightMeters ?? 0 );
 			if ( Number.isFinite( stepY ) ) {
 				_hostedStepStart.copy( this._previousPosition );
 				_hostedStepStart.y = stepY;
@@ -352,7 +354,7 @@ export class Player {
 		const wasGrounded = this.grounded;
 		p.addScaledVector( this.velocity, dt );
 		if ( wasGrounded && this.velocity.y <= 0 && this.colliders?.stepCapsuleToSurface ) {
-			const stepY = this.colliders.stepCapsuleToSurface( p, old, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
+			const stepY = this.colliders.stepCapsuleToSurface( p, old, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarStepHeightMeters ?? 0 );
 			if ( Number.isFinite( stepY ) ) {
 				p.y = stepY;
 				this.velocity.y = 0;
@@ -819,7 +821,7 @@ export class Player {
 
 			if ( ! c.solid ) continue;
 			const top = c.center.y + c.half.y, bot = c.center.y - c.half.y;
-			if ( top <= p.y + DECK_STEP || bot >= p.y + this.playerCapsule.heightMeters ) continue;
+			if ( top <= p.y + ( this.vehicleStepHeightMeters ?? 0 ) || bot >= p.y + this.playerCapsule.heightMeters ) continue;
 			const ex = c.half.x + DECK_RADIUS, ez = c.half.z + DECK_RADIUS;
 			const dx = p.x - c.center.x, dz = p.z - c.center.z;
 			if ( Math.abs( dx ) >= ex || Math.abs( dz ) >= ez ) continue;
@@ -834,7 +836,7 @@ export class Player {
 		const halfIn = Math.max( 0.15, L.halfBreadth( L.tAtSheerZ( p.z ), Math.max( p.y, L.deckY ) ) - L.shell - DECK_RADIUS );
 		p.x = THREE.MathUtils.clamp( p.x, - halfIn, halfIn );
 
-		const g = this.deckGroundAt( p.x, p.z, p.y + DECK_STEP );
+		const g = this.deckGroundAt( p.x, p.z, p.y + ( this.vehicleStepHeightMeters ?? 0 ) );
 		if ( p.y <= g ) {
 
 			p.y = g;
