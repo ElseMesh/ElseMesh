@@ -130,15 +130,8 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	if sourceRules["maxVisitors"] == nil || sourceRules["spawnRadius"] == nil {
 		return signedDocument{}, errors.New("world-source.json must define maxVisitors and spawnRadius")
 	}
-	allowedRuleFields := map[string]bool{
-		"gravity": true, "seaLevel": true, "atmosphereLevel": true, "avatarComplexity": true,
-		"physicsProfile": true, "maxVisitors": true, "spawnRadius": true, "movement": true, "avatarPolicy": true, "vehiclePolicy": true, "maxPackageBytes": true,
-		"requiredFeatures": true,
-	}
-	for field := range sourceRules {
-		if !allowedRuleFields[field] {
-			return signedDocument{}, fmt.Errorf("unsupported world rule %q", field)
-		}
+	if err := validateWorldSourceRuleFields(sourceRules); err != nil {
+		return signedDocument{}, err
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(raw)))
 	decoder.DisallowUnknownFields()
@@ -252,6 +245,20 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	}
 	log.Printf("Prepared signed world manifest for %s (%s)", source.Title, source.WorldID)
 	return document, nil
+}
+
+func validateWorldSourceRuleFields(fields map[string]json.RawMessage) error {
+	allowed := map[string]bool{
+		"gravity": true, "seaLevel": true, "atmosphereLevel": true, "avatarComplexity": true,
+		"physicsProfile": true, "maxVisitors": true, "spawnRadius": true, "movement": true, "movementProfiles": true, "avatarPolicy": true, "vehiclePolicy": true, "maxPackageBytes": true,
+		"requiredFeatures": true,
+	}
+	for field := range fields {
+		if !allowed[field] {
+			return fmt.Errorf("unsupported world rule %q", field)
+		}
+	}
+	return nil
 }
 
 func worldSourceAssets(directory string, source worldSourceDocument) ([]assetRef, error) {
