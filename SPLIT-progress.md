@@ -119,7 +119,9 @@ WebGPU visual parity remain incomplete.
   its graph covers basic material color/roughness/transmission but omits source
   bark relief, full frond variation, wind deformation, and shadow behavior.
   Trees/shrubs still need view-dependent impostor support, and no matched AMD
-  render exists. No completion percentage changes on this evidence.
+  render exists. Tidewater's focused graph compiler check passes for WebGPU and
+  WebGL, and the deterministic export check confirms the graph is present in
+  both palm GLBs. No completion percentage changes on this evidence.
 
 - 2026-11-15: added the renderer-neutral `thinTransmission` material-graph
   output to the engine's WebGPU and WebGL lighting compilers. Both paths apply
