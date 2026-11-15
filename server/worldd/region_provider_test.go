@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 )
