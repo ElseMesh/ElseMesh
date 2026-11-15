@@ -40,7 +40,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 				|| availableAssetIDs === null && ! ASSET_ID.test( lod.assetId ) ) throw new Error( `Invalid LOD record for static model ${model.id}` );
 			if ( availableAssetIDs && ! availableAssetIDs.has( lod.assetId ) ) throw new Error( `Static model LOD asset is missing: ${lod.assetId}` );
 		}
-		if ( ! [ 'projected-radius', 'scaled-distance' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );
+		if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );
 		if ( ! Array.isArray( model.lodThresholds ) || model.lodThresholds.length !== model.lods.length - 1 ) throw new Error( `Invalid LOD thresholds for static model ${model.id}` );
 		let previousThreshold = model.lodMetric === 'projected-radius' ? 0 : Infinity;
 		for ( const threshold of model.lodThresholds ) {

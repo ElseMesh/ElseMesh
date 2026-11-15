@@ -113,10 +113,12 @@ WebGPU visual parity remain incomplete.
 - 2026-11-15: Tidewater now exports an inactive generic static-model sidecar
   for coconut palms, including its source near/far GLBs, post-scatter
   placements, and three VEC4 vertex streams. The deterministic world-export
-  check covers hashes and placement mapping. The artifact is not signed or
-  installed; scaled-distance LOD, shadows, and material parity still differ
-  from the active WebGPU path, and trees/shrubs still need view-dependent
-  impostor support. No completion percentage changes on this evidence.
+  check covers hashes and placement mapping. ElseMesh now supports
+  scale-independent world-distance LOD, and the palm asset expresses the
+  source handoff band's distances. The artifact remains unsigned and inactive;
+  its transition curve, shadows, and material do not yet match WebGPU, and
+  trees/shrubs still need view-dependent impostor support. No completion
+  percentage changes on this evidence.
 
 - 2026-11-15: added the renderer-neutral `thinTransmission` material-graph
   output to the engine's WebGPU and WebGL lighting compilers. Both paths apply

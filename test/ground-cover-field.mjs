@@ -26,6 +26,7 @@ const field = {
 };
 
 assert.equal( validateGroundCoverField( field, assets ), field, 'the signed renderer-neutral field descriptor is accepted' );
+assert.equal( validateGroundCoverField( { ...field, species: [ { ...field.species[ 0 ], lodMetric: 'world-distance' } ] }, assets ).species[ 0 ].lodMetric, 'world-distance', 'ground cover accepts authored world-space LOD distances' );
 for ( const invalid of [
 	{ ...field, unexpected: true },
 	{ ...field, densityAssetId: farAssetId },

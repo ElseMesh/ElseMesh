@@ -101,7 +101,10 @@ LOD entries are ordered from coarsest to finest detail. With `lodMetric` set to
 `projected-radius`, each `lodThresholds` entry is a normalized projected-radius
 boundary for the next finer level and values ascend. With `scaled-distance`,
 each is a world distance divided by the instance's largest scale and values
-descend. `lodFadeFraction`
+descend. With `world-distance`, each is a camera-to-instance-origin distance
+in metres and values descend, independent of model bounds center and instance
+scale. This is for authored handoff ranges defined in world space.
+`lodFadeFraction`
 sets the transition-band width for either metric; overlapping bands are
 rejected. `drawMaxDistance` limits color rendering by world-space distance from
 the transformed bounds center, and `drawFadeStartDistance` sets where its

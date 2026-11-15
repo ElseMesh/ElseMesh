@@ -58,7 +58,10 @@ export class GroundCoverFieldDrawPlanner {
 			if ( ! visible ) continue;
 
 			const fade = writeInstanceDrawDistanceFade( this.fadeScratch, record.drawFadeStartDistance, record.drawMaxDistance, distance );
-			const selection = writeInstanceLODSelection( this.lodScratch, record.lodMetric, distance, radius, maxScale, tanHalfFov, record.lodThresholds, record.lodFadeFraction, renderLoadBias - STREAMING_DETAIL_HEADROOM );
+			const lodDistance = record.lodMetric === 'world-distance'
+				? Math.hypot( record.position[ 0 ] - camera.position[ 0 ], record.position[ 1 ] - camera.position[ 1 ], record.position[ 2 ] - camera.position[ 2 ] )
+				: distance;
+			const selection = writeInstanceLODSelection( this.lodScratch, record.lodMetric, lodDistance, radius, maxScale, tanHalfFov, record.lodThresholds, record.lodFadeFraction, renderLoadBias - ( record.lodMetric === 'world-distance' ? 0 : STREAMING_DETAIL_HEADROOM ) );
 			const groups = groupsFor( visibleGroups, record );
 			const [ lodIndex, transition, incomingFade ] = selection;
 			if ( transition >= 0 ) {

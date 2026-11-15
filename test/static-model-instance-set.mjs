@@ -39,6 +39,7 @@ const valid = {
 };
 
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
+assert.equal( validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 120 ], lodMetric: 'world-distance' } ] } ).models[ 0 ].lodMetric, 'world-distance', 'accepts fixed world-space handoff distances' );
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
 assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set( [ hi, low, lowest ] ) } ).instances.length, 1 );
 const providerLocalID = 'local-mesh-lod:great-hall:component:0';
@@ -147,6 +148,21 @@ assert.equal( planner.groups[ 3 ].incoming[ 0 ], 2, 'a steady LOD is distinct fr
 assert.ok( ! Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ).includes( 6 ), 'instances beyond drawMaxDistance are omitted from color draws' );
 assert.equal( planner.groups[ 4 ].count, 0, 'color draw distance can hide a model independently of its shadow range' );
 assert.equal( planner.shadowGroups[ 2 ].indices[ 0 ], 8, 'shadow selection remains independent of color draw distance' );
+
+const worldDistanceDocument = {
+	...valid,
+	models: [ { ...valid.models[ 0 ], bounds: { center: [ 0, - 50, 0 ], radius: 1 }, lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 120 ], lodMetric: 'world-distance', shadowLod: 0, drawMaxDistance: 1000, drawFadeStartDistance: 1000 } ],
+	instances: [ { model: 'market-table-fish', position: [ 0, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 4, 4, 4 ] } ],
+};
+const worldDistancePlanner = new StaticModelInstanceSetPlanner( worldDistanceDocument );
+const worldDistanceCamera = {
+	position: [ 0, 100, 0 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: [ [ 1, 0, 0, 1000 ], [ - 1, 0, 0, 1000 ], [ 0, 1, 0, 1000 ], [ 0, - 1, 0, 1000 ], [ 0, 0, 1, 1000 ], [ 0, 0, - 1, 1000 ] ],
+};
+worldDistancePlanner.update( worldDistanceCamera );
+assert.equal( worldDistancePlanner.groups[ 1 ].count, 1, 'world-distance LOD measures from the placement origin and ignores the offset bounds center and instance scale' );
+worldDistancePlanner.update( worldDistanceCamera, { renderLoadBias: 1 } );
+assert.equal( worldDistancePlanner.groups[ 0 ].count, 1, 'render-load bias still permits an engine-owned coarser world-distance LOD under sustained load' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
 const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };

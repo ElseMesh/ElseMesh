@@ -66,6 +66,10 @@ semantics as `elsemesh.static-model-instance-set/1`, allowing both field
 adapters to use the engine's shared visibility, LOD, transition, and shadow
 planner.
 
+The `world-distance` metric measures from the instance placement origin in
+metres and ignores instance scale and the model bounds center. Use it when a
+world authors LOD handoffs at fixed world-space distances.
+
 `blue-noise/1` gives both renderers the same deterministic candidate positions
 for the signed `seed`, `cellSize`, and `pointsPerCell`. It creates one
 Mitchell-best-candidate pattern using the engine's `mulberry32/1` integer

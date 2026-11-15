@@ -23,6 +23,13 @@ assert.deepEqual( groups[ 1 ].indices, [ 0, 1 ], 'visible records are indexed co
 assert.deepEqual( result.shadowGroups.get( 'grass' )[ 0 ].indices, [ 0, 1, 2 ], 'shadow selection remains independent of view frustum culling' );
 assert.ok( groups[ 1 ].drawFade[ 1 ] < 1, 'draw distance fade is included in shared records' );
 
+const worldDistanceGroundCover = {
+	...record( 0 ), lodMetric: 'world-distance', lodThresholds: [ 120 ], drawMaxDistance: 1000, drawFadeStartDistance: 1000,
+	bounds: { center: [ 0, - 50, 0 ], radius: 1 }, position: [ 0, 0, 0 ], scale: [ 4, 4, 4 ],
+};
+const worldDistanceGroundCoverResult = planner.update( [ worldDistanceGroundCover ], { ...camera, position: [ 0, 100, 0 ], frustumPlanes: camera.frustumPlanes.map( plane => [ plane[ 0 ], plane[ 1 ], plane[ 2 ], 1000 ] ) } );
+assert.deepEqual( worldDistanceGroundCoverResult.visibleGroups.get( 'grass' )[ 1 ].indices, [ 0 ], 'ground cover uses the same placement-origin world-distance LOD semantics as static models' );
+
 const biased = planner.update( [ record( 5 ) ], { ...camera, frustumPlanes: camera.frustumPlanes.map( plane => [ ...plane ] ) }, 2 );
 assert.equal( biased.visibleGroups.get( 'grass' )[ 0 ].indices.length, 1, 'render-load bias shifts demand toward coarser authored LODs' );
 

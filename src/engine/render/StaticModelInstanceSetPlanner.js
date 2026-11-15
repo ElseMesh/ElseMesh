@@ -105,6 +105,9 @@ export class StaticModelInstanceSetPlanner {
 			const [ centerX, centerY, centerZ, radius, maxScale ] = sphere;
 			const dx = centerX - camera.position[ 0 ], dy = centerY - camera.position[ 1 ], dz = centerZ - camera.position[ 2 ];
 			const distance = Math.hypot( dx, dy, dz );
+			const lodDistance = model.lodMetric === 'world-distance'
+				? Math.hypot( instance.position[ 0 ] - camera.position[ 0 ], instance.position[ 1 ] - camera.position[ 1 ], instance.position[ 2 ] - camera.position[ 2 ] )
+				: distance;
 			this._viewCenterDistanceByInstance[ instanceIndex ] = distance;
 			this._viewDistanceByInstance[ instanceIndex ] = Math.max( 0, distance - radius );
 			if ( includeShadows && distance <= model.shadowMaxDistance ) {
@@ -122,7 +125,7 @@ export class StaticModelInstanceSetPlanner {
 			this._projectedRadiusByInstance[ instanceIndex ] = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
 			// Sustained render overload shifts demand toward coarser authored LODs.
 			const fade = writeInstanceDrawDistanceFade( this._drawFadeScratch, model.drawFadeStartDistance, model.drawMaxDistance, distance );
-			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, distance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias - STREAMING_DETAIL_HEADROOM );
+			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, lodDistance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias - ( model.lodMetric === 'world-distance' ? 0 : STREAMING_DETAIL_HEADROOM ) );
 			const groups = this._groupsByModel[ modelIndex ];
 			const [ lodIndex, transition, incomingFade ] = selection;
 			if ( transition >= 0 ) {
