@@ -280,6 +280,42 @@ pre-split WebGPU baseline. Tidewater parity remains 90%.
 [WebGL Marta shop](images/tidewater-rendered-webgl-marta-shop-amd-2026-11-15.png),
 [WebGPU Marta shop](images/tidewater-rendered-webgpu-marta-shop-amd-2026-11-15.png).
 
+### Matched AMD frame-time sample, 2026-11-15
+
+I measured 20 seconds of `requestAnimationFrame` intervals at the stationary
+`swashAbove` view, simulation time 1000 s, and 1600×813 canvas after an 8-second
+startup warmup. The split build was `3de22a1b`; its WebGPU browser reported the
+AMD RADV Renoir adapter and `webgpu` enabled. The pre-split build came from
+`23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`. All 765 tracked file blobs in its
+existing isolated build tree were checked against that commit before the build.
+Both WebGPU samples used full render scale. The current WebGL run used the same
+view, time, canvas, Weston display, and RadeonSI device.
+
+| Build/backend | Frames | Mean frame interval | Median | 95th percentile |
+| --- | ---: | ---: | ---: | ---: |
+| Pre-split WebGPU, `23c30bf6`, start dismissed | 194 | 104.2 ms (9.6 FPS) | 99.4 ms | 206.4 ms |
+| Split WebGPU, `3de22a1b`, start dismissed | 256 | 78.2 ms (12.8 FPS) | 77.3 ms | 150.9 ms |
+| Split WebGL | 474 | 42.3 ms (23.7 FPS) | 40.9 ms | 67.9 ms |
+
+The matched split sample is faster than this pre-split sample, but the result is
+not stable enough to attribute to the code change. A first pre-split run left
+its older start overlay visible and measured 82.9 ms mean / 79.6 ms median;
+after dismissing that overlay, the repeat measured 104.2 / 99.4 ms. That
+26%-scale variation makes the single paired difference inconclusive. Neither
+pre-split run reproduced the remembered 27 FPS. The measured WebGPU GPU
+timestamps ranged about 70–130 ms while CPU work stayed around 8 ms, indicating
+a GPU-bound render. WebGL is faster here but its vegetation and material detail
+remain visibly different.
+
+The static `simtime` view keeps frame `dt` at zero, so it does not exercise the
+normal gameplay-time workload or adaptive LOD warmup. The current split build
+was in Visual Quality mode at render scale 1 with render-load bias 0. FPS mode
+does enable adaptive LOD, but it also starts with a 0.7 canvas scale and turns
+off TAA and shadows, so that is not a resolution-preserving comparison. These
+samples are from one review host and do not establish device-wide performance
+acceptance. Tidewater parity remains 90%; supported-hardware gameplay
+performance and the visible material gap remain open.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
