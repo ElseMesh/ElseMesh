@@ -763,11 +763,12 @@ export class LocalRegionConnector {
 		const diskKey = etag ? `${assetId}\0range\0${etag}\0${start}-${end}` : null;
 		if ( diskKey && totalLength !== undefined && this.diskCache ) {
 			try {
+				const diskReadStartedAt = performance.now();
 				const bytes = await this.diskCache.get( diskKey );
 				if ( bytes && bytes.byteLength === end - start + 1 && ( ! sha256 || await this.#matchesSHA256( bytes, sha256 ) ) ) {
 					const result = { bytes, etag, start, end, totalLength };
 					this.#cacheAssetRange( rangeKey, result, assetId );
-					if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region range disk cache hit:', JSON.stringify( { assetId, start, end, bytes: bytes.byteLength } ) );
+					if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region range disk cache hit:', JSON.stringify( { assetId, start, end, bytes: bytes.byteLength, elapsedMs: performance.now() - diskReadStartedAt } ) );
 					return result;
 				}
 			} catch ( error ) {
@@ -829,6 +830,7 @@ export class LocalRegionConnector {
 		for ( let index = 1; index < requested.length; index ++ ) requireValue( requested[ index ].start > requested[ index - 1 ].end, 'Local region byte ranges overlap' );
 		const results = new Array( ranges.length );
 		const missing = [];
+		const diskCandidates = [];
 		for ( const range of requested ) {
 			const key = `${assetId}\n${etag || ''}\n${range.start}-${range.end}`;
 			const cached = this.assetRanges.get( key );
@@ -841,20 +843,43 @@ export class LocalRegionConnector {
 			}
 			const diskKey = etag && totalLength !== undefined ? `${assetId}\0range\0${etag}\0${range.start}-${range.end}` : null;
 			if ( diskKey && this.diskCache ) {
-				try {
-					const bytes = await this.diskCache.get( diskKey );
-					if ( bytes?.byteLength === range.end - range.start + 1 ) {
-						const value = { bytes, etag, start: range.start, end: range.end, totalLength };
-						this.#cacheAssetRange( key, value, assetId );
-						results[ range.index ] = value;
-						continue;
-					}
-				} catch ( error ) {
-					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache read failed:', error );
-				}
-			}
-			missing.push( { ...range, key, diskKey } );
+				diskCandidates.push( { ...range, key, diskKey } );
+			} else missing.push( { ...range, key, diskKey } );
 		}
+		for ( let offset = 0; offset < diskCandidates.length; ) {
+			let batchLength = 0;
+			let batchBytes = 0;
+			for ( const range of diskCandidates.slice( offset, offset + LOCAL_REGION_CACHE_READ_CONCURRENCY ) ) {
+				const bytes = range.end - range.start + 1;
+				if ( batchLength && batchBytes + bytes > LOCAL_REGION_CACHE_READ_BATCH_BYTES ) break;
+				batchLength ++;
+				batchBytes += bytes;
+				if ( bytes > LOCAL_REGION_CACHE_READ_BATCH_BYTES ) break;
+			}
+			const batch = diskCandidates.slice( offset, offset + batchLength );
+			const reads = await Promise.all( batch.map( async range => {
+				const startedAt = performance.now();
+				try { return { range, bytes: await this.diskCache.get( range.diskKey ), elapsedMs: performance.now() - startedAt }; }
+				catch ( error ) { return { range, error }; }
+			} ) );
+			for ( const { range, bytes, elapsedMs, error } of reads ) {
+				if ( error ) {
+					if ( this.regionDiagnostics ) console.warn( 'ElseMesh local-region range disk cache read failed:', error );
+					missing.push( range );
+					continue;
+				}
+				if ( bytes?.byteLength !== range.end - range.start + 1 ) {
+					missing.push( range );
+					continue;
+				}
+				const value = { bytes, etag, start: range.start, end: range.end, totalLength };
+				this.#cacheAssetRange( range.key, value, assetId );
+				results[ range.index ] = value;
+				if ( this.regionDiagnostics ) console.info( 'ElseMesh local-region range disk cache hit:', JSON.stringify( { assetId, start: range.start, end: range.end, bytes: bytes.byteLength, elapsedMs } ) );
+			}
+			offset += batch.length;
+		}
+		missing.sort( ( a, b ) => a.index - b.index );
 		if ( missing.length === 0 ) return results;
 		if ( missing.length === 1 ) {
 			const range = missing[ 0 ];
