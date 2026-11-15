@@ -237,6 +237,7 @@ export class WebGLAtmosphere {
 		this._render( 1 );
 		this._render( 2 );
 		this._render( 3 );
+		this._render( 4 );
 
 	}
 

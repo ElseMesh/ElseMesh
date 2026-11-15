@@ -14,16 +14,17 @@ assert.equal( adaptWebGLMaterialLighting( THREE, material, atmosphere ), true );
 assert.equal( adaptWebGLMaterialLighting( THREE, material, atmosphere ), false, 'adaptation is idempotent' );
 
 const shader = {
-	fragmentShader: '#include <lights_fragment_begin>\n#include <lights_fragment_maps>',
+	fragmentShader: '#include <lights_fragment_begin>\n#include <lights_fragment_maps>\n#include <lights_fragment_end>',
 	uniforms: {},
 };
 material.onBeforeCompile( shader, {} );
 assert.match( shader.fragmentShader, /emAtmosphereWorldNormal/ );
 assert.match( shader.fragmentShader, /emAtmosphereSkyIrradianceTexture/ );
 assert.match( shader.fragmentShader, /#include <lights_fragment_maps>/, 'the Three.js PMREM stage remains installed' );
-assert.match( shader.fragmentShader, /irradiance \+= emAtmosphereDiffuse;/, 'atmosphere sky contributes to diffuse lighting, not the PMREM multiscatter accumulator' );
-assert.doesNotMatch( shader.fragmentShader, /iblIrradiance \+= emAtmosphereDiffuse/ );
-assert.match( THREE.ShaderChunk.lights_fragment_maps, /getIBLIrradiance\( geometryNormal \)/, 'Three.js keeps its PMREM specular input unchanged' );
+assert.match( shader.fragmentShader, /iblIrradiance = emAtmosphereDiffuse;(?=\n#include <lights_fragment_end>)/, 'physical materials replace PMREM diffuse before physical lighting resolves' );
+assert.doesNotMatch( shader.fragmentShader, /irradiance \+= emAtmosphereDiffuse;/, 'physical materials do not double-count atmosphere in the Lambert accumulator' );
+assert.match( THREE.ShaderChunk.lights_fragment_maps, /getIBLIrradiance\( geometryNormal \)/, 'Three.js PMREM diffuse is replaced after its map stage' );
+assert.match( THREE.ShaderChunk.lights_fragment_maps, /getIBLRadiance\( geometryViewDir, geometryNormal, material\.roughness \)/, 'Three.js PMREM specular radiance remains intact' );
 assert.match( shader.fragmentShader, /prior material hook/, 'existing material hooks still run' );
 assert.equal( shader.uniforms.emAtmosphereSkyIrradianceTexture.value, skyIrradianceTexture );
 assert.equal( shader.uniforms.emAtmosphereHorizonTexture.value, horizonTexture );
@@ -49,6 +50,7 @@ assert.equal( adaptWebGLMaterialLighting( THREE, grassMaterial, atmosphere ), tr
 const grassShader = { fragmentShader: '#include <common>\n#include <lights_fragment_begin>', uniforms: {} };
 grassMaterial.onBeforeCompile( grassShader, {} );
 assert.match( grassShader.fragmentShader, /irradiance \+= emAtmosphereDiffuse/ );
+assert.doesNotMatch( grassShader.fragmentShader, /iblIrradiance = emAtmosphereDiffuse/ );
 assert.match( grassShader.fragmentShader, /#include <lights_fragment_begin>/, 'the Three.js direct lighting chunk remains intact' );
 
 skyIrradianceTexture.dispose();

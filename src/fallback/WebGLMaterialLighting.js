@@ -1,9 +1,9 @@
 import { G } from '../engine/render/Frame.js';
 
-const LIGHTING_KEY = 'elsemesh-atmosphere-diffuse-v2';
+const LIGHTING_KEY = 'elsemesh-atmosphere-diffuse-v3';
 
-// Keep Three's sky PMREM for specular reflections, and add the atmosphere sky
-// term to Three's separate diffuse irradiance accumulator.
+// Keep Three's sky PMREM for specular reflections. Physical materials use
+// Three's IBL diffuse accumulator, while Lambert and Phong use irradiance.
 export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvironmentIntensity = () => 1 ) {
 
 	const standard = material?.isMeshStandardMaterial;
@@ -24,9 +24,15 @@ export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvi
 			emAtmosphereWorldNormal.y * 0.5 + 0.5 ) * emAtmosphereIntensity;`;
 		const worldNormalDeclaration = `vec3 emAtmosphereWorldNormal = inverseTransformDirection( geometryNormal, viewMatrix );`;
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>\nuniform sampler2D emAtmosphereSkyIrradianceTexture;\nuniform sampler2D emAtmosphereHorizonTexture;\nuniform float emAtmosphereNight;\nuniform float emAtmosphereIntensity;` );
-		const marker = '#include <lights_fragment_begin>';
-		if ( ! shader.fragmentShader.includes( marker ) ) throw new Error( 'ElseMesh WebGL atmosphere material is missing the diffuse lighting stage' );
-		shader.fragmentShader = shader.fragmentShader.replace( marker, `${marker}\n${worldNormalDeclaration}\n${irradiance}\nirradiance += emAtmosphereDiffuse;` );
+		const lightingMarker = '#include <lights_fragment_begin>';
+		if ( ! shader.fragmentShader.includes( lightingMarker ) ) throw new Error( 'ElseMesh WebGL atmosphere material is missing the diffuse lighting stage' );
+		const diffuseLighting = standard ? '' : '\nirradiance += emAtmosphereDiffuse;';
+		shader.fragmentShader = shader.fragmentShader.replace( lightingMarker, `${lightingMarker}\n${worldNormalDeclaration}\n${irradiance}${diffuseLighting}` );
+		if ( standard ) {
+			const physicalIblMarker = '#include <lights_fragment_maps>';
+			if ( ! shader.fragmentShader.includes( physicalIblMarker ) ) throw new Error( 'ElseMesh WebGL physical material is missing the IBL lighting stage' );
+			shader.fragmentShader = shader.fragmentShader.replace( physicalIblMarker, `${physicalIblMarker}\niblIrradiance = emAtmosphereDiffuse;` );
+		}
 		shader.uniforms.emAtmosphereSkyIrradianceTexture = { value: atmosphere.skyIrradianceTexture };
 		shader.uniforms.emAtmosphereHorizonTexture = { value: atmosphere.horizonTexture };
 		shader.uniforms.emAtmosphereNight = { get value() { return G.night.value; } };
