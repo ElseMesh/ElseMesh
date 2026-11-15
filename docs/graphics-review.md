@@ -20,9 +20,9 @@ this scene; that instantaneous display is not a controlled performance result.
 One earlier cast at 17–18 m depth remained in `wait` with a non-finite bite
 timer, even though a later sample at the bobber showed fishable bay habitat.
 A subsequent cast produced finite natural bites and catches. The landing-time
-habitat discrepancy is not yet explained. The rendered real-water catch,
-sale, and purchase path has been verified on WebGPU only; the corresponding
-WebGL gameplay path and the remaining visual parity checks are still open.
+habitat discrepancy is not yet explained. The rendered real-water catch, sale,
+and purchase path was first verified on WebGPU; the AMD WebGL live path is
+recorded below. Remaining visual parity checks are still open.
 
 ## 2026-11-15 AMD WebGL start interaction crash
 
@@ -55,9 +55,34 @@ Source inspection found that `WebGLFallback.requestLock()` called
 returns no value after issuing its request, so WebGL immediately issued a
 second native request. The fallback now makes one request through `Input` and
 uses the canvas request only when `Input` is absent; a focused regression check
-covers both cases. The next AMD review must verify that this removes the crash
-and reaches live WebGL gameplay before the WebGL parity gate can close. AMD
-device selection was already verified and was not the missing prerequisite.
+covers both cases and passes from the external build; the rebuilt production
+bundle also succeeds. AMD device selection was already verified and was not the
+missing prerequisite. The remaining crash was specific to running the review
+in Weston with `--no-input`; its nested window had no pointer-lock seat. The
+checked-in launcher now supports `WESTON_ENABLE_INPUT=1` while retaining its
+no-input default for other reviews.
+
+## 2026-11-15 AMD WebGL rendered fishing and upgrade
+
+After rebuilding the committed WebGL pointer-lock fix, a fresh browser profile
+started the built-in Tidewater world on the AMD Radeon through ANGLE GL. With
+the input-enabled Weston session, the start control acquired pointer lock and
+the browser remained alive. Real keyboard and mouse input moved down the pier,
+cast to bay-only water at about 4 m depth, waited for natural bites, struck,
+and reeled through the tension band. The six catches were a 0.70 kg mullet
+($4), two jacks (5.77 kg/$35 and 1.74 kg/$10), two sergeant majors
+(0.21 kg/$1 and 0.10 kg/$1), and a 1.01 kg yellowtail ($12), totaling $63.
+
+The rendered Joe panel sold all six fish for $63. The rendered Marta panel then
+accepted the $60 fishing-line upgrade; the fresh profile ended with $3, an
+empty cooler, and line level 1 (15 lb mono). This matches the WebGPU run's sale
+and upgrade amounts. Its recorded $5 ending balance is not directly comparable:
+the WebGL profile started at $0, while the WebGPU run's starting wallet was not
+recorded and Tidewater saves the wallet per browser profile. The retained
+[WebGL post-purchase scene](images/tidewater-rendered-webgl-line-upgrade-amd-2026-11-15.png)
+shows Marta's upgraded stock and the $3 balance. This closes the real-water
+WebGL catch, sale, and upgrade gate; remaining view/material and controlled FPS
+comparisons are still open.
 
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
