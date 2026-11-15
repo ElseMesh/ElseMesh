@@ -23,14 +23,20 @@ import (
 const maxRegionProviderDescriptorBytes = 1 << 20
 
 type dynamicRegionProviderDescriptor struct {
-	Schema         string `json:"schema"`
-	WorldID        string `json:"worldId"`
-	SourceRevision string `json:"sourceRevision"`
-	CacheRevision  string `json:"cacheRevision"`
-	ReadOnly       bool   `json:"readOnly"`
-	EntrySelection struct {
-		PlayerCapsule *playerCapsule `json:"playerCapsule"`
-	} `json:"entrySelection"`
+	Schema         string                       `json:"schema"`
+	WorldID        string                       `json:"worldId"`
+	SourceRevision string                       `json:"sourceRevision"`
+	CacheRevision  string                       `json:"cacheRevision"`
+	ReadOnly       bool                         `json:"readOnly"`
+	EntrySelection regionProviderEntrySelection `json:"entrySelection"`
+}
+
+type regionProviderEntrySelection struct {
+	PlayerCapsule    *playerCapsule      `json:"playerCapsule"`
+	MovementProfiles *movementProfiles   `json:"movementProfiles"`
+	AvatarOptions    []worldAvatarOption `json:"avatarOptions"`
+	PreviewSpawn     *worldSpawn         `json:"previewSpawn"`
+	Experience       *worldExperience    `json:"experience"`
 }
 
 type authoritativeMovementSweepRequest struct {
@@ -57,6 +63,7 @@ type regionProviderGateway struct {
 	sourceRevision    string
 	cacheRevision     string
 	playerCapsule     *playerCapsule
+	entrySelection    *dynamicRegionProviderDescriptor
 	allowedOrigins    map[string]struct{}
 	regionDiagnostics bool
 	requestSequence   atomic.Uint64
@@ -235,10 +242,38 @@ func (gateway *regionProviderGateway) discoverWorldID() (string, error) {
 	if !validPlayerCapsule(descriptor.EntrySelection.PlayerCapsule) {
 		return "", errors.New("descriptor has invalid player capsule dimensions")
 	}
+	if err := validateRegionProviderEntrySelection(descriptor.EntrySelection); err != nil {
+		return "", err
+	}
 	gateway.sourceRevision = descriptor.SourceRevision
 	gateway.cacheRevision = descriptor.CacheRevision
 	gateway.playerCapsule = descriptor.EntrySelection.PlayerCapsule
+	gateway.entrySelection = &descriptor
 	return descriptor.WorldID, nil
+}
+
+func validateRegionProviderEntrySelection(selection regionProviderEntrySelection) error {
+	spawn := selection.PreviewSpawn
+	if spawn == nil || len(spawn.Position) != 3 || spawn.Yaw == nil || spawn.Pitch == nil {
+		return errors.New("descriptor has no valid world-authored preview spawn")
+	}
+	for _, value := range spawn.Position {
+		if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > 1e6 {
+			return errors.New("descriptor has an invalid world-authored preview spawn")
+		}
+	}
+	if math.IsNaN(*spawn.Yaw) || math.IsInf(*spawn.Yaw, 0) || math.Abs(*spawn.Yaw) > 360 || math.IsNaN(*spawn.Pitch) || math.IsInf(*spawn.Pitch, 0) || math.Abs(*spawn.Pitch) > 1.5 {
+		return errors.New("descriptor has an invalid world-authored preview orientation")
+	}
+	if len(selection.AvatarOptions) > 16 {
+		return errors.New("descriptor has too many world-authored avatar options")
+	}
+	if selection.Experience != nil {
+		if err := validateWorldExperience(selection.Experience); err != nil {
+			return fmt.Errorf("descriptor world experience: %w", err)
+		}
+	}
+	return nil
 }
 
 func samePlayerCapsule(a, b *playerCapsule) bool {

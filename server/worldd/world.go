@@ -581,7 +581,9 @@ type worldExperience struct {
 	LoadingNote string                     `json:"loadingNote"`
 	Tips        []string                   `json:"tips"`
 	Stages      map[string]string          `json:"stages"`
+	Theme       json.RawMessage            `json:"theme,omitempty"`
 	Environment *worldEnvironment          `json:"environment,omitempty"`
+	Navigation  json.RawMessage            `json:"navigation,omitempty"`
 	Behaviors   map[string]json.RawMessage `json:"behaviors,omitempty"`
 	Extensions  []worldJavaScriptExtension `json:"extensions,omitempty"`
 }
@@ -681,6 +683,15 @@ func validateWorldExperience(experience *worldExperience) error {
 	}
 	if behaviorDataBytes > 64<<10 {
 		return errors.New("world experience behavior data exceeds its size limit")
+	}
+	for name, raw := range map[string]json.RawMessage{"theme": experience.Theme, "navigation": experience.Navigation} {
+		if len(raw) == 0 {
+			continue
+		}
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &object); err != nil || object == nil {
+			return fmt.Errorf("world experience %s must be an object", name)
+		}
 	}
 	return nil
 }

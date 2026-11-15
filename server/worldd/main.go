@@ -352,7 +352,7 @@ func run() error {
 		return nil
 	}
 	if *listProposals || *removeProposalID != "" || *exportProposalID != "" {
-		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "")
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "", nil)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -437,7 +437,7 @@ func run() error {
 		if *manifestPath == "" {
 			return errors.New("--import-package requires an owner-signed --manifest")
 		}
-		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "")
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "", nil)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -461,7 +461,7 @@ func run() error {
 		if *roleDocumentOut == *signRoleGrantPath || *roleDocumentOut == *signRoleRevocationsPath {
 			return errors.New("role-document output must differ from its unsigned input")
 		}
-		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "")
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "", nil)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -583,7 +583,11 @@ func run() error {
 	if worldDirectory != "" {
 		manifest = *preparedWorld
 	} else {
-		manifest, err = loadWorldManifest(*manifestPath, *dataDir, *worldName, localPeerID, key, regionProviderWorldID)
+		var initialProvider *dynamicRegionProviderDescriptor
+		if regionProvider != nil {
+			initialProvider = regionProvider.entrySelection
+		}
+		manifest, err = loadWorldManifest(*manifestPath, *dataDir, *worldName, localPeerID, key, regionProviderWorldID, initialProvider)
 	}
 	if err != nil {
 		return err
@@ -848,7 +852,7 @@ func libp2pLocalListenAddresses(port int) []string {
 	}
 }
 
-func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey, initialWorldID string) (signedDocument, error) {
+func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey, initialWorldID string, initialProvider *dynamicRegionProviderDescriptor) (signedDocument, error) {
 	if path == "" {
 		path = filepath.Join(dataDir, "world.json")
 	}
@@ -873,6 +877,11 @@ func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey, i
 		}
 		manifest.WorldID = initialWorldID
 	}
+	if initialProvider != nil {
+		if err := applyRegionProviderSelection(&manifest, initialProvider); err != nil {
+			return signedDocument{}, err
+		}
+	}
 	doc, err := signDocument(manifestProtocol, manifest, key)
 	if err != nil {
 		return signedDocument{}, err
@@ -885,6 +894,37 @@ func loadWorldManifest(path, dataDir, title, owner string, key crypto.PrivKey, i
 		return signedDocument{}, err
 	}
 	return doc, nil
+}
+
+func applyRegionProviderSelection(manifest *worldManifest, descriptor *dynamicRegionProviderDescriptor) error {
+	if manifest == nil || descriptor == nil || descriptor.WorldID != manifest.WorldID {
+		return errors.New("region provider selection does not match the world manifest")
+	}
+	selection := descriptor.EntrySelection
+	if err := validateRegionProviderEntrySelection(selection); err != nil {
+		return err
+	}
+	manifest.Spawn = selection.PreviewSpawn
+	manifest.Rules.PlayerCapsule = selection.PlayerCapsule
+	manifest.Rules.MovementProfiles = selection.MovementProfiles
+	manifest.AvatarOptions = append([]worldAvatarOption(nil), selection.AvatarOptions...)
+	manifest.Experience = selection.Experience
+	if len(selection.AvatarOptions) > 0 {
+		profiles := make([]string, 0, len(selection.AvatarOptions))
+		seen := make(map[string]struct{}, len(selection.AvatarOptions))
+		for _, option := range selection.AvatarOptions {
+			if _, exists := seen[option.ProfileID]; exists {
+				continue
+			}
+			seen[option.ProfileID] = struct{}{}
+			profiles = append(profiles, option.ProfileID)
+		}
+		manifest.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: profiles}
+	}
+	if err := validateManifest(*manifest, manifest.OwnerPeerID, time.Now()); err != nil {
+		return fmt.Errorf("invalid world-authored region-provider selection: %w", err)
+	}
+	return nil
 }
 
 func newStarterManifest(title, owner string) worldManifest {

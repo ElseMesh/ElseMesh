@@ -13,6 +13,7 @@ import (
 	"time"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Server, *regionProviderGateway, *atomic.Int32) {
@@ -176,6 +177,8 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			descriptor := dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, SourceRevision: sourceRevision, CacheRevision: cacheRevision, ReadOnly: true}
 			descriptor.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+			yaw, pitch := 3.141592653589793, -0.1
+			descriptor.EntrySelection.PreviewSpawn = &worldSpawn{Position: []float64{0, 8.62, 90}, Yaw: &yaw, Pitch: &pitch}
 			_ = json.NewEncoder(w).Encode(descriptor)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/regions":
 			if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
@@ -416,7 +419,7 @@ func TestLoadWorldManifestUsesRegionProviderWorldID(t *testing.T) {
 		t.Fatal(err)
 	}
 	const worldID = "elsemesh:hogwarts-legacy"
-	document, err := loadWorldManifest("", t.TempDir(), "Hogwarts", "owner", key, worldID)
+	document, err := loadWorldManifest("", t.TempDir(), "Hogwarts", "owner", key, worldID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,5 +429,61 @@ func TestLoadWorldManifestUsesRegionProviderWorldID(t *testing.T) {
 	}
 	if manifest.WorldID != worldID {
 		t.Fatalf("starter manifest world ID = %q, want %q", manifest.WorldID, worldID)
+	}
+}
+
+func TestLoadWorldManifestUsesRegionProviderWorldContract(t *testing.T) {
+	key, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID, err := peer.IDFromPublicKey(key.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const worldID = "elsemesh:hogwarts-legacy"
+	yaw, pitch := 3.141592653589793, -0.1
+	step := 0.6
+	provider := &dynamicRegionProviderDescriptor{WorldID: worldID}
+	provider.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+	provider.EntrySelection.PreviewSpawn = &worldSpawn{Position: []float64{0, 8.62, 90}, Yaw: &yaw, Pitch: &pitch}
+	provider.EntrySelection.MovementProfiles = &movementProfiles{Avatars: map[string]movementProfile{
+		"elsemesh.avatar.stock-male/1":   {StepHeightMeters: step},
+		"elsemesh.avatar.stock-female/1": {StepHeightMeters: step},
+	}}
+	provider.EntrySelection.AvatarOptions = []worldAvatarOption{
+		{ID: "short-hair", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Short hair"},
+		{ID: "ponytail", ProfileID: "elsemesh.avatar.stock-female/1", Label: "Ponytail"},
+	}
+	provider.EntrySelection.Experience = &worldExperience{
+		Genre: "The Great Hall", Tagline: "Step into the Great Hall.", LoadingNote: "Preparing the castle.",
+		Tips: []string{"You start in the Great Hall."}, Stages: map[string]string{"world": "Loading the Great Hall."},
+		Environment: &worldEnvironment{Sky: "atmosphere", Clouds: "none"},
+		Theme:       json.RawMessage(`{"colors":{"accent":"#c6a664"}}`),
+		Navigation:  json.RawMessage(`{"compass":{"north":"N","east":"E","south":"S","west":"W"}}`),
+	}
+
+	document, err := loadWorldManifest("", t.TempDir(), "Hogwarts", ownerID.String(), key, worldID, provider)
+	if err != nil {
+		t.Fatalf("load provider-backed world manifest: %v", err)
+	}
+	manifest, err := decodeManifest(document, ownerID.String(), time.Now())
+	if err != nil {
+		t.Fatalf("decode provider-backed world manifest: %v", err)
+	}
+	if manifest.Spawn == nil || manifest.Spawn.Position[0] != 0 || manifest.Spawn.Position[1] != 8.62 || manifest.Spawn.Position[2] != 90 || *manifest.Spawn.Yaw != yaw || *manifest.Spawn.Pitch != pitch {
+		t.Fatalf("world spawn = %+v, want provider-authored Great Hall pose", manifest.Spawn)
+	}
+	if manifest.Rules.PlayerCapsule == nil || manifest.Rules.PlayerCapsule.RadiusMeters != 0.42 || manifest.Rules.PlayerCapsule.HeightMeters != 1.76 {
+		t.Fatalf("world capsule = %+v, want provider-authored capsule", manifest.Rules.PlayerCapsule)
+	}
+	if manifest.Rules.MovementProfiles == nil || manifest.Rules.MovementProfiles.Avatars["elsemesh.avatar.stock-female/1"].StepHeightMeters != step {
+		t.Fatalf("movement profiles = %+v, want provider-authored avatar step limits", manifest.Rules.MovementProfiles)
+	}
+	if len(manifest.AvatarOptions) != 2 || manifest.Rules.AvatarPolicy == nil || len(manifest.Rules.AvatarPolicy.AllowedProfiles) != 2 {
+		t.Fatalf("world avatar contract = options:%+v policy:%+v", manifest.AvatarOptions, manifest.Rules.AvatarPolicy)
+	}
+	if manifest.Experience == nil || string(manifest.Experience.Navigation) != string(provider.EntrySelection.Experience.Navigation) || string(manifest.Experience.Theme) != string(provider.EntrySelection.Experience.Theme) {
+		t.Fatalf("world experience presentation was not preserved: %+v", manifest.Experience)
 	}
 }
