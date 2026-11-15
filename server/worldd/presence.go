@@ -266,12 +266,23 @@ func (d *daemon) validateOwnerMovement(from, to []float64, pose *playerPose) err
 	if parent == nil {
 		parent = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
-	defer cancel()
-	if err := d.regionProvider.validateMovement(ctx, from, to, d.presenceStepHeight(pose)); err != nil {
+	for attempt := 0; attempt < 2; attempt++ {
+		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+		err := d.regionProvider.validateMovement(ctx, from, to, d.presenceStepHeight(pose))
+		cancel()
+		if err == nil {
+			return nil
+		}
+		if attempt == 0 && parent.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			// The bridge builds a cold collision index using its own service lifetime,
+			// so one authority request can finish indexing just after this bounded
+			// caller deadline. Retry that completed cache build once; never retry a
+			// reported blocker or an unavailable provider.
+			continue
+		}
 		return err
 	}
-	return nil
+	return errors.New("movement_authority_unavailable: retry limit reached")
 }
 
 func (d *daemon) validatePresenceHorizontalMovement(old playerPresence, next *playerPose, now time.Time) (float64, error) {

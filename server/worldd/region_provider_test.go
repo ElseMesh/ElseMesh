@@ -87,6 +87,47 @@ func TestRegionProviderMovementAuthorityIsInternalAndRevisionPinned(t *testing.T
 	}
 }
 
+func TestOwnerMovementRetriesOnceAfterColdIndexTimeout(t *testing.T) {
+	const worldID = "elsemesh:hogwarts-legacy"
+	const sourceRevision = "installed-source:bridge-revision"
+	const cacheRevision = sourceRevision + ":cache"
+	var requests atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/authority/movement-sweep" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		if requests.Add(1) == 1 {
+			// Model the bridge finishing its service-scoped cold cell-index build
+			// shortly after the first worldd request deadline expires.
+			time.Sleep(2100 * time.Millisecond)
+		}
+		w.Header().Set("X-ElseMesh-World-ID", worldID)
+		w.Header().Set("X-ElseMesh-Source-Revision", sourceRevision)
+		w.Header().Set("X-ElseMesh-Cache-Revision", cacheRevision)
+		_ = json.NewEncoder(w).Encode(authoritativeMovementSweepResponse{
+			WorldID: worldID, SourceRevision: sourceRevision, Ready: true, Reason: "clear",
+		})
+	}))
+	defer upstream.Close()
+
+	gateway, err := newRegionProviderGateway(upstream.URL, worldID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway.worldID = worldID
+	gateway.sourceRevision = sourceRevision
+	gateway.cacheRevision = cacheRevision
+	gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+	d := &daemon{ctx: context.Background(), regionProvider: gateway}
+	if err := d.validateOwnerMovement([]float64{0, 7, 90}, []float64{0, 7, 90.1}, presenceTestPose()); err != nil {
+		t.Fatalf("owner movement did not recover from a cold-index deadline: %v", err)
+	}
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("owner movement requests = %d, want one bounded retry after timeout", got)
+	}
+}
+
 func TestPresenceRejectsBlockedOwnerSweepWithoutPublishingPose(t *testing.T) {
 	var ready atomic.Bool
 	ready.Store(true)
