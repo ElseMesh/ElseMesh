@@ -1956,14 +1956,18 @@ export class WebGLFallback {
 				modelSourcesParsed: this.hostedStaticModelSourceStats?.parsed || 0,
 				modelSourcesReused: this.hostedStaticModelSourceStats?.reused || 0,
 			} ) );
+			const coarseCoverageStartedAt = performance.now();
 			await this._waitForHostedCoarseCoverage();
+			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL coarse coverage ready:', JSON.stringify( { elapsedMs: Math.round( performance.now() - coarseCoverageStartedAt ) } ) );
 			if ( startupLODObjectAssetIDs.size ) {
+				const startupLODStartedAt = performance.now();
 				const variants = await this.connector.preload( {
 					assetIDs: startupLODObjectAssetIDs,
 					position: localSpawn.position,
 					onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
 				} );
 				for ( const [ assetId, bytes ] of variants ) assets.set( assetId, bytes );
+				if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL entry-model preload:', JSON.stringify( { assets: startupLODObjectAssetIDs.size, elapsedMs: Math.round( performance.now() - startupLODStartedAt ) } ) );
 			}
 		}
 		for ( const object of manifest.objects || [] ) {
