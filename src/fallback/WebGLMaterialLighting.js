@@ -1,10 +1,9 @@
 import { G } from '../engine/render/Frame.js';
 
-const LIGHTING_KEY = 'elsemesh-atmosphere-diffuse-v1';
-const DIFFUSE_IBL_CALL = 'iblIrradiance += getIBLIrradiance( geometryNormal );';
+const LIGHTING_KEY = 'elsemesh-atmosphere-diffuse-v2';
 
-// Keep Three's sky PMREM for specular reflections, but feed its physical diffuse
-// lighting path the same sky irradiance and horizon inputs used by the primary renderer.
+// Keep Three's sky PMREM for specular reflections, and add the atmosphere sky
+// term to Three's separate diffuse irradiance accumulator.
 export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvironmentIntensity = () => 1 ) {
 
 	const standard = material?.isMeshStandardMaterial;
@@ -25,22 +24,9 @@ export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvi
 			emAtmosphereWorldNormal.y * 0.5 + 0.5 ) * emAtmosphereIntensity;`;
 		const worldNormalDeclaration = `vec3 emAtmosphereWorldNormal = inverseTransformDirection( geometryNormal, viewMatrix );`;
 		shader.fragmentShader = shader.fragmentShader.replace( '#include <common>', `#include <common>\nuniform sampler2D emAtmosphereSkyIrradianceTexture;\nuniform sampler2D emAtmosphereHorizonTexture;\nuniform float emAtmosphereNight;\nuniform float emAtmosphereIntensity;` );
-		if ( standard ) {
-			const chunk = THREE.ShaderChunk?.lights_fragment_maps;
-			if ( typeof chunk !== 'string' || ! chunk.includes( DIFFUSE_IBL_CALL ) ) {
-				throw new Error( 'ElseMesh WebGL atmosphere lighting does not match the installed Three.js lighting chunk' );
-			}
-			const replacement = `${ worldNormalDeclaration }\n${ irradiance }\niblIrradiance += emAtmosphereDiffuse;`;
-			shader.fragmentShader = shader.fragmentShader.replace( '#include <lights_fragment_maps>', chunk.replace( DIFFUSE_IBL_CALL, replacement ) );
-		} else {
-			const chunk = THREE.ShaderChunk?.lights_fragment_begin;
-			const marker = '\t#endif\n#endif\n#if defined( RE_IndirectSpecular )';
-			if ( typeof chunk !== 'string' || ! chunk.includes( marker ) ) {
-				throw new Error( 'ElseMesh WebGL atmosphere lighting does not match the installed Three.js diffuse chunk' );
-			}
-			const replacement = `\t#endif\n\t${ worldNormalDeclaration }\n\t${ irradiance.split( '\n' ).join( '\n\t' ) }\n\tirradiance += emAtmosphereDiffuse;\n#endif\n#if defined( RE_IndirectSpecular )`;
-			shader.fragmentShader = shader.fragmentShader.replace( '#include <lights_fragment_begin>', chunk.replace( marker, replacement ) );
-		}
+		const marker = '#include <lights_fragment_begin>';
+		if ( ! shader.fragmentShader.includes( marker ) ) throw new Error( 'ElseMesh WebGL atmosphere material is missing the diffuse lighting stage' );
+		shader.fragmentShader = shader.fragmentShader.replace( marker, `${marker}\n${worldNormalDeclaration}\n${irradiance}\nirradiance += emAtmosphereDiffuse;` );
 		shader.uniforms.emAtmosphereSkyIrradianceTexture = { value: atmosphere.skyIrradianceTexture };
 		shader.uniforms.emAtmosphereHorizonTexture = { value: atmosphere.horizonTexture };
 		shader.uniforms.emAtmosphereNight = { get value() { return G.night.value; } };
