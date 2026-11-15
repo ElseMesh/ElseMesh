@@ -52,9 +52,12 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   those shapes with the active region and its instance transforms.
 - Presence updates remain client-reported poses. The owner bounds horizontal
   displacement by the signed movement speed using a capped 100 ms burst credit;
-  this prevents repeated speed bursts but is not collision validation. Hosts
-  must also reject swept paths that intersect authoritative collision before
-  treating a reported position as traversable.
+  a first pose without spawn candidates must also stay within the signed spawn
+  radius. These checks prevent arbitrary distant admission and repeated speed
+  bursts but are not collision validation. Portal handoffs outside the spawn
+  radius require an owner-verifiable handoff proof before admission. Hosts must
+  reject swept paths that intersect authoritative collision before treating a
+  reported position as traversable.
 - Dynamic doors require an authoritative interaction request and a
   host-committed transition carrying the stable door ID, sequence/transition
   ID, start time, target state, and collision change. The same committed event

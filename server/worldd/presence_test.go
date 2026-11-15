@@ -142,6 +142,31 @@ func TestPresenceBoundsHorizontalSpeedWithCappedBurstCredit(t *testing.T) {
 	}
 }
 
+func TestPresenceRejectsInitialPoseOutsideSpawnRadius(t *testing.T) {
+	d := presenceTestDaemon(t)
+	now := time.Now()
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 1.38, -1}
+	request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindPresenceRequest(&request, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(request, now); err == nil || err.Error() != "spawn_outside_radius" {
+		t.Fatalf("initial pose outside signed spawn radius accepted: %v", err)
+	}
+	if len(d.players) != 0 {
+		t.Fatal("rejected initial position created a presence session")
+	}
+
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{0, 1.38, 8}
+	if _, err := d.presenceRequest(request, now.Add(time.Second)); err != nil {
+		t.Fatalf("initial pose within signed spawn radius rejected: %v", err)
+	}
+}
+
 func TestPresenceGhostLifecycle(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()

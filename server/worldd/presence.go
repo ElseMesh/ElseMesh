@@ -275,12 +275,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 			return peerResponse{}, errors.New("unexpected_spawn_candidates")
 		}
 		if !exists && len(request.SpawnCandidates) > 0 {
-			spawn := d.world.Spawn
-			spawnPosition := []float64{0, 3, 8}
-			if spawn != nil && len(spawn.Position) == 3 {
-				spawnPosition = spawn.Position
-			}
-			start := []float64{spawnPosition[0], spawnPosition[1] - playerEyeHeight, spawnPosition[2]}
+			start := d.presenceSpawnFootPosition()
 			chosen := false
 			lastDistanceSq := -1.0
 			for _, candidate := range request.SpawnCandidates {
@@ -306,6 +301,18 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 			}
 			if !chosen {
 				return peerResponse{}, errors.New("spawn_unavailable")
+			}
+		} else if !exists {
+			start := d.presenceSpawnFootPosition()
+			dx := request.Pose.Position[0] - start[0]
+			dz := request.Pose.Position[2] - start[2]
+			if dx*dx+dz*dz > d.world.Rules.SpawnRadius*d.world.Rules.SpawnRadius+1e-9 {
+				return peerResponse{}, errors.New("spawn_outside_radius")
+			}
+			for _, visitor := range d.players {
+				if now.Sub(visitor.updated) < presenceGhostAfter && presenceCapsulesOverlap(request.Pose.Position, visitor.Position) {
+					return peerResponse{}, errors.New("spawn_unavailable")
+				}
 			}
 		}
 		if exists && now.Sub(old.updated) < 50*time.Millisecond {
@@ -334,6 +341,14 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].ID < players[j].ID })
 	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players}, nil
+}
+
+func (d *daemon) presenceSpawnFootPosition() []float64 {
+	spawnPosition := []float64{0, 3, 8}
+	if d.world.Spawn != nil && len(d.world.Spawn.Position) == 3 {
+		spawnPosition = d.world.Spawn.Position
+	}
+	return []float64{spawnPosition[0], spawnPosition[1] - playerEyeHeight, spawnPosition[2]}
 }
 
 // Expire silent records even if there are no other connected visitors
