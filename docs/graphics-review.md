@@ -226,9 +226,31 @@ made for this revision, so the vegetation/sand parity gap and 90% estimate
 remain open pending a live render. On 2026-11-15 the review setup was confirmed
 on AMD Radeon Renoir: Chromium used the named Weston Wayland socket, ANGLE GL,
 and `/dev/dri/renderD128`; CDP reported the AMD RadeonSI renderer and a 1600×813
-WebGL canvas. The captured browser was still on the start overlay. Chromium
-exited while the overlay was being dismissed, before a matched playable view
-could be captured. The renderer setup is verified; the diffuse change is not.
+WebGL canvas. Chromium exited in attempts using the CTA's normal pointer-lock
+request, while the Weston compositor and preview server remained healthy. The
+idle page stayed alive for over two minutes. In a separate run, overriding
+`HTMLCanvasElement.prototype.requestPointerLock` in the review page before
+clicking the CTA let the browser enter the scene; this workaround only disables
+mouse capture for the diagnostic.
+
+The captured `swashAbove` frame at simulation time 1000 s has the same 1600×813
+canvas and crop coordinates as the earlier AMD comparison. Its Rec. 709
+diagnostic RGB means (WebGL vs pre-split WebGPU) are:
+
+| Region | WebGL | WebGPU reference |
+| --- | --- | --- |
+| Sea | 125.5, 148.0, 122.2 | 133.7, 171.4, 151.8 |
+| Swash | 225.3, 216.0, 199.5 | 227.3, 218.4, 200.5 |
+| Dry sand | 207.0, 190.2, 160.5 | 222.2, 209.7, 185.8 |
+| Vegetation | 99.9, 94.9, 76.9 | 155.1, 148.0, 115.6 |
+
+Compared with the previous WebGL capture, all four crops changed by at most
+1.3 RGB points. The corrected diffuse accumulator therefore does not close the
+visible vegetation and sand gap. These compositor crop means are diagnostic,
+not pixel-exact renderer conformance or performance results. The capture is
+available at
+[the current AMD WebGL frame](images/tidewater-split-webgl-amd-diffuse-corrected-2026-11-15.png).
+Tidewater parity remains 90%.
 
 ## 2026-11-07 Tidewater main beach-grit baseline
 

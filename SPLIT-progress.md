@@ -114,18 +114,30 @@ WebGPU visual parity remain incomplete.
   Three.js diffuse materials consume the `irradiance` accumulator from
   `lights_fragment_begin`; the previous hook modified the separate
   `iblIrradiance` multiscatter/specular input. The adapter now adds atmosphere
-  sky/horizon light to the diffuse accumulator and preserves PMREM. The focused
-  hook test passes, but no live AMD capture has verified the visual effect;
+  sky/horizon light to the diffuse accumulator and preserves PMREM. A live AMD
+  WebGL capture now verifies the scene renders with the hook installed, but its
+  four crop means differ by at most 1.3 RGB points from the previous WebGL
+  capture; the vegetation/sand gap against WebGPU remains substantial. The
+  focused hook test passes, but this correction does not close visual parity;
   Tidewater parity remains 90%.
 
 - 2026-11-15: verified the AMD browser-review route with a dedicated Weston
   session, private mode-0700 runtime directory, native Wayland, ANGLE GL, and
   `/dev/dri/renderD128`. CDP reported `ANGLE (AMD, AMD Radeon Graphics
   (radeonsi renoir ACO), OpenGL ES 3.2)` and a 1600x813 WebGL canvas. The
-  captured page remained on the start overlay; Chromium exited while entering
-  the world (63 CPU seconds, 1.51 GB peak memory), before a matched playable
-  view could be captured. This confirms AMD availability and the review setup,
-  not the diffuse fix or visual parity. Tidewater parity remains 90%.
+  normal start CTA requests pointer lock; Chromium exited in that path while
+  Weston and the preview remained alive. An untouched control remained alive
+  beyond two minutes. With `requestPointerLock()` stubbed in the review page
+  before clicking, the scene entered and stayed open long enough to capture.
+  WebGL vs pre-split WebGPU means were 125.5/148.0/122.2 vs
+  133.7/171.4/151.8 in sea, 225.3/216.0/199.5 vs 227.3/218.4/200.5 in swash,
+  207.0/190.2/160.5 vs 222.2/209.7/185.8 on dry sand, and 99.9/94.9/76.9 vs
+  155.1/148.0/115.6 in vegetation. WebGL crop means were nearly unchanged
+  from the previous WebGL capture; the diffuse correction has not closed the
+  visible gap. Pointer-lock behavior remains unverified in this `--no-input`
+  Weston environment. The capture is in
+  `docs/images/tidewater-split-webgl-amd-diffuse-corrected-2026-11-15.png`;
+  Tidewater parity remains 90%.
 
 - 2026-11-15: Tidewater now exports an inactive generic static-model sidecar
   for coconut palms, including its source near/far GLBs, post-scatter
