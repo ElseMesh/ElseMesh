@@ -28,7 +28,7 @@ assert.match( THREE.ShaderChunk.lights_fragment_maps, /getIBLRadiance\( geometry
 assert.match( shader.fragmentShader, /prior material hook/, 'existing material hooks still run' );
 assert.equal( shader.uniforms.emAtmosphereSkyIrradianceTexture.value, skyIrradianceTexture );
 assert.equal( shader.uniforms.emAtmosphereHorizonTexture.value, horizonTexture );
-assert.equal( material.customProgramCacheKey(), 'test-profile|elsemesh-atmosphere-diffuse-v2' );
+assert.equal( material.customProgramCacheKey(), 'test-profile|elsemesh-atmosphere-diffuse-v3' );
 assert.notEqual( priorHook, material.onBeforeCompile );
 
 const scene = new THREE.Scene();
