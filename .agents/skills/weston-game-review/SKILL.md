@@ -12,6 +12,9 @@ Use the checked-in display setup and browser helper; do not launch Weston with
 
 ### Keep the user's desktop input out of the test
 
+- Treat a visible review as observation-only. Assume the user may touch the
+  desktop during the review; never rely on them avoiding the Weston window to
+  protect test state.
 - Configure the review so the user's mouse and keyboard cannot control the
   game or browser, even if the Weston window is visible or focused. Keep Weston
   input disabled (`--no-input`) for the whole review; never enable its input
