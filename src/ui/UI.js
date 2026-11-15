@@ -2038,7 +2038,6 @@ export class UI {
 		this.navigationMap.hidden = ! activeMap;
 		if ( activeMap ) {
 			this.navigationMapImage.alt = activeMap.alt;
-			if ( this.navigationMapImage.getAttribute( 'src' ) !== activeMap.src ) this.navigationMapImage.setAttribute( 'src', activeMap.src );
 		} else this.navigationMapImage.removeAttribute( 'src' );
 
 		const degrees = normalizeNavigationHeading( heading );
@@ -2048,10 +2047,40 @@ export class UI {
 			this.navigationCardinal.textContent = compass[ [ 'north', 'east', 'south', 'west' ][ Math.round( degrees / 90 ) % 4 ] ];
 		}
 		if ( activeMap ) {
-			const projected = navigationMapPosition( activeMap.bounds, position, this.navigationMapImage.naturalWidth, this.navigationMapImage.naturalHeight );
+			const headingUp = map?.orientation !== 'north-up';
+			const zoom = map?.zoom ?? 1;
+			const projected = navigationMapPosition( activeMap.bounds, position, this.navigationMapImage.naturalWidth || 1, this.navigationMapImage.naturalHeight || 1 );
 			const markerVisible = !! projected?.visible;
+			if ( headingUp && ! markerVisible ) {
+				this.navigationMap.hidden = true;
+				this.navigationMapImage.removeAttribute( 'src' );
+				return;
+			}
+			if ( this.navigationMapImage.getAttribute( 'src' ) !== activeMap.src ) this.navigationMapImage.setAttribute( 'src', activeMap.src );
 			this.navigationMapMarker.hidden = ! markerVisible;
-			if ( markerVisible ) {
+			if ( headingUp ) {
+				this.navigationMapImage.style.right = 'auto';
+				this.navigationMapImage.style.bottom = 'auto';
+				this.navigationMapImage.style.width = `${ ( zoom * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapImage.style.height = `${ ( zoom * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapImage.style.left = `${ ( 50 - projected.x * zoom * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapImage.style.top = `${ ( 50 - projected.y * zoom * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapImage.style.transformOrigin = `${ ( projected.x * 100 ).toFixed( 2 ) }% ${ ( projected.y * 100 ).toFixed( 2 ) }%`;
+				this.navigationMapImage.style.transform = `rotate(${ - degrees }deg)`;
+				this.navigationMapMarker.style.left = '50%';
+				this.navigationMapMarker.style.top = '50%';
+				this.navigationMapMarker.style.transform = 'translate(-50%, -50%)';
+			} else {
+				this.navigationMapImage.style.right = '0';
+				this.navigationMapImage.style.bottom = '0';
+				this.navigationMapImage.style.width = '100%';
+				this.navigationMapImage.style.height = '100%';
+				this.navigationMapImage.style.left = '0';
+				this.navigationMapImage.style.top = '0';
+				this.navigationMapImage.style.transformOrigin = '50% 50%';
+				this.navigationMapImage.style.transform = 'none';
+			}
+			if ( markerVisible && ! headingUp ) {
 				this.navigationMapMarker.style.left = `${ ( projected.x * 100 ).toFixed( 2 ) }%`;
 				this.navigationMapMarker.style.top = `${ ( projected.y * 100 ).toFixed( 2 ) }%`;
 				this.navigationMapMarker.style.transform = `translate(-50%, -50%) rotate(${ degrees }deg)`;
