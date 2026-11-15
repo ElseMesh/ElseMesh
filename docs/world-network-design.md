@@ -549,16 +549,9 @@ remain guest-readable unless their signed access policy requires invitations.
 The invitation is separate from account roles and does not replace owner-signed
 manifest/provider validation.
 
-When a world requires a Google or Facebook login, the identity provider's
-authenticated subject is linked directly to the ElseMesh visitor account and
-the visitor's ZeroTier NodeID. The world-bound admission assertion carries the
-resulting visitor identity and scopes it to that world and session. An IP
-address is only a current route hint: it can change, be shared, or be reassigned,
-so it must not establish account ownership, visitor identity, or authorization.
-The local owner's account is linked through the same account authentication
-flow; `127.0.0.1` is not proof that a request belongs to the owner. A NodeID
-identifies a ZeroTier node/device, not by itself a human account, so account
-linking must be explicit and revocable rather than inferred from the node or IP.
+See [Google and Facebook visitor authentication](visitor-identity-and-world-state.md#google-and-facebook-visitor-authentication)
+for account-to-node binding and the rule that IP addresses are route hints,
+not identities.
 
 For a world entry, the destination owns the preferred spawn. Its version-2
 source and signed runtime manifest must define `rules.maxVisitors` (1–128) and
