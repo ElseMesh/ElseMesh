@@ -1,11 +1,11 @@
 # Optional account and world roles
 
-This document specifies the account boundary for ElseMesh. `server/accountd` implements opt-in Google ID-token verification, nonce-bound Ed25519 proof of possession, exact-origin CORS, short-lived in-memory sessions, and a private account-key mapping file. The browser includes an opt-in sign-in and account-key UI. `worldd` now consumes owner-signed `world.content.edit` grants at the proposal-inbox write path; this queues unsigned, reviewable proposals and does not publish or sign world content.
+This document specifies the account boundary for ElseMesh. `server/accountd` currently implements opt-in Google ID-token verification, nonce-bound Ed25519 proof of possession, exact-origin CORS, short-lived in-memory sessions, and a private account-key mapping file. The browser includes an opt-in Google sign-in and account-key UI. Visitor authentication through Google or Facebook and short-lived assertions for `worldd` admission are a separate required extension described in [visitor identity and world-local state](visitor-identity-and-world-state.md); they are not implemented by the current role workflow. `worldd` now consumes owner-signed `world.content.edit` grants at the proposal-inbox write path; this queues unsigned, reviewable proposals and does not publish or sign world content.
 
 ## Trust boundaries
 
 - Worlds, nodes, and owners keep their existing cryptographic identities. Google is never a source of world ownership, node identity, manifest authority, or host grants.
-- A world remains readable and playable as a guest when its visitor is signed out, offline, or unable to contact the account service. Accounts add optional per-world roles; they do not become a global login gate.
+- Guest play remains available by default when a visitor is signed out or the account service is unavailable. A signed world access policy may require a verified ElseMesh account; account sign-in is not a platform-wide login gate.
 - Google proves control of a Google account to an optional account broker. It does not issue world roles. Only the key that owns a ThruHold can issue or revoke that world's role grants.
 - Role grants target an account public key, not an email address or raw Google subject. A browser creates the key and proves possession. The broker privately maps the verified Google `sub` to that key so the same account can recover its account association on another device.
 - Account and role endpoints are separate from `worldd`'s public manifest, asset, and lookup endpoints and from `directoryd`. CORS is never authorization. Account endpoints require explicit allowed origins and do not accept credentialed wildcard CORS.

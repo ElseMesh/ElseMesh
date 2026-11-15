@@ -92,7 +92,27 @@ session-derived player IDs. They are not stable returning-visitor identities.
 A general visitor-key proof and owner-side persistent record lookup/binding
 contract is not yet implemented. Identity recovery, key rotation, revocation
 and cross-world linkability/privacy remain design decisions. Ordinary guest
-visits need not require Google account sign-in.
+visits need not require account sign-in.
+
+## Google and Facebook visitor authentication
+
+Visitors must be able to authenticate an ElseMesh account by signing in with
+Google or Facebook. The external provider verifies control of its account;
+ElseMesh maps the provider's issuer-scoped stable subject to a user-held
+ElseMesh account key. Email addresses are contact attributes, never account
+identifiers. The browser proves possession of that key, and the account broker
+issues a short-lived, audience- and world-bound signed visitor assertion for
+`worldd`. Assertions expose only the ElseMesh account identity and the
+authentication status needed by the world's signed access policy; external
+provider tokens and raw provider subject IDs stay between the browser and the
+account broker. Provider sign-in does not grant world access by itself: the
+world owner still applies invitations, visitor limits, bans and other signed
+admission rules.
+
+Guest access remains the default unless a world owner requires an authenticated
+account. The current account service implements Google sign-in for role-gated
+authoring actions only. Facebook login, account assertions for visitor
+admission, and stable account-to-presence binding are not implemented yet.
 
 ## State that does and does not traverse a portal
 
