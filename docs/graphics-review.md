@@ -44,6 +44,14 @@ the dump did not yield a symbolized call stack. The cause remains unresolved;
 the live WebGL fishing, sale, and upgrade path was not reached, and no WebGL
 gameplay parity conclusion is drawn.
 
+Inspecting the five retained minidumps confirms the same exception site and
+main-thread frame chain in every run. Each context has `R11=0`; disassembly of
+Chromium 156.0.8078.79 at `0xd698ec0` is `push 0x8(%r11)`, which faults at
+address `0x8`. The first captured return offsets are `0x726a5fd`, `0x6e905c1`,
+`0x70a21d9`, `0x867b755`, and `0x70941f6`. These unsymbolized frames do not
+identify which start-callback operation triggers the browser fault. AMD device
+selection is verified independently and is not the missing prerequisite here.
+
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
 The split Tidewater geometry builder emitted authored vertex colors as a custom
