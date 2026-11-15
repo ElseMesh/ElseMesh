@@ -178,7 +178,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 			playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
 			movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 } } },
 			entryPointPrompt: 'Which Hogwarts house will you join?',
-			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1 },
+			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1, basis: 'world-authored camera reference' },
 			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, visualComponentPathExclusionsByMap: previewVisualComponentPathExclusions },
 			previewSupport: { status: 'provisional', position: [ 0, 6.75, 8 ], halfExtents: [ 2, 0.25, 3 ], basis: 'synthetic rendered floor bounds' },
 			choices: descriptorChoices,

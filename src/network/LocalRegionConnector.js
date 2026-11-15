@@ -282,9 +282,10 @@ export class LocalRegionConnector {
 			} finally {
 				ownerConnector.close();
 			}
+			const expectedSpawn = Object.fromEntries( [ 'position', 'yaw', 'pitch' ].filter( key => selection.previewSpawn[ key ] !== undefined ).map( key => [ key, selection.previewSpawn[ key ] ] ) );
 			const expectedEntryPoints = selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ), ...( choice.avatarOptionId ? { avatarOptionId: choice.avatarOptionId } : {} ) } ) );
 			requireValue( ownerManifest.worldId === descriptor.worldId
-				&& canonicalJSON( ownerManifest.spawn ) === canonicalJSON( selection.previewSpawn )
+				&& canonicalJSON( ownerManifest.spawn ) === canonicalJSON( expectedSpawn )
 				&& canonicalJSON( ownerManifest.rules.playerCapsule ) === canonicalJSON( selection.playerCapsule )
 				&& canonicalJSON( ownerManifest.rules.movementProfiles ) === canonicalJSON( selection.movementProfiles )
 				&& canonicalJSON( ownerManifest.avatarOptions || [] ) === canonicalJSON( avatarOptions )
