@@ -12,7 +12,6 @@ import { createWorldInviteURL, worldLinkFromLocation, WorldConnector } from '../
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 import { matchingPortalAgreement } from '../src/network/PortalAgreement.js';
-import { matchingPortalAgreement } from '../src/network/PortalAgreement.js';
 
 const portal = { entry: { position: [ 0, 1, 0 ], yaw: 0 } };
 const portalViewDeltas = [];
@@ -50,7 +49,7 @@ const scaledEntry = { position: [ 10, 2, - 4 ], yaw: 0 };
 const scaledExit = { position: [ - 5, 20, 12 ], yaw: Math.PI / 2 };
 const scaledPlayer = mapPortalPlayerState( { position: new Vector3( 12, 4, - 1 ), velocity: { x: 1, y: 2, z: 3 }, yaw: 0.5, pitch: 0.2 }, scaledEntry, scaledExit, 3 );
 assert.ok( scaledPlayer.position.distanceTo( new Vector3( 4, 26, 6 ) ) < 1e-9, 'portal scale ratio scales position offset before rotation' );
-assert.deepEqual( scaledPlayer.velocity, { x: 9, y: 6, z: - 3 }, 'portal scale ratio scales linear velocity' );
+assert.ok( Math.hypot( scaledPlayer.velocity.x - 9, scaledPlayer.velocity.y - 6, scaledPlayer.velocity.z + 3 ) < 1e-9, 'portal scale ratio scales linear velocity' );
 assert.equal( scaledPlayer.yaw, 0.5 + Math.PI / 2, 'portal scale ratio leaves orientation unchanged' );
 assert.ok( mapPortalPlayerState( scaledPlayer, scaledExit, scaledEntry, 1 / 3 ).position.distanceTo( new Vector3( 12, 4, - 1 ) ) < 1e-9, 'reciprocal ratio restores position' );
 const scaledBoat = mapPortalVehicleState( boatState, scaledEntry, scaledExit, 3 );

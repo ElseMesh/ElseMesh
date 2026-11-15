@@ -8,7 +8,7 @@ import { exportPortalLink, importPortalLink } from '../tools/portal-link.mjs';
 import { applyWorldProposal } from '../tools/apply-world-proposal.mjs';
 import { App } from '../src/App.js';
 
-const portal = {id:'elsemesh-portal:two-sided',destinationWorldId:'elsemesh:front',entry:{position:[0,2,0],yaw:0},exit:{position:[10,2,0],yaw:.4},enabled:true,openView:true,back:{destinationWorldId:'elsemesh:back',exit:{position:[50,2,0],yaw:Math.PI},enabled:true,openView:true}};
+const portal = {id:'elsemesh-portal:two-sided',destinationWorldId:'elsemesh:front',destinationPortalId:'elsemesh-portal:front-door',destinationPortalSide:'front',scaleRatio:2,entry:{position:[0,2,0],yaw:0},exit:{position:[10,2,0],yaw:.4},enabled:true,openView:true,back:{destinationWorldId:'elsemesh:back',destinationPortalId:'elsemesh-portal:back-door',destinationPortalSide:'back',scaleRatio:3,exit:{position:[50,2,0],yaw:Math.PI},enabled:true,openView:true}};
 const front = new Vector3(0,2,2), back = new Vector3(0,2,-2);
 const frontRoute = portalRouteFromPosition(portal,front), backRoute=portalRouteFromPosition(portal,back);
 assert.equal(frontRoute,portal);
@@ -25,7 +25,7 @@ assert.equal(portalRouteFromPosition({...portal,enabled:false},back).destination
 
 function exercise(previous,current,{crossing=false}={}) {
  const selected=[];
- const app={player:{mode:'walk'},remoteWorldActive:true,worldConnector:{manifest:{portals:[portal]}},camera:{position:current.clone()},portalPreviousPosition:previous.clone(),portalPreparations:new Map([[portal.id,{status:'ready',root:{},connector:{}}],[backRoute.connectionKey,{status:'ready',root:{},connector:{}}]]),portalTransferStatus(){return {allowed:true};},
+ const app={player:{mode:'walk'},remoteWorldActive:true,worldConnector:{manifest:{worldId:'elsemesh:source',portals:[portal]}},camera:{position:current.clone()},portalPreviousPosition:previous.clone(),portalPreparations:new Map([[portal.id,{status:'ready',root:{},connector:{manifest:{worldId:'elsemesh:front',portals:[{id:'elsemesh-portal:front-door',destinationWorldId:'elsemesh:source',destinationPortalId:portal.id,destinationPortalSide:'front',scaleRatio:.5}]}}}],[backRoute.connectionKey,{status:'ready',root:{},connector:{manifest:{worldId:'elsemesh:back',portals:[{id:'elsemesh-portal:back-door',back:{destinationWorldId:'elsemesh:source',destinationPortalId:portal.id,destinationPortalSide:'back',scaleRatio:1/3}}]}}}]]),portalTransferStatus(){return {allowed:true};},
  cancelUnneededPortalPreparations(key){this.selectedKey=key;},clearPortalView(){this.portalViewId=null;},portalView:{setTarget(root,route){selected.push(route);}},async enterWorldPortal(route){selected.push(route);this.crossed=true;}};
  App.prototype.updateWorldPortals.call(app);
  assert.equal(!!app.crossed,crossing);
