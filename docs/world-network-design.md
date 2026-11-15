@@ -381,12 +381,12 @@ may explicitly request a water renderer, and other worlds such as Hogwarts may
 provide a better-suited implementation.
 
 For the Hogwarts bridge, the four house choice IDs, button label, and prompt
-are world-owned metadata. The current Great Hall preview presents that button
-and the choices; individual house spawn poses remain blocked on a location
-survey. The bridge must translate a selected choice into a validated region
-and collision-backed spawn before the player enters. The same generic path
-must remain usable by Tidewater and future worlds without a default-path
-change.
+are world-owned metadata. The current Great Hall preview keeps this chooser
+disabled until house arrival poses are surveyed. When enabled, the engine owns
+the generic selection and admission flow, and Hogwarts maps each selected
+house to its matching uniform appearance. The bridge must translate a selected
+choice into a validated region and collision-backed spawn before the player
+enters. The same generic path must remain usable by other worlds.
 
 Game-backed regions also carry a collision layer derived from Unreal BodySetup
 data; renderer triangles are not a substitute. Interactive doors are shared
