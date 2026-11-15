@@ -182,14 +182,33 @@ export class Colliders {
 
 	}
 
+	// Find a nearby raised walkable surface that a grounded capsule can step onto.
+	// The returned height is only a candidate; callers that stream collision data
+	// must validate the raised path before applying it.
+	stepCapsuleToSurface( pos, from, radius, height, maxStepHeight ) {
+
+		if ( ! Number.isFinite( maxStepHeight ) || maxStepHeight <= 0 ) return null;
+		const fromGround = this.groundHeightAt( from.x, from.z, from.y + 0.08, radius * 0.25 );
+		if ( ! Number.isFinite( fromGround ) || from.y - fromGround > 0.08 ) return null;
+
+		const stepGround = this.groundHeightAt( pos.x, pos.z, fromGround + maxStepHeight + 1e-4, radius );
+		const rise = stepGround - fromGround;
+		if ( ! Number.isFinite( stepGround ) || rise < 0.02 || rise > maxStepHeight + 1e-4 ) return null;
+
+		const candidate = { x: pos.x, y: stepGround, z: pos.z };
+		if ( this.resolveCapsule( candidate, radius, height ) ) return null;
+		return stepGround;
+
+	}
+
 	// Push a vertical capsule (feet at pos.y) out of solid geometry. Returns true if collided.
-	resolveCapsule( pos, radius, height, stepHeight = 0.35 ) {
+	resolveCapsule( pos, radius, height ) {
 
 		let hit = false;
 		for ( const b of this.boxes ) {
 
 			if ( ! b.solid ) continue;
-			if ( pos.y + height < b.bottom || pos.y + stepHeight > b.top ) continue;
+			if ( pos.y + height <= b.bottom || pos.y >= b.top ) continue;
 			if ( Math.abs( pos.x - b.center.x ) > b.radius + radius || Math.abs( pos.z - b.center.z ) > b.radius + radius ) continue;
 			const [ lx, lz ] = this._toLocal( b, pos.x, pos.z );
 			const cx = Math.max( - b.half.x, Math.min( b.half.x, lx ) );
@@ -220,7 +239,7 @@ export class Colliders {
 
 		for ( const c of this.cylinders ) {
 
-			if ( pos.y + height < c.yMin || pos.y + stepHeight > c.yMax ) continue;
+			if ( pos.y + height <= c.yMin || pos.y >= c.yMax ) continue;
 			const dx = pos.x - c.x, dz = pos.z - c.z;
 			const r = c.radius + radius;
 			const d2 = dx * dx + dz * dz;

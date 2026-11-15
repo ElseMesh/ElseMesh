@@ -9,8 +9,10 @@ const SWIM_EYE = EYE * 0.1; // eyes above the body's float point while swimming
 // water depth (mean level over the feet) where you start swimming / find your feet again
 const SWIM_DEPTH = 1.35;
 const STAND_DEPTH = 1.1;
-// Provisional engine threshold; no native movement evidence verifies 0.4 m for this world.
-const PLAYER_STEP_HEIGHT_METERS = 0.4;
+// The Great Hall's measured floor-end collision rises 0.578 m above the aisle.
+// This threshold includes 2.2 cm for collider sampling; it is not a claim about
+// Unreal's native MaxStepHeight.
+const PLAYER_STEP_HEIGHT_METERS = 0.6;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -23,6 +25,8 @@ const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THRE
 const _wish = new THREE.Vector3();
 const _hostedTarget = new THREE.Vector3();
 const _hostedAxisStep = new THREE.Vector3();
+const _hostedStepStart = new THREE.Vector3();
+const _hostedStepTarget = new THREE.Vector3();
 const HOSTED_MOVE_AXES = [ 'x', 'z', 'y' ];
 const _boatLocal = new THREE.Vector3();
 const _boatPrevLocal = new THREE.Vector3();
@@ -154,6 +158,7 @@ export class Player {
 		const k = 1 - Math.exp( - ( this.grounded ? 14 : 2.5 ) * dt );
 		this.velocity.x += ( _wish.x * speed - this.velocity.x ) * k;
 		this.velocity.z += ( _wish.z * speed - this.velocity.z ) * k;
+		const wasGrounded = this.grounded;
 		if ( this.grounded && this.worldMovement.jumpSpeed > 0 && inp.hit( 'Space' ) ) { this.velocity.y = this.worldMovement.jumpSpeed; this.grounded = false; }
 		this.velocity.y -= this.gravity * dt;
 		this._previousPosition.copy( this.position );
@@ -173,7 +178,24 @@ export class Player {
 		} else {
 			this.position.copy( _hostedTarget );
 		}
-		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
+		if ( wasGrounded && this.velocity.y <= 0 && this.colliders?.stepCapsuleToSurface ) {
+			const stepY = this.colliders.stepCapsuleToSurface( this.position, this._previousPosition, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
+			if ( Number.isFinite( stepY ) ) {
+				_hostedStepStart.copy( this._previousPosition );
+				_hostedStepStart.y = stepY;
+				_hostedStepTarget.copy( this.position );
+				_hostedStepTarget.y = stepY;
+				const pathReady = ! this.hostedCollisionGuard || (
+					this.hostedCollisionGuard( this._previousPosition, _hostedStepStart ) &&
+					this.hostedCollisionGuard( _hostedStepStart, _hostedStepTarget )
+				);
+				if ( pathReady ) {
+					this.position.y = stepY;
+					this.velocity.y = 0;
+				}
+			}
+		}
+		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters );
 		this.resolveBoatCollision( this.position, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;
 		// Hosted collision data includes object and deck colliders, while the signed
@@ -327,8 +349,16 @@ export class Player {
 
 		const p = this.position;
 		const old = p.clone();
+		const wasGrounded = this.grounded;
 		p.addScaledVector( this.velocity, dt );
-		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
+		if ( wasGrounded && this.velocity.y <= 0 && this.colliders?.stepCapsuleToSurface ) {
+			const stepY = this.colliders.stepCapsuleToSurface( p, old, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
+			if ( Number.isFinite( stepY ) ) {
+				p.y = stepY;
+				this.velocity.y = 0;
+			}
+		}
+		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters );
 		this.resolveBoatCollision( p, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );
@@ -499,7 +529,7 @@ export class Player {
 
 		p.addScaledVector( this.velocity, dt );
 		p.y = Math.min( p.y, surfaceY + 0.05 );
-		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, 1.0, 0 );
+		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, 1.0 );
 		this.resolveBoatCollision( p, 1.0 );
 		const g = this.groundAt( p.x, p.z, p.y + 0.3 );
 		if ( p.y < g + 0.25 ) p.y = g + 0.25;

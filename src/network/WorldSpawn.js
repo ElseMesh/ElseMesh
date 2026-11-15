@@ -26,7 +26,7 @@ export function worldSpawnCandidates( spawn, radius, colliders, { limit = WORLD_
 			if ( Number.isFinite( ground ) && position.y < ground ) position.y = ground;
 			const distanceSq = ( position.x - start.x ) ** 2 + ( position.z - start.z ) ** 2;
 			if ( distanceSq > radius * radius + 1e-9 ) continue;
-			if ( colliders.resolveCapsule( { ...position }, capsule.radiusMeters, capsule.heightMeters, 0.001 ) ) continue;
+			if ( colliders.resolveCapsule( { ...position }, capsule.radiusMeters, capsule.heightMeters ) ) continue;
 			candidates.push( { position: [ position.x, position.y, position.z ], distanceSq } );
 		}
 		const farthestDistanceSq = candidates.reduce( ( farthest, candidate ) => Math.max( farthest, candidate.distanceSq ), 0 );
