@@ -66,6 +66,11 @@ canceled when the final lease is released or expires.
 
 ### Server-authoritative movement and content scope
 
+This is the required runtime contract. The current `worldd` presence endpoint
+still receives client-reported poses; it enforces signed horizontal speed,
+spawn-radius, visitor-cap, and spawn-overlap checks, but it does not yet sweep
+movement against collision or derive player positions from input intent.
+
 Treat the browser as an untrusted requester. It must not choose arbitrary
 world-region IDs or claim a player position to unlock content. The active world
 authority (`worldd`) tracks the accepted player pose and movement mode,
