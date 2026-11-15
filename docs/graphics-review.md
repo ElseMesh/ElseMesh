@@ -316,6 +316,35 @@ samples are from one review host and do not establish device-wide performance
 acceptance. Tidewater parity remains 90%; supported-hardware gameplay
 performance and the visible material gap remain open.
 
+### Repeated AMD WebGPU pass profile against the pre-split build, 2026-11-15
+
+I repeated the comparison with the existing `?bench` timestamp profiler so the
+same render passes could be compared directly. Chromium ran through native
+Wayland in the dedicated Weston display; browser-level CDP reported
+`ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon Graphics (RADV RENOIR)), radv-26.1.6)`.
+The split source was `18705823`; the pre-split build was the retained
+`23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e` build. Each run used the `swashAbove`
+camera, 1600×813 output, default visual-quality settings, 90 warm-up frames,
+then 120 measured frames at `dt=1/60`. I used the same benchmark implementation
+from the pre-split build and from the split build, overriding only its output
+size to keep the earlier comparison's resolution.
+
+| Build | Run GPU averages | Median run GPU average | Median of per-run frame medians | Median CPU frame |
+| --- | --- | ---: | ---: | ---: |
+| Pre-split WebGPU | 82.84, 77.70, 77.18 ms | 77.70 ms | 75.69 ms | 8.27 ms |
+| Split WebGPU | 77.65, 81.08, 76.91 ms | 77.65 ms | 75.30 ms | 7.60 ms |
+
+The median run averages differ by 0.05 ms (about 0.1%), much less than the
+run-to-run spread. The average across the three runs is 79.24 ms pre-split and
+78.55 ms split. The largest individual pass costs were also nearly unchanged:
+opaque averaged 22.31 ms pre-split / 22.10 ms split; water plus transparency
+averaged 19.15 / 19.17 ms; TAAU 5.43 / 5.39 ms; refraction 4.83 / 4.79 ms.
+This matched AMD workload shows no measurable GPU-frame regression attributable
+to the split. It also does not reproduce 27 FPS: pass profiling drives frames
+back-to-back rather than measuring display presentation cadence, and both builds
+remain GPU-bound in this view. This is one AMD device and one camera, not a
+device-wide performance or visual-parity result. Tidewater parity remains 90%.
+
 ## 2026-11-07 Tidewater main beach-grit baseline
 
 The baseline was rendered from the original `tidewater/main` ref at
