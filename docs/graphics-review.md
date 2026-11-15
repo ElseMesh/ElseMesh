@@ -103,6 +103,25 @@ captures.
 [Fresh WebGPU profile](images/tidewater-fresh-wallet-webgpu-amd-2026-11-15.png),
 [fresh WebGL profile](images/tidewater-fresh-wallet-webgl-amd-2026-11-15.png).
 
+## 2026-11-15 AMD straight spawn-to-pier walk
+
+The live walk reproduced the player's route from the default start. Before the
+fix, the start was at `x=53.6` while the pier stairs and deck were centered at
+`x=55` with a 1.3 m half-width. Straight-ahead movement left the player beside
+the deck; live state reached submerged terrain and no walkable collider. The
+Tidewater-authored built-in start and signed world spawn now share the pier
+centerline. A fresh WebGPU profile started at `[55, 2.46, -77]`; after walking
+straight with sprint, the player was at `[55.98, 2.3, -60.38]` and the live
+collider reported the 2.3 m deck. A separate fresh WebGL profile started at
+the same `[55, 2.46, -77]`; it reached `[55, 2.3, -59.06]` with the same live
+deck height. Both runs used the AMD Radeon through the configured ANGLE paths.
+This verifies the start-to-deck movement and collision in both renderers. The
+captures are movement evidence, not matched camera/material comparisons or a
+fishing-path parity result.
+
+[WebGPU walk](images/tidewater-pier-start-webgpu-amd-2026-11-15.png),
+[WebGL walk](images/tidewater-pier-start-webgl-amd-2026-11-15.png).
+
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
 The split Tidewater geometry builder emitted authored vertex colors as a custom

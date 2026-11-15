@@ -169,6 +169,15 @@ WebGPU visual parity remain incomplete.
   Tidewater gameplay and content parity moves from 91% to 93%; renderer
   appearance and controlled FPS remain open.
 
+- 2026-11-15: fixed the Tidewater start-to-pier walk in world-authored data.
+  The previous `x=53.6` start was outside the pier's narrow stair/deck centerline;
+  a live walk went beside the deck onto submerged terrain. The built-in start
+  and signed spawn now use `x=55`, and the pier regression test checks both
+  alignments. A rebuilt AMD live walk reaches the 2.3 m deck in WebGPU and
+  WebGL. This closes the straight start-to-deck collision gate only; fishing
+  replay from matched profiles, visual parity, and controlled FPS remain open.
+  See [the live walk captures](docs/graphics-review.md#2026-11-15-amd-straight-spawn-to-pier-walk).
+
 - 2026-11-15: Tidewater now exports an inactive generic static-model sidecar
   for coconut palms, including its source near/far GLBs, post-scatter
   placements, and three VEC4 vertex streams. The deterministic world-export
