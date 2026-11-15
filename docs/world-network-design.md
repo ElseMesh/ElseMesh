@@ -42,11 +42,15 @@ and subscriber lifetimes; identical in-flight requests are coalesced. A provider
 may prepare regions ahead of time or convert them on demand; either way, conversion stays
 off the renderer frame path and the host serves one shared result to every
 visitor. Responses are checked against a content digest and declared limits
-before installation. The host owns the shared bounded RAM and optional disk
-cache for all visitors, keyed by world ID, source revision, converter version,
-and region ID. `sourceRevision` identifies source content; `cacheRevision`
-identifies the generated response set and includes both source and converter
-identity. Browser OPFS caches scope asset IDs by world ID and `cacheRevision`,
+before installation. The host pins the provider's world ID, source revision,
+and cache revision when it starts. Every provider response carries those values
+in headers; missing or changed values are rejected so streamed collision and
+render data cannot silently mix different installed content or converter
+output. The host owns the shared bounded RAM and optional disk cache for all
+visitors, keyed by world ID, source
+revision, converter version, and region ID. `sourceRevision` identifies source
+content; `cacheRevision` identifies the generated response set and includes
+both source and converter identity. Browser OPFS caches scope asset IDs by world ID and `cacheRevision`,
 so converter changes cannot reuse stale derived GLBs while source-derived
 texture IDs remain tied to the source revision. Active reads stay pinned;
 unused entries are evicted by LRU policy. Clients separately release decoded
@@ -544,6 +548,17 @@ and replay protection are enforced by durable admission state. Existing worlds
 remain guest-readable unless their signed access policy requires invitations.
 The invitation is separate from account roles and does not replace owner-signed
 manifest/provider validation.
+
+When a world requires a Google or Facebook login, the identity provider's
+authenticated subject is linked directly to the ElseMesh visitor account and
+the visitor's ZeroTier NodeID. The world-bound admission assertion carries the
+resulting visitor identity and scopes it to that world and session. An IP
+address is only a current route hint: it can change, be shared, or be reassigned,
+so it must not establish account ownership, visitor identity, or authorization.
+The local owner's account is linked through the same account authentication
+flow; `127.0.0.1` is not proof that a request belongs to the owner. A NodeID
+identifies a ZeroTier node/device, not by itself a human account, so account
+linking must be explicit and revocable rather than inferred from the node or IP.
 
 For a world entry, the destination owns the preferred spawn. Its version-2
 source and signed runtime manifest must define `rules.maxVisitors` (1–128) and

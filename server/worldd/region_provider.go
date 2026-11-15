@@ -22,14 +22,18 @@ import (
 const maxRegionProviderDescriptorBytes = 1 << 20
 
 type dynamicRegionProviderDescriptor struct {
-	Schema   string `json:"schema"`
-	WorldID  string `json:"worldId"`
-	ReadOnly bool   `json:"readOnly"`
+	Schema         string `json:"schema"`
+	WorldID        string `json:"worldId"`
+	SourceRevision string `json:"sourceRevision"`
+	CacheRevision  string `json:"cacheRevision"`
+	ReadOnly       bool   `json:"readOnly"`
 }
 
 type regionProviderGateway struct {
 	upstream          *url.URL
 	worldID           string
+	sourceRevision    string
+	cacheRevision     string
 	allowedOrigins    map[string]struct{}
 	regionDiagnostics bool
 	requestSequence   atomic.Uint64
@@ -151,25 +155,42 @@ func (gateway *regionProviderGateway) discoverWorldID() (string, error) {
 	if response.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("descriptor returned HTTP %d", response.StatusCode)
 	}
-	return readRegionProviderDescriptor(response.Body)
-}
-
-func readRegionProviderDescriptor(reader io.Reader) (string, error) {
-	data, err := io.ReadAll(io.LimitReader(reader, maxRegionProviderDescriptorBytes+1))
+	descriptor, err := readRegionProviderDescriptorDetails(response.Body)
 	if err != nil {
 		return "", err
 	}
+	gateway.sourceRevision = descriptor.SourceRevision
+	gateway.cacheRevision = descriptor.CacheRevision
+	return descriptor.WorldID, nil
+}
+
+func readRegionProviderDescriptor(reader io.Reader) (string, error) {
+	descriptor, err := readRegionProviderDescriptorDetails(reader)
+	if err != nil {
+		return "", err
+	}
+	return descriptor.WorldID, nil
+}
+
+func readRegionProviderDescriptorDetails(reader io.Reader) (dynamicRegionProviderDescriptor, error) {
+	data, err := io.ReadAll(io.LimitReader(reader, maxRegionProviderDescriptorBytes+1))
+	if err != nil {
+		return dynamicRegionProviderDescriptor{}, err
+	}
 	if len(data) > maxRegionProviderDescriptorBytes {
-		return "", errors.New("descriptor exceeds 1 MiB")
+		return dynamicRegionProviderDescriptor{}, errors.New("descriptor exceeds 1 MiB")
 	}
 	var descriptor dynamicRegionProviderDescriptor
 	if err := json.Unmarshal(data, &descriptor); err != nil {
-		return "", fmt.Errorf("invalid descriptor: %w", err)
+		return dynamicRegionProviderDescriptor{}, fmt.Errorf("invalid descriptor: %w", err)
 	}
 	if descriptor.Schema != "elsemesh.dynamic-region-provider/1" || !descriptor.ReadOnly || !worldIDPattern.MatchString(descriptor.WorldID) {
-		return "", errors.New("descriptor has an unsupported schema, access mode, or world ID")
+		return dynamicRegionProviderDescriptor{}, errors.New("descriptor has an unsupported schema, access mode, or world ID")
 	}
-	return descriptor.WorldID, nil
+	if descriptor.SourceRevision == "" || len(descriptor.SourceRevision) > 512 || descriptor.CacheRevision == "" || len(descriptor.CacheRevision) > 512 {
+		return dynamicRegionProviderDescriptor{}, errors.New("descriptor has an invalid source or cache revision")
+	}
+	return descriptor, nil
 }
 
 func (gateway *regionProviderGateway) validateProviderResponse(response *http.Response) error {
@@ -180,6 +201,17 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	if response.Request != nil {
 		if requestID := response.Request.Header.Get("X-ElseMesh-Request-ID"); requestID != "" {
 			response.Header.Set("X-ElseMesh-Request-ID", requestID)
+		}
+	}
+	if response.Request != nil && strings.HasPrefix(response.Request.URL.Path, "/v1/") {
+		if got := response.Header.Get("X-ElseMesh-World-ID"); got == "" || got != gateway.worldID {
+			return fmt.Errorf("provider response world ID %q does not match hosted world %q", got, gateway.worldID)
+		}
+		if got := response.Header.Get("X-ElseMesh-Source-Revision"); got == "" || got != gateway.sourceRevision {
+			return errors.New("provider response source revision does not match the revision pinned at worldd startup")
+		}
+		if got := response.Header.Get("X-ElseMesh-Cache-Revision"); got == "" || got != gateway.cacheRevision {
+			return errors.New("provider response cache revision does not match the revision pinned at worldd startup")
 		}
 	}
 	if response.Request == nil || response.Request.URL.Path != "/v1/descriptor" {
@@ -193,12 +225,18 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	if len(data) > maxRegionProviderDescriptorBytes {
 		return errors.New("region provider descriptor exceeds 1 MiB")
 	}
-	worldID, err := readRegionProviderDescriptor(bytes.NewReader(data))
+	descriptor, err := readRegionProviderDescriptorDetails(bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
-	if gateway.worldID != "" && worldID != gateway.worldID {
-		return fmt.Errorf("provider world ID %q does not match hosted world %q", worldID, gateway.worldID)
+	if gateway.worldID != "" && descriptor.WorldID != gateway.worldID {
+		return fmt.Errorf("provider world ID %q does not match hosted world %q", descriptor.WorldID, gateway.worldID)
+	}
+	if gateway.sourceRevision != "" && descriptor.SourceRevision != gateway.sourceRevision {
+		return errors.New("provider source revision changed after worldd startup")
+	}
+	if gateway.cacheRevision != "" && descriptor.CacheRevision != gateway.cacheRevision {
+		return errors.New("provider cache revision changed after worldd startup")
 	}
 	response.Body = io.NopCloser(bytes.NewReader(data))
 	response.ContentLength = int64(len(data))

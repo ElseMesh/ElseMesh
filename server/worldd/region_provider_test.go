@@ -57,11 +57,16 @@ func TestRegionProviderUsesLoopbackP2PAddresses(t *testing.T) {
 
 func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 	const worldID = "elsemesh:hogwarts-legacy"
+	const sourceRevision = "container-fingerprint:installed-content"
+	const cacheRevision = sourceRevision + ":converter-1"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-ElseMesh-World-ID", worldID)
+		w.Header().Set("X-ElseMesh-Source-Revision", sourceRevision)
+		w.Header().Set("X-ElseMesh-Cache-Revision", cacheRevision)
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/descriptor":
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			_ = json.NewEncoder(w).Encode(dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, ReadOnly: true})
+			_ = json.NewEncoder(w).Encode(dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, SourceRevision: sourceRevision, CacheRevision: cacheRevision, ReadOnly: true})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/regions":
 			if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
 				t.Errorf("credentials were forwarded: headers=%v", r.Header)
@@ -189,6 +194,45 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		}
 	})
 
+	t.Run("source and converter revisions are pinned", func(t *testing.T) {
+		gateway.worldID = worldID
+		gateway.cacheRevision = "stale-cache-revision"
+		request := httptest.NewRequest(http.MethodGet, "/v1/descriptor", nil)
+		response := httptest.NewRecorder()
+		gateway.ServeHTTP(response, request)
+		if response.Code != http.StatusBadGateway {
+			t.Fatalf("changed provider cache revision status = %d, want %d", response.Code, http.StatusBadGateway)
+		}
+		gateway.cacheRevision = cacheRevision
+		gateway.sourceRevision = "stale-source-revision"
+		response = httptest.NewRecorder()
+		gateway.ServeHTTP(response, request)
+		if response.Code != http.StatusBadGateway {
+			t.Fatalf("changed provider source revision status = %d, want %d", response.Code, http.StatusBadGateway)
+		}
+	})
+
+	t.Run("every provider response carries pinned identity", func(t *testing.T) {
+		gateway.worldID = worldID
+		gateway.sourceRevision = sourceRevision
+		gateway.cacheRevision = cacheRevision
+		for _, header := range []string{"X-ElseMesh-World-ID", "X-ElseMesh-Source-Revision", "X-ElseMesh-Cache-Revision"} {
+			request := httptest.NewRequest(http.MethodGet, "/v1/regions", nil)
+			headers := make(http.Header)
+			headers.Set("X-ElseMesh-World-ID", worldID)
+			headers.Set("X-ElseMesh-Source-Revision", sourceRevision)
+			headers.Set("X-ElseMesh-Cache-Revision", cacheRevision)
+			headers.Del(header)
+			response := &http.Response{
+				Request: request,
+				Header:  headers,
+			}
+			if err := gateway.validateProviderResponse(response); err == nil {
+				t.Errorf("provider response without %s was accepted", header)
+			}
+		}
+	})
+
 	t.Run("only region control methods are accepted", func(t *testing.T) {
 		for _, test := range []struct {
 			method string
@@ -209,7 +253,7 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 }
 
 func TestReadRegionProviderDescriptorBoundsResponse(t *testing.T) {
-	payload := `{"schema":"elsemesh.dynamic-region-provider/1","worldId":"elsemesh:hogwarts-legacy","readOnly":true,"mapGraphTrace":"` + strings.Repeat("x", 128<<10) + `"}`
+	payload := `{"schema":"elsemesh.dynamic-region-provider/1","worldId":"elsemesh:hogwarts-legacy","sourceRevision":"source-1","cacheRevision":"source-1:converter-1","readOnly":true,"mapGraphTrace":"` + strings.Repeat("x", 128<<10) + `"}`
 	worldID, err := readRegionProviderDescriptor(strings.NewReader(payload))
 	if err != nil || worldID != "elsemesh:hogwarts-legacy" {
 		t.Fatalf("bounded descriptor with graph metadata = %q, %v", worldID, err)
@@ -218,6 +262,14 @@ func TestReadRegionProviderDescriptorBoundsResponse(t *testing.T) {
 	_, err = readRegionProviderDescriptor(strings.NewReader(strings.Repeat("x", maxRegionProviderDescriptorBytes+1)))
 	if err == nil {
 		t.Fatal("oversized provider descriptor was accepted")
+	}
+	for _, payload := range []string{
+		`{"schema":"elsemesh.dynamic-region-provider/1","worldId":"elsemesh:hogwarts-legacy","readOnly":true}`,
+		`{"schema":"elsemesh.dynamic-region-provider/1","worldId":"elsemesh:hogwarts-legacy","sourceRevision":"source-1","cacheRevision":"","readOnly":true}`,
+	} {
+		if _, err := readRegionProviderDescriptor(strings.NewReader(payload)); err == nil {
+			t.Fatalf("descriptor without valid source/cache revision was accepted: %s", payload)
+		}
 	}
 }
 
