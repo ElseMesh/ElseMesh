@@ -111,15 +111,27 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 - 2026-11-15: corrected the WebGL atmosphere hook's diffuse destination.
-  Three.js diffuse materials consume the `irradiance` accumulator from
-  `lights_fragment_begin`; the previous hook modified the separate
-  `iblIrradiance` multiscatter/specular input. The adapter now adds atmosphere
-  sky/horizon light to the diffuse accumulator and preserves PMREM. A live AMD
-  WebGL capture now verifies the scene renders with the hook installed, but its
-  four crop means differ by at most 1.3 RGB points from the previous WebGL
-  capture; the vegetation/sand gap against WebGPU remains substantial. The
-  focused hook test passes, but this correction does not close visual parity;
-  Tidewater parity remains 90%.
+  Three.js Standard/Physical materials resolve atmosphere diffuse through
+  `iblIrradiance` in the physical multiscatter path; Lambert/Phong use the
+  plain `irradiance` accumulator. The adapter handles both paths and preserves
+  PMREM specular radiance. The focused hook test checks those shader stages.
+  The matched AMD capture shows only a small change from the previous WebGL
+  capture, and the vegetation/sand gap against WebGPU remains substantial; the
+  lighting correction alone does not close visual parity. Tidewater parity
+  remains 93%.
+
+- 2026-11-15: source inspection narrowed the vegetation appearance mismatch.
+  The Tidewater WebGL presenter converts a short material-ID palette to vertex
+  colors and uses `MeshStandardMaterial`; its distant tree LODs use instanced
+  cylinders and colored sphere lobes. The WebGPU presenter instead evaluates
+  species-specific procedural bark/leaf color, AO, normals, and translucency
+  in `VegMaterials.js`. This is a concrete renderer-content difference in the
+  crop where WebGL vegetation is much darker, but has not yet been isolated
+  as the sole cause. It is existing world-owned renderer debt. The fix must
+  define renderer-neutral vegetation inputs and implement both presenters in
+  ElseMesh with a shared fixture; moving or copying only one backend shader
+  would not meet the renderer boundary. No percentage changes on this source
+  diagnosis alone.
 
 - 2026-11-15: verified the AMD browser-review route with a dedicated Weston
   session, private mode-0700 runtime directory, native Wayland, ANGLE GL, and
