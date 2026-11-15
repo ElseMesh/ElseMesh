@@ -25,6 +25,7 @@ globalThis.fetch = async url => {
 			unindexedSpatialBoundsComponents: 0, unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false,
 			explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0, userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0,
 			audioOnlyPolicyExcludedOtherPrimitiveComponents: 0,
+			worldPolicyNonBlockingVolumeComponents: 0,
 			noSkeletalCollisionGeometryComponents: 0,
 			landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {},
 		};

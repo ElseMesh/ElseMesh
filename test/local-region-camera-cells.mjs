@@ -17,6 +17,7 @@ const collisionSourceInventory = {
 	staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0,
 	explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0,
 	userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0,
+	worldPolicyNonBlockingVolumeComponents: 0,
 	noSkeletalCollisionGeometryComponents: 0, landscapeHeightfieldCollisionComponents: 0,
 	unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {},
 	unindexedOtherPrimitiveComponents: 0, unindexedOtherPrimitiveObjectPaths: [],
