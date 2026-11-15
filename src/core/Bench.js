@@ -19,6 +19,13 @@ const MAX = 512;
 const _up = new Vector3( 0, 1, 0 );
 const DEFAULT_VIEWS = [ 'beach', 'pier', 'sunGlitter', 'village', 'underwater', 'aerial', 'palms', 'boatFish' ];
 
+export function advanceBenchFrame( app, dt ) {
+
+	if ( app.hostedPackageWorld ) app.hostedPackageFrame( dt );
+	else app.frame( dt );
+
+}
+
 export class Bench {
 
 	constructor( app ) {
@@ -204,7 +211,7 @@ export class Bench {
 		let pending = null;
 		for ( let i = 0; i < n; i ++ ) {
 
-			app.frame( dt );
+			advanceBenchFrame( app, dt );
 			const done = GPU.queue.onSubmittedWorkDone();
 			if ( pending ) await pending;
 			pending = done;
