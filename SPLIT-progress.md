@@ -161,8 +161,11 @@ WebGPU visual parity remain incomplete.
   for $63; Marta accepted the $60 fishing-line upgrade. The fresh profile ended
   with $3, an empty cooler, and line level 1 (15 lb mono). This matches the
   WebGPU run's sale and purchase amounts, but its recorded $5 ending wallet
-  started from an unrecorded saved balance, so exact wallet parity still needs
-  matched fresh profiles. [WebGL scene](docs/images/tidewater-rendered-webgl-line-upgrade-amd-2026-11-15.png).
+  started from an unrecorded saved balance. New isolated AMD WebGPU and WebGL
+  profiles both show the same $0 starting wallet and empty cooler; exact
+  post-sale wallet parity still needs the catch/sale/upgrade path replayed from
+  those clean profiles. [WebGL scene](docs/images/tidewater-rendered-webgl-line-upgrade-amd-2026-11-15.png),
+  [fresh-profile captures](docs/graphics-review.md#2026-11-15-amd-fresh-profile-wallet-baseline).
   Tidewater gameplay and content parity moves from 91% to 93%; renderer
   appearance and controlled FPS remain open.
 

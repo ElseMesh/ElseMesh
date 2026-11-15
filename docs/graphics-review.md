@@ -84,6 +84,25 @@ shows Marta's upgraded stock and the $3 balance. This closes the real-water
 WebGL catch, sale, and upgrade gate; remaining view/material and controlled FPS
 comparisons are still open.
 
+## 2026-11-15 AMD fresh-profile wallet baseline
+
+Separate temporary Chromium profiles were opened in the named, input-enabled
+1600×900 Weston display; both page captures are 1600×813. CDP
+`SystemInfo.getInfo` identified AMD Radeon
+Graphics (RADV RENOIR), with `webgpu` enabled, for the WebGPU run. The WebGL
+canvas reported `ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL
+ES 3.2)` through `WEBGL_debug_renderer_info`. Both profiles entered the
+built-in Tidewater world and showed a starting wallet of `$0` and an empty
+30 kg cooler. This establishes the current fresh-profile baseline for both
+renderers; it does not recover the unrecorded initial balance from the earlier
+WebGPU sale/upgrade run, so that run's `$5` ending balance cannot be compared
+directly with WebGL's `$3` ending balance. The onboarding panel remained visible
+in these captures; they are wallet-state evidence, not matched visual or FPS
+captures.
+
+[Fresh WebGPU profile](images/tidewater-fresh-wallet-webgpu-amd-2026-11-15.png),
+[fresh WebGL profile](images/tidewater-fresh-wallet-webgl-amd-2026-11-15.png).
+
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
 The split Tidewater geometry builder emitted authored vertex colors as a custom
