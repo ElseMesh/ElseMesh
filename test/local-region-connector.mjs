@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
-import { worldLinkFromLocation } from '../src/network/WorldConnector.js';
+import { WorldConnector, worldLinkFromLocation } from '../src/network/WorldConnector.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL } from '../src/network/WorldLauncher.js';
 import { chooseWorldEntryPoint } from '../src/ui/WorldEntryPointPicker.js';
+
+const localPreviewCapabilities = new LocalRegionConnector( { localProvider: 'http://127.0.0.1:41001', localMap: 'Great Hall' } );
+assert.equal( localPreviewCapabilities.localOnly, true );
+assert.equal( localPreviewCapabilities.dynamicRegions, true );
+const hostedStaticCapabilities = new WorldConnector( { worldId: 'elsemesh:connector-capabilities', gateway: 'https://gateway.example' } );
+assert.equal( hostedStaticCapabilities.localOnly, false );
+assert.equal( hostedStaticCapabilities.dynamicRegions, false );
+hostedStaticCapabilities.close();
 
 function makeGlb() {
 	const document = {

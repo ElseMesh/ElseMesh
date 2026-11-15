@@ -108,6 +108,8 @@ export class WorldConnector {
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
 		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && directory, 'ZeroTier lookup requires a valid node ID, network ID, and HTTPS resolver' );
 		this.worldId = worldId;
+		this.localOnly = false;
+		this.dynamicRegions = false;
 		this.zeroTierNodeId = zeroTierNodeId;
 		this.zeroTierNetworkId = zeroTierNetworkId;
 		this.nodeId = nodeId || '';

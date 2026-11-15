@@ -190,6 +190,7 @@ async function parseByteRangeResponse( response ) {
 export class LocalRegionConnector {
 	constructor( { localProvider, localMap, regionDiagnostics = false } ) {
 		this.localOnly = true;
+		this.dynamicRegions = true;
 		this.localProvider = new URL( localProvider ).origin;
 		this.localMap = localMap;
 		this.regionDiagnostics = regionDiagnostics;

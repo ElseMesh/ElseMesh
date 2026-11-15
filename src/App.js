@@ -669,16 +669,16 @@ export class App {
 			this.player.yaw = spawn.yaw;
 			this.player.pitch = spawn.pitch;
 			this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
-			const selectedObjects = connector.localOnly
+			const selectedObjects = connector.dynamicRegions
 				? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
 				: selectWorldObjectsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background', maxDistance: 500 } );
-			const initialObjects = connector.localOnly
+			const initialObjects = connector.dynamicRegions
 				? selectLocalRegionEntryObjects( connector, connector.manifest, selectedObjects, this.camera )
 				: selectedObjects;
 			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
-			if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
-			if ( ! connector.localOnly ) {
+			if ( ! connector.dynamicRegions ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
+			if ( ! connector.dynamicRegions ) {
 				for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius, connector.manifest.rules.playerCapsule ) ) initialObjectIDs.add( objectID );
 			}
 			const initialComponentIDs = new Set( initialComponents.map( ( component ) => component.id ) );
@@ -688,10 +688,10 @@ export class App {
 			const progressiveAssets = new Map();
 			const initialViewPriorityByAsset = worldViewPriorityByAsset( initialObjects, initialComponents, this.camera );
 			const visibleAssets = await connector.preload( {
-				through: 'background', assetIDs: initialAssetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined,
+				through: 'background', assetIDs: initialAssetIDs, position: connector.dynamicRegions ? this.camera.position.toArray() : undefined,
 				viewPriorityByAsset: initialViewPriorityByAsset,
 				onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total, 'Loading visible world assets…' ),
-				onAsset: connector.localOnly ? ( assetId, _bytes, progressive ) => { if ( progressive ) progressiveAssets.set( assetId, progressive ); } : undefined,
+				onAsset: connector.dynamicRegions ? ( assetId, _bytes, progressive ) => { if ( progressive ) progressiveAssets.set( assetId, progressive ); } : undefined,
 			} );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext, progressiveAssets } );
 			this.linkedWorldRoot.userData.worldPackage.coarseCoverageReady = false;
@@ -861,18 +861,18 @@ export class App {
 		this.player.yaw = spawn.yaw;
 		this.player.pitch = spawn.pitch;
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
-		if ( connector.localOnly ) await connector.ensureCellsForCamera?.( this.camera );
+		if ( connector.dynamicRegions ) await connector.ensureCellsForCamera?.( this.camera );
 
 		await progress( 0.34, 'Loading visible world assets…', 0.58, 'world' );
-		const selectedObjects = connector.localOnly
+		const selectedObjects = connector.dynamicRegions
 			? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
 			: selectWorldObjectsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background', maxDistance: 500 } );
-		const initialObjects = connector.localOnly
+		const initialObjects = connector.dynamicRegions
 			? selectLocalRegionEntryObjects( connector, connector.manifest, selectedObjects, this.camera )
 			: selectedObjects;
 		const initialObjectIDs = new Set( initialObjects.map( object => object.id ) );
-		if ( ! connector.localOnly ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
-		if ( ! connector.localOnly ) {
+		if ( ! connector.dynamicRegions ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
+		if ( ! connector.dynamicRegions ) {
 			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius, connector.manifest.rules.playerCapsule ) ) initialObjectIDs.add( objectID );
 		}
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
@@ -890,7 +890,7 @@ export class App {
 			retainAssetIDs.add( extension.assetId );
 		}
 		const initialViewPriorityByAsset = worldViewPriorityByAsset( initialObjects, initialComponents, this.camera );
-		if ( connector.localOnly ) {
+		if ( connector.dynamicRegions ) {
 			if ( connector.regionDiagnostics ) console.info( 'ElseMesh local-region startup selection:', JSON.stringify( {
 				objects: initialObjectIDs.size,
 				assets: assetIDs.size,
@@ -1437,7 +1437,7 @@ export class App {
 	hasWorldCoarseCoverage( connector, root ) {
 		const worldPackage = root.userData.worldPackage;
 		if ( ! worldPackage ) return false;
-		const maxDistance = connector.localOnly ? connector.maxViewDistanceMeters : 500;
+		const maxDistance = connector.dynamicRegions ? connector.maxViewDistanceMeters : 500;
 		const loaded = worldPackage.loadedObjects || new Set();
 		const visibleObjects = selectWorldObjectsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
 		if ( visibleObjects.some( object => ! object.collisionPayload && object.assetId && ! loaded.has( object.id ) ) ) return false;
@@ -1459,7 +1459,7 @@ export class App {
 				const installed = root.userData.installedWorldComponentIDs || new Set();
 				const visibleStaticComponents = selectWorldComponentsForView( connector.manifest, this.camera, {
 					nearbyDistance: 0,
-					maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
+				maxDistance: connector.dynamicRegions ? connector.maxViewDistanceMeters : 500,
 					maxPriority: 'background',
 				} ).filter( component => component.type === 'elsemesh.static-model-instance-set/1'
 					&& component.streamingBounds && componentAssetIDs( component ).length && installed.has( component.id ) );
@@ -1707,14 +1707,14 @@ export class App {
 		if ( performance.now() - state.lastUpdate < 400 ) return;
 		state.lastUpdate = performance.now();
 		const loaded = root.userData.worldPackage?.loadedObjects || new Set();
-		if ( connector.localOnly && connector.ensureCellsForCamera && ! state.viewCellsPending ) {
+		if ( connector.dynamicRegions && connector.ensureCellsForCamera && ! state.viewCellsPending ) {
 			state.viewCellsPending = true;
 			root.userData.worldPackage.coarseCoverageReady = false;
 			connector.ensureCellsForCamera( this.camera ).catch( error => {
 				if ( connector.regionDiagnostics && error?.name !== 'AbortError' ) console.warn( 'ElseMesh local-region view-cell query failed:', error );
 			} ).finally( () => { state.viewCellsPending = false; this.updateWorldCoarseCoverage( connector, root, state ); } );
 		}
-		if ( connector.localOnly ) {
+		if ( connector.dynamicRegions ) {
 			const releaseObjectIDs = new Set();
 			const center = new Vector3();
 			for ( const object of connector.manifest.objects ) {
@@ -1729,16 +1729,16 @@ export class App {
 		for ( const component of connector.manifest.components || [] ) {
 			if ( ! installedComponentIDs.has( component.id ) || ! component.streamingBounds ) continue;
 			const bounds = component.streamingBounds;
-			const maxDistance = Math.min( connector.localOnly ? connector.maxViewDistanceMeters : 500, bounds.maxDistanceMeters ?? Infinity );
+			const maxDistance = Math.min( connector.dynamicRegions ? connector.maxViewDistanceMeters : 500, bounds.maxDistanceMeters ?? Infinity );
 			const dx = this.camera.position.x - bounds.center[ 0 ], dy = this.camera.position.y - bounds.center[ 1 ], dz = this.camera.position.z - bounds.center[ 2 ];
 			if ( dx * dx + dy * dy + dz * dz > ( maxDistance * 1.1 ) ** 2 ) releaseComponentIDs.add( component.id );
 		}
 		if ( releaseComponentIDs.size ) unloadWorldPackageComponents( root, connector, releaseComponentIDs );
-		const objects = ( connector.localOnly
+		const objects = ( connector.dynamicRegions
 			? selectLocalRegionStreamingObjects( connector, connector.manifest, this.camera )
 			: selectWorldObjectsForView( connector.manifest, this.camera, { maxDistance: 500 } )
 		).filter( ( object ) => ! loaded.has( object.id ) );
-		if ( connector.localOnly && connector.collisionObjectIDsAlongPath ) {
+		if ( connector.dynamicRegions && connector.collisionObjectIDsAlongPath ) {
 			const flying = this.freeCam;
 			const position = flying ? this.camera.position.clone().setY( this.camera.position.y - 1.62 ) : this.player.position.clone();
 			const direction = new Vector3();
@@ -1792,7 +1792,7 @@ export class App {
 		const viewPriorityByAsset = worldViewPriorityByAsset( objects, components, this.camera );
 		const objectIDsByAsset = new Map();
 		const standaloneComponentIDsByAsset = new Map();
-		if ( connector.localOnly ) {
+		if ( connector.dynamicRegions ) {
 			for ( const object of objects ) {
 				if ( ! object.assetId ) continue;
 				const assetObjectIDs = objectIDsByAsset.get( object.assetId ) || new Set();
@@ -1819,8 +1819,8 @@ export class App {
 		state.loadingObjectIDs = objectIDs;
 		state.loadingComponentIDs = componentIDs;
 		state.loadingRank = loadRank;
-		const preloadOptions = { assetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined, viewPriorityByAsset, signal: loadController.signal, concurrency: 2 };
-		if ( connector.localOnly ) {
+		const preloadOptions = { assetIDs, position: connector.dynamicRegions ? this.camera.position.toArray() : undefined, viewPriorityByAsset, signal: loadController.signal, concurrency: 2 };
+		if ( connector.dynamicRegions ) {
 			preloadOptions.retainAssets = false;
 			preloadOptions.retainAssetIDs = new Set( components.flatMap( componentAssetIDs ) );
 			preloadOptions.onAsset = async ( assetId, bytes, progressive ) => {
@@ -1838,7 +1838,7 @@ export class App {
 		}
 		connector.preload( preloadOptions ).then( async ( assets ) => {
 			if ( loadController.signal.aborted || state.controller.signal.aborted || this.linkedWorldRoot !== root ) return;
-			if ( ! connector.localOnly ) await appendWorldPackageAssets( connector, root, assets, { signal: loadController.signal, objectIDs } );
+			if ( ! connector.dynamicRegions ) await appendWorldPackageAssets( connector, root, assets, { signal: loadController.signal, objectIDs } );
 			await this.installWorldComponents( root, connector, componentIDs );
 			return registerWorldPackageCollisions( root, this.hostedColliders );
 		} ).catch( ( error ) => {
