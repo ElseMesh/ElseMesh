@@ -85,6 +85,7 @@ import { ensureWebGPUHostedOceanEffects, updateHostedShoreWetness } from './ocea
 import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
 import { FrameWorkMeter } from './core/FrameWorkMeter.js';
+import { staticModelCoarseViewProgress } from './engine/render/StaticModelInstanceSetRuntime.js';
 import { GENERIC_WORLD_EXPERIENCE, worldEnvironmentSettings } from './network/WorldExperience.js';
 
 const _up = new Vector3( 0, 1, 0 );
@@ -689,6 +690,7 @@ export class App {
 			const visibleAssets = await connector.preload( {
 				through: 'background', assetIDs: initialAssetIDs, position: connector.localOnly ? this.camera.position.toArray() : undefined,
 				viewPriorityByAsset: initialViewPriorityByAsset,
+				onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total, 'Loading visible world assets…' ),
 				onAsset: connector.localOnly ? ( assetId, _bytes, progressive ) => { if ( progressive ) progressiveAssets.set( assetId, progressive ); } : undefined,
 			} );
 			this.linkedWorldRoot = await loadWorldPackage( connector, { assets: visibleAssets, objectIDs: initialObjectIDs, materialContext: this.worldVillageMaterialContext, progressiveAssets } );
@@ -861,7 +863,7 @@ export class App {
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
 		if ( connector.localOnly ) await connector.ensureCellsForCamera?.( this.camera );
 
-		await progress( 0.34, 'Loading the starting area…', 0.82, 'world' );
+		await progress( 0.34, 'Loading visible world assets…', 0.58, 'world' );
 		const selectedObjects = connector.localOnly
 			? selectLocalRegionStartupObjects( connector, connector.manifest, this.camera, spawn )
 			: selectWorldObjectsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background', maxDistance: 500 } );
@@ -923,7 +925,8 @@ export class App {
 		}
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 		await this.installWorldComponents( this.linkedWorldRoot, connector, initialComponentIDs );
-		await this.waitForWorldCoarseCoverage( connector, this.linkedWorldRoot );
+		await progress( 0.58, 'Loading visible base models…', 0.82, 'world' );
+		await this.waitForWorldCoarseCoverage( connector, this.linkedWorldRoot, true );
 		registerWorldPackageCollisions( this.linkedWorldRoot, this.hostedColliders );
 		this.player.hostedCollisionGuard = typeof connector.isCollisionPathReady === 'function'
 			? ( from, to ) => connector.isCollisionPathReady( from, to, this.linkedWorldRoot?.userData?.worldPackage )
@@ -1448,10 +1451,14 @@ export class App {
 		} );
 	}
 
-	async waitForWorldCoarseCoverage( connector, root ) {
+	async waitForWorldCoarseCoverage( connector, root, reportProgress = false ) {
 		const worldPackage = root.userData.worldPackage;
 		while ( this.linkedWorldRoot === root && ! worldPackage?.disposed ) {
 			this.updateWorldComponents( root, 0, this.camera );
+			if ( reportProgress ) {
+				const progress = staticModelCoarseViewProgress( root.userData.worldComponentRuntimes?.values?.() );
+				globalThis.__ui?.setLoadingDetail( progress.done, progress.total, 'Loading visible base models…' );
+			}
 			if ( this.hasWorldCoarseCoverage( connector, root ) ) {
 				worldPackage.coarseCoverageReady = true;
 				return;

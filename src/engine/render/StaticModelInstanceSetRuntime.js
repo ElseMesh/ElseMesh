@@ -76,13 +76,20 @@ export class StaticModelInstanceSetRuntime {
 		} );
 	}
 
-	isCoarseReadyForView() {
-		if ( ! this._cameraStateValid ) return this.loadedLods.every( loaded => loaded.has( 0 ) );
+	coarseViewProgress() {
+		let done = 0, total = 0;
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
-			if ( ! this.planner._groupsByModel[ modelIndex ].some( group => group.count > 0 ) ) continue;
-			if ( ! this.loadedLods[ modelIndex ].has( 0 ) ) return false;
+			const visible = ! this._cameraStateValid || this.planner._groupsByModel[ modelIndex ].some( group => group.count > 0 );
+			if ( ! visible ) continue;
+			total ++;
+			if ( this.loadedLods[ modelIndex ].has( 0 ) ) done ++;
 		}
-		return true;
+		return { done, total };
+	}
+
+	isCoarseReadyForView() {
+		const { done, total } = this.coarseViewProgress();
+		return done === total;
 	}
 
 	// Camera changes are tracked by consumers; notify them when planner data
@@ -299,4 +306,15 @@ export class StaticModelInstanceSetRuntime {
 		}
 		this.disposeBatches?.();
 	}
+}
+
+export function staticModelCoarseViewProgress( runtimes ) {
+	let done = 0, total = 0;
+	for ( const runtime of runtimes || [] ) {
+		const progress = runtime?.coarseViewProgress?.();
+		if ( ! progress ) continue;
+		done += progress.done;
+		total += progress.total;
+	}
+	return { done, total };
 }

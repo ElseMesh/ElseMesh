@@ -3541,11 +3541,12 @@ export class UI {
 
 	}
 
-	setLoadingDetail( done, total ) {
+	setLoadingDetail( done, total, status = null ) {
 
 		const ld = this._loaderState();
 		if ( ! ( total > 0 ) ) return;
 		ld.detail = clamp( done / total, 0, 1 );
+		if ( status != null ) ld.status = String( status );
 		if ( ld.statusEl ) ld.statusEl.textContent = `${ ld.status.replace( /…$/, '' ) } · ${ done } / ${ total }`;
 		this._loaderPaint();
 

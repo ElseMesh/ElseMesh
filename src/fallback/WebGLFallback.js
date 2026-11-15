@@ -55,6 +55,7 @@ import { movementParameters, movementProfileSelection, worldHasWater } from '../
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
 import { SHORE_WATER_TURBIDITY, WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, WATER_ROUGHNESS, WATER_SCATTERING } from '../ocean/WaterDefaults.js';
 import { G } from '../engine/render/Frame.js';
+import { staticModelCoarseViewProgress } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { advanceWorldWindField, setWorldWindFrame } from '../engine/world/WorldWindField.js';
 import { GroundCoverCellPlanner } from '../engine/render/GroundCoverCellPlanner.js';
 
@@ -1947,7 +1948,7 @@ export class WebGLFallback {
 				components: startupComponents.length,
 				staticModelComponents: startupComponents.filter( component => component.type === 'elsemesh.static-model-instance-set/1' ).length,
 			} ) );
-			await progress( 0.18, 'Loading visible coarse geometry…', 0.9 );
+			await progress( 0.18, 'Installing visible world components…', 0.45 );
 			backendComponentIDs = await this._installHostedBackendComponents( startupComponents.filter( component => component.type !== 'elsemesh.humpback-whale/1' ), manifest, assets, ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ) );
 			this.hostedInstalledComponentIDs = new Set( backendComponentIDs );
 			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL model installation:', JSON.stringify( {
@@ -1957,6 +1958,7 @@ export class WebGLFallback {
 				modelSourcesReused: this.hostedStaticModelSourceStats?.reused || 0,
 			} ) );
 			const coarseCoverageStartedAt = performance.now();
+			await progress( 0.45, 'Loading visible base models…', 0.82 );
 			await this._waitForHostedCoarseCoverage();
 			if ( this.connector.regionDiagnostics ) console.info( 'ElseMesh hosted WebGL coarse coverage ready:', JSON.stringify( { elapsedMs: Math.round( performance.now() - coarseCoverageStartedAt ) } ) );
 			if ( startupLODObjectAssetIDs.size ) {
@@ -2631,6 +2633,8 @@ export class WebGLFallback {
 		while ( connector === this.connector && ! connector.closed && ! this.hostedCoarseCoverageReady ) {
 			this._updateHostedCoarseCoverage();
 			updateWorldComponentRuntimes( this.hostedComponentRuntimes?.values?.(), 0, this.camera, this.player, 0 );
+			const progress = staticModelCoarseViewProgress( this.hostedComponentRuntimes?.values?.() );
+			globalThis.__ui?.setLoadingDetail( progress.done, progress.total, 'Loading visible base models…' );
 			if ( this.hostedCoarseCoverageReady ) return;
 			await new Promise( resolve => requestAnimationFrame( resolve ) );
 		}
