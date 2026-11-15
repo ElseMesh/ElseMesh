@@ -9,6 +9,8 @@ const SWIM_EYE = EYE * 0.1; // eyes above the body's float point while swimming
 // water depth (mean level over the feet) where you start swimming / find your feet again
 const SWIM_DEPTH = 1.35;
 const STAND_DEPTH = 1.1;
+// Provisional engine threshold; no native movement evidence verifies 0.4 m for this world.
+const PLAYER_STEP_HEIGHT_METERS = 0.4;
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -171,7 +173,7 @@ export class Player {
 		} else {
 			this.position.copy( _hostedTarget );
 		}
-		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, 0.4 );
+		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
 		this.resolveBoatCollision( this.position, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;
 		// Hosted collision data includes object and deck colliders, while the signed
@@ -326,7 +328,7 @@ export class Player {
 		const p = this.position;
 		const old = p.clone();
 		p.addScaledVector( this.velocity, dt );
-		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, 0.4 );
+		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, PLAYER_STEP_HEIGHT_METERS );
 		this.resolveBoatCollision( p, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );
