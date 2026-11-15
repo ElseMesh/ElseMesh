@@ -867,6 +867,7 @@ export class WebGLFallback {
 		this.builtinComponentRuntimes = new Map();
 		this.hostedInstalledComponentIDs = new Set();
 		this.hostedCollisionPayloads = new Map();
+		this.blockedHostedCollisionIDs = new Set();
 		this.vegetationRecords = null;
 
 	}
@@ -975,7 +976,12 @@ export class WebGLFallback {
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
 			this.player.setWorldRules( this.connector.manifest.rules );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
-			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );
+			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => {
+				const ready = this.connector.isCollisionPathReady( from, to, { loadedObjects: this.localLoadedObjectIDs } );
+				const blocked = this.connector.lastCollisionPathStatus;
+				if ( ! ready && blocked?.reason === 'collision-object-not-loaded' ) this.blockedHostedCollisionIDs.add( blocked.objectID );
+				return ready;
+			};
 			this.player.hostedSeaLevel = this.hostedSeaLevel;
 			if ( this.hostedVehicleSpec ) {
 				const { object: berth, preview } = this.hostedVehicleSpec;
@@ -2451,7 +2457,6 @@ export class WebGLFallback {
 				}
 			}
 		}
-		let blockingCollisionID = null;
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath && this.player ) {
 			if ( connector.ensureCellsForCamera && ! this.hostedViewCellsPending
 				&& performance.now() - ( this.hostedViewCellsLastRequestedAt || 0 ) >= 400 ) {
@@ -2486,13 +2491,10 @@ export class WebGLFallback {
 			}
 			const selected = new Set( objects.map( object => object.id ) );
 			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) selected.add( objectID );
-			// A rejected player sweep names the exact collision payload that is
-			// keeping the capsule in place. Keep requesting that payload even after
-			// input stops or changes direction; otherwise the predicted lookahead can
-			// turn away and leave the player permanently gated at the cell boundary.
-			const gateStatus = connector.lastCollisionPathStatus;
-			blockingCollisionID = gateStatus?.reason === 'collision-object-not-loaded' ? gateStatus.objectID : null;
-			if ( blockingCollisionID ) selected.add( blockingCollisionID );
+			// Rejected player sweeps may be followed by a clear tangent-axis sweep,
+			// which replaces the connector's last status. Persist every exact missing
+			// collision payload so direction changes cannot lose a blocking request.
+			for ( const objectID of this.blockedHostedCollisionIDs ) selected.add( objectID );
 			const objectByID = new Map( manifest.objects.map( object => [ object.id, object ] ) );
 			for ( const objectID of selected ) {
 				const object = objectByID.get( objectID );
@@ -2505,8 +2507,8 @@ export class WebGLFallback {
 			if ( collisionWanted.length ) {
 				const center = new this.THREE.Vector3();
 				collisionWanted.sort( ( a, b ) => {
-					if ( a.id === blockingCollisionID ) return -1;
-					if ( b.id === blockingCollisionID ) return 1;
+					const aBlocked = this.blockedHostedCollisionIDs.has( a.id ), bBlocked = this.blockedHostedCollisionIDs.has( b.id );
+					if ( aBlocked !== bBlocked ) return aBlocked ? -1 : 1;
 					transformBoundsCenter( a, a.streamingBounds.center, center );
 					const aDistance = this.camera.position.distanceToSquared( center );
 					transformBoundsCenter( b, b.streamingBounds.center, center );
@@ -2546,6 +2548,7 @@ export class WebGLFallback {
 				if ( object.collisionPayload ) {
 					const shapes = registerWorldPackageCollisionPayload( assets.get( object.assetId ), object, this.app.hostedColliders );
 					if ( shapes.length ) this.hostedCollisionPayloads.set( object.id, shapes );
+					this.blockedHostedCollisionIDs.delete( object.id );
 					loaded.add( object.id );
 					continue;
 				}
