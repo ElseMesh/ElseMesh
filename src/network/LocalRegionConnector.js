@@ -258,7 +258,9 @@ export class LocalRegionConnector {
 		}
 		const experience = selection.experience ? structuredClone( validateWorldExperience( selection.experience ) ) : null;
 		if ( experience?.theme?.logo?.src.startsWith( '/' ) ) experience.theme.logo.src = new URL( experience.theme.logo.src, `${base}/` ).href;
-		if ( experience?.navigation?.map?.src.startsWith( '/' ) ) experience.navigation.map.src = new URL( experience.navigation.map.src, `${base}/` ).href;
+		const map = experience?.navigation?.map;
+		const resolveMapAsset = layer => { if ( layer.src.startsWith( '/' ) ) layer.src = new URL( layer.src, `${base}/` ).href; };
+		if ( map ) map.layers.forEach( resolveMapAsset );
 		const catalog = await fetchJSON( new URL( descriptor.regions, `${base}/descriptor` ), signal );
 		requireValue( Array.isArray( catalog.regions ) && catalog.regions.length <= 10000, 'Local provider returned an invalid region catalog' );
 		const region = catalog.regions.find( item => item.id === this.localMap || item.label === this.localMap );

@@ -1,6 +1,6 @@
 import { icon, brandMark } from './icons.js';
 import { builtInWorldURL, clearHomeWorld, getHomeWorld, listVisitedWorlds, parseWorldInviteURL, setHomeWorld } from '../network/WorldLauncher.js';
-import { navigationMapPosition, normalizeNavigationHeading } from './NavigationMap.js';
+import { navigationMapLayer, navigationMapPosition, normalizeNavigationHeading } from './NavigationMap.js';
 
 // ElseMesh UI: settings panel (tabs → folders → controls), HUD, help,
 // photo mode, start overlay and loader. Plain DOM, no dependencies.
@@ -2011,21 +2011,22 @@ export class UI {
 
 		const compass = navigation?.compass;
 		const map = navigation?.map;
-		const visible = !! ( compass || map );
+		const activeMap = navigationMapLayer( map, position?.y );
+		const visible = !! ( compass || activeMap );
 		this.navigationEl.classList.toggle( 'is-on', visible );
 		this.navigationEl.setAttribute( 'aria-hidden', visible ? 'false' : 'true' );
-		if ( ! visible ) return;
+		if ( ! visible ) {
+			this.navigationMap.hidden = true;
+			this.navigationCompass.hidden = true;
+			this.navigationMapImage.removeAttribute( 'src' );
+			return;
+		}
 
 		if ( navigation !== this._navigationConfig || theme !== this._navigationTheme ) {
 			this._navigationConfig = navigation;
 			this._navigationTheme = theme;
-			this.navigationMap.hidden = ! map;
 			this.navigationCompass.hidden = ! compass;
 			this.navigationLabels.forEach( ( label, index ) => { label.textContent = compass ? compass[ [ 'north', 'east', 'south', 'west' ][ index ] ] : ''; } );
-			if ( map ) {
-				this.navigationMapImage.alt = map.alt;
-				if ( this.navigationMapImage.src !== map.src ) this.navigationMapImage.src = map.src;
-			} else this.navigationMapImage.removeAttribute( 'src' );
 			const colors = theme?.colors || {};
 			this.navigationEl.style.setProperty( '--em-nav-bg', colors.background || '#11131a' );
 			this.navigationEl.style.setProperty( '--em-nav-surface', colors.surface || '#20212a' );
@@ -2034,6 +2035,11 @@ export class UI {
 			this.navigationEl.style.setProperty( '--em-nav-muted', colors.muted || '#a8b7bd' );
 			this.navigationEl.style.setProperty( '--em-nav-border', colors.border || '#627178' );
 		}
+		this.navigationMap.hidden = ! activeMap;
+		if ( activeMap ) {
+			this.navigationMapImage.alt = activeMap.alt;
+			if ( this.navigationMapImage.getAttribute( 'src' ) !== activeMap.src ) this.navigationMapImage.setAttribute( 'src', activeMap.src );
+		} else this.navigationMapImage.removeAttribute( 'src' );
 
 		const degrees = normalizeNavigationHeading( heading );
 		if ( compass ) {
@@ -2041,8 +2047,8 @@ export class UI {
 			this.navigationDegrees.textContent = `${ String( Math.round( degrees ) % 360 ).padStart( 3, '0' ) }°`;
 			this.navigationCardinal.textContent = compass[ [ 'north', 'east', 'south', 'west' ][ Math.round( degrees / 90 ) % 4 ] ];
 		}
-		if ( map ) {
-			const projected = navigationMapPosition( map.bounds, position, this.navigationMapImage.naturalWidth, this.navigationMapImage.naturalHeight );
+		if ( activeMap ) {
+			const projected = navigationMapPosition( activeMap.bounds, position, this.navigationMapImage.naturalWidth, this.navigationMapImage.naturalHeight );
 			const markerVisible = !! projected?.visible;
 			this.navigationMapMarker.hidden = ! markerVisible;
 			if ( markerVisible ) {

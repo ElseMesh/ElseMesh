@@ -1,10 +1,17 @@
 import assert from 'node:assert/strict';
-import { navigationMapPosition, normalizeNavigationHeading } from '../src/ui/NavigationMap.js';
+import { navigationMapLayer, navigationMapPosition, normalizeNavigationHeading } from '../src/ui/NavigationMap.js';
 import { App } from '../src/App.js';
 import { PerspectiveCamera as EngineCamera } from '../src/engine/index.js';
 import { PerspectiveCamera as ThreeCamera } from 'three';
 
 const bounds = { minX: -20, maxX: 20, minZ: 10, maxZ: 50 };
+const map = { layers: [ { src: '/map/all.png', alt: 'World map', bounds } ] };
+const floors = { layers: [ { src: '/map/lower.png', alt: 'Lower floor', bounds, heightRange: { minY: 0, maxY: 4 } }, { src: '/map/upper.png', alt: 'Upper floor', bounds, heightRange: { minY: 4, maxY: 10 } } ] };
+assert.equal( navigationMapLayer( map ).src, '/map/all.png', 'a single unbounded layer remains active at any height' );
+assert.equal( navigationMapLayer( floors, 0 ).src, '/map/lower.png', 'the lower vertical interval selects its own map image' );
+assert.equal( navigationMapLayer( floors, 4 ).src, '/map/upper.png', 'half-open intervals select the next floor at their shared boundary' );
+assert.equal( navigationMapLayer( floors, 10 ), null, 'gaps and heights outside the authored intervals have no active map' );
+assert.equal( navigationMapLayer( floors, NaN ), null, 'unknown player height hides a layered map' );
 assert.deepEqual( navigationMapPosition( bounds, { x: -20, z: 10 } ), { x: 0, y: 0, visible: true }, 'north-west world bound maps to the top-left of north-up art' );
 assert.deepEqual( navigationMapPosition( bounds, { x: 20, z: 50 } ), { x: 1, y: 1, visible: true }, 'south-east world bound maps to the bottom-right' );
 assert.deepEqual( navigationMapPosition( bounds, { x: 0, z: 30 } ), { x: 0.5, y: 0.5, visible: true }, 'the map center tracks the matching world position' );

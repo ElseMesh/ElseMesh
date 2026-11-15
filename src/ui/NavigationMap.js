@@ -12,6 +12,14 @@ export function navigationMapPosition( bounds, position, imageWidth = 1, imageHe
 	return { x: displayedX, y: displayedY, visible: x >= 0 && x <= 1 && y >= 0 && y <= 1 && displayedX >= 0 && displayedX <= 1 && displayedY >= 0 && displayedY <= 1 };
 }
 
+/** Select the north-up map art authored for the visitor's world-space height. */
+export function navigationMapLayer( map, worldY ) {
+	if ( ! map || ! Array.isArray( map.layers ) ) return null;
+	if ( map.layers.length === 1 && ! map.layers[ 0 ].heightRange ) return map.layers[ 0 ];
+	if ( ! Number.isFinite( worldY ) ) return null;
+	return map.layers.find( layer => layer.heightRange && worldY >= layer.heightRange.minY && worldY < layer.heightRange.maxY ) || null;
+}
+
 export function normalizeNavigationHeading( degrees ) {
 	if ( ! Number.isFinite( degrees ) ) return 0;
 	return ( degrees % 360 + 360 ) % 360;

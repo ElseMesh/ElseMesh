@@ -8,6 +8,34 @@ const THEME_COLORS = [ 'background', 'surface', 'accent', 'text', 'muted', 'butt
 const SKY_MODES = new Set( [ 'none', 'atmosphere' ] );
 const CLOUD_MODES = new Set( [ 'none', 'procedural' ] );
 
+function validWorldAssetURL( source ) {
+	if ( typeof source !== 'string' || source.length > 500 ) return false;
+	if ( source.startsWith( '/' ) ) return ! source.startsWith( '//' ) && ! source.split( '/' ).includes( '..' );
+	try {
+		const url = new URL( source );
+		return url.protocol === 'https:' && ! url.username && ! url.password;
+	} catch { return false; }
+}
+
+function validNavigationMapLayer( layer ) {
+	if ( ! layer || typeof layer !== 'object' || Array.isArray( layer ) || Object.keys( layer ).some( key => ! [ 'src', 'alt', 'bounds', 'heightRange' ].includes( key ) ) || ! validWorldAssetURL( layer.src ) || typeof layer.alt !== 'string' || ! layer.alt.trim() || layer.alt.length > 160 ) return false;
+	const bounds = layer.bounds;
+	if ( ! bounds || typeof bounds !== 'object' || Array.isArray( bounds ) || Object.keys( bounds ).some( key => ! [ 'minX', 'maxX', 'minZ', 'maxZ' ].includes( key ) ) || ! [ bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ ].every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) || bounds.minX >= bounds.maxX || bounds.minZ >= bounds.maxZ ) return false;
+	const range = layer.heightRange;
+	return range === undefined || !! range && typeof range === 'object' && ! Array.isArray( range ) && Object.keys( range ).length === 2 && Object.keys( range ).every( key => [ 'minY', 'maxY' ].includes( key ) ) && Number.isFinite( range.minY ) && Number.isFinite( range.maxY ) && Math.abs( range.minY ) <= 1e6 && Math.abs( range.maxY ) <= 1e6 && range.minY < range.maxY;
+}
+
+function validNavigationMap( map ) {
+	const layers = map?.layers;
+	if ( ! map || typeof map !== 'object' || Array.isArray( map ) || Object.keys( map ).some( key => key !== 'layers' ) || ! Array.isArray( layers ) || layers.length < 1 || layers.length > 64 ) return false;
+	for ( let index = 0; index < layers.length; index ++ ) {
+		const layer = layers[ index ];
+		if ( ! validNavigationMapLayer( layer ) || ( layers.length > 1 && ! layer.heightRange ) ) return false;
+		if ( index > 0 && layers[ index - 1 ].heightRange.maxY > layer.heightRange.minY ) return false;
+	}
+	return true;
+}
+
 export function worldEnvironmentSettings( experience ) {
 	const environment = experience?.environment;
 	return {
@@ -77,14 +105,7 @@ export function validateWorldExperience( experience, assets, options = {} ) {
 			if ( ! compass || typeof compass !== 'object' || Array.isArray( compass ) || Object.keys( compass ).some( key => ! [ 'north', 'east', 'south', 'west' ].includes( key ) ) || [ compass.north, compass.east, compass.south, compass.west ].some( label => typeof label !== 'string' || ! label.trim() || label.length > 8 ) ) throw new Error( 'Invalid ThruHold compass labels' );
 		}
 		if ( navigation.map !== undefined ) {
-			const map = navigation.map;
-			const bounds = map?.bounds;
-			let safeURL = typeof map?.src === 'string' && map.src.length <= 500 && typeof map.alt === 'string' && map.alt.trim() && map.alt.length <= 160;
-			if ( safeURL && map.src.startsWith( '/' ) ) safeURL = ! map.src.startsWith( '//' ) && ! map.src.split( '/' ).includes( '..' );
-			else if ( safeURL ) {
-				try { const url = new URL( map.src ); safeURL = url.protocol === 'https:' && ! url.username && ! url.password; } catch { safeURL = false; }
-			}
-			if ( ! safeURL || Object.keys( map ).some( key => ! [ 'src', 'alt', 'bounds' ].includes( key ) ) || ! bounds || typeof bounds !== 'object' || Array.isArray( bounds ) || Object.keys( bounds ).some( key => ! [ 'minX', 'maxX', 'minZ', 'maxZ' ].includes( key ) ) || ! [ bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ ].every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) || bounds.minX >= bounds.maxX || bounds.minZ >= bounds.maxZ ) throw new Error( 'Invalid ThruHold minimap source or world bounds' );
+			if ( ! validNavigationMap( navigation.map ) ) throw new Error( 'Invalid ThruHold minimap source or world bounds' );
 		}
 	}
 	return experience;
