@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -32,6 +33,24 @@ type dynamicRegionProviderDescriptor struct {
 	} `json:"entrySelection"`
 }
 
+type authoritativeMovementSweepRequest struct {
+	WorldID          string    `json:"worldId"`
+	SourceRevision   string    `json:"sourceRevision"`
+	From             []float64 `json:"from"`
+	To               []float64 `json:"to"`
+	RadiusMeters     float64   `json:"radiusMeters"`
+	HeightMeters     float64   `json:"heightMeters"`
+	StepHeightMeters float64   `json:"stepHeightMeters"`
+}
+
+type authoritativeMovementSweepResponse struct {
+	WorldID        string `json:"worldId"`
+	SourceRevision string `json:"sourceRevision"`
+	Ready          bool   `json:"ready"`
+	Reason         string `json:"reason"`
+	ComponentPath  string `json:"componentPath"`
+}
+
 type regionProviderGateway struct {
 	upstream          *url.URL
 	worldID           string
@@ -42,6 +61,7 @@ type regionProviderGateway struct {
 	regionDiagnostics bool
 	requestSequence   atomic.Uint64
 	proxy             *httputil.ReverseProxy
+	client            *http.Client
 }
 
 type regionProviderMetricsWriter struct {
@@ -118,8 +138,7 @@ func newRegionProviderGateway(rawURL, expectedWorldID string, allowedOrigins map
 		allowedOrigins:    allowedOrigins,
 		regionDiagnostics: os.Getenv("ELSEMESH_REGION_PROVIDER_DIAGNOSTICS") == "1",
 	}
-	proxy := httputil.NewSingleHostReverseProxy(upstream)
-	proxy.Transport = &http.Transport{
+	transport := &http.Transport{
 		Proxy:                 nil,
 		DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		MaxIdleConns:          8,
@@ -128,13 +147,63 @@ func newRegionProviderGateway(rawURL, expectedWorldID string, allowedOrigins map
 		TLSHandshakeTimeout:   5 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}
+	proxy := httputil.NewSingleHostReverseProxy(upstream)
+	proxy.Transport = transport
 	proxy.FlushInterval = -1
 	proxy.ModifyResponse = gateway.validateProviderResponse
 	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
 		http.Error(w, "local region provider unavailable", http.StatusBadGateway)
 	}
 	gateway.proxy = proxy
+	gateway.client = &http.Client{Transport: transport}
 	return gateway, nil
+}
+
+func (gateway *regionProviderGateway) validateMovement(ctx context.Context, from, to []float64, stepHeight float64) error {
+	if gateway.playerCapsule == nil || len(from) != 3 || len(to) != 3 || stepHeight < 0 || math.IsNaN(stepHeight) || math.IsInf(stepHeight, 0) {
+		return errors.New("invalid_movement_sweep")
+	}
+	body, err := json.Marshal(authoritativeMovementSweepRequest{
+		WorldID: gateway.worldID, SourceRevision: gateway.sourceRevision,
+		From: from, To: to, RadiusMeters: gateway.playerCapsule.RadiusMeters,
+		HeightMeters: gateway.playerCapsule.HeightMeters, StepHeightMeters: stepHeight,
+	})
+	if err != nil {
+		return fmt.Errorf("movement_authority_unavailable: %w", err)
+	}
+	u := *gateway.upstream
+	u.Path = "/v1/authority/movement-sweep"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("movement_authority_unavailable: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := gateway.client.Do(request)
+	if err != nil {
+		return fmt.Errorf("movement_authority_unavailable: %w", err)
+	}
+	defer response.Body.Close()
+	if err := gateway.validateProviderResponse(response); err != nil {
+		return fmt.Errorf("movement_authority_unavailable: %w", err)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, 64*1024+1))
+	if err != nil || len(data) > 64*1024 {
+		return errors.New("movement_authority_unavailable: invalid provider response size")
+	}
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("movement_authority_unavailable: provider returned HTTP %d", response.StatusCode)
+	}
+	var result authoritativeMovementSweepResponse
+	if err := json.Unmarshal(data, &result); err != nil || result.WorldID != gateway.worldID || result.SourceRevision != gateway.sourceRevision {
+		return errors.New("movement_authority_unavailable: provider returned an invalid movement result")
+	}
+	if !result.Ready {
+		if result.ComponentPath != "" {
+			return fmt.Errorf("movement_blocked:%s:%s", result.Reason, result.ComponentPath)
+		}
+		return fmt.Errorf("movement_blocked:%s", result.Reason)
+	}
+	return nil
 }
 
 func (gateway *regionProviderGateway) discoverWorldID() (string, error) {
@@ -268,6 +337,10 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 
 func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/v1/") || len(r.URL.Path) > 4096 || len(r.URL.RawQuery) > 4096 {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/v1/authority/") {
 		http.NotFound(w, r)
 		return
 	}

@@ -238,6 +238,33 @@ func (d *daemon) presenceHorizontalSpeedLimit(p *playerPose) (float64, error) {
 	return 6.2, nil
 }
 
+func (d *daemon) presenceStepHeight(p *playerPose) float64 {
+	profiles := d.world.Rules.MovementProfiles
+	if profiles == nil || p == nil {
+		return 0
+	}
+	if p.Mode == "boat" || p.Mode == "deck" {
+		return profiles.Vehicles[p.VehicleType].StepHeightMeters
+	}
+	return profiles.Avatars[p.AvatarProfileID].StepHeightMeters
+}
+
+func (d *daemon) validateOwnerMovement(from, to []float64, pose *playerPose) error {
+	if d.regionProvider == nil {
+		return nil
+	}
+	parent := d.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+	if err := d.regionProvider.validateMovement(ctx, from, to, d.presenceStepHeight(pose)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (d *daemon) validatePresenceHorizontalMovement(old playerPresence, next *playerPose, now time.Time) (float64, error) {
 	maxSpeed, err := d.presenceHorizontalSpeedLimit(next)
 	if err != nil {
@@ -303,6 +330,30 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 			return peerResponse{}, err
 		}
 	}
+	var checkedPrior playerPresence
+	checkedPriorExists := false
+	if request.Type == "presence.update" && d.regionProvider != nil {
+		d.presenceMu.Lock()
+		checkedPrior, checkedPriorExists = d.players[request.presenceKey]
+		if checkedPriorExists && now.Sub(checkedPrior.updated) >= presenceTTL {
+			checkedPriorExists = false
+		}
+		d.presenceMu.Unlock()
+		if checkedPriorExists {
+			if request.Pose.Sequence <= checkedPrior.Sequence {
+				return peerResponse{}, errors.New("stale_presence_sequence")
+			}
+			if now.Sub(checkedPrior.updated) < 50*time.Millisecond {
+				return peerResponse{}, errors.New("presence_rate_limited")
+			}
+			if _, err := d.validatePresenceHorizontalMovement(checkedPrior, request.Pose, now); err != nil {
+				return peerResponse{}, err
+			}
+			if err := d.validateOwnerMovement(checkedPrior.Position, request.Pose.Position, request.Pose); err != nil {
+				return peerResponse{}, err
+			}
+		}
+	}
 	d.presenceMu.Lock()
 	defer d.presenceMu.Unlock()
 	if d.players == nil {
@@ -317,6 +368,9 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		delete(d.players, request.presenceKey)
 	} else {
 		old, exists := d.players[request.presenceKey]
+		if d.regionProvider != nil && (exists != checkedPriorExists || exists && old.Sequence != checkedPrior.Sequence) {
+			return peerResponse{}, errors.New("presence_retry_required")
+		}
 		if exists && request.Pose.Sequence <= old.Sequence {
 			return peerResponse{}, errors.New("stale_presence_sequence")
 		}
@@ -395,6 +449,9 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				return peerResponse{}, err
 			}
 			movementCredit = maxSpeed * presenceMovementBurstWindow.Seconds()
+			if err := d.validateOwnerMovement(request.Pose.Position, request.Pose.Position, request.Pose); err != nil {
+				return peerResponse{}, err
+			}
 		}
 		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now, movementCredit: movementCredit}
 	}
