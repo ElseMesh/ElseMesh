@@ -504,21 +504,12 @@ optional provider/gateway hints. Portal links are unsigned authoring documents;
 they help two owners create complementary doorway records but do not grant
 access or synchronize future edits. Each owner publishes their own route.
 
-Each route may author `scaleRatio`, defined as destination-world coordinate
-units per source-world coordinate unit. It scales position offsets from the
-entry frame and linear velocity during transfer; orientation and angular
-velocity are rotated without scale. Omission means `1`. Keep the ratio finite
-and within `0.001..1000` for transform stability. Front and back routes each
-have their own ratio; complementary routes should use reciprocal values. The
-destination's own avatar, vehicle, collision, and movement profiles determine
-body dimensions and movement limits after arrival; the portal ratio does not
-rescale those destination-authored profiles.
-
-The source route must name a destination portal ID and side. The destination's
-owner-signed route must point back to the source portal ID and side, and the
-two ratios must multiply to `1` within floating-point tolerance. The browser
-keeps the portal view closed and holds the visitor at the threshold when the
-signed manifests do not agree. A one-sided route is therefore not traversable.
+Portal coordinates use a bilateral route contract so worlds with different
+scales cannot unilaterally reinterpret a visitor's position. The detailed
+mapping, reciprocal agreement, and bounds are specified in the
+[portal handover protocol](world-network-protocol.md#portal-handover-sequence-in-the-client).
+The receiving world's avatar, vehicle, collision, and movement profiles govern
+the entity after arrival.
 
 When a visitor approaches a portal, the client resolves the destination,
 verifies its signed manifest, and prepares the prioritized preview and visible
