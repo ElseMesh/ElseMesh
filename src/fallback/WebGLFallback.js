@@ -1961,7 +1961,6 @@ export class WebGLFallback {
 				const variants = await this.connector.preload( {
 					assetIDs: startupLODObjectAssetIDs,
 					position: localSpawn.position,
-					concurrency: 1,
 					onProgress: ( done, total ) => globalThis.__ui?.setLoadingDetail( done, total ),
 				} );
 				for ( const [ assetId, bytes ] of variants ) assets.set( assetId, bytes );
