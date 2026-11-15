@@ -16,10 +16,14 @@ Use the checked-in display setup and browser helper; do not launch Weston with
 2. Start a project Weston display with
    `worlds/Hogwarts/tools/hogwartsmp-parity/start-weston-review.sh`. It uses the
    checked-in `weston.ini`, disables idle blanking, and creates a dedicated
-   socket. Input is disabled by default. Set `WESTON_ENABLE_INPUT=1` for reviews
-   that need native pointer lock, such as starting and playing through Tidewater;
-   this gives the nested Weston window its own input seat for Chromium's
-   pointer-lock path. Give each outer Weston window a concise title that names
+   socket. Keep Weston input disabled (`--no-input`) during reviews. Do not set
+   `WESTON_ENABLE_INPUT=1`: host mouse or keyboard input could reach the test
+   window when it is focused, letting the user accidentally alter the run.
+   Drive browser input through the isolated Chromium DevTools session instead.
+   If a check cannot be performed without native input, stop and design an
+   isolated input path that cannot receive the user's desktop events before
+   continuing; do not expose the host input seat as a shortcut. Give each outer
+   Weston window a concise title that names
    the task, build/revision, and renderer (for example, `Tidewater original —
    WebGPU` and `ElseMesh split — WebGPU`). Target the exact outer-window ID with
    `wmctrl -ir WINDOW_ID -T TITLE`. Prefer matching its PID from `wmctrl -lp`;
