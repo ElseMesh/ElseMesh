@@ -10,7 +10,7 @@ let stopPreload;
 const pending = new Promise( resolve => { stopPreload = resolve; } );
 const calls = [];
 const connector = {
-	localOnly: true, worldId: 'test', maxViewDistanceMeters: 100, collisionAssetIDs: new Set(), assets: new Map(),
+	localOnly: true, dynamicRegions: true, worldId: 'test', maxViewDistanceMeters: 100, collisionAssetIDs: new Set(), assets: new Map(),
 	manifest: { objects: [], components: [ staticComponent, dependentComponent ], assets: [ { id: 'wall-descriptor' }, { id: 'dependent-asset' } ] },
 	async preload( options ) {
 		const bytes = new Uint8Array( [ 1 ] );
