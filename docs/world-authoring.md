@@ -40,17 +40,24 @@ Static GLB materials may use `KHR_materials_emissive_strength`; the loader appli
 
 ## Shared source format
 
-### World-scoped avatar appearance (planned)
+### World-scoped avatar appearance (partial)
 
-The current browser client selects from a fixed stock avatar catalogue and
-stores the visitor's preference globally. A future world-scoped policy should
-let a world choose an allowed avatar catalogue/appearance set and complexity
-limits, while each visitor selects their own avatar within that world's rules.
-The world must reference versioned, bounded appearance data rather than
-arbitrary downloaded behavior. This is a native ElseMesh world feature; a live
-game video bridge shows the game's own avatar and does not insert remote
-ElseMesh avatars. See the private
-[Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md).
+The engine currently supports a world-authored `avatarPolicy.allowedProfiles`
+list over its registered stock avatar profiles. `WorldPresenceSession` applies
+that policy before initial or portal admission: it preserves the visitor's
+saved appearance when allowed, otherwise selects the first profile allowed by
+the destination while retaining the selected outfit colors. An empty allowed
+list rejects admission before a presence request is sent. The engine owns this
+validation; each world owns its allowed-profile list and any uniform palettes
+attached to its generic entry choices. The entry-choice UI is engine-provided
+and does not contain game-specific choice labels.
+
+The visitor's body-style preference is still global, and there is no
+per-world avatar catalogue or world-specific robe/body asset contract yet.
+Future world-specific appearance options must use bounded, versioned data or
+assets rather than arbitrary downloaded behavior. A live game video bridge
+shows the game's own avatar and does not insert remote ElseMesh avatars. See
+the private [Hogwarts bridge design](../worlds/Hogwarts/docs/bridge-design.md).
 
 The normative JSON Schema is [`schemas/world-source.schema.json`](schemas/world-source.schema.json).
 

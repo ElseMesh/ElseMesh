@@ -1,8 +1,9 @@
 import { WorldConnector } from './WorldConnector.js';
 import { PlayerPresence, PLAYER_PRESENCE_PROTOCOL } from './PlayerPresence.js';
-import { avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
+import { appearanceForAllowedProfiles, avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
 import { RemoteAvatar } from '../player/RemoteAvatar.js';
 import { worldComponentDescriptor } from './WorldComponentRegistry.js';
+import { avatarPolicy } from './WorldRules.js';
 
 export function makePresencePose(player, sequence, appearance, vehicleType = player.vehicleType) {
  const boat = player.mode === 'boat' ? player.boat : null;
@@ -28,10 +29,14 @@ export class WorldPresenceSession {
   createConnector = options => new WorldConnector(options),
   createAvatar = options => new RemoteAvatar(options),
   onError = error => console.warn('Player presence unavailable', error), clock = () => performance.now()}) {
+  const allowedProfiles = avatarPolicy(connector.manifest.rules).allowedProfiles;
+  const admittedAppearance = appearanceForAllowedProfiles(appearance, allowedProfiles);
+  if ( ! admittedAppearance ) throw new Error( 'This world does not permit any supported avatar profile' );
   this.connector = createConnector({worldId: connector.worldId,
    nodeId: connector.manifest.ownerPeerId, gateway: connector.gateway, directory: connector.directory});
   this.parent = parent;
-  this.appearance = {...appearance};
+  this.appearance = {...admittedAppearance};
+  this.appearanceSubstituted = avatarProfileId(appearance) !== avatarProfileId(admittedAppearance);
   this.vehicleType = connector.manifest.components?.find( component => worldComponentDescriptor( component.type )?.vehicle === true )?.type || null;
   this.maxComplexity = connector.manifest.rules.avatarComplexity;
   this.state = new PlayerPresence(connector.worldId);

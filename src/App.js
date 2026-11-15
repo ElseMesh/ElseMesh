@@ -1588,6 +1588,7 @@ export class App {
 		}
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
+		if ( this.worldPresence?.appearanceSubstituted ) this.ui?.ui?.toast( 'Using an avatar profile allowed by this world; your outfit colors were preserved.', 3200 );
 		this.dispatchWorldActivated( experience, this.activeHostedExtensions, connector.worldId, { mode: 'hosted', connector, root, terrain, runtime } );
 
 	}

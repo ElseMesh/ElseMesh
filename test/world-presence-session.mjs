@@ -39,6 +39,22 @@ assert.equal(admittedPose.sequence,0,'admission creates the session before its r
 assert.deepEqual(admissionOptions.spawnCandidates,[[1,1,3],[1.6,1,3]],'invitation candidates reach the owner for atomic player occupancy checks');
 assert.deepEqual(accepted.position,[1,1,3],'admission returns the owner-selected position');
 admissionSession.dispose();
+const houseUniform = {...DEFAULT_APPEARANCE, shirt:'#8b1c2b', trousers:'#3e2434'};
+const restrictedWorld = {...connector, manifest:{...connector.manifest, rules:{...connector.manifest.rules,
+ avatarPolicy:{allowedProfiles:['elsemesh.avatar.stock-female/1']}}}};
+const restrictedSession = new WorldPresenceSession({connector:restrictedWorld,parent:{add(){}},appearance:houseUniform,
+ createConnector(){return {close(){}}}});
+assert.equal(restrictedSession.appearance.style,'female','engine admission selects a profile allowed by the destination world');
+assert.equal(restrictedSession.appearance.shirt,houseUniform.shirt,'profile substitution preserves the world-selected house uniform');
+assert.equal(restrictedSession.appearance.trousers,houseUniform.trousers,'profile substitution preserves the rest of the house palette');
+assert.equal(restrictedSession.appearance.skin,houseUniform.skin,'profile substitution preserves the saved skin appearance');
+assert.equal(restrictedSession.appearance.hair,houseUniform.hair,'profile substitution preserves the saved hair appearance');
+assert.equal(restrictedSession.appearanceSubstituted,true,'the session exposes when the world profile policy changed the saved preference');
+assert.equal(makePresencePose(player,0,restrictedSession.appearance).avatarProfileId,'elsemesh.avatar.stock-female/1','initial presence carries the world-allowed profile with the selected house uniform');
+restrictedSession.dispose();
+assert.throws(()=>new WorldPresenceSession({connector:{...connector,manifest:{...connector.manifest,rules:{...connector.manifest.rules,
+ avatarPolicy:{allowedProfiles:[]}}}},parent:{add(){}},appearance:houseUniform,createConnector(){throw new Error('must reject before creating a transport')}}),
+ /does not permit any supported avatar profile/,'an empty world avatar profile policy rejects admission before transport setup');
 const boatPose=makePresencePose({...player,mode:'boat',boat:{getYaw:()=>1,speed:7.5},helmYaw:.2,helmPitch:.4},4,DEFAULT_APPEARANCE,'elsemesh.test-vehicle/1');
 assert.ok(Math.abs(boatPose.yaw-Math.atan2(Math.sin(1+Math.PI+.2),Math.cos(1+Math.PI+.2)))<1e-9);
 assert.equal(boatPose.pitch,.4); assert.equal(boatPose.moving,false,'helm pose is distinct from walking');
