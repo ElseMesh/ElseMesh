@@ -1,5 +1,5 @@
 import { Matrix4, Quaternion, Vector3, Vector4 } from '../engine/math/index.js';
-import { portalScaleRatio } from './PortalScale.js';
+import { portalPositionInBounds, portalScaleRatio } from './PortalScale.js';
 export { portalScaleRatio } from './PortalScale.js';
 
 const _up = new Vector3( 0, 1, 0 );
@@ -65,8 +65,9 @@ export function mapPortalVehicleState( state, entry, exit, scaleRatio = 1 ) {
 	scaleRatio = portalScaleRatio( scaleRatio );
 	const yawDelta = exit.yaw - entry.yaw;
 	const rotation = new Quaternion().setFromAxisAngle( _up, yawDelta );
+	const position = new Vector3().copy( state.position ).sub( new Vector3().fromArray( entry.position ) ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yawDelta ).add( new Vector3().fromArray( exit.position ) );
 	return {
-		position: new Vector3().copy( state.position ).sub( new Vector3().fromArray( entry.position ) ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yawDelta ).add( new Vector3().fromArray( exit.position ) ),
+		position: portalPositionInBounds( position ),
 		quaternion: rotation.multiply( state.quaternion.clone() ).normalize(),
 		velocity: new Vector3( state.velocity.x, state.velocity.y, state.velocity.z ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yawDelta ),
 		angular: new Vector3( state.angular.x, state.angular.y, state.angular.z ).applyAxisAngle( _up, yawDelta ),
@@ -84,6 +85,7 @@ export function mapPortalPlayerState( state, entry, exit, scaleRatio = 1 ) {
 		.multiplyScalar( scaleRatio )
 		.applyAxisAngle( _up, yawDelta )
 		.add( new Vector3().fromArray( exit.position ) );
+	portalPositionInBounds( position );
 	const velocity = rotatePortalVelocity( state.velocity, entry.yaw, exit.yaw );
 	return {
 		position,
@@ -103,7 +105,9 @@ export function alignPortalView( root, entry, exit, scaleRatio = 1 ) {
 	const rotatedZ = - x * sin + z * cos;
 	root.rotation.y = yaw;
 	root.scale.multiplyScalar( 1 / scaleRatio );
-	root.position.set( entry.position[ 0 ] - rotatedX, entry.position[ 1 ] - y, entry.position[ 2 ] - rotatedZ );
+	const [ px, py, pz ] = [ entry.position[ 0 ] - rotatedX, entry.position[ 1 ] - y, entry.position[ 2 ] - rotatedZ ];
+	portalPositionInBounds( { x: px, y: py, z: pz } );
+	root.position.set( px, py, pz );
 	return root;
 }
 
@@ -114,6 +118,7 @@ export function mapPortalCamera( sourceCamera, destinationCamera, entry, exit, s
 	_entry.fromArray( entry.position );
 	_exit.fromArray( exit.position );
 	destinationCamera.position.copy( sourceCamera.position ).sub( _entry ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yaw ).add( _exit );
+	portalPositionInBounds( destinationCamera.position );
 	_portalRotation.setFromAxisAngle( _up, yaw );
 	destinationCamera.quaternion.copy( _portalRotation ).multiply( sourceCamera.quaternion );
 	destinationCamera.fov = sourceCamera.fov;

@@ -1,8 +1,11 @@
-export const PORTAL_SCALE_RATIO_MIN = 0.001;
-export const PORTAL_SCALE_RATIO_MAX = 1000;
-
-// Scale is a bounded, positive destination-units-per-source-unit multiplier.
+// Scale is a positive destination-units-per-source-unit multiplier. Require a
+// finite reciprocal so the inverse route remains representable by IEEE-754.
 export function portalScaleRatio( value = 1 ) {
-	if ( ! Number.isFinite( value ) || value < PORTAL_SCALE_RATIO_MIN || value > PORTAL_SCALE_RATIO_MAX ) throw new Error( 'Invalid portal scale ratio' );
+	if ( ! Number.isFinite( value ) || value <= 0 || ! Number.isFinite( 1 / value ) ) throw new Error( 'Invalid portal scale ratio' );
 	return value;
+}
+
+export function portalPositionInBounds( position ) {
+	if ( ! [ position.x, position.y, position.z ].every( value => Number.isFinite( value ) && Math.abs( value ) <= 100000 ) ) throw new Error( 'Mapped portal position is outside world bounds' );
+	return position;
 }

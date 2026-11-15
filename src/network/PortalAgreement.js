@@ -26,5 +26,6 @@ export function matchingPortalAgreement( sourceWorldId, route, destinationManife
 	if ( ! counterpart || counterpart.destinationWorldId !== sourceWorldId || counterpart.destinationPortalId !== route.id || ( counterpart.destinationPortalSide || 'front' ) !== sourceSide ) return false;
 	const sourceRatio = route.scaleRatio ?? 1;
 	const destinationRatio = counterpart.scaleRatio ?? 1;
-	return Math.abs( sourceRatio * destinationRatio - 1 ) <= 1e-9;
+	const product = sourceRatio * destinationRatio;
+	return Number.isFinite( product ) && Math.abs( product - 1 ) <= Number.EPSILON * Math.max( 1, Math.abs( product ) );
 }

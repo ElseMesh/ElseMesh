@@ -1124,8 +1124,7 @@
         },
         "scaleRatio": {
           "type": "number",
-          "minimum": 0.001,
-          "maximum": 1000,
+          "exclusiveMinimum": 0,
           "default": 1,
           "description": "Destination coordinate units per source coordinate unit; counterpart route must use its reciprocal."
         },
@@ -1204,8 +1203,7 @@
         },
         "scaleRatio": {
           "type": "number",
-          "minimum": 0.001,
-          "maximum": 1000,
+          "exclusiveMinimum": 0,
           "default": 1,
           "description": "Destination coordinate units per source coordinate unit; counterpart route must use its reciprocal."
         },

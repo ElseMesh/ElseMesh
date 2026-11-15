@@ -1167,7 +1167,7 @@ func validPortalScaleRatio(ratio *float64) bool {
 	if ratio == nil {
 		return true
 	}
-	return !math.IsNaN(*ratio) && !math.IsInf(*ratio, 0) && *ratio >= 0.001 && *ratio <= 1000
+	return !math.IsNaN(*ratio) && !math.IsInf(*ratio, 0) && *ratio > 0 && !math.IsInf(1 / *ratio, 0)
 }
 
 func vector3OutOfBounds(vector vector3, limit float64) bool {

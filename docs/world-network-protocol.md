@@ -286,12 +286,13 @@ details.
 5. Map position, velocity, yaw, and pitch through source entry and destination
    exit frames. `scaleRatio` is destination units per source unit (default `1`);
    apply it to offsets from the entry frame and linear velocity. Rotate
-   orientation and angular velocity without scaling. Validate ratios in the
-   inclusive range `0.001..1000`; author the reciprocal on a complementary
-   route. The destination's own avatar/vehicle profiles define body dimensions
-   and movement limits after arrival. For a supported boat transfer, map boat
-   pose and linear momentum by the ratio, preserve angular velocity magnitude,
-   and apply the destination speed limit.
+   orientation and angular velocity without scaling. The ratio must be
+   positive, finite, and have a finite reciprocal; mapped positions must remain
+   within the existing world-presence bounds. Author the reciprocal on a
+   complementary route. The destination's own avatar/vehicle profiles define
+   body dimensions and movement limits after arrival. For a supported boat
+   transfer, map boat pose and linear momentum by the ratio, preserve angular
+   velocity magnitude, and apply the destination speed limit.
 6. Deactivate source hosted simulation/resources, switch active world root,
    collision set, connector, and signed movement rules; activate destination
    world and presence session, append lower priority content, and close the

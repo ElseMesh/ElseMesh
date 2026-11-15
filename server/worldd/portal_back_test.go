@@ -23,7 +23,7 @@ func TestPortalBackStrictFields(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"id":"elsemesh-portal:legacy"}`), &p); err != nil || p.Back != nil {
 		t.Fatalf("legacy: %v", err)
 	}
-	if !validPortalAgreementReference("elsemesh-portal:b", "back") || validPortalAgreementReference("elsemesh-portal:b", "") || !validPortalScaleRatio(nil) || validPortalScaleRatio(ptrFloat64(0.0001)) || !validPortalScaleRatio(ptrFloat64(0.5)) {
+	if !validPortalAgreementReference("elsemesh-portal:b", "back") || validPortalAgreementReference("elsemesh-portal:b", "") || !validPortalScaleRatio(nil) || validPortalScaleRatio(ptrFloat64(0)) || !validPortalScaleRatio(ptrFloat64(0.5)) {
 		t.Fatal("portal agreement reference or scale ratio validation is incorrect")
 	}
 }
