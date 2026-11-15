@@ -56,7 +56,7 @@ export class WorldPortalView {
 	render( now, sourceCamera, loadBias = 0, activeRoot = null ) {
 		if ( ! this.active ) return null;
 		const { root, portal } = this.active;
-		mapPortalCamera( sourceCamera, this.camera, portal.entry, portal.exit );
+		mapPortalCamera( sourceCamera, this.camera, portal.entry, portal.exit, portal.scaleRatio );
 		updateWorldPackageLOD( root, this.camera, loadBias );
 		setFrameCamera( this.camera, this.target.width, this.target.height, { block: this.frameBlock } );
 		const dt = updatePortalViewComponents( root.userData.worldComponents, now, this.lastRenderAt, this.camera, root === activeRoot );

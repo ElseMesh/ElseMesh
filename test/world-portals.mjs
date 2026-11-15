@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { alignPortalView, crossedPortalPlane, mapPortalCamera, mapPortalPlayerState, mapPortalVehicleState, portalExitClipPlane, rotatePortalVelocity, updatePortalViewComponents } from '../src/network/PortalHandoff.js';
+import { alignPortalView, crossedPortalPlane, mapPortalCamera, mapPortalPlayerState, mapPortalVehicleState, portalExitClipPlane, portalScaleRatio, rotatePortalVelocity, updatePortalViewComponents } from '../src/network/PortalHandoff.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 import { Quaternion } from '../src/engine/math/Quaternion.js';
@@ -11,6 +11,8 @@ import { validateWorldComponents, validateWorldHosts, validateWorldObjects, vali
 import { createWorldInviteURL, worldLinkFromLocation, WorldConnector } from '../src/network/WorldConnector.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
+import { matchingPortalAgreement } from '../src/network/PortalAgreement.js';
+import { matchingPortalAgreement } from '../src/network/PortalAgreement.js';
 
 const portal = { entry: { position: [ 0, 1, 0 ], yaw: 0 } };
 const portalViewDeltas = [];
@@ -44,6 +46,35 @@ const mappedBoat = mapPortalVehicleState( boatState, { position: [ 0, 0, 0 ], ya
 assert.ok( mappedBoat.position.distanceTo( new Vector3( 23, 2, - 1 ) ) < 1e-9, 'vehicle origin follows the portal transform' );
 assert.ok( mappedBoat.velocity.distanceTo( new Vector3( 4, 1, 0 ) ) < 1e-9, 'vehicle velocity follows the portal transform' );
 assert.ok( mappedBoat.angular.distanceTo( new Vector3( 3, 2, - 1 ) ) < 1e-9, 'vehicle angular velocity follows the portal transform' );
+const scaledEntry = { position: [ 10, 2, - 4 ], yaw: 0 };
+const scaledExit = { position: [ - 5, 20, 12 ], yaw: Math.PI / 2 };
+const scaledPlayer = mapPortalPlayerState( { position: new Vector3( 12, 4, - 1 ), velocity: { x: 1, y: 2, z: 3 }, yaw: 0.5, pitch: 0.2 }, scaledEntry, scaledExit, 3 );
+assert.ok( scaledPlayer.position.distanceTo( new Vector3( 4, 26, 6 ) ) < 1e-9, 'portal scale ratio scales position offset before rotation' );
+assert.deepEqual( scaledPlayer.velocity, { x: 9, y: 6, z: - 3 }, 'portal scale ratio scales linear velocity' );
+assert.equal( scaledPlayer.yaw, 0.5 + Math.PI / 2, 'portal scale ratio leaves orientation unchanged' );
+assert.ok( mapPortalPlayerState( scaledPlayer, scaledExit, scaledEntry, 1 / 3 ).position.distanceTo( new Vector3( 12, 4, - 1 ) ) < 1e-9, 'reciprocal ratio restores position' );
+const scaledBoat = mapPortalVehicleState( boatState, scaledEntry, scaledExit, 3 );
+assert.ok( scaledBoat.position.distanceTo( new Vector3( 16, 20, 39 ) ) < 1e-9, 'portal scale ratio scales vehicle position offsets' );
+assert.ok( scaledBoat.velocity.distanceTo( new Vector3( 12, 3, - 3 ) ) < 1e-9, 'portal scale ratio scales vehicle linear velocity' );
+assert.ok( scaledBoat.angular.distanceTo( new Vector3( 3, 2, - 1 ) ) < 1e-9, 'portal scale ratio does not scale vehicle angular velocity' );
+assert.throws( () => portalScaleRatio( 0 ), /Invalid portal scale ratio/ );
+assert.throws( () => portalScaleRatio( Infinity ), /Invalid portal scale ratio/ );
+const agreedRoute = {
+	id: 'elsemesh-portal:coast-exit', side: 'front', destinationWorldId: 'elsemesh:coast-b',
+	destinationPortalId: 'elsemesh-portal:coast-entry', destinationPortalSide: 'back', scaleRatio: 2,
+};
+const agreedDestination = {
+	worldId: 'elsemesh:coast-b',
+	portals: [ { id: 'elsemesh-portal:coast-entry', back: {
+		destinationWorldId: 'elsemesh:coast-a', destinationPortalId: 'elsemesh-portal:coast-exit',
+		destinationPortalSide: 'front', scaleRatio: 0.5,
+	} } ],
+};
+assert.equal( matchingPortalAgreement( 'elsemesh:coast-a', agreedRoute, agreedDestination ), true, 'reciprocal owner-authored routes agree on their portal sides and scale' );
+assert.equal( matchingPortalAgreement( 'elsemesh:coast-a', { ...agreedRoute, scaleRatio: 1 }, agreedDestination ), false, 'a one-sided portal scale change is not accepted' );
+assert.equal( matchingPortalAgreement( 'elsemesh:coast-a', { ...agreedRoute, destinationPortalSide: 'front' }, agreedDestination ), false, 'an unpaired destination side is not accepted' );
+assert.equal( matchingPortalAgreement( 'elsemesh:coast-a', { ...agreedRoute, destinationPortalId: 'elsemesh-portal:missing' }, agreedDestination ), false, 'a missing counterpart portal is not accepted' );
+assert.throws( () => validateWorldPortals( [ { ...agreedRoute, destinationPortalSide: undefined } ] ), /portal agreement/, 'portal agreement IDs and sides must be supplied together' );
 for ( const verticalSpeed of [ 4.6, - 9.81, 0 ] ) {
 	const entry = { position: [ 2, 3, - 7 ], yaw: - 0.4 };
 	const exit = { position: [ - 10, 5, 20 ], yaw: 1.2 };
@@ -66,7 +97,7 @@ for ( const verticalSpeed of [ 4.6, - 9.81, 0 ] ) {
 }
 
 
-const preview = { position: { set( x, y, z ) { this.x = x; this.y = y; this.z = z; } }, rotation: { y: 0 } };
+const preview = { position: { set( x, y, z ) { this.x = x; this.y = y; this.z = z; } }, rotation: { y: 0 }, scale: { value: 1, multiplyScalar( scalar ) { this.value *= scalar; } } };
 alignPortalView( preview, { position: [ 10, 2, 20 ], yaw: Math.PI / 2 }, { position: [ 3, 4, 5 ], yaw: 0 } );
 assert.ok( Math.abs( preview.position.x - 5 ) < 1e-9 && Math.abs( preview.position.y + 2 ) < 1e-9 && Math.abs( preview.position.z - 23 ) < 1e-9, 'preview aligns destination exit position with the local portal entry' );
 assert.ok( Math.abs( preview.rotation.y - Math.PI / 2 ) < 1e-9, 'preview aligns destination exit orientation with the local portal entry' );
@@ -76,9 +107,9 @@ sourceCamera.position.set( 0, 1, 2 );
 sourceCamera.rotation.y = 0;
 sourceCamera.updateMatrixWorld( true );
 const destinationCamera = new PerspectiveCamera();
-mapPortalCamera( sourceCamera, destinationCamera, { position: [ 0, 0, 0 ], yaw: 0 }, { position: [ 10, 2, 20 ], yaw: Math.PI / 2 } );
+mapPortalCamera( sourceCamera, destinationCamera, { position: [ 0, 0, 0 ], yaw: 0 }, { position: [ 10, 2, 20 ], yaw: Math.PI / 2 }, 3 );
 const destinationDirection = destinationCamera.getWorldDirection( new Vector3() );
-assert.ok( Math.abs( destinationCamera.position.x - 12 ) < 1e-9 && Math.abs( destinationCamera.position.y - 3 ) < 1e-9 && Math.abs( destinationCamera.position.z - 20 ) < 1e-9, 'portal camera position maps from entry coordinates into the destination' );
+assert.ok( Math.abs( destinationCamera.position.x - 16 ) < 1e-9 && Math.abs( destinationCamera.position.y - 5 ) < 1e-9 && Math.abs( destinationCamera.position.z - 20 ) < 1e-9, 'portal camera position uses the source-to-destination scale ratio' );
 assert.ok( Math.abs( destinationDirection.x + 1 ) < 1e-9 && Math.abs( destinationDirection.z ) < 1e-9, 'portal camera direction rotates through the destination orientation' );
 assert.equal( destinationCamera.userData.portalObliqueClipApplied, true, 'portal camera applies an oblique reversed-depth clip plane' );
 const projectedPortalDepth = ( point ) => new Vector4( ...point, 1 ).applyMatrix4( destinationCamera.matrixWorldInverse ).applyMatrix4( destinationCamera.projectionMatrix );
@@ -105,6 +136,11 @@ const source = {
 		exit: { position: [ 0, 0, 0 ], yaw: 0 }, openView: true, enabled: true,
 	} ],
 };
+const agreementRoute = { id: 'elsemesh-portal:source', destinationWorldId: 'elsemesh:destination', destinationPortalId: 'elsemesh-portal:destination', destinationPortalSide: 'front', scaleRatio: 2 };
+const agreeingWorld = { worldId: 'elsemesh:destination', portals: [ { id: 'elsemesh-portal:destination', destinationWorldId: 'elsemesh:source', destinationPortalId: 'elsemesh-portal:source', destinationPortalSide: 'front', scaleRatio: 0.5 } ] };
+assert.equal( matchingPortalAgreement( 'elsemesh:source', agreementRoute, agreeingWorld ), true, 'matching signed routes with reciprocal ratios agree' );
+assert.equal( matchingPortalAgreement( 'elsemesh:source', agreementRoute, { ...agreeingWorld, portals: [ { ...agreeingWorld.portals[ 0 ], scaleRatio: 0.25 } ] } ), false, 'a ratio mismatch disables the portal route' );
+assert.equal( matchingPortalAgreement( 'elsemesh:source', { ...agreementRoute, destinationPortalSide: 'back' }, agreeingWorld ), false, 'a route that names the wrong destination side is not agreed' );
 assert.doesNotThrow( () => validateWorldSource( source ), 'portal may pin a separate secure destination gateway' );
 assert.doesNotThrow( () => validateWorldSource( { ...source, portals: [ { ...source.portals[ 0 ], visual: 'timber' } ] } ), 'source accepts a supported optional portal frame style' );
 assert.throws( () => validateWorldSource( { ...source, portals: [ { ...source.portals[ 0 ], visual: 'glass' } ] } ), /Invalid or duplicate portal record/, 'source rejects unsupported portal frame styles' );
@@ -113,6 +149,8 @@ delete discoveredSourcePortal.destinationPeerId;
 assert.doesNotThrow( () => validateWorldSource( { ...source, portals: [ discoveredSourcePortal ] } ), 'portal can resolve providers by stable destination world ID' );
 assert.throws( () => validateWorldSource( { ...source, portals: [ { ...discoveredSourcePortal, destinationPeerId: 'invalid' } ] } ), /Invalid or duplicate portal record/, 'portal rejects malformed optional provider identities' );
 assert.throws( () => validateWorldSource( { ...source, portals: [ { ...source.portals[ 0 ], destinationGateway: 'http://world.example' } ] } ), 'insecure destination gateways must be rejected' );
+assert.doesNotThrow( () => validateWorldSource( { ...source, portals: [ { ...source.portals[ 0 ], ...agreementRoute } ] } ), 'world source accepts an explicitly paired portal scale route' );
+assert.throws( () => validateWorldSource( { ...source, portals: [ { ...source.portals[ 0 ], ...agreementRoute, scaleRatio: 1001 } ] } ), /Invalid portal scale ratio/, 'world source rejects an unsafe portal scale ratio' );
 const runtimePortal = { id: 'elsemesh-portal:runtime-door', destinationWorldId: 'elsemesh:destination', destinationPeerId: '12D3KooW12345678901234567890', entry: { position: [ 0, 0, 0 ], yaw: 0 }, exit: { position: [ 0, 0, 0 ], yaw: 0 }, openView: true, enabled: true };
 const runtimeIDs = new Set( [ 'elsemesh-object:asset' ] );
 assert.doesNotThrow( () => validateWorldPortals( [ runtimePortal ], runtimeIDs ), 'browser accepts a valid signed portal' );

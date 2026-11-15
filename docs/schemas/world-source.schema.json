@@ -191,6 +191,30 @@
       "maxLength": 240,
       "description": "World-authored question shown after the visitor activates the entry-point button."
     },
+    "avatarOptions": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [ "id", "profileId", "label" ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$" },
+          "profileId": { "enum": [ "elsemesh.avatar.stock-male/1", "elsemesh.avatar.stock-female/1" ], "description": "Must identify a registered avatar profile implemented by ElseMesh." },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "palette": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+              "shirt": { "type": "string", "pattern": "^#[0-9a-f]{6}$" },
+              "trousers": { "type": "string", "pattern": "^#[0-9a-f]{6}$" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Optional renderer-neutral visitor avatar choices, restricted to registered client profiles and safe color palettes."
+    },
     "entryPoints": {
       "type": "array",
       "maxItems": 16,
@@ -231,6 +255,11 @@
             "type": "number",
             "minimum": -1.5,
             "maximum": 1.5
+          },
+          "avatarOptionId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$",
+            "description": "Selects a matching world-authored avatarOptions entry."
           },
           "uniform": {
             "type": "object",
@@ -1084,6 +1113,22 @@
           "description": "Optional HTTPS or WSS origin for the destination node's browser gateway.",
           "pattern": "^(https|wss)://[^/?#]+/?$"
         },
+        "destinationPortalId": {
+          "type": "string",
+          "pattern": "^elsemesh-portal:[\\w.-]{1,128}$",
+          "description": "Identifies the destination world's signed counterpart route required for bilateral portal activation."
+        },
+        "destinationPortalSide": {
+          "enum": [ "front", "back" ],
+          "description": "Side of destinationPortalId that reciprocally names this route."
+        },
+        "scaleRatio": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 1000,
+          "default": 1,
+          "description": "Destination coordinate units per source coordinate unit; counterpart route must use its reciprocal."
+        },
         "exit": {
           "type": "object",
           "required": [
@@ -1109,6 +1154,10 @@
           "type": "boolean"
         }
       },
+      "allOf": [
+        { "if": { "required": [ "destinationPortalId" ] }, "then": { "required": [ "destinationPortalSide" ] } },
+        { "if": { "required": [ "destinationPortalSide" ] }, "then": { "required": [ "destinationPortalId" ] } }
+      ],
       "additionalProperties": false,
       "description": "Independent rear connection. Uses the same entry position and entry yaw plus PI radians. Omission preserves the legacy portal behavior. Requires rules.requiredFeatures to include elsemesh.portal-two-sided/1."
     },
@@ -1144,6 +1193,22 @@
           "description": "Optional HTTPS or WSS origin for the destination node's browser gateway.",
           "pattern": "^(https|wss)://[^/?#]+/?$"
         },
+        "destinationPortalId": {
+          "type": "string",
+          "pattern": "^elsemesh-portal:[\\w.-]{1,128}$",
+          "description": "Identifies the destination world's signed counterpart route required for bilateral portal activation."
+        },
+        "destinationPortalSide": {
+          "enum": [ "front", "back" ],
+          "description": "Side of destinationPortalId that reciprocally names this route."
+        },
+        "scaleRatio": {
+          "type": "number",
+          "minimum": 0.001,
+          "maximum": 1000,
+          "default": 1,
+          "description": "Destination coordinate units per source coordinate unit; counterpart route must use its reciprocal."
+        },
         "entry": {
           "$ref": "#/$defs/transform"
         },
@@ -1169,6 +1234,10 @@
           "description": "Optional client-rendered doorway frame material. Omit to render no frame."
         }
       },
+      "allOf": [
+        { "if": { "required": [ "destinationPortalId" ] }, "then": { "required": [ "destinationPortalSide" ] } },
+        { "if": { "required": [ "destinationPortalSide" ] }, "then": { "required": [ "destinationPortalId" ] } }
+      ],
       "additionalProperties": true
     }
   },

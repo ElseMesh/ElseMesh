@@ -5,6 +5,7 @@ import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { isWorldID } from './WorldIdentity.js';
 import { movementProfileParameters, playerCapsuleParameters } from './WorldRules.js';
+import { validateWorldAvatarOptions } from './WorldSource.js';
 import { LocalRegionDiskCache } from './LocalRegionDiskCache.js';
 import { localRegionStaticModelSets, localRegionVisualStreamingBounds } from './LocalRegionStaticModels.js';
 import { decodeStaticModelInstanceSet, MAX_STATIC_MODEL_INSTANCE_SET_BYTES, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
@@ -235,7 +236,10 @@ export class LocalRegionConnector {
 		const cacheRevision = descriptor.cacheRevision;
 		requireValue( typeof cacheRevision === 'string' && cacheRevision.trim() && cacheRevision.length <= 512, 'Local provider returned an invalid cache revision' );
 		const selection = descriptor.entrySelection;
-		requireValue( selection && ( selection.schema === undefined || selection.schema === 'elsemesh.world-entry-selection/1' ) && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice?.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
+		let avatarOptions;
+		try { avatarOptions = validateWorldAvatarOptions( selection?.avatarOptions ); } catch { throw new Error( 'Local provider has invalid world-authored avatar options' ); }
+		const avatarOptionIDs = new Set( avatarOptions.map( option => option.id ) );
+		requireValue( selection && ( selection.schema === undefined || selection.schema === 'elsemesh.world-entry-selection/1' ) && typeof selection.entryPointActionLabel === 'string' && selection.entryPointActionLabel.trim() && selection.entryPointActionLabel.length <= 80 && typeof selection.entryPointPrompt === 'string' && selection.entryPointPrompt.trim() && Array.isArray( selection.choices ) && selection.choices.length <= 16 && new Set( selection.choices.map( choice => choice?.id ) ).size === selection.choices.length && selection.choices.every( choice => choice && typeof choice === 'object' && ! Array.isArray( choice ) && Object.keys( choice ).every( key => [ 'id', 'label', 'uniform', 'avatarOptionId' ].includes( key ) ) && /^[a-z0-9][a-z0-9.-]{0,63}$/.test( choice.id || '' ) && typeof choice.label === 'string' && choice.label.trim() && choice.label.length <= 80 && ( choice.avatarOptionId === undefined || avatarOptionIDs.has( choice.avatarOptionId ) ) && ( choice.uniform === undefined || choice.uniform && typeof choice.uniform === 'object' && ! Array.isArray( choice.uniform ) && Object.keys( choice.uniform ).length === 2 && Object.keys( choice.uniform ).every( key => [ 'shirt', 'trousers' ].includes( key ) ) && [ choice.uniform.shirt, choice.uniform.trousers ].every( color => typeof color === 'string' && /^#[0-9a-f]{6}$/.test( color ) ) ) ) && selection.previewSpawn && Array.isArray( selection.previewSpawn.position ) && selection.previewSpawn.position.length === 3 && selection.previewSpawn.position.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Number.isFinite( selection.previewSpawn.yaw ) && Math.abs( selection.previewSpawn.yaw ) <= 360 && ( selection.previewSpawn.pitch === undefined || Number.isFinite( selection.previewSpawn.pitch ) && Math.abs( selection.previewSpawn.pitch ) <= 1.5 ), 'Local provider has no valid world-authored entry selection or preview pose' );
 		const previewRegion = selection.previewRegion;
 		requireValue( previewRegion && Number.isInteger( previewRegion.cellSizeMeters ) && previewRegion.cellSizeMeters >= 8 && previewRegion.cellSizeMeters <= 256, 'Local provider has no valid preview cell size' );
 		requireValue( Number.isFinite( previewRegion.maxViewDistanceMeters ) && previewRegion.maxViewDistanceMeters > 0 && previewRegion.maxViewDistanceMeters <= 10000, 'Local provider has no valid world-authored cell view distance' );
@@ -284,7 +288,8 @@ export class LocalRegionConnector {
 			rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'default', maxVisitors: 128, spawnRadius: 0, playerCapsule, movementProfiles },
 			spawn,
 			entryPointActionLabel: selection.entryPointActionLabel,
-			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ) } ) ),
+			avatarOptions,
+			entryPoints: selection.choices.map( choice => ( { id: choice.id, label: choice.label, ...( choice.uniform ? { uniform: choice.uniform } : {} ), ...( choice.avatarOptionId ? { avatarOptionId: choice.avatarOptionId } : {} ) } ) ),
 			entryPointPrompt: selection.entryPointPrompt, sourceRevision: this.sourceRevision,
 		};
 		this.baseURL = base;

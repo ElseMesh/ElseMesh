@@ -35,7 +35,8 @@ export function validateWorldRequirements( manifest ) {
 	playerCapsuleParameters( rules );
 	movementProfileParameters( rules );
 	vehiclePolicy( rules );
-	avatarPolicy( rules );
+	const admittedAvatarPolicy = avatarPolicy( rules );
+	if ( admittedAvatarPolicy.allowedProfiles && ( manifest.avatarOptions || [] ).some( option => ! admittedAvatarPolicy.allowedProfiles.includes( option.profileId ) ) ) throw new Error( 'World avatar option is excluded by the avatar policy' );
 	validateVehicleComplexityContracts( manifest.components );
 	validateWorldPackageBudget( manifest );
 	const required = rules.requiredFeatures ?? [];

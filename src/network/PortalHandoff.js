@@ -1,4 +1,6 @@
 import { Matrix4, Quaternion, Vector3, Vector4 } from '../engine/math/index.js';
+import { portalScaleRatio } from './PortalScale.js';
+export { portalScaleRatio } from './PortalScale.js';
 
 const _up = new Vector3( 0, 1, 0 );
 const _entry = new Vector3();
@@ -32,6 +34,7 @@ export function portalRouteFromPosition( portal, position ) {
 		route = {
 			id: portal.id, connectionKey: `${portal.id}#back`, side: 'back',
 			...portal.back,
+				scaleRatio: portal.back.scaleRatio ?? 1,
 			entry: { position: [ ...portal.entry.position ], yaw: portal.entry.yaw + Math.PI },
 		};
 		backRoutes.set( portal, route );
@@ -58,13 +61,14 @@ export function rotatePortalVelocity( velocity, entryYaw, exitYaw ) {
 
 // Carry the built-in vehicle's rigid-body state through the same yaw-only
 // transform as the player. Vehicle portability is a destination opt-in.
-export function mapPortalVehicleState( state, entry, exit ) {
+export function mapPortalVehicleState( state, entry, exit, scaleRatio = 1 ) {
+	scaleRatio = portalScaleRatio( scaleRatio );
 	const yawDelta = exit.yaw - entry.yaw;
 	const rotation = new Quaternion().setFromAxisAngle( _up, yawDelta );
 	return {
-		position: new Vector3().copy( state.position ).sub( new Vector3().fromArray( entry.position ) ).applyAxisAngle( _up, yawDelta ).add( new Vector3().fromArray( exit.position ) ),
+		position: new Vector3().copy( state.position ).sub( new Vector3().fromArray( entry.position ) ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yawDelta ).add( new Vector3().fromArray( exit.position ) ),
 		quaternion: rotation.multiply( state.quaternion.clone() ).normalize(),
-		velocity: new Vector3( state.velocity.x, state.velocity.y, state.velocity.z ).applyAxisAngle( _up, yawDelta ),
+		velocity: new Vector3( state.velocity.x, state.velocity.y, state.velocity.z ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yawDelta ),
 		angular: new Vector3( state.angular.x, state.angular.y, state.angular.z ).applyAxisAngle( _up, yawDelta ),
 	};
 }
@@ -72,38 +76,44 @@ export function mapPortalVehicleState( state, entry, exit ) {
 // Preserve the visitor's offset and view through the same rigid transform used
 // for the open doorway camera. Destination rules apply to subsequent physics;
 // the crossing itself preserves world-space momentum, including a jump or fall.
-export function mapPortalPlayerState( state, entry, exit ) {
+export function mapPortalPlayerState( state, entry, exit, scaleRatio = 1 ) {
+	scaleRatio = portalScaleRatio( scaleRatio );
 	const yawDelta = exit.yaw - entry.yaw;
 	const position = new Vector3().copy( state.position )
 		.sub( new Vector3().fromArray( entry.position ) )
+		.multiplyScalar( scaleRatio )
 		.applyAxisAngle( _up, yawDelta )
 		.add( new Vector3().fromArray( exit.position ) );
+	const velocity = rotatePortalVelocity( state.velocity, entry.yaw, exit.yaw );
 	return {
 		position,
-		velocity: rotatePortalVelocity( state.velocity, entry.yaw, exit.yaw ),
+		velocity: { x: velocity.x * scaleRatio, y: velocity.y * scaleRatio, z: velocity.z * scaleRatio },
 		yaw: state.yaw + yawDelta,
 		pitch: state.pitch,
 	};
 }
 
 // Place destination-world geometry so its signed exit transform meets the local entry.
-export function alignPortalView( root, entry, exit ) {
+export function alignPortalView( root, entry, exit, scaleRatio = 1 ) {
+	scaleRatio = portalScaleRatio( scaleRatio );
 	const yaw = entry.yaw - exit.yaw;
 	const cos = Math.cos( yaw ), sin = Math.sin( yaw );
-	const [ x, y, z ] = exit.position;
+	const [ x, y, z ] = exit.position.map( ( value ) => value / scaleRatio );
 	const rotatedX = x * cos + z * sin;
 	const rotatedZ = - x * sin + z * cos;
 	root.rotation.y = yaw;
+	root.scale.multiplyScalar( 1 / scaleRatio );
 	root.position.set( entry.position[ 0 ] - rotatedX, entry.position[ 1 ] - y, entry.position[ 2 ] - rotatedZ );
 	return root;
 }
 
 // Map the visitor's view through the opening into destination coordinates.
-export function mapPortalCamera( sourceCamera, destinationCamera, entry, exit ) {
+export function mapPortalCamera( sourceCamera, destinationCamera, entry, exit, scaleRatio = 1 ) {
+	scaleRatio = portalScaleRatio( scaleRatio );
 	const yaw = exit.yaw - entry.yaw;
 	_entry.fromArray( entry.position );
 	_exit.fromArray( exit.position );
-	destinationCamera.position.copy( sourceCamera.position ).sub( _entry ).applyAxisAngle( _up, yaw ).add( _exit );
+	destinationCamera.position.copy( sourceCamera.position ).sub( _entry ).multiplyScalar( scaleRatio ).applyAxisAngle( _up, yaw ).add( _exit );
 	_portalRotation.setFromAxisAngle( _up, yaw );
 	destinationCamera.quaternion.copy( _portalRotation ).multiply( sourceCamera.quaternion );
 	destinationCamera.fov = sourceCamera.fov;

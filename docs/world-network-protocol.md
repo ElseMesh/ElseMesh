@@ -274,15 +274,24 @@ details.
    and verify its owner-signed manifest, then stage `portal-preview` and
    `visible` assets. A reused source-world gateway is only a route/discovery
    service unless it is also authorized to serve the destination world. Abort
-   preparation if the portal is no longer selected.
+   preparation if the portal is no longer selected. The source route must name
+   a destination portal ID and side; that signed destination route must point
+   back to this route, and the ratios must be reciprocal. Missing or mismatched
+   agreement means no preview and no crossing.
 3. Render a read-only view of the destination when requested and prepared. Do
    not start destination presence while the visitor is only looking through it.
 4. Hold the player at the source threshold until destination content is ready.
    For a boat, check destination opt-in, component/berth compatibility, and
    combined complexity; hold at the threshold if any check fails.
 5. Map position, velocity, yaw, and pitch through source entry and destination
-   exit frames. For a supported boat transfer, map boat pose and momentum and
-   apply the destination speed limit.
+   exit frames. `scaleRatio` is destination units per source unit (default `1`);
+   apply it to offsets from the entry frame and linear velocity. Rotate
+   orientation and angular velocity without scaling. Validate ratios in the
+   inclusive range `0.001..1000`; author the reciprocal on a complementary
+   route. The destination's own avatar/vehicle profiles define body dimensions
+   and movement limits after arrival. For a supported boat transfer, map boat
+   pose and linear momentum by the ratio, preserve angular velocity magnitude,
+   and apply the destination speed limit.
 6. Deactivate source hosted simulation/resources, switch active world root,
    collision set, connector, and signed movement rules; activate destination
    world and presence session, append lower priority content, and close the

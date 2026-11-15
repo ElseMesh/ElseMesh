@@ -6,9 +6,9 @@ import (
 )
 
 func TestPortalBackStrictFields(t *testing.T) {
-	valid := `{"id":"elsemesh-portal:a","back":{"destinationWorldId":"elsemesh:b","exit":{"position":[0,0,0],"yaw":3.14},"enabled":true,"openView":false}}`
+	valid := `{"id":"elsemesh-portal:a","back":{"destinationWorldId":"elsemesh:b","destinationPortalId":"elsemesh-portal:b","destinationPortalSide":"back","scaleRatio":0.5,"exit":{"position":[0,0,0],"yaw":3.14},"enabled":true,"openView":false}}`
 	var p portal
-	if err := json.Unmarshal([]byte(valid), &p); err != nil || p.Back == nil || p.Back.Destination != "elsemesh:b" {
+	if err := json.Unmarshal([]byte(valid), &p); err != nil || p.Back == nil || p.Back.Destination != "elsemesh:b" || p.Back.ScaleRatio == nil || *p.Back.ScaleRatio != 0.5 || p.Back.DestinationPortalSide != "back" {
 		t.Fatalf("valid rear: %v", err)
 	}
 	for _, invalid := range []string{
@@ -23,4 +23,9 @@ func TestPortalBackStrictFields(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"id":"elsemesh-portal:legacy"}`), &p); err != nil || p.Back != nil {
 		t.Fatalf("legacy: %v", err)
 	}
+	if !validPortalAgreementReference("elsemesh-portal:b", "back") || validPortalAgreementReference("elsemesh-portal:b", "") || !validPortalScaleRatio(nil) || validPortalScaleRatio(ptrFloat64(0.0001)) || !validPortalScaleRatio(ptrFloat64(0.5)) {
+		t.Fatal("portal agreement reference or scale ratio validation is incorrect")
+	}
 }
+
+func ptrFloat64(value float64) *float64 { return &value }

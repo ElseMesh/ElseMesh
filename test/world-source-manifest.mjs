@@ -25,6 +25,10 @@ try {
 	await writeFile( path.join( assetsPath, assetId.slice( 'sha256:'.length ) ), bytes );
 	const source = createWorldSource( { worldId: 'elsemesh:generic-manifest-test', title: 'Generic manifest test' } );
 	source.updatedAt = '2026-10-01T12:00:00Z';
+	source.avatarOptions = [ { id: 'traveler', profileId: 'elsemesh.avatar.stock-male/1', label: 'Traveler', palette: { shirt: '#aabbcc' } } ];
+	source.entryPointActionLabel = 'Enter';
+	source.entryPointPrompt = 'Choose a start';
+	source.entryPoints = [ { id: 'start', label: 'Start here', position: [ 1, 2, 3 ], yaw: 0, avatarOptionId: 'traveler' } ];
 	source.rules.requiredFeatures = [ 'elsemesh.static-glb/1' ];
 	source.rules.avatarPolicy = { allowedProfiles: [ 'elsemesh.avatar.stock-male/1' ] };
 	source.rules.vehiclePolicy = { enabled: true, maxSpeed: 8, maxCombinedComplexity: 50000, allowedCombinations: [ { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } ] };
@@ -54,6 +58,10 @@ try {
 	assert.deepEqual( first, second, 'generic manifest conversion is byte deterministic' );
 	const manifest = JSON.parse( first );
 	assert.deepEqual( manifest.components, source.components, 'component envelope and opaque data survive conversion unchanged' );
+	assert.deepEqual( manifest.avatarOptions, source.avatarOptions, 'world-authored registered avatar options survive source-to-manifest conversion' );
+	assert.deepEqual( manifest.entryPoints, source.entryPoints, 'entry points retain their selected avatar option reference' );
+	assert.equal( manifest.entryPointPrompt, source.entryPointPrompt );
+	assert.equal( manifest.entryPointActionLabel, source.entryPointActionLabel );
 	assert.deepEqual( manifest.assets, [ { id: assetId, bytes: bytes.length, kind: 'example-binary/1', priority: 'visible' } ], 'asset inventory derives only from generic references' );
 	assert.doesNotThrow( () => validateWorldRequirements( manifest ) );
 	assert.deepEqual( movementProfileSelection( { components: [ { type: 'elsemesh.fixture-vehicle/1' } ] }, 'elsemesh.avatar.stock-male/1' ), { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.fixture-vehicle/1' }, 'renderer clients select the same authored profile for a single world vehicle type' );

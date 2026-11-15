@@ -121,6 +121,74 @@ func TestWorldManifestRequiresObjectArray(t *testing.T) {
 	}
 }
 
+func TestWorldAvatarOptionsAreRegisteredAndEntryBound(t *testing.T) {
+	owner := testKey(t)
+	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())
+	if err != nil {
+		t.Fatal(err)
+	}
+	shirt := "#aabbcc"
+	manifest := newStarterManifest("Avatar options", ownerID.String())
+	manifest.AvatarOptions = []worldAvatarOption{{ID: "traveler", ProfileID: "elsemesh.avatar.stock-female/1", Label: "Ponytail", Palette: &worldAvatarPalette{Shirt: &shirt}}}
+	manifest.EntryPointPrompt = "Choose a start"
+	manifest.EntryPointActionLabel = "Enter"
+	manifest.EntryPoints = []worldEntryPoint{{ID: "start", Label: "Start here", Position: []float64{1, 2, 3}, Yaw: 0, AvatarOptionID: "traveler"}}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid registered avatar option rejected: %v", err)
+	}
+	wire, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip worldManifest
+	if err := json.Unmarshal(wire, &roundTrip); err != nil {
+		t.Fatalf("valid avatar option manifest failed JSON decoding: %v", err)
+	}
+	if len(roundTrip.AvatarOptions) != 1 || roundTrip.EntryPoints[0].AvatarOptionID != "traveler" {
+		t.Fatal("avatar option catalogue or entry reference was lost in manifest serialization")
+	}
+
+	bad := manifest
+	bad.AvatarOptions = append([]worldAvatarOption(nil), manifest.AvatarOptions...)
+	bad.AvatarOptions[0].ProfileID = "elsemesh.avatar.unregistered/1"
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("unregistered avatar profile was accepted")
+	}
+	bad = manifest
+	bad.AvatarOptions = append(append([]worldAvatarOption(nil), manifest.AvatarOptions...), manifest.AvatarOptions[0])
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("duplicate avatar option ID was accepted")
+	}
+	bad = manifest
+	bad.EntryPoints = append([]worldEntryPoint(nil), manifest.EntryPoints...)
+	bad.EntryPoints[0].AvatarOptionID = "missing"
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("entry point reference to missing avatar option was accepted")
+	}
+	unsafe := "#AABBCC"
+	bad = manifest
+	bad.AvatarOptions = append([]worldAvatarOption(nil), manifest.AvatarOptions...)
+	bad.AvatarOptions[0].Palette = &worldAvatarPalette{Shirt: &unsafe}
+	if err := validateManifest(bad, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("unsafe avatar palette color was accepted")
+	}
+
+	for _, document := range []string{
+		`{"id":"x","profileId":"elsemesh.avatar.stock-male/1","label":"X","unknown":true}`,
+		`{"id":"x","profileId":"elsemesh.avatar.stock-male/1","label":"X","palette":{"hair":"#000000"}}`,
+		`{"id":"x","profileId":"elsemesh.avatar.stock-male/1","label":"X","palette":{}}`,
+	} {
+		var option worldAvatarOption
+		if err := json.Unmarshal([]byte(document), &option); err == nil {
+			t.Fatalf("invalid world avatar option JSON was accepted: %s", document)
+		}
+	}
+	var entry worldEntryPoint
+	if err := json.Unmarshal([]byte(`{"id":"x","label":"X","position":[0,0,0],"yaw":0,"unknown":true}`), &entry); err == nil {
+		t.Fatal("unknown world entry point field was accepted")
+	}
+}
+
 func TestWorldManifestAcceptsGenericBehaviorData(t *testing.T) {
 	owner := testKey(t)
 	ownerID, err := peer.IDFromPublicKey(owner.GetPublic())

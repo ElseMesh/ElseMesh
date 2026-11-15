@@ -2,6 +2,8 @@ import { validatePortalBack } from './PortalSideContract.js';
 import { MAX_WORLD_PACKAGE_BYTES, movementParameters, movementProfileParameters, SUPPORTED_PHYSICS_PROFILES, validateWorldLevels, avatarPolicy, vehiclePolicy, visitorRules } from './WorldRules.js';
 import { validateWorldExperience } from './WorldExperience.js';
 import { WORLD_ID_PREFIX, isWorldID } from './WorldIdentity.js';
+import { AVATAR_STYLES } from '../player/AvatarAppearance.js';
+import { validatePortalRouteContract } from './PortalAgreement.js';
 
 export const WORLD_SOURCE_PROTOCOL = 'elsemesh.world-source/3';
 const WORLD_COLLISION_TAG_PATTERN = /^[A-Za-z][A-Za-z0-9._:-]{0,63}$/;
@@ -33,6 +35,7 @@ export function createWorldSource( { worldId = `${WORLD_ID_PREFIX}local-${ crypt
 		coordinateSystem: 'right-handed-y-up-meters',
 		styleGuide: '',
 		entryPoints: [],
+		avatarOptions: [],
 		entryPointPrompt: '',
 		entryPointActionLabel: '',
 		rules: { gravity: 1, avatarComplexity: 20000, physicsProfile: 'elsemesh-default', maxVisitors: 128, spawnRadius: 8, movement: { walkSpeed: 3, sprintSpeed: 6.2, jumpSpeed: 4.6 } },
@@ -46,7 +49,7 @@ export function createWorldSource( { worldId = `${WORLD_ID_PREFIX}local-${ crypt
 
 export function validateWorldSource( source, { allowUnregisteredBehaviors = false } = {} ) {
 	validateWorldSpawn( source?.spawn );
-	validateWorldEntryPoints( source?.entryPoints, source?.entryPointPrompt, source?.entryPointActionLabel );
+	validateWorldEntryPoints( source?.entryPoints, source?.entryPointPrompt, source?.entryPointActionLabel, source?.avatarOptions );
 	if ( ! source || source.protocol !== WORLD_SOURCE_PROTOCOL ) throw new Error( 'Unsupported world source format' );
 	if ( ! isWorldID( source.worldId ) ) throw new Error( 'Invalid worldId' );
 	if ( typeof source.title !== 'string' || ! source.title.trim() || source.title.length > 160 ) throw new Error( 'Invalid world title' );
@@ -58,7 +61,9 @@ export function validateWorldSource( source, { allowUnregisteredBehaviors = fals
 	try { movementParameters( source.rules ); } catch { throw new Error( 'Invalid or unsupported world movement rules' ); }
 	try { movementProfileParameters( source.rules ); } catch { throw new Error( 'Invalid or unsupported world movement profiles' ); }
 	try { vehiclePolicy( source.rules ); } catch { throw new Error( 'Invalid or unsupported world vehicle policy' ); }
-	try { avatarPolicy( source.rules ); } catch { throw new Error( 'Invalid or unsupported world avatar policy' ); }
+	let selectedAvatarPolicy;
+	try { selectedAvatarPolicy = avatarPolicy( source.rules ); } catch { throw new Error( 'Invalid or unsupported world avatar policy' ); }
+	if ( selectedAvatarPolicy.allowedProfiles && ( source.avatarOptions || [] ).some( option => ! selectedAvatarPolicy.allowedProfiles.includes( option.profileId ) ) ) throw new Error( 'World avatar option is excluded by the avatar policy' );
 	if ( source.rules.maxPackageBytes !== undefined && ( ! Number.isSafeInteger( source.rules.maxPackageBytes ) || source.rules.maxPackageBytes < 1 || source.rules.maxPackageBytes > MAX_WORLD_PACKAGE_BYTES ) ) throw new Error( 'Invalid world package byte budget' );
 	if ( source.rules.requiredFeatures !== undefined && ( ! Array.isArray( source.rules.requiredFeatures ) || source.rules.requiredFeatures.length > 64 || new Set( source.rules.requiredFeatures ).size !== source.rules.requiredFeatures.length || source.rules.requiredFeatures.some( ( feature ) => typeof feature !== 'string' || feature.length > 96 || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( feature ) ) ) ) throw new Error( 'Invalid required world features' );
 	if ( ! Array.isArray( source.objects ) || ! Array.isArray( source.portals ) || source.objects.length > 10000 || source.portals.length > 1024 || source.hosts !== undefined && ( ! Array.isArray( source.hosts ) || source.hosts.length > 256 ) || source.components !== undefined && ( ! Array.isArray( source.components ) || source.components.length > 128 ) ) throw new Error( 'Invalid world object, portal, component, or host grant list' );
@@ -98,6 +103,7 @@ export function validateWorldSource( source, { allowUnregisteredBehaviors = fals
 	}
 	for ( const portal of source.portals ) {
 		if ( typeof portal.id !== 'string' || ! /^elsemesh-portal:[\w.-]{1,128}$/.test( portal.id ) || ids.has( portal.id ) || ! isWorldID( portal.destinationWorldId ) || portal.destinationPeerId !== undefined && ( typeof portal.destinationPeerId !== 'string' || ! /^[A-Za-z0-9]{20,256}$/.test( portal.destinationPeerId ) ) || ( portal.destinationGateway !== undefined && ! validGateway( portal.destinationGateway ) ) || portal.visual !== undefined && ! [ 'timber', 'stone', 'metal' ].includes( portal.visual ) || ! portal.entry || ! validVector( portal.entry.position ) || ! Number.isFinite( portal.entry.yaw ) || portal.entry.rotation !== undefined || ! portal.exit || ! validVector( portal.exit.position ) || ! Number.isFinite( portal.exit.yaw ) || portal.exit.rotation !== undefined || typeof portal.openView !== 'boolean' || typeof portal.enabled !== 'boolean' ) throw new Error( 'Invalid or duplicate portal record' );
+		validatePortalRouteContract( portal );
 		if ( portal.back !== undefined ) {
 			if ( ! source.rules.requiredFeatures?.includes( 'elsemesh.portal-two-sided/1' ) ) throw new Error( 'Portal back requires elsemesh.portal-two-sided/1' );
 			validatePortalBack( portal.back, validGateway );
@@ -159,7 +165,22 @@ export function validateWorldSpawn( spawn ) {
 
 // Named arrival choices can also carry a world-specific uniform palette. The
 // player's body style, skin, and hair remain their own appearance preferences.
-export function validateWorldEntryPoints( entryPoints, prompt, actionLabel ) {
+export function validateWorldAvatarOptions( avatarOptions ) {
+	if ( avatarOptions === undefined ) return [];
+	if ( ! Array.isArray( avatarOptions ) || avatarOptions.length > 16 ) throw new Error( 'Invalid world avatar option list' );
+	const ids = new Set();
+	const profileIDs = new Set( Object.values( AVATAR_STYLES ).map( profile => profile.profileId ) );
+	for ( const option of avatarOptions ) {
+		if ( ! option || typeof option !== 'object' || Array.isArray( option ) || Object.keys( option ).some( key => ! [ 'id', 'profileId', 'label', 'palette' ].includes( key ) ) || typeof option.id !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}$/.test( option.id ) || ids.has( option.id ) || ! profileIDs.has( option.profileId ) || typeof option.label !== 'string' || ! option.label.trim() || option.label.length > 80 ) throw new Error( 'Invalid or duplicate world avatar option' );
+		if ( option.palette !== undefined && ( ! option.palette || typeof option.palette !== 'object' || Array.isArray( option.palette ) || Object.keys( option.palette ).some( key => ! [ 'shirt', 'trousers' ].includes( key ) ) || ! Object.keys( option.palette ).length || Object.values( option.palette ).some( color => typeof color !== 'string' || ! /^#[0-9a-f]{6}$/.test( color ) ) ) ) throw new Error( 'Invalid world avatar option palette' );
+		ids.add( option.id );
+	}
+	return avatarOptions;
+}
+
+export function validateWorldEntryPoints( entryPoints, prompt, actionLabel, avatarOptions ) {
+	const options = validateWorldAvatarOptions( avatarOptions );
+	const optionIDs = new Set( options.map( option => option.id ) );
 	if ( prompt !== undefined && ( typeof prompt !== 'string' || prompt.length > 240 || prompt && ! prompt.trim() ) ) throw new Error( 'Invalid world entry point prompt' );
 	if ( actionLabel !== undefined && ( typeof actionLabel !== 'string' || actionLabel.length > 80 || actionLabel.trim() !== actionLabel || Array.isArray( entryPoints ) && entryPoints.length > 0 && ! actionLabel ) ) throw new Error( 'Invalid world entry point action label' );
 	if ( entryPoints === undefined ) entryPoints = [];
@@ -168,7 +189,7 @@ export function validateWorldEntryPoints( entryPoints, prompt, actionLabel ) {
 	if ( entryPoints.length && ( typeof actionLabel !== 'string' || ! actionLabel.trim() ) ) throw new Error( 'A world entry point action label is required when entry points are defined' );
 	const ids = new Set();
 	for ( const entry of entryPoints ) {
-		if ( ! entry || typeof entry !== 'object' || Array.isArray( entry ) || Object.keys( entry ).some( key => ! [ 'id', 'label', 'position', 'yaw', 'pitch', 'uniform' ].includes( key ) ) || typeof entry.id !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}$/.test( entry.id ) || ids.has( entry.id ) || typeof entry.label !== 'string' || ! entry.label.trim() || entry.label.length > 80 || ! validVector( entry.position ) || entry.position.some( value => Math.abs( value ) > 1e6 ) || ! Number.isFinite( entry.yaw ) || Math.abs( entry.yaw ) > 360 || entry.pitch !== undefined && ( ! Number.isFinite( entry.pitch ) || Math.abs( entry.pitch ) > 1.5 ) ) throw new Error( 'Invalid or duplicate world entry point' );
+		if ( ! entry || typeof entry !== 'object' || Array.isArray( entry ) || Object.keys( entry ).some( key => ! [ 'id', 'label', 'position', 'yaw', 'pitch', 'uniform', 'avatarOptionId' ].includes( key ) ) || typeof entry.id !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}$/.test( entry.id ) || ids.has( entry.id ) || typeof entry.label !== 'string' || ! entry.label.trim() || entry.label.length > 80 || ! validVector( entry.position ) || entry.position.some( value => Math.abs( value ) > 1e6 ) || ! Number.isFinite( entry.yaw ) || Math.abs( entry.yaw ) > 360 || entry.pitch !== undefined && ( ! Number.isFinite( entry.pitch ) || Math.abs( entry.pitch ) > 1.5 ) || entry.avatarOptionId !== undefined && ! optionIDs.has( entry.avatarOptionId ) ) throw new Error( 'Invalid or duplicate world entry point' );
 		if ( entry.uniform !== undefined && ( ! entry.uniform || typeof entry.uniform !== 'object' || Array.isArray( entry.uniform ) || Object.keys( entry.uniform ).some( key => ! [ 'shirt', 'trousers' ].includes( key ) ) || ! [ entry.uniform.shirt, entry.uniform.trousers ].every( color => typeof color === 'string' && /^#[0-9a-f]{6}$/.test( color ) ) ) ) throw new Error( 'Invalid world entry point uniform' );
 		ids.add( entry.id );
 	}

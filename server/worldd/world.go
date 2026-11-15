@@ -123,12 +123,15 @@ type collisionCylinder struct {
 }
 
 type portalBack struct {
-	Destination string    `json:"destinationWorldId"`
-	PeerID      string    `json:"destinationPeerId,omitempty"`
-	Gateway     string    `json:"destinationGateway,omitempty"`
-	Exit        transform `json:"exit"`
-	OpenView    bool      `json:"openView"`
-	Enabled     bool      `json:"enabled"`
+	Destination           string    `json:"destinationWorldId"`
+	PeerID                string    `json:"destinationPeerId,omitempty"`
+	Gateway               string    `json:"destinationGateway,omitempty"`
+	DestinationPortalID   string    `json:"destinationPortalId,omitempty"`
+	DestinationPortalSide string    `json:"destinationPortalSide,omitempty"`
+	ScaleRatio            *float64  `json:"scaleRatio,omitempty"`
+	Exit                  transform `json:"exit"`
+	OpenView              bool      `json:"openView"`
+	Enabled               bool      `json:"enabled"`
 }
 
 func (side *portalBack) UnmarshalJSON(data []byte) error {
@@ -139,9 +142,14 @@ func (side *portalBack) UnmarshalJSON(data []byte) error {
 	if fields == nil {
 		return errors.New("portal back must be an object")
 	}
+	for _, key := range []string{"destinationPeerId", "destinationGateway", "destinationPortalId", "destinationPortalSide", "scaleRatio"} {
+		if raw, ok := fields[key]; ok && strings.TrimSpace(string(raw)) == "null" {
+			return fmt.Errorf("portal back %s cannot be null", key)
+		}
+	}
 	for key := range fields {
 		switch key {
-		case "destinationWorldId", "destinationPeerId", "destinationGateway", "exit", "openView", "enabled":
+		case "destinationWorldId", "destinationPeerId", "destinationGateway", "destinationPortalId", "destinationPortalSide", "scaleRatio", "exit", "openView", "enabled":
 		default:
 			return fmt.Errorf("unsupported portal back field %q", key)
 		}
@@ -177,16 +185,19 @@ func (side *portalBack) UnmarshalJSON(data []byte) error {
 }
 
 type portal struct {
-	Back        *portalBack `json:"back,omitempty"`
-	ID          string      `json:"id"`
-	Destination string      `json:"destinationWorldId"`
-	PeerID      string      `json:"destinationPeerId,omitempty"`
-	Gateway     string      `json:"destinationGateway,omitempty"`
-	Visual      string      `json:"visual,omitempty"`
-	Entry       transform   `json:"entry"`
-	Exit        transform   `json:"exit"`
-	OpenView    bool        `json:"openView"`
-	Enabled     bool        `json:"enabled"`
+	Back                  *portalBack `json:"back,omitempty"`
+	ID                    string      `json:"id"`
+	Destination           string      `json:"destinationWorldId"`
+	PeerID                string      `json:"destinationPeerId,omitempty"`
+	Gateway               string      `json:"destinationGateway,omitempty"`
+	DestinationPortalID   string      `json:"destinationPortalId,omitempty"`
+	DestinationPortalSide string      `json:"destinationPortalSide,omitempty"`
+	ScaleRatio            *float64    `json:"scaleRatio,omitempty"`
+	Visual                string      `json:"visual,omitempty"`
+	Entry                 transform   `json:"entry"`
+	Exit                  transform   `json:"exit"`
+	OpenView              bool        `json:"openView"`
+	Enabled               bool        `json:"enabled"`
 }
 
 func (p *portal) UnmarshalJSON(data []byte) error {
@@ -196,6 +207,11 @@ func (p *portal) UnmarshalJSON(data []byte) error {
 	}
 	if raw, ok := fields["back"]; ok && strings.TrimSpace(string(raw)) == "null" {
 		return errors.New("portal back must be an object")
+	}
+	for _, key := range []string{"destinationPeerId", "destinationGateway", "destinationPortalId", "destinationPortalSide", "scaleRatio"} {
+		if raw, ok := fields[key]; ok && strings.TrimSpace(string(raw)) == "null" {
+			return fmt.Errorf("portal %s cannot be null", key)
+		}
 	}
 	type plain portal
 	var decoded plain
@@ -441,37 +457,110 @@ type worldUniform struct {
 	Trousers string `json:"trousers"`
 }
 
+type worldAvatarPalette struct {
+	Shirt    *string `json:"shirt,omitempty"`
+	Trousers *string `json:"trousers,omitempty"`
+}
+
+type worldAvatarOption struct {
+	ID        string              `json:"id"`
+	ProfileID string              `json:"profileId"`
+	Label     string              `json:"label"`
+	Palette   *worldAvatarPalette `json:"palette,omitempty"`
+}
+
+var registeredAvatarProfiles = map[string]struct{}{
+	"elsemesh.avatar.stock-male/1":   {},
+	"elsemesh.avatar.stock-female/1": {},
+}
+
+func (option *worldAvatarOption) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("world avatar option must be an object")
+	}
+	for field := range fields {
+		if field != "id" && field != "profileId" && field != "label" && field != "palette" {
+			return fmt.Errorf("unknown world avatar option field %q", field)
+		}
+	}
+	if fields["id"] == nil || fields["profileId"] == nil || fields["label"] == nil {
+		return errors.New("world avatar option requires id, profileId, and label")
+	}
+	type plain worldAvatarOption
+	return json.Unmarshal(data, (*plain)(option))
+}
+
+func (palette *worldAvatarPalette) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("world avatar palette must be an object")
+	}
+	for field := range fields {
+		if field != "shirt" && field != "trousers" {
+			return fmt.Errorf("unknown world avatar palette field %q", field)
+		}
+	}
+	if len(fields) == 0 {
+		return errors.New("world avatar palette must set shirt or trousers")
+	}
+	type plain worldAvatarPalette
+	return json.Unmarshal(data, (*plain)(palette))
+}
+
 type worldEntryPoint struct {
-	ID       string        `json:"id"`
-	Label    string        `json:"label"`
-	Position []float64     `json:"position"`
-	Yaw      float64       `json:"yaw"`
-	Pitch    *float64      `json:"pitch,omitempty"`
-	Uniform  *worldUniform `json:"uniform,omitempty"`
+	ID             string        `json:"id"`
+	Label          string        `json:"label"`
+	Position       []float64     `json:"position"`
+	Yaw            float64       `json:"yaw"`
+	Pitch          *float64      `json:"pitch,omitempty"`
+	Uniform        *worldUniform `json:"uniform,omitempty"`
+	AvatarOptionID string        `json:"avatarOptionId,omitempty"`
+}
+
+func (entry *worldEntryPoint) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil || fields == nil {
+		return errors.New("world entry point must be an object")
+	}
+	for field := range fields {
+		if field != "id" && field != "label" && field != "position" && field != "yaw" && field != "pitch" && field != "uniform" && field != "avatarOptionId" {
+			return fmt.Errorf("unknown world entry point field %q", field)
+		}
+	}
+	type plain worldEntryPoint
+	if err := json.Unmarshal(data, (*plain)(entry)); err != nil {
+		return err
+	}
+	if fields["avatarOptionId"] != nil && entry.AvatarOptionID == "" {
+		return errors.New("world entry point avatarOptionId cannot be empty")
+	}
+	return nil
 }
 
 type worldManifest struct {
-	Protocol              string            `json:"protocol"`
-	WorldID               string            `json:"worldId"`
-	SourceHash            string            `json:"sourceHash,omitempty"`
-	OwnerPeerID           string            `json:"ownerPeerId"`
-	AuthorityPeerID       string            `json:"authorityPeerId"`
-	AuthorityEpoch        uint64            `json:"authorityEpoch"`
-	Discoverable          bool              `json:"discoverable"`
-	Version               uint64            `json:"version"`
-	Title                 string            `json:"title"`
-	Experience            *worldExperience  `json:"experience,omitempty"`
-	Spawn                 *worldSpawn       `json:"spawn,omitempty"`
-	EntryPoints           []worldEntryPoint `json:"entryPoints,omitempty"`
-	EntryPointPrompt      string            `json:"entryPointPrompt,omitempty"`
-	EntryPointActionLabel string            `json:"entryPointActionLabel,omitempty"`
-	Rules                 worldRules        `json:"rules"`
-	Assets                []assetRef        `json:"assets"`
-	Objects               []worldObject     `json:"objects"`
-	Components            []worldComponent  `json:"components,omitempty"`
-	Portals               []portal          `json:"portals"`
-	Hosts                 []hostingGrant    `json:"hosts,omitempty"`
-	UpdatedAt             int64             `json:"updatedAt"`
+	Protocol              string              `json:"protocol"`
+	WorldID               string              `json:"worldId"`
+	SourceHash            string              `json:"sourceHash,omitempty"`
+	OwnerPeerID           string              `json:"ownerPeerId"`
+	AuthorityPeerID       string              `json:"authorityPeerId"`
+	AuthorityEpoch        uint64              `json:"authorityEpoch"`
+	Discoverable          bool                `json:"discoverable"`
+	Version               uint64              `json:"version"`
+	Title                 string              `json:"title"`
+	Experience            *worldExperience    `json:"experience,omitempty"`
+	Spawn                 *worldSpawn         `json:"spawn,omitempty"`
+	EntryPoints           []worldEntryPoint   `json:"entryPoints,omitempty"`
+	AvatarOptions         []worldAvatarOption `json:"avatarOptions,omitempty"`
+	EntryPointPrompt      string              `json:"entryPointPrompt,omitempty"`
+	EntryPointActionLabel string              `json:"entryPointActionLabel,omitempty"`
+	Rules                 worldRules          `json:"rules"`
+	Assets                []assetRef          `json:"assets"`
+	Objects               []worldObject       `json:"objects"`
+	Components            []worldComponent    `json:"components,omitempty"`
+	Portals               []portal            `json:"portals"`
+	Hosts                 []hostingGrant      `json:"hosts,omitempty"`
+	UpdatedAt             int64               `json:"updatedAt"`
 }
 
 type worldExperience struct {
@@ -620,9 +709,38 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	if len(manifest.EntryPointActionLabel) > 80 || manifest.EntryPointActionLabel != "" && strings.TrimSpace(manifest.EntryPointActionLabel) != manifest.EntryPointActionLabel {
 		return errors.New("invalid world entry point action label")
 	}
+	if len(manifest.AvatarOptions) > 16 {
+		return errors.New("manifest contains too many world avatar options")
+	}
+	avatarOptions := make(map[string]bool, len(manifest.AvatarOptions))
+	for _, option := range manifest.AvatarOptions {
+		if !entryPointIDPattern.MatchString(option.ID) || avatarOptions[option.ID] || strings.TrimSpace(option.Label) == "" || len(option.Label) > 80 {
+			return errors.New("invalid or duplicate world avatar option")
+		}
+		if _, registered := registeredAvatarProfiles[option.ProfileID]; !registered {
+			return errors.New("world avatar option references an unregistered avatar profile")
+		}
+		if option.Palette != nil {
+			if option.Palette.Shirt == nil && option.Palette.Trousers == nil || option.Palette.Shirt != nil && !presenceColorPattern.MatchString(*option.Palette.Shirt) || option.Palette.Trousers != nil && !presenceColorPattern.MatchString(*option.Palette.Trousers) {
+				return errors.New("invalid world avatar option palette")
+			}
+		}
+		avatarOptions[option.ID] = true
+	}
+	if policy := manifest.Rules.AvatarPolicy; policy != nil {
+		allowedProfiles := make(map[string]bool, len(policy.AllowedProfiles))
+		for _, profile := range policy.AllowedProfiles {
+			allowedProfiles[profile] = true
+		}
+		for _, option := range manifest.AvatarOptions {
+			if !allowedProfiles[option.ProfileID] {
+				return errors.New("world avatar option is excluded by the avatar policy")
+			}
+		}
+	}
 	seenEntryPoints := make(map[string]bool, len(manifest.EntryPoints))
 	for _, entry := range manifest.EntryPoints {
-		if !entryPointIDPattern.MatchString(entry.ID) || seenEntryPoints[entry.ID] || strings.TrimSpace(entry.Label) == "" || len(entry.Label) > 80 || len(entry.Position) != 3 || math.IsNaN(entry.Yaw) || math.IsInf(entry.Yaw, 0) || math.Abs(entry.Yaw) > 360 || entry.Pitch != nil && (math.IsNaN(*entry.Pitch) || math.IsInf(*entry.Pitch, 0) || math.Abs(*entry.Pitch) > 1.5) {
+		if !entryPointIDPattern.MatchString(entry.ID) || seenEntryPoints[entry.ID] || strings.TrimSpace(entry.Label) == "" || len(entry.Label) > 80 || len(entry.Position) != 3 || math.IsNaN(entry.Yaw) || math.IsInf(entry.Yaw, 0) || math.Abs(entry.Yaw) > 360 || entry.Pitch != nil && (math.IsNaN(*entry.Pitch) || math.IsInf(*entry.Pitch, 0) || math.Abs(*entry.Pitch) > 1.5) || entry.AvatarOptionID != "" && !avatarOptions[entry.AvatarOptionID] {
 			return errors.New("invalid or duplicate world entry point")
 		}
 		for _, value := range entry.Position {
@@ -945,7 +1063,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 	}
 	seenPortals := make(map[string]bool, len(manifest.Portals))
 	for _, p := range manifest.Portals {
-		if !portalIDPattern.MatchString(p.ID) || seenPortals[p.ID] || seenObjects[p.ID] || !worldIDPattern.MatchString(p.Destination) || len(p.PeerID) > 256 || p.Visual != "" && p.Visual != "timber" && p.Visual != "stone" && p.Visual != "metal" {
+		if !portalIDPattern.MatchString(p.ID) || seenPortals[p.ID] || seenObjects[p.ID] || !worldIDPattern.MatchString(p.Destination) || len(p.PeerID) > 256 || p.Visual != "" && p.Visual != "timber" && p.Visual != "stone" && p.Visual != "metal" || !validPortalAgreementReference(p.DestinationPortalID, p.DestinationPortalSide) || !validPortalScaleRatio(p.ScaleRatio) {
 			return fmt.Errorf("invalid portal %q", p.ID)
 		}
 		if p.PeerID != "" {
@@ -974,7 +1092,7 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 				return errors.New("portal back requires elsemesh.portal-two-sided/1")
 			}
 			back := p.Back
-			if !worldIDPattern.MatchString(back.Destination) || back.Gateway != "" && !validPortalGateway(back.Gateway) {
+			if !worldIDPattern.MatchString(back.Destination) || back.Gateway != "" && !validPortalGateway(back.Gateway) || !validPortalAgreementReference(back.DestinationPortalID, back.DestinationPortalSide) || !validPortalScaleRatio(back.ScaleRatio) {
 				return errors.New("invalid portal back destination")
 			}
 			if back.PeerID != "" {
@@ -1036,6 +1154,20 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		seenComponents[component.ID] = true
 	}
 	return nil
+}
+
+func validPortalAgreementReference(portalID, side string) bool {
+	if portalID == "" && side == "" {
+		return true
+	}
+	return portalIDPattern.MatchString(portalID) && (side == "front" || side == "back")
+}
+
+func validPortalScaleRatio(ratio *float64) bool {
+	if ratio == nil {
+		return true
+	}
+	return !math.IsNaN(*ratio) && !math.IsInf(*ratio, 0) && *ratio >= 0.001 && *ratio <= 1000
 }
 
 func vector3OutOfBounds(vector vector3, limit float64) bool {

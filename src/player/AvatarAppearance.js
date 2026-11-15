@@ -3,8 +3,10 @@ export const AVATAR_STYLES = Object.freeze({
 	male: { profileId: 'elsemesh.avatar.stock-male/1', asset: 'stock-player', label: 'Man · short hair', image: 'avatar-male.png' },
 	female: { profileId: 'elsemesh.avatar.stock-female/1', asset: 'stock-female', label: 'Woman · ponytail', image: 'avatar-female.png' },
 });
+export const AVATAR_STYLE_BY_PROFILE_ID = Object.freeze( Object.fromEntries( Object.entries( AVATAR_STYLES ).map( ( [ style, profile ] ) => [ profile.profileId, style ] ) ) );
 export const DEFAULT_APPEARANCE = Object.freeze({ style: 'male', shirt: '#7194aa', trousers: '#27313d', skin: '#c68c67', hair: '#33251c' });
 const fields = Object.keys(DEFAULT_APPEARANCE);
+const WORLD_APPEARANCE_PREFIX = 'elsemesh.world-avatar.v1:';
 export function validateAppearance(value) {
 	if (!value || Array.isArray(value) || typeof value !== 'object' || Object.keys(value).length !== fields.length || !fields.every(k => Object.hasOwn(value,k))) throw new Error('Invalid avatar appearance');
 	if (!Object.hasOwn(AVATAR_STYLES,value.style) || !fields.slice(1).every(k => typeof value[k] === 'string' && /^#[0-9a-f]{6}$/.test(value[k]))) throw new Error('Invalid avatar appearance');
@@ -29,5 +31,15 @@ export function loadAppearance(storage) {
 export function saveAppearance(value, storage) {
 	validateAppearance(value);
 	try { (storage || globalThis.localStorage).setItem('elsemesh.avatar.v1',JSON.stringify(value)); return true; } catch { return false; }
+}
+export function loadWorldAppearance( worldId, storage ) {
+	if ( typeof worldId !== 'string' || ! worldId ) return null;
+	try { return { ...validateAppearance( JSON.parse( ( storage || globalThis.localStorage ).getItem( `${WORLD_APPEARANCE_PREFIX}${worldId}` ) ) ) }; }
+	catch { return null; }
+}
+export function saveWorldAppearance( worldId, value, storage ) {
+	if ( typeof worldId !== 'string' || ! worldId ) return false;
+	validateAppearance( value );
+	try { ( storage || globalThis.localStorage ).setItem( `${WORLD_APPEARANCE_PREFIX}${worldId}`, JSON.stringify( value ) ); return true; } catch { return false; }
 }
 export function appearanceKey(value) { return fields.map(k => value[k]).join('|'); }

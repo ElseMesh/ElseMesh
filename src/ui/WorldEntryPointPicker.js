@@ -1,10 +1,19 @@
-import { loadAppearance } from '../player/AvatarAppearance.js';
+import { AVATAR_STYLE_BY_PROFILE_ID, loadAppearance, loadWorldAppearance, saveWorldAppearance } from '../player/AvatarAppearance.js';
 
 const STORAGE_PREFIX = 'elsemesh.world-entry.v1:';
 
-export function selectedWorldEntryAppearance( entry, storage = globalThis.localStorage ) {
-	const appearance = loadAppearance( storage );
+export function selectedWorldEntryAppearance( entry, manifest, { storage = globalThis.localStorage, persist = true } = {} ) {
+	const worldId = manifest?.worldId;
+	const appearance = ( worldId && loadWorldAppearance( worldId, storage ) ) || loadAppearance( storage );
+	if ( entry?.avatarOptionId ) {
+		const option = manifest?.avatarOptions?.find( candidate => candidate.id === entry.avatarOptionId );
+		const style = option && AVATAR_STYLE_BY_PROFILE_ID[ option.profileId ];
+		if ( ! style ) throw new Error( `World entry refers to an unsupported avatar option: ${entry.avatarOptionId}` );
+		appearance.style = style;
+		if ( option.palette ) Object.assign( appearance, option.palette );
+	}
 	if ( entry?.uniform ) Object.assign( appearance, entry.uniform );
+	if ( persist && worldId && entry ) saveWorldAppearance( worldId, appearance, storage );
 	return appearance;
 }
 
