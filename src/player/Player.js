@@ -19,6 +19,9 @@ const _e = new THREE.Euler( 0, 0, 0, 'YXZ' );
 const _yAxis = new THREE.Vector3( 0, 1, 0 );
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const _wish = new THREE.Vector3();
+const _hostedTarget = new THREE.Vector3();
+const _hostedAxisStep = new THREE.Vector3();
+const HOSTED_MOVE_AXES = [ 'x', 'z', 'y' ];
 const _boatLocal = new THREE.Vector3();
 const _boatPrevLocal = new THREE.Vector3();
 const _boatInvQ = new THREE.Quaternion();
@@ -152,10 +155,21 @@ export class Player {
 		if ( this.grounded && this.worldMovement.jumpSpeed > 0 && inp.hit( 'Space' ) ) { this.velocity.y = this.worldMovement.jumpSpeed; this.grounded = false; }
 		this.velocity.y -= this.gravity * dt;
 		this._previousPosition.copy( this.position );
-		this.position.addScaledVector( this.velocity, dt );
-		if ( this.hostedCollisionGuard && ! this.hostedCollisionGuard( this._previousPosition, this.position ) ) {
-			this.position.copy( this._previousPosition );
-			this.velocity.set( 0, 0, 0 );
+		_hostedTarget.copy( this.position ).addScaledVector( this.velocity, dt );
+		if ( this.hostedCollisionGuard ) {
+			// Test each part of the move independently. A blocked diagonal sweep used to
+			// discard the whole frame, even when one tangent direction was clear. These
+			// sequential axis sweeps preserve fail-closed checks while allowing the usual
+			// wall-sliding behavior around a real or unresolved obstacle.
+			for ( const axis of HOSTED_MOVE_AXES ) {
+				if ( this.position[ axis ] === _hostedTarget[ axis ] ) continue;
+				_hostedAxisStep.copy( this.position );
+				_hostedAxisStep[ axis ] = _hostedTarget[ axis ];
+				if ( this.hostedCollisionGuard( this.position, _hostedAxisStep ) ) this.position[ axis ] = _hostedTarget[ axis ];
+				else this.velocity[ axis ] = 0;
+			}
+		} else {
+			this.position.copy( _hostedTarget );
 		}
 		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, 0.4 );
 		this.resolveBoatCollision( this.position, this.playerCapsule.heightMeters );

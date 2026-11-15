@@ -163,6 +163,14 @@ available detail tiers, and any world-specific constraints. Camera visibility
 and projected size refine visual quality; they do not replace traversal
 reachability as the basis for deciding which region to prepare next.
 
+The browser movement controller checks a proposed displacement as sequential
+horizontal and vertical swept segments. A blocker stops the intersecting axis
+without discarding clear tangent motion, so a diagonal input can slide along a
+wall while every accepted segment still requires collision readiness. The
+authoritative `worldd` movement validator must preserve the same segmented
+path semantics; this does not grant movement through unknown or unloaded
+collision.
+
 Texture quality tiers must be explicit content variants when they change
 transfer size or decoded source data. A conventional GPU mip chain is still
 needed for minification and reduces sampling aliasing, but it does not reduce
