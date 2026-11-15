@@ -2007,7 +2007,7 @@ export class UI {
 
 	}
 
-	setNavigationHUD( { navigation, theme, position, heading = 0 } = {} ) {
+	setNavigationHUD( { navigation, theme, position, heading = 0, avatarHeading = heading } = {} ) {
 
 		const compass = navigation?.compass;
 		const map = navigation?.map;
@@ -2041,6 +2041,7 @@ export class UI {
 		} else this.navigationMapImage.removeAttribute( 'src' );
 
 		const degrees = normalizeNavigationHeading( heading );
+		const mapDegrees = normalizeNavigationHeading( map?.headingSource === 'avatar' ? avatarHeading : heading );
 		if ( compass ) {
 			this.navigationCard.setAttribute( 'transform', `rotate(${ - degrees } 50 50)` );
 			this.navigationDegrees.textContent = `${ String( Math.round( degrees ) % 360 ).padStart( 3, '0' ) }°`;
@@ -2066,7 +2067,7 @@ export class UI {
 				this.navigationMapImage.style.left = `${ ( 50 - projected.x * zoom * 100 ).toFixed( 2 ) }%`;
 				this.navigationMapImage.style.top = `${ ( 50 - projected.y * zoom * 100 ).toFixed( 2 ) }%`;
 				this.navigationMapImage.style.transformOrigin = `${ ( projected.x * 100 ).toFixed( 2 ) }% ${ ( projected.y * 100 ).toFixed( 2 ) }%`;
-				this.navigationMapImage.style.transform = `rotate(${ - degrees }deg)`;
+				this.navigationMapImage.style.transform = `rotate(${ - mapDegrees }deg)`;
 				this.navigationMapMarker.style.left = '50%';
 				this.navigationMapMarker.style.top = '50%';
 				this.navigationMapMarker.style.transform = 'translate(-50%, -50%)';
@@ -2083,7 +2084,7 @@ export class UI {
 			if ( markerVisible && ! headingUp ) {
 				this.navigationMapMarker.style.left = `${ ( projected.x * 100 ).toFixed( 2 ) }%`;
 				this.navigationMapMarker.style.top = `${ ( projected.y * 100 ).toFixed( 2 ) }%`;
-				this.navigationMapMarker.style.transform = `translate(-50%, -50%) rotate(${ degrees }deg)`;
+				this.navigationMapMarker.style.transform = `translate(-50%, -50%) rotate(${ mapDegrees }deg)`;
 			}
 		}
 

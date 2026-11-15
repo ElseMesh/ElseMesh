@@ -27,8 +27,9 @@ function validNavigationMapLayer( layer ) {
 
 function validNavigationMap( map ) {
 	const layers = map?.layers;
-	if ( ! map || typeof map !== 'object' || Array.isArray( map ) || Object.keys( map ).some( key => ! [ 'layers', 'orientation', 'zoom' ].includes( key ) ) || ! Array.isArray( layers ) || layers.length < 1 || layers.length > 64 ) return false;
+	if ( ! map || typeof map !== 'object' || Array.isArray( map ) || Object.keys( map ).some( key => ! [ 'layers', 'orientation', 'headingSource', 'zoom' ].includes( key ) ) || ! Array.isArray( layers ) || layers.length < 1 || layers.length > 64 ) return false;
 	if ( map.orientation !== undefined && ! [ 'north-up', 'heading-up' ].includes( map.orientation ) ) return false;
+	if ( map.headingSource !== undefined && ! [ 'view', 'avatar' ].includes( map.headingSource ) ) return false;
 	if ( map.zoom !== undefined && ( ! Number.isFinite( map.zoom ) || map.zoom < 1 || map.zoom > 16 ) ) return false;
 	for ( let index = 0; index < layers.length; index ++ ) {
 		const layer = layers[ index ];

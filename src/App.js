@@ -1251,6 +1251,7 @@ export class App {
 			theme: experience?.theme,
 			position: player?.position,
 			heading: MathUtils.radToDeg( Math.atan2( _navigationForward.x, - _navigationForward.z ) ),
+			avatarHeading: MathUtils.radToDeg( player?.yaw ?? 0 ),
 		} );
 
 	}
