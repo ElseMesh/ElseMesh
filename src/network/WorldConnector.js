@@ -2,8 +2,7 @@ import { validatePortalBack } from './PortalSideContract.js';
 import { isValidWorldCollisionCompound, isValidWorldCollisionTag, validateObjectLODs, validateWorldEntryPoints, validateWorldSpawn, worldComponentRuntimeRecord } from './WorldSource.js';
 import { validatePresencePose } from './PlayerPresence.js';
 import { validateWorldRequirements } from './WorldRules.js';
-import { portalScaleRatio } from './PortalScale.js';
-import { validatePortalAgreementReference } from './PortalAgreement.js';
+import { matchingPortalAgreement, validatePortalRouteContract } from './PortalAgreement.js';
 import { validateWorldExperience } from './WorldExperience.js';
 import { verifySignedDocument } from './SignedDocument.js';
 import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
@@ -429,6 +428,7 @@ export class WorldConnector {
 		try {
 			await destination.getManifest( { signal } );
 			throwIfAborted( signal );
+			invariant( matchingPortalAgreement( this.worldId, portal, destination.manifest ), 'Destination world has not agreed to this portal route and scale' );
 			const previewAssets = await destination.preload( { through: 'portal-preview', signal } );
 			throwIfAborted( signal );
 			const portalView = onPortalView ? await onPortalView( { connector: destination, assets: previewAssets, signal } ) : null;
@@ -748,8 +748,7 @@ export function validateWorldPortals( portals = [], ids = new Set(), rules = {} 
 	for ( const portal of portals ) {
 		invariant( portal && typeof portal.id === 'string' && /^elsemesh-portal:[\w.-]{1,128}$/.test( portal.id ) && ! ids.has( portal.id ), 'World manifest has an invalid or duplicate portal ID' );
 		invariant( isWorldID( portal.destinationWorldId ) && ( portal.destinationPeerId === undefined || typeof portal.destinationPeerId === 'string' && /^[A-Za-z0-9]{20,256}$/.test( portal.destinationPeerId ) ), `Portal ${portal.id} has an invalid destination` );
-		validatePortalAgreementReference( portal );
-		portalScaleRatio( portal.scaleRatio );
+		validatePortalRouteContract( portal );
 		invariant( portal.destinationGateway === undefined || validWorldGateway( portal.destinationGateway ), `Portal ${portal.id} has an invalid destination gateway` );
 		invariant( portal.visual === undefined || [ 'timber', 'stone', 'metal' ].includes( portal.visual ), `Portal ${portal.id} has an unsupported visual style` );
 		for ( const transform of [ portal.entry, portal.exit ] ) {
