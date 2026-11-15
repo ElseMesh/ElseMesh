@@ -109,6 +109,19 @@ account broker. Provider sign-in does not grant world access by itself: the
 world owner still applies invitations, visitor limits, bans and other signed
 admission rules.
 
+IP addresses are transport locators, not account identities. This includes
+`localhost` and a ZeroTier virtual IP: addresses can be shared, reassigned,
+proxied or changed, so `worldd` must not infer that an IP belongs to a Google
+or Facebook account or use an IP match to link a person to a world owner. A
+ZeroTier NodeID can authenticate a network node, but it does not establish
+which person or social account is using that node. If a deployment wants to
+associate a visitor account with a ZeroTier node, require independent proof of
+the ElseMesh account key and of the ZeroTier node, then bind both proofs to a
+short-lived world/presence session. The observed source address may help route
+or rate-limit that session; it is not the proof of either identity. A local
+world owner likewise authenticates as an account or owner key, not by being
+`localhost`.
+
 Guest access remains the default unless a world owner requires an authenticated
 account. The current account service implements Google sign-in for role-gated
 authoring actions only. Facebook login, account assertions for visitor
