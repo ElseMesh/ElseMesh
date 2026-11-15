@@ -43,17 +43,18 @@ export function collisionPathStatus( { from, to, cellSizeMeters, radius = 0.3, h
 			if ( unknownObjectIDs?.has( objectID ) ) {
 				if ( unknownSourcesCompleteByCell?.get( cellKey ) !== true ) return { ready: false, reason: 'unknown-collision-sources-incomplete', cellKey, objectID };
 				for ( const source of unknownSourcesByCell?.get( cellKey ) || [] ) {
-					const bounds = source.bounds;
-					if ( bounds[ 0 ] <= sweepBounds[ 3 ] && bounds[ 3 ] >= sweepBounds[ 0 ]
+					const candidateBounds = source.candidateBounds ?? [ source.bounds ];
+					const overlappingBounds = candidateBounds.find( bounds => bounds[ 0 ] <= sweepBounds[ 3 ] && bounds[ 3 ] >= sweepBounds[ 0 ]
 						&& bounds[ 1 ] <= sweepBounds[ 4 ] && bounds[ 4 ] >= sweepBounds[ 1 ]
-						&& bounds[ 2 ] <= sweepBounds[ 5 ] && bounds[ 5 ] >= sweepBounds[ 2 ] ) return { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey, objectID, source: {
+						&& bounds[ 2 ] <= sweepBounds[ 5 ] && bounds[ 5 ] >= sweepBounds[ 2 ] );
+					if ( overlappingBounds ) return { ready: false, reason: 'unknown-collision-source-overlaps-path', cellKey, objectID, source: {
 							assetPath: source.assetPath ?? null,
 							componentPath: source.componentPath ?? null,
 							collisionType: source.collisionType ?? null,
 							...( source.objectPath ? { objectPath: source.objectPath } : {} ),
 							...( source.status ? { status: source.status } : {} ),
 							boundsSource: source.boundsSource ?? null,
-							bounds: [ ...bounds ],
+						bounds: [ ...overlappingBounds ],
 						} };
 				}
 			}
