@@ -2451,6 +2451,7 @@ export class WebGLFallback {
 				}
 			}
 		}
+		let blockingCollisionID = null;
 		if ( connector.localOnly && connector.collisionObjectIDsAlongPath && this.player ) {
 			if ( connector.ensureCellsForCamera && ! this.hostedViewCellsPending
 				&& performance.now() - ( this.hostedViewCellsLastRequestedAt || 0 ) >= 400 ) {
@@ -2485,6 +2486,13 @@ export class WebGLFallback {
 			}
 			const selected = new Set( objects.map( object => object.id ) );
 			for ( const objectID of connector.collisionObjectIDsAlongPath( position, destination ) ) selected.add( objectID );
+			// A rejected player sweep names the exact collision payload that is
+			// keeping the capsule in place. Keep requesting that payload even after
+			// input stops or changes direction; otherwise the predicted lookahead can
+			// turn away and leave the player permanently gated at the cell boundary.
+			const gateStatus = connector.lastCollisionPathStatus;
+			blockingCollisionID = gateStatus?.reason === 'collision-object-not-loaded' ? gateStatus.objectID : null;
+			if ( blockingCollisionID ) selected.add( blockingCollisionID );
 			const objectByID = new Map( manifest.objects.map( object => [ object.id, object ] ) );
 			for ( const objectID of selected ) {
 				const object = objectByID.get( objectID );
@@ -2497,6 +2505,8 @@ export class WebGLFallback {
 			if ( collisionWanted.length ) {
 				const center = new this.THREE.Vector3();
 				collisionWanted.sort( ( a, b ) => {
+					if ( a.id === blockingCollisionID ) return -1;
+					if ( b.id === blockingCollisionID ) return 1;
 					transformBoundsCenter( a, a.streamingBounds.center, center );
 					const aDistance = this.camera.position.distanceToSquared( center );
 					transformBoundsCenter( b, b.streamingBounds.center, center );
