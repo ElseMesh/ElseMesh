@@ -1,5 +1,29 @@
 # Reproducible graphics review
 
+## 2026-11-15 AMD WebGPU rendered fishing and upgrade
+
+The isolated Weston review browser was explicitly started with Vulkan and
+WebGPU enabled, ANGLE on Vulkan, and `/dev/dri/renderD128`. Chromium's live GPU
+diagnostics identified `ANGLE (AMD, Vulkan 1.4.354 (AMD Radeon Graphics (RADV
+RENOIR)), radv-26.1.6)` and reported WebGPU enabled. This was an AMD hardware
+run, not a software renderer fallback.
+
+In the built-in Tidewater scene, real keyboard and mouse input drove fishing
+against the production water query. Ten fish were caught through natural bites
+and fights, then sold to Joe for $63. The rendered Marta shop accepted the
+$60 fishing-line upgrade; the game state afterward showed $5, an empty cooler,
+and line level 1 (15 lb mono). The retained
+[post-purchase scene](images/tidewater-rendered-webgpu-line-upgrade-amd-2026-11-15.png)
+shows the updated shop and live world. The HUD briefly showed about 15 FPS in
+this scene; that instantaneous display is not a controlled performance result.
+
+One earlier cast at 17–18 m depth remained in `wait` with a non-finite bite
+timer, even though a later sample at the bobber showed fishable bay habitat.
+A subsequent cast produced finite natural bites and catches. The landing-time
+habitat discrepancy is not yet explained. The rendered real-water catch,
+sale, and purchase path has been verified on WebGPU only; the corresponding
+WebGL gameplay path and the remaining visual parity checks are still open.
+
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
 The split Tidewater geometry builder emitted authored vertex colors as a custom
