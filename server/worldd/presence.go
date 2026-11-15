@@ -23,6 +23,11 @@ const presencePlayerRadius = 0.3
 const presencePlayerHeight = 1.75
 const playerEyeHeight = 1.62
 
+// Presence normally publishes at 10 Hz. This bounded credit absorbs one
+// publication interval of arrival jitter without allowing idle time to bank
+// arbitrary movement distance.
+const presenceMovementBurstWindow = 100 * time.Millisecond
+
 var presenceSessionPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var presenceColorPattern = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 var avatarProfilePattern = regexp.MustCompile(`^elsemesh\.avatar\.[a-z0-9.-]+/\d+$`)
@@ -53,8 +58,9 @@ type playerPresence struct {
 	playerPose
 	UpdatedAt int64 `json:"updatedAt"`
 	// Ghost is computed by the owner, never taken from a client pose.
-	Ghost   bool `json:"ghost,omitempty"`
-	updated time.Time
+	Ghost          bool `json:"ghost,omitempty"`
+	updated        time.Time
+	movementCredit float64
 }
 
 func newPresenceSession() (string, error) {
@@ -154,6 +160,39 @@ func (d *daemon) validatePresenceAdmission(p *playerPose) error {
 		return errors.New("vehicle_complexity_exceeded")
 	}
 	return nil
+}
+
+func (d *daemon) presenceHorizontalSpeedLimit(p *playerPose) (float64, error) {
+	if p.Mode == "boat" || p.Mode == "deck" {
+		policy := d.world.Rules.VehiclePolicy
+		if policy == nil || !policy.Enabled || policy.MaxSpeed == nil || *policy.MaxSpeed <= 0 {
+			return 0, errors.New("vehicle_policy_invalid")
+		}
+		return *policy.MaxSpeed, nil
+	}
+	if movement := d.world.Rules.Movement; movement != nil {
+		return movement.SprintSpeed, nil
+	}
+	// Match the engine's documented default world movement rules.
+	return 6.2, nil
+}
+
+func (d *daemon) validatePresenceHorizontalMovement(old playerPresence, next *playerPose, now time.Time) (float64, error) {
+	maxSpeed, err := d.presenceHorizontalSpeedLimit(next)
+	if err != nil {
+		return 0, err
+	}
+	elapsed := now.Sub(old.updated)
+	if elapsed <= 0 {
+		return 0, errors.New("presence_time_invalid")
+	}
+	creditCap := maxSpeed * presenceMovementBurstWindow.Seconds()
+	credit := math.Min(creditCap, old.movementCredit+maxSpeed*elapsed.Seconds())
+	distance := math.Hypot(next.Position[0]-old.Position[0], next.Position[2]-old.Position[2])
+	if distance > credit+1e-6 {
+		return 0, errors.New("presence_movement_too_fast")
+	}
+	return credit - distance, nil
 }
 
 func signedVehicleComplexity(components []worldComponent, vehicleType string) (uint32, bool) {
@@ -272,7 +311,21 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		if exists && now.Sub(old.updated) < 50*time.Millisecond {
 			return peerResponse{}, errors.New("presence_rate_limited")
 		}
-		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now}
+		movementCredit := 0.0
+		if exists {
+			credit, moveErr := d.validatePresenceHorizontalMovement(old, request.Pose, now)
+			if moveErr != nil {
+				return peerResponse{}, moveErr
+			}
+			movementCredit = credit
+		} else {
+			maxSpeed, err := d.presenceHorizontalSpeedLimit(request.Pose)
+			if err != nil {
+				return peerResponse{}, err
+			}
+			movementCredit = maxSpeed * presenceMovementBurstWindow.Seconds()
+		}
+		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now, movementCredit: movementCredit}
 	}
 	players := make([]playerPresence, 0, len(d.players))
 	for _, p := range d.players {

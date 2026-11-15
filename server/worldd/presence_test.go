@@ -100,6 +100,48 @@ func TestPresenceLimitsExpiryAndIdentity(t *testing.T) {
 	}
 }
 
+func TestPresenceBoundsHorizontalSpeedWithCappedBurstCredit(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Rules.Movement = &movementRules{WalkSpeed: 4, SprintSpeed: 8, JumpSpeed: 4}
+	now := time.Now()
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 2, 0}
+	request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindPresenceRequest(&request, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(request, now); err != nil {
+		t.Fatalf("admit player: %v", err)
+	}
+
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{2, 2, 0}
+	if _, err := d.presenceRequest(request, now.Add(100*time.Millisecond)); err == nil || err.Error() != "presence_movement_too_fast" {
+		t.Fatalf("over-speed movement accepted: %v", err)
+	}
+	if got := d.players[request.presenceKey].Position[0]; got != 0 {
+		t.Fatalf("rejected movement changed authoritative position to %v", got)
+	}
+
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{0.5, 2, 0}
+	if _, err := d.presenceRequest(request, now.Add(100*time.Millisecond)); err != nil {
+		t.Fatalf("normal movement rejected: %v", err)
+	}
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{1.2, 2, 0}
+	if _, err := d.presenceRequest(request, now.Add(200*time.Millisecond)); err != nil {
+		t.Fatalf("normal movement rejected after burst credit use: %v", err)
+	}
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{3.3, 2, 0}
+	if _, err := d.presenceRequest(request, now.Add(300*time.Millisecond)); err == nil || err.Error() != "presence_movement_too_fast" {
+		t.Fatalf("repeated over-speed burst accepted: %v", err)
+	}
+}
+
 func TestPresenceGhostLifecycle(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()

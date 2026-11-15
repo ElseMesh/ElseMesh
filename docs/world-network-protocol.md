@@ -50,6 +50,11 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
 - Region collision is explicit data, not inferred from render meshes. The
   region loader must validate provider collision limits and register/remove
   those shapes with the active region and its instance transforms.
+- Presence updates remain client-reported poses. The owner bounds horizontal
+  displacement by the signed movement speed using a capped 100 ms burst credit;
+  this prevents repeated speed bursts but is not collision validation. Hosts
+  must also reject swept paths that intersect authoritative collision before
+  treating a reported position as traversable.
 - Dynamic doors require an authoritative interaction request and a
   host-committed transition carrying the stable door ID, sequence/transition
   ID, start time, target state, and collision change. The same committed event
