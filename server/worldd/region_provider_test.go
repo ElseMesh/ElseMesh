@@ -85,6 +85,40 @@ func TestRegionProviderMovementAuthorityIsInternalAndRevisionPinned(t *testing.T
 	}
 }
 
+func TestPresenceRejectsBlockedOwnerSweepWithoutPublishingPose(t *testing.T) {
+	var ready atomic.Bool
+	ready.Store(true)
+	_, gateway, _ := movementAuthorityFixture(t, &ready)
+	d := presenceTestDaemon(t)
+	d.world.WorldID = "elsemesh:hogwarts-legacy"
+	d.world.Rules.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
+	d.regionProvider = gateway
+
+	now := time.Now()
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 1.38, 8}
+	request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindPresenceRequest(&request, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(request, now); err != nil {
+		t.Fatalf("admit at clear spawn: %v", err)
+	}
+
+	ready.Store(false)
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{0.2, 1.38, 8}
+	if _, err := d.presenceRequest(request, now.Add(time.Second)); err == nil || !strings.Contains(err.Error(), "movement_blocked:collision_bounds_block_path:SM_TestWall") {
+		t.Fatalf("blocked owner sweep result = %v", err)
+	}
+	stored := d.players[request.presenceKey]
+	if stored.Sequence != 1 || stored.Position[0] != 0 || stored.Position[1] != 1.38 || stored.Position[2] != 8 {
+		t.Fatalf("blocked movement changed authoritative pose: %+v", stored.playerPose)
+	}
+}
+
 func TestParseRegionProviderURL(t *testing.T) {
 	tests := []struct {
 		name string
