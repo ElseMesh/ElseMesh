@@ -205,18 +205,34 @@ export class LocalRegionDiskCache {
 		return sha256Hex( new TextEncoder().encode( `${this.scope}\0${assetId}` ) );
 	}
 
-	async get( assetId ) {
+	async cachedByteLength( assetId ) {
+		await this.ready;
 		const id = await this.#idFor( assetId );
-		let metadata;
-		try {
-			const metaHandle = await this.directory.getFileHandle( `${id}.meta` );
-			metadata = JSON.parse( await ( await metaHandle.getFile() ).text() );
-			if ( ! validMetadata( metadata, id ) ) throw new Error( 'Invalid local region cache metadata' );
-		} catch ( error ) {
-			if ( error?.name !== 'NotFoundError' ) this.onError( error );
-			await this.#removeEntry( id );
-			if ( this.indexDirty ) this.#scheduleIndexWrite();
-			return null;
+		return this.entries.get( id )?.bytes ?? null;
+	}
+
+	async get( assetId ) {
+		await this.ready;
+		const id = await this.#idFor( assetId );
+		let metadata = this.entries.get( id );
+		if ( ! metadata ) {
+			// The startup index is validated against entry metadata and data files.
+			// Only read a metadata file for entries another tab added after this
+			// cache instance opened; the common warm-hit path stays to one data-file
+			// read plus its content-digest check.
+			try {
+				const metaHandle = await this.directory.getFileHandle( `${id}.meta` );
+				metadata = JSON.parse( await ( await metaHandle.getFile() ).text() );
+				if ( ! validMetadata( metadata, id ) ) throw new Error( 'Invalid local region cache metadata' );
+				this.entries.set( id, metadata );
+				this.cachedBytes += metadata.bytes;
+				this.indexDirty = true;
+			} catch ( error ) {
+				if ( error?.name !== 'NotFoundError' ) this.onError( error );
+				await this.#removeEntry( id );
+				if ( this.indexDirty ) this.#scheduleIndexWrite();
+				return null;
+			}
 		}
 		try {
 			const handle = await this.directory.getFileHandle( `${id}.bin` );

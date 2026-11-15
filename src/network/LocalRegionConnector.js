@@ -16,6 +16,11 @@ import { worldViewCellCoordinates } from './WorldViewCells.js';
 const MAX_LOCAL_REGION_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_DISK_WRITE_QUEUE_BYTES = 768 * 1024 * 1024;
 const MAX_LOCAL_REGION_DISK_WRITE_BATCH_ENTRIES = 64;
+// Warm cache reads are asynchronous OPFS operations. Keep a few known-small
+// assets in flight, while bounding their combined resident bytes; misses and
+// large assets continue through the single-asset path.
+const LOCAL_REGION_CACHE_READ_CONCURRENCY = 3;
+const LOCAL_REGION_CACHE_READ_BATCH_BYTES = 16 * 1024 * 1024;
 const DEFAULT_LOCAL_REGION_CACHE_BYTES = 128 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 1024 * 1024 * 1024;
 const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
@@ -1010,12 +1015,13 @@ export class LocalRegionConnector {
 		return Boolean( bytes ) || releasedRange;
 	}
 
-	async preload( { assetIDs, position, viewPriorityByAsset = new Map(), signal, onProgress = () => {}, onAsset, retainAssets = true, retainAssetIDs = new Set() } = {} ) {
+	async preload( { assetIDs, position, viewPriorityByAsset = new Map(), signal, onProgress = () => {}, onAsset, retainAssets = true, retainAssetIDs = new Set(), concurrency = LOCAL_REGION_CACHE_READ_CONCURRENCY } = {} ) {
 		requireValue( this.manifest, 'Load the local world descriptor first' );
 		requireValue( typeof onProgress === 'function', 'Local region preload progress callback must be a function' );
 		requireValue( onAsset === undefined || typeof onAsset === 'function', 'Local region asset callback must be a function' );
 		requireValue( typeof retainAssets === 'boolean', 'Local region retention option must be a boolean' );
 		requireValue( retainAssetIDs instanceof Set, 'Local region retained asset IDs must be a Set' );
+		requireValue( Number.isInteger( concurrency ) && concurrency >= 1 && concurrency <= 8, 'Local region preload concurrency is invalid' );
 		requireValue( viewPriorityByAsset instanceof Map && [ ...viewPriorityByAsset.values() ].every( value => typeof value === 'number' && ! Number.isNaN( value ) && value >= 0 ), 'Local region visual priority map is invalid' );
 		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...new Set( [
 			...( this.manifest.objects || [] ).map( object => object.assetId ).filter( Boolean ),
@@ -1054,11 +1060,15 @@ export class LocalRegionConnector {
 			return originalOrder.get( a ) - originalOrder.get( b );
 		} );
 		const loaded = new Map();
-		for ( const [ index, assetId ] of selected.entries() ) {
+		const prepareAsset = async assetId => {
 			const kind = assetKinds.get( assetId );
 			const isGLB = kind === 'glb' || kind === 'model/gltf-binary';
 			const progressive = this.collisionAssetIDs.has( assetId ) || ! isGLB ? null : await fetchGLBWithCoarseKTX2( this, assetId, { signal } );
 			const bytes = progressive?.bytes || await this.getAsset( assetId, { signal } );
+			return { assetId, bytes, progressive };
+		};
+		const installAsset = async ( prepared, index ) => {
+			const { assetId, bytes, progressive } = prepared;
 			const retain = retainAssets || retainAssetIDs.has( assetId );
 			const installStartedAt = performance.now();
 			try {
@@ -1075,6 +1085,28 @@ export class LocalRegionConnector {
 				if ( ! retain ) this.releaseAsset( assetId );
 			}
 			onProgress( index + 1, selected.length );
+		};
+		for ( let offset = 0; offset < selected.length; ) {
+			abortIfNeeded( signal );
+			const candidates = selected.slice( offset, offset + concurrency );
+			const sizes = await Promise.all( candidates.map( async assetId => {
+				const resident = this.assets.get( assetId );
+				return resident?.byteLength ?? await this.diskCache?.cachedByteLength( assetId ) ?? null;
+			} ) );
+			let batchBytes = 0;
+			let batchLength = 0;
+			for ( const size of sizes ) {
+				if ( size === null || size > LOCAL_REGION_CACHE_READ_BATCH_BYTES || batchBytes + size > LOCAL_REGION_CACHE_READ_BATCH_BYTES ) {
+					if ( batchLength === 0 ) batchLength = 1;
+					break;
+				}
+				batchBytes += size;
+				batchLength ++;
+			}
+			const assetIDsToPrepare = selected.slice( offset, offset + batchLength );
+			const prepared = await Promise.all( assetIDsToPrepare.map( prepareAsset ) );
+			for ( let index = 0; index < prepared.length; index ++ ) await installAsset( prepared[ index ], offset + index );
+			offset += prepared.length;
 		}
 		return loaded;
 	}
