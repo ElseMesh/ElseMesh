@@ -1456,7 +1456,14 @@ export class App {
 		while ( this.linkedWorldRoot === root && ! worldPackage?.disposed ) {
 			this.updateWorldComponents( root, 0, this.camera );
 			if ( reportProgress ) {
-				const progress = staticModelCoarseViewProgress( root.userData.worldComponentRuntimes?.values?.() );
+				const installed = root.userData.installedWorldComponentIDs || new Set();
+				const visibleStaticComponents = selectWorldComponentsForView( connector.manifest, this.camera, {
+					nearbyDistance: 0,
+					maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
+					maxPriority: 'background',
+				} ).filter( component => component.type === 'elsemesh.static-model-instance-set/1'
+					&& component.streamingBounds && componentAssetIDs( component ).length && installed.has( component.id ) );
+				const progress = staticModelCoarseViewProgress( visibleStaticComponents.map( component => root.userData.worldComponentRuntimes?.get( component.id ) ) );
 				globalThis.__ui?.setLoadingDetail( progress.done, progress.total, 'Loading visible base models…' );
 			}
 			if ( this.hasWorldCoarseCoverage( connector, root ) ) {

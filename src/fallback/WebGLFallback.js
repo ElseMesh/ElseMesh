@@ -2633,7 +2633,15 @@ export class WebGLFallback {
 		while ( connector === this.connector && ! connector.closed && ! this.hostedCoarseCoverageReady ) {
 			this._updateHostedCoarseCoverage();
 			updateWorldComponentRuntimes( this.hostedComponentRuntimes?.values?.(), 0, this.camera, this.player, 0 );
-			const progress = staticModelCoarseViewProgress( this.hostedComponentRuntimes?.values?.() );
+			const visibleStaticComponents = selectWorldComponentsForView( connector.manifest, this.camera, {
+				nearbyDistance: 0,
+				maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
+				maxPriority: 'background',
+			} ).filter( component => component.type === 'elsemesh.static-model-instance-set/1'
+				&& component.streamingBounds && worldComponentAssetIDs( component ).length
+				&& ( this.app.vegetationEnabled || ! isVegetationWorldComponent( component ) )
+				&& this.hostedInstalledComponentIDs?.has( component.id ) );
+			const progress = staticModelCoarseViewProgress( visibleStaticComponents.map( component => this.hostedComponentRuntimes.get( component.id ) ) );
 			globalThis.__ui?.setLoadingDetail( progress.done, progress.total, 'Loading visible base models…' );
 			if ( this.hostedCoarseCoverageReady ) return;
 			await new Promise( resolve => requestAnimationFrame( resolve ) );
