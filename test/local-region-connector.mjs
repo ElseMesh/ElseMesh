@@ -103,7 +103,8 @@ let rangeFetches = 0;
 let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let omitCacheRevision = false;
-let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
+const descriptorAvatarOptions = [ { id: 'short-hair', profileId: 'elsemesh.avatar.stock-male/1', label: 'Short hair' } ];
+let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor', avatarOptionId: 'short-hair' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
 let previewVisualComponentPathExclusions = {};
 const payloadFetchOrder = [];
 const cellIndexRequests = [];
@@ -164,6 +165,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 		sourceRevision: 'test-revision', ...( omitCacheRevision ? {} : { cacheRevision: 'test-revision:converter-1' } ), readOnly: true, regions: '/v1/regions',
 		entrySelection: {
 			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
+			avatarOptions: descriptorAvatarOptions,
 			playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
 			movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 } } },
 			entryPointPrompt: 'Which Hogwarts house will you join?',
@@ -382,6 +384,8 @@ try {
 	assert.equal( manifest.entryPointActionLabel, 'Choose your house' );
 	assert.equal( manifest.entryPointPrompt, 'Which Hogwarts house will you join?' );
 	assert.deepEqual( manifest.entryPoints.map( entry => entry.id ), [ 'gryffindor', 'hufflepuff' ] );
+	assert.deepEqual( manifest.avatarOptions, descriptorAvatarOptions, 'world-authored avatar options reach the generic local world manifest' );
+	assert.equal( manifest.entryPoints[ 0 ].avatarOptionId, 'short-hair', 'local entry choices preserve their generic avatar option reference' );
 	assert.equal( manifest.rules.physicsProfile, 'default' );
 	assert.deepEqual( manifest.rules.playerCapsule, { radiusMeters: 0.42, heightMeters: 1.76 }, 'local region world-authored capsule dimensions reach the runtime rules' );
 	assert.equal( manifest.rules.movementProfiles.avatars[ 'elsemesh.avatar.stock-male/1' ].stepHeightMeters, 0.6, 'local region avatar step capability comes from world-authored entry metadata' );
