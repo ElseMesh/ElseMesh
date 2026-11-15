@@ -24,6 +24,26 @@ habitat discrepancy is not yet explained. The rendered real-water catch,
 sale, and purchase path has been verified on WebGPU only; the corresponding
 WebGL gameplay path and the remaining visual parity checks are still open.
 
+## 2026-11-15 AMD WebGL start interaction crash
+
+The same Weston launcher and `review-browser.mjs` were used with
+`?renderer=webgl`. Before the start interaction, ElseMesh reported
+`backend: webgl`; `WEBGL_debug_renderer_info` reported
+`ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)`, and
+the Weston log identified `/dev/dri/renderD128` and the AMD Radeon Graphics
+device. The start screen rendered normally on this adapter.
+
+Five isolated browser profiles were tried: two mouse starts and three Enter
+starts. One retry disabled both `Input.requestLock()` and the separate
+`WebGLFallback.requestLock()` pointer-lock path. All five Chromium processes
+then terminated with the same SIGSEGV: fault address `0x8`, instruction offset
+`0xd698ec0` in `/usr/lib/chromium/chromium`. The crash dumps identify each
+dedicated review profile. Kernel logs show no OOM kill or AMD GPU reset, and
+Weston continued running on AMD. The installed Chromium binary is stripped, so
+the dump did not yield a symbolized call stack. The cause remains unresolved;
+the live WebGL fishing, sale, and upgrade path was not reached, and no WebGL
+gameplay parity conclusion is drawn.
+
 ## 2026-11-14 Tidewater procedural vertex-color correction
 
 The split Tidewater geometry builder emitted authored vertex colors as a custom
