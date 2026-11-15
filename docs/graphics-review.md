@@ -1,5 +1,34 @@
 # Reproducible graphics review
 
+## 2026-11-15 matched pre-split and split WebGPU views
+
+The original ElseMesh build at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
+and the committed split build at `2b346e09` were captured in the same AMD
+WebGPU browser (RADV RENOIR), at 2560×1267. Each page was freshly loaded before
+capture. The static `village`, `pier`, and `beach` views used 64 settling frames
+at `dt=0`; full-frame RGB MAE was 1.34/255, 0.31/255, and 0.30/255. The
+village crops for the central house, row of houses, and boardwalk were
+3.07/255, 2.02/255, and 2.21/255. The
+[static comparison sheet](images/tidewater-presplit-split-webgpu-static-views-2026-11-15.jpg)
+shows those views.
+
+For animated wave and spray checks, both fresh pages used the same `beach`,
+`surf`, `swash` view order, 64 frames per view at `dt=0.5`, then three captures
+30 frames apart. `Bench.shots()` advances simulation time continuously across
+its view list, so keeping that order identical is required for phase-matched
+images. Over the wave/shoreline band, RGB MAE was 0.30–0.33/255 at `beach`,
+0.37–0.49/255 at `surf`, and 0.40–2.06/255 at `swash`. Full-frame MAE was
+0.10–0.17/255, 0.83–3.20/255, and 0.19–0.66/255 respectively. The
+[three-phase beach comparison](images/tidewater-presplit-split-webgpu-wave-spray-2026-11-15.jpg)
+shows the matched wave crests and spray.
+
+An earlier animated capture used different view order on the two builds and
+was discarded; it shifted the simulation clock before the beach pose. The
+static and phase-matched images above are the current evidence. This closes
+the sampled WebGPU appearance check for village houses, pier, beach, surf, and
+swash; close-up prop/material coverage, other times of day, and WebGL
+appearance remain open. The overall Tidewater parity estimate is unchanged.
+
 ## 2026-11-15 AMD WebGPU rendered fishing and upgrade
 
 The isolated Weston review browser was explicitly started with Vulkan and

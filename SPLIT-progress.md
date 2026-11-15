@@ -1092,6 +1092,8 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-15: Compared pre-split ElseMesh `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e` with split build `2b346e09` in one AMD RADV WebGPU browser. Matched static village, pier, and beach images measured 1.34/255, 0.31/255, and 0.30/255 full-frame RGB MAE; the central-house crop measured 3.07/255. Fresh-page animated captures used the same `beach`, `surf`, `swash` order, 64 frames at `dt=0.5`, and three samples 30 frames apart. The wave-band MAE stayed within 0.30–2.06/255 across all poses and phases. The view order matters because `Bench.shots()` advances simulation time across poses. See [static views](docs/images/tidewater-presplit-split-webgpu-static-views-2026-11-15.jpg) and [wave/spray phases](docs/images/tidewater-presplit-split-webgpu-wave-spray-2026-11-15.jpg). This closes the sampled WebGPU appearance gate for houses, pier, and shoreline, but other close-up materials, WebGL appearance, gameplay, and FPS remain open; the overall Tidewater parity estimate stays 93%.
+
 - 2026-11-14: Re-ran Tidewater's `test:webgl-shore-query-parity` against the
   pre-split WebGPU water-query source. All 13 packaged-terrain samples passed
   (WebGL height MAE 0.0094 m, maximum 0.0504 m; normal MAE 0.0045). The
