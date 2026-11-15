@@ -969,8 +969,14 @@ function registerEmbeddedBodySetup( root, instance, objectId, colliders ) {
 			const center = vector( box.center, 'box center' ), half = vector( box.halfExtents, 'box half extents', true );
 			const rotation = shapeRotation( box.rotation );
 			const worldRotation = node.getWorldQuaternion( new Quaternion() ).multiply( rotation );
-			const up = new Vector3( 0, 1, 0 ).applyQuaternion( worldRotation );
-			const walkable = up.y > 0.95 && half.y <= Math.min( half.x, half.z ) * 0.2;
+			let thinAxis = 0, thinExtent = half.x;
+			if ( half.y < thinExtent ) { thinAxis = 1; thinExtent = half.y; }
+			if ( half.z < thinExtent ) { thinAxis = 2; thinExtent = half.z; }
+			const thinAxisDirection = new Vector3( thinAxis === 0 ? 1 : 0, thinAxis === 1 ? 1 : 0, thinAxis === 2 ? 1 : 0 ).applyQuaternion( worldRotation );
+			const otherMinimum = thinAxis === 0 ? Math.min( half.y, half.z ) : thinAxis === 1 ? Math.min( half.x, half.z ) : Math.min( half.x, half.y );
+			// Preserve the existing geometric walkable-box heuristic across rotated
+			// shapes; these thresholds describe shape orientation, not game movement data.
+			const walkable = Math.abs( thinAxisDirection.y ) > 0.95 && thinExtent <= otherMinimum * 0.2;
 			addBounds( center, half, rotation, walkable );
 		}
 		for ( const sphere of checkCount( source.spheres || [] ) ) {

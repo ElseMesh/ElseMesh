@@ -105,6 +105,17 @@ const bodySetupMetadata = {
 	taperedCapsules: [],
 	convexes: [ { vertices: [ [ 6, 0, 0 ], [ 7, 0, 0 ], [ 6, 0, 1 ], [ 7, 0, 1 ], [ 6, 1, 0 ], [ 7, 1, 0 ], [ 6, 1, 1 ], [ 7, 1, 1 ] ], indices: [ 0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5 ] } ],
 };
+const rotatedFloorObject = { id: 'elsemesh-object:rotated-floor', kind: 'asset-instance', assetId: `sha256:${'c'.repeat( 64 )}`, transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { enabled: false, shape: 'none' } };
+const rotatedFloorCollision = { ...bodySetupMetadata, boxes: [ { center: [ 0, 0, 0 ], halfExtents: [ 2, 2, 0.1 ], rotation: [ 0.5, - 0.5, 0.5, 0.5 ] } ], spheres: [], capsules: [], taperedCapsules: [], convexes: [] };
+const rotatedFloorRoot = await loadWorldPackage( { worldId: 'elsemesh:rotated-floor', manifest: { objects: [ rotatedFloorObject ], portals: [] } }, { assets: new Map( [ [ rotatedFloorObject.assetId, bodySetupGLB( { elsemeshCollision: rotatedFloorCollision } ) ] ] ) } );
+const rotatedFloorColliders = new Colliders();
+registerWorldPackageCollisions( rotatedFloorRoot, rotatedFloorColliders );
+assert.equal( rotatedFloorColliders.boxes[ 0 ].walkable, true, 'a thin box is walkable when its rotated thin axis aligns with world up, regardless of its local axis' );
+const rotatedWallCollision = { ...rotatedFloorCollision, boxes: [ { center: [ 0, 0, 0 ], halfExtents: [ 0.1, 2, 2 ], rotation: [ 0, 0, 0, 1 ] } ] };
+const rotatedWallRoot = await loadWorldPackage( { worldId: 'elsemesh:rotated-wall', manifest: { objects: [ { ...rotatedFloorObject, id: 'elsemesh-object:rotated-wall', assetId: `sha256:${'d'.repeat( 64 )}` } ], portals: [] } }, { assets: new Map( [ [ `sha256:${'d'.repeat( 64 )}`, bodySetupGLB( { elsemeshCollision: rotatedWallCollision } ) ] ] ) } );
+const rotatedWallColliders = new Colliders();
+registerWorldPackageCollisions( rotatedWallRoot, rotatedWallColliders );
+assert.equal( rotatedWallColliders.boxes[ 0 ].walkable, false, 'a thin vertical wall remains non-walkable' );
 const bridgedObject = { id: 'elsemesh-object:bridged', kind: 'asset-instance', assetId: `sha256:${'b'.repeat( 64 )}`, transform: { position: [ 10, 2, 30 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } };
 const bridgedConnector = { worldId: 'elsemesh:bridge-collision', manifest: { objects: [ bridgedObject ], portals: [] } };
 const bridgedRoot = await loadWorldPackage( bridgedConnector, { assets: new Map( [ [ bridgedObject.assetId, bodySetupGLB( { elsemeshCollision: bodySetupMetadata } ) ] ] ) } );
