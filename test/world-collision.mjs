@@ -171,6 +171,22 @@ assert.equal( supportColliders.groundHeightAt( 1, 9, 10 ), 7, 'collision-only pa
 assert.equal( supportRoot.children[ 0 ].visible, false, 'collision-only support never renders as geometry' );
 unregisterWorldPackageCollisions( supportRoot, supportColliders );
 
+const stepColliders = new Colliders();
+stepColliders.addBox( new Vector3( 0, - 0.25, 0 ), new Vector3( 2, 0.25, 2 ), 0, { walkable: true, solid: true } );
+stepColliders.addBox( new Vector3( 0, 0.289, - 0.5 ), new Vector3( 1, 0.289, 0.5 ), 0, { walkable: true, solid: true } );
+const stepStart = { x: 0, y: 0, z: 0 };
+const stepTarget = { x: 0, y: - 0.01, z: - 0.1 };
+assert.ok( Math.abs( stepColliders.stepCapsuleToSurface( stepTarget, stepStart, 0.42, 1.76, 0.6 ) - 0.578 ) < 1e-6, 'grounded capsules find the measured raised walkable surface within the step limit' );
+const steppedPosition = { ...stepTarget, y: 0.578 };
+assert.equal( stepColliders.resolveCapsule( steppedPosition, 0.42, 1.76 ), false, 'capsule clearance succeeds once feet reach the step top' );
+const settledPosition = { x: 0, y: - 0.01, z: 1.5 };
+assert.equal( stepColliders.resolveCapsule( settledPosition, 0.42, 1.76 ), true, 'small floor penetration is resolved vertically on a walkable box' );
+assert.equal( settledPosition.y, 0, 'walkable floor correction preserves feet height' );
+assert.equal( settledPosition.z, 1.5, 'walkable floor correction does not push the capsule sideways' );
+const highWall = new Colliders();
+highWall.addBox( new Vector3( 0, 0.5, - 0.5 ), new Vector3( 1, 0.5, 0.5 ), 0, { walkable: false, solid: true } );
+assert.equal( highWall.stepCapsuleToSurface( stepTarget, stepStart, 0.42, 1.76, 0.6 ), null, 'non-walkable walls are never treated as steps' );
+
 const invalidCollisionRoot = new Group();
 const invalidCollisionInstance = new Group();
 invalidCollisionInstance.userData.worldObjectId = 'elsemesh-object:invalid-body-setup';

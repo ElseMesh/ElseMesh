@@ -66,6 +66,37 @@ Player.prototype.updateHostedWorld.call( gatedPlayer, 1 / 60 );
 assert.equal( gatedPlayer.position.x, 0, 'the collision gate still rejects movement into its blocked axis' );
 assert.ok( gatedPlayer.position.z < 0, 'the collision gate permits clear tangent movement during diagonal input' );
 
+function makeHostedStepPlayer( allowRise ) {
+	const stepColliders = new Colliders();
+	stepColliders.addBox( new Vector3( 0, - 0.25, 0 ), new Vector3( 2, 0.25, 2 ), 0, { walkable: true, solid: true } );
+	stepColliders.addBox( new Vector3( 0, 0.289, - 0.5 ), new Vector3( 1, 0.289, 0.5 ), 0, { walkable: true, solid: true } );
+	const guardPaths = [];
+	const stepPlayer = Object.assign( Object.create( Player.prototype ), {
+		camera: { position: new Vector3(), quaternion: new Quaternion() },
+		input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 0, y: 1, sprint: 0 } ), down: () => false, hit: () => false },
+		colliders: stepColliders, terrain: { heightAt: () => 0 }, position: new Vector3(), velocity: new Vector3(),
+		_previousPosition: new Vector3(), playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
+		worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
+		yaw: 0, pitch: 0, grounded: true, gravity: 9.81, hostedSeaLevel: null,
+		hostedCollisionGuard: ( from, to ) => {
+			guardPaths.push( [ from.y, to.y ] );
+			return allowRise || to.y <= from.y;
+		},
+	} );
+	Player.prototype.setHostedWorldPose.call( stepPlayer, new Vector3( 0, 1.62, 0.6 ), 0, 0 );
+	stepPlayer.grounded = true;
+	stepPlayer.guardPaths = guardPaths;
+	return stepPlayer;
+}
+
+const stepPlayer = makeHostedStepPlayer( true );
+for ( let frame = 0; frame < 20; frame ++ ) Player.prototype.updateHostedWorld.call( stepPlayer, 1 / 30 );
+assert.ok( Math.abs( stepPlayer.position.y - 0.578 ) < 1e-6, 'hosted walking steps onto a clear raised walkable collider without jumping' );
+assert.ok( stepPlayer.guardPaths.some( ( [ fromY, toY ] ) => toY > fromY ), 'hosted step-up rechecks the vertical segment with the collision frontier' );
+const blockedStepPlayer = makeHostedStepPlayer( false );
+for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( blockedStepPlayer, 1 / 30 );
+assert.equal( blockedStepPlayer.position.y, 0, 'hosted movement does not step when the collision frontier rejects the rise' );
+
 // Signed world terrain is a ground surface even when the package has no object
 // collider at the player's position (for example, open beach sand).
 const terrainGroundPlayer = Object.assign( Object.create( Player.prototype ), {

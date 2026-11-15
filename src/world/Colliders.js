@@ -216,6 +216,11 @@ export class Colliders {
 			let dx = lx - cx, dz = lz - cz;
 			const d2 = dx * dx + dz * dz;
 			if ( d2 >= radius * radius ) continue;
+			if ( b.walkable && b.top - pos.y <= 0.05 ) {
+				pos.y = b.top;
+				hit = true;
+				continue;
+			}
 			let nx, nz, pen;
 			if ( d2 > 1e-8 ) {
 

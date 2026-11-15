@@ -202,7 +202,7 @@ export class Player {
 		// terrain heightfield is the ground surface between them. Never sample the
 		// hidden local procedural island for a hosted world.
 		const terrainGround = this.terrain?.heightAt( this.position.x, this.position.z ) ?? - Infinity;
-		const colliderGround = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, 0.15 );
+		const colliderGround = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, this.playerCapsule.radiusMeters );
 		const ground = Math.max( terrainGround, colliderGround );
 		if ( this.position.y <= ground ) {
 			this.position.y = ground;
@@ -242,7 +242,7 @@ export class Player {
 	groundAt( x, z, maxY ) {
 
 		let g = this.terrain?.heightAt( x, z ) ?? - Infinity;
-		const c = this.colliders.groundHeightAt( x, z, maxY );
+		const c = this.colliders.groundHeightAt( x, z, maxY, this.playerCapsule.radiusMeters );
 		if ( c > g ) g = c;
 		if ( this.reef && this.reef.floorHeightAt ) g = Math.max( g, this.reef.floorHeightAt( x, z ) );
 		return g;
