@@ -7,6 +7,8 @@ import { validateWorldComponents } from '../src/network/WorldConnector.js';
 import { createWorldSource, isValidWorldCollisionCompound, validateWorldSource, WORLD_SOURCE_PROTOCOL } from '../src/network/WorldSource.js';
 import { GENERIC_WORLD_EXPERIENCE } from '../src/network/WorldExperience.js';
 import { movementProfileSelection, validateWorldRequirements } from '../src/network/WorldRules.js';
+import { registerWorldComponent } from '../src/network/WorldComponentRegistry.js';
+registerWorldComponent( 'elsemesh.fixture-vehicle/1', { vehicle: true, complexityTriangles: 1 } );
 
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const root = await mkdtemp( path.join( temporaryRoot, 'elsemesh-generic-manifest-' ) );
@@ -54,8 +56,8 @@ try {
 	assert.deepEqual( manifest.components, source.components, 'component envelope and opaque data survive conversion unchanged' );
 	assert.deepEqual( manifest.assets, [ { id: assetId, bytes: bytes.length, kind: 'example-binary/1', priority: 'visible' } ], 'asset inventory derives only from generic references' );
 	assert.doesNotThrow( () => validateWorldRequirements( manifest ) );
-	assert.deepEqual( movementProfileSelection( { components: [ { type: 'elsemesh.downeast-boat/1' } ] }, 'elsemesh.avatar.stock-male/1' ), { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' }, 'renderer clients select the same authored profile for a single world vehicle type' );
-	assert.equal( movementProfileSelection( { components: [ { type: 'elsemesh.downeast-boat/1' } ] }, 'elsemesh.avatar.stock-male/1', 'elsemesh.other-vehicle/1' ).vehicleType, null, 'an undeclared vehicle never receives a movement profile' );
+	assert.deepEqual( movementProfileSelection( { components: [ { type: 'elsemesh.fixture-vehicle/1' } ] }, 'elsemesh.avatar.stock-male/1' ), { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.fixture-vehicle/1' }, 'renderer clients select the same authored profile for a single world vehicle type' );
+	assert.equal( movementProfileSelection( { components: [ { type: 'elsemesh.fixture-vehicle/1' } ] }, 'elsemesh.avatar.stock-male/1', 'elsemesh.other-vehicle/1' ).vehicleType, null, 'an undeclared vehicle never receives a movement profile' );
 	assert.deepEqual( manifest.rules.avatarPolicy, source.rules.avatarPolicy, 'avatar allowlist survives deterministic manifest conversion' );
 	assert.deepEqual( manifest.rules.vehiclePolicy, source.rules.vehiclePolicy, 'vehicle pair moderation survives deterministic manifest conversion' );
 	assert.deepEqual( manifest.rules.movementProfiles, source.rules.movementProfiles, 'avatar and vehicle step capabilities survive deterministic manifest conversion' );
