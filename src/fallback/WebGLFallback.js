@@ -48,7 +48,7 @@ import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
-import { registerWorldPackageCollisionPayload } from '../network/WorldPackage.js';
+import { registerWorldPackageCollisionPayload, replaceWorldSourceCollisions } from '../network/WorldPackage.js';
 import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 import { movementParameters, worldHasWater } from '../network/WorldRules.js';
@@ -950,9 +950,7 @@ export class WebGLFallback {
 			this.boat.controller.model = this.boat.model;
 			this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 			this._createWebGLWake();
-			const installGameplayColliders = this.defaultWorldPackage?.presentation?.installGameplayColliders;
-			if ( typeof installGameplayColliders !== 'function' ) throw new Error( 'The default world package must provide its gameplay colliders' );
-			installGameplayColliders( { colliders: this.app.worldState.colliders, terrain: this.terrain, worldLayout: this.worldLayout } );
+			replaceWorldSourceCollisions( this.defaultWorldPackage.source, this.app.worldState.colliders );
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: this.terrain, colliders: this.app.worldState.colliders, query: this.waterQuery, boat: this.boat.controller, audio: this.app.audio, worldLayout } );
 			this.player.yaw = this.spawn.yaw || 0;
 			this.player.pitch = this.spawn.pitch || 0;

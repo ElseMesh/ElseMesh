@@ -16,13 +16,15 @@ for ( const factory of [ 'createVillage', 'createRocks', 'createReef', 'createBo
 assert.doesNotMatch( debrisRenderer, /DebrisShapes|KIND\./, 'the engine debris renderer does not import Tidewater shape IDs' );
 assert.match( defaultWorld, /createDebris:[\s\S]*?import\( '\.\/tidewater\/DebrisPlacement\.js' \)[\s\S]*?isShadowCaster: debrisCastsShadow/, 'the Tidewater package provides its placer and shadow policy' );
 assert.match( defaultWorld, /createWildlife:[\s\S]*?import\( '\.\/tidewater\/wildlife\/Wildlife\.js' \)/, 'the Tidewater world package provides its wildlife runtime' );
-assert.match( defaultWorld, /installGameplayColliders: installPierGameplayColliders/, 'the Tidewater package provides built-in gameplay collider installation' );
+assert.match( app, /replaceWorldSourceCollisions\( this\.worldPackage\.source, this\.colliders \)/, 'the built-in WebGPU player uses source-authored collision data' );
+assert.match( webglFallback, /replaceWorldSourceCollisions\( this\.defaultWorldPackage\.source, this\.app\.worldState\.colliders \)/, 'the built-in WebGL player uses the same source-authored collision data' );
+assert.doesNotMatch( defaultWorld, /installGameplayColliders/, 'the built-in world no longer publishes a renderer-specific collision installer' );
 assert.match( defaultWorld, /createVillage:[\s\S]*?import\( '\.\/tidewater\/Village\.js' \)/, 'the default package loads village construction from Tidewater' );
 assert.match( village, /createVillageMaterialContext/, 'Tidewater creates its own village material context' );
 assert.match( defaultWorld, /createBuilder:[\s\S]*?createInstancedProps/, 'the default package supplies Tidewater geometry factories to the generic debris renderer' );
 assert.doesNotMatch( debrisRenderer, /from ['"].*(Props|GeoBuilder)\.js/, 'the generic debris renderer does not import Tidewater geometry content' );
 assert.match( debrisRenderer, /createInstancedProps/, 'the generic debris renderer consumes world-provided geometry factories' );
-assert.match( webglFallback, /defaultWorldPackage\?\.presentation\?\.installGameplayColliders/, 'the WebGL built-in asks the active package to install gameplay colliders' );
+assert.match( webglFallback, /replaceWorldSourceCollisions\( this\.defaultWorldPackage\.source, this\.app\.worldState\.colliders \)/, 'the WebGL built-in consumes the same source collision contract' );
 assert.doesNotMatch( webglFallback, /pierWalkableHeightAt|pierStep|pierRail/, 'the engine fallback contains no Tidewater pier-collider recipe' );
 
 console.log( 'Built-in world presentation loads only after the hosted WebGPU package-only route' );

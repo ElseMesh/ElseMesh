@@ -826,6 +826,40 @@
                 "additionalProperties": false
               }
             },
+            "cylinders": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2048,
+              "items": {
+                "type": "object",
+                "required": [
+                  "center",
+                  "radius",
+                  "halfHeight"
+                ],
+                "properties": {
+                  "center": {
+                    "$ref": "#/$defs/vector3"
+                  },
+                  "radius": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "halfHeight": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000
+                  },
+                  "tag": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,63}$",
+                    "description": "Optional bounded semantic tag. The owning world's behavior defines its meaning."
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "walkable": {
               "type": "boolean"
             },
@@ -893,15 +927,16 @@
                     }
                   },
                   {
-                    "required": [
-                      "shape",
-                      "boxes"
-                    ],
+                    "required": [ "shape" ],
                     "properties": {
                       "shape": {
                         "const": "compound"
                       }
-                    }
+                    },
+                    "anyOf": [
+                      { "required": [ "boxes" ] },
+                      { "required": [ "cylinders" ] }
+                    ]
                   },
                   {
                     "required": [

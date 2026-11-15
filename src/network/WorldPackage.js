@@ -29,7 +29,7 @@ import { registeredWorldPackageMaterialAdapters } from './WorldPackageMaterialAd
 import { fetchGLBTextureLevel } from '../engine/loaders/GLBRange.js';
 import { STREAMING_DETAIL_HEADROOM } from '../engine/render/InstanceDrawPlannerMath.js';
 import { transformBoundsCenter } from './WorldStreaming.js';
-import { isValidWorldCollisionTag } from './WorldSource.js';
+import { isValidWorldCollisionCompound } from './WorldSource.js';
 
 const COMPONENTS = Object.freeze( {
 	POSITION: [ 'position', 3 ],
@@ -642,6 +642,80 @@ export function cloneWorldPackageAssets( root, connector, assetIDs ) {
 	return preview;
 }
 
+function addWorldObjectCompoundCollision( object, colliders ) {
+	const collision = object.collision, scale = object.scale || [ 1, 1, 1 ], yaw = object.transform?.yaw || 0;
+	if ( ! isValidWorldCollisionCompound( collision, scale ) ) throw new Error( `World object ${object.id} has invalid compound collision data` );
+	const cos = Math.cos( yaw ), sin = Math.sin( yaw ), boxes = [], cylinders = [];
+	const position = object.transform?.position;
+	if ( ! Array.isArray( position ) || position.length !== 3 || ! position.every( Number.isFinite ) ) throw new Error( `World object ${object.id} has invalid collision transform` );
+	const transformCenter = ( center ) => {
+		const x = center[ 0 ] * scale[ 0 ], y = center[ 1 ] * scale[ 1 ], z = center[ 2 ] * scale[ 2 ];
+		return new Vector3( position[ 0 ] + x * cos + z * sin, position[ 1 ] + y, position[ 2 ] - x * sin + z * cos );
+	};
+	for ( const item of collision.boxes || [] ) {
+		const center = transformCenter( item.center );
+		const half = new Vector3( item.halfExtents[ 0 ] * scale[ 0 ], item.halfExtents[ 1 ] * scale[ 1 ], item.halfExtents[ 2 ] * scale[ 2 ] );
+		boxes.push( colliders.addBox( center, half, yaw + item.yaw, { walkable: item.walkable, solid: item.solid, tag: item.tag || `world:${object.id}` } ) );
+	}
+	for ( const item of collision.cylinders || [] ) {
+		const center = transformCenter( item.center );
+		const halfHeight = item.halfHeight * scale[ 1 ];
+		cylinders.push( colliders.addCylinder( center.x, center.z, item.radius * scale[ 0 ], center.y - halfHeight, center.y + halfHeight, { tag: item.tag || `world:${object.id}` } ) );
+	}
+	return { boxes, cylinders };
+}
+
+function addWorldObjectBoxCollision( object, colliders ) {
+	const collision = object.collision, scale = object.scale || [ 1, 1, 1 ], yaw = object.transform?.yaw || 0;
+	if ( ! collision || ! Array.isArray( collision.center ) || collision.center.length !== 3 || ! collision.center.every( Number.isFinite ) || ! Array.isArray( collision.halfExtents ) || collision.halfExtents.length !== 3 || ! collision.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) ) throw new Error( `World object ${object.id} has invalid collision bounds` );
+	const [ x, y, z ] = collision.center.map( ( value, axis ) => value * scale[ axis ] ), cos = Math.cos( yaw ), sin = Math.sin( yaw );
+	const center = new Vector3( object.transform.position[ 0 ] + x * cos + z * sin, object.transform.position[ 1 ] + y, object.transform.position[ 2 ] - x * sin + z * cos );
+	const half = new Vector3( collision.halfExtents[ 0 ] * scale[ 0 ], collision.halfExtents[ 1 ] * scale[ 1 ], collision.halfExtents[ 2 ] * scale[ 2 ] );
+	return colliders.addBox( center, half, yaw, { walkable: collision.walkable, solid: collision.solid, tag: `world:${object.id}` } );
+}
+
+function validateWorldSourceCollisionData( source ) {
+	if ( ! Array.isArray( source?.objects ) ) throw new Error( 'World source collision installation requires source objects' );
+	for ( const object of source.objects ) {
+		const collision = object.collision;
+		if ( collision?.enabled !== true || collision.shape === 'heightfield' ) continue;
+		const position = object.transform?.position, scale = object.scale || [ 1, 1, 1 ];
+		if ( ! Array.isArray( position ) || position.length !== 3 || ! position.every( Number.isFinite ) || ! Array.isArray( scale ) || scale.length !== 3 || ! scale.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) ) throw new Error( `World object ${object.id} has an invalid collision transform` );
+		if ( collision.shape === 'compound' ) {
+			if ( ! isValidWorldCollisionCompound( collision, scale ) ) throw new Error( `World object ${object.id} has invalid compound collision data` );
+		} else if ( collision.shape === 'box' ) {
+			if ( ! Array.isArray( collision.center ) || collision.center.length !== 3 || ! collision.center.every( Number.isFinite ) || ! Array.isArray( collision.halfExtents ) || collision.halfExtents.length !== 3 || ! collision.halfExtents.every( value => Number.isFinite( value ) && value > 0 && value <= 1000 ) || typeof collision.walkable !== 'boolean' || typeof collision.solid !== 'boolean' ) throw new Error( `World object ${object.id} has invalid box collision data` );
+		} else throw new Error( `World object ${object.id} has unsupported collision shape ${collision.shape}` );
+	}
+}
+
+export function installWorldSourceCollisions( source, colliders ) {
+	if ( ! colliders?.addBox || ! colliders?.addCylinder ) throw new Error( 'World source collision installation requires a collision world' );
+	validateWorldSourceCollisionData( source );
+	const installed = { boxes: [], cylinders: [] };
+	for ( const object of source.objects ) {
+		const collision = object.collision;
+		if ( collision?.enabled !== true || collision.shape === 'heightfield' ) continue;
+		if ( collision.shape === 'compound' ) {
+			const result = addWorldObjectCompoundCollision( object, colliders );
+			installed.boxes.push( ...result.boxes );
+			installed.cylinders.push( ...result.cylinders );
+		} else if ( collision.shape === 'box' ) installed.boxes.push( addWorldObjectBoxCollision( object, colliders ) );
+		else throw new Error( `World object ${object.id} has unsupported collision shape ${collision.shape}` );
+	}
+	return installed;
+}
+
+export function replaceWorldSourceCollisions( source, colliders ) {
+	if ( ! colliders?.boxes || ! colliders?.cylinders || ! colliders?.convexes || ! colliders?.heightfields ) throw new Error( 'World source collision replacement requires a complete collision world' );
+	validateWorldSourceCollisionData( source );
+	colliders.boxes.length = 0;
+	colliders.cylinders.length = 0;
+	colliders.convexes.length = 0;
+	colliders.heightfields.length = 0;
+	return installWorldSourceCollisions( source, colliders );
+}
+
 export function registerWorldPackageCollisions( root, colliders, objectIDs = null ) {
 	if ( ! colliders ) return;
 	const state = root.userData.worldPackage;
@@ -683,36 +757,11 @@ export function registerWorldPackageCollisions( root, colliders, objectIDs = nul
 			continue;
 		}
 		if ( collision.shape === 'compound' ) {
-			if ( ! Array.isArray( collision.boxes ) || collision.boxes.length === 0 || collision.boxes.length > 2048 || ! collision.boxes.every( ( item ) => item && ( item.tag === undefined || isValidWorldCollisionTag( item.tag ) ) && Array.isArray( item.center ) && item.center.length === 3 && item.center.every( ( value ) => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) && Array.isArray( item.halfExtents ) && item.halfExtents.length === 3 && item.halfExtents.every( ( value ) => Number.isFinite( value ) && value > 0 && value <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' ) ) throw new Error( `World object ${object.id} has invalid compound collision boxes` );
-			const scale = object.scale || [ 1, 1, 1 ];
-			const yaw = object.transform?.yaw || 0;
-			const cos = Math.cos( yaw ), sin = Math.sin( yaw );
-			const boxes = [];
-			for ( const item of collision.boxes ) {
-				const localX = item.center[ 0 ] * scale[ 0 ], localY = item.center[ 1 ] * scale[ 1 ], localZ = item.center[ 2 ] * scale[ 2 ];
-				const center = new Vector3(
-					object.transform.position[ 0 ] + localX * cos + localZ * sin,
-					object.transform.position[ 1 ] + localY,
-					object.transform.position[ 2 ] - localX * sin + localZ * cos,
-				);
-				const half = new Vector3( item.halfExtents[ 0 ] * scale[ 0 ], item.halfExtents[ 1 ] * scale[ 1 ], item.halfExtents[ 2 ] * scale[ 2 ] );
-				boxes.push( colliders.addBox( center, half, yaw + item.yaw, { walkable: item.walkable, solid: item.solid, tag: item.tag || `world:${object.id}` } ) );
-			}
-			state.activeColliders.set( object.id, { shape: 'compound', collider: boxes } );
+			state.activeColliders.set( object.id, { shape: 'compound', collider: addWorldObjectCompoundCollision( object, colliders ) } );
 			continue;
 		}
-		if ( collision.shape !== 'box' || ! Array.isArray( collision.center ) || collision.center.length !== 3 || ! collision.center.every( Number.isFinite ) || ! Array.isArray( collision.halfExtents ) || collision.halfExtents.length !== 3 || ! collision.halfExtents.every( ( value ) => Number.isFinite( value ) && value > 0 ) ) throw new Error( `World object ${object.id} has invalid collision bounds` );
-		const scale = object.scale || [ 1, 1, 1 ];
-		const yaw = object.transform?.yaw || 0;
-		const cos = Math.cos( yaw ), sin = Math.sin( yaw );
-		const localX = collision.center[ 0 ] * scale[ 0 ], localY = collision.center[ 1 ] * scale[ 1 ], localZ = collision.center[ 2 ] * scale[ 2 ];
-		const center = new Vector3(
-			object.transform.position[ 0 ] + localX * cos + localZ * sin,
-			object.transform.position[ 1 ] + localY,
-			object.transform.position[ 2 ] - localX * sin + localZ * cos,
-		);
-		const half = new Vector3( collision.halfExtents[ 0 ] * scale[ 0 ], collision.halfExtents[ 1 ] * scale[ 1 ], collision.halfExtents[ 2 ] * scale[ 2 ] );
-		const box = colliders.addBox( center, half, yaw, { walkable: collision.walkable, solid: collision.solid, tag: `world:${object.id}` } );
+		if ( collision.shape !== 'box' ) throw new Error( `World object ${object.id} has unsupported collision shape ${collision.shape}` );
+		const box = addWorldObjectBoxCollision( object, colliders );
 		state.activeColliders.set( object.id, { shape: 'box', collider: box } );
 	}
 }
@@ -723,7 +772,10 @@ export function unregisterWorldPackageCollisions( root, colliders ) {
 	if ( ! colliders ) return;
 	for ( const { shape, collider } of active?.values() || [] ) {
 		if ( shape === 'heightfield' ) colliders.removeHeightfield( collider );
-		else if ( shape === 'compound' ) for ( const box of collider || [] ) colliders.removeBox( box );
+		else if ( shape === 'compound' ) {
+			for ( const box of collider?.boxes || [] ) colliders.removeBox( box );
+			for ( const cylinder of collider?.cylinders || [] ) colliders.removeCylinder( cylinder );
+		}
 		else colliders.removeBox( collider );
 	}
 	active?.clear();

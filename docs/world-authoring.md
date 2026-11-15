@@ -150,7 +150,7 @@ blender working-copy.blend --background --python tools/blender/world_actions.py 
   --out-source candidate.world-source.json --out-blend candidate.blend
 ```
 
-Enabled collision supports one box, a compound of up to 2048 asset-local boxes, or a regular-grid heightfield. Each compound box stores its local center, positive half extents, yaw, and walkable/solid flags; the loader applies the parent instance transform and removes every box during world handoff.
+Enabled collision supports one box, a regular-grid heightfield, or a compound with up to 2048 asset-local boxes and 2048 vertical cylinders. Compound boxes store a local center, positive half extents, yaw, and walkable/solid flags. Cylinders store a local center, radius, half-height, and optional tag; their parent instance must use uniform horizontal scale. The loader applies the parent transform and removes every registered shape during world handoff.
 
 ## AI editor service
 

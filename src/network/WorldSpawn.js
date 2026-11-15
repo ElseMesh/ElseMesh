@@ -58,10 +58,15 @@ export function worldSpawnCollisionObjectIDs( manifest, spawn, radius, playerCap
 			nearestCenter = Math.hypot( center[ 0 ] - spawn.position[ 0 ], center[ 2 ] - spawn.position[ 2 ] );
 			objectRadius = Math.hypot( collision.halfExtents[ 0 ] * scale[ 0 ], collision.halfExtents[ 2 ] * scale[ 2 ] ) + capsule.radiusMeters;
 		} else if ( collision.shape === 'compound' ) {
-			for ( const box of collision.boxes ) {
+			for ( const box of collision.boxes || [] ) {
 				const center = centerFor( box.center );
 				nearestCenter = Math.min( nearestCenter, Math.hypot( center[ 0 ] - spawn.position[ 0 ], center[ 2 ] - spawn.position[ 2 ] ) );
 				objectRadius = Math.max( objectRadius, Math.hypot( box.halfExtents[ 0 ] * scale[ 0 ], box.halfExtents[ 2 ] * scale[ 2 ] ) + capsule.radiusMeters );
+			}
+			for ( const cylinder of collision.cylinders || [] ) {
+				const center = centerFor( cylinder.center );
+				nearestCenter = Math.min( nearestCenter, Math.hypot( center[ 0 ] - spawn.position[ 0 ], center[ 2 ] - spawn.position[ 2 ] ) );
+				objectRadius = Math.max( objectRadius, cylinder.radius * scale[ 0 ] + capsule.radiusMeters );
 			}
 		}
 		if ( nearestCenter <= radius + objectRadius ) selected.add( object.id );

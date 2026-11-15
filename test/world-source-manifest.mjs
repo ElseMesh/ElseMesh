@@ -4,12 +4,16 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { validateWorldComponents } from '../src/network/WorldConnector.js';
-import { createWorldSource, validateWorldSource, WORLD_SOURCE_PROTOCOL } from '../src/network/WorldSource.js';
+import { createWorldSource, isValidWorldCollisionCompound, validateWorldSource, WORLD_SOURCE_PROTOCOL } from '../src/network/WorldSource.js';
 import { GENERIC_WORLD_EXPERIENCE } from '../src/network/WorldExperience.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
 
 const temporaryRoot = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const root = await mkdtemp( path.join( temporaryRoot, 'elsemesh-generic-manifest-' ) );
+
+const cylinderCompound = { cylinders: [ { center: [ 0, 0, 0 ], radius: 0.5, halfHeight: 1 } ] };
+assert( isValidWorldCollisionCompound( cylinderCompound, [ 1, 1, 1 ] ), 'compound collision validates vertical cylinders' );
+assert.equal( isValidWorldCollisionCompound( cylinderCompound, [ 1, 1, 2 ] ), false, 'compound cylinders reject non-uniform horizontal scale' );
 
 try {
 	const assetsPath = path.join( root, 'assets' );

@@ -23,10 +23,11 @@ assert.equal( worldSpawnCandidates( spawn, 0, capsuleProbe, { playerCapsule: { r
 const objectIDs = worldSpawnCollisionObjectIDs( { objects: [
 	{ id: 'elsemesh-object:near', transform: { position: [ 2, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
 	{ id: 'elsemesh-object:far', transform: { position: [ 50, 2.62, 0 ], yaw: 0 }, collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.5, 1, 0.5 ] } },
+	{ id: 'elsemesh-object:cylinder', transform: { position: [ 2.5, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { enabled: true, shape: 'compound', cylinders: [ { center: [ 0, 0, 0 ], radius: 0.5, halfHeight: 1 } ] } },
 	{ id: 'elsemesh-object:terrain', transform: { position: [ 500, 0, 500 ], yaw: 0 }, collision: { enabled: true, shape: 'heightfield' } },
 	{ id: 'elsemesh-object:decor', transform: { position: [ 0, 0, 0 ], yaw: 0 }, collision: { enabled: false, shape: 'none' } },
 ] }, spawn, 2 );
-assert.deepEqual( [ ...objectIDs ].sort(), [ 'elsemesh-object:near', 'elsemesh-object:terrain' ], 'spawn loads every potentially intersecting collider and heightfield, but skips distant or noncolliding objects' );
+assert.deepEqual( [ ...objectIDs ].sort(), [ 'elsemesh-object:cylinder', 'elsemesh-object:near', 'elsemesh-object:terrain' ], 'spawn loads every potentially intersecting box, cylinder, and heightfield, but skips distant or noncolliding objects' );
 const capsuleObjectIDs = worldSpawnCollisionObjectIDs( { objects: [
 	{ id: 'elsemesh-object:capsule-edge', transform: { position: [ 0.45, 2.62, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: [ 0.05, 1, 0.05 ] } },
 ] }, spawn, 0, { radiusMeters: 0.42, heightMeters: 1.76 } );

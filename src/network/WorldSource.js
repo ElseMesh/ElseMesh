@@ -10,6 +10,15 @@ export function isValidWorldCollisionTag( tag ) {
 	return typeof tag === 'string' && WORLD_COLLISION_TAG_PATTERN.test( tag );
 }
 
+export function isValidWorldCollisionCompound( collision, scale = [ 1, 1, 1 ] ) {
+	const boxes = collision?.boxes;
+	const cylinders = collision?.cylinders;
+	const validScale = validVector( scale ) && scale.every( value => value > 0 && value <= 1000 );
+	const validBoxes = boxes === undefined || Array.isArray( boxes ) && boxes.length > 0 && boxes.length <= 2048 && boxes.every( item => item && ( item.tag === undefined || isValidWorldCollisionTag( item.tag ) ) && validVector( item.center ) && item.center.every( value => Math.abs( value ) <= 1e6 ) && validVector( item.halfExtents ) && item.halfExtents.every( value => value > 0 && value <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' );
+	const validCylinders = cylinders === undefined || Array.isArray( cylinders ) && cylinders.length > 0 && cylinders.length <= 2048 && cylinders.every( item => item && ( item.tag === undefined || isValidWorldCollisionTag( item.tag ) ) && validVector( item.center ) && item.center.every( value => Math.abs( value ) <= 1e6 ) && Number.isFinite( item.radius ) && item.radius > 0 && item.radius <= 1000 && Number.isFinite( item.halfHeight ) && item.halfHeight > 0 && item.halfHeight <= 1000 );
+	return validScale && ( Array.isArray( boxes ) && boxes.length > 0 || Array.isArray( cylinders ) && cylinders.length > 0 ) && validBoxes && validCylinders && ( ! Array.isArray( cylinders ) || ! cylinders.length || Math.abs( scale[ 0 ] - scale[ 2 ] ) <= 1e-8 );
+}
+
 // Canonical source and manifest components keep authored fields inside `data`.
 // Runtime dispatch consumes a flat record after signature/source validation.
 export function worldComponentRuntimeRecord( component ) {
@@ -71,7 +80,7 @@ export function validateWorldSource( source, { allowUnregisteredBehaviors = fals
 			const common = typeof collision.walkable === 'boolean' && typeof collision.solid === 'boolean';
 			const box = collision.shape === 'box' && validVector( collision.center ) && validVector( collision.halfExtents ) && collision.halfExtents.every( ( n ) => n > 0 && n <= 1000 );
 			const heightfield = collision.shape === 'heightfield' && Number.isInteger( collision.columns ) && Number.isInteger( collision.rows ) && collision.columns >= 2 && collision.rows >= 2 && collision.columns <= 4097 && collision.rows <= 4097 && collision.columns * collision.rows <= 4194304 && collision.walkable === true && collision.solid === true;
-			const compound = collision.shape === 'compound' && Array.isArray( collision.boxes ) && collision.boxes.length > 0 && collision.boxes.length <= 2048 && collision.boxes.every( ( item ) => item && ( item.tag === undefined || isValidWorldCollisionTag( item.tag ) ) && validVector( item.center ) && item.center.every( ( n ) => Math.abs( n ) <= 1e6 ) && validVector( item.halfExtents ) && item.halfExtents.every( ( n ) => n > 0 && n <= 1000 ) && Number.isFinite( item.yaw ) && Math.abs( item.yaw ) <= 360 && typeof item.walkable === 'boolean' && typeof item.solid === 'boolean' );
+			const compound = collision.shape === 'compound' && isValidWorldCollisionCompound( collision, object.scale );
 			if ( ! box && ! heightfield && ! compound || ( box || heightfield ) && ! common ) throw new Error( 'Enabled object collision requires bounded box, compound, or heightfield data' );
 		}
 		if ( object.assetId !== null && object.assetId !== undefined && ! /^sha256:[0-9a-f]{64}$/.test( object.assetId ) ) throw new Error( 'Invalid object assetId' );

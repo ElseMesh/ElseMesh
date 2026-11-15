@@ -22,6 +22,7 @@ const (
 	maxAssetBytes          = 2 << 30
 	maxSafeJSInteger       = uint64(9007199254740991)
 	maxCollisionBoxes      = 2048
+	maxCollisionCylinders  = 2048
 	maxComponentDataBytes  = 64 << 10
 	maxComponentAssets     = 256
 )
@@ -92,15 +93,16 @@ type worldObject struct {
 	Transform        transform        `json:"transform"`
 	Scale            vector3          `json:"scale"`
 	Collision        struct {
-		Shape       string         `json:"shape"`
-		Enabled     bool           `json:"enabled"`
-		Center      vector3        `json:"center"`
-		HalfExtents vector3        `json:"halfExtents"`
-		Boxes       []collisionBox `json:"boxes,omitempty"`
-		Columns     uint32         `json:"columns"`
-		Rows        uint32         `json:"rows"`
-		Walkable    bool           `json:"walkable"`
-		Solid       bool           `json:"solid"`
+		Shape       string              `json:"shape"`
+		Enabled     bool                `json:"enabled"`
+		Center      vector3             `json:"center"`
+		HalfExtents vector3             `json:"halfExtents"`
+		Boxes       []collisionBox      `json:"boxes,omitempty"`
+		Cylinders   []collisionCylinder `json:"cylinders,omitempty"`
+		Columns     uint32              `json:"columns"`
+		Rows        uint32              `json:"rows"`
+		Walkable    bool                `json:"walkable"`
+		Solid       bool                `json:"solid"`
 	} `json:"collision"`
 }
 
@@ -111,6 +113,13 @@ type collisionBox struct {
 	Walkable    bool    `json:"walkable"`
 	Solid       bool    `json:"solid"`
 	Tag         string  `json:"tag,omitempty"`
+}
+
+type collisionCylinder struct {
+	Center     vector3 `json:"center"`
+	Radius     float64 `json:"radius"`
+	HalfHeight float64 `json:"halfHeight"`
+	Tag        string  `json:"tag,omitempty"`
 }
 
 type portalBack struct {
@@ -851,8 +860,8 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 					return errors.New("invalid object heightfield dimensions or flags")
 				}
 			case "compound":
-				if len(object.Collision.Boxes) == 0 || len(object.Collision.Boxes) > maxCollisionBoxes {
-					return errors.New("invalid compound collision box count")
+				if len(object.Collision.Boxes) == 0 && len(object.Collision.Cylinders) == 0 || len(object.Collision.Boxes) > maxCollisionBoxes || len(object.Collision.Cylinders) > maxCollisionCylinders {
+					return errors.New("invalid compound collision primitive count")
 				}
 				for _, box := range object.Collision.Boxes {
 					if box.Tag != "" && !collisionTagPattern.MatchString(box.Tag) {
@@ -870,6 +879,22 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 					}
 					if math.IsNaN(box.Yaw) || math.IsInf(box.Yaw, 0) || math.Abs(box.Yaw) > 360 {
 						return errors.New("compound collision yaw out of bounds")
+					}
+				}
+				if len(object.Collision.Cylinders) > 0 && math.Abs(object.Scale[0]-object.Scale[2]) > 1e-8 {
+					return errors.New("compound collision cylinders require uniform horizontal scale")
+				}
+				for _, cylinder := range object.Collision.Cylinders {
+					if cylinder.Tag != "" && !collisionTagPattern.MatchString(cylinder.Tag) {
+						return errors.New("unsupported compound collision tag")
+					}
+					for _, coordinate := range cylinder.Center {
+						if math.IsNaN(coordinate) || math.IsInf(coordinate, 0) || math.Abs(coordinate) > 1e6 {
+							return errors.New("compound collision cylinder center out of bounds")
+						}
+					}
+					if math.IsNaN(cylinder.Radius) || math.IsInf(cylinder.Radius, 0) || cylinder.Radius <= 0 || cylinder.Radius > 1000 || math.IsNaN(cylinder.HalfHeight) || math.IsInf(cylinder.HalfHeight, 0) || cylinder.HalfHeight <= 0 || cylinder.HalfHeight > 1000 {
+						return errors.New("compound collision cylinder dimensions out of bounds")
 					}
 				}
 			default:

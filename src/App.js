@@ -71,7 +71,7 @@ import { appearanceForAllowedProfiles, avatarProfileId, AVATAR_STYLES, loadAppea
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -588,6 +588,7 @@ export class App {
 		// interactive wake around the boat (Kelvin pattern, bow/stern waves, prop wash foam)
 		this.wake = new WakeSim( renderer, { terrainGPU: this.terrainGPU, boat: this.boatCtl, colliders: this.colliders } );
 		this.surface.wake = this.wake;
+		replaceWorldSourceCollisions( this.worldPackage.source, this.colliders );
 		this.player = new Player( { camera, input: this.input, terrain: this.terrainData, colliders: this.colliders, query: this.query, boat: this.boatCtl, reef: this.reef, worldLayout: this.worldLayout } );
 		this.localPlayerEnvironment = { terrain: this.player.terrain, colliders: this.player.colliders, query: this.player.query, slot: this.player.slot, reef: this.player.reef, boat: this.player.boat, hostedSeaLevel: null };
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)

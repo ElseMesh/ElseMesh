@@ -677,6 +677,31 @@ func TestWorldManifestValidatesEnabledObjectCollisionBounds(t *testing.T) {
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("out-of-range compound collider yaw accepted")
 	}
+	manifest.Objects[0].Collision.Boxes = nil
+	manifest.Objects[0].Collision.Cylinders = []collisionCylinder{{Center: vector3{1, 2, 3}, Radius: 0.5, HalfHeight: 1, Tag: "elsemesh.vendor.counter"}}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err != nil {
+		t.Fatalf("valid compound cylinder collision rejected: %v", err)
+	}
+	manifest.Objects[0].Collision.Cylinders[0].Tag = "invalid tag"
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("malformed compound cylinder tag accepted")
+	}
+	manifest.Objects[0].Collision.Cylinders[0].Tag = "elsemesh.vendor.counter"
+	manifest.Objects[0].Collision.Cylinders[0].Radius = 0
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("zero compound cylinder radius accepted")
+	}
+	manifest.Objects[0].Collision.Cylinders[0].Radius = 0.5
+	manifest.Objects[0].Scale = vector3{1, 1, 2}
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("non-uniform horizontal cylinder scale accepted")
+	}
+	manifest.Objects[0].Scale = vector3{1, 1, 1}
+	manifest.Objects[0].Collision.Cylinders = make([]collisionCylinder, maxCollisionCylinders+1)
+	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
+		t.Fatal("excessive compound collision cylinders accepted")
+	}
+	manifest.Objects[0].Collision.Cylinders = nil
 	manifest.Objects[0].Collision.Boxes = make([]collisionBox, maxCollisionBoxes+1)
 	if err := validateManifest(manifest, ownerID.String(), time.Now()); err == nil {
 		t.Fatal("excessive compound collision boxes accepted")
