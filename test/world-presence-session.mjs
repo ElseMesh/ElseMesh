@@ -64,6 +64,17 @@ assert.equal(housePose.avatarOptionId, 'gryffindor', 'presence carries the world
 assert.equal(housePose.entryPointId, 'gryffindor-start', 'presence carries the world-authored entry point selected by the visitor');
 assert.throws(() => new WorldPresenceSession({ connector: houseWorld, parent: { add() {} }, appearance: { ...houseUniform, style: 'female' }, avatarOptionId: 'gryffindor', entryPointId: 'wrong-entry', createConnector() { throw new Error('must reject a mismatched entry before transport setup'); } }), /selected world entry point/);
 houseSession.dispose();
+const optionalGenericAvatarWorld = { ...connector, manifest: { ...connector.manifest, avatarOptions: [
+ { id: 'short-hair', profileId: 'elsemesh.avatar.stock-male/1', label: 'Short hair' },
+ { id: 'ponytail', profileId: 'elsemesh.avatar.stock-female/1', label: 'Ponytail' },
+] } };
+const genericAvatarSession = new WorldPresenceSession({ connector: optionalGenericAvatarWorld, parent: { add() {} }, createConnector() { return { close() {} }; } });
+assert.equal(genericAvatarSession.avatarOptionId, '', 'unbound generic avatar options do not force a choice before the world exposes an avatar selector');
+genericAvatarSession.dispose();
+assert.throws(() => new WorldPresenceSession({
+ connector: { ...connector, manifest: { ...connector.manifest, avatarOptions: [ { id: 'uniform', profileId: 'elsemesh.avatar.stock-male/1', label: 'Uniform', palette: { shirt: '#8b1c2b' } } ] } },
+ parent: { add() {} }, createConnector() { throw new Error('palette-bound choices must be selected before transport'); },
+}), /world-authored avatar option/);
 assert.throws(()=>new WorldPresenceSession({connector:{...connector,manifest:{...connector.manifest,rules:{...connector.manifest.rules,
  avatarPolicy:{allowedProfiles:[]}}}},parent:{add(){}},appearance:houseUniform,createConnector(){throw new Error('must reject before creating a transport')}}),
  /does not permit any supported avatar profile/,'an empty world avatar profile policy rejects admission before transport setup');

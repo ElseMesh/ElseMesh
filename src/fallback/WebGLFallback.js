@@ -2,8 +2,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createWebGLKTX2Loader } from '../engine/loaders/KTX2.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
-import { makePresencePose } from '../network/WorldPresenceSession.js';
-import { avatarProfileId, DEFAULT_APPEARANCE, loadAppearance } from '../player/AvatarAppearance.js';
+import { WorldPresenceSession } from '../network/WorldPresenceSession.js';
+import { avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
 import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
 import { CDLOD } from '../core/CDLOD.js';
@@ -49,7 +49,8 @@ import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldOb
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { registerWorldPackageCollisionPayload, replaceWorldSourceCollisions } from '../network/WorldPackage.js';
-import { chooseWorldEntryPoint } from '../ui/WorldEntryPointPicker.js';
+import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from '../ui/WorldEntryPointPicker.js';
+import { worldSpawnCandidates } from '../network/WorldSpawn.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 import { movementParameters, movementProfileSelection, worldHasWater } from '../network/WorldRules.js';
 import { DEFAULT_ENVIRONMENT } from '../core/EnvironmentDefaults.js';
@@ -849,12 +850,11 @@ export class WebGLFallback {
 		this.keys = new Set();
 		this.velocityY = 0;
 		this.sequence = 0;
-		this.presenceConnector = null;
-		this.presencePending = false;
-		this.presenceNextSend = 0;
+		this.worldPresence = null;
+		this.entrySelection = null;
+		this.entryAppearance = null;
 		this.portals = [];
 		this.blockers = [];
-		this.remotePlayers = new Map();
 		this.loader = new GLTFLoader();
 		this.ktx2Loader = null;
 		this.worldLink = worldLinkFromLocation();
@@ -974,7 +974,7 @@ export class WebGLFallback {
 				this._bindShoreSurfaceToWater();
 			}
 			this.player = new Player( { camera: this.camera, input: this.input, terrain: hostedTerrain, colliders: hostedColliders, query: this.waterQuery, boat: null, audio: this.app.audio } );
-			const appearance = this.app.worldPresence?.appearance || loadAppearance();
+			const appearance = this.entryAppearance || this.app.worldPresence?.appearance || loadAppearance();
 			this.player.setWorldRules( this.connector.manifest.rules, movementProfileSelection( this.connector.manifest, avatarProfileId( appearance ) ) );
 			this.player.setHostedWorldPose( { x: this.spawn.position[ 0 ], y: this.spawn.position[ 1 ], z: this.spawn.position[ 2 ] }, this.spawn.yaw, this.spawn.pitch );
 			if ( this.connector?.localOnly ) this.player.hostedCollisionGuard = ( from, to ) => {
@@ -1030,8 +1030,8 @@ export class WebGLFallback {
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
 		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
+		await this._startPresence();
 		this.renderer.setAnimationLoop( () => this._frame() );
-		this._startPresence();
 	}
 
 	async _loadWebGLWhale( component, assets, terrain = null, seaLevel = 0 ) {
@@ -1820,6 +1820,13 @@ export class WebGLFallback {
 		} else manifest = await this.connector.getManifest();
 		const hostedWaterEnabled = worldHasWater( manifest );
 		if ( ! hostedWaterEnabled ) this.debugNoWater = true;
+		const entry = await chooseWorldEntryPoint( manifest );
+		this.entrySelection = entry;
+		this.entryAppearance = selectedWorldEntryAppearance( entry, manifest );
+		const selectedSpawn = worldEntryPointPose( entry ) || worldSpawnPose( manifest );
+		this.camera.position.set( ...selectedSpawn.position );
+		this.camera.rotation.order = 'YXZ';
+		this.camera.rotation.set( selectedSpawn.pitch || 0, selectedSpawn.yaw || 0, 0 );
 		let localSpawn = null;
 		let assets;
 		const components = manifest.components || [];
@@ -1830,11 +1837,7 @@ export class WebGLFallback {
 		this.worldLODs = new Map();
 		this.hostedObjectRoots ||= new Map();
 		if ( this.connector.localOnly ) {
-			const entry = await chooseWorldEntryPoint( manifest );
-			localSpawn = worldEntryPointPose( entry ) || worldSpawnPose( manifest );
-			this.camera.position.set( ...localSpawn.position );
-			this.camera.rotation.order = 'YXZ';
-			this.camera.rotation.set( localSpawn.pitch || 0, localSpawn.yaw || 0, 0 );
+			localSpawn = selectedSpawn;
 			const spawnFoot = new T.Vector3( localSpawn.position[ 0 ], localSpawn.position[ 1 ] - PLAYER_EYE_HEIGHT, localSpawn.position[ 2 ] );
 			const cellSize = this.connector.cellSizeMeters;
 			if ( Number.isInteger( cellSize ) && cellSize > 0 ) {
@@ -2078,7 +2081,7 @@ export class WebGLFallback {
 		for ( const ambience of components.filter( component => component.type === 'elsemesh.ambient-audio/1' ) ) {
 			if ( ambience.beds.every( bed => assets.has( bed.assetId ) ) ) supportedComponents.add( ambience.id );
 		}
-		const spawn = localSpawn || manifest.spawn || {};
+		const spawn = localSpawn || selectedSpawn || manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
 		const transfer = new URLSearchParams( location.search ).get( 'webglSpawn' )?.split( ',' ).map( Number );
 		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
@@ -2341,6 +2344,7 @@ export class WebGLFallback {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );
 		}
+		this.worldPresence?.update( dt, this.player, now, this.app.renderLoadBias || 0 );
 		for ( const { lod, geometry } of this.oceanLODs ) {
 			lod.update( this.camera );
 			geometry.instanceCount = lod.count;
@@ -2794,56 +2798,25 @@ export class WebGLFallback {
 
 	}
 
-	_startPresence() {
+	async _startPresence() {
 
-		if ( ! this.connector || ! this.worldLink || ! this.connector.manifest?.ownerPeerId || this.connector.localOnly ) return;
-		this.presenceConnector = new WorldConnector( {
-			worldId: this.connector.worldId, nodeId: this.connector.manifest.ownerPeerId,
-			gateway: this.connector.gateway, directory: this.connector.directory,
+		if ( ! this.connector?.presenceEnabled || ! this.connector.manifest?.ownerPeerId ) return;
+		const appearance = this.entryAppearance || this.app.worldPresence?.appearance || loadAppearance();
+		const session = new WorldPresenceSession( {
+			connector: this.connector, parent: this.scene, appearance,
+			avatarOptionId: this.entrySelection?.avatarOptionId || '', entryPointId: this.entrySelection?.id || '',
 		} );
-		const send = () => {
-			if ( this.presencePending || performance.now() < this.presenceNextSend ) return;
-			this.presencePending = true;
-			this.presenceConnector.updatePresence( makePresencePose( this.player, this.sequence ++, DEFAULT_APPEARANCE ) )
-				.then( snapshot => { this._updateRemotePlayers( snapshot ); this.presenceFailed = false; } )
-				.catch( error => {
-					this.presenceNextSend = performance.now() + 2000;
-					if ( ! this.presenceFailed ) console.warn( 'WebGL fallback presence unavailable:', error.message );
-					this.presenceFailed = true;
-				} )
-				.finally( () => { this.presencePending = false; } );
-		};
-		this.presenceTimer = setInterval( send, 100 );
-		send();
-		window.addEventListener( 'pagehide', () => {
-			clearInterval( this.presenceTimer );
-			const connector = this.presenceConnector;
-			connector?.leavePresence().catch( () => {} ).finally( () => connector.close() );
-		}, { once: true } );
-
-	}
-
-	_updateRemotePlayers( snapshot ) {
-
-		const ids = new Set();
-		for ( const pose of snapshot.players ) {
-			if ( pose.id === snapshot.playerId ) continue;
-			ids.add( pose.id );
-			let actor = this.remotePlayers.get( pose.id );
-			if ( ! actor ) {
-				const T = this.THREE, group = new T.Group();
-				const body = new T.Mesh( new T.CapsuleGeometry( 0.34, 0.85, 4, 8 ), new T.MeshStandardMaterial( { color: pose.appearance.shirt, roughness: 0.9 } ) );
-				body.position.y = 0.95; group.add( body );
-				const head = new T.Mesh( new T.SphereGeometry( 0.23, 10, 8 ), new T.MeshStandardMaterial( { color: pose.appearance.skin, roughness: 0.9 } ) );
-				head.position.y = 1.72; group.add( head );
-				this.scene.add( group ); actor = { group, body, head }; this.remotePlayers.set( pose.id, actor );
-			}
-			actor.group.position.set( ...pose.position ); actor.group.rotation.y = pose.yaw + Math.PI;
-			actor.body.material.color.set( pose.appearance.shirt ); actor.head.material.color.set( pose.appearance.skin );
+		try {
+			const candidates = worldSpawnCandidates( this.spawn, this.connector.manifest.rules.spawnRadius, this.app.hostedColliders, { playerCapsule: this.connector.manifest.rules.playerCapsule } );
+			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
+			const admitted = await session.admit( this.player, candidates );
+			this.player.setHostedWorldPose( new EngineVector3( ...admitted.position ), this.player.yaw, this.player.pitch );
+		} catch ( error ) {
+			session.dispose();
+			throw new Error( `Unable to enter this ThruHold: ${error.message}` );
 		}
-		for ( const [ id, actor ] of this.remotePlayers ) if ( ! ids.has( id ) ) {
-			this.scene.remove( actor.group ); actor.body.geometry.dispose(); actor.body.material.dispose(); actor.head.geometry.dispose(); actor.head.material.dispose(); this.remotePlayers.delete( id );
-		}
+		this.worldPresence = session;
+		window.addEventListener( 'pagehide', () => session.dispose(), { once: true } );
 
 	}
 
