@@ -133,9 +133,10 @@ export class WorldPresenceSession {
  #observeDoorStates( states ) {
   if ( states === undefined ) return;
   if ( ! Array.isArray( states ) || states.length > 128 ) throw new Error( 'Invalid world door state snapshot' );
+  const doorIDs = new Set( ( this.manifest.components || [] ).filter( component => component.type === 'elsemesh.interactive-door/1' ).map( component => component.id ) );
   const next = new Map(), transitions = [];
   for ( const state of states ) {
-   if ( ! state || typeof state !== 'object' || typeof state.id !== 'string' || ! /^elsemesh-component:[\w.-]{1,128}$/.test( state.id ) || typeof state.open !== 'boolean' || ! Number.isSafeInteger( state.sequence ) || state.sequence < 0 || state.eventId !== undefined && ( typeof state.eventId !== 'string' || state.eventId.length > 256 ) || state.sequence > 0 && ( ! state.eventId || ! Number.isSafeInteger( state.updatedAt ) || state.updatedAt < 0 ) || state.soundAssetId !== undefined && ( typeof state.soundAssetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( state.soundAssetId ) || ! this.manifest.assets?.some( asset => asset.id === state.soundAssetId && asset.kind === 'audio/ogg' ) ) || state.updatedAt !== undefined && ( ! Number.isSafeInteger( state.updatedAt ) || state.updatedAt < 0 ) || next.has( state.id ) ) throw new Error( 'Invalid world door state record' );
+   if ( ! state || typeof state !== 'object' || typeof state.id !== 'string' || ! doorIDs.has( state.id ) || typeof state.open !== 'boolean' || ! Number.isSafeInteger( state.sequence ) || state.sequence < 0 || state.eventId !== undefined && ( typeof state.eventId !== 'string' || state.eventId.length > 256 ) || state.sequence > 0 && ( ! state.eventId || ! Number.isSafeInteger( state.updatedAt ) || state.updatedAt < 0 ) || state.soundAssetId !== undefined && ( typeof state.soundAssetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( state.soundAssetId ) || ! this.manifest.assets?.some( asset => asset.id === state.soundAssetId && asset.kind === 'audio/ogg' ) ) || state.updatedAt !== undefined && ( ! Number.isSafeInteger( state.updatedAt ) || state.updatedAt < 0 ) || next.has( state.id ) ) throw new Error( 'Invalid world door state record' );
    const copy = { ...state };
    const previous = this.doorStates.get( state.id );
    if ( previous && state.sequence < previous.sequence ) {
