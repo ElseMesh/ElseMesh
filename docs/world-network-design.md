@@ -407,17 +407,12 @@ or revalidate the same choice under the destination world's policy.
 Hosted worlds have no active waterline by default. A world opts into water by
 declaring a supported water component and its own finite `rules.seaLevel`;
 without both, the hosted player has no swim/waterline behavior. Tidewater's
-built-in world continues to use its existing ocean. Hosted Tidewater worlds
-may explicitly request a water renderer, and other worlds such as Hogwarts may
-provide a better-suited implementation.
+built-in world continues to use its existing ocean. Hosted worlds may explicitly
+request a water renderer or provide a better-suited implementation.
 
-For the Hogwarts bridge, the four house choice IDs, button label, and prompt
-are world-owned metadata. The current Great Hall preview keeps this chooser
-disabled until house arrival poses are surveyed. When enabled, the engine owns
-the generic selection and admission flow, and Hogwarts maps each selected
-house to its matching uniform appearance. The bridge must translate a selected
-choice into a validated region and collision-backed spawn before the player
-enters. The same generic path must remain usable by other worlds.
+World-specific choice IDs, labels, prompts, entry points, appearance mappings,
+and access rules are authored with that world. ElseMesh validates the generic
+contract and enforces the resulting admission and movement decisions.
 
 Game-backed regions also carry a collision layer derived from Unreal BodySetup
 data; renderer triangles are not a substitute. Interactive doors are shared

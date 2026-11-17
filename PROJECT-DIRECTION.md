@@ -146,7 +146,7 @@ in `docs/`.
   override selects another provider/world. The selected world's data defines
   its entry prompt, choices, spawn poses, and optional appearance palettes;
   ElseMesh supplies a generic chooser and must not hardcode world names or
-  house-specific behavior. Persist a visitor's choice per world and use it for
+  world-specific behavior. Persist a visitor's choice per world and use it for
   arrival and avatar appearance. Keep implementation and evidence in
   [world and network design](docs/world-network-design.md#world-selection-and-world-authored-entry-choices)
   and [implementation status](docs/elsemesh-status.md).
@@ -262,7 +262,7 @@ and region, and must be evictable after they are no longer in use.
 
 The normal world launch remains Tidewater. Add an explicit world/provider
 override for bridge development and hosted deployment, with the chosen world
-specified by world data or profile rather than a Hogwarts-specific branch in
+specified by world data or profile rather than a special-case branch in
 ElseMesh. On entry, a world's validated metadata may present a prompt and
 bounded choices that resolve to authored entry poses and appearance palettes.
 The chooser is generic; world labels, choice IDs, spawn positions, and avatar

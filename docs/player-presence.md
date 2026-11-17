@@ -53,8 +53,8 @@ after admission.
   "moving": false,
   "mode": "walk",
   "avatarProfileId": "elsemesh.avatar.stock-female/1",
-  "entryPointId": "great-hall",
-  "avatarOptionId": "gryffindor-uniform",
+  "entryPointId": "starting-area-a",
+  "avatarOptionId": "world-authored-option-a",
   "appearance": {
     "style": "female",
     "shirt": "#8b1c2b",

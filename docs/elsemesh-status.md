@@ -12,11 +12,10 @@ not in this general ElseMesh status ledger.
 
 The provider evolution is additive: Tidewater remains the default static
 package world, and a future explicit launch/profile override selects a bridge
-provider without a Hogwarts-specific branch. Entry prompts, choice labels,
+provider without a special-case branch. Entry prompts, choice labels,
 stable IDs, spawn poses, and optional avatar palettes are world-authored data
-interpreted by a generic ElseMesh chooser. Hogwarts's four house choices exist
-as private world metadata; usable house spawn positions still require a
-measured location survey. See [world and network design](world-network-design.md#world-selection-and-world-authored-entry-choices)
+interpreted by a generic ElseMesh chooser. See
+[world and network design](world-network-design.md#world-selection-and-world-authored-entry-choices)
 for the contract. This is a design requirement, not a claim that an override
 or bridge provider is already wired into the normal browser launch.
 
