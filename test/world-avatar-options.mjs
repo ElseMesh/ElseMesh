@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { AVATAR_STYLES, DEFAULT_APPEARANCE, loadWorldAppearance, saveAppearance } from '../src/player/AvatarAppearance.js';
 import { createWorldSource, validateWorldEntryPoints, validateWorldSource } from '../src/network/WorldSource.js';
-import { selectedWorldEntryAppearance } from '../src/ui/WorldEntryPointPicker.js';
+import { chooseWorldAdmission, selectedWorldAppearance } from '../src/ui/WorldEntryPointPicker.js';
 
 const hogwarts = JSON.parse( await readFile( new URL( '../worlds/Hogwarts/entry-point-selection.json', import.meta.url ), 'utf8' ) );
 assert.equal( hogwarts.entryPointChoicesEnabled, false, 'avatar catalogues do not re-enable the Hogwarts house prompt' );
@@ -36,11 +36,15 @@ const storage = {
 };
 saveAppearance( { ...DEFAULT_APPEARANCE, style: 'male', trousers: '#102030' }, storage );
 const manifest = { worldId: source.worldId, avatarOptions };
-const selected = selectedWorldEntryAppearance( entryPoints[ 0 ], manifest, { storage } );
+const selected = selectedWorldAppearance( entryPoints[ 0 ], manifest, { storage } );
 assert.equal( selected.style, 'female' );
 assert.equal( selected.shirt, '#aabbcc' );
 assert.equal( selected.trousers, '#102030' );
 assert.deepEqual( loadWorldAppearance( source.worldId, storage ), selected, 'selected appearance persists under this world ID' );
-assert.equal( selectedWorldEntryAppearance( { id: 'other' }, manifest, { storage } ).style, 'female', 'the world appearance remains selected when the next entry has no override' );
-assert.equal( selectedWorldEntryAppearance( { id: 'other' }, { ...manifest, worldId: 'elsemesh:another-world' }, { storage } ).style, 'male', 'another world retains the global fallback instead of inheriting this world selection' );
+assert.equal( selectedWorldAppearance( { id: 'other' }, manifest, { storage } ).style, 'female', 'the world appearance remains selected when the next entry has no override' );
+assert.equal( selectedWorldAppearance( { id: 'other' }, { ...manifest, worldId: 'elsemesh:another-world' }, { storage } ).style, 'male', 'another world retains the global fallback instead of inheriting this world selection' );
+
+const avatarOnlyStorage = { getItem: key => key.endsWith( `:${manifest.worldId}` ) ? 'traveler' : null };
+const avatarOnlySelection = await chooseWorldAdmission( { ...manifest, entryPoints: [] }, { storage: avatarOnlyStorage, documentRef: null } );
+assert.deepEqual( avatarOnlySelection, { avatarOptionId: 'traveler' }, 'world-authored avatar choices remain selectable when a world has no entry points' );
 console.log( 'ok world-authored avatar options and per-world appearance persistence' );

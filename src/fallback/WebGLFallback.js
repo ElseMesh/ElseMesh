@@ -50,7 +50,7 @@ import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldOb
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { registerWorldPackageCollisionPayload, replaceWorldSourceCollisions } from '../network/WorldPackage.js';
-import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from '../ui/WorldEntryPointPicker.js';
+import { chooseWorldAdmission, selectedWorldAppearance } from '../ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates } from '../network/WorldSpawn.js';
 import { worldEnvironmentSettings } from '../network/WorldExperience.js';
 import { movementParameters, movementProfileSelection, worldHasWater } from '../network/WorldRules.js';
@@ -1821,9 +1821,9 @@ export class WebGLFallback {
 		} else manifest = await this.connector.getManifest();
 		const hostedWaterEnabled = worldHasWater( manifest );
 		if ( ! hostedWaterEnabled ) this.debugNoWater = true;
-		const entry = await chooseWorldEntryPoint( manifest );
+		const entry = await chooseWorldAdmission( manifest );
 		this.entrySelection = entry;
-		this.entryAppearance = selectedWorldEntryAppearance( entry, manifest );
+		this.entryAppearance = selectedWorldAppearance( entry, manifest );
 		const selectedSpawn = worldEntryPointPose( entry ) || worldSpawnPose( manifest );
 		this.camera.position.set( ...selectedSpawn.position );
 		this.camera.rotation.order = 'YXZ';

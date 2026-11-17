@@ -3,7 +3,7 @@ import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
 import { WorldConnector, worldLinkFromLocation } from '../src/network/WorldConnector.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL } from '../src/network/WorldLauncher.js';
-import { chooseWorldEntryPoint } from '../src/ui/WorldEntryPointPicker.js';
+import { chooseWorldAdmission } from '../src/ui/WorldEntryPointPicker.js';
 
 const localPreviewCapabilities = new LocalRegionConnector( { localProvider: 'http://127.0.0.1:41001', localMap: 'Great Hall' } );
 assert.equal( localPreviewCapabilities.localOnly, true );
@@ -548,7 +548,8 @@ try {
 	const singleSpawnConnector = new LocalRegionConnector( link );
 	const singleSpawnManifest = await singleSpawnConnector.getManifest();
 	assert.deepEqual( singleSpawnManifest.entryPoints, [], 'a world may temporarily disable optional entry-point choices' );
-	assert.equal( await chooseWorldEntryPoint( singleSpawnManifest, { documentRef: null } ), null, 'no choices means entry directly at the world spawn without opening a prompt' );
+	const avatarChoiceStorage = { getItem: key => key === `elsemesh.world-avatar-option.v1:${singleSpawnManifest.worldId}` ? 'short-hair' : null };
+	assert.deepEqual( await chooseWorldAdmission( singleSpawnManifest, { storage: avatarChoiceStorage, documentRef: null } ), { avatarOptionId: 'short-hair' }, 'a remembered world avatar option survives while the house entry prompt is disabled' );
 	singleSpawnConnector.close();
 	Object.defineProperty( globalThis, 'navigator', { configurable: true, value: { deviceMemory: 2, storage: {
 		getDirectory: async () => new TestOPFSDirectoryHandle(),

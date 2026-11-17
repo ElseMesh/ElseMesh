@@ -69,7 +69,7 @@ import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { avatarPolicy, movementProfileSelection, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
 import { appearanceForAllowedProfiles, avatarProfileId, AVATAR_STYLES, loadAppearance } from './player/AvatarAppearance.js';
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
-import { chooseWorldEntryPoint, selectedWorldEntryAppearance } from './ui/WorldEntryPointPicker.js';
+import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED } from './network/WorldBehaviorRegistry.js';
@@ -660,8 +660,8 @@ export class App {
 			if ( connector.localOnly ) this.proceduralWorldRoot.visible = false;
 			const manifestResult = await this.worldManifestPromise;
 			if ( manifestResult.error ) throw manifestResult.error;
-			const entrySelection = await chooseWorldEntryPoint( connector.manifest );
-			const entryAppearance = selectedWorldEntryAppearance( entrySelection, connector.manifest );
+			const entrySelection = await chooseWorldAdmission( connector.manifest );
+			const entryAppearance = selectedWorldAppearance( entrySelection, connector.manifest );
 			this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, avatarProfileId( entryAppearance ) ) );
 			G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
 			const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
@@ -856,8 +856,8 @@ export class App {
 		await progress( 0.18, 'Connecting to ThruHold…', undefined, 'world' );
 		const connector = this.worldConnector;
 		G.seaLevel.value = worldSeaLevel( connector.manifest.rules ) ?? 0;
-		const entrySelection = await chooseWorldEntryPoint( connector.manifest );
-		const entryAppearance = selectedWorldEntryAppearance( entrySelection, connector.manifest );
+		const entrySelection = await chooseWorldAdmission( connector.manifest );
+		const entryAppearance = selectedWorldAppearance( entrySelection, connector.manifest );
 		const spawn = worldEntryPointPose( entrySelection ) || worldSpawnPose( connector.manifest );
 		this.player.setWorldRules( connector.manifest.rules, movementProfileSelection( connector.manifest, avatarProfileId( entryAppearance ) ) );
 		this.camera.position.set( ...spawn.position );
@@ -1949,10 +1949,10 @@ export class App {
 			} );
 		}
 		const portalAgreed = preparation.connector && matchingPortalAgreement( connector.worldId, portal, preparation.connector.manifest );
-		const portalTransfer = preparation.connector ? portalAgreed ? this.portalTransferStatus( preparation.connector, selectedWorldEntryAppearance( preparation.entrySelection, preparation.connector.manifest, { persist: false } ) ) : { allowed: false, reason: 'The destination world has not agreed to this portal route and scale' } : preparation.portalTransfer;
-		if ( preparation.status === 'ready' && preparation.connector?.manifest?.entryPoints?.length && ! preparation.entrySelectionPromise ) {
+		const portalTransfer = preparation.connector ? portalAgreed ? this.portalTransferStatus( preparation.connector, selectedWorldAppearance( preparation.entrySelection, preparation.connector.manifest, { persist: false } ) ) : { allowed: false, reason: 'The destination world has not agreed to this portal route and scale' } : preparation.portalTransfer;
+		if ( preparation.status === 'ready' && ( preparation.connector?.manifest?.entryPoints?.length || preparation.connector?.manifest?.avatarOptions?.length ) && ! preparation.entrySelectionPromise ) {
 			preparation.entrySelectionReady = false;
-			preparation.entrySelectionPromise = chooseWorldEntryPoint( preparation.connector.manifest ).then( entry => { preparation.entrySelection = entry; } ).catch( error => { preparation.entrySelectionError = error; } ).finally( () => { preparation.entrySelectionReady = true; } );
+			preparation.entrySelectionPromise = chooseWorldAdmission( preparation.connector.manifest ).then( entry => { preparation.entrySelection = entry; } ).catch( error => { preparation.entrySelectionError = error; } ).finally( () => { preparation.entrySelectionReady = true; } );
 		}
 		if ( portal.openView && preparation.root && portalTransfer?.allowed ) {
 			if ( this.portalViewId !== portalKey ) this.clearPortalView();
@@ -2108,7 +2108,7 @@ export class App {
 		this.portalPreviousPosition.copy( previous );
 		this.holdPlayerAtPortal( previous );
 		const arrivalPlayer = { ...this.player, position: new Vector3( arrival.position.x, arrival.position.y - 1.62, arrival.position.z ), yaw: arrival.yaw, pitch: arrival.pitch };
-		const arrivalAppearance = admittedAppearance || selectedWorldEntryAppearance( entrySelection, destinationConnector.manifest );
+		const arrivalAppearance = admittedAppearance || selectedWorldAppearance( entrySelection, destinationConnector.manifest );
 		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot, appearance: arrivalAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
 		try {
 			await admissionSession.admit( arrivalPlayer, undefined, { yaw: arrival.yaw } );
@@ -2174,7 +2174,7 @@ export class App {
 		} );
 		document.title = `${destinationConnector.manifest.title} · ElseMesh`;
 		const arrivalProfile = Object.values( AVATAR_STYLES ).find( profile => profile.profileId === avatarProfileId( arrivalAppearance ) );
-		this.ui?.ui?.toast( `Entered ${destinationConnector.manifest.title}${arrivalProfile && arrivalAppearance.style !== selectedWorldEntryAppearance( entrySelection, destinationConnector.manifest, { persist: false } ).style ? ` · using ${arrivalProfile.label}` : ''}`, 3200 );
+		this.ui?.ui?.toast( `Entered ${destinationConnector.manifest.title}${arrivalProfile && arrivalAppearance.style !== selectedWorldAppearance( entrySelection, destinationConnector.manifest, { persist: false } ).style ? ` · using ${arrivalProfile.label}` : ''}`, 3200 );
 
 	}
 
