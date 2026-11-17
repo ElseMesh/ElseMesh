@@ -512,14 +512,19 @@ func TestWorldDoorStateEnforcesHouseEntryRangeAndLock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			d := presenceTestDaemon(t)
 			d.world.EntryPoints = []worldEntryPoint{
-				{ID: "gryffindor", Label: "Gryffindor", Position: []float64{1, 2, 3}},
-				{ID: "slytherin", Label: "Slytherin", Position: []float64{1, 2, 3}},
+				{ID: "gryffindor", Label: "Gryffindor", Position: []float64{1, 2, 3}, AvatarOptionID: "gryffindor-avatar"},
+				{ID: "slytherin", Label: "Slytherin", Position: []float64{1, 2, 3}, AvatarOptionID: "slytherin-avatar"},
+			}
+			d.world.AvatarOptions = []worldAvatarOption{
+				{ID: "gryffindor-avatar", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Gryffindor"},
+				{ID: "slytherin-avatar", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Slytherin"},
 			}
 			raw := fmt.Sprintf(`{"position":[1,2,3],"interactionRadiusMeters":2,"initialOpen":false,"locked":%t,"allowedEntryPointIds":["gryffindor"]}`, test.locked)
 			d.world.Components = []worldComponent{{ID: "elsemesh-component:house-door", Type: interactiveDoorComponentType, Data: json.RawMessage(raw)}}
 			pose := presenceTestPose()
 			pose.Position = test.position
 			pose.EntryPointID = test.entryPoint
+			pose.AvatarOptionID = test.entryPoint + "-avatar"
 			request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
 			session, err := newPresenceSession()
 			if err != nil {
