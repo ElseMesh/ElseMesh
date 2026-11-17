@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-15. Percentages are rough completion estimates for the
+Last assessed: 2026-11-17. Percentages are rough completion estimates for the
 active engine/world-separation, Tidewater parity, and AI Portals hosting goals. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -1889,3 +1889,10 @@ finding changes them.
 - 2026-11-15: on AMD RADV WebGPU and AMD RadeonSI WebGL, repeated the same built-in spawn-to-pier movement route with the newly shared source collision set (489 boxes, 601 cylinders). Both runs ended grounded on the authored wooden decking; the sampled positions while moving were within 0.11 m, but key-hold durations differed (3.004 s vs 3.158 s), so this does not establish movement-speed parity. Collision coverage is verified in both renderers; exact movement and pre-split gameplay parity remain open. Tidewater parity remains 90%.
 
 - 2026-11-15: built committed `a2a55eec` and verified the authored avatar/vehicle step profiles in AMD RADV WebGPU and RadeonSI WebGL. The same centered boardwalk route ended grounded on wood in both; renderer runtime showed the same selected profile IDs and collision inventory. This is a focused split-renderer movement check, not a full pre-split gameplay comparison or a controlled movement-speed benchmark. Tidewater gameplay and content parity remains 93%.
+
+- 2026-11-17: restored hosted WebGPU package shadows by enabling shared sun
+  cascades and setting cast/receive flags on package GLBs and streamed LODs.
+  The hosted village comparison against pre-split `23c30bf6` reduced full-frame
+  RGB MAE from 8.70 to 4.21/255. This closes only the hosted WebGPU shadow
+  omission for the captured village view; broader material/spray and WebGL
+  parity remain open. Tidewater gameplay and content parity remains 93%.

@@ -1,5 +1,26 @@
 # Reproducible graphics review
 
+## 2026-11-17 hosted WebGPU shadow restoration
+
+The hosted WebGPU path had two missing pieces: hosted shadow cascades were
+disabled, and package GLB meshes kept the engine defaults `castShadow=false`
+and `receiveShadow=false`. The first was aligned with the built-in WebGPU
+shadow setup in `b4b5627e`; `3a71343e` now applies cast/receive flags to hosted
+package meshes and each streamed mesh LOD. The generic `world-object-lod`
+test asserts both flags on the base asset and streamed levels.
+
+An isolated AMD WebGPU review captured the `village` view at 2560×1267 and
+simulation time 1000. Browser diagnostics identified the Radeon RADV adapter;
+runtime state reported WebGPU, shadows enabled, and three cascades. Comparing
+the pre-split `23c30bf6` image to the hosted image gives full-frame RGB MAE
+4.21/255; before the package-mesh fix it was 8.70/255. The comparison shows
+the house, fish-stand, and boardwalk shadows visible in hosted WebGPU in the
+same locations as the pre-split reference. It is evidence for this view and
+shadow path only: broader view/material parity, wave spray, WebGL comparison,
+and performance remain open, so no parity percentage changes.
+
+[Pre-split and hosted shadow comparison](images/tidewater-hosted-webgpu-shadows-2026-11-17.png).
+
 ## 2026-11-15 matched pre-split and split WebGPU views
 
 The original ElseMesh build at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
