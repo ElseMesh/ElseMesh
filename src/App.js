@@ -229,7 +229,6 @@ export class App {
 		if ( this.engine ) this.engine.setFrameRateLimit( this.desktopFrameRateLimit );
 		if ( this.settings && this.engine && this.post ) this.setRenderScale( this.settings.renderScale );
 		if ( this.post ) this.post.aaMode = fpsMode ? 'none' : 'taa';
-		if ( this.shadows ) this.shadows.enabled = ! fpsMode;
 		if ( this.refraction ) this.refraction.scale = this.desktopRefractionScale;
 		if ( this.scene ) this.scene.traverse( ( object ) => {
 
@@ -1147,7 +1146,6 @@ export class App {
 			bias: SUN_SHADOW_PROFILE.bias,
 		} );
 		shadows.layerMask = ( 1 << LAYERS.OPAQUE ) | ( 1 << LAYERS.TRANSPARENT );
-		if ( this.desktopAdaptiveScale ) shadows.enabled = false;
 		return shadows;
 
 	}

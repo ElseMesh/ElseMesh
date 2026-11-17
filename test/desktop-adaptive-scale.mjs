@@ -45,7 +45,7 @@ quality.refraction = { scale: 0.5 };
 quality.scene = { traverse( callback ) { callback( { material: waterMaterial } ); } };
 quality.renderLoadLOD = { bias: 2, cpuOverload: 1, gpuOverload: 1, cpuHeadroom: 1, gpuHeadroom: 1 };
 quality.setGraphicsPriority( 'fps' );
-if ( quality.desktopFrameRateLimit !== 24 || frameRateLimit !== 24 || quality.settings.renderScale !== 1 || quality.autoScale !== true || quality.post.aaMode !== 'none' || quality.shadows.enabled || waterMaterial.params.ssr.value !== 0 || quality.refraction.scale !== 0.35 || stored.get( 'elsemesh.graphics-priority' ) !== 'fps' ) throw new Error( 'Switching to FPS should start at full resolution and apply the responsive profile' );
+if ( quality.desktopFrameRateLimit !== 24 || frameRateLimit !== 24 || quality.settings.renderScale !== 1 || quality.autoScale !== true || quality.post.aaMode !== 'none' || ! quality.shadows.enabled || waterMaterial.params.ssr.value !== 0 || quality.refraction.scale !== 0.35 || stored.get( 'elsemesh.graphics-priority' ) !== 'fps' ) throw new Error( 'Switching to FPS should apply the responsive profile while keeping shadows enabled' );
 quality.setGraphicsPriority( 'quality' );
 if ( quality.desktopFrameRateLimit !== 0 || frameRateLimit !== 0 || quality.settings.renderScale !== 1 || quality.autoScale || quality.post.aaMode !== 'taa' || ! quality.shadows.enabled || waterMaterial.params.ssr.value !== 1 || quality.refraction.scale !== 0.5 || quality.renderLoadBias !== 0 || quality.renderLoadLOD.bias !== 0 || stored.get( 'elsemesh.graphics-priority' ) !== 'quality' ) throw new Error( 'Switching to Visual Quality should restore defaults, disable automatic detail reductions, and persist the choice' );
 
