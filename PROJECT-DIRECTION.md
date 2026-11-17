@@ -90,8 +90,9 @@ identity boundary across world packages:
   events and gameplay; sign and hash their assets, pass versioned messages,
   bound execution time, and terminate unresponsive workers. Do not add
   Tidewater-specific events or gameplay rules to the engine.
-- Complete the ElseMesh v3 wire and ID namespace migration without parsing old
-  identifiers as a compatibility path.
+- The ElseMesh v3 wire and ID namespace migration is complete; see
+  [GOAL-done.md](GOAL-done.md). Keep rejecting old protocols and IDs without a
+  compatibility parser.
 - Keep Tidewater and Hogwarts authored world data in their world repositories;
   the engine supplies generic providers and versioned runtime contracts.
 - Verify Tidewater gameplay against the pre-split WebGPU behavior, and check

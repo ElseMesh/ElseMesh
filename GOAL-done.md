@@ -27,6 +27,22 @@ checkout, and build ElseMesh with the package available. The checks above establ
 The remaining parity and runtime acceptance belongs to the active project
 direction. This completed record replaces the former repository split roadmap.
 
+## ElseMesh v3 wire and world-ID namespace — complete
+
+- Browser source validation accepts only `elsemesh.world-source/3`; signed
+  runtime manifests and browser-host profiles accept only `elsemesh.world/3`.
+- Client and daemon world identity validation accepts `elsemesh:<id>` and
+  rejects `world:<id>`, the nested `elsemesh:world:<id>` form, `elsemesh-world`,
+  and `em-world`. No old-protocol or old-ID compatibility path remains.
+- Focused checks passed: `node test/world-identity.mjs`,
+  `node --loader ./test/vite-query-loader.mjs test/world-source-manifest.mjs`,
+  and `go test -ldflags='-checklinkname=0' ./worldd
+  -run '^TestWorldV3RejectsLegacyProtocolAndWorldID$' -count=1`.
+
+This closes the document-wire and world-ID migration only. Engine/world behavior
+separation, per-world renderer selection and portal composition, and Tidewater
+view/gameplay parity remain active requirements.
+
 ## Shared engine touch controls and renderer diagnostics — complete
 
 - Move and look controls are provided once by the ElseMesh engine across
