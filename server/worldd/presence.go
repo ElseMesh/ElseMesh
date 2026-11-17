@@ -281,6 +281,9 @@ func (d *daemon) validateOwnerMovement(from, to []float64, pose *playerPose) err
 	if d.regionProvider == nil {
 		return nil
 	}
+	if samePresencePosition(from, to) {
+		return nil
+	}
 	parent := d.ctx
 	if parent == nil {
 		parent = context.Background()
@@ -302,6 +305,18 @@ func (d *daemon) validateOwnerMovement(from, to []float64, pose *playerPose) err
 		return err
 	}
 	return errors.New("movement_authority_unavailable: retry limit reached")
+}
+
+func samePresencePosition(from, to []float64) bool {
+	if len(from) != 3 || len(to) != 3 {
+		return false
+	}
+	for index := range from {
+		if math.IsNaN(from[index]) || math.IsInf(from[index], 0) || math.IsNaN(to[index]) || math.IsInf(to[index], 0) || math.Abs(from[index]-to[index]) > 1e-6 {
+			return false
+		}
+	}
+	return true
 }
 
 func (d *daemon) validatePresenceHorizontalMovement(old playerPresence, next *playerPose, now time.Time) (float64, error) {

@@ -165,6 +165,14 @@ func TestPresenceRejectsBlockedOwnerSweepWithoutPublishingPose(t *testing.T) {
 	if stored.Sequence != 1 || stored.Position[0] != 0 || stored.Position[1] != 1.38 || stored.Position[2] != 8 {
 		t.Fatalf("blocked movement changed authoritative pose: %+v", stored.playerPose)
 	}
+	request.Pose.Sequence++
+	request.Pose.Position = []float64{0, 1.38, 8}
+	if _, err := d.presenceRequest(request, now.Add(1100*time.Millisecond)); err != nil {
+		t.Fatalf("unchanged pose should refresh a stopped visitor without a new collision sweep: %v", err)
+	}
+	if stored = d.players[request.presenceKey]; stored.Sequence != 3 || stored.Position[0] != 0 || stored.Position[1] != 1.38 || stored.Position[2] != 8 {
+		t.Fatalf("accepted stopped-pose refresh changed the authoritative position: %+v", stored.playerPose)
+	}
 }
 
 func TestParseRegionProviderURL(t *testing.T) {
