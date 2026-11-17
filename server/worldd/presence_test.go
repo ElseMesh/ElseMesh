@@ -757,6 +757,7 @@ func TestBrowserDoorStateAcrossGatewayForwarding(t *testing.T) {
 	if err := a.ReadJSON(&opened); err != nil || opened.Type != "world.door.state" || len(opened.DoorStates) != 1 || !opened.DoorStates[0].Open || opened.DoorStates[0].Sequence != 1 {
 		t.Fatalf("owner door transition response: %+v %v", opened, err)
 	}
+	time.Sleep(60 * time.Millisecond)
 	observed := update(b, "b-observe-door", 2, []float64{2, 2, 3})
 	if len(observed.DoorStates) != 1 || !observed.DoorStates[0].Open || observed.DoorStates[0].EventID != opened.DoorStates[0].EventID {
 		t.Fatalf("second browser did not observe the same owner transition: %+v", observed.DoorStates)
