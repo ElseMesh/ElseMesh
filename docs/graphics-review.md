@@ -1,5 +1,27 @@
 # Reproducible graphics review
 
+## 2026-11-17 hosted WebGL shadow coverage
+
+Hosted WebGL used one 1024² directional shadow map spanning 600 m. In the
+hosted `village` capture, the boardwalk and nearby vegetation cast little
+legible shadow detail. The engine now shares its renderer-neutral 10/60/400 m
+cascade distances and 1/2/4-frame update cadence with both renderers; the
+WebGL backend translates that profile through Three.js cascaded shadow maps.
+WebGL keeps 1024² maps per cascade, while WebGPU uses 2048².
+
+The before and after captures use the hosted `village` camera (`timeOfDay=15.5`,
+`simtime=1000`) at 1600×813. Runtime reported WebGL, hosted world
+`elsemesh:example-island`, shadows enabled, three cascades, 394 shadow-casting
+meshes, and 543 shadow-receiving meshes. Chromium's WebGL renderer string was
+`ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2)`. The
+new image shows the boardwalk, buildings, and vegetation shadows. This verifies
+the hosted WebGL shadow path in this view; it does not establish full
+WebGL/WebGPU appearance parity or a performance change. The instantaneous HUD
+sample was 18 fps with 45.2 ms gap, 15.6 ms CPU, and 37.8 ms GPU; no controlled
+before/after performance comparison was made.
+
+[Before cascaded WebGL shadows](images/hosted-tidewater-webgl-shadows-before-2026-11-17.png) · [After](images/hosted-tidewater-webgl-shadows-cascaded-2026-11-17.png).
+
 ## 2026-11-17 hosted WebGPU shadow restoration
 
 The hosted WebGPU path had two missing pieces: hosted shadow cascades were
