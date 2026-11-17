@@ -481,7 +481,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		players = append(players, p)
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].ID < players[j].ID })
-	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players}, nil
+	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players, DoorStates: d.doorStateSnapshotLocked()}, nil
 }
 
 func (d *daemon) presenceSpawnFootPosition() []float64 {

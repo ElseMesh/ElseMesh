@@ -64,6 +64,31 @@ assert.equal(housePose.avatarOptionId, 'gryffindor', 'presence carries the world
 assert.equal(housePose.entryPointId, 'gryffindor-start', 'presence carries the world-authored entry point selected by the visitor');
 assert.throws(() => new WorldPresenceSession({ connector: houseWorld, parent: { add() {} }, appearance: { ...houseUniform, style: 'female' }, avatarOptionId: 'gryffindor', entryPointId: 'wrong-entry', createConnector() { throw new Error('must reject a mismatched entry before transport setup'); } }), /selected world entry point/);
 houseSession.dispose();
+const doorId = 'elsemesh-component:great-hall-door';
+const doorSound = 'sha256:' + 'c'.repeat(64);
+const doorUpdates = [], doorTransitions = [];
+let doorRequestOpen = false;
+const doorConnector = { ...connector, manifest: { ...connector.manifest, assets: [{ id: doorSound, kind: 'audio/ogg' }], components: [{ id: doorId, type: 'elsemesh.interactive-door/1' }] } };
+const doorSession = new WorldPresenceSession({ connector: doorConnector, parent: { add() {} }, onDoorStates: (states, transitions) => { doorUpdates.push(states); doorTransitions.push(...transitions); }, createConnector() {
+ return {
+  updatePresence(pose) { return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: 'door-admit', playerId: own, players: [{ ...pose, id: own, updatedAt: 800 }], doorStates: [{ id: doorId, open: false, sequence: 0 }] }); },
+  async setDoorState(id, open) {
+   assert.equal(id, doorId);
+   doorRequestOpen = open;
+   return { type: 'world.door.state', worldId: connector.worldId, playerId: own, doorStates: [{ id, open, sequence: 1, eventId: `${id}:1`, soundAssetId: doorSound, updatedAt: 900 }] };
+  },
+  close() {},
+ };
+} });
+await doorSession.admit(player);
+assert.equal(doorSession.doorStates.get(doorId).open, false, 'admission receives the owner-authored initial door state');
+await doorSession.setDoorState(doorId, true);
+assert.equal(doorRequestOpen, true, 'the admitted session requests an explicit desired state');
+assert.equal(doorSession.doorStates.get(doorId).open, true, 'the session adopts the owner state response');
+assert.equal(doorTransitions.length, 1, 'one monotonic transition is exposed for one-shot sound playback');
+assert.equal(doorTransitions[0].soundAssetId, doorSound, 'the state event carries its signed sound asset ID');
+assert.equal(doorUpdates.length, 2, 'initial and changed state snapshots are delivered to the renderer');
+doorSession.dispose();
 const optionalGenericAvatarWorld = { ...connector, manifest: { ...connector.manifest, avatarOptions: [
  { id: 'short-hair', profileId: 'elsemesh.avatar.stock-male/1', label: 'Short hair' },
  { id: 'ponytail', profileId: 'elsemesh.avatar.stock-female/1', label: 'Ponytail' },

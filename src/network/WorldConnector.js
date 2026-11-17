@@ -225,6 +225,13 @@ export class WorldConnector {
 		return reply;
 	}
 
+	async setDoorState( doorId, open, { signal } = {} ) {
+		if ( typeof doorId !== 'string' || ! /^elsemesh-component:[\w.-]{1,128}$/.test( doorId ) || typeof open !== 'boolean' ) throw new Error( 'Invalid world door state request' );
+		const reply = await this.#request( { type: 'world.door.set', doorId, open }, { signal } );
+		invariant( reply.type === 'world.door.state' && reply.worldId === this.worldId && typeof reply.playerId === 'string' && Array.isArray( reply.doorStates ), 'Invalid world door state response' );
+		return reply;
+	}
+
 	async #fetchManifest( signal ) {
 		const reply = await this.#request( { type: 'manifest.get' }, { signal } );
 		invariant( reply.type === 'manifest' && reply.document, 'World gateway returned no manifest' );

@@ -206,7 +206,7 @@ func (d *daemon) handleWebRTCRequest(session *worldRTCSession, channel *webrtc.D
 		}
 		session.idleMu.Unlock()
 		switch request.Type {
-		case "manifest.get", "role-revocations.get", "asset.get", "presence.update", "presence.leave":
+		case "manifest.get", "role-revocations.get", "asset.get", "presence.update", "presence.leave", "world.door.set":
 		default:
 			_ = channel.Close()
 			return

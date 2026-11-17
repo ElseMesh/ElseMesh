@@ -74,6 +74,7 @@ type daemon struct {
 	proposalMu            sync.Mutex
 	presenceMu            sync.Mutex
 	players               map[string]playerPresence
+	doorStates            map[string]worldDoorState
 	browserHostsMu        sync.RWMutex
 	browserHosts          map[string]*browserHostSession
 	webrtcSTUNServers     []string
@@ -1472,6 +1473,8 @@ type gatewayMessage struct {
 	PresenceSession string      `json:"presenceSession,omitempty"`
 	Pose            *playerPose `json:"pose,omitempty"`
 	SpawnCandidates [][]float64 `json:"spawnCandidates,omitempty"`
+	DoorID          string      `json:"doorId,omitempty"`
+	DoorOpen        *bool       `json:"open,omitempty"`
 	presenceKey     string
 	gatewayPeerID   string
 	Type            string `json:"type"`
@@ -1487,6 +1490,7 @@ type gatewayMessage struct {
 type peerResponse struct {
 	PlayerID        string           `json:"playerId,omitempty"`
 	Players         []playerPresence `json:"players,omitempty"`
+	DoorStates      []worldDoorState `json:"doorStates,omitempty"`
 	Type            string           `json:"type"`
 	WorldID         string           `json:"worldId,omitempty"`
 	RequestID       string           `json:"requestId,omitempty"`
@@ -1684,6 +1688,8 @@ func (d *daemon) localRequest(request gatewayMessage) (peerResponse, error) {
 	switch request.Type {
 	case "presence.update", "presence.leave":
 		return d.presenceRequest(request, time.Now())
+	case "world.door.set":
+		return d.setWorldDoorState(request, time.Now())
 	case "manifest.get":
 		return peerResponse{Type: "manifest", WorldID: d.world.WorldID, RequestID: request.RequestID, Document: &d.manifest, AuthorityLease: d.currentAuthorityLease()}, nil
 	case "role-revocations.get":

@@ -70,6 +70,42 @@ func TestWorldManifestOwnerAndScopedHostGrant(t *testing.T) {
 	}
 }
 
+func TestInteractiveDoorComponentRequiresExplicitStateAndSignedSoundAssets(t *testing.T) {
+	d := presenceTestDaemon(t)
+	manifest := d.world
+	manifest.Rules.RequiredFeatures = []string{interactiveDoorComponentType}
+	manifest.Components = []worldComponent{{
+		ID:   "elsemesh-component:door",
+		Type: interactiveDoorComponentType,
+		Data: json.RawMessage(`{"position":[1,2,3],"interactionRadiusMeters":2,"initialOpen":false,"locked":false}`),
+	}}
+	if err := validateManifest(manifest, d.host.ID().String(), time.Now()); err != nil {
+		t.Fatalf("valid explicit door state rejected: %v", err)
+	}
+	manifest.Components[0].Data = json.RawMessage(`{"position":[1,2,3],"interactionRadiusMeters":2,"initialOpen":false}`)
+	if err := validateManifest(manifest, d.host.ID().String(), time.Now()); err == nil {
+		t.Fatal("door with unspecified lock state was accepted")
+	}
+
+	openSoundID := "sha256:" + strings.Repeat("a", 64)
+	closeSoundID := "sha256:" + strings.Repeat("b", 64)
+	component := manifest.Components[0]
+	component.Data = json.RawMessage(`{"position":[1,2,3],"interactionRadiusMeters":2,"initialOpen":false,"locked":false,"openSoundAssetId":"` + openSoundID + `","closeSoundAssetId":"` + closeSoundID + `"}`)
+	component.Priority = "nearby"
+	component.Assets = []componentAssetReference{{AssetID: openSoundID, Kind: "audio/ogg"}, {AssetID: closeSoundID, Kind: "audio/ogg"}}
+	assets := map[string]assetRef{
+		openSoundID:  {ID: openSoundID, Bytes: 1, Kind: "audio/ogg", Priority: "nearby"},
+		closeSoundID: {ID: closeSoundID, Bytes: 1, Kind: "audio/ogg", Priority: "nearby"},
+	}
+	if err := validateInteractiveDoorComponent(component, assets, map[string]bool{}); err != nil {
+		t.Fatalf("signed door sound references rejected: %v", err)
+	}
+	delete(assets, closeSoundID)
+	if err := validateInteractiveDoorComponent(component, assets, map[string]bool{}); err == nil {
+		t.Fatal("door sound not present in the owner-signed asset set was accepted")
+	}
+}
+
 func TestWorldV3RejectsLegacyProtocolAndWorldID(t *testing.T) {
 	if worldIDPattern.MatchString("world:legacy") {
 		t.Fatal("legacy world ID was accepted")

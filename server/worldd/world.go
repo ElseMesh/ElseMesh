@@ -1157,6 +1157,11 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		if err := json.Unmarshal(component.Data, &dataObject); err != nil || dataObject == nil {
 			return fmt.Errorf("world component %q data must be a JSON object", component.ID)
 		}
+		if component.Type == interactiveDoorComponentType {
+			if err := validateInteractiveDoorComponent(component, assetRefs, seenEntryPoints); err != nil {
+				return err
+			}
+		}
 		if bounds := component.StreamingBounds; bounds != nil {
 			if math.IsNaN(bounds.Radius) || math.IsInf(bounds.Radius, 0) || bounds.Radius <= 0 || bounds.Radius > 10000 || vector3OutOfBounds(vector3(bounds.Center), 10000) {
 				return fmt.Errorf("invalid streaming bounds on world component %q", component.ID)

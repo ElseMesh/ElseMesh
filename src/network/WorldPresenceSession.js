@@ -29,7 +29,7 @@ export class WorldPresenceSession {
  constructor({connector, parent, appearance = loadAppearance(), avatarOptionId = '', entryPointId = '',
   createConnector = options => new WorldConnector(options),
   createAvatar = options => new RemoteAvatar(options),
-  onError = error => console.warn('Player presence unavailable', error), clock = () => performance.now()}) {
+  onError = error => console.warn('Player presence unavailable', error), onDoorStates = () => {}, clock = () => performance.now()}) {
   const allowedProfiles = avatarPolicy(connector.manifest.rules).allowedProfiles;
   const admittedAppearance = appearanceForAllowedProfiles(appearance, allowedProfiles);
   if ( ! admittedAppearance ) throw new Error( 'This world does not permit any supported avatar profile' );
@@ -46,6 +46,7 @@ export class WorldPresenceSession {
   }
   this.connector = createConnector({worldId: connector.worldId,
    nodeId: connector.manifest.ownerPeerId, gateway: connector.gateway, directory: connector.directory});
+  this.manifest = connector.manifest;
   this.parent = parent;
   this.appearance = {...admittedAppearance};
   this.avatarOptionId = avatarOptionId;
@@ -56,8 +57,10 @@ export class WorldPresenceSession {
   this.state = new PlayerPresence(connector.worldId);
   this.createAvatar = createAvatar;
   this.onError = onError;
+  this.onDoorStates = onDoorStates;
   this.clock = clock;
   this.avatars = new Map();
+  this.doorStates = new Map();
   this.controller = new AbortController();
   this.sequence = 0;
   this.nextSend = -Infinity;
@@ -77,6 +80,7 @@ export class WorldPresenceSession {
   const snapshot = await this.connector.updatePresence(pose, {signal:this.controller.signal, spawnCandidates});
   if (this.disposed) throw new DOMException('Left ThruHold', 'AbortError');
   this.state.observe(snapshot, {requestId:snapshot.requestId, now:this.clock()});
+  this.#observeDoorStates( snapshot.doorStates );
   const own = snapshot.players.find(value => value.id === snapshot.playerId);
   if (!own) throw new Error('World admission did not return the admitted visitor');
   this.admitted = true;
@@ -106,14 +110,43 @@ export class WorldPresenceSession {
   this.pending = this.connector.updatePresence(pose,{signal:this.controller.signal})
    .then(snapshot => {
     if (this.disposed) return;
-    if (this.state.playerId && snapshot.playerId !== this.state.playerId) this.state.reset();
+    if (this.state.playerId && snapshot.playerId !== this.state.playerId) {
+     this.state.reset();
+     this.doorStates.clear();
+    }
     this.state.observe(snapshot,{requestId:snapshot.requestId, now:this.clock()});
+    this.#observeDoorStates( snapshot.doorStates );
     this.reportedError = false;
    }).catch(error => {
     if (this.disposed) return;
     this.nextSend = this.clock() + 2000;
     if (!this.reportedError) { this.reportedError = true; this.onError(error); }
    }).finally(() => { this.pending = null; });
+ }
+ async setDoorState( doorId, open ) {
+  if ( this.disposed || ! this.admitted ) throw new Error( 'World door interaction requires an admitted visitor' );
+  if ( ! this.manifest.components?.some( component => component.id === doorId && component.type === 'elsemesh.interactive-door/1' ) ) throw new Error( 'World door is not defined by the admitted manifest' );
+  const snapshot = await this.connector.setDoorState( doorId, open, { signal: this.controller.signal } );
+  this.#observeDoorStates( snapshot.doorStates );
+  return snapshot.doorStates;
+ }
+ #observeDoorStates( states ) {
+  if ( states === undefined ) return;
+  if ( ! Array.isArray( states ) || states.length > 128 ) throw new Error( 'Invalid world door state snapshot' );
+  const next = new Map(), transitions = [];
+  for ( const state of states ) {
+   if ( ! state || typeof state !== 'object' || typeof state.id !== 'string' || ! /^elsemesh-component:[\w.-]{1,128}$/.test( state.id ) || typeof state.open !== 'boolean' || ! Number.isSafeInteger( state.sequence ) || state.sequence < 0 || state.eventId !== undefined && ( typeof state.eventId !== 'string' || state.eventId.length > 256 ) || state.sequence > 0 && ( ! state.eventId || ! Number.isSafeInteger( state.updatedAt ) || state.updatedAt < 0 ) || state.soundAssetId !== undefined && ( typeof state.soundAssetId !== 'string' || ! /^sha256:[0-9a-f]{64}$/.test( state.soundAssetId ) || ! this.manifest.assets?.some( asset => asset.id === state.soundAssetId && asset.kind === 'audio/ogg' ) ) || state.updatedAt !== undefined && ( ! Number.isSafeInteger( state.updatedAt ) || state.updatedAt < 0 ) || next.has( state.id ) ) throw new Error( 'Invalid world door state record' );
+   const copy = { ...state };
+   const previous = this.doorStates.get( state.id );
+   if ( previous && state.sequence < previous.sequence ) {
+    next.set( state.id, previous );
+    continue;
+   }
+   if ( state.sequence > ( previous?.sequence ?? 0 ) && state.eventId ) transitions.push( copy );
+   next.set( state.id, copy );
+  }
+  this.doorStates = next;
+  this.onDoorStates( [ ...next.values() ], transitions );
  }
  dispose() {
   if (this.disposed) return;
@@ -125,6 +158,6 @@ export class WorldPresenceSession {
    Promise.resolve().then(() => this.connector.leavePresence()).catch(() => {}).finally(() => this.connector.close());
   } else this.connector.close();
   for (const avatar of this.avatars.values()) avatar.dispose();
-  this.avatars.clear(); this.state.reset();
+  this.avatars.clear(); this.state.reset(); this.doorStates.clear();
  }
 }

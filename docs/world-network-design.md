@@ -421,8 +421,15 @@ Game-backed regions also carry a collision layer derived from Unreal BodySetup
 data; renderer triangles are not a substitute. Interactive doors are shared
 world entities with host-authorized state transitions. The transition updates
 door motion and collision as one state change and includes a sound event ID so
-clients play the sound once. Current presence messages do not replicate these
-entities; this is a required protocol extension.
+clients play the sound once. `worldd` now accepts owner-authorized
+`world.door.set` requests for signed `elsemesh.interactive-door/1` definitions,
+checks the visitor's admission, range, lock, and allowed-entry policy, and
+replicates monotonic state/event IDs through presence snapshots. Sound assets
+are signed `audio/ogg` references. The browser still needs to animate the
+authored door, change its collision with the same transition, and play each
+event once; until that integration exists, the protocol does not make a door
+passable. See the [interactive door contract](schemas/interactive-door.md) for
+the bounded source-data and state-message definition.
 
 The provider API also serves non-game sources that are naturally regionized or
 too large to package monolithically. It is a boundary around content production

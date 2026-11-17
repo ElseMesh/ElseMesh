@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -438,6 +439,104 @@ func TestPresenceCannotChangeWorldAvatarSelectionMidSession(t *testing.T) {
 	request.Pose = &playerPose{Protocol: playerPresenceProtocol, Sequence: 2, Position: []float64{1.1, 2, 3}, Mode: "walk", AvatarProfileID: "elsemesh.avatar.stock-male/1", AvatarOptionID: "option-b", EntryPointID: "entry-b", Appearance: avatarAppearance{Style: "male", Shirt: paletteB, Trousers: "#27313d", Skin: "#c68c67", Hair: "#33251c"}}
 	if _, err := d.presenceRequest(request, time.Now().Add(time.Second)); err == nil || err.Error() != "presence_avatar_selection_changed" {
 		t.Fatalf("visitor changed signed avatar selection during one presence session: %v", err)
+	}
+}
+
+func TestWorldDoorStateIsRangeCheckedAndReplicated(t *testing.T) {
+	d := presenceTestDaemon(t)
+	d.world.Components = []worldComponent{{
+		ID:   "elsemesh-component:great-hall-door",
+		Type: interactiveDoorComponentType,
+		Data: json.RawMessage(`{"position":[1,2,3],"interactionRadiusMeters":2,"initialOpen":false,"locked":false}`),
+	}}
+	join := func(position []float64) (gatewayMessage, peerResponse) {
+		request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: presenceTestPose()}
+		request.Pose.Position = position
+		session, err := newPresenceSession()
+		if err != nil {
+			t.Fatal(err)
+		}
+		bindPresenceRequest(&request, d.host.ID().String(), session)
+		reply, err := d.presenceRequest(request, time.Now())
+		if err != nil {
+			t.Fatalf("admit visitor: %v", err)
+		}
+		request.Type = "world.door.set"
+		request.DoorID = "elsemesh-component:great-hall-door"
+		return request, reply
+	}
+	first, joined := join([]float64{1, 2, 3})
+	if len(joined.DoorStates) != 1 || joined.DoorStates[0].Open || joined.DoorStates[0].Sequence != 0 {
+		t.Fatalf("initial signed door state = %+v", joined.DoorStates)
+	}
+	open := true
+	first.DoorOpen = &open
+	opened, err := d.localRequest(first)
+	if err != nil {
+		t.Fatalf("open nearby door: %v", err)
+	}
+	if opened.Type != "world.door.state" || len(opened.DoorStates) != 1 || !opened.DoorStates[0].Open || opened.DoorStates[0].Sequence != 1 || opened.DoorStates[0].EventID == "" {
+		t.Fatalf("authoritative open state = %+v", opened)
+	}
+	duplicate, err := d.localRequest(first)
+	if err != nil || duplicate.DoorStates[0].Sequence != 1 || duplicate.DoorStates[0].EventID != opened.DoorStates[0].EventID {
+		t.Fatalf("idempotent repeated open = %+v, err %v", duplicate.DoorStates, err)
+	}
+	second, _ := join([]float64{2, 2, 3})
+	second.Type = "presence.update"
+	second.Pose = presenceTestPose()
+	second.Pose.Sequence = 2
+	second.Pose.Position = []float64{2, 2, 3}
+	seen, err := d.presenceRequest(second, time.Now().Add(2*time.Second))
+	if err != nil {
+		t.Fatalf("second visitor presence update: %v", err)
+	}
+	if len(seen.DoorStates) != 1 || !seen.DoorStates[0].Open || seen.DoorStates[0].Sequence != 1 {
+		t.Fatalf("second visitor did not receive the shared door state: %+v", seen.DoorStates)
+	}
+}
+
+func TestWorldDoorStateEnforcesHouseEntryRangeAndLock(t *testing.T) {
+	tests := []struct {
+		name       string
+		position   []float64
+		entryPoint string
+		locked     bool
+		wantError  string
+	}{
+		{name: "another house", position: []float64{1, 2, 3}, entryPoint: "slytherin", wantError: "world_door_access_denied"},
+		{name: "out of range", position: []float64{4, 2, 3}, entryPoint: "gryffindor", wantError: "world_door_out_of_range"},
+		{name: "locked", position: []float64{1, 2, 3}, entryPoint: "gryffindor", locked: true, wantError: "world_door_locked"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			d := presenceTestDaemon(t)
+			d.world.EntryPoints = []worldEntryPoint{
+				{ID: "gryffindor", Label: "Gryffindor", Position: []float64{1, 2, 3}},
+				{ID: "slytherin", Label: "Slytherin", Position: []float64{1, 2, 3}},
+			}
+			raw := fmt.Sprintf(`{"position":[1,2,3],"interactionRadiusMeters":2,"initialOpen":false,"locked":%t,"allowedEntryPointIds":["gryffindor"]}`, test.locked)
+			d.world.Components = []worldComponent{{ID: "elsemesh-component:house-door", Type: interactiveDoorComponentType, Data: json.RawMessage(raw)}}
+			pose := presenceTestPose()
+			pose.Position = test.position
+			pose.EntryPointID = test.entryPoint
+			request := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+			session, err := newPresenceSession()
+			if err != nil {
+				t.Fatal(err)
+			}
+			bindPresenceRequest(&request, d.host.ID().String(), session)
+			if _, err := d.presenceRequest(request, time.Now()); err != nil {
+				t.Fatalf("valid house entry admission: %v", err)
+			}
+			request.Type = "world.door.set"
+			request.DoorID = "elsemesh-component:house-door"
+			open := true
+			request.DoorOpen = &open
+			if _, err := d.localRequest(request); err == nil || err.Error() != test.wantError {
+				t.Fatalf("door request error = %v, want %s", err, test.wantError)
+			}
+		})
 	}
 }
 
