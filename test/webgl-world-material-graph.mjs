@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
 import { applyWebGLWorldMaterialGraphs } from '../src/fallback/WebGLWorldMaterialGraphs.js';
+
+const fallbackSource = await readFile( new URL( '../src/fallback/WebGLFallback.js', import.meta.url ), 'utf8' );
+assert.doesNotMatch( fallbackSource, /material\.color\.set\s*\(\s*0x80532f/, 'WebGL fallback does not apply the old name-based wood tint over authored material factors' );
 
 const graph = {
 	format: 'elsemesh.material-graph/1',
@@ -20,6 +24,8 @@ const graph = {
 	outputs: { vertexPosition: 'moved' },
 };
 const material = new THREE.MeshStandardMaterial();
+material.color.set( 0x80532f );
+const sourceColor = material.color.clone();
 material.userData.elsemeshMaterial = { profile: 'elsemesh.material-graph/1', role: 'graph', graph };
 const geometry = new THREE.BufferGeometry();
 geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 1, 0, 0, 0, 1, 0 ], 3 ) );
@@ -29,6 +35,7 @@ const root = new THREE.Group(); root.add( mesh );
 
 assert.equal( applyWebGLWorldMaterialGraphs( THREE, root ), 1 );
 assert.notEqual( mesh.material, material, 'ElseMesh compiles the graph without a world material runtime' );
+assert.ok( mesh.material.color.equals( sourceColor ), 'the engine preserves the authored glTF material factor when compiling a graph' );
 assert.ok( mesh.material.userData.elsemeshWorldMaterialGraph );
 assert.ok( mesh.customDepthMaterial, 'vertex graph outputs also compile for shadows' );
 assert.ok( geometry.getAttribute( 'vdata' ), 'the engine prepares the graph attribute alias' );

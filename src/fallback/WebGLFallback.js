@@ -89,9 +89,7 @@ function prepareHostedWebGLModel( root ) {
 		const wasArray = Array.isArray( object.material );
 		const materials = ( wasArray ? object.material : [ object.material ] ).map( material => {
 			if ( ! material ) return material;
-			const instance = material.clone();
-			if ( /(?:^| )(?:wood|sign-wood|lantern-wood)$/i.test( instance.name ) ) instance.color.set( 0x80532f );
-			return instance;
+			return material.clone();
 		} );
 		object.material = wasArray ? materials : materials[ 0 ];
 	} );
@@ -1758,9 +1756,6 @@ export class WebGLFallback {
 				if ( ! object.isMesh ) return;
 				object.castShadow = true;
 				object.receiveShadow = true;
-				for ( const material of Array.isArray( object.material ) ? object.material : [ object.material ] ) {
-					if ( /(?:^| )(?:wood|sign-wood|lantern-wood)$/i.test( material.name ) ) material.color.set( 0x80532f );
-				}
 			} );
 			applyWebGLWorldMaterialGraphs( T, model.scene );
 			this.scene.add( model.scene );
