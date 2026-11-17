@@ -16,29 +16,26 @@ do not reintroduce them as part of world-runtime work.
 **Repository separation: 100% — complete.** The structural split and its
 verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
 
-**Tidewater package integration and parity: 75%.** This goal covers the
-Example Island content now stored in the pinned Tidewater submodule. ElseMesh builds with Tidewater
-mounted, verifies its content-addressed assets, and loads portable worlds
-through versioned interfaces. Matched hosted/built-in start and village views
-render on Android. The package includes a signed, content-addressed grass-density
-mask; CPU checks prove that packaged plant placements and grass density match
-seeded source generation, and that all 143 non-terrain objects have
-geometry-reducing distance levels. The 2026-10-22/23 captures establish selected
-hosted-versus-built-in views and grass presence, but do not yet establish visual
-parity with the retained in-engine Example Island across the world.
+**Tidewater package integration and parity: 93%.** This estimate follows the
+current acceptance record in [`SPLIT-progress.md`](SPLIT-progress.md). Tidewater
+authored data and gameplay modules are in its pinned world repository. The
+signed package loads through ElseMesh's versioned interfaces. The retained
+pre-split WebGPU Example Island is the visual baseline; it is not the WebGL
+fallback. A matched AMD WebGPU comparison against pre-split commit `23c30bf`
+passed for the beach and `swashAbove` views across three simulation phases.
+Production-water fishing has also been exercised through live WebGPU and WebGL
+browser sessions.
 
-The remaining visual parity task is to compare the retained in-engine Example
-Island (the pre-split WebGPU reference) with the Tidewater package loaded by the
-same ElseMesh build. View parity is the main acceptance focus: first match the
-original WebGPU wave spray, then the appearance of the timber, houses, fish
-stand, and harbour. Also compare the beach, village, valley, and summit views
-with matched device, camera pose, time, viewport, render scale, and graphics
-settings. Track content omissions, terrain/material appearance, vegetation
-density, object LOD transitions, water, and lighting/shadows as separate
-findings. WebGL is not the visual baseline; after WebGPU view parity, check that
-WebGL presents the same authored world content. Gameplay parity is secondary
-until the visual gates are met. Treat existing captures as partial evidence,
-not completion.
+The remaining gates are to compare additional views and materials, replay
+fishing/sale from matched fresh profiles to confirm exact wallet parity, and
+measure supported-hardware FPS with a controlled method. Keep the timber,
+houses, fish stand, harbour, vegetation, LOD, water, spray, and lighting/shadows
+as distinct visual findings. The WebGPU headless review on 2026-11-17 confirmed
+that the hosted package used the AMD RADV adapter and rendered its three-cascade
+shadow path; its headless FPS is not a performance measurement. WebGL remains a
+content/gameplay alignment check after the original WebGPU appearance is
+established. See [`SPLIT-progress.md`](SPLIT-progress.md) for the detailed
+evidence and open gates; existing captures do not alone establish completion.
 
 The renderer architecture is hybrid across worlds and renderer-neutral within
 each world. ElseMesh owns backend selection and translates portable content and
