@@ -21,6 +21,15 @@ and performance remain open, so no parity percentage changes.
 
 [Pre-split and hosted shadow comparison](images/tidewater-hosted-webgpu-shadows-2026-11-17.png).
 
+The same review captured one hosted `surf` phase at the same 2560×1267 viewport
+and simulation time. Against the pre-split `surf` capture, full-frame RGB MAE
+is 2.52/255 and the breaker-band MAE is 2.71/255. The whitewater sheet and
+visible breaker shapes are present in both. This is one static phase and does
+not establish particle-spray motion or phase-by-phase parity; those checks
+remain open.
+
+[Pre-split and hosted surf comparison](images/tidewater-hosted-webgpu-surf-2026-11-17.png).
+
 ## 2026-11-15 matched pre-split and split WebGPU views
 
 The original ElseMesh build at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`

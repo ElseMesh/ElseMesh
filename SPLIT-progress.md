@@ -1894,5 +1894,7 @@ finding changes them.
   cascades and setting cast/receive flags on package GLBs and streamed LODs.
   The hosted village comparison against pre-split `23c30bf6` reduced full-frame
   RGB MAE from 8.70 to 4.21/255. This closes only the hosted WebGPU shadow
-  omission for the captured village view; broader material/spray and WebGL
-  parity remain open. Tidewater gameplay and content parity remains 93%.
+  omission for the captured village view. One static hosted `surf` capture has
+  2.52/255 full-frame and 2.71/255 breaker-band MAE against the pre-split view;
+  time-varying spray, broader material, and WebGL parity remain open. Tidewater
+  gameplay and content parity remains 93%.
