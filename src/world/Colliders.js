@@ -1,5 +1,31 @@
 import * as THREE from '../engine/index.js';
 
+function closestPointOnSegmentXZ( x, z, a, b ) {
+
+	const dx = b.x - a.x, dz = b.z - a.z, lengthSq = dx * dx + dz * dz;
+	const t = lengthSq > 1e-12 ? THREE.MathUtils.clamp( ( ( x - a.x ) * dx + ( z - a.z ) * dz ) / lengthSq, 0, 1 ) : 0;
+	const px = a.x + t * dx, pz = a.z + t * dz;
+	return { x: px, z: pz, distanceSq: ( x - px ) ** 2 + ( z - pz ) ** 2 };
+
+}
+
+function closestPointOnTriangleXZ( x, z, a, b, c ) {
+
+	const abx = b.x - a.x, abz = b.z - a.z, acx = c.x - a.x, acz = c.z - a.z;
+	const apx = x - a.x, apz = z - a.z;
+	const d00 = abx * abx + abz * abz, d01 = abx * acx + abz * acz, d11 = acx * acx + acz * acz;
+	const d20 = apx * abx + apz * abz, d21 = apx * acx + apz * acz;
+	const denominator = d00 * d11 - d01 * d01;
+	if ( Math.abs( denominator ) > 1e-12 ) {
+		const v = ( d11 * d20 - d01 * d21 ) / denominator, w = ( d00 * d21 - d01 * d20 ) / denominator, u = 1 - v - w;
+		if ( u >= 0 && v >= 0 && w >= 0 ) return { x, z, distanceSq: 0 };
+	}
+
+	const ab = closestPointOnSegmentXZ( x, z, a, b ), bc = closestPointOnSegmentXZ( x, z, b, c ), ca = closestPointOnSegmentXZ( x, z, c, a );
+	return ab.distanceSq <= bc.distanceSq && ab.distanceSq <= ca.distanceSq ? ab : bc.distanceSq <= ca.distanceSq ? bc : ca;
+
+}
+
 // Lightweight collision world for the character controller and boat.
 // Boxes are oriented around Y only; convexes keep world-space hull planes.
 // This preserves the prior normal.y > 0.95 walkable-face cutoff when a world
@@ -152,18 +178,13 @@ export class Colliders {
 
 		}
 		for ( const convex of this.convexes ) {
-			if ( convex.min.y > maxY || x < convex.min.x - pad || x > convex.max.x + pad || z < convex.min.z - pad || z > convex.max.z + pad ) continue;
+			if ( convex.min.y > maxY || x < convex.min.x - pad - capsuleRadius || x > convex.max.x + pad + capsuleRadius || z < convex.min.z - pad - capsuleRadius || z > convex.max.z + pad + capsuleRadius ) continue;
 			for ( const triangle of convex.triangles ) {
 				const { a, b, c, normal } = triangle;
 				if ( normal.y < minWalkableNormalY ) continue;
-				const v0x = c.x - a.x, v0z = c.z - a.z, v1x = b.x - a.x, v1z = b.z - a.z, v2x = x - a.x, v2z = z - a.z;
-				const dot00 = v0x * v0x + v0z * v0z, dot01 = v0x * v1x + v0z * v1z, dot02 = v0x * v2x + v0z * v2z;
-				const dot11 = v1x * v1x + v1z * v1z, dot12 = v1x * v2x + v1z * v2z;
-				const denominator = dot00 * dot11 - dot01 * dot01;
-				if ( Math.abs( denominator ) < 1e-12 ) continue;
-				const u = ( dot11 * dot02 - dot01 * dot12 ) / denominator, v = ( dot00 * dot12 - dot01 * dot02 ) / denominator;
-				if ( u < - 1e-6 || v < - 1e-6 || u + v > 1 + 1e-6 ) continue;
-				const surfaceHeight = ( triangle.distance - normal.x * x - normal.z * z ) / normal.y;
+				const support = closestPointOnTriangleXZ( x, z, a, b, c );
+				if ( support.distanceSq > capsuleRadius * capsuleRadius + 1e-12 ) continue;
+				const surfaceHeight = ( triangle.distance - normal.x * support.x - normal.z * support.z ) / normal.y;
 				const capsuleSupportHeight = surfaceHeight + capsuleRadius * ( 1 / normal.y - 1 );
 				if ( capsuleSupportHeight <= maxY ) best = Math.max( best, capsuleSupportHeight );
 			}

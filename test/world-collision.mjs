@@ -219,6 +219,9 @@ rampColliders.addConvex( [
 ], [ 0, 1, 3, 0, 3, 2, 0, 4, 5, 0, 5, 1, 0, 2, 4, 1, 5, 3, 2, 3, 5, 2, 5, 4 ] );
 const rampHeight = rampColliders.groundHeightAt( 0, - 0.5, 1, 0, 34, 0.42 );
 assert.ok( rampHeight > 0.4 && rampHeight < 0.42, 'walkable convex slope height includes the vertical capsule support offset' );
+const rampEdgeHeight = rampColliders.groundHeightAt( 0, 0.2, 0.15, 0, 34, 0.42 );
+assert.ok( rampEdgeHeight > 0.07 && rampEdgeHeight < 0.09, 'capsule radius reaches the source slope edge and raises feet to the exact contact support height' );
+assert.equal( rampColliders.groundHeightAt( 0, 0.5, 0.15, 0, 34, 0.42 ), 0, 'convex slope support does not extend beyond the capsule radius' );
 const rampPosition = { x: 0, y: 0, z: - 0.5 };
 assert.equal( rampColliders.resolveCapsule( rampPosition, 0.42, 1.76, 34 ), true, 'the profile permits contact correction on a walkable 33 degree convex slope' );
 assert.ok( Math.abs( rampPosition.y - rampHeight ) < 1e-6, 'walkable slope contact corrects capsule height instead of pushing it downhill' );

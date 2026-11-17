@@ -42,14 +42,14 @@ type regionProviderEntrySelection struct {
 }
 
 type authoritativeMovementSweepRequest struct {
-	WorldID          string    `json:"worldId"`
-	SourceRevision   string    `json:"sourceRevision"`
-	From             []float64 `json:"from"`
-	To               []float64 `json:"to"`
-	RadiusMeters     float64   `json:"radiusMeters"`
-	HeightMeters     float64   `json:"heightMeters"`
-	StepHeightMeters float64   `json:"stepHeightMeters"`
-	MaxWalkableSlopeDegrees float64 `json:"maxWalkableSlopeDegrees"`
+	WorldID                 string    `json:"worldId"`
+	SourceRevision          string    `json:"sourceRevision"`
+	From                    []float64 `json:"from"`
+	To                      []float64 `json:"to"`
+	RadiusMeters            float64   `json:"radiusMeters"`
+	HeightMeters            float64   `json:"heightMeters"`
+	StepHeightMeters        float64   `json:"stepHeightMeters"`
+	MaxWalkableSlopeDegrees float64   `json:"maxWalkableSlopeDegrees"`
 }
 
 type authoritativeMovementSweepResponse struct {
