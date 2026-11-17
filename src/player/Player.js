@@ -140,6 +140,23 @@ export class Player {
 		this._camY = this.camera.position.y;
 	}
 
+	setHostedWorldAuthoritativePose( position, yaw, pitch, mode = 'walk' ) {
+		if ( ! Array.isArray( position ) || position.length !== 3 || ! position.every( Number.isFinite )
+			|| ! Number.isFinite( yaw ) || ! Number.isFinite( pitch ) || ! [ 'walk', 'swim' ].includes( mode ) ) return false;
+		this.position.set( position[ 0 ], position[ 1 ], position[ 2 ] );
+		this.velocity.set( 0, 0, 0 );
+		this.yaw = yaw;
+		this.pitch = pitch;
+		this.mode = mode;
+		this.grounded = mode === 'walk';
+		this.camOff = 0;
+		this.camOffV = 0;
+		this.camera.position.set( this.position.x, this.position.y + ( mode === 'swim' ? SWIM_EYE : EYE ), this.position.z );
+		this.camera.quaternion.setFromEuler( _e.set( pitch, yaw, 0, 'YXZ' ) );
+		this._camY = this.camera.position.y;
+		return true;
+	}
+
 	// Hosted static worlds use only their signed package colliders. They must not collide with or
 	// sample the hidden local procedural island, reef, water, or boat simulation.
 	updateHostedWorld( dt ) {

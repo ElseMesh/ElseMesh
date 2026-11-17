@@ -65,6 +65,8 @@ export class WorldPresenceSession {
   this.sequence = 0;
   this.nextSend = -Infinity;
   this.pending = null;
+  this.lastAcceptedPose = null;
+  this.lastRejectedPose = null;
   this.disposed = false;
   this.reportedError = false;
   this.admitted = false;
@@ -83,6 +85,7 @@ export class WorldPresenceSession {
   this.#observeDoorStates( snapshot.doorStates );
   const own = snapshot.players.find(value => value.id === snapshot.playerId);
   if (!own) throw new Error('World admission did not return the admitted visitor');
+  this.#rememberAcceptedPose(own);
   this.admitted = true;
   return own;
  }
@@ -115,10 +118,14 @@ export class WorldPresenceSession {
      this.doorStates.clear();
     }
     this.state.observe(snapshot,{requestId:snapshot.requestId, now:this.clock()});
+    const own = snapshot.players.find(value => value.id === snapshot.playerId);
+    if (own) this.#rememberAcceptedPose(own);
     this.#observeDoorStates( snapshot.doorStates );
     this.reportedError = false;
    }).catch(error => {
     if (this.disposed) return;
+    this.lastRejectedPose = { position: [...pose.position], yaw: pose.yaw, pitch: pose.pitch, mode: pose.mode, error: String(error) };
+    this.#restoreLastAcceptedPose(player);
     this.nextSend = this.clock() + 2000;
     if (!this.reportedError) { this.reportedError = true; this.onError(error); }
    }).finally(() => { this.pending = null; });
@@ -148,6 +155,17 @@ export class WorldPresenceSession {
   }
   this.doorStates = next;
   this.onDoorStates( [ ...next.values() ], transitions );
+ }
+ #rememberAcceptedPose(pose) {
+  if (!Array.isArray(pose.position) || pose.position.length !== 3 || !pose.position.every(Number.isFinite)) return;
+  this.lastAcceptedPose = {
+   position: [...pose.position], yaw: pose.yaw, pitch: pose.pitch, mode: pose.mode,
+  };
+ }
+ #restoreLastAcceptedPose(player) {
+  const pose = this.lastAcceptedPose;
+  if (!pose || !['walk', 'swim'].includes(pose.mode) || !['walk', 'swim'].includes(player?.mode)) return;
+  player.setHostedWorldAuthoritativePose?.(pose.position, pose.yaw, pose.pitch, pose.mode);
  }
  dispose() {
   if (this.disposed) return;
