@@ -32,6 +32,10 @@ function closestPointOnTriangleXZ( x, z, a, b, c ) {
 // does not supply a more specific avatar/vehicle slope capability.
 export const DEFAULT_WALKABLE_SLOPE_DEGREES = Math.acos( 0.95 ) * 180 / Math.PI;
 
+let movementSupportKernel = null;
+
+export function setMovementSupportKernel( kernel ) { movementSupportKernel = kernel; }
+
 export class Colliders {
 
 	constructor() {
@@ -40,6 +44,7 @@ export class Colliders {
 		this.cylinders = [];
 		this.convexes = [];
 		this.heightfields = [];
+		this._movementRevision = 0;
 		this._v = new THREE.Vector3();
 
 	}
@@ -55,6 +60,7 @@ export class Colliders {
 			radius: Math.hypot( half.x, half.z ),
 		};
 		this.boxes.push( b );
+		this._movementRevision ++;
 		return b;
 
 	}
@@ -63,6 +69,7 @@ export class Colliders {
 		const index = this.boxes.indexOf( box );
 		if ( index === - 1 ) return false;
 		this.boxes.splice( index, 1 );
+		this._movementRevision ++;
 		return true;
 	}
 
@@ -114,6 +121,7 @@ export class Colliders {
 		if ( planes.length < 4 ) throw new Error( 'Convex collider has fewer than four faces' );
 		const convex = { vertices, planes, triangles, min, max, tag };
 		this.convexes.push( convex );
+		this._movementRevision ++;
 		return convex;
 	}
 
@@ -121,6 +129,7 @@ export class Colliders {
 		const index = this.convexes.indexOf( convex );
 		if ( index === - 1 ) return false;
 		this.convexes.splice( index, 1 );
+		this._movementRevision ++;
 		return true;
 	}
 
@@ -140,6 +149,7 @@ export class Colliders {
 		}
 		const field = { positions, columns, rows, minX, minZ, maxX, maxZ, stepX, stepZ, position, scale, yaw, cos: Math.cos( yaw ), sin: Math.sin( yaw ), tag };
 		this.heightfields.push( field );
+		this._movementRevision ++;
 		return field;
 	}
 
@@ -147,6 +157,7 @@ export class Colliders {
 		const index = this.heightfields.indexOf( field );
 		if ( index === - 1 ) return false;
 		this.heightfields.splice( index, 1 );
+		this._movementRevision ++;
 		return true;
 	}
 
@@ -166,6 +177,8 @@ export class Colliders {
 	// Highest permitted convex surface under (x, z). A capsule support radius
 	// shifts its feet upward on an incline by the geometric plane-contact offset.
 	groundHeightAt( x, z, maxY, pad = 0, maxWalkableSlopeDegrees = DEFAULT_WALKABLE_SLOPE_DEGREES, capsuleRadius = 0 ) {
+
+		if ( movementSupportKernel ) return movementSupportKernel.supportHeight( this, x, z, maxY, pad, maxWalkableSlopeDegrees, capsuleRadius );
 
 		let best = - Infinity;
 		const minWalkableNormalY = Math.cos( THREE.MathUtils.degToRad( maxWalkableSlopeDegrees ) );

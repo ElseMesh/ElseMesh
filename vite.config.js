@@ -63,6 +63,36 @@ function basisTranscoderAssets() {
 	};
 }
 
+function movementSupportKernelAssets() {
+	const wasmPath = resolve( 'native/movement/elsemesh_movement.wasm' );
+	function serveWasm( req, res, next ) {
+		let pathname;
+		try { pathname = new URL( req.url || '/', 'http://vite.local' ).pathname; }
+		catch { return next(); }
+		if ( pathname.split( '/' ).at( - 1 ) !== 'elsemesh-movement.wasm' || ! existsSync( wasmPath ) ) return next();
+		if ( req.method !== 'GET' && req.method !== 'HEAD' ) {
+			res.statusCode = 405;
+			res.end();
+			return;
+		}
+		const bytes = readFileSync( wasmPath );
+		res.statusCode = 200;
+		res.setHeader( 'Content-Type', 'application/wasm' );
+		res.setHeader( 'Content-Length', bytes.byteLength );
+		res.setHeader( 'Cache-Control', 'public, max-age=0, must-revalidate' );
+		res.end( req.method === 'HEAD' ? undefined : bytes );
+	}
+	return {
+		name: 'elsemesh-movement-support-kernel',
+		configureServer( server ) { server.middlewares.use( serveWasm ); },
+		configurePreviewServer( server ) { server.middlewares.use( serveWasm ); },
+		generateBundle() {
+			if ( ! existsSync( wasmPath ) ) throw new Error( `The movement WebAssembly module was not built: ${ wasmPath }` );
+			this.emitFile( { type: 'asset', fileName: 'elsemesh-movement.wasm', source: readFileSync( wasmPath ) } );
+		},
+	};
+}
+
 const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
 const defaultWorldModule = resolve( process.env.ELSEMESH_DEFAULT_WORLD_MODULE || 'worlds/default.js' );
 const worldsPath = resolve( 'worlds' );
@@ -213,7 +243,7 @@ export default defineConfig( {
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ aiPortalsThreeCompatibility(), defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), basisTranscoderAssets(), {
+	plugins: [ aiPortalsThreeCompatibility(), defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), basisTranscoderAssets(), movementSupportKernelAssets(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html, context ) {
 			if ( context.filename !== resolve( 'index.html' ) ) return;
