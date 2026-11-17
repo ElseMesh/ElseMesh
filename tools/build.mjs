@@ -27,14 +27,6 @@ if (!existsSync(viteCli)) {
   process.exit(1);
 }
 
-const movementKernelConfigure = spawnSync('cmake', ['-S', 'native/movement', '-B', 'native/movement'], { stdio: 'inherit' });
-if (movementKernelConfigure.error) throw movementKernelConfigure.error;
-if (movementKernelConfigure.status !== 0) process.exit(movementKernelConfigure.status ?? 1);
-
-const movementKernel = spawnSync('cmake', ['--build', 'native/movement', '--target', 'elsemesh_movement_wasm', '-j2'], { stdio: 'inherit' });
-if (movementKernel.error) throw movementKernel.error;
-if (movementKernel.status !== 0) process.exit(movementKernel.status ?? 1);
-
 const build = spawn(process.execPath, [viteCli, 'build'], { stdio: 'inherit' });
 const buildExitCode = await new Promise((resolve, reject) => {
   build.once('error', reject);

@@ -20,7 +20,7 @@ const tests = [
 	'test/ai-edit-worker.mjs', 'test/ai-edit-mcp.mjs', 'test/ai-edit-review-html.mjs', 'test/prepare-ai-edit-publication.mjs',
 	'test/ai-edit-worker-runtime.mjs', 'worlds/tidewater/test/world-export.mjs', 'test/world-ocean-frame.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'test/world-audio.mjs',
 	'worlds/tidewater/test/boat-lod-runtime.mjs', 'worlds/tidewater/test/webgl-pier-collision.mjs',
-	'test/world-collision.mjs', 'test/movement-support-kernel.mjs', 'test/world-package-emissive-texture.mjs', 'test/world-hosted-player.mjs', 'test/world-hosted-lifecycle.mjs', 'test/player-presence.mjs', 'test/world-presence-session.mjs',
+	'test/world-collision.mjs', 'test/world-package-emissive-texture.mjs', 'test/world-hosted-player.mjs', 'test/world-hosted-lifecycle.mjs', 'test/player-presence.mjs', 'test/world-presence-session.mjs',
 	'test/remote-avatar.mjs', 'test/avatar-lod-assets.mjs', 'test/account-client.mjs', 'test/serve-world-profile-options.mjs', 'test/ktx2-browser.mjs',
 	'test/local-region-startup-cells.mjs', 'test/local-region-layers.mjs', 'test/local-region-connector.mjs', 'test/local-region-disk-cache.mjs', 'test/local-region-disk-cache-browser.mjs', 'worlds/Hogwarts/tests/network-shaping-proxy.mjs', 'test/collision-frontier.mjs', 'test/engine-smoke.mjs', 'test/world-gateway-e2e.mjs', 'test/browser-host-client.mjs',
 	'test/priority-request-queue.mjs', 'test/local-region-request-budget.mjs', 'test/world-streaming-incremental-components.mjs', 'test/static-model-texture-demand.mjs', 'test/webgl-static-texture-lod.mjs', 'test/world-texture-priority.mjs',
@@ -31,12 +31,6 @@ const dawnTests = new Set( [
 const androidOnlySkipTests = new Set( [ 'test/static-model-instance-set-webgl-render.mjs', 'test/ground-cover-field-webgl-render.mjs', 'test/webgl-water-fft-render.mjs', 'test/webgl-refraction-pass-render.mjs', 'test/webgl-breaker-lips-render.mjs', 'test/webgl-terrain-render.mjs' ] );
 const viteAssetTests = new Set( [ 'test/desktop-adaptive-scale.mjs', 'test/portal-sides.mjs', 'test/world-hosted-player.mjs', 'test/world-component-backend-registry.mjs' ] );
 const android = process.platform === 'android';
-
-for ( const args of [ [ '-S', 'native/movement', '-B', 'native/movement' ], [ '--build', 'native/movement', '--target', 'elsemesh_movement_wasm', '-j2' ] ] ) {
-	const result = spawnSync( 'cmake', args, { stdio: 'inherit' } );
-	if ( result.error ) throw result.error;
-	if ( result.status !== 0 ) process.exit( result.status ?? 1 );
-}
 
 for ( const file of tests ) {
 	if ( android && androidOnlySkipTests.has( file ) ) {
