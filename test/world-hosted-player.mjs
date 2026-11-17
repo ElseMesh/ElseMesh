@@ -68,6 +68,17 @@ assert.equal( player.grounded, true );
 assert.ok( camera.position.z < -1, 'camera follows the hosted player' );
 assert.ok( Math.abs( player.velocity.z + 1.5 ) < 0.01, 'hosted walk speed follows the signed world rule' );
 assert.ok( capsuleCalls.some( capsule => capsule.radius === 0.42 && capsule.height === 1.76 ), 'hosted movement uses the world-authored player capsule' );
+const authorityBlockedPosition = player.position.clone();
+player.worldMovementAuthorityBlocked = true;
+for ( let frame = 0; frame < 30; frame ++ ) Player.prototype.updateHostedWorld.call( player, 1 / 60 );
+assert.ok( player.position.distanceTo( authorityBlockedPosition ) < 1e-9, 'owner-denied movement remains frozen while held input continues' );
+assert.deepEqual( player.velocity.toArray(), [ 0, 0, 0 ], 'owner-denied movement keeps velocity stopped' );
+player.setHostedWorldAuthoritativePose( [ 1, 2, 3 ], 0.5, - 0.2, 'walk' );
+assert.deepEqual( player.position.toArray(), [ 1, 2, 3 ], 'authoritative correction uses the owner-approved feet position' );
+assert.deepEqual( camera.position.toArray(), [ 1, 3.62, 3 ], 'authoritative correction keeps the hosted camera aligned with the feet pose' );
+player.setHostedWorldPose( new Vector3( 0, 1.62, 0 ), 0, 0 );
+player.worldMovementAuthorityBlocked = false;
+player.grounded = true;
 
 // A blocked axis must not cancel a clear tangent segment of diagonal movement.
 const gatedPlayer = Object.assign( Object.create( Player.prototype ), {

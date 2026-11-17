@@ -169,6 +169,13 @@ export class Player {
 		const look = inp.consumeLook( dt );
 		this.yaw -= look.x * 0.0022;
 		this.pitch = THREE.MathUtils.clamp( this.pitch - look.y * 0.0022, - 1.5, 1.5 );
+		if ( this.worldMovementAuthorityBlocked ) {
+			this.velocity.set( 0, 0, 0 );
+			this.camera.position.set( this.position.x, this.position.y + ( this.mode === 'swim' ? SWIM_EYE : EYE ), this.position.z );
+			this.camera.quaternion.setFromEuler( _e.set( this.pitch, this.yaw, 0, 'YXZ' ) );
+			this._camY = this.camera.position.y;
+			return;
+		}
 		if ( this.mode === 'swim' && this.hostedSeaLevel !== null ) {
 			this.updateSwim( dt );
 			this.camera.position.set( this.position.x, this.position.y + SWIM_EYE, this.position.z );

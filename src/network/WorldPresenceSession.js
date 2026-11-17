@@ -75,6 +75,8 @@ export class WorldPresenceSession {
   if (this.disposed || this.admitted || spawnCandidates !== undefined && (!Array.isArray(spawnCandidates) || !spawnCandidates.length)) throw new Error('Invalid world presence admission');
   const pose = makePresencePose(player, this.sequence, this.appearance, this.vehicleType, { avatarOptionId: this.avatarOptionId, entryPointId: this.entryPointId });
   if (Number.isFinite(yaw)) pose.yaw = yaw;
+  player.worldMovementAuthorityBlocked = false;
+  player.worldMovementAuthorityRequiresRelease = false;
   return this.admitPose(pose, spawnCandidates);
  }
  async admitPose(pose, spawnCandidates) {
@@ -120,6 +122,10 @@ export class WorldPresenceSession {
     this.state.observe(snapshot,{requestId:snapshot.requestId, now:this.clock()});
     const own = snapshot.players.find(value => value.id === snapshot.playerId);
     if (own) this.#rememberAcceptedPose(own);
+    if (player?.worldMovementAuthorityRequiresRelease && this.#movementReleased(player)) {
+     player.worldMovementAuthorityBlocked = false;
+     player.worldMovementAuthorityRequiresRelease = false;
+    }
     this.#observeDoorStates( snapshot.doorStates );
     this.reportedError = false;
    }).catch(error => {
@@ -165,7 +171,13 @@ export class WorldPresenceSession {
  #restoreLastAcceptedPose(player) {
   const pose = this.lastAcceptedPose;
   if (!pose || !['walk', 'swim'].includes(pose.mode) || !['walk', 'swim'].includes(player?.mode)) return;
+  player.worldMovementAuthorityBlocked = true;
+  player.worldMovementAuthorityRequiresRelease = true;
   player.setHostedWorldAuthoritativePose?.(pose.position, pose.yaw, pose.pitch, pose.mode);
+ }
+ #movementReleased(player) {
+  const axes = player?.input?.moveAxes?.();
+  return !axes || Math.hypot(axes.x || 0, axes.y || 0) < 0.01;
  }
  dispose() {
   if (this.disposed) return;

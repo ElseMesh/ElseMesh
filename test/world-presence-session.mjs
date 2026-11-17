@@ -42,6 +42,7 @@ admissionSession.dispose();
 let authoritativeNow = 1000, authoritativeRequests = 0;
 const authorityPlayer = {
  position: new Vector3( 0, 1, 0 ), velocity: new Vector3( 0, 0, - 3 ), mode: 'walk', yaw: 0, pitch: 0,
+ input: { moveAxes: () => ( { x: 0, y: 0 } ) },
  setHostedWorldAuthoritativePose( position, yaw, pitch, mode ) {
   this.position.set( ...position ); this.velocity.set( 0, 0, 0 ); this.yaw = yaw; this.pitch = pitch; this.mode = mode;
  },
@@ -50,8 +51,8 @@ const authoritySession = new WorldPresenceSession({ connector, parent: { add() {
  onError() {}, createConnector() { return {
   updatePresence(pose) {
    authoritativeRequests++;
-   if (authoritativeRequests > 1) return Promise.reject(new Error('movement_blocked:collision_bounds_block_path:test-wall'));
-   return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: 'authority-admit', playerId: own,
+   if (authoritativeRequests === 2) return Promise.reject(new Error('movement_blocked:collision_bounds_block_path:test-wall'));
+   return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: `authority-${authoritativeRequests}`, playerId: own,
     players: [{ ...pose, id: own, updatedAt: authoritativeNow }] });
   }, close() {},
  }; },
@@ -65,8 +66,13 @@ authoritySession.update( 1 / 60, authorityPlayer, authoritativeNow );
 await authoritySession.pending;
 assert.deepEqual(authorityPlayer.position.toArray(), [ 0, 1, 0 ], 'a rejected owner pose restores the last owner-approved feet position');
 assert.deepEqual(authorityPlayer.velocity.toArray(), [ 0, 0, 0 ], 'a rejected owner pose clears predicted velocity');
+assert.equal(authorityPlayer.worldMovementAuthorityBlocked, true, 'owner rejection blocks further local movement');
 assert.deepEqual(authoritySession.lastRejectedPose.position, [ 0, 1, - 0.5 ], 'the rejected predicted pose is retained for diagnosis');
 assert.match(authoritySession.lastRejectedPose.error, /movement_blocked:collision_bounds_block_path:test-wall/, 'the denial reason is retained with the rejected pose');
+authoritativeNow += 2100;
+authoritySession.update( 1 / 60, authorityPlayer, authoritativeNow );
+await authoritySession.pending;
+assert.equal(authorityPlayer.worldMovementAuthorityBlocked, false, 'the owner reopens movement after accepting the stopped pose with controls released');
 authoritySession.dispose();
 const houseUniform = {...DEFAULT_APPEARANCE, shirt:'#8b1c2b', trousers:'#3e2434'};
 const restrictedWorld = {...connector, manifest:{...connector.manifest, rules:{...connector.manifest.rules,
