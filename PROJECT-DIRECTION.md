@@ -7,14 +7,14 @@ Completed milestones have been moved to [GOAL-done.md](GOAL-done.md). Reassess
 these estimates when new verification evidence is recorded.
 
 World behavior extensions must be owner-signed modules executed in dedicated,
-bounded browser Workers. JavaScript and WebAssembly are both valid worker
-implementations. Choose whichever performs better using reproducible,
-same-workload benchmarks on supported hardware. Measure end-to-end CPU/frame
-time and responsiveness as well as startup, download/transfer, instantiation,
-first-use, and memory costs. Do not select a runtime based on assumptions about
-language or format; a kernel-only microbenchmark is not sufficient. Keep
-correctness and conformance coverage for both implementations while comparing
-them.
+bounded browser Workers. Workers may use JavaScript or WebAssembly (WASM); neither
+runtime is preferred in advance. Choose the better-performing option using
+reproducible, same-workload benchmarks on supported hardware. Measure end-to-end
+CPU/frame time and responsiveness as well as startup, download/transfer,
+instantiation, first-use, and memory costs. Do not select a runtime based on
+assumptions about language or format; a kernel-only microbenchmark is not
+sufficient. Keep correctness and conformance coverage for both implementations
+while comparing them.
 
 ## Current priority: finish Tidewater package integration and parity
 
