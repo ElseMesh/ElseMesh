@@ -4,6 +4,7 @@ import { commonModule } from '../engine/render/wgsl/common.js';
 import { surfaceModule } from '../engine/render/wgsl/lighting.js';
 import { G } from '../engine/render/Frame.js';
 import { SceneLighting } from './SceneLighting.js';
+import { worldLocalLightSources } from '../network/WorldLocalLightSet.js';
 
 // Local lights (lanterns, lamp posts, path lights, lit windows, the boat's cabin and navigation
 // lights, the handheld flashlight) without a light object per lamp: unrolling every light into every
@@ -125,6 +126,7 @@ export class LocalLights {
 		this.sources = [];
 		this.worldPackage = null;
 		this.worldSourceCache = new Map();
+		this.worldSources = [];
 		this.enabled = true;
 		this.strength = 1; // UI multiplier for the lamps (not the flashlight)
 		this.flashlight = {
@@ -150,6 +152,23 @@ export class LocalLights {
 	setWorldPackage( worldPackage ) {
 		this.worldPackage = worldPackage || null;
 		this.worldSourceCache.clear();
+		this.setWorldComponents( worldPackage?.connector?.manifest?.components || [] );
+	}
+
+	setWorldComponents( components ) {
+		this.worldSources = worldLocalLightSources( components ).map( ( light, index ) => ( {
+			position: new THREE.Vector3( ...light.position ),
+			color: new THREE.Color( ...light.color ),
+			intensity: light.intensity,
+			range: light.range,
+			kind: `world-${light.type}`,
+			dir: light.direction ? new THREE.Vector3( ...light.direction ) : null,
+			cosInner: light.innerCone === undefined ? undefined : Math.cos( light.innerCone ),
+			cosOuter: light.outerCone === undefined ? undefined : Math.cos( light.outerCone ),
+			flicker: light.flicker || 0,
+			alwaysOn: light.alwaysOn === true,
+			phase: index * 17.13,
+		} ) );
 	}
 
 	toggleFlashlight( on = ! this.flashlight.on ) {
@@ -236,7 +255,15 @@ export class LocalLights {
 				}
 
 			}
-		for ( const s of includeDefaultSources ? this.sources : [] ) {
+			for ( const s of this.worldSources ) {
+
+				if ( on <= 0.002 && ! s.alwaysOn ) continue;
+				s.d2 = s.position.distanceToSquared( cp );
+				list.push( s );
+
+			}
+
+			for ( const s of includeDefaultSources ? this.sources : [] ) {
 
 				if ( s.enabled === false ) continue;
 				if ( on <= 0.002 && ! s.alwaysOn ) continue;
@@ -312,51 +339,5 @@ export function addBoatLights( lights, boat ) {
 	}
 
 	return out;
-
-}
-
-// Village lights (Village.getLightSources()): lanterns, lamp posts, path lights, lit windows. Window
-// lights sit just outside the pane and only light outward (porches); lanterns flicker a little.
-export function addVillageLights( lights, village ) {
-
-	const K = { lantern: 1.5, pathLight: 1.0, window: 0.8 };
-	const R = { lantern: 11, pathLight: 7, window: 6 };
-	for ( const l of village.getLightSources() ) {
-
-		const kind = l.kind || 'lantern';
-		const src = { position: l.position, color: l.color, intensity: l.intensity * ( K[ kind ] ?? 1.2 ), range: R[ kind ] ?? 12, kind };
-		if ( kind === 'window' ) {
-
-			// outward normal: away from the nearest building centre
-			let best = null, bd = Infinity;
-			for ( const b of village.buildings || [] ) {
-
-				const dd = ( b.x - l.position.x ) ** 2 + ( b.z - l.position.z ) ** 2;
-				if ( dd < bd ) {
-
-					bd = dd;
-					best = b;
-
-				}
-
-			}
-
-			const n = best ? _v.set( l.position.x - best.x, 0, l.position.z - best.z ) : _v.set( 0, 0, 1 );
-			if ( n.lengthSq() < 1e-6 ) n.set( 0, 0, 1 );
-			n.normalize();
-			src.position = l.position.clone().addScaledVector( n, 0.35 );
-			src.dir = n.clone();
-			src.cosInner = 0.35;
-			src.cosOuter = - 0.15;
-
-		} else {
-
-			src.flicker = 0.08;
-
-		}
-
-		lights.add( src );
-
-	}
 
 }

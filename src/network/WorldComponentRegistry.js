@@ -1,5 +1,6 @@
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 import { GROUND_COVER_FIELD_COMPONENT_TYPE, GROUND_COVER_FIELD_DENSITY_ASSET_KIND } from './GroundCoverField.js';
+import { WORLD_LOCAL_LIGHT_SET_COMPONENT } from './WorldLocalLightSet.js';
 
 const components = new Map();
 
@@ -32,6 +33,7 @@ registerWorldComponent( 'elsemesh.water-body/1', { waterSurface: true } );
 registerWorldComponent( 'elsemesh.ambient-audio/1' );
 registerWorldComponent( 'elsemesh.terrain-surface/1', { installRank: 0 } );
 registerWorldComponent( 'elsemesh.static-model-instance-set/1', { installRank: 2 } );
+registerWorldComponent( WORLD_LOCAL_LIGHT_SET_COMPONENT, { installRank: 0 } );
 registerWorldComponent( 'elsemesh.ground-detail-field/1', { installRank: 2 } );
 registerWorldComponent( 'elsemesh.static-fish-props/1', { installRank: 2 } );
 registerWorldComponent( GROUND_COVER_FIELD_COMPONENT_TYPE, { vegetation: true, installRank: 2 } );

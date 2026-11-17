@@ -18,6 +18,7 @@ import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { loadWorldComponentAssets } from '../network/WorldComponentAssets.js';
+import { WebGLLocalLights } from './WebGLLocalLights.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
@@ -933,6 +934,7 @@ export class WebGLFallback {
 		this.sunLight = this.sunLights[ 0 ];
 		this.sunDirection = sunDirection;
 		this._updateLighting();
+		this.webglLocalLights = new WebGLLocalLights( T, this.scene, this.defaultWorldSource?.components || [] );
 		this.webglEnvironment = this.worldEnvironment.sky ? new WebGLSkyEnvironment( T, this.renderer, this.cloudLayer ) : null;
 		if ( this.webglEnvironment?.texture ) this.scene.environment = this.webglEnvironment.texture;
 		installWebGLSceneMaterialLighting( T, this.scene, this.webglAtmosphere, this.sunShadows );
@@ -1034,7 +1036,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.sunShadows?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglLocalLights?.dispose(); this.sunShadows?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		await this._startPresence();
 		this._applyReviewCameraPose();
 		this.renderer.setAnimationLoop( () => this._frame() );
@@ -1816,6 +1818,8 @@ export class WebGLFallback {
 			manifest = result.manifest;
 		} else manifest = await this.connector.getManifest();
 		const hostedWaterEnabled = worldHasWater( manifest );
+		this.webglLocalLights?.dispose();
+		this.webglLocalLights = new WebGLLocalLights( this.THREE, this.scene, manifest.components || [] );
 		if ( ! hostedWaterEnabled ) this.debugNoWater = true;
 		const entry = await chooseWorldAdmission( manifest );
 		this.entrySelection = entry;
@@ -2327,6 +2331,7 @@ export class WebGLFallback {
 		this.spray?.update( dt );
 		const T = this.THREE;
 		this._updateLighting();
+		this.webglLocalLights?.update( this.camera, dt, G.night.value );
 		this.webglAtmosphere?.updateSun( this.sunDirection );
 		if ( this.webglEnvironment?.update( this.sunDirection, simulationTime ) ) this.scene.environment = this.webglEnvironment.texture;
 		this.cloudLayer.position.copy( this.camera.position );

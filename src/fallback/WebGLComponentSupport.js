@@ -1,5 +1,6 @@
 import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
+import { WORLD_LOCAL_LIGHT_SET_COMPONENT, validateWorldLocalLightSet } from '../network/WorldLocalLightSet.js';
 import './WebGLWaterComponentAdapters.js';
 import './WebGLStaticModelInstanceSetAdapter.js';
 import './WebGLGroundCoverFieldAdapter.js';
@@ -19,6 +20,10 @@ export function hostedCollisionBoxes( collision ) {
 // Components whose hosted WebGL implementation is ready before asset-specific loaders run.
 export function initialHostedWebGLSupport( components, { vehicleComponentId = null } = {} ) {
 	const supported = new Set( components.filter( component => worldComponentDescriptor( component.type )?.waterSurface && ( worldComponentBackendAdapter( 'webgl', component.type ) || worldComponentBackendBatchAdapter( 'webgl', component.type ) ) ).map( component => component.id ) );
+	for ( const component of components ) if ( component.type === WORLD_LOCAL_LIGHT_SET_COMPONENT ) {
+		validateWorldLocalLightSet( component );
+		supported.add( component.id );
+	}
 	if ( vehicleComponentId && components.some( component => component.id === vehicleComponentId && worldComponentDescriptor( component.type )?.vehicle ) ) supported.add( vehicleComponentId );
 	return supported;
 }

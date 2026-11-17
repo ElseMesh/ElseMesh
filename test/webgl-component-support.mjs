@@ -66,6 +66,9 @@ assert.deepEqual( resolveHostedWebGLVehicleSpec( neutralComponents, [ vehicleObj
 	component: neutralComponents[ 2 ], object: vehicleObject, preview,
 }, 'vehicle setup resolves a registered component without Tidewater IDs' );
 
+const lightComponent = { id: 'lights', type: 'elsemesh.local-light-set/1', data: { lights: [ { position: [ 1, 2, 3 ], color: [ 1, 1, 1 ], intensity: 1, range: 6, type: 'point' } ] } };
+assert.deepEqual( unsupportedHostedWebGLComponents( [ lightComponent ], initialHostedWebGLSupport( [ lightComponent ] ) ), [], 'the generic WebGL punctual-light presenter accepts the shared light-set contract' );
+
 const wildlifeAdapter = worldComponentBackendBatchAdapter( 'webgl', 'elsemesh.example-island-wildlife/1' );
 assert.equal( typeof wildlifeAdapter, 'function', 'Tidewater registers its WebGL wildlife backend through the component registry' );
 const wildlifeInstall = wildlifeAdapter( { fallback: {} }, [ { id: 'wildlife-runtime' } ] );
