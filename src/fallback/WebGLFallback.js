@@ -966,6 +966,7 @@ export class WebGLFallback {
 			this.activeWorldExtensions?.dispose();
 			this.activeWorldExtensions = createWorldBehaviorExtensions( this.defaultWorldSource.experience, this.defaultWorldAssets.extensionModules );
 			dispatchWorldBehaviorHooks( this.defaultWorldSource.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'builtin', THREE: T, extensions: this.activeWorldExtensions } );
+			this.app.dispatchWorldActivated( this.defaultWorldSource.experience, this.activeWorldExtensions, 'elsemesh:local', { fallback: this, mode: 'builtin' } );
 		} else {
 			const hostedColliders = this.app.hostedColliders;
 			const hostedTerrain = this.hostedTerrainData || { heightAt: () => Number( this.spawn.position[ 1 ] ) - 1.7 };
@@ -1011,6 +1012,7 @@ export class WebGLFallback {
 			this.activeWorldExtensions = createWorldBehaviorExtensions( this.connector?.manifest?.experience, this.connector?.assets );
 			try {
 				dispatchWorldBehaviorHooks( this.connector?.manifest?.experience, 'onWebGLWorldActivated', { fallback: this, mode: 'hosted', THREE: T, extensions: this.activeWorldExtensions } );
+				this.app.dispatchWorldActivated( this.connector?.manifest?.experience, this.activeWorldExtensions, this.connector?.worldId, { fallback: this, mode: 'hosted' } );
 			} catch ( error ) {
 				this.activeWorldExtensions.dispose();
 				this.activeWorldExtensions = null;
@@ -2375,6 +2377,7 @@ export class WebGLFallback {
 		}
 		updateWebGLGrassWind( this.grass, simulationTime );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
+		this.app.dispatchWorldFrameEvent( experience, this.activeWorldExtensions, this.worldLink ? this.connector?.worldId : 'elsemesh:local', dt, simulationTime, this.player, { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin' } );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
 		for ( const runtime of this.builtinComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );
 		this._updateAudio( dt );

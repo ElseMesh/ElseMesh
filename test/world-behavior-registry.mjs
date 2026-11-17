@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor, WORLD_EXTENSION_EVENT_ACTIVATED } from '../src/network/WorldBehaviorRegistry.js';
+import { App } from '../src/App.js';
+import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from '../src/network/WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 
 registerWorldBehavior( 'elsemesh.registry-test/1', {
@@ -101,5 +102,68 @@ assert.deepEqual( await worldOwnedExtensions.dispatch( { type: 'elsemesh.world.e
 assert.deepEqual( await worldOwnedExtensions.dispatch( { type: 'elsemesh.world-owned-test/1', value: 3 } ), [ { behaviorId: worldOwnedBehaviorID, result: { echo: { type: 'elsemesh.world-owned-test/1', value: 3 } } } ], 'the Engine can broadcast subscribed events to owner-defined extensions without a built-in behavior registration' );
 worldOwnedExtensions.dispose();
 assert.equal( worldOwnedWorker.terminated, true, 'owner-defined behavior worker is terminated with its world' );
+
+const frameBehaviorID = 'elsemesh.frame-bridge-test/1';
+let latestFrameResult = null;
+registerWorldBehavior( frameBehaviorID, {
+	validateExtensionEvent: event => { if ( event.type !== WORLD_EXTENSION_EVENT_FRAME ) throw new Error( 'unexpected frame event' ); },
+	validateExtensionResult: ( result, event ) => { if ( result.echo?.sequence !== event.sequence ) throw new Error( 'invalid frame result' ); },
+} );
+registerWorldBehaviorImplementation( frameBehaviorID, { onWorldExtensionResult: state => { latestFrameResult = state; } } );
+const frameAssetID = `sha256:${'d'.repeat( 64 )}`;
+const frameExperience = { behaviors: { [ frameBehaviorID ]: {} }, extensions: [ { behaviorId: frameBehaviorID, assetId: frameAssetID, events: [ WORLD_EXTENSION_EVENT_FRAME ] } ] };
+class BlockingWorker extends FakeWorker {
+	blocked = [];
+	postMessage( message ) {
+		this.messages.push( message );
+		if ( message.type === 'init' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, type: 'ready' } } ) );
+		else if ( message.type === 'run' && message.event.type === 'initialize' ) queueMicrotask( () => this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, id: message.id, result: { echo: message.event } } } ) );
+		else if ( message.type === 'run' ) this.blocked.push( message );
+	}
+	respond( message ) {
+		this.blocked.splice( this.blocked.indexOf( message ), 1 );
+		this.onmessage( { data: { protocol: WORLD_JAVASCRIPT_EXTENSION_PROTOCOL, id: message.id, result: { echo: message.event } } } );
+	}
+}
+const frameWorker = new BlockingWorker();
+const frameExtensions = createWorldBehaviorExtensions( frameExperience, new Map( [ [ frameAssetID, new TextEncoder().encode( 'export function run(event) { return { echo: event }; }' ) ] ] ), { workerFactory: () => frameWorker } );
+assert.equal( frameExtensions.subscribes( WORLD_EXTENSION_EVENT_FRAME ), true, 'the Worker manager exposes signed event subscriptions to the engine' );
+assert.equal( frameExtensions.subscribes( WORLD_EXTENSION_EVENT_ACTIVATED ), false, 'activation is not delivered without an explicit signed subscription' );
+const waitFor = async predicate => {
+	const deadline = Date.now() + 1500;
+	while ( ! predicate() ) {
+		if ( Date.now() >= deadline ) throw new Error( 'Timed out waiting for the frame Worker bridge' );
+		await new Promise( resolve => setTimeout( resolve, 2 ) );
+	}
+};
+const frameApp = {
+	worldExtensionGeneration: 0,
+	worldExtensionFrameSequence: 0,
+	localWorldExtensions: frameExtensions,
+	activeHostedExtensions: null,
+	webglFallback: null,
+	isCurrentWorldExtensions: App.prototype.isCurrentWorldExtensions,
+};
+App.prototype.dispatchWorldActivated.call( frameApp, frameExperience, frameExtensions, 'elsemesh:frame-test', { mode: 'hosted' } );
+assert.equal( frameApp.worldExtensionGeneration, 1, 'world activation establishes the generation even when the Worker only subscribes to frame events' );
+const playerSnapshot = { position: { x: 1, y: 2, z: 3 }, velocity: { x: 0, y: 0, z: 0 }, yaw: 0.4, pitch: -0.1, mode: 'walk', grounded: true, avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: null };
+const publishFrame = () => {
+	playerSnapshot.position.x = frameApp.worldExtensionFrameSequence + 1;
+	App.prototype.dispatchWorldFrameEvent.call( frameApp, frameExperience, frameExtensions, 'elsemesh:frame-test', 1 / 60, frameApp.worldExtensionFrameSequence / 60, playerSnapshot );
+};
+publishFrame();
+await waitFor( () => frameWorker.blocked.length === 1 );
+publishFrame();
+publishFrame();
+frameWorker.respond( frameWorker.blocked[ 0 ] );
+await waitFor( () => frameWorker.blocked.length === 1 && frameWorker.blocked[ 0 ].event.sequence === 3 );
+assert.ok( Math.abs( frameWorker.blocked[ 0 ].event.dt - 2 / 60 ) < 1e-9, 'coalescing accumulates elapsed simulation delta while retaining the latest snapshot' );
+frameWorker.respond( frameWorker.blocked[ 0 ] );
+await waitFor( () => latestFrameResult?.event.sequence === 3 );
+assert.equal( frameWorker.messages.filter( message => message.type === 'run' && message.event.type === WORLD_EXTENSION_EVENT_FRAME ).length, 2, 'the latest-only frame lane skips superseded snapshots instead of queueing every frame' );
+assert.equal( latestFrameResult.result.echo.avatar.position[ 0 ], 3, 'the Worker receives plain renderer-neutral avatar state' );
+assert.equal( latestFrameResult.result.echo.avatar.yaw, 0.4, 'the frame snapshot carries renderer-neutral avatar orientation' );
+frameExtensions.dispose();
+assert.equal( frameWorker.terminated, true, 'disposing a world clears and terminates its coalesced event Worker' );
 
 console.log( 'world behavior registry: ok' );

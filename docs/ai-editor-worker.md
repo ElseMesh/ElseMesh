@@ -64,6 +64,28 @@ The adapter uses the official MCP TypeScript server SDK over local stdio. Config
 
 ## Current boundary
 
+### Engine events delivered to world Workers
+
+Signed extension references may subscribe to versioned ElseMesh events in their
+`events` list. The engine sends `elsemesh.world.activated/1` when that world is
+activated and `elsemesh.world.frame/1` when it publishes a frame snapshot. The
+frame payload contains the world ID, a per-activation sequence, simulation
+time, elapsed simulation delta, and a renderer-neutral avatar snapshot
+(position, velocity, yaw, pitch, movement mode, grounded state, avatar profile
+ID, and vehicle type). Vector values and IDs are plain JSON; Workers receive no
+engine, renderer, scene, camera, or player object references.
+
+Frame publication is bounded to at most 10 events per second per subscribed
+event type and Worker set. While a Worker is busy, the engine keeps one pending
+snapshot and replaces it with the newest state; elapsed frame delta is
+accumulated, and sequence gaps indicate coalesced frames. This channel is for
+world logic that can consume snapshots. Deterministic or input-sensitive
+simulation, such as Tidewater's fishing fight steps, should continue to use its
+world-owned batched messages rather than relying on coalesced frame timing.
+Worker results return through the registered world behavior's
+`onWorldExtensionResult` handler, which validates and applies that world's
+result. Subscriptions remain optional and owner-signed.
+
 This worker supplies a provider-neutral task and execution format that Blender-capable assistants can use, plus a local artifact review page with a rendered candidate image and a CLI that prepares a hash-verified owner publication package. The offline review page now lets an owner record acceptance or rejection in a downloadable `elsemesh.ai-edit-decision/1` JSON file bound to the world, task, base-source hash, and candidate-source hash. Acceptance requires an explicit checkbox confirming inspection of the source changes, preview, and Blender scene. The record is unsigned and does not publish; the owner still invokes the separate publication command. Its versioned contract is [ai-edit-decision.schema.json](schemas/ai-edit-decision.schema.json). The opt-in Blender runtime test runs the real worker output through the preparer and verifies the complete unsigned package. Model selection, paid-service credentials, remote task hosting, proposal-inbox handoff of accepted decisions, and automated training-data collection are separate service work and are not implemented here. The worker currently requires Linux user namespaces and Bubblewrap; a portable Blender runtime is supported via an explicit trusted prefix. On 2026-10-02, the isolated worker test ran with Blender 4.3.2 and created an unsigned candidate source, `.blend`, content-hash-verified GLB, rendered review image, and review report. It is not a Termux execution path. The source and world-node formats remain usable without this worker.
 
 The MCP adapter now connects compatible local assistants to this workflow. The owner-facing accept/reject screen works only from the local offline review package; the editing service is not hosted, decision records are not imported into the proposal inbox, and there is no accepted-task training corpus.

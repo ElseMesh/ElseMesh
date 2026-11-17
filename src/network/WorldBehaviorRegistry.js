@@ -4,6 +4,8 @@ const behaviors = new Map();
 const implementations = new Map();
 const resolvedExperiences = new WeakMap();
 export const WORLD_EXTENSION_EVENT_ACTIVATED = 'elsemesh.world.activated/1';
+export const WORLD_EXTENSION_EVENT_FRAME = 'elsemesh.world.frame/1';
+const WORLD_EXTENSION_LATEST_EVENT_INTERVAL_MS = 100;
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
@@ -50,6 +52,18 @@ export function dispatchWorldBehaviorHooks( experience, hook, context ) {
 export async function dispatchWorldBehaviorExtensionEvent( experience, extensions, event, context = {} ) {
 	if ( ! extensions || typeof extensions.dispatch !== 'function' ) return [];
 	const responses = await extensions.dispatch( event );
+	applyWorldBehaviorExtensionResults( experience, event, responses, context );
+	return responses;
+}
+
+export function dispatchLatestWorldBehaviorExtensionEvent( experience, extensions, event, context = {} ) {
+	if ( ! extensions || typeof extensions.publishLatest !== 'function' ) return false;
+	return extensions.publishLatest( event, responses => applyWorldBehaviorExtensionResults( experience, event, responses, context ), error => {
+		console.error( 'World JavaScript extension event failed:', error );
+	} );
+}
+
+function applyWorldBehaviorExtensionResults( experience, event, responses, context ) {
 	for ( const { behaviorId, result } of responses ) {
 		if ( typeof context.isCurrent === 'function' && ! context.isCurrent() ) continue;
 		const implementation = implementations.get( behaviorId );
@@ -65,7 +79,6 @@ export async function dispatchWorldBehaviorExtensionEvent( experience, extension
 			result,
 		} );
 	}
-	return responses;
 }
 
 export function hasWorldBehavior( experience, id ) {
@@ -82,6 +95,8 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 	const resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
 	const runtimes = new Map();
 	const eventTypesByBehavior = new Map();
+	const latestDispatches = new Map();
+	let disposed = false;
 	try {
 		for ( const reference of experience?.extensions || [] ) {
 			const behavior = resolved.get( reference.behaviorId );
@@ -114,15 +129,50 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 		for ( const runtime of runtimes.values() ) runtime.dispose();
 		throw error;
 	}
-	let disposed = false;
+	const dispatch = event => Promise.all( [ ...runtimes ]
+		.filter( ( [ behaviorId ] ) => eventTypesByBehavior.get( behaviorId )?.includes( event.type ) )
+		.map( async ( [ behaviorId, runtime ] ) => ( { behaviorId, result: await runtime.run( event ) } ) ) );
+	const subscribes = eventType => ! disposed && [ ...eventTypesByBehavior.values() ].some( eventTypes => eventTypes.includes( eventType ) );
+	const scheduleLatestDispatch = ( type, state ) => {
+		if ( disposed || state.running || state.timer || ! state.pending ) return;
+		const elapsed = performance.now() - state.lastStartedAt;
+		const delay = Math.max( 0, WORLD_EXTENSION_LATEST_EVENT_INTERVAL_MS - elapsed );
+		state.timer = setTimeout( () => {
+			state.timer = null;
+			if ( disposed || state.running || ! state.pending ) return;
+			const next = state.pending;
+			state.pending = null;
+			state.running = true;
+			state.lastStartedAt = performance.now();
+			void dispatch( next.event ).then( next.deliver ).catch( error => { if ( ! disposed ) next.onError( error ); } ).finally( () => {
+				state.running = false;
+				scheduleLatestDispatch( type, state );
+			} );
+		}, delay );
+	};
 	return Object.freeze( {
 		has( behaviorId ) { return ! disposed && runtimes.has( behaviorId ); },
+		subscribes,
 		dispatch( event ) {
 			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
 			if ( typeof event?.type !== 'string' ) throw new Error( 'World behavior extension events require a type' );
-			return Promise.all( [ ...runtimes ]
-				.filter( ( [ behaviorId ] ) => eventTypesByBehavior.get( behaviorId )?.includes( event.type ) )
-				.map( async ( [ behaviorId, runtime ] ) => ( { behaviorId, result: await runtime.run( event ) } ) ) );
+			return dispatch( event );
+		},
+		publishLatest( event, deliver = () => {}, onError = error => console.error( error ) ) {
+			if ( disposed ) return false;
+			if ( typeof event?.type !== 'string' || typeof deliver !== 'function' || typeof onError !== 'function' ) throw new Error( 'Invalid latest world behavior event' );
+			if ( ! subscribes( event.type ) ) return false;
+			let state = latestDispatches.get( event.type );
+			if ( ! state ) {
+				state = { pending: null, running: false, timer: null, lastStartedAt: - Infinity };
+				latestDispatches.set( event.type, state );
+			}
+			if ( event.type === WORLD_EXTENSION_EVENT_FRAME && state.pending && Number.isFinite( event.dt ) && Number.isFinite( state.pending.event.dt ) ) {
+				event = { ...event, dt: event.dt + state.pending.event.dt };
+			}
+			state.pending = { event, deliver, onError };
+			scheduleLatestDispatch( event.type, state );
+			return true;
 		},
 		run( behaviorId, event ) {
 			if ( disposed ) throw new Error( 'World behavior extensions are disposed' );
@@ -139,6 +189,11 @@ export function createWorldBehaviorExtensions( experience, assets, options = {} 
 		dispose() {
 			if ( disposed ) return;
 			disposed = true;
+			for ( const state of latestDispatches.values() ) {
+				clearTimeout( state.timer );
+				state.pending = null;
+			}
+			latestDispatches.clear();
 			for ( const runtime of runtimes.values() ) runtime.dispose();
 		},
 	} );

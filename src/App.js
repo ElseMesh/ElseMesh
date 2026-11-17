@@ -73,7 +73,7 @@ import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
-import { createWorldBehaviorExtensions, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED } from './network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { matchingPortalAgreement } from './network/PortalAgreement.js';
@@ -190,6 +190,8 @@ export class App {
 		this.remoteWorlds = new Map();
 		this.portalPreparations = new Map();
 		this.portalViewId = null;
+		this.activeHostedWorldId = null;
+		this.worldExtensionFrameSequence = 0;
 		this.worldBackgroundLoads = new Map();
 		this.worldStreamState = new Map();
 		this.portalPreviousPosition = null;
@@ -209,8 +211,42 @@ export class App {
 
 		if ( ! extensions ) return;
 		const generation = ++ this.worldExtensionGeneration;
-		const isCurrent = () => this.worldExtensionGeneration === generation && ( this.localWorldExtensions === extensions || this.activeHostedExtensions === extensions );
+		this.worldExtensionFrameSequence = 0;
+		const isCurrent = () => this.worldExtensionGeneration === generation && this.isCurrentWorldExtensions( extensions );
 		void dispatchWorldBehaviorExtensionEvent( experience, extensions, { type: WORLD_EXTENSION_EVENT_ACTIVATED, worldId }, { ...context, app: this, worldId, isCurrent } ).catch( error => console.error( 'World JavaScript extension event failed:', error ) );
+
+	}
+
+	isCurrentWorldExtensions( extensions ) {
+
+		return this.localWorldExtensions === extensions || this.activeHostedExtensions === extensions || this.webglFallback?.activeWorldExtensions === extensions;
+
+	}
+
+	dispatchWorldFrameEvent( experience, extensions, worldId, dt, simulationTime, player, context = {} ) {
+
+		if ( ! extensions?.subscribes?.( WORLD_EXTENSION_EVENT_FRAME ) ) return;
+		const generation = this.worldExtensionGeneration;
+		const vector = value => value && [ value.x, value.y, value.z ].every( Number.isFinite ) ? [ value.x, value.y, value.z ] : null;
+		const event = {
+			type: WORLD_EXTENSION_EVENT_FRAME,
+			worldId,
+			sequence: ++ this.worldExtensionFrameSequence,
+			simulationTime: Number.isFinite( simulationTime ) ? simulationTime : 0,
+			dt: Number.isFinite( dt ) ? Math.max( 0, Math.min( dt, 0.1 ) ) : 0,
+			avatar: player ? {
+				position: vector( player.position ),
+				velocity: vector( player.velocity ),
+				yaw: Number.isFinite( player.yaw ) ? player.yaw : 0,
+				pitch: Number.isFinite( player.pitch ) ? player.pitch : 0,
+				mode: typeof player.mode === 'string' ? player.mode : 'walk',
+				grounded: player.grounded === true,
+				avatarProfileId: typeof player.avatarProfileId === 'string' ? player.avatarProfileId : null,
+				vehicleType: typeof player.vehicleType === 'string' ? player.vehicleType : null,
+			} : null,
+		};
+		const isCurrent = () => this.worldExtensionGeneration === generation && this.isCurrentWorldExtensions( extensions );
+		dispatchLatestWorldBehaviorExtensionEvent( experience, extensions, event, { ...context, app: this, worldId, isCurrent } );
 
 	}
 
@@ -1028,6 +1064,7 @@ export class App {
 		if ( this.freeCam ) this.updateFreeCamera( dt );
 		else this.player.updateHostedWorld( dt );
 		dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
+		this.dispatchWorldFrameEvent( this.activeHostedExperience, this.activeHostedExtensions, this.activeHostedWorldId, dt, G.time.value, this.player, { mode: 'hosted' } );
 		this.updateWorldPortals();
 		this.updateWorldStreaming();
 		this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
@@ -1619,12 +1656,14 @@ export class App {
 		}
 		this.activeHostedExtensions = createWorldBehaviorExtensions( experience, connector.assets );
 		this.activeHostedExperience = experience;
+		this.activeHostedWorldId = connector.worldId;
 		try {
 			dispatchWorldBehaviorHooks( experience, 'onHostedWorldActivated', { app: this, connector, root, terrain, runtime, extensions: this.activeHostedExtensions } );
 		} catch ( error ) {
 			this.activeHostedExtensions.dispose();
 			this.activeHostedExtensions = null;
 			this.activeHostedExperience = null;
+			this.activeHostedWorldId = null;
 			throw error;
 		}
 		if ( presenceSession ) this.worldPresence = presenceSession;
@@ -1666,6 +1705,7 @@ export class App {
 		this.activeHostedExtensions?.dispose();
 		this.activeHostedExtensions = null;
 		this.activeHostedExperience = null;
+		this.activeHostedWorldId = null;
 
 		this.activeHostedWildlife = null;
 		this.activeHostedWhale = null;
@@ -2258,6 +2298,7 @@ export class App {
 			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.updateHostedWorld( dt );
 			dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
+			this.dispatchWorldFrameEvent( this.activeHostedExperience, this.activeHostedExtensions, this.activeHostedWorldId, dt, G.time.value, this.player, { mode: 'hosted' } );
 			this.updateWorldPortals();
 			this.updateWorldStreaming();
 			this.worldPresence?.update( dt, this.player, undefined, this.renderLoadBias );
@@ -2270,6 +2311,7 @@ export class App {
 			if ( this.freeCam ) this.updateFreeCamera( dt );
 			else this.player.update( dt );
 			dispatchWorldBehaviorHooks( this.localWorldExperience, 'onWorldFrame', { app: this, mode: 'builtin', dt, extensions: this.localWorldExtensions } );
+			this.dispatchWorldFrameEvent( this.localWorldExperience, this.localWorldExtensions, 'elsemesh:local', dt, G.time.value, this.player, { mode: 'builtin' } );
 
 		}
 		this.updateSun();
