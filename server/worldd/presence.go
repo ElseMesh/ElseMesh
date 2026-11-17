@@ -182,16 +182,7 @@ func (d *daemon) validatePresenceAvatarSelection(p *playerPose) error {
 			break
 		}
 	}
-	selectionRequired := len(d.world.EntryPoints) > 0
-	if !selectionRequired {
-		for _, option := range d.world.AvatarOptions {
-			if option.Palette != nil {
-				selectionRequired = true
-				break
-			}
-		}
-	}
-	if selectionRequired && selected == nil {
+	if len(d.world.AvatarOptions) > 0 && selected == nil {
 		return errors.New("avatar_option_required")
 	}
 	if p.AvatarOptionID != "" && selected == nil {

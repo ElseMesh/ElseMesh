@@ -408,21 +408,33 @@ func TestPresenceEnforcesWorldAvatarAndEntrySelection(t *testing.T) {
 	}
 }
 
-func TestPresenceAllowsDefaultAvatarWithoutWorldEntryChoice(t *testing.T) {
+func TestPresenceRequiresWorldAvatarOptionWhenOptionsExist(t *testing.T) {
 	d := presenceTestDaemon(t)
 	d.world.Rules.AvatarPolicy = &avatarPolicy{AllowedProfiles: []string{"elsemesh.avatar.stock-male/1", "elsemesh.avatar.stock-female/1"}}
+	if err := d.validatePresenceAdmission(presenceTestPose()); err != nil {
+		t.Fatalf("world without avatar options should allow the default appearance: %v", err)
+	}
 	d.world.AvatarOptions = []worldAvatarOption{
 		{ID: "short-hair", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Short hair"},
 		{ID: "ponytail", ProfileID: "elsemesh.avatar.stock-female/1", Label: "Ponytail"},
 	}
-	if err := d.validatePresenceAdmission(presenceTestPose()); err != nil {
-		t.Fatalf("world default avatar was rejected without an entry chooser: %v", err)
-	}
-
-	shirt := "#8b1c2b"
-	d.world.AvatarOptions[0].Palette = &worldAvatarPalette{Shirt: &shirt}
 	if err := d.validatePresenceAdmission(presenceTestPose()); err == nil || err.Error() != "avatar_option_required" {
-		t.Fatalf("palette-enforced avatar catalog accepted an unselected appearance: %v", err)
+		t.Fatalf("visitor without the selected world avatar was accepted: %v", err)
+	}
+	selected := presenceTestPose()
+	selected.AvatarOptionID = "short-hair"
+	if err := d.validatePresenceAdmission(selected); err != nil {
+		t.Fatalf("selected world avatar was rejected: %v", err)
+	}
+	unknown := *selected
+	unknown.AvatarOptionID = "unknown"
+	if err := d.validatePresenceAdmission(&unknown); err == nil || err.Error() != "avatar_option_unknown" {
+		t.Fatalf("unknown world avatar was accepted: %v", err)
+	}
+	wrongProfile := *selected
+	wrongProfile.AvatarOptionID = "ponytail"
+	if err := d.validatePresenceAdmission(&wrongProfile); err == nil || err.Error() != "avatar_option_profile_mismatch" {
+		t.Fatalf("avatar option with a different profile was accepted: %v", err)
 	}
 }
 

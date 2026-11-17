@@ -37,8 +37,7 @@ export class WorldPresenceSession {
   if ( connector.manifest.entryPoints?.length && ! entryPoint ) throw new Error( 'World presence requires the selected world entry point' );
   if ( entryPoint && ( entryPoint.avatarOptionId || '' ) !== avatarOptionId ) throw new Error( 'Selected avatar option does not match the world entry point' );
   const avatarOption = avatarOptionId && connector.manifest.avatarOptions?.find( value => value.id === avatarOptionId );
-  const avatarSelectionRequired = connector.manifest.entryPoints?.length || connector.manifest.avatarOptions?.some( value => value.palette );
-  if ( avatarSelectionRequired && ! avatarOption && connector.manifest.avatarOptions?.length ) throw new Error( 'World presence requires a world-authored avatar option' );
+  if ( connector.manifest.avatarOptions?.length && ! avatarOption ) throw new Error( 'World presence requires a world-authored avatar option' );
   if ( avatarOptionId && ! avatarOption ) throw new Error( 'Selected avatar option is not defined by this world' );
   if ( avatarOption && avatarOption.profileId !== avatarProfileId( admittedAppearance ) ) throw new Error( 'Selected avatar option does not match the admitted avatar profile' );
   for ( const [ field, color ] of Object.entries( { ...avatarOption?.palette, ...entryPoint?.uniform } ) ) {

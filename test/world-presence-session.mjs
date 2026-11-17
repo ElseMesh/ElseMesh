@@ -135,12 +135,13 @@ assert.equal(doorTransitions.length, 1, 'one monotonic transition is exposed for
 assert.equal(doorTransitions[0].soundAssetId, doorSound, 'the state event carries its signed sound asset ID');
 assert.equal(doorUpdates.length, 2, 'initial and changed state snapshots are delivered to the renderer');
 doorSession.dispose();
-const optionalGenericAvatarWorld = { ...connector, manifest: { ...connector.manifest, avatarOptions: [
+const genericAvatarWorld = { ...connector, manifest: { ...connector.manifest, avatarOptions: [
  { id: 'short-hair', profileId: 'elsemesh.avatar.stock-male/1', label: 'Short hair' },
  { id: 'ponytail', profileId: 'elsemesh.avatar.stock-female/1', label: 'Ponytail' },
 ] } };
-const genericAvatarSession = new WorldPresenceSession({ connector: optionalGenericAvatarWorld, parent: { add() {} }, createConnector() { return { close() {} }; } });
-assert.equal(genericAvatarSession.avatarOptionId, '', 'unbound generic avatar options do not force a choice before the world exposes an avatar selector');
+assert.throws(() => new WorldPresenceSession({ connector: genericAvatarWorld, parent: { add() {} }, createConnector() { throw new Error('world avatar selection must be checked before transport'); } }), /world-authored avatar option/);
+const genericAvatarSession = new WorldPresenceSession({ connector: genericAvatarWorld, parent: { add() {} }, appearance: { ...DEFAULT_APPEARANCE, style: 'male' }, avatarOptionId: 'short-hair', createConnector() { return { close() {} }; } });
+assert.equal(genericAvatarSession.avatarOptionId, 'short-hair', 'the selected world avatar is retained even without a uniform palette');
 genericAvatarSession.dispose();
 assert.throws(() => new WorldPresenceSession({
  connector: { ...connector, manifest: { ...connector.manifest, avatarOptions: [ { id: 'uniform', profileId: 'elsemesh.avatar.stock-male/1', label: 'Uniform', palette: { shirt: '#8b1c2b' } } ] } },
