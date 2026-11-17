@@ -16,12 +16,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Server, *regionProviderGateway, *atomic.Int32) {
+func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Server, *regionProviderGateway, *atomic.Int32, *atomic.Uint64) {
 	t.Helper()
 	const worldID = "elsemesh:hogwarts-legacy"
 	const sourceRevision = "installed-source:bridge-revision"
 	const cacheRevision = sourceRevision + ":cache"
 	var internalRequests atomic.Int32
+	var requestedSlopeMillidegrees atomic.Uint64
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/authority/movement-sweep" || r.Method != http.MethodPost {
 			http.NotFound(w, r)
@@ -40,9 +41,10 @@ func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Serve
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		if request.WorldID != worldID || request.SourceRevision != sourceRevision || request.RadiusMeters != 0.42 || request.HeightMeters != 1.76 || request.MaxWalkableSlopeDegrees != 34 {
+		if request.WorldID != worldID || request.SourceRevision != sourceRevision || request.RadiusMeters != 0.42 || request.HeightMeters != 1.76 || request.MaxWalkableSlopeDegrees < 0 || request.MaxWalkableSlopeDegrees > 89 {
 			t.Errorf("movement request did not carry pinned world and capsule: %+v", request)
 		}
+		requestedSlopeMillidegrees.Store(uint64(request.MaxWalkableSlopeDegrees * 1000))
 		result := authoritativeMovementSweepResponse{WorldID: worldID, SourceRevision: sourceRevision, Ready: ready.Load(), Reason: "clear"}
 		if !result.Ready {
 			result.Reason = "collision_bounds_block_path"
@@ -60,18 +62,21 @@ func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Serve
 	gateway.cacheRevision = cacheRevision
 	gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
 	t.Cleanup(upstream.Close)
-	return upstream, gateway, &internalRequests
+	return upstream, gateway, &internalRequests, &requestedSlopeMillidegrees
 }
 
 func TestRegionProviderMovementAuthorityIsInternalAndRevisionPinned(t *testing.T) {
 	var ready atomic.Bool
 	ready.Store(true)
-	_, gateway, requests := movementAuthorityFixture(t, &ready)
+	_, gateway, requests, requestedSlope := movementAuthorityFixture(t, &ready)
 	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6, 34); err != nil {
 		t.Fatalf("clear owner sweep rejected: %v", err)
 	}
 	if requests.Load() != 1 {
 		t.Fatalf("owner sweep requests = %d, want 1", requests.Load())
+	}
+	if got := requestedSlope.Load(); got != 34000 {
+		t.Fatalf("movement request slope = %d millidegrees, want 34000", got)
 	}
 	ready.Store(false)
 	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6, 34); err == nil || !strings.Contains(err.Error(), "movement_blocked:collision_bounds_block_path:SM_TestWall") {
@@ -131,7 +136,7 @@ func TestOwnerMovementRetriesOnceAfterColdIndexTimeout(t *testing.T) {
 func TestPresenceRejectsBlockedOwnerSweepWithoutPublishingPose(t *testing.T) {
 	var ready atomic.Bool
 	ready.Store(true)
-	_, gateway, _ := movementAuthorityFixture(t, &ready)
+	_, gateway, _, _ := movementAuthorityFixture(t, &ready)
 	d := presenceTestDaemon(t)
 	d.world.WorldID = "elsemesh:hogwarts-legacy"
 	d.world.Rules.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
