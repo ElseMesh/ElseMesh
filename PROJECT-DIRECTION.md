@@ -40,22 +40,38 @@ WebGL presents the same authored world content. Gameplay parity is secondary
 until the visual gates are met. Treat existing captures as partial evidence,
 not completion.
 
-The renderer architecture target is one shared world runtime and renderer-
-neutral content contract. ElseMesh owns backend selection and supplies WebGPU
-and WebGL presenters that consume that same world data and simulation state.
-The client selects one backend for a run; do not mix both renderers in one
-frame. Do not keep separate world/game loops or move renderer-specific
-presenters into Tidewater. WebGPU and WebGL view parity must be tested against
-the same world-authored inputs, with the pre-split WebGPU render as the visual
-reference. Keep Tidewater authored content and gameplay modules in its
-repository, with ElseMesh providing generic browser-worker hosting, lifecycle,
-and message transport. World modules are owner-signed, hash-verified JavaScript
-assets executed in dedicated workers; pass versioned messages without engine
-object references, bound execution time, and terminate unresponsive workers.
-Keep each world's event vocabulary and gameplay rules in that world package,
-not in the ElseMesh engine. Preserve per-world state isolation and the declared
-shared, player, group, or persistent scopes. Keep player platform identity
-across portals without leaking instance state.
+The renderer architecture is hybrid across worlds and renderer-neutral within
+each world. ElseMesh owns backend selection and translates portable content and
+simulation through its WebGPU and WebGL presenters. Native world definitions
+must not select a renderer or contain backend code. The engine determines which
+registered presenter can consume each world's authored contracts and the
+browser's supported features, then chooses a suitable backend for that world.
+An existing world format may use an ElseMesh compatibility bridge that reads it
+unchanged when that is the only faithful path; AI Portals should initially use
+the Three.js/WebGL compatibility path without changes to its repository.
+
+Renderer choice can change as the player crosses between worlds. On a portal
+transition, preserve the browser client's player and simulation state while
+ElseMesh selects the destination world's presenter. A portal view into another
+world must use that destination's compatible presentation path and remain a
+contiguous, LOD-aware view from the mapped camera position. Define and verify
+the render-target/composition boundary for WebGL-to-WebGPU and
+WebGPU-to-WebGL portal views; do not assume both worlds must share one backend
+or that the same backend must render the whole visit. A world author must not
+have to implement both renderers.
+
+WebGPU and WebGL views of portable worlds must be tested against the same
+world-authored inputs, with the pre-split WebGPU render as the Tidewater visual
+reference. Do not keep separate world/game loops or move renderer-specific
+presenters into Tidewater. Keep Tidewater authored content and gameplay modules
+in its repository, with ElseMesh providing generic browser-worker hosting,
+lifecycle, and message transport. World modules are owner-signed,
+hash-verified JavaScript assets executed in dedicated workers; pass versioned
+messages without engine object references, bound execution time, and terminate
+unresponsive workers. Keep each world's event vocabulary and gameplay rules in
+that world package, not in the ElseMesh engine. Preserve per-world state
+isolation and the declared shared, player, group, or persistent scopes. Keep
+player platform identity across portals without leaking instance state.
 
 **Graphical world editor: 0%.** After package import and multiplayer acceptance
 pass, build the editor in ElseMesh so it edits the mounted Tidewater repository.
