@@ -182,7 +182,7 @@ func (d *daemon) validatePresenceAvatarSelection(p *playerPose) error {
 			break
 		}
 	}
-	if len(d.world.AvatarOptions) > 0 && selected == nil {
+	if p.AvatarOptionID == "" && len(d.world.AvatarOptions) > 0 {
 		return errors.New("avatar_option_required")
 	}
 	if p.AvatarOptionID != "" && selected == nil {
