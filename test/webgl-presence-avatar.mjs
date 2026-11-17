@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { WebGLRemoteAvatar } from '../src/fallback/WebGLRemoteAvatar.js';
+import { DEFAULT_APPEARANCE } from '../src/player/AvatarAppearance.js';
+
+const avatar = new WebGLRemoteAvatar( THREE, { appearance: DEFAULT_APPEARANCE } );
+assert.ok( avatar.group.isGroup, 'WebGL remote avatars use a Three.js group' );
+assert.equal( typeof avatar.group.onBeforeRender, 'function', 'the group satisfies Three.js renderer hooks' );
+assert.ok( avatar.group.children.every( child => child.isObject3D && typeof child.onBeforeRender === 'function' ), 'each child is a Three.js Object3D' );
+const pose = { position: [ 1.2, 7, 90 ], yaw: 0.4 };
+avatar.update( 0.016, pose );
+assert.deepEqual( avatar.group.position.toArray(), pose.position, 'remote pose updates the Three.js group position' );
+assert.equal( avatar.group.rotation.y, pose.yaw + Math.PI, 'remote pose updates the body heading' );
+avatar.setAppearance( { ...DEFAULT_APPEARANCE, shirt: '#8b1c2b' } );
+assert.equal( avatar.bodyMaterial.color.getHexString(), '8b1c2b', 'the world-selected appearance reaches the WebGL adapter' );
+avatar.setGhost( true );
+assert.equal( avatar.bodyMaterial.opacity, 0.35, 'ghost visitors render translucent' );
+avatar.setGhost( false );
+assert.equal( avatar.bodyMaterial.depthWrite, true, 'live visitors restore opaque depth writes' );
+avatar.dispose();
+console.log( 'ok   Three.js WebGL remote avatar adapter' );

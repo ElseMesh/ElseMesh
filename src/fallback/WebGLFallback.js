@@ -38,6 +38,7 @@ import { installWebGLSceneMaterialLighting } from './WebGLMaterialLighting.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
 import { WebGLRefractionPass } from './WebGLRefractionPass.js';
+import { WebGLRemoteAvatar } from './WebGLRemoteAvatar.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
 import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
@@ -2805,6 +2806,7 @@ export class WebGLFallback {
 		const session = new WorldPresenceSession( {
 			connector: this.connector, parent: this.scene, appearance,
 			avatarOptionId: this.entrySelection?.avatarOptionId || '', entryPointId: this.entrySelection?.id || '',
+			createAvatar: options => new WebGLRemoteAvatar( this.THREE, options ),
 		} );
 		try {
 			const candidates = worldSpawnCandidates( this.spawn, this.connector.manifest.rules.spawnRadius, this.app.hostedColliders, { playerCapsule: this.connector.manifest.rules.playerCapsule } );
