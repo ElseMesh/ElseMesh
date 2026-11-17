@@ -41,6 +41,12 @@ shadow path; its headless FPS is not a performance measurement. WebGL remains a
 content/gameplay alignment check after the original WebGPU appearance is
 established. See [`SPLIT-progress.md`](SPLIT-progress.md) for the detailed
 evidence and open gates; existing captures do not alone establish completion.
+Engine-controlled adaptive quality may tune render scale, shadow/reflection
+cost, texture mip or residency, and selection among the shared authored LOD
+assets to meet the frame-rate target. Those controls must keep the same world
+objects, placements, and texture sources available in WebGPU and WebGL; do not
+meet the target by dropping object classes or switching to a backend-specific
+content set.
 
 The renderer architecture is hybrid across worlds and renderer-neutral within
 each world. ElseMesh owns backend selection and translates portable content and
