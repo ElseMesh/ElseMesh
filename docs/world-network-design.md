@@ -391,6 +391,17 @@ while preserving their independent avatar body and personal style settings.
 If a world provides no choices, keep the ordinary authored spawn behavior.
 Reject malformed or unresolvable choices rather than guessing positions.
 
+World-authored choices may also grant access to authored regions or actions.
+The engine keeps the selected choice bound to the admitted visitor session;
+`worldd` evaluates the world's access rules before authorizing movement,
+collision-frontier prefetch, or visual/content leases. A client-selected label,
+avatar appearance, URL, or local state is not proof of permission. The world
+defines the rule and its stable region/action identifiers; the generic engine
+does not encode a particular world's groups or locations. Denied destinations
+must remain unreachable and their protected content must not be served, even
+when requested directly. Admission, portal handoff, and reconnect must carry
+or revalidate the same choice under the destination world's policy.
+
 Hosted worlds have no active waterline by default. A world opts into water by
 declaring a supported water component and its own finite `rules.seaLevel`;
 without both, the hosted player has no swim/waterline behavior. Tidewater's
