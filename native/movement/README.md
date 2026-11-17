@@ -7,7 +7,7 @@ movement validation. The bridge/provider remains responsible for decoding and
 normalizing source collision; the caller still decides whether collision
 coverage is complete and whether a missing support result is safe.
 
-The kernel is not yet wired into the browser or `worldd`/HogwartsBridge. Keep
+The kernel is not yet wired into the browser or `worldd`/source provider. Keep
 the existing movement gate fail-closed until both sides call this implementation
 with the same normalized collision data. This support-only API does not replace
 capsule sweeps, contact resolution, or step selection.
