@@ -43,8 +43,10 @@ await assert.rejects( selectBackend( {
 // Exercise hosted initialization through lighting setup without needing a GPU.
 // A world may omit its environment or explicitly request a skyless scene.
 const previousLocation = globalThis.location;
+const previousWindow = globalThis.window;
 try {
 	globalThis.location = { search: '' };
+	globalThis.window = { innerWidth: 1600, innerHeight: 900, addEventListener() {} };
 	for ( const environment of [ undefined, { sky: 'none', clouds: 'none' } ] ) {
 		const fallback = Object.create( WebGLFallback.prototype );
 		const reachedWorldLoading = new Error( 'lighting initialized' );
@@ -70,6 +72,8 @@ try {
 } finally {
 	if ( previousLocation === undefined ) delete globalThis.location;
 	else globalThis.location = previousLocation;
+	if ( previousWindow === undefined ) delete globalThis.window;
+	else globalThis.window = previousWindow;
 }
 
 console.log( 'webgl backend selection passed' );
