@@ -1141,6 +1141,7 @@ export class App {
 		const shadows = new SunShadows( {
 			size: SUN_SHADOW_PROFILE.mapSize,
 			splits: SUN_SHADOW_PROFILE.cascadeDistances,
+			updatePeriods: SUN_SHADOW_PROFILE.updatePeriods,
 			lightMargin: SUN_SHADOW_PROFILE.lightMargin,
 			normalBias: SUN_SHADOW_PROFILE.normalBias,
 			bias: SUN_SHADOW_PROFILE.bias,

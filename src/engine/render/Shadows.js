@@ -21,14 +21,14 @@ const _tmp4 = new Vector4();
 
 export class SunShadows {
 
-	constructor( { size = 2048, splits = [ 10, 60, 400 ], lightMargin = 200, normalBias = [ 0.015, 0.06, 0.3 ], bias = 0.00002, pcssCascades = 1 } = {} ) {
+	constructor( { size = 2048, splits = [ 10, 60, 400 ], updatePeriods = null, lightMargin = 200, normalBias = [ 0.015, 0.06, 0.3 ], bias = 0.00002, pcssCascades = 1 } = {} ) {
 
 		this.size = size;
 		this.splits = splits;
 		this.count = splits.length;
 		this.lightMargin = lightMargin;
 		this.normalBias = normalBias;
-		this.periods = splits.map( ( _, i ) => i === 0 ? 1 : i === 1 ? 2 : 4 );
+		this.periods = updatePeriods || splits.map( ( _, i ) => i === 0 ? 1 : i === 1 ? 2 : 4 );
 		this.texture = new Texture( { label: 'sunShadowMap', width: size, height: size, depth: this.count, dimension: '2d-array', format: 'depth32float', usage: [ 'sample', 'render' ] } );
 		setShadowMap( this.texture );
 		this.cascades = splits.map( ( _, i ) => ( {
