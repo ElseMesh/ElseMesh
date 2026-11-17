@@ -23,7 +23,7 @@ jobs:
           ref: main
           submodules: false
       - name: Initialize public Pages submodules
-        run: git submodule update --init --recursive --depth=1 -- third_party/basis_universal worlds/tidewater
+        run: git submodule update --init --recursive --depth=1 -- third_party/basis_universal worlds/tidewater worlds/ai-portals
       - id: main-revision
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
