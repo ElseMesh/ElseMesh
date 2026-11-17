@@ -1,11 +1,12 @@
 # Ground-cover field component, version 1
 
-**Status: migration contract; no production adapter is registered yet.** This
-component defines the portable inputs for dense vegetation. The world supplies
-signed density and GLB model assets plus placement, species, LOD, wind, and
-shadow data. ElseMesh owns deterministic cell selection, instance generation,
-GPU resources, and the WebGPU/WebGL presenters. Neither the component nor its
-assets select a backend or contain shader source.
+**Status: generic WebGPU and WebGL adapters are registered and covered by a
+shared signed-asset render fixture. Tidewater has not switched to this
+component.** This component defines the portable inputs for dense vegetation.
+The world supplies signed density and GLB model assets plus placement, species,
+LOD, wind, and shadow data. ElseMesh owns deterministic cell selection,
+instance generation, GPU resources, and both backend presenters. Neither the
+component nor its assets select a backend or contain shader source.
 
 ```json
 {
@@ -40,7 +41,6 @@ assets select a backend or contain shader source.
         "drawMaxDistance": 88,
         "drawFadeStartDistance": 81,
         "scaleRange": [ 0.7, 1.3 ],
-        "windInfluence": 1,
         "castsShadow": false,
         "shadowMaxDistance": 0
       }
@@ -88,15 +88,23 @@ selection.
 
 Species GLBs use standard glTF materials or `elsemesh.material-graph/1` data.
 The graph may use the shared time, wind direction, and wind speed inputs for
-vertex deformation. `windInfluence` scales that declared behavior per species;
-it does not select a renderer implementation. `castsShadow` and
+vertex deformation; authored wind response belongs in that renderer-neutral
+material graph rather than in a renderer-specific field setting. `castsShadow` and
 `shadowMaxDistance` are shared intent consumed by each backend's shadow path.
+
+The registered WebGPU and WebGL adapters consume the same signed-density and
+GLB fixture. Both select 51 visible and 45 near-shadow instances from the same
+seeded camera view; WebGPU verifies that disabling the shared shadow map changes
+receiving pixels, and WebGL compiles and renders the three-cascade depth path
+without GL errors. These checks prove component installation and backend draw
+submission, not matched visual parity for Tidewater's authored vegetation.
 
 The validator rejects unknown fields, duplicate species, malformed density
 expressions, unsigned or undeclared assets, invalid LOD thresholds,
 out-of-range distances, and unbounded counts. The sum of distance-band capacities times candidate points
 per cell times species count may not exceed one million visible candidate
 records. The runtime releases cached cell records once they leave its active
-camera coverage. Tidewater must not switch to this component until both engine
-backends consume one signed fixture and matched images preserve the pre-split
-WebGPU vegetation at identical camera, time, viewport, and render scale.
+camera coverage. Tidewater must not switch to this component until matched
+images preserve the pre-split WebGPU vegetation at identical camera, time,
+viewport, and render scale, including species appearance, density distribution,
+wind response, LOD transitions, and shadow reach.

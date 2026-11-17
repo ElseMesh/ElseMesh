@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerWorldComponentBackendAdapter, registerWorldComponentBackendBatchAdapter, worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../src/network/WorldComponentBackendRegistry.js';
-import { worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
 
 const webgpu = ( context, component ) => ( { backend: 'webgpu', context, component } );
 const webgl = ( context, component ) => ( { backend: 'webgl', context, component } );
@@ -63,6 +63,11 @@ assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGPU static-model adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGL static-model adapter' );
+const groundCoverType = 'elsemesh.ground-cover-field/1';
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', groundCoverType ), 'function', 'ElseMesh registers a generic WebGPU ground-cover presenter' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgl', groundCoverType ), 'function', 'ElseMesh registers a generic WebGL ground-cover presenter' );
+assert.equal( worldComponentDescriptor( groundCoverType )?.vegetation, true, 'ground-cover fields participate in renderer-neutral vegetation visibility policy' );
+assert.deepEqual( worldComponentAssetIDs( { type: groundCoverType, assets: [ { assetId: 'density', kind: 'grass-density/1' }, { assetId: 'near', kind: 'glb' }, { assetId: 'far', kind: 'glb' } ] } ), [ 'density' ], 'ground-cover model GLBs are lazy assets while density is loaded with the component' );
 const tidewaterFishProps = 'elsemesh.static-fish-props/1';
 assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'ElseMesh registers the generic fish-props component contract' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGPU fish-props presenter' );

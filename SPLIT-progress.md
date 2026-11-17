@@ -1915,3 +1915,14 @@ finding changes them.
   commit `779c7def` at `https://elsemesh.org/`. No fresh FPS-mode image was
   captured, so this is a code/deployment check rather than a new visual-parity
   gate. Tidewater gameplay and content parity remains 93%.
+
+- 2026-11-17: registered paired engine-owned WebGPU and WebGL presenters for
+  `elsemesh.ground-cover-field/1`. Both consume one signed density/GLB fixture
+  and select 51 visible plus 45 near-shadow instances from the same seeded
+  camera view. WebGPU renders the field over a receiver and detects 82 changed
+  pixels when the shadow map is disabled; WebGL renders the matching scene with
+  three compiled shadow programs and no GL errors. Tidewater remains on its
+  existing vegetation presenters until authored appearance, wind, LOD, and
+  shadow reach match the pre-split WebGPU view. This closes generic adapter
+  coverage only; renderer-neutral progress remains 71% and Tidewater parity
+  remains 93%.

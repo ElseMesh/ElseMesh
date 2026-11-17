@@ -13,7 +13,7 @@ const data = {
 		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [], lodFadeFraction: 0.12,
 		drawMaxDistance: 24, drawFadeStartDistance: 20, scaleRange: [ 1, 1 ],
-		windInfluence: 1, castsShadow: true, shadowMaxDistance: 12,
+		castsShadow: true, shadowMaxDistance: 12,
 	} ],
 };
 const terrain = { res: 16, size: 16, origin: 0, texel: 1, heights: new Float32Array( 256 ), heightAt: () => 0 };

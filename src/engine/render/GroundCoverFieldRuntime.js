@@ -106,7 +106,6 @@ export class GroundCoverFieldRuntime {
 					lodFadeFraction: species.lodFadeFraction,
 					drawMaxDistance: species.drawMaxDistance,
 					drawFadeStartDistance: species.drawFadeStartDistance,
-					windInfluence: species.windInfluence,
 					castsShadow: species.castsShadow,
 					shadowMaxDistance: species.shadowMaxDistance,
 					cellIndex,

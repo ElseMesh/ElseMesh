@@ -5,7 +5,7 @@ import { StaticModelInstanceSetPlanner } from '../src/engine/render/StaticModelI
 const modelAssetIds = [ `sha256:${'a'.repeat( 64 )}`, `sha256:${'b'.repeat( 64 )}` ];
 const record = ( x, shadowMaxDistance = 25 ) => ( {
 	speciesId: 'grass', modelAssetIds, lodMetric: 'scaled-distance', lodThresholds: [ 10 ], lodFadeFraction: 0.2,
-	drawMaxDistance: 100, drawFadeStartDistance: 8, windInfluence: 1, castsShadow: true, shadowMaxDistance,
+	drawMaxDistance: 100, drawFadeStartDistance: 8, castsShadow: true, shadowMaxDistance,
 	bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, position: [ x, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ],
 } );
 const camera = {

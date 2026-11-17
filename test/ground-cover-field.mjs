@@ -21,7 +21,7 @@ const field = {
 		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [ 46 ], lodFadeFraction: 0.12,
 		drawMaxDistance: 88, drawFadeStartDistance: 81, scaleRange: [ 0.7, 1.3 ],
-		windInfluence: 1, castsShadow: false, shadowMaxDistance: 0,
+		castsShadow: false, shadowMaxDistance: 0,
 	} ],
 };
 
@@ -37,6 +37,7 @@ for ( const invalid of [
 	{ ...field, species: [ { ...field.species[ 0 ], modelAssetIds: [ `sha256:${'d'.repeat( 64 )}` ], lodThresholds: [] } ] },
 	{ ...field, species: [ { ...field.species[ 0 ], lodThresholds: [ 0, 46 ] } ] },
 	{ ...field, species: [ { ...field.species[ 0 ], castsShadow: false, shadowMaxDistance: 20 } ] },
+	{ ...field, species: [ { ...field.species[ 0 ], windInfluence: 1 } ] },
 	{ ...field, pointsPerCell: 4096, distanceBands: [ { maxDistance: 100, cellCapacity: 8192 } ] },
 ] ) assert.throws( () => validateGroundCoverField( invalid, assets ), /Invalid ground-cover field/ );
 

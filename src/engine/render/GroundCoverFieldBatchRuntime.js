@@ -12,7 +12,7 @@ function pack( cache, instances, speciesId, lodIndex, group, shadow = false ) {
 	const key = `${speciesId}:${lodIndex}:${shadow ? 'shadow' : 'visible'}`;
 	let batch = cache.get( key );
 	if ( ! batch ) {
-		batch = { speciesId, lodIndex, shadow, count: 0, matrices: new Float32Array( 0 ), fades: new Float32Array( 0 ) };
+		batch = { speciesId, lodIndex, shadow, count: 0, matrices: new Float32Array( 0 ), fades: new Float32Array( 0 ), geometryMirrorX: false };
 		cache.set( key, batch );
 	}
 	batch.count = count;
@@ -21,6 +21,7 @@ function pack( cache, instances, speciesId, lodIndex, group, shadow = false ) {
 	writeInstanceMatrices( instances, group, batch.matrices );
 	writeInstanceFades( group, batch.fades );
 	batch.assetId = count ? instances[ group.indices[ 0 ] ].modelAssetIds[ lodIndex ] : null;
+	batch.geometryMirrorX = count ? instances[ group.indices[ 0 ] ].geometryMirrorX : false;
 	return batch;
 }
 

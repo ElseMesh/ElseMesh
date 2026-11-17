@@ -12,7 +12,7 @@ const data = {
 		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [], lodFadeFraction: 0.12,
 		drawMaxDistance: 24, drawFadeStartDistance: 20, scaleRange: [ 0.7, 1.3 ],
-		windInfluence: 1, castsShadow: false, shadowMaxDistance: 0,
+		castsShadow: false, shadowMaxDistance: 0,
 	} ],
 };
 const terrain = {

@@ -2,6 +2,7 @@ import { worldComponentDescriptor } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import './WebGLWaterComponentAdapters.js';
 import './WebGLStaticModelInstanceSetAdapter.js';
+import './WebGLGroundCoverFieldAdapter.js';
 import './WebGLGroundDetailFieldAdapter.js';
 import './WebGLFishPropsComponentAdapter.js';
 

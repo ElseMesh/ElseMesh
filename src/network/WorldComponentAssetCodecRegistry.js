@@ -1,5 +1,6 @@
 import { decodeStaticModelInstanceSet, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
 import { decodeGroundDetailDensityAsset, GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js';
+import { decodeGrassDensityAsset, GRASS_DENSITY_ASSET_KIND } from './GrassDensityAsset.js';
 
 const decoders = new Map();
 
@@ -7,6 +8,7 @@ const decoders = new Map();
 // format, so every world uses the same validator without registering a codec.
 decoders.set( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, decodeStaticModelInstanceSet );
 decoders.set( GROUND_DETAIL_DENSITY_ASSET_KIND, decodeGroundDetailDensityAsset );
+decoders.set( GRASS_DENSITY_ASSET_KIND, decodeGrassDensityAsset );
 
 export function registerWorldComponentAssetDecoder( kind, decode ) {
 	if ( typeof kind !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}\/\d+$/.test( kind ) || typeof decode !== 'function' || decoders.has( kind ) ) {

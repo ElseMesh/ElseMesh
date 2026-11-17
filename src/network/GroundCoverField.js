@@ -30,7 +30,7 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 	if ( ! Array.isArray( data.species ) || data.species.length < 1 || data.species.length > MAX_SPECIES ) fail( `species must contain 1–${MAX_SPECIES} entries` );
 	const speciesIDs = new Set(), modelAssetIDs = new Set();
 	for ( const species of data.species ) {
-		if ( ! record( species ) || ! allowed( species, [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'drawMaxDistance', 'drawFadeStartDistance', 'scaleRange', 'windInfluence', 'castsShadow', 'shadowMaxDistance' ] ) ) fail( 'species entry has unknown fields' );
+		if ( ! record( species ) || ! allowed( species, [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'drawMaxDistance', 'drawFadeStartDistance', 'scaleRange', 'castsShadow', 'shadowMaxDistance' ] ) ) fail( 'species entry has unknown fields' );
 		if ( typeof species.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( species.id ) || speciesIDs.has( species.id ) ) fail( 'species ID is invalid or duplicated' );
 		speciesIDs.add( species.id );
 		try { compileGroundCoverDensityExpression( species.densityExpression ); } catch ( error ) { fail( `species ${species.id} has an invalid density expression (${error.message})` ); }
@@ -42,7 +42,7 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 		if ( ! finite( species.lodFadeFraction ) || species.lodFadeFraction < 0 || species.lodFadeFraction > 0.5 ) fail( `species ${species.id} LOD fade is invalid` );
 		if ( ! finite( species.drawMaxDistance ) || species.drawMaxDistance <= 0 || species.drawMaxDistance > data.distanceBands.at( - 1 ).maxDistance || ! finite( species.drawFadeStartDistance ) || species.drawFadeStartDistance < 0 || species.drawFadeStartDistance > species.drawMaxDistance ) fail( `species ${species.id} draw range is invalid` );
 		if ( ! Array.isArray( species.scaleRange ) || species.scaleRange.length !== 2 || species.scaleRange.some( value => ! finite( value ) || value <= 0 || value > 100 ) || species.scaleRange[ 0 ] > species.scaleRange[ 1 ] ) fail( `species ${species.id} scale range is invalid` );
-		if ( ! finite( species.windInfluence ) || species.windInfluence < 0 || species.windInfluence > 4 || typeof species.castsShadow !== 'boolean' || ! finite( species.shadowMaxDistance ) || species.shadowMaxDistance < 0 || species.shadowMaxDistance > 10000 ) fail( `species ${species.id} wind or shadow settings are invalid` );
+		if ( typeof species.castsShadow !== 'boolean' || ! finite( species.shadowMaxDistance ) || species.shadowMaxDistance < 0 || species.shadowMaxDistance > 10000 ) fail( `species ${species.id} shadow settings are invalid` );
 		if ( ! species.castsShadow && species.shadowMaxDistance !== 0 ) fail( `species ${species.id} cannot have a shadow distance when shadows are disabled` );
 	}
 	const maxCandidates = data.distanceBands.reduce( ( total, band ) => total + band.cellCapacity, 0 ) * data.pointsPerCell * data.species.length;
