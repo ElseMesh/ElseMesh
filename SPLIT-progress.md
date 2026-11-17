@@ -1898,3 +1898,12 @@ finding changes them.
   2.52/255 full-frame and 2.71/255 breaker-band MAE against the pre-split view;
   time-varying spray, broader material, and WebGL parity remain open. Tidewater
   gameplay and content parity remains 93%.
+
+- 2026-11-17: captured hosted WebGPU `beach`, `surf`, and `swash` sequences on
+  AMD RADV with 64 settling frames and three samples 30 frames apart. The three
+  hosted beach phases visually track the pre-split breaker and whitewater
+  phases; comparison against the retained JPEG reference gives approximate
+  full-frame MAE 2.32–2.44/255. Matching raw pre-split sequences for `surf` and
+  `swash` were unavailable, so those dynamic views remain unverified. This
+  closes no broad parity gate; Tidewater gameplay and content parity remains
+  93%.

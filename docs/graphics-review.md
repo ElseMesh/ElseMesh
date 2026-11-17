@@ -30,6 +30,20 @@ remain open.
 
 [Pre-split and hosted surf comparison](images/tidewater-hosted-webgpu-surf-2026-11-17.png).
 
+A fresh hosted WebGPU run then captured `beach`, `surf`, and `swash` in the same
+order, with 64 settling frames, `dt=0.5`, and three samples 30 frames apart.
+Chromium reported the AMD Radeon RADV RENOIR adapter and WebGPU enabled. The
+hosted `beach` sequence follows the same three breaker/whitewater phases as the
+pre-split sequence shown in the 2026-11-15 reference sheet. Approximate MAE
+after matching the reference JPEG panels to the 1100×544 hosted frames was
+2.32–2.44/255 full frame and 2.69–2.81/255 over the shoreline/wave band. The
+JPEG contact sheet is a lossy reference, so these numbers are indicative rather
+than raw-frame parity metrics. The hosted run also collected `surf` and
+`swash`, but no matching raw pre-split sequences are retained for those poses;
+their phase parity remains open.
+
+[Pre-split and hosted WebGPU beach spray phases](images/tidewater-hosted-webgpu-wave-spray-phases-2026-11-17.jpg).
+
 ## 2026-11-15 matched pre-split and split WebGPU views
 
 The original ElseMesh build at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
