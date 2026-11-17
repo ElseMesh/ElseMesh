@@ -42,18 +42,22 @@ Object.setPrototypeOf( player, Player.prototype );
 const movementRules = {
 	gravity: 1, movement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 }, playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 },
 	movementProfiles: {
-		avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 }, 'elsemesh.avatar.stock-female/1': { stepHeightMeters: 0.2 } },
-		vehicles: { 'elsemesh.downeast-boat/1': { stepHeightMeters: 0.36 } },
+		avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6, maxWalkableSlopeDegrees: 34 }, 'elsemesh.avatar.stock-female/1': { stepHeightMeters: 0.2, maxWalkableSlopeDegrees: 12 } },
+		vehicles: { 'elsemesh.downeast-boat/1': { stepHeightMeters: 0.36, maxWalkableSlopeDegrees: 24 } },
 	},
 };
 Player.prototype.setWorldRules.call( player, movementRules, { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } );
 assert.equal( player.avatarStepHeightMeters, 0.6, 'walking step capability follows the active avatar profile' );
 assert.equal( player.vehicleStepHeightMeters, 0.36, 'deck step capability follows the active vehicle profile' );
+assert.equal( player.avatarMaxWalkableSlopeDegrees, 34, 'walking slope capability follows the active avatar profile' );
+assert.equal( player.vehicleMaxWalkableSlopeDegrees, 24, 'vehicle slope capability follows the active vehicle profile' );
 Player.prototype.setWorldRules.call( player, movementRules, { avatarProfileId: 'elsemesh.avatar.stock-female/1', vehicleType: null } );
 assert.equal( player.avatarStepHeightMeters, 0.2, 'a different avatar can carry a different authored step capability' );
+assert.equal( player.avatarMaxWalkableSlopeDegrees, 12, 'a different avatar can carry a different authored slope capability' );
 assert.equal( player.vehicleStepHeightMeters, 0, 'a walking avatar does not inherit the vehicle step capability' );
 Player.prototype.setWorldRules.call( player, { gravity: 1 }, { avatarProfileId: 'elsemesh.avatar.stock-female/1', vehicleType: null } );
 assert.equal( player.avatarStepHeightMeters, 0, 'an omitted avatar capability fails closed to no automatic step-up' );
+assert.ok( Math.abs( player.avatarMaxWalkableSlopeDegrees - Math.acos( 0.95 ) * 180 / Math.PI ) < 1e-9, 'an omitted slope capability retains the existing engine slope limit' );
 Player.prototype.setWorldRules.call( player, movementRules, { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.downeast-boat/1' } );
 Player.prototype.setHostedWorldPose.call( player, new Vector3( 0, 1.62, 0 ), 0, 0 );
 assert.equal( player.position.y, 0 );
@@ -115,6 +119,48 @@ assert.equal( blockedStepPlayer.position.y, 0, 'hosted movement does not step wh
 const incapableAvatar = makeHostedStepPlayer( true, 0.2 );
 for ( let frame = 0; frame < 60; frame ++ ) Player.prototype.updateHostedWorld.call( incapableAvatar, 1 / 30 );
 assert.equal( incapableAvatar.position.y, 0, 'an avatar whose world profile is shorter than the riser cannot step onto it' );
+
+const convexStepColliders = new Colliders();
+convexStepColliders.addBox( new Vector3( 0, - 0.1, 0 ), new Vector3( 3, 0.1, 3 ), 0, { walkable: true, solid: true } );
+convexStepColliders.addConvex( [
+	new Vector3( - 1, 0, 0 ), new Vector3( 1, 0, 0 ), new Vector3( - 1, 0, - 2 ), new Vector3( 1, 0, - 2 ),
+	new Vector3( - 1, 0.5, 0 ), new Vector3( 1, 0.5, 0 ), new Vector3( 1, 0.5, - 2 ), new Vector3( - 1, 0.5, - 2 ),
+], [ 4, 5, 6, 4, 6, 7, 0, 2, 3, 0, 3, 1, 0, 1, 5, 0, 5, 4, 1, 3, 6, 1, 6, 5, 3, 2, 7, 3, 7, 6, 2, 0, 4, 2, 4, 7 ] );
+const convexStepPlayer = Object.assign( Object.create( Player.prototype ), {
+	camera: { position: new Vector3(), quaternion: new Quaternion() },
+	input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 0, y: 1, sprint: 0 } ), down: () => false, hit: () => false },
+	colliders: convexStepColliders, terrain: { heightAt: () => 0 }, position: new Vector3(), velocity: new Vector3(),
+	_previousPosition: new Vector3(), playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 }, avatarStepHeightMeters: 0.6,
+	worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
+	yaw: 0, pitch: 0, grounded: true, gravity: 9.81, hostedSeaLevel: null,
+	hostedCollisionGuard: () => true,
+} );
+Player.prototype.setHostedWorldPose.call( convexStepPlayer, new Vector3( 0, 1.62, 0.6 ), 0, 0 );
+convexStepPlayer.grounded = true;
+for ( let frame = 0; frame < 90; frame ++ ) Player.prototype.updateHostedWorld.call( convexStepPlayer, 1 / 60 );
+assert.ok( Math.abs( convexStepPlayer.position.y - 0.5 ) < 1e-6, 'hosted walking steps up a convex riser using the capsule leading edge' );
+assert.ok( convexStepPlayer.position.z < - 0.5, 'hosted movement continues across the convex stair tread without jumping' );
+
+const rampColliders = new Colliders();
+rampColliders.addBox( new Vector3( 0, - 0.1, 0 ), new Vector3( 3, 0.1, 3 ), 0, { walkable: true, solid: true } );
+rampColliders.addConvex( [
+	new Vector3( - 1, 0, 0 ), new Vector3( 1, 0, 0 ), new Vector3( - 1, 0, - 1 ),
+	new Vector3( 1, 0, - 1 ), new Vector3( - 1, 0.65, - 1 ), new Vector3( 1, 0.65, - 1 ),
+], [ 0, 1, 3, 0, 3, 2, 0, 4, 5, 0, 5, 1, 0, 2, 4, 1, 5, 3, 2, 3, 5, 2, 5, 4 ] );
+const rampPlayer = Object.assign( Object.create( Player.prototype ), {
+	camera: { position: new Vector3(), quaternion: new Quaternion() },
+	input: { consumeLook: () => ( { x: 0, y: 0 } ), moveAxes: () => ( { x: 0, y: 1, sprint: 0 } ), down: () => false, hit: () => false },
+	colliders: rampColliders, terrain: { heightAt: () => 0 }, position: new Vector3(), velocity: new Vector3(),
+	_previousPosition: new Vector3(), playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 }, avatarStepHeightMeters: 0.6,
+	avatarMaxWalkableSlopeDegrees: 34,
+	worldMovement: { walkSpeed: 1.5, sprintSpeed: 4, jumpSpeed: 2.5 },
+	yaw: 0, pitch: 0, grounded: true, gravity: 9.81, hostedSeaLevel: null,
+	hostedCollisionGuard: () => true,
+} );
+Player.prototype.setHostedWorldPose.call( rampPlayer, new Vector3( 0, 1.62, 0.4 ), 0, 0 );
+rampPlayer.grounded = true;
+for ( let frame = 0; frame < 35; frame ++ ) Player.prototype.updateHostedWorld.call( rampPlayer, 1 / 60 );
+assert.ok( rampPlayer.position.y > 0.2 && rampPlayer.position.z < - 0.3, 'hosted avatar walks up a convex incline allowed by its movement profile' );
 
 // Signed world terrain is a ground surface even when the package has no object
 // collider at the player's position (for example, open beach sand).

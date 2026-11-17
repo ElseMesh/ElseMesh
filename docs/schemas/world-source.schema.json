@@ -395,7 +395,10 @@
                 "^elsemesh\\.avatar\\.[a-z0-9.-]+/\\d+$": {
                   "type": "object",
                   "required": [ "stepHeightMeters" ],
-                  "properties": { "stepHeightMeters": { "type": "number", "minimum": 0, "maximum": 1.5 } },
+                  "properties": {
+                    "stepHeightMeters": { "type": "number", "minimum": 0, "maximum": 1.5 },
+                    "maxWalkableSlopeDegrees": { "type": "number", "minimum": 0, "maximum": 89 }
+                  },
                   "additionalProperties": false
                 }
               },
@@ -408,7 +411,10 @@
                 "^elsemesh\\.[a-z0-9.-]+/\\d+$": {
                   "type": "object",
                   "required": [ "stepHeightMeters" ],
-                  "properties": { "stepHeightMeters": { "type": "number", "minimum": 0, "maximum": 1.5 } },
+                  "properties": {
+                    "stepHeightMeters": { "type": "number", "minimum": 0, "maximum": 1.5 },
+                    "maxWalkableSlopeDegrees": { "type": "number", "minimum": 0, "maximum": 89 }
+                  },
                   "additionalProperties": false
                 }
               },
@@ -416,7 +422,7 @@
             }
           },
           "additionalProperties": false,
-          "description": "Optional step-up capabilities keyed by stable avatar profile or vehicle type ID. Missing entries grant no automatic step-up."
+          "description": "Optional step-up and walkable-slope capabilities keyed by stable avatar profile or vehicle type ID. Missing entries grant no automatic step-up and retain the engine default walkable-slope limit."
         },
         "vehiclePolicy": {
           "type": "object",

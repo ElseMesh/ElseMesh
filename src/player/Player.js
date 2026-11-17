@@ -1,5 +1,6 @@
 import * as THREE from '../engine/math/index.js';
 import { gravityAcceleration, movementParameters, movementProfileParameters, playerCapsuleParameters } from '../network/WorldRules.js';
+import { DEFAULT_WALKABLE_SLOPE_DEGREES } from '../world/Colliders.js';
 import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
 
 const DEFAULT_HELM = { x: 0, z: 0 };
@@ -82,6 +83,10 @@ export class Player {
 		this.avatarProfileId = 'elsemesh.avatar.stock-male/1';
 		this.vehicleType = null;
 		this.movementProfiles = movementProfileParameters( null );
+		this.avatarStepHeightMeters = 0;
+		this.vehicleStepHeightMeters = 0;
+		this.avatarMaxWalkableSlopeDegrees = DEFAULT_WALKABLE_SLOPE_DEGREES;
+		this.vehicleMaxWalkableSlopeDegrees = DEFAULT_WALKABLE_SLOPE_DEGREES;
 		this.hostedCollisionGuard = null;
 
 		// boat cameras
@@ -113,13 +118,17 @@ export class Player {
 		this.movementProfiles = movementProfileParameters( rules );
 		this.avatarProfileId = avatarProfileId;
 		this.vehicleType = vehicleType;
-		this.avatarStepHeightMeters = this.movementProfiles.avatars[ avatarProfileId ]?.stepHeightMeters ?? 0;
-		this.vehicleStepHeightMeters = this.movementProfiles.vehicles[ vehicleType ]?.stepHeightMeters ?? 0;
+		const avatarProfile = this.movementProfiles.avatars[ avatarProfileId ];
+		const vehicleProfile = this.movementProfiles.vehicles[ vehicleType ];
+		this.avatarStepHeightMeters = avatarProfile?.stepHeightMeters ?? 0;
+		this.vehicleStepHeightMeters = vehicleProfile?.stepHeightMeters ?? 0;
+		this.avatarMaxWalkableSlopeDegrees = avatarProfile?.maxWalkableSlopeDegrees ?? DEFAULT_WALKABLE_SLOPE_DEGREES;
+		this.vehicleMaxWalkableSlopeDegrees = vehicleProfile?.maxWalkableSlopeDegrees ?? DEFAULT_WALKABLE_SLOPE_DEGREES;
 	}
 
 	setHostedWorldPose( eyePosition, yaw = this.yaw, pitch = this.pitch ) {
 		this.position.set( eyePosition.x, eyePosition.y - EYE, eyePosition.z );
-		const ground = this.colliders.groundHeightAt( this.position.x, this.position.z, eyePosition.y + 0.5 );
+		const ground = this.colliders.groundHeightAt( this.position.x, this.position.z, eyePosition.y + 0.5, 0, this.avatarMaxWalkableSlopeDegrees, this.playerCapsule.radiusMeters );
 		if ( Number.isFinite( ground ) && this.position.y < ground ) this.position.y = ground;
 		this.velocity.set( 0, 0, 0 );
 		this.yaw = yaw;
@@ -197,14 +206,14 @@ export class Player {
 				}
 			}
 		}
-		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters );
+		this.colliders.resolveCapsule( this.position, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarMaxWalkableSlopeDegrees );
 		this.resolveBoatCollision( this.position, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( this._previousPosition, this.position ) ) return;
 		// Hosted collision data includes object and deck colliders, while the signed
 		// terrain heightfield is the ground surface between them. Never sample the
 		// hidden local procedural island for a hosted world.
 		const terrainGround = this.terrain?.heightAt( this.position.x, this.position.z ) ?? - Infinity;
-		const colliderGround = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, this.playerCapsule.radiusMeters );
+		const colliderGround = this.colliders.groundHeightAt( this.position.x, this.position.z, this.position.y + 0.45, this.playerCapsule.radiusMeters, this.avatarMaxWalkableSlopeDegrees, this.playerCapsule.radiusMeters );
 		const ground = Math.max( terrainGround, colliderGround );
 		if ( this.position.y <= ground ) {
 			this.position.y = ground;
@@ -244,7 +253,7 @@ export class Player {
 	groundAt( x, z, maxY ) {
 
 		let g = this.terrain?.heightAt( x, z ) ?? - Infinity;
-		const c = this.colliders.groundHeightAt( x, z, maxY, this.playerCapsule.radiusMeters );
+		const c = this.colliders.groundHeightAt( x, z, maxY, this.playerCapsule.radiusMeters, this.avatarMaxWalkableSlopeDegrees, this.playerCapsule.radiusMeters );
 		if ( c > g ) g = c;
 		if ( this.reef && this.reef.floorHeightAt ) g = Math.max( g, this.reef.floorHeightAt( x, z ) );
 		return g;
@@ -360,7 +369,7 @@ export class Player {
 				this.velocity.y = 0;
 			}
 		}
-		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters );
+		this.colliders.resolveCapsule( p, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarMaxWalkableSlopeDegrees );
 		this.resolveBoatCollision( p, this.playerCapsule.heightMeters );
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );

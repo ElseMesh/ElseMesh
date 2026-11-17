@@ -41,6 +41,23 @@ func presenceForPlayer(players []playerPresence, id string) playerPresence {
 	}
 	return playerPresence{}
 }
+
+func TestPresenceWalkableSlopeUsesSelectedMovementProfile(t *testing.T) {
+	d := presenceTestDaemon(t)
+	slope := 34.0
+	d.world.Rules.MovementProfiles = &movementProfiles{Avatars: map[string]movementProfile{
+		"elsemesh.avatar.stock-male/1": {StepHeightMeters: 0.6, MaxWalkableSlopeDegrees: &slope},
+	}}
+	pose := presenceTestPose()
+	if got := d.presenceMaxWalkableSlopeDegrees(pose); got != slope {
+		t.Fatalf("avatar walkable slope = %v, want %v", got, slope)
+	}
+	pose.AvatarProfileID = "elsemesh.avatar.unconfigured/1"
+	if got := d.presenceMaxWalkableSlopeDegrees(pose); got != defaultWalkableSlopeDegrees {
+		t.Fatalf("unconfigured avatar slope = %v, want engine default %v", got, defaultWalkableSlopeDegrees)
+	}
+}
+
 func TestPresenceLimitsExpiryAndIdentity(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()

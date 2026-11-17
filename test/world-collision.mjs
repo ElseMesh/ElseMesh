@@ -190,6 +190,42 @@ const stepTarget = { x: 0, y: - 0.01, z: - 0.1 };
 assert.ok( Math.abs( stepColliders.stepCapsuleToSurface( stepTarget, stepStart, 0.42, 1.76, 0.6 ) - 0.578 ) < 1e-6, 'grounded capsules find the measured raised walkable surface within the step limit' );
 const steppedPosition = { ...stepTarget, y: 0.578 };
 assert.equal( stepColliders.resolveCapsule( steppedPosition, 0.42, 1.76 ), false, 'capsule clearance succeeds once feet reach the step top' );
+
+// A BodySetup convex stair hull has a vertical riser in front of its top face.
+// Its tread is walkable as soon as the capsule's leading support point reaches
+// the top, even while the capsule center remains just in front of that face.
+const convexStepColliders = new Colliders();
+convexStepColliders.addBox( new Vector3( 0, - 0.1, 0 ), new Vector3( 3, 0.1, 3 ), 0, { walkable: true, solid: true } );
+const convexStepVertices = [
+	new Vector3( - 1, 0, 0 ), new Vector3( 1, 0, 0 ), new Vector3( - 1, 0, - 2 ), new Vector3( 1, 0, - 2 ),
+	new Vector3( - 1, 0.5, 0 ), new Vector3( 1, 0.5, 0 ), new Vector3( 1, 0.5, - 2 ), new Vector3( - 1, 0.5, - 2 ),
+];
+convexStepColliders.addConvex( convexStepVertices, [
+	4, 5, 6, 4, 6, 7, 0, 2, 3, 0, 3, 1,
+	0, 1, 5, 0, 5, 4, 1, 3, 6, 1, 6, 5,
+	3, 2, 7, 3, 7, 6, 2, 0, 4, 2, 4, 7,
+] );
+const convexStepStart = { x: 0, y: 0, z: 0.5 };
+const convexStepTarget = { x: 0, y: 0, z: 0.4 };
+assert.equal( convexStepColliders.groundHeightAt( convexStepTarget.x, convexStepTarget.z, 0.61 ), 0, 'the capsule center has not reached the convex tread yet' );
+assert.ok( Math.abs( convexStepColliders.stepCapsuleToSurface( convexStepTarget, convexStepStart, 0.42, 1.76, 0.6 ) - 0.5 ) < 1e-6, 'the leading edge detects a convex tread before the center crosses the riser' );
+assert.equal( convexStepColliders.resolveCapsule( { ...convexStepTarget, y: 0.5 }, 0.42, 1.76 ), false, 'the raised capsule clears the convex riser' );
+
+const rampColliders = new Colliders();
+rampColliders.addBox( new Vector3( 0, - 0.1, 0 ), new Vector3( 3, 0.1, 3 ), 0, { walkable: true, solid: true } );
+rampColliders.addConvex( [
+	new Vector3( - 1, 0, 0 ), new Vector3( 1, 0, 0 ), new Vector3( - 1, 0, - 1 ),
+	new Vector3( 1, 0, - 1 ), new Vector3( - 1, 0.65, - 1 ), new Vector3( 1, 0.65, - 1 ),
+], [ 0, 1, 3, 0, 3, 2, 0, 4, 5, 0, 5, 1, 0, 2, 4, 1, 5, 3, 2, 3, 5, 2, 5, 4 ] );
+const rampHeight = rampColliders.groundHeightAt( 0, - 0.5, 1, 0, 34, 0.42 );
+assert.ok( rampHeight > 0.4 && rampHeight < 0.42, 'walkable convex slope height includes the vertical capsule support offset' );
+const rampPosition = { x: 0, y: 0, z: - 0.5 };
+assert.equal( rampColliders.resolveCapsule( rampPosition, 0.42, 1.76, 34 ), true, 'the profile permits contact correction on a walkable 33 degree convex slope' );
+assert.ok( Math.abs( rampPosition.y - rampHeight ) < 1e-6, 'walkable slope contact corrects capsule height instead of pushing it downhill' );
+const steepSlopePosition = { x: 0, y: 0, z: - 0.5 };
+rampColliders.resolveCapsule( steepSlopePosition, 0.42, 1.76, 18 );
+assert.equal( steepSlopePosition.y, 0, 'a profile below the convex slope angle does not climb that face' );
+
 const settledPosition = { x: 0, y: - 0.0981, z: 1.5 };
 assert.equal( stepColliders.resolveCapsule( settledPosition, 0.42, 1.76 ), true, 'measured first-frame floor penetration is resolved vertically on a walkable box' );
 assert.equal( settledPosition.y, 0, 'walkable floor correction preserves feet height' );

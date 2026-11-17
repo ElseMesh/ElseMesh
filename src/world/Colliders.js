@@ -2,6 +2,10 @@ import * as THREE from '../engine/index.js';
 
 // Lightweight collision world for the character controller and boat.
 // Boxes are oriented around Y only; convexes keep world-space hull planes.
+// This preserves the prior normal.y > 0.95 walkable-face cutoff when a world
+// does not supply a more specific avatar/vehicle slope capability.
+export const DEFAULT_WALKABLE_SLOPE_DEGREES = Math.acos( 0.95 ) * 180 / Math.PI;
+
 export class Colliders {
 
 	constructor() {
@@ -79,7 +83,7 @@ export class Colliders {
 			if ( ! bucket ) planeBuckets.set( key, bucket = [] );
 			let plane = bucket.find( item => item.normal.dot( normal ) > 1 - 1e-5 && Math.abs( item.distance - distance ) < 1e-4 );
 			if ( ! plane ) { plane = { normal: normal.clone(), distance }; bucket.push( plane ); planes.push( plane ); }
-			if ( normal.y > 0.95 ) triangles.push( { a: a.clone(), b: b.clone(), c: c.clone(), normal: normal.clone(), distance } );
+			if ( normal.y > 0 ) triangles.push( { a: a.clone(), b: b.clone(), c: c.clone(), normal: normal.clone(), distance } );
 		}
 		if ( planes.length < 4 ) throw new Error( 'Convex collider has fewer than four faces' );
 		const convex = { vertices, planes, triangles, min, max, tag };
@@ -133,10 +137,12 @@ export class Colliders {
 
 	}
 
-	// Highest walkable surface under (x, z) not higher than maxY.
-	groundHeightAt( x, z, maxY, pad = 0 ) {
+	// Highest permitted convex surface under (x, z). A capsule support radius
+	// shifts its feet upward on an incline by the geometric plane-contact offset.
+	groundHeightAt( x, z, maxY, pad = 0, maxWalkableSlopeDegrees = DEFAULT_WALKABLE_SLOPE_DEGREES, capsuleRadius = 0 ) {
 
 		let best = - Infinity;
+		const minWalkableNormalY = Math.cos( THREE.MathUtils.degToRad( maxWalkableSlopeDegrees ) );
 		for ( const b of this.boxes ) {
 
 			if ( ! b.walkable || b.top > maxY ) continue;
@@ -146,9 +152,10 @@ export class Colliders {
 
 		}
 		for ( const convex of this.convexes ) {
-			if ( convex.max.y > maxY || x < convex.min.x - pad || x > convex.max.x + pad || z < convex.min.z - pad || z > convex.max.z + pad ) continue;
+			if ( convex.min.y > maxY || x < convex.min.x - pad || x > convex.max.x + pad || z < convex.min.z - pad || z > convex.max.z + pad ) continue;
 			for ( const triangle of convex.triangles ) {
 				const { a, b, c, normal } = triangle;
+				if ( normal.y < minWalkableNormalY ) continue;
 				const v0x = c.x - a.x, v0z = c.z - a.z, v1x = b.x - a.x, v1z = b.z - a.z, v2x = x - a.x, v2z = z - a.z;
 				const dot00 = v0x * v0x + v0z * v0z, dot01 = v0x * v1x + v0z * v1z, dot02 = v0x * v2x + v0z * v2z;
 				const dot11 = v1x * v1x + v1z * v1z, dot12 = v1x * v2x + v1z * v2z;
@@ -156,8 +163,9 @@ export class Colliders {
 				if ( Math.abs( denominator ) < 1e-12 ) continue;
 				const u = ( dot11 * dot02 - dot01 * dot12 ) / denominator, v = ( dot00 * dot12 - dot01 * dot02 ) / denominator;
 				if ( u < - 1e-6 || v < - 1e-6 || u + v > 1 + 1e-6 ) continue;
-				const height = ( triangle.distance - normal.x * x - normal.z * z ) / normal.y;
-				if ( height <= maxY ) best = Math.max( best, height );
+				const surfaceHeight = ( triangle.distance - normal.x * x - normal.z * z ) / normal.y;
+				const capsuleSupportHeight = surfaceHeight + capsuleRadius * ( 1 / normal.y - 1 );
+				if ( capsuleSupportHeight <= maxY ) best = Math.max( best, capsuleSupportHeight );
 			}
 		}
 		for ( const field of this.heightfields ) {
@@ -188,10 +196,18 @@ export class Colliders {
 	stepCapsuleToSurface( pos, from, radius, height, maxStepHeight ) {
 
 		if ( ! Number.isFinite( maxStepHeight ) || maxStepHeight <= 0 ) return null;
+		const moveX = pos.x - from.x, moveZ = pos.z - from.z;
+		const moveLength = Math.hypot( moveX, moveZ );
+		if ( moveLength <= 1e-8 ) return null;
 		const fromGround = this.groundHeightAt( from.x, from.z, from.y + 0.08, radius * 0.25 );
 		if ( ! Number.isFinite( fromGround ) || from.y - fromGround > 0.08 ) return null;
 
-		const stepGround = this.groundHeightAt( pos.x, pos.z, fromGround + maxStepHeight + 1e-4, radius );
+		// A convex stair hull has a vertical riser and a separate horizontal tread.
+		// The capsule center can still be in front of that tread when its leading
+		// edge reaches it, so sample the support point in the direction of travel.
+		const stepX = pos.x + moveX / moveLength * radius;
+		const stepZ = pos.z + moveZ / moveLength * radius;
+		const stepGround = this.groundHeightAt( stepX, stepZ, fromGround + maxStepHeight + 1e-4, 0 );
 		const rise = stepGround - fromGround;
 		if ( ! Number.isFinite( stepGround ) || rise < 0.02 || rise > maxStepHeight + 1e-4 ) return null;
 
@@ -202,9 +218,10 @@ export class Colliders {
 	}
 
 	// Push a vertical capsule (feet at pos.y) out of solid geometry. Returns true if collided.
-	resolveCapsule( pos, radius, height ) {
+	resolveCapsule( pos, radius, height, maxWalkableSlopeDegrees = DEFAULT_WALKABLE_SLOPE_DEGREES ) {
 
 		let hit = false;
+		const minWalkableNormalY = Math.cos( THREE.MathUtils.degToRad( maxWalkableSlopeDegrees ) );
 		for ( const b of this.boxes ) {
 
 			if ( ! b.solid ) continue;
@@ -274,6 +291,11 @@ export class Colliders {
 				if ( depth < bestDepth ) { bestDepth = depth; bestNormal = n; }
 			}
 			if ( separated || ! bestNormal || bestDepth <= 1e-6 || Math.hypot( bestNormal.x, bestNormal.z ) <= 1e-4 ) continue;
+			if ( bestNormal.y >= minWalkableNormalY ) {
+				pos.y += bestDepth / bestNormal.y;
+				hit = true;
+				continue;
+			}
 			const horizontalLength = Math.hypot( bestNormal.x, bestNormal.z );
 			const distance = bestDepth / horizontalLength;
 			pos.x += bestNormal.x / horizontalLength * distance;

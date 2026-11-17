@@ -40,7 +40,7 @@ func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Serve
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		if request.WorldID != worldID || request.SourceRevision != sourceRevision || request.RadiusMeters != 0.42 || request.HeightMeters != 1.76 {
+		if request.WorldID != worldID || request.SourceRevision != sourceRevision || request.RadiusMeters != 0.42 || request.HeightMeters != 1.76 || request.MaxWalkableSlopeDegrees != 34 {
 			t.Errorf("movement request did not carry pinned world and capsule: %+v", request)
 		}
 		result := authoritativeMovementSweepResponse{WorldID: worldID, SourceRevision: sourceRevision, Ready: ready.Load(), Reason: "clear"}
@@ -67,14 +67,14 @@ func TestRegionProviderMovementAuthorityIsInternalAndRevisionPinned(t *testing.T
 	var ready atomic.Bool
 	ready.Store(true)
 	_, gateway, requests := movementAuthorityFixture(t, &ready)
-	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6); err != nil {
+	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6, 34); err != nil {
 		t.Fatalf("clear owner sweep rejected: %v", err)
 	}
 	if requests.Load() != 1 {
 		t.Fatalf("owner sweep requests = %d, want 1", requests.Load())
 	}
 	ready.Store(false)
-	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6); err == nil || !strings.Contains(err.Error(), "movement_blocked:collision_bounds_block_path:SM_TestWall") {
+	if err := gateway.validateMovement(context.Background(), []float64{0, 1, 2}, []float64{0.2, 1, 2}, 0.6, 34); err == nil || !strings.Contains(err.Error(), "movement_blocked:collision_bounds_block_path:SM_TestWall") {
 		t.Fatalf("blocked owner sweep error = %v", err)
 	}
 	public := httptest.NewRecorder()
@@ -488,12 +488,13 @@ func TestLoadWorldManifestUsesRegionProviderWorldContract(t *testing.T) {
 	const worldID = "elsemesh:hogwarts-legacy"
 	yaw, pitch := 3.141592653589793, -0.1
 	step := 0.6
+	slope := 34.0
 	provider := &dynamicRegionProviderDescriptor{WorldID: worldID}
 	provider.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
 	provider.EntrySelection.PreviewSpawn = &worldSpawn{Position: []float64{0, 8.62, 90}, Yaw: &yaw, Pitch: &pitch}
 	provider.EntrySelection.MovementProfiles = &movementProfiles{Avatars: map[string]movementProfile{
-		"elsemesh.avatar.stock-male/1":   {StepHeightMeters: step},
-		"elsemesh.avatar.stock-female/1": {StepHeightMeters: step},
+		"elsemesh.avatar.stock-male/1":   {StepHeightMeters: step, MaxWalkableSlopeDegrees: &slope},
+		"elsemesh.avatar.stock-female/1": {StepHeightMeters: step, MaxWalkableSlopeDegrees: &slope},
 	}}
 	provider.EntrySelection.AvatarOptions = []worldAvatarOption{
 		{ID: "short-hair", ProfileID: "elsemesh.avatar.stock-male/1", Label: "Short hair"},
@@ -523,7 +524,7 @@ func TestLoadWorldManifestUsesRegionProviderWorldContract(t *testing.T) {
 	if manifest.Rules.PlayerCapsule == nil || manifest.Rules.PlayerCapsule.RadiusMeters != 0.42 || manifest.Rules.PlayerCapsule.HeightMeters != 1.76 {
 		t.Fatalf("world capsule = %+v, want provider-authored capsule", manifest.Rules.PlayerCapsule)
 	}
-	if manifest.Rules.MovementProfiles == nil || manifest.Rules.MovementProfiles.Avatars["elsemesh.avatar.stock-female/1"].StepHeightMeters != step {
+	if manifest.Rules.MovementProfiles == nil || manifest.Rules.MovementProfiles.Avatars["elsemesh.avatar.stock-female/1"].StepHeightMeters != step || manifest.Rules.MovementProfiles.Avatars["elsemesh.avatar.stock-female/1"].MaxWalkableSlopeDegrees == nil || *manifest.Rules.MovementProfiles.Avatars["elsemesh.avatar.stock-female/1"].MaxWalkableSlopeDegrees != slope {
 		t.Fatalf("movement profiles = %+v, want provider-authored avatar step limits", manifest.Rules.MovementProfiles)
 	}
 	if len(manifest.AvatarOptions) != 2 || manifest.Rules.AvatarPolicy == nil || len(manifest.Rules.AvatarPolicy.AllowedProfiles) != 2 {

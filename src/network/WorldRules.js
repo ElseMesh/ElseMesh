@@ -123,8 +123,12 @@ export function movementProfileParameters( rules ) {
 		const idPattern = category === 'avatars' ? AVATAR_PROFILE_ID : FEATURE_ID;
 		if ( ! entries || typeof entries !== 'object' || Array.isArray( entries ) || Object.keys( entries ).length > 128 ) throw new Error( `World ${category} movement profiles are invalid` );
 		for ( const [ id, profile ] of Object.entries( entries ) ) {
-			if ( ! idPattern.test( id ) || ! profile || typeof profile !== 'object' || Array.isArray( profile ) || Object.keys( profile ).length !== 1 || ! Object.hasOwn( profile, 'stepHeightMeters' ) || ! Number.isFinite( profile.stepHeightMeters ) || profile.stepHeightMeters < 0 || profile.stepHeightMeters > 1.5 ) throw new Error( `World ${category} movement profile is invalid` );
-			result[ category ][ id ] = { stepHeightMeters: profile.stepHeightMeters };
+			const keys = profile && typeof profile === 'object' && ! Array.isArray( profile ) ? Object.keys( profile ) : [];
+			if ( ! idPattern.test( id ) || ! profile || typeof profile !== 'object' || Array.isArray( profile ) || keys.some( key => ! [ 'stepHeightMeters', 'maxWalkableSlopeDegrees' ].includes( key ) ) || ! Object.hasOwn( profile, 'stepHeightMeters' ) || ! Number.isFinite( profile.stepHeightMeters ) || profile.stepHeightMeters < 0 || profile.stepHeightMeters > 1.5 || ( Object.hasOwn( profile, 'maxWalkableSlopeDegrees' ) && ( ! Number.isFinite( profile.maxWalkableSlopeDegrees ) || profile.maxWalkableSlopeDegrees < 0 || profile.maxWalkableSlopeDegrees > 89 ) ) ) throw new Error( `World ${category} movement profile is invalid` );
+			result[ category ][ id ] = {
+				stepHeightMeters: profile.stepHeightMeters,
+				...( Object.hasOwn( profile, 'maxWalkableSlopeDegrees' ) ? { maxWalkableSlopeDegrees: profile.maxWalkableSlopeDegrees } : {} ),
+			};
 		}
 	}
 	return result;

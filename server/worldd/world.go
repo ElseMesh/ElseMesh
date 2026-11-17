@@ -455,7 +455,8 @@ type movementProfiles struct {
 }
 
 type movementProfile struct {
-	StepHeightMeters float64 `json:"stepHeightMeters"`
+	StepHeightMeters        float64  `json:"stepHeightMeters"`
+	MaxWalkableSlopeDegrees *float64 `json:"maxWalkableSlopeDegrees,omitempty"`
 }
 
 type worldSpawn struct {
@@ -828,12 +829,12 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 			return errors.New("world has too many movement profiles")
 		}
 		for id, profile := range profiles.Avatars {
-			if len(id) > 96 || !avatarProfilePattern.MatchString(id) || math.IsNaN(profile.StepHeightMeters) || math.IsInf(profile.StepHeightMeters, 0) || profile.StepHeightMeters < 0 || profile.StepHeightMeters > 1.5 {
+			if len(id) > 96 || !avatarProfilePattern.MatchString(id) || math.IsNaN(profile.StepHeightMeters) || math.IsInf(profile.StepHeightMeters, 0) || profile.StepHeightMeters < 0 || profile.StepHeightMeters > 1.5 || profile.MaxWalkableSlopeDegrees != nil && (math.IsNaN(*profile.MaxWalkableSlopeDegrees) || math.IsInf(*profile.MaxWalkableSlopeDegrees, 0) || *profile.MaxWalkableSlopeDegrees < 0 || *profile.MaxWalkableSlopeDegrees > 89) {
 				return errors.New("invalid avatar movement profile")
 			}
 		}
 		for id, profile := range profiles.Vehicles {
-			if len(id) > 96 || !vehicleTypePattern.MatchString(id) || math.IsNaN(profile.StepHeightMeters) || math.IsInf(profile.StepHeightMeters, 0) || profile.StepHeightMeters < 0 || profile.StepHeightMeters > 1.5 {
+			if len(id) > 96 || !vehicleTypePattern.MatchString(id) || math.IsNaN(profile.StepHeightMeters) || math.IsInf(profile.StepHeightMeters, 0) || profile.StepHeightMeters < 0 || profile.StepHeightMeters > 1.5 || profile.MaxWalkableSlopeDegrees != nil && (math.IsNaN(*profile.MaxWalkableSlopeDegrees) || math.IsInf(*profile.MaxWalkableSlopeDegrees, 0) || *profile.MaxWalkableSlopeDegrees < 0 || *profile.MaxWalkableSlopeDegrees > 89) {
 				return errors.New("invalid vehicle movement profile")
 			}
 		}

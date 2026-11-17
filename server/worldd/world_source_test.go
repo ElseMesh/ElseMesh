@@ -11,7 +11,7 @@ func TestWorldSourceRuleFieldsIncludeMovementProfiles(t *testing.T) {
 	fields := map[string]json.RawMessage{
 		"maxVisitors":      json.RawMessage(`128`),
 		"spawnRadius":      json.RawMessage(`8`),
-		"movementProfiles": json.RawMessage(`{"avatars":{"elsemesh.avatar.stock-male/1":{"stepHeightMeters":0.6}}}`),
+		"movementProfiles": json.RawMessage(`{"avatars":{"elsemesh.avatar.stock-male/1":{"stepHeightMeters":0.6,"maxWalkableSlopeDegrees":34}}}`),
 	}
 	if err := validateWorldSourceRuleFields(fields); err != nil {
 		t.Fatalf("valid movementProfiles rule was rejected: %v", err)

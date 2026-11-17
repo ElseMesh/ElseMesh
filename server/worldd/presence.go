@@ -258,6 +258,25 @@ func (d *daemon) presenceStepHeight(p *playerPose) float64 {
 	return profiles.Avatars[p.AvatarProfileID].StepHeightMeters
 }
 
+const defaultWalkableSlopeDegrees = 18.194872338766785
+
+func (d *daemon) presenceMaxWalkableSlopeDegrees(p *playerPose) float64 {
+	profiles := d.world.Rules.MovementProfiles
+	if profiles == nil || p == nil {
+		return defaultWalkableSlopeDegrees
+	}
+	var profile movementProfile
+	if p.Mode == "boat" || p.Mode == "deck" {
+		profile = profiles.Vehicles[p.VehicleType]
+	} else {
+		profile = profiles.Avatars[p.AvatarProfileID]
+	}
+	if profile.MaxWalkableSlopeDegrees == nil {
+		return defaultWalkableSlopeDegrees
+	}
+	return *profile.MaxWalkableSlopeDegrees
+}
+
 func (d *daemon) validateOwnerMovement(from, to []float64, pose *playerPose) error {
 	if d.regionProvider == nil {
 		return nil
@@ -268,7 +287,7 @@ func (d *daemon) validateOwnerMovement(from, to []float64, pose *playerPose) err
 	}
 	for attempt := 0; attempt < 2; attempt++ {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
-		err := d.regionProvider.validateMovement(ctx, from, to, d.presenceStepHeight(pose))
+		err := d.regionProvider.validateMovement(ctx, from, to, d.presenceStepHeight(pose), d.presenceMaxWalkableSlopeDegrees(pose))
 		cancel()
 		if err == nil {
 			return nil

@@ -49,6 +49,7 @@ type authoritativeMovementSweepRequest struct {
 	RadiusMeters     float64   `json:"radiusMeters"`
 	HeightMeters     float64   `json:"heightMeters"`
 	StepHeightMeters float64   `json:"stepHeightMeters"`
+	MaxWalkableSlopeDegrees float64 `json:"maxWalkableSlopeDegrees"`
 }
 
 type authoritativeMovementSweepResponse struct {
@@ -168,14 +169,15 @@ func newRegionProviderGateway(rawURL, expectedWorldID string, allowedOrigins map
 	return gateway, nil
 }
 
-func (gateway *regionProviderGateway) validateMovement(ctx context.Context, from, to []float64, stepHeight float64) error {
-	if gateway.playerCapsule == nil || len(from) != 3 || len(to) != 3 || stepHeight < 0 || math.IsNaN(stepHeight) || math.IsInf(stepHeight, 0) {
+func (gateway *regionProviderGateway) validateMovement(ctx context.Context, from, to []float64, stepHeight, maxWalkableSlopeDegrees float64) error {
+	if gateway.playerCapsule == nil || len(from) != 3 || len(to) != 3 || stepHeight < 0 || math.IsNaN(stepHeight) || math.IsInf(stepHeight, 0) || maxWalkableSlopeDegrees < 0 || maxWalkableSlopeDegrees > 89 || math.IsNaN(maxWalkableSlopeDegrees) || math.IsInf(maxWalkableSlopeDegrees, 0) {
 		return errors.New("invalid_movement_sweep")
 	}
 	body, err := json.Marshal(authoritativeMovementSweepRequest{
 		WorldID: gateway.worldID, SourceRevision: gateway.sourceRevision,
 		From: from, To: to, RadiusMeters: gateway.playerCapsule.RadiusMeters,
 		HeightMeters: gateway.playerCapsule.HeightMeters, StepHeightMeters: stepHeight,
+		MaxWalkableSlopeDegrees: maxWalkableSlopeDegrees,
 	})
 	if err != nil {
 		return fmt.Errorf("movement_authority_unavailable: %w", err)
