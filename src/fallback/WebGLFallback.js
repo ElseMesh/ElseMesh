@@ -940,7 +940,10 @@ export class WebGLFallback {
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
-		if ( this.reviewPose ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
+		// Built-in review views can use the camera pose as the local spawn. A hosted
+		// review camera is applied after signed spawn admission below; using it as an
+		// admission pose would violate the owner's spawn-radius rule.
+		if ( this.reviewPose && ! this.worldLink ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
 		this.input = new Input( this.engine.canvas );
 		if ( ! this.worldLink ) {
@@ -1032,6 +1035,7 @@ export class WebGLFallback {
 		window.addEventListener( 'resize', this._resize );
 		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		await this._startPresence();
+		this._applyReviewCameraPose();
 		this.renderer.setAnimationLoop( () => this._frame() );
 	}
 
@@ -2340,11 +2344,11 @@ export class WebGLFallback {
 		}
 		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
 		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWebGLBlocksPlayerInput', { fallback: this, extensions: this.activeWorldExtensions } );
-		if ( this.player && ! gamePanelOpen ) {
+		if ( ! this.reviewCameraOnly && this.player && ! gamePanelOpen ) {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );
 		}
-		this.worldPresence?.update( dt, this.player, now, this.app.renderLoadBias || 0 );
+		if ( ! this.reviewCameraOnly ) this.worldPresence?.update( dt, this.player, now, this.app.renderLoadBias || 0 );
 		for ( const { lod, geometry } of this.oceanLODs ) {
 			lod.update( this.camera );
 			geometry.instanceCount = lod.count;
@@ -2795,6 +2799,18 @@ export class WebGLFallback {
 			if ( route && d < distance ) { nearest = route; distance = d; }
 		}
 		return nearest;
+
+	}
+
+	_applyReviewCameraPose() {
+
+		if ( ! this.worldLink || ! this.reviewPose ) return false;
+		this.reviewCameraOnly = true;
+		this.camera.position.set( ...this.reviewPose.p );
+		this.camera.rotation.order = 'YXZ';
+		this.camera.rotation.set( this.reviewPose.pitch, this.reviewPose.yaw, 0, 'YXZ' );
+		this.camera.updateMatrixWorld();
+		return true;
 
 	}
 
