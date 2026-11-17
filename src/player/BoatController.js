@@ -546,7 +546,7 @@ export class BoatController {
 				this.toWorld( lp, pw );
 				tmp.copy( pw );
 				tmp.y -= 0.9;
-				if ( this.colliders.resolveCapsule( tmp, 0.25, 1.6 ) ) {
+				if ( this.colliders.resolveCapsule( tmp, 0.25, 1.6, 0 ) ) {
 
 					vp.copy( this.angular ).cross( r.copy( pw ).sub( comW ) ).add( this.velocity );
 					f.set( ( tmp.x - pw.x ) * 260000 - vp.x * 8000, 0, ( tmp.z - pw.z ) * 260000 - vp.z * 8000 );
