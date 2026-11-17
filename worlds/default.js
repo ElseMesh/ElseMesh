@@ -10,6 +10,7 @@ import { DEFAULT_REEF_PLACEMENT_ASSETS as reefPlacementAssets } from './tidewate
 import { TIDEWATER_LAYOUT as defaultLayout } from './tidewater/layout.js';
 import { TIDEWATER_WHALE_PROFILE } from './tidewater/WhaleProfile.js';
 import { scannedAssetRuntimeDescriptors } from './tidewater/debris/ScannedAssets.js';
+import { loadTidewaterVegetationRuntimeAssets } from './tidewater/vegetation/RuntimeAssets.js';
 
 const scannedAssets = scannedAssetRuntimeDescriptors( `${import.meta.env.BASE_URL}models/debris/` );
 
@@ -76,8 +77,10 @@ export const defaultWorldPackage = Object.freeze( {
 			return new Wildlife( options );
 		},
 		createVegetation: async options => {
+			const component = source.components.find( entry => entry.type === 'elsemesh.static-vegetation/1' );
+			const { placementRecords, grassMask } = await loadTidewaterVegetationRuntimeAssets( component, assetURLs );
 			const { Vegetation } = await import( './tidewater/renderers/WebGPUVegetation.js' );
-			return new Vegetation( options );
+			return new Vegetation( { ...options, placementRecords, grassMask } );
 		},
 		createDebris: async options => {
 			const [ { Debris }, { DebrisPlacer, debrisCastsShadow }, { Builder, Batch }, { InstancedProps } ] = await Promise.all( [
