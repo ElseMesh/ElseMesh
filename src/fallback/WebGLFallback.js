@@ -1494,11 +1494,10 @@ export class WebGLFallback {
 					vec4 shoreState = surfFoamStateAt( p );
 					float simFoam = max( shoreState.r, wakeField.foam );
 					float freshFoam = max( breakerFoam, swashFoam );
-					float foam = surfFoamMask( foamCoverage, offshoreFoam, freshFoam, simFoam, shoreState.a, depth, footprint, vWorldPosition, vShoreDirection );
-					float whitewater = smoothstep( 0.45, 0.8, breakerFoam );
-					float foamWrap = mix( 0.45, 0.12, whitewater );
-					float foamDiffuse = clamp( dot( normal, lightDirection ) * ( 1.0 - foamWrap ) + foamWrap, 0.0, 1.0 );
-					vec3 foamLight = ( uKeyLightRadiance * ( foamDiffuse / 3.14159265359 ) + skyIrradiance * 0.95 ) * 0.85;
+					SurfFoamInfoGLSL foamInfo = surfFoamShadingGLSL( foamCoverage, offshoreFoam, freshFoam, simFoam, shoreState.a,
+						depth, footprint, max( foamCoverage, simFoam ), vWorldPosition, vShoreDirection, normal, normal );
+					float foam = foamInfo.foam;
+					vec3 foamLight = surfFoamLightGLSL( foamInfo, normal, lightDirection, viewDirection, uKeyLightRadiance, skyIrradiance, vWorldPosition );
 					reflected = mix( reflected, foamLight + sunSpecular * 0.05, foam );
 					gl_FragColor = vec4( reflected, 1.0 );
 					#include <tonemapping_fragment>
