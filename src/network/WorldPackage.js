@@ -111,6 +111,7 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 			state.parsed.set( object.assetId, gltf );
 		}
 		const instance = cloneScene( gltf );
+		prepareWorldPackageShadowFlags( instance );
 		instance.traverse( object => { if ( object.userData.elsemeshPunctualLight ) state.lightNodes.add( object ); } );
 		instance.name = object.label || object.id;
 		instance.userData.worldObjectId = object.id;
@@ -543,7 +544,7 @@ function installObjectLOD( connector, root, instance, object ) {
 				if ( shared ) { disposeWorldPackage( source ); source = shared; }
 				else state.parsed.set( assetId, source );
 			}
-			const visual = cloneScene( source ); prepareObjectLODVisual( visual ); visual.visible = false;
+			const visual = cloneScene( source ); prepareWorldPackageShadowFlags( visual ); prepareObjectLODVisual( visual ); visual.visible = false;
 			instance.add( visual ); levels.set( level, visual );
 		}, priority ),
 		showLevel: level => {
@@ -560,6 +561,14 @@ function installObjectLOD( connector, root, instance, object ) {
 			}
 		},
 	} ) );
+}
+
+function prepareWorldPackageShadowFlags( root ) {
+	root.traverse( object => {
+		if ( ! object.isMesh ) return;
+		object.castShadow = true;
+		object.receiveShadow = true;
+	} );
 }
 
 function prepareObjectLODVisual( root ) {

@@ -62,6 +62,8 @@ const releasedAssets=[];
 const connector={worldId:'elsemesh:lod',manifest:{objects:[object],portals:[]},getAsset:async id => {requests.push(id);return payloads.get(id);},releaseAsset:id=>{releasedAssets.push(id);return true;}};
 const root = await loadWorldPackage(connector,{assets:new Map([['full',payloads.get('full')]])});
 const instance=root.children[0]; const colliders = new Colliders(); registerWorldPackageCollisions(root,colliders);
+const packageMeshes=[]; instance.traverse(node=>{if(node.isMesh)packageMeshes.push(node);});
+assert.ok(packageMeshes.length>0 && packageMeshes.every(mesh=>mesh.castShadow && mesh.receiveShadow),'Hosted package meshes cast and receive shadows');
 const originalCollider=root.userData.worldPackage.activeColliders.get(object.id).collider;
 function visibleTriangles(start = root) {
  let total=0; function visit(node) {if(!node.visible)return;if(node.isMesh)total+=node.geometry.getAttribute('position').count/3;for(const child of node.children)visit(child);}visit(start);return total;
@@ -80,6 +82,9 @@ assert.equal(baseMaterial.uniforms.lodFade.value.y,1,'Outgoing base level uses t
 assert.equal(lowMaterial.uniforms.lodFade.value.x,0,'Incoming low level starts invisible');
 assert.equal(lowMaterial.uniforms.lodFade.value.y,0,'Incoming low level uses the complementary mask');
 assert.equal(baseMaterial.modules.some(module=>module.name==='lodFade'),true,'Object material includes screen-door shader module');
+assert.ok(packageMeshes.every(mesh=>mesh.castShadow && mesh.receiveShadow),'Base LOD retains package shadow flags');
+const allLODMeshes=[]; instance.traverse(node=>{if(node.isMesh)allLODMeshes.push(node);});
+assert.ok(allLODMeshes.length>packageMeshes.length && allLODMeshes.every(mesh=>mesh.castShadow && mesh.receiveShadow),'Streamed LOD meshes cast and receive shadows');
 now+=100;updateWorldPackageLOD(root,camera,0,now);
 assert.equal(baseMaterial.uniforms.lodFade.value.x,.5,'Transition progresses smoothly');
 now+=100;updateWorldPackageLOD(root,camera,0,now);
