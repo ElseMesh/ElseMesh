@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { buildMovementKernel } from './build-movement-kernel.mjs';
 
 const tests = [
 	'test/world-wind-field.mjs', 'test/webgl-material-lighting.mjs', 'test/webgl-sun-shadows.mjs', 'test/webgl-atmosphere-initialization.mjs',
@@ -32,11 +33,7 @@ const androidOnlySkipTests = new Set( [ 'test/static-model-instance-set-webgl-re
 const viteAssetTests = new Set( [ 'test/desktop-adaptive-scale.mjs', 'test/portal-sides.mjs', 'test/world-hosted-player.mjs', 'test/world-component-backend-registry.mjs' ] );
 const android = process.platform === 'android';
 
-for ( const args of [ [ '-S', 'native/movement', '-B', 'native/movement' ], [ '--build', 'native/movement', '--target', 'elsemesh_movement', 'elsemesh_movement_wasm', '-j2' ] ] ) {
-	const result = spawnSync( 'cmake', args, { stdio: 'inherit' } );
-	if ( result.error ) throw result.error;
-	if ( result.status !== 0 ) process.exit( result.status ?? 1 );
-}
+buildMovementKernel();
 
 for ( const file of tests ) {
 	if ( android && androidOnlySkipTests.has( file ) ) {

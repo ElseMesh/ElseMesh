@@ -51,7 +51,8 @@ import { PostFX } from './post/PostFX.js';
 import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
-import { Colliders } from './world/Colliders.js';
+import { Colliders, setMovementSupportKernel } from './world/Colliders.js';
+import { loadMovementSupportKernel } from './world/MovementSupportKernel.js';
 import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
@@ -337,6 +338,11 @@ export class App {
 			if ( typeof requestAnimationFrame === 'function' ) await new Promise( ( r ) => requestAnimationFrame( () => setTimeout( r, 0 ) ) );
 
 		};
+		await progress( 0.01, 'Starting shared movement support…' );
+		const movementSupportKernel = await loadMovementSupportKernel();
+		if ( ! movementSupportKernel ) throw new Error( 'The required shared movement support module is unavailable' );
+		setMovementSupportKernel( movementSupportKernel );
+		console.info( 'Shared movement support module loaded' );
 		if ( worldLink?.localProvider ) {
 
 			await progress( 0.03, 'Starting the graphics backend…', undefined, 'gpu' );
