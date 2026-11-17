@@ -1927,3 +1927,14 @@ finding changes them.
   shadow reach match the pre-split WebGPU view. This closes generic adapter
   coverage only; renderer-neutral progress remains 71% and Tidewater parity
   remains 93%.
+
+- 2026-11-17: restored the boat hull's explicit zero-degree walkable-slope
+  collision argument, preserving the pre-split `BoatController` behavior after
+  avatar step-up handling changed the collider default. The pinned pre-split
+  controller and design hashes, hosted boat water-surface handoff, deterministic
+  18-second water-query trace, WebGPU/WebGL fishing trace, and pre-split boat
+  gameplay checks pass. The trace is a synthetic sensitivity check, not a live
+  backend comparison. Fixed the Tidewater-owned fixture to pass a generic ocean
+  surface record directly rather than call a removed world installer. No
+  percentage changes: matched visual views/materials, fresh-profile wallet
+  parity, and supported-hardware FPS remain open; Tidewater parity remains 93%.
