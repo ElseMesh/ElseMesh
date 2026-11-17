@@ -1907,3 +1907,11 @@ finding changes them.
   `swash` were unavailable, so those dynamic views remain unverified. This
   closes no broad parity gate; Tidewater gameplay and content parity remains
   93%.
+
+- 2026-11-17: removed Linux FPS-priority gates that disabled WebGPU sun
+  shadows, aligning shadow availability with WebGL while retaining adaptive
+  render scale, frame pacing, refraction, and antialiasing settings. Focused
+  checks and the external build pass; Pages deploy run 44108687480 published
+  commit `779c7def` at `https://elsemesh.org/`. No fresh FPS-mode image was
+  captured, so this is a code/deployment check rather than a new visual-parity
+  gate. Tidewater gameplay and content parity remains 93%.

@@ -66,6 +66,20 @@ their phase parity remains open.
 
 [Pre-split and hosted WebGPU beach spray phases](images/tidewater-hosted-webgpu-wave-spray-phases-2026-11-17.jpg).
 
+## Hosted WebGPU shadows with FPS priority, 2026-11-17
+
+Linux FPS priority previously disabled WebGPU sun shadows both during shadow
+construction and when switching graphics priority. Both gates are removed, so
+FPS priority can adjust render scale, frame pacing, refraction, and antialiasing
+without omitting shadows. `desktop-adaptive-scale.mjs` verifies that switching
+to FPS keeps shadows enabled; `hosted-webgpu-routing.mjs` verifies the shared
+shadow setup has no FPS-mode disable. Both focused checks and the external
+production build passed. Pages deployment run 44108687480 succeeded and
+published commit `779c7def` at the configured `https://elsemesh.org/` domain.
+This is code and deployment evidence only; no new image was captured, so the
+visual result in the FPS profile still needs a fresh review. The wider
+WebGPU/WebGL and pre-split parity gates remain open.
+
 ## 2026-11-15 matched pre-split and split WebGPU views
 
 The original ElseMesh build at `23c30bf62aae2aefd0f2bcdd3edc650cf960ce3e`
