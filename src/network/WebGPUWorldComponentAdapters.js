@@ -13,6 +13,7 @@ import { GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js'
 import { PebbleField } from '../world/debris/PebbleField.js';
 
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWaterBody );
+registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1', installIslandOcean );
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.ground-detail-field/1', installGroundDetailField );
 
 async function installGroundDetailField( { app, root, connector, installed }, component ) {
@@ -65,5 +66,25 @@ function installWaterBody( { app, root, connector, installed }, component ) {
 	root.add( mesh );
 	installed.push( { waterBody: true, surface, material, waterBounds: { center: component.center, extent }, update: ( _dt, camera ) => lod.update( camera ), dispose: () => { root.remove( mesh ); lod.geometry.dispose(); material.dispose(); } } );
 	return true;
+
+}
+
+function installIslandOcean( { app, root }, _component ) {
+
+	const lod = new CDLOD( { gridSize: Number( app.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
+	const mesh = new Mesh( lod.geometry, app.waterMaterial );
+	mesh.frustumCulled = false;
+	mesh.receiveShadow = true;
+	mesh.layers.set( LAYERS.WATER );
+	root.add( mesh );
+	return {
+		installed: true,
+		runtime: {
+			isWorldOcean: true,
+			surface: app.surface,
+			update: ( _dt, camera ) => lod.update( camera ),
+			dispose: () => { root.remove( mesh ); lod.geometry.dispose(); },
+		},
+	};
 
 }

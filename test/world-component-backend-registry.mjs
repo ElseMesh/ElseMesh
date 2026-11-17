@@ -58,6 +58,7 @@ assert.doesNotMatch( appSource, /IslandWorldState|world\/TerrainData\.js/, 'App 
 assert.match( appSource, /if \( engine\.backend !== 'webgl' \|\| ! worldLink \) await this\.initializeWorldState\(\)/, 'built-in runtime state is not created for hosted WebGL startup' );
 assert.match( appSource, /async initializeWorldState\(\)[\s\S]*?presentation\?\.createWorldState/, 'built-in world state is created through the package presentation boundary' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1' ), 'function', 'App registers the WebGPU water-body adapter' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1' ), 'function', 'ElseMesh owns the WebGPU island-ocean presenter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.terrain-surface/1' ), 'function', 'ElseMesh registers the WebGPU terrain-surface adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1' ), 'function', 'WebGLFallback registers the WebGL water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
@@ -73,6 +74,8 @@ assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'ElseMesh registers t
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGPU fish-props presenter' );
 assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGL fish-props presenter' );
 await import( '../worlds/tidewater/register-components.js' );
+assert.equal( worldComponentDescriptor( 'elsemesh.island-ocean/1' )?.install, null, 'Tidewater declares the ocean capability without installing a renderer presenter' );
+assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1' ), 'function', 'loading Tidewater does not replace the engine WebGPU ocean presenter' );
 assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'Tidewater uses the engine component contract without registering a presenter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'loading Tidewater does not replace the engine WebGPU presenter' );
 assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'loading Tidewater does not replace the engine WebGL presenter' );
