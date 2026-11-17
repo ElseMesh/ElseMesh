@@ -700,3 +700,65 @@ func TestBrowserPresenceAcrossGatewayForwarding(t *testing.T) {
 		t.Fatalf("disconnected presence not expired: %+v %v", expired, err)
 	}
 }
+
+func TestBrowserDoorStateAcrossGatewayForwarding(t *testing.T) {
+	owner := presenceTestDaemon(t)
+	owner.world.Rules.MaxVisitors = 2
+	owner.world.Components = []worldComponent{{
+		ID:   "elsemesh-component:shared-door",
+		Type: interactiveDoorComponentType,
+		Data: json.RawMessage(`{"position":[1,2,3],"interactionRadiusMeters":3,"initialOpen":false,"locked":false}`),
+	}}
+	gateway := presenceTestDaemon(t)
+	gateway.host.Peerstore().AddAddrs(owner.host.ID(), owner.host.Addrs(), peerstore.PermanentAddrTTL)
+	owner.host.SetStreamHandler(worldProtocol, owner.handlePeerStream)
+	server := httptest.NewServer(http.HandlerFunc(gateway.handleBrowserGateway))
+	defer server.Close()
+	connect := func() *websocket.Conn {
+		c, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { c.Close() })
+		c.SetReadDeadline(time.Now().Add(5 * time.Second))
+		if err := c.WriteJSON(gatewayMessage{Type: "connect", WorldID: owner.world.WorldID, TargetPeerID: owner.host.ID().String()}); err != nil {
+			t.Fatal(err)
+		}
+		var reply map[string]any
+		if err := c.ReadJSON(&reply); err != nil || reply["type"] != "connected" {
+			t.Fatalf("connect: %v %v", reply, err)
+		}
+		return c
+	}
+	a, b := connect(), connect()
+	update := func(c *websocket.Conn, requestID string, sequence uint64, position []float64) peerResponse {
+		pose := presenceTestPose()
+		pose.Sequence = sequence
+		pose.Position = position
+		if err := c.WriteJSON(gatewayMessage{Type: "presence.update", WorldID: owner.world.WorldID, RequestID: requestID, Pose: pose}); err != nil {
+			t.Fatal(err)
+		}
+		var response peerResponse
+		if err := c.ReadJSON(&response); err != nil || response.Type != "presence" {
+			t.Fatalf("presence update: %+v %v", response, err)
+		}
+		return response
+	}
+	first := update(a, "a-join", 1, []float64{1, 2, 3})
+	second := update(b, "b-join", 1, []float64{2, 2, 3})
+	if first.PlayerID == second.PlayerID || len(second.Players) != 2 {
+		t.Fatalf("browser sessions were not isolated: %+v %+v", first, second)
+	}
+	open := true
+	if err := a.WriteJSON(gatewayMessage{Type: "world.door.set", WorldID: owner.world.WorldID, RequestID: "door-open", DoorID: "elsemesh-component:shared-door", DoorOpen: &open}); err != nil {
+		t.Fatal(err)
+	}
+	var opened peerResponse
+	if err := a.ReadJSON(&opened); err != nil || opened.Type != "world.door.state" || len(opened.DoorStates) != 1 || !opened.DoorStates[0].Open || opened.DoorStates[0].Sequence != 1 {
+		t.Fatalf("owner door transition response: %+v %v", opened, err)
+	}
+	observed := update(b, "b-observe-door", 2, []float64{2, 2, 3})
+	if len(observed.DoorStates) != 1 || !observed.DoorStates[0].Open || observed.DoorStates[0].EventID != opened.DoorStates[0].EventID {
+		t.Fatalf("second browser did not observe the same owner transition: %+v", observed.DoorStates)
+	}
+}
