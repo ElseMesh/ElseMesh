@@ -6,10 +6,15 @@ and the linked runbooks. They measure requirement completion, not code volume.
 Completed milestones have been moved to [GOAL-done.md](GOAL-done.md). Reassess
 these estimates when new verification evidence is recorded.
 
-**Extension constraint: do not implement or extend Wasm.** It is too CPU-heavy.
-Use the lighter owner-signed JavaScript module path in dedicated browser
-Workers. The retired Wasm guard, worker, and asset validators have been removed;
-do not reintroduce them as part of world-runtime work.
+World behavior extensions must be owner-signed modules executed in dedicated,
+bounded browser Workers. JavaScript and WebAssembly are both valid worker
+implementations. Choose between them using reproducible, same-workload
+benchmarks on supported hardware, measuring end-to-end CPU/frame time and
+responsiveness as well as startup, download/transfer, instantiation, first-use,
+and memory costs. Select Wasm only when it demonstrates a meaningful sustained
+performance improvement over JavaScript; a kernel-only microbenchmark is not
+sufficient. Keep correctness and conformance coverage for both implementations
+while comparing them.
 
 ## Current priority: finish Tidewater package integration and parity
 
@@ -63,8 +68,10 @@ reference. Do not keep separate world/game loops or move renderer-specific
 presenters into Tidewater. Keep Tidewater authored content and gameplay modules
 in its repository, with ElseMesh providing generic browser-worker hosting,
 lifecycle, and message transport. World modules are owner-signed,
-hash-verified JavaScript assets executed in dedicated workers; pass versioned
-messages without engine object references, bound execution time, and terminate
+hash-verified assets executed in dedicated workers; JavaScript and WebAssembly
+are both candidates, and the same-world workload must determine the selected
+runtime through measured end-to-end performance. Pass versioned messages
+without engine object references, bound execution time, and terminate
 unresponsive workers. Keep each world's event vocabulary and gameplay rules in
 that world package, not in the ElseMesh engine. Preserve per-world state
 isolation and the declared shared, player, group, or persistent scopes. Keep
@@ -83,10 +90,13 @@ The current implementation goal also requires finishing the behavior and
 identity boundary across world packages:
 
 - Keep reusable behavior dispatch and browser-worker hosting generic in the
-  engine registry. World-owned JavaScript modules define world-specific
-  events and gameplay; sign and hash their assets, pass versioned messages,
-  bound execution time, and terminate unresponsive workers. Do not add
-  Tidewater-specific events or gameplay rules to the engine.
+  engine registry. World-owned JavaScript or WebAssembly modules define
+  world-specific events and gameplay; sign and hash their assets, pass
+  versioned messages, bound execution time, and terminate unresponsive
+  workers. Choose the worker implementation with better measured end-to-end
+  performance on supported hardware, including startup, transfer,
+  instantiation, first-use, and memory costs. Do not add Tidewater-specific
+  events or gameplay rules to the engine.
 - The ElseMesh v3 wire and ID namespace migration is complete; see
   [GOAL-done.md](GOAL-done.md). Keep rejecting old protocols and IDs without a
   compatibility parser.
