@@ -8,13 +8,13 @@ these estimates when new verification evidence is recorded.
 
 World behavior extensions must be owner-signed modules executed in dedicated,
 bounded browser Workers. JavaScript and WebAssembly are both valid worker
-implementations. Choose between them using reproducible, same-workload
-benchmarks on supported hardware, measuring end-to-end CPU/frame time and
-responsiveness as well as startup, download/transfer, instantiation, first-use,
-and memory costs. Select Wasm only when it demonstrates a meaningful sustained
-performance improvement over JavaScript; a kernel-only microbenchmark is not
-sufficient. Keep correctness and conformance coverage for both implementations
-while comparing them.
+implementations. Choose whichever performs better using reproducible,
+same-workload benchmarks on supported hardware. Measure end-to-end CPU/frame
+time and responsiveness as well as startup, download/transfer, instantiation,
+first-use, and memory costs. Do not select a runtime based on assumptions about
+language or format; a kernel-only microbenchmark is not sufficient. Keep
+correctness and conformance coverage for both implementations while comparing
+them.
 
 ## Current priority: finish Tidewater package integration and parity
 
@@ -93,9 +93,10 @@ identity boundary across world packages:
   engine registry. World-owned JavaScript or WebAssembly modules define
   world-specific events and gameplay; sign and hash their assets, pass
   versioned messages, bound execution time, and terminate unresponsive
-  workers. Choose the worker implementation with better measured end-to-end
-  performance on supported hardware, including startup, transfer,
-  instantiation, first-use, and memory costs. Do not add Tidewater-specific
+  workers. Choose whichever worker implementation, JavaScript or WebAssembly,
+  has better measured end-to-end performance on supported hardware, including
+  startup, transfer, instantiation, first-use, responsiveness, and memory
+  costs. Do not add Tidewater-specific
   events or gameplay rules to the engine.
 - The ElseMesh v3 wire and ID namespace migration is complete; see
   [GOAL-done.md](GOAL-done.md). Keep rejecting old protocols and IDs without a
