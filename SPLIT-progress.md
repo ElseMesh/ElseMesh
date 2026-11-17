@@ -1938,3 +1938,12 @@ finding changes them.
   surface record directly rather than call a removed world installer. No
   percentage changes: matched visual views/materials, fresh-profile wallet
   parity, and supported-hardware FPS remain open; Tidewater parity remains 93%.
+
+- 2026-11-17: strengthened Tidewater's renderer-owned gameplay checks with
+  pre-split `GameState`/`FishTable`/`Gear` outcomes. A deterministic fresh wallet
+  catches and sells a 0.30 kg grunt for $2 in WebGPU and WebGL; the original
+  $300 engine upgrade leaves $700 in both. The focused renderer-parity suite
+  and the pre-split bite, fight, cast, and boat checks pass. This establishes
+  deterministic gameplay-state parity, not matched live browser profiles or
+  production-water browser parity. Visual/material review and supported-
+  hardware FPS remain open; Tidewater parity remains 93%.
