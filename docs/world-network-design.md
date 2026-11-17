@@ -84,6 +84,17 @@ camera/view information; it does not authoritatively set position. World data
 defines permitted movement profiles, while the engine/server validates them;
 unknown speeds or collision do not grant extra movement.
 
+Collision and support use one canonical engine calculation and one canonical
+collision dataset. The browser may run that shared calculation for responsive
+local prediction, but it must not maintain a separate ground-height, floor
+support, step-up, or contact calculation. `worldd` independently runs the same
+calculation against its accepted pose and authoritative world data to reject
+forged movement; independent authority does not mean different physics rules.
+The browser's result is advisory and never grants permission to move or fetch
+content. Until both callers use the shared implementation and collision data,
+movement remains fail-closed. Conformance tests must cover identical support,
+sweep, and step results in browser and `worldd` contexts.
+
 Step height and walkable-slope angle are movement capabilities selected from
 the active avatar or vehicle, not engine-wide movement limits. World rules may
 declare bounded `stepHeightMeters` and optional `maxWalkableSlopeDegrees` in
