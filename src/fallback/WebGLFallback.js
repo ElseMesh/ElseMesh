@@ -17,6 +17,7 @@ import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
+import { loadWorldComponentAssets } from '../network/WorldComponentAssets.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
 import { WebGLBoatAdapter } from './WebGLBoatAdapter.js';
@@ -1792,15 +1793,7 @@ export class WebGLFallback {
 		}
 		for ( const [ type, { adapter, components } ] of groups ) {
 			try {
-				const assets = new Map();
-				for ( const component of components ) for ( const assetID of worldComponentAssetIDs( component ) ) {
-					if ( assets.has( assetID ) ) continue;
-					const url = this.defaultWorldAssets?.assetURLs?.[ assetID ];
-					if ( ! url ) continue;
-					const response = await fetch( url );
-					if ( ! response.ok ) throw new Error( `Component asset ${assetID} returned ${response.status}` );
-					assets.set( assetID, new Uint8Array( await response.arrayBuffer() ) );
-				}
+				const assets = await loadWorldComponentAssets( components, this.defaultWorldAssets?.assetURLs );
 				const result = await adapter( { fallback: this, manifest: this.defaultWorldSource, assets }, components );
 				if ( result?.runtime ) this.builtinComponentRuntimes.set( result.runtimeComponentId || components[ 0 ].id, result.runtime );
 			} catch ( error ) {
