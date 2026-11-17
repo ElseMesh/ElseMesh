@@ -539,7 +539,7 @@ func (d *daemon) presenceCapsulesOverlap(a, b []float64) bool {
 func bindPresenceRequest(message *gatewayMessage, gatewayID, session string) {
 	message.PresenceSession = ""
 	message.presenceKey = ""
-	if strings.HasPrefix(message.Type, "presence.") && presenceSessionPattern.MatchString(session) {
+	if (strings.HasPrefix(message.Type, "presence.") || message.Type == "world.door.set") && presenceSessionPattern.MatchString(session) {
 		message.PresenceSession = session
 		message.presenceKey = presenceKey(gatewayID, session)
 	}
