@@ -42,7 +42,7 @@ admissionSession.dispose();
 let authoritativeNow = 1000, authoritativeRequests = 0;
 const authorityPlayer = {
  position: new Vector3( 0, 1, 0 ), velocity: new Vector3( 0, 0, - 3 ), mode: 'walk', yaw: 0, pitch: 0,
- input: { moveAxes: () => ( { x: 0, y: 0 } ) },
+ input: { axes: { x: 0, y: 0 }, moveAxes() { return this.axes; } },
  setHostedWorldAuthoritativePose( position, yaw, pitch, mode ) {
   this.position.set( ...position ); this.velocity.set( 0, 0, 0 ); this.yaw = yaw; this.pitch = pitch; this.mode = mode;
  },
@@ -72,7 +72,18 @@ assert.match(authoritySession.lastRejectedPose.error, /movement_blocked:collisio
 authoritativeNow += 2100;
 authoritySession.update( 1 / 60, authorityPlayer, authoritativeNow );
 await authoritySession.pending;
-assert.equal(authorityPlayer.worldMovementAuthorityBlocked, false, 'the owner reopens movement after accepting the stopped pose with controls released');
+assert.equal(authorityPlayer.worldMovementAuthorityBlocked, true, 'an accepted stopped pose keeps local physics frozen until fresh movement input');
+assert.equal(authorityPlayer.worldMovementAuthorityCanResume, true, 'the owner-approved stop arms movement recovery after controls are released');
+authoritativeNow += 100;
+authoritySession.update( 1 / 60, authorityPlayer, authoritativeNow );
+await authoritySession.pending;
+assert.equal(authorityPlayer.worldMovementAuthorityBlocked, true, 'idle accepted heartbeats do not restart gravity after an owner rejection');
+authorityPlayer.input.axes = { x: 0, y: 1 };
+authoritativeNow += 100;
+authoritySession.update( 1 / 60, authorityPlayer, authoritativeNow );
+await authoritySession.pending;
+assert.equal(authorityPlayer.worldMovementAuthorityBlocked, false, 'fresh input resumes movement only after the owner accepted a stopped pose');
+assert.equal(authorityPlayer.worldMovementAuthorityCanResume, false, 'movement recovery latch clears when local simulation resumes');
 authoritySession.dispose();
 const houseUniform = {...DEFAULT_APPEARANCE, shirt:'#8b1c2b', trousers:'#3e2434'};
 const restrictedWorld = {...connector, manifest:{...connector.manifest, rules:{...connector.manifest.rules,

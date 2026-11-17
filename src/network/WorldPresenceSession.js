@@ -77,6 +77,7 @@ export class WorldPresenceSession {
   if (Number.isFinite(yaw)) pose.yaw = yaw;
   player.worldMovementAuthorityBlocked = false;
   player.worldMovementAuthorityRequiresRelease = false;
+  player.worldMovementAuthorityCanResume = false;
   return this.admitPose(pose, spawnCandidates);
  }
  async admitPose(pose, spawnCandidates) {
@@ -122,9 +123,16 @@ export class WorldPresenceSession {
     this.state.observe(snapshot,{requestId:snapshot.requestId, now:this.clock()});
     const own = snapshot.players.find(value => value.id === snapshot.playerId);
     if (own) this.#rememberAcceptedPose(own);
-    if (player?.worldMovementAuthorityRequiresRelease && this.#movementReleased(player)) {
-     player.worldMovementAuthorityBlocked = false;
-     player.worldMovementAuthorityRequiresRelease = false;
+    if (player?.worldMovementAuthorityRequiresRelease) {
+     // Keep local physics frozen while idle after rollback. A stopped pose may
+     // be owner-approved above the client's current ground sample; resuming
+     // gravity here makes the client fall, get rejected, and snap back forever.
+     if (this.#movementReleased(player)) player.worldMovementAuthorityCanResume = true;
+     else if (player.worldMovementAuthorityCanResume) {
+      player.worldMovementAuthorityBlocked = false;
+      player.worldMovementAuthorityRequiresRelease = false;
+      player.worldMovementAuthorityCanResume = false;
+     }
     }
     this.#observeDoorStates( snapshot.doorStates );
     this.reportedError = false;
@@ -173,6 +181,7 @@ export class WorldPresenceSession {
   if (!pose || !['walk', 'swim'].includes(pose.mode) || !['walk', 'swim'].includes(player?.mode)) return;
   player.worldMovementAuthorityBlocked = true;
   player.worldMovementAuthorityRequiresRelease = true;
+  player.worldMovementAuthorityCanResume = false;
   player.setHostedWorldAuthoritativePose?.(pose.position, pose.yaw, pose.pitch, pose.mode);
  }
  #movementReleased(player) {
