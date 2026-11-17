@@ -29,25 +29,33 @@ parity with the retained in-engine Example Island across the world.
 
 The remaining visual parity task is to compare the retained in-engine Example
 Island (the pre-split WebGPU reference) with the Tidewater package loaded by the
-same ElseMesh build. Use matched device, camera pose, time, viewport, render
-scale, and graphics settings for the beach, village, valley, and summit views,
-plus close views where material, vegetation, or authored LOD differences are
-visible. Track content omissions, terrain/material appearance, vegetation
+same ElseMesh build. View parity is the main acceptance focus: first match the
+original WebGPU wave spray, then the appearance of the timber, houses, fish
+stand, and harbour. Also compare the beach, village, valley, and summit views
+with matched device, camera pose, time, viewport, render scale, and graphics
+settings. Track content omissions, terrain/material appearance, vegetation
 density, object LOD transitions, water, and lighting/shadows as separate
-findings. WebGL was never the visual parity baseline; check it for the same
-world content and gameplay behavior as WebGPU without using its appearance as a
-comparison target. Treat the existing captures as partial evidence, not
-completion. Desktop WebGPU visual acceptance and complete gameplay parity
-remain open. Keep Tidewater authored content and gameplay modules in its
+findings. WebGL is not the visual baseline; after WebGPU view parity, check that
+WebGL presents the same authored world content. Gameplay parity is secondary
+until the visual gates are met. Treat existing captures as partial evidence,
+not completion.
+
+The renderer architecture target is one shared world runtime and renderer-
+neutral content contract. ElseMesh owns backend selection and supplies WebGPU
+and WebGL presenters that consume that same world data and simulation state.
+The client selects one backend for a run; do not mix both renderers in one
+frame. Do not keep separate world/game loops or move renderer-specific
+presenters into Tidewater. WebGPU and WebGL view parity must be tested against
+the same world-authored inputs, with the pre-split WebGPU render as the visual
+reference. Keep Tidewater authored content and gameplay modules in its
 repository, with ElseMesh providing generic browser-worker hosting, lifecycle,
 and message transport. World modules are owner-signed, hash-verified JavaScript
 assets executed in dedicated workers; pass versioned messages without engine
 object references, bound execution time, and terminate unresponsive workers.
 Keep each world's event vocabulary and gameplay rules in that world package,
-not in the ElseMesh engine. Preserve
-per-world state isolation and the declared shared, player, group, or persistent
-scopes. Keep player platform identity across portals without leaking instance
-state.
+not in the ElseMesh engine. Preserve per-world state isolation and the declared
+shared, player, group, or persistent scopes. Keep player platform identity
+across portals without leaking instance state.
 
 **Graphical world editor: 0%.** After package import and multiplayer acceptance
 pass, build the editor in ElseMesh so it edits the mounted Tidewater repository.
