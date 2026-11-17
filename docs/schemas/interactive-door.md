@@ -24,7 +24,10 @@ the one-shot sound once. Initial state has sequence zero and no event ID.
 
 `worldd` currently implements definition validation, owner authorization,
 range and entry-choice checks, idempotent state changes, sound-event IDs, and
-state replication. The browser's animated presenter and the atomic link between
-door state and authoritative collision are not implemented. A world must not
-declare this capability as required until its client can present the door and
-the movement authority applies the same state to collision.
+state replication. The shared WebGPU/WebGL audio engine now plays a signed
+`audio/ogg` event at the component's world-space position when browser audio is
+enabled, deduplicating it by world and event ID. The browser's animated
+presenter and the atomic link between door state and authoritative collision
+are not implemented. A world must not declare this capability as required
+until its client can present the door and the movement authority applies the
+same state to collision.

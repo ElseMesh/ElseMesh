@@ -80,6 +80,7 @@ import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapP
 import { matchingPortalAgreement } from './network/PortalAgreement.js';
 import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
+import { createWorldDoorAudioObserver } from './network/WorldDoorAudio.js';
 import './network/WebGPUWorldComponentAdapters.js';
 import './network/WebGPUTerrainSurfaceAdapter.js';
 import './network/WebGPUFishPropsComponentAdapter.js';
@@ -746,7 +747,7 @@ export class App {
 				if ( connector.presenceEnabled ) {
 					const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 					if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
+					admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '', onDoorStates: createWorldDoorAudioObserver( this.audio, connector ) } );
 					const admitted = await admissionSession.admit( this.player, candidates );
 					this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 					this.camera.position.copy( this.player.camera.position );
@@ -984,7 +985,7 @@ export class App {
 		if ( connector.presenceEnabled ) {
 			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
 			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
+			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '', onDoorStates: createWorldDoorAudioObserver( this.audio, connector ) } );
 			const admitted = await admissionSession.admit( this.player, candidates );
 			this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
 			this.camera.position.copy( this.player.camera.position );
@@ -1681,7 +1682,7 @@ export class App {
 
 	startWorldPresence( root, connector ) {
 		if ( ! connector.presenceEnabled ) return;
-		this.worldPresence = new WorldPresenceSession( { connector, parent: root } );
+		this.worldPresence = new WorldPresenceSession( { connector, parent: root, onDoorStates: createWorldDoorAudioObserver( this.audio, connector ) } );
 	}
 
 	prepareHostedWorld( connector ) {
@@ -2173,7 +2174,7 @@ export class App {
 		this.holdPlayerAtPortal( previous );
 		const arrivalPlayer = { ...this.player, position: new Vector3( arrival.position.x, arrival.position.y - 1.62, arrival.position.z ), yaw: arrival.yaw, pitch: arrival.pitch };
 		const arrivalAppearance = admittedAppearance || selectedWorldAppearance( entrySelection, destinationConnector.manifest );
-		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot, appearance: arrivalAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '' } );
+		const admissionSession = new WorldPresenceSession( { connector: destinationConnector, parent: destinationRoot, appearance: arrivalAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '', onDoorStates: createWorldDoorAudioObserver( this.audio, destinationConnector ) } );
 		try {
 			await admissionSession.admit( arrivalPlayer, undefined, { yaw: arrival.yaw } );
 		} catch ( error ) {

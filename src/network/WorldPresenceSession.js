@@ -163,7 +163,7 @@ export class WorldPresenceSession {
     next.set( state.id, previous );
     continue;
    }
-   if ( state.sequence > ( previous?.sequence ?? 0 ) && state.eventId ) transitions.push( copy );
+   if ( previous && state.sequence > previous.sequence && state.eventId ) transitions.push( copy );
    next.set( state.id, copy );
   }
   this.doorStates = next;

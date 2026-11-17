@@ -117,21 +117,23 @@ let doorRequestOpen = false;
 const doorConnector = { ...connector, manifest: { ...connector.manifest, assets: [{ id: doorSound, kind: 'audio/ogg' }], components: [{ id: doorId, type: 'elsemesh.interactive-door/1' }] } };
 const doorSession = new WorldPresenceSession({ connector: doorConnector, parent: { add() {} }, onDoorStates: (states, transitions) => { doorUpdates.push(states); doorTransitions.push(...transitions); }, createConnector() {
  return {
-  updatePresence(pose) { return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: 'door-admit', playerId: own, players: [{ ...pose, id: own, updatedAt: 800 }], doorStates: [{ id: doorId, open: false, sequence: 0 }] }); },
+  updatePresence(pose) { return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: 'door-admit', playerId: own, players: [{ ...pose, id: own, updatedAt: 800 }], doorStates: [{ id: doorId, open: false, sequence: 1, eventId: `${doorId}:1`, soundAssetId: doorSound, updatedAt: 850 }] }); },
   async setDoorState(id, open) {
    assert.equal(id, doorId);
    doorRequestOpen = open;
-   return { type: 'world.door.state', worldId: connector.worldId, playerId: own, doorStates: [{ id, open, sequence: 1, eventId: `${id}:1`, soundAssetId: doorSound, updatedAt: 900 }] };
+   return { type: 'world.door.state', worldId: connector.worldId, playerId: own, doorStates: [{ id, open, sequence: 2, eventId: `${id}:2`, soundAssetId: doorSound, updatedAt: 900 }] };
   },
   close() {},
  };
 } });
 await doorSession.admit(player);
 assert.equal(doorSession.doorStates.get(doorId).open, false, 'admission receives the owner-authored initial door state');
+assert.equal(doorTransitions.length, 0, 'admission does not replay a door sound from a prior state transition');
 await doorSession.setDoorState(doorId, true);
 assert.equal(doorRequestOpen, true, 'the admitted session requests an explicit desired state');
 assert.equal(doorSession.doorStates.get(doorId).open, true, 'the session adopts the owner state response');
-assert.equal(doorTransitions.length, 1, 'one monotonic transition is exposed for one-shot sound playback');
+assert.equal(doorTransitions.length, 1, 'one newly observed transition is exposed for one-shot sound playback');
+assert.equal(doorTransitions[0].eventId, `${doorId}:2`, 'the newly observed transition retains its event ID');
 assert.equal(doorTransitions[0].soundAssetId, doorSound, 'the state event carries its signed sound asset ID');
 assert.equal(doorUpdates.length, 2, 'initial and changed state snapshots are delivered to the renderer');
 doorSession.dispose();

@@ -3,6 +3,7 @@ import { createWebGLKTX2Loader } from '../engine/loaders/KTX2.js';
 import { computeShoreField } from '../world/ShoreField.js';
 import { WorldConnector, worldLinkFromLocation } from '../network/WorldConnector.js';
 import { WorldPresenceSession } from '../network/WorldPresenceSession.js';
+import { createWorldDoorAudioObserver } from '../network/WorldDoorAudio.js';
 import { avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
 import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
@@ -2822,6 +2823,7 @@ export class WebGLFallback {
 		const session = new WorldPresenceSession( {
 			connector: this.connector, parent: this.scene, appearance,
 			avatarOptionId: this.entrySelection?.avatarOptionId || '', entryPointId: this.entrySelection?.id || '',
+			onDoorStates: createWorldDoorAudioObserver( this.app.audio, this.connector ),
 			createAvatar: options => new WebGLRemoteAvatar( this.THREE, options ),
 		} );
 		try {
