@@ -35,6 +35,7 @@ import { surfFoamGLSL } from '../ocean/SurfFoamGLSL.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { installWebGLSceneMaterialLighting } from './WebGLMaterialLighting.js';
+import { WebGLSunShadows } from './WebGLSunShadows.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
 import { WebGLRefractionPass } from './WebGLRefractionPass.js';
@@ -920,23 +921,21 @@ export class WebGLFallback {
 		this.scene.add( this.cloudLayer );
 		this.hemisphereLight = new T.HemisphereLight( 0xd9f1ff, 0x42513f, 1.5 );
 		this.scene.add( this.hemisphereLight );
-		const sun = new T.DirectionalLight( 0xfff0d2, 2.4 );
-		sun.position.copy( sunDirection ).multiplyScalar( 500 );
-		this.sunLight = sun;
-		sun.castShadow = true;
-		sun.shadow.mapSize.set( 1024, 1024 );
-		sun.shadow.camera.left = sun.shadow.camera.bottom = - 300;
-		sun.shadow.camera.right = sun.shadow.camera.top = 300;
-		sun.shadow.camera.near = 1;
-		sun.shadow.camera.far = 1400;
-		sun.shadow.bias = - 0.00008;
-		sun.shadow.normalBias = 0.025;
-		this.scene.add( sun );
+		const initialLighting = webglLightingForTime( T, this.app.settings.timeOfDay );
+		this.shadowDirection = initialLighting.keyDirection.clone().negate();
+		this.sunShadows = new WebGLSunShadows( {
+			renderer: this.renderer,
+			scene: this.scene,
+			camera: this.camera,
+			direction: this.shadowDirection,
+		} );
+		this.sunLights = this.sunShadows.lights;
+		this.sunLight = this.sunLights[ 0 ];
 		this.sunDirection = sunDirection;
 		this._updateLighting();
 		this.webglEnvironment = this.worldEnvironment.sky ? new WebGLSkyEnvironment( T, this.renderer, this.cloudLayer ) : null;
 		if ( this.webglEnvironment?.texture ) this.scene.environment = this.webglEnvironment.texture;
-		installWebGLSceneMaterialLighting( T, this.scene, this.webglAtmosphere );
+		installWebGLSceneMaterialLighting( T, this.scene, this.webglAtmosphere, this.sunShadows );
 		this._makeHUD();
 		if ( this.worldLink ) await this._loadHostedWorld( onProgress );
 		else await this._loadIsland( onProgress );
@@ -1033,7 +1032,7 @@ export class WebGLFallback {
 		this._bindInput();
 		this._resize();
 		window.addEventListener( 'resize', this._resize );
-		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
+		window.addEventListener( 'pagehide', () => { this.frameWorkMeter.dispose(); this.postFX.dispose(); this.refractionPass.dispose(); this.shoreWetness?.dispose(); this.wake?.dispose(); this.sunShadows?.dispose(); this.webglEnvironment?.dispose(); this.webglAtmosphere?.dispose(); }, { once: true } );
 		await this._startPresence();
 		this._applyReviewCameraPose();
 		this.renderer.setAnimationLoop( () => this._frame() );
@@ -1684,9 +1683,11 @@ export class WebGLFallback {
 		this.lighting = lighting;
 		G.night.value = lighting.night;
 		this.sunDirection.copy( lighting.sunDirection );
-		this.sunLight.position.copy( lighting.keyDirection ).multiplyScalar( 500 );
-		this.sunLight.color.copy( lighting.keyColor );
-		this.sunLight.intensity = lighting.keyIntensity;
+		this.shadowDirection.copy( lighting.keyDirection ).negate();
+		for ( const light of this.sunLights ) {
+			light.color.copy( lighting.keyColor );
+			light.intensity = lighting.keyIntensity;
+		}
 		// The sky PMREM contributes indirect diffuse, matching WebGPU's sky irradiance. Keep the
 		// hemisphere fill only when there is no sky environment, so lit worlds do not count it twice.
 		this.hemisphereLight.intensity = this.webglEnvironment?.texture ? 0 : lighting.ambientIntensity;
@@ -2238,6 +2239,7 @@ export class WebGLFallback {
 			const w = window.innerWidth, h = window.innerHeight;
 			this.camera.aspect = w / Math.max( 1, h );
 			this.camera.updateProjectionMatrix();
+			this.sunShadows.updateFrustums();
 			const scale = Math.max( 0.35, Math.min( 1, Number( this.renderScale ?? this.app.settings?.renderScale ) || 1 ) );
 			this.renderer.setPixelRatio( Math.min( window.devicePixelRatio || 1, 1.5 ) * scale );
 			this.renderer.setSize( w, h );
@@ -2380,6 +2382,7 @@ export class WebGLFallback {
 		this.renderer.autoClear = true;
 		this.frameWorkMeter.begin();
 		try {
+			this.sunShadows.update( this.camera, this.shadowDirection );
 			this.renderer.render( this.scene, this.camera );
 			if ( this.waterScene.children.length && ! this.debugNoWater ) {
 				this.refractionPass.render( this.worldSeaLevel );

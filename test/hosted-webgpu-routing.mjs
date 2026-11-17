@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { App } from '../src/App.js';
 import { Engine } from '../src/engine/Engine.js';
 import { WorldConnector } from '../src/network/WorldConnector.js';
+import { SUN_SHADOW_PROFILE } from '../src/engine/render/SunShadowProfile.js';
 
 globalThis.location = {
 	href: 'http://127.0.0.1/?worldId=elsemesh:routing&gateway=http%3A%2F%2F127.0.0.1%3A5200',
@@ -40,7 +41,8 @@ try {
 	assert.match( App.prototype.initHostedPackageWorld.toString(), /installDebugViews\( this \)/, 'hosted WebGPU worlds install the shared camera review controls' );
 	assert.match( App.prototype.initHostedPackageWorld.toString(), /new RefractionPass\([\s\S]*sceneRenderer\.onBeforeWater = \(\) => this\.refraction\.render\( G\.seaLevel\.value \)/, 'hosted WebGPU water captures the below-water scene before rendering the surface' );
 	assert.match( App.prototype.initHostedPackageWorld.toString(), /sceneDepthHalf: this\.sceneRenderer\.opaqueDepthHalf\.texture, refraction: this\.refraction/, 'hosted WebGPU water material receives the shared refraction source' );
-	assert.match( App.prototype.createSunShadows.toString(), /size: 2048, splits: \[ 10, 60, 400 \][\s\S]*shadows\.layerMask = \( 1 << LAYERS\.OPAQUE \) \| \( 1 << LAYERS\.TRANSPARENT \)[\s\S]*this\.desktopAdaptiveScale/, 'built-in and hosted WebGPU worlds share the same shadow cascades and quality policy' );
+	assert.deepEqual( SUN_SHADOW_PROFILE.cascadeDistances, [ 10, 60, 400 ], 'the engine shadow profile defines shared near, mid, and far coverage' );
+	assert.match( App.prototype.createSunShadows.toString(), /size: SUN_SHADOW_PROFILE\.mapSize,[\s\S]*splits: SUN_SHADOW_PROFILE\.cascadeDistances[\s\S]*shadows\.layerMask = \( 1 << LAYERS\.OPAQUE \) \| \( 1 << LAYERS\.TRANSPARENT \)[\s\S]*this\.desktopAdaptiveScale/, 'built-in and hosted WebGPU worlds use the shared renderer-neutral shadow profile' );
 	assert.match( App.prototype.hostedPackageFrame.toString(), /this\.renderSunShadows\(\)/, 'hosted WebGPU frames render the shared sun shadows' );
 	assert.match( App.prototype._frame.toString(), /this\.renderSunShadows\(\)/, 'built-in WebGPU frames use the same sun shadow path' );
 	assert.match( App.prototype.activateHostedWorld.toString(), /if \( this\.activeHostedOcean && ! this\.spray \)[\s\S]*new Spray\( this\.renderer[\s\S]*this\.scene\.add\( this\.spray\.mesh \)/, 'hosted WebGPU oceans install the particle system required for breaker spray and mist' );

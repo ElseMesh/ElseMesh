@@ -53,6 +53,7 @@ try {
 		fallback.worldLink = {};
 		fallback.renderer = { shadowMap: {} };
 		fallback.scene = new three.Scene();
+		fallback.camera = new three.PerspectiveCamera( 62, 16 / 9, 0.1, 5000 );
 		fallback.ktx2Loader = {};
 		fallback.loader = { setKTX2Loader() {} };
 		fallback._sunDirection = () => new three.Vector3( 0, 1, 0 );

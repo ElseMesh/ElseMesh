@@ -47,14 +47,18 @@ export function adaptWebGLMaterialLighting( THREE, material, atmosphere, getEnvi
 
 // Hook additions at the scene-graph boundary so streamed LODs and world objects
 // receive the same engine-owned lighting adapter without a per-frame scene walk.
-export function installWebGLSceneMaterialLighting( THREE, scene, atmosphere ) {
+export function installWebGLSceneMaterialLighting( THREE, scene, atmosphere, sunShadows = null ) {
 
-	if ( ! atmosphere?.skyIrradianceTexture || ! atmosphere?.horizonTexture ) return 0;
+	const hasAtmosphere = !! atmosphere?.skyIrradianceTexture && !! atmosphere?.horizonTexture;
+	if ( ! hasAtmosphere && ! sunShadows ) return 0;
 	let adapted = 0;
 	const installNode = object => {
 		if ( object.isMesh ) {
 			const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
-			for ( const material of materials ) if ( adaptWebGLMaterialLighting( THREE, material, atmosphere, () => scene.environmentIntensity ?? 1 ) ) adapted ++;
+			for ( const material of materials ) {
+				if ( sunShadows?.setupMaterial( material ) ) adapted ++;
+				if ( hasAtmosphere && adaptWebGLMaterialLighting( THREE, material, atmosphere, () => scene.environmentIntensity ?? 1 ) ) adapted ++;
+			}
 		}
 		if ( object.userData?.elsemeshLightingAddHook ) return;
 		const sourceAdd = object.add;

@@ -1,6 +1,7 @@
 import { Vector3, Euler, Color, MathUtils, Mesh } from './engine/index.js';
 import { GPU } from './engine/gpu/GPU.js';
 import { SunShadows } from './engine/render/Shadows.js';
+import { SUN_SHADOW_PROFILE } from './engine/render/SunShadowProfile.js';
 import { FrameUniforms } from './engine/render/Frame.js';
 import { updateWorldComponentRuntimes } from './engine/scene/WorldComponentUpdate.js';
 import { advanceWorldWindField, setWorldWindFrame } from './engine/world/WorldWindField.js';
@@ -1137,7 +1138,13 @@ export class App {
 
 	createSunShadows() {
 
-		const shadows = new SunShadows( { size: 2048, splits: [ 10, 60, 400 ], lightMargin: 200, normalBias: [ 0.015, 0.06, 0.3 ], bias: 0.00002 } );
+		const shadows = new SunShadows( {
+			size: SUN_SHADOW_PROFILE.mapSize,
+			splits: SUN_SHADOW_PROFILE.cascadeDistances,
+			lightMargin: SUN_SHADOW_PROFILE.lightMargin,
+			normalBias: SUN_SHADOW_PROFILE.normalBias,
+			bias: SUN_SHADOW_PROFILE.bias,
+		} );
 		shadows.layerMask = ( 1 << LAYERS.OPAQUE ) | ( 1 << LAYERS.TRANSPARENT );
 		if ( this.desktopAdaptiveScale ) shadows.enabled = false;
 		return shadows;
