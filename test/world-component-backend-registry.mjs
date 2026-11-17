@@ -59,6 +59,17 @@ assert.match( appSource, /if \( engine\.backend !== 'webgl' \|\| ! worldLink \) 
 assert.match( appSource, /async initializeWorldState\(\)[\s\S]*?presentation\?\.createWorldState/, 'built-in world state is created through the package presentation boundary' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1' ), 'function', 'App registers the WebGPU water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1' ), 'function', 'ElseMesh owns the WebGPU island-ocean presenter' );
+const oceanSurface = {}, oceanRoot = { children: [], add( child ) { this.children.push( child ); }, remove( child ) { this.children.splice( this.children.indexOf( child ), 1 ); } };
+const oceanInstallation = await worldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1' )( {
+	app: { qs: { get: () => null }, waterMaterial: {}, surface: oceanSurface }, root: oceanRoot,
+}, { id: 'elsemesh-component:ocean', type: 'elsemesh.island-ocean/1' } );
+assert.equal( oceanInstallation?.installed, true, 'the engine WebGPU island-ocean presenter installs the water mesh' );
+assert.equal( oceanInstallation.runtime.isWorldOcean, true, 'the adapter exposes the world-ocean runtime capability' );
+assert.equal( oceanInstallation.runtime.surface, oceanSurface, 'the runtime exposes its surface to shared engine effects' );
+assert.equal( oceanRoot.children.length, 1, 'the adapter adds one water mesh to the world root' );
+assert.equal( oceanRoot.children[ 0 ].receiveShadow, true, 'the water mesh retains its receive-shadow setting' );
+oceanInstallation.runtime.dispose();
+assert.equal( oceanRoot.children.length, 0, 'the engine adapter removes the water mesh on disposal' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.terrain-surface/1' ), 'function', 'ElseMesh registers the WebGPU terrain-surface adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1' ), 'function', 'WebGLFallback registers the WebGL water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
