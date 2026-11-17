@@ -82,16 +82,16 @@ SurfFoamInfoGLSL surfFoamShadingGLSL( float coverage, float offshoreFoam, float 
 	float ww = clamp( fresh * 1.4, 0.0, 1.0 );
 	float steep = 1.0 - smoothstep( 0.5, 0.82, baseNormal.y );
 	bool farOnly = footprint >= 0.12;
-	vec4 flat = vec4( 0.5 );
-	if ( ! farOnly ) flat = surfFoamFlowLace( position.xz, flow, 0.0 );
-	vec4 lace = flat;
+	vec4 flatPattern = vec4( 0.5 );
+	if ( ! farOnly ) flatPattern = surfFoamFlowLace( position.xz, flow, 0.0 );
+	vec4 lace = flatPattern;
 	float lumps = 0.5;
 	vec2 tangent = vec2( -direction.y, direction.x );
 	float along = dot( position.xz, tangent );
 	vec2 qv = vec2( along + sin( along * 0.19 + 0.8 ) * 2.1 + sin( along * 0.47 + 2.9 ) * 0.6 + sin( position.y * 1.7 + along * 0.11 ) * 0.5, position.y * 1.1 );
 	if ( steep > 0.01 && ! farOnly ) {
 		vec4 vertical = surfFoamFlowLace( qv, vec2( 0.0, -0.9 ), 1.0 );
-		lace = mix( flat, vertical, steep );
+		lace = mix( flatPattern, vertical, steep );
 	}
 	if ( ww > 0.02 && ! farOnly ) {
 		vec2 patternPosition = mix( position.xz, qv, steep );
