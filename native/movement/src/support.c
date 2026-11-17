@@ -1,5 +1,8 @@
 #include "elsemesh_movement.h"
 
+#include <math.h>
+#include <stdint.h>
+
 enum {
 	BOX_STRIDE = 11,
 	CONVEX_STRIDE = 8,
@@ -8,20 +11,13 @@ enum {
 	QUERY_STRIDE = 6
 };
 
-/* Keep this kernel usable by freestanding WebAssembly builds without a WASI
- * sysroot. Grid coordinates are clamped nonnegative before integer conversion,
- * which therefore has the required floor behavior. */
-static double absolute(double value) { return value < 0.0 ? -value : value; }
-static double minimum(double a, double b) { return a < b ? a : b; }
-static double maximum(double a, double b) { return a > b ? a : b; }
-
 static double closest_segment_xz(double x, double z, const double *a, const double *b,
 		double *closest_x, double *closest_z) {
 	const double dx = b[0] - a[0];
 	const double dz = b[2] - a[2];
 	const double length_squared = dx * dx + dz * dz;
 	const double projection = length_squared > 1e-12
-		? maximum(0.0, minimum(1.0, ((x - a[0]) * dx + (z - a[2]) * dz) / length_squared))
+		? fmax(0.0, fmin(1.0, ((x - a[0]) * dx + (z - a[2]) * dz) / length_squared))
 		: 0.0;
 	*closest_x = a[0] + projection * dx;
 	*closest_z = a[2] + projection * dz;
@@ -48,7 +44,7 @@ static double closest_triangle_xz(double x, double z, const double *triangle,
 	const double d21 = ap_x * ac_x + ap_z * ac_z;
 	const double denominator = d00 * d11 - d01 * d01;
 
-	if (absolute(denominator) > 1e-12) {
+	if (fabs(denominator) > 1e-12) {
 		const double v = (d11 * d20 - d01 * d21) / denominator;
 		const double w = (d00 * d21 - d01 * d20) / denominator;
 		const double u = 1.0 - v - w;
@@ -89,19 +85,19 @@ static double support_height(const double *boxes, size_t box_count,
 	const double pad = query[3];
 	const double min_normal_y = query[4];
 	const double capsule_radius = query[5];
-	double best = -__builtin_inf();
+	double best = -INFINITY;
 
 	for (size_t i = 0; i < box_count; ++i) {
 		const double *box = boxes + i * BOX_STRIDE;
 		if (box[10] == 0.0 || box[9] > max_y) continue;
-		if (absolute(x - box[0]) > box[8] + pad + 0.01
-				|| absolute(z - box[2]) > box[8] + pad + 0.01) continue;
+		if (fabs(x - box[0]) > box[8] + pad + 0.01
+				|| fabs(z - box[2]) > box[8] + pad + 0.01) continue;
 		const double dx = x - box[0];
 		const double dz = z - box[2];
 		const double local_x = dx * box[6] - dz * box[7];
 		const double local_z = dx * box[7] + dz * box[6];
-		if (absolute(local_x) <= box[3] + pad && absolute(local_z) <= box[5] + pad)
-			best = maximum(best, box[9]);
+		if (fabs(local_x) <= box[3] + pad && fabs(local_z) <= box[5] + pad)
+			best = fmax(best, box[9]);
 	}
 
 	const double capsule_radius_squared = capsule_radius * capsule_radius;
@@ -122,7 +118,7 @@ static double support_height(const double *boxes, size_t box_count,
 			if (distance_squared > capsule_radius_squared + 1e-12) continue;
 			const double surface_height = (triangle[12] - triangle[9] * closest_x - triangle[11] * closest_z) / normal_y;
 			const double capsule_support_height = surface_height + capsule_radius * (1.0 / normal_y - 1.0);
-			if (capsule_support_height <= max_y) best = maximum(best, capsule_support_height);
+			if (capsule_support_height <= max_y) best = fmax(best, capsule_support_height);
 		}
 	}
 
@@ -143,10 +139,10 @@ static double support_height(const double *boxes, size_t box_count,
 		double row = (local_z - min_z) / step_z;
 		if (column < -pad / step_x || column > columns - 1.0 + pad / step_x
 				|| row < -pad / step_z || row > rows - 1.0 + pad / step_z) continue;
-		column = maximum(0.0, minimum(columns - 1.0, column));
-		row = maximum(0.0, minimum(rows - 1.0, row));
-		size_t x0 = (size_t)column;
-		size_t z0 = (size_t)row;
+		column = fmax(0.0, fmin(columns - 1.0, column));
+		row = fmax(0.0, fmin(rows - 1.0, row));
+		size_t x0 = (size_t)floor(column);
+		size_t z0 = (size_t)floor(row);
 		const size_t column_count = (size_t)columns;
 		const size_t row_count = (size_t)rows;
 		if (x0 >= column_count - 1) x0 = column_count - 2;
@@ -161,7 +157,7 @@ static double support_height(const double *boxes, size_t box_count,
 		const double h0 = h00 * (1.0 - tx) + h10 * tx;
 		const double h1 = h01 * (1.0 - tx) + h11 * tx;
 		const double world_height = field[1] + (h0 * (1.0 - tz) + h1 * tz) * field[4];
-		if (world_height <= max_y) best = maximum(best, world_height);
+		if (world_height <= max_y) best = fmax(best, world_height);
 	}
 
 	return best;
@@ -189,8 +185,7 @@ int em_movement_support_height_batch(
 		const size_t columns = (size_t)field[8];
 		const size_t rows = (size_t)field[9];
 		const size_t first = (size_t)field[14];
-		const size_t size_max = (size_t)-1;
-		if (columns < 2 || rows < 2 || columns > size_max / rows || first > size_max - columns * rows) return 0;
+		if (columns < 2 || rows < 2 || columns > SIZE_MAX / rows || first > SIZE_MAX - columns * rows) return 0;
 	}
 	for (size_t i = 0; i < query_count; ++i)
 		results[i] = support_height(boxes, box_count, convexes, convex_count, triangles,
