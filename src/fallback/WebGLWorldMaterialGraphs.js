@@ -2,7 +2,7 @@ import { worldMaterialRole } from '../network/WorldMaterialProfileRegistry.js';
 import { worldMaterialGraph } from '../network/WorldMaterialGraph.js';
 import { compileWorldMaterialProfile } from '../materials/WorldMaterialProfileCompilerRegistry.js';
 
-// Compile renderer-neutral signed material graphs for ordinary hosted GLB objects.
+// Compile renderer-neutral signed material graphs for world GLB content.
 // World runtimes remain available for non-graph material contracts.
 export function applyWebGLWorldMaterialGraphs( THREE, root ) {
 	let applied = 0;

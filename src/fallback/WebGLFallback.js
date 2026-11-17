@@ -1762,6 +1762,7 @@ export class WebGLFallback {
 					if ( /(?:^| )(?:wood|sign-wood|lantern-wood)$/i.test( material.name ) ) material.color.set( 0x80532f );
 				}
 			} );
+			applyWebGLWorldMaterialGraphs( T, model.scene );
 			this.scene.add( model.scene );
 			this._collectBlockers( model.scene );
 		} catch ( error ) {
