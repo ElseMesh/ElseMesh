@@ -157,11 +157,13 @@ export class Bench {
 	// output size used by the benchmark (the README's target: 2560 x 1267)
 	setSize( w = 2560, h = 1267 ) {
 
-		const e = this.app.engine;
+		const { engine: e } = this.app;
+		const camera = e.camera || this.app.camera;
+		if ( ! camera ) throw new Error( 'Benchmark renderer does not expose a camera' );
 		e.canvas.width = w;
 		e.canvas.height = h;
-		e.camera.aspect = w / h;
-		e.camera.updateProjectionMatrix();
+		camera.aspect = w / h;
+		camera.updateProjectionMatrix();
 
 	}
 
