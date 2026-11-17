@@ -32,9 +32,11 @@ backend independence.
   resources, WebGPU/WebGL adapters, shaders, particles, lighting, and post
   effects. Both adapters consume the same renderer-neutral content and
   simulation state; they cannot omit or redefine an entity or gameplay
-  behavior. World packages may register component schemas, decoders, and
-  renderer-neutral simulation factories, but may not register backend
-  presenters or material compilers.
+  behavior. Built-in and hosted routes must use the same authored object and
+  texture inputs; a built-in fallback may not silently omit or regenerate
+  objects represented by the world source. World packages may register
+  component schemas, decoders, and renderer-neutral simulation factories, but
+  may not register backend presenters or material compilers.
 - **Application orchestration** constructs the shared world/game runtime once,
   selects a presentation adapter, and sends the same updates to shared
   simulation regardless of backend.
