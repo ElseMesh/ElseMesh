@@ -929,6 +929,7 @@ export class WebGLFallback {
 			camera: this.camera,
 			direction: this.shadowDirection,
 		} );
+		this.app.shadows = this.sunShadows;
 		this.sunLights = this.sunShadows.lights;
 		this.sunLight = this.sunLights[ 0 ];
 		this.sunDirection = sunDirection;

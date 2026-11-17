@@ -9,6 +9,7 @@ export class WebGLSunShadows {
 	constructor( { renderer, scene, camera, direction } ) {
 
 		this.renderer = renderer;
+		this.rendererShadowEnabled = renderer.shadowMap.enabled;
 		this.rendererShadowAutoUpdate = renderer.shadowMap.autoUpdate;
 		this.direction = direction.clone().normalize();
 		this.lastDirection = this.direction.clone();
@@ -37,10 +38,22 @@ export class WebGLSunShadows {
 		this.lights = this.csm.lights;
 		this.periods = SUN_SHADOW_PROFILE.updatePeriods;
 		this.renderer.shadowMap.autoUpdate = false;
+		this.enabled = true;
 		for ( const light of this.lights ) {
 			light.shadow.autoUpdate = false;
 			light.shadow.mapSize.set( WEBGL_SHADOW_MAP_SIZE, WEBGL_SHADOW_MAP_SIZE );
 		}
+
+	}
+
+	get enabled() {
+
+		return this.renderer.shadowMap.enabled;
+	}
+
+	set enabled( value ) {
+
+		this.renderer.shadowMap.enabled = Boolean( value );
 
 	}
 
@@ -93,6 +106,7 @@ export class WebGLSunShadows {
 			material.needsUpdate = true;
 		}
 		this.materialCompileHooks.clear();
+		this.renderer.shadowMap.enabled = this.rendererShadowEnabled;
 		this.renderer.shadowMap.autoUpdate = this.rendererShadowAutoUpdate;
 	}
 
