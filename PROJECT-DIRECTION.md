@@ -64,14 +64,18 @@ have to implement both renderers.
 
 WebGPU and WebGL views of portable worlds must be tested against the same
 world-authored inputs, with the pre-split WebGPU render as the Tidewater visual
-reference. Both backends must consume the same object set, placements, variants,
-and renderer-neutral LOD/visibility plan. That includes vegetation, shoreline
-logs and debris, buildings, stands, and harbour props. Backend-specific code may
-translate each shared LOD tier to its own GPU representation, but it must not
-create a second arrangement, omit object classes, or move their placements.
-Do not keep separate world/game loops or move renderer-specific presenters into
-Tidewater. Keep Tidewater authored content and gameplay modules in its
-repository, with ElseMesh providing generic browser-worker hosting,
+reference. Both backends must consume the same world-authored objects, geometry
+and LOD assets, textures, material data, variants, placements, and shared
+visibility/LOD decisions. This includes vegetation, shoreline logs and debris,
+buildings, stands, and harbour props. Do not recreate WebGPU content as a
+WebGL-specific copy or substitute hand-built objects for the authored assets.
+Do not copy WebGPU shaders into WebGL; ElseMesh owns paired backend adapters that
+translate the same content and renderer-neutral material contracts for each GPU
+API. A distant proxy is valid only when it is an authored LOD asset selected by
+the shared LOD plan. Do not keep separate world/game loops or move
+renderer-specific presenters into Tidewater. Keep Tidewater authored content
+and gameplay modules in its repository, with ElseMesh providing generic
+browser-worker hosting,
 lifecycle, and message transport. World modules are owner-signed,
 hash-verified assets executed in dedicated workers; JavaScript and WebAssembly
 are both candidates, and the same-world workload must determine the selected
