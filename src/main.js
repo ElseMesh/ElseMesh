@@ -3,6 +3,14 @@ import { App } from './App.js';
 import { UI } from './ui/UI.js';
 import { AppUI } from './ui/AppUI.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL } from './network/WorldLauncher.js';
+import { setMovementSupportKernel } from './world/Colliders.js';
+import { loadMovementSupportKernel } from './world/MovementSupportKernel.js';
+
+const movementSupportKernel = await loadMovementSupportKernel();
+if ( movementSupportKernel ) {
+	setMovementSupportKernel( movementSupportKernel );
+	console.info( 'Shared movement support module loaded' );
+}
 
 // Public deployments can opt into account sign-in without exposing secrets or
 // requiring a build change. A missing file leaves the guest experience intact.
