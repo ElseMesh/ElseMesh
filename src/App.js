@@ -387,9 +387,7 @@ export class App {
 		// contact-hardening filter sized by the sun's disc on the near cascade. Each cascade's depth range
 		// is its light margin (200 m) + its extent, which keeps the depth bias small in metres.
 		// Shadows come from the opaque and the late (transparent-pass) layers.
-		this.csm = this.shadows = new SunShadows( { size: 2048, splits: [ 10, 60, 400 ], lightMargin: 200, normalBias: [ 0.015, 0.06, 0.3 ], bias: 0.00002 } );
-		this.shadows.layerMask = ( 1 << LAYERS.OPAQUE ) | ( 1 << LAYERS.TRANSPARENT );
-		if ( this.desktopAdaptiveScale ) this.shadows.enabled = false;
+		this.csm = this.shadows = this.createSunShadows();
 
 		this.environment = new Environment( renderer, scene, this.sky );
 		// Keep renderer-owned atmosphere/environment roots separate from replaceable world content.
@@ -800,9 +798,7 @@ export class App {
 		}
 		this.environment = new Environment( engine, scene, this.sky );
 		this.updateSun();
-		this.shadows = new SunShadows( { size: 1024, splits: [ 12, 60, 240 ] } );
-		this.shadows.enabled = false;
-		this.shadows.update( camera, new Vector3( 0, 1, 0 ) );
+		this.csm = this.shadows = this.createSunShadows();
 		this.sceneRenderer = new SceneRenderer( engine.meshRenderer, scene, camera );
 		// Keep hosted water on the same below-water refraction path as the built-in renderer.
 		this.refraction = new RefractionPass( { meshRenderer: engine.meshRenderer, scene, camera, sceneRenderer: this.sceneRenderer, scale: this.desktopRefractionScale } );
@@ -1051,6 +1047,7 @@ export class App {
 		const windRoot = this.linkedWorldRoot || this.scene;
 		advanceWorldWindField( windRoot, dt, G.windDir.value, G.windSpeed.value );
 		setWorldWindFrame( windRoot, FrameUniforms.fields );
+		this.renderSunShadows();
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
 		if ( portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera, this.renderLoadBias );
 		this.sceneRenderer.render();
@@ -1135,6 +1132,21 @@ export class App {
 		// twilight anyway), then the moon
 		const light = dir.y > - 0.07 ? dir : moon;
 		G.sunDir.value.copy( light );
+
+	}
+
+	createSunShadows() {
+
+		const shadows = new SunShadows( { size: 2048, splits: [ 10, 60, 400 ], lightMargin: 200, normalBias: [ 0.015, 0.06, 0.3 ], bias: 0.00002 } );
+		shadows.layerMask = ( 1 << LAYERS.OPAQUE ) | ( 1 << LAYERS.TRANSPARENT );
+		if ( this.desktopAdaptiveScale ) shadows.enabled = false;
+		return shadows;
+
+	}
+
+	renderSunShadows() {
+
+		this.shadows.render( this.scene, this.engine.meshRenderer, this.shadows.update( this.camera, G.sunDir.value ) );
 
 	}
 
@@ -2332,7 +2344,7 @@ export class App {
 		const windRoot = this.linkedWorldRoot || this.scene;
 		advanceWorldWindField( windRoot, dt, G.windDir.value, G.windSpeed.value );
 		setWorldWindFrame( windRoot, FrameUniforms.fields );
-		this.shadows.render( this.scene, this.engine.meshRenderer, this.shadows.update( this.camera, G.sunDir.value ) );
+		this.renderSunShadows();
 		const portalViewRoot = this.portalView.render( performance.now(), this.camera, this.renderLoadBias, this.linkedWorldRoot );
 		if ( this.remoteWorldActive && portalViewRoot === this.linkedWorldRoot ) this.updateWorldComponents( this.linkedWorldRoot, 0, this.camera );
 		this.sceneRenderer.render();
