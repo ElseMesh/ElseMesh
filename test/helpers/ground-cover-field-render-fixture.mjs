@@ -11,16 +11,12 @@ async function assetID( bytes ) {
 }
 
 /** One signed world fixture shared by the browser WebGL and native WebGPU render checks. */
-export async function groundCoverFieldRenderFixture( { density: authoredDensity = null, terrain: authoredTerrain = null, terrainHeightModule: authoredTerrainHeightModule = null, terrainDetail: authoredTerrainDetail = null, graphPositionOnly = false, graphPositionMode = 'authored', graphForcePresence = false } = {} ) {
+export async function groundCoverFieldRenderFixture( { density: authoredDensity = null, terrain: authoredTerrain = null, terrainHeightModule: authoredTerrainHeightModule = null, terrainDetail: authoredTerrainDetail = null } = {} ) {
 	const densityData = authoredDensity?.data || new Uint8Array( 32 * 32 * 4 );
 	if ( ! authoredDensity ) for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
 	const density = authoredDensity || { data: densityData, res: 32, size: 32, origin: -16 };
 	const densityBytes = encodeGrassDensityAsset( density );
-	const authoredGraph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: density.origin, densitySize: density.size, vertexPositionMode: graphPositionMode, forcePresence: graphForcePresence } );
-	const positionInput = authoredGraph.nodes.find( node => node.op === 'input' && node.name === 'position' )?.id;
-	const graph = graphPositionOnly
-		? { ...authoredGraph, outputs: { ...authoredGraph.outputs, vertexPosition: positionInput } }
-		: authoredGraph;
+	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: density.origin, densitySize: density.size } );
 	// fixed-cell-patch asset lists are ordered far-to-near; the source patch
 	// exporter emits near-to-far, so reverse the source LOD indices here.
 	const modelBytesByLOD = [ 2, 1, 0 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
