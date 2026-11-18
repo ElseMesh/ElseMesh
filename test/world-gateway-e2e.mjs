@@ -16,6 +16,7 @@ const tempDirectory = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' 
 const tempRoot = await mkdtemp( path.join( tempDirectory, 'elsemesh-world-gateway-' ) );
 const processes = [];
 globalThis.crypto ||= webcrypto;
+let workerGateway;
 
 class MemoryKV {
 	values = new Map();
@@ -72,6 +73,11 @@ try {
 	const cacheP2PPort = await unusedPort();
 	const ownerHTTPPort = await unusedPort();
 	const cacheHTTPPort = await unusedPort();
+	const certPath = path.join( tempRoot, 'gateway-cert.pem' );
+	const keyPath = path.join( tempRoot, 'gateway-key.pem' );
+	const certificate = spawnSync( 'openssl', [ 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-keyout', keyPath, '-out', certPath, '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE' ], { encoding: 'utf8', timeout: 30000 } );
+	assert.equal( certificate.status, 0, `local gateway test certificate generation failed:\n${certificate.stdout}\n${certificate.stderr}` );
+	workerGateway = await createSecureGatewayProxy( cacheHTTPPort, keyPath, certPath );
 	const owner = startDaemon( binary, [
 		'--data', ownerData, '--manifest', manifestPath, '--p2p-port', String( ownerP2PPort ),
 		'--http', `127.0.0.1:${ownerHTTPPort}`, '--dht-mode', 'server',
@@ -80,7 +86,7 @@ try {
 	const bootstrap = `/ip4/127.0.0.1/tcp/${ownerP2PPort}/p2p/${ownerPeerID}`;
 	const cache = startDaemon( binary, [
 		'--data', cacheData, '--manifest', manifestPath, '--p2p-port', String( cacheP2PPort ),
-		'--http', `127.0.0.1:${cacheHTTPPort}`, '--dht-mode', 'server', '--bootstrap', bootstrap,
+		'--http', `127.0.0.1:${cacheHTTPPort}`, '--public-gateway', workerGateway.url, '--dht-mode', 'server', '--bootstrap', bootstrap,
 		'--cache-from', ownerPeerID, '--cache-sync-interval', '1s',
 	] );
 	await waitForHTTP( `http://127.0.0.1:${cacheHTTPPort}/healthz`, cache );
@@ -94,10 +100,6 @@ try {
 		}
 	}, 'authorized cache to sync and verify the signed asset', [ owner, cache ] );
 
-	const certPath = path.join( tempRoot, 'gateway-cert.pem' );
-	const keyPath = path.join( tempRoot, 'gateway-key.pem' );
-	const certificate = spawnSync( 'openssl', [ 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-keyout', keyPath, '-out', certPath, '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE' ], { encoding: 'utf8', timeout: 30000 } );
-	assert.equal( certificate.status, 0, `local gateway test certificate generation failed:\n${certificate.stdout}\n${certificate.stderr}` );
 	const secureGateway = await createSecureGatewayProxy( cacheHTTPPort, keyPath, certPath );
 	try {
 		const result = await runConnectorClient( {
@@ -111,32 +113,31 @@ try {
 		await new Promise( ( resolve, reject ) => secureGateway.server.close( ( error ) => error ? reject( error ) : resolve() ) );
 	}
 
-	const workerGateway = await createSecureGatewayProxy( cacheHTTPPort, keyPath, certPath );
 	let resolverServer;
 	try {
-		const cacheKeyPath = path.join( tempRoot, 'cache-node.key' );
-		runCli( binary, [ '--data', cacheData, '--export-node-key', cacheKeyPath ] );
-		const cacheIdentity = await readLibp2pIdentity( cacheKeyPath );
-		assert.equal( cacheIdentity.peerID, cachePeerID, 'the exported test identity matches the running worldd node ID' );
-		const resolverNode = await signNodeRecord( {
-			protocol: 'elsemesh.node/1', nodeId: cachePeerID, gateway: workerGateway.url,
-			worldIds: [ worldID ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
-			issuedAt: Math.floor( Date.now() / 1000 ), expiresAt: Math.floor( Date.now() / 1000 ) + 600,
-		}, cacheIdentity );
+		const nodeResponse = await fetch( `http://127.0.0.1:${cacheHTTPPort}/.well-known/elsemesh/node` );
+		if ( nodeResponse.status !== 200 ) throw new Error( `running worldd did not provide its signed node record: ${await nodeResponse.text()}` );
+		const resolverNode = await nodeResponse.json();
+		assert.equal( resolverNode.protocol, 'elsemesh.node/1' );
+		assert.equal( resolverNode.payload.nodeId, cachePeerID, 'the signed advertisement belongs to the running worldd provider' );
+		assert.equal( resolverNode.payload.gateway, workerGateway.url, 'worldd advertises its actual HTTPS/WSS gateway' );
+		assert.match( resolverNode.payload.zeroTierNodeId || '', /^[0-9a-f]{10}$/, 'worldd advertises its embedded libzt HostID' );
+		assert.equal( resolverNode.payload.zeroTierNetworkId, 'e3918db4832a3056', 'worldd joined the configured network through embedded libzt' );
 		const resolverState = { PROVIDERS: new MemoryKV() };
 		const resolverManifest = JSON.parse( await readFile( manifestPath, 'utf8' ) );
 		const announcement = await handleResolverRequest( new Request( 'https://resolver.example/v1/announce', {
 			method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify( { node: resolverNode, manifest: resolverManifest } ),
 		} ), resolverState );
 		assert.equal( announcement.status, 202, `Worker contract rejected the live cache node advertisement: ${await announcement.text()}` );
-		const lookup = await handleResolverRequest( new Request( 'https://resolver.example/v1/zerotier/e3918db4832a3056/3af4fd5d50' ), resolverState );
+		const zeroTierNodeID = resolverNode.payload.zeroTierNodeId;
+		const lookup = await handleResolverRequest( new Request( `https://resolver.example/v1/zerotier/e3918db4832a3056/${zeroTierNodeID}` ), resolverState );
 		const lookupResult = await lookup.json();
 		assert.equal( lookup.status, 200 );
 		assert.deepEqual( lookupResult.providers, [ resolverNode ], 'HostID discovery returns the signed live worldd provider record' );
 		resolverServer = await createResolverServer( resolverState, keyPath, certPath );
 
 		const result = await runWorkerDiscoveryClient( {
-			worldID, ownerPeerID, cachePeerID, zeroTierNodeID: '3af4fd5d50',
+			worldID, ownerPeerID, cachePeerID, zeroTierNodeID,
 			zeroTierNetworkID: 'e3918db4832a3056', directory: resolverServer.url,
 			assetID, assetSource, certPath,
 		} );
@@ -152,9 +153,10 @@ try {
 		].filter( Boolean ) );
 	}
 
-	console.log( 'ok   live WSS admission and recovery plus Worker HostID lookup to direct worldd gateway' );
+	console.log( 'ok   live WSS admission and recovery plus Worker lookup using the actual embedded-libzt HostID' );
 } finally {
 	for ( const child of processes.reverse() ) await stopDaemon( child );
+	if ( workerGateway?.server.listening ) await new Promise( resolve => workerGateway.server.close( resolve ) );
 	await rm( tempRoot, { recursive: true, force: true } );
 }
 
@@ -253,43 +255,6 @@ async function createResolverServer( env, keyPath, certPath ) {
 	} );
 	await new Promise( ( resolve, reject ) => server.listen( 0, '127.0.0.1', resolve ).once( 'error', reject ) );
 	return { server, url: `https://127.0.0.1:${server.address().port}`, get lookups() { return lookups; } };
-}
-
-async function readLibp2pIdentity( keyPath ) {
-	const serialized = await readFile( keyPath );
-	assert.equal( serialized[ 0 ], 8, 'libp2p private key protobuf has an algorithm field' );
-	assert.equal( serialized[ 1 ], 1, 'libp2p private key is Ed25519' );
-	assert.equal( serialized[ 2 ], 18, 'libp2p private key protobuf has private data' );
-	assert.equal( serialized[ 3 ], 64, 'Ed25519 private key data is 64 bytes' );
-	const privateBytes = serialized.subarray( 4 );
-	assert.equal( privateBytes.length, 64 );
-	const publicKey = Buffer.concat( [ Buffer.from( [ 8, 1, 18, 32 ] ), privateBytes.subarray( 32 ) ] );
-	const peerID = base58( Buffer.concat( [ Buffer.from( [ 0, publicKey.length ] ), publicKey ] ) );
-	const pkcs8Prefix = Buffer.from( '302e020100300506032b657004220420', 'hex' );
-	const signingKey = await webcrypto.subtle.importKey( 'pkcs8', Buffer.concat( [ pkcs8Prefix, privateBytes.subarray( 0, 32 ) ] ), { name: 'Ed25519' }, false, [ 'sign' ] );
-	return { peerID, publicKey, signingKey };
-}
-
-async function signNodeRecord( payload, identity ) {
-	const unsigned = { protocol: 'elsemesh.node/1', signer: identity.peerID, publicKey: identity.publicKey.toString( 'base64' ).replace( /=+$/g, '' ), payload };
-	const signature = await webcrypto.subtle.sign( 'Ed25519', identity.signingKey, new TextEncoder().encode( canonicalJSON( unsigned ) ) );
-	return { ...unsigned, signature: Buffer.from( signature ).toString( 'base64' ).replace( /=+$/g, '' ) };
-}
-
-function canonicalJSON( value ) {
-	if ( Array.isArray( value ) ) return `[${value.map( canonicalJSON ).join( ',' )}]`;
-	if ( value && typeof value === 'object' ) return `{${Object.keys( value ).sort().map( ( key ) => `${JSON.stringify( key )}:${canonicalJSON( value[ key ] )}` ).join( ',' )}}`;
-	return JSON.stringify( value );
-}
-
-function base58( bytes ) {
-	const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-	let value = 0n;
-	for ( const byte of bytes ) { value = value * 256n + BigInt( byte ); }
-	let encoded = '';
-	while ( value > 0n ) { encoded = alphabet[ Number( value % 58n ) ] + encoded; value /= 58n; }
-	for ( const byte of bytes ) { if ( byte !== 0 ) break; encoded = `1${encoded}`; }
-	return encoded;
 }
 
 async function runWorkerDiscoveryClient( options ) {

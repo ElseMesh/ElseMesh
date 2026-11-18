@@ -215,6 +215,13 @@ assert.equal( overlayInviteURL.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'sh
 assert.equal( overlayInviteURL.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056', 'shared invites retain the ZeroTier network ID for Worker fallback' );
 assert.equal( overlayInviteURL.searchParams.get( 'gateway' ), 'https://coast.tailnet-example.ts.net', 'shared invites preserve the direct secure overlay gateway' );
 assert.equal( overlayInviteURL.searchParams.get( 'ztGateway' ), 'http://10.147.20.4:43127', 'shared invites carry the private ZeroTier gateway for direct first attempt' );
+const workerOnlyInviteURL = new URL( createWorldInviteURL( {
+	pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org',
+} ) );
+assert.equal( workerOnlyInviteURL.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'HostID-only invites remain usable without a private ZeroTier gateway' );
+assert.equal( workerOnlyInviteURL.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056', 'HostID-only invites retain the configured network for Worker lookup' );
+assert.equal( workerOnlyInviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'HostID-only invites preserve Worker discovery when no private route is provided' );
+assert.equal( workerOnlyInviteURL.searchParams.has( 'ztGateway' ), false, 'a private gateway is optional for ZeroTier discovery' );
 assert.throws( () => createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierGateway: 'http://8.8.8.8:43127', directory: 'https://thruhold.org' } ), /ZeroTier private gateway/, 'ZeroTier private gateways cannot point at a public IP' );
 const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
 assert.deepEqual( redundantInvite.searchParams.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );

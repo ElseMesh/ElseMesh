@@ -165,10 +165,10 @@ export class AppUI {
 						const nodeDocument = await nodeResponse.json();
 						await verifySignedDocument( nodeDocument, 'elsemesh.node/1' );
 						const node = nodeDocument.payload;
-						if ( node.nodeId === connector.nodeId && node.worldIds?.includes( connector.worldId ) && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && /^[0-9a-f]{16}$/.test( node.zeroTierNetworkId || '' ) && node.zeroTierGateway ) {
+						if ( node.nodeId === connector.nodeId && node.worldIds?.includes( connector.worldId ) && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && /^[0-9a-f]{16}$/.test( node.zeroTierNetworkId || '' ) ) {
 							zeroTierNodeId = node.zeroTierNodeId;
 							zeroTierNetworkId = node.zeroTierNetworkId;
-							zeroTierGateway = node.zeroTierGateway;
+							zeroTierGateway = node.zeroTierGateway || '';
 							inviteNodeId = node.nodeId;
 							inviteGateway = node.gateway || '';
 							if ( ! inviteGateway ) inviteProviders = [];
