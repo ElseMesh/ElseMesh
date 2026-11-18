@@ -19,8 +19,10 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   NodeID in its API/config) and network ID;
   ZeroTier roots provide overlay path discovery, not ElseMesh world
   registration or membership authorization. When `worldd` is configured for
-  ZeroTier, ztlib sign-in is enabled by default; its authenticated NodeID may
-  be associated with a world-local player record. Browser hosts can advertise
+  ZeroTier, ztlib identifies the server node by default; this does not prove a
+  visitor's identity. A verified client integration may provide the visitor's
+  authenticated NodeID for association with a world-local player record.
+  Browser hosts can advertise
   the same HostID through their gateway without a ZeroTier client. IRC may be
   evaluated as a separate discovery lookup method, not an identity proof.
 - `ownerPeerId` identifies the owner node. Optional portal peer/gateway fields
@@ -85,10 +87,10 @@ contract.
 
 World access may be invitation-gated independently of signed content and
 provider identity checks. An owner-authorized invitation names a world and may
-bind admission to a stable identity. When `worldd` is configured for
-ZeroTier, ztlib sign-in is enabled by default; its authenticated NodeID can be
-used as a reusable identity and associated with the player's world-local
-record after join. The invitation creator need not know the NodeID in advance.
+bind admission to a stable identity. A ZeroTier-configured `worldd` uses ztlib
+for its server node identity. This does not authenticate a browser visitor;
+the visitor needs their own ZeroTier client identity and proof of control. The
+invitation creator need not know that Host ID in advance.
 An invitation can instead require social-account authentication or act as a
 single-use bearer capability.
 Portals and invitation codes are alternative arrival routes: both are
@@ -96,51 +98,81 @@ subject to destination admission. A portal may admit visitors without codes
 where permitted, but cannot bypass a destination's invitation requirement.
 
 The desired public entry point is a short ElseMesh invitation URL such as
-`https://elsemesh.org/?invite=<opaque-code>` (a path-form URL may be supported
-as an alias). The Pages app reads the query and sends an explicit redemption
-request to a public invitation/rendezvous API; GitHub Pages alone cannot
-resolve codes or route requests to `worldd`. The API maps the code to an
-owner-authorized world, signed gateway candidates, allowed authentication
-methods, and optionally a pending world-local player record created by
-`worldd` for the invite. It checks expiry, revocation, and redemption limits,
-then returns a short-lived launch grant scoped to that world and record.
-Keep any internal player number server-side; the code is the lookup key, not
-a client-selected player number or proof of identity.
-The browser removes the code and grant from its URL/history after handoff. A
-link preview or crawler must not consume the invite; redemption happens only
-after a visitor opens the app and completes any required authentication. A
-code may be a high-entropy bearer capability or require a verified account
-identity such as Facebook, Google, or Telegram. Never put raw IPs, private
-credentials, or reusable account tokens in the URL. A ZeroTier Host ID is a
-node identity when authenticated through the configured ZeroTier path; an IP
-address is only a route hint.
+`https://elsemesh.org/?invite=<signed-ticket>` (a path-form URL may be
+supported as an alias). Avoid a separate invitation lookup service: `worldd`
+creates the pending world-local player record and issues a self-contained,
+URL-safe ticket signed by the world owner key. The ticket binds the world ID,
+owner identity, network route, a random opaque player-record reference, the
+allowed sign-in methods or identities, issue/expiry times, a unique ticket ID,
+and redemption policy. A 24-hour expiry should be available as a preset; the
+owner may choose a shorter or longer lifetime. Signatures prevent editing the
+player reference, route, or expiry. Use random record references rather than
+guessable sequential player numbers, and never treat client-supplied player
+numbers as authority. The ticket is signed, not secret: don't include provider
+tokens, ZeroTier private keys, or other reusable credentials. The client can
+parse and verify its structure locally, but `worldd` is the final validator.
 
-The rendezvous API is not a world server or gateway and cannot grant access by
-itself. It returns only owner-authorized, signed route data. The browser
-verifies the owner's world manifest, then connects to a reachable HTTPS/WSS
-gateway; `worldd` validates the launch grant and retains final admission
-authority. A compact invite mapping can contain the owner's ZeroTier network
-ID and Host ID plus the reference to a pending player record; the client can
-then use the existing signed directory lookup to obtain that daemon's
-advertised HTTPS/WSS gateway. The directory does not translate the Host ID to
-a ZeroTier IP. A daemon behind NAT/firewall needs a public TLS gateway,
-tunnel/reverse proxy, or browser-compatible relay. A ZeroTier Host ID is not
-a browser route. The current directory API resolves world and ZeroTier IDs
-only; opaque invite issuance, revocation, and redemption are not implemented.
+The owner signature binds the invite to the existing pending player record.
+On connection, `worldd` verifies the signature, target world, expiry,
+revocation/replay state, allowed authentication, and the record binding before
+admission. It can maintain revoked ticket IDs and redeemed-ticket state in its
+own database; no separate online invite service is needed. Provider login, if
+required, still occurs before the world binds the player record. A self-issued
+ticket is a bearer capability unless it also requires an allowed provider
+identity or authenticated ZeroTier Host ID. Remove the ticket from browser
+history after parsing and avoid consuming it on a link-preview GET.
 
-The destination gateway exchanges the launch grant for a signed admission
-assertion bound to the target world, redemption, identity, audience/gateway,
-expiry, and replay nonce. Browser `connect` messages carry that assertion, and
+The ticket must contain a route the visitor can actually reach. Prefer a
+stable HTTPS/WSS gateway origin directly in the signed ticket for ordinary
+browsers. A ticket may instead carry the ZeroTier network ID, Host ID, and
+managed IP. That requires the visitor's device to have joined and been
+authorized on that same network; the browser then reaches the IP through its
+device's ZeroTier interface. A Host ID by itself is not an IP route. The
+existing signed directory may optionally map Host ID/network ID to an
+advertised gateway, but then that lookup service is a dependency. No separate
+invite service is needed when the ticket contains a usable route. A private
+route also has to satisfy browser HTTPS/WSS certificate requirements.
+
+The browser verifies the owner's world manifest, then connects to the chosen
+HTTPS/WSS gateway; `worldd` validates the ticket and retains final admission
+authority. Ticket state and admission assertions bind the target world,
+identity, audience/gateway, expiry, and replay nonce. Browser `connect`
+messages carry the proof, and
 the same gate applies to WebSocket, WebTransport, WebRTC, and gateway fallback
 paths. A world whose signed access policy requires invitations must reject
 manifest, asset, presence, and gameplay requests without a valid assertion;
 direct routing URLs cannot bypass this check. Non-gated worlds retain the
 existing guest-readable behavior.
 
+### ZeroTier browser transport and invites
+
+Direct browser access to a ZeroTier IP requires the browser's device to be a
+member of that ZeroTier network. A regular web page does not join ZeroTier
+merely by receiving a Host ID. The target is to run ztlib as WebAssembly in the
+ElseMesh client so it can hold a visitor-specific ZeroTier identity, join the
+configured network, discover the target node, and prove control of the
+visitor's Host ID. Do not use the server's ztlib identity as the visitor's or
+trust a client-supplied Host ID without proof.
+
+This browser implementation is unproven and must be benchmarked before it is
+selected. Keep ZeroTier as a supported route; ordinary HTTPS/WSS access must
+not depend on a browser-specific ZeroTier implementation. Compare it with the
+native OS ZeroTier client and the public HTTPS/WSS gateway path, measuring
+time to join/connect, latency, throughput,
+CPU, memory, bundle/startup cost, browser compatibility, and failure recovery.
+Standard browser networking does not expose raw UDP sockets; the WASM port may
+need a WebRTC or WebTransport adapter. See [Emscripten networking
+limits](https://emscripten.org/docs/porting/networking.html) and the open
+[libzt WebAssembly investigation](https://github.com/zerotier/libzt/issues/173).
+The benchmark is tracked at 0% in
+[project direction](../PROJECT-DIRECTION.md#product-requirements). Until it
+passes, a visitor must use a device-level ZeroTier client for a direct
+ZeroTier-IP route, or use a public gateway/tunnel/relay.
+
 Invitation codes and launch grants are capabilities, not account role grants.
 They must not contain private keys or reusable account session tokens. Enforce
 bounded clock skew, replay protection, rate limits, durable redemption state,
-and revocation checks at the admission service and world authority.
+and revocation checks at the gateway and world authority.
 
 ## Trusted-neighbor identity introduction
 
@@ -173,11 +205,13 @@ correlatable identifier to every other world.
 
 The initial invitation flow must present the visitor with the permitted
 Facebook, Google, and Telegram sign-in choices. When `worldd` is configured
-for ZeroTier, sign-in via ztlib is also enabled by default and remains
+for ZeroTier, ZeroTier identity association is enabled by default and remains
 separate from the invitation's social-provider allowlist. The owner need not
-know the visitor's ZeroTier Host ID when issuing the invite. When the visitor
-joins through ZeroTier, ztlib supplies the authenticated Host ID to the world,
-where the owner may associate it with the visitor's world-local player record.
+know the visitor's ZeroTier Host ID when issuing the invite. `worldd`'s ztlib
+identity proves the server's network node, not the visitor's. The visitor's
+Host ID may be associated with their world-local player record only after a
+client-side ZeroTier integration proves control of that identity; the browser
+WebAssembly path remains an unverified benchmark target described above.
 This is distinct from linking the Host ID to a Facebook, Google, Telegram, or ElseMesh account,
 which requires its own explicit account-linking flow. Do not infer NodeID from
 an IP address or expose ZeroTier identity secrets to browser code. The exact

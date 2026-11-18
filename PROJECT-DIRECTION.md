@@ -208,14 +208,19 @@ in `docs/`.
   authentication proof, and allow no public link. A destination may accept a
   signed, destination-bound introduction from a trusted portal neighbor
   without prompting for sign-in again, then store its own known-player record
-  while retaining final admission authority. **ZeroTier sign-in via ztlib and
+  while retaining final admission authority. **ZeroTier identity association
+  via ztlib and
   owner-controlled ZeroTier NodeID-to-player association: 0%.** Enable it by
-  default when `worldd` is configured for ZeroTier; it is unavailable without
-  that configuration. When a player joins through it, the authenticated
-  ZeroTier NodeID is available to that world; the owner may then bind it to
-  the player's world-local record. See
+  default when `worldd` is configured for ZeroTier; this authenticates the
+  server's network node, not the browser visitor. Visitor sign-in requires the
+  visitor's own ZeroTier client identity and a verified proof path. **Browser
+  ztlib/WebAssembly feasibility and comparative performance benchmark: 0%.**
+  Compare a browser WebAssembly client with an OS ZeroTier client and a public
+  HTTPS/WSS gateway on startup/join time, throughput, latency, CPU, memory,
+  browser support and failure recovery. See
   [account roles](docs/account-roles.md) and [visitor identity and world-local
-  state](docs/visitor-identity-and-world-state.md).
+  state](docs/visitor-identity-and-world-state.md), plus the [network
+  protocol](docs/world-network-protocol.md#zerotier-browser-transport-and-invites).
 - **Portals and multiple worlds (75%):** support independently configured portal
   sides, mapped arrival orientation/travel direction, owner-authorized sharing,
   preview/entry rules, and at least two separately hosted worlds including an
@@ -269,40 +274,45 @@ Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
 **Opaque friend-link resolution, account-bound admission, and reachable-
 gateway routing: 0%.** The shareable entry URL should be as simple as
-`https://elsemesh.org/?invite=<opaque-code>`. The Pages client reads the code
-and redeems it through a public invitation/rendezvous API, which resolves the
-owner-authorized world and signed, reachable gateway candidates, then returns
-a short-lived launch grant. The browser connects to the gateway, and the
-destination `worldd` validates the grant and remains the admission authority.
-`worldd` may create the invite's pending world-local player record in advance;
-the code maps to that record and the world's ZeroTier network/Host ID. The
-client uses the existing signed provider directory to resolve the Host ID to
-an advertised HTTPS/WSS route, not a ZeroTier IP. The provider directory does
-not redeem invite codes. See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
-The code may be
-a high-entropy, expiring, single-use capability, or the owner may require the
+`https://elsemesh.org/?invite=<signed-ticket>`. `worldd` creates the pending
+world-local player record and signs a self-contained ticket binding that
+record, world, authentication policy, route and expiry. The Pages client
+parses the ticket locally; no separate invitation lookup service is required.
+The destination `worldd` verifies the signature and admission policy. The
+ticket may contain a direct HTTPS/WSS gateway route, or a ZeroTier route. A
+ZeroTier route works only when the visitor's device has joined the same
+network; Host ID alone is not a route. An optional signed provider-directory
+lookup can map Host ID to an advertised gateway when that extra service is
+available. See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
+The ticket may expire after a configurable period, for example 24 hours, or
+the owner may require the
 visitor to authenticate with one of the providers enabled for that invite:
 Facebook, Google, and/or
 Telegram. The owner can enable all three, allowing the visitor to choose any
-linked account. When `worldd` is configured for ZeroTier, the visitor may also
-sign in through ztlib, enabled by default. The owner need not know the
-visitor's ZeroTier Host ID when creating an invite; if the visitor joins
-through ZeroTier, ztlib supplies the authenticated Host ID to the world and
-the owner may associate it with that player's world-local record. After
+linked account. When `worldd` is configured for ZeroTier, ZeroTier identity
+association is enabled by default. The owner need not know the visitor's
+ZeroTier Host ID when creating an invite. The server's ztlib identity proves
+the server node, not the visitor; the visitor Host ID can be associated with
+the world-local record only after a verified client-side ZeroTier integration
+proves control of it. Browser ztlib/WebAssembly remains a feasibility and
+performance benchmark, not an implemented sign-in path. After
 authentication, the visitor chooses which verified, publicly linkable
 provider identity to show other players; authentication identity and visible
 identity are separate choices, and a private/no-link
-choice remains available. Never encode a raw ZeroTier IP, private credential,
-or reusable account token in the URL. A ZeroTier NodeID identifies the
+choice remains available. A signed ZeroTier route may carry the network ID and
+managed IP, provided the visitor's device has joined and been authorized on
+that network. Never include a private credential or
+reusable account token. A ZeroTier NodeID identifies the
 authenticated network node; an owner-controlled database association can make
 it a player identifier in that world. This association does not prove a
 Facebook, Google, or Telegram identity, and IP addresses remain route hints.
-The destination `worldd` remains the final admission authority. Until the
-short-link, redemption, and remote-admission path is implemented and verified,
-the browser can use direct world/gateway URLs or configured resolver lookups; these are not
-revocable owner-issued short-code invitations. A remote visitor still needs a
-reachable secure gateway, tunnel, or browser-compatible relay and an
-owner-authorized admission path. DNS or a redirect only reaches the static
+The destination `worldd` remains the final admission authority. Until
+client-side ticket parsing, signature verification and remote admission are
+implemented and verified, the browser can use direct world/gateway URLs or
+configured resolver lookups; those are not revocable owner-issued tickets. A
+remote visitor still needs a reachable secure gateway, tunnel, or
+browser-compatible relay and an owner-authorized admission path. DNS or a
+redirect only reaches the static
 client; it does not make a private daemon reachable. The current Pages
 deployment serves `https://elsemesh.org` directly (HTTP 200, no redirect in
 the 2026-11-18 check); any future redirect must preserve the `invite` query.

@@ -19,11 +19,13 @@ signed directory/resolver and configured gateway handle application-level
 world discovery. A browser host can advertise through the gateway with the
 same HostID and without joining ZeroTier. A ZeroTier NodeID identifies a
 ZeroTier node, but does not register an ElseMesh world or by itself identify a
-social account. When `worldd` is configured for ZeroTier, ztlib sign-in is
-enabled by default and authenticates that node identity. The world owner can
-then associate it with a world-local player record. A ZeroTier virtual IP
-remains routing information. IRC may be evaluated as a separate discovery
-lookup method; it would not replace authenticated identity.
+social account. A ZeroTier-configured `worldd` uses ztlib for its own network
+identity; this does not authenticate a browser visitor. The visitor must join
+the same ZeroTier network using their own node identity before a browser can
+reach a ZeroTier IP. The owner's association of that authenticated Host ID
+with a world-local player record remains distinct from social-account linking.
+IRC may be evaluated as an alternative lookup method, but lookup does not
+replace authenticated identity.
 
 When one machine hosts multiple worlds that need distinct HostIDs, give each
 world a persistent node profile and `node.key`. Its signed node record binds
@@ -609,24 +611,22 @@ using its own timeout. No atomic inter-owner membership commit is required.
 ### Invitation-gated entry
 
 World owners may opt into invitation admission. The desired share URL is a
-short root URL such as `https://elsemesh.org/?invite=<opaque-code>`. The Pages
-client reads the code and redeems it through a public invitation/rendezvous
-service. The service resolves it to the owner-authorized world and signed,
-reachable gateway candidates, then returns a short-lived opaque launch grant.
-The browser connects to the destination gateway; `worldd` validates the grant
-and applies its own admission policy. A path-form URL may be supported as an
-alias. The directory/resolver is not itself a world server or gateway.
-An invite may reference a pending world-local player record created by
-`worldd` when the owner issues it. Redemption attaches the admitted visitor
-to that record; keep its internal player number server-side. The protocol
-design describes the Host ID to gateway lookup and invite binding.
-accepting the browser connection. A path-form URL may be supported as an alias.
-
-When `worldd` is configured for ZeroTier, ztlib sign-in is enabled by default
-and provides the visitor's authenticated NodeID. The owner may associate it
-with a world-local player record after the visitor joins; the owner need not
-know it when creating an invitation. This does not link social accounts. A
-`worldd` instance without ZeroTier configuration cannot offer this method.
+short root URL such as `https://elsemesh.org/?invite=<signed-ticket>`. The
+ticket is self-contained and owner-signed, so the Pages client can parse it
+locally without a separate invite lookup service. It binds the world, route,
+auth policy, expiry and a pending world-local player record created by
+`worldd`. The client must not accept a player number outside the signed ticket;
+`worldd` validates the ticket and applies its own admission policy. A path-form
+URL may be supported as an alias. See the protocol design for ticket format,
+ZeroTier routing and browser-side ztlib requirements.
+When `worldd` is configured for ZeroTier, ztlib identifies the server node by
+default; it does not authenticate the visitor. A verified client-side
+ZeroTier integration must prove the visitor's own NodeID before the owner can
+associate it with the world-local player record. The owner need not know it
+when creating an invitation. This does not link social accounts. A `worldd`
+instance without ZeroTier configuration cannot offer this method. The browser
+ztlib/WebAssembly route remains a feasibility and performance benchmark, as
+specified in the protocol.
 Owners may choose a high-entropy bearer invitation or require
 an authenticated account through any providers allowed by the invite, initially
 Facebook, Google, and Telegram, linked through a verified account key. IP

@@ -13,19 +13,26 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   short URL that discovers the owner's reachable gateway and admits a friend
   from another machine is therefore not ready. Current direct world/gateway
   links and configured resolver lookups do not provide revocable owner-issued
-  short-code admission. The short-link resolution/account-bound admission
+  short-code admission. The signed-ticket parsing/account-bound admission
   sub-gate is tracked at 0% in
   [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
   The live `elsemesh.org` check returned HTTP 200 directly from the Pages app
   with no redirect, so the query reaches the client; however, the client does
-  not parse opaque invite codes and the deployed directory API has no invite
-  redemption route. A private `worldd` still needs an independently reachable
-  HTTPS/WSS gateway, tunnel, or browser-compatible relay.
+  not parse or verify self-contained signed invite tickets. An invite
+  redemption endpoint is no longer a design requirement: the world owner
+  signs the ticket and the destination `worldd` validates it. The design uses
+  a self-contained owner-signed ticket
+  rather than requiring an invite lookup service. A private `worldd` still
+  needs a reachable path: the visitor must join its ZeroTier network or use a
+  public HTTPS/WSS gateway, tunnel, or relay.
 - Clarified that an invite can map to a `worldd`-created pending player record
-  and a ZeroTier Host ID/network; the existing signed directory can resolve
-  that host locator to its advertised HTTPS/WSS gateway without returning a
-  ZeroTier IP. Neither the invite-code client path nor record-bound admission is
-  implemented; both remain part of the 0% invitation sub-gate.
+  and carry a direct network route, without a separate invite-resolution
+  service. A ZeroTier Host ID can be used directly only when the visitor's
+  device joins the same network; a public browser needs a reachable gateway or
+  a WebAssembly ZeroTier client. The browser WASM feasibility/performance
+  comparison against the native client and public gateway paths is tracked at
+  0%; signed ticket parsing and record-bound
+  admission remain in the 0% invite sub-gate.
 - Added the cross-world account requirement to the identity design: one
   ElseMesh account can link multiple verified providers, and a destination may
   accept a short-lived broker assertion plus a trusted-neighbor introduction
@@ -39,11 +46,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   keeps it private. Provider-specific profile-link availability and the
   distinction between authenticated identity and public link are documented;
   implementation remains at 0%.
-- Added ZeroTier sign-in via ztlib as a separate identity method, enabled by
-  default when `worldd` is configured for ZeroTier and unavailable otherwise.
-  Invites do not require a known Host ID; when a player joins through ZeroTier,
-  ztlib supplies the authenticated Host ID for the world owner to associate with
-  that player's world-local database record. Implementation remains at 0%.
+- Added ZeroTier identity association as a separate method, enabled by default
+  when `worldd` is configured for ZeroTier and unavailable otherwise. The
+  server's ztlib identity proves the server node only. Associating a visitor's
+  Host ID requires a verified client-side ZeroTier integration; browser
+  ztlib/WebAssembly feasibility and performance remain at 0% pending the
+  benchmark against the native client and public gateway paths.
 
 ## 2026-11-04
 

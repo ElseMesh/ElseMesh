@@ -24,39 +24,42 @@ different built-in world package.
 ### Invitation-gated launches
 
 The planned short friend URL is `https://elsemesh.org/?invite=<opaque-code>`.
-The Pages app reads the query and redeems the code with a public
-invitation/rendezvous API. That API maps it to an owner-authorized world and
-reachable gateway; the browser connects to the gateway, and the destination
-`worldd` checks a short-lived launch grant and its own admission policy. This
-short-code issuance, API, and redemption flow are not implemented yet. The
-existing `elsemesh-world-resolver` is only a signed provider directory: its
-current routes look up worlds or ZeroTier nodes and do not redeem invitations.
-The invitation API can extend that Worker or be a separate service. Today,
-**Share world invite** creates a full provider-bearing URL, which works only
-when the included gateway is reachable by the visitor.
+`worldd` can issue a self-contained owner-signed ticket that the Pages client
+parses locally, without a separate invitation lookup service. The ticket can
+bind the invite to a pending player record, allowed sign-in methods, route and
+expiry; `worldd` verifies it when the browser connects. This client path is not
+implemented yet. The existing `elsemesh-world-resolver` is a signed provider
+directory, not an invitation service; it remains an optional fallback when a
+ticket does not carry a usable route and a gateway advertisement must be found.
+A direct ZeroTier route should carry the network ID and managed IP; a Host ID
+can identify the target node but does not itself provide an IP route. Today,
+**Share world invite**
+creates a full provider-bearing URL, which works only when the included
+gateway is reachable by the visitor.
 
-The invitation service is a lookup/rendezvous component, not a world server.
-It stores owner-authorized invite metadata and redemption state, not world
-assets or reusable account credentials. It returns only owner-authorized,
-signed records. An invite may reference a pending world-local player entry
-created by `worldd`; keep its internal player number server-side. The opaque
-code is a lookup capability, not a client-selected player number or proof of
-identity. See the [wire contract](world-network-protocol.md#invitation-admission-and-launch-grants)
-for mapping this record and a ZeroTier Host ID to an advertised gateway.
+`worldd` owns the pending record and signs the ticket; no invite lookup or
+redemption service is required. The ticket carries a random player-record
+reference rather than a client-selected player number. The self-contained
+ticket is signed, not encrypted: its claims can be inspected by the page and
+must contain no account tokens or ZeroTier identity secrets. The client parses
+it locally, and `worldd` enforces signature, expiry, identity policy and record
+binding on connection. Provide a 24-hour expiry preset and support revocation
+using local `worldd` state. See the [wire contract](world-network-protocol.md#invitation-admission-and-launch-grants).
 
-Do not accept an arbitrary gateway URL from invite input. Link previewers and
-crawlers must not consume an invite: redeem only after the visitor opens the
-page and completes any required sign-in. Make codes high-entropy and
-short-lived, remove them from browser history after handoff, and never put
-account tokens, ZeroTier secrets, or raw IPs in the link.
+The client must not accept a route or player number independently of the
+signed ticket. Remove the ticket from browser history after parsing, and
+avoid making link-preview requests that try to join the world.
 
-The world gateway still has to be reachable from the visitor's browser over
-HTTPS/WSS (or a later browser-compatible relay). A ZeroTier Host ID or private
-ZeroTier address does not make a private `worldd` reachable from the public
-internet, and the browser does not join the host's ZeroTier network. A host
-behind NAT/firewall needs a public TLS gateway, a configured tunnel/reverse
-proxy, or a relay path that forwards browser traffic to the owner-authorized
-daemon. The invite resolver discovers the route; it does not create it.
+For direct ZeroTier-IP access, the visitor's device networking stack
+must already be joined and authorized on the same ZeroTier network. A public
+web page cannot reach a private ZeroTier IP just because it has the Host ID.
+The desired browser-side ztlib/WebAssembly path is a research and performance
+benchmark gate; until it is proven, use a device-level ZeroTier client or a
+public HTTPS/WSS gateway, tunnel, reverse proxy, or browser-compatible relay.
+An invite resolver can discover routes but cannot create network membership or
+reachability. Compare WebAssembly with the native OS client and public gateway
+for connection time, latency, throughput, CPU, memory, startup cost, browser
+compatibility, and failure recovery.
 
 On 2026-11-18, `https://elsemesh.org/?invite=codex-test` returned the ElseMesh
 Pages app directly with HTTP 200 and no `Location` redirect. The custom domain
@@ -73,11 +76,13 @@ sign-in, the visitor chooses one verified public profile to display to other
 players, or keeps all profile links private; that choice may differ from the
 provider used to authenticate. Profile-link availability and verification vary
 by provider, so a missing link must not be fabricated. When `worldd` is
-configured for ZeroTier, sign-in via ztlib is enabled by default; without
-that configuration the method is unavailable. An invite need not know the
-visitor's NodeID in advance. If the visitor joins through ZeroTier, the
-authenticated NodeID may be associated with their world-local player record
-by the owner.
+configured for ZeroTier, ZeroTier identity association is enabled by default;
+without that configuration the method is unavailable. An invite need not
+know the visitor's NodeID in advance. The visitor NodeID must come from a
+verified client-side ZeroTier integration; `worldd`'s own ztlib identity
+identifies the server only. The owner may associate a verified visitor NodeID
+with the world-local player record. Browser ztlib/WebAssembly remains an
+unverified performance benchmark, not an implemented sign-in path.
 This does not link a social account, and IP addresses remain route hints.
 Never put private credentials or reusable account tokens in an invite URL.
 Once implemented, redemption must enforce expiry, revocation,

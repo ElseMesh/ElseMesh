@@ -138,23 +138,33 @@ presence binding are not implemented yet.
 
 ## ZeroTier sign-in and player association
 
-ZeroTier sign-in through ztlib is a distinct authentication method. It is
-enabled by default in a `worldd` instance configured for ZeroTier and is
-unavailable when the daemon has no ZeroTier configuration. The authenticated
-ZeroTier Host ID (NodeID) is supplied by this login flow; there is no separate
-“reveal my ID” prompt. Since the owner generally will not know the visitor's
-Host ID when issuing an invitation, the invite does not bind to one in advance.
-After the visitor joins through ZeroTier, the owner may associate that
-authenticated Host ID with the visitor's world-local player record. The link
-is recorded in the world's database and can be revoked by its owner.
+When `worldd` is configured for ZeroTier, its ztlib network transport is
+enabled by default. This identifies the server node; it does not authenticate
+the visitor. For direct access to a ZeroTier IP, the visitor's device must
+also join and be authorized on that same network with its own ZeroTier
+identity. A browser then reaches the managed IP through the device's ZeroTier
+network interface. The visitor's authenticated Host ID should be provided by
+the client ZeroTier integration, not inferred from the source IP or assumed
+from the server's ztlib identity. When the visitor joins, the owner can bind
+that Host ID to the pending world-local player record without requiring it in
+the invite. The association is stored in the world's database and can be
+revoked by its owner.
+
+The target browser path is ztlib compiled to WebAssembly, but this is not
+implemented or proven. It must be benchmarked against the device's native
+ZeroTier client and a public HTTPS/WSS gateway. A normal browser does not
+provide raw UDP sockets; a WASM implementation likely needs a WebRTC or
+WebTransport network adapter. Until that work succeeds, direct ZeroTier access
+requires a device-level ZeroTier client, or the world must expose a public
+gateway/tunnel/relay. **Browser WASM feasibility and performance benchmark:
+0%.**
 
 This ZeroTier player association does not automatically link Facebook, Google,
 Telegram, or an ElseMesh account; those identities require their own sign-in
-and explicit account-linking flow. IP addresses are never used as a substitute
-for the authenticated NodeID. Do not expose ZeroTier identity secrets or
-control-plane credentials to the browser. The exact ztlib login assertion and
-verification boundary must be specified before implementation. **Design
-complete: 0%; implementation: 0%.**
+and explicit account-linking flow. Do not expose another user's identity
+secret or ZeroTier control-plane credentials to browser code. The client
+proof-of-control contract remains to be specified. **Player binding design:
+0%; implementation: 0%.**
 
 ## Multiple sign-in methods for one visitor
 
