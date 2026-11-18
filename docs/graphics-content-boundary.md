@@ -45,6 +45,18 @@ Content descriptors should be ordinary data and stable across backend changes.
 Presentation objects should be disposable and rebuildable from those
 descriptors plus current simulation state.
 
+## Performance controls and content identity
+
+ElseMesh may expose a minimum-FPS target and quality controls. Its adaptive
+policy may reduce render scale or shadow/reflection cost, change mip selection
+or texture residency, and select among the world's authored LOD assets. These
+choices adjust presentation cost while preserving the same authored objects,
+placements, geometry, texture sources, variants, and material inputs. WebGPU
+and WebGL must follow the same visibility and LOD policy and select the same
+authored LOD assets at matched view and quality settings. A backend may use its
+own GPU implementation, but it must not meet an FPS target by dropping object
+classes or substituting another content or texture set.
+
 ## Migration rule
 
 This ownership is a fixed architecture decision, not a per-feature choice.
@@ -126,22 +138,22 @@ and WebGL. This removes the world-owned village shader and profile-resolution
 paths; the built-in procedural village still generates its portable source maps
 through Tidewater's WebGPU texture baker and remains migration debt.
 
-The Tidewater exporter now emits a renderer-neutral scanned-debris migration
-fixture with all 141 authored placements, the three source mesh LODs per model,
-and the original albedo, normal, and ARM maps embedded in portable glTF PBR.
-Its signed GLB graph expresses per-instance wood bleaching, wet darkening and
-roughness, and contact dust/AO with data-only operations that both engine graph
-compilers understand. Both backends now query the same authored terrain
-heightfield per fragment, removing the former center-sampled contact-height
-approximation. The shared static-model planner supports the source
-radius-adjusted LOD distance through per-instance `lodDistanceOffset`; Tidewater authors the
-original six-times-radius calculation, and the planner applies that measure to
-LOD and color draw range/fade in both backends, plus WebGPU's separate shadow
-range. WebGL continues to cast from its visible LOD. The offset metric uses a
-centered smoothstep band matching Tidewater's authored fade math; rendered fade
-parity remains unverified. The fixture remains outside the signed runtime
-package until built-in package integration and matched backend images verify
-contact shading, LOD fades, and overall appearance.
+The Tidewater exporter now includes scanned debris in the signed world source
+as one renderer-neutral static-model component. Its descriptor carries all 141
+placements, four model classes, and three source mesh LODs per model. Those GLBs
+reference the unchanged albedo, normal, and ARM source maps as shared
+content-addressed image assets instead of embedding duplicate map bytes in
+each LOD. Their signed material graph describes wood bleaching, wet darkening
+and roughness, and contact dust/AO with data-only operations understood by
+both engine graph compilers. The graph contract queries the installed authored
+terrain heightfield per fragment, removing the former center-sampled
+contact-height approximation. The shared static-model planner applies
+Tidewater's six-times-radius distance metric to LOD and color draw range/fade
+in both backends, plus WebGPU's separate shadow range. WebGL continues to cast
+from its visible LOD. The offset metric uses a centered smoothstep band
+matching Tidewater's authored fade math; rendered fade parity remains
+unverified. Matched backend images are still required to verify contact
+shading, LOD fades, and overall appearance.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable

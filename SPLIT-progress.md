@@ -1992,3 +1992,13 @@ finding changes them.
   check, and external production build pass. The scanned-debris component is
   still outside the signed runtime package, and no matched rendered comparison
   has verified its appearance or LOD fade. Tidewater parity remains 93%.
+
+- 2026-11-18: moved the scanned-debris migration into Tidewater's signed
+  package as one shared static-model component, removing 141 per-object GLB
+  records. All four models retain three source LODs and all 141 authored
+  placements. Each of the 12 original PBR maps is now one content-addressed
+  image shared by the LOD GLBs. This keeps the referenced assets at 159.5 MB,
+  under Tidewater's existing 160 MiB package limit; the deterministic export
+  test verifies the component references and asset hashes. No matched rendered
+  comparison has verified appearance or LOD fade, so Tidewater parity remains
+  93%.
