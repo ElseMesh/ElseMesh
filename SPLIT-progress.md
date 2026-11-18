@@ -1116,6 +1116,13 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-19: registered `elsemesh.octahedral-canopy/1` as an engine
+  vegetation component with install rank 2. The registry check passes and
+  confirms startup requests only the signed descriptor while dependent canopy
+  assets remain lazy. This exposes the contract to world lifecycle handling;
+  no backend presenter or Tidewater production atlas is wired yet, so renderer
+  neutrality and appearance parity remain open. No percentage change.
+
 - 2026-11-19: ran the shared `elsemesh.local-light-set/1` contract check and
   Tidewater's world-light profile check in the external build. The world data
   validates, the WebGL presenter selects and activates authored point/spot
