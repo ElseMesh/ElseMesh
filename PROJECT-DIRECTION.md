@@ -45,9 +45,9 @@ content/gameplay alignment check after the original WebGPU appearance is
 established. See [`SPLIT-progress.md`](SPLIT-progress.md) for the detailed
 evidence and open gates; existing captures do not alone establish completion.
 Users may adjust an engine-owned minimum-FPS target and related quality
-controls. To approach that target, the engine may tune render scale,
-shadow/reflection cost, texture mip or residency, and selection among the
-shared authored LOD assets. These are adjustable rendering-cost settings, not
+controls. The engine may adapt render scale, shadow/reflection cost, texture
+mip or residency, and selection among the shared authored LOD assets at runtime
+to approach that target. These are adjustable rendering-cost settings, not
 separate content variants: WebGPU and WebGL must resolve the same authored
 objects, placements, geometry, texture sources, variants, and material inputs
 through the same visibility/LOD policy. A renderer may sample a different mip

@@ -2199,3 +2199,10 @@ finding changes them.
   two extra cells do not materially change this image. This is not a production
   terrain or pre-split beach comparison. The signed Tidewater component remains
   inactive; Tidewater remains 93% and no production parity gate closes.
+
+- 2026-11-18: clarified that the engine may adapt quality controls at runtime
+  to approach the adjustable minimum-FPS target. Adaptation may change rendering
+  cost or select coarser shared authored LODs, while both backends retain the
+  same authored objects, placements, geometry, texture sources, variants, and
+  material inputs. This is a goal clarification, not new parity evidence;
+  Tidewater remains 93%.
