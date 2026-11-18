@@ -4,6 +4,7 @@ import { buildMovementKernel } from './build-movement-kernel.mjs';
 const tests = [
 	'test/cloud-profile.mjs',
 	'test/world-local-light-set.mjs',
+	'test/webgl-local-light-render.mjs',
 	'worlds/tidewater/test/world-light-set.mjs',
 	'test/world-wind-field.mjs', 'test/webgl-material-lighting.mjs', 'test/webgl-sun-shadows.mjs', 'test/webgl-atmosphere-initialization.mjs',
 	'test/webgl-world-material-graph.mjs',
@@ -32,7 +33,7 @@ const tests = [
 const dawnTests = new Set( [
 	'worlds/tidewater/test/reef-placement-render.mjs', 'test/static-model-instance-set-webgpu-render.mjs', 'test/ground-cover-field-webgpu-render.mjs', 'worlds/tidewater/test/ground-cover-graph-parity-webgpu.mjs', 'worlds/tidewater/test/village-materials.mjs', 'worlds/tidewater/test/world-export.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'worlds/tidewater/test/webgpu-fish-props-adapter-build.mjs', 'worlds/tidewater/test/fish-props-webgpu-render.mjs', 'worlds/tidewater/test/scanned-debris-render-parity.mjs', 'test/engine-smoke.mjs', 'test/mesh-renderer-resource-preparation.mjs', 'test/ocean-spectrum-parity.mjs',
 ] );
-const androidOnlySkipTests = new Set( [ 'test/static-model-instance-set-webgl-render.mjs', 'worlds/tidewater/test/scanned-debris-render-parity.mjs', 'test/ground-cover-field-webgl-render.mjs', 'test/webgl-water-fft-render.mjs', 'test/webgl-refraction-pass-render.mjs', 'test/webgl-breaker-lips-render.mjs', 'test/webgl-terrain-render.mjs' ] );
+const androidOnlySkipTests = new Set( [ 'test/static-model-instance-set-webgl-render.mjs', 'test/webgl-local-light-render.mjs', 'worlds/tidewater/test/scanned-debris-render-parity.mjs', 'test/ground-cover-field-webgl-render.mjs', 'test/webgl-water-fft-render.mjs', 'test/webgl-refraction-pass-render.mjs', 'test/webgl-breaker-lips-render.mjs', 'test/webgl-terrain-render.mjs' ] );
 const viteAssetTests = new Set( [ 'test/desktop-adaptive-scale.mjs', 'test/portal-sides.mjs', 'test/world-hosted-player.mjs', 'test/world-component-backend-registry.mjs' ] );
 const android = process.platform === 'android';
 

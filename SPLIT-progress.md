@@ -2385,3 +2385,10 @@ finding changes them.
   pass. The shader and Three.js spotlight still use different lighting models,
   and there is no matched rendered comparison yet, so this closes a missing
   gameplay feature but not a visual parity gate or percentage.
+
+- 2026-11-18: added a private-profile, headless WebGL render fixture for the
+  flashlight. The controlled surface's center-region mean luminance changed
+  from 0.00 to 27.34, one lighting program compiled, and WebGL reported no
+  errors. The test-owned Chromium process exited and its temporary profile was
+  removed. This proves the WebGL flashlight affects rendered pixels, but it is
+  not a matched WebGPU comparison; no parity percentage changes.
