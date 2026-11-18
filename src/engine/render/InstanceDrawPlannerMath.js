@@ -31,11 +31,27 @@ export function writeInstanceLODSelection( target, lodMetric, distance, radius, 
 	let transition = -1;
 	for ( let thresholdIndex = 0; thresholdIndex < thresholds.length; thresholdIndex ++ ) {
 		const threshold = thresholds[ thresholdIndex ];
+		if ( lodMetric === 'world-distance-offset' ) {
+			const fadeStart = threshold * ( 1 - fadeFraction / 2 );
+			const fadeEnd = threshold * ( 1 + fadeFraction / 2 );
+			if ( lodMeasure >= fadeStart && lodMeasure < fadeEnd ) { transition = thresholdIndex; break; }
+			continue;
+		}
 		const fadeStart = threshold * ( 1 - fadeFraction );
 		if ( lodMetric === 'projected-radius' ? lodMeasure < threshold && lodMeasure >= fadeStart : lodMeasure >= threshold && lodMeasure < threshold / ( 1 - fadeFraction ) ) { transition = thresholdIndex; break; }
 	}
 	if ( transition >= 0 ) {
 		const threshold = thresholds[ transition ];
+		if ( lodMetric === 'world-distance-offset' ) {
+			const fadeStart = threshold * ( 1 - fadeFraction / 2 );
+			const fadeEnd = threshold * ( 1 + fadeFraction / 2 );
+			const t = Math.max( 0, Math.min( 1, ( lodMeasure - fadeStart ) / ( fadeEnd - fadeStart ) ) );
+			target[ 0 ] = transition;
+			target[ 1 ] = transition;
+			target[ 2 ] = 1 - t * t * ( 3 - 2 * t );
+			target[ 3 ] = lodMeasure;
+			return target;
+		}
 		const fadeStart = lodMetric === 'projected-radius' ? threshold * ( 1 - fadeFraction ) : threshold / ( 1 - fadeFraction );
 		target[ 0 ] = transition;
 		target[ 1 ] = transition;

@@ -112,11 +112,13 @@ non-negative `lodDistanceOffset`. The planner subtracts it from camera-to-origin
 distance, clamped at zero, and uses that measure for LOD selection, color draw
 range/fade, and shadow range. This supports authored policies that account for
 an instance's actual size without coupling the engine to a world's geometry.
-`lodFadeFraction`
-sets the transition-band width for either metric; overlapping bands are
-rejected. `drawMaxDistance` limits color rendering by world-space distance from
-the transformed bounds center, and `drawFadeStartDistance` sets where its
-screen-door fade begins. Shadows use the independent `shadowMaxDistance`.
+`lodFadeFraction` sets the transition-band width; overlapping bands are
+rejected. For `world-distance-offset`, the fraction describes a band centered
+on each threshold and the shared planner applies a smoothstep transition.
+`drawMaxDistance` limits color rendering and `drawFadeStartDistance` begins its
+screen-door fade using distance from the transformed bounds center, except that
+`world-distance-offset` uses its adjusted camera-to-origin measure for both.
+Shadows use the independent `shadowMaxDistance`.
 `shadowLod` selects any valid level in the model's LOD list. For distance-based
 LOD, assets are ordered coarse-to-fine; a world can therefore choose its
 near-detail mesh for shadows while keeping coarse color rendering as the first

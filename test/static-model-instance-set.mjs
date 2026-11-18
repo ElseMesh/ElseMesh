@@ -181,6 +181,16 @@ const offsetDistancePlanner = new StaticModelInstanceSetPlanner( offsetDistanceD
 assert.equal( offsetDistancePlanner.groups[ 1 ].count, 1, 'authored offset is subtracted from camera-to-origin distance for shared LOD selection' );
 assert.equal( offsetDistancePlanner.groups[ 1 ].drawFade[ 0 ], 0.5, 'the same radius-adjusted distance controls color fade and draw range' );
 assert.equal( offsetDistancePlanner.shadowGroups[ 0 ].count, 1, 'the same adjusted distance controls the authored shadow range' );
+const offsetTransitionPlanner = new StaticModelInstanceSetPlanner( {
+	...offsetDistanceDocument,
+	instances: [ { ...offsetDistanceDocument.instances[ 0 ], position: [ 0, 0, - 90 ] } ],
+} ).update( {
+	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: [ [ 1, 0, 0, 1000 ], [ -1, 0, 0, 1000 ], [ 0, 1, 0, 1000 ], [ 0, -1, 0, 1000 ], [ 0, 0, 1, 1000 ], [ 0, 0, -1, 1000 ] ],
+} );
+assert.equal( offsetTransitionPlanner.groups[ 0 ].count, 1, 'centered smoothstep LOD band draws the coarse level during transition' );
+assert.equal( offsetTransitionPlanner.groups[ 1 ].count, 1, 'centered smoothstep LOD band draws the fine level during transition' );
+assert.ok( Math.abs( offsetTransitionPlanner.groups[ 0 ].fade[ 0 ] - 0.5 ) < 1e-6 && Math.abs( offsetTransitionPlanner.groups[ 1 ].fade[ 0 ] - 0.5 ) < 1e-6, 'the source handoff threshold produces the same centered half-fade as Tidewater bandFade' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
 const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };

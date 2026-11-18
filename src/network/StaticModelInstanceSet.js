@@ -46,9 +46,12 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 		if ( ! Array.isArray( model.lodThresholds ) || model.lodThresholds.length !== model.lods.length - 1 ) throw new Error( `Invalid LOD thresholds for static model ${model.id}` );
 		let previousThreshold = model.lodMetric === 'projected-radius' ? 0 : Infinity;
 		for ( const threshold of model.lodThresholds ) {
+			const distanceFadeRatio = model.lodMetric === 'world-distance-offset'
+				? ( 1 - model.lodFadeFraction / 2 ) / ( 1 + model.lodFadeFraction / 2 )
+				: 1 - model.lodFadeFraction;
 			const invalidOrder = model.lodMetric === 'projected-radius'
 				? threshold <= previousThreshold || previousThreshold > 0 && threshold * ( 1 - model.lodFadeFraction ) <= previousThreshold
-				: threshold >= previousThreshold || previousThreshold < Infinity && threshold >= previousThreshold * ( 1 - model.lodFadeFraction );
+			: threshold >= previousThreshold || previousThreshold < Infinity && threshold >= previousThreshold * distanceFadeRatio;
 			if ( ! Number.isFinite( threshold ) || threshold <= 0 || invalidOrder ) throw new Error( `Invalid or overlapping LOD thresholds for static model ${model.id}` );
 			previousThreshold = threshold;
 		}
