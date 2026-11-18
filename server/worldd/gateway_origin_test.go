@@ -4,7 +4,7 @@ import "testing"
 
 func TestWorldGatewayOriginAllowlist(t *testing.T) {
 	allowed, err := parseAllowedBrowserOrigins([]string{
-		"https://rebroad.github.io",
+		"https://game.example",
 		"http://127.0.0.1:5189",
 	})
 	if err != nil {
@@ -17,11 +17,11 @@ func TestWorldGatewayOriginAllowlist(t *testing.T) {
 		{name: "non-browser client", host: "127.0.0.1:5222", want: true},
 		{name: "same loopback origin", origin: "http://127.0.0.1:5222", host: "127.0.0.1:5222", want: true},
 		{name: "explicit local game origin", origin: "http://127.0.0.1:5189", host: "127.0.0.1:5222", want: true},
-		{name: "explicit hosted game origin", origin: "https://rebroad.github.io", host: "world.example", secure: true, want: true},
+		{name: "explicit hosted game origin", origin: "https://game.example", host: "world.example", secure: true, want: true},
 		{name: "unlisted secure origin", origin: "https://attacker.example", host: "world.example", secure: true, want: false},
 		{name: "unlisted local port", origin: "http://127.0.0.1:5190", host: "127.0.0.1:5222", want: false},
-		{name: "untrusted public HTTP origin", origin: "http://rebroad.github.io", host: "world.example", want: false},
-		{name: "origin with a path", origin: "https://rebroad.github.io/path", host: "world.example", secure: true, want: false},
+		{name: "untrusted public HTTP origin", origin: "http://game.example", host: "world.example", want: false},
+		{name: "origin with a path", origin: "https://game.example/path", host: "world.example", secure: true, want: false},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -35,9 +35,9 @@ func TestWorldGatewayOriginAllowlist(t *testing.T) {
 func TestParseAllowedBrowserOriginsRejectsUnsafeValues(t *testing.T) {
 	for _, origin := range []string{
 		"http://world.example",
-		"https://rebroad.github.io/path",
-		"https://user@rebroad.github.io",
-		"https://rebroad.github.io?query=1",
+		"https://game.example/path",
+		"https://user@game.example",
+		"https://game.example?query=1",
 	} {
 		if _, err := parseAllowedBrowserOrigins([]string{origin}); err == nil {
 			t.Errorf("parseAllowedBrowserOrigins accepted unsafe origin %q", origin)

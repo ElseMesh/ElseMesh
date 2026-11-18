@@ -36,6 +36,7 @@ jobs:
         env:
           ELSEMESH_COMMIT_SHA: ${{ steps.main-revision.outputs.sha }}
           ELSEMESH_ALLOW_SOURCE_BUILD: '1'
+          ELSEMESH_WORLD_RESOLVER: ${{ vars.ELSEMESH_WORLD_RESOLVER }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

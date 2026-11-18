@@ -106,7 +106,12 @@ const worldProviderModules = configuredWorldProviderModules === undefined
 const localWorldProvider = process.env.ELSEMESH_LOCAL_WORLD_PROVIDER || '';
 const localWorldMap = process.env.ELSEMESH_LOCAL_WORLD_MAP || '';
 const localWorldGatewayValue = process.env.ELSEMESH_LOCAL_WORLD_GATEWAY || '';
+const worldResolverValue = process.env.ELSEMESH_WORLD_RESOLVER || '';
 let localWorldGateway = null;
+if ( worldResolverValue ) {
+	const resolver = new URL( worldResolverValue );
+	if ( resolver.protocol !== 'https:' || resolver.username || resolver.password || ! [ '', '/' ].includes( resolver.pathname ) || resolver.search || resolver.hash ) throw new Error( 'ELSEMESH_WORLD_RESOLVER must be a canonical HTTPS origin' );
+}
 if ( Boolean( localWorldProvider ) !== Boolean( localWorldMap ) ) throw new Error( 'ELSEMESH_LOCAL_WORLD_PROVIDER and ELSEMESH_LOCAL_WORLD_MAP must be configured together' );
 if ( localWorldProvider ) {
 	const provider = new URL( localWorldProvider );
@@ -190,6 +195,7 @@ function connectionLog() {
 function localWorldRuntimeConfig() {
 	if ( ! localWorldProvider ) return null;
 	const config = JSON.stringify( {
+		worldResolver: worldResolverValue,
 		localWorld: {
 			provider: localWorldProvider,
 			map: localWorldMap,
@@ -208,6 +214,38 @@ function localWorldRuntimeConfig() {
 		name: 'elsemesh-local-world-runtime-config',
 		configureServer( server ) { server.middlewares.use( serveConfig ); },
 		configurePreviewServer( server ) { server.middlewares.use( serveConfig ); },
+	};
+}
+
+function worldResolverRuntimeConfig() {
+	const configPath = resolve( 'public/elsemesh-config.js' );
+	function configuredSource() {
+		const source = readFileSync( configPath, 'utf8' );
+		const setting = /worldResolver:\s*''/g;
+		const matches = [ ...source.matchAll( setting ) ];
+		if ( matches.length !== 1 ) throw new Error( `Expected one empty worldResolver setting in public/elsemesh-config.js, found ${ matches.length }` );
+		const replacement = `worldResolver: ${ JSON.stringify( worldResolverValue ) }`;
+		return source.replace( setting, replacement );
+	}
+	function serveConfig( req, res, next ) {
+		if ( req.method !== 'GET' && req.method !== 'HEAD' ) return next();
+		if ( new URL( req.url, 'http://localhost' ).pathname !== '/elsemesh-config.js' ) return next();
+		const body = configuredSource();
+		res.statusCode = 200;
+		res.setHeader( 'Content-Type', 'text/javascript; charset=utf-8' );
+		res.setHeader( 'Cache-Control', 'no-store' );
+		res.setHeader( 'Content-Length', Buffer.byteLength( body ) );
+		res.end( req.method === 'HEAD' ? undefined : body );
+	}
+	return {
+		name: 'elsemesh-world-resolver-runtime-config',
+		configureServer( server ) { server.middlewares.use( serveConfig ); },
+		configurePreviewServer( server ) { server.middlewares.use( serveConfig ); },
+		generateBundle( _options, bundle ) {
+			const asset = bundle[ 'elsemesh-config.js' ];
+			if ( ! asset || asset.type !== 'asset' ) throw new Error( 'Built public/elsemesh-config.js asset is missing' );
+			asset.source = configuredSource();
+		},
 	};
 }
 
@@ -252,7 +290,7 @@ export default defineConfig( {
 	// World package assets use extensionless, content-addressed filenames.
 	assetsInclude: [ /\/assets\/[a-f\d]{64}$/i ],
 	resolve: { preserveSymlinks: true },
-	plugins: [ aiPortalsThreeCompatibility(), defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), basisTranscoderAssets(), movementSupportKernelAssets(), {
+	plugins: [ aiPortalsThreeCompatibility(), defaultWorldBinding(), worldProviderBinding(), connectionLog(), worldPackageAssets(), localWorldRuntimeConfig(), worldResolverRuntimeConfig(), basisTranscoderAssets(), movementSupportKernelAssets(), {
 		name: 'elsemesh-build-commit',
 		transformIndexHtml( html, context ) {
 			if ( context.filename !== resolve( 'index.html' ) ) return;

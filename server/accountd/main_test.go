@@ -171,7 +171,7 @@ func TestBrokerRejectsWrongOriginAndGoogleNonce(t *testing.T) {
 }
 
 func TestParseAllowedOriginsRequiresCanonicalHTTPSOrigins(t *testing.T) {
-	valid, err := parseAllowedOrigins("https://game.example,https://rebroad.github.io")
+	valid, err := parseAllowedOrigins("https://game.example,https://play.example")
 	if err != nil || len(valid) != 2 {
 		t.Fatalf("valid origins rejected: %v", err)
 	}
