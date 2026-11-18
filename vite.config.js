@@ -221,9 +221,10 @@ function worldResolverRuntimeConfig() {
 	const configPath = resolve( 'public/elsemesh-config.js' );
 	function configuredSource() {
 		const source = readFileSync( configPath, 'utf8' );
-		const setting = /worldResolver:\s*''/g;
+		const setting = /worldResolver:\s*(['"])([^'"]*)\1/g;
 		const matches = [ ...source.matchAll( setting ) ];
-		if ( matches.length !== 1 ) throw new Error( `Expected one empty worldResolver setting in public/elsemesh-config.js, found ${ matches.length }` );
+		if ( matches.length !== 1 ) throw new Error( `Expected one quoted worldResolver setting in public/elsemesh-config.js, found ${ matches.length }` );
+		if ( ! worldResolverValue ) return source;
 		const replacement = `worldResolver: ${ JSON.stringify( worldResolverValue ) }`;
 		return source.replace( setting, replacement );
 	}
