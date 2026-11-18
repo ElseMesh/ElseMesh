@@ -135,8 +135,70 @@ world owner likewise authenticates as an account or owner key, not by being
 
 Guest access remains the default unless a world owner requires an authenticated
 account. The current account service implements Google sign-in for role-gated
-authoring actions only. Facebook login, account assertions for visitor
+authoring actions only. Facebook/Telegram login, account assertions for visitor
 admission, and stable account-to-presence binding are not implemented yet.
+
+## Multiple sign-in methods for one visitor
+
+The user's ElseMesh account key is the canonical account identity. A user may
+link several independently verified external identities to that account, such
+as more than one Google account and a Telegram account. Linking a new method
+requires proof of control of that provider identity and authorization from the
+existing account key; matching email addresses, display names, IP addresses,
+or ZeroTier addresses never merge accounts. Each provider identity is keyed by
+its issuer and stable provider subject. The target account broker must support
+linking, unlinking, revocation, recovery, and key rotation without treating any
+provider as the owner of the ElseMesh account. A display name such as `loz` is a
+world-local label, not an identity.
+
+The broker must not send Google or Telegram bearer tokens, raw provider subject
+IDs, or account session secrets to `worldd` or neighboring worlds. After
+interactive sign-in, it issues a short-lived signed assertion that proves the
+ElseMesh account key and, with the visitor's consent, identifies the verified
+authentication method or methods and their authentication time/assurance. A
+world can check which method was used or which linked methods were verified
+without receiving a reusable provider token. The world may request a stronger
+or more recent proof when its access policy requires one.
+
+**Implementation gap:** the current broker maps Google sign-in to one account
+key for authoring actions. It does not yet support multiple linked provider
+identities per account, Telegram sign-in, account assertions for world entry,
+or stable world-local visitor identifiers.
+
+## Reusing authentication through a trusted neighboring world
+
+At portal crossing, the browser may present an account-broker assertion for
+the destination world and a one-time introduction signed by the source world's
+owner key. The introduction binds the verified account assertion to the
+current source session, source world, destination world, portal, expiry, and
+replay nonce. The source world cannot invent or strengthen the broker's
+authentication claims. The destination verifies both signatures and accepts
+the introduction only if its own signed access policy trusts that source
+world and accepts the asserted authentication method and age.
+
+When accepted, the destination creates or updates its own known-player record,
+keyed by a destination-specific pseudonymous account subject. It may record the
+verified method(s), introduction source, first/last visit, and the local
+display name chosen by that visitor. The browser need not prompt for another
+login while the proof is valid and the destination's trust policy accepts it.
+Each destination retains final control over access, bans, visitor limits,
+avatar rules, and saved state; a neighbor's introduction grants no roles or
+privileges. If the source is not trusted, the assertion has expired, the
+destination requires stronger authentication, or account proof is unavailable,
+the destination applies its ordinary guest/invitation policy and may ask the
+visitor to authenticate directly.
+
+Use a destination-specific subject by default so two unrelated worlds cannot
+correlate a visitor merely by comparing IDs. The account broker can reproduce
+the same subject for that destination on later visits, including visits reached
+through a different linked sign-in method. Store the minimum evidence needed
+for local recognition and authorization; discard consumed bearer assertions
+and retain replay/revocation state only as long as required by policy.
+
+**Implementation gap:** trusted-neighbor identity introductions, signed
+cross-world account assertions, destination known-player records, and
+no-reprompt portal handoff are design requirements only. Current portal
+presence carries no verified account identity between worlds.
 
 ## State that does and does not traverse a portal
 

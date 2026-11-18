@@ -113,6 +113,35 @@ They must not contain private keys or reusable account session tokens. Enforce
 bounded clock skew, replay protection, rate limits, durable redemption state,
 and revocation checks at the admission service and world authority.
 
+## Trusted-neighbor identity introduction
+
+One ElseMesh account key may have multiple separately verified sign-in methods
+linked to it. For a portal crossing, the account broker issues a short-lived
+authentication assertion whose audience is the destination world. With visitor
+consent, it records the verified method(s) used and their authentication
+time/assurance, but contains no external provider token or raw provider subject.
+The source owner signs a one-time introduction binding that assertion to the
+source session, source world, destination world, portal, expiry, and a unique
+nonce. This statement proves provenance from a neighbor; it cannot add account
+methods, roles, or permissions to the broker's assertion.
+
+The destination accepts the handoff without another interactive login only
+when its own policy trusts the source world's owner key and accepts the
+assertion's account proof and authentication methods. On acceptance it creates
+or updates a destination-local known-player record keyed by a pairwise subject
+for that world, and records the disclosed methods and introduction provenance.
+The assertion is single-use, audience-bound, expiry-checked, and replay
+protected. The destination's bans, admission rules, visitor limits, and world
+roles remain authoritative; trust in a neighbor conveys identity provenance,
+not the neighbor's privileges. If the proof is missing, stale, or insufficient,
+the destination falls back to its own guest, invitation, or login policy.
+
+Account-linked methods are merged only after separate proof of control and
+account-key authorization. Email, display name, IP address, and ZeroTier IP
+must never be used to merge accounts. Use destination-specific account subjects
+so a world can recognize a returning visitor without exposing a globally
+correlatable identifier to every other world.
+
 ## Presence ghosting and world-defined simulation authority
 
 After 10 seconds without an accepted client update, the owner includes

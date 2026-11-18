@@ -199,8 +199,15 @@ in `docs/`.
   [implementation status](docs/elsemesh-status.md).
 - **Optional identity and editing (65%):** keep worlds usable without an account;
   support optional Google login, owner-signed roles/revocations, and the
-  reviewable AI/Blender editing boundary. See [account roles](docs/account-roles.md)
-  and [AI editing](docs/ai-editor-worker.md).
+  reviewable AI/Blender editing boundary. **Multi-authenticator account linking
+  and trusted-neighbor portal identity introduction: 0%.** One ElseMesh account
+  key may link multiple verified identities (including multiple Google
+  accounts and Telegram), and a destination may accept a signed,
+  destination-bound introduction from a trusted portal neighbor without
+  prompting the visitor to authenticate again. The destination stores a
+  world-local known-player record and retains final admission authority. See
+  [account roles](docs/account-roles.md) and [visitor identity and world-local
+  state](docs/visitor-identity-and-world-state.md).
 - **Portals and multiple worlds (75%):** support independently configured portal
   sides, mapped arrival orientation/travel direction, owner-authorized sharing,
   preview/entry rules, and at least two separately hosted worlds including an

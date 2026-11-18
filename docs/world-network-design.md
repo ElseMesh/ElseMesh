@@ -490,6 +490,14 @@ world by stable world ID, verify the owner's signed manifest and content hashes,
 then connect to the owner or an owner-authorized content provider. A provider
 address is a route, not proof of ownership or permission.
 
+For portal travel, a destination may accept a signed identity introduction from
+a trusted neighboring world and avoid a second interactive login. The account
+broker proves the linked sign-in methods; the source world proves the visitor
+arrived through its trusted portal. The destination records its own
+world-specific known-player identity and still applies its own admission and
+moderation policy. See [visitor identity and world-local state](visitor-identity-and-world-state.md#reusing-authentication-through-a-trusted-neighboring-world)
+for the assertion and privacy contract.
+
 The owner should be able to protect the service from resource exhaustion by
 setting a maximum population and caps on the complexity of avatars, vehicles,
 and carried or spawned objects. Those limits need enforcement before expensive

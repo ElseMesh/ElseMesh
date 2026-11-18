@@ -16,6 +16,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   short-code admission. The short-link resolution/account-bound admission
   sub-gate is tracked at 0% in
   [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
+- Added the cross-world account requirement to the identity design: one
+  ElseMesh account can link multiple verified providers, and a destination may
+  accept a short-lived broker assertion plus a trusted-neighbor introduction
+  at portal arrival. The destination records a local known-player identity
+  while keeping its own admission policy authoritative. This is design-only;
+  the multi-authenticator and trusted-neighbor sub-gate is tracked at 0% in
+  [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#product-requirements).
 
 ## 2026-11-04
 
