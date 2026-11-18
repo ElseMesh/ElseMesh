@@ -638,8 +638,15 @@ func (gateway *regionProviderGateway) cellIsAuthorized(visitor playerPresence, c
 	// maximum and a conservative 80-degree horizontal half-angle because the
 	// server does not know the visitor's viewport aspect ratio.
 	forwardDistance = math.Max(0, forwardDistance)
-	if math.Abs(dot3(delta, right)) > forwardDistance*math.Tan(80*math.Pi/180)+cellRadius ||
-		math.Abs(dot3(delta, up)) > forwardDistance*math.Tan(50*math.Pi/180)+cellRadius {
+	horizontalHalfAngle := 80 * math.Pi / 180
+	verticalHalfAngle := 50 * math.Pi / 180
+	// A cell is represented by a bounding sphere. Its support along a sloped
+	// frustum plane is radius times the plane normal's length, not radius along
+	// each projected axis. This is the sphere/frustum intersection bound.
+	horizontalRadius := cellRadius / math.Cos(horizontalHalfAngle)
+	verticalRadius := cellRadius / math.Cos(verticalHalfAngle)
+	if math.Abs(dot3(delta, right)) > forwardDistance*math.Tan(horizontalHalfAngle)+horizontalRadius ||
+		math.Abs(dot3(delta, up)) > forwardDistance*math.Tan(verticalHalfAngle)+verticalRadius {
 		return false
 	}
 	return true

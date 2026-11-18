@@ -31,3 +31,37 @@ presenter and the atomic link between door state and authoritative collision
 are not implemented. A world must not declare this capability as required
 until its client can present the door and the movement authority applies the
 same state to collision.
+
+## Animation and traversal implementation contract
+
+A usable door definition must bind one owner-authorized state transition to
+three effects: the visual door pose, the browser's local collision set, and the
+owner's movement sweep. A component that only emits audio or changes an
+unrelated boolean is not a traversable door.
+
+The world supplies the stable visual object binding, hinge/pivot transform,
+closed and open poses, and the authored transition timing/curve. It also maps
+the door to the exact collision sources affected by that motion and states when
+those sources stop blocking and become blocking again. Do not infer a hinge,
+open angle, duration, or passability threshold from a door name or from its
+sound event. Missing or inconsistent visual/collision mappings leave the door
+closed and movement fail-closed.
+
+The engine owns a renderer-neutral door runtime. It consumes the signed world
+definition and owner-replicated state, drives the shared runtime update path,
+and applies the same collision-state transition used by local movement. A
+backend adapter may bind the authored object to that runtime, but WebGPU and
+WebGL must use the same transform track and passability rule. The browser may
+predict the animation for responsiveness; it cannot authorize the state change
+or remove the authoritative sweep blocker.
+
+`worldd` validates the interaction and determines the effective transition
+time/state. Its movement authority passes that state to the provider's sweep;
+the provider resolves the signed door-to-source mapping and ignores only the
+door collision sources whose authored passability condition is currently
+satisfied. The request must not accept a client-selected list of ignored
+colliders. Owner state, provider collision filtering, and browser collision
+updates must switch from the same replicated sequence and world-authored
+transition rule. Tests must cover closed, opening, passable-open, closing, and
+closed-again states, including a forged request that attempts to walk through
+the door before it becomes passable.

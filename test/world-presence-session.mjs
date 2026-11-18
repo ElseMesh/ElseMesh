@@ -102,6 +102,43 @@ await authoritySession.pending;
 assert.equal(authorityPlayer.worldMovementAuthorityBlocked, false, 'fresh input resumes movement only after the owner accepted a stopped pose');
 assert.equal(authorityPlayer.worldMovementAuthorityCanResume, false, 'movement recovery latch clears when local simulation resumes');
 authoritySession.dispose();
+
+let transientNow = 5000, transientRequests = 0, transientErrors = 0;
+const transientPlayer = {
+	position: new Vector3( 0, 1, 0 ), velocity: new Vector3( 0, 0, 0 ), mode: 'walk', yaw: 0, pitch: 0,
+	setHostedWorldAuthoritativePose( position, yaw, pitch, mode ) {
+		this.position.set( ...position ); this.velocity.set( 0, 0, 0 ); this.yaw = yaw; this.pitch = pitch; this.mode = mode;
+	},
+};
+const transientSession = new WorldPresenceSession( { connector, parent: { add() {} }, clock: () => transientNow,
+	onError() { transientErrors ++; }, createConnector() { return {
+		updatePresence( pose ) {
+			transientRequests ++;
+			if ( transientRequests === 2 ) return Promise.reject( new Error( 'presence_rate_limited' ) );
+			return Promise.resolve( { type: 'presence', worldId: connector.worldId, requestId: `transient-${transientRequests}`, playerId: own,
+				players: [ { ...pose, id: own, updatedAt: transientNow } ] } );
+		}, close() {},
+	}; },
+} );
+await transientSession.admit( transientPlayer );
+transientPlayer.position.z = -0.5;
+transientPlayer.velocity.z = -3;
+transientNow += 200;
+transientSession.update( 1 / 60, transientPlayer, transientNow );
+await transientSession.pending;
+assert.deepEqual( transientPlayer.position.toArray(), [ 0, 1, 0 ], 'a transient rate limit rolls back to the owner-approved pose' );
+assert.equal( transientPlayer.worldMovementAuthorityBlocked, false, 'a transient rate limit does not latch the movement block' );
+assert.equal( transientErrors, 0, 'a transient rate limit does not report an authority failure to the user' );
+transientNow += 99;
+transientPlayer.position.z = -0.1;
+transientSession.update( 1 / 60, transientPlayer, transientNow );
+assert.equal( transientRequests, 2, 'the client waits through the short rate-limit retry interval' );
+transientNow ++;
+transientSession.update( 1 / 60, transientPlayer, transientNow );
+await transientSession.pending;
+assert.equal( transientRequests, 3, 'presence publication retries after the rate-limit interval' );
+assert.deepEqual( transientSession.lastAcceptedPose.position, [ 0, 1, -0.1 ], 'the next owner-approved movement pose is accepted without a release-and-repress cycle' );
+transientSession.dispose();
 const houseUniform = {...DEFAULT_APPEARANCE, shirt:'#8b1c2b', trousers:'#3e2434'};
 const restrictedWorld = {...connector, manifest:{...connector.manifest, rules:{...connector.manifest.rules,
  avatarPolicy:{allowedProfiles:['elsemesh.avatar.stock-female/1']}}}};

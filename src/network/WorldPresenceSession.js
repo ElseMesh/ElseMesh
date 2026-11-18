@@ -167,9 +167,10 @@ export class WorldPresenceSession {
    }).catch(error => {
     if (this.disposed) return;
     this.lastRejectedPose = { position: [...pose.position], yaw: pose.yaw, pitch: pose.pitch, mode: pose.mode, error: String(error) };
-    this.#restoreLastAcceptedPose(player);
-    this.nextSend = this.clock() + 2000;
-    if (!this.reportedError) { this.reportedError = true; this.onError(error); }
+    const rateLimited = String( error?.message || error ) === 'presence_rate_limited';
+    this.#restoreLastAcceptedPose(player, { blockMovement: ! rateLimited });
+    this.nextSend = this.clock() + ( rateLimited ? 100 : 2000 );
+    if (!rateLimited && !this.reportedError) { this.reportedError = true; this.onError(error); }
    }).finally(() => { this.pending = null; });
  }
  async setDoorState( doorId, open ) {
@@ -204,12 +205,14 @@ export class WorldPresenceSession {
    position: [...pose.position], yaw: pose.yaw, pitch: pose.pitch, mode: pose.mode,
   };
  }
- #restoreLastAcceptedPose(player) {
+ #restoreLastAcceptedPose(player, { blockMovement = true } = {}) {
   const pose = this.lastAcceptedPose;
   if (!pose || !['walk', 'swim'].includes(pose.mode) || !['walk', 'swim'].includes(player?.mode)) return;
-  player.worldMovementAuthorityBlocked = true;
-  player.worldMovementAuthorityRequiresRelease = true;
-  player.worldMovementAuthorityCanResume = false;
+  if ( blockMovement ) {
+   player.worldMovementAuthorityBlocked = true;
+   player.worldMovementAuthorityRequiresRelease = true;
+   player.worldMovementAuthorityCanResume = false;
+  }
   player.setHostedWorldAuthoritativePose?.(pose.position, pose.yaw, pose.pitch, pose.mode);
  }
  #movementReleased(player) {

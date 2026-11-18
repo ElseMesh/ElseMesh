@@ -24,6 +24,9 @@ const LOCAL_REGION_CACHE_READ_CONCURRENCY = 3;
 const LOCAL_REGION_CACHE_READ_BATCH_BYTES = 16 * 1024 * 1024;
 const DEFAULT_LOCAL_REGION_CACHE_BYTES = 128 * 1024 * 1024;
 const MAX_LOCAL_REGION_CACHE_BYTES = 1024 * 1024 * 1024;
+const REGION_ASSET_FORBIDDEN_RETRY_INITIAL_MS = 1000;
+const REGION_ASSET_FORBIDDEN_RETRY_MAX_MS = 30000;
+const MAX_REGION_ASSET_FORBIDDEN_RETRIES = 4096;
 const MIN_LOCAL_REGION_CACHE_BYTES = 64 * 1024 * 1024;
 const LOCAL_REGION_CACHE_BYTES_PER_GIB = 64 * 1024 * 1024;
 const REGION_LEASE_RENEW_MS = 10000;
@@ -219,6 +222,7 @@ export class LocalRegionConnector {
 		this.assetRangeCacheBudgetBytes = memoryCacheBudgetBytes - this.assetCacheBudgetBytes;
 		this.regionAssets = new Map();
 		this.regionAssetsByCell = new Map();
+		this.forbiddenAssetRetry = new Map();
 		this.regionRequestQueue = new PriorityRequestQueue( REGION_DATA_REQUEST_LIMIT );
 		this.syntheticAssetLoaders = new Map();
 		this.collisionAssetIDs = new Set();
@@ -258,6 +262,10 @@ export class LocalRegionConnector {
 
 	#contentHeaders( headers = {} ) {
 		return this.contentCapability ? { ...headers, Authorization: `Bearer ${this.contentCapability}` } : headers;
+	}
+
+	#assetRetryKey( assetId ) {
+		return `${assetId}\n${this.regionAssets.get( assetId ) || ''}`;
 	}
 
 	async getManifest( { signal } = {} ) {
@@ -1079,7 +1087,11 @@ export class LocalRegionConnector {
 		const authHeaders = this.#contentHeaders();
 		const leaseResponse = await fetch( leaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal, headers: authHeaders } );
 		phaseMs.providerLeaseRequest = performance.now() - phaseStartedAt;
-		if ( ! leaseResponse.ok ) throw new Error( `Local region lease request failed (${leaseResponse.status})` );
+		if ( ! leaseResponse.ok ) {
+			const error = new Error( `Local region lease request failed (${leaseResponse.status})` );
+			error.status = leaseResponse.status;
+			throw error;
+		}
 		phaseStartedAt = performance.now();
 		const lease = await leaseResponse.json();
 		phaseMs.providerLeaseResponseParse = performance.now() - phaseStartedAt;
@@ -1108,6 +1120,11 @@ export class LocalRegionConnector {
 			phaseStartedAt = performance.now();
 			const response = await fetch( leasedURL, { credentials: 'omit', cache: 'no-store', signal: controller.signal, headers: this.#contentHeaders( requestHeaders ) } );
 			phaseMs.providerRegionResponse = performance.now() - phaseStartedAt;
+			if ( response.status === 403 ) {
+				const error = new Error( 'Local region content request is forbidden for the current admitted view' );
+				error.status = response.status;
+				throw error;
+			}
 			return await consumeResponse( response, controller.signal );
 		} finally {
 			released = true;
@@ -1159,10 +1176,13 @@ export class LocalRegionConnector {
 		requireValue( retainAssetIDs instanceof Set, 'Local region retained asset IDs must be a Set' );
 		requireValue( Number.isInteger( concurrency ) && concurrency >= 1 && concurrency <= 8, 'Local region preload concurrency is invalid' );
 		requireValue( viewPriorityByAsset instanceof Map && [ ...viewPriorityByAsset.values() ].every( value => typeof value === 'number' && ! Number.isNaN( value ) && value >= 0 ), 'Local region visual priority map is invalid' );
-		const selected = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...new Set( [
+		const requested = assetIDs ? [ ...new Set( assetIDs ) ] : [ ...new Set( [
 			...( this.manifest.objects || [] ).map( object => object.assetId ).filter( Boolean ),
 			...( this.manifest.components || [] ).flatMap( worldComponentAssetIDs ),
 		] ) ];
+		const now = performance.now();
+		const selected = requested.filter( assetId => ( this.forbiddenAssetRetry.get( this.#assetRetryKey( assetId ) )?.retryAt ?? -Infinity ) <= now );
+		if ( this.regionDiagnostics && selected.length !== requested.length ) console.info( 'ElseMesh local-region forbidden assets deferred:', JSON.stringify( { count: requested.length - selected.length } ) );
 		const selectedSet = new Set( selected );
 		const assetKinds = new Map( this.manifest.assets.map( asset => [ asset.id, asset.kind ] ) );
 		const originalOrder = new Map( selected.map( ( assetId, index ) => [ assetId, index ] ) );
@@ -1199,9 +1219,23 @@ export class LocalRegionConnector {
 		const prepareAsset = async assetId => {
 			const kind = assetKinds.get( assetId );
 			const isGLB = kind === 'glb' || kind === 'model/gltf-binary';
-			const progressive = this.collisionAssetIDs.has( assetId ) || ! isGLB ? null : await fetchGLBWithCoarseKTX2( this, assetId, { signal } );
-			const bytes = progressive?.bytes || await this.getAsset( assetId, { signal } );
-			return { assetId, bytes, progressive };
+			const retryKey = this.#assetRetryKey( assetId );
+			try {
+				const progressive = this.collisionAssetIDs.has( assetId ) || ! isGLB ? null : await fetchGLBWithCoarseKTX2( this, assetId, { signal } );
+				const bytes = progressive?.bytes || await this.getAsset( assetId, { signal } );
+				this.forbiddenAssetRetry.delete( retryKey );
+				return { assetId, bytes, progressive };
+			} catch ( error ) {
+				if ( error?.status === 403 ) {
+					const previous = this.forbiddenAssetRetry.get( retryKey );
+					const delayMs = Math.min( REGION_ASSET_FORBIDDEN_RETRY_MAX_MS,
+						previous ? Math.max( REGION_ASSET_FORBIDDEN_RETRY_INITIAL_MS, ( previous.delayMs || REGION_ASSET_FORBIDDEN_RETRY_INITIAL_MS ) * 2 ) : REGION_ASSET_FORBIDDEN_RETRY_INITIAL_MS );
+					this.forbiddenAssetRetry.delete( retryKey );
+					if ( this.forbiddenAssetRetry.size >= MAX_REGION_ASSET_FORBIDDEN_RETRIES ) this.forbiddenAssetRetry.delete( this.forbiddenAssetRetry.keys().next().value );
+					this.forbiddenAssetRetry.set( retryKey, { retryAt: performance.now() + delayMs, delayMs } );
+				}
+				throw error;
+			}
 		};
 		const installAsset = async ( prepared, index ) => {
 			const { assetId, bytes, progressive } = prepared;
@@ -1255,6 +1289,7 @@ export class LocalRegionConnector {
 		this.assetRanges.clear();
 		this.assetRangeBytes = 0;
 		this.regionAssets.clear();
+		this.forbiddenAssetRetry.clear();
 		this.initialRegionCellObjectIDs.clear();
 		this.collisionAssetIDs.clear();
 		this.collisionObjectIDByAsset.clear();

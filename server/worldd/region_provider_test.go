@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -148,8 +149,9 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 	gateway.previewRegion = &regionProviderPreviewRegion{CellSizeMeters: 16, MaxViewDistanceMeters: 32}
 	gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.3, HeightMeters: 1.75}
 	gateway.regionIDs = map[string]struct{}{"GreatHall": {}}
+	visitor := playerPresence{playerPose: playerPose{Position: []float64{0, 0, 0}, Yaw: 0, Pitch: 0}}
 	gateway.authorizeContent = func(token string) (playerPresence, bool) {
-		return playerPresence{playerPose: playerPose{Position: []float64{0, 0, 0}, Yaw: 0, Pitch: 0}}, token == "accepted-presence-capability"
+		return visitor, token == "accepted-presence-capability"
 	}
 	gateway.maxMovementSpeed = func(playerPresence) (float64, error) { return 6.2, nil }
 
@@ -222,6 +224,33 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 	gateway.ServeHTTP(response, request)
 	if response.Code != http.StatusForbidden || upstreamRequests.Load() != 3 {
 		t.Fatalf("behind-view visual asset request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	// This is the live browser pose and the denied 8 m Great Hall cell. Its
+	// bounding sphere intersects the supported view frustum even though the
+	// cell center sits just beyond the vertical cone plane.
+	gateway.previewRegion = &regionProviderPreviewRegion{CellSizeMeters: 8, MaxViewDistanceMeters: 64}
+	visitor = playerPresence{playerPose: playerPose{
+		Position: []float64{-0.6640636558730705, 7, 103.70598454468201},
+		Yaw:      math.Pi,
+		Pitch:    -0.1,
+	}}
+	request = httptest.NewRequest(http.MethodGet,
+		"/v1/regions/GreatHall?cell=-3,2,13,8&payload=visual&mesh=%2FGame%2FWalls%2FBlankDoor&lod=0&lease="+strings.Repeat("b", 32), nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || upstreamRequests.Load() != 4 {
+		t.Fatalf("visible overlapping-cell visual asset request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet,
+		"/v1/regions/GreatHall?cell=-3,2,11,8&payload=visual&lease="+strings.Repeat("c", 32), nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || upstreamRequests.Load() != 4 {
+		t.Fatalf("behind-camera overlapping-cell visual asset request status=%d upstream=%d", response.Code, upstreamRequests.Load())
 	}
 
 	request = httptest.NewRequest(http.MethodOptions, "/v1/regions/GreatHall/cells", nil)
