@@ -2367,3 +2367,12 @@ finding changes them.
   substitute. ElseMesh now has the renderer-neutral canopy descriptor codec
   and CPU reference math, but no production asset or paired presenter consumes
   them yet. No parity gate closed; Tidewater remains 93%.
+
+- 2026-11-18: extended the renderer-neutral canopy descriptor to describe
+  multiple atlas variants selected from bounded per-instance material data.
+  The shared `fractional-bin/1` CPU reference matches the source canopy's
+  `floor(fract(seed * 7.77) * variantCount)` variant choice for trees and
+  shrubs, and descriptor/math tests pass. This closes a contract gap only:
+  there are still no signed canopy atlas assets or ElseMesh WebGPU/WebGL
+  presenters consuming the descriptor, so appearance parity remains open and
+  Tidewater stays at 93%.

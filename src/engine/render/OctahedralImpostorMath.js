@@ -18,6 +18,12 @@ function gridSize( value ) {
 	return value;
 }
 
+export function selectFractionalBinVariant( value, variantCount, multiplier ) {
+	if ( ! Number.isFinite( value ) || value < 0 || value > 1 || ! Number.isInteger( variantCount ) || variantCount < 1 || variantCount > 64 || ! Number.isFinite( multiplier ) || multiplier <= 0 ) throw new Error( 'Invalid fractional-bin variant selection' );
+	const fraction = value * multiplier - Math.floor( value * multiplier );
+	return Math.min( variantCount - 1, Math.floor( fraction * variantCount ) );
+}
+
 export function decodeHemiOctahedral( u, v ) {
 	if ( ! Number.isFinite( u ) || ! Number.isFinite( v ) || Math.abs( u ) > 1 || Math.abs( v ) > 1 ) throw new Error( 'Hemi-octahedral coordinates must be finite and within [-1, 1]' );
 	const x = ( u - v ) * 0.5;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
 	decodeHemiOctahedral, encodeHemiOctahedral, hemiOctahedralAtlasUV,
-	hemiOctahedralFrameBasis, reprojectRayToHemiFrame, selectHemiOctahedralFrames,
+	hemiOctahedralFrameBasis, reprojectRayToHemiFrame, selectFractionalBinVariant, selectHemiOctahedralFrames,
 } from '../src/engine/render/OctahedralImpostorMath.js';
 
 for ( const direction of [ [ 0, 1, 0 ], [ 1, 1, 0 ], [ - 1, 2, 3 ], [ 0.2, 0.7, - 0.4 ] ] ) {
@@ -27,6 +27,8 @@ assert.deepEqual( reprojectRayToHemiFrame( [ 0, 0, 1 ], [ 0, 0, - 1 ], [ 0, 0, 1
 assert.equal( reprojectRayToHemiFrame( [ 0, 1, 0 ], [ 1, 0, 0 ], [ 0, 1, 0 ], 1 ), null, 'parallel rays have no frame-plane intersection' );
 const atlasUV = hemiOctahedralAtlasUV( { variantIndex: 1, variantCount: 5, framesPerAxis: 6, frameX: 2, frameY: 3, localX: 0, localY: 0 } );
 assert.ok( Math.abs( atlasUV[ 0 ] - 8.5 / 30 ) < 1e-12 && Math.abs( atlasUV[ 1 ] - 5 / 12 ) < 1e-12 );
+assert.equal( selectFractionalBinVariant( 0.1337, 3, 7.77 ), Math.floor( ( 0.1337 * 7.77 % 1 ) * 3 ), 'variant selection matches the shared per-instance seed-bin rule' );
+assert.equal( selectFractionalBinVariant( 0.7331, 2, 7.77 ), Math.floor( ( 0.7331 * 7.77 % 1 ) * 2 ), 'variant selection supports different variant counts' );
 
 assert.throws( () => decodeHemiOctahedral( 1.1, 0 ), /within/ );
 assert.throws( () => encodeHemiOctahedral( [ 1, - 1, 0 ] ), /upper hemisphere/ );

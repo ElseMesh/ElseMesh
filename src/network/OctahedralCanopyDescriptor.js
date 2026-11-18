@@ -59,17 +59,23 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 	let nextVariant = 0;
 	const groupIDs = new Set(), referencedModels = new Set();
 	for ( const group of document.variantGroups ) {
-		if ( ! hasExactKeys( group, [ 'id', 'modelIds', 'atlasVariantRange', 'bounds' ] ) || typeof group.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( group.id ) || groupIDs.has( group.id ) ) fail( 'variant group ID or fields are invalid' );
+		if ( ! hasExactKeys( group, [ 'id', 'modelIds', 'atlasVariantRange', 'variantSelection', 'bounds' ] ) || typeof group.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( group.id ) || groupIDs.has( group.id ) ) fail( 'variant group ID or fields are invalid' );
 		groupIDs.add( group.id );
 		if ( ! Array.isArray( group.modelIds ) || group.modelIds.length < 1 || group.modelIds.length > 64 || group.modelIds.some( id => ! validModelID( id ) || ! modelByID.has( id ) || referencedModels.has( id ) ) ) fail( `variant group ${group.id} has invalid or duplicate static-model IDs` );
 		for ( const id of group.modelIds ) referencedModels.add( id );
 		const range = group.atlasVariantRange;
-		if ( ! hasExactKeys( range, [ 'start', 'end' ] ) || ! Number.isInteger( range.start ) || ! Number.isInteger( range.end ) || range.start !== nextVariant || range.end - range.start !== group.modelIds.length ) fail( `variant group ${group.id} atlas range must be contiguous and match its model IDs` );
+		if ( ! hasExactKeys( range, [ 'start', 'end' ] ) || ! Number.isInteger( range.start ) || ! Number.isInteger( range.end ) || range.start !== nextVariant || range.end <= range.start || range.end - range.start > 64 ) fail( `variant group ${group.id} atlas range must be contiguous and contain 1–64 variants` );
+		const selection = group.variantSelection;
+		if ( ! hasExactKeys( selection, [ 'source', 'index', 'method', 'multiplier' ] ) || selection.source !== 'instance-material-data' || ! Number.isInteger( selection.index ) || selection.index < 0 || selection.index > 7 || selection.method !== 'fractional-bin/1' || ! finiteIn( selection.multiplier, 0.001, 1e4 ) ) fail( `variant group ${group.id} selection rule is invalid` );
+		for ( const id of group.modelIds ) {
+			const instances = set.instances.filter( instance => instance?.model === id );
+			if ( ! instances.length || instances.some( instance => ! Array.isArray( instance.materialData ) || ! finiteIn( instance.materialData[ selection.index ], 0, 1 ) ) ) fail( `variant group ${group.id} requires normalized per-instance variant data for model ${id}` );
+		}
 		nextVariant = range.end;
 		const bounds = group.bounds;
 		if ( ! hasExactKeys( bounds, [ 'center', 'radius', 'horizontalRadius', 'halfHeight' ] ) || ! Array.isArray( bounds.center ) || bounds.center.length !== 3 || bounds.center.some( value => ! finiteIn( value, -1e6, 1e6 ) ) || ! finiteIn( bounds.radius, 0.001, 1e6 ) || ! finiteIn( bounds.horizontalRadius, 0.001, 1e6 ) || ! finiteIn( bounds.halfHeight, 0.001, 1e6 ) || bounds.horizontalRadius > bounds.radius || bounds.halfHeight > bounds.radius ) fail( `variant group ${group.id} bounds are invalid` );
 	}
-	if ( document.frameGrid.columns !== nextVariant * frames ) fail( 'frame-grid columns must equal variant count times frames per side' );
+	if ( document.frameGrid.columns !== nextVariant * frames ) fail( 'frame-grid columns must equal atlas variant count times frames per side' );
 	for ( const id of document.atlasAssetIds ) if ( ! inventory.has( id ) ) fail( `atlas asset is missing from component inventory: ${id}` );
 	if ( ! hasExactKeys( document.nearHandoff, [ 'startDistance', 'endDistance' ] ) || ! finiteIn( document.nearHandoff.startDistance, 0.1, 10000 ) || ! finiteIn( document.nearHandoff.endDistance, 0.1, 10000 ) || document.nearHandoff.endDistance <= document.nearHandoff.startDistance ) fail( 'near handoff blend range is invalid' );
 	if ( ! hasExactKeys( document.drawRange, [ 'startDistance', 'fadeStartDistance', 'endDistance' ] ) || ! finiteIn( document.drawRange.startDistance, 0, 1e6 ) || ! finiteIn( document.drawRange.fadeStartDistance, 0, 1e6 ) || ! finiteIn( document.drawRange.endDistance, 0.1, 1e6 ) || document.drawRange.startDistance > document.nearHandoff.startDistance || document.drawRange.fadeStartDistance < document.nearHandoff.endDistance || document.drawRange.fadeStartDistance >= document.drawRange.endDistance || document.drawRange.endDistance <= document.nearHandoff.endDistance ) fail( 'impostor draw or fade range is invalid' );
