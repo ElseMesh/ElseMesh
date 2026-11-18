@@ -43,6 +43,14 @@ assert.equal( validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.m
 const coarseToFine = validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 70, 22 ], lodMetric: 'world-distance', shadowLod: 2 } ] } );
 assert.equal( coarseToFine.models[ 0 ].shadowLod, 2, 'distance-ordered LODs can select a finer authored shadow mesh' );
 assert.equal( new StaticModelInstanceSetPlanner( coarseToFine ).shadowGroups[ 0 ].lodIndex, 2, 'shared shadow planner uses the authored LOD index' );
+const offsetDistanceDocument = validateStaticModelInstanceSet( {
+	...valid,
+	models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 70, 22 ], lodMetric: 'world-distance-offset', shadowLod: 2, shadowMaxDistance: 70, drawMaxDistance: 70, drawFadeStartDistance: 50 } ],
+	instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, - 80 ], lodDistanceOffset: 20 } ],
+} );
+assert.equal( offsetDistanceDocument.instances[ 0 ].lodDistanceOffset, 20, 'offset distance is explicit authored instance data' );
+assert.throws( () => validateStaticModelInstanceSet( { ...offsetDistanceDocument, instances: [ valid.instances[ 0 ] ] } ), /LOD distance offset/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], lodDistanceOffset: 20 } ] } ), /LOD distance offset/ );
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
 assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set( [ hi, low, lowest ] ) } ).instances.length, 1 );
 const providerLocalID = 'local-mesh-lod:great-hall:component:0';
@@ -166,6 +174,13 @@ worldDistancePlanner.update( worldDistanceCamera );
 assert.equal( worldDistancePlanner.groups[ 1 ].count, 1, 'world-distance LOD measures from the placement origin and ignores the offset bounds center and instance scale' );
 worldDistancePlanner.update( worldDistanceCamera, { renderLoadBias: 1 } );
 assert.equal( worldDistancePlanner.groups[ 0 ].count, 1, 'render-load bias still permits an engine-owned coarser world-distance LOD under sustained load' );
+const offsetDistancePlanner = new StaticModelInstanceSetPlanner( offsetDistanceDocument ).update( {
+	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: [ [ 1, 0, 0, 1000 ], [ -1, 0, 0, 1000 ], [ 0, 1, 0, 1000 ], [ 0, -1, 0, 1000 ], [ 0, 0, 1, 1000 ], [ 0, 0, -1, 1000 ] ],
+} );
+assert.equal( offsetDistancePlanner.groups[ 1 ].count, 1, 'authored offset is subtracted from camera-to-origin distance for shared LOD selection' );
+assert.equal( offsetDistancePlanner.groups[ 1 ].drawFade[ 0 ], 0.5, 'the same radius-adjusted distance controls color fade and draw range' );
+assert.equal( offsetDistancePlanner.shadowGroups[ 0 ].count, 1, 'the same adjusted distance controls the authored shadow range' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
 const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };

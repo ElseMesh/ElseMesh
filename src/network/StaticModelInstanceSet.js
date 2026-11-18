@@ -30,9 +30,11 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 	if ( availableAssetIDs !== null && ! ( availableAssetIDs instanceof Set ) ) throw new Error( 'Available model asset IDs must be a Set' );
 
 	const modelIDs = new Set();
+	const modelsByID = new Map();
 	for ( const model of document.models ) {
 		if ( ! hasExactKeys( model, [ 'id', 'bounds', 'geometryMirrorX', 'lods', 'lodThresholds', 'lodMetric', 'lodFadeFraction', 'shadowLod', 'shadowMaxDistance', 'drawMaxDistance', 'drawFadeStartDistance' ] ) || typeof model.id !== 'string' || ! MODEL_ID.test( model.id ) || modelIDs.has( model.id ) || typeof model.geometryMirrorX !== 'boolean' ) throw new Error( 'Invalid or duplicate static model record' );
 		modelIDs.add( model.id );
+		modelsByID.set( model.id, model );
 		if ( ! hasExactKeys( model.bounds, [ 'center', 'radius' ] ) || ! validVector( model.bounds.center, 3, 1e6 ) || ! Number.isFinite( model.bounds.radius ) || model.bounds.radius <= 0 || model.bounds.radius > 1e6 ) throw new Error( `Invalid bounds for static model ${model.id}` );
 		if ( ! Array.isArray( model.lods ) || model.lods.length === 0 || model.lods.length > MAX_STATIC_MODEL_INSTANCE_LODS ) throw new Error( `Invalid LOD list for static model ${model.id}` );
 		for ( const lod of model.lods ) {
@@ -40,7 +42,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 				|| availableAssetIDs === null && ! ASSET_ID.test( lod.assetId ) ) throw new Error( `Invalid LOD record for static model ${model.id}` );
 			if ( availableAssetIDs && ! availableAssetIDs.has( lod.assetId ) ) throw new Error( `Static model LOD asset is missing: ${lod.assetId}` );
 		}
-		if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );
+		if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance', 'world-distance-offset' ].includes( model.lodMetric ) || ! Number.isFinite( model.lodFadeFraction ) || model.lodFadeFraction <= 0 || model.lodFadeFraction > 0.5 ) throw new Error( `Invalid LOD metric or fade fraction for static model ${model.id}` );
 		if ( ! Array.isArray( model.lodThresholds ) || model.lodThresholds.length !== model.lods.length - 1 ) throw new Error( `Invalid LOD thresholds for static model ${model.id}` );
 		let previousThreshold = model.lodMetric === 'projected-radius' ? 0 : Infinity;
 		for ( const threshold of model.lodThresholds ) {
@@ -57,11 +59,13 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 
 	for ( const instance of document.instances ) {
 		const requiredKeys = [ 'model', 'position', 'rotation', 'scale' ];
-		const allowedKeys = [ ...requiredKeys, 'placementId', 'materialData' ];
+		const allowedKeys = [ ...requiredKeys, 'placementId', 'materialData', 'lodDistanceOffset' ];
 		if ( ! isRecord( instance ) || ! requiredKeys.every( key => Object.hasOwn( instance, key ) ) || Object.keys( instance ).some( key => ! allowedKeys.includes( key ) )
 			|| Object.hasOwn( instance, 'placementId' ) && ( typeof instance.placementId !== 'string' || instance.placementId.length === 0 || instance.placementId.length > 8192 )
 			|| Object.hasOwn( instance, 'materialData' ) && ( ! Array.isArray( instance.materialData ) || instance.materialData.length !== 8 || ! instance.materialData.every( value => Number.isFinite( value ) && Math.abs( value ) <= 1e6 ) )
 			|| typeof instance.model !== 'string' || ! modelIDs.has( instance.model ) || ! validVector( instance.position, 3, 1e6 ) || ! validVector( instance.rotation, 4, 1.001 ) || ! validVector( instance.scale, 3, 1e4 ) || instance.scale.some( value => value <= 0 ) ) throw new Error( 'Invalid static model instance transform or material data' );
+		const radiusAdjustedDistance = modelsByID.get( instance.model ).lodMetric === 'world-distance-offset';
+		if ( radiusAdjustedDistance !== Object.hasOwn( instance, 'lodDistanceOffset' ) || Object.hasOwn( instance, 'lodDistanceOffset' ) && ( ! Number.isFinite( instance.lodDistanceOffset ) || instance.lodDistanceOffset < 0 || instance.lodDistanceOffset > 1e6 ) ) throw new Error( 'Invalid per-instance LOD distance offset' );
 		const quaternionLength = Math.hypot( ...instance.rotation );
 		if ( Math.abs( quaternionLength - 1 ) > 0.002 ) throw new Error( 'Static model instance rotation must be a normalized quaternion' );
 	}

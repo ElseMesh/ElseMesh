@@ -86,6 +86,9 @@ does not assign domain-specific meanings to the values. Omitted data is passed
 as zeroes. The attributes are allocated only when the component uses this
 field. This supports authored per-placement appearance while keeping the model
 set and draw batching renderer-neutral.
+`lodDistanceOffset` is a separate placement field, accepted only when its
+model uses `world-distance-offset`; it is consumed by the shared planner and
+is not folded into opaque material data.
 On WebGL, a world material-profile runtime may also return a Three.js
 `MeshDepthMaterial` alongside its color material. The static-model adapter
 clones and wraps that depth material with the same per-instance data varyings
@@ -104,6 +107,11 @@ each is a world distance divided by the instance's largest scale and values
 descend. With `world-distance`, each is a camera-to-instance-origin distance
 in metres and values descend, independent of model bounds center and instance
 scale. This is for authored handoff ranges defined in world space.
+With `world-distance-offset`, each instance must also provide a finite,
+non-negative `lodDistanceOffset`. The planner subtracts it from camera-to-origin
+distance, clamped at zero, and uses that measure for LOD selection, color draw
+range/fade, and shadow range. This supports authored policies that account for
+an instance's actual size without coupling the engine to a world's geometry.
 `lodFadeFraction`
 sets the transition-band width for either metric; overlapping bands are
 rejected. `drawMaxDistance` limits color rendering by world-space distance from

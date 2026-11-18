@@ -26,7 +26,7 @@ export function writeInstanceLODSelection( target, lodMetric, distance, radius, 
 	const loadScale = 2 ** renderLoadBias;
 	const baseMeasure = lodMetric === 'projected-radius'
 		? radius / ( Math.max( distance, 1e-6 ) * tanHalfFov )
-		: lodMetric === 'world-distance' ? distance : distance / scale;
+		: lodMetric === 'world-distance' || lodMetric === 'world-distance-offset' ? distance : distance / scale;
 	const lodMeasure = lodMetric === 'projected-radius' ? baseMeasure / loadScale : baseMeasure * loadScale;
 	let transition = -1;
 	for ( let thresholdIndex = 0; thresholdIndex < thresholds.length; thresholdIndex ++ ) {

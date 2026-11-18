@@ -105,16 +105,17 @@ export class StaticModelInstanceSetPlanner {
 			const [ centerX, centerY, centerZ, radius, maxScale ] = sphere;
 			const dx = centerX - camera.position[ 0 ], dy = centerY - camera.position[ 1 ], dz = centerZ - camera.position[ 2 ];
 			const distance = Math.hypot( dx, dy, dz );
-			const lodDistance = model.lodMetric === 'world-distance'
-				? Math.hypot( instance.position[ 0 ] - camera.position[ 0 ], instance.position[ 1 ] - camera.position[ 1 ], instance.position[ 2 ] - camera.position[ 2 ] )
-				: distance;
+			const originDistance = Math.hypot( instance.position[ 0 ] - camera.position[ 0 ], instance.position[ 1 ] - camera.position[ 1 ], instance.position[ 2 ] - camera.position[ 2 ] );
+			const usesAuthoredDistance = model.lodMetric === 'world-distance' || model.lodMetric === 'world-distance-offset';
+			const lodDistance = model.lodMetric === 'world-distance-offset' ? Math.max( 0, originDistance - instance.lodDistanceOffset ) : usesAuthoredDistance ? originDistance : distance;
+			const renderDistance = model.lodMetric === 'world-distance-offset' ? lodDistance : distance;
 			this._viewCenterDistanceByInstance[ instanceIndex ] = distance;
 			this._viewDistanceByInstance[ instanceIndex ] = Math.max( 0, distance - radius );
-			if ( includeShadows && distance <= model.shadowMaxDistance ) {
+			if ( includeShadows && renderDistance <= model.shadowMaxDistance ) {
 				const shadowGroup = this._shadowsByModel[ modelIndex ];
 				this._append( shadowGroup, instanceIndex, 1, 2, 1, 0 );
 			}
-			if ( distance > model.drawMaxDistance ) continue;
+			if ( renderDistance > model.drawMaxDistance ) continue;
 			let visible = true;
 			for ( let planeIndex = 0; planeIndex < 6; planeIndex ++ ) {
 				const offset = planeIndex * 4;
@@ -124,8 +125,8 @@ export class StaticModelInstanceSetPlanner {
 
 			this._projectedRadiusByInstance[ instanceIndex ] = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
 			// Sustained render overload shifts demand toward coarser authored LODs.
-			const fade = writeInstanceDrawDistanceFade( this._drawFadeScratch, model.drawFadeStartDistance, model.drawMaxDistance, distance );
-			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, lodDistance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias - ( model.lodMetric === 'world-distance' ? 0 : STREAMING_DETAIL_HEADROOM ) );
+			const fade = writeInstanceDrawDistanceFade( this._drawFadeScratch, model.drawFadeStartDistance, model.drawMaxDistance, renderDistance );
+			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, lodDistance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias - ( usesAuthoredDistance ? 0 : STREAMING_DETAIL_HEADROOM ) );
 			const groups = this._groupsByModel[ modelIndex ];
 			const [ lodIndex, transition, incomingFade ] = selection;
 			if ( transition >= 0 ) {
