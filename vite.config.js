@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { appendFile, mkdir, stat } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { defineConfig } from 'vite';
@@ -241,10 +241,11 @@ function worldResolverRuntimeConfig() {
 		name: 'elsemesh-world-resolver-runtime-config',
 		configureServer( server ) { server.middlewares.use( serveConfig ); },
 		configurePreviewServer( server ) { server.middlewares.use( serveConfig ); },
-		generateBundle( _options, bundle ) {
-			const asset = bundle[ 'elsemesh-config.js' ];
-			if ( ! asset || asset.type !== 'asset' ) throw new Error( 'Built public/elsemesh-config.js asset is missing' );
-			asset.source = configuredSource();
+		writeBundle( outputOptions ) {
+			if ( ! outputOptions.dir ) throw new Error( 'Vite did not provide an output directory for world resolver configuration' );
+			const outputPath = resolve( outputOptions.dir, 'elsemesh-config.js' );
+			if ( ! existsSync( outputPath ) ) throw new Error( 'Built public/elsemesh-config.js file is missing' );
+			writeFileSync( outputPath, configuredSource() );
 		},
 	};
 }
