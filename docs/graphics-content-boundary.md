@@ -129,12 +129,14 @@ through Tidewater's WebGPU texture baker and remains migration debt.
 The Tidewater exporter now emits a renderer-neutral scanned-debris migration
 fixture with all 141 authored placements, the three source mesh LODs per model,
 and the original albedo, normal, and ARM maps embedded in portable glTF PBR.
-It remains outside the signed runtime package. The source WebGPU presenter also
-applies per-instance bleaching, terrain-contact dust/AO, wet darkening and
-roughness, plus its own fade bands and distance offset. The static-model
-contract does not yet represent those appearance inputs exactly; do not switch
-either production backend to the fixture until a shared material/effect
-contract and matched WebGPU/WebGL presentation preserve that appearance.
+Its signed GLB graph expresses per-instance wood bleaching, wet darkening and
+roughness, and contact dust/AO with data-only operations that both engine graph
+compilers understand. Contact currently uses one center-sampled terrain height
+per placement, while the WebGPU source presenter samples terrain height at each
+fragment and applies a radius-adjusted LOD distance. The fixture remains
+outside the signed runtime package until matched backend images show those
+remaining differences preserve the original appearance, or the shared contract
+is extended to represent them exactly.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable

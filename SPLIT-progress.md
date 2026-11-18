@@ -1961,7 +1961,9 @@ finding changes them.
   so distance-ordered LODs can select and request their near-detail shadow
   mesh. The static-model contract check, deterministic Tidewater export check,
   and external production build pass. The fixture is not installed at runtime
-  because the shared material contract still needs the WebGPU per-instance
-  bleaching, terrain contact, wet shading, and fade behavior in both
-  presenters. Built-in package integration and matched backend appearance
-  checks remain open; no Tidewater parity percentage changes.
+  because its signed graph currently approximates per-fragment terrain contact
+  with a center-sampled height, and its shared distance planner does not yet
+  encode the source radius adjustment. Tidewater's export check now validates
+  the graph with both engine compilers. Built-in package integration and
+  matched backend appearance checks remain open; no Tidewater parity
+  percentage changes.
