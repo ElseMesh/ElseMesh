@@ -288,12 +288,12 @@ const cameraPositionGraph = {
 };
 assert.match( compileWorldMaterialGraph( cameraPositionGraph, 'webgpu' ).surface, /frame\.cameraPos/ );
 const cameraPositionWebGL = compileWorldMaterialGraph( cameraPositionGraph, 'webgl' );
-assert.match( cameraPositionWebGL.glsl.uniforms, /uniform vec3 emgCameraPosition/ );
-assert.match( cameraPositionWebGL.glsl.fragment, /length\( emgCameraPosition \)/ );
+assert.equal( cameraPositionWebGL.glsl.uniformInputs.includes( 'cameraPosition' ), false, 'WebGL uses the renderer-managed camera uniform for the current view' );
+assert.match( cameraPositionWebGL.glsl.fragment, /length\( cameraPosition \)/ );
 const cameraPositionMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), cameraPositionGraph );
 const cameraPositionShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
 cameraPositionMaterial.material.onBeforeCompile( cameraPositionShader );
-assert.equal( cameraPositionShader.uniforms.emgCameraPosition.value, G.cameraPos.value, 'WebGL camera input tracks the same engine frame position as WebGPU' );
+assert.equal( Object.hasOwn( cameraPositionShader.uniforms, 'cameraPosition' ), false, 'WebGL camera position remains bound to the active Three.js camera' );
 cameraPositionMaterial.material.dispose();
 
 const surfaceNormalGraph = {

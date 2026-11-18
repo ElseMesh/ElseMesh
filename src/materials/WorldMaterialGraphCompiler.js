@@ -3,7 +3,7 @@ import { WORLD_MATERIAL_GRAPH_INPUT_TYPES, validateWorldMaterialGraph, worldMate
 const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
 	worldVertexPosition: { wgsl: '( v.model * vec4f( v.position, 1.0 ) ).xyz', glsl: 'emgWorldVertexPosition.xyz' },
-	cameraPosition: { uniform: true, wgsl: 'frame.cameraPos', glsl: 'emgCameraPosition' },
+	cameraPosition: { uniform: true, webglBuiltinUniform: true, wgsl: 'frame.cameraPos', glsl: 'cameraPosition' },
 	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
 	worldNormal: { fragmentOnly: true, fragmentWGSL: 'in.N', fragmentGLSL: 'vEmg_worldNormal' },
 	frontFacing: { fragmentOnly: true, builtinFragment: true, fragmentWGSL: 'in.front', fragmentGLSL: 'gl_FrontFacing' },
@@ -187,7 +187,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	}
 	const glslVaryings = usedInputs.filter( name => fragmentInputs.has( name ) && ! INPUT_SOURCES[ name ].uniform && ! INPUT_SOURCES[ name ].builtinFragment ).map( name => `varying ${glslType( inputTypes[ name ] )} vEmg_${name};` ).join( '\n' );
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
-	const glslUniforms = [ ...glslUniformInputs.map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ), ...( usedInputs.includes( 'pixelPosition' ) ? [ 'uniform vec2 emgViewportSize;' ] : [] ) ].join( '\n' );
+	const glslUniforms = [ ...glslUniformInputs.filter( name => ! INPUT_SOURCES[ name ].webglBuiltinUniform ).map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ), ...( usedInputs.includes( 'pixelPosition' ) ? [ 'uniform vec2 emgViewportSize;' ] : [] ) ].join( '\n' );
 	const needsNormalFromSlope = graph.nodes.some( node => node.op === 'normalFromSlope' && fragmentRequired.has( node.id ) );
 	const glslFragmentHelpers = [ valueNoiseUsedInFragment ? VALUE_NOISE_GLSL : '', needsNormalFromSlope ? `
 vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
@@ -223,7 +223,7 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 			declarations: glslVaryings,
 			uniforms: glslUniforms,
 			vertexHelpers: glslVertexHelpers,
-			uniformInputs: Object.freeze( glslUniformInputs.map( name => INPUT_SOURCES[ name ].glsl ) ),
+			uniformInputs: Object.freeze( glslUniformInputs.filter( name => ! INPUT_SOURCES[ name ].webglBuiltinUniform ).map( name => INPUT_SOURCES[ name ].glsl ) ),
 			worldPosition: fragmentInputs.has( 'worldPosition' ),
 			worldNormal: fragmentInputs.has( 'worldNormal' ),
 			terrainHeight: graph.nodes.some( node => node.op === 'terrainHeightAt' && fragmentRequired.has( node.id ) ),
