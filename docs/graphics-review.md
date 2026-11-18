@@ -18,7 +18,12 @@ WebGL) were sky `119/156/190` vs `99/136/174`, open sea `114/148/170` vs
 `97/134/157`, swash `158/176/177` vs `139/157/163`, wet sand `167/166/166` vs
 `152/144/140`, and pier `118/133/133` vs `96/116/120`. Dry sand was closer:
 `211/187/137` vs `202/182/149`. These measurements are diagnostic image
-samples, not calibrated colorimetric values or an FPS benchmark.
+samples, not calibrated colorimetric values or an FPS benchmark. The capture
+record does not establish that auto-exposure was disabled or that reflection
+settings matched. It confirms a visible color difference but cannot isolate
+whether lighting, image-based reflections, exposure, or tone mapping caused it.
+The next matched capture must record and lock those settings, and use the
+current shadow-LOD selection on both backends.
 
 The WebGPU static-model runtime selected shadow-only batches for the four
 scanned-debris classes (`5, 1, 7, 4`). This capture predates `0c3dabde`, which
