@@ -2070,3 +2070,16 @@ finding changes them.
   [graphics content boundary](docs/graphics-content-boundary.md#dense-ground-cover-migration-target).
   No package switch or parity percentage change is justified until both
   backends consume the same signed patch assets and matched views pass.
+
+- 2026-11-18: extracted Tidewater's authored patch geometry into the
+  renderer-independent `worlds/tidewater/vegetation/GroundCoverPatch.js`, which
+  emits typed streams instead of engine geometry objects. The current WebGPU
+  presenter wraps those streams; its authored seed, slot positions, categories,
+  and near/mid/far triangle counts (17,560 / 4,716 / 768) are locked by a
+  Tidewater-owned test. That test and the existing headless WebGPU meadow render
+  pass, and the external production build passes. This moves geometry authoring
+  out of the world renderer module, but WebGL still generates a separate grass
+  arrangement and does not yet consume signed patch assets. Tidewater remains
+  93%; no dual-backend or matched-baseline parity gate has closed. The headless
+  grass timing (598 ms with, 298 ms without grass at 2560x1267) is not supported-
+  hardware frame-rate evidence.
