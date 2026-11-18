@@ -32,13 +32,19 @@ type dynamicRegionProviderDescriptor struct {
 }
 
 type regionProviderEntrySelection struct {
-	PlayerCapsule         *playerCapsule      `json:"playerCapsule"`
-	MovementProfiles      *movementProfiles   `json:"movementProfiles"`
-	AvatarOptions         []worldAvatarOption `json:"avatarOptions"`
-	PreviewSpawn          *worldSpawn         `json:"previewSpawn"`
-	EntryPointPrompt      string              `json:"entryPointPrompt"`
-	EntryPointActionLabel string              `json:"entryPointActionLabel"`
-	Experience            *worldExperience    `json:"experience"`
+	PlayerCapsule         *playerCapsule               `json:"playerCapsule"`
+	MovementProfiles      *movementProfiles            `json:"movementProfiles"`
+	AvatarOptions         []worldAvatarOption          `json:"avatarOptions"`
+	PreviewSpawn          *worldSpawn                  `json:"previewSpawn"`
+	PreviewRegion         *regionProviderPreviewRegion `json:"previewRegion"`
+	EntryPointPrompt      string                       `json:"entryPointPrompt"`
+	EntryPointActionLabel string                       `json:"entryPointActionLabel"`
+	Experience            *worldExperience             `json:"experience"`
+}
+
+type regionProviderPreviewRegion struct {
+	CellSizeMeters        int     `json:"cellSizeMeters"`
+	MaxViewDistanceMeters float64 `json:"maxViewDistanceMeters"`
 }
 
 type authoritativeMovementSweepRequest struct {
@@ -66,13 +72,15 @@ type regionProviderGateway struct {
 	sourceRevision    string
 	cacheRevision     string
 	playerCapsule     *playerCapsule
+	previewRegion     *regionProviderPreviewRegion
 	entrySelection    *dynamicRegionProviderDescriptor
 	allowedOrigins    map[string]struct{}
 	regionDiagnostics bool
 	requestSequence   atomic.Uint64
 	proxy             *httputil.ReverseProxy
 	client            *http.Client
-	authorizeContent  func(string) bool
+	authorizeContent  func(string) (playerPresence, bool)
+	maxMovementSpeed  func(playerPresence) (float64, error)
 }
 
 type regionProviderMetricsWriter struct {
@@ -253,6 +261,7 @@ func (gateway *regionProviderGateway) discoverWorldID() (string, error) {
 	gateway.sourceRevision = descriptor.SourceRevision
 	gateway.cacheRevision = descriptor.CacheRevision
 	gateway.playerCapsule = descriptor.EntrySelection.PlayerCapsule
+	gateway.previewRegion = descriptor.EntrySelection.PreviewRegion
 	gateway.entrySelection = &descriptor
 	return descriptor.WorldID, nil
 }
@@ -272,6 +281,12 @@ func validateRegionProviderEntrySelection(selection regionProviderEntrySelection
 	}
 	if len(selection.AvatarOptions) > 16 {
 		return errors.New("descriptor has too many world-authored avatar options")
+	}
+	previewRegion := selection.PreviewRegion
+	if previewRegion == nil || previewRegion.CellSizeMeters < 8 || previewRegion.CellSizeMeters > 256 ||
+		math.IsNaN(previewRegion.MaxViewDistanceMeters) || math.IsInf(previewRegion.MaxViewDistanceMeters, 0) ||
+		previewRegion.MaxViewDistanceMeters <= 0 || previewRegion.MaxViewDistanceMeters > 10000 {
+		return errors.New("descriptor has invalid world-authored preview cell bounds")
 	}
 	if selection.Experience != nil {
 		if err := validateWorldExperience(selection.Experience); err != nil {
@@ -365,8 +380,14 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	if !validPlayerCapsule(descriptor.EntrySelection.PlayerCapsule) {
 		return errors.New("provider descriptor has invalid player capsule dimensions")
 	}
+	if err := validateRegionProviderEntrySelection(descriptor.EntrySelection); err != nil {
+		return err
+	}
 	if gateway.worldID != "" && !samePlayerCapsule(descriptor.EntrySelection.PlayerCapsule, gateway.playerCapsule) {
 		return errors.New("provider player capsule changed after worldd startup")
+	}
+	if gateway.previewRegion != nil && descriptor.EntrySelection.PreviewRegion != *gateway.previewRegion {
+		return errors.New("provider preview region bounds changed after worldd startup")
 	}
 	response.Body = io.NopCloser(bytes.NewReader(data))
 	response.ContentLength = int64(len(data))
@@ -416,9 +437,21 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	if gateway.authorizeContent != nil && isRegionContentPath(r.URL.Path) {
 		const prefix = "Bearer "
 		authorization := r.Header.Get("Authorization")
-		if !strings.HasPrefix(authorization, prefix) || !gateway.authorizeContent(strings.TrimPrefix(authorization, prefix)) {
+		visitor, authenticated := gateway.authorizeContent(strings.TrimPrefix(authorization, prefix))
+		if !strings.HasPrefix(authorization, prefix) || !authenticated {
 			http.Error(w, "an active world presence session is required for region content", http.StatusUnauthorized)
 			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/v1/regions/") {
+			if gateway.maxMovementSpeed == nil {
+				http.Error(w, "region authorization is unavailable", http.StatusForbidden)
+				return
+			}
+			maxSpeed, err := gateway.maxMovementSpeed(visitor)
+			if err != nil || !gateway.authorizeRequestedContent(visitor, r, maxSpeed) {
+				http.Error(w, "requested region content is outside the admitted view or collision lookahead", http.StatusForbidden)
+				return
+			}
 		}
 	}
 	r.Header.Del("Cookie")
@@ -445,6 +478,158 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 
 func isRegionContentPath(path string) bool {
 	return strings.HasPrefix(path, "/v1/regions/") || strings.HasPrefix(path, "/v1/leases/")
+}
+
+func (gateway *regionProviderGateway) authorizeRequestedContent(visitor playerPresence, request *http.Request, maxSpeed float64) bool {
+	if strings.HasPrefix(request.URL.Path, "/v1/leases/") {
+		return request.URL.RawQuery == ""
+	}
+	preview := gateway.previewRegion
+	if preview == nil || gateway.playerCapsule == nil || preview.CellSizeMeters < 8 || preview.CellSizeMeters > 256 ||
+		!finiteRegionNumber(preview.MaxViewDistanceMeters) || preview.MaxViewDistanceMeters <= 0 ||
+		!finiteRegionNumber(maxSpeed) || maxSpeed <= 0 {
+		return false
+	}
+	relativePath := strings.TrimPrefix(request.URL.Path, "/v1/regions/")
+	pathParts := strings.Split(relativePath, "/")
+	if pathParts[0] == "" || len(pathParts) > 2 || len(pathParts) == 2 && pathParts[1] != "cells" && pathParts[1] != "leases" {
+		return false
+	}
+	query := request.URL.Query()
+	if strings.HasSuffix(request.URL.Path, "/cells") {
+		scopes := query["scope"]
+		sourceInventories := query["sourceInventory"]
+		size, err := strconv.Atoi(query.Get("size"))
+		cells := query["cell"]
+		if request.Method != http.MethodGet || err != nil || size != preview.CellSizeMeters || len(query["size"]) != 1 || len(scopes) != 1 || len(sourceInventories) != 1 || sourceInventories[0] != "0" && sourceInventories[0] != "1" || len(cells) == 0 || len(cells) > 512 || !regionQueryKeysAllowed(query, map[string]bool{"cell": true, "size": true, "scope": true, "sourceInventory": true}) {
+			return false
+		}
+		for _, value := range cells {
+			coordinates, ok := parseRegionCell(value, size, false)
+			if !ok || !gateway.cellIsAuthorized(visitor, coordinates, scopes[0], maxSpeed) {
+				return false
+			}
+		}
+		query.Del("scope") // scope is a worldd authorization hint, not provider input.
+		request.URL.RawQuery = query.Encode()
+		return true
+	}
+	leaseCreation := len(pathParts) == 2 && pathParts[1] == "leases"
+	if leaseCreation && request.Method != http.MethodPost || !leaseCreation && request.Method != http.MethodGet && request.Method != http.MethodHead {
+		return false
+	}
+	allowedQuery := map[string]bool{"cell": true, "payload": true, "mesh": true, "lod": true, "texture": true}
+	if leaseCreation {
+		delete(allowedQuery, "texture")
+	} else {
+		allowedQuery["lease"] = true
+	}
+	if len(query["cell"]) != 1 || len(query["payload"]) != 1 || !regionQueryKeysAllowed(query, allowedQuery) {
+		return false
+	}
+	if leaseCreation && len(query["lease"]) != 0 || !leaseCreation && !validRegionLeaseQuery(query.Get("lease")) {
+		return false
+	}
+	coordinates, ok := parseRegionCell(query.Get("cell"), preview.CellSizeMeters, true)
+	if !ok {
+		return false
+	}
+	payload := query.Get("payload")
+	return gateway.cellIsAuthorized(visitor, coordinates, payload, maxSpeed)
+}
+
+func regionQueryKeysAllowed(query url.Values, allowed map[string]bool) bool {
+	for key, values := range query {
+		if !allowed[key] || len(values) != 1 && key != "cell" {
+			return false
+		}
+	}
+	return true
+}
+
+func (gateway *regionProviderGateway) cellIsAuthorized(visitor playerPresence, coordinates [3]int64, purpose string, maxSpeed float64) bool {
+	size := float64(gateway.previewRegion.CellSizeMeters)
+	center := [3]float64{
+		(float64(coordinates[0]) + 0.5) * size,
+		(float64(coordinates[1]) + 0.5) * size,
+		(float64(coordinates[2]) + 0.5) * size,
+	}
+	cellRadius := size * math.Sqrt(3) / 2
+	if purpose == "collision" {
+		// Match CollisionFrontier.js without trusting a client-supplied latency:
+		// movement speed is owner-authored and the lookahead horizon caps at 2 s.
+		lookahead := math.Min(512, maxSpeed*2.0+2*size)
+		radius := lookahead + cellRadius + gateway.playerCapsule.HeightMeters/2
+		return squaredDistance3(center, visitor.Position) <= radius*radius
+	}
+	if purpose != "view" && purpose != "visual" {
+		return false
+	}
+	eye := [3]float64{visitor.Position[0], visitor.Position[1] + playerEyeHeight, visitor.Position[2]}
+	delta := [3]float64{center[0] - eye[0], center[1] - eye[1], center[2] - eye[2]}
+	distance := math.Sqrt(delta[0]*delta[0] + delta[1]*delta[1] + delta[2]*delta[2])
+	if distance > gateway.previewRegion.MaxViewDistanceMeters+cellRadius {
+		return false
+	}
+	yaw, pitch := visitor.Yaw, visitor.Pitch
+	forward := [3]float64{-math.Sin(yaw) * math.Cos(pitch), math.Sin(pitch), -math.Cos(yaw) * math.Cos(pitch)}
+	right := [3]float64{math.Cos(yaw), 0, -math.Sin(yaw)}
+	up := [3]float64{math.Sin(yaw) * math.Sin(pitch), math.Cos(pitch), math.Cos(yaw) * math.Sin(pitch)}
+	forwardDistance := dot3(delta, forward)
+	if forwardDistance+cellRadius < 0 {
+		return false
+	}
+	// The browser FOV control ranges to 100 degrees. Use the supported range's
+	// maximum and a conservative 80-degree horizontal half-angle because the
+	// server does not know the visitor's viewport aspect ratio.
+	forwardDistance = math.Max(0, forwardDistance)
+	if math.Abs(dot3(delta, right)) > forwardDistance*math.Tan(80*math.Pi/180)+cellRadius ||
+		math.Abs(dot3(delta, up)) > forwardDistance*math.Tan(50*math.Pi/180)+cellRadius {
+		return false
+	}
+	return true
+}
+
+func parseRegionCell(raw string, expectedSize int, includesSize bool) ([3]int64, bool) {
+	var coordinates [3]int64
+	parts := strings.Split(raw, ",")
+	wantParts := 3
+	if includesSize {
+		wantParts++
+	}
+	if len(parts) != wantParts {
+		return coordinates, false
+	}
+	for axis := 0; axis < 3; axis++ {
+		value, err := strconv.ParseInt(parts[axis], 10, 32)
+		if err != nil {
+			return coordinates, false
+		}
+		coordinates[axis] = value
+	}
+	if includesSize {
+		size, err := strconv.Atoi(parts[3])
+		if err != nil || size != expectedSize {
+			return coordinates, false
+		}
+	}
+	return coordinates, true
+}
+
+func finiteRegionNumber(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func dot3(a, b [3]float64) float64 {
+	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+}
+
+func squaredDistance3(a [3]float64, b []float64) float64 {
+	if len(b) != 3 {
+		return math.Inf(1)
+	}
+	dx, dy, dz := a[0]-b[0], a[1]-b[1], a[2]-b[2]
+	return dx*dx + dy*dy + dz*dz
 }
 
 func diagnosticQueryValue(r *http.Request, key string) string {
@@ -496,4 +681,8 @@ func validRegionLeasePath(path string) bool {
 		}
 	}
 	return true
+}
+
+func validRegionLeaseQuery(id string) bool {
+	return validRegionLeasePath("/v1/leases/" + id)
 }

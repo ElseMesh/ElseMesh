@@ -1,5 +1,5 @@
 import { validateWorldExperience } from './WorldExperience.js';
-import { collisionPathStatus, sweptCollisionCellKeys } from './CollisionFrontier.js';
+import { collisionLookaheadDistance, collisionPathStatus, sweptCollisionCellKeys } from './CollisionFrontier.js';
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 import { parseGLB } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
@@ -30,8 +30,6 @@ const REGION_LEASE_RENEW_MS = 10000;
 // Provisional shared request budget: browsers do not expose their per-origin
 // connection limit. Two data requests leave control headroom in Chromium.
 const REGION_DATA_REQUEST_LIMIT = 2;
-// Provisional render-prefetch radius; tune it from streamed-cell latency and cache telemetry.
-const LOCAL_REGION_PREFETCH_RADIUS_CELLS = 4;
 // worldd's dynamic-provider gateway limits raw query strings to 4096 characters.
 const LOCAL_REGION_CELL_QUERY_LIMIT = 4096;
 const LOCAL_REGION_CELL_BATCH_LIMIT = 512;
@@ -378,14 +376,15 @@ export class LocalRegionConnector {
 		return this.manifest;
 	}
 
-	async ensureCells( coordinates, { signal } = {} ) {
+	async ensureCells( coordinates, { signal, purpose = 'view' } = {} ) {
+		requireValue( purpose === 'view' || purpose === 'collision', 'Local provider request purpose is invalid' );
 		const previousQuery = this.cellQueryQueue;
-		const query = previousQuery.then( () => this.#ensureCells( coordinates, { signal } ) );
+		const query = previousQuery.then( () => this.#ensureCells( coordinates, { signal, purpose } ) );
 		this.cellQueryQueue = query.catch( () => {} );
 		return query;
 	}
 
-	async #ensureCells( coordinates, { signal } = {} ) {
+	async #ensureCells( coordinates, { signal, purpose = 'view' } = {} ) {
 		abortIfNeeded( signal );
 		requireValue( this.manifest && Array.isArray( coordinates ) && coordinates.length > 0, 'Local provider cell request is empty or the manifest is unavailable' );
 		const requested = [ ...new Set( coordinates.map( coordinate => {
@@ -404,6 +403,7 @@ export class LocalRegionConnector {
 			for ( let offset = 0; offset < pending.length; ) {
 				const params = new URLSearchParams();
 				params.set( 'size', String( cellSize ) );
+				if ( this.contentCapability ) params.set( 'scope', purpose );
 				params.set( 'sourceInventory', this.collisionSourceInventories.has( sourceRegion.id ) ? '0' : '1' );
 				const batch = [];
 				let queryLength = params.toString().length;
@@ -470,15 +470,23 @@ export class LocalRegionConnector {
 		const frontier = sweptCollisionCellKeys( from, to, {
 			cellSizeMeters: cellSize, radius: this.playerCapsule.radiusMeters, height: this.playerCapsule.heightMeters,
 		} );
+		const maxSpeedMetersPerSecond = this.manifest.rules.movement?.sprintSpeed || 6.2;
+		const lookaheadMeters = collisionLookaheadDistance( maxSpeedMetersPerSecond, this.collisionLoadLatencyMs || 2000, cellSize );
+		const cellRadiusMeters = cellSize * Math.sqrt( 3 ) / 2;
+		const prefetchRadiusMeters = lookaheadMeters + cellRadiusMeters + this.playerCapsule.heightMeters / 2;
+		const prefetchRadiusCells = Math.ceil( prefetchRadiusMeters / cellSize );
 		const candidates = [];
-		for ( let x = - LOCAL_REGION_PREFETCH_RADIUS_CELLS; x <= LOCAL_REGION_PREFETCH_RADIUS_CELLS; x ++ ) for ( let y = - LOCAL_REGION_PREFETCH_RADIUS_CELLS; y <= LOCAL_REGION_PREFETCH_RADIUS_CELLS; y ++ ) for ( let z = - LOCAL_REGION_PREFETCH_RADIUS_CELLS; z <= LOCAL_REGION_PREFETCH_RADIUS_CELLS; z ++ ) {
-			if ( x * x + y * y + z * z > LOCAL_REGION_PREFETCH_RADIUS_CELLS ** 2 ) continue;
-			candidates.push( [ centerCell[ 0 ] + x, centerCell[ 1 ] + y, centerCell[ 2 ] + z ] );
+		for ( let x = - prefetchRadiusCells; x <= prefetchRadiusCells; x ++ ) for ( let y = - prefetchRadiusCells; y <= prefetchRadiusCells; y ++ ) for ( let z = - prefetchRadiusCells; z <= prefetchRadiusCells; z ++ ) {
+			const cell = [ centerCell[ 0 ] + x, centerCell[ 1 ] + y, centerCell[ 2 ] + z ];
+			const cellCenter = cell.map( value => ( value + 0.5 ) * cellSize );
+			if ( Math.hypot( cellCenter[ 0 ] - center[ 0 ], cellCenter[ 1 ] - center[ 1 ], cellCenter[ 2 ] - center[ 2 ] ) > prefetchRadiusMeters ) continue;
+			candidates.push( cell );
 		}
 		const distanceSquared = cell => ( cell[ 0 ] - centerCell[ 0 ] ) ** 2 + ( cell[ 1 ] - centerCell[ 1 ] ) ** 2 + ( cell[ 2 ] - centerCell[ 2 ] ) ** 2;
 		candidates.sort( ( a, b ) => distanceSquared( a ) - distanceSquared( b ) );
-		const requested = new Set( [ ...frontier, ...candidates.map( cell => cell.join( ',' ) ) ] );
-		return this.ensureCells( [ ...requested ].map( cell => cell.split( ',' ).map( Number ) ) );
+		const requested = new Set( frontier );
+		for ( const cell of candidates ) requested.add( cell.join( ',' ) );
+		return this.ensureCells( [ ...requested ].map( cell => cell.split( ',' ).map( Number ) ), { purpose: 'collision' } );
 	}
 
 	ensureCellsForCamera( camera, { signal } = {} ) {
@@ -486,7 +494,7 @@ export class LocalRegionConnector {
 		const cells = worldViewCellCoordinates( camera, this.cellSizeMeters, this.maxViewDistanceMeters );
 		if ( cells.length === 0 ) return Promise.resolve( this.manifest );
 		const previousKnownCells = this.knownCells.size;
-		return this.ensureCells( cells, { signal } ).then( manifest => {
+		return this.ensureCells( cells, { signal, purpose: 'view' } ).then( manifest => {
 			const indexedCells = this.knownCells.size - previousKnownCells;
 			if ( indexedCells > 0 && this.regionDiagnostics ) console.info( 'ElseMesh local-region camera cells indexed:', JSON.stringify( {
 				frustumCells: cells.length, newlyIndexedCells: indexedCells,
@@ -583,6 +591,8 @@ export class LocalRegionConnector {
 						const descriptorURL = new URL( `${sourceURL.pathname}/cells`, this.#providerOrigin() );
 						descriptorURL.searchParams.set( 'size', String( previewRegion.cellSizeMeters ) );
 						descriptorURL.searchParams.set( 'cell', cellKey );
+						descriptorURL.searchParams.set( 'sourceInventory', this.collisionSourceInventories.has( sourceRegion.id ) ? '0' : '1' );
+						if ( this.contentCapability ) descriptorURL.searchParams.set( 'scope', 'view' );
 						const latest = await fetchJSON( descriptorURL, signal, this.#contentHeaders() );
 						requireValue( latest.sourceRevision === this.sourceRevision && latest.cellSizeMeters === previewRegion.cellSizeMeters && Array.isArray( latest.cells ), 'Local provider returned stale static-mesh instance metadata' );
 						const sourceCell = latest.cells.find( item => item.x === cell.x && item.y === cell.y && item.z === cell.z );

@@ -70,7 +70,10 @@ export function collisionPathReady( options ) {
 
 export function collisionLookaheadDistance( speedMetersPerSecond, latencyMs, cellSizeMeters, maxDistance = 512 ) {
 	if ( ! Number.isFinite( speedMetersPerSecond ) || speedMetersPerSecond < 0 || ! Number.isFinite( latencyMs ) || latencyMs < 0 || ! Number.isInteger( cellSizeMeters ) || cellSizeMeters < 1 || ! Number.isFinite( maxDistance ) || maxDistance < cellSizeMeters ) throw new TypeError( 'Invalid collision lookahead inputs' );
-	return Math.min( maxDistance, speedMetersPerSecond * Math.max( 400, latencyMs ) / 1000 + cellSizeMeters * 2 );
+	// Keep prediction within the shared two-second horizon used by hosted
+	// collision authorization. Slower links still fail closed at the last safe
+	// boundary while collision content arrives.
+	return Math.min( maxDistance, speedMetersPerSecond * Math.max( 400, Math.min( 2000, latencyMs ) ) / 1000 + cellSizeMeters * 2 );
 }
 
 function vectorValues( value ) {

@@ -615,7 +615,10 @@ func run() error {
 	}
 	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
 	if regionProvider != nil {
-		regionProvider.authorizeContent = d.authorizeRegionContent
+		regionProvider.authorizeContent = d.regionContentVisitor
+		regionProvider.maxMovementSpeed = func(visitor playerPresence) (float64, error) {
+			return d.presenceHorizontalSpeedLimit(&visitor.playerPose)
+		}
 	}
 	go d.maintainPresenceExpiry(ctx)
 	if regionProvider != nil {

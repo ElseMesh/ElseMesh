@@ -58,10 +58,13 @@ func TestRegionContentCapabilityFollowsAcceptedPresenceLifetime(t *testing.T) {
 		t.Fatalf("admit player: %v", err)
 	}
 	token := response.ContentCapability
-	if len(token) != 64 || !d.authorizeRegionContent(token) {
+	if len(token) != 64 {
 		t.Fatalf("issued content capability was not accepted: %q", token)
 	}
-	if d.authorizeRegionContent(token[:63] + "0") {
+	if _, ok := d.regionContentVisitor(token); !ok {
+		t.Fatal("issued content capability was not bound to the admitted presence")
+	}
+	if _, ok := d.regionContentVisitor(token[:63] + "0"); ok {
 		t.Fatal("modified content capability was accepted")
 	}
 
@@ -72,8 +75,11 @@ func TestRegionContentCapabilityFollowsAcceptedPresenceLifetime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update presence: %v", err)
 	}
-	if updated.ContentCapability != "" || !d.authorizeRegionContent(token) {
+	if updated.ContentCapability != "" {
 		t.Fatal("capability was rotated or invalidated during an accepted update")
+	}
+	if _, ok := d.regionContentVisitor(token); !ok {
+		t.Fatal("capability became invalid during an accepted update")
 	}
 
 	leave := gatewayMessage{Type: "presence.leave", WorldID: d.world.WorldID}
@@ -81,7 +87,7 @@ func TestRegionContentCapabilityFollowsAcceptedPresenceLifetime(t *testing.T) {
 	if _, err := d.presenceRequest(leave, now.Add(200*time.Millisecond)); err != nil {
 		t.Fatalf("leave presence: %v", err)
 	}
-	if d.authorizeRegionContent(token) {
+	if _, ok := d.regionContentVisitor(token); ok {
 		t.Fatal("content capability remained valid after explicit leave")
 	}
 }

@@ -99,6 +99,9 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 	var upstreamRequests atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upstreamRequests.Add(1)
+		if r.URL.Query().Has("scope") {
+			t.Errorf("gateway authorization hint was forwarded to the provider: %q", r.URL.RawQuery)
+		}
 		w.Header().Set("X-ElseMesh-World-ID", worldID)
 		w.Header().Set("X-ElseMesh-Source-Revision", sourceRevision)
 		w.Header().Set("X-ElseMesh-Cache-Revision", cacheRevision)
@@ -112,7 +115,12 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 	}
 	gateway.sourceRevision = sourceRevision
 	gateway.cacheRevision = cacheRevision
-	gateway.authorizeContent = func(token string) bool { return token == "accepted-presence-capability" }
+	gateway.previewRegion = &regionProviderPreviewRegion{CellSizeMeters: 16, MaxViewDistanceMeters: 32}
+	gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.3, HeightMeters: 1.75}
+	gateway.authorizeContent = func(token string) (playerPresence, bool) {
+		return playerPresence{playerPose: playerPose{Position: []float64{0, 0, 0}, Yaw: 0, Pitch: 0}}, token == "accepted-presence-capability"
+	}
+	gateway.maxMovementSpeed = func(playerPresence) (float64, error) { return 6.2, nil }
 
 	request := httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,0", nil)
 	response := httptest.NewRecorder()
@@ -129,12 +137,52 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 		t.Fatalf("invalid capability request status=%d upstream=%d", response.Code, upstreamRequests.Load())
 	}
 
-	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,0", nil)
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,-1&size=16&scope=view&sourceInventory=1", nil)
 	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
 	response = httptest.NewRecorder()
 	gateway.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || upstreamRequests.Load() != 1 {
 		t.Fatalf("authorized cell request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,1&size=16&scope=view&sourceInventory=1", nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || upstreamRequests.Load() != 1 {
+		t.Fatalf("behind-view cell request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,1&size=16&scope=collision&sourceInventory=1", nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || upstreamRequests.Load() != 2 {
+		t.Fatalf("speed-bounded collision prefetch status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=5,0,0&size=16&scope=collision&sourceInventory=1", nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || upstreamRequests.Load() != 2 {
+		t.Fatalf("distant collision request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall?cell=0,0,-1,16&payload=visual&lease="+strings.Repeat("a", 32), nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || upstreamRequests.Load() != 3 {
+		t.Fatalf("visible cell asset request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall?cell=0,0,1,16&payload=visual&lease="+strings.Repeat("a", 32), nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || upstreamRequests.Load() != 3 {
+		t.Fatalf("behind-view visual asset request status=%d upstream=%d", response.Code, upstreamRequests.Load())
 	}
 
 	request = httptest.NewRequest(http.MethodOptions, "/v1/regions/GreatHall/cells", nil)
@@ -286,6 +334,7 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 			descriptor.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
 			yaw, pitch := 3.141592653589793, -0.1
 			descriptor.EntrySelection.PreviewSpawn = &worldSpawn{Position: []float64{0, 8.62, 90}, Yaw: &yaw, Pitch: &pitch}
+			descriptor.EntrySelection.PreviewRegion = &regionProviderPreviewRegion{CellSizeMeters: 16, MaxViewDistanceMeters: 32}
 			_ = json.NewEncoder(w).Encode(descriptor)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/regions":
 			if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
@@ -558,6 +607,7 @@ func TestLoadWorldManifestUsesRegionProviderWorldContract(t *testing.T) {
 	provider := &dynamicRegionProviderDescriptor{WorldID: worldID}
 	provider.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
 	provider.EntrySelection.PreviewSpawn = &worldSpawn{Position: []float64{0, 8.62, 90}, Yaw: &yaw, Pitch: &pitch}
+	provider.EntrySelection.PreviewRegion = &regionProviderPreviewRegion{CellSizeMeters: 16, MaxViewDistanceMeters: 32}
 	provider.EntrySelection.MovementProfiles = &movementProfiles{Avatars: map[string]movementProfile{
 		"elsemesh.avatar.stock-male/1":   {StepHeightMeters: step, MaxWalkableSlopeDegrees: &slope},
 		"elsemesh.avatar.stock-female/1": {StepHeightMeters: step, MaxWalkableSlopeDegrees: &slope},

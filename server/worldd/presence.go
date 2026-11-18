@@ -77,25 +77,30 @@ func newContentCapability() (string, string, error) {
 	return token, hex.EncodeToString(digest[:]), nil
 }
 
-func (d *daemon) authorizeRegionContent(token string) bool {
+func (d *daemon) regionContentVisitor(token string) (playerPresence, bool) {
 	if len(token) != 64 {
-		return false
+		return playerPresence{}, false
 	}
 	if _, err := hex.DecodeString(token); err != nil {
-		return false
+		return playerPresence{}, false
 	}
 	digest := sha256.Sum256([]byte(token))
 	d.presenceMu.Lock()
 	defer d.presenceMu.Unlock()
 	valid := 0
+	var authorized playerPresence
 	now := time.Now()
 	for _, visitor := range d.players {
 		if visitor.contentCapabilityHash == "" || now.Sub(visitor.updated) >= presenceTTL {
 			continue
 		}
-		valid |= subtle.ConstantTimeCompare([]byte(hex.EncodeToString(digest[:])), []byte(visitor.contentCapabilityHash))
+		match := subtle.ConstantTimeCompare([]byte(hex.EncodeToString(digest[:])), []byte(visitor.contentCapabilityHash))
+		if match == 1 {
+			authorized = visitor
+		}
+		valid |= match
 	}
-	return valid == 1
+	return authorized, valid == 1
 }
 
 func newPresenceSession() (string, error) {

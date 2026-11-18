@@ -187,7 +187,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) {
-		authenticatedCellRequestOrigins.push( { origin: url.origin, authorization: new Headers( options.headers ).get( 'Authorization' ) } );
+		authenticatedCellRequestOrigins.push( { origin: url.origin, authorization: new Headers( options.headers ).get( 'Authorization' ), scope: url.searchParams.get( 'scope' ) } );
 		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
 		cellIndexRequestQueryLengths.push( url.search.slice( 1 ).length );
 		cellInventoryRequests.push( url.searchParams.get( 'sourceInventory' ) );
@@ -427,7 +427,9 @@ try {
 	assert.equal( hostedRegionManifest.entryPointActionLabel, 'Choose your house' );
 	hostedRegionConnector.setContentCapability( 'c'.repeat( 64 ) );
 	await hostedRegionConnector.ensureCells( [ [ 999, 0, 999 ] ] );
-	assert.ok( authenticatedCellRequestOrigins.some( request => request.origin === 'http://127.0.0.1:4190' && request.authorization === `Bearer ${'c'.repeat( 64)}` ), 'post-admission cell metadata is routed through worldd with its presence capability' );
+	assert.ok( authenticatedCellRequestOrigins.some( request => request.origin === 'http://127.0.0.1:4190' && request.authorization === `Bearer ${'c'.repeat( 64)}` && request.scope === 'view' ), 'post-admission visible-cell metadata is routed through worldd with its presence capability and view scope' );
+	await hostedRegionConnector.ensureCells( [ [ 998, 0, 998 ] ], { purpose: 'collision' } );
+	assert.ok( authenticatedCellRequestOrigins.some( request => request.scope === 'collision' ), 'collision-frontier cell metadata uses its separate request scope' );
 	hostedRegionConnector.close();
 	const mismatchedSignedContract = { ...signedEntryContract, spawn: { ...signedEntryContract.spawn, position: [ 2, 8.62, 9 ] } };
 	const mismatchedRegionConnector = new LocalRegionConnector( { ...link, worldId: descriptorWorldId, gateway: 'http://127.0.0.1:4190', createWorldConnector: () => ( { getManifest: async () => mismatchedSignedContract, close() {} } ) } );
