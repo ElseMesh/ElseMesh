@@ -246,7 +246,7 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHei
 		material.userData.releaseTerrainHeightBinding = terrainHeightBinding.release;
 	}
 	const depthMaterial = compiled.hasVertexOutput
-		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false, textureBindings } )
+		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false, textureBindings, terrainHeightBinding } )
 		: null;
 	return {
 		material,
