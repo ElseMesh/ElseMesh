@@ -9,27 +9,27 @@ class MemoryStorage {
 	removeItem( key ) { this.items.delete( key ); }
 }
 
-const pageURL = 'https://rebroad.github.io/tidewater/?worldId=elsemesh:old&nodeId=old';
+const pageURL = 'https://app.example/tidewater/?worldId=elsemesh:old&nodeId=old';
 const peerId = '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ';
-const invite = `https://rebroad.github.io/tidewater/?worldId=elsemesh%3Acave&nodeId=${peerId}&gateway=https%3A%2F%2Fworld.example&directory=https%3A%2F%2Fthruhold.org`;
+const invite = `https://app.example/tidewater/?worldId=elsemesh%3Acave&nodeId=${peerId}&gateway=https%3A%2F%2Fworld.example&directory=https%3A%2F%2Fthruhold.org`;
 const priorConfig = globalThis.ELSEMESH_CONFIG;
 globalThis.ELSEMESH_CONFIG = { worldResolver: 'https://resolver.example' };
 
-assert.equal( builtInWorldURL( pageURL ), 'https://rebroad.github.io/tidewater/' );
+assert.equal( builtInWorldURL( pageURL ), 'https://app.example/tidewater/' );
 assert.equal( parseWorldInviteURL( invite, pageURL ), invite );
-assert.equal( parseWorldInviteURL( 'elsemesh:cave', pageURL ), 'https://rebroad.github.io/tidewater/?worldId=elsemesh%3Acave&directory=https%3A%2F%2Fresolver.example', 'a bare canonical ThruHold ID becomes a resolver-backed world link' );
+assert.equal( parseWorldInviteURL( 'elsemesh:cave', pageURL ), 'https://app.example/tidewater/?worldId=elsemesh%3Acave&directory=https%3A%2F%2Fresolver.example', 'a bare canonical ThruHold ID becomes a resolver-backed world link' );
 const zeroTierInvite = new URL( parseWorldInviteURL( '3AF4FD5D50', pageURL ) );
 assert.equal( zeroTierInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'a bare ZeroTier ID becomes a normalized, lower-case locator' );
 assert.equal( zeroTierInvite.searchParams.get( 'directory' ), 'https://resolver.example' );
-assert.equal( parseWorldInviteURL( 'https://elsemesh.example/another-app/?worldId=elsemesh:cave&gateway=https%3A%2F%2Fworld.example', pageURL ), 'https://rebroad.github.io/tidewater/?worldId=elsemesh%3Acave&gateway=https%3A%2F%2Fworld.example&directory=https%3A%2F%2Fresolver.example' );
+assert.equal( parseWorldInviteURL( 'https://elsemesh.example/another-app/?worldId=elsemesh:cave&gateway=https%3A%2F%2Fworld.example', pageURL ), 'https://app.example/tidewater/?worldId=elsemesh%3Acave&gateway=https%3A%2F%2Fworld.example&directory=https%3A%2F%2Fresolver.example' );
 const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';
 const multiGateway = new URL( pageURL );
 multiGateway.search = new URLSearchParams( [ [ 'worldId', 'elsemesh:cave' ], [ 'nodeId', peerId ], [ 'gateway', 'https://desktop.example' ], [ 'nodeId', backupPeerId ], [ 'gateway', 'wss://flip.example' ] ] ).toString();
 assert.equal( parseWorldInviteURL( multiGateway.href, pageURL ), `${multiGateway.href}&directory=https%3A%2F%2Fresolver.example`, 'validated invites retain ordered candidates and add the configured discovery resolver' );
 assert.throws( () => parseWorldInviteURL( `${pageURL}&nodeId=${peerId}`, pageURL ), /must be paired/ );
-assert.throws( () => parseWorldInviteURL( 'https://rebroad.github.io/tidewater/?worldId=bad', pageURL ), /valid ThruHold ID or ZeroTier node ID/ );
-assert.throws( () => parseWorldInviteURL( 'https://rebroad.github.io/tidewater/?worldId=elsemesh:cave&gateway=http%3A%2F%2Fworld.example', pageURL ), /invalid or insecure gateway/ );
-assert.throws( () => parseWorldInviteURL( `https://rebroad.github.io/tidewater/?worldId=elsemesh:cave&padding=${'x'.repeat(4096)}`, pageURL ), /too long/ );
+assert.throws( () => parseWorldInviteURL( 'https://app.example/tidewater/?worldId=bad', pageURL ), /valid ThruHold ID or ZeroTier node ID/ );
+assert.throws( () => parseWorldInviteURL( 'https://app.example/tidewater/?worldId=elsemesh:cave&gateway=http%3A%2F%2Fworld.example', pageURL ), /invalid or insecure gateway/ );
+assert.throws( () => parseWorldInviteURL( `https://app.example/tidewater/?worldId=elsemesh:cave&padding=${'x'.repeat(4096)}`, pageURL ), /too long/ );
 
 const localInvite = parseWorldInviteURL( 'http://127.0.0.1:5189/?worldId=elsemesh:local&gateway=http%3A%2F%2F127.0.0.1%3A5222', 'http://127.0.0.1:5189/' );
 assert.equal( new URL( localInvite ).searchParams.get( 'gateway' ), 'http://127.0.0.1:5222' );
@@ -77,7 +77,7 @@ assert.equal( rememberWorldVisit( { pageURL, worldId: 'elsemesh:cave', nodeId: p
 assert.deepEqual( listVisitedWorlds( { pageURL, storage } ), [ { worldId: 'elsemesh:cave', title: 'Hosted World', url: invite, updatedAt: 10 } ] );
 assert.equal( setHomeWorld( { ...listVisitedWorlds( { pageURL, storage } )[ 0 ], pageURL, storage } ), true, 'home selection preserves the full saved provider invite' );
 assert.deepEqual( getHomeWorld( { pageURL, storage } ), { worldId: 'elsemesh:cave', title: 'Hosted World', url: invite } );
-const barePageURL = 'https://rebroad.github.io/tidewater/';
+const barePageURL = 'https://app.example/tidewater/';
 assert.equal( defaultHomeWorldURL( { pageURL: barePageURL, storage } ), invite, 'a bare app visit opens the explicitly selected home ThruHold' );
 assert.equal( defaultHomeWorldURL( { pageURL: `${barePageURL}?view=beach`, storage } ), `${invite}&view=beach`, 'non-routing camera/debug query parameters survive home routing' );
 assert.equal( defaultHomeWorldURL( { pageURL: `${barePageURL}?example=1`, storage } ), null, 'the explicit built-in example override bypasses the personal home' );
@@ -86,7 +86,7 @@ storage.setItem( homeWorldStorageKey(), JSON.stringify( { worldId: 'elsemesh:oth
 assert.equal( getHomeWorld( { pageURL, storage } ), null, 'a stored home ID must match its validated invite URL' );
 storage.setItem( homeWorldStorageKey(), JSON.stringify( { worldId: 'elsemesh:cave', title: 'External', url: 'https://evil.example/?worldId=elsemesh:cave' } ) );
 assert.equal( getHomeWorld( { pageURL, storage } ), null, 'a stored home must stay on this app origin and path' );
-storage.setItem( homeWorldStorageKey(), JSON.stringify( { worldId: 'elsemesh:cave', title: 'Insecure', url: 'https://rebroad.github.io/tidewater/?worldId=elsemesh:cave&gateway=http%3A%2F%2Fworld.example' } ) );
+storage.setItem( homeWorldStorageKey(), JSON.stringify( { worldId: 'elsemesh:cave', title: 'Insecure', url: 'https://app.example/tidewater/?worldId=elsemesh:cave&gateway=http%3A%2F%2Fworld.example' } ) );
 assert.equal( getHomeWorld( { pageURL, storage } ), null, 'a secure app must reject an insecure home gateway' );
 assert.equal( setHomeWorld( { pageURL, worldId: 'elsemesh:cave', nodeId: peerId, gateway: 'https://world.example', directory: 'https://thruhold.org', title: 'Hosted World', storage } ), true );
 assert.equal( clearHomeWorld( { storage } ), true );

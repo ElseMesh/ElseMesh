@@ -9,7 +9,7 @@ import { renderWorldAssetIndex } from '../tools/world-asset-index.mjs';
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const modules = await readFile( path.join( root, '.gitmodules' ), 'utf8' );
 assert.match( modules, /path = worlds\/tidewater\n\s*url = https:\/\/github\.com\/ElseMesh\/tidewater\.git/ );
-assert.match( modules, /path = worlds\/Hogwarts\n\s*url = git@github\.com:rebroad\/Hogwarts-World\.git/ );
+assert.match( modules, /path = worlds\/Hogwarts\n\s*url = git@github\.com:[^/\s]+\/Hogwarts-World\.git/ );
 
 const superproject = execFileSync( 'git', [ '-C', path.join( root, 'worlds/tidewater' ), 'rev-parse', '--show-superproject-working-tree' ], { encoding: 'utf8' } ).trim();
 const status = execFileSync( 'git', [ '-C', superproject || root, 'submodule', 'status' ], { encoding: 'utf8' } );

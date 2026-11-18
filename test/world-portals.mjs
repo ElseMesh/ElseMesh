@@ -181,14 +181,14 @@ assert.throws( () => validateWorldComponents( [ genericComponent ], { requiredFe
 const genericWorldSource = { ...source, rules: { ...source.rules, requiredFeatures: [ genericComponent.type ] }, components: [ genericComponent ] };
 assert.doesNotThrow( () => validateWorldSource( genericWorldSource ), 'authoring accepts generic components without a world-specific schema' );
 assert.throws( () => validateWorldSource( { ...genericWorldSource, components: [ { ...genericComponent, extra: true } ] } ), /world component envelope/, 'authoring rejects component envelope extensions' );
-const directoryLink = worldLinkFromLocation( { search: '?worldId=elsemesh:coast&directory=https%3A%2F%2Fthruhold.org', origin: 'https://rebroad.github.io' } );
+const directoryLink = worldLinkFromLocation( { search: '?worldId=elsemesh:coast&directory=https%3A%2F%2Fthruhold.org', origin: 'https://app.example' } );
 assert.equal( directoryLink.directory, 'https://thruhold.org', 'browser link can opt into the community directory' );
 const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';
-const pairedLink = worldLinkFromLocation( { search: `?worldId=elsemesh:coast&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fdesktop.example&nodeId=${backupPeerId}&gateway=wss%3A%2F%2Fflip.example`, origin: 'https://rebroad.github.io' } );
+const pairedLink = worldLinkFromLocation( { search: `?worldId=elsemesh:coast&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fdesktop.example&nodeId=${backupPeerId}&gateway=wss%3A%2F%2Fflip.example`, origin: 'https://app.example' } );
 assert.deepEqual( pairedLink.providers, [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ], 'browser links preserve each peer identity with its own secure gateway' );
 assert.throws( () => new WorldConnector( { worldId: 'elsemesh:coast', directory: 'http://thruhold.org' } ), 'directory endpoints must use HTTPS' );
 const invite = createWorldInviteURL( {
-	pageURL: 'https://rebroad.github.io/tidewater/?noVeg=1',
+	pageURL: 'https://app.example/tidewater/?noVeg=1',
 	worldId: 'elsemesh:coast',
 	nodeId: '12D3KooWAbcdefghijk1234567890123456',
 	gateway: 'https://coast.example',
@@ -201,7 +201,7 @@ assert.equal( inviteURL.searchParams.get( 'nodeId' ), '12D3KooWAbcdefghijk123456
 assert.equal( inviteURL.searchParams.get( 'gateway' ), 'https://coast.example', 'world invitations carry the provider gateway' );
 assert.equal( inviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'world invitations retain optional decentralized discovery' );
 assert.equal( inviteURL.searchParams.get( 'noVeg' ), '1', 'world invitations preserve unrelated client options' );
-const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://rebroad.github.io/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
+const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
 assert.deepEqual( redundantInvite.searchParams.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
-assert.throws( () => createWorldInviteURL( { pageURL: 'https://rebroad.github.io/tidewater/', worldId: 'elsemesh:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );
+assert.throws( () => createWorldInviteURL( { pageURL: 'https://app.example/tidewater/', worldId: 'elsemesh:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );
 console.log( 'ok   portal crossing geometry and orientation handoff' );
