@@ -39,3 +39,4 @@ registerWorldComponent( WORLD_LOCAL_LIGHT_SET_COMPONENT, { installRank: 0 } );
 registerWorldComponent( 'elsemesh.ground-detail-field/1', { installRank: 2 } );
 registerWorldComponent( 'elsemesh.static-fish-props/1', { installRank: 2 } );
 registerWorldComponent( GROUND_COVER_FIELD_COMPONENT_TYPE, { vegetation: true, installRank: 2 } );
+registerWorldComponent( OCTAHEDRAL_CANOPY_COMPONENT_TYPE, { vegetation: true, installRank: 2 } );

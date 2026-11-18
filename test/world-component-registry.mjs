@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { registerWorldComponent, registeredWorldComponents, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
+import { registerWorldComponent, registeredWorldComponents, worldComponentAssetIDs, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
 import { decodeWorldComponentAsset, registerWorldComponentAssetDecoder } from '../src/network/WorldComponentAssetCodecRegistry.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
 import { worldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
@@ -9,6 +9,9 @@ assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, 
 assert.equal( worldComponentDescriptor( 'elsemesh.ambient-audio/1' ).waterSurface, false );
 assert.equal( worldComponentDescriptor( 'elsemesh.terrain-surface/1' ).installRank, 0, 'terrain surface installation precedes components which depend on terrain' );
 assert.equal( worldComponentDescriptor( 'elsemesh.local-light-set/1' ).installRank, 0, 'renderer-neutral local light data is available before visual components install' );
+assert.equal( worldComponentDescriptor( 'elsemesh.octahedral-canopy/1' ).vegetation, true, 'the shared canopy contract is registered as a vegetation component' );
+assert.equal( worldComponentDescriptor( 'elsemesh.octahedral-canopy/1' ).installRank, 2, 'the canopy component installs after foundational world data' );
+assert.deepEqual( worldComponentAssetIDs( { type: 'elsemesh.octahedral-canopy/1', assets: [ { assetId: 'sha256:descriptor', kind: 'octahedral-canopy/1' }, { assetId: 'sha256:instance-set', kind: 'static-model-instance-set/1' }, { assetId: 'sha256:atlas', kind: 'image/png' } ] } ), [ 'sha256:descriptor' ], 'canopy startup requests only its descriptor; dependent signed assets load lazily' );
 assert.equal( worldComponentDescriptor( 'elsemesh.unregistered/1' ), null );
 
 const type = 'elsemesh.registry-fixture/1';

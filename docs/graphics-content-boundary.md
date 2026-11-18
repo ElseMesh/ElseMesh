@@ -261,10 +261,10 @@ remain required before replacing either presenter.
 `src/engine/render/OctahedralCanopyRuntime.js` now resolves each instance to its
 authored group, quaternion yaw, seed-selected atlas variant, and shared near/far
 weights. Its camera plan also applies group cutoffs, tree fade, deterministic
-thinning, and crown-growth compensation. Both future backend presenters must
-consume this same plan. The runtime is not yet registered to a world component
-or consumed by either renderer, so the old presenters remain active and no
-appearance-parity gate has closed.
+thinning, and crown-growth compensation. The `elsemesh.octahedral-canopy/1`
+component is registered as a vegetation feature and requests only its signed
+descriptor at startup. Neither backend presenter consumes the contract yet;
+the old presenters remain active and no appearance-parity gate has closed.
 
 Use the common asset-index convention for this contract: LOD0 is the highest-
 detail near model, and increasing indices are progressively coarser. The
