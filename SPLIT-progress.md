@@ -2307,16 +2307,8 @@ finding changes them.
   scanned-debris component and beach-trunk camera pose as the WebGL fixture.
   Both load the 141-placement document and select LOD 2 with the same authored
   trunk GLB (`sha256:416b79f7e408d37089535dfb65e3ded7239f332534ea65e793be8b2c52386333`).
-  At 192×144, the software WebGPU check renders 578 foreground pixels and the
-  isolated SwiftShader WebGL check renders 568; both report no graphics errors.
-  This is closely matched raster coverage and identical asset/LOD selection,
-  not pixel-image or material parity: WebGPU decodes the signed JPEGs at 32×32
-  in this harness, and backend lighting/rasterization differ. The WebGL fixture
-  also loads a view-dependent number of texture assets (9–10 across runs; the
-  WebGPU fixture loaded 12), so texture residency is not yet aligned or directly
-  comparable. Pre-split image matching,
-  full-resolution texture detail, other debris views, and LOD transitions remain
-  open. Tidewater remains 93%.
+  This initial smoke used 32×32-downsampled textures and foreground counts only;
+  it was superseded by the full-resolution matched-image comparison below.
 
 - 2026-11-18: upgraded the signed debris comparison to decode full-resolution
   JPEG maps, save both backend captures, and calculate a matched-view silhouette
@@ -2328,3 +2320,12 @@ finding changes them.
   residency still differ. This software Dawn/SwiftShader fixture is not the
   pre-split full-scene visual gate; other views, LOD transitions, and AMD
   production capture remain open. No percentage change.
+
+- 2026-11-18: moved Tidewater's shared procedural plant geometry builders from
+  `renderers/webgpu-vegetation/` into `vegetation/geometry/`. The WebGPU and
+  WebGL presenters and the world exporter now import the same world-owned
+  geometry source. Coconut preservation, placement parity, and the WebGL
+  geometry-presentation fixture pass. The builders still emit engine
+  `BufferGeometry`, and their WebGPU/WebGL presenters, material inputs, far
+  LODs, and wind remain world-owned and divergent. This is source ownership
+  cleanup, not a renderer-parity fix; no percentage change.

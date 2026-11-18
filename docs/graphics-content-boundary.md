@@ -197,6 +197,11 @@ the world's `presentation.createVegetation` factory. These presenters still
 implement different LOD and wind behavior. Their location in the Tidewater
 repository does not satisfy renderer neutrality, and moving either presenter
 alone would repeat the backend-by-backend migration that this document forbids.
+The shared procedural plant geometry builders now live in
+`worlds/tidewater/vegetation/geometry/` and are consumed by both presenters and
+the world exporter. They still return engine `BufferGeometry`; this clarifies
+authorship but does not yet provide the portable signed model/LOD inputs needed
+to remove the presenters from Tidewater.
 
 Dense ground cover now uses the engine-owned `elsemesh.ground-cover-field/1`
 runtime in both built-in and hosted paths. The former Tidewater-specific
