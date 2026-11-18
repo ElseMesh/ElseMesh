@@ -24,12 +24,14 @@ verified submodule boundary are recorded in [GOAL-done.md](GOAL-done.md).
 **Tidewater package integration and parity: 93%.** This estimate follows the
 current acceptance record in [`SPLIT-progress.md`](SPLIT-progress.md). Tidewater
 authored data and gameplay modules are in its pinned world repository. The
-signed package loads through ElseMesh's versioned interfaces. The retained
-pre-split WebGPU Example Island is the visual baseline; it is not the WebGL
-fallback. A matched AMD WebGPU comparison against pre-split commit `23c30bf`
-passed for the beach and `swashAbove` views across three simulation phases.
-Production-water fishing has also been exercised through live WebGPU and WebGL
-browser sessions.
+signed package loads through ElseMesh's versioned interfaces. The authoritative
+appearance target is the WebGPU build from the `tidewater/main` branch of
+`dgreenheck/tidewater`; pre-split ElseMesh captures are useful for identifying
+regressions introduced by the split, but do not replace the original game's
+appearance as the parity target. The matched AMD comparison recorded on
+2026-11-19 found no meaningful default-path darkening at the beach camera after
+matching auto-exposure settings. Production-water fishing has also been
+exercised through live WebGPU and WebGL browser sessions.
 
 The remaining gates are to compare additional views and materials and measure
 supported-hardware FPS with a controlled method. Tidewater's signed-Worker
@@ -82,8 +84,11 @@ or that the same backend must render the whole visit. A world author must not
 have to implement both renderers.
 
 WebGPU and WebGL views of portable worlds must be tested against the same
-world-authored inputs, with the pre-split WebGPU render as the Tidewater visual
-reference. Both backends must consume the same world-authored objects, geometry
+world-authored inputs. For Tidewater visual parity, compare WebGPU to the
+authoritative `dgreenheck/tidewater` `tidewater/main` WebGPU output; use a
+pre-split ElseMesh render only to isolate split regressions. Then verify that
+WebGL presents the same authored content and appearance. Both backends must
+consume the same world-authored objects, geometry
 and LOD assets, textures, material data, variants, placements, and shared
 visibility/LOD decisions. This includes vegetation, shoreline logs and debris,
 buildings, stands, and harbour props. Do not recreate WebGPU content as a
@@ -131,9 +136,11 @@ identity boundary across world packages:
   compatibility parser.
 - Keep Tidewater and Hogwarts authored world data in their world repositories;
   the engine supplies generic providers and versioned runtime contracts.
-- Verify Tidewater gameplay against the pre-split WebGPU behavior, and check
-  WebGL for content and gameplay parity without treating its visuals as a
-  baseline.
+- Verify Tidewater gameplay against `tidewater/main` where the original game
+  exposes the same behavior, using pre-split ElseMesh traces as migration
+  regression checks. Compare WebGL content and gameplay to the same world data
+  and behavior; its visuals must also match the Tidewater appearance target,
+  rather than being treated as a separate baseline.
 - Treat avatar and vehicle presentation as portal-travelling entities. A
   destination may cap complexity or moderate participation with a signed
   allowlist of avatar profiles and permitted avatar/vehicle combinations. The
