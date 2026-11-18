@@ -1,5 +1,6 @@
 import { Color } from '../engine/math/Color.js';
 import { G } from '../engine/render/Frame.js';
+import { ShaderModule } from '../engine/gpu/Shader.js';
 import { standard } from './Materials.js';
 import { compileWorldMaterialGraph } from './WorldMaterialGraphCompiler.js';
 
@@ -57,6 +58,7 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 	const graphUsesVertexColorForAlbedo = Boolean( graph.outputs.baseColor && usesVertexColors );
 	for ( const slot of compiled.textureSlots ) if ( ! graphTextures[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const useBaseColorMap = Boolean( albedo && ! compiled.samplesBaseColorForBaseColor );
+	const graphHelpers = compiled.wgslHelpers ? new ShaderModule( { name: 'worldMaterialGraphHelpers', code: compiled.wgslHelpers } ) : null;
 	const pbr = gltfMaterial.pbrMetallicRoughness || {};
 	const base = pbr.baseColorFactor || [ 1, 1, 1, 1 ];
 	const emissive = gltfMaterial.emissiveFactor || [ 0, 0, 0 ];
@@ -85,7 +87,7 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 		vertexColors: usesVertexColors,
 		vertexColorAlbedo: ! graphUsesVertexColorForAlbedo,
 		emissiveIntensity: gltfMaterial.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1,
-		modules: compiled.requiresTerrainHeight ? [ terrainHeightModule ] : [],
+		modules: [ compiled.requiresTerrainHeight ? terrainHeightModule : null, graphHelpers ].filter( Boolean ),
 		textures: {
 			...( useBaseColorMap ? { worldGraphAlbedoMap: albedo } : {} ),
 			...( normalMap ? { worldGraphNormalMap: normalMap } : {} ),
@@ -113,7 +115,7 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			if ( ! source.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			return source.replace( marker, `${code}\n${marker}` );
 		};
-		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations, compiled.glsl.uniforms ].filter( Boolean ).join( '\n' );
+		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.vertexHelpers ].filter( Boolean ).join( '\n' );
 		shader.vertexShader = insert( shader.vertexShader, '#include <common>', vertexDecl );
 		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
 		const worldVertexPosition = compiled.inputs.includes( 'worldVertexPosition' ) ? `

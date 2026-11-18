@@ -66,6 +66,15 @@ graph.nodes.push(
 	{ id: 'bentWithTexture', op: 'add', args: [ 'bentWithData', 'vertexTextureOffset' ] },
 );
 graph.outputs.vertexPosition = 'bentWithTexture';
+graph.nodes.push(
+	{ id: 'noiseScale', op: 'constant', value: 80 },
+	{ id: 'noiseUV', op: 'multiply', args: [ 'uv', 'noiseScale' ] },
+	{ id: 'noiseDetail', op: 'valueNoise2', args: [ 'noiseUV' ] },
+	{ id: 'noiseAmplitude', op: 'constant', value: 0.01 },
+	{ id: 'noiseRoughness', op: 'multiply', args: [ 'noiseDetail', 'noiseAmplitude' ] },
+	{ id: 'roughnessWithNoise', op: 'add', args: [ 'roughnessWithHeight', 'noiseRoughness' ] },
+);
+graph.outputs.roughness = 'roughnessWithNoise';
 const graphGLB = staticModelGLB( {
 	doubleSided: true,
 	materialTexture: true,

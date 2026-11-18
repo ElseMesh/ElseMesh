@@ -78,6 +78,13 @@ the same authored height data using bilinear interpolation and return `-90`
 outside the terrain domain. This is a world-surface input to the graph contract;
 it does not select a renderer or provide backend shader code.
 
+`valueNoise2` takes a `vec2` and returns deterministic cubic-smoothed value
+noise in `[0, 1)`. It uses the same hash and interpolation definition in the
+WebGPU and WebGL compilers, and is available in vertex and fragment outputs.
+Use it for authored material variation when portable source texture data is not
+the appropriate representation; it does not introduce a backend-specific
+texture or shader path.
+
 The `uv` field references an earlier `vec2` node. Supported slots are
 `baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive`; each
 resolves to the matching standard glTF material texture slot. Color slots use
