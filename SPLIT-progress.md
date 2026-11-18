@@ -2430,10 +2430,12 @@ finding changes them.
 
 - 2026-11-19: compared a fixed-time split ElseMesh WebGPU beach render at
   `65d2b30b` with the authoritative `dgreenheck/tidewater` `tidewater/main`
-  ref at `4811ba48`, using the same AMD/RADV WebGPU adapter, 1600×813 output,
-  beach pose, exposure, and 64 zero-delta settling frames. Full-frame RGB MAE
-  is 5.01/255; sky, sea, swash, wet sand, dry sand, and pier ROIs range from
-  4.50 to 6.10. The captures confirm the split WebGPU view is quite similar,
-  with the split image a few RGB values darker. This closes only this beach
-  camera gate: spray, other views/assets, LOD transitions, and WebGL comparison
-  remain open. Tidewater parity stays at 93%; no percentage change.
+  ref at `4811ba48`. The first capture disabled auto-exposure only in split
+  WebGPU, so its 5.01/255 MAE and apparent darkening were invalid for default
+  parity. Recaptured both with auto-exposure enabled, the same AMD/RADV adapter,
+  1600×813 output, beach pose, exposure, and 64 zero-delta settling frames.
+  Full-frame RGB MAE is 0.349/255; the split mean is within 0.25 RGB values per
+  channel. This confirms a close match at this camera and removes the reported
+  default-path darkening; no exposure change is needed. Spray, other
+  views/assets, LOD transitions, and WebGL comparison remain open. Tidewater
+  parity stays at 93%; no percentage change.

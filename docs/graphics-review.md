@@ -6,18 +6,22 @@ Compared the split ElseMesh build at `65d2b30b` with the authoritative
 `dgreenheck/tidewater` `tidewater/main` ref at `4811ba48`. Both used Chromium
 156 on AMD Radeon Graphics (RADV RENOIR), WebGPU, a 1600×813 output, the exact
 `beach` pose (`[15, 3, -58]`, yaw `3.14`, pitch `-0.08`, time of day `16.2`),
-fixed exposure `0.55`, and 64 settling frames with `dt=0` and simulation time
-`1000`. The split capture explicitly disabled auto-exposure. Both images are
-the scene output without the DOM HUD, captured through the respective
-benchmark harnesses. The exported source revisions and rendering setup were
-kept separate from the active source checkout.
+exposure `0.55`, auto-exposure enabled in both builds, and 64 settling frames
+with `dt=0` and simulation time `1000`. The runtime uniform reported
+`autoExposure.enabled=1` in each build. Both images are the scene output without
+the DOM HUD, captured through the respective benchmark harnesses. The exported
+source revisions and rendering setup were kept separate from the active source
+checkout.
 
-The images support the observation that split WebGPU is quite similar to the
-original: the beach, pier, sky, open sea, and swash line up closely. Full-frame
-RGB mean absolute error is `5.01/255`; ROI MAE is `5.63` for sky, `6.10` for
-open sea, `5.14` for swash, `5.22` for wet sand, `4.50` for dry sand, and `4.94`
-for the pier. In these samples, split output is about 4–6 RGB code values
-darker. These are diagnostic pixel measurements, not calibrated color values.
+The matched images confirm that split WebGPU is very close to the original:
+full-frame RGB mean absolute error is `0.349/255`. ROI MAE is `0.26` for sky,
+`0.76` for open sea, `0.59` for swash, `0.24` for wet sand, `0.21` for dry
+sand, and `2.32` for the pier. Mean full-frame RGB differs by only
+`(-0.15, -0.19, -0.24)` (split minus Tidewater), so there is no meaningful
+overall darkening to correct in the default path. The earlier `5.01/255`
+result came from disabling auto-exposure only in the split capture; it was not
+a valid default-render comparison. These are diagnostic pixel measurements,
+not calibrated color values.
 
 ![Authoritative Tidewater main WebGPU beach capture](images/tidewater-main-beach-2026-11-19.png)
 
