@@ -3,6 +3,7 @@ import { decodeWorldComponentAsset } from '../src/network/WorldComponentAssetCod
 import {
 	OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND,
 	OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT,
+	OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT,
 	decodeOctahedralCanopyDescriptor,
 } from '../src/network/OctahedralCanopyDescriptor.js';
 
@@ -12,8 +13,8 @@ const inventory = [
 	{ assetId: setID, kind: 'static-model-instance-set/1' },
 	{ assetId: nearTreeID, kind: 'glb' },
 	{ assetId: nearShrubID, kind: 'glb' },
-	{ assetId: atlasColorID, kind: 'image/ktx2' },
-	{ assetId: atlasAuxID, kind: 'image/ktx2' },
+	{ assetId: atlasColorID, kind: 'image/png' },
+	{ assetId: atlasAuxID, kind: 'image/png' },
 ];
 const instanceSet = {
 	format: 'elsemesh.static-model-instance-set/1',
@@ -30,6 +31,11 @@ const descriptor = {
 	format: OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT,
 	instanceSetAssetId: setID,
 	atlasAssetIds: [ atlasColorID, atlasAuxID ],
+	atlasDataFormat: OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT,
+	atlasChannels: {
+		material: { r: 'brightness', g: 'leaf-flag', b: 'card-variation', a: 'coverage' },
+		normalExposure: { r: 'normal-x-encoded', g: 'normal-y-encoded', b: 'normal-z-encoded', a: 'ambient-exposure' },
+	},
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
@@ -49,6 +55,8 @@ assert.equal( decodeWorldComponentAsset( OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND
 
 const invalid = [
 	{ ...descriptor, extra: true },
+	{ ...descriptor, atlasDataFormat: 'rgba8-srgb/1' },
+	{ ...descriptor, atlasChannels: { ...descriptor.atlasChannels, material: { ...descriptor.atlasChannels.material, a: 'opacity' } } },
 	{ ...descriptor, instanceSetAssetId: id( 'f' ) },
 	{ ...descriptor, atlasAssetIds: [ atlasColorID, atlasColorID ] },
 	{ ...descriptor, atlasAssetIds: [ atlasColorID, nearTreeID ] },
@@ -68,7 +76,7 @@ for ( const value of invalid ) assert.throws( () => decodeOctahedralCanopyDescri
 
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, componentAssets: inventory.filter( asset => asset.assetId !== nearTreeID ) } ), /near GLB referenced by static model tree-oak is not a signed component asset/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, staticModelInstanceSetAssetId: id( 'f' ) } ), /does not match the signed descriptor reference/ );
-assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, componentAssets: inventory.map( asset => asset.assetId === atlasAuxID ? { ...asset, kind: 'image/png' } : asset ) } ), /atlas reference is not a declared image\/ktx2 asset/ );
+assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, componentAssets: inventory.map( asset => asset.assetId === atlasAuxID ? { ...asset, kind: 'image/ktx2' } : asset ) } ), /atlas reference is not a declared image\/png data asset/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, staticModelInstanceSet: { ...instanceSet, instances: [ { model: 'tree-oak' }, instanceSet.instances[ 1 ] ] } } ), /requires normalized per-instance variant data/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( new Uint8Array(), options ), /non-empty binary data/ );
 

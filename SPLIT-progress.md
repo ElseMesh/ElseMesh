@@ -2377,6 +2377,15 @@ finding changes them.
   presenters consuming the descriptor, so appearance parity remains open and
   Tidewater stays at 93%.
 
+- 2026-11-18: corrected the canopy descriptor to match the current Tidewater
+  bake output: signed `image/png` atlases decoded as raw `rgba8unorm` data,
+  with explicit brightness/leaf/variation/coverage and encoded-normal/exposure
+  channel meanings. This replaces the unsupported KTX2-only assumption and
+  guards against sRGB conversion or premultiplied coverage when backend loaders
+  are implemented. The palette, wind, group-specific distance rules, exported
+  atlas assets, and both engine presenters are still missing; no parity
+  percentage change.
+
 - 2026-11-18: added the same `L` flashlight control to the engine's WebGL
   fallback. The camera-attached spotlight uses the WebGPU path's position
   offset, 9°/35° cone, 30 m range, warm color, night intensity ramp, and

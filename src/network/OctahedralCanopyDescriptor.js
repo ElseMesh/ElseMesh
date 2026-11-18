@@ -2,6 +2,12 @@ export const OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT = 'elsemesh.octahedral-canopy/1
 export const OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND = 'octahedral-canopy/1';
 export const MAX_OCTAHEDRAL_CANOPY_DESCRIPTOR_BYTES = 64 * 1024;
 export const OCTAHEDRAL_CANOPY_PROJECTION = 'hemi-octahedral/1';
+export const OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT = 'rgba8unorm-data/1';
+
+const ATLAS_CHANNELS = {
+	material: [ 'brightness', 'leaf-flag', 'card-variation', 'coverage' ],
+	normalExposure: [ 'normal-x-encoded', 'normal-y-encoded', 'normal-z-encoded', 'ambient-exposure' ],
+};
 
 const isRecord = value => !! value && typeof value === 'object' && ! Array.isArray( value );
 const hasExactKeys = ( value, keys ) => isRecord( value ) && Object.keys( value ).length === keys.length && Object.keys( value ).every( key => keys.includes( key ) );
@@ -29,8 +35,9 @@ export function decodeOctahedralCanopyDescriptor( bytes, options = {} ) {
  * choose how to sample the two atlas images for their backend.
  */
 export function validateOctahedralCanopyDescriptor( document, { componentAssets, staticModelInstanceSetAssetId, staticModelInstanceSet } = {} ) {
-	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'projection', 'frameGrid', 'variantGroups', 'nearHandoff', 'drawRange', 'thinning', 'windResponse' ];
+	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'projection', 'frameGrid', 'variantGroups', 'nearHandoff', 'drawRange', 'thinning', 'windResponse' ];
 	if ( ! hasExactKeys( document, rootKeys ) || document.format !== OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT ) fail( 'unsupported format or fields' );
+	if ( document.atlasDataFormat !== OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT || ! hasExactKeys( document.atlasChannels, [ 'material', 'normalExposure' ] ) || ! hasExactKeys( document.atlasChannels.material, [ 'r', 'g', 'b', 'a' ] ) || ! hasExactKeys( document.atlasChannels.normalExposure, [ 'r', 'g', 'b', 'a' ] ) || [ 'r', 'g', 'b', 'a' ].some( ( channel, index ) => document.atlasChannels.material[ channel ] !== ATLAS_CHANNELS.material[ index ] || document.atlasChannels.normalExposure[ channel ] !== ATLAS_CHANNELS.normalExposure[ index ] ) ) fail( 'atlas data encoding or channel semantics are invalid' );
 	if ( ! validAssetID( document.instanceSetAssetId ) || ! Array.isArray( document.atlasAssetIds ) || document.atlasAssetIds.length !== 2 || document.atlasAssetIds.some( id => ! validAssetID( id ) ) || new Set( document.atlasAssetIds ).size !== 2 ) fail( 'signed instance-set or atlas asset IDs are invalid' );
 	if ( ! Array.isArray( componentAssets ) || ! componentAssets.length ) fail( 'component asset inventory is required' );
 	const inventory = new Map();
@@ -43,7 +50,7 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 	}
 	if ( inventory.get( document.instanceSetAssetId ) !== 'static-model-instance-set/1' ) fail( 'instance-set reference is not a declared static-model-instance-set/1 asset' );
 	if ( staticModelInstanceSetAssetId !== document.instanceSetAssetId ) fail( 'decoded static-model instance set does not match the signed descriptor reference' );
-	for ( const id of document.atlasAssetIds ) if ( inventory.get( id ) !== 'image/ktx2' ) fail( `atlas reference is not a declared image/ktx2 asset: ${id}` );
+	for ( const id of document.atlasAssetIds ) if ( inventory.get( id ) !== 'image/png' ) fail( `atlas reference is not a declared image/png data asset: ${id}` );
 	if ( ! hasExactKeys( document.projection, [ 'type', 'framesPerSide' ] ) || document.projection.type !== OCTAHEDRAL_CANOPY_PROJECTION || ! Number.isInteger( document.projection.framesPerSide ) || document.projection.framesPerSide < 2 || document.projection.framesPerSide > 16 ) fail( 'projection or frame count is invalid' );
 	const frames = document.projection.framesPerSide;
 	if ( ! hasExactKeys( document.frameGrid, [ 'columns', 'rows', 'frameWidth', 'frameHeight' ] ) || ! Number.isInteger( document.frameGrid.columns ) || ! Number.isInteger( document.frameGrid.rows ) || ! Number.isInteger( document.frameGrid.frameWidth ) || ! Number.isInteger( document.frameGrid.frameHeight ) || document.frameGrid.rows !== frames || document.frameGrid.columns < frames || document.frameGrid.columns % frames !== 0 || document.frameGrid.frameWidth < 16 || document.frameGrid.frameWidth > 2048 || document.frameGrid.frameHeight < 16 || document.frameGrid.frameHeight > 2048 ) fail( 'atlas frame grid is invalid' );

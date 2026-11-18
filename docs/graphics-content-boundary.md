@@ -233,6 +233,19 @@ needs one explicit engine component contract rather than separate WGSL and
 GLSL implementations in Tidewater. Both backends must sample the same signed
 atlas assets and select the same LOD at matched quality settings.
 
+`elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
+with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
+values; color-space conversion and alpha premultiplication are not allowed.
+The material atlas channels are R brightness, G leaf flag, B per-card color
+variation, and A coverage. The normal/exposure atlas stores the three
+0.5-encoded local normal components in RGB and ambient exposure in A. The
+engine must generate sampling mips from these data values without an sRGB
+transform. This corrects the earlier KTX2-only assumption: no KTX2 encoder is
+currently available in the Tidewater export pipeline. The descriptor still
+does not specify the complete canopy palette, wind response, group-specific
+near/far ranges, or exact atlas assets, and no production adapter consumes it;
+those remain required before replacing either presenter.
+
 Use the common asset-index convention for this contract: LOD0 is the highest-
 detail near model, and increasing indices are progressively coarser. The
 runtime can preserve coarse-first streaming by requesting the last index first;
