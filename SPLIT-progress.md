@@ -2002,3 +2002,12 @@ finding changes them.
   test verifies the component references and asset hashes. No matched rendered
   comparison has verified appearance or LOD fade, so Tidewater parity remains
   93%.
+
+- 2026-11-18: fixed WebGPU material composition for the signed static-model
+  component. The terrain module now depends on the same height-query module
+  used by material graphs, so lighting and graph composition share one WGSL
+  definition instead of declaring duplicate terrain helpers. The external
+  production build and WebGPU static-model render fixture pass (252 visible
+  pixels, color and shadow pipelines compiled). This verifies the engine
+  component path, not the hosted Tidewater scene or scanned-debris appearance;
+  Tidewater parity remains 93%.
