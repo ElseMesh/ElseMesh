@@ -46,7 +46,7 @@ const now = Math.floor( Date.now() / 1000 );
 const worldId = 'elsemesh:worker-test';
 const node = await signedDocument( 'elsemesh.node/1', {
 	protocol: 'elsemesh.node/1', nodeId: owner.peerId, gateway: 'https://owner.example',
-	worldIds: [ worldId ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+	worldIds: [ worldId ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', zeroTierGateway: 'http://10.147.20.4:43127',
 	issuedAt: now, expiresAt: now + 600,
 }, owner );
 const manifest = await signedDocument( 'elsemesh.world/3', {
@@ -69,6 +69,7 @@ const worldResult = await worldLookup.json();
 assert.equal( worldResult.worldId, worldId );
 assert.equal( worldResult.providers.length, 1 );
 assert.deepEqual( worldResult.providers[ 0 ], node );
+assert.equal( worldResult.providers[ 0 ].payload.zeroTierGateway, 'http://10.147.20.4:43127', 'the signed announcement carries its optional private browser gateway' );
 
 const nodeLookup = await handleRequest( new Request( 'https://resolver.example/v1/zerotier/e3918db4832a3056/3af4fd5d50' ), env );
 const nodeResult = await nodeLookup.json();
@@ -90,6 +91,11 @@ assert.equal( limited.status, 429, 'per-provider rate limiting protects repeated
 
 const invalidLocator = await handleRequest( new Request( 'https://resolver.example/v1/zerotier/not-a-network/not-a-node' ), env );
 assert.equal( invalidLocator.status, 400 );
+const unsupportedNetwork = await handleRequest( new Request( 'https://resolver.example/v1/zerotier/0123456789abcdef/3af4fd5d50' ), env );
+assert.equal( unsupportedNetwork.status, 400, 'the configured resolver is limited to the single supported ZeroTier network' );
+const unsupportedAnnouncementNode = await signedDocument( 'elsemesh.node/1', { ...node.payload, zeroTierNetworkId: '0123456789abcdef', issuedAt: now, expiresAt: now + 600 }, owner );
+const unsupportedAnnouncement = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: JSON.stringify( { node: unsupportedAnnouncementNode, manifest } ) } ), env );
+assert.equal( unsupportedAnnouncement.status, 422, 'announcements for other ZeroTier networks are rejected' );
 
 const oversized = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: ' '.repeat( 2 * 1024 * 1024 + 1 ) } ), env );
 assert.equal( oversized.status, 413, 'body-size limits apply even when a caller does not provide Content-Length' );

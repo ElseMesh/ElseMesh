@@ -62,7 +62,9 @@ type libztRuntime struct {
 	closeOnce    sync.Once
 	listener     int
 	ipv4Listener int
+	httpListener int
 	listenerOnce sync.Once
+	bridgeCtx    context.Context
 	bridgeCancel context.CancelFunc
 	acceptWG     sync.WaitGroup
 	proxyWG      sync.WaitGroup
@@ -156,7 +158,7 @@ func startZeroTier(networkID, storagePath string, blacklistInterfaces []string) 
 				return nil, errors.New("assigned ZeroTier IPv6 address does not match this network's 6PLANE address")
 			}
 			mask := net.CIDRMask(40, 128)
-			runtime := &libztRuntime{networkID: netID, nodeID: nodeID, address: address, prefix: net.IPNet{IP: address.Mask(mask), Mask: mask}, listener: -1, ipv4Listener: -1}
+			runtime := &libztRuntime{networkID: netID, nodeID: nodeID, address: address, prefix: net.IPNet{IP: address.Mask(mask), Mask: mask}, listener: -1, ipv4Listener: -1, httpListener: -1}
 			switch assigned := int(C.zts_addr_is_assigned(C.uint64_t(netID), C.ZTS_AF_INET)); assigned {
 			case 0:
 				log.Printf("ZeroTier managed IPv4 address: not assigned")
@@ -256,6 +258,7 @@ func (z *libztRuntime) Libp2pOptions() []libp2p.Option {
 func (z *libztRuntime) StartBridge(ctx context.Context, port int) error {
 	z.port = port
 	bridgeCtx, cancel := context.WithCancel(ctx)
+	z.bridgeCtx = bridgeCtx
 	z.bridgeCancel = cancel
 	if err := z.startBridgeListener(bridgeCtx, z.address.String(), C.ZTS_AF_INET6); err != nil {
 		cancel()
@@ -271,13 +274,31 @@ func (z *libztRuntime) StartBridge(ctx context.Context, port int) error {
 }
 
 func (z *libztRuntime) startBridgeListener(ctx context.Context, addressText string, family C.int) error {
+	return z.startForwardListener(ctx, addressText, family, z.port, z.port, false)
+}
+
+func (z *libztRuntime) StartHTTPBridge(ctx context.Context, port int) error {
+	if port < 1 || port > 65535 {
+		return errors.New("HTTP gateway bridge requires an assigned TCP port")
+	}
+	bridgeCtx := z.bridgeCtx
+	if bridgeCtx == nil {
+		bridgeCtx = ctx
+	}
+	if z.ipv4 != nil {
+		return z.startForwardListener(bridgeCtx, z.ipv4.String(), C.ZTS_AF_INET, port, port, true)
+	}
+	return z.startForwardListener(bridgeCtx, z.address.String(), C.ZTS_AF_INET6, port, port, true)
+}
+
+func (z *libztRuntime) startForwardListener(ctx context.Context, addressText string, family C.int, listenPort, targetPort int, httpGateway bool) error {
 	address := C.CString(addressText)
 	defer C.free(unsafe.Pointer(address))
 	fd := int(C.zts_socket(family, C.ZTS_SOCK_STREAM, C.ZTS_IPPROTO_TCP))
 	if fd < 0 {
 		return fmt.Errorf("libzt TCP socket creation failed (%d)", fd)
 	}
-	if code := int(C.zts_bind(C.int(fd), address, C.ushort(z.port))); code != 0 {
+	if code := int(C.zts_bind(C.int(fd), address, C.ushort(listenPort))); code != 0 {
 		C.zts_close(C.int(fd))
 		return fmt.Errorf("libzt TCP bind failed (%d)", code)
 	}
@@ -291,7 +312,9 @@ func (z *libztRuntime) startBridgeListener(ctx context.Context, addressText stri
 		C.zts_close(C.int(fd))
 		return fmt.Errorf("libzt nonblocking TCP listener setup failed (%d)", code)
 	}
-	if family == C.ZTS_AF_INET {
+	if httpGateway {
+		z.httpListener = fd
+	} else if family == C.ZTS_AF_INET {
 		z.ipv4Listener = fd
 	} else {
 		z.listener = fd
@@ -322,16 +345,16 @@ func (z *libztRuntime) startBridgeListener(ctx context.Context, addressText stri
 			z.proxyWG.Add(1)
 			go func() {
 				defer z.proxyWG.Done()
-				z.proxy(ztConn)
+				z.proxy(ztConn, targetPort)
 			}()
 		}
 	}()
 	return nil
 }
 
-func (z *libztRuntime) proxy(ztConn *ztConn) {
+func (z *libztRuntime) proxy(ztConn *ztConn, targetPort int) {
 	defer ztConn.Close()
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(z.port)), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(targetPort)), 5*time.Second)
 	if err != nil {
 		return
 	}
@@ -382,6 +405,9 @@ func (z *libztRuntime) closeListener() {
 		}
 		if z.ipv4Listener >= 0 {
 			C.zts_close(C.int(z.ipv4Listener))
+		}
+		if z.httpListener >= 0 {
+			C.zts_close(C.int(z.httpListener))
 		}
 	})
 }

@@ -63,6 +63,7 @@ type daemon struct {
 	directoryURL          string
 	zeroTierNodeID        string
 	zeroTierNetworkID     string
+	zeroTierGateway       string
 	allowedBrowserOrigins map[string]struct{}
 	assetCheckMu          sync.Mutex
 	verifiedAssets        map[string]assetFileStamp
@@ -667,10 +668,6 @@ func run() error {
 	p2pHost.SetStreamHandler(worldProtocol, d.handlePeerStream)
 	go d.advertiseWorld()
 	go d.logPeerAddresses()
-	if d.directoryURL != "" {
-		go d.publishDirectory()
-	}
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", d.handleHealth)
 	mux.HandleFunc("/.well-known/elsemesh/node", d.handleNodeRecord)
@@ -705,6 +702,20 @@ func run() error {
 	}
 	serverErr := make(chan error, 1)
 	go func() { serverErr <- server.Serve(httpListener) }()
+	if zeroTier != nil {
+		httpPort := httpListener.Addr().(*net.TCPAddr).Port
+		if bridgeErr := zeroTier.StartHTTPBridge(ctx, httpPort); bridgeErr != nil {
+			log.Printf("ZeroTier browser gateway unavailable; clients will use the advertised HTTPS gateway or Worker lookup: %v", bridgeErr)
+		} else {
+			d.zeroTierGateway = zeroTierGatewayURL(zeroTier.Addresses(), httpPort)
+			if d.zeroTierGateway != "" {
+				log.Printf("ZeroTier browser gateway=%s", d.zeroTierGateway)
+			}
+		}
+	}
+	if d.directoryURL != "" {
+		go d.publishDirectory()
+	}
 	var webTransportErr chan error
 	if wtServer != nil {
 		webTransportErr = make(chan error, 1)
@@ -1124,7 +1135,16 @@ func (d *daemon) currentAuthorityLease() *signedDocument {
 	return &lease
 }
 
-func (d *daemon) handleNodeRecord(w http.ResponseWriter, _ *http.Request) {
+func (d *daemon) handleNodeRecord(w http.ResponseWriter, r *http.Request) {
+	setPublicReadCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	now := time.Now()
 	doc, err := signDocument("elsemesh.node/1", d.nodeRecordPayload(now), d.key)
 	if err != nil {
@@ -1139,8 +1159,33 @@ func (d *daemon) nodeRecordPayload(now time.Time) map[string]any {
 	if d.zeroTierNodeID != "" && d.zeroTierNetworkID != "" {
 		record["zeroTierNodeId"] = d.zeroTierNodeID
 		record["zeroTierNetworkId"] = d.zeroTierNetworkID
+		if d.zeroTierGateway != "" {
+			record["zeroTierGateway"] = d.zeroTierGateway
+		}
 	}
 	return record
+}
+
+func zeroTierGatewayURL(addresses []net.IP, port int) string {
+	for _, address := range addresses {
+		if address.To4() != nil && privateZeroTierAddress(address) {
+			return fmt.Sprintf("http://%s", net.JoinHostPort(address.String(), fmt.Sprint(port)))
+		}
+	}
+	for _, address := range addresses {
+		if address.To4() == nil && address.To16() != nil && privateZeroTierAddress(address) {
+			return fmt.Sprintf("http://%s", net.JoinHostPort(address.String(), fmt.Sprint(port)))
+		}
+	}
+	return ""
+}
+
+func privateZeroTierAddress(address net.IP) bool {
+	if ipv4 := address.To4(); ipv4 != nil {
+		return ipv4[0] == 10 || ipv4[0] == 192 && ipv4[1] == 168 || ipv4[0] == 172 && ipv4[1] >= 16 && ipv4[1] <= 31 || ipv4[0] == 100 && ipv4[1] >= 64 && ipv4[1] <= 127
+	}
+	ipv6 := address.To16()
+	return ipv6 != nil && ipv6[0]&0xfe == 0xfc
 }
 
 func (d *daemon) publishDirectory() {

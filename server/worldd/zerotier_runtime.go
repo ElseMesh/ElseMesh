@@ -14,6 +14,7 @@ type zeroTierRuntime interface {
 	NodeID() string
 	Libp2pOptions() []libp2p.Option
 	StartBridge(context.Context, int) error
+	StartHTTPBridge(context.Context, int) error
 	StopAccepting() error
 	CloseListeners() error
 	Stop() error

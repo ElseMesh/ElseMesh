@@ -2,7 +2,7 @@ import * as THREE from '../engine/index.js';
 import { UI } from './UI.js';
 import { G } from '../core/Globals.js';
 import { GroundBounce } from '../materials/GroundBounce.js';
-import { createWorldInviteURL } from '../network/WorldConnector.js';
+import { createWorldInviteURL, verifySignedDocument } from '../network/WorldConnector.js';
 import { browserHostSocketURL, createBrowserHostWorker, pickBrowserWorldProfile } from '../network/BrowserHost.js';
 import { AccountClient, accountConfiguration } from '../network/AccountClient.js';
 
@@ -148,14 +148,43 @@ export class AppUI {
 				ui.toast( 'Enter a linked world to create an invite', 3200 );
 				return;
 			}
+			let zeroTierNodeId = connector?.zeroTierNodeId || '';
+			let zeroTierNetworkId = connector?.zeroTierNetworkId;
+			let zeroTierGateway = connector?.zeroTierGateway || '';
+			let inviteNodeId = hostedDocument?.signer || connector?.nodeId || '';
+			let inviteGateway = hostedDocument ? browserHostState.gateway : connector?.gateway || '';
+			let inviteProviders = hostedDocument ? [] : connector?.providers || [];
+			if ( inviteGateway && inviteGateway === zeroTierGateway ) inviteGateway = '';
+			if ( ! hostedDocument && connector?.nodeId && connector?.gateway && ( ! zeroTierGateway || ! inviteGateway ) ) {
+				try {
+					const nodeBase = new URL( connector.gateway );
+					if ( nodeBase.protocol === 'wss:' ) nodeBase.protocol = 'https:';
+					else if ( nodeBase.protocol === 'ws:' ) nodeBase.protocol = 'http:';
+					const nodeResponse = await fetch( new URL( '/.well-known/elsemesh/node', nodeBase ), { credentials: 'omit', cache: 'no-store' } );
+					if ( nodeResponse.ok ) {
+						const nodeDocument = await nodeResponse.json();
+						await verifySignedDocument( nodeDocument, 'elsemesh.node/1' );
+						const node = nodeDocument.payload;
+						if ( node.nodeId === connector.nodeId && node.worldIds?.includes( connector.worldId ) && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && /^[0-9a-f]{16}$/.test( node.zeroTierNetworkId || '' ) && node.zeroTierGateway ) {
+							zeroTierNodeId = node.zeroTierNodeId;
+							zeroTierNetworkId = node.zeroTierNetworkId;
+							zeroTierGateway = node.zeroTierGateway;
+							inviteNodeId = node.nodeId;
+							inviteGateway = node.gateway || '';
+							if ( ! inviteGateway ) inviteProviders = [];
+						}
+					}
+				} catch {}
+			}
 			const url = createWorldInviteURL( {
 				pageURL: location.href,
 				worldId: hostedDocument?.payload.worldId || connector.worldId,
-				zeroTierNodeId: hostedDocument ? '' : connector.zeroTierNodeId,
-				zeroTierNetworkId: connector?.zeroTierNetworkId,
-				nodeId: hostedDocument?.signer || connector.nodeId,
-				gateway: hostedDocument ? browserHostState.gateway : connector.gateway,
-				providers: hostedDocument ? [] : connector.providers,
+				zeroTierNodeId: hostedDocument ? '' : zeroTierNodeId,
+				zeroTierNetworkId,
+				zeroTierGateway: hostedDocument ? '' : zeroTierGateway,
+				nodeId: inviteGateway ? inviteNodeId : '',
+				gateway: inviteGateway,
+				providers: inviteGateway ? inviteProviders : [],
 				directory: hostedDocument ? '' : connector.directory,
 			} );
 			try {

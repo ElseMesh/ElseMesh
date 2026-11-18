@@ -7,6 +7,7 @@ const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_RECORD_BYTES = 1024 * 1024;
 const MAX_ADVERTISEMENT_AGE_SECONDS = 15 * 60;
 const MAX_LOOKUP_PROVIDERS = 256;
+const ALLOWED_ZERO_TIER_NETWORK_ID = 'e3918db4832a3056';
 const WORLD_ID = /^elsemesh:[A-Za-z0-9._-]{1,128}$/;
 const PEER_ID = /^[A-Za-z0-9]{20,256}$/;
 const ZT_NODE_ID = /^[0-9a-f]{10}$/;
@@ -29,6 +30,21 @@ function validGateway( value ) {
 	try {
 		const gateway = new URL( value );
 		return [ 'https:', 'wss:' ].includes( gateway.protocol ) && gateway.hostname && ! gateway.username && ! gateway.password && [ '', '/' ].includes( gateway.pathname ) && ! gateway.search && ! gateway.hash;
+	} catch {
+		return false;
+	}
+}
+
+function validZeroTierGateway( value ) {
+	try {
+		const gateway = new URL( value );
+		if ( gateway.protocol !== 'http:' || ! gateway.port || gateway.username || gateway.password || ! [ '', '/' ].includes( gateway.pathname ) || gateway.search || gateway.hash ) return false;
+		const hostname = gateway.hostname.replace( /^\[|\]$/g, '' ).toLowerCase();
+		const ipv4 = hostname.split( '.' ).map( Number );
+		if ( ipv4.length === 4 && ipv4.every( ( octet ) => Number.isInteger( octet ) && octet >= 0 && octet <= 255 ) ) {
+			return ipv4[ 0 ] === 10 || ipv4[ 0 ] === 192 && ipv4[ 1 ] === 168 || ipv4[ 0 ] === 172 && ipv4[ 1 ] >= 16 && ipv4[ 1 ] <= 31 || ipv4[ 0 ] === 100 && ipv4[ 1 ] >= 64 && ipv4[ 1 ] <= 127;
+		}
+		return /^f[cd][0-9a-f]{2}:/i.test( hostname );
 	} catch {
 		return false;
 	}
@@ -84,7 +100,8 @@ async function validateAnnouncement( announcement, nowSeconds ) {
 	if ( JSON.stringify( node ).length > MAX_RECORD_BYTES || JSON.stringify( manifest ).length > MAX_RECORD_BYTES ) throw new Error( 'signed document payload exceeds the size limit' );
 	if ( node.protocol !== NODE_PROTOCOL || node.nodeId !== announcement.node.signer || ! PEER_ID.test( node.nodeId ) || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! WORLD_ID.test( node.worldIds[ 0 ] ) || ! validGateway( node.gateway ) ) throw new Error( 'invalid node advertisement' );
 	if ( ! safeInteger( node.issuedAt ) || node.issuedAt > nowSeconds + 300 || node.issuedAt < nowSeconds - MAX_ADVERTISEMENT_AGE_SECONDS || ! safeInteger( node.expiresAt ) || node.expiresAt <= nowSeconds || node.expiresAt > nowSeconds + MAX_ADVERTISEMENT_AGE_SECONDS || node.expiresAt > node.issuedAt + MAX_ADVERTISEMENT_AGE_SECONDS ) throw new Error( 'node advertisement is expired or outside the short freshness window' );
-	if ( ( node.zeroTierNodeId || '' ) !== '' && ( ! ZT_NODE_ID.test( node.zeroTierNodeId ) || ! ZT_NETWORK_ID.test( node.zeroTierNetworkId || '' ) ) || ( node.zeroTierNetworkId || '' ) !== '' && ! node.zeroTierNodeId ) throw new Error( 'invalid ZeroTier locator' );
+	if ( ( node.zeroTierNodeId || '' ) !== '' && ( ! ZT_NODE_ID.test( node.zeroTierNodeId ) || node.zeroTierNetworkId !== ALLOWED_ZERO_TIER_NETWORK_ID ) || ( node.zeroTierNetworkId || '' ) !== '' && ! node.zeroTierNodeId ) throw new Error( 'invalid or unsupported ZeroTier network locator' );
+	if ( node.zeroTierGateway && ( ! node.zeroTierNodeId || ! validZeroTierGateway( node.zeroTierGateway ) ) ) throw new Error( 'invalid ZeroTier private gateway' );
 	const worldId = node.worldIds[ 0 ];
 	if ( manifest.protocol !== WORLD_PROTOCOL || manifest.worldId !== worldId || manifest.ownerPeerId !== announcement.manifest.signer || ! PEER_ID.test( manifest.ownerPeerId ) || manifest.discoverable !== true || ! safeInteger( manifest.authorityEpoch ) || ! Array.isArray( manifest.hosts ) ) throw new Error( 'manifest does not authorize public discovery' );
 	validateFailoverWindows( manifest.hosts );
@@ -203,7 +220,7 @@ export async function handleRequest( request, env ) {
 			return jsonResponse( { worldId, providers: records.map( ( record ) => record.node ) }, 200, headers );
 		}
 		const parts = url.pathname.slice( '/v1/zerotier/'.length ).split( '/' );
-		if ( parts.length !== 2 || ! ZT_NETWORK_ID.test( parts[ 0 ] ) || ! ZT_NODE_ID.test( parts[ 1 ] ) ) return jsonResponse( { error: 'invalid ZeroTier network or node ID' }, 400, headers );
+		if ( parts.length !== 2 || ! ZT_NETWORK_ID.test( parts[ 0 ] ) || parts[ 0 ] !== ALLOWED_ZERO_TIER_NETWORK_ID || ! ZT_NODE_ID.test( parts[ 1 ] ) ) return jsonResponse( { error: 'invalid or unsupported ZeroTier network or node ID' }, 400, headers );
 		const prefix = `z:${parts[ 0 ]}:${parts[ 1 ]}:`;
 		const records = orderedRecords( await lookupRecords( env.PROVIDERS, prefix, nowSeconds ), nowSeconds ).filter( ( record ) => record.zeroTierNodeId === parts[ 1 ] && record.zeroTierNetworkId === parts[ 0 ] );
 		return jsonResponse( { networkId: parts[ 0 ], nodeId: parts[ 1 ], worldIds: [ ...new Set( records.map( ( record ) => record.worldId ) ) ], providers: records.map( ( record ) => record.node ) }, 200, headers );

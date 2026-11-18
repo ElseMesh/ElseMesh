@@ -138,19 +138,32 @@ a ZeroTier managed IP, the network must provide a stable managed address or
 the client must obtain the current HostID-to-managed-address mapping from a
 trusted network advertisement/controller. Host ID alone is not an IP route.
 The visitor's browser can use a ZeroTier private route only when its host OS
-provides the ZeroTier route (or a working browser ZeroTier transport exists),
-and the endpoint is HTTPS/WSS with a certificate the browser trusts. A secure
-provider gateway supplied in the invite is tried before HostID lookup. If it
-fails, the signed directory can map Host ID/network ID to the provider's
-current HTTPS/WSS gateway; the Worker performs lookup only and never carries
-world traffic. A Tailscale MagicDNS `*.ts.net` gateway can use the same direct
-gateway slot when the visitor's device has been connected to or shared into
-the relevant tailnet. This uses the host OS Tailscale route, not a browser
-Tailscale implementation. Tailscale Funnel is a separate public-exposure mode:
-it can make a `.ts.net` endpoint reachable to ordinary Internet visitors, but
-then ElseMesh must enforce access itself and cannot treat Tailscale identity
-headers as proof of the visitor's identity. A raw overlay IP over plain
-HTTP/WS is not a valid route from the hosted HTTPS client.
+provides the ZeroTier route (or a working browser ZeroTier transport exists).
+An invite may include a private HTTP gateway as a fast first attempt. `worldd`
+publishes this optional address inside its signed node record and bridges the
+ZeroTier TCP port to its dynamically selected local HTTP/WebSocket gateway
+port. The client fetches the signed node record first and checks its ZeroTier
+network ID, Host ID, world ID and gateway before connecting. If that route
+fails, it tries any explicit HTTPS/WSS provider routes, then resolves the
+HostID/network ID through the signed directory and tries the returned private
+gateway before the signed HTTPS/WSS gateway. The Worker performs lookup only
+and never carries world traffic.
+
+Hosted HTTPS pages cannot generally connect to private IPs without browser
+permission. Chrome 142 and newer supports local-network requests from secure
+contexts, including HTTP fetch and WebSocket URLs using private IP literals,
+behind the user's Local Network Access permission. The browser must still have
+the ZeroTier OS route, and `worldd` must allow the ElseMesh page origin for its
+WebSocket gateway. Other browsers or denied permissions fall through to the
+HTTPS/WSS provider gateway. See [Chrome Local Network Access](https://developer.chrome.com/docs/modern-web-guidance/guides/security/local-network-access).
+
+A Tailscale MagicDNS `*.ts.net` gateway can use the secure direct-gateway slot
+when the visitor's device has been connected to or shared into the relevant
+tailnet. This uses the host OS Tailscale route, not a browser Tailscale
+implementation. Tailscale Funnel is a separate public-exposure mode: it can
+make a `.ts.net` endpoint reachable to ordinary Internet visitors, but then
+ElseMesh must enforce access itself and cannot treat Tailscale identity
+headers as proof of the visitor's identity.
 
 ElseMesh already has an optional signed provider locator: `worldd` can publish
 its current gateway advertisement, and the client can look it up by world ID
@@ -175,7 +188,9 @@ existing guest-readable behavior.
 
 Direct browser access to a ZeroTier IP requires the browser's device to be a
 member of that ZeroTier network. A regular web page does not join ZeroTier
-merely by receiving a Host ID. Issue #173 is an open question from 2022 about
+merely by receiving a Host ID. The initial direct route uses the device's
+existing OS route and a short-lived, signed `zeroTierGateway` address; it does
+not add ZeroTier membership to the browser. Issue #173 is an open question from 2022 about
 compiling libzt to WASM; it contains no implementation recipe or linked
 working branch. The target is to run ztlib as WebAssembly in ElseMesh so it
 can hold a visitor-specific ZeroTier identity, join the configured network,

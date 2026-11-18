@@ -1,4 +1,5 @@
 import { isWorldID } from './WorldIdentity.js';
+import { validZeroTierGateway } from './WorldConnector.js';
 
 const STORAGE_KEY = 'elsemesh.visited-worlds.v1';
 const HOME_STORAGE_KEY = 'elsemesh.home-world.v1';
@@ -61,11 +62,12 @@ function validGateway( value, page ) {
 	}
 }
 
-function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNetworkId = 'e3918db4832a3056', nodeId = '', gateway = '', providers = [], directory = '' } ) {
+function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNetworkId = 'e3918db4832a3056', zeroTierGateway = '', nodeId = '', gateway = '', providers = [], directory = '' } ) {
 	const page = appPageURL( pageURL );
 	if ( ! isWorldID( worldId ) && ! ( ! worldId && /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) ) throw new Error( 'Invite does not contain a valid ThruHold ID or ZeroTier node ID' );
 	if ( zeroTierNodeId && ! /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) throw new Error( 'Invite contains an invalid ZeroTier node ID' );
 	if ( zeroTierNodeId && ! /^[0-9a-f]{16}$/i.test( zeroTierNetworkId ) ) throw new Error( 'Invite contains an invalid ZeroTier network ID' );
+	if ( zeroTierGateway && ( ! zeroTierNodeId || ! validZeroTierGateway( zeroTierGateway ) ) ) throw new Error( 'Invite contains an invalid ZeroTier private gateway' );
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	if ( candidates.length > 8 ) throw new Error( 'Invite contains too many gateway candidates' );
 	for ( const candidate of candidates ) {
@@ -78,14 +80,16 @@ function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNe
 		const directoryURL = new URL( directory );
 		if ( directoryURL.protocol !== 'https:' || directoryURL.username || directoryURL.password || ! [ '', '/' ].includes( directoryURL.pathname ) || directoryURL.search || directoryURL.hash ) throw new Error( 'Invite contains an invalid directory URL' );
 	}
-	if ( zeroTierNodeId && ! directory && ! candidates.length ) throw new Error( 'A ZeroTier node ID requires a direct provider gateway or HTTPS world resolver' );
+	if ( zeroTierNodeId && ! directory && ! zeroTierGateway && ! candidates.length ) throw new Error( 'A ZeroTier node ID requires a direct provider gateway or HTTPS world resolver' );
 	if ( worldId ) page.searchParams.set( 'worldId', worldId );
 	else page.searchParams.delete( 'worldId' );
 	page.searchParams.delete( 'ztNodeId' );
 	page.searchParams.delete( 'ztNetworkId' );
+	page.searchParams.delete( 'ztGateway' );
 	if ( zeroTierNodeId ) {
 		page.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
 		page.searchParams.set( 'ztNetworkId', zeroTierNetworkId.toLowerCase() );
+		if ( zeroTierGateway ) page.searchParams.set( 'ztGateway', new URL( zeroTierGateway ).origin );
 	}
 	page.searchParams.delete( 'nodeId' );
 	page.searchParams.delete( 'gateway' );
@@ -131,6 +135,7 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 		worldId: params.get( 'worldId' ),
 		zeroTierNodeId: params.get( 'ztNodeId' ) || '',
 		zeroTierNetworkId: params.get( 'ztNetworkId' ) || 'e3918db4832a3056',
+		zeroTierGateway: params.get( 'ztGateway' ) || '',
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
 		gateway: nodeIds.length ? '' : gateways[ 0 ] || '',
 		directory: params.get( 'directory' ) || resolver,
@@ -213,7 +218,7 @@ export function defaultHomeWorldURL( { pageURL = globalThis.location?.href, stor
 	if ( ! home ) return null;
 	const url = new URL( home.url );
 	for ( const [ key, value ] of current.searchParams ) {
-		if ( ! [ 'worldId', 'ztNodeId', 'nodeId', 'gateway', 'directory', 'example' ].includes( key ) ) url.searchParams.append( key, value );
+		if ( ! [ 'worldId', 'ztNodeId', 'ztGateway', 'nodeId', 'gateway', 'directory', 'example' ].includes( key ) ) url.searchParams.append( key, value );
 	}
 	return url.href;
 }
