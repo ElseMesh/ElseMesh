@@ -11,12 +11,12 @@ async function assetID( bytes ) {
 }
 
 /** One signed world fixture shared by the browser WebGL and native WebGPU render checks. */
-export async function groundCoverFieldRenderFixture( { density: authoredDensity = null, terrain: authoredTerrain = null, terrainHeightModule: authoredTerrainHeightModule = null, terrainDetail: authoredTerrainDetail = null, graphPositionOnly = false } = {} ) {
+export async function groundCoverFieldRenderFixture( { density: authoredDensity = null, terrain: authoredTerrain = null, terrainHeightModule: authoredTerrainHeightModule = null, terrainDetail: authoredTerrainDetail = null, graphPositionOnly = false, graphPositionMode = 'authored' } = {} ) {
 	const densityData = authoredDensity?.data || new Uint8Array( 32 * 32 * 4 );
 	if ( ! authoredDensity ) for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
 	const density = authoredDensity || { data: densityData, res: 32, size: 32, origin: -16 };
 	const densityBytes = encodeGrassDensityAsset( density );
-	const authoredGraph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: density.origin, densitySize: density.size } );
+	const authoredGraph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: density.origin, densitySize: density.size, vertexPositionMode: graphPositionMode } );
 	const positionInput = authoredGraph.nodes.find( node => node.op === 'input' && node.name === 'position' )?.id;
 	const graph = graphPositionOnly
 		? { ...authoredGraph, outputs: { ...authoredGraph.outputs, vertexPosition: positionInput } }
