@@ -2388,6 +2388,14 @@ finding changes them.
   exported atlas assets, and both engine presenters are still missing; no
   parity percentage change.
 
+- 2026-11-18: added an engine-owned CPU canopy plan that resolves signed
+  instances to authored groups and atlas variants, then emits shared near/far
+  transition weights, per-group culls/fades, and deterministic thinning with
+  density compensation. Its focused test is registered in the standard test
+  runner. The world component and both renderer adapters do not consume the
+  plan yet, so the current presenters remain active and Tidewater parity stays
+  at 93%.
+
 - 2026-11-18: added the same `L` flashlight control to the engine's WebGL
   fallback. The camera-attached spotlight uses the WebGPU path's position
   offset, 9°/35° cone, 30 m range, warm color, night intensity ramp, and
