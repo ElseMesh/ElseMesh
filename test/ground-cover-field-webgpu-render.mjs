@@ -12,7 +12,7 @@ import { readTexture } from '../src/engine/gpu/Readback.js';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
 
-const { component, connector, terrain, terrainDetail } = await groundCoverFieldRenderFixture();
+const { component, connector, terrain, terrainHeightModule, terrainDetail } = await groundCoverFieldRenderFixture();
 const L = await setupLife( { W: 192, H: 144, shadowSplits: [ 12 ] } );
 let runtime, terrainDetailTexture;
 try {
@@ -23,7 +23,7 @@ try {
 	const root = new Group();
 	root.userData.terrainData = terrain;
 	terrainDetailTexture = new Texture( { label: 'fixture-signed-terrain-detail', width: terrainDetail.width, height: terrainDetail.height, format: 'rgba8unorm', data: terrainDetail.data, sampler: 'aniso4Repeat' } );
-	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: { detailTexture: terrainDetailTexture } } ];
+	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: { detailTexture: terrainDetailTexture, heightModule: terrainHeightModule } } ];
 	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, progressiveController: new AbortController() };
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const installed = await install( { app: {}, root, connector }, component );

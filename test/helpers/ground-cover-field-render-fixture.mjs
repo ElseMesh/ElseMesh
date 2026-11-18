@@ -1,4 +1,5 @@
 import { encodeGrassDensityAsset } from '../../src/network/GrassDensityAsset.js';
+import { ShaderModule } from '../../src/engine/gpu/Shader.js';
 import { createTidewaterGroundCoverMaterialGraph } from '../../worlds/tidewater/vegetation/GroundCoverMaterialGraph.js';
 import { buildGroundCoverPatch } from '../../worlds/tidewater/vegetation/GroundCoverPatch.js';
 import { groundCoverPatchGLB } from '../../worlds/tidewater/vegetation/GroundCoverPatchGLB.js';
@@ -44,6 +45,7 @@ export async function groundCoverFieldRenderFixture() {
 		heights: new Float32Array( 4 ),
 		heightAt: () => 0,
 	};
+	const terrainHeightModule = new ShaderModule( { name: 'groundCoverFixtureTerrainHeight', code: 'fn terrainHeightAt( xz: vec2f ) -> f32 { return 0.0; }' } );
 	const connector = {
 		manifest: { assets: component.assets.map( asset => ( { id: asset.assetId, kind: asset.kind } ) ) },
 		assets: new Map( [ [ densityAssetId, densityBytes ] ] ),
@@ -53,5 +55,5 @@ export async function groundCoverFieldRenderFixture() {
 			return densityBytes;
 		},
 	};
-	return { component, connector, terrain, terrainDetail: { data: detailData, width: 8, height: 8 }, graph, modelAssetIds, modelBytesByLOD };
+	return { component, connector, terrain, terrainHeightModule, terrainDetail: { data: detailData, width: 8, height: 8 }, graph, modelAssetIds, modelBytesByLOD };
 }
