@@ -117,6 +117,7 @@ let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor', avatarOptionI
 let previewVisualComponentPathExclusions = {};
 const payloadFetchOrder = [];
 const cellIndexRequests = [];
+const authenticatedCellRequestOrigins = [];
 const cellIndexRequestQueryLengths = [];
 const cellInventoryRequests = [];
 let secondCellCollisionMissing = true;
@@ -186,6 +187,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	} );
 	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
 	if ( url.pathname === '/v1/regions/great-hall/cells' ) {
+		authenticatedCellRequestOrigins.push( { origin: url.origin, authorization: new Headers( options.headers ).get( 'Authorization' ) } );
 		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
 		cellIndexRequestQueryLengths.push( url.search.slice( 1 ).length );
 		cellInventoryRequests.push( url.searchParams.get( 'sourceInventory' ) );
@@ -423,6 +425,10 @@ try {
 	assert.equal( hostedRegionManifest.rules.spawnRadius, 8, 'hosted admission uses the owner-signed spawn policy' );
 	assert.equal( hostedRegionManifest.rules.maxVisitors, 8, 'hosted admission uses the owner-signed visitor limit' );
 	assert.equal( hostedRegionManifest.entryPointActionLabel, 'Choose your house' );
+	hostedRegionConnector.setContentCapability( 'c'.repeat( 64 ) );
+	await hostedRegionConnector.ensureCells( [ [ 999, 0, 999 ] ] );
+	assert.ok( authenticatedCellRequestOrigins.some( request => request.origin === 'http://127.0.0.1:4190' && request.authorization === `Bearer ${'c'.repeat( 64)}` ), 'post-admission cell metadata is routed through worldd with its presence capability' );
+	hostedRegionConnector.close();
 	const mismatchedSignedContract = { ...signedEntryContract, spawn: { ...signedEntryContract.spawn, position: [ 2, 8.62, 9 ] } };
 	const mismatchedRegionConnector = new LocalRegionConnector( { ...link, worldId: descriptorWorldId, gateway: 'http://127.0.0.1:4190', createWorldConnector: () => ( { getManifest: async () => mismatchedSignedContract, close() {} } ) } );
 	await assert.rejects( mismatchedRegionConnector.getManifest(), /does not match the dynamic region provider/, 'presence refuses an owner manifest whose signed spawn differs from the live provider' );

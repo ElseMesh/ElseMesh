@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -60,9 +61,41 @@ type playerPresence struct {
 	playerPose
 	UpdatedAt int64 `json:"updatedAt"`
 	// Ghost is computed by the owner, never taken from a client pose.
-	Ghost          bool `json:"ghost,omitempty"`
-	updated        time.Time
-	movementCredit float64
+	Ghost                 bool `json:"ghost,omitempty"`
+	updated               time.Time
+	movementCredit        float64
+	contentCapabilityHash string
+}
+
+func newContentCapability() (string, string, error) {
+	var secret [32]byte
+	if _, err := rand.Read(secret[:]); err != nil {
+		return "", "", err
+	}
+	token := hex.EncodeToString(secret[:])
+	digest := sha256.Sum256([]byte(token))
+	return token, hex.EncodeToString(digest[:]), nil
+}
+
+func (d *daemon) authorizeRegionContent(token string) bool {
+	if len(token) != 64 {
+		return false
+	}
+	if _, err := hex.DecodeString(token); err != nil {
+		return false
+	}
+	digest := sha256.Sum256([]byte(token))
+	d.presenceMu.Lock()
+	defer d.presenceMu.Unlock()
+	valid := 0
+	now := time.Now()
+	for _, visitor := range d.players {
+		if visitor.contentCapabilityHash == "" || now.Sub(visitor.updated) >= presenceTTL {
+			continue
+		}
+		valid |= subtle.ConstantTimeCompare([]byte(hex.EncodeToString(digest[:])), []byte(visitor.contentCapabilityHash))
+	}
+	return valid == 1
 }
 
 func newPresenceSession() (string, error) {
@@ -409,6 +442,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 			delete(d.players, id)
 		}
 	}
+	contentCapability := ""
 	if request.Type == "presence.leave" {
 		delete(d.players, request.presenceKey)
 	} else {
@@ -498,7 +532,15 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				return peerResponse{}, err
 			}
 		}
-		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now, movementCredit: movementCredit}
+		contentCapabilityHash := old.contentCapabilityHash
+		if !exists {
+			var err error
+			contentCapability, contentCapabilityHash, err = newContentCapability()
+			if err != nil {
+				return peerResponse{}, errors.New("content_capability_unavailable")
+			}
+		}
+		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now, movementCredit: movementCredit, contentCapabilityHash: contentCapabilityHash}
 	}
 	players := make([]playerPresence, 0, len(d.players))
 	for _, p := range d.players {
@@ -506,7 +548,7 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		players = append(players, p)
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].ID < players[j].ID })
-	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players, DoorStates: d.doorStateSnapshotLocked()}, nil
+	return peerResponse{Type: "presence", WorldID: d.world.WorldID, RequestID: request.RequestID, PlayerID: request.presenceKey, Players: players, DoorStates: d.doorStateSnapshotLocked(), ContentCapability: contentCapability}, nil
 }
 
 func (d *daemon) presenceSpawnFootPosition() []float64 {

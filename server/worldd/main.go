@@ -614,6 +614,9 @@ func run() error {
 		return err
 	}
 	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	if regionProvider != nil {
+		regionProvider.authorizeContent = d.authorizeRegionContent
+	}
 	go d.maintainPresenceExpiry(ctx)
 	if regionProvider != nil {
 		log.Printf("local region provider proxy enabled for world %s", world.WorldID)
@@ -1488,21 +1491,22 @@ type gatewayMessage struct {
 }
 
 type peerResponse struct {
-	PlayerID        string           `json:"playerId,omitempty"`
-	Players         []playerPresence `json:"players,omitempty"`
-	DoorStates      []worldDoorState `json:"doorStates,omitempty"`
-	Type            string           `json:"type"`
-	WorldID         string           `json:"worldId,omitempty"`
-	RequestID       string           `json:"requestId,omitempty"`
-	Document        *signedDocument  `json:"document,omitempty"`
-	RoleRevocations *signedDocument  `json:"roleRevocations,omitempty"`
-	AuthorityLease  *signedDocument  `json:"authorityLease,omitempty"`
-	AssetID         string           `json:"assetId,omitempty"`
-	Offset          int64            `json:"offset"`
-	Total           int64            `json:"total,omitempty"`
-	Chunk           string           `json:"chunk,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	SDP             string           `json:"sdp,omitempty"`
+	PlayerID          string           `json:"playerId,omitempty"`
+	Players           []playerPresence `json:"players,omitempty"`
+	DoorStates        []worldDoorState `json:"doorStates,omitempty"`
+	Type              string           `json:"type"`
+	WorldID           string           `json:"worldId,omitempty"`
+	RequestID         string           `json:"requestId,omitempty"`
+	Document          *signedDocument  `json:"document,omitempty"`
+	RoleRevocations   *signedDocument  `json:"roleRevocations,omitempty"`
+	AuthorityLease    *signedDocument  `json:"authorityLease,omitempty"`
+	AssetID           string           `json:"assetId,omitempty"`
+	Offset            int64            `json:"offset"`
+	Total             int64            `json:"total,omitempty"`
+	Chunk             string           `json:"chunk,omitempty"`
+	Error             string           `json:"error,omitempty"`
+	SDP               string           `json:"sdp,omitempty"`
+	ContentCapability string           `json:"contentCapability,omitempty"`
 }
 
 func (d *daemon) handleBrowserGateway(w http.ResponseWriter, r *http.Request) {

@@ -135,14 +135,14 @@ function hasEmbeddedCollisionShape( bytes ) {
 	} );
 }
 
-async function fetchJSON( url, signal ) {
-	const response = await fetch( url, { credentials: 'omit', cache: 'no-store', signal } );
+async function fetchJSON( url, signal, headers = {} ) {
+	const response = await fetch( url, { credentials: 'omit', cache: 'no-store', signal, headers } );
 	if ( ! response.ok ) throw new Error( `Local region provider returned HTTP ${response.status}` );
 	return response.json();
 }
 
-async function fetchJSONBytes( url, signal ) {
-	const response = await fetch( url, { credentials: 'omit', cache: 'no-store', signal } );
+async function fetchJSONBytes( url, signal, headers = {} ) {
+	const response = await fetch( url, { credentials: 'omit', cache: 'no-store', signal, headers } );
 	if ( ! response.ok ) throw new Error( `Local region provider returned HTTP ${response.status}` );
 	const bytes = new Uint8Array( await response.arrayBuffer() );
 	return { bytes, value: JSON.parse( new TextDecoder().decode( bytes ) ) };
@@ -205,6 +205,7 @@ export class LocalRegionConnector {
 		this.presenceWorldId = worldId;
 		this.presenceNodeId = nodeId;
 		this.gateway = gateway || this.localProvider;
+		this.contentCapability = '';
 		this.directory = directory;
 		this.createWorldConnector = createWorldConnector;
 		this.worldId = '';
@@ -243,6 +244,19 @@ export class LocalRegionConnector {
 		this.pendingDiskWriteBytes = 0;
 		this.pendingDiskWriteEntries = [];
 		this.diskWriteFlushTimer = null;
+	}
+
+	setContentCapability( capability ) {
+		requireValue( this.presenceEnabled && typeof capability === 'string' && /^[a-f0-9]{64}$/.test( capability ), 'World content capability is invalid' );
+		this.contentCapability = capability;
+	}
+
+	#providerOrigin() {
+		return this.contentCapability ? new URL( this.gateway ).origin : this.localProvider;
+	}
+
+	#contentHeaders( headers = {} ) {
+		return this.contentCapability ? { ...headers, Authorization: `Bearer ${this.contentCapability}` } : headers;
 	}
 
 	async getManifest( { signal } = {} ) {
@@ -403,7 +417,7 @@ export class LocalRegionConnector {
 					queryLength = nextQueryLength;
 				}
 				requireValue( batch.length > 0, 'Local provider cell coordinate exceeds the request URL limit' );
-				const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
+				const cellIndexURL = new URL( `${sourceURL.pathname}/cells`, this.#providerOrigin() );
 				cellIndexURL.search = params.toString();
 				const includesSourceInventory = ! this.collisionSourceInventories.has( sourceRegion.id );
 				const cacheKey = `cell-index\0${sourceRegion.id}\0${cellSize}\0${JSON.stringify( this.previewRegion )}\0${includesSourceInventory ? 1 : 0}\0${batch.join( ';' )}`;
@@ -430,7 +444,7 @@ export class LocalRegionConnector {
 					}
 				}
 				if ( ! cellIndex ) {
-					const fetched = await fetchJSONBytes( cellIndexURL, signal );
+					const fetched = await fetchJSONBytes( cellIndexURL, signal, this.#contentHeaders() );
 					cellIndex = fetched.value;
 					responseBytes = fetched.bytes;
 					validateCellIndex( cellIndex );
@@ -566,10 +580,10 @@ export class LocalRegionConnector {
 					this.manifest.components.push( component );
 					this.manifest.assets.push( { id: set.descriptorAssetID, bytes: 0, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND, priority } );
 					this.syntheticAssetLoaders.set( set.descriptorAssetID, async signal => {
-						const descriptorURL = new URL( `${sourceURL.pathname}/cells`, this.localProvider );
+						const descriptorURL = new URL( `${sourceURL.pathname}/cells`, this.#providerOrigin() );
 						descriptorURL.searchParams.set( 'size', String( previewRegion.cellSizeMeters ) );
 						descriptorURL.searchParams.set( 'cell', cellKey );
-						const latest = await fetchJSON( descriptorURL, signal );
+						const latest = await fetchJSON( descriptorURL, signal, this.#contentHeaders() );
 						requireValue( latest.sourceRevision === this.sourceRevision && latest.cellSizeMeters === previewRegion.cellSizeMeters && Array.isArray( latest.cells ), 'Local provider returned stale static-mesh instance metadata' );
 						const sourceCell = latest.cells.find( item => item.x === cell.x && item.y === cell.y && item.z === cell.z );
 						const refreshedSets = localRegionStaticModelSets( sourceCell, {
@@ -779,7 +793,8 @@ export class LocalRegionConnector {
 		requireValue( EXTERNAL_TEXTURE_ID.test( textureAssetId || '' ), 'External texture asset id is invalid' );
 		const parentAssetURL = this.regionAssets.get( parentAssetId );
 		requireValue( parentAssetURL, 'External texture source asset was not declared by the provider' );
-		const textureURL = new URL( parentAssetURL, this.localProvider );
+		const sourceURL = new URL( parentAssetURL, this.localProvider );
+		const textureURL = new URL( `${sourceURL.pathname}${sourceURL.search}`, this.#providerOrigin() );
 		textureURL.searchParams.set( 'texture', textureAssetId );
 		this.regionAssets.set( textureAssetId, textureURL.href );
 	}
@@ -996,22 +1011,25 @@ export class LocalRegionConnector {
 	}
 
 	async #withRegionLease( assetURL, signal, consumeResponse, phaseMs = {}, requestHeaders = {} ) {
-		const url = new URL( assetURL, this.localProvider );
+		const sourceURL = new URL( assetURL, this.localProvider );
+		const url = new URL( `${sourceURL.pathname}${sourceURL.search}`, this.#providerOrigin() );
 		const priority = url.searchParams.get( 'payload' ) === 'collision' ? 0 : url.searchParams.has( 'texture' ) ? 2 : 1;
 		return this.regionRequestQueue.run( signal, priority, () => this.#fetchWithRegionLease( assetURL, signal, consumeResponse, phaseMs, requestHeaders ) );
 	}
 
 	async #fetchWithRegionLease( assetURL, signal, consumeResponse, phaseMs, requestHeaders ) {
 		abortIfNeeded( signal );
-		const regionURL = new URL( assetURL, this.localProvider );
-		const leaseURL = new URL( `${regionURL.pathname}/leases`, this.localProvider );
+		const sourceURL = new URL( assetURL, this.localProvider );
+		const regionURL = new URL( `${sourceURL.pathname}${sourceURL.search}`, this.#providerOrigin() );
+		const leaseURL = new URL( `${regionURL.pathname}/leases`, this.#providerOrigin() );
 		leaseURL.searchParams.set( 'cell', regionURL.searchParams.get( 'cell' ) || '' );
 		leaseURL.searchParams.set( 'payload', regionURL.searchParams.get( 'payload' ) || 'visual' );
 		for ( const parameter of [ 'mesh', 'lod' ] ) {
 			if ( regionURL.searchParams.has( parameter ) ) leaseURL.searchParams.set( parameter, regionURL.searchParams.get( parameter ) );
 		}
 		let phaseStartedAt = performance.now();
-		const leaseResponse = await fetch( leaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal } );
+		const authHeaders = this.#contentHeaders();
+		const leaseResponse = await fetch( leaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal, headers: authHeaders } );
 		phaseMs.providerLeaseRequest = performance.now() - phaseStartedAt;
 		if ( ! leaseResponse.ok ) throw new Error( `Local region lease request failed (${leaseResponse.status})` );
 		phaseStartedAt = performance.now();
@@ -1022,13 +1040,13 @@ export class LocalRegionConnector {
 		const abort = () => controller.abort( signal?.reason || new DOMException( 'Aborted', 'AbortError' ) );
 		if ( signal?.aborted ) abort();
 		else signal?.addEventListener( 'abort', abort, { once: true } );
-		const controlURL = new URL( `/v1/leases/${lease.leaseId}`, this.localProvider );
+		const controlURL = new URL( `/v1/leases/${lease.leaseId}`, this.#providerOrigin() );
 		let renewalTimer;
 		let released = false;
 		const renew = async () => {
 			if ( released || controller.signal.aborted ) return;
 			try {
-				const response = await fetch( controlURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal: controller.signal } );
+				const response = await fetch( controlURL, { method: 'POST', credentials: 'omit', cache: 'no-store', signal: controller.signal, headers: authHeaders } );
 				if ( ! response.ok ) throw new Error( `Local region lease renewal failed (${response.status})` );
 				if ( ! released && ! controller.signal.aborted ) renewalTimer = setTimeout( () => { renew(); }, REGION_LEASE_RENEW_MS );
 			} catch ( error ) {
@@ -1040,7 +1058,7 @@ export class LocalRegionConnector {
 		leasedURL.searchParams.set( 'lease', lease.leaseId );
 		try {
 			phaseStartedAt = performance.now();
-			const response = await fetch( leasedURL, { credentials: 'omit', cache: 'no-store', signal: controller.signal, headers: requestHeaders } );
+			const response = await fetch( leasedURL, { credentials: 'omit', cache: 'no-store', signal: controller.signal, headers: this.#contentHeaders( requestHeaders ) } );
 			phaseMs.providerRegionResponse = performance.now() - phaseStartedAt;
 			return await consumeResponse( response, controller.signal );
 		} finally {
@@ -1049,8 +1067,8 @@ export class LocalRegionConnector {
 			signal?.removeEventListener( 'abort', abort );
 			phaseStartedAt = performance.now();
 			try {
-				const releaseURL = new URL( `${controlURL.pathname}/release`, this.localProvider );
-				await fetch( releaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', keepalive: true } );
+				const releaseURL = new URL( `${controlURL.pathname}/release`, this.#providerOrigin() );
+				await fetch( releaseURL, { method: 'POST', credentials: 'omit', cache: 'no-store', keepalive: true, headers: authHeaders } );
 			} catch { /* Lease expiry reclaims interest if the browser has gone away. */ }
 			phaseMs.providerLeaseRelease = performance.now() - phaseStartedAt;
 		}
@@ -1183,6 +1201,7 @@ export class LocalRegionConnector {
 
 	close() {
 		this.closed = true;
+		this.contentCapability = '';
 		this.assets.clear();
 		this.assetBytes = 0;
 		this.assetRanges.clear();

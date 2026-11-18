@@ -45,6 +45,7 @@ export class WorldPresenceSession {
   }
   this.connector = createConnector({worldId: connector.worldId,
    nodeId: connector.manifest.ownerPeerId, gateway: connector.gateway, directory: connector.directory});
+  this.regionConnector = connector;
   this.manifest = connector.manifest;
   this.parent = parent;
   this.appearance = {...admittedAppearance};
@@ -83,6 +84,7 @@ export class WorldPresenceSession {
   if (this.disposed || this.admitted) throw new Error('Invalid world presence admission');
   const snapshot = await this.connector.updatePresence(pose, {signal:this.controller.signal, spawnCandidates});
   if (this.disposed) throw new DOMException('Left ThruHold', 'AbortError');
+  if (snapshot.contentCapability) this.regionConnector.setContentCapability?.(snapshot.contentCapability);
   this.state.observe(snapshot, {requestId:snapshot.requestId, now:this.clock()});
   this.#observeDoorStates( snapshot.doorStates );
   const own = snapshot.players.find(value => value.id === snapshot.playerId);

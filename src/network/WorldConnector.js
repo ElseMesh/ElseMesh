@@ -133,6 +133,7 @@ export class WorldConnector {
 		this.chunkBytes = chunkBytes;
 		this.loadWorldProviders = loadWorldProviders;
 		this.manifest = null;
+		this.contentCapability = '';
 		this.assets = new Map();
 		this.assetDownloads = new Map();
 		this.unavailableProviders = new Set();
@@ -216,12 +217,17 @@ export class WorldConnector {
 		if ( spawnCandidates !== undefined && ( ! Array.isArray( spawnCandidates ) || spawnCandidates.length < 1 || spawnCandidates.length > 1024 || spawnCandidates.some( ( position ) => ! Array.isArray( position ) || position.length !== 3 || ! position.every( ( value ) => Number.isFinite( value ) && Math.abs( value ) <= 100000 ) ) ) ) throw new Error( 'Invalid world spawn candidates' );
 		const reply = await this.#request( { type: 'presence.update', pose, ...( spawnCandidates ? { spawnCandidates } : {} ) }, { signal } );
 		invariant( reply.type === 'presence' && reply.worldId === this.worldId && typeof reply.playerId === 'string' && Array.isArray( reply.players ), 'Invalid player presence response' );
+		if ( reply.contentCapability !== undefined ) {
+			invariant( typeof reply.contentCapability === 'string' && /^[a-f0-9]{64}$/.test( reply.contentCapability ), 'Invalid world content capability' );
+			this.contentCapability = reply.contentCapability;
+		}
 		return reply;
 	}
 
 	async leavePresence( { signal } = {} ) {
 		const reply = await this.#request( { type: 'presence.leave' }, { signal } );
 		invariant( reply.type === 'presence' && reply.worldId === this.worldId, 'Invalid presence departure response' );
+		this.contentCapability = '';
 		return reply;
 	}
 
@@ -720,6 +726,7 @@ export class WorldConnector {
 
 	close() {
 		this.#closeRTC( new Error( 'World connector closed' ) );
+		this.contentCapability = '';
 		this.socket?.close();
 		this.webTransport?.close();
 		this.socket = null;

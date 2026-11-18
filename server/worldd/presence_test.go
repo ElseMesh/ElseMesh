@@ -42,6 +42,50 @@ func presenceForPlayer(players []playerPresence, id string) playerPresence {
 	return playerPresence{}
 }
 
+func TestRegionContentCapabilityFollowsAcceptedPresenceLifetime(t *testing.T) {
+	d := presenceTestDaemon(t)
+	now := time.Now()
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 1.38, 8}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	join := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose, SpawnCandidates: presenceTestSpawnCandidates()}
+	bindPresenceRequest(&join, d.host.ID().String(), session)
+	response, err := d.presenceRequest(join, now)
+	if err != nil {
+		t.Fatalf("admit player: %v", err)
+	}
+	token := response.ContentCapability
+	if len(token) != 64 || !d.authorizeRegionContent(token) {
+		t.Fatalf("issued content capability was not accepted: %q", token)
+	}
+	if d.authorizeRegionContent(token[:63] + "0") {
+		t.Fatal("modified content capability was accepted")
+	}
+
+	pose.Sequence++
+	update := gatewayMessage{Type: "presence.update", WorldID: d.world.WorldID, Pose: pose}
+	bindPresenceRequest(&update, d.host.ID().String(), session)
+	updated, err := d.presenceRequest(update, now.Add(100*time.Millisecond))
+	if err != nil {
+		t.Fatalf("update presence: %v", err)
+	}
+	if updated.ContentCapability != "" || !d.authorizeRegionContent(token) {
+		t.Fatal("capability was rotated or invalidated during an accepted update")
+	}
+
+	leave := gatewayMessage{Type: "presence.leave", WorldID: d.world.WorldID}
+	bindPresenceRequest(&leave, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(leave, now.Add(200*time.Millisecond)); err != nil {
+		t.Fatalf("leave presence: %v", err)
+	}
+	if d.authorizeRegionContent(token) {
+		t.Fatal("content capability remained valid after explicit leave")
+	}
+}
+
 func TestPresenceWalkableSlopeUsesSelectedMovementProfile(t *testing.T) {
 	d := presenceTestDaemon(t)
 	slope := 34.0

@@ -72,6 +72,7 @@ type regionProviderGateway struct {
 	requestSequence   atomic.Uint64
 	proxy             *httputil.ReverseProxy
 	client            *http.Client
+	authorizeContent  func(string) bool
 }
 
 type regionProviderMetricsWriter struct {
@@ -399,7 +400,7 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	}
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, If-None-Match, Range, If-Range")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-None-Match, Range, If-Range")
 		w.Header().Set("Access-Control-Max-Age", "600")
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -411,6 +412,14 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 	if (r.Method == http.MethodPost || r.Method == http.MethodDelete) && (r.ContentLength > 0 || len(r.TransferEncoding) != 0) {
 		http.Error(w, "region provider control requests must not contain a body", http.StatusBadRequest)
 		return
+	}
+	if gateway.authorizeContent != nil && isRegionContentPath(r.URL.Path) {
+		const prefix = "Bearer "
+		authorization := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authorization, prefix) || !gateway.authorizeContent(strings.TrimPrefix(authorization, prefix)) {
+			http.Error(w, "an active world presence session is required for region content", http.StatusUnauthorized)
+			return
+		}
 	}
 	r.Header.Del("Cookie")
 	r.Header.Del("Authorization")
@@ -432,6 +441,10 @@ func (gateway *regionProviderGateway) ServeHTTP(w http.ResponseWriter, r *http.R
 		return
 	}
 	gateway.proxy.ServeHTTP(w, r)
+}
+
+func isRegionContentPath(path string) bool {
+	return strings.HasPrefix(path, "/v1/regions/") || strings.HasPrefix(path, "/v1/leases/")
 }
 
 func diagnosticQueryValue(r *http.Request, key string) string {

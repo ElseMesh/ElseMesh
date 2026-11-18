@@ -92,6 +92,59 @@ func TestRegionProviderMovementAuthorityIsInternalAndRevisionPinned(t *testing.T
 	}
 }
 
+func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
+	const worldID = "elsemesh:hogwarts-legacy"
+	const sourceRevision = "installed-source:bridge-revision"
+	const cacheRevision = sourceRevision + ":cache"
+	var upstreamRequests atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		w.Header().Set("X-ElseMesh-World-ID", worldID)
+		w.Header().Set("X-ElseMesh-Source-Revision", sourceRevision)
+		w.Header().Set("X-ElseMesh-Cache-Revision", cacheRevision)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	gateway, err := newRegionProviderGateway(upstream.URL, worldID, nil)
+	if err != nil {
+		t.Fatalf("new region provider gateway: %v", err)
+	}
+	gateway.sourceRevision = sourceRevision
+	gateway.cacheRevision = cacheRevision
+	gateway.authorizeContent = func(token string) bool { return token == "accepted-presence-capability" }
+
+	request := httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,0", nil)
+	response := httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized || upstreamRequests.Load() != 0 {
+		t.Fatalf("uncredentialed cell request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,0", nil)
+	request.Header.Set("Authorization", "Bearer rejected")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized || upstreamRequests.Load() != 0 {
+		t.Fatalf("invalid capability request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=0,0,0", nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || upstreamRequests.Load() != 1 {
+		t.Fatalf("authorized cell request status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodOptions, "/v1/regions/GreatHall/cells", nil)
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if !strings.Contains(strings.ToLower(response.Header().Get("Access-Control-Allow-Headers")), "authorization") {
+		t.Fatalf("preflight does not allow Authorization: %q", response.Header().Get("Access-Control-Allow-Headers"))
+	}
+}
+
 func TestOwnerMovementRetriesOnceAfterColdIndexTimeout(t *testing.T) {
 	const worldID = "elsemesh:hogwarts-legacy"
 	const sourceRevision = "installed-source:bridge-revision"

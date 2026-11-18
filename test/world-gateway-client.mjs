@@ -14,12 +14,15 @@ try {
 	const pose = { protocol: PLAYER_PRESENCE_PROTOCOL, sequence: 1, position: [ 0, 1.38, 8 ], yaw: 0, pitch: 0, moving: false, mode: 'walk', avatarProfileId: 'elsemesh.avatar.stock-male/1', appearance: { style: 'male', shirt: '#7194aa', trousers: '#27313d', skin: '#c68c67', hair: '#33251c' } };
 	const spawnCandidates = [ [ 0, 1.38, 8 ], [ 0.6, 1.38, 8 ], [ -0.6, 1.38, 8 ], [ 0, 1.38, 8.6 ], [ 0, 1.38, 7.4 ] ];
 	const own = await connector.updatePresence( pose, { spawnCandidates } );
+	assert.match( own.contentCapability || '', /^[a-f0-9]{64}$/, 'owner issues a session-bound region-content capability at admission' );
 	const ownPose = own.players.find( ( player ) => player.id === own.playerId );
 	assert.deepEqual( ownPose.position, [ 0, 1.38, 8 ], 'first WSS visitor keeps the preferred spawn position' );
 	const observer = new WorldConnector( { worldId: worldID, nodeId: ownerPeerID, gateway } );
 	try {
 		await observer.getManifest();
 		const shared = await observer.updatePresence( pose, { spawnCandidates } );
+		assert.match( shared.contentCapability || '', /^[a-f0-9]{64}$/, 'each admitted visitor receives a content capability' );
+		assert.notEqual( shared.contentCapability, own.contentCapability, 'different presence sessions receive distinct content capabilities' );
 		assert.notEqual( shared.playerId, own.playerId, 'production connectors receive distinct session-bound player IDs' );
 		assert.equal( shared.players.length, 2, 'production WSS connections share owner presence' );
 		const observerPose = shared.players.find( ( player ) => player.id === shared.playerId );
