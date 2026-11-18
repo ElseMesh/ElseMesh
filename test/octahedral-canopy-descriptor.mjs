@@ -71,6 +71,7 @@ const invalid = [
 	{ ...descriptor, frameBlendDistance: -1 },
 	{ ...descriptor, lodBandFraction: 0 },
 	{ ...descriptor, thinning: { ...descriptor.thinning, endDistance: 130 } },
+	{ ...descriptor, thinning: { ...descriptor.thinning, removeFraction: 1 } },
 	{ ...descriptor, thinning: { ...descriptor.thinning, scaleCompensation: 'none' } },
 ];
 for ( const value of invalid ) assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( value ), options ), /Invalid octahedral canopy descriptor/ );

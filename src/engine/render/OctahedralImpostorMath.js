@@ -26,7 +26,7 @@ export function selectFractionalBinVariant( value, variantCount, multiplier ) {
 
 // CPU reference for the source canopy's seeded thinning and density compensation.
 export function planCanopyThinning( distance, seed, { startDistance, endDistance, removeFraction, seedMultiplier } ) {
-	if ( ! Number.isFinite( distance ) || distance < 0 || ! Number.isFinite( seed ) || ! Number.isFinite( startDistance ) || ! Number.isFinite( endDistance ) || endDistance <= startDistance || ! Number.isFinite( removeFraction ) || removeFraction < 0 || removeFraction >= 1 || ! Number.isFinite( seedMultiplier ) || seedMultiplier <= 0 ) throw new Error( 'Invalid canopy thinning inputs' );
+	if ( ! Number.isFinite( distance ) || distance < 0 || ! Number.isFinite( seed ) || seed < 0 || seed > 1 || ! Number.isFinite( startDistance ) || ! Number.isFinite( endDistance ) || endDistance <= startDistance || ! Number.isFinite( removeFraction ) || removeFraction < 0 || removeFraction >= 1 || ! Number.isFinite( seedMultiplier ) || seedMultiplier <= 0 ) throw new Error( 'Invalid canopy thinning inputs' );
 	const x = Math.max( 0, Math.min( 1, ( distance - startDistance ) / ( endDistance - startDistance ) ) );
 	const amount = x * x * ( 3 - 2 * x );
 	const seedFraction = seed * seedMultiplier - Math.floor( seed * seedMultiplier );

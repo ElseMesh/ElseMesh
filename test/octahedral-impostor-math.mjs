@@ -42,5 +42,6 @@ assert.throws( () => encodeHemiOctahedral( [ 1, - 1, 0 ] ), /upper hemisphere/ )
 assert.throws( () => selectHemiOctahedralFrames( [ 0, 1, 0 ], 1 ), /between 2 and 32/ );
 assert.throws( () => hemiOctahedralAtlasUV( { variantIndex: 5, variantCount: 5, framesPerAxis: 6, frameX: 0, frameY: 0, localX: 0, localY: 0 } ), /atlas address/ );
 assert.throws( () => planCanopyThinning( 140, 0, { ...thinning, removeFraction: 1 } ), /Invalid canopy thinning/ );
+assert.throws( () => planCanopyThinning( 140, 1.1, thinning ), /Invalid canopy thinning/ );
 
 console.log( 'hemi-octahedral frame selection, ray reprojection, and atlas addressing pass' );
