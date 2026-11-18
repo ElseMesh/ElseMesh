@@ -15,7 +15,7 @@ import { parseGLB } from './GLB.js';
 //
 // Each LOD level is ONE InstancedMesh holding the geometry of every asset (vertex attribute
 // aAsset); an instance draws only its own asset (iData.x), the other assets' vertices collapse
-// to a point. So the whole set costs 3 draw calls (+ 3 shadow draws for the near LOD) and one
+// to a point. So the whole set costs 3 draw calls (+ 3 shadow draws for the selected LODs) and one
 // material. The asset textures (1K albedo / normal / AO-rough-metal) are packed into 2K atlases
 // (2 x 2 tiles): 3 samplers.
 // Instances are re-bucketed into the LODs (and distance culled) on the CPU when the camera moves.
@@ -159,7 +159,7 @@ export class ScannedDebris {
 			const mesh = new InstancedMesh( geo, this.material, n );
 			mesh.name = 'debris-scan-lod' + l;
 			mesh.count = 0;
-			mesh.castShadow = l === 0;
+			mesh.castShadow = true;
 			mesh.receiveShadow = true;
 			mesh.frustumCulled = false;
 			mesh.instanceMatrix.setUsage( DynamicDrawUsage );

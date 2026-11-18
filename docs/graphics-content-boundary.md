@@ -152,10 +152,15 @@ both engine graph compilers. The graph contract queries the installed authored
 terrain heightfield per fragment, removing the former center-sampled
 contact-height approximation. The shared static-model planner applies
 Tidewater's six-times-radius distance metric to LOD and color draw range/fade
-in both backends, plus WebGPU's separate shadow range. WebGL continues to cast
-from its visible LOD. The offset metric uses a centered smoothstep band
-matching Tidewater's authored fade math; rendered fade parity remains
-unverified. Matched backend images are still required to verify contact
+in both backends. Both renderers select shadow batches from the same LOD family,
+thresholds, and transition fades, with a shared optional coarser shadow bias;
+shadow distance is independently bounded. The native WebGPU bootstrap's
+legacy scanned-debris presenter also enables shadow casting on every LOD batch,
+so its color-selected LOD supplies the shadow. These legacy procedural
+presenters remain migration debt and do not yet consume the signed static-model
+component used by hosted package worlds. The offset metric uses a centered
+smoothstep band matching Tidewater's authored fade math; rendered fade parity
+remains unverified. Matched backend images are still required to verify contact
 shading, LOD fades, and overall appearance.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
