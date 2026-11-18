@@ -32,20 +32,9 @@ async function installGroundCoverField( { app, root, connector }, component ) {
 		data: assets.density.data,
 		sampler: 'linearClamp',
 	} );
-	const detailFieldTexture = assets.detailField ? new Texture( {
-		label: `ground-cover-detail-${component.id}`,
-		width: assets.detailField.width,
-		height: assets.detailField.height,
-		format: 'rgba8unorm',
-		data: assets.detailField.data,
-		sampler: 'linearRepeat',
-	} ) : null;
+	const detailFieldTexture = installedTerrain.terrainGPU.detailTexture || null;
 	const textureKey = `component:${component.id}:densityField`;
 	root.userData.worldPackage.textureAssets.set( textureKey, { key: textureKey, texture: densityTexture } );
-	if ( detailFieldTexture ) {
-		const detailKey = `component:${component.id}:detailField`;
-		root.userData.worldPackage.textureAssets.set( detailKey, { key: detailKey, texture: detailFieldTexture } );
-	}
 	const field = new GroundCoverFieldRuntime( { data: assets.data, componentAssets: component.assets, terrain, density: assets.density } );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const presentation = new GroundCoverFieldPresentationRuntime( field, {

@@ -6,14 +6,15 @@ import { Group } from '../src/engine/scene/Group.js';
 import { Mesh } from '../src/engine/scene/Mesh.js';
 import { PlaneGeometry } from '../src/engine/geometry/PrimitiveGeometries.js';
 import { GPU } from '../src/engine/gpu/GPU.js';
+import { Texture } from '../src/engine/gpu/Texture.js';
 import { standard } from '../src/materials/Materials.js';
 import { readTexture } from '../src/engine/gpu/Readback.js';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
 
-const { component, connector, terrain } = await groundCoverFieldRenderFixture();
+const { component, connector, terrain, terrainDetail } = await groundCoverFieldRenderFixture();
 const L = await setupLife( { W: 192, H: 144, shadowSplits: [ 12 ] } );
-let runtime;
+let runtime, terrainDetailTexture;
 try {
 	const ground = new Mesh( new PlaneGeometry( 32, 32 ).rotateX( - Math.PI / 2 ), standard( { name: 'ground-cover-render-ground', color: 0xc3b895, roughness: 1 } ) );
 	ground.position.y = - 0.02;
@@ -21,7 +22,8 @@ try {
 	L.scene.add( ground );
 	const root = new Group();
 	root.userData.terrainData = terrain;
-	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: {} } ];
+	terrainDetailTexture = new Texture( { label: 'fixture-signed-terrain-detail', width: terrainDetail.width, height: terrainDetail.height, format: 'rgba8unorm', data: terrainDetail.data, sampler: 'aniso4Repeat' } );
+	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: { detailTexture: terrainDetailTexture } } ];
 	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, progressiveController: new AbortController() };
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const installed = await install( { app: {}, root, connector }, component );
@@ -59,6 +61,7 @@ try {
 	console.log( `ground-cover WebGPU fixed-cell fixture rendered (${ visibleInstances } visible; ${ shadowInstances } shadow instances; ${ shadowChangedPixels } receiver pixels changed when shadows were disabled)` );
 } finally {
 	runtime?.dispose();
+	terrainDetailTexture?.destroy();
 	GPU.device?.destroy();
 }
 await new Promise( resolve => setTimeout( resolve, 200 ) );

@@ -1,5 +1,4 @@
 import { encodeGrassDensityAsset } from '../../src/network/GrassDensityAsset.js';
-import { encodeRgbaDataTextureAsset } from '../../src/network/RgbaDataTextureAsset.js';
 import { staticModelGLB } from './static-model-glb.mjs';
 
 async function assetID( bytes ) {
@@ -19,7 +18,6 @@ export async function groundCoverFieldRenderFixture() {
 		detailData[ index * 4 + 2 ] = 64;
 		detailData[ index * 4 + 3 ] = 255 - ( index % 8 ) * 24;
 	}
-	const detailBytes = encodeRgbaDataTextureAsset( { data: detailData, width: 8, height: 8 } );
 	const densityGraph = {
 		format: 'elsemesh.material-graph/1',
 		nodes: [
@@ -40,13 +38,12 @@ export async function groundCoverFieldRenderFixture() {
 		staticModelGLB( { materialExtras } ),
 	];
 	const densityAssetId = await assetID( densityBytes );
-	const detailFieldAssetId = await assetID( detailBytes );
 	const modelAssetIds = await Promise.all( modelBytesByLOD.map( assetID ) );
 	const component = {
 		id: 'elsemesh-component:ground-cover-render-fixture',
 		type: 'elsemesh.ground-cover-field/1',
 		data: {
-			densityAssetId, detailFieldAssetId, seed: 314159, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
+			densityAssetId, seed: 314159, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
 			distanceBands: [ { maxDistance: 8, cellCapacity: 24 }, { maxDistance: 16, cellCapacity: 24 }, { maxDistance: 24, cellCapacity: 24 } ],
 			species: [ {
 				id: 'fixture-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,
@@ -55,7 +52,7 @@ export async function groundCoverFieldRenderFixture() {
 				castsShadow: true, shadowMaxDistance: 12,
 			} ],
 		},
-		assets: [ { assetId: densityAssetId, kind: 'grass-density/1' }, { assetId: detailFieldAssetId, kind: 'rgba-data-texture/1' }, ...modelAssetIds.map( assetId => ( { assetId, kind: 'glb' } ) ) ],
+		assets: [ { assetId: densityAssetId, kind: 'grass-density/1' }, ...modelAssetIds.map( assetId => ( { assetId, kind: 'glb' } ) ) ],
 	};
 	const terrain = {
 		res: 2, size: 32, origin: -16, texel: 32,
@@ -64,12 +61,12 @@ export async function groundCoverFieldRenderFixture() {
 	};
 	const connector = {
 		manifest: { assets: component.assets.map( asset => ( { id: asset.assetId, kind: asset.kind } ) ) },
-		assets: new Map( [ [ densityAssetId, densityBytes ], [ detailFieldAssetId, detailBytes ] ] ),
+		assets: new Map( [ [ densityAssetId, densityBytes ] ] ),
 		getAsset: async id => {
 			const model = modelBytesByLOD[ modelAssetIds.indexOf( id ) ];
 			if ( model ) return model;
-			return id === detailFieldAssetId ? detailBytes : densityBytes;
+			return densityBytes;
 		},
 	};
-	return { component, connector, terrain, modelAssetIds, modelBytesByLOD };
+	return { component, connector, terrain, terrainDetail: { data: detailData, width: 8, height: 8 }, modelAssetIds, modelBytesByLOD };
 }

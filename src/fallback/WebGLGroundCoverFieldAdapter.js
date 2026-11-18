@@ -26,18 +26,8 @@ async function installGroundCoverField( { fallback, terrain, assets }, component
 	densityTexture.unpackAlignment = 1;
 	densityTexture.colorSpace = T.NoColorSpace;
 	densityTexture.needsUpdate = true;
-	const detailFieldTexture = loaded.detailField ? new T.DataTexture( loaded.detailField.data, loaded.detailField.width, loaded.detailField.height, T.RGBAFormat, T.UnsignedByteType ) : null;
-	if ( detailFieldTexture ) {
-		detailFieldTexture.magFilter = T.LinearFilter;
-		detailFieldTexture.minFilter = T.LinearFilter;
-		detailFieldTexture.wrapS = T.RepeatWrapping;
-		detailFieldTexture.wrapT = T.RepeatWrapping;
-		detailFieldTexture.generateMipmaps = false;
-		detailFieldTexture.flipY = false;
-		detailFieldTexture.unpackAlignment = 1;
-		detailFieldTexture.colorSpace = T.NoColorSpace;
-		detailFieldTexture.needsUpdate = true;
-	}
+	const detailFieldTexture = fallback.beachDetailTexture || createTerrainDetailTexture( T, fallback.hostedTerrainSurface );
+	const ownsDetailFieldTexture = Boolean( detailFieldTexture && detailFieldTexture !== fallback.beachDetailTexture );
 	const field = new GroundCoverFieldRuntime( { data: loaded.data, componentAssets: component.assets, terrain, density: loaded.density } );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const presentation = new GroundCoverFieldPresentationRuntime( field, {
@@ -64,7 +54,7 @@ async function installGroundCoverField( { fallback, terrain, assets }, component
 			for ( const geometry of ownedGeometry ) geometry.dispose();
 			for ( const material of ownedMaterials ) material.dispose();
 			densityTexture.dispose();
-			detailFieldTexture?.dispose();
+			if ( ownsDetailFieldTexture ) detailFieldTexture.dispose();
 			ownedGeometry.clear();
 			ownedMaterials.clear();
 		},
@@ -85,6 +75,21 @@ function disposeParsedSource( source ) {
 	for ( const geometry of geometries ) geometry.dispose();
 	for ( const material of materials ) material.dispose();
 	for ( const texture of textures ) texture.dispose();
+}
+
+function createTerrainDetailTexture( T, terrainSurface ) {
+	if ( ! terrainSurface?.detail || ! Number.isInteger( terrainSurface.detailWidth ) || ! Number.isInteger( terrainSurface.detailHeight ) ) return null;
+	const texture = new T.DataTexture( terrainSurface.detail, terrainSurface.detailWidth, terrainSurface.detailHeight, T.RGBAFormat, T.UnsignedByteType );
+	texture.magFilter = T.LinearFilter;
+	texture.minFilter = T.LinearFilter;
+	texture.wrapS = T.RepeatWrapping;
+	texture.wrapT = T.RepeatWrapping;
+	texture.generateMipmaps = false;
+	texture.flipY = false;
+	texture.unpackAlignment = 1;
+	texture.colorSpace = T.NoColorSpace;
+	texture.needsUpdate = true;
+	return texture;
 }
 
 function createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX, densityTexture, detailFieldTexture, ownedGeometry, ownedMaterials ) {

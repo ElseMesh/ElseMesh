@@ -13,13 +13,11 @@ component nor its assets select a backend or contain shader source.
   "type": "elsemesh.ground-cover-field/1",
   "assets": [
     { "assetId": "sha256:<density-hash>", "kind": "grass-density/1" },
-    { "assetId": "sha256:<detail-hash>", "kind": "rgba-data-texture/1" },
     { "assetId": "sha256:<near-model-hash>", "kind": "glb" },
     { "assetId": "sha256:<far-model-hash>", "kind": "glb" }
   ],
   "data": {
     "densityAssetId": "sha256:<density-hash>",
-    "detailFieldAssetId": "sha256:<detail-hash>",
     "seed": 7,
     "cellSize": 8,
     "pointsPerCell": 384,
@@ -61,12 +59,6 @@ such as Tidewater's dune/meadow grass density without giving the renderer
 Tidewater-specific channel meanings. In `blue-noise/1`, expressions affect
 candidate presence; species-specific appearance is carried by its model assets
 and material data.
-
-`detailFieldAssetId` is optional. When present, it references exactly one
-signed `rgba-data-texture/1` asset. Material graphs can sample this raw RGBA
-texture through `detailField`; ElseMesh applies linear filtering and repeat
-addressing in WebGPU and WebGL. This repeating material input is distinct from
-the terrain-domain density field.
 
 Each blue-noise species references one to four signed
 static GLBs, ordered coarsest to finest, and declares the same LOD metric and

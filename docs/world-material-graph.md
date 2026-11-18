@@ -96,10 +96,10 @@ by ElseMesh's ground-cover component to that component's signed
 `grass-density/1` RGBA asset; it uses linear filtering and clamp addressing in
 both backends and preserves the raw data channels. Its graph must compute UVs
 for the density asset's world domain and avoid sampling outside that domain.
-The optional `detailField` slot is bound by the same component to its signed
-`rgba-data-texture/1` asset; it uses linear filtering and repeat addressing in
-both backends and preserves raw RGBA channels. It is a repeating material
-input, separate from the domain-bounded density field.
+The `detailField` slot is bound by a ground-cover component to the installed
+terrain surface's detail texture from its signed terrain-surface asset. It uses
+linear filtering and repeat addressing in both backends and preserves raw RGBA
+channels. It is separate from the domain-bounded density field.
 Color slots use the texture's linearized sample, while data slots preserve
 their linear channel values. Explicit-LOD vertex reads let signed portable
 textures drive deformation without sending shader code. The graph chooses its
@@ -164,7 +164,7 @@ this graph.
 ## Current limits and migration gate
 
 Format `/1` supports the five standard glTF material texture slots plus the
-ground-cover component `densityField` and optional `detailField` bindings; it
+ground-cover component `densityField` and terrain-provided `detailField` bindings; it
 does not define arbitrary material-specific texture bundles. Vertex texture reads require an explicit
 LOD and are shared by color, depth, and shadow deformation paths. The
 graph inputs otherwise include vertex/instance data, and the standard glTF

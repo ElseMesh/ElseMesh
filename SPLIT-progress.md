@@ -2153,12 +2153,13 @@ finding changes them.
   Lower cost may select a coarser shared authored LOD; it must not remove object
   classes or substitute backend-specific content. Tidewater remains 93%.
 
-- 2026-11-18: added an optional signed `rgba-data-texture/1` asset for the
-  ground-cover component's repeat-sampled `detailField` material-graph slot.
-  WebGPU and WebGL bind the same raw RGBA bytes with linear filtering and repeat
-  addressing. The graph and asset checks pass, and both paired browser render
-  fixtures compile and render signed synthetic GLBs that sample the slot. This
-  closes generic texture-binding plumbing only: Tidewater has not yet exported
-  or connected its original repeating detail texture, its authored patches
-  remain unsigned/inactive, and no matched Tidewater visuals were compared.
+- 2026-11-18: the ground-cover material graph's `detailField` slot now binds
+  the same repeatable texture already packaged in the signed terrain-surface
+  asset. WebGPU reuses the installed terrain texture; WebGL binds the same raw
+  RGBA texels from that signed asset with linear filtering and repeat addressing.
+  The graph/asset checks and both paired browser render fixtures pass; the
+  fixtures compile GLBs that sample supplied synthetic terrain-detail bytes,
+  and do not validate a Tidewater package or signed terrain asset end to end.
+  This closes generic binding plumbing only: Tidewater's authored patches are
+  still unsigned/inactive, and no matched Tidewater visuals were compared.
   Tidewater remains 93%; no parity gate changed.

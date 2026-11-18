@@ -79,7 +79,7 @@ const groundCoverType = 'elsemesh.ground-cover-field/1';
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', groundCoverType ), 'function', 'ElseMesh registers a generic WebGPU ground-cover presenter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', groundCoverType ), 'function', 'ElseMesh registers a generic WebGL ground-cover presenter' );
 assert.equal( worldComponentDescriptor( groundCoverType )?.vegetation, true, 'ground-cover fields participate in renderer-neutral vegetation visibility policy' );
-assert.deepEqual( worldComponentAssetIDs( { type: groundCoverType, assets: [ { assetId: 'density', kind: 'grass-density/1' }, { assetId: 'detail', kind: 'rgba-data-texture/1' }, { assetId: 'near', kind: 'glb' }, { assetId: 'far', kind: 'glb' } ] } ), [ 'density', 'detail' ], 'ground-cover data textures load with the component while model GLBs remain lazy' );
+assert.deepEqual( worldComponentAssetIDs( { type: groundCoverType, assets: [ { assetId: 'density', kind: 'grass-density/1' }, { assetId: 'near', kind: 'glb' }, { assetId: 'far', kind: 'glb' } ] } ), [ 'density' ], 'ground-cover density loads with the component while model GLBs remain lazy' );
 const tidewaterFishProps = 'elsemesh.static-fish-props/1';
 assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'ElseMesh registers the generic fish-props component contract' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGPU fish-props presenter' );
