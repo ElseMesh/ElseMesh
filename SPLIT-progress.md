@@ -2376,3 +2376,12 @@ finding changes them.
   there are still no signed canopy atlas assets or ElseMesh WebGPU/WebGL
   presenters consuming the descriptor, so appearance parity remains open and
   Tidewater stays at 93%.
+
+- 2026-11-18: added the same `L` flashlight control to the engine's WebGL
+  fallback. The camera-attached spotlight uses the WebGPU path's position
+  offset, 9°/35° cone, 30 m range, warm color, night intensity ramp, and
+  60 ms direction smoothing; it shares the eight-light capacity with authored
+  world lights. The local-light contract and WebGL component-support checks
+  pass. The shader and Three.js spotlight still use different lighting models,
+  and there is no matched rendered comparison yet, so this closes a missing
+  gameplay feature but not a visual parity gate or percentage.

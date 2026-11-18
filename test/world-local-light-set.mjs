@@ -19,6 +19,16 @@ runtime.update( camera, 1 / 60, 1 );
 assert.equal( runtime.active, 2, 'the WebGL presenter selects the shared point and spot sources' );
 assert( runtime.pool.point[ 0 ].intensity > 0, 'the WebGL point light receives the authored source intensity at night' );
 assert( runtime.pool.spot[ 0 ].intensity > 0, 'the WebGL spot light receives the authored cone and intensity at night' );
+assert.equal( runtime.toggleFlashlight(), true, 'the renderer-neutral WebGL player controls can enable the flashlight' );
+runtime.update( camera, 1 / 60, 0 );
+assert.equal( runtime.active, 1, 'the flashlight is active while world night lights remain off in daylight' );
+assert.equal( runtime.flashlight.visible, true, 'the WebGL flashlight becomes visible when enabled' );
+assert.ok( runtime.flashlight.intensity > 0, 'the WebGL flashlight remains usable in daylight at reduced intensity' );
+runtime.update( camera, 1 / 60, 1 );
+assert.equal( runtime.active, 3, 'the flashlight and both night sources share the WebGL local-light pool' );
+assert.equal( runtime.toggleFlashlight( false ), false, 'the flashlight can be disabled deterministically' );
+runtime.update( camera, 1 / 60, 1 );
+assert.equal( runtime.flashlight.visible, false, 'disabling the flashlight removes it from presentation' );
 runtime.dispose();
 assert.equal( scene.children.length, 0, 'the WebGL presenter removes its light pool on disposal' );
 

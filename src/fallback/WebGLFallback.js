@@ -2180,6 +2180,11 @@ export class WebGLFallback {
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
 			const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
 			if ( dispatchWorldBehaviorHooks( experience, 'onWebGLKeyDown', { fallback: this, event, extensions: this.activeWorldExtensions } ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+			if ( event.code === 'KeyL' ) {
+				this.webglLocalLights?.toggleFlashlight();
+				event.preventDefault();
+				return;
+			}
 			if ( this.worldLink && event.code === 'KeyE' ) this._useNearestPortal();
 		};
 		this._resize = () => {
