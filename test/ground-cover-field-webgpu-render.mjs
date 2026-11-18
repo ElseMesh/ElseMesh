@@ -44,7 +44,7 @@ try {
 	assert.ok( visible.length > 0 && visible.every( mesh => ! mesh.castShadow && mesh.receiveShadow ), 'WebGPU visible draws receive shadows without duplicating shadow casters' );
 	assert.ok( shadows.length > 0 && shadows.every( mesh => mesh.castShadow && ! mesh.material.colorWrite && mesh.count > 0 ), 'WebGPU shadow-only draws contain the same visible instances and enter the depth pass' );
 	const visibleInstances = visible.reduce( ( n, mesh ) => n + mesh.count, 0 ), shadowInstances = shadows.reduce( ( n, mesh ) => n + mesh.count, 0 );
-	assert.ok( visibleInstances > 0 && shadowInstances > 0 && shadowInstances <= visibleInstances, 'the signed fixed-cell fixture selects bounded visible and near-shadow patch instances' );
+	assert.ok( visibleInstances > 0 && shadowInstances > 0 && shadowInstances <= visibleInstances, `the signed fixed-cell fixture selects bounded visible and near-shadow patch instances (${ visibleInstances } visible; ${ shadowInstances } shadows)` );
 	const errors = [];
 	GPU.device.addEventListener( 'uncapturederror', event => errors.push( event.error?.message || 'unknown GPU error' ) );
 	await L.run( 2, dt => runtime.update( dt, L.camera ) );
