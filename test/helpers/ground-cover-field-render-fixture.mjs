@@ -30,11 +30,11 @@ export async function groundCoverFieldRenderFixture() {
 		type: 'elsemesh.ground-cover-field/1',
 		data: {
 			densityAssetId, seed: 314159, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
-			distanceBands: [ { maxDistance: 8, cellCapacity: 24 }, { maxDistance: 16, cellCapacity: 24 }, { maxDistance: 24, cellCapacity: 24 } ],
+			distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 			species: [ {
 				id: 'fixture-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,
 				modelAssetIds, bounds: { center: [ 4, 0.5, 4 ], radius: 6 }, geometryMirrorX: false,
-				drawMaxDistance: 24, drawFadeStartDistance: 23,
+				drawMaxDistance: 88, drawFadeStartDistance: 88,
 				castsShadow: true, shadowMaxDistance: 12,
 			} ],
 		},
