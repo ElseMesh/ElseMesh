@@ -1,6 +1,5 @@
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT, MAX_STATIC_MODEL_INSTANCE_LODS, MAX_STATIC_MODEL_INSTANCES } from './StaticModelInstanceSet.js';
 
-const MODELS_PER_COMPONENT = 24;
 const ID_PART_LIMIT = 2048;
 const finiteVector = ( value, length ) => Array.isArray( value ) && value.length === length && value.every( Number.isFinite );
 
@@ -132,17 +131,16 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 	const models = [ ...groups.values() ].sort( ( a, b ) => a.componentPath.localeCompare( b.componentPath ) || Number( a.geometryMirrorX ) - Number( b.geometryMirrorX ) );
 	if ( models.some( model => model.instances.length === 0 ) ) return null;
 	const result = [];
-	for ( let offset = 0, chunk = 0; offset < models.length; offset += MODELS_PER_COMPONENT, chunk ++ ) {
-		const modelChunk = models.slice( offset, offset + MODELS_PER_COMPONENT );
-		const chunkBounds = { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] };
-		for ( const model of modelChunk ) includeBounds( chunkBounds, model.bounds );
+	// Keep each mesh group's visibility bounds independent so one visible model
+	// cannot schedule unrelated mesh LODs from the same spatial cell.
+	for ( const [ chunk, model ] of models.entries() ) {
 		const cellCenter = [ 0, 1, 2 ].map( axis => ( coordinates[ axis ] + 0.5 ) * cellSizeMeters );
-		const streamingBounds = boundsSphere( chunkBounds, maxDistanceMeters ) || { center: cellCenter, radius: cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters };
-		const ids = new Map( modelChunk.map( ( model, index ) => [ model, `m${index}` ] ) );
+		const streamingBounds = boundsSphere( model.bounds, maxDistanceMeters ) || { center: cellCenter, radius: cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters };
+		const modelID = 'm0';
 		const document = {
 			format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-			models: modelChunk.map( ( model, index ) => ( {
-				id: ids.get( model ),
+			models: [ {
+				id: modelID,
 				geometryMirrorX: model.geometryMirrorX,
 				bounds: { center: [ 0, 0, 0 ], radius: model.radius },
 				lods: model.sourceLods.map( lod => ( { assetId: localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index ) } ) ),
@@ -154,22 +152,22 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				shadowMaxDistance: maxDistanceMeters,
 				drawMaxDistance: maxDistanceMeters,
 				drawFadeStartDistance: maxDistanceMeters,
-			} ) ),
-			instances: modelChunk.flatMap( model => model.instances.map( instance => ( {
-				model: ids.get( model ),
+			} ],
+			instances: model.instances.map( instance => ( {
+				model: modelID,
 				placementId: instance.placementId,
 				position: instance.position,
 				rotation: instance.rotation,
 				scale: instance.scale,
-			} ) ) ),
+			} ) ),
 		};
 		if ( document.instances.length > MAX_STATIC_MODEL_INSTANCES ) return null;
 		const descriptorAssetID = localStaticModelSetAssetID( regionID, cellSizeMeters, coordinates, chunk );
 		const assetReferences = [ { assetId: descriptorAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ];
-		for ( const model of modelChunk ) for ( const lod of model.sourceLods ) {
+		for ( const lod of model.sourceLods ) {
 			const assetId = localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index );
 			if ( assetId.length > 8192 ) return null;
-			if ( ! assetReferences.some( reference => reference.assetId === assetId ) ) assetReferences.push( { assetId, kind: 'glb' } );
+			assetReferences.push( { assetId, kind: 'glb' } );
 		}
 		if ( assetReferences.length > 256 ) return null;
 		result.push( {
@@ -183,11 +181,11 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 			},
 			descriptorAssetID,
 			document,
-			modelAssets: modelChunk.flatMap( model => model.sourceLods.map( lod => ( {
+			modelAssets: model.sourceLods.map( lod => ( {
 				assetId: localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index ),
 				componentPath: model.componentPath,
 				lodIndex: lod.index,
-			} ) ) ),
+			} ) ),
 		} );
 	}
 	return result;
