@@ -198,7 +198,7 @@ function fishMaterial( T, presentation ) {
 		vertexColors: true, roughness: 0.42, metalness: 0.06,
 		clearcoat: 1, clearcoatRoughness: 0.24,
 	} );
-	material.name = 'Tidewater fish-prop skin';
+	material.name = 'ElseMesh fish-prop skin';
 	material.onBeforeCompile = shader => {
 		const insert = ( source, marker, code ) => {
 			if ( ! source.includes( marker ) ) throw new Error( `Three.js fish material hook is missing ${ marker }` );

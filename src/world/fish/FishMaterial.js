@@ -815,13 +815,12 @@ export function createPropMaterial( batch, { fade = false, presentation } = {} )
 
 }
 
-// Tidewater's renderer-neutral static instance-set profile. The placement and
-// LOD contract stays in ElseMesh; this world material consumes the opaque
-// profile data and Tidewater's own fish-presentation table.
+// Renderer-neutral static instance-set profile. Placement and LOD are handled
+// by generic engine systems; this material consumes world-supplied fish data.
 export function createStaticPropMaterial( presentation ) {
 	if ( ! presentation?.SPECIES || ! presentation?.PATTERN || ! presentation?.SKIN ) throw new Error( 'Static fish props require a registered world fish-presentation profile' );
 	return new Material( {
-		name: 'Tidewater static fish props',
+		name: 'ElseMesh static fish props',
 		modules: [ fishModule( presentation ) ],
 		attributes: { aData: 'vec4f', iStaticMaterialData0: 'vec4f', iStaticMaterialData1: 'vec4f' },
 		varyings: VARYINGS,
