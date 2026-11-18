@@ -2292,12 +2292,13 @@ finding changes them.
   Tidewater debris comparison or full visual parity; Tidewater remains 93%.
 
 - 2026-11-18: fixed WebGL static-model fade hooks to reuse instance-material
-  attribute declarations already installed by the material graph. The isolated
-  browser check now loads the built-in package's signed scanned-debris component
-  through the registry and renders its authored 141 placements (924 foreground
-  pixels), fetching 9 referenced JPEG assets, compiling 10 programs, and
-  reporting no GL errors. Static-model adapter and contract checks also pass.
-  This proves the built-in signed asset path renders; it is not a matched image
-  comparison against pre-split WebGPU or hosted Tidewater parity. Other debris
-  views, LOD transitions, materials, and full-world visual parity remain open;
-  Tidewater remains 93%.
+  attribute declarations already installed by the material graph. Tidewater now
+  owns the signed scanned-debris package render test and its package command.
+  From a close beach-trunk pose, the isolated browser check renders the authored
+  141-placement component (568 foreground pixels), loads 9 referenced JPEGs,
+  selects authored LOD 2, compiles two programs, and reports no GL errors. The
+  separate generic engine fixture still passes (343 pixels, eight programs).
+  This proves the built-in signed asset path renders at a debris-visible view;
+  it is not a matched image comparison against pre-split WebGPU or hosted
+  Tidewater parity. Other debris views, LOD transitions, materials, and
+  full-world visual parity remain open; Tidewater remains 93%.
