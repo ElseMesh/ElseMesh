@@ -2163,3 +2163,11 @@ finding changes them.
   This closes generic binding plumbing only: Tidewater's authored patches are
   still unsigned/inactive, and no matched Tidewater visuals were compared.
   Tidewater remains 93%; no parity gate changed.
+
+- 2026-11-18: clarified the shared-content requirement alongside the FPS
+  controls: engine quality settings may lower render scale, shadow/reflection
+  cost, texture mip/residency, or select coarser authored LODs to meet a minimum
+  FPS target. WebGPU and WebGL must still use the same authored texture assets
+  and world content; matched settings must select the same LOD assets. Quality
+  settings cannot remove object classes or substitute backend-specific content.
+  This is a goal clarification, not new parity evidence; Tidewater remains 93%.
