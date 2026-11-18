@@ -2085,3 +2085,12 @@ finding changes them.
   93%; no dual-backend or matched-baseline parity gate has closed. The headless
   grass timing (598 ms with, 298 ms without grass at 2560x1267) is not supported-
   hardware frame-rate evidence.
+
+- 2026-11-18: extended the shared material graph with per-view camera position
+  and vertex-stage terrain-height queries, compiled from the same graph contract
+  to WebGPU and WebGL. The focused graph check covers WebGL's active-camera
+  uniform and uses the same terrain heightfield binding in its color and depth
+  materials; it passes, as does the external production build. These inputs
+  support the authored Tidewater patch migration, but density-field binding,
+  shared patch instances, and matched rendering are still open. Tidewater stays
+  93%; no parity gate or percentage changes.
