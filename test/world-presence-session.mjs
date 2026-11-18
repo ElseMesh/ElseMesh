@@ -17,9 +17,8 @@ session.update(.016,player); assert.equal(sent.length,1);
 assert.ok(Math.abs(sent[0].pose.yaw)<=Math.PI,'accumulated player yaw is normalized for bounded wire protocol');
 now=500; session.update(.016,player); assert.equal(sent.length,1,'one in-flight request prevents overlapping publishes');
 const pose = {...sent[0].pose,id:remote,position:[4,2,3],updatedAt:1000};
-pending.resolve({type:'presence',worldId:connector.worldId,requestId:'one',playerId:own,contentCapability:'a'.repeat(64),players:[pose]});
+pending.resolve({type:'presence',worldId:connector.worldId,requestId:'one',playerId:own,players:[pose]});
 await session.pending;
-assert.equal(receivedCapability, 'a'.repeat(64), 'admission forwards the owner capability to the region connector');
 session.update(.016,player); assert.equal(created.length,1,'validated remote snapshot creates an avatar');
 assert.equal(ghostStates.at(-1),false,'Live remote avatar is rendered as opaque');
 assert.equal(sent.length,2,'publication resumes after the request completes');
@@ -33,9 +32,10 @@ session.update(.016,player); assert.equal(created.length,1,'late source-world re
 session.dispose(); assert.equal(closed,1,'disposal is idempotent');
 let admissionOptions, admittedPose;
 const admissionSession = new WorldPresenceSession({connector,parent:{add(){}},clock:()=>700,
- createConnector(){return {updatePresence(pose,options){admittedPose=pose;admissionOptions=options;return Promise.resolve({type:'presence',worldId:connector.worldId,requestId:'admit',playerId:own,players:[{...pose,position:options.spawnCandidates[0],id:own,updatedAt:700}]})},close(){}}},
+ createConnector(){return {updatePresence(pose,options){admittedPose=pose;admissionOptions=options;return Promise.resolve({type:'presence',worldId:connector.worldId,requestId:'admit',playerId:own,contentCapability:'b'.repeat(64),players:[{...pose,position:options.spawnCandidates[0],id:own,updatedAt:700}]})},close(){}}},
 });
 const accepted = await admissionSession.admit(player, [[1,1,3],[1.6,1,3]]);
+assert.equal(receivedCapability, 'b'.repeat(64), 'admission forwards the owner capability to the region connector');
 assert.equal(admittedPose.sequence,0,'admission creates the session before its regular update sequence');
 assert.deepEqual(admissionOptions.spawnCandidates,[[1,1,3],[1.6,1,3]],'invitation candidates reach the owner for atomic player occupancy checks');
 assert.deepEqual(accepted.position,[1,1,3],'admission returns the owner-selected position');
