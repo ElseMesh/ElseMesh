@@ -137,10 +137,11 @@ fragment. The shared static-model planner now supports the source radius-adjuste
 LOD distance through per-instance `lodDistanceOffset`; Tidewater authors the
 original six-times-radius calculation, and the planner applies that measure to
 LOD and color draw range/fade in both backends, plus WebGPU's separate shadow
-range. WebGL continues to cast from its visible LOD. The fixture remains
-outside the signed runtime package until matched backend images verify its
-center-sampled contact shading and fade behavior, or the shared contract is
-extended to represent them exactly.
+range. WebGL continues to cast from its visible LOD. The offset metric uses a
+centered smoothstep band matching Tidewater's authored fade math; rendered fade
+parity remains unverified. The fixture remains outside the signed runtime
+package until matched backend images verify its center-sampled contact shading
+and appearance, or the shared contract is extended to represent contact exactly.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable

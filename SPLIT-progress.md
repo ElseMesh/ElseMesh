@@ -1962,12 +1962,14 @@ finding changes them.
   mesh. Added a shared `world-distance-offset` metric; Tidewater exports the
   exact source six-times-radius offset per placement, and the engine applies it
   to shared LOD/color draw-range/fade and WebGPU's separate shadow-range
-  selection. WebGL continues to cast shadows from its selected visual LOD. The static-model
+  selection. WebGL continues to cast shadows from its selected visual LOD. The
+  new metric uses Tidewater's centered 12% smoothstep fade band; the shared
+  planner test verifies its half-fade at the threshold. The static-model
   contract check, deterministic Tidewater export check, and external production
   build pass. Tidewater's export check validates the graph with both engine
   compilers. The fixture remains outside the signed runtime package because
   contact shading still approximates the source per-fragment terrain query
   with a center-sampled height, and no matched rendered comparison has verified
-  its fade behavior or appearance. Built-in package integration and matched
-  backend appearance checks remain open; no Tidewater parity percentage
+  the visual fade or overall appearance. Built-in package integration and
+  matched backend appearance checks remain open; no Tidewater parity percentage
   changes.
