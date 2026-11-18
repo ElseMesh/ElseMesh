@@ -2214,10 +2214,11 @@ finding changes them.
   source grass; the harness now updates it as Tidewater's live grass test does.
   With committed signed assets at the overhead meadow view, the source changes
   22,087 pixels while the graph changes none (MAE 68.423/255), so parity is
-  clearly failing. Forcing graph density and terrain height still leaves the
+  clearly failing. Forcing graph presence and terrain height still leaves the
   full graph invisible; unscaled graph positions affect 3,793 pixels, and a
   raw geometry material affects 1,438. This localizes the fault to the graph's
-  authored vertex deformation path, but does not yet identify the bad term.
+  authored vertex deformation/scaling path, but does not yet identify the bad
+  term.
   Source and graph also select different cell sets and LODs. A concurrent
   uncommitted Tidewater terrain-asset edit now fails the signed hash check; it
   was preserved, and these measurements use committed asset bytes staged under
