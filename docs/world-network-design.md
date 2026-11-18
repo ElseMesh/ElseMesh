@@ -203,6 +203,22 @@ available detail tiers, and any world-specific constraints. Camera visibility
 and projected size refine visual quality; they do not replace traversal
 reachability as the basis for deciding which region to prepare next.
 
+Reachability is also the content-authorization boundary. `worldd` starts from
+the owner's accepted pose and selected avatar/vehicle movement profile, then
+authorizes collision prefetch only for the connected movement frontier
+produced from the world's traversal graph and canonical collision data. A
+distance or time horizon bounds the graph search; being inside that radius
+does not make a cell reachable. Incomplete collision, unknown blockers, denied
+world-local access, and a closed door stop expansion along that route. The
+door's own visible/collision content may be fetched so the visitor can interact
+with it, but content beyond it becomes eligible only after the authoritative
+door state makes passage traversable. Visual requests must also intersect the
+accepted view; signed portal previews use their separately bounded preview
+scope. A client-supplied region ID, cell coordinate, pose, or ignored-collider
+list never establishes reachability. If the bounded search cannot establish a
+route, it returns no authorization for that route and leaves movement
+fail-closed.
+
 The browser movement controller checks a proposed displacement as sequential
 horizontal and vertical swept segments. A blocker stops the intersecting axis
 without discarding clear tangent motion, so a diagonal input can slide along a
