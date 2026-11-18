@@ -2171,3 +2171,14 @@ finding changes them.
   and world content; matched settings must select the same LOD assets. Quality
   settings cannot remove object classes or substitute backend-specific content.
   This is a goal clarification, not new parity evidence; Tidewater remains 93%.
+
+- 2026-11-18: extended the renderer-neutral material graph with `translucency`
+  and `specularIntensity` outputs needed to represent Tidewater's original
+  WebGPU foliage surface. WebGPU writes its existing `Surface` fields; WebGL
+  uses the same graph values in its shadowed direct-light and metallic-roughness
+  specular paths. The graph unit test passes, the paired generic static-model
+  render fixtures pass (252 WebGPU foreground pixels; 343 WebGL pixels, eight
+  programs, no GL errors), and the external production build succeeds. These
+  fixtures prove the shared graph compiles and renders, not Tidewater appearance:
+  its patch assets remain unsigned/inactive and no parity gate closes. Tidewater
+  remains 93%.

@@ -233,7 +233,11 @@ detail texture through the `detailField` slot. This reuses the texture already
 included in the signed terrain-surface asset: both presenters bind its RGBA
 texels with linear filtering and repeat addressing. The synthetic paired
 fixture verifies the binding, but does not establish Tidewater material or
-visual parity.
+visual parity. The graph also exposes `translucency` and `specularIntensity`
+through the shared material contract; WebGPU writes its existing surface fields,
+and WebGL maps them into its standard physical-lighting path. Paired generic GLB
+render fixtures exercise those outputs, but do not establish Tidewater material
+or visual parity.
 
 The ground-cover field is only the dense-flora contract; it does not cover the
 finite vegetation set. Tidewater's placement asset has ten authored categories
@@ -320,6 +324,11 @@ select a coarser authored patch LOD and tune render scale or other presentation
 costs. At matched settings both backends must use the same LOD asset and its
 authored category fades; adaptation may not independently remove categories or
 substitute a backend-specific content set.
+
+The shared graph now has the `translucency` and `specularIntensity` outputs
+needed by the source foliage lighting. Tidewater still needs to author their
+expressions alongside density response, terrain alignment, wind, palette, and
+category fades in the exported patch materials.
 
 Before activating the component, a conformance fixture must load the exported
 Tidewater patch set through both engine adapters and assert identical cell
