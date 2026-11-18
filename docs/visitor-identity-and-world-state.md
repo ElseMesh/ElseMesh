@@ -14,6 +14,48 @@ stored. Worlds may define their own scores, inventory, progression, rules and
 other per-visitor data, with no requirement that their semantics match those
 of any other world.
 
+## Owner player and invitation administration
+
+The primary owner-management interface should be `worldd` command-line
+subcommands, so player records and invites can be managed in scripts as well as
+by hand. A graphical owner panel may be added later, but it must use the same
+validated operations and authority checks. The CLI should support listing and
+showing players, creating pending player records, editing owner-controlled
+fields, listing linked authentication methods, issuing invites with an explicit
+provider allowlist and expiry, and revoking invites or player access. It should
+offer stable opaque player IDs and machine-readable output for automation; it
+must not expose sequential player numbers as admission credentials.
+
+Provider identities may be linked only after the provider login flow proves
+control of the account. CLI input may select an already verified identity,
+change owner-controlled metadata, or revoke a link, but typing a provider name
+or account ID must never create a verified link. Store provider subjects and
+verification metadata, not reusable OAuth credentials. Keep durable state in a
+transactional world-local store (SQLite is the current design choice) and offer
+validated human-readable export/import for review and backup; do not treat
+manual edits to the live database as an administration interface. Invite
+commands should print or write the signed URL only on explicit request, and
+must not log bearer ticket material.
+
+The intended command shape is along these lines; names and exact flags remain
+subject to implementation:
+
+```text
+worldd player list
+worldd player create --display-name "Alex"
+worldd player show <player-id>
+worldd player set <player-id> --display-name "Alex"
+worldd player auth list <player-id>
+worldd invite create --player <player-id> --provider google --provider telegram --expires-in 24h
+worldd invite list --player <player-id>
+worldd invite revoke <invite-id>
+```
+
+An invite may create its pending player record in one operation when a named
+record is unnecessary. Owners should be able to see which providers the invite
+allows and its expiry before sharing it. The CLI is not implemented yet; the
+examples above define the intended workflow, not currently executable options.
+
 ElseMesh connects these independently authored experiences into one traversable
 world network. A visitor can carry a verifiable identity between worlds, but
 does not carry the source world's gameplay rules or avatar selection as
