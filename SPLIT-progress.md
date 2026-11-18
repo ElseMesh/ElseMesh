@@ -2141,3 +2141,14 @@ finding changes them.
   input types. This supplies the per-position hash needed to translate
   Tidewater's authored blade density/yaw calculations into the portable graph;
   it does not yet activate those GLBs or close a visual-parity gate.
+
+- 2026-11-18: exposed the shared world-space `sunDirection` frame input to
+  material graphs and both shader compilers, with a focused graph assertion for
+  WGSL and GLSL. This is another renderer-neutral input for translating
+  Tidewater's authored material response; the current graph test passed, but no
+  Tidewater asset or matched visual gate is activated by this change. The
+  minimum-FPS and quality controls remain engine-owned rendering-cost choices:
+  at matched settings, WebGPU and WebGL must use the same authored objects,
+  placements, geometry/LOD assets, textures, variants, and material inputs.
+  Lower cost may select a coarser shared authored LOD; it must not remove object
+  classes or substitute backend-specific content. Tidewater remains 93%.

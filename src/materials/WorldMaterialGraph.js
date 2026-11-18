@@ -11,6 +11,7 @@ const FRAME_UNIFORM_VALUES = Object.freeze( {
 	emgWindSpeed: () => G.windSpeed.value,
 	emgWindDirectionIntegral: () => G.windDirectionIntegral.value,
 	emgWindVelocityIntegral: () => G.windVelocityIntegral.value,
+	emgSunDirection: () => G.sunDir.value,
 } );
 
 const terrainHeightBindings = new WeakMap();

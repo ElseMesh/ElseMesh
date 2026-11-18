@@ -4,6 +4,7 @@ const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
 	worldVertexPosition: { wgsl: '( v.model * vec4f( v.position, 1.0 ) ).xyz', glsl: 'emgWorldVertexPosition.xyz' },
 	cameraPosition: { uniform: true, webglBuiltinUniform: true, wgsl: 'frame.cameraPos', glsl: 'cameraPosition' },
+	sunDirection: { uniform: true, wgsl: 'frame.sunDir', glsl: 'emgSunDirection' },
 	worldPosition: { fragmentOnly: true, fragmentWGSL: 'in.P', fragmentGLSL: 'vEmg_worldPosition' },
 	worldNormal: { fragmentOnly: true, fragmentWGSL: 'in.N', fragmentGLSL: 'vEmg_worldNormal' },
 	frontFacing: { fragmentOnly: true, builtinFragment: true, fragmentWGSL: 'in.front', fragmentGLSL: 'gl_FrontFacing' },

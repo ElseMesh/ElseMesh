@@ -75,6 +75,9 @@ assert.match( hashWebGPU.surface, /emgValueNoiseHash12\( in\.vs\.emg_uv \)/, 'We
 assert.match( hashWebGL.glsl.fragmentHelpers, /float emgValueNoiseHash12\( vec2 p \)/, 'WebGL emits the same hash implementation' );
 assert.match( hashWebGL.glsl.fragment, /emgValueNoiseHash12\( vEmg_uv \)/ );
 assert.throws( () => validateWorldMaterialGraph( { ...hashGraph, nodes: [ hashGraph.nodes[ 0 ], { id: 'scalar', op: 'constant', value: 1 }, { ...hashGraph.nodes[ 1 ], id: 'badHash', args: [ 'scalar' ] }, hashGraph.nodes[ 2 ] ] } ), /operation/, 'hash12 accepts only a vec2 input' );
+const sunGraph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'sun', op: 'input', name: 'sunDirection' } ], outputs: { emissive: 'sun' } };
+assert.match( compileWorldMaterialGraph( sunGraph, 'webgpu' ).surface, /frame\.sunDir/ );
+assert.match( compileWorldMaterialGraph( sunGraph, 'webgl' ).glsl.uniforms, /uniform vec3 emgSunDirection/ );
 
 const vertexDataGraph = {
 	format: 'elsemesh.material-graph/1',

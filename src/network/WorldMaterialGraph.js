@@ -9,6 +9,7 @@ const INPUT_TYPES = Object.freeze( {
 	worldVertexPosition: 'vec3',
 	worldPosition: 'vec3',
 	cameraPosition: 'vec3',
+	sunDirection: 'vec3',
 	worldNormal: 'vec3',
 	frontFacing: 'bool',
 	pixelPosition: 'vec2',

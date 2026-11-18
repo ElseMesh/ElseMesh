@@ -31,6 +31,7 @@ Input nodes use these engine-defined semantics and types:
 | `worldVertexPosition` | vec3 | World-space vertex position after object and instance transforms but before graph deformation; available to vertex outputs |
 | `worldPosition` | vec3 | Final world-space position, available in fragment outputs |
 | `cameraPosition` | vec3 | Shared world-space camera position, available to vertex and fragment outputs |
+| `sunDirection` | vec3 | Shared world-space direction toward the sun |
 | `worldNormal` | vec3 | Interpolated world-space surface normal, available in fragment outputs |
 | `frontFacing` | bool | Whether the fragment belongs to a front-facing primitive |
 | `pixelPosition` | vec2 | Fragment-center pixel coordinate from the viewport's top-left corner |
