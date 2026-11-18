@@ -58,6 +58,11 @@ export class GroundCoverFieldDrawPlanner {
 			if ( ! visible ) continue;
 
 			const fade = writeInstanceDrawDistanceFade( this.fadeScratch, record.drawFadeStartDistance, record.drawMaxDistance, distance );
+			if ( record.placementAlgorithm === 'fixed-cell-patch/1' ) {
+				const lodIndex = Math.max( 0, Math.min( record.modelAssetIds.length - 1, record.modelAssetIds.length - 1 - record.cellLodIndex - renderLoadBias ) );
+				append( groupsFor( visibleGroups, record )[ lodIndex ], index, 1, 2, fade[ 0 ], fade[ 1 ] );
+				continue;
+			}
 			const lodDistance = record.lodMetric === 'world-distance'
 				? Math.hypot( record.position[ 0 ] - camera.position[ 0 ], record.position[ 1 ] - camera.position[ 1 ], record.position[ 2 ] - camera.position[ 2 ] )
 				: distance;

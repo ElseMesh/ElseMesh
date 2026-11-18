@@ -75,6 +75,27 @@ export class GroundCoverFieldRuntime {
 		let records = this.recordsByCell.get( cellIndex );
 		if ( records ) return records;
 		const [ originX, originZ ] = this.planner.cellOrigin( cellIndex, this.cellOriginScratch );
+		if ( this.data.placementAlgorithm === 'fixed-cell-patch/1' ) {
+			const species = this.species[ 0 ];
+			records = [ {
+				speciesId: species.id,
+				modelAssetIds: species.modelAssetIds,
+				bounds: species.bounds,
+				geometryMirrorX: species.geometryMirrorX,
+				drawMaxDistance: species.drawMaxDistance,
+				drawFadeStartDistance: species.drawFadeStartDistance,
+				castsShadow: species.castsShadow,
+				shadowMaxDistance: species.shadowMaxDistance,
+				placementAlgorithm: this.data.placementAlgorithm,
+				cellIndex,
+				position: [ originX, 0, originZ ],
+				rotation: [ 0, 0, 0, 1 ],
+				scale: [ 1, 1, 1 ],
+				seed: this.data.seed,
+			} ];
+			this.recordsByCell.set( cellIndex, records );
+			return records;
+		}
 		const cellX = cellIndex % this.planner.cellsPerSide, cellZ = Math.floor( cellIndex / this.planner.cellsPerSide );
 		const rotation = random01( this.data.seed, cellX, cellZ, 0, 31 ) * Math.PI * 2;
 		const offsetX = random01( this.data.seed, cellX, cellZ, 0, 32 ) * this.data.cellSize;

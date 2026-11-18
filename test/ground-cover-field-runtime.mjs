@@ -43,4 +43,32 @@ first.dispose();
 assert.throws( () => first.update( { x: 3, z: 3 } ), /disposed/ );
 assert.throws( () => first.planDraws( { position: [ 0, 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /disposed/ );
 
+const fixedModelIDs = [ 'c', 'd', 'e' ].map( character => `sha256:${character.repeat( 64 )}` );
+const fixedData = {
+	densityAssetId, seed: 7, cellSize: 4, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
+	distanceBands: [ { maxDistance: 5, cellCapacity: 32 }, { maxDistance: 12, cellCapacity: 32 }, { maxDistance: 24, cellCapacity: 32 } ],
+	species: [ {
+		id: 'authored-patch', densityExpression: { op: 'max', left: { op: 'channel', index: 0 }, right: { op: 'max', left: { op: 'max', left: { op: 'channel', index: 1 }, right: { op: 'channel', index: 2 } }, right: { op: 'channel', index: 3 } } },
+		densityThreshold: 1, modelAssetIds: fixedModelIDs,
+		bounds: { center: [ 2, 0.5, 2 ], radius: 3 }, geometryMirrorX: false,
+		drawMaxDistance: 24, drawFadeStartDistance: 22,
+		castsShadow: false, shadowMaxDistance: 0,
+	} ],
+};
+const fixedAssets = [ { assetId: densityAssetId, kind: 'grass-density/1' }, ...fixedModelIDs.map( assetId => ( { assetId, kind: 'glb' } ) ) ];
+const fixedDensityData = new Uint8Array( 16 * 16 * 4 );
+for ( let index = 0; index < fixedDensityData.length; index += 4 ) fixedDensityData[ index ] = 255;
+const fixedRuntime = new GroundCoverFieldRuntime( { data: fixedData, componentAssets: fixedAssets, terrain, density: { res: 16, size: 16, origin: 0, data: fixedDensityData } } );
+const fixedInstances = fixedRuntime.update( { x: 3, z: 3 } );
+assert.ok( fixedInstances.length > 0 );
+assert.ok( fixedInstances.every( record => record.placementAlgorithm === 'fixed-cell-patch/1' && record.scale.every( value => value === 1 ) && record.rotation.join( ',' ) === '0,0,0,1' ), 'fixed authored patches keep identity rotation and unit scale' );
+assert.ok( fixedInstances.every( record => record.position[ 0 ] % 4 === 0 && record.position[ 2 ] % 4 === 0 ), 'fixed patch instances use exact authored cell origins without random translation' );
+const fixedView = { position: [ 3, 5, 3 ], verticalFovRadians: Math.PI / 2, frustumPlanes: Array.from( { length: 6 }, () => [ 0, 0, 0, 1 ] ) };
+const fixedPlan = fixedRuntime.planDraws( fixedView );
+const fixedNear = fixedPlan.visibleGroups.get( 'authored-patch' );
+assert.ok( fixedNear[ 2 ].indices.some( index => fixedInstances[ index ].cellLodIndex === 0 ), 'near cells select the authored near patch asset' );
+const fixedCoarsePlan = fixedRuntime.planDraws( fixedView, 2 );
+assert.ok( fixedCoarsePlan.visibleGroups.get( 'authored-patch' )[ 0 ].indices.length > 0, 'minimum-FPS bias selects a coarser authored LOD while retaining the same patch instances' );
+fixedRuntime.dispose();
+
 console.log( 'ground-cover shared placement runtime: ok' );

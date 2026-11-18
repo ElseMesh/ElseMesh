@@ -56,15 +56,15 @@ and binary `add`, `subtract`, `multiply`, `divide`, `min`, and `max`. Expression
 are limited to 64 nodes and 12 levels; division by a value near zero returns
 zero, and the final density is clamped to 0–1. This lets a world describe blends
 such as Tidewater's dune/meadow grass density without giving the renderer
-Tidewater-specific channel meanings. Expressions affect candidate presence;
-species-specific appearance is carried by its model assets and material data.
-Each species references one to four signed static GLBs, ordered coarsest to
-finest, and must declare the same LOD metric and thresholds understood by the
-static-model contract. The asset references must also appear in the component's
-signed asset list. Its authored bounds and reflection parity use the same
-semantics as `elsemesh.static-model-instance-set/1`, allowing both field
-adapters to use the engine's shared visibility, LOD, transition, and shadow
-planner.
+Tidewater-specific channel meanings. In `blue-noise/1`, expressions affect
+candidate presence; species-specific appearance is carried by its model assets
+and material data. Each blue-noise species references one to four signed
+static GLBs, ordered coarsest to finest, and declares the same LOD metric and
+thresholds understood by the static-model contract. The asset references must
+also appear in the component's signed asset list. Its authored bounds and
+reflection parity use the same semantics as
+`elsemesh.static-model-instance-set/1`, allowing both field adapters to use the
+engine's shared visibility, LOD, transition, and shadow planner.
 
 The `world-distance` metric measures from the instance placement origin in
 metres and ignores instance scale and the model bounds center. Use it when a
@@ -85,6 +85,19 @@ LOD cannot move an instance. The engine uses the shared distance bands and cell
 capacities to maintain camera-centered coverage; backend frustum culling may
 reject additional cells but cannot change candidate placement or species
 selection.
+
+`fixed-cell-patch/1` is for a signed GLB whose geometry already contains the
+world-authored arrangement for one whole cell, including any species categories
+that share that patch. It requires `pointsPerCell: 1` and exactly one species
+model set. The species density expression identifies the RGBA channels that
+make a cell occupied; it does not scatter or randomly filter instances. The
+engine emits one instance at each occupied cell's exact origin with identity
+rotation and unit scale. Its `modelAssetIds` are ordered coarsest to finest and
+their count matches the distance-band count; those shared distance bands select
+the matching authored patch level. This mode does not use per-species scale or
+LOD-transition settings. Minimum-FPS
+render-load bias may select a coarser asset from that same list, without
+regenerating placements or changing patch contents.
 
 Species GLBs use standard glTF materials or `elsemesh.material-graph/1` data.
 The graph may use the shared time, wind direction, and wind speed inputs for

@@ -17,7 +17,7 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 	const allowed = ( value, keys ) => Object.keys( value ).every( key => keys.includes( key ) );
 	if ( ! record( data ) || ! allowed( data, [ 'densityAssetId', 'seed', 'cellSize', 'pointsPerCell', 'placementAlgorithm', 'distanceBands', 'species' ] ) ) fail( 'component data has unknown fields' );
 	if ( ! assetID( data.densityAssetId ) || ! Number.isInteger( data.seed ) || data.seed < 0 || data.seed > 0xffffffff ) fail( 'density asset ID or seed is invalid' );
-	if ( ! finite( data.cellSize ) || data.cellSize < 0.25 || data.cellSize > 128 || ! Number.isInteger( data.pointsPerCell ) || data.pointsPerCell < 1 || data.pointsPerCell > MAX_BLUE_NOISE_POINTS || data.placementAlgorithm !== 'blue-noise/1' ) fail( 'cell placement settings are invalid' );
+	if ( ! finite( data.cellSize ) || data.cellSize < 0.25 || data.cellSize > 128 || ! Number.isInteger( data.pointsPerCell ) || data.pointsPerCell < 1 || data.pointsPerCell > MAX_BLUE_NOISE_POINTS || ! [ 'blue-noise/1', 'fixed-cell-patch/1' ].includes( data.placementAlgorithm ) || data.placementAlgorithm === 'fixed-cell-patch/1' && data.pointsPerCell !== 1 ) fail( 'cell placement settings are invalid' );
 	if ( ! Array.isArray( componentAssets ) ) fail( 'component asset list is invalid' );
 	const densityAssets = componentAssets.filter( asset => asset?.kind === GROUND_COVER_FIELD_DENSITY_ASSET_KIND );
 	if ( densityAssets.length !== 1 || densityAssets[ 0 ].assetId !== data.densityAssetId ) fail( 'must reference exactly one signed grass-density/1 asset' );
@@ -28,9 +28,12 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 		previousDistance = band.maxDistance;
 	}
 	if ( ! Array.isArray( data.species ) || data.species.length < 1 || data.species.length > MAX_SPECIES ) fail( `species must contain 1–${MAX_SPECIES} entries` );
+	if ( data.placementAlgorithm === 'fixed-cell-patch/1' && data.species.length !== 1 ) fail( 'fixed-cell-patch/1 requires exactly one authored patch model set' );
 	const speciesIDs = new Set(), modelAssetIDs = new Set();
 	for ( const species of data.species ) {
-		if ( ! record( species ) || ! allowed( species, [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'drawMaxDistance', 'drawFadeStartDistance', 'scaleRange', 'castsShadow', 'shadowMaxDistance' ] ) ) fail( 'species entry has unknown fields' );
+		const patchMode = data.placementAlgorithm === 'fixed-cell-patch/1';
+		const speciesKeys = [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'drawMaxDistance', 'drawFadeStartDistance', 'castsShadow', 'shadowMaxDistance', ...( patchMode ? [] : [ 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'scaleRange' ] ) ];
+		if ( ! record( species ) || ! allowed( species, speciesKeys ) ) fail( 'species entry has unknown fields' );
 		if ( typeof species.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( species.id ) || speciesIDs.has( species.id ) ) fail( 'species ID is invalid or duplicated' );
 		speciesIDs.add( species.id );
 		try { compileGroundCoverDensityExpression( species.densityExpression ); } catch ( error ) { fail( `species ${species.id} has an invalid density expression (${error.message})` ); }
@@ -38,10 +41,14 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 		if ( ! Array.isArray( species.modelAssetIds ) || species.modelAssetIds.length < 1 || species.modelAssetIds.length > MAX_MODEL_LODS || species.modelAssetIds.some( id => ! assetID( id ) ) || new Set( species.modelAssetIds ).size !== species.modelAssetIds.length ) fail( `species ${species.id} model assets are invalid` );
 		for ( const id of species.modelAssetIds ) modelAssetIDs.add( id );
 		if ( ! record( species.bounds ) || ! allowed( species.bounds, [ 'center', 'radius' ] ) || ! Array.isArray( species.bounds.center ) || species.bounds.center.length !== 3 || species.bounds.center.some( value => ! finite( value ) || Math.abs( value ) > 1e6 ) || ! finite( species.bounds.radius ) || species.bounds.radius <= 0 || species.bounds.radius > 1e6 || typeof species.geometryMirrorX !== 'boolean' ) fail( `species ${species.id} model bounds or reflection is invalid` );
-		if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance' ].includes( species.lodMetric ) || ! Array.isArray( species.lodThresholds ) || species.lodThresholds.length !== species.modelAssetIds.length - 1 || species.lodThresholds.some( ( value, index, values ) => ! finite( value ) || value <= 0 || index > 0 && ( species.lodMetric === 'projected-radius' ? value <= values[ index - 1 ] : value >= values[ index - 1 ] ) ) ) fail( `species ${species.id} LOD thresholds are invalid` );
-		if ( ! finite( species.lodFadeFraction ) || species.lodFadeFraction < 0 || species.lodFadeFraction > 0.5 ) fail( `species ${species.id} LOD fade is invalid` );
+		if ( patchMode ) {
+			if ( species.modelAssetIds.length !== data.distanceBands.length ) fail( `species ${species.id} patch LOD count must match the distance-band count` );
+		} else {
+			if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance' ].includes( species.lodMetric ) || ! Array.isArray( species.lodThresholds ) || species.lodThresholds.length !== species.modelAssetIds.length - 1 || species.lodThresholds.some( ( value, index, values ) => ! finite( value ) || value <= 0 || index > 0 && ( species.lodMetric === 'projected-radius' ? value <= values[ index - 1 ] : value >= values[ index - 1 ] ) ) ) fail( `species ${species.id} LOD thresholds are invalid` );
+			if ( ! finite( species.lodFadeFraction ) || species.lodFadeFraction < 0 || species.lodFadeFraction > 0.5 ) fail( `species ${species.id} LOD fade is invalid` );
+			if ( ! Array.isArray( species.scaleRange ) || species.scaleRange.length !== 2 || species.scaleRange.some( value => ! finite( value ) || value <= 0 || value > 100 ) || species.scaleRange[ 0 ] > species.scaleRange[ 1 ] ) fail( `species ${species.id} scale range is invalid` );
+		}
 		if ( ! finite( species.drawMaxDistance ) || species.drawMaxDistance <= 0 || species.drawMaxDistance > data.distanceBands.at( - 1 ).maxDistance || ! finite( species.drawFadeStartDistance ) || species.drawFadeStartDistance < 0 || species.drawFadeStartDistance > species.drawMaxDistance ) fail( `species ${species.id} draw range is invalid` );
-		if ( ! Array.isArray( species.scaleRange ) || species.scaleRange.length !== 2 || species.scaleRange.some( value => ! finite( value ) || value <= 0 || value > 100 ) || species.scaleRange[ 0 ] > species.scaleRange[ 1 ] ) fail( `species ${species.id} scale range is invalid` );
 		if ( typeof species.castsShadow !== 'boolean' || ! finite( species.shadowMaxDistance ) || species.shadowMaxDistance < 0 || species.shadowMaxDistance > 10000 ) fail( `species ${species.id} shadow settings are invalid` );
 		if ( ! species.castsShadow && species.shadowMaxDistance !== 0 ) fail( `species ${species.id} cannot have a shadow distance when shadows are disabled` );
 	}

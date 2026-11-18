@@ -217,12 +217,16 @@ camera-centered candidate generation; `GroundCoverFieldDrawPlanner` owns
 shared visibility, LOD, transition, draw-fade, and shadow selection; and
 `GroundCoverFieldBatchRuntime` packs those selections into shared transform,
 fade, and shadow batches for backend upload. The
-contract currently represents species as signed GLB model sets. Tidewater's
-WebGPU grass instead builds procedural blade patches and carries world-authored
-meadow/dune coloring, blade tiers, oats, creepers, gust response, and per-blade
-fades in its presenter. The field still needs a renderer-neutral way to
-represent that authored geometry/material behavior and paired engine WebGPU and
-WebGL adapters before it can replace the current vegetation paths.
+contract now has a `fixed-cell-patch/1` placement mode for signed GLBs that
+already contain each cell's complete authored layout. It emits one identity
+instance at each occupied cell origin and uses the shared distance-band choice
+for both adapters; minimum-FPS bias may choose a coarser asset from the same
+signed LOD list. The runtime and focused fixture do not yet carry Tidewater's
+patch GLBs or its material behavior. Tidewater's WebGPU grass still owns the
+meadow/dune coloring, density interpretation, blade tiers, oats, creepers, gust
+response, terrain alignment, and per-blade fades. Those renderer-neutral graph
+inputs and authored assets, plus paired adapter render evidence, remain before
+it can replace the current vegetation paths.
 
 The ground-cover field is only the dense-flora contract; it does not cover the
 finite vegetation set. Tidewater's placement asset has ten authored categories
