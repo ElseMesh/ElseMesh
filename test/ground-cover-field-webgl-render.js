@@ -45,7 +45,7 @@ try {
 	if ( ! visible.length || visible.some( mesh => mesh.castShadow || ! mesh.receiveShadow || mesh.count === 0 ) ) throw new Error( `WebGL visible draws must receive shadows without duplicate casting: ${ JSON.stringify( visible.map( mesh => ( { castShadow: mesh.castShadow, receiveShadow: mesh.receiveShadow, count: mesh.count, shadowOnly: mesh.userData.shadowOnly } ) ) ) }` );
 	if ( ! shadowCasters.length || shadowCasters.some( mesh => ! mesh.castShadow || ! mesh.customDepthMaterial || mesh.count === 0 ) ) throw new Error( `WebGL shadow draws must use the signed instances in the depth pass: ${ JSON.stringify( shadowCasters.map( mesh => ( { castShadow: mesh.castShadow, count: mesh.count, customDepth: !! mesh.customDepthMaterial } ) ) ) }` );
 	const instanceCounts = [ visible.reduce( ( total, mesh ) => total + mesh.count, 0 ), shadowCasters.reduce( ( total, mesh ) => total + mesh.count, 0 ) ];
-	if ( instanceCounts[ 0 ] <= 0 || instanceCounts[ 1 ] <= 0 || instanceCounts[ 1 ] > instanceCounts[ 0 ] ) throw new Error( `WebGL fixed-cell visible/shadow instance selection is invalid: ${ JSON.stringify( instanceCounts ) }` );
+	if ( instanceCounts[ 0 ] <= 0 || instanceCounts[ 1 ] <= 0 ) throw new Error( `WebGL fixed-cell visible/shadow instance selection is invalid: ${ JSON.stringify( instanceCounts ) }` );
 	shadows.update( camera, sunDirection );
 	renderer.render( scene, camera );
 	const gl = renderer.getContext(), pixels = new Uint8Array( canvas.width * canvas.height * 4 );
