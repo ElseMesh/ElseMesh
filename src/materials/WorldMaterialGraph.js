@@ -6,6 +6,7 @@ import { compileWorldMaterialGraph } from './WorldMaterialGraphCompiler.js';
 
 const FRAME_UNIFORM_VALUES = Object.freeze( {
 	emgFrameTime: () => G.time.value,
+	emgCameraPosition: () => G.cameraPos.value,
 	emgNight: () => G.night.value,
 	emgWindDirection: () => G.windDir.value,
 	emgWindSpeed: () => G.windSpeed.value,
@@ -116,7 +117,23 @@ function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, 
 			return source.replace( marker, `${code}\n${marker}` );
 		};
 		const vertexDecl = [ compiled.glsl.attributes, compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.vertexHelpers ].filter( Boolean ).join( '\n' );
-		shader.vertexShader = insert( shader.vertexShader, '#include <common>', vertexDecl );
+		const terrainHeightVertex = compiled.glsl.terrainHeightVertex ? /* glsl */`
+uniform sampler2D emgTerrainHeightTexture;
+uniform vec3 emgTerrainHeightParams;
+float emgTerrainHeightAt( vec2 xz ) {
+	float resolution = emgTerrainHeightParams.z;
+	vec2 f = ( xz - vec2( emgTerrainHeightParams.x ) ) / emgTerrainHeightParams.y * resolution - 0.5;
+	if ( f.x < 0.0 || f.y < 0.0 || f.x > resolution - 1.0 || f.y > resolution - 1.0 ) return -90.0;
+	vec2 fc = clamp( f, vec2( 0.0 ), vec2( resolution - 1.001 ) );
+	vec2 p = floor( fc ), t = fract( fc ), invResolution = vec2( 1.0 / resolution );
+	vec2 uv = ( p + 0.5 ) * invResolution;
+	float a = textureLod( emgTerrainHeightTexture, uv, 0.0 ).r;
+	float b = textureLod( emgTerrainHeightTexture, uv + vec2( invResolution.x, 0.0 ), 0.0 ).r;
+	float c = textureLod( emgTerrainHeightTexture, uv + vec2( 0.0, invResolution.y ), 0.0 ).r;
+	float d = textureLod( emgTerrainHeightTexture, uv + invResolution, 0.0 ).r;
+	return mix( mix( a, b, t.x ), mix( c, d, t.x ), t.y );
+}` : '';
+		shader.vertexShader = insert( shader.vertexShader, '#include <common>', [ vertexDecl, terrainHeightVertex ].filter( Boolean ).join( '\n' ) );
 		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
 		const worldVertexPosition = compiled.inputs.includes( 'worldVertexPosition' ) ? `
 vec4 emgWorldVertexPosition = vec4( transformed, 1.0 );
@@ -194,7 +211,7 @@ float emgTerrainHeightAt( vec2 xz ) {
 			shader.uniforms.emgViewportSize = { get value() { return renderer.getDrawingBufferSize( size ); } };
 		}
 		for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
-		if ( fragment && compiled.glsl.terrainHeight ) {
+		if ( compiled.glsl.terrainHeightVertex || fragment && compiled.glsl.terrainHeight ) {
 			if ( ! terrainHeightBinding ) throw new Error( 'WebGL material graph terrainHeightAt requires an installed terrain heightfield' );
 			shader.uniforms.emgTerrainHeightTexture = { value: terrainHeightBinding.texture };
 			shader.uniforms.emgTerrainHeightParams = { value: new T.Vector3( terrainHeightBinding.origin, terrainHeightBinding.size, terrainHeightBinding.resolution ) };

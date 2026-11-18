@@ -235,7 +235,25 @@ assert.equal( terrainHeightWebGPU.requiresTerrainHeight, true );
 assert.equal( terrainHeightWebGL.requiresTerrainHeight, true );
 assert.match( terrainHeightWebGPU.surface, /terrainHeightAt\( emg_xz \)/ );
 assert.match( terrainHeightWebGL.glsl.fragment, /emgTerrainHeightAt\( emg_xz \)/ );
-assert.throws( () => compileWorldMaterialGraph( { ...terrainHeightGraph, outputs: { vertexPosition: 'world' } }, 'webgpu' ), /fragment outputs/ );
+const terrainVertexGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'world', op: 'input', name: 'worldVertexPosition' },
+		{ id: 'worldX', op: 'x', args: [ 'world' ] }, { id: 'worldZ', op: 'z', args: [ 'world' ] },
+		{ id: 'xz', op: 'vec2', args: [ 'worldX', 'worldZ' ] },
+		{ id: 'ground', op: 'terrainHeightAt', args: [ 'xz' ] },
+		{ id: 'position', op: 'input', name: 'position' },
+		{ id: 'localX', op: 'x', args: [ 'position' ] }, { id: 'localZ', op: 'z', args: [ 'position' ] },
+		{ id: 'deformed', op: 'vec3', args: [ 'localX', 'ground', 'localZ' ] },
+	],
+	outputs: { vertexPosition: 'deformed' },
+};
+const terrainVertexWebGPU = compileWorldMaterialGraph( terrainVertexGraph, 'webgpu' );
+const terrainVertexWebGL = compileWorldMaterialGraph( terrainVertexGraph, 'webgl' );
+assert.equal( terrainVertexWebGPU.requiresTerrainHeight, true );
+assert.equal( terrainVertexWebGL.glsl.terrainHeightVertex, true );
+assert.match( terrainVertexWebGPU.vertex, /terrainHeightAt\( emg_xz \)/ );
+assert.match( terrainVertexWebGL.glsl.vertex, /emgTerrainHeightAt\( emg_xz \)/ );
 const terrainHeightModule = new ShaderModule( { name: 'fixtureTerrainHeight', code: 'fn terrainHeightAt( xz: vec2f ) -> f32 { return xz.x + xz.y; }' } );
 assert.throws( () => createWebGPUMaterialGraph( {}, terrainHeightGraph ), /installed terrain height module/ );
 const terrainHeightMaterial = createWebGPUMaterialGraph( {}, terrainHeightGraph, { terrainHeightModule } );
@@ -250,6 +268,33 @@ assert.match( terrainHeightShader.fragmentShader, /float emgTerrainHeightAt\( ve
 assert.match( terrainHeightShader.fragmentShader, /emgTerrainHeightTexture/ );
 assert.equal( terrainHeightShader.uniforms.emgTerrainHeightParams.value.z, 2, 'WebGL material graph binds the same heightfield resolution' );
 terrainHeightWebGLMaterial.material.dispose();
+
+const terrainVertexWebGLMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), terrainVertexGraph, { terrainHeightField: terrainField } );
+const terrainVertexShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>', uniforms: {} };
+terrainVertexWebGLMaterial.depthMaterial.onBeforeCompile( terrainVertexShader );
+assert.match( terrainVertexShader.vertexShader, /float emgTerrainHeightAt\( vec2 xz \)/ );
+assert.match( terrainVertexShader.vertexShader, /textureLod\( emgTerrainHeightTexture/ );
+assert.equal( terrainVertexShader.uniforms.emgTerrainHeightParams.value.z, 2, 'WebGL depth deformation binds the installed terrain heightfield' );
+terrainVertexWebGLMaterial.material.dispose();
+terrainVertexWebGLMaterial.depthMaterial.dispose();
+
+const cameraPositionGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'camera', op: 'input', name: 'cameraPosition' },
+		{ id: 'distance', op: 'length', args: [ 'camera' ] },
+	],
+	outputs: { roughness: 'distance' },
+};
+assert.match( compileWorldMaterialGraph( cameraPositionGraph, 'webgpu' ).surface, /frame\.cameraPos/ );
+const cameraPositionWebGL = compileWorldMaterialGraph( cameraPositionGraph, 'webgl' );
+assert.match( cameraPositionWebGL.glsl.uniforms, /uniform vec3 emgCameraPosition/ );
+assert.match( cameraPositionWebGL.glsl.fragment, /length\( emgCameraPosition \)/ );
+const cameraPositionMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), cameraPositionGraph );
+const cameraPositionShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+cameraPositionMaterial.material.onBeforeCompile( cameraPositionShader );
+assert.equal( cameraPositionShader.uniforms.emgCameraPosition.value, G.cameraPos.value, 'WebGL camera input tracks the same engine frame position as WebGPU' );
+cameraPositionMaterial.material.dispose();
 
 const surfaceNormalGraph = {
 	format: 'elsemesh.material-graph/1',

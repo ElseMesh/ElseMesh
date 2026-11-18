@@ -30,6 +30,7 @@ Input nodes use these engine-defined semantics and types:
 | `position` | vec3 | Local vertex position |
 | `worldVertexPosition` | vec3 | World-space vertex position after object and instance transforms but before graph deformation; available to vertex outputs |
 | `worldPosition` | vec3 | Final world-space position, available in fragment outputs |
+| `cameraPosition` | vec3 | Shared world-space camera position, available to vertex and fragment outputs |
 | `worldNormal` | vec3 | Interpolated world-space surface normal, available in fragment outputs |
 | `frontFacing` | bool | Whether the fragment belongs to a front-facing primitive |
 | `pixelPosition` | vec2 | Fragment-center pixel coordinate from the viewport's top-left corner |
@@ -72,11 +73,12 @@ material effects that choose texture detail themselves. It can feed vertex or
 fragment outputs; `textureSample` with implicit LOD remains fragment-only.
 
 `terrainHeightAt` takes a `vec2` world-space XZ coordinate and returns the
-installed world's terrain height at that point. It is fragment-only and
-requires a terrain surface with an available heightfield. Both backends query
-the same authored height data using bilinear interpolation and return `-90`
-outside the terrain domain. This is a world-surface input to the graph contract;
-it does not select a renderer or provide backend shader code.
+installed world's terrain height at that point. It is available to vertex and
+fragment outputs and requires a terrain surface with an available heightfield.
+Both backends query the same authored height data using bilinear interpolation
+and return `-90` outside the terrain domain. This is a world-surface input to
+the graph contract; it does not select a renderer or provide backend shader
+code.
 
 `valueNoise2` takes a `vec2` and returns deterministic cubic-smoothed value
 noise in `[0, 1)`. It uses the same hash and interpolation definition in the
