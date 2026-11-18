@@ -215,6 +215,19 @@ consume the same authored near and far content. Preserve both current paths
 until that contract passes matched pre-split WebGPU and WebGL reviews; do not
 replace the WebGL primitives with another Tidewater-owned presenter.
 
+The current source bake provides a concrete portable target: 3 tree and 2 shrub
+variants, each rendered from a 6-by-6 upper-hemisphere direction grid with
+128-pixel frames. Its two RGBA atlases carry coverage/leaf brightness/class
+data and local normal/exposure data. The new contract should package those
+shared atlas bytes once, with authored bounds, variant mapping, near/far
+handoff, palette inputs, and per-instance seed/yaw/scale. ElseMesh should own
+the billboard orientation, octahedral frame lookup/reprojection, wind offset,
+LOD fade, and WebGPU/WebGL texture binding through registered adapters. This
+view-dependent lookup is beyond the current static GLB material graph, so it
+needs one explicit engine component contract rather than separate WGSL and
+GLSL implementations in Tidewater. Both backends must sample the same signed
+atlas assets and select the same LOD at matched quality settings.
+
 Dense ground cover now uses the engine-owned `elsemesh.ground-cover-field/1`
 runtime in both built-in and hosted paths. The former Tidewater-specific
 `webglGrassMesh()` approximation has been removed from
