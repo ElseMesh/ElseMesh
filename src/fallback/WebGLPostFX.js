@@ -120,9 +120,10 @@ void main() {
 		this.gradeMaterial = new THREE.ShaderMaterial( {
 			uniforms: {
 				uSource: { value: this.sceneTarget.texture },
-				uVignette: { value: 0.28 }, uSaturation: { value: 1.06 },
-				uContrast: { value: 1.04 }, uWarmth: { value: 0.02 },
-				uGrain: { value: 0.012 }, uFrame: { value: 0 },
+				// Match WebGPU's shared output path: ACES and exposure only.
+				uVignette: { value: 0 }, uSaturation: { value: 1 },
+				uContrast: { value: 1 }, uWarmth: { value: 0 },
+				uGrain: { value: 0 }, uFrame: { value: 0 },
 			},
 			vertexShader: this.copyMaterial.vertexShader,
 			fragmentShader: /* glsl */`
