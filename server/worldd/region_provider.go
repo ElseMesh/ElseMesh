@@ -386,7 +386,7 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	if gateway.worldID != "" && !samePlayerCapsule(descriptor.EntrySelection.PlayerCapsule, gateway.playerCapsule) {
 		return errors.New("provider player capsule changed after worldd startup")
 	}
-	if gateway.previewRegion != nil && descriptor.EntrySelection.PreviewRegion != *gateway.previewRegion {
+	if gateway.previewRegion != nil && (descriptor.EntrySelection.PreviewRegion == nil || *descriptor.EntrySelection.PreviewRegion != *gateway.previewRegion) {
 		return errors.New("provider preview region bounds changed after worldd startup")
 	}
 	response.Body = io.NopCloser(bytes.NewReader(data))

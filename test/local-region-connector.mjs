@@ -526,6 +526,8 @@ try {
 	const unknownPrimitiveCollisionAsset = primitiveCoverageManifest.assets.find( asset => asset.id === 'local-region:great-hall:16:3,0,0:collision' );
 	await primitiveCoverageConnector.getAsset( unknownPrimitiveCollisionAsset.id );
 	assert.equal( primitiveCoverageConnector.isCollisionPathReady( [ 49, 0, 1 ], [ 50, 0, 1 ], { loadedObjects: new Set( [ unknownPrimitiveCollisionID ] ) } ), false, 'a bounded but unconverted primitive blocks only its indexed cell' );
+	assert.equal( primitiveCoverageConnector.isCollisionPathReady( [ 65, 0, 1 ], [ 66, 0, 1 ], { loadedObjects: new Set() } ), false, 'unrequested collision cells remain fail-closed outside the speed-bounded prefetch horizon' );
+	await primitiveCoverageConnector.ensureCells( [ [ 4, 0, 0 ] ] );
 	assert.equal( primitiveCoverageConnector.isCollisionPathReady( [ 65, 0, 1 ], [ 66, 0, 1 ], { loadedObjects: new Set() } ), true, 'a bounded unknown primitive does not block unrelated verified empty cells' );
 	primitiveCoverageConnector.close();
 	includeUnknownPrimitiveCell = false;
