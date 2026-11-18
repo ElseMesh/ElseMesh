@@ -286,10 +286,13 @@ verifies signed provider records, and falls back to direct HTTPS/WSS worldd
 gateways. Focused client tests pass, and an end-to-end test announces a signed
 worldd provider's actual signed node record and embedded-libzt HostID to an
 in-memory Worker, then connects to the real local worldd over WSS; the Worker
-handles lookup only. The remaining gate is a live announcement to the deployed
-Worker and a client connection over a reachable public gateway. The host
-operating system does not need to join ZeroTier; a visitor's system-level
-ZeroTier client is optional and only enables the private-gateway fast path.
+handles lookup only. A live check also announced the actual signed node record
+to the deployed Worker and connected through a temporary public tunnel. This
+verified lookup and gateway selection, but not an independent browser/device or
+a stable public gateway. The remaining gate is a separate visitor device using
+a durable reachable gateway. The host operating system does not need to join
+ZeroTier; a visitor's system-level ZeroTier client is optional and only enables
+the private-gateway fast path.
 The default browser path is Worker lookup followed by direct HTTPS/WSS to a
 reachable provider gateway. **Opaque friend-link tickets and account-bound admission:
 0%.** The shareable entry URL for those tickets should be as simple as
@@ -307,6 +310,14 @@ ZeroTier, dynamic DNS with inbound reachability or a stable online relay is
 required; GitHub Pages cannot resolve a changing IP. A directory or DHT can
 provide lookup, but it adds online infrastructure or bootstrap dependencies.
 See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
+**Three-provider friend-invite acceptance: 0%.** Acceptance requires the owner
+to create one world-local player and issue one `elsemesh.org?invite=` URL
+allowing that invited person to authenticate through any of their enabled
+Facebook, Google, or Telegram accounts. Each allowed account must be proven
+and bound to that same player; authentication through an unrelated account
+from an allowed provider must not redeem the invite. The browser must then
+open the invited world from the URL. Keep contact details out of the URL and
+logs; a typed phone number, email, or profile URL is not proof of identity.
 **Owner player/invite management (CLI and private web UI): 0%.** Provide
 `worldd player` and `worldd invite` subcommands for scripts plus a small owner
 web interface using the same validated operations. Support creating/editing

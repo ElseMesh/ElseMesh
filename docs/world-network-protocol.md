@@ -112,6 +112,21 @@ numbers as authority. The ticket is signed, not secret: don't include provider
 tokens, ZeroTier private keys, or other reusable credentials. The client can
 parse and verify its structure locally, but `worldd` is the final validator.
 
+For a single friend invitation that allows Facebook, Google, and Telegram,
+all three verified provider identities must resolve to the same pending
+world-local player. The ticket may bind the provider allowlist and opaque
+identity references, but must not expose contact details. On redemption, the
+selected provider must prove control of an identity explicitly authorized for
+that player; merely signing in with an arbitrary account at an allowed
+provider is insufficient. Treat owner-entered email addresses, phone numbers,
+and profile URLs as unverified matching hints until the provider's supported
+login or verification flow proves the association. In particular, do not
+assume a Telegram login claim proves control of a phone number unless that
+flow returns a verified phone claim. The acceptance test is one URL of the
+form `https://elsemesh.org/?invite=<signed-ticket>` that opens the target
+world after successful authentication with any one of the invite's verified,
+allowed identities.
+
 The owner signature binds the invite to the existing pending player record.
 On connection, `worldd` verifies the signature, target world, expiry,
 revocation/replay state, allowed authentication, and the record binding before

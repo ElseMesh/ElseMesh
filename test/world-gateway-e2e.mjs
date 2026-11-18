@@ -17,6 +17,11 @@ const tempRoot = await mkdtemp( path.join( tempDirectory, 'elsemesh-world-gatewa
 const processes = [];
 globalThis.crypto ||= webcrypto;
 let workerGateway;
+const liveDirectoryURL = process.env.ELSEMESH_TEST_DIRECTORY_URL || '';
+const livePublicGateway = process.env.ELSEMESH_TEST_PUBLIC_GATEWAY || '';
+const liveHTTPPort = Number( process.env.ELSEMESH_TEST_HTTP_PORT || 0 );
+assert.equal( Boolean( liveDirectoryURL ), Boolean( livePublicGateway ), 'live Worker checks require both a directory URL and public gateway' );
+assert.equal( Boolean( liveDirectoryURL ), liveHTTPPort > 0 && liveHTTPPort <= 65535, 'live Worker checks require a valid fixed local HTTP port for the gateway tunnel' );
 
 class MemoryKV {
 	values = new Map();
@@ -46,7 +51,7 @@ try {
 	await writeFile( assetSource, assetBytes, { mode: 0o600 } );
 	const assetID = runCli( binary, [ '--data', ownerData, '--import-asset', assetSource ] );
 	const assetHex = assetID.slice( 'sha256:'.length );
-	const worldID = 'elsemesh:live-gateway-e2e';
+	const worldID = liveDirectoryURL ? `elsemesh:live-gateway-${Date.now().toString( 36 )}` : 'elsemesh:live-gateway-e2e';
 	const manifestInput = path.join( tempRoot, 'world-unsigned.json' );
 	const manifestPath = path.join( tempRoot, 'world-signed.json' );
 	const expiresAt = Math.floor( Date.now() / 1000 ) + 3600;
@@ -71,18 +76,38 @@ try {
 
 	const ownerP2PPort = await unusedPort();
 	const cacheP2PPort = await unusedPort();
-	const ownerHTTPPort = await unusedPort();
+	const ownerHTTPPort = liveHTTPPort || await unusedPort();
 	const cacheHTTPPort = await unusedPort();
 	const certPath = path.join( tempRoot, 'gateway-cert.pem' );
 	const keyPath = path.join( tempRoot, 'gateway-key.pem' );
 	const certificate = spawnSync( 'openssl', [ 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-keyout', keyPath, '-out', certPath, '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE' ], { encoding: 'utf8', timeout: 30000 } );
 	assert.equal( certificate.status, 0, `local gateway test certificate generation failed:\n${certificate.stdout}\n${certificate.stderr}` );
 	workerGateway = await createSecureGatewayProxy( cacheHTTPPort, keyPath, certPath );
-	const owner = startDaemon( binary, [
+	const ownerArgs = [
 		'--data', ownerData, '--manifest', manifestPath, '--p2p-port', String( ownerP2PPort ),
 		'--http', `127.0.0.1:${ownerHTTPPort}`, '--dht-mode', 'server',
-	] );
+	];
+	if ( liveDirectoryURL ) ownerArgs.push( '--public-gateway', livePublicGateway, '--directory-url', liveDirectoryURL );
+	const owner = startDaemon( binary, ownerArgs );
 	await waitForHTTP( `http://127.0.0.1:${ownerHTTPPort}/healthz`, owner );
+	if ( liveDirectoryURL ) {
+		const nodeResponse = await fetch( `http://127.0.0.1:${ownerHTTPPort}/.well-known/elsemesh/node` );
+		assert.equal( nodeResponse.status, 200, 'live owner worldd exposes its signed provider record' );
+		const ownerNode = await nodeResponse.json();
+		assert.equal( ownerNode.payload.nodeId, ownerPeerID );
+		assert.equal( ownerNode.payload.gateway, livePublicGateway );
+		assert.match( ownerNode.payload.zeroTierNodeId || '', /^[0-9a-f]{10}$/ );
+		assert.equal( ownerNode.payload.zeroTierNetworkId, 'e3918db4832a3056' );
+		const liveResult = await runWorkerDiscoveryClient( {
+			worldID, ownerPeerID, cachePeerID: ownerPeerID, zeroTierNodeID: ownerNode.payload.zeroTierNodeId,
+			zeroTierNetworkID: ownerNode.payload.zeroTierNetworkId, directory: liveDirectoryURL,
+			assetID, assetSource, certPath,
+		} );
+		assert.ok( liveResult.ok, `deployed Worker lookup to the public worldd gateway failed: ${liveResult.error || 'unknown error'}\nworldd log:\n${owner.output}` );
+		assert.equal( liveResult.nodeId, ownerPeerID, 'deployed Worker lookup selects the live worldd owner' );
+		assert.equal( liveResult.gateway, livePublicGateway, 'the client uses the signed public gateway, not the Worker, for world traffic' );
+		console.log( 'ok   deployed Worker HostID lookup connects directly to the temporary public worldd gateway' );
+	}
 	const bootstrap = `/ip4/127.0.0.1/tcp/${ownerP2PPort}/p2p/${ownerPeerID}`;
 	const cache = startDaemon( binary, [
 		'--data', cacheData, '--manifest', manifestPath, '--p2p-port', String( cacheP2PPort ),
@@ -259,7 +284,7 @@ async function createResolverServer( env, keyPath, certPath ) {
 
 async function runWorkerDiscoveryClient( options ) {
 	const child = spawn( process.execPath, [ fileURLToPath( new URL( './world-gateway-worker-client.mjs', import.meta.url ) ), JSON.stringify( options ) ], {
-		env: { ...process.env, NODE_EXTRA_CA_CERTS: options.certPath },
+		env: { ...process.env, ...( options.certPath ? { NODE_EXTRA_CA_CERTS: options.certPath } : {} ) },
 		stdio: [ 'ignore', 'pipe', 'pipe' ],
 	} );
 	child.output = '';

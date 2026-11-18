@@ -250,6 +250,10 @@ allowed methods, and the visitor may authenticate through any enabled method.
 The visitor can link it to an existing ElseMesh account after proving control
 of that account, or create an account if needed. For a friend who uses all
 three, the owner can enable all three choices on one invitation.
+For a person-specific invite, every enabled provider option must be tied to an
+identity that the invite authorizes for that same player; a login from an
+unrelated account at an allowed provider is not enough. Provider verification
+must establish the association before admission.
 
 After authentication, the visitor must be asked which one of their verified
 Facebook, Google, or Telegram identities they want other players to see. This
@@ -284,7 +288,8 @@ and [Telegram login widget fields](https://core.telegram.org/widgets/login/).
 
 **Implementation gap:** invite-level provider allowlists, the required
 post-authentication identity prompt, validated provider profile links,
-visibility consent, and per-world identity records are not implemented.
+visibility consent, per-world identity records, and matching invited provider
+identities to the authenticated account are not implemented.
 
 ## Reusing authentication through a trusted neighboring world
 
