@@ -30,9 +30,17 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   service. A ZeroTier Host ID can be used directly only when the visitor's
   device joins the same network; a public browser needs a reachable gateway or
   a WebAssembly ZeroTier client. The browser WASM feasibility/performance
-  comparison against the native client and public gateway paths is tracked at
-  0%; signed ticket parsing and record-bound
+  comparison against the native client and existing WSS/WebRTC gateway path is
+  tracked at 0%; signed ticket parsing and record-bound
   admission remain in the 0% invite sub-gate.
+- Clarified dynamic-address discovery: GitHub Pages cannot resolve invite codes
+  to a changing world address. A ZeroTier ticket should identify the stable
+  network/node, with the visitor joined to ZeroTier; browser-only access needs
+  dynamic DNS with inbound reachability or a reachable relay/locator. A
+  browser WASM port also needs an adapter between libzt's UDP packet interface
+  and browser networking, plus a compatible peer or relay; issue #173 is an
+  open feasibility question, not a working implementation. Benchmark and
+  implementation remain at 0%.
 - Added the cross-world account requirement to the identity design: one
   ElseMesh account can link multiple verified providers, and a destination may
   accept a short-lived broker assertion plus a trusted-neighbor introduction

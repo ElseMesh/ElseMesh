@@ -43,6 +43,14 @@ Exact daemon commands and grant workflows depend on the public gateway configura
 
 The dedicated Worker in [`cloudflare/world-resolver`](../cloudflare/world-resolver/README.md) implements `GET /v1/worlds/{worldId}` and `GET /v1/zerotier/{networkId}/{nodeId}` with short-lived KV storage. `POST /v1/announce` verifies the provider, world, and optional authority-lease signatures, checks current owner grants, and stores only the signed provider node advertisement plus lookup metadata. Entries expire no later than 15 minutes after the last refresh. Body size is bounded and a Cloudflare rate-limit binding limits repeated writes by provider identity. The lookup API returns a bounded set of signed node documents, not an unsigned address book; the browser verifies them before connecting. The ZeroTier ID never overrides the world's signed owner identity or scopes.
 
+For an invite whose owner address can change, put a stable world/ZeroTier
+identity in the signed ticket, then resolve that identity to the provider's
+latest signed gateway advertisement. `worldd` must publish a gateway origin
+that visitors can actually reach; the directory does not infer a new public IP
+or proxy traffic. A stable DNS name updated by dynamic DNS or an outbound
+reverse tunnel can keep the gateway origin usable. GitHub Pages can host the
+client but cannot host this changing registry or gateway path.
+
 The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials; clients retain static invites and portal discovery as fallback when it is unavailable. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. On 2026-10-11, a live read-only lookup for `elsemesh:example-island` returned `providers: []`; no provider was announced. A custom HTTPS hostname remains optional. A Worker can provide a WebSocket endpoint or route to a gateway, but that is a separate traffic path from lookup; deployment should measure and state whether world traffic traverses Cloudflare. Cloudflare Tunnel can expose a private daemon gateway without opening inbound ports, but it still depends on Cloudflare's gateway path being reachable.
 
 Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tokens in local secret storage and deploy them through Cloudflare's secret mechanism, never in this repository or a browser URL.

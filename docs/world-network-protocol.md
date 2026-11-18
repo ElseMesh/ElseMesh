@@ -122,16 +122,34 @@ ticket is a bearer capability unless it also requires an allowed provider
 identity or authenticated ZeroTier Host ID. Remove the ticket from browser
 history after parsing and avoid consuming it on a link-preview GET.
 
-The ticket must contain a route the visitor can actually reach. Prefer a
-stable HTTPS/WSS gateway origin directly in the signed ticket for ordinary
-browsers. A ticket may instead carry the ZeroTier network ID, Host ID, and
-managed IP. That requires the visitor's device to have joined and been
-authorized on that same network; the browser then reaches the IP through its
-device's ZeroTier interface. A Host ID by itself is not an IP route. The
-existing signed directory may optionally map Host ID/network ID to an
-advertised gateway, but then that lookup service is a dependency. No separate
-invite service is needed when the ticket contains a usable route. A private
-route also has to satisfy browser HTTPS/WSS certificate requirements.
+The ticket must identify a route the visitor can actually reach. Prefer a
+stable HTTPS/WSS gateway hostname for ordinary browsers. If its address is
+dynamic, DNS must be updated or a relay must keep a stable public endpoint;
+GitHub Pages cannot perform that lookup. These approaches require DNS control
+or an online relay/locator service. A self-contained invite ticket is
+service-free only when it contains a stable locator, not an address that may
+change after issuance.
+
+A ZeroTier ticket should carry the network ID and stable ZeroTier Host ID, not
+the host's changing public/WAN IP. The Host ID lets ZeroTier's peer discovery
+find the node's current underlying endpoint, but a client still needs to join
+and be authorized on that network. Where the application socket API requires
+a ZeroTier managed IP, the network must provide a stable managed address or
+the client must obtain the current HostID-to-managed-address mapping from a
+trusted network advertisement/controller. Host ID alone is not an IP route.
+The visitor's browser can use this path only through a native ZeroTier
+interface or a working browser ZeroTier transport. The existing signed
+directory may optionally map Host ID/network ID to an advertised HTTPS/WSS
+gateway, but then that lookup service is a dependency. A private route must
+also satisfy browser HTTPS/WSS certificate requirements.
+
+ElseMesh already has an optional signed provider locator: `worldd` can publish
+its current gateway advertisement, and the client can look it up by world ID
+or ZeroTier network/node ID. This resolves a stable identity to the current
+HTTPS/WSS gateway; it does not proxy world traffic or redeem invite codes.
+The deployment must still provide a reachable gateway, such as a stable DNS
+hostname or reverse tunnel. See [gateway resilience](gateway-resilience.md)
+for its expiry, refresh and deployment behavior.
 
 The browser verifies the owner's world manifest, then connects to the chosen
 HTTPS/WSS gateway; `worldd` validates the ticket and retains final admission
@@ -148,20 +166,34 @@ existing guest-readable behavior.
 
 Direct browser access to a ZeroTier IP requires the browser's device to be a
 member of that ZeroTier network. A regular web page does not join ZeroTier
-merely by receiving a Host ID. The target is to run ztlib as WebAssembly in the
-ElseMesh client so it can hold a visitor-specific ZeroTier identity, join the
-configured network, discover the target node, and prove control of the
-visitor's Host ID. Do not use the server's ztlib identity as the visitor's or
-trust a client-supplied Host ID without proof.
+merely by receiving a Host ID. Issue #173 is an open question from 2022 about
+compiling libzt to WASM; it contains no implementation recipe or linked
+working branch. The target is to run ztlib as WebAssembly in ElseMesh so it
+can hold a visitor-specific ZeroTier identity, join the configured network,
+discover the target node and prove control of the visitor's Host ID. Do not
+use the server's ztlib identity as the visitor's or trust a client-supplied
+Host ID without proof.
+
+Here, a **transport adapter** means the code that connects libzt's expected
+UDP packet send/receive operations to browser networking APIs. WASM does not
+grant raw UDP access: Emscripten documents WebRTC DataChannels and WebTransport
+datagrams as alternatives, but supplies no C/C++ API for either. A DataChannel
+connects to a WebRTC peer, while WebTransport connects to a server; neither
+lets the browser send arbitrary UDP packets directly to ZeroTier roots and
+peers. The adapter therefore needs either a protocol-aware browser transport
+supported by the remote ZeroTier peers, or a reachable gateway/relay that
+forwards the ZeroTier packets. That relay must be discoverable at a stable
+endpoint, so it is an online dependency. This is substantial networking work,
+not merely a compiler flag.
 
 This browser implementation is unproven and must be benchmarked before it is
-selected. Keep ZeroTier as a supported route; ordinary HTTPS/WSS access must
-not depend on a browser-specific ZeroTier implementation. Compare it with the
-native OS ZeroTier client and the public HTTPS/WSS gateway path, measuring
-time to join/connect, latency, throughput,
+selected. Keep ZeroTier as a supported route; ordinary browser access must not
+depend on a browser-specific ZeroTier implementation. Compare it with the
+native OS ZeroTier client and ElseMesh's existing WSS/WebRTC gateway path,
+measuring time to join/connect, latency, throughput,
 CPU, memory, bundle/startup cost, browser compatibility, and failure recovery.
 Standard browser networking does not expose raw UDP sockets; the WASM port may
-need a WebRTC or WebTransport adapter. See [Emscripten networking
+need a WebRTC or WebTransport adapter and a compatible peer or relay. See [Emscripten networking
 limits](https://emscripten.org/docs/porting/networking.html) and the open
 [libzt WebAssembly investigation](https://github.com/zerotier/libzt/issues/173).
 The benchmark is tracked at 0% in

@@ -215,9 +215,9 @@ in `docs/`.
   server's network node, not the browser visitor. Visitor sign-in requires the
   visitor's own ZeroTier client identity and a verified proof path. **Browser
   ztlib/WebAssembly feasibility and comparative performance benchmark: 0%.**
-  Compare a browser WebAssembly client with an OS ZeroTier client and a public
-  HTTPS/WSS gateway on startup/join time, throughput, latency, CPU, memory,
-  browser support and failure recovery. See
+  Compare a browser WebAssembly client with an OS ZeroTier client and the
+  existing browser WSS/WebRTC gateway path on startup/join time, throughput,
+  latency, CPU, memory, browser support, and failure recovery. See
   [account roles](docs/account-roles.md) and [visitor identity and world-local
   state](docs/visitor-identity-and-world-state.md), plus the [network
   protocol](docs/world-network-protocol.md#zerotier-browser-transport-and-invites).
@@ -280,10 +280,14 @@ record, world, authentication policy, route and expiry. The Pages client
 parses the ticket locally; no separate invitation lookup service is required.
 The destination `worldd` verifies the signature and admission policy. The
 ticket may contain a direct HTTPS/WSS gateway route, or a ZeroTier route. A
-ZeroTier route works only when the visitor's device has joined the same
-network; Host ID alone is not a route. An optional signed provider-directory
-lookup can map Host ID to an advertised gateway when that extra service is
-available. See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
+ZeroTier route uses the stable network ID and Host ID, not the host's changing
+public IP, and works only when the visitor's device has joined the same
+network. If the application needs a managed ZeroTier IP, it must be stable or
+discovered from trusted network state. For browser-only visitors outside
+ZeroTier, dynamic DNS with inbound reachability or a stable online relay is
+required; GitHub Pages cannot resolve a changing IP. A directory or DHT can
+provide lookup, but it adds online infrastructure or bootstrap dependencies.
+See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
 The ticket may expire after a configurable period, for example 24 hours, or
 the owner may require the
 visitor to authenticate with one of the providers enabled for that invite:

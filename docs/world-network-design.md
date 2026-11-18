@@ -619,6 +619,18 @@ auth policy, expiry and a pending world-local player record created by
 `worldd` validates the ticket and applies its own admission policy. A path-form
 URL may be supported as an alias. See the protocol design for ticket format,
 ZeroTier routing and browser-side ztlib requirements.
+
+The ticket can be resolved without a separate service only when its locator is
+stable. For ZeroTier clients, use the network ID and stable Host ID; ZeroTier
+peer discovery handles the node's changing public endpoint after the client
+joins the network. The application's ZeroTier managed address must also be
+stable or discoverable from trusted network configuration. For a browser that
+does not join ZeroTier, a changing public address needs dynamic DNS plus
+inbound reachability, or an online relay/rendezvous endpoint to which `worldd`
+connects outbound. GitHub Pages is static hosting and cannot map an invite code
+to a changing address by itself. DHT-based lookup can distribute that mapping,
+but still depends on bootstrap peers and online nodes; it is not infrastructure
+free.
 When `worldd` is configured for ZeroTier, ztlib identifies the server node by
 default; it does not authenticate the visitor. A verified client-side
 ZeroTier integration must prove the visitor's own NodeID before the owner can

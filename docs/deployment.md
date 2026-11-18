@@ -31,8 +31,10 @@ expiry; `worldd` verifies it when the browser connects. This client path is not
 implemented yet. The existing `elsemesh-world-resolver` is a signed provider
 directory, not an invitation service; it remains an optional fallback when a
 ticket does not carry a usable route and a gateway advertisement must be found.
-A direct ZeroTier route should carry the network ID and managed IP; a Host ID
-can identify the target node but does not itself provide an IP route. Today,
+A direct ZeroTier invite should carry the network ID and stable Host ID, not
+the changing public IP. If the socket API needs a managed overlay IP, the
+client must get it from stable network configuration or a signed current
+advertisement. Today,
 **Share world invite**
 creates a full provider-bearing URL, which works only when the included
 gateway is reachable by the visitor.
@@ -57,9 +59,27 @@ The desired browser-side ztlib/WebAssembly path is a research and performance
 benchmark gate; until it is proven, use a device-level ZeroTier client or a
 public HTTPS/WSS gateway, tunnel, reverse proxy, or browser-compatible relay.
 An invite resolver can discover routes but cannot create network membership or
-reachability. Compare WebAssembly with the native OS client and public gateway
-for connection time, latency, throughput, CPU, memory, startup cost, browser
-compatibility, and failure recovery.
+reachability. Compare WebAssembly with the native OS client and ElseMesh's
+existing WSS/WebRTC gateway path for connection time, latency, throughput, CPU,
+memory, startup cost, browser compatibility, and failure recovery.
+
+GitHub Pages serves static files; it cannot look up a changing world address
+from an invite code. A self-contained signed ticket avoids a separate invite
+lookup only when it contains a stable locator, such as a ZeroTier node/network
+identity or a hostname whose DNS is kept current. The existing optional
+Cloudflare Worker is a dynamic provider locator: `worldd` publishes a signed
+gateway advertisement and the Pages client can look it up by world or
+ZeroTier identity. It is not an invitation service or traffic relay; details
+are in [gateway resilience](gateway-resilience.md#optional-cloudflare-resolver).
+If an ordinary browser needs to reach a world whose public address changes,
+use a dynamic DNS update with
+inbound reachability, or a stable public relay/reverse tunnel to which
+`worldd` connects outbound. A relay or resolver adds an online service
+dependency; ZeroTier can avoid putting the changing public IP in the invite,
+but only for visitors whose device is an authorized ZeroTier node. A browser
+WASM client would need a supported ZeroTier packet transport, not just a
+compiled binary. GitHub Pages alone cannot provide that transport, registration
+or relay.
 
 On 2026-11-18, `https://elsemesh.org/?invite=codex-test` returned the ElseMesh
 Pages app directly with HTTP 200 and no `Location` redirect. The custom domain
