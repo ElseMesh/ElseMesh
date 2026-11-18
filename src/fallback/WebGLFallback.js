@@ -1087,8 +1087,8 @@ export class WebGLFallback {
 
 		const unsupported = unsupportedHostedWebGLComponents( this.hostedComponents, this.hostedSupportedComponents );
 		const explicitlySelected = this.engine.fallbackReason === 'WebGL was selected explicitly.';
-		this.fallbackBadge.hidden = explicitlySelected && unsupported.length === 0;
-		this.fallbackBadge.textContent = `${ explicitlySelected ? 'WebGL' : `WebGL fallback · ${ this.engine.fallbackReason }` }${ unsupported.length ? ` · ${ unsupported.length } hosted components without a WebGL presenter` : '' }`;
+		this.fallbackBadge.hidden = explicitlySelected || unsupported.length === 0;
+		this.fallbackBadge.textContent = `WebGL fallback · ${ this.engine.fallbackReason }${ unsupported.length ? ` · ${ unsupported.length } hosted components not currently presented` : '' }`;
 
 	}
 
