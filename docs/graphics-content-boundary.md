@@ -291,9 +291,10 @@ The first vegetation slice is Tidewater's dense ground cover. The signed world
 must describe one cell-patch arrangement for both backends: the source 8 m cells,
 seeded clump, oat, and creeper slots, all five authored visual forms (meadow and
 dune grass, oat stalks and heads, creeper leaves and flowers), and the source
-near/mid/far geometry levels. Tidewater owns those authored inputs and exports
-the portable assets. The present WebGPU patch counts and ranges are the starting
-reference; the WebGL 0.46 m lattice and its reduced species set are not.
+near/mid/far geometry levels, including the source-authored distance fades for
+oats and creepers. Tidewater owns those authored inputs and exports the portable
+assets. The present WebGPU patch counts and ranges are the starting reference;
+the WebGL 0.46 m lattice and its backend-specific omissions are not.
 
 ElseMesh must provide one shared cell/instance list and LOD decision, then feed
 the same signed patch assets, density data, per-instance data, and material
@@ -304,7 +305,9 @@ selection, density interpretation, geometry, palette, and LOD asset identity in
 the signed world data; backend shaders may translate that contract but must not
 generate different placements or substitute content. Minimum-FPS adaptation may
 select a coarser authored patch LOD and tune render scale or other presentation
-costs, while retaining every species and the same patch source assets.
+costs. At matched settings both backends must use the same LOD asset and its
+authored category fades; adaptation may not independently remove categories or
+substitute a backend-specific content set.
 
 Before activating the component, a conformance fixture must load the exported
 Tidewater patch set through both engine adapters and assert identical cell
