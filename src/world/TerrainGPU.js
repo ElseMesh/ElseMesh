@@ -105,20 +105,6 @@ export class TerrainGPU {
 		if ( shoreField ) this.setShoreField( shoreField );
 		this._initSunShadow();
 
-		this.module = new ShaderModule( {
-			name: 'terrain',
-			deps: [ commonModule ],
-			uniforms: this.uniforms,
-			bindings: {
-				terrainHeightTex: { texture: this.heightTexture, sampleType: 'unfilterable-float' },
-				terrainNormalTex: { texture: this.normalTexture },
-				terrainSplatTex: { texture: this.splatTexture },
-				terrainDetailTex: detailBinding( this.detailTexture ),
-				terrainShoreTex: { texture: () => this.shoreTexture, sampleType: 'unfilterable-float' },
-				terrainSunShadowTex: { texture: this.sunShadowTexture },
-			},
-			code: TERRAIN_WGSL,
-		} );
 		// Small graph-facing module keeps material terrain queries from importing
 		// the shoreline, splat, detail, and sun-shadow bindings they do not use.
 		this.heightModule = new ShaderModule( {
@@ -126,6 +112,18 @@ export class TerrainGPU {
 			uniforms: this.uniforms,
 			bindings: { terrainHeightTex: { texture: this.heightTexture, sampleType: 'unfilterable-float' } },
 			code: TERRAIN_HEIGHT_WGSL,
+		} );
+		this.module = new ShaderModule( {
+			name: 'terrain',
+			deps: [ commonModule, this.heightModule ],
+			bindings: {
+				terrainNormalTex: { texture: this.normalTexture },
+				terrainSplatTex: { texture: this.splatTexture },
+				terrainDetailTex: detailBinding( this.detailTexture ),
+				terrainShoreTex: { texture: () => this.shoreTexture, sampleType: 'unfilterable-float' },
+				terrainSunShadowTex: { texture: this.sunShadowTexture },
+			},
+			code: TERRAIN_WGSL,
 		} );
 
 		// the former TerrainLightingModel: multiplies the key light by the heightfield sun shadow.
@@ -264,8 +262,6 @@ fn terrainHeightAt( xz: vec2f ) -> f32 {
 `;
 
 const TERRAIN_WGSL = /* wgsl */`
-${TERRAIN_HEIGHT_WGSL}
-
 // filtered normal (xz components), rock mask, ambient occlusion
 fn terrainNormalRock( xz: vec2f ) -> vec4f {
 	let s = textureSample( terrainNormalTex, smpLinearClamp, terrainUvOf( xz ) );

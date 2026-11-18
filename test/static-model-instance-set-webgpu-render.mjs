@@ -9,7 +9,9 @@ import { registerWorldMaterialProfile } from '../src/network/WorldMaterialProfil
 import { disposeWorldPackage } from '../src/network/WorldPackage.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
 import { GPU } from '../src/engine/gpu/GPU.js';
+import { ShaderModule } from '../src/engine/gpu/Shader.js';
 import { standard } from '../src/materials/Materials.js';
+import { SceneLighting } from '../src/materials/SceneLighting.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
@@ -28,6 +30,13 @@ registerWorldPackageMaterialAdapter( materialAdapterType, {
 } );
 const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = hash( glbBytes );
 const graph = { format: 'elsemesh.material-graph/1', nodes: [ { id: 'position', op: 'input', name: 'position' }, { id: 'normal', op: 'input', name: 'normal' }, { id: 'worldPosition', op: 'input', name: 'worldPosition' }, { id: 'worldVertexPosition', op: 'input', name: 'worldVertexPosition' }, { id: 'worldVertexX', op: 'x', args: [ 'worldVertexPosition' ] }, { id: 'worldVertexZ', op: 'z', args: [ 'worldVertexPosition' ] }, { id: 'worldVertexUV', op: 'vec2', args: [ 'worldVertexX', 'worldVertexZ' ] }, { id: 'worldNormal', op: 'input', name: 'worldNormal' }, { id: 'uv', op: 'input', name: 'uv' }, { id: 'frontFacing', op: 'input', name: 'frontFacing' }, { id: 'pixelPosition', op: 'input', name: 'pixelPosition' }, { id: 'pixelX', op: 'x', args: [ 'pixelPosition' ] }, { id: 'pixelScale', op: 'constant', value: 0.0001 }, { id: 'pixelDetail', op: 'multiply', args: [ 'pixelX', 'pixelScale' ] }, { id: 'z', op: 'z', args: [ 'position' ] }, { id: 'threshold', op: 'constant', value: 0.2 }, { id: 'above', op: 'greaterThan', args: [ 'z', 'threshold' ] }, { id: 'highColor', op: 'constant', value: [ 0.15, 0.8, 0.35 ] }, { id: 'lowColor', op: 'constant', value: [ 0.1, 0.25, 0.8 ] }, { id: 'albedo', op: 'select', args: [ 'above', 'highColor', 'lowColor' ] }, { id: 'frontScale', op: 'constant', value: 1 }, { id: 'backScale', op: 'constant', value: 0.5 }, { id: 'faceScale', op: 'select', args: [ 'frontFacing', 'frontScale', 'backScale' ] }, { id: 'albedoFacing', op: 'multiply', args: [ 'albedo', 'faceScale' ] }, { id: 'roughness', op: 'add', args: [ 'pixelDetail', 'pixelScale' ] }, { id: 'lift', op: 'constant', value: [ 0, 0.15, 0 ] }, { id: 'bentPosition', op: 'add', args: [ 'position', 'lift' ] }, { id: 'slope', op: 'constant', value: [ 0.08, - 0.04 ] }, { id: 'surfaceNormal', op: 'normalFromSlope', args: [ 'worldPosition', 'worldNormal', 'uv', 'slope' ] } ], outputs: { baseColor: 'albedoFacing', roughness: 'roughness', vertexPosition: 'bentPosition', vertexNormal: 'normal', surfaceNormal: 'surfaceNormal' } };
+graph.nodes.push(
+	{ id: 'groundHeight', op: 'terrainHeightAt', args: [ 'worldVertexUV' ] },
+	{ id: 'heightScale', op: 'constant', value: 0.0001 },
+	{ id: 'heightDetail', op: 'multiply', args: [ 'groundHeight', 'heightScale' ] },
+	{ id: 'roughnessWithHeight', op: 'add', args: [ 'roughness', 'heightDetail' ] },
+);
+graph.outputs.roughness = 'roughnessWithHeight';
 graph.nodes.push( { id: 'thinTint', op: 'constant', value: [ 0.18, 0.32, 0.07 ] } );
 graph.outputs.thinTransmission = 'thinTint';
 graph.nodes.push(
@@ -86,9 +95,14 @@ const connector = {
 const errors = [];
 const L = await setupLife( { W: 192, H: 144, shadowSplits: [ 12 ] } );
 let runtime;
+const previousBounce = SceneLighting.hooks.bounce;
+const heightModule = new ShaderModule( { name: 'fixtureTerrainHeight', code: 'fn terrainUvOf( xz: vec2f ) -> vec2f { return xz; }\nfn terrainHeightAt( xz: vec2f ) -> f32 { return terrainUvOf( xz ).y; }' } );
+const terrainModule = new ShaderModule( { name: 'fixtureTerrain', deps: [ heightModule ], code: 'fn fixtureTerrainNormal( xz: vec2f ) -> vec3f { return vec3f( 0.0, 1.0, 0.0 ); }' } );
+SceneLighting.set( 'bounce', new ShaderModule( { name: 'fixtureTerrainBounce', deps: [ terrainModule ], code: 'fn hookBounce( P: vec3f, N: vec3f ) -> vec3f { return vec3f( fixtureTerrainNormal( P.xz ).y ); }' } ) );
 try {
 	GPU.device.addEventListener( 'uncapturederror', event => errors.push( event.error?.message || 'unknown GPU error' ) );
 	const root = new Group();
+	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: { heightModule } } ];
 	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, materialAdapterContexts: new Map( [ [ materialAdapterType, { context: { material: profileMaterial } } ] ] ) };
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const result = await install( { root, connector }, component );
@@ -124,6 +138,8 @@ try {
 	console.log( `generic WebGPU static-model render passed (${changedPixels} non-background pixels; color and shadow pipelines compiled)` );
 } finally {
 	runtime?.dispose();
+	SceneLighting.hooks.bounce = previousBounce;
+	SceneLighting.version ++;
 	profileMaterial.dispose();
 	GPU.device?.destroy();
 	if ( previousAssetImageDecoder === undefined ) delete globalThis.__assetImage;
