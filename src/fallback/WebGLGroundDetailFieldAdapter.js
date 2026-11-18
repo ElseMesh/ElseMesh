@@ -5,12 +5,13 @@ import { webglBeachDebris } from './WebGLBeachDebris.js';
 
 registerWorldComponentBackendAdapter( 'webgl', 'elsemesh.ground-detail-field/1', installGroundDetailField );
 
-async function installGroundDetailField( { fallback, terrain, assets }, component ) {
+async function installGroundDetailField( { fallback, connector: providedConnector, terrain, assets }, component ) {
 
 	if ( ! terrain || ! Number.isFinite( terrain.size ) ) throw new Error( `Ground-detail field ${component.id} requires an installed terrain surface` );
 	const references = ( component.assets || [] ).filter( asset => asset.kind === GROUND_DETAIL_DENSITY_ASSET_KIND );
 	if ( references.length !== 1 ) throw new Error( `Ground-detail field ${component.id} must reference exactly one density asset` );
-	const bytes = assets?.get( references[ 0 ].assetId ) || await fallback.connector.getAsset( references[ 0 ].assetId );
+	const connector = providedConnector || fallback.connector;
+	const bytes = assets?.get( references[ 0 ].assetId ) || await connector.getAsset( references[ 0 ].assetId );
 	const density = await decodeWorldComponentAsset( GROUND_DETAIL_DENSITY_ASSET_KIND, bytes, {
 		resolution: component.data?.resolution,
 		texel: component.data?.texel,

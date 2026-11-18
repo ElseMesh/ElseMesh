@@ -113,6 +113,21 @@ assert.equal( resolved.parsedModels.size, 0, 'the adapter can release temporary 
 await assert.rejects( () => loadStaticModelInstanceSetAssets( { ...assetConnector, manifest: { assets: assetConnector.manifest.assets.map( asset => asset.id === lowest ? { ...asset, kind: 'image/1' } : asset ) } }, { assets: componentAssets } ), /missing/ );
 await assert.rejects( () => loadStaticModelInstanceSetAssets( assetConnector, { assets: [ componentAssets[ 0 ] ] } ), /component GLB/ );
 
+const imageAssetID = `sha256:${'e'.repeat( 64 )}`;
+const imageReferenceComponent = { assets: [ ...componentAssets, { assetId: imageAssetID, kind: 'image/jpeg' } ] };
+const imageReferenceConnector = {
+	...assetConnector,
+	manifest: { assets: [ ...assetConnector.manifest.assets, { id: imageAssetID, kind: 'image/jpeg' } ] },
+};
+const imageReferenceModel = { images: [ { assetId: imageAssetID, mimeType: 'image/jpeg' } ], skins: [], animations: [], nodes: [], meshes: [] };
+const imageReferenceAssets = await loadStaticModelInstanceSetAssets( imageReferenceConnector, imageReferenceComponent, { parseModel: () => imageReferenceModel } );
+await imageReferenceAssets.loadModelLOD( 0, 0 );
+await assert.rejects(
+	() => loadStaticModelInstanceSetAssets( { ...imageReferenceConnector, manifest: { assets: [ ...assetConnector.manifest.assets, { id: imageAssetID, kind: 'image/png' } ] } }, imageReferenceComponent, { parseModel: () => imageReferenceModel } ).then( loaded => loaded.loadModelLOD( 0, 0 ) ),
+	/not a signed component asset/,
+	'external glTF textures must be declared in the component with their matching image kind',
+);
+
 const placements = [ 20, 35, 100, 300 ].map( z => ( { model: 'market-table-fish', position: [ 1, 2, z ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ) );
 placements.push( { model: 'market-table-fish', position: [ 500, 2, 20 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
 placements.push( { model: 'market-table-fish', position: [ 5, 2, 20 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );

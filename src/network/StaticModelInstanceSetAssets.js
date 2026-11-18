@@ -39,6 +39,11 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 			const bytes = progressive?.bytes || connector.assets.get( assetId ) || await connector.getAsset( assetId, { signal: requestSignal } );
 			const webGLBytes = progressive?.webGLBytes || null;
 			const gltf = parseModel( bytes );
+			for ( const image of gltf.images || [] ) {
+				if ( ! image.assetId ) continue;
+				const asset = assetsByID.get( image.assetId );
+				if ( ! asset || asset.kind !== image.mimeType || componentAssetsByID.get( image.assetId ) !== image.mimeType ) throw new Error( `Static model image is not a signed component asset: ${image.assetId}` );
+			}
 			if ( ( gltf.skins || [] ).length || ( gltf.animations || [] ).length || ( gltf.nodes || [] ).some( node => node.skin !== undefined ) || ( gltf.meshes || [] ).some( mesh => mesh.primitives.some( primitive => primitive.targets?.length ) ) ) throw new Error( `Static model GLB cannot contain skins, animation, or morph targets: ${assetId}` );
 			for ( const mesh of gltf.meshes || [] ) for ( const primitive of mesh.primitives ) {
 				if ( ( primitive.mode ?? 4 ) !== 4 ) throw new Error( `Static model GLB must use triangle-list primitives: ${assetId}` );

@@ -1,4 +1,5 @@
 import { loadStaticModelInstanceSetAssets } from '../network/StaticModelInstanceSetAssets.js';
+import { materializeGLBAssetReferencesForWebGL } from '../engine/loaders/GLBRange.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from '../network/StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
@@ -63,8 +64,9 @@ function releaseParsedModelSource( fallback, assetId ) {
 	disposeParsedModelSource( entry.source );
 }
 
-async function installStaticModelInstanceSet( { fallback }, component ) {
-	const connector = fallback.connector;
+async function installStaticModelInstanceSet( { fallback, connector: providedConnector, isCurrent: providedIsCurrent }, component ) {
+	const connector = providedConnector || fallback.connector;
+	const isCurrent = providedIsCurrent || ( () => fallback.connector === connector );
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
 	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set();
 	const root = fallback.app?.linkedWorldRoot;
@@ -115,10 +117,11 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			initialLoadedLods,
 			loadLOD: ( modelIndex, lodIndex, signal, priority ) => lodQueue.run( signal, async () => {
 				const { bytes, webGLBytes, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
-				if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
+				if ( ! isCurrent() ) throw new DOMException( 'World unloaded', 'AbortError' );
 				const assetId = document.models[ modelIndex ].lods[ lodIndex ].assetId;
-				const source = await parseModel( assetId, webGLBytes || bytes );
-				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
+				const modelBytes = await materializeGLBAssetReferencesForWebGL( webGLBytes || bytes, ( imageAssetID, options ) => connector.getAsset( imageAssetID, options ), { signal } );
+				const source = await parseModel( assetId, modelBytes );
+				if ( signal.aborted || ! isCurrent() ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
 				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, false );

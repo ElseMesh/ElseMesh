@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { staticModelGLB } from './helpers/static-model-glb.mjs';
+import { staticModelGLB, staticModelTexturePNG } from './helpers/static-model-glb.mjs';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
 import { registerWorldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
@@ -18,6 +18,7 @@ let profileMaterial, profileDepthMaterial;
 try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
 	registerWorldMaterialProfile( profile, { roles: [ 'tint' ] } );
+	const textureAssetID = await hash( staticModelTexturePNG );
 	const glbBytes = staticModelGLB( { materialExtras: { elsemeshMaterial: { profile, role: 'tint' } } } ), modelAssetID = await hash( glbBytes );
 	const graph = {
 		format: 'elsemesh.material-graph/1',
@@ -113,8 +114,9 @@ try {
 	graph.outputs.vertexPosition = 'movedWithTexture';
 	const graphGLB = staticModelGLB( {
 		doubleSided: true,
-		materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
 		materialTexture: true,
+		externalImageAssetID: textureAssetID,
+		materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph } },
 		extraAttributes: {
 			_ELSEMESH_VDATA1: [ 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0 ],
 			_ELSEMESH_VDATA2: [ 0, 0.02, 0, 0, 0, 0.02, 0, 0, 0, 0.02, 0, 0 ],
@@ -133,10 +135,10 @@ try {
 		],
 	};
 	const setBytes = new TextEncoder().encode( JSON.stringify( packageDocument ) ), setAssetID = await hash( setBytes );
-	const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: graphAssetID, kind: 'glb' } ] };
-	const assetBytes = new Map( [ [ setAssetID, setBytes ], [ modelAssetID, glbBytes ], [ graphAssetID, graphGLB ] ] );
+	const component = { id: 'render-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: graphAssetID, kind: 'glb' }, { assetId: textureAssetID, kind: 'image/png' } ] };
+	const assetBytes = new Map( [ [ setAssetID, setBytes ], [ modelAssetID, glbBytes ], [ graphAssetID, graphGLB ], [ textureAssetID, staticModelTexturePNG ] ] );
 	const connector = {
-		manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: graphAssetID, kind: 'glb' } ] },
+		manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: graphAssetID, kind: 'glb' }, { id: textureAssetID, kind: 'image/png' } ] },
 		assets: new Map( [ [ setAssetID, setBytes ] ] ),
 		getAsset: async id => assetBytes.get( id ),
 	};

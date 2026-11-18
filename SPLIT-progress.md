@@ -2280,3 +2280,13 @@ finding changes them.
   checks rather than a full pre-split world comparison. Broader world views,
   finite vegetation, and controlled hardware FPS remain open; no percentage
   changes.
+
+- 2026-11-18: built-in WebGL now routes generic single-component adapters as
+  well as batch adapters, so the signed scanned-debris static-model component
+  is eligible for installation through the same registry as hosted worlds.
+  Its bundled asset connector verifies content hashes and lazily loads model
+  LODs and referenced images. The package URL test checks all 12 scanned-debris
+  LODs; focused registry and asset tests pass, and the isolated WebGL static
+  model render resolves an external signed PNG with no GL errors. This closes
+  built-in adapter routing and external-image loading checks, not a rendered
+  Tidewater debris comparison or full visual parity; Tidewater remains 93%.

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
 import { extractKTX2Level } from '../src/engine/loaders/KTX2Level.js';
-import { fetchGLBWithCoarseKTX2, fetchGLBTextureLevel, fetchNextGLBTextureLevels } from '../src/engine/loaders/GLBRange.js';
+import { fetchGLBWithCoarseKTX2, fetchGLBTextureLevel, fetchNextGLBTextureLevels, materializeGLBAssetReferencesForWebGL } from '../src/engine/loaders/GLBRange.js';
+
+const GLB_MAGIC = 0x46546c67, JSON_CHUNK = 0x4e4f534a, BIN_CHUNK = 0x004e4942;
 
 const ktx2 = new Uint8Array( await readFile( new URL( './fixtures/ktx2-checker.ktx2', import.meta.url ) ) );
 const sourceView = new DataView( ktx2.buffer, ktx2.byteOffset, ktx2.byteLength );
@@ -168,4 +170,41 @@ const beforeExternalRevisit = externalRequests.length;
 const externalRevisited = await fetchGLBTextureLevel( externalConnector, 'external-glb', externalResult, { imageIndices: [ 0 ], levelIndex: externalFineIndex } );
 assert.deepEqual( externalRevisited[ 0 ].bytes, extractKTX2Level( ktx2, externalFineIndex ), 'an evicted standalone texture mip can be fetched again by exact level index' );
 assert.deepEqual( externalRequests.slice( beforeExternalRevisit ), [ { assetId: textureAssetId, start: externalFineOffset, end: externalFineOffset + externalFineLength - 1 } ], 'revisiting an evicted external mip requests only its payload range' );
+
+const jpegAssetID = `sha256:${'b'.repeat( 64 )}`;
+const jpegBytes = new Uint8Array( [ 0xff, 0xd8, 0xff, 0xd9 ] );
+const jpegDocument = {
+	asset: { version: '2.0' },
+	buffers: [ { byteLength: geometry.byteLength } ],
+	bufferViews: [ { buffer: 0, byteOffset: 0, byteLength: geometry.byteLength } ],
+	images: [ { mimeType: 'image/jpeg', extensions: { EXT_elsemesh_asset_reference: { assetId: jpegAssetID } } } ],
+	textures: [ { source: 0 } ],
+	nodes: [], scenes: [ { nodes: [] } ], scene: 0,
+	extensionsUsed: [ 'EXT_elsemesh_asset_reference' ], extensionsRequired: [ 'EXT_elsemesh_asset_reference' ],
+};
+const jpegJSON = new TextEncoder().encode( JSON.stringify( jpegDocument ) );
+const jpegJSONLength = ( jpegJSON.byteLength + 3 ) & ~3;
+const jpegGLB = new Uint8Array( 28 + jpegJSONLength + geometry.byteLength );
+const jpegView = new DataView( jpegGLB.buffer );
+jpegView.setUint32( 0, GLB_MAGIC, true );
+jpegView.setUint32( 4, 2, true );
+jpegView.setUint32( 8, jpegGLB.byteLength, true );
+jpegView.setUint32( 12, jpegJSONLength, true );
+jpegView.setUint32( 16, JSON_CHUNK, true );
+jpegGLB.fill( 0x20, 20, 20 + jpegJSONLength );
+jpegGLB.set( jpegJSON, 20 );
+jpegView.setUint32( 20 + jpegJSONLength, geometry.byteLength, true );
+jpegView.setUint32( 24 + jpegJSONLength, BIN_CHUNK, true );
+jpegGLB.set( geometry, 28 + jpegJSONLength );
+const jpegWebGLGLB = await materializeGLBAssetReferencesForWebGL( jpegGLB, async assetId => {
+	assert.equal( assetId, jpegAssetID );
+	return jpegBytes;
+} );
+const jpegWebGLDocument = parseGLB( jpegWebGLGLB );
+assert.equal( jpegWebGLDocument.images[ 0 ].assetId, null, 'the WebGL model no longer depends on the engine-only image-reference extension' );
+assert.equal( jpegWebGLDocument.images[ 0 ].mimeType, 'image/jpeg' );
+assert.match( jpegWebGLDocument.images[ 0 ].uri, /^data:image\/jpeg;base64,/, 'external JPEG bytes are exposed to Three.js as an ordinary glTF data URI' );
+assert.deepEqual( Uint8Array.from( atob( jpegWebGLDocument.images[ 0 ].uri.split( ',' )[ 1 ] ), char => char.charCodeAt( 0 ) ), jpegBytes, 'the resolved URI contains the verified external image bytes' );
+assert.deepEqual( jpegWebGLDocument.json.bufferViews[ 0 ], { buffer: 0, byteOffset: 0, byteLength: geometry.byteLength }, 'materializing image references preserves the geometry buffer views' );
+assert( ! jpegWebGLDocument.json.extensionsRequired?.includes( 'EXT_elsemesh_asset_reference' ), 'the WebGL model no longer requires the engine-only image-reference extension' );
 console.log( 'Ranged GLB coarse-texture checks passed' );

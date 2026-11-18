@@ -1,4 +1,6 @@
-export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false, doubleSided = false, extraAttributes = {} } = {} ) {
+export const staticModelTexturePNG = Uint8Array.from( atob( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' ), character => character.charCodeAt( 0 ) );
+
+export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = undefined, materialAlpha = 1, materialTexture = false, externalImageAssetID = null, doubleSided = false, extraAttributes = {} } = {} ) {
 	const positions = [ - 0.5, 0, 0, 0.5, 0, 0, 0, 1, 0 ];
 	const normals = [ 0, 0, 1, 0, 0, 1, 0, 0, 1 ];
 	const parts = [
@@ -24,13 +26,12 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 		accessors.push( accessor );
 	}
 	let textureImageBufferView = null;
-	if ( materialTexture ) {
-		const png = Uint8Array.from( atob( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==' ), character => character.charCodeAt( 0 ) );
+	if ( materialTexture && ! externalImageAssetID ) {
 		const padding = ( 4 - byteLength % 4 ) % 4;
 		if ( padding ) { chunks.push( new Uint8Array( padding ) ); byteLength += padding; }
 		textureImageBufferView = bufferViews.length;
-		bufferViews.push( { buffer: 0, byteOffset: byteLength, byteLength: png.byteLength } );
-		chunks.push( png ); byteLength += png.byteLength;
+		bufferViews.push( { buffer: 0, byteOffset: byteLength, byteLength: staticModelTexturePNG.byteLength } );
+		chunks.push( staticModelTexturePNG ); byteLength += staticModelTexturePNG.byteLength;
 	}
 	const binary = new Uint8Array( byteLength );
 	let binaryOffset = 0;
@@ -48,8 +49,11 @@ export function staticModelGLB( { nodeScale = [ 1, 1, 1 ], materialExtras = unde
 		meshes: [ { primitives: [ { attributes: Object.fromEntries( parts.slice( 0, - 1 ).map( ( part, index ) => [ part.name, index ] ) ), indices: parts.length - 1, material: 0, mode: 4 } ] } ],
 		materials: [ material ],
 		...( materialTexture ? {
-			images: [ { bufferView: textureImageBufferView, mimeType: 'image/png' } ],
+			images: [ externalImageAssetID
+				? { mimeType: 'image/png', extensions: { EXT_elsemesh_asset_reference: { assetId: externalImageAssetID } } }
+				: { bufferView: textureImageBufferView, mimeType: 'image/png' } ],
 			textures: [ { source: 0 } ],
+			...( externalImageAssetID ? { extensionsUsed: [ 'EXT_elsemesh_asset_reference' ], extensionsRequired: [ 'EXT_elsemesh_asset_reference' ] } : {} ),
 		} : {} ),
 		buffers: [ { byteLength: binary.byteLength } ], bufferViews, accessors,
 	};

@@ -10,11 +10,12 @@ import { compileWorldMaterialProfile } from '../materials/WorldMaterialProfileCo
 const COMPONENT_TYPE = 'elsemesh.ground-cover-field/1';
 registerWorldComponentBackendAdapter( 'webgl', COMPONENT_TYPE, installGroundCoverField );
 
-async function installGroundCoverField( { fallback, terrain, assets }, component ) {
+async function installGroundCoverField( { fallback, connector: providedConnector, isCurrent: providedIsCurrent, terrain, assets }, component ) {
 	if ( ! terrain || ! Number.isFinite( terrain.size ) ) throw new Error( `Ground-cover field ${ component.id } requires an installed terrain surface` );
-	const connector = fallback.connector;
+	const connector = providedConnector || fallback.connector;
+	const isCurrent = providedIsCurrent || ( () => fallback.connector === connector );
 	const loaded = await loadGroundCoverFieldAssets( connector, component, { terrain, assets } );
-	if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
+	if ( ! isCurrent() ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const T = fallback.THREE;
 	const densityTexture = new T.DataTexture( loaded.density.data, loaded.density.res, loaded.density.res, T.RGBAFormat, T.UnsignedByteType );
 	densityTexture.magFilter = T.LinearFilter;
@@ -34,10 +35,10 @@ async function installGroundCoverField( { fallback, terrain, assets }, component
 		root: fallback.scene,
 		loadModel: async ( assetId, signal ) => {
 			const bytes = await loaded.loadModel( assetId, signal );
-			if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
+			if ( ! isCurrent() ) throw new DOMException( 'World unloaded', 'AbortError' );
 			const buffer = bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
 			const parsed = await fallback.loader.parseAsync( buffer, '' );
-			if ( fallback.connector !== connector ) { disposeParsedSource( parsed.scene ); throw new DOMException( 'World unloaded', 'AbortError' ); }
+			if ( ! isCurrent() ) { disposeParsedSource( parsed.scene ); throw new DOMException( 'World unloaded', 'AbortError' ); }
 			return parsed.scene;
 		},
 		createDraws: ( source, capacity, shadowOnly, geometryMirrorX ) => createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX, densityTexture, detailFieldTexture, ownedGeometry, ownedMaterials ),

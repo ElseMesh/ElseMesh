@@ -17,7 +17,7 @@ import { portalRouteFromPosition } from '../network/PortalHandoff.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
-import { loadWorldComponentAssets } from '../network/WorldComponentAssets.js';
+import { createBundledWorldAssetConnector, loadWorldComponentAssets } from '../network/WorldComponentAssets.js';
 import { WebGLLocalLights } from './WebGLLocalLights.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
@@ -1674,7 +1674,7 @@ export class WebGLFallback {
 		} catch ( error ) {
 			console.warn( 'WebGL fallback village model unavailable:', error );
 		}
-		await this._loadBuiltinBatchComponents();
+		await this._loadBuiltinComponents();
 		const start = WORLD.start || WORLD.spawn;
 		const startX = start.position.x ?? start.position[ 0 ];
 		const startZ = start.position.z ?? start.position[ 2 ];
@@ -1684,21 +1684,44 @@ export class WebGLFallback {
 
 	}
 
-	async _loadBuiltinBatchComponents() {
+	async _loadBuiltinComponents() {
 
-		const groups = new Map();
+		const singles = [], groups = new Map();
 		for ( const component of this.defaultWorldSource?.components || [] ) {
-			const adapter = worldComponentBackendBatchAdapter( 'webgl', component.type );
-			if ( ! adapter ) continue;
-			const group = groups.get( component.type ) || { adapter, components: [] };
-			group.components.push( component );
-			groups.set( component.type, group );
+			const batchAdapter = worldComponentBackendBatchAdapter( 'webgl', component.type );
+			if ( batchAdapter ) {
+				const group = groups.get( component.type ) || { adapter: batchAdapter, components: [] };
+				group.components.push( component );
+				groups.set( component.type, group );
+			} else {
+				const adapter = worldComponentBackendAdapter( 'webgl', component.type );
+				if ( adapter ) singles.push( { adapter, component } );
+			}
+		}
+		if ( singles.length === 0 && groups.size === 0 ) return;
+		const connector = this.builtinAssetConnector ||= createBundledWorldAssetConnector( this.defaultWorldSource, this.defaultWorldAssets?.assetURLs );
+		const manuallyPresented = new Set( [
+			this.defaultWorldSource.components.find( component => component.type === 'elsemesh.terrain-surface/1' )?.id,
+			this.defaultWorldSource.components.find( component => component.type === 'elsemesh.island-ocean/1' )?.id,
+		].filter( Boolean ) );
+		const isCurrent = () => ! this.worldLink && connector === this.builtinAssetConnector;
+		for ( const { adapter, component } of singles ) {
+			if ( manuallyPresented.has( component.id ) ) continue;
+			try {
+				const assets = await loadWorldComponentAssets( [ component ], this.defaultWorldAssets?.assetURLs );
+				for ( const [ assetID, bytes ] of assets ) connector.assets.set( assetID, bytes );
+				const result = await adapter( { fallback: this, connector, isCurrent, manifest: connector.manifest, assets, rules: this.defaultWorldSource.rules, terrain: this.terrain }, component );
+				if ( result?.runtime ) this.builtinComponentRuntimes.set( component.id, result.runtime );
+			} catch ( error ) {
+				console.warn( `WebGL fallback component ${component.type} unavailable:`, error );
+			}
 		}
 		for ( const [ type, { adapter, components } ] of groups ) {
 			try {
 				const assets = await loadWorldComponentAssets( components, this.defaultWorldAssets?.assetURLs );
+				for ( const [ assetID, bytes ] of assets ) connector.assets.set( assetID, bytes );
 				const result = await adapter( { fallback: this, manifest: this.defaultWorldSource, assets }, components );
-				if ( result?.runtime ) this.builtinComponentRuntimes.set( result.runtimeComponentId || components[ 0 ].id, result.runtime );
+				if ( result?.runtime ) this.builtinComponentRuntimes.set( result.runtimeComponentId || result.componentIDs?.[ 0 ] || components[ 0 ].id, result.runtime );
 			} catch ( error ) {
 				console.warn( `WebGL fallback component batch ${type} unavailable:`, error );
 			}

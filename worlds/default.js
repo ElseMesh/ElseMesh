@@ -12,6 +12,8 @@ import { TIDEWATER_WHALE_PROFILE } from './tidewater/WhaleProfile.js';
 import { scannedAssetRuntimeDescriptors } from './tidewater/debris/ScannedAssets.js';
 import { loadTidewaterVegetationRuntimeAssets } from './tidewater/vegetation/RuntimeAssets.js';
 
+const bundledContentAssetURLs = Object.fromEntries( Object.entries( import.meta.glob( './tidewater/assets/*', { eager: true, query: '?url', import: 'default' } ) ).map( ( [ path, url ] ) => [ `sha256:${path.split( '/' ).at( - 1 )}`, url ] ) );
+
 const scannedAssets = scannedAssetRuntimeDescriptors( `${import.meta.env.BASE_URL}models/debris/` );
 
 const vegetation = source.components.find( component => component.type === 'elsemesh.static-vegetation/1' );
@@ -21,6 +23,7 @@ const vegetationGrassDensityAsset = vegetation?.assets.find( asset => asset.kind
 const fishProps = source.components.find( component => component.type === 'elsemesh.static-fish-props/1' );
 const fishPropsAsset = fishProps?.assets.find( asset => asset.assetId === fishProps?.data?.placementAssetId );
 const assetURLs = {
+	...bundledContentAssetURLs,
 	...reefPlacementAssets,
 	...( vegetationAsset ? { [ vegetationAsset.assetId ]: vegetationPlacements } : {} ),
 	...( vegetationGrassDensityAsset ? { [ vegetationGrassDensityAsset.assetId ]: vegetationGrassDensity } : {} ),

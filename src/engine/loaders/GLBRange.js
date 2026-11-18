@@ -69,6 +69,71 @@ function buildGLB( json, geometry, images ) {
 	return output;
 }
 
+// Three.js does not understand ElseMesh's content-addressed image extension.
+// Materialize those references only for the WebGL loader, keeping the signed
+// source GLB and its image assets separate in the world package.
+export async function materializeGLBAssetReferencesForWebGL( bytes, loadAsset, { signal } = {} ) {
+	const data = bytes instanceof Uint8Array ? bytes : new Uint8Array( bytes );
+	const json = JSON.parse( new TextDecoder().decode( (() => {
+		const view = new DataView( data.buffer, data.byteOffset, data.byteLength );
+		if ( view.getUint32( 0, true ) !== GLB_MAGIC || view.getUint32( 4, true ) !== 2 || view.getUint32( 8, true ) !== data.byteLength ) throw new Error( 'GLB header is invalid' );
+		for ( let offset = 12; offset < data.byteLength; ) {
+			const length = view.getUint32( offset, true ), type = view.getUint32( offset + 4, true );
+			if ( type === JSON_CHUNK ) return data.subarray( offset + 8, offset + 8 + length );
+			offset += 8 + length;
+		}
+		throw new Error( 'GLB JSON chunk is missing' );
+	})() ) );
+	const references = new Map();
+	for ( const [ index, image ] of ( json.images || [] ).entries() ) {
+		const assetId = image.extensions?.EXT_elsemesh_asset_reference?.assetId;
+		if ( assetId === undefined ) continue;
+		if ( typeof assetId !== 'string' || ! /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/.test( assetId ) || ! [ 'image/jpeg', 'image/png', 'image/ktx2', 'image/webp' ].includes( image.mimeType ) ) throw new Error( `GLB image ${index} has an invalid WebGL asset reference` );
+		references.set( assetId, image.mimeType );
+	}
+	if ( references.size === 0 ) return data;
+	if ( typeof loadAsset !== 'function' ) throw new TypeError( 'Resolving GLB image references requires an asset loader' );
+	const imageBytes = new Map();
+	for ( const [ assetId, mimeType ] of references ) {
+		if ( signal?.aborted ) throw signal.reason || new DOMException( 'Aborted', 'AbortError' );
+		const loaded = await loadAsset( assetId, { signal } );
+		const image = loaded instanceof Uint8Array ? loaded : loaded instanceof ArrayBuffer ? new Uint8Array( loaded ) : null;
+		if ( ! image?.byteLength ) throw new Error( `GLB image asset ${assetId} is empty or invalid` );
+		imageBytes.set( assetId, `data:${mimeType};base64,${bytesToBase64( image )}` );
+	}
+	for ( const image of json.images || [] ) {
+		const reference = image.extensions?.EXT_elsemesh_asset_reference;
+		if ( ! reference ) continue;
+		image.uri = imageBytes.get( reference.assetId );
+		delete image.extensions.EXT_elsemesh_asset_reference;
+		if ( image.extensions && Object.keys( image.extensions ).length === 0 ) delete image.extensions;
+	}
+	if ( ! json.images.some( image => image.extensions?.EXT_elsemesh_asset_reference ) ) {
+		for ( const key of [ 'extensionsUsed', 'extensionsRequired' ] ) {
+			const extensions = json[ key ]?.filter( extension => extension !== 'EXT_elsemesh_asset_reference' );
+			if ( extensions ) {
+				if ( extensions.length ) json[ key ] = extensions;
+				else delete json[ key ];
+			}
+		}
+	}
+	const view = new DataView( data.buffer, data.byteOffset, data.byteLength );
+	let geometry = null;
+	for ( let offset = 12; offset < data.byteLength; ) {
+		const length = view.getUint32( offset, true ), type = view.getUint32( offset + 4, true );
+		if ( type === BIN_CHUNK ) geometry = data.slice( offset + 8, offset + 8 + length );
+		offset += 8 + length;
+	}
+	if ( ! geometry || ! Number.isSafeInteger( json.buffers?.[ 0 ]?.byteLength ) || json.buffers.length !== 1 || json.buffers[ 0 ].byteLength > geometry.byteLength ) throw new Error( 'GLB binary buffer is invalid for external image references' );
+	return buildGLB( json, geometry.subarray( 0, json.buffers[ 0 ].byteLength ), [] );
+}
+
+function bytesToBase64( bytes ) {
+	let binary = '';
+	for ( let offset = 0; offset < bytes.length; offset += 0x8000 ) binary += String.fromCharCode( ...bytes.subarray( offset, Math.min( offset + 0x8000, bytes.length ) ) );
+	return btoa( binary );
+}
+
 /** Fetch geometry and only the coarsest indexed mip for each embedded KTX2 image in a GLB. */
 export async function fetchGLBWithCoarseKTX2( connector, assetId, { signal } = {} ) {
 	if ( typeof connector?.getAssetRange !== 'function' || typeof connector?.getAssetRanges !== 'function' ) throw new TypeError( 'Progressive GLB loading requires a range-capable connector' );
