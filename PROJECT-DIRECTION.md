@@ -31,11 +31,14 @@ passed for the beach and `swashAbove` views across three simulation phases.
 Production-water fishing has also been exercised through live WebGPU and WebGL
 browser sessions.
 
-The remaining gates are to compare additional views and materials, replay
-fishing/sale from matched fresh profiles to confirm exact wallet parity, and
-measure supported-hardware FPS with a controlled method. Keep the timber,
-houses, fish stand, harbour, vegetation, LOD, water, spray, and lighting/shadows
-as distinct visual findings. The WebGPU headless review on 2026-11-17 confirmed
+The remaining gates are to compare additional views and materials and measure
+supported-hardware FPS with a controlled method. Tidewater's signed-Worker
+browser test now compares WebGPU and WebGL through cast, catch, sale, and shop
+purchase from matched fresh in-memory wallets; it asserts matching ending
+state. This test uses synthetic water and does not establish production-water
+or persisted-profile parity. Keep the timber, houses, fish stand, harbour,
+vegetation, LOD, water, spray, and lighting/shadows as distinct visual
+findings. The WebGPU headless review on 2026-11-17 confirmed
 that the hosted package used the AMD RADV adapter and rendered its three-cascade
 shadow path; its headless FPS is not a performance measurement. WebGL remains a
 content/gameplay alignment check after the original WebGPU appearance is
