@@ -54,9 +54,11 @@ assets. These are rendering-cost adjustments, not backend-specific content
 variants: WebGPU and WebGL retain the same authored objects, placements,
 geometry, texture sources, variants, and material inputs. Both follow the same
 visibility and LOD policy and select the same authored LOD assets at matched
-view and quality settings. A backend may use its own GPU implementation, but
-it must not meet an FPS target by dropping object classes or substituting
-another content or texture set.
+view and quality settings. Their live quality levels may differ when measured
+frame rates differ, which can select different levels from those shared authored
+asset families. A backend may use its own GPU implementation, but it must not
+meet an FPS target by dropping object classes or substituting another content
+or texture set.
 
 ## Migration rule
 

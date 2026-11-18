@@ -1986,9 +1986,10 @@ finding changes them.
   cost, texture mip or residency, and selection among shared authored LODs.
   These controls must preserve the same world-authored object, geometry,
   placement, texture-source, variant, and material-input set in WebGPU and
-  WebGL. At matched view and quality settings both renderers must select the
-  same LOD assets. This records a requirement clarification only; no parity
-  percentage changes.
+  WebGL. Their active quality levels may differ if measured FPS differs, and
+  can then select different levels from the shared asset families. At matched
+  view and quality settings both renderers must select the same LOD assets.
+  This records a requirement clarification only; no parity percentage changes.
 
 - 2026-11-18: added the renderer-neutral `terrainHeightAt(vec2 worldXZ)`
   material-graph operation. WebGPU materials receive the installed terrain

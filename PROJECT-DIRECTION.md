@@ -52,11 +52,14 @@ separate content variants: WebGPU and WebGL must resolve the same authored
 objects, placements, geometry, texture sources, variants, and material inputs
 through the same visibility/LOD policy. A renderer may sample a different mip
 level or residency tier from the same authored texture when quality settings
-require it; the texture asset and source content remain shared. At matched view
-and quality settings both renderers must select the same LOD assets. Quality
-controls may reduce rendering cost or choose coarser levels from the shared
-assets, but must not drop object classes or switch to backend-specific objects,
-placements, geometry, or texture sets.
+require it; the texture asset and source content remain shared. The active
+quality level may differ between WebGPU and WebGL when their measured frame
+rates differ, so their current LOD or mip selection may differ while both use
+the same authored asset families and engine policy. At matched view and quality
+settings both renderers must select the same LOD assets. Quality controls may
+reduce rendering cost or choose coarser levels from the shared assets, but must
+not drop object classes or switch to backend-specific objects, placements,
+geometry, or texture sets.
 
 The renderer architecture is hybrid across worlds and renderer-neutral within
 each world. ElseMesh owns backend selection and translates portable content and
