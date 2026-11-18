@@ -274,7 +274,12 @@ and redeems it through a public invitation/rendezvous API, which resolves the
 owner-authorized world and signed, reachable gateway candidates, then returns
 a short-lived launch grant. The browser connects to the gateway, and the
 destination `worldd` validates the grant and remains the admission authority.
-The existing provider directory does not redeem invite codes. The code may be
+`worldd` may create the invite's pending world-local player record in advance;
+the code maps to that record and the world's ZeroTier network/Host ID. The
+client uses the existing signed provider directory to resolve the Host ID to
+an advertised HTTPS/WSS route, not a ZeroTier IP. The provider directory does
+not redeem invite codes. See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
+The code may be
 a high-entropy, expiring, single-use capability, or the owner may require the
 visitor to authenticate with one of the providers enabled for that invite:
 Facebook, Google, and/or

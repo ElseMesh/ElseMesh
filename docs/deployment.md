@@ -36,15 +36,17 @@ The invitation API can extend that Worker or be a separate service. Today,
 when the included gateway is reachable by the visitor.
 
 The invitation service is a lookup/rendezvous component, not a world server.
-It stores owner-authorized invite metadata (world ID, signed gateway/provider
-candidates, allowed sign-in methods, expiry and revocation/redemption state),
-not world assets or reusable account credentials. It returns only
-owner-authorized, signed records. The browser verifies the world owner's
-manifest before accepting content, then uses the returned route to contact
-`worldd`. Do not accept an arbitrary gateway URL from invite input. Link
-previewers and crawlers must not consume an invite: use a non-consuming
-preview and an explicit redemption request after the visitor opens the page
-and completes any required sign-in. Make invite codes high-entropy and
+It stores owner-authorized invite metadata and redemption state, not world
+assets or reusable account credentials. It returns only owner-authorized,
+signed records. An invite may reference a pending world-local player entry
+created by `worldd`; keep its internal player number server-side. The opaque
+code is a lookup capability, not a client-selected player number or proof of
+identity. See the [wire contract](world-network-protocol.md#invitation-admission-and-launch-grants)
+for mapping this record and a ZeroTier Host ID to an advertised gateway.
+
+Do not accept an arbitrary gateway URL from invite input. Link previewers and
+crawlers must not consume an invite: redeem only after the visitor opens the
+page and completes any required sign-in. Make codes high-entropy and
 short-lived, remove them from browser history after handoff, and never put
 account tokens, ZeroTier secrets, or raw IPs in the link.
 

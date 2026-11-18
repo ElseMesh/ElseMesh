@@ -100,8 +100,12 @@ The desired public entry point is a short ElseMesh invitation URL such as
 as an alias). The Pages app reads the query and sends an explicit redemption
 request to a public invitation/rendezvous API; GitHub Pages alone cannot
 resolve codes or route requests to `worldd`. The API maps the code to an
-owner-authorized world and signed gateway candidates, checks expiry,
-revocation, and redemption limits, then returns a short-lived launch grant.
+owner-authorized world, signed gateway candidates, allowed authentication
+methods, and optionally a pending world-local player record created by
+`worldd` for the invite. It checks expiry, revocation, and redemption limits,
+then returns a short-lived launch grant scoped to that world and record.
+Keep any internal player number server-side; the code is the lookup key, not
+a client-selected player number or proof of identity.
 The browser removes the code and grant from its URL/history after handoff. A
 link preview or crawler must not consume the invite; redemption happens only
 after a visitor opens the app and completes any required authentication. A
@@ -115,7 +119,11 @@ The rendezvous API is not a world server or gateway and cannot grant access by
 itself. It returns only owner-authorized, signed route data. The browser
 verifies the owner's world manifest, then connects to a reachable HTTPS/WSS
 gateway; `worldd` validates the launch grant and retains final admission
-authority. A daemon behind NAT/firewall needs a public TLS gateway,
+authority. A compact invite mapping can contain the owner's ZeroTier network
+ID and Host ID plus the reference to a pending player record; the client can
+then use the existing signed directory lookup to obtain that daemon's
+advertised HTTPS/WSS gateway. The directory does not translate the Host ID to
+a ZeroTier IP. A daemon behind NAT/firewall needs a public TLS gateway,
 tunnel/reverse proxy, or browser-compatible relay. A ZeroTier Host ID is not
 a browser route. The current directory API resolves world and ZeroTier IDs
 only; opaque invite issuance, revocation, and redemption are not implemented.

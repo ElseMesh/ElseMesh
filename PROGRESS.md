@@ -21,6 +21,11 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   not parse opaque invite codes and the deployed directory API has no invite
   redemption route. A private `worldd` still needs an independently reachable
   HTTPS/WSS gateway, tunnel, or browser-compatible relay.
+- Clarified that an invite can map to a `worldd`-created pending player record
+  and a ZeroTier Host ID/network; the existing signed directory can resolve
+  that host locator to its advertised HTTPS/WSS gateway without returning a
+  ZeroTier IP. Neither the invite-code client path nor record-bound admission is
+  implemented; both remain part of the 0% invitation sub-gate.
 - Added the cross-world account requirement to the identity design: one
   ElseMesh account can link multiple verified providers, and a destination may
   accept a short-lived broker assertion plus a trusted-neighbor introduction

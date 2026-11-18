@@ -616,6 +616,10 @@ reachable gateway candidates, then returns a short-lived opaque launch grant.
 The browser connects to the destination gateway; `worldd` validates the grant
 and applies its own admission policy. A path-form URL may be supported as an
 alias. The directory/resolver is not itself a world server or gateway.
+An invite may reference a pending world-local player record created by
+`worldd` when the owner issues it. Redemption attaches the admitted visitor
+to that record; keep its internal player number server-side. The protocol
+design describes the Host ID to gateway lookup and invite binding.
 accepting the browser connection. A path-form URL may be supported as an alias.
 
 When `worldd` is configured for ZeroTier, ztlib sign-in is enabled by default
