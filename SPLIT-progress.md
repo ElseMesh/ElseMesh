@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-18. Percentages are rough completion estimates for the
+Last assessed: 2026-11-19. Percentages are rough completion estimates for the
 active engine/world-separation, Tidewater parity, and AI Portals hosting goals. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -2427,3 +2427,13 @@ finding changes them.
   with FFT-only inputs and are sensitivity measurements, not a WebGPU/WebGL
   parity result. Production-water fish/sale sessions remain documented
   separately. No percentage change.
+
+- 2026-11-19: compared a fixed-time split ElseMesh WebGPU beach render at
+  `65d2b30b` with the authoritative `dgreenheck/tidewater` `tidewater/main`
+  ref at `4811ba48`, using the same AMD/RADV WebGPU adapter, 1600×813 output,
+  beach pose, exposure, and 64 zero-delta settling frames. Full-frame RGB MAE
+  is 5.01/255; sky, sea, swash, wet sand, dry sand, and pier ROIs range from
+  4.50 to 6.10. The captures confirm the split WebGPU view is quite similar,
+  with the split image a few RGB values darker. This closes only this beach
+  camera gate: spray, other views/assets, LOD transitions, and WebGL comparison
+  remain open. Tidewater parity stays at 93%; no percentage change.
