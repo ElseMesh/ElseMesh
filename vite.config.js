@@ -119,6 +119,14 @@ if ( localWorldGatewayValue ) {
 	localWorldGateway = gateway.origin;
 }
 
+function localWorldGatewayProxy() {
+	return {
+		'/api/world/manifest': localWorldGateway,
+		'/gateway': { target: localWorldGateway.replace( /^http/, 'ws' ), ws: true },
+		'/v1': localWorldGateway,
+	};
+}
+
 function defaultWorldBinding() {
 	const id = '\0virtual:elsemesh-default-world';
 	return {
@@ -256,15 +264,11 @@ export default defineConfig( {
 		port: 0,
 		strictPort: true,
 		host: '127.0.0.1',
-		...( localWorldGateway ? {
-			proxy: {
-				'/api/world/manifest': localWorldGateway,
-				'/gateway': { target: localWorldGateway.replace( /^http/, 'ws' ), ws: true },
-			},
-		} : {} ),
+		...( localWorldGateway ? { proxy: localWorldGatewayProxy() } : {} ),
 	},
 	preview: {
 		port: 0,
 		strictPort: true,
+		...( localWorldGateway ? { proxy: localWorldGatewayProxy() } : {} ),
 	},
 } );
