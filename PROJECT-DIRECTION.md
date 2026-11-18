@@ -279,8 +279,12 @@ verifies signed provider records, and falls back to direct HTTPS/WSS worldd
 gateways. Focused client tests pass, and an end-to-end test announces a signed
 worldd provider to the Worker handler and connects to the real local worldd
 over WSS; the Worker handles lookup only. The remaining gate is a live run
-using an authorized member of the configured ZeroTier network and an actively
-advertised provider. **Opaque friend-link tickets and account-bound admission:
+using an actively advertised provider whose `worldd` joins the configured
+ZeroTier network through its embedded libzt identity. The host operating
+system does not need to join that network; a visitor's system-level ZeroTier
+client is optional and only enables the private-gateway fast path. The default
+browser path is Worker lookup followed by direct HTTPS/WSS to a reachable
+provider gateway. **Opaque friend-link tickets and account-bound admission:
 0%.** The shareable entry URL for those tickets should be as simple as
 `https://elsemesh.org/?invite=<signed-ticket>`. `worldd` creates the pending
 world-local player record and signs a self-contained ticket binding that

@@ -2,6 +2,15 @@
 
 ElseMesh separates a world's identity from the machines that can serve it. This lets an owner keep one ThruHold while their desktop, Flip7, or a trusted friend's daemon is online independently.
 
+`worldd` uses embedded libzt for its own ZeroTier identity and overlay
+connection. The host operating system does not need to join the ZeroTier
+network. A system-level ZeroTier client is only an optional way for a visitor
+to reach a provider's private gateway directly. The low-friction browser path
+is Worker lookup followed by a direct connection to the provider's signed,
+reachable HTTPS/WSS gateway; the Worker resolves records but carries no world
+traffic. This path still requires the provider to have a reachable public
+gateway. A visitor without ZeroTier cannot use a private ZeroTier address.
+
 ## Identifiers and routes
 
 | Value | Identifies | Browser can connect directly? |
@@ -57,8 +66,9 @@ requires a current discoverable advertisement; if that node advertises several
 worlds, provide a ThruHold ID too. Secure pages reject arbitrary HTTP/WS
 gateways; the separate ZeroTier gateway field accepts only private IP literals
 and is subject to browser Local Network Access rules. The browser does not
-join ZeroTier itself: the visitor's operating-system ZeroTier client supplies
-the private route.
+join ZeroTier itself: a visitor may use an operating-system ZeroTier client for
+the private route, or omit that route and connect to the provider's reachable
+HTTPS/WSS gateway.
 
 When sharing a URL, include only providers that already serve the same world and have the necessary owner-signed host grant. A PeerID/gateway in a link does not grant content-cache or failover-authority permission. Each daemon must have its own persistent identity directory; do not copy a private node key from desktop to phone or friend. Issue/renew grants through the world's owner-authorized manifest workflow.
 
