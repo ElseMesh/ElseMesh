@@ -2182,3 +2182,17 @@ finding changes them.
   fixtures prove the shared graph compiles and renders, not Tidewater appearance:
   its patch assets remain unsigned/inactive and no parity gate closes. Tidewater
   remains 93%.
+
+- 2026-11-18: Tidewater now exports the same 595-node authored ground-cover
+  graph in each near/mid/far patch GLB, including density/detail sampling,
+  terrain alignment, wind deformation, source category fades and foliage
+  lighting. Fixed the GLB scene nodes to reference their mesh so the engine
+  loader can instantiate the authored geometry. Tidewater's exporter test
+  validates graph bounds, both compiler texture-slot sets, identical graph data
+  across LODs, and deterministic assets. Paired engine fixtures now load those
+  exact Tidewater patch GLBs and graph: WebGPU renders 12 visible and 4 shadow
+  instances; WebGL renders 12 visible and 4 shadow instances with three
+  programs and no GL errors. Both use synthetic density/detail data and flat
+  terrain; their pixel counts are not a cross-renderer comparison. The signed
+  Tidewater component remains inactive, and no matched pre-split beach capture
+  has been made. Tidewater remains 93%; no parity gate closes.

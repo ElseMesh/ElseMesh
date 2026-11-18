@@ -221,12 +221,12 @@ contract now has a `fixed-cell-patch/1` placement mode for signed GLBs that
 already contain each cell's complete authored layout. It emits one identity
 instance at each occupied cell origin and uses the shared distance-band choice
 for both adapters; minimum-FPS bias may choose a coarser asset from the same
-signed LOD list. The runtime and focused fixture do not yet carry Tidewater's
-patch GLBs or its material behavior. Tidewater's WebGPU grass still owns the
-meadow/dune coloring, density interpretation, blade tiers, oats, creepers, gust
-response, terrain alignment, and per-blade fades. Those renderer-neutral graph
-inputs and authored assets, plus paired adapter render evidence, remain before
-it can replace the current vegetation paths.
+signed LOD list. Tidewater now exports its patch GLBs with the world-owned
+ground-cover graph. The paired fixture loads those authored GLBs through both
+adapters and exercises their material graph, geometry, and shadow paths using a
+synthetic density/detail field and flat terrain. Tidewater's WebGPU grass still
+owns the active world path; matched production-world appearance against the
+pre-split reference remains open.
 
 The ground-cover material graph can read the installed terrain surface's
 detail texture through the `detailField` slot. This reuses the texture already
@@ -237,7 +237,11 @@ visual parity. The graph also exposes `translucency` and `specularIntensity`
 through the shared material contract; WebGPU writes its existing surface fields,
 and WebGL maps them into its standard physical-lighting path. Paired generic GLB
 render fixtures exercise those outputs, but do not establish Tidewater material
-or visual parity.
+or visual parity. Tidewater's generated ground-cover graph now combines these
+outputs with the authored density, detail, wind, terrain-height, color, and
+per-blade LOD behavior. Its signed world package has not selected the inactive
+patch sidecars yet; that switch awaits matched production views against the
+pre-split WebGPU reference.
 
 The ground-cover field is only the dense-flora contract; it does not cover the
 finite vegetation set. Tidewater's placement asset has ten authored categories
