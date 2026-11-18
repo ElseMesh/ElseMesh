@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { builtInWorldURL, clearHomeWorld, defaultHomeWorldURL, discoverLocalWorldURL, getHomeWorld, homeWorldStorageKey, listVisitedWorlds, parseWorldInviteURL, rememberWorldVisit, setHomeWorld, worldLauncherStorageKey } from '../src/network/WorldLauncher.js';
+import { worldLinkFromLocation } from '../src/network/WorldConnector.js';
 
 class MemoryStorage {
 	items = new Map();
@@ -49,6 +50,27 @@ assert.equal( new URL( daemonWorldURL ).searchParams.get( 'renderer' ), 'webgl',
 assert.equal( await discoverLocalWorldURL( { pageURL: 'https://elsemesh.org/' } ), null, 'daemon world discovery is limited to loopback pages' );
 assert.equal( await discoverLocalWorldURL( { pageURL: 'http://127.0.0.1:5189/?worldId=elsemesh:explicit' } ), null, 'an explicit world link is not replaced by local daemon discovery' );
 assert.equal( await discoverLocalWorldURL( { pageURL: 'http://127.0.0.1:5189/?example=1' } ), null, 'the explicit built-in example route bypasses local daemon discovery' );
+globalThis.ELSEMESH_CONFIG = {
+	localWorld: { provider: 'http://127.0.0.1:38941', map: 'SUB_GreatHall_Int' },
+	localWorldGatewayConfigured: true,
+};
+const localHostedWorldURL = await discoverLocalWorldURL( {
+	pageURL: 'http://127.0.0.1:4179/',
+	fetchImpl: async () => ( {
+		ok: true,
+		json: async () => ( { document: { payload: { worldId: 'elsemesh:hogwarts-legacy-local', ownerPeerId: peerId } } } ),
+	} ),
+} );
+assert.equal( new URL( localHostedWorldURL ).searchParams.get( 'localMap' ), null, 'world selection uses the configured local map without putting a second map in the URL' );
+assert.equal( new URL( localHostedWorldURL ).searchParams.get( 'worldId' ), 'elsemesh:hogwarts-legacy-local', 'a gateway-configured local world is selected from the root URL' );
+assert.equal( new URL( localHostedWorldURL ).searchParams.get( 'gateway' ), 'http://127.0.0.1:4179' );
+const localHostedRoute = worldLinkFromLocation( { search: new URL( localHostedWorldURL ).search, href: localHostedWorldURL } );
+assert.equal( localHostedRoute.localProvider, 'http://127.0.0.1:38941', 'root-world routing retains the configured loopback bridge provider' );
+assert.equal( localHostedRoute.localMap, 'SUB_GreatHall_Int', 'root-world routing retains the configured region selector' );
+assert.equal( localHostedRoute.worldId, 'elsemesh:hogwarts-legacy-local' );
+assert.equal( localHostedRoute.gateway, 'http://127.0.0.1:4179' );
+globalThis.ELSEMESH_CONFIG.localWorldGatewayConfigured = false;
+assert.equal( await discoverLocalWorldURL( { pageURL: 'http://127.0.0.1:4179/', fetchImpl: () => { throw new Error( 'local-only preview must not probe worldd' ); } } ), null, 'local-only previews do not require or probe an owner gateway' );
 
 const storage = new MemoryStorage();
 assert.equal( rememberWorldVisit( { pageURL, worldId: 'elsemesh:cave', nodeId: peerId, gateway: 'https://world.example', directory: 'https://thruhold.org', title: 'Hosted World', storage, now: 10 } ), true );

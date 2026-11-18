@@ -4,6 +4,7 @@ import { appearanceForAllowedProfiles, avatarProfileId, loadAppearance } from '.
 import { RemoteAvatar } from '../player/RemoteAvatar.js';
 import { worldComponentDescriptor } from './WorldComponentRegistry.js';
 import { avatarPolicy } from './WorldRules.js';
+import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 
 export function makePresencePose(player, sequence, appearance, vehicleType = player.vehicleType, { avatarOptionId = '', entryPointId = '' } = {}) {
  const boat = player.mode === 'boat' ? player.boat : null;
@@ -70,6 +71,8 @@ export class WorldPresenceSession {
   this.disposed = false;
   this.reportedError = false;
   this.admitted = false;
+  this.bootstrapPlayer = null;
+  this.bootstrapHeartbeat = null;
  }
  async admit(player, spawnCandidates, {yaw = null} = {}) {
   if (this.disposed || this.admitted || spawnCandidates !== undefined && (!Array.isArray(spawnCandidates) || !spawnCandidates.length)) throw new Error('Invalid world presence admission');
@@ -80,10 +83,34 @@ export class WorldPresenceSession {
   player.worldMovementAuthorityCanResume = false;
   return this.admitPose(pose, spawnCandidates);
  }
+ async admitAtSpawn(spawn) {
+  const yaw = spawn?.yaw ?? 0, pitch = spawn?.pitch ?? 0;
+  if (!spawn || !Array.isArray(spawn.position) || spawn.position.length !== 3 || !spawn.position.every(Number.isFinite)
+   || !Number.isFinite(yaw) || !Number.isFinite(pitch)) throw new Error('Invalid world-authored entry spawn');
+  const [x, eyeY, z] = spawn.position;
+  const position = { x, y: eyeY - PLAYER_EYE_HEIGHT, z };
+  const player = {
+   position, velocity: { lengthSq: () => 0 }, mode: 'walk', yaw, pitch,
+  };
+  this.bootstrapPlayer = player;
+  return this.admit(player, [[position.x, position.y, position.z]]);
+ }
+ startBootstrapHeartbeat(intervalMs = 1000) {
+  if (!this.admitted || !this.bootstrapPlayer || this.bootstrapHeartbeat !== null
+   || !Number.isInteger(intervalMs) || intervalMs < 250 || intervalMs > 10000) throw new Error('Invalid world presence bootstrap heartbeat');
+  this.bootstrapHeartbeat = setInterval(() => this.update(0, this.bootstrapPlayer), intervalMs);
+ }
+ stopBootstrapHeartbeat() {
+  if (this.bootstrapHeartbeat === null) return;
+  clearInterval(this.bootstrapHeartbeat);
+  this.bootstrapHeartbeat = null;
+  this.bootstrapPlayer = null;
+ }
  async admitPose(pose, spawnCandidates) {
   if (this.disposed || this.admitted) throw new Error('Invalid world presence admission');
   const snapshot = await this.connector.updatePresence(pose, {signal:this.controller.signal, spawnCandidates});
   if (this.disposed) throw new DOMException('Left ThruHold', 'AbortError');
+  if (this.regionConnector?.presenceEnabled && !snapshot.contentCapability) throw new Error('Owner admission did not issue a local region content capability');
   if (snapshot.contentCapability) this.regionConnector.setContentCapability?.(snapshot.contentCapability);
   this.state.observe(snapshot, {requestId:snapshot.requestId, now:this.clock()});
   this.#observeDoorStates( snapshot.doorStates );
@@ -191,6 +218,7 @@ export class WorldPresenceSession {
  }
  dispose() {
   if (this.disposed) return;
+  this.stopBootstrapHeartbeat();
   this.disposed = true;
   this.controller.abort(new DOMException('Left ThruHold', 'AbortError'));
   // Explicit portal/exit departure removes presence immediately. Unexpected

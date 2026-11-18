@@ -51,6 +51,7 @@ import { PostFX } from './post/PostFX.js';
 import { AirHaze } from './post/AirHaze.js';
 import { FlyCamera } from './player/FlyCamera.js';
 import { Player } from './player/Player.js';
+import { PLAYER_EYE_HEIGHT } from './player/PlayerDimensions.js';
 import { Colliders, setMovementSupportKernel } from './world/Colliders.js';
 import { loadMovementSupportKernel } from './world/MovementSupportKernel.js';
 import { BoatController } from './player/BoatController.js';
@@ -903,7 +904,26 @@ export class App {
 		this.player.yaw = spawn.yaw;
 		this.player.pitch = spawn.pitch;
 		this.camera.quaternion.setFromEuler( new Euler( spawn.pitch, spawn.yaw, 0, 'YXZ' ) );
-		if ( connector.dynamicRegions ) await connector.ensureCellsForCamera?.( this.camera );
+		let admissionSession;
+		if ( connector.presenceEnabled ) {
+			admissionSession = new WorldPresenceSession( { connector, parent: scene, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '', onDoorStates: createWorldDoorAudioObserver( this.audio, connector ) } );
+			this.pendingWorldPresenceSession = admissionSession;
+			try {
+				const admitted = await admissionSession.admitAtSpawn( spawn );
+				admissionSession.startBootstrapHeartbeat();
+				this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + PLAYER_EYE_HEIGHT, admitted.position[ 2 ] ), spawn.yaw, spawn.pitch );
+				this.camera.position.copy( this.player.camera.position );
+				window.addEventListener( 'pagehide', () => admissionSession.dispose(), { once: true } );
+			} catch ( error ) {
+				admissionSession.dispose();
+				this.pendingWorldPresenceSession = null;
+				throw new Error( `Unable to enter this ThruHold: ${error.message}` );
+			}
+		}
+		if ( connector.dynamicRegions ) {
+			await connector.ensureCellsForView?.( this.player.position, this.player.position );
+			await connector.ensureCellsForCamera?.( this.camera );
+		}
 
 		await progress( 0.34, 'Loading visible world assets…', 0.58, 'world' );
 		const selectedObjects = connector.dynamicRegions
@@ -981,14 +1001,14 @@ export class App {
 		this.worldConnector = connector;
 		this.remoteWorldActive = true;
 		this.remoteWorlds.set( connector.worldId, { connector, root: this.linkedWorldRoot } );
-		let admissionSession;
 		if ( connector.presenceEnabled ) {
-			const candidates = worldSpawnCandidates( spawn, connector.manifest.rules.spawnRadius, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } );
-			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-			admissionSession = new WorldPresenceSession( { connector, parent: this.linkedWorldRoot, appearance: entryAppearance, avatarOptionId: entrySelection?.avatarOptionId || '', entryPointId: entrySelection?.id || '', onDoorStates: createWorldDoorAudioObserver( this.audio, connector ) } );
-			const admitted = await admissionSession.admit( this.player, candidates );
-			this.player.setHostedWorldPose( new Vector3( admitted.position[ 0 ], admitted.position[ 1 ] + 1.62, admitted.position[ 2 ] ), this.player.yaw, this.player.pitch );
+			const admittedPosition = admissionSession?.lastAcceptedPose?.position;
+			if ( ! admittedPosition ) throw new Error( 'Owner admission did not establish a hosted player pose' );
+			if ( ! worldSpawnCandidates( spawn, 0, this.hostedColliders, { playerCapsule: connector.manifest.rules.playerCapsule } ).length ) throw new Error( 'The world-authored spawn is obstructed by loaded collision; entry is blocked' );
+			admissionSession.stopBootstrapHeartbeat();
+			this.player.setHostedWorldPose( new Vector3( admittedPosition[ 0 ], admittedPosition[ 1 ] + PLAYER_EYE_HEIGHT, admittedPosition[ 2 ] ), this.player.yaw, this.player.pitch );
 			this.camera.position.copy( this.player.camera.position );
+			if ( ! this.player.hostedCollisionGuard?.( this.player.position, this.player.position ) ) throw new Error( 'Collision coverage for the world-authored spawn is incomplete; entry is blocked' );
 		}
 		this.activateHostedWorld( this.linkedWorldRoot, connector, admissionSession );
 		this.streamWorldRemainder( connector, this.linkedWorldRoot );
@@ -1675,6 +1695,7 @@ export class App {
 		}
 		if ( presenceSession ) this.worldPresence = presenceSession;
 		else this.startWorldPresence( root, connector );
+		if ( presenceSession === this.pendingWorldPresenceSession ) this.pendingWorldPresenceSession = null;
 		if ( this.worldPresence?.appearanceSubstituted ) this.ui?.ui?.toast( 'Using an avatar profile allowed by this world; your outfit colors were preserved.', 3200 );
 		this.dispatchWorldActivated( experience, this.activeHostedExtensions, connector.worldId, { mode: 'hosted', connector, root, terrain, runtime } );
 
@@ -1683,6 +1704,13 @@ export class App {
 	startWorldPresence( root, connector ) {
 		if ( ! connector.presenceEnabled ) return;
 		this.worldPresence = new WorldPresenceSession( { connector, parent: root, onDoorStates: createWorldDoorAudioObserver( this.audio, connector ) } );
+	}
+
+	disposePendingWorldPresence() {
+		const session = this.pendingWorldPresenceSession || this.webglFallback?.earlyPresenceSession;
+		session?.dispose();
+		this.pendingWorldPresenceSession = null;
+		if ( this.webglFallback?.earlyPresenceSession === session ) this.webglFallback.earlyPresenceSession = null;
 	}
 
 	prepareHostedWorld( connector ) {

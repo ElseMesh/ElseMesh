@@ -90,6 +90,7 @@ app.init( ( p, text, until ) => ui.setLoading( p, text, until ) ).then( async ()
 
 } ).catch( ( e ) => {
 
+	app.disposePendingWorldPresence?.();
 	console.error( e );
 	ui.setLoadingError( 'Something went wrong: ' + e.message );
 

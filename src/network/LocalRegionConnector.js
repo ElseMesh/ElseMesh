@@ -251,6 +251,7 @@ export class LocalRegionConnector {
 	}
 
 	#providerOrigin() {
+		requireValue( ! this.presenceEnabled || this.contentCapability, 'Local region content requires an active worldd admission capability' );
 		return this.contentCapability ? new URL( this.gateway ).origin : this.localProvider;
 	}
 
@@ -369,8 +370,13 @@ export class LocalRegionConnector {
 		this.collisionSourceInventories = new Map();
 		this.knownCells = new Set();
 		this.cellQueryQueue = Promise.resolve();
-		await this.ensureCells( startupCells, { signal } );
-		if ( ! this.allCollisionSourcesIndexed ) this.unknownSourcesCompleteByCell.clear();
+		// Hosted sessions must be admitted by worldd before any spatial index or
+		// collision data is requested. Local-only inspection has no owner gateway,
+		// so it can keep loading its initial cells during descriptor setup.
+		if ( ! this.presenceEnabled ) {
+			await this.ensureCells( startupCells, { signal } );
+			if ( ! this.allCollisionSourcesIndexed ) this.unknownSourcesCompleteByCell.clear();
+		}
 		const support = selection.previewSupport;
 		if ( support ) {
 			this.manifest.objects.push( {
@@ -379,7 +385,7 @@ export class LocalRegionConnector {
 				collision: { enabled: true, shape: 'box', center: [ 0, 0, 0 ], halfExtents: support.halfExtents, walkable: true, solid: true },
 			} );
 		}
-		await this.ensureCellsForView( spawn.position, spawn.position );
+		if ( ! this.presenceEnabled ) await this.ensureCellsForView( spawn.position, spawn.position );
 		return this.manifest;
 	}
 

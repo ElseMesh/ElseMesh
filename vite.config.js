@@ -194,6 +194,7 @@ function localWorldRuntimeConfig() {
 			provider: localWorldProvider,
 			map: localWorldMap,
 		},
+		localWorldGatewayConfigured: Boolean( localWorldGateway ),
 	} );
 	const serveConfig = ( req, res, next ) => {
 		if ( req.method !== 'GET' && req.method !== 'HEAD' ) return next();

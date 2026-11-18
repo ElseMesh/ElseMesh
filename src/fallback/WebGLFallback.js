@@ -1829,6 +1829,25 @@ export class WebGLFallback {
 		this.camera.position.set( ...selectedSpawn.position );
 		this.camera.rotation.order = 'YXZ';
 		this.camera.rotation.set( selectedSpawn.pitch || 0, selectedSpawn.yaw || 0, 0 );
+		if ( this.connector.presenceEnabled ) {
+			const session = new WorldPresenceSession( {
+				connector: this.connector, parent: this.scene, appearance: this.entryAppearance,
+				avatarOptionId: entry?.avatarOptionId || '', entryPointId: entry?.id || '',
+				onDoorStates: createWorldDoorAudioObserver( this.app.audio, this.connector ),
+				createAvatar: options => new WebGLRemoteAvatar( this.THREE, options ),
+			} );
+			try {
+				await session.admitAtSpawn( selectedSpawn );
+				session.startBootstrapHeartbeat();
+				this.earlyPresenceSession = session;
+				this.app.pendingWorldPresenceSession = session;
+				window.addEventListener( 'pagehide', () => session.dispose(), { once: true } );
+			} catch ( error ) {
+				session.dispose();
+				this.app.pendingWorldPresenceSession = null;
+				throw new Error( `Unable to enter this ThruHold: ${error.message}` );
+			}
+		}
 		let localSpawn = null;
 		let assets;
 		const components = manifest.components || [];
@@ -2086,7 +2105,7 @@ export class WebGLFallback {
 		const spawn = localSpawn || selectedSpawn || manifest.spawn || {};
 		this.spawn = { position: spawn.position || [ 0, 1.7, 0 ], yaw: spawn.yaw || 0, pitch: spawn.pitch || 0 };
 		const transfer = new URLSearchParams( location.search ).get( 'webglSpawn' )?.split( ',' ).map( Number );
-		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 ) {
+		if ( transfer?.length === 5 && transfer.every( Number.isFinite ) && transfer.slice( 0, 3 ).every( value => Math.abs( value ) <= 100000 ) && Math.abs( transfer[ 3 ] ) <= 1000 && Math.abs( transfer[ 4 ] ) <= 1.5 && ! this.connector.presenceEnabled ) {
 			this.spawn = { position: transfer.slice( 0, 3 ), yaw: transfer[ 3 ], pitch: transfer[ 4 ] };
 		}
 		this.hostedSeaLevel = hostedWaterEnabled ? manifest.rules.seaLevel : null;
@@ -2820,22 +2839,31 @@ export class WebGLFallback {
 
 		if ( ! this.connector?.presenceEnabled || ! this.connector.manifest?.ownerPeerId ) return;
 		const appearance = this.entryAppearance || this.app.worldPresence?.appearance || loadAppearance();
-		const session = new WorldPresenceSession( {
+		const session = this.earlyPresenceSession || new WorldPresenceSession( {
 			connector: this.connector, parent: this.scene, appearance,
 			avatarOptionId: this.entrySelection?.avatarOptionId || '', entryPointId: this.entrySelection?.id || '',
 			onDoorStates: createWorldDoorAudioObserver( this.app.audio, this.connector ),
 			createAvatar: options => new WebGLRemoteAvatar( this.THREE, options ),
 		} );
 		try {
-			const candidates = worldSpawnCandidates( this.spawn, this.connector.manifest.rules.spawnRadius, this.app.hostedColliders, { playerCapsule: this.connector.manifest.rules.playerCapsule } );
-			if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
-			const admitted = await session.admit( this.player, candidates );
-			this.player.setHostedWorldPose( new EngineVector3( ...admitted.position ), this.player.yaw, this.player.pitch );
+			let admittedPosition = session.lastAcceptedPose?.position;
+			if ( ! session.admitted ) {
+				const candidates = worldSpawnCandidates( this.spawn, this.connector.manifest.rules.spawnRadius, this.app.hostedColliders, { playerCapsule: this.connector.manifest.rules.playerCapsule } );
+				if ( ! candidates.length ) throw new Error( 'No free player position exists within this ThruHold’s spawn radius' );
+				const admitted = await session.admit( this.player, candidates );
+				admittedPosition = admitted.position;
+			} else {
+				if ( ! worldSpawnCandidates( this.spawn, 0, this.app.hostedColliders, { playerCapsule: this.connector.manifest.rules.playerCapsule } ).length ) throw new Error( 'The world-authored spawn is obstructed by loaded collision; entry is blocked' );
+				session.stopBootstrapHeartbeat();
+			}
+			this.player.setHostedWorldPose( new EngineVector3( admittedPosition[ 0 ], admittedPosition[ 1 ] + PLAYER_EYE_HEIGHT, admittedPosition[ 2 ] ), this.player.yaw, this.player.pitch );
+			if ( this.connector.localOnly && ! this.player.hostedCollisionGuard?.( this.player.position, this.player.position ) ) throw new Error( 'Collision coverage for the world-authored spawn is incomplete; entry is blocked' );
 		} catch ( error ) {
 			session.dispose();
 			throw new Error( `Unable to enter this ThruHold: ${error.message}` );
 		}
 		this.worldPresence = session;
+		if ( session === this.app.pendingWorldPresenceSession ) this.app.pendingWorldPresenceSession = null;
 		window.addEventListener( 'pagehide', () => session.dispose(), { once: true } );
 
 	}

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
+import { validateWorldExperience } from '../src/network/WorldExperience.js';
 
 const indexedStartupCell = [ 0, 0, 5 ];
 const descriptor = {
-	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', cacheRevision: 'test-revision:converter-1', worldId: 'elsemesh:test', regions: '/v1/regions',
+	schema: 'elsemesh.dynamic-region-provider/1', readOnly: true, sourceRevision: 'test-revision', cacheRevision: 'test-revision:converter-1', worldId: 'elsemesh:test', regions: '/v1/regions', regionScope: { regionIds: [ 'hall' ] },
 	entrySelection: {
 		entryPointActionLabel: 'Choose your house', entryPointPrompt: 'Which house?',
+		playerCapsule: { radiusMeters: 0.42, heightMeters: 1.76 }, movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 } } },
 		choices: [ { id: 'gryffindor', label: 'Gryffindor' } ],
 		experience: {
 			genre: 'The Great Hall', tagline: 'Choose your house.', loadingNote: 'Preparing the Hall.', tips: [ 'Nearby rooms load as you explore.' ],
@@ -16,8 +18,11 @@ const descriptor = {
 	},
 };
 const originalFetch = globalThis.fetch;
-globalThis.fetch = async url => {
-	const path = new URL( url ).pathname;
+const cellRequests = [];
+globalThis.fetch = async ( url, options = {} ) => {
+	const requestURL = new URL( url );
+	const path = requestURL.pathname;
+	if ( path.endsWith( '/cells' ) ) cellRequests.push( { url: requestURL, authorization: new Headers( options.headers ).get( 'Authorization' ), scope: requestURL.searchParams.get( 'scope' ) } );
 	const payload = path.endsWith( '/descriptor' ) ? descriptor : path === '/v1/regions' ? { regions: [ { id: 'hall', label: 'Great Hall', asset: '/v1/regions/hall' } ] } : { sourceRevision: 'test-revision', cellSizeMeters: 16, cells: [ { x: 0, y: 0, z: 5 } ] };
 	if ( path !== '/v1/descriptor' && path !== '/v1/regions' ) {
 		if ( new URL( url ).searchParams.get( 'sourceInventory' ) !== '0' ) payload.collisionSourceInventory = {
@@ -54,6 +59,32 @@ try {
 	assert.equal( manifest.objects.filter( object => object.regionCell && object.collisionPayload ).length, 1, 'unindexed empty cells do not create synthetic collision assets' );
 	assert.equal( connector.isCollisionPathReady( [ 17, 1, 81 ], [ 18, 1, 81 ], { loadedObjects: new Set() } ), true, 'a path through an absent cell is open when every layer has complete collision coverage' );
 	connector.close();
+
+	cellRequests.length = 0;
+	const entry = descriptor.entrySelection;
+	const validatedExperience = structuredClone( validateWorldExperience( entry.experience ) );
+	const hostedConnector = new LocalRegionConnector( {
+		localProvider: 'http://127.0.0.1:4179', localMap: 'hall', worldId: 'elsemesh:test', nodeId: 'owner-peer-id-12345678901234567890', gateway: 'http://127.0.0.1:4190',
+		createWorldConnector: () => ( {
+			getManifest: async () => ( {
+				worldId: 'elsemesh:test', ownerPeerId: 'owner-peer-id-12345678901234567890',
+				spawn: { position: entry.previewSpawn.position, yaw: entry.previewSpawn.yaw },
+				rules: { playerCapsule: entry.playerCapsule, movementProfiles: entry.movementProfiles, spawnRadius: 0 },
+				avatarOptions: [], entryPoints: entry.choices, experience: validatedExperience,
+				entryPointPrompt: entry.entryPointPrompt, entryPointActionLabel: entry.entryPointActionLabel,
+			} ), close() {},
+		} ),
+	} );
+	await hostedConnector.getManifest();
+	assert.equal( cellRequests.length, 0, 'hosted descriptor setup does not request cell metadata before owner admission' );
+	await assert.rejects( hostedConnector.ensureCells( [ indexedStartupCell ], { purpose: 'collision' } ), /worldd admission capability/, 'hosted region cell requests fail closed until admission' );
+	assert.equal( cellRequests.length, 0, 'the pre-admission guard prevents the request from reaching the provider' );
+	hostedConnector.setContentCapability( 'a'.repeat( 64 ) );
+	await hostedConnector.ensureCells( [ indexedStartupCell ], { purpose: 'collision' } );
+	assert.equal( cellRequests.length, 1, 'cell metadata is fetched only after receiving the owner content capability' );
+	assert.equal( cellRequests[ 0 ].url.origin, 'http://127.0.0.1:4190', 'authenticated collision cell requests use the worldd gateway' );
+	assert.equal( cellRequests[ 0 ].authorization, `Bearer ${'a'.repeat( 64 )}`, 'cell requests carry the owner-issued capability' );
+	assert.equal( cellRequests[ 0 ].scope, 'collision', 'collision cell metadata declares its bounded purpose to worldd' );
 } finally {
 	globalThis.fetch = originalFetch;
 }

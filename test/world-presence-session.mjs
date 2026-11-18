@@ -40,6 +40,22 @@ assert.equal(admittedPose.sequence,0,'admission creates the session before its r
 assert.deepEqual(admissionOptions.spawnCandidates,[[1,1,3],[1.6,1,3]],'invitation candidates reach the owner for atomic player occupancy checks');
 assert.deepEqual(accepted.position,[1,1,3],'admission returns the owner-selected position');
 admissionSession.dispose();
+let spawnAdmissionPose, spawnAdmissionCandidates;
+const spawnAdmissionSession = new WorldPresenceSession({connector,parent:{add(){}},
+	createConnector(){return {updatePresence(pose,options){spawnAdmissionPose=pose;spawnAdmissionCandidates=options.spawnCandidates;return Promise.resolve({type:'presence',worldId:connector.worldId,requestId:'spawn',playerId:own,contentCapability:'c'.repeat(64),players:[{...pose,position:options.spawnCandidates[0],id:own,updatedAt:700}]})},close(){}}},
+});
+const admittedSpawn = await spawnAdmissionSession.admitAtSpawn({position:[2,8.62,3],yaw:0.5,pitch:0.1});
+assert.ok(spawnAdmissionPose.position.every((value,index)=>Math.abs(value-[2,7,3][index])<1e-9),'bootstrap admission uses the world-authored eye spawn converted to the shared feet pose');
+assert.equal(spawnAdmissionCandidates.length,1,'bootstrap admission submits only the signed spawn candidate');
+assert.ok(spawnAdmissionCandidates[0].every((value,index)=>Math.abs(value-[2,7,3][index])<1e-9),'bootstrap admission cannot choose an arbitrary client-provided spawn');
+assert.ok(admittedSpawn.position.every((value,index)=>Math.abs(value-[2,7,3][index])<1e-9));
+spawnAdmissionSession.dispose();
+const missingCapabilityRegion = { ...connector, presenceEnabled: true };
+const missingCapabilitySession = new WorldPresenceSession({ connector: missingCapabilityRegion, parent: { add() {} },
+	createConnector() { return { updatePresence(pose) { return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: 'missing-capability', playerId: own, players: [{ ...pose, id: own, updatedAt: 700 }] }); }, close() {} }; },
+});
+await assert.rejects( missingCapabilitySession.admitAtSpawn( { position: [ 2, 8.62, 3 ] } ), /did not issue a local region content capability/, 'hosted region admission must fail closed without the owner-issued content capability' );
+missingCapabilitySession.dispose();
 let authoritativeNow = 1000, authoritativeRequests = 0;
 const authorityPlayer = {
  position: new Vector3( 0, 1, 0 ), velocity: new Vector3( 0, 0, - 3 ), mode: 'walk', yaw: 0, pitch: 0,
