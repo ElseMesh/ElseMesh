@@ -2152,3 +2152,13 @@ finding changes them.
   placements, geometry/LOD assets, textures, variants, and material inputs.
   Lower cost may select a coarser shared authored LOD; it must not remove object
   classes or substitute backend-specific content. Tidewater remains 93%.
+
+- 2026-11-18: added an optional signed `rgba-data-texture/1` asset for the
+  ground-cover component's repeat-sampled `detailField` material-graph slot.
+  WebGPU and WebGL bind the same raw RGBA bytes with linear filtering and repeat
+  addressing. The graph and asset checks pass, and both paired browser render
+  fixtures compile and render signed synthetic GLBs that sample the slot. This
+  closes generic texture-binding plumbing only: Tidewater has not yet exported
+  or connected its original repeating detail texture, its authored patches
+  remain unsigned/inactive, and no matched Tidewater visuals were compared.
+  Tidewater remains 93%; no parity gate changed.

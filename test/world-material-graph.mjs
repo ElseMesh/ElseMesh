@@ -235,6 +235,34 @@ densityMaterialWebGPU.dispose();
 densityMaterialWebGL.material.dispose();
 densityTexture.dispose();
 
+const detailFieldGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'fieldUv', op: 'input', name: 'uv' },
+		{ id: 'zero', op: 'constant', value: 0 },
+		{ id: 'detail', op: 'textureSampleLevel', slot: 'detailField', uv: 'fieldUv', lod: 'zero' },
+		{ id: 'alpha', op: 'w', args: [ 'detail' ] },
+	],
+	outputs: { roughness: 'alpha' },
+};
+const detailWebGPU = compileWorldMaterialGraph( detailFieldGraph, 'webgpu' );
+const detailWebGL = compileWorldMaterialGraph( detailFieldGraph, 'webgl' );
+assert.deepEqual( detailWebGPU.textureSlots, [ 'detailField' ], 'the repeat-sampled data texture is a renderer-neutral graph input' );
+assert.match( detailWebGPU.surface, /textureSampleLevel\( emgTexture_detailField, smpLinearRepeat,/ );
+assert.match( detailWebGL.glsl.fragment, /textureLod\( emgTexture_detailField,/ );
+const detailTexture = new THREE.DataTexture( new Uint8Array( [ 1, 2, 3, 4 ] ), 1, 1, THREE.RGBAFormat, THREE.UnsignedByteType );
+detailTexture.magFilter = THREE.LinearFilter; detailTexture.minFilter = THREE.LinearFilter;
+detailTexture.wrapS = THREE.RepeatWrapping; detailTexture.wrapT = THREE.RepeatWrapping; detailTexture.colorSpace = THREE.NoColorSpace;
+const detailMaterialWebGPU = createWebGPUMaterialGraph( {}, detailFieldGraph, { graphTextures: { detailField: detailTexture } } );
+const detailMaterialWebGL = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), detailFieldGraph, { graphTextures: { detailField: detailTexture } } );
+assert.equal( detailMaterialWebGPU.bindings.emgTexture_detailField.texture, detailTexture, 'WebGPU binds the component detail texture' );
+const detailShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+detailMaterialWebGL.material.onBeforeCompile( detailShader );
+assert.equal( detailShader.uniforms.emgTexture_detailField.value, detailTexture, 'WebGL binds the same component detail texture' );
+detailMaterialWebGPU.dispose();
+detailMaterialWebGL.material.dispose();
+detailTexture.dispose();
+
 const worldPositionGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [

@@ -228,6 +228,13 @@ response, terrain alignment, and per-blade fades. Those renderer-neutral graph
 inputs and authored assets, plus paired adapter render evidence, remain before
 it can replace the current vegetation paths.
 
+The ground-cover component can optionally bind a signed
+`rgba-data-texture/1` asset to the `detailField` material-graph slot. Both
+presenters sample its raw channels with linear filtering and repeat addressing;
+the synthetic paired render fixture exercises that binding. Tidewater has not
+yet exported or connected its original repeating detail texture to this slot,
+and this fixture does not establish Tidewater material or visual parity.
+
 The ground-cover field is only the dense-flora contract; it does not cover the
 finite vegetation set. Tidewater's placement asset has ten authored categories
 (palms, trees, bananas, shrubs, young palms, ferns, monsteras, elephant ears,

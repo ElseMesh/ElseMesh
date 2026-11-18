@@ -30,7 +30,7 @@ const INPUT_TYPES = Object.freeze( {
 	instanceMaterial1: 'vec4',
 } );
 export const WORLD_MATERIAL_GRAPH_INPUT_TYPES = INPUT_TYPES;
-export const WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS = Object.freeze( [ 'baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive', 'densityField' ] );
+export const WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS = Object.freeze( [ 'baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive', 'densityField', 'detailField' ] );
 
 const OUTPUT_TYPES = Object.freeze( {
 	baseColor: 'vec3',

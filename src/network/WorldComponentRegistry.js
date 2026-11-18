@@ -1,5 +1,5 @@
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
-import { GROUND_COVER_FIELD_COMPONENT_TYPE, GROUND_COVER_FIELD_DENSITY_ASSET_KIND } from './GroundCoverField.js';
+import { GROUND_COVER_FIELD_COMPONENT_TYPE, GROUND_COVER_FIELD_DENSITY_ASSET_KIND, GROUND_COVER_FIELD_DETAIL_ASSET_KIND } from './GroundCoverField.js';
 import { WORLD_LOCAL_LIGHT_SET_COMPONENT } from './WorldLocalLightSet.js';
 
 const components = new Map();
@@ -21,7 +21,7 @@ export function worldComponentDescriptor( type ) {
 export function worldComponentAssetIDs( component ) {
 	const references = component?.assets || [];
 	if ( component?.type === 'elsemesh.static-model-instance-set/1' ) return references.filter( reference => reference.kind === STATIC_MODEL_INSTANCE_SET_ASSET_KIND ).map( reference => reference.assetId );
-	if ( component?.type === GROUND_COVER_FIELD_COMPONENT_TYPE ) return references.filter( reference => reference.kind === GROUND_COVER_FIELD_DENSITY_ASSET_KIND ).map( reference => reference.assetId );
+	if ( component?.type === GROUND_COVER_FIELD_COMPONENT_TYPE ) return references.filter( reference => [ GROUND_COVER_FIELD_DENSITY_ASSET_KIND, GROUND_COVER_FIELD_DETAIL_ASSET_KIND ].includes( reference.kind ) ).map( reference => reference.assetId );
 	return references.map( reference => reference.assetId );
 }
 

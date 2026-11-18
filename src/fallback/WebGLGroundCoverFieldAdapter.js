@@ -26,6 +26,18 @@ async function installGroundCoverField( { fallback, terrain, assets }, component
 	densityTexture.unpackAlignment = 1;
 	densityTexture.colorSpace = T.NoColorSpace;
 	densityTexture.needsUpdate = true;
+	const detailFieldTexture = loaded.detailField ? new T.DataTexture( loaded.detailField.data, loaded.detailField.width, loaded.detailField.height, T.RGBAFormat, T.UnsignedByteType ) : null;
+	if ( detailFieldTexture ) {
+		detailFieldTexture.magFilter = T.LinearFilter;
+		detailFieldTexture.minFilter = T.LinearFilter;
+		detailFieldTexture.wrapS = T.RepeatWrapping;
+		detailFieldTexture.wrapT = T.RepeatWrapping;
+		detailFieldTexture.generateMipmaps = false;
+		detailFieldTexture.flipY = false;
+		detailFieldTexture.unpackAlignment = 1;
+		detailFieldTexture.colorSpace = T.NoColorSpace;
+		detailFieldTexture.needsUpdate = true;
+	}
 	const field = new GroundCoverFieldRuntime( { data: loaded.data, componentAssets: component.assets, terrain, density: loaded.density } );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const presentation = new GroundCoverFieldPresentationRuntime( field, {
@@ -38,7 +50,7 @@ async function installGroundCoverField( { fallback, terrain, assets }, component
 			if ( fallback.connector !== connector ) { disposeParsedSource( parsed.scene ); throw new DOMException( 'World unloaded', 'AbortError' ); }
 			return parsed.scene;
 		},
-		createDraws: ( source, capacity, shadowOnly, geometryMirrorX ) => createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX, densityTexture, ownedGeometry, ownedMaterials ),
+		createDraws: ( source, capacity, shadowOnly, geometryMirrorX ) => createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX, densityTexture, detailFieldTexture, ownedGeometry, ownedMaterials ),
 		disposeSource: disposeParsedSource,
 		onError: ( message, error ) => console.warn( message, error ),
 	} );
@@ -52,6 +64,7 @@ async function installGroundCoverField( { fallback, terrain, assets }, component
 			for ( const geometry of ownedGeometry ) geometry.dispose();
 			for ( const material of ownedMaterials ) material.dispose();
 			densityTexture.dispose();
+			detailFieldTexture?.dispose();
 			ownedGeometry.clear();
 			ownedMaterials.clear();
 		},
@@ -74,7 +87,7 @@ function disposeParsedSource( source ) {
 	for ( const texture of textures ) texture.dispose();
 }
 
-function createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX, densityTexture, ownedGeometry, ownedMaterials ) {
+function createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX, densityTexture, detailFieldTexture, ownedGeometry, ownedMaterials ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const draws = [];
@@ -83,7 +96,7 @@ function createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX
 		if ( ! object.isMesh ) return;
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Ground-cover GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Ground-cover GLBs require triangle meshes with one material per primitive' );
-		const resolution = resolveMaterial( fallback, object.material, densityTexture );
+		const resolution = resolveMaterial( fallback, object.material, densityTexture, detailFieldTexture );
 		const sourceMaterial = resolution?.material || resolution || object.material;
 		const depthSource = resolution?.depthMaterial || sourceMaterial;
 		const geometry = object.geometry.clone().applyMatrix4( object.matrixWorld );
@@ -116,12 +129,12 @@ function createDraws( T, fallback, source, capacity, shadowOnly, geometryMirrorX
 	return draws;
 }
 
-function resolveMaterial( fallback, sourceMaterial, densityTexture ) {
+function resolveMaterial( fallback, sourceMaterial, densityTexture, detailFieldTexture ) {
 	const profile = sourceMaterial.userData?.elsemeshMaterial;
 	const material = { extras: { elsemeshMaterial: profile } };
 	const role = worldMaterialRole( material );
 	if ( ! role ) return sourceMaterial;
-	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ), terrainHeightField: fallback.hostedTerrainData || fallback.terrain || null, graphTextures: { densityField: densityTexture } } );
+	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ), terrainHeightField: fallback.hostedTerrainData || fallback.terrain || null, graphTextures: { densityField: densityTexture, ...( detailFieldTexture ? { detailField: detailFieldTexture } : {} ) } } );
 	if ( compiled ) return compiled;
 	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
 		const resolution = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );

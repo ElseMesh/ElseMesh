@@ -3,6 +3,7 @@ import { compileGroundCoverDensityExpression } from './GroundCoverDensityExpress
 
 export const GROUND_COVER_FIELD_COMPONENT_TYPE = 'elsemesh.ground-cover-field/1';
 export const GROUND_COVER_FIELD_DENSITY_ASSET_KIND = 'grass-density/1';
+export const GROUND_COVER_FIELD_DETAIL_ASSET_KIND = 'rgba-data-texture/1';
 const MAX_SPECIES = 4;
 const MAX_MODEL_LODS = 4;
 export const MAX_GROUND_COVER_FIELD_RECORDS = 1_000_000;
@@ -15,12 +16,16 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 	const finite = value => Number.isFinite( value );
 	const assetID = value => typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test( value );
 	const allowed = ( value, keys ) => Object.keys( value ).every( key => keys.includes( key ) );
-	if ( ! record( data ) || ! allowed( data, [ 'densityAssetId', 'seed', 'cellSize', 'pointsPerCell', 'placementAlgorithm', 'distanceBands', 'species' ] ) ) fail( 'component data has unknown fields' );
+	if ( ! record( data ) || ! allowed( data, [ 'densityAssetId', 'detailFieldAssetId', 'seed', 'cellSize', 'pointsPerCell', 'placementAlgorithm', 'distanceBands', 'species' ] ) ) fail( 'component data has unknown fields' );
 	if ( ! assetID( data.densityAssetId ) || ! Number.isInteger( data.seed ) || data.seed < 0 || data.seed > 0xffffffff ) fail( 'density asset ID or seed is invalid' );
 	if ( ! finite( data.cellSize ) || data.cellSize < 0.25 || data.cellSize > 128 || ! Number.isInteger( data.pointsPerCell ) || data.pointsPerCell < 1 || data.pointsPerCell > MAX_BLUE_NOISE_POINTS || ! [ 'blue-noise/1', 'fixed-cell-patch/1' ].includes( data.placementAlgorithm ) || data.placementAlgorithm === 'fixed-cell-patch/1' && data.pointsPerCell !== 1 ) fail( 'cell placement settings are invalid' );
 	if ( ! Array.isArray( componentAssets ) ) fail( 'component asset list is invalid' );
 	const densityAssets = componentAssets.filter( asset => asset?.kind === GROUND_COVER_FIELD_DENSITY_ASSET_KIND );
 	if ( densityAssets.length !== 1 || densityAssets[ 0 ].assetId !== data.densityAssetId ) fail( 'must reference exactly one signed grass-density/1 asset' );
+	const detailAssets = componentAssets.filter( asset => asset?.kind === GROUND_COVER_FIELD_DETAIL_ASSET_KIND );
+	if ( data.detailFieldAssetId === undefined ) {
+		if ( detailAssets.length !== 0 ) fail( 'component data must reference its rgba-data-texture/1 asset' );
+	} else if ( ! assetID( data.detailFieldAssetId ) || detailAssets.length !== 1 || detailAssets[ 0 ].assetId !== data.detailFieldAssetId ) fail( 'detailFieldAssetId must reference exactly one signed rgba-data-texture/1 asset when present' );
 	if ( ! Array.isArray( data.distanceBands ) || data.distanceBands.length < 1 || data.distanceBands.length > 4 ) fail( 'distanceBands must contain 1–4 entries' );
 	let previousDistance = 0;
 	for ( const band of data.distanceBands ) {

@@ -84,7 +84,7 @@ function expression( node, names, backend ) {
 		const texture = `emgTexture_${node.slot}`;
 		const uv = names.get( node.uv );
 		const lod = node.op === 'textureSampleLevel' ? names.get( node.lod ) : null;
-		const sampler = node.slot === 'densityField' ? 'smpLinearClamp' : 'smpAnisoRepeat';
+		const sampler = node.slot === 'densityField' ? 'smpLinearClamp' : node.slot === 'detailField' ? 'smpLinearRepeat' : 'smpAnisoRepeat';
 		if ( backend === 'webgpu' ) return node.op === 'textureSampleLevel' ? `textureSampleLevel( ${texture}, ${sampler}, ${uv}, ${lod} )` : `textureSample( ${texture}, ${sampler}, ${uv} )`;
 		return node.op === 'textureSampleLevel' ? `textureLod( ${texture}, ${uv}, ${lod} )` : `texture2D( ${texture}, ${uv} )`;
 	}

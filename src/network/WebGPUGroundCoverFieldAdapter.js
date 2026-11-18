@@ -32,8 +32,20 @@ async function installGroundCoverField( { app, root, connector }, component ) {
 		data: assets.density.data,
 		sampler: 'linearClamp',
 	} );
+	const detailFieldTexture = assets.detailField ? new Texture( {
+		label: `ground-cover-detail-${component.id}`,
+		width: assets.detailField.width,
+		height: assets.detailField.height,
+		format: 'rgba8unorm',
+		data: assets.detailField.data,
+		sampler: 'linearRepeat',
+	} ) : null;
 	const textureKey = `component:${component.id}:densityField`;
 	root.userData.worldPackage.textureAssets.set( textureKey, { key: textureKey, texture: densityTexture } );
+	if ( detailFieldTexture ) {
+		const detailKey = `component:${component.id}:detailField`;
+		root.userData.worldPackage.textureAssets.set( detailKey, { key: detailKey, texture: detailFieldTexture } );
+	}
 	const field = new GroundCoverFieldRuntime( { data: assets.data, componentAssets: component.assets, terrain, density: assets.density } );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const presentation = new GroundCoverFieldPresentationRuntime( field, {
@@ -44,7 +56,7 @@ async function installGroundCoverField( { app, root, connector }, component ) {
 			const source = await loadWorldPackageModelAsset( connector, root, assetId, {
 				bytes,
 				terrainHeightModule: installedTerrain.terrainGPU.heightModule,
-				graphTextureOverrides: { densityField: densityTexture },
+				graphTextureOverrides: { densityField: densityTexture, ...( detailFieldTexture ? { detailField: detailFieldTexture } : {} ) },
 				cacheKey: `${assetId}\0${component.id}`,
 			} );
 			if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
