@@ -2119,6 +2119,7 @@ finding changes them.
   WebGPU/WebGL fixed-cell browser fixtures now render signed synthetic GLBs that
   sample this component binding; both select the same patch instances, WebGL
   reports no GL errors, and WebGPU's shadow toggle changes two receiver pixels.
-  Tidewater has not yet exported or activated its authored patch GLBs using this
-  slot, so its separate vegetation arrangements and matched visual parity remain
-  open; Tidewater remains 93%.
+  The external production build passes from the committed source copy. Tidewater
+  has not yet exported or activated its authored patch GLBs using this slot, so
+  its separate vegetation arrangements and matched visual parity remain open;
+  Tidewater remains 93%.
