@@ -114,11 +114,12 @@ assert.ok( webglMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count ==
 assert.ok( webglMeshes.every( mesh => mesh.matrixAutoUpdate === false && mesh.matrixWorldAutoUpdate === false ), 'newly streamed WebGL LOD batches also freeze their world transforms' );
 assert.ok( webglShadow, 'WebGL submits a separate batch for the shared authored shadow LOD' );
 assert.equal( webglMain.castShadow, false, 'the WebGL color LOD does not duplicate the shared shadow batch' );
-assert.ok( webglMain.customDepthMaterial, 'the selected color LOD uses a screen-door aware depth material' );
+assert.equal( webglMain.customDepthMaterial, null, 'the selected color LOD does not allocate an unused shadow material' );
 assert.equal( webglShadow.castShadow, true, 'the selected WebGL shadow LOD casts shadows' );
 assert.equal( webglShadow.receiveShadow, false, 'the WebGL shadow-only LOD does not receive duplicate shadows' );
 assert.equal( webglShadow.material.colorWrite, false, 'the WebGL shadow LOD does not write color' );
 assert.equal( webglShadow.material.depthWrite, false, 'the WebGL shadow LOD does not occlude the color pass' );
+assert.ok( webglShadow.customDepthMaterial, 'the selected shadow LOD uses its fade-aware depth material' );
 assert.equal( webglResult.runtime.usesShadowBatches, true, 'WebGL uses the shared independent shadow selection' );
 assert.equal( webglResult.runtime.planner.shadowGroups[ 0 ].count, 1, 'WebGL selects the same shadow instance independently of color visibility' );
 assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 2.5, 'the WebGL batch retains reflected GLB node geometry positions' );

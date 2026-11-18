@@ -229,7 +229,7 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		mesh.castShadow = shadowOnly;
 		mesh.receiveShadow = ! shadowOnly;
 		mesh.userData.shadowOnly = shadowOnly;
-		mesh.customDepthMaterial = staticFadeDepthMaterial( T, depthSourceMaterial, hasMaterialData, !! profileDepthMaterial );
+		mesh.customDepthMaterial = shadowOnly ? staticFadeDepthMaterial( T, depthSourceMaterial, hasMaterialData, !! profileDepthMaterial ) : null;
 		ownedGeometry.add( geometry );
 		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
 	} );

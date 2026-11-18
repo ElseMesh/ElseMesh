@@ -194,6 +194,7 @@ try {
 	if ( applyWebGLWorldMaterialGraphs( THREE, hostedGraphMesh ) !== 1 || ! hostedGraphMesh.customDepthMaterial ) throw new Error( 'ElseMesh hosted GLB graph material did not use the engine compiler and shadow path' );
 	scene.add( hostedGraphMesh );
 	const mesh = runtime.batches[ 0 ][ 0 ].mesh;
+	const shadowMesh = runtime.shadowBatches[ 0 ][ 0 ].mesh;
 	const graphMesh = runtime.batches[ 1 ][ 0 ].mesh;
 	if ( ! graphMesh.geometry.getAttribute( 'vdata1' ) || ! graphMesh.geometry.getAttribute( 'vdata2' ) ) throw new Error( 'WebGL static-model GLBs must map both auxiliary material-graph streams' );
 	if ( mesh.material.color.getHex() !== profileMaterial.color.getHex() ) throw new Error( `WebGL static models did not resolve the registered world material profile (actual ${mesh.material.color.getHex().toString( 16 )}, expected ${profileMaterial.color.getHex().toString( 16 )}, source userData ${JSON.stringify( mesh.material.userData )})` );
@@ -206,8 +207,8 @@ try {
 	mesh.material.onBeforeCompile( colorShader, renderer );
 	if ( ! colorShader.vertexShader.includes( 'fixtureColorProfile' ) || ! mesh.material.customProgramCacheKey().includes( 'fixture-color-profile-v1' ) ) throw new Error( 'WebGL profile color shader hooks and cache key must survive the static-model wrapper' );
 	const depthShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\nvoid main() {}' };
-	mesh.customDepthMaterial.onBeforeCompile( depthShader, renderer );
-	if ( ! depthShader.vertexShader.includes( 'fixtureDepthProfile' ) || ! depthShader.vertexShader.includes( 'vStaticMaterialData0 = iStaticMaterialData0' ) || ! depthShader.fragmentShader.includes( 'vStaticMaterialData0' ) || ! depthShader.fragmentShader.includes( 'emStaticFadeVisible' ) || ! mesh.customDepthMaterial.customProgramCacheKey().includes( 'fixture-depth-profile-v1' ) || ! mesh.customDepthMaterial.customProgramCacheKey().includes( 'elsemesh-static-instance-shadow-fade-v1' ) ) throw new Error( 'WebGL profile depth material must retain world shader hooks, per-instance data, and engine LOD fade' );
+	shadowMesh.customDepthMaterial.onBeforeCompile( depthShader, renderer );
+	if ( ! depthShader.vertexShader.includes( 'fixtureDepthProfile' ) || ! depthShader.vertexShader.includes( 'vStaticMaterialData0 = iStaticMaterialData0' ) || ! depthShader.fragmentShader.includes( 'vStaticMaterialData0' ) || ! depthShader.fragmentShader.includes( 'emStaticFadeVisible' ) || ! shadowMesh.customDepthMaterial.customProgramCacheKey().includes( 'fixture-depth-profile-v1' ) || ! shadowMesh.customDepthMaterial.customProgramCacheKey().includes( 'elsemesh-static-instance-shadow-fade-v1' ) ) throw new Error( 'WebGL profile depth material must retain world shader hooks, per-instance data, and engine LOD fade' );
 	if ( mesh.frustumCulled !== true ) throw new Error( 'Instanced draws do not use view-frustum culling when conservative bounds exist' );
 	if ( ! mesh.boundingSphere?.containsPoint( new THREE.Vector3( 81.5, 0.5, - 5 ) ) ) throw new Error( 'Draw bounds omit the scaled outer extent of the farthest instance' );
 	runtime.update( 1 / 60, camera );
