@@ -2349,3 +2349,10 @@ finding changes them.
   consume those values. Their procedural cloud fields and rendering methods
   remain different, so this is partial input alignment, not cloud appearance
   parity; no percentage change.
+
+- 2026-11-18: reran the renderer gameplay traces against the current source.
+  WebGPU and WebGL matched the pre-split fight and bite goldens (987 and 2,400
+  frames), the pre-split boat rules, the cast-to-sale flow (519 bite and 1,199
+  fight frames), and cast/cancel state (171 fixed-step frames). These fixtures
+  use synthetic water and do not establish live-world, water-query, or rendered
+  gameplay parity. The broader Tidewater parity estimate remains 93%.
