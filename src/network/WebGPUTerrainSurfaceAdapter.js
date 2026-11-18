@@ -15,12 +15,15 @@ async function installTerrainSurface( { root, connector, installed }, component 
 	root.userData.terrainData = terrainData;
 	const surfaceMaps = { normal: maps.normal, splat: maps.splat, detailWidth: maps.detailWidth, detailHeight: maps.detailHeight, detail: maps.detail };
 	const terrainGPU = new TerrainGPU( terrainData, maps.shoreField, surfaceMaps );
+	const packageState = root.userData.worldPackage;
+	const previousTerrainHeightModule = packageState?.terrainHeightModule || null;
+	if ( packageState ) packageState.terrainHeightModule = terrainGPU.heightModule;
 	const terrain = new Terrain( { scene: root, terrainData, terrainGPU, surfaceProfile: component.surfaceProfile } );
 	if ( fallback ) fallback.visible = false;
 	installed.push( {
 		terrainSurface: true, terrain, terrainGPU,
 		update: ( _dt, camera ) => terrain.update( camera, true ),
-		dispose: () => { replacedObjects.delete( component.objectId ); root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); terrainGPU.dispose(); if ( fallback ) fallback.visible = true; },
+		dispose: () => { replacedObjects.delete( component.objectId ); if ( packageState?.terrainHeightModule === terrainGPU.heightModule ) packageState.terrainHeightModule = previousTerrainHeightModule; root.remove( terrain.mesh ); terrain.mesh.geometry.dispose(); terrain.mesh.material.dispose(); terrainGPU.dispose(); if ( fallback ) fallback.visible = true; },
 	} );
 	return true;
 }

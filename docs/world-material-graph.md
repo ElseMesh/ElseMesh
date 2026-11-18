@@ -71,6 +71,13 @@ stage at the graph-provided UV coordinate and return a `vec4`:
 material effects that choose texture detail themselves. It can feed vertex or
 fragment outputs; `textureSample` with implicit LOD remains fragment-only.
 
+`terrainHeightAt` takes a `vec2` world-space XZ coordinate and returns the
+installed world's terrain height at that point. It is fragment-only and
+requires a terrain surface with an available heightfield. Both backends query
+the same authored height data using bilinear interpolation and return `-90`
+outside the terrain domain. This is a world-surface input to the graph contract;
+it does not select a renderer or provide backend shader code.
+
 The `uv` field references an earlier `vec2` node. Supported slots are
 `baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive`; each
 resolves to the matching standard glTF material texture slot. Color slots use
@@ -86,8 +93,9 @@ texture path intact.
 
 Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`, `sqrt`,
-`sign`, `exp`, `log2`, `normalize`, `normalFromSlope`, `x`, `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`,
-`vec3`, `vec4`, `length`, `dot`, `mix`, `clamp`, `smoothstep`, `lessThan`,
+`sign`, `exp`, `log2`, `normalize`, `normalFromSlope`, `terrainHeightAt`, `x`,
+`y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`, `vec3`, `vec4`, `length`, `dot`,
+`mix`, `clamp`, `smoothstep`, `lessThan`,
 `lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,
 `select`, `step`, and `atan2`. Operations are type checked before the engine
 generates shader code. Comparisons currently accept scalar inputs and produce a
@@ -101,6 +109,8 @@ functions for the selected backend.
 `normalFromSlope` takes world position, world normal, UV, and a vec2 slope,
 then applies that slope in the UV tangent frame and returns a world-space
 normal. ElseMesh compiles the same derivative frame to WGSL and GLSL.
+`terrainHeightAt` is the only operation that reads the installed world terrain
+field, and the compiler rejects it in vertex outputs.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `occlusion` (scalar),

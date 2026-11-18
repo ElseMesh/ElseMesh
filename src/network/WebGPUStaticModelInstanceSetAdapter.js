@@ -10,17 +10,18 @@ import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installStaticModelInstanceSet );
 
-async function installStaticModelInstanceSet( { root, connector }, component ) {
+async function installStaticModelInstanceSet( { root, connector, installed = [] }, component ) {
 	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const materialCache = new Map(), sceneCache = new Map(), lodQueue = worldPackageMeshLODQueue( root );
+	const terrainHeightModule = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU )?.terrainGPU.heightModule || null;
 	let unregisterTextureDemand = null;
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const getScene = async ( assetId, bytes, progressive ) => {
 		if ( progressive?.textures ) setWorldPackageProgressiveAsset( root, assetId, { textures: progressive.textures } );
-		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { bytes } ) );
+		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { bytes, terrainHeightModule } ) );
 		return sceneCache.get( assetId );
 	};
 	const modelOffsets = [];

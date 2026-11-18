@@ -6,6 +6,7 @@ import { createWebGLMaterialGraph, createWebGPUMaterialGraph } from '../src/mate
 import { worldMaterialRole } from '../src/network/WorldMaterialProfileRegistry.js';
 import { G } from '../src/engine/render/Frame.js';
 import { buildMeshShader } from '../src/engine/render/MeshShader.js';
+import { ShaderModule } from '../src/engine/gpu/Shader.js';
 
 const graphAtNodeLimit = {
 	format: 'elsemesh.material-graph/1',
@@ -192,6 +193,39 @@ assert.match( worldPositionShader.vertexShader, /vec4 emgWorldPosition = vec4\( 
 assert.match( worldPositionShader.vertexShader, /#ifdef USE_BATCHING[\s\S]*batchingMatrix[\s\S]*#endif[\s\S]*#ifdef USE_INSTANCING[\s\S]*instanceMatrix[\s\S]*#endif[\s\S]*modelMatrix/ );
 worldPositionMaterial.material.dispose();
 assert.throws( () => compileWorldMaterialGraph( { ...worldPositionGraph, outputs: { vertexPosition: 'worldPosition' } }, 'webgpu' ), /fragment outputs/ );
+
+const terrainHeightGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'world', op: 'input', name: 'worldPosition' },
+		{ id: 'x', op: 'x', args: [ 'world' ] }, { id: 'z', op: 'z', args: [ 'world' ] },
+		{ id: 'xz', op: 'vec2', args: [ 'x', 'z' ] },
+		{ id: 'ground', op: 'terrainHeightAt', args: [ 'xz' ] },
+		{ id: 'color', op: 'vec3', args: [ 'ground', 'ground', 'ground' ] },
+	],
+	outputs: { baseColor: 'color' },
+};
+const terrainHeightWebGPU = compileWorldMaterialGraph( terrainHeightGraph, 'webgpu' );
+const terrainHeightWebGL = compileWorldMaterialGraph( terrainHeightGraph, 'webgl' );
+assert.equal( terrainHeightWebGPU.requiresTerrainHeight, true );
+assert.equal( terrainHeightWebGL.requiresTerrainHeight, true );
+assert.match( terrainHeightWebGPU.surface, /terrainHeightAt\( emg_xz \)/ );
+assert.match( terrainHeightWebGL.glsl.fragment, /emgTerrainHeightAt\( vEmg_xz \)/ );
+assert.throws( () => compileWorldMaterialGraph( { ...terrainHeightGraph, outputs: { vertexPosition: 'world' } }, 'webgpu' ), /fragment outputs/ );
+const terrainHeightModule = new ShaderModule( { name: 'fixtureTerrainHeight', code: 'fn terrainHeightAt( xz: vec2f ) -> f32 { return xz.x + xz.y; }' } );
+assert.throws( () => createWebGPUMaterialGraph( {}, terrainHeightGraph ), /installed terrain height module/ );
+const terrainHeightMaterial = createWebGPUMaterialGraph( {}, terrainHeightGraph, { terrainHeightModule } );
+assert.deepEqual( terrainHeightMaterial.modules, [ terrainHeightModule ], 'WebGPU material graph binds the installed world height module' );
+terrainHeightMaterial.dispose();
+const terrainField = { origin: - 1, size: 2, res: 2, heights: new Float32Array( [ 1, 2, 3, 4 ] ) };
+assert.throws( () => createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), terrainHeightGraph ), /installed terrain heightfield/ );
+const terrainHeightWebGLMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), terrainHeightGraph, { terrainHeightField: terrainField } );
+const terrainHeightShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+terrainHeightWebGLMaterial.material.onBeforeCompile( terrainHeightShader );
+assert.match( terrainHeightShader.fragmentShader, /float emgTerrainHeightAt\( vec2 xz \)/ );
+assert.match( terrainHeightShader.fragmentShader, /emgTerrainHeightTexture/ );
+assert.equal( terrainHeightShader.uniforms.emgTerrainHeightParams.value.z, 2, 'WebGL material graph binds the same heightfield resolution' );
+terrainHeightWebGLMaterial.material.dispose();
 
 const surfaceNormalGraph = {
 	format: 'elsemesh.material-graph/1',

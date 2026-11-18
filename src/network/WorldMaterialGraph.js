@@ -56,6 +56,7 @@ function nodeType( node, types ) {
 	const argTypes = node.args?.map( id => types.get( id ) );
 	if ( node.op === 'input' ) return INPUT_TYPES[ node.name ] || null;
 	if ( node.op === 'constant' ) return constantType( node.value );
+	if ( node.op === 'terrainHeightAt' ) return argTypes?.length === 1 && argTypes[ 0 ] === 'vec2' ? 'scalar' : null;
 	if ( node.op === 'textureSample' || node.op === 'textureSampleLevel' ) return WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS.includes( node.slot ) && types.get( node.uv ) === 'vec2' && ( node.op === 'textureSample' || types.get( node.lod ) === 'scalar' ) ? 'vec4' : null;
 	if ( ! Array.isArray( node.args ) || argTypes.some( type => ! type ) ) return null;
 	const same = count => argTypes.length === count && argTypes.every( type => type === argTypes[ 0 ] );

@@ -109,7 +109,7 @@ function resolveMaterial( fallback, sourceMaterial ) {
 	const material = { extras: { elsemeshMaterial: profile } };
 	const role = worldMaterialRole( material );
 	if ( ! role ) return sourceMaterial;
-	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ) } );
+	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ), terrainHeightField: fallback.hostedTerrainData || fallback.terrain || null } );
 	if ( compiled ) return compiled;
 	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
 		const resolution = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );

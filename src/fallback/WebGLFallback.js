@@ -1761,7 +1761,7 @@ export class WebGLFallback {
 				object.castShadow = true;
 				object.receiveShadow = true;
 			} );
-			applyWebGLWorldMaterialGraphs( T, model.scene );
+			applyWebGLWorldMaterialGraphs( T, model.scene, { terrainHeightField: this.terrain } );
 			this.scene.add( model.scene );
 			this._collectBlockers( model.scene );
 		} catch ( error ) {
@@ -2187,7 +2187,7 @@ export class WebGLFallback {
 
 	_applyHostedWorldObjectPresentations( object, visual ) {
 
-		applyWebGLWorldMaterialGraphs( this.THREE, visual );
+		applyWebGLWorldMaterialGraphs( this.THREE, visual, { terrainHeightField: this.hostedTerrainData || this.terrain || null } );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.applyObject?.( object, visual );
 
 	}

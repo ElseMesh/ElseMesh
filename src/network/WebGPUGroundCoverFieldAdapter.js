@@ -28,7 +28,7 @@ async function installGroundCoverField( { app, root, connector }, component ) {
 		loadModel: async ( assetId, signal ) => {
 			const bytes = await assets.loadModel( assetId, signal );
 			if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
-			const source = await loadWorldPackageModelAsset( connector, root, assetId, { bytes } );
+			const source = await loadWorldPackageModelAsset( connector, root, assetId, { bytes, terrainHeightModule: installedTerrain.terrainGPU.heightModule } );
 			if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 			return source;
 		},

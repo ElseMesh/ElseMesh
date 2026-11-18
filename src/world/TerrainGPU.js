@@ -119,6 +119,14 @@ export class TerrainGPU {
 			},
 			code: TERRAIN_WGSL,
 		} );
+		// Small graph-facing module keeps material terrain queries from importing
+		// the shoreline, splat, detail, and sun-shadow bindings they do not use.
+		this.heightModule = new ShaderModule( {
+			name: 'terrainHeight',
+			uniforms: this.uniforms,
+			bindings: { terrainHeightTex: { texture: this.heightTexture, sampleType: 'unfilterable-float' } },
+			code: TERRAIN_HEIGHT_WGSL,
+		} );
 
 		// the former TerrainLightingModel: multiplies the key light by the heightfield sun shadow.
 		// Materials add it to `modules` and set the define MATERIAL_SUN_MODULATION: 1.
@@ -231,7 +239,7 @@ fn main( @builtin( global_invocation_id ) gid: vec3u ) {
 
 }
 
-const TERRAIN_WGSL = /* wgsl */`
+const TERRAIN_HEIGHT_WGSL = /* wgsl */`
 fn terrainUvOf( xz: vec2f ) -> vec2f {
 	return ( xz - terrainParams.origin ) / terrainParams.size;
 }
@@ -253,6 +261,10 @@ fn terrainHeightAt( xz: vec2f ) -> f32 {
 	let outside = f.x < 0.0 || f.y < 0.0 || f.x > res - 1.0 || f.y > res - 1.0;
 	return select( h, -90.0, outside );
 }
+`;
+
+const TERRAIN_WGSL = /* wgsl */`
+${TERRAIN_HEIGHT_WGSL}
 
 // filtered normal (xz components), rock mask, ambient occlusion
 fn terrainNormalRock( xz: vec2f ) -> vec4f {

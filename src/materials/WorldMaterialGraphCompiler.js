@@ -37,6 +37,7 @@ function literal( value, type, backend ) {
 function expression( node, names, backend ) {
 	if ( node.op === 'input' ) return names.get( node.id );
 	if ( node.op === 'constant' ) return literal( node.value, Array.isArray( node.value ) ? `vec${node.value.length}` : 'scalar', backend );
+	if ( node.op === 'terrainHeightAt' ) return backend === 'webgpu' ? `terrainHeightAt( ${names.get( node.args[ 0 ] )} )` : `emgTerrainHeightAt( ${names.get( node.args[ 0 ] )} )`;
 	if ( node.op === 'textureSample' || node.op === 'textureSampleLevel' ) {
 		const texture = `emgTexture_${node.slot}`;
 		const uv = names.get( node.uv );
@@ -92,6 +93,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	const fragmentRequired = dependencyIDs( graph, fragmentRoots );
 	const baseColorRequired = dependencyIDs( graph, [ graph.outputs.baseColor ] );
 	if ( graph.nodes.some( node => [ 'textureSample', 'dpdx', 'dpdy', 'fwidth' ].includes( node.op ) && vertexRequired.has( node.id ) ) ) throw new Error( 'Implicit texture sampling and derivatives are only available to fragment outputs' );
+	if ( graph.nodes.some( node => node.op === 'terrainHeightAt' && vertexRequired.has( node.id ) ) ) throw new Error( 'Terrain height queries are only available to fragment outputs' );
 	if ( graph.nodes.some( node => node.op === 'input' && INPUT_SOURCES[ node.name ].fragmentOnly && vertexRequired.has( node.id ) ) ) throw new Error( 'World-space fragment inputs are only available to fragment outputs' );
 	const usedInputs = [ ...new Set( graph.nodes.filter( node => node.op === 'input' ).map( node => node.name ) ) ];
 	const fragmentInputs = new Set( graph.nodes.filter( node => node.op === 'input' && fragmentRequired.has( node.id ) ).map( node => node.name ) );
@@ -165,6 +167,7 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 		backend,
 		inputs: Object.freeze( usedInputs ),
 		textureSlots: Object.freeze( textureSlots ),
+		requiresTerrainHeight: graph.nodes.some( node => node.op === 'terrainHeightAt' && fragmentRequired.has( node.id ) ),
 		samplesBaseColorForBaseColor: graph.nodes.some( node => [ 'textureSample', 'textureSampleLevel' ].includes( node.op ) && node.slot === 'baseColor' && baseColorRequired.has( node.id ) ),
 		hasVertexOutput: graph.outputs.vertexPosition !== undefined || graph.outputs.vertexNormal !== undefined,
 		attributes: Object.freeze( attributes ),
@@ -178,6 +181,7 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 			uniformInputs: Object.freeze( glslUniformInputs.map( name => INPUT_SOURCES[ name ].glsl ) ),
 			worldPosition: fragmentInputs.has( 'worldPosition' ),
 			worldNormal: fragmentInputs.has( 'worldNormal' ),
+			terrainHeight: graph.nodes.some( node => node.op === 'terrainHeightAt' && fragmentRequired.has( node.id ) ),
 			viewportSize: fragmentInputs.has( 'pixelPosition' ),
 			fragmentHelpers: glslFragmentHelpers,
 			vertex: commonVertex,

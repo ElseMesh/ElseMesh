@@ -4,7 +4,7 @@ import { compileWorldMaterialProfile } from '../materials/WorldMaterialProfileCo
 
 // Compile renderer-neutral signed material graphs for world GLB content.
 // World runtimes remain available for non-graph material contracts.
-export function applyWebGLWorldMaterialGraphs( THREE, root ) {
+export function applyWebGLWorldMaterialGraphs( THREE, root, { terrainHeightField = null } = {} ) {
 	let applied = 0;
 	root?.traverse?.( object => {
 		if ( ! object.isMesh || ! object.material ) return;
@@ -15,7 +15,7 @@ export function applyWebGLWorldMaterialGraphs( THREE, root ) {
 			const role = worldMaterialRole( materialRecord );
 			if ( ! role ) return sourceMaterial;
 			const graph = worldMaterialGraph( materialRecord );
-			const compiled = compileWorldMaterialProfile( descriptor.profile, 'webgl', { THREE, sourceMaterial, graph } );
+			const compiled = compileWorldMaterialProfile( descriptor.profile, 'webgl', { THREE, sourceMaterial, graph, terrainHeightField } );
 			if ( ! compiled?.material ) throw new Error( `ElseMesh has no WebGL compiler for material graph role ${role}` );
 			compiled.prepareGeometry?.( object.geometry );
 			compiled.material.userData.elsemeshWorldMaterialGraph = true;

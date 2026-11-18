@@ -12,8 +12,47 @@ const FRAME_UNIFORM_VALUES = Object.freeze( {
 	emgWindVelocityIntegral: () => G.windVelocityIntegral.value,
 } );
 
-export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {} } = {} ) {
+const terrainHeightBindings = new WeakMap();
+
+function acquireTerrainHeightBinding( T, terrain ) {
+	if ( ! terrain || ! Number.isFinite( terrain.origin ) || ! Number.isFinite( terrain.size ) || terrain.size <= 0 || ! Number.isInteger( terrain.res ) || terrain.res < 2 || terrain.heights?.length !== terrain.res * terrain.res ) throw new Error( 'World material graph terrainHeightAt requires an installed terrain heightfield' );
+	let byRenderer = terrainHeightBindings.get( terrain );
+	if ( ! byRenderer ) terrainHeightBindings.set( terrain, byRenderer = new Map() );
+	let binding = byRenderer.get( T );
+	if ( ! binding ) {
+		const texture = new T.DataTexture( terrain.heights, terrain.res, terrain.res, T.RedFormat, T.FloatType );
+		texture.magFilter = T.NearestFilter;
+		texture.minFilter = T.NearestFilter;
+		texture.wrapS = T.ClampToEdgeWrapping;
+		texture.wrapT = T.ClampToEdgeWrapping;
+		texture.generateMipmaps = false;
+		texture.flipY = false;
+		texture.unpackAlignment = 1;
+		texture.needsUpdate = true;
+		binding = { texture, references: 0 };
+		byRenderer.set( T, binding );
+	}
+	binding.references ++;
+	let released = false;
+	return {
+		texture: binding.texture,
+		origin: terrain.origin,
+		size: terrain.size,
+		resolution: terrain.res,
+		release() {
+			if ( released ) return;
+			released = true;
+			if ( -- binding.references === 0 ) {
+				binding.texture.dispose();
+				byRenderer.delete( T );
+			}
+		},
+	};
+}
+
+export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null, normalMap = null, emissiveMap = null, graphTextures = {}, terrainHeightModule = null } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgpu', { doubleSided: Boolean( gltfMaterial.doubleSided ) } );
+	if ( compiled.requiresTerrainHeight && ! terrainHeightModule ) throw new Error( 'World material graph terrainHeightAt requires an installed terrain height module' );
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
 	const graphUsesVertexColorForAlbedo = Boolean( graph.outputs.baseColor && usesVertexColors );
 	for ( const slot of compiled.textureSlots ) if ( ! graphTextures[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
@@ -46,6 +85,7 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 		vertexColors: usesVertexColors,
 		vertexColorAlbedo: ! graphUsesVertexColorForAlbedo,
 		emissiveIntensity: gltfMaterial.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? 1,
+		modules: compiled.requiresTerrainHeight ? [ terrainHeightModule ] : [],
 		textures: {
 			...( useBaseColorMap ? { worldGraphAlbedoMap: albedo } : {} ),
 			...( normalMap ? { worldGraphNormalMap: normalMap } : {} ),
@@ -58,7 +98,7 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 	} );
 }
 
-function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, textureBindings = {}, graphUsesVertexColorForAlbedo = false } = {} ) {
+function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, textureBindings = {}, graphUsesVertexColorForAlbedo = false, terrainHeightBinding = null } = {} ) {
 	const originalCompile = material.onBeforeCompile;
 	const originalKey = material.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
@@ -108,7 +148,23 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 		const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 		if ( textureUniforms ) shader.vertexShader = insert( shader.vertexShader, '#include <common>', textureUniforms );
 		if ( fragment ) {
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers, compiled.glsl.thinTransmission ? `vec3 emgThinTransmission;${compiled.glsl.uniformInputs.includes( 'emgNight' ) ? '' : '\nuniform float emgNight;'}` : '' ].filter( Boolean ).join( '\n' ) );
+			const terrainHeightHelpers = compiled.glsl.terrainHeight ? /* glsl */`
+uniform sampler2D emgTerrainHeightTexture;
+uniform vec3 emgTerrainHeightParams;
+float emgTerrainHeightAt( vec2 xz ) {
+	float resolution = emgTerrainHeightParams.z;
+	vec2 f = ( xz - vec2( emgTerrainHeightParams.x ) ) / emgTerrainHeightParams.y * resolution - 0.5;
+	if ( f.x < 0.0 || f.y < 0.0 || f.x > resolution - 1.0 || f.y > resolution - 1.0 ) return -90.0;
+	vec2 fc = clamp( f, vec2( 0.0 ), vec2( resolution - 1.001 ) );
+	vec2 p = floor( fc ), t = fract( fc ), invResolution = vec2( 1.0 / resolution );
+	vec2 uv = ( p + 0.5 ) * invResolution;
+	float a = texture2D( emgTerrainHeightTexture, uv ).r;
+	float b = texture2D( emgTerrainHeightTexture, uv + vec2( invResolution.x, 0.0 ) ).r;
+	float c = texture2D( emgTerrainHeightTexture, uv + vec2( 0.0, invResolution.y ) ).r;
+	float d = texture2D( emgTerrainHeightTexture, uv + invResolution ).r;
+	return mix( mix( a, b, t.x ), mix( c, d, t.x ), t.y );
+}` : '';
+			shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', [ compiled.glsl.declarations, compiled.glsl.uniforms, compiled.glsl.fragmentHelpers, terrainHeightHelpers, compiled.glsl.thinTransmission ? `vec3 emgThinTransmission;${compiled.glsl.uniformInputs.includes( 'emgNight' ) ? '' : '\nuniform float emgNight;'}` : '' ].filter( Boolean ).join( '\n' ) );
 			if ( textureUniforms ) shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			if ( compiled.glsl.alphaFragment ) shader.fragmentShader = insert( shader.fragmentShader, '#include <alphatest_fragment>', compiled.glsl.alphaFragment );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
@@ -136,6 +192,11 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 			shader.uniforms.emgViewportSize = { get value() { return renderer.getDrawingBufferSize( size ); } };
 		}
 		for ( const slot of compiled.textureSlots ) shader.uniforms[ `emgTexture_${slot}` ] = { value: textureBindings[ slot ] };
+		if ( fragment && compiled.glsl.terrainHeight ) {
+			if ( ! terrainHeightBinding ) throw new Error( 'WebGL material graph terrainHeightAt requires an installed terrain heightfield' );
+			shader.uniforms.emgTerrainHeightTexture = { value: terrainHeightBinding.texture };
+			shader.uniforms.emgTerrainHeightParams = { value: new T.Vector3( terrainHeightBinding.origin, terrainHeightBinding.size, terrainHeightBinding.resolution ) };
+		}
 	};
 	material.customProgramCacheKey = () => `${originalKey?.call( material ) || ''}|elsemesh-material-graph-1:${graphKey}:${fragment ? 'color' : 'depth'}`;
 	material.userData ||= {};
@@ -143,8 +204,9 @@ vEmg_worldPosition = emgWorldPosition.xyz;` );
 	return material;
 }
 
-export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
+export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHeightField = null } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgl', { doubleSided: sourceMaterial.side === T.DoubleSide } );
+	const terrainHeightBinding = compiled.requiresTerrainHeight ? acquireTerrainHeightBinding( T, terrainHeightField ) : null;
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
 	const graphUsesVertexColorForAlbedo = Boolean( graph.outputs.baseColor && usesVertexColors );
 	const textureBindings = {
@@ -159,7 +221,11 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph ) {
 	const materialSource = sourceMaterial.clone();
 	materialSource.vertexColors = usesVertexColors;
 	if ( compiled.samplesBaseColorForBaseColor ) materialSource.map = null;
-	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings, graphUsesVertexColorForAlbedo } );
+	const material = installWebGLGraph( T, materialSource, compiled, graphKey, { textureBindings, graphUsesVertexColorForAlbedo, terrainHeightBinding } );
+	if ( terrainHeightBinding ) {
+		material.addEventListener( 'dispose', terrainHeightBinding.release );
+		material.userData.releaseTerrainHeightBinding = terrainHeightBinding.release;
+	}
 	const depthMaterial = compiled.hasVertexOutput
 		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false, textureBindings } )
 		: null;

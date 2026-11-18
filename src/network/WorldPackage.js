@@ -140,14 +140,14 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 // Decode one content-addressed GLB through the same cache and material adapter
 // path used by ordinary world objects. Callers may clone its primitives, but
 // this cached source remains owned by disposeWorldPackage().
-export async function loadWorldPackageModelAsset( connector, root, assetId, { signal, parsedGLTF = null, bytes = null } = {} ) {
+export async function loadWorldPackageModelAsset( connector, root, assetId, { signal, parsedGLTF = null, bytes = null, terrainHeightModule = null } = {} ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! state || state.disposed ) throw new Error( 'Cannot load a model into a disposed world package' );
 	const cached = state.parsed.get( assetId );
 	if ( cached ) return cached;
 	const modelBytes = parsedGLTF ? null : bytes || await connector.getAsset( assetId, { signal } );
 	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const decoded = await buildGLTF( parsedGLTF || parseGLB( modelBytes ), state, signal, assetId );
+	const decoded = await buildGLTF( parsedGLTF || parseGLB( modelBytes ), state, signal, assetId, terrainHeightModule );
 	if ( signal?.aborted || state.disposed ) {
 		disposeWorldPackage( decoded );
 		throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
@@ -1125,7 +1125,7 @@ function unregisterPackageLightNodes( state, root ) {
 	root.traverse( object => state.lightNodes.delete( object ) );
 }
 
-async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null ) {
+async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null, terrainHeightModule = null ) {
 
 	if ( packageState ) packageState.textureAssets ||= new Map();
 	const root = new Group();
@@ -1251,6 +1251,7 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 				}
 				resolvedMaterials.push( compileWorldMaterialProfile( source.extras.elsemeshMaterial.profile, 'webgpu', {
 					source, graph, textures: { albedo, normalMap, emissiveMap, graphTextures },
+					terrainHeightModule: terrainHeightModule || packageState?.terrainHeightModule || null,
 				} ) );
 				materialHooks.push( null );
 				continue;

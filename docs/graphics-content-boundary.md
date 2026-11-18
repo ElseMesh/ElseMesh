@@ -131,17 +131,17 @@ fixture with all 141 authored placements, the three source mesh LODs per model,
 and the original albedo, normal, and ARM maps embedded in portable glTF PBR.
 Its signed GLB graph expresses per-instance wood bleaching, wet darkening and
 roughness, and contact dust/AO with data-only operations that both engine graph
-compilers understand. Contact currently uses one center-sampled terrain height
-per placement, while the WebGPU source presenter samples terrain height at each
-fragment. The shared static-model planner now supports the source radius-adjusted
-LOD distance through per-instance `lodDistanceOffset`; Tidewater authors the
+compilers understand. Both backends now query the same authored terrain
+heightfield per fragment, removing the former center-sampled contact-height
+approximation. The shared static-model planner supports the source
+radius-adjusted LOD distance through per-instance `lodDistanceOffset`; Tidewater authors the
 original six-times-radius calculation, and the planner applies that measure to
 LOD and color draw range/fade in both backends, plus WebGPU's separate shadow
 range. WebGL continues to cast from its visible LOD. The offset metric uses a
 centered smoothstep band matching Tidewater's authored fade math; rendered fade
 parity remains unverified. The fixture remains outside the signed runtime
-package until matched backend images verify its center-sampled contact shading
-and appearance, or the shared contract is extended to represent contact exactly.
+package until built-in package integration and matched backend images verify
+contact shading, LOD fades, and overall appearance.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable
