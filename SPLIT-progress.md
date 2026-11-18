@@ -2356,3 +2356,14 @@ finding changes them.
   fight frames), and cast/cancel state (171 fixed-step frames). These fixtures
   use synthetic water and do not establish live-world, water-query, or rendered
   gameplay parity. The broader Tidewater parity estimate remains 93%.
+
+- 2026-11-18: compared the split Tidewater WebGPU vegetation presenter and
+  impostor-atlas sources with the local authoritative `tidewater/main` source.
+  The canopy geometry, bake, shader, frame selection, and LOD logic are
+  substantially the same; observed source differences are import/path moves,
+  the extracted grass field, and authored-data wiring. This supports using
+  split WebGPU as the candidate visual baseline, but does not prove rendered
+  image parity. WebGL still uses the distant cylinder-and-sphere-lobe
+  substitute. ElseMesh now has the renderer-neutral canopy descriptor codec
+  and CPU reference math, but no production asset or paired presenter consumes
+  them yet. No parity gate closed; Tidewater remains 93%.
