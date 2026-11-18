@@ -241,10 +241,14 @@ variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The
 engine must generate sampling mips from these data values without an sRGB
 transform. This corrects the earlier KTX2-only assumption: no KTX2 encoder is
-currently available in the Tidewater export pipeline. The descriptor still
-does not specify the complete canopy palette, wind response, group-specific
-near/far ranges, or exact atlas assets, and no production adapter consumes it;
-those remain required before replacing either presenter.
+currently available in the Tidewater export pipeline. The descriptor now
+records the source tree handoff at 65 m, shrub handoff at 45 m, tree fade from
+2,600 to 2,800 m, and shrub hard cutoff at 180 m. It also specifies the 100 m
+three-frame blend limit, shared 12% LOD transition band, and 50% thinning from
+140 to 320 m, selected with the source seed multiplier 91.7 and compensated
+with inverse-square-root retained density. The complete canopy palette, wind
+response, exact atlas assets, and production adapters are still missing; those
+remain required before replacing either presenter.
 
 Use the common asset-index convention for this contract: LOD0 is the highest-
 detail near model, and increasing indices are progressively coarser. The

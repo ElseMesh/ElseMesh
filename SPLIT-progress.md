@@ -2382,9 +2382,11 @@ finding changes them.
   with explicit brightness/leaf/variation/coverage and encoded-normal/exposure
   channel meanings. This replaces the unsupported KTX2-only assumption and
   guards against sRGB conversion or premultiplied coverage when backend loaders
-  are implemented. The palette, wind, group-specific distance rules, exported
-  atlas assets, and both engine presenters are still missing; no parity
-  percentage change.
+  are implemented. The descriptor also now records the source's separate tree
+  and shrub handoffs, far limits, 100 m atlas-frame blend distance, 12% LOD
+  band, and seed-selected, density-compensated thinning rule. Palette, wind,
+  exported atlas assets, and both engine presenters are still missing; no
+  parity percentage change.
 
 - 2026-11-18: added the same `L` flashlight control to the engine's WebGL
   fallback. The camera-attached spotlight uses the WebGPU path's position

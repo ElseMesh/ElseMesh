@@ -24,6 +24,17 @@ export function selectFractionalBinVariant( value, variantCount, multiplier ) {
 	return Math.min( variantCount - 1, Math.floor( fraction * variantCount ) );
 }
 
+// CPU reference for the source canopy's seeded thinning and density compensation.
+export function planCanopyThinning( distance, seed, { startDistance, endDistance, removeFraction, seedMultiplier } ) {
+	if ( ! Number.isFinite( distance ) || distance < 0 || ! Number.isFinite( seed ) || ! Number.isFinite( startDistance ) || ! Number.isFinite( endDistance ) || endDistance <= startDistance || ! Number.isFinite( removeFraction ) || removeFraction < 0 || removeFraction >= 1 || ! Number.isFinite( seedMultiplier ) || seedMultiplier <= 0 ) throw new Error( 'Invalid canopy thinning inputs' );
+	const x = Math.max( 0, Math.min( 1, ( distance - startDistance ) / ( endDistance - startDistance ) ) );
+	const amount = x * x * ( 3 - 2 * x );
+	const seedFraction = seed * seedMultiplier - Math.floor( seed * seedMultiplier );
+	const keep = seedFraction >= amount * removeFraction;
+	const scale = 1 + amount * ( 1 / Math.sqrt( 1 - removeFraction ) - 1 );
+	return { amount, keep, scale };
+}
+
 export function decodeHemiOctahedral( u, v ) {
 	if ( ! Number.isFinite( u ) || ! Number.isFinite( v ) || Math.abs( u ) > 1 || Math.abs( v ) > 1 ) throw new Error( 'Hemi-octahedral coordinates must be finite and within [-1, 1]' );
 	const x = ( u - v ) * 0.5;

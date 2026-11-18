@@ -31,11 +31,11 @@ export function decodeOctahedralCanopyDescriptor( bytes, options = {} ) {
 
 /**
  * The static-model set supplies stable model IDs, placements and near GLBs. The
- * descriptor supplies only portable atlas layout and LOD inputs; presenters
+ * descriptor supplies portable atlas layout and canopy appearance/LOD inputs; presenters
  * choose how to sample the two atlas images for their backend.
  */
 export function validateOctahedralCanopyDescriptor( document, { componentAssets, staticModelInstanceSetAssetId, staticModelInstanceSet } = {} ) {
-	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'projection', 'frameGrid', 'variantGroups', 'nearHandoff', 'drawRange', 'thinning', 'windResponse' ];
+	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
 	if ( ! hasExactKeys( document, rootKeys ) || document.format !== OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT ) fail( 'unsupported format or fields' );
 	if ( document.atlasDataFormat !== OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT || ! hasExactKeys( document.atlasChannels, [ 'material', 'normalExposure' ] ) || ! hasExactKeys( document.atlasChannels.material, [ 'r', 'g', 'b', 'a' ] ) || ! hasExactKeys( document.atlasChannels.normalExposure, [ 'r', 'g', 'b', 'a' ] ) || [ 'r', 'g', 'b', 'a' ].some( ( channel, index ) => document.atlasChannels.material[ channel ] !== ATLAS_CHANNELS.material[ index ] || document.atlasChannels.normalExposure[ channel ] !== ATLAS_CHANNELS.normalExposure[ index ] ) ) fail( 'atlas data encoding or channel semantics are invalid' );
 	if ( ! validAssetID( document.instanceSetAssetId ) || ! Array.isArray( document.atlasAssetIds ) || document.atlasAssetIds.length !== 2 || document.atlasAssetIds.some( id => ! validAssetID( id ) ) || new Set( document.atlasAssetIds ).size !== 2 ) fail( 'signed instance-set or atlas asset IDs are invalid' );
@@ -66,7 +66,7 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 	let nextVariant = 0;
 	const groupIDs = new Set(), referencedModels = new Set();
 	for ( const group of document.variantGroups ) {
-		if ( ! hasExactKeys( group, [ 'id', 'modelIds', 'atlasVariantRange', 'variantSelection', 'bounds' ] ) || typeof group.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( group.id ) || groupIDs.has( group.id ) ) fail( 'variant group ID or fields are invalid' );
+		if ( ! hasExactKeys( group, [ 'id', 'modelIds', 'atlasVariantRange', 'variantSelection', 'bounds', 'lod' ] ) || typeof group.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( group.id ) || groupIDs.has( group.id ) ) fail( 'variant group ID or fields are invalid' );
 		groupIDs.add( group.id );
 		if ( ! Array.isArray( group.modelIds ) || group.modelIds.length < 1 || group.modelIds.length > 64 || group.modelIds.some( id => ! validModelID( id ) || ! modelByID.has( id ) || referencedModels.has( id ) ) ) fail( `variant group ${group.id} has invalid or duplicate static-model IDs` );
 		for ( const id of group.modelIds ) referencedModels.add( id );
@@ -81,12 +81,13 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 		nextVariant = range.end;
 		const bounds = group.bounds;
 		if ( ! hasExactKeys( bounds, [ 'center', 'radius', 'horizontalRadius', 'halfHeight' ] ) || ! Array.isArray( bounds.center ) || bounds.center.length !== 3 || bounds.center.some( value => ! finiteIn( value, -1e6, 1e6 ) ) || ! finiteIn( bounds.radius, 0.001, 1e6 ) || ! finiteIn( bounds.horizontalRadius, 0.001, 1e6 ) || ! finiteIn( bounds.halfHeight, 0.001, 1e6 ) || bounds.horizontalRadius > bounds.radius || bounds.halfHeight > bounds.radius ) fail( `variant group ${group.id} bounds are invalid` );
+		const lod = group.lod;
+		if ( ! hasExactKeys( lod, [ 'nearDistance', 'maxDistance', 'farFade' ] ) || ! finiteIn( lod.nearDistance, 0.1, 10000 ) || ! finiteIn( lod.maxDistance, lod.nearDistance, 1e6 ) || lod.maxDistance <= lod.nearDistance ) fail( `variant group ${group.id} LOD range is invalid` );
+		if ( lod.farFade !== null && ( ! hasExactKeys( lod.farFade, [ 'startDistance', 'endDistance' ] ) || ! finiteIn( lod.farFade.startDistance, lod.nearDistance, lod.maxDistance ) || ! finiteIn( lod.farFade.endDistance, lod.farFade.startDistance, lod.maxDistance ) || lod.farFade.endDistance !== lod.maxDistance || lod.farFade.endDistance <= lod.farFade.startDistance ) ) fail( `variant group ${group.id} far fade is invalid` );
 	}
 	if ( document.frameGrid.columns !== nextVariant * frames ) fail( 'frame-grid columns must equal atlas variant count times frames per side' );
 	for ( const id of document.atlasAssetIds ) if ( ! inventory.has( id ) ) fail( `atlas asset is missing from component inventory: ${id}` );
-	if ( ! hasExactKeys( document.nearHandoff, [ 'startDistance', 'endDistance' ] ) || ! finiteIn( document.nearHandoff.startDistance, 0.1, 10000 ) || ! finiteIn( document.nearHandoff.endDistance, 0.1, 10000 ) || document.nearHandoff.endDistance <= document.nearHandoff.startDistance ) fail( 'near handoff blend range is invalid' );
-	if ( ! hasExactKeys( document.drawRange, [ 'startDistance', 'fadeStartDistance', 'endDistance' ] ) || ! finiteIn( document.drawRange.startDistance, 0, 1e6 ) || ! finiteIn( document.drawRange.fadeStartDistance, 0, 1e6 ) || ! finiteIn( document.drawRange.endDistance, 0.1, 1e6 ) || document.drawRange.startDistance > document.nearHandoff.startDistance || document.drawRange.fadeStartDistance < document.nearHandoff.endDistance || document.drawRange.fadeStartDistance >= document.drawRange.endDistance || document.drawRange.endDistance <= document.nearHandoff.endDistance ) fail( 'impostor draw or fade range is invalid' );
-	if ( ! hasExactKeys( document.thinning, [ 'startDistance', 'endDistance', 'removeFraction' ] ) || ! finiteIn( document.thinning.startDistance, document.nearHandoff.endDistance, 1e6 ) || ! finiteIn( document.thinning.endDistance, document.thinning.startDistance, 1e6 ) || document.thinning.endDistance <= document.thinning.startDistance || document.thinning.endDistance > document.drawRange.endDistance || ! finiteIn( document.thinning.removeFraction, 0, 1 ) ) fail( 'distance thinning range or fraction is invalid' );
-	if ( ! hasExactKeys( document.windResponse, [ 'direction', 'speed', 'gust', 'heightExponent', 'maximumDisplacement' ] ) || ! finiteIn( document.windResponse.direction, 0, 4 ) || ! finiteIn( document.windResponse.speed, 0, 4 ) || ! finiteIn( document.windResponse.gust, 0, 4 ) || ! finiteIn( document.windResponse.heightExponent, 0, 4 ) || ! finiteIn( document.windResponse.maximumDisplacement, 0, 100 ) ) fail( 'renderer-neutral wind response is invalid' );
+	if ( ! finiteIn( document.frameBlendDistance, 0, 1e6 ) || ! finiteIn( document.lodBandFraction, 0, 1 ) || document.lodBandFraction === 0 ) fail( 'frame blend distance or LOD transition band is invalid' );
+	if ( ! hasExactKeys( document.thinning, [ 'startDistance', 'endDistance', 'removeFraction', 'seedMultiplier', 'scaleCompensation' ] ) || ! finiteIn( document.thinning.startDistance, 0, 1e6 ) || ! finiteIn( document.thinning.endDistance, document.thinning.startDistance, 1e6 ) || document.thinning.endDistance <= document.thinning.startDistance || ! finiteIn( document.thinning.removeFraction, 0, 1 ) || document.thinning.removeFraction >= 1 || ! finiteIn( document.thinning.seedMultiplier, 0.001, 1e4 ) || document.thinning.scaleCompensation !== 'inverse-square-root-retained-density/1' ) fail( 'distance thinning range or method is invalid' );
 	return document;
 }

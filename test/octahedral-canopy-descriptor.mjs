@@ -39,13 +39,12 @@ const descriptor = {
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
-		{ id: 'trees', modelIds: [ 'tree-oak' ], atlasVariantRange: { start: 0, end: 3 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 4, 0 ], radius: 8, horizontalRadius: 6, halfHeight: 8 } },
-		{ id: 'shrubs', modelIds: [ 'shrub-low' ], atlasVariantRange: { start: 3, end: 5 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 1, 0 ], radius: 2, horizontalRadius: 1.5, halfHeight: 2 } },
+		{ id: 'trees', modelIds: [ 'tree-oak' ], atlasVariantRange: { start: 0, end: 3 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 4, 0 ], radius: 8, horizontalRadius: 6, halfHeight: 8 }, lod: { nearDistance: 65, maxDistance: 2800, farFade: { startDistance: 2600, endDistance: 2800 } } },
+		{ id: 'shrubs', modelIds: [ 'shrub-low' ], atlasVariantRange: { start: 3, end: 5 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 1, 0 ], radius: 2, horizontalRadius: 1.5, halfHeight: 2 }, lod: { nearDistance: 45, maxDistance: 180, farFade: null } },
 	],
-	nearHandoff: { startDistance: 45, endDistance: 75 },
-	drawRange: { startDistance: 40, fadeStartDistance: 300, endDistance: 320 },
-	thinning: { startDistance: 140, endDistance: 320, removeFraction: 0.5 },
-	windResponse: { direction: 1, speed: 0.7, gust: 1, heightExponent: 1, maximumDisplacement: 1.5 },
+	frameBlendDistance: 100,
+	lodBandFraction: 0.12,
+	thinning: { startDistance: 140, endDistance: 320, removeFraction: 0.5, seedMultiplier: 91.7, scaleCompensation: 'inverse-square-root-retained-density/1' },
 };
 const options = { componentAssets: inventory, staticModelInstanceSetAssetId: setID, staticModelInstanceSet: instanceSet };
 const bytes = value => new TextEncoder().encode( JSON.stringify( value ) );
@@ -67,10 +66,12 @@ const invalid = [
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], variantSelection: { ...descriptor.variantGroups[ 0 ].variantSelection, index: 9 } }, descriptor.variantGroups[ 1 ] ] },
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], variantSelection: { ...descriptor.variantGroups[ 0 ].variantSelection, multiplier: 0 } }, descriptor.variantGroups[ 1 ] ] },
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], bounds: { ...descriptor.variantGroups[ 0 ].bounds, horizontalRadius: 9 } }, descriptor.variantGroups[ 1 ] ] },
-	{ ...descriptor, nearHandoff: { startDistance: 75, endDistance: 45 } },
-	{ ...descriptor, drawRange: { ...descriptor.drawRange, fadeStartDistance: 321 } },
+	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], lod: { ...descriptor.variantGroups[ 0 ].lod, maxDistance: 2000 } }, descriptor.variantGroups[ 1 ] ] },
+	{ ...descriptor, variantGroups: [ descriptor.variantGroups[ 0 ], { ...descriptor.variantGroups[ 1 ], lod: { ...descriptor.variantGroups[ 1 ].lod, farFade: { startDistance: 150, endDistance: 170 } } } ] },
+	{ ...descriptor, frameBlendDistance: -1 },
+	{ ...descriptor, lodBandFraction: 0 },
 	{ ...descriptor, thinning: { ...descriptor.thinning, endDistance: 130 } },
-	{ ...descriptor, windResponse: { ...descriptor.windResponse, maximumDisplacement: -1 } },
+	{ ...descriptor, thinning: { ...descriptor.thinning, scaleCompensation: 'none' } },
 ];
 for ( const value of invalid ) assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( value ), options ), /Invalid octahedral canopy descriptor/ );
 
