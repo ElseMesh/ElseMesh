@@ -2094,3 +2094,16 @@ finding changes them.
   support the authored Tidewater patch migration, but density-field binding,
   shared patch instances, and matched rendering are still open. Tidewater stays
   93%; no parity gate or percentage changes.
+
+- 2026-11-18: added `fixed-cell-patch/1` to the generic ground-cover runtime.
+  It emits one identity transform at each occupied cell origin and selects the
+  same authored near/mid/far asset list from shared cell-distance bands; engine
+  render-load bias may choose a coarser LOD without changing those instances.
+  The validator, runtime, LOD planner, batch, asset, and presentation checks
+  pass. A signed synthetic three-LOD fixture also renders in both backends:
+  each selects four visible and six nearby shadow patches, WebGL reports no GL
+  errors, and WebGPU's shadow toggle changes two receiver pixels. The isolated
+  production build passes. This verifies the shared fixed-cell adapter route,
+  not Tidewater material or visual parity; Tidewater remains 93% and no parity
+  gate closes. Exporting its authored patch assets and connecting the signed
+  density data to their material graph remain open.
