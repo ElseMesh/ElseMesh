@@ -6,6 +6,7 @@ import { GPU } from '../engine/gpu/GPU.js';
 import { FrameUniforms, G } from '../engine/render/Frame.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
 import { Vector2, Vector3, MathUtils } from '../engine/math/index.js';
+import { CLOUD_PROFILE } from './CloudProfile.js';
 
 // Volumetric trade-wind cumulus (Schneider/Nubis density model, Hillaire multiple-scattering
 // approximation) under a thin cirrus veil.
@@ -246,10 +247,10 @@ export class Clouds {
 
 		const wind0 = new Vector2().copy( G.windDir.value ).normalize().multiplyScalar( 12 );
 		this.params = new UniformBlock( 'CloudsParams', {
-			coverage: [ 'f32', 0.45 ],
-			densityScale: [ 'f32', 0.07 ], // extinction (1/m) of the densest cloud
-			bottom: [ 'f32', 750 ],
-			top: [ 'f32', 2400 ],
+			coverage: [ 'f32', CLOUD_PROFILE.coverage ],
+			densityScale: [ 'f32', CLOUD_PROFILE.densityScale ], // extinction (1/m) of the densest cloud
+			bottom: [ 'f32', CLOUD_PROFILE.bottom ],
+			top: [ 'f32', CLOUD_PROFILE.top ],
 			// m/s; clouds drift along it (by default with the surface wind, as trade winds do)
 			wind: [ 'vec2f', wind0 ],
 			offset: [ 'vec2f', new Vector2() ], // accumulated wind offset (m)

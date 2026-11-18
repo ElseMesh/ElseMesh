@@ -51,16 +51,17 @@ parity remains 93%.
 ### Cloud field source audit
 
 The two renderers currently feed different procedural cloud content to their
-sky presenters. WebGPU's `Clouds` defaults to 45% coverage and a 750–2400 m
-cloud layer; it generates weather, 3D shape/detail, synoptic and fibre fields,
-an occupancy SDF, and a temporally accumulated view. The WebGL fallback instead
-generates its own 512² 2D noise and 64³ volume, then marches 12 samples through
-an 850–1650 m layer. Both receive the world's `clouds` enable flag, but that
-boolean does not make their inputs or rendered cloud shapes equivalent. This
-source audit confirms a cloud-content parity gap; it does not establish the
-cause of the beach color differences above. Closing it requires a shared,
-renderer-neutral cloud profile and content input consumed by both ElseMesh
-presenters, followed by matched rendered views.
+sky presenters. Both now consume `CLOUD_PROFILE` for 45% coverage, density
+scale 0.07, and a 750–2400 m cloud layer. WebGPU's `Clouds` generates weather,
+3D shape/detail, synoptic and fibre fields, an occupancy SDF, and a temporally
+accumulated view. The WebGL fallback still generates its own 512² 2D noise and
+64³ volume, then marches 12 samples through that shared height range. The
+focused source check confirms the shared scalar profile and does not compare
+cloud pixels or prove equivalent cloud shapes. This source audit confirms a
+remaining cloud-content parity gap; it does not establish the cause of the
+beach color differences above. Closing the gap requires a common
+renderer-neutral cloud content input or field, followed by matched rendered
+views.
 
 ## 2026-11-17 hosted WebGL shadow coverage
 

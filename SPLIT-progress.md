@@ -2342,3 +2342,10 @@ finding changes them.
   do not. This narrows the finite-vegetation parity work to a renderer-neutral
   signed canopy LOD contract consumed by both engine backends. No code or
   parity gate changed; Tidewater remains 93%.
+
+- 2026-11-18: centralized the cloud coverage, density scale, and vertical
+  range used by the WebGPU and WebGL sky presenters, retaining the original
+  Tidewater WebGPU defaults. The focused source check verifies both presenters
+  consume those values. Their procedural cloud fields and rendering methods
+  remain different, so this is partial input alignment, not cloud appearance
+  parity; no percentage change.

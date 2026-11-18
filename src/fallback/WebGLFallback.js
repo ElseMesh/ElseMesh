@@ -37,6 +37,7 @@ import { surfFoamGLSL } from '../ocean/SurfFoamGLSL.js';
 import { WebGLSkyEnvironment } from './WebGLSkyEnvironment.js';
 import { WebGLAtmosphere, webglAtmosphereSkyLookupGLSL } from './WebGLAtmosphere.js';
 import { installWebGLSceneMaterialLighting } from './WebGLMaterialLighting.js';
+import { CLOUD_PROFILE } from '../sky/CloudProfile.js';
 import { WebGLSunShadows } from './WebGLSunShadows.js';
 import { webglBeachDebris } from './WebGLBeachDebris.js';
 import { WebGLPostFX } from './WebGLPostFX.js';
@@ -1494,6 +1495,8 @@ export class WebGLFallback {
 			uniforms: {
 				uTime: { value: 0 }, uSunDirection: { value: sunDirection.clone() }, uCameraPosition: { value: new T.Vector3() },
 				uCloudNoise: { value: cloudNoise }, uCloudVolume: { value: cloudVolume }, uCloudsEnabled: { value: cloudsEnabled ? 1 : 0 },
+				uCloudCoverage: { value: CLOUD_PROFILE.coverage }, uCloudDensityScale: { value: CLOUD_PROFILE.densityScale },
+				uCloudBottom: { value: CLOUD_PROFILE.bottom }, uCloudTop: { value: CLOUD_PROFILE.top },
 				uAtmosphereSkyView: { value: this.webglAtmosphere?.skyViewTexture || null }, uAtmosphereEnabled: { value: this.webglAtmosphere?.supported ? 1 : 0 },
 			},
 			vertexShader: /* glsl */`
@@ -1509,6 +1512,10 @@ export class WebGLFallback {
 				uniform vec3 uSunDirection;
 				uniform vec3 uCameraPosition;
 				uniform float uCloudsEnabled;
+				uniform float uCloudCoverage;
+				uniform float uCloudDensityScale;
+				uniform float uCloudBottom;
+				uniform float uCloudTop;
 				uniform sampler2D uCloudNoise;
 				uniform sampler3D uCloudVolume;
 				uniform sampler2D uAtmosphereSkyView;
@@ -1537,12 +1544,13 @@ export class WebGLFallback {
 					float fine = texture2D( uCloudNoise, uv * 3.1 + vec2( 0.31, -0.19 ) ).b;
 					float n = broad - max( 0.0, 0.52 - detail ) * 0.32 + ( fine - 0.5 ) * 0.045;
 					float band = smoothstep( 0.055, 0.16, dir.y ) * ( 1.0 - smoothstep( 0.72, 0.96, dir.y ) );
-					float coverage = smoothstep( 0.57, 0.73, n ) * band * 0.92 * uCloudsEnabled;
+					float coverageThresholdShift = ( 0.45 - uCloudCoverage ) * 0.25;
+					float coverage = smoothstep( 0.57 + coverageThresholdShift, 0.73 + coverageThresholdShift, n ) * band * 0.92 * uCloudsEnabled;
 					float transmittance = 1.0;
 					vec3 cloudRadiance = vec3( 0.0 );
 					float cloudSun = max( dot( dir, normalize( uSunDirection ) ), 0.0 );
-					float cloudStart = max( 0.0, ( 850.0 - uCameraPosition.y ) / max( dir.y, 0.055 ) );
-					float cloudEnd = max( cloudStart, ( 1650.0 - uCameraPosition.y ) / max( dir.y, 0.055 ) );
+					float cloudStart = max( 0.0, ( uCloudBottom - uCameraPosition.y ) / max( dir.y, 0.055 ) );
+					float cloudEnd = max( cloudStart, ( uCloudTop - uCameraPosition.y ) / max( dir.y, 0.055 ) );
 					float stepLength = min( ( cloudEnd - cloudStart ) / 12.0, 12000.0 );
 					if ( coverage > 0.002 && stepLength > 0.0 && dir.y > 0.055 ) {
 						for ( int i = 0; i < 12; i ++ ) {
@@ -1550,7 +1558,7 @@ export class WebGLFallback {
 							vec3 worldPoint = uCameraPosition + dir * t;
 							vec3 noisePoint = worldPoint * 0.0027 + vec3( uTime * 0.0000068, 0.0, -uTime * 0.0000044 );
 							vec4 volume = texture( uCloudVolume, noisePoint );
-							float height = clamp( ( worldPoint.y - 850.0 ) / 800.0, 0.0, 1.0 );
+							float height = clamp( ( worldPoint.y - uCloudBottom ) / max( uCloudTop - uCloudBottom, 1.0 ), 0.0, 1.0 );
 							float profile = smoothstep( 0.0, 0.15, height ) * ( 1.0 - smoothstep( 0.76, 1.0, height ) );
 							float shape = 0.5 + ( volume.r - 0.5 ) * 0.24 + ( volume.g - 0.5 ) * 0.08 + ( broad - 0.5 ) * 0.45;
 							float density = smoothstep( 0.36, 0.63, shape - max( 0.0, 0.52 - volume.b ) * 0.06 ) * profile * coverage;
@@ -1558,7 +1566,7 @@ export class WebGLFallback {
 							float lightHeight = 0.12 + height * 0.3 + smoothstep( 0.52, 0.76, volume.g ) * 0.2 + lightFacing * 0.38;
 							vec3 light = mix( vec3( 0.18, 0.25, 0.37 ), vec3( 1.35, 1.28, 1.15 ), clamp( lightHeight, 0.0, 1.0 ) );
 							light += vec3( 1.0, 0.66, 0.38 ) * pow( cloudSun, 12.0 ) * 0.18;
-							float stepAlpha = 1.0 - exp( - density * stepLength * 0.00045 );
+							float stepAlpha = 1.0 - exp( - density * stepLength * 0.00045 * ( uCloudDensityScale / 0.07 ) );
 							cloudRadiance += transmittance * stepAlpha * light;
 							transmittance *= 1.0 - stepAlpha;
 						}
