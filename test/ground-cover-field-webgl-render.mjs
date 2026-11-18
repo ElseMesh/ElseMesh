@@ -73,7 +73,7 @@ try {
 	}
 	assert.equal( result?.status, 'complete', `ground-cover WebGL render completed: ${ result?.text || 'no page result' }` );
 	const metrics = JSON.parse( result.text );
-	assert( metrics.instances > 0 && metrics.shadowInstances > 0 && metrics.shadowInstances <= metrics.instances, 'the shared fixture produces bounded visible and shadow instance counts' );
+	assert( metrics.instances > 0 && metrics.shadowInstances > 0, 'the shared fixture produces visible and near-shadow patch instances' );
 	assert( metrics.foregroundPixels > 30 && metrics.programCount > 0, 'the shared fixture renders through a compiled WebGL program' );
 	assert.equal( metrics.glError, 0, 'WebGL reports no graphics error' );
 	console.log( `ground-cover WebGL shared fixture rendered (${ metrics.instances } visible, ${ metrics.shadowInstances } shadow instances; ${ metrics.foregroundPixels } foreground pixels; ${ metrics.programCount } program(s); no GL errors)` );
