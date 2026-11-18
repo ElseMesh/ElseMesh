@@ -13,6 +13,7 @@ import { TemporalUpscale } from './TemporalUpscale.js';
 import { LensDroplets } from './LensDroplets.js';
 import { LensFlare } from './LensFlare.js';
 import { MotionBlur } from './MotionBlur.js';
+import { POST_COLOR_GRADE } from './ColorGrade.js';
 
 // full-screen passes overwrite every pixel: clear instead of load (no tile load of the old contents on
 // tile-based GPUs)
@@ -73,11 +74,11 @@ export class PostFX {
 		this.uniforms = new UniformBlock( 'PostParams', {
 			aoStrength: [ 'f32', 1.0 ],
 			bloom: [ 'f32', 0.05 ],
-			vignette: [ 'f32', 0.28 ],
-			saturation: [ 'f32', 1.06 ],
-			contrast: [ 'f32', 1.04 ],
-			warmth: [ 'f32', 0.02 ],
-			grain: [ 'f32', 0.012 ],
+			vignette: [ 'f32', POST_COLOR_GRADE.vignette ],
+			saturation: [ 'f32', POST_COLOR_GRADE.saturation ],
+			contrast: [ 'f32', POST_COLOR_GRADE.contrast ],
+			warmth: [ 'f32', POST_COLOR_GRADE.warmth ],
+			grain: [ 'f32', POST_COLOR_GRADE.grain ],
 			sharpen: [ 'f32', 0.45 ], // RCAS strength (0 = off, 1 = strong)
 		}, { label: 'post' } );
 		this.params = this.uniforms.fields;

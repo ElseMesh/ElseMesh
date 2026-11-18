@@ -1,3 +1,5 @@
+import { POST_COLOR_GRADE } from '../post/ColorGrade.js';
+
 const AUTO_EXPOSURE = Object.freeze( {
 	refLum: 0.25,
 	min: 0.6,
@@ -120,10 +122,10 @@ void main() {
 		this.gradeMaterial = new THREE.ShaderMaterial( {
 			uniforms: {
 				uSource: { value: this.sceneTarget.texture },
-				// Match WebGPU's shared output path: ACES and exposure only.
-				uVignette: { value: 0 }, uSaturation: { value: 1 },
-				uContrast: { value: 1 }, uWarmth: { value: 0 },
-				uGrain: { value: 0 }, uFrame: { value: 0 },
+				// Match the same engine-owned grade used by the WebGPU final pass.
+				uVignette: { value: POST_COLOR_GRADE.vignette }, uSaturation: { value: POST_COLOR_GRADE.saturation },
+				uContrast: { value: POST_COLOR_GRADE.contrast }, uWarmth: { value: POST_COLOR_GRADE.warmth },
+				uGrain: { value: POST_COLOR_GRADE.grain }, uFrame: { value: 0 },
 			},
 			vertexShader: this.copyMaterial.vertexShader,
 			fragmentShader: /* glsl */`

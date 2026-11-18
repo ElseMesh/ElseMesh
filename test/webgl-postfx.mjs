@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { adaptExposure, decodeMeterLuminance, meterSize } from '../src/fallback/WebGLPostFX.js';
+import { POST_COLOR_GRADE } from '../src/post/ColorGrade.js';
+
+assert.deepEqual( POST_COLOR_GRADE, { vignette: 0.28, saturation: 1.06, contrast: 1.04, warmth: 0.02, grain: 0.012 }, 'both renderers use the same engine-owned color grade defaults' );
 
 const neutral = adaptExposure( 1, 0.25, 1, 0 );
 assert.equal( neutral, 1, 'reference luminance leaves exposure unchanged' );
