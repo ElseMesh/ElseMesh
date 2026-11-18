@@ -14,6 +14,17 @@ stored. Worlds may define their own scores, inventory, progression, rules and
 other per-visitor data, with no requirement that their semantics match those
 of any other world.
 
+ElseMesh connects these independently authored experiences into one traversable
+world network. A visitor can carry a verifiable identity between worlds, but
+does not carry the source world's gameplay rules or avatar selection as
+authority. At the portal boundary the destination evaluates admission and
+chooses the movement, interaction, simulation, and avatar-presentation rules
+that apply after arrival. A destination may accept, map, or replace incoming
+presentation according to its own authored policy; the owner/server enforces
+that decision. A world-local choice may link appearance to permissions or
+other local state, and that relationship remains explicit server-side state
+rather than an inference from visible clothing.
+
 A world does not need to agree with another world about which world a player
 is currently "in". ElseMesh does not require globally exclusive membership,
 a distributed source/destination portal commit, signed departure receipts or
@@ -131,8 +142,13 @@ admission, and stable account-to-presence binding are not implemented yet.
 
 The client may map position, orientation, velocity, compatible avatar
 appearance and supported vehicle pose/mode into a destination session,
-subject to the destination's approval. This is navigation and presentation
-context, not transfer of authoritative gameplay ownership.
+subject to the destination's approval and portal agreement. This is a proposed
+arrival context, not transfer of authoritative gameplay ownership or source
+world rules. The destination applies its own authored movement and interaction
+rules immediately after admission and chooses the visitor's local avatar
+appearance. If the destination links a choice such as team, class, or house to
+appearance or access, its owner/server authorizes and records that linked
+choice; a client cannot independently change its presentation or permissions.
 
 Inventories, currencies, scores, quests, owned objects and progression stay
 with the world that defined them. Worlds may have their own item ownership,

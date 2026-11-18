@@ -405,17 +405,23 @@ revision, entry metadata, and region data through the shared provider boundary.
 Entry-choice metadata is authored by the world. It may define a world-owned
 action-button label, a prompt, a bounded list of stable choice IDs and
 player-facing labels, and a mapping from each choice to an authored spawn pose
-and optional avatar appearance palette. ElseMesh validates and displays this
-metadata using a generic chooser; it does not know Hogwarts houses or any
-other world's choice labels. Store a visitor's selected choice per world and
-use that choice for invite entry, future portal entry, and appearance updates
-while preserving their independent avatar body and personal style settings.
-If a world provides no choices, keep the ordinary authored spawn behavior.
-Reject malformed or unresolvable choices rather than guessing positions.
+and optional avatar profile/appearance. ElseMesh validates and displays this
+metadata using a generic chooser; it does not know a world's choice labels.
+Store a visitor's selection per world. The world may link that choice to its
+avatar body style, appearance, spawn, permissions, or other local rules; such
+linked values form one owner-authorized world state, not independent client
+fields. On portal entry the destination evaluates incoming presentation and
+applies its own authored mapping and rules before admitting presence. The
+source world's body style or gameplay rules do not carry authority across the
+portal. Preserve personal appearance attributes only where the destination's
+policy permits them. If a world provides no choices, keep the ordinary
+authored spawn behavior. Reject malformed or unresolvable choices rather than
+guessing positions.
 
 World-authored choices may also grant access to authored regions or actions.
-The engine keeps the selected choice bound to the admitted visitor session;
-`worldd` evaluates the world's access rules before authorizing movement,
+The engine keeps the selected choice and its linked presentation bound to the
+admitted visitor session; `worldd` evaluates the destination world's access
+rules before authorizing movement,
 collision-frontier prefetch, or visual/content leases. A client-selected label,
 avatar appearance, URL, or local state is not proof of permission. The world
 defines the rule and its stable region/action identifiers; the generic engine
@@ -667,9 +673,9 @@ the current presence protocol does not contain one.
 
 ## Desired avatar and vehicle admission policy
 
-Avatars and occupied vehicles travel with a visitor through a portal when the
-destination accepts the visitor's presentation and entity combination. The
-destination's signed policy may set a per-avatar complexity ceiling, an
+Avatar and occupied-vehicle pose may be proposed to a destination through a
+portal, but the destination selects the accepted profile and local appearance
+under its own signed policy. Its policy may set a per-avatar complexity ceiling, an
 aggregate avatar-plus-vehicle ceiling, or a moderation catalog that allows
 only named avatar profiles and explicitly permitted avatar/vehicle pairs.
 The policy must use stable, versioned profile and component IDs with
@@ -677,16 +683,17 @@ content-addressed assets and engine-measured complexity metadata; a client may
 not claim its own triangle count or supply arbitrary model URLs.
 
 The browser checks the destination policy before showing a traversal-ready
-portal or switching worlds. A walking visitor whose selected profile is denied
-is admitted with the first locally supported profile in the destination's
-allowlist, preserving their other appearance colors and notifying them after
-arrival. The same substitution applies while aboard a vehicle only when the
-destination's allowed avatar/vehicle pair includes the replacement profile. If
-no supported profile or pair is allowed, the crossing is blocked. The owner
-applies the same profile, pair, speed, and resource limits when admitting
-presence. These checks govern sharing and admission, while ElseMesh selects the
-local WebGPU or WebGL presentation for the same approved profile. Worlds
-describe policy and approved content without choosing a renderer.
+portal or switching worlds. A denied incoming profile may be mapped to a
+destination-authored replacement only when that mapping is explicit in the
+destination policy; otherwise the crossing is blocked. The same rule applies
+while aboard a vehicle, and any replacement must be in an allowed
+avatar/vehicle pair. The owner applies the same profile, pair, speed, and
+resource limits when admitting presence. These checks govern presentation and
+admission, while ElseMesh selects the local WebGPU or WebGL presentation for
+the same approved profile. Worlds describe policy and approved content without
+choosing a renderer. The current implementation's first-supported-profile
+fallback is provisional and must be replaced by an explicit destination-owned
+mapping before it can satisfy this contract.
 
 The current implementation establishes signed allowlists and stable presence
 identities, but runtime selection still exposes only two stock avatar profiles
