@@ -2215,19 +2215,23 @@ finding changes them.
   material inputs. This is a goal clarification, not new parity evidence;
   Tidewater remains 93%.
 
-- 2026-11-18: extended Tidewater's source-versus-graph WebGPU diagnostic to
-  hash-check and decode the actual signed grass-density and terrain-surface
-  assets, and to use the packaged heightfield, terrain detail texture, and
-  height shader. The first run omitted Tidewater's `uCamPos` update, hiding the
-  source grass; the harness now updates it as Tidewater's live grass test does.
-  With committed signed assets at the overhead meadow view, the source changes
-  22,087 pixels while the graph changes none (MAE 68.423/255), so parity is
-  clearly failing. Forcing graph presence and terrain height still leaves the
-  full graph invisible; unscaled graph positions affect 3,793 pixels, and a
-  raw geometry material affects 1,438. This localizes the fault to the graph's
-  authored vertex deformation/scaling path, but does not yet identify the bad
-  term.
-  Source and graph also select different cell sets and LODs. A concurrent
-  uncommitted Tidewater terrain-asset edit now fails the signed hash check; it
-  was preserved, and these measurements use committed asset bytes staged under
-  `/var/tmp`. Paired WebGL comparison remains open. Tidewater stays 93%.
+- 2026-11-18: an intermediate Tidewater source-versus-graph WebGPU diagnostic,
+  run with the committed signed grass-density and terrain-surface assets,
+  reported MAE 68.423/255 and no visible graph grass. That failure was
+  superseded by the corrected ground-cover LOD distance axes recorded above;
+  the latest rerun below passes. A concurrent uncommitted Tidewater terrain
+  asset edit was preserved, and both comparisons used the committed asset blob
+  staged under `/var/tmp`.
+
+- 2026-11-18: reran the signed-asset Tidewater WebGPU source/graph comparison
+  after the LOD-axis correction. At the overhead meadow view it reports MAE
+  3.479/255 (under the 10/255 threshold), with source/graph foliage pixels
+  22,087/22,046. The source selects 20 cells while the shared field selects 42,
+  including additional coarser-band cells; the current image remains within the
+  comparison gate. The paired WebGL fixture also renders the same deterministic
+  Tidewater patch GLBs through the engine adapter (12 visible, 4 shadow
+  instances, 9,481 foreground pixels, 3 programs, no GL errors). That WebGL
+  fixture uses synthetic density and flat terrain, so it proves generic asset
+  and adapter execution rather than signed-package visual parity. Tidewater's
+  production package still has the old grass presenters active; no migration
+  gate closes and the overall 93% estimate is unchanged.
