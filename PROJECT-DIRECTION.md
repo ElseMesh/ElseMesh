@@ -288,12 +288,14 @@ ZeroTier, dynamic DNS with inbound reachability or a stable online relay is
 required; GitHub Pages cannot resolve a changing IP. A directory or DHT can
 provide lookup, but it adds online infrastructure or bootstrap dependencies.
 See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
-**Owner player/invite CLI: 0%.** Prefer `worldd player` and `worldd invite`
-subcommands for creating and editing world-local player records, linking only
-verified identities, setting invite provider allowlists/expiry, and revoking
-access. Support scripts with stable opaque IDs and structured output; a GUI
-owner panel can follow the same operations later. The intended interface and
-security boundaries are specified in
+**Owner player/invite management (CLI and private web UI): 0%.** Provide
+`worldd player` and `worldd invite` subcommands for scripts plus a small owner
+web interface using the same validated operations. Support creating/editing
+world-local player records, linking only verified identities, setting invite
+provider allowlists/expiry, and revoking access. Keep the web UI on loopback by
+default; if enabled on a private network, keep it off the visitor gateway and
+require owner authentication. Support stable opaque IDs and structured CLI
+output. The interface and security boundaries are specified in
 [visitor identity and world-local state](docs/visitor-identity-and-world-state.md#owner-player-and-invitation-administration).
 The ticket may expire after a configurable period, for example 24 hours, or
 the owner may require the

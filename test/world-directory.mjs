@@ -175,14 +175,14 @@ try {
 	assert.equal( directZeroTierConnector.gateway, 'http://10.147.20.4:43127' );
 	assert.equal( zeroTierLookups, zeroTierLookupsBeforePrivate, 'a working private gateway is tried before Worker HostID lookup' );
 	directZeroTierConnector.close();
-	const lookupsBeforeDirect = zeroTierLookups;
+	const lookupsBeforeWorkerFallback = zeroTierLookups;
 	const tailscaleGateway = new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 		nodeId: second.peerId, gateway: 'https://world-host.tailnet-example.ts.net', directory: 'https://thruhold.org',
 	} );
 	await tailscaleGateway.getManifest();
-	assert.equal( tailscaleGateway.gateway, 'https://world-host.tailnet-example.ts.net', 'an invite-supplied secure Tailscale gateway is tried directly before ZeroTier resolver lookup' );
-	assert.equal( zeroTierLookups, lookupsBeforeDirect, 'a working direct gateway avoids the resolver request' );
+	assert.equal( tailscaleGateway.gateway, 'http://10.147.20.4:43127', 'the Worker HostID lookup and its signed private gateway take priority over a static invite gateway when the invite has no private gateway' );
+	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 1, 'the resolver is queried before trying a static invite gateway when the private route was not included in the invite' );
 	tailscaleGateway.close();
 	const directThenResolver = new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
@@ -191,7 +191,7 @@ try {
 	await directThenResolver.getManifest();
 	assert.equal( directThenResolver.nodeId, second.peerId, 'an unreachable invite gateway falls back to the signed ZeroTier HostID resolver result' );
 	assert.equal( directThenResolver.gateway, 'http://10.147.20.4:43127', 'a signed private gateway is attempted before the provider HTTPS gateway after lookup' );
-	assert.equal( zeroTierLookups, lookupsBeforeDirect + 1, 'the resolver is queried after the direct route fails' );
+	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 2, 'the resolver is queried after the direct route fails' );
 	directThenResolver.close();
 	privateGatewayReachable = false;
 	const directThenFallback = new WorldConnector( {
@@ -201,7 +201,7 @@ try {
 	await directThenFallback.getManifest();
 	assert.equal( directThenFallback.nodeId, second.peerId, 'if the private ZeroTier gateway fails, the verified public provider remains available' );
 	assert.equal( directThenFallback.gateway, 'https://online.example' );
-	assert.equal( zeroTierLookups, lookupsBeforeDirect + 2 );
+	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 3 );
 	directThenFallback.close();
 	privateGatewayReachable = true;
 	failoverProviderReachable = false;

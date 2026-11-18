@@ -16,15 +16,20 @@ of any other world.
 
 ## Owner player and invitation administration
 
-The primary owner-management interface should be `worldd` command-line
-subcommands, so player records and invites can be managed in scripts as well as
-by hand. A graphical owner panel may be added later, but it must use the same
-validated operations and authority checks. The CLI should support listing and
-showing players, creating pending player records, editing owner-controlled
-fields, listing linked authentication methods, issuing invites with an explicit
-provider allowlist and expiry, and revoking invites or player access. It should
-offer stable opaque player IDs and machine-readable output for automation; it
-must not expose sequential player numbers as admission credentials.
+Provide both `worldd` command-line subcommands and a small owner web interface
+for player and invitation management. The CLI supports scripts and batch work;
+the web interface makes routine edits discoverable. Both must call the same
+validated owner operations. The web interface must be private by default:
+bind its listener to loopback unless the owner explicitly enables a private
+network listener, keep it separate from the public visitor gateway, and require
+owner authentication even when reached through ZeroTier. Private-network
+reachability alone is not proof of owner identity. Both interfaces should
+support listing and showing players, creating pending player records, editing
+owner-controlled fields, listing linked authentication methods, issuing invites
+with an explicit provider allowlist and expiry, and revoking invites or player
+access. They should offer stable opaque player IDs; the CLI should also provide
+machine-readable output for automation. Sequential player numbers must not be
+admission credentials.
 
 Provider identities may be linked only after the provider login flow proves
 control of the account. CLI input may select an already verified identity,
@@ -53,8 +58,9 @@ worldd invite revoke <invite-id>
 
 An invite may create its pending player record in one operation when a named
 record is unnecessary. Owners should be able to see which providers the invite
-allows and its expiry before sharing it. The CLI is not implemented yet; the
-examples above define the intended workflow, not currently executable options.
+allows and its expiry before sharing it. Neither the CLI nor the private owner
+web interface is implemented yet; the examples above define the intended CLI
+workflow, not currently executable options.
 
 ElseMesh connects these independently authored experiences into one traversable
 world network. A visitor can carry a verifiable identity between worlds, but

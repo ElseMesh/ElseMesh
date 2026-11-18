@@ -175,27 +175,27 @@ export class WorldConnector {
 		throwIfAborted( signal );
 		let lastError = null;
 		const attempted = new Set( excludeProviders );
-		if ( this.zeroTierGateway && this.zeroTierNodeId ) {
-			try {
-				const direct = await this.#discoverDirectZeroTierProvider( signal );
-				this.nodeId = direct.nodeId;
-				this.gateway = this.zeroTierGateway;
-				return await this.#fetchManifest( signal );
-			} catch ( error ) {
+		const inviteProviders = this.providers.slice();
+		const attemptProvider = async ( nodeId, gateway ) => {
+			const key = `${nodeId}\n${gateway}`;
+			if ( attempted.has( key ) ) return null;
+			attempted.add( key );
+			this.nodeId = nodeId;
+			this.gateway = gateway;
+			try { return await this.#fetchManifest( signal ); }
+			catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
 				lastError = error;
 				this.close();
 				this.nodeId = '';
+				return null;
 			}
-		}
-		for ( const provider of this.providers ) {
-			const key = `${provider.nodeId}\n${provider.gateway}`;
-			if ( attempted.has( key ) ) continue;
-			attempted.add( key );
-			this.nodeId = provider.nodeId;
-			this.gateway = provider.gateway;
+		};
+		if ( this.zeroTierGateway && this.zeroTierNodeId ) {
 			try {
-				return await this.#fetchManifest( signal );
+				const direct = await this.#discoverDirectZeroTierProvider( signal );
+				const manifest = await attemptProvider( direct.nodeId, this.zeroTierGateway );
+				if ( manifest ) return manifest;
 			} catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
 				lastError = error;
@@ -204,51 +204,37 @@ export class WorldConnector {
 			}
 		}
 		if ( this.zeroTierNodeId ) {
-			let discovered;
+			let discovered = [];
 			try { discovered = await this.#discoverZeroTierProviders( signal ); }
 			catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
-				throw lastError || error;
+				lastError = error;
 			}
-			if ( ! this.worldId ) {
+			if ( discovered.length && ! this.worldId ) {
 				const worldIDs = [ ...new Set( discovered.flatMap( ( provider ) => provider.worldIds ) ) ];
-				invariant( worldIDs.length === 1, worldIDs.length ? 'ZeroTier node advertises multiple ThruHolds; choose one by ThruHold ID' : 'ZeroTier node does not currently advertise a ThruHold' );
+				if ( worldIDs.length !== 1 ) throw new Error( worldIDs.length ? 'ZeroTier node advertises multiple ThruHolds; choose one by ThruHold ID' : 'ZeroTier node does not currently advertise a ThruHold' );
 				this.worldId = worldIDs[ 0 ];
 			}
 			const candidates = discovered.filter( ( provider ) => provider.worldIds.includes( this.worldId ) );
-			invariant( candidates.length > 0, 'ZeroTier node does not advertise the requested ThruHold' );
+			if ( discovered.length && candidates.length === 0 ) lastError = new Error( 'ZeroTier node does not advertise the requested ThruHold' );
 			for ( const provider of candidates ) {
 				if ( ! provider.zeroTierGateway ) continue;
 				this.zeroTierGateway = provider.zeroTierGateway;
-				this.nodeId = provider.nodeId;
-				this.gateway = provider.zeroTierGateway;
-				try { return await this.#fetchManifest( signal ); }
-				catch ( error ) {
-					if ( signal?.aborted ) throw signal.reason || error;
-					lastError = error;
-					this.close();
-					this.nodeId = '';
-				}
+				const manifest = await attemptProvider( provider.nodeId, provider.zeroTierGateway );
+				if ( manifest ) return manifest;
 			}
 			this.providers = candidates.map( ( provider ) => ( { nodeId: provider.nodeId, gateway: provider.gateway } ) );
-		}
-		invariant( isWorldID( this.worldId ), 'A valid worldId is required' );
-		for ( const provider of this.providers ) {
-			const key = `${provider.nodeId}\n${provider.gateway}`;
-			if ( ! attempted.has( key ) ) {
-				attempted.add( key );
-				this.nodeId = provider.nodeId;
-				this.gateway = provider.gateway;
-				try {
-					return await this.#fetchManifest( signal );
-				} catch ( error ) {
-					if ( signal?.aborted ) throw signal.reason || error;
-					lastError = error;
-					this.close();
-					this.nodeId = '';
-				}
+			for ( const provider of this.providers ) {
+				const manifest = await attemptProvider( provider.nodeId, provider.gateway );
+				if ( manifest ) return manifest;
 			}
 		}
+		if ( this.zeroTierNodeId && ! this.worldId ) throw new Error( lastError?.message || 'ZeroTier node does not currently advertise a ThruHold' );
+		for ( const provider of inviteProviders ) {
+			const manifest = await attemptProvider( provider.nodeId, provider.gateway );
+			if ( manifest ) return manifest;
+		}
+		invariant( isWorldID( this.worldId ), lastError?.message || 'A valid worldId is required' );
 		this.nodeId = '';
 		let providers;
 		try {
@@ -261,19 +247,8 @@ export class WorldConnector {
 			throwIfAborted( signal );
 			const nodeId = typeof provider === 'string' ? provider : provider.nodeId;
 			const gateway = typeof provider === 'string' ? this.gateway : provider.gateway;
-			const key = `${nodeId}\n${gateway}`;
-			if ( attempted.has( key ) ) continue;
-			attempted.add( key );
-			this.nodeId = nodeId;
-			this.gateway = gateway;
-			try {
-				return await this.#fetchManifest( signal );
-			} catch ( error ) {
-				if ( signal?.aborted ) throw signal.reason || error;
-				lastError = error;
-				this.close();
-				this.nodeId = '';
-			}
+			const manifest = await attemptProvider( nodeId, gateway );
+			if ( manifest ) return manifest;
 		}
 		throw lastError || new Error( 'No available provider could serve this world' );
 	}
