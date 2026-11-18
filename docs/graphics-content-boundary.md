@@ -285,6 +285,36 @@ the Tidewater production presenters and their registration only in that complete
 migration. Until then, keep the existing path and report renderer-neutral
 vegetation as incomplete.
 
+### Dense ground-cover migration target
+
+The first vegetation slice is Tidewater's dense ground cover. The signed world
+must describe one cell-patch arrangement for both backends: the source 8 m cells,
+seeded clump, oat, and creeper slots, all five authored visual forms (meadow and
+dune grass, oat stalks and heads, creeper leaves and flowers), and the source
+near/mid/far geometry levels. Tidewater owns those authored inputs and exports
+the portable assets. The present WebGPU patch counts and ranges are the starting
+reference; the WebGL 0.46 m lattice and its reduced species set are not.
+
+ElseMesh must provide one shared cell/instance list and LOD decision, then feed
+the same signed patch assets, density data, per-instance data, and material
+inputs to its WebGPU and WebGL adapters. Add any missing renderer-neutral graph
+inputs for density sampling, terrain height, and wind to ElseMesh's bounded
+material contract and compile each input for both backends. Keep species
+selection, density interpretation, geometry, palette, and LOD asset identity in
+the signed world data; backend shaders may translate that contract but must not
+generate different placements or substitute content. Minimum-FPS adaptation may
+select a coarser authored patch LOD and tune render scale or other presentation
+costs, while retaining every species and the same patch source assets.
+
+Before activating the component, a conformance fixture must load the exported
+Tidewater patch set through both engine adapters and assert identical cell
+transforms, species coverage, density inputs, selected LOD asset IDs, and wind
+inputs. Matched WebGPU/WebGL captures must then compare the same beach poses,
+time, viewport, render scale, and quality settings against pre-split WebGPU,
+including the near/mid/far transitions. Only after those gates pass may the
+world package select the shared component and the existing Tidewater vegetation
+presenters and WebGL grass approximation be removed.
+
 ## Migration order
 
 1. Introduce a backend-neutral world runtime and explicit content/state

@@ -2058,3 +2058,15 @@ finding changes them.
   93%. Engine quality controls may tune cost while both backends retain the
   same authored object, placement, geometry/LOD, texture, variant, and material
   inputs.
+
+- 2026-11-18: source audit confirmed the active Tidewater grass paths do not
+  share an arrangement. WebGPU uses seeded 8 m patches with 384 grass slots, 12
+  oat slots, 28 creeper slots, and three related geometry LODs; WebGL generates
+  blades on a separate 0.46 m lattice, omits oat heads and creeper flowers, and
+  drops oats/creepers in farther bands. Both receive the same density map, but
+  that is not object/placement parity. The existing GLB-only ground-cover
+  contract cannot represent the source patch arrangement. The migration target
+  and activation gate are now specified in
+  [graphics content boundary](docs/graphics-content-boundary.md#dense-ground-cover-migration-target).
+  No package switch or parity percentage change is justified until both
+  backends consume the same signed patch assets and matched views pass.
