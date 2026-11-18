@@ -1973,3 +1973,12 @@ finding changes them.
   the visual fade or overall appearance. Built-in package integration and
   matched backend appearance checks remain open; no Tidewater parity percentage
   changes.
+
+- 2026-11-18: clarified the active performance/parity acceptance rule. An
+  engine-owned minimum-FPS target may adjust render scale, shadow/reflection
+  cost, texture mip or residency, and selection among shared authored LODs.
+  These controls must preserve the same world-authored object, geometry,
+  placement, texture-source, variant, and material-input set in WebGPU and
+  WebGL. At matched view and quality settings both renderers must select the
+  same LOD assets. This records a requirement clarification only; no parity
+  percentage changes.

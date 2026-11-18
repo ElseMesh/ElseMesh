@@ -45,11 +45,13 @@ Users may adjust an engine-owned minimum-FPS target and related quality
 controls. The engine may tune render scale, shadow/reflection cost, texture mip
 or residency, and selection among the shared authored LOD assets to approach
 that target. These controls change rendering cost, not the world's content:
-WebGPU and WebGL must resolve the same authored objects, placements, texture
-sources, variants, and material inputs through the same visibility/LOD policy.
-At matched view and quality settings they must select the same LOD assets. Do
-not meet the target by dropping object classes, substituting different texture
-sets, or switching to a backend-specific content set.
+WebGPU and WebGL must resolve the same authored objects, placements, geometry,
+texture sources, variants, and material inputs through the same visibility/LOD
+policy. A renderer may sample a different mip level or residency tier from the
+same authored texture when quality settings require it; it must not substitute
+a different texture set. At matched view and quality settings both renderers
+must select the same LOD assets. Do not meet the target by dropping object
+classes or switching to a backend-specific content set.
 
 The renderer architecture is hybrid across worlds and renderer-neutral within
 each world. ElseMesh owns backend selection and translates portable content and
