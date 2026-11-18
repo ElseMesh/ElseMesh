@@ -4,6 +4,19 @@ This is the dated implementation and verification log. Current priorities and
 open product requirements are tracked in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md);
 completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
+## 2026-11-18
+
+- Audited the browser launch path for short friend-invitation URLs. The client
+  can share a full provider-bearing world URL and resolve world or ZeroTier
+  NodeIDs through configured discovery, but it does not redeem an opaque
+  `?invite=` code or bind social-account authentication to world admission. A
+  short URL that discovers the owner's reachable gateway and admits a friend
+  from another machine is therefore not ready. Current direct world/gateway
+  links and configured resolver lookups do not provide revocable owner-issued
+  short-code admission. The short-link resolution/account-bound admission
+  sub-gate is tracked at 0% in
+  [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
+
 ## 2026-11-04
 
 - Extended the live signed-module Chromium/worldd test to run separate dedicated

@@ -594,17 +594,23 @@ using its own timeout. No atomic inter-owner membership commit is required.
 
 ### Invitation-gated entry
 
-World owners may opt into invitation admission. A visitor opens an
-`elsemesh.org/invite/<code>` URL; the main ElseMesh service validates the
-invitation and the approved identity, then redirects with a short-lived opaque
-launch grant. The destination gateway exchanges that grant for a signed,
-world-bound admission assertion before accepting the browser connection.
+World owners may opt into invitation admission. The desired share URL is a
+short root URL such as `https://elsemesh.org/?invite=<opaque-code>`; the main
+ElseMesh invitation service resolves it to the owner-authorized world and
+reachable gateway, validates the invitation and any required visitor identity,
+then redirects with a short-lived opaque launch grant. The destination gateway
+exchanges that grant for a signed, world-bound admission assertion before
+accepting the browser connection. A path-form URL may be supported as an alias.
 
-ZeroTier node ID is the first reusable stable identity. An invitation without a
-provable static identity is single-use. Reuse, inactivity expiry, revocation,
-and replay protection are enforced by durable admission state. Existing worlds
-remain guest-readable unless their signed access policy requires invitations.
-The invitation is separate from account roles and does not replace owner-signed
+ZeroTier NodeID is an optional reusable network identity, not proof of a
+person's account. Owners may choose a high-entropy bearer invitation or require
+an authenticated account such as Google or Telegram, linked through a verified
+account key. IP addresses, including ZeroTier addresses, are routing
+information, not account identity. An invitation without a provable static
+identity is single-use. Reuse, inactivity expiry, revocation, and replay
+protection are enforced by durable admission state. Existing worlds remain
+guest-readable unless their signed access policy requires invitations. The
+invitation is separate from account roles and does not replace owner-signed
 manifest/provider validation.
 
 See [Google and Facebook visitor authentication](visitor-identity-and-world-state.md#google-and-facebook-visitor-authentication)

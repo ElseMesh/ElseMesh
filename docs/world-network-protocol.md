@@ -88,11 +88,16 @@ Portals and invitation codes are alternative arrival routes: both are
 subject to destination admission. A portal may admit visitors without codes
 where permitted, but cannot bypass a destination's invitation requirement.
 
-The public entry point is an ElseMesh invitation URL such as
-`https://elsemesh.org/invite/<code>`. The main ElseMesh service validates the
-code, identity, expiry, inactivity timeout, revocation state, and redemption
-limits. It then returns a short-lived opaque launch grant. The browser removes
-the invitation code and grant from its URL/history after handoff.
+The desired public entry point is a short ElseMesh invitation URL such as
+`https://elsemesh.org/?invite=<opaque-code>` (a path-form URL may be supported
+as an alias). The main ElseMesh service resolves the code to the authorized
+world and reachable gateway, then validates identity, expiry, inactivity
+timeout, revocation state, and redemption limits. It returns a short-lived
+opaque launch grant. The browser removes the invitation code and grant from its
+URL/history after handoff. A code may be a high-entropy bearer capability or
+require a verified account identity such as Google or Telegram. Never place a
+raw IP address, private credential, or reusable account token in the URL;
+ZeroTier NodeID is optional network identity and IP is only a route hint.
 
 The destination gateway exchanges the launch grant for a signed admission
 assertion bound to the target world, redemption, identity, audience/gateway,

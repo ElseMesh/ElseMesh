@@ -252,6 +252,22 @@ details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-h
 
 Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
+**Opaque friend-link resolution and account-bound admission: 0%.** The
+shareable entry URL should be as simple as
+`https://elsemesh.org/?invite=<opaque-code>`: ElseMesh resolves the code to
+the owner-authorized world and its reachable gateway, then hands the browser a
+short-lived launch grant. The code may itself be a high-entropy, expiring,
+single-use capability, or the owner may require the visitor to authenticate
+with a linked provider such as Google or Telegram. Never encode a raw ZeroTier
+IP, private credential, or reusable account token in the URL. A ZeroTier
+NodeID may be bound as a separately verified network identity; neither it nor
+an IP address proves a person's Google/Telegram identity. The destination
+`worldd` remains the final admission authority. Until the short-link,
+redemption, and remote-admission path is implemented and verified, the browser
+can use direct world/gateway URLs or configured resolver lookups; these are not
+revocable owner-issued short-code invitations. A remote visitor still needs a
+reachable secure gateway and an owner-authorized admission path.
+
 Invitation launches use the destination world's authored spawn as the preferred
 entry point. Move the player only when a player or colliding object occupies
 that point, choose the nearest free location within the world's configured

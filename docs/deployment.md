@@ -23,19 +23,19 @@ different built-in world package.
 
 ### Invitation-gated launches
 
-An owner may publish an invitation URL at `elsemesh.org/invite/<code>` instead
-of sharing a direct world URL. The main ElseMesh service validates the code,
-approved identity, expiry/inactivity policy, revocation state, and redemption
-limits, then redirects with a short-lived opaque launch grant. The destination
-gateway exchanges that grant for a signed admission assertion before allowing a
-browser connection.
+The planned short friend URL is `https://elsemesh.org/?invite=<opaque-code>`.
+It resolves to the owner's authorized world and reachable gateway; the
+destination gateway then checks a short-lived launch grant and owner admission.
+This short-code issuance and redemption flow is not implemented yet. Today,
+**Share world invite** creates a full provider-bearing URL, which works only
+when the included gateway is reachable by the visitor.
 
-ZeroTier node ID is the first reusable static identity. Invitations without a
-provable static identity are single-use. Configure the world access policy to
-require admission; otherwise existing direct guest URLs continue to work.
-Never put account session tokens, private keys, or long-lived bearer secrets in
-an invite URL. The browser removes the code and grant from its URL after
-redemption.
+The owner may eventually choose a high-entropy bearer code or require an
+authenticated Google or Telegram account linked to a verified identity. A
+ZeroTier NodeID may identify a network member but does not prove a person's
+account; IP addresses are route hints. Never put private credentials or
+reusable account tokens in an invite URL. Once implemented, redemption must
+enforce expiry, revocation, replay protection, and destination-owner admission.
 
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
 arguments. For example (replace the placeholder with an actual world gateway):
