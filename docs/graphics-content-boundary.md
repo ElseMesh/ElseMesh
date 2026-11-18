@@ -47,15 +47,16 @@ descriptors plus current simulation state.
 
 ## Performance controls and content identity
 
-ElseMesh may expose a minimum-FPS target and quality controls. Its adaptive
-policy may reduce render scale or shadow/reflection cost, change mip selection
-or texture residency, and select among the world's authored LOD assets. These
-choices adjust presentation cost while preserving the same authored objects,
-placements, geometry, texture sources, variants, and material inputs. WebGPU
-and WebGL must follow the same visibility and LOD policy and select the same
-authored LOD assets at matched view and quality settings. A backend may use its
-own GPU implementation, but it must not meet an FPS target by dropping object
-classes or substituting another content or texture set.
+ElseMesh may expose an adjustable minimum-FPS target and quality controls. Its
+adaptive policy may reduce render scale or shadow/reflection cost, change mip
+selection or texture residency, and select among the world's authored LOD
+assets. These are rendering-cost adjustments, not backend-specific content
+variants: WebGPU and WebGL retain the same authored objects, placements,
+geometry, texture sources, variants, and material inputs. Both follow the same
+visibility and LOD policy and select the same authored LOD assets at matched
+view and quality settings. A backend may use its own GPU implementation, but
+it must not meet an FPS target by dropping object classes or substituting
+another content or texture set.
 
 ## Migration rule
 

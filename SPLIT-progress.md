@@ -2057,7 +2057,9 @@ finding changes them.
   wind, LOD, shadow, matched-visual, and hardware-FPS gates. Tidewater remains
   93%. Engine quality controls may tune cost while both backends retain the
   same authored object, placement, geometry/LOD, texture, variant, and material
-  inputs.
+  inputs. Adjustable minimum-FPS and quality controls remain allowed: they can
+  trade render scale, shadow/reflection cost, mip/residency, and authored LOD
+  selection while keeping both backends on the same world content and assets.
 
 - 2026-11-18: source audit confirmed the active Tidewater grass paths do not
   share an arrangement. WebGPU uses seeded 8 m patches with 384 grass slots, 12
