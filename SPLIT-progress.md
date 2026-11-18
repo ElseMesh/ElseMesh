@@ -1982,3 +1982,13 @@ finding changes them.
   WebGL. At matched view and quality settings both renderers must select the
   same LOD assets. This records a requirement clarification only; no parity
   percentage changes.
+
+- 2026-11-18: added the renderer-neutral `terrainHeightAt(vec2 worldXZ)`
+  material-graph operation. WebGPU materials receive the installed terrain
+  height module; WebGL materials sample the same authored heightfield through
+  an engine-owned binding. Tidewater's scanned-debris graph now uses the
+  per-fragment query instead of placement-center ground height. The graph
+  compiler check, built-in WebGL route check, deterministic Tidewater export
+  check, and external production build pass. The scanned-debris component is
+  still outside the signed runtime package, and no matched rendered comparison
+  has verified its appearance or LOD fade. Tidewater parity remains 93%.
