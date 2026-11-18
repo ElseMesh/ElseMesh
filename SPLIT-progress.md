@@ -2189,10 +2189,13 @@ finding changes them.
   lighting. Fixed the GLB scene nodes to reference their mesh so the engine
   loader can instantiate the authored geometry. Tidewater's exporter test
   validates graph bounds, both compiler texture-slot sets, identical graph data
-  across LODs, and deterministic assets. Paired engine fixtures now load those
-  exact Tidewater patch GLBs and graph: WebGPU renders 12 visible and 4 shadow
+  across LODs, and deterministic assets. Paired engine fixtures load those exact
+  Tidewater patch GLBs and graph with a synthetic density mask, shared terrain-
+  detail texels, and flat terrain: WebGPU renders 12 visible and 4 shadow
   instances; WebGL renders 12 visible and 4 shadow instances with three
-  programs and no GL errors. Both use synthetic density/detail data and flat
-  terrain; their pixel counts are not a cross-renderer comparison. The signed
-  Tidewater component remains inactive, and no matched pre-split beach capture
-  has been made. Tidewater remains 93%; no parity gate closes.
+  programs and no GL errors. A separate source-versus-graph WebGPU render check
+  reports 4.979/255 RGB MAE under its 10/255 threshold. The source selects 10
+  cells while the engine submits 12 because its sphere culling is looser; the
+  two extra cells do not materially change this image. This is not a production
+  terrain or pre-split beach comparison. The signed Tidewater component remains
+  inactive; Tidewater remains 93% and no production parity gate closes.

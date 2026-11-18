@@ -224,16 +224,22 @@ for both adapters; minimum-FPS bias may choose a coarser asset from the same
 signed LOD list. Tidewater now exports its patch GLBs with the world-owned
 ground-cover graph. The paired fixture loads those authored GLBs through both
 adapters and exercises their material graph, geometry, and shadow paths using a
-synthetic density/detail field and flat terrain. Tidewater's WebGPU grass still
-owns the active world path; matched production-world appearance against the
-pre-split reference remains open.
+synthetic density mask, the shared terrain-detail texels, and flat terrain. A
+separate matched WebGPU fixture compares the graph against Tidewater's source
+`GrassField` with the same patches, camera, mask, and fixed frame time; its RGB
+mean absolute error is 4.979/255. The engine path currently submits two
+additional near-field cells because its shared sphere culling is looser than
+the source cell-box culling. Tidewater's WebGPU grass still owns the active
+world path; matched production-world appearance against the pre-split reference
+remains open.
 
 The ground-cover material graph can read the installed terrain surface's
 detail texture through the `detailField` slot. This reuses the texture already
 included in the signed terrain-surface asset: both presenters bind its RGBA
-texels with linear filtering and repeat addressing. The synthetic paired
-fixture verifies the binding, but does not establish Tidewater material or
-visual parity. The graph also exposes `translucency` and `specularIntensity`
+texels with linear filtering and repeat addressing. The paired generic fixture
+verifies the binding using the shared terrain-detail bytes, but does not
+establish production-world visual parity. The graph also exposes
+`translucency` and `specularIntensity`
 through the shared material contract; WebGPU writes its existing surface fields,
 and WebGL maps them into its standard physical-lighting path. Paired generic GLB
 render fixtures exercise those outputs, but do not establish Tidewater material
