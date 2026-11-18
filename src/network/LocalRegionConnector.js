@@ -33,6 +33,7 @@ const REGION_DATA_REQUEST_LIMIT = 2;
 // worldd's dynamic-provider gateway limits raw query strings to 4096 characters.
 const LOCAL_REGION_CELL_QUERY_LIMIT = 4096;
 const LOCAL_REGION_CELL_BATCH_LIMIT = 512;
+const MAX_LOCAL_REGION_PREVIEW_LAYERS = 16;
 const EMPTY_GLB = createEmptyGlb();
 const EXTERNAL_TEXTURE_ID = /^(?:sha256:[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})$/;
 const LOCAL_REGION_ETAG = /^\"(?:sha256-[0-9a-f]{64}|source:[A-Za-z0-9_-]{1,2040})\"$/;
@@ -323,7 +324,7 @@ export class LocalRegionConnector {
 		const region = catalog.regions.find( item => item.id === this.localMap || item.label === this.localMap );
 		requireValue( region && typeof region.id === 'string' && typeof region.asset === 'string', `No local map matches “${this.localMap}”` );
 		const layerLabels = previewRegion.layers || [];
-		requireValue( Array.isArray( layerLabels ) && layerLabels.length <= 8 && layerLabels.every( label => typeof label === 'string' && label.trim() && label.length <= 160 ) && new Set( layerLabels ).size === layerLabels.length, 'Local provider has invalid preview layers' );
+		requireValue( Array.isArray( layerLabels ) && layerLabels.length <= MAX_LOCAL_REGION_PREVIEW_LAYERS && layerLabels.every( label => typeof label === 'string' && label.trim() && label.length <= 160 ) && new Set( layerLabels ).size === layerLabels.length, 'Local provider has invalid preview layers' );
 		const regions = [ region, ...layerLabels.map( label => catalog.regions.find( item => item.id === label || item.label === label ) ) ];
 		requireValue( regions.every( item => item && typeof item.id === 'string' && typeof item.asset === 'string' ) && new Set( regions.map( item => item.id ) ).size === regions.length, 'Local provider is missing or duplicates a preview layer' );
 		requireValue( regions.every( item => authorizedRegionIDs.has( item.id ) ), 'Local provider selected a region outside its authorized region scope' );

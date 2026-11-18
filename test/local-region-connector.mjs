@@ -112,6 +112,7 @@ let rangeFetches = 0;
 let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
 let descriptorRegionIDs = [ 'great-hall' ];
+let descriptorPreviewLayers = [];
 let omitCacheRevision = false;
 const descriptorAvatarOptions = [ { id: 'short-hair', profileId: 'elsemesh.avatar.stock-male/1', label: 'Short hair' } ];
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor', avatarOptionId: 'short-hair' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
@@ -155,9 +156,18 @@ const staticMeshLODs = [
 	{ index: 1, usable: true, screenSize: 0.05985, vertices: 976, triangles: 610 },
 	{ index: 2, usable: true, screenSize: 0.02498, vertices: 120, triangles: 76 },
 ];
+const emptyCollisionSourceInventory = {
+	staticMeshComponents: 0, otherPrimitiveComponents: 0, unclassifiedOtherPrimitiveComponents: 0,
+	explicitlyNonQueryOtherPrimitiveComponents: 0, explicitlyNonBlockingForPawnOtherPrimitiveComponents: 0,
+	userVerifiedNonBlockingForPawnOtherPrimitiveComponents: 0, audioOnlyPolicyExcludedOtherPrimitiveComponents: 0,
+	worldPolicyNonBlockingVolumeComponents: 0, noSkeletalCollisionGeometryComponents: 0,
+	landscapeHeightfieldCollisionComponents: 0, unresolvedInstancedMeshComponents: 0, otherPrimitiveStatuses: {},
+	unindexedOtherPrimitiveComponents: 0, unindexedSpatialBoundsComponents: 0,
+	unindexedSpatialBoundsFailures: [], unindexedSpatialBoundsFailuresTruncated: false,
+};
 globalThis.fetch = async ( input, options = {} ) => {
 	const url = new URL( input );
-	if ( url.pathname === '/v1/regions/great-hall/leases' && options.method === 'POST' ) {
+	if ( url.pathname.startsWith( '/v1/regions/' ) && url.pathname.endsWith( '/leases' ) && options.method === 'POST' ) {
 		createdRegionLeaseQuery = new URLSearchParams( url.searchParams );
 		return Response.json( { leaseId: 'a'.repeat( 32 ), expiresInSeconds: 30 } );
 	}
@@ -182,13 +192,14 @@ globalThis.fetch = async ( input, options = {} ) => {
 			movementProfiles: { avatars: { 'elsemesh.avatar.stock-male/1': { stepHeightMeters: 0.6 } } },
 			entryPointPrompt: 'Which Hogwarts house will you join?',
 			previewSpawn: { position: [ 1, 8.62, 9 ], yaw: 0, pitch: - 0.1, basis: 'world-authored camera reference' },
-			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, visualComponentPathExclusionsByMap: previewVisualComponentPathExclusions },
+			previewRegion: { cellSizeMeters: 16, maxViewDistanceMeters: 32, layers: descriptorPreviewLayers, visualComponentPathExclusionsByMap: previewVisualComponentPathExclusions },
 			previewSupport: { status: 'provisional', position: [ 0, 6.75, 8 ], halfExtents: [ 2, 0.25, 3 ], basis: 'synthetic rendered floor bounds' },
 			choices: descriptorChoices,
 		},
 	} );
-	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' } ] } );
-	if ( url.pathname === '/v1/regions/great-hall/cells' ) {
+	if ( url.pathname === '/v1/regions' ) return Response.json( { regions: [ { id: 'great-hall', label: 'Great Hall', asset: '/v1/regions/great-hall' }, ...descriptorPreviewLayers.map( label => ( { id: label, label, asset: `/v1/regions/${label}` } ) ) ] } );
+	if ( url.pathname.startsWith( '/v1/regions/' ) && url.pathname.endsWith( '/cells' ) ) {
+		if ( url.pathname !== '/v1/regions/great-hall/cells' ) return Response.json( { sourceRevision: 'test-revision', cellSizeMeters: Number( url.searchParams.get( 'size' ) ), collisionSourceInventory: url.searchParams.get( 'sourceInventory' ) === '0' ? null : emptyCollisionSourceInventory, cells: [] } );
 		authenticatedCellRequestOrigins.push( { origin: url.origin, authorization: new Headers( options.headers ).get( 'Authorization' ), scope: url.searchParams.get( 'scope' ) } );
 		cellIndexRequests.push( url.searchParams.getAll( 'cell' ) );
 		cellIndexRequestQueryLengths.push( url.search.slice( 1 ).length );
@@ -327,6 +338,18 @@ try {
 	omitCacheRevision = true;
 	await assert.rejects( new LocalRegionConnector( link ).getManifest(), /invalid cache revision/, 'region providers must identify the converter-aware disk-cache revision' );
 	omitCacheRevision = false;
+	descriptorPreviewLayers = Array.from( { length: 10 }, ( _, index ) => `castle-layer-${index}` );
+	descriptorRegionIDs = [ 'great-hall', ...descriptorPreviewLayers ];
+	const multiLayerConnector = new LocalRegionConnector( link );
+	await multiLayerConnector.getManifest();
+	assert.equal( multiLayerConnector.sourceRegions.length, 11, 'the connector accepts all maps of an authored Castle stream group' );
+	multiLayerConnector.close();
+	descriptorPreviewLayers = [];
+	descriptorRegionIDs = [ 'great-hall' ];
+	cellIndexRequests.length = 0;
+	cellIndexRequestQueryLengths.length = 0;
+	cellInventoryRequests.length = 0;
+	authenticatedCellRequestOrigins.length = 0;
 
 	const connector = new LocalRegionConnector( link );
 	const manifest = await connector.getManifest();
