@@ -133,10 +133,14 @@ Its signed GLB graph expresses per-instance wood bleaching, wet darkening and
 roughness, and contact dust/AO with data-only operations that both engine graph
 compilers understand. Contact currently uses one center-sampled terrain height
 per placement, while the WebGPU source presenter samples terrain height at each
-fragment and applies a radius-adjusted LOD distance. The fixture remains
-outside the signed runtime package until matched backend images show those
-remaining differences preserve the original appearance, or the shared contract
-is extended to represent them exactly.
+fragment. The shared static-model planner now supports the source radius-adjusted
+LOD distance through per-instance `lodDistanceOffset`; Tidewater authors the
+original six-times-radius calculation, and the planner applies that measure to
+LOD and color draw range/fade in both backends, plus WebGPU's separate shadow
+range. WebGL continues to cast from its visible LOD. The fixture remains
+outside the signed runtime package until matched backend images verify its
+center-sampled contact shading and fade behavior, or the shared contract is
+extended to represent them exactly.
 
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable

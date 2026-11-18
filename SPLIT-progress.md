@@ -1959,11 +1959,15 @@ finding changes them.
   LODs, and the unchanged albedo/normal/ARM bytes are represented by one
   renderer-neutral static-model instance set. Generalized the engine contract
   so distance-ordered LODs can select and request their near-detail shadow
-  mesh. The static-model contract check, deterministic Tidewater export check,
-  and external production build pass. The fixture is not installed at runtime
-  because its signed graph currently approximates per-fragment terrain contact
-  with a center-sampled height, and its shared distance planner does not yet
-  encode the source radius adjustment. Tidewater's export check now validates
-  the graph with both engine compilers. Built-in package integration and
-  matched backend appearance checks remain open; no Tidewater parity
-  percentage changes.
+  mesh. Added a shared `world-distance-offset` metric; Tidewater exports the
+  exact source six-times-radius offset per placement, and the engine applies it
+  to shared LOD/color draw-range/fade and WebGPU's separate shadow-range
+  selection. WebGL continues to cast shadows from its selected visual LOD. The static-model
+  contract check, deterministic Tidewater export check, and external production
+  build pass. Tidewater's export check validates the graph with both engine
+  compilers. The fixture remains outside the signed runtime package because
+  contact shading still approximates the source per-fragment terrain query
+  with a center-sampled height, and no matched rendered comparison has verified
+  its fade behavior or appearance. Built-in package integration and matched
+  backend appearance checks remain open; no Tidewater parity percentage
+  changes.
