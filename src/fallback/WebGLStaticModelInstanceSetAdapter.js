@@ -80,10 +80,11 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const mainBatches = Array.from( { length: batchOffset }, () => [] );
+	const shadowBatches = Array.from( { length: document.models.length }, () => [] );
 	const initialLoadedLods = modelCapacity.map( capacity => capacity === 0 ? [ 0 ] : [] );
 	const disposeOwned = () => {
 		if ( runtime ) textureLOD.unregister( runtime );
-		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) {
+		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) {
 			mesh.parent?.remove( mesh );
 			mesh.customDepthMaterial?.dispose();
 		}
@@ -110,11 +111,8 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			placementOwners: connector.staticModelPlacementOwners ||= new Map(),
 			canRefine: () => fallback.hostedCoarseCoverageReady !== false,
 			batches: mainBatches,
+			shadowBatches,
 			initialLoadedLods,
-			// Three.js submits scene-visible meshes in the color pass even when
-			// their material has colorWrite disabled. Let each selected color LOD
-			// cast its own shadow instead of adding a duplicate draw per primitive.
-			shadowBatches: null,
 			loadLOD: ( modelIndex, lodIndex, signal, priority ) => lodQueue.run( signal, async () => {
 				const { bytes, webGLBytes, progressive } = await loadModelLOD( modelIndex, lodIndex, { signal } );
 				if ( fallback.connector !== connector ) throw new DOMException( 'World unloaded', 'AbortError' );
@@ -123,11 +121,18 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 				if ( signal.aborted || fallback.connector !== connector ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData );
+				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, false );
 				runtime.sharedMaterials = [ ...sharedProfileMaterials ];
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
-				freezeStaticModelInstanceBatchTransforms( fallback.scene, [ draws ] );
+				const groups = [ draws ];
+				if ( lodIndex === document.models[ modelIndex ].shadowLod ) {
+					const shadows = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, true );
+					shadowBatches[ modelIndex ] = shadows;
+					for ( const draw of shadows ) fallback.scene.add( draw.mesh );
+					groups.push( shadows );
+				}
+				freezeStaticModelInstanceBatchTransforms( fallback.scene, groups );
 			}, priority ),
 			dispose: disposeOwned,
 		} );
@@ -140,8 +145,8 @@ async function installStaticModelInstanceSet( { fallback }, component ) {
 			updateRuntime( dt, camera, player, fallback.app?.renderLoadBias ?? 0, cameraWorldUpdated );
 			if ( fallback.hostedCoarseCoverageReady !== false ) textureLOD.update( camera, elapsed );
 		};
-		for ( const mesh of mainBatches.flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
-		freezeStaticModelInstanceBatchTransforms( fallback.scene, mainBatches );
+		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) fallback.scene.add( mesh );
+		freezeStaticModelInstanceBatchTransforms( fallback.scene, [ ...mainBatches, ...shadowBatches ] );
 		return { installed: true, runtime };
 	} catch ( error ) {
 		disposeOwned();
@@ -175,7 +180,7 @@ function staticModelInstanceBoundsSphere( T, document, modelIndex ) {
 	return new T.Sphere( new T.Vector3( ...sphereCenter ), sphereRadius );
 }
 
-function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX, hasMaterialData ) {
+function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX, hasMaterialData, shadowOnly ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const materialData0Attribute = hasMaterialData ? new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
@@ -209,10 +214,10 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		if ( sourceMaterial !== object.material ) sharedProfileMaterials.add( sourceMaterial );
 		if ( profileDepthMaterial ) sharedProfileMaterials.add( profileDepthMaterial );
 		const depthSourceMaterial = profileDepthMaterial || sourceMaterial;
-		const cacheKey = `${ sourceMaterial.uuid }:${ depthSourceMaterial.uuid }`;
+		const cacheKey = `${ sourceMaterial.uuid }:${ depthSourceMaterial.uuid }:${ shadowOnly ? 'shadow' : 'color' }`;
 		let material = materialCache.get( cacheKey );
 		if ( ! material ) {
-			material = staticFadeMaterial( T, sourceMaterial, hasMaterialData );
+			material = staticFadeMaterial( T, sourceMaterial, hasMaterialData, shadowOnly );
 			materialCache.set( cacheKey, material );
 			ownedMaterials.add( material );
 		}
@@ -221,8 +226,9 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		mesh.count = 0;
 		mesh.frustumCulled = !! instanceBoundsSphere;
 		mesh.boundingSphere = instanceBoundsSphere?.clone() || null;
-		mesh.castShadow = true;
-		mesh.receiveShadow = true;
+		mesh.castShadow = shadowOnly;
+		mesh.receiveShadow = ! shadowOnly;
+		mesh.userData.shadowOnly = shadowOnly;
 		mesh.customDepthMaterial = staticFadeDepthMaterial( T, depthSourceMaterial, hasMaterialData, !! profileDepthMaterial );
 		ownedGeometry.add( geometry );
 		draws.push( { mesh, matrixAttribute, fadeAttribute, materialData0Attribute, materialData1Attribute } );
@@ -246,7 +252,7 @@ function resolveStaticModelMaterial( fallback, sourceMaterial ) {
 	throw new Error( `WebGL static model has no installed renderer for material profile ${profile.profile}/${role}` );
 }
 
-function staticFadeMaterial( T, source, hasMaterialData ) {
+function staticFadeMaterial( T, source, hasMaterialData, shadowOnly ) {
 	const material = source.clone();
 	// Three.js Material.copy() does not copy shader hooks. Keep the world profile's
 	// hooks explicitly when cloning so the engine's fade wrapper composes with them.
@@ -263,7 +269,11 @@ function staticFadeMaterial( T, source, hasMaterialData ) {
 			.replace( '#include <common>', `#include <common>\n${ GLSL_FADE }\nvarying vec4 vStaticFade;${ materialVaryings }` )
 			.replace( 'void main() {', 'void main() {\nif ( ! emStaticFadeVisible( gl_FragCoord.xy, vStaticFade ) ) discard;' );
 	};
-	material.customProgramCacheKey = () => `${ originalKey?.call( material ) || '' }|elsemesh-static-instance-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }`;
+	material.customProgramCacheKey = () => `${ originalKey?.call( material ) || '' }|elsemesh-static-instance-fade-v1${ hasMaterialData ? '+material-data-v1' : '' }${ shadowOnly ? '+shadow-only-v1' : '' }`;
+	if ( shadowOnly ) {
+		material.colorWrite = false;
+		material.depthWrite = false;
+	}
 	return material;
 }
 
