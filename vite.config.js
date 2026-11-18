@@ -1,14 +1,24 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { appendFile, mkdir, stat } from 'node:fs/promises';
-import { resolve, sep } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import { defineConfig } from 'vite';
 
-// Builds run from a separate .build worktree whose per-worktree HEAD can lag
-// behind the source checkout. Read HEAD from Git's common directory so the
-// game stamp always identifies the source repository revision.
-const commonGitDir = execFileSync( 'git', [ 'rev-parse', '--git-common-dir' ], { encoding: 'utf8' } ).trim();
-const commitSha = execFileSync( 'git', [ '--git-dir', resolve( commonGitDir ), 'rev-parse', 'HEAD' ], { encoding: 'utf8' } ).trim();
+// cpto build trees carry this marker because they intentionally do not contain
+// Git metadata. Resolve the stamp from the canonical source checkout; linked
+// worktrees without a marker continue to use their common Git directory.
+const cwd = realpathSync( process.cwd() );
+const sourceMarkerPath = resolve( cwd, '.elsemesh-source-root' );
+let sourceRoot;
+if ( existsSync( sourceMarkerPath ) ) {
+	const sourceMarker = readFileSync( sourceMarkerPath, 'utf8' ).trim();
+	if ( ! sourceMarker ) throw new Error( `ElseMesh source-root marker is empty: ${sourceMarkerPath}` );
+	sourceRoot = realpathSync( resolve( cwd, sourceMarker ) );
+} else {
+	const commonGitDir = execFileSync( 'git', [ 'rev-parse', '--git-common-dir' ], { cwd, encoding: 'utf8' } ).trim();
+	sourceRoot = dirname( realpathSync( resolve( cwd, commonGitDir ) ) );
+}
+const commitSha = execFileSync( 'git', [ '-C', sourceRoot, 'rev-parse', '--verify', 'HEAD' ], { encoding: 'utf8' } ).trim();
 if ( ! /^[\da-f]{40}$/i.test( commitSha ) ) throw new Error( 'Git HEAD must be a full 40-character commit SHA' );
 const commitShort = commitSha.slice( 0, 8 ).toLowerCase();
 
