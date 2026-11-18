@@ -133,7 +133,8 @@ field, and the compiler rejects it in vertex outputs.
 
 Outputs may be `baseColor` (vec3), `roughness` (scalar), `metalness` (scalar),
 `opacity` (scalar), `emissive` (vec3), `occlusion` (scalar),
-`thinTransmission` (vec3),
+`translucency` (vec3), `thinTransmission` (vec3),
+`specularIntensity` (scalar),
 `surfaceNormal` (vec3 world-space), `vertexPosition` (vec3), and
 `vertexNormal` (vec3). `occlusion` multiplies indirect diffuse and specular
 lighting in both backends. `opacity` multiplies the surface alpha before the
@@ -150,6 +151,12 @@ light transmission. The engine applies the same back-light cosine,
 view-forward factor, shadowed direct-light color, and night attenuation in
 WebGPU and WebGL; the graph contains no backend shader code or duplicated
 lighting implementation.
+
+`translucency` supplies the linear RGB transmitted-light contribution used by
+the shared direct-light path, multiplied by the shadowed light color in both
+backends. `specularIntensity` scales the dielectric F0 and F90 terms before
+metalness blending, matching the WebGPU surface model in the WebGL standard
+material path.
 
 The graph compiler and pixel fixture live in ElseMesh. The fixture checks the
 same signed GLB through both static-model adapters. Tidewater's signed village

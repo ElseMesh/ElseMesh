@@ -41,6 +41,12 @@ graph.outputs.roughness = 'roughnessWithHeight';
 graph.nodes.push( { id: 'thinTint', op: 'constant', value: [ 0.18, 0.32, 0.07 ] } );
 graph.outputs.thinTransmission = 'thinTint';
 graph.nodes.push(
+	{ id: 'leafTranslucency', op: 'constant', value: [ 0.08, 0.1, 0.04 ] },
+	{ id: 'leafSpecularIntensity', op: 'constant', value: 0.4 },
+);
+graph.outputs.translucency = 'leafTranslucency';
+graph.outputs.specularIntensity = 'leafSpecularIntensity';
+graph.nodes.push(
 	{ id: 'data1', op: 'input', name: 'vdata1' }, { id: 'data2', op: 'input', name: 'vdata2' },
 	{ id: 'dataX', op: 'x', args: [ 'data1' ] }, { id: 'dataY', op: 'y', args: [ 'data2' ] },
 	{ id: 'dataLift', op: 'add', args: [ 'dataX', 'dataY' ] }, { id: 'zero', op: 'constant', value: 0 },

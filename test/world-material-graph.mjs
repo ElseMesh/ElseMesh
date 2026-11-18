@@ -412,6 +412,35 @@ assert.match( thinTransmissionShader.fragmentShader, /emgThinTransmission \* dir
 assert.equal( thinTransmissionShader.uniforms.emgNight.value, G.night.value, 'WebGL thin transmission shares the engine night level' );
 thinTransmissionMaterial.material.dispose();
 
+const foliageLightingGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'leafColor', op: 'constant', value: [ 0.2, 0.35, 0.08 ] },
+		{ id: 'leafSpecular', op: 'constant', value: 0.4 },
+	],
+	outputs: { translucency: 'leafColor', specularIntensity: 'leafSpecular' },
+};
+const foliageLightingWebGPU = createWebGPUMaterialGraph( {}, foliageLightingGraph );
+assert.match( foliageLightingWebGPU.surface, /s\.translucency = emg_leafColor/ );
+assert.match( foliageLightingWebGPU.surface, /s\.specularIntensity = emg_leafSpecular/ );
+const foliageLightingWebGL = compileWorldMaterialGraph( foliageLightingGraph, 'webgl' );
+assert.match( foliageLightingWebGL.glsl.translucency, /emgTranslucency = emg_leafColor/ );
+assert.match( foliageLightingWebGL.glsl.specularIntensity, /mix\( vec3\( 0\.04 \) \* emg_leafSpecular, diffuseColor\.rgb, metalnessFactor \)/ );
+assert.match( foliageLightingWebGL.glsl.specularIntensity, /material\.specularF90 = mix\( emg_leafSpecular, 1\.0, metalnessFactor \)/ );
+assert.doesNotMatch( foliageLightingWebGL.glsl.fragment, /s\.(?:translucency|specularIntensity)/, 'WebGL translates graph surface values through its renderer contract' );
+const foliageLightingMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), foliageLightingGraph );
+const foliageLightingShader = {
+	vertexShader: '#include <common>\n#include <begin_vertex>',
+	fragmentShader: '#include <common>\n#include <lights_physical_pars_fragment>\n#include <lights_physical_fragment>\n#include <lights_fragment_begin>',
+	uniforms: {},
+};
+foliageLightingMaterial.material.onBeforeCompile( foliageLightingShader );
+assert.match( foliageLightingShader.fragmentShader, /emgTranslucency = emg_leafColor;\s*#include <lights_physical_fragment>/ );
+assert.match( foliageLightingShader.fragmentShader, /reflectedLight\.directDiffuse \+= emgTranslucency \* directLight\.color;/ );
+assert.match( foliageLightingShader.fragmentShader, /#include <lights_physical_fragment>\s*material\.specularColor = mix\( vec3\( 0\.04 \) \* emg_leafSpecular, diffuseColor\.rgb, metalnessFactor \)/ );
+assert.ok( foliageLightingShader.fragmentShader.indexOf( 'material.specularColor = mix' ) < foliageLightingShader.fragmentShader.indexOf( '#include <lights_fragment_begin>' ), 'WebGL applies graph specular intensity after initializing the physical material and before direct lighting' );
+foliageLightingMaterial.material.dispose();
+
 const frontFacingGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [

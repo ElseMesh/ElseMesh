@@ -66,8 +66,10 @@ try {
 			{ id: 'slope', op: 'constant', value: [ 0.08, - 0.04 ] },
 			{ id: 'surfaceNormal', op: 'normalFromSlope', args: [ 'worldPosition', 'worldNormal', 'uv', 'slope' ] },
 			{ id: 'thinTint', op: 'constant', value: [ 0.18, 0.32, 0.07 ] },
+			{ id: 'leafTranslucency', op: 'constant', value: [ 0.08, 0.1, 0.04 ] },
+			{ id: 'leafSpecularIntensity', op: 'constant', value: 0.4 },
 		],
-		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal', thinTransmission: 'thinTint' },
+		outputs: { baseColor: 'albedo', roughness: 'roughness', vertexPosition: 'moved', surfaceNormal: 'surfaceNormal', thinTransmission: 'thinTint', translucency: 'leafTranslucency', specularIntensity: 'leafSpecularIntensity' },
 	};
 	graph.nodes.push(
 		{ id: 'noiseScale', op: 'constant', value: 80 },
