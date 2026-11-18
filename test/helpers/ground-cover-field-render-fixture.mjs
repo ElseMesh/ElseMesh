@@ -1,5 +1,7 @@
 import { encodeGrassDensityAsset } from '../../src/network/GrassDensityAsset.js';
-import { staticModelGLB } from './static-model-glb.mjs';
+import { createTidewaterGroundCoverMaterialGraph } from '../../worlds/tidewater/vegetation/GroundCoverMaterialGraph.js';
+import { buildGroundCoverPatch } from '../../worlds/tidewater/vegetation/GroundCoverPatch.js';
+import { groundCoverPatchGLB } from '../../worlds/tidewater/vegetation/GroundCoverPatchGLB.js';
 
 async function assetID( bytes ) {
 	const digest = new Uint8Array( await crypto.subtle.digest( 'SHA-256', bytes ) );
@@ -9,7 +11,7 @@ async function assetID( bytes ) {
 /** One signed world fixture shared by the browser WebGL and native WebGPU render checks. */
 export async function groundCoverFieldRenderFixture() {
 	const densityData = new Uint8Array( 32 * 32 * 4 );
-	for ( let index = 0; index < 32 * 32; index ++ ) densityData[ index * 4 + 1 ] = 255;
+	for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
 	const densityBytes = encodeGrassDensityAsset( { data: densityData, res: 32, size: 32, origin: -16 } );
 	const detailData = new Uint8Array( 8 * 8 * 4 );
 	for ( let index = 0; index < 8 * 8; index ++ ) {
@@ -18,25 +20,8 @@ export async function groundCoverFieldRenderFixture() {
 		detailData[ index * 4 + 2 ] = 64;
 		detailData[ index * 4 + 3 ] = 255 - ( index % 8 ) * 24;
 	}
-	const densityGraph = {
-		format: 'elsemesh.material-graph/1',
-		nodes: [
-			{ id: 'uv', op: 'input', name: 'uv' },
-			{ id: 'sample', op: 'textureSample', slot: 'densityField', uv: 'uv' },
-			{ id: 'color', op: 'rgb', args: [ 'sample' ] },
-			{ id: 'detailUv', op: 'input', name: 'uv' },
-			{ id: 'zero', op: 'constant', value: 0 },
-			{ id: 'detailSample', op: 'textureSampleLevel', slot: 'detailField', uv: 'detailUv', lod: 'zero' },
-			{ id: 'detailColor', op: 'rgb', args: [ 'detailSample' ] },
-		],
-		outputs: { baseColor: 'color', emissive: 'detailColor' },
-	};
-	const materialExtras = { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph: densityGraph } };
-	const modelBytesByLOD = [
-		staticModelGLB( { nodeScale: [ 0.6, 0.6, 1 ], materialExtras } ),
-		staticModelGLB( { nodeScale: [ 0.8, 0.8, 1 ], materialExtras } ),
-		staticModelGLB( { materialExtras } ),
-	];
+	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: -16, densitySize: 32 } );
+	const modelBytesByLOD = [ 0, 1, 2 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
 	const densityAssetId = await assetID( densityBytes );
 	const modelAssetIds = await Promise.all( modelBytesByLOD.map( assetID ) );
 	const component = {
@@ -47,7 +32,7 @@ export async function groundCoverFieldRenderFixture() {
 			distanceBands: [ { maxDistance: 8, cellCapacity: 24 }, { maxDistance: 16, cellCapacity: 24 }, { maxDistance: 24, cellCapacity: 24 } ],
 			species: [ {
 				id: 'fixture-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,
-				modelAssetIds, bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false,
+				modelAssetIds, bounds: { center: [ 4, 0.5, 4 ], radius: 6 }, geometryMirrorX: false,
 				drawMaxDistance: 24, drawFadeStartDistance: 23,
 				castsShadow: true, shadowMaxDistance: 12,
 			} ],
@@ -68,5 +53,5 @@ export async function groundCoverFieldRenderFixture() {
 			return densityBytes;
 		},
 	};
-	return { component, connector, terrain, terrainDetail: { data: detailData, width: 8, height: 8 }, modelAssetIds, modelBytesByLOD };
+	return { component, connector, terrain, terrainDetail: { data: detailData, width: 8, height: 8 }, graph, modelAssetIds, modelBytesByLOD };
 }
