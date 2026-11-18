@@ -2015,11 +2015,22 @@ finding changes them.
 - 2026-11-18: matched hosted AMD beach captures confirm WebGPU and WebGL load
   the same signed 141-placement scanned-debris component and their shared LOD
   planner selects the same camera-visible groups at this pose. WebGL is still
-  darker/less blue in the sky, sea, swash, wet sand, and pier; WebGPU also has
-  shadow-only batches absent from the WebGL static-model adapter. The captures
+  darker/less blue in the sky, sea, swash, wet sand, and pier. That capture
+  predates the WebGL shadow-LOD alignment in `0c3dabde`, which now consumes the
+  shared authored shadow selection; adapter conformance, WebGL/WebGPU render
+  fixtures, and the external production build pass. A matched AMD hosted view
+  still needs to verify the shadow result. The capture and follow-up evidence
   are recorded in [graphics review](docs/graphics-review.md#2026-11-18-matched-hosted-beach-webgpu-and-webgl).
-  This adds matched-view evidence, not parity completion or FPS evidence; the
-  Tidewater parity estimate remains 93%. Engine-owned minimum-FPS and quality
-  controls may reduce rendering cost, while both backends must use the same
-  authored objects, placements, geometry/LOD assets, texture sources, variants,
-  and material inputs.
+  This is not full parity or FPS evidence; Tidewater remains 93%. Engine-owned
+  minimum-FPS and quality controls may reduce rendering cost, while both
+  backends must use the same authored objects, placements, geometry/LOD assets,
+  texture sources, variants, and material inputs.
+
+- 2026-11-18: WebGL static models now use the shared visibility planner's
+  independent authored shadow-LOD groups, matching WebGPU. The adapter test
+  verifies the same selected instance and the separate color/depth/shadow
+  material roles; the isolated WebGL fixture renders 343 foreground pixels
+  with eight programs and no GL errors, the WebGPU fixture renders 252 pixels,
+  and the production build passes. This closes a backend LOD-selection gap for
+  static-model shadows, but not its matched hosted visual/performance gate or
+  overall Tidewater parity; no percentage change.

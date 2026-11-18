@@ -20,15 +20,21 @@ WebGL) were sky `119/156/190` vs `99/136/174`, open sea `114/148/170` vs
 `211/187/137` vs `202/182/149`. These measurements are diagnostic image
 samples, not calibrated colorimetric values or an FPS benchmark.
 
-The WebGPU static-model runtime also selected shadow-only batches for the four
-scanned-debris classes (`5, 1, 7, 4`); WebGL's static-model adapter currently
-does not submit shadow-only batches. Investigate whether this affects matched
-views before closing shadow parity. Users may tune engine-owned quality controls
-to meet a minimum-FPS target, but both backends must keep the same authored
-objects, placements, geometry/LOD assets, texture sources, variants, and
-material inputs. Quality changes may adjust cost or sample a different mip of
-the same texture; they must not switch to a backend-specific content set.
-Tidewater parity remains 93%.
+The WebGPU static-model runtime selected shadow-only batches for the four
+scanned-debris classes (`5, 1, 7, 4`). This capture predates `0c3dabde`, which
+aligns the generic WebGL adapter with that shared authored shadow-LOD selection.
+The adapter conformance test, WebGL render fixture (343 foreground pixels, eight
+programs, no GL errors), WebGPU render fixture (252 foreground pixels), and
+external production build pass after the change. The WebGL shadow-only batch
+uses the authored shadow LOD, writes neither color nor depth in the color pass,
+and casts through its fade-aware depth material. A matched AMD hosted capture
+after this change is still needed to verify the resulting shadow appearance and
+cost in Tidewater. Users may tune engine-owned quality controls to meet a
+minimum-FPS target, but both backends must keep the same authored objects,
+placements, geometry/LOD assets, texture sources, variants, and material
+inputs. Quality changes may adjust cost or sample a different mip of the same
+texture; they must not switch to a backend-specific content set. Tidewater
+parity remains 93%.
 
 [Hosted WebGPU beach](images/tidewater-hosted-webgpu-beach-amd-radv-2026-11-18.png) ·
 [Hosted WebGL beach](images/tidewater-hosted-webgl-beach-amd-radeonsi-2026-11-18.png).
