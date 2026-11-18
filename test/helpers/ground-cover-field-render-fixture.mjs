@@ -29,7 +29,7 @@ export async function groundCoverFieldRenderFixture( { density: authoredDensity 
 		id: 'elsemesh-component:ground-cover-render-fixture',
 		type: 'elsemesh.ground-cover-field/1',
 		data: {
-			densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
+			densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1', cellHeightPadding: { below: 0, above: 0 },
 			distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 			species: [ {
 				id: 'fixture-grass', densityExpression: { op: 'max', left: { op: 'channel', index: 0 }, right: { op: 'max', left: { op: 'max', left: { op: 'channel', index: 1 }, right: { op: 'channel', index: 2 } }, right: { op: 'channel', index: 3 } } }, densityThreshold: 8,

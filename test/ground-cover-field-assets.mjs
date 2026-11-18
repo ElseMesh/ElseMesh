@@ -8,7 +8,7 @@ const hash = bytes => `sha256:${createHash( 'sha256' ).update( bytes ).digest( '
 const densityBytes = encodeGrassDensityAsset( { data: new Uint8Array( 4 * 4 * 4 ), res: 4, size: 16, origin: -8 } );
 const densityAssetId = hash( densityBytes ), modelAssetId = hash( new Uint8Array( [ 0x67, 0x6c, 0x62 ] ) );
 const data = {
-	densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1',
+	densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1', cellHeightPadding: { below: 0, above: 0 },
 	distanceBands: [ { maxDistance: 20, cellCapacity: 8 } ],
 	species: [ {
 		id: 'meadow', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,

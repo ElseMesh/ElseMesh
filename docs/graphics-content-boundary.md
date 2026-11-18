@@ -227,13 +227,13 @@ with the authored ground-cover graph. The paired fixture loads those exact GLBs
 through both adapters and exercises their material graph and geometry using a
 synthetic density mask, shared terrain-detail texels, and flat terrain. A
 separate signed-asset WebGPU comparison uses Tidewater's committed density and
-terrain assets: the graph render is 3.479/255 RGB mean absolute error from the
-test-only pre-migration `GrassField` at the overhead meadow view. The source
-selects 20 cells while the shared runtime selects 42 (16 near and 26 mid);
-this remains a placement/culling difference from the old reference, even though
-the captured image passes the current 10/255 diagnostic threshold. A WebGL
-browser fixture also renders the signed patch GLBs, density, and terrain with
-no GL errors. Matched production views against pre-split WebGPU remain open.
+terrain assets at the same 55-degree ground-level meadow camera as the WebGL
+fixture. The graph render is 6.653/255 RGB mean absolute error from the test-only
+pre-migration `GrassField`. Shared cell-height padding makes its selected cell
+coordinates identical to the source's 51 cells and its near/mid/far counts
+identical at 9/23/19. The signed-content WebGL browser fixture also renders
+without GL errors. Matched production views against pre-split WebGPU remain
+open.
 
 The ground-cover material graph can read the installed terrain surface's
 detail texture through the `detailField` slot. This reuses the texture already
@@ -344,10 +344,11 @@ exported patch materials.
 
 The generic paired-adapter fixture loads the exported patch set and verifies
 both renderers use the same component assets and shared runtime selections.
-Signed-asset source comparison and WebGL browser checks also pass, but source
-and migrated WebGPU cell lists still differ and there is no matched production
-WebGPU/WebGL/pre-split capture across beach poses and near/mid/far transitions.
-The dense-ground-cover component is active. Finite Tidewater vegetation stays
+Signed-asset source comparison now selects identical cells and near/mid/far
+counts to old WebGPU at the ground-level meadow view; WebGL browser checks also
+pass. There is still no matched production WebGPU/WebGL/pre-split capture across
+beach poses and near/mid/far transitions. The dense-ground-cover component is
+active. Finite Tidewater vegetation stays
 on its world-owned presenters until its assets, shared data contract, and both
 backend adapters pass the corresponding migration and visual gates.
 

@@ -15,6 +15,7 @@ const field = {
 	cellSize: 8,
 	pointsPerCell: 384,
 	placementAlgorithm: 'blue-noise/1',
+	cellHeightPadding: { below: 0, above: 0 },
 	distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 	species: [ {
 		id: 'meadow-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 8, modelAssetIds: [ nearAssetId, farAssetId ],
@@ -30,6 +31,7 @@ assert.equal( validateGroundCoverField( { ...field, species: [ { ...field.specie
 for ( const invalid of [
 	{ ...field, unexpected: true },
 	{ ...field, densityAssetId: farAssetId },
+	{ ...field, cellHeightPadding: { below: - 0.1, above: 0 } },
 	{ ...field, distanceBands: [ ...field.distanceBands, { maxDistance: 87, cellCapacity: 1 } ] },
 	{ ...field, species: [ ...field.species, { ...field.species[ 0 ] } ] },
 	{ ...field, species: [ { ...field.species[ 0 ], densityExpression: { op: 'channel', index: 4 } } ] },

@@ -7,7 +7,7 @@ const densityAssetId = `sha256:${'a'.repeat( 64 )}`;
 const modelAssetId = `sha256:${'b'.repeat( 64 )}`;
 const componentAssets = [ { assetId: densityAssetId, kind: 'grass-density/1' }, { assetId: modelAssetId, kind: 'glb' } ];
 const data = {
-	densityAssetId, seed: 19, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1',
+	densityAssetId, seed: 19, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1', cellHeightPadding: { below: 0, above: 0 },
 	distanceBands: [ { maxDistance: 24, cellCapacity: 32 } ],
 	species: [ {
 		id: 'meadow', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,

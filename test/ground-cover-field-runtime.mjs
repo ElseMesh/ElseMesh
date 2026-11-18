@@ -5,7 +5,7 @@ const densityAssetId = `sha256:${'a'.repeat( 64 )}`;
 const modelAssetId = `sha256:${'b'.repeat( 64 )}`;
 const componentAssets = [ { assetId: densityAssetId, kind: 'grass-density/1' }, { assetId: modelAssetId, kind: 'glb' } ];
 const data = {
-	densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1',
+	densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 4, placementAlgorithm: 'blue-noise/1', cellHeightPadding: { below: 0, above: 0 },
 	distanceBands: [ { maxDistance: 4, cellCapacity: 8 }, { maxDistance: 24, cellCapacity: 16 } ],
 	species: [ {
 		id: 'meadow-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 8, modelAssetIds: [ modelAssetId ],
@@ -45,7 +45,7 @@ assert.throws( () => first.planDraws( { position: [ 0, 0, 0 ], verticalFovRadian
 
 const fixedModelIDs = [ 'c', 'd', 'e' ].map( character => `sha256:${character.repeat( 64 )}` );
 const fixedData = {
-	densityAssetId, seed: 7, cellSize: 4, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
+	densityAssetId, seed: 7, cellSize: 4, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1', cellHeightPadding: { below: 0, above: 0 },
 	distanceBands: [ { maxDistance: 5, cellCapacity: 32 }, { maxDistance: 12, cellCapacity: 32 }, { maxDistance: 24, cellCapacity: 32 } ],
 	species: [ {
 		id: 'authored-patch', densityExpression: { op: 'max', left: { op: 'channel', index: 0 }, right: { op: 'max', left: { op: 'max', left: { op: 'channel', index: 1 }, right: { op: 'channel', index: 2 } }, right: { op: 'channel', index: 3 } } },

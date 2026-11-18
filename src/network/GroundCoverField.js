@@ -15,9 +15,10 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 	const finite = value => Number.isFinite( value );
 	const assetID = value => typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test( value );
 	const allowed = ( value, keys ) => Object.keys( value ).every( key => keys.includes( key ) );
-	if ( ! record( data ) || ! allowed( data, [ 'densityAssetId', 'seed', 'cellSize', 'pointsPerCell', 'placementAlgorithm', 'distanceBands', 'species' ] ) ) fail( 'component data has unknown fields' );
+	if ( ! record( data ) || ! allowed( data, [ 'densityAssetId', 'seed', 'cellSize', 'pointsPerCell', 'placementAlgorithm', 'cellHeightPadding', 'distanceBands', 'species' ] ) ) fail( 'component data has unknown fields' );
 	if ( ! assetID( data.densityAssetId ) || ! Number.isInteger( data.seed ) || data.seed < 0 || data.seed > 0xffffffff ) fail( 'density asset ID or seed is invalid' );
 	if ( ! finite( data.cellSize ) || data.cellSize < 0.25 || data.cellSize > 128 || ! Number.isInteger( data.pointsPerCell ) || data.pointsPerCell < 1 || data.pointsPerCell > MAX_BLUE_NOISE_POINTS || ! [ 'blue-noise/1', 'fixed-cell-patch/1' ].includes( data.placementAlgorithm ) || data.placementAlgorithm === 'fixed-cell-patch/1' && data.pointsPerCell !== 1 ) fail( 'cell placement settings are invalid' );
+	if ( ! record( data.cellHeightPadding ) || ! allowed( data.cellHeightPadding, [ 'below', 'above' ] ) || ! finite( data.cellHeightPadding.below ) || data.cellHeightPadding.below < 0 || data.cellHeightPadding.below > 1000 || ! finite( data.cellHeightPadding.above ) || data.cellHeightPadding.above < 0 || data.cellHeightPadding.above > 1000 ) fail( 'cell height padding is invalid' );
 	if ( ! Array.isArray( componentAssets ) ) fail( 'component asset list is invalid' );
 	const densityAssets = componentAssets.filter( asset => asset?.kind === GROUND_COVER_FIELD_DENSITY_ASSET_KIND );
 	if ( densityAssets.length !== 1 || densityAssets[ 0 ].assetId !== data.densityAssetId ) fail( 'must reference exactly one signed grass-density/1 asset' );

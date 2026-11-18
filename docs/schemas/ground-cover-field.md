@@ -1,8 +1,9 @@
 # Ground-cover field component, version 1
 
-**Status: generic WebGPU and WebGL adapters are registered and covered by a
-shared signed-asset render fixture. Tidewater has not switched to this
-component.** This component defines the portable inputs for dense vegetation.
+**Status: generic WebGPU and WebGL adapters consume Tidewater's active signed
+ground-cover component.** The paired adapter fixture and signed-asset checks
+pass; matched production appearance against pre-split WebGPU remains open. This
+component defines the portable inputs for dense vegetation.
 The world supplies signed density and GLB model assets plus placement, species,
 LOD, wind, and shadow data. ElseMesh owns deterministic cell selection,
 instance generation, GPU resources, and both backend presenters. Neither the
@@ -22,6 +23,7 @@ component nor its assets select a backend or contain shader source.
     "cellSize": 8,
     "pointsPerCell": 384,
     "placementAlgorithm": "blue-noise/1",
+    "cellHeightPadding": { "below": 0.5, "above": 1.8 },
     "distanceBands": [
       { "maxDistance": 18, "cellCapacity": 48 },
       { "maxDistance": 46, "cellCapacity": 160 },
@@ -84,9 +86,10 @@ Each species evaluates its density expression over bilinearly sampled RGBA
 channels; a candidate is selected when its seeded value is below that density.
 Scale and yaw use separate ID-seeded values, so changing the camera or selected
 LOD cannot move an instance. The engine uses the shared distance bands and cell
-capacities to maintain camera-centered coverage; backend frustum culling may
-reject additional cells but cannot change candidate placement or species
-selection.
+capacities to maintain camera-centered coverage. `cellHeightPadding` gives the
+vertical padding below and above each terrain cell's sampled height range for
+shared cell-box frustum culling; it changes visibility only, not placement or
+species selection. Both backends use the same planes and cell bounds.
 
 `fixed-cell-patch/1` is for a signed GLB whose geometry already contains the
 world-authored arrangement for one whole cell, including any species categories

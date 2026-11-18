@@ -6,7 +6,7 @@ const densityAssetId = `sha256:${'a'.repeat( 64 )}`;
 const modelAssetId = `sha256:${'b'.repeat( 64 )}`;
 const componentAssets = [ { assetId: densityAssetId, kind: 'grass-density/1' }, { assetId: modelAssetId, kind: 'glb' } ];
 const data = {
-	densityAssetId, seed: 11, cellSize: 8, pointsPerCell: 8, placementAlgorithm: 'blue-noise/1',
+	densityAssetId, seed: 11, cellSize: 8, pointsPerCell: 8, placementAlgorithm: 'blue-noise/1', cellHeightPadding: { below: 0, above: 0 },
 	distanceBands: [ { maxDistance: 4, cellCapacity: 8 }, { maxDistance: 24, cellCapacity: 16 } ],
 	species: [ {
 		id: 'meadow', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0, modelAssetIds: [ modelAssetId ],
@@ -31,6 +31,13 @@ assert.ok( visible.visible.length > 0 && visible.visible.every( batch => batch.a
 assert.ok( visible.visible.every( batch => batch.count > 0 && batch.matrices.length >= batch.count * 16 && batch.fades.length >= batch.count * 4 ), 'visible batches expose packed transforms and fades' );
 assert.ok( visible.shadows.length > 0 && visible.shadows.every( batch => batch.shadow && batch.assetId === modelAssetId ), 'shadow intent produces separate packed shadow batches' );
 assert.ok( visible.batches.every( batch => batch.count > 0 ), 'active batches are available for backend synchronization' );
+
+const clipped = batches.update( {
+	...camera,
+	frustumPlanes: [ [ 1, 0, 0, 1 ], [ - 1, 0, 0, 7 ], [ 0, 1, 0, 1 ], [ 0, - 1, 0, 2 ], [ 0, 0, 1, 1 ], [ 0, 0, - 1, 7 ] ],
+} );
+assert.ok( clipped.visible.length > 0 );
+assert.deepEqual( new Set( field.instances.map( instance => instance.cellIndex ) ), new Set( [ 0 ] ), 'shared frustum culling tests authored terrain-cell bounds before batching' );
 
 const empty = batches.update( { ...camera, position: [ 1000, 5, 1000 ] } );
 assert.equal( empty.visible.length, 0 );

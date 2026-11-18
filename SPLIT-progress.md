@@ -2254,3 +2254,29 @@ finding changes them.
   matched production WebGPU/WebGL views, exact source-reference placement/cull
   alignment, finite-vegetation migration, and supported-hardware FPS remain
   open. No Tidewater percentage changes.
+
+- 2026-11-18: closed the ground-cover cell-selection discrepancy at the signed
+  overhead meadow view. Added renderer-neutral cell height padding to the field
+  contract and shared cell-box frustum culling in the common batch runtime;
+  Tidewater authors 0.5 m below and 1.8 m above its sampled terrain range, which
+  matches the source WebGPU cull bounds. The signed-density source/graph test
+  now asserts identical selected cell coordinates and reports 20/20 cells,
+  while retaining the 3.479/255 RGB MAE. Ground-cover contract, runtime, batch,
+  signed asset, WebGPU render, source conversion, and deterministic world-export
+  checks pass. The signed-content WebGL browser fixture renders 51 visible
+  instances with three programs and no GL errors. This is same-view selection
+  parity and adapter execution, not matched production WebGL/WebGPU image parity
+  against pre-split WebGPU; broader views, finite vegetation, and hardware FPS
+  remain open. No Tidewater percentage changes.
+
+- 2026-11-18: moved the signed-asset WebGPU comparison to the same 55-degree,
+  ground-level meadow pose used by the WebGL package fixture. The source and
+  graph select the same 51 cell coordinates and the same near/mid/far counts
+  (9/23/19); signed-density/terrain RGB MAE is 6.653/255, within the existing
+  10/255 diagnostic threshold. At that pose the WebGL fixture renders 51
+  visible instances (its shadow toggle is fixture-only), compiles three
+  programs, and reports no GL errors. The direct pre-migration reference is
+  still the source WebGPU grass presenter, and these are focused ground-cover
+  checks rather than a full pre-split world comparison. Broader world views,
+  finite vegetation, and controlled hardware FPS remain open; no percentage
+  changes.

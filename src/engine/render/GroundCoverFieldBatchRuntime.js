@@ -25,6 +25,18 @@ function pack( cache, instances, speciesId, lodIndex, group, shadow = false ) {
 	return batch;
 }
 
+function cellIntersectsFrustum( frustumPlanes, cellSize, heightPadding, x, z, minY, maxY ) {
+	for ( const plane of frustumPlanes ) {
+		if ( ! Array.isArray( plane ) || plane.length !== 4 || ! plane.every( Number.isFinite ) ) throw new Error( 'Invalid ground-cover cell frustum plane' );
+		const [ nx, ny, nz, constant ] = plane;
+		const px = nx >= 0 ? x + cellSize : x;
+		const py = ny >= 0 ? maxY + heightPadding.above : minY - heightPadding.below;
+		const pz = nz >= 0 ? z + cellSize : z;
+		if ( nx * px + ny * py + nz * pz + constant < 0 ) return false;
+	}
+	return true;
+}
+
 /**
  * Turn shared field selection into backend-neutral instance batches.
  * GPU adapters own uploads and meshes; this class owns no renderer objects.
@@ -39,7 +51,9 @@ export class GroundCoverFieldBatchRuntime {
 
 	update( { position, verticalFovRadians, frustumPlanes }, renderLoadBias = 0 ) {
 		if ( this.disposed ) throw new Error( 'Ground-cover batch runtime is disposed' );
-		const instances = this.fieldRuntime.update( { x: position[ 0 ], z: position[ 2 ] } );
+		const heightPadding = this.fieldRuntime.data.cellHeightPadding;
+		const cellSize = this.fieldRuntime.data.cellSize;
+		const instances = this.fieldRuntime.update( { x: position[ 0 ], z: position[ 2 ] }, ( _index, x, z, minY, maxY ) => cellIntersectsFrustum( frustumPlanes, cellSize, heightPadding, x, z, minY, maxY ) );
 		const { visibleGroups, shadowGroups } = this.fieldRuntime.planDraws( { position, verticalFovRadians, frustumPlanes }, renderLoadBias );
 		for ( const batch of this.cache.values() ) { batch.count = 0; batch.assetId = null; }
 		const visible = [], shadows = [];
