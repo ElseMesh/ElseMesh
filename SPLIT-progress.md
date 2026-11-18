@@ -2206,3 +2206,12 @@ finding changes them.
   same authored objects, placements, geometry, texture sources, variants, and
   material inputs. This is a goal clarification, not new parity evidence;
   Tidewater remains 93%.
+
+- 2026-11-18: extended Tidewater's source-versus-graph WebGPU diagnostic to
+  hash-check and decode the actual signed grass-density and terrain-surface
+  assets, and to use the packaged heightfield, terrain detail texture, and
+  height shader. The presenters select matching populated cells, but this
+  headless camera produces no foliage pixels beyond its empty background, so
+  the zero image difference is not visual-parity evidence. The diagnostic does
+  not close a gate; a view that visibly renders Tidewater foliage and a paired
+  WebGL comparison are still required. Tidewater remains 93%.
