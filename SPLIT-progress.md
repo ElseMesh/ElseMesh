@@ -2396,6 +2396,13 @@ finding changes them.
   plan yet, so the current presenters remain active and Tidewater parity stays
   at 93%.
 
+- 2026-11-18: added the engine's signed canopy asset loader. It verifies the
+  descriptor, static-model set, PNG atlas references, manifest kinds, raw-data
+  dimensions, and lazy near-model loads; atlas bitmap creation explicitly
+  disables color conversion and alpha premultiplication. The component still
+  has no exported Tidewater atlas assets and neither backend adapter consumes
+  the loader. No parity percentage change.
+
 - 2026-11-18: added the same `L` flashlight control to the engine's WebGL
   fallback. The camera-attached spotlight uses the WebGPU path's position
   offset, 9°/35° cone, 30 m range, warm color, night intensity ramp, and

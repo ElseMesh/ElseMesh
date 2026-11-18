@@ -1,4 +1,5 @@
 export const OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT = 'elsemesh.octahedral-canopy/1';
+export const OCTAHEDRAL_CANOPY_COMPONENT_TYPE = 'elsemesh.octahedral-canopy/1';
 export const OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND = 'octahedral-canopy/1';
 export const MAX_OCTAHEDRAL_CANOPY_DESCRIPTOR_BYTES = 64 * 1024;
 export const OCTAHEDRAL_CANOPY_PROJECTION = 'hemi-octahedral/1';

@@ -233,6 +233,14 @@ needs one explicit engine component contract rather than separate WGSL and
 GLSL implementations in Tidewater. Both backends must sample the same signed
 atlas assets and select the same LOD at matched quality settings.
 
+`src/network/OctahedralCanopyAssets.js` loads the signed descriptor, validates
+the instance-set and PNG references against the component and manifest, checks
+atlas dimensions and data-image encoding, and exposes near GLBs through a lazy
+signed-asset loader. Startup requests only the descriptor; adapters fetch the
+instance set and atlas data as they initialize. The PNG decoder disables color
+conversion and alpha premultiplication. This prepares the shared input path;
+Tidewater does not export the production atlas assets yet.
+
 `elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
 with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
 values; color-space conversion and alpha premultiplication are not allowed.
