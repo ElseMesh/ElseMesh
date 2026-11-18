@@ -59,7 +59,7 @@ const valueNoiseWebGPU = compileWorldMaterialGraph( valueNoiseGraph, 'webgpu' );
 const valueNoiseWebGL = compileWorldMaterialGraph( valueNoiseGraph, 'webgl' );
 assert.match( valueNoiseWebGPU.wgslHelpers, /fn emgValueNoise2\( p: vec2f \)/, 'WebGPU emits the shared value-noise function as a shader module' );
 assert.match( valueNoiseWebGPU.vertex, /emgValueNoise2\( v\.uv \)/, 'WebGPU vertex graphs can evaluate value noise' );
-assert.match( valueNoiseWebGPU.surface, /emgValueNoise2\( in\.vs\.uv \)/, 'WebGPU fragment graphs can evaluate value noise' );
+assert.match( valueNoiseWebGPU.surface, /emgValueNoise2\( in\.vs\.emg_uv \)/, 'WebGPU fragment graphs can evaluate value noise' );
 assert.match( valueNoiseWebGL.glsl.vertexHelpers, /float emgValueNoise2\( vec2 p \)/, 'WebGL vertex graphs receive the same value-noise implementation' );
 assert.match( valueNoiseWebGL.glsl.fragmentHelpers, /float emgValueNoise2\( vec2 p \)/, 'WebGL fragment graphs receive the same value-noise implementation' );
 assert.throws( () => validateWorldMaterialGraph( { ...valueNoiseGraph, nodes: [ ...valueNoiseGraph.nodes, { id: 'badNoise', op: 'valueNoise2', args: [ 'noise' ] } ] } ), /operation/, 'valueNoise2 accepts only a vec2 input' );
