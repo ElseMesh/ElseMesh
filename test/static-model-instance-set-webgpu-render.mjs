@@ -12,6 +12,7 @@ import { GPU } from '../src/engine/gpu/GPU.js';
 import { ShaderModule } from '../src/engine/gpu/Shader.js';
 import { standard } from '../src/materials/Materials.js';
 import { SceneLighting } from '../src/materials/SceneLighting.js';
+import { TerrainGPU } from '../src/world/TerrainGPU.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
@@ -96,13 +97,17 @@ const errors = [];
 const L = await setupLife( { W: 192, H: 144, shadowSplits: [ 12 ] } );
 let runtime;
 const previousBounce = SceneLighting.hooks.bounce;
-const heightModule = new ShaderModule( { name: 'fixtureTerrainHeight', code: 'fn terrainUvOf( xz: vec2f ) -> vec2f { return xz; }\nfn terrainHeightAt( xz: vec2f ) -> f32 { return terrainUvOf( xz ).y; }' } );
-const terrainModule = new ShaderModule( { name: 'fixtureTerrain', deps: [ heightModule ], code: 'fn fixtureTerrainNormal( xz: vec2f ) -> vec3f { return vec3f( 0.0, 1.0, 0.0 ); }' } );
-SceneLighting.set( 'bounce', new ShaderModule( { name: 'fixtureTerrainBounce', deps: [ terrainModule ], code: 'fn hookBounce( P: vec3f, N: vec3f ) -> vec3f { return vec3f( fixtureTerrainNormal( P.xz ).y ); }' } ) );
+const terrainGPU = new TerrainGPU( {
+	res: 4, origin: - 2, size: 4, texel: 1, heights: new Float32Array( 16 ).fill( - 1 ),
+}, null, {
+	normal: new Uint8Array( 64 ).fill( 127 ), splat: new Uint8Array( 64 ),
+	detailWidth: 1, detailHeight: 1, detail: new Uint8Array( [ 127, 127, 127, 255 ] ),
+} );
+SceneLighting.set( 'bounce', new ShaderModule( { name: 'fixtureTerrainBounce', deps: [ terrainGPU.module ], code: 'fn hookBounce( P: vec3f, N: vec3f ) -> vec3f { return vec3f( terrainHeightAt( P.xz ) * 0.0 ); }' } ) );
 try {
 	GPU.device.addEventListener( 'uncapturederror', event => errors.push( event.error?.message || 'unknown GPU error' ) );
 	const root = new Group();
-	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: { heightModule } } ];
+	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU } ];
 	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, materialAdapterContexts: new Map( [ [ materialAdapterType, { context: { material: profileMaterial } } ] ] ) };
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
 	const result = await install( { root, connector }, component );
@@ -140,6 +145,7 @@ try {
 	runtime?.dispose();
 	SceneLighting.hooks.bounce = previousBounce;
 	SceneLighting.version ++;
+	terrainGPU.dispose();
 	profileMaterial.dispose();
 	GPU.device?.destroy();
 	if ( previousAssetImageDecoder === undefined ) delete globalThis.__assetImage;
