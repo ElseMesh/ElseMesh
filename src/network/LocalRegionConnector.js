@@ -263,6 +263,11 @@ export class LocalRegionConnector {
 		const descriptor = await fetchJSON( `${base}/descriptor`, signal );
 		requireValue( descriptor.schema === 'elsemesh.dynamic-region-provider/1' && descriptor.readOnly === true && typeof descriptor.sourceRevision === 'string' && isWorldID( descriptor.worldId ) && ( descriptor.title === undefined || typeof descriptor.title === 'string' && descriptor.title.trim() && descriptor.title.length <= 160 ), 'Local provider returned an unsupported descriptor' );
 		requireValue( ! this.presenceEnabled || this.presenceWorldId === descriptor.worldId, 'Local region provider and worldd route identify different worlds' );
+		const regionIDs = descriptor.regionScope?.regionIds;
+		requireValue( Array.isArray( regionIDs ) && regionIDs.length > 0 && regionIDs.length <= 10000
+			&& regionIDs.every( id => typeof id === 'string' && id.length > 0 && id.length <= 256 && /^[A-Za-z0-9_.-]+$/.test( id ) )
+			&& new Set( regionIDs ).size === regionIDs.length, 'Local provider returned an invalid authorized region scope' );
+		const authorizedRegionIDs = new Set( regionIDs );
 		const cacheRevision = descriptor.cacheRevision;
 		requireValue( typeof cacheRevision === 'string' && cacheRevision.trim() && cacheRevision.length <= 512, 'Local provider returned an invalid cache revision' );
 		const selection = descriptor.entrySelection;
@@ -321,6 +326,7 @@ export class LocalRegionConnector {
 		requireValue( Array.isArray( layerLabels ) && layerLabels.length <= 8 && layerLabels.every( label => typeof label === 'string' && label.trim() && label.length <= 160 ) && new Set( layerLabels ).size === layerLabels.length, 'Local provider has invalid preview layers' );
 		const regions = [ region, ...layerLabels.map( label => catalog.regions.find( item => item.id === label || item.label === label ) ) ];
 		requireValue( regions.every( item => item && typeof item.id === 'string' && typeof item.asset === 'string' ) && new Set( regions.map( item => item.id ) ).size === regions.length, 'Local provider is missing or duplicates a preview layer' );
+		requireValue( regions.every( item => authorizedRegionIDs.has( item.id ) ), 'Local provider selected a region outside its authorized region scope' );
 		this.cellSizeMeters = previewRegion.cellSizeMeters;
 		this.maxViewDistanceMeters = previewRegion.maxViewDistanceMeters;
 		const assetURL = new URL( region.asset, `${base}/` );

@@ -29,6 +29,11 @@ type dynamicRegionProviderDescriptor struct {
 	CacheRevision  string                       `json:"cacheRevision"`
 	ReadOnly       bool                         `json:"readOnly"`
 	EntrySelection regionProviderEntrySelection `json:"entrySelection"`
+	RegionScope    *regionProviderRegionScope   `json:"regionScope"`
+}
+
+type regionProviderRegionScope struct {
+	RegionIDs []string `json:"regionIds"`
 }
 
 type regionProviderEntrySelection struct {
@@ -73,6 +78,7 @@ type regionProviderGateway struct {
 	cacheRevision     string
 	playerCapsule     *playerCapsule
 	previewRegion     *regionProviderPreviewRegion
+	regionIDs         map[string]struct{}
 	entrySelection    *dynamicRegionProviderDescriptor
 	allowedOrigins    map[string]struct{}
 	regionDiagnostics bool
@@ -258,10 +264,15 @@ func (gateway *regionProviderGateway) discoverWorldID() (string, error) {
 	if err := validateRegionProviderEntrySelection(descriptor.EntrySelection); err != nil {
 		return "", err
 	}
+	regionIDs, err := validateProviderRegionScope(descriptor.RegionScope)
+	if err != nil {
+		return "", err
+	}
 	gateway.sourceRevision = descriptor.SourceRevision
 	gateway.cacheRevision = descriptor.CacheRevision
 	gateway.playerCapsule = descriptor.EntrySelection.PlayerCapsule
 	gateway.previewRegion = descriptor.EntrySelection.PreviewRegion
+	gateway.regionIDs = regionIDs
 	gateway.entrySelection = &descriptor
 	return descriptor.WorldID, nil
 }
@@ -294,6 +305,40 @@ func validateRegionProviderEntrySelection(selection regionProviderEntrySelection
 		}
 	}
 	return nil
+}
+
+func validateProviderRegionScope(scope *regionProviderRegionScope) (map[string]struct{}, error) {
+	if scope == nil || len(scope.RegionIDs) == 0 || len(scope.RegionIDs) > 10000 {
+		return nil, errors.New("descriptor has no valid authorized region ID list")
+	}
+	regionIDs := make(map[string]struct{}, len(scope.RegionIDs))
+	for _, regionID := range scope.RegionIDs {
+		if len(regionID) == 0 || len(regionID) > 256 {
+			return nil, errors.New("descriptor has an invalid authorized region ID")
+		}
+		for _, char := range regionID {
+			if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' || char == '_' || char == '-' || char == '.') {
+				return nil, errors.New("descriptor has an unsafe authorized region ID")
+			}
+		}
+		if _, exists := regionIDs[regionID]; exists {
+			return nil, errors.New("descriptor has a duplicate authorized region ID")
+		}
+		regionIDs[regionID] = struct{}{}
+	}
+	return regionIDs, nil
+}
+
+func sameRegionScope(a, b map[string]struct{}) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for regionID := range a {
+		if _, exists := b[regionID]; !exists {
+			return false
+		}
+	}
+	return true
 }
 
 func samePlayerCapsule(a, b *playerCapsule) bool {
@@ -383,11 +428,18 @@ func (gateway *regionProviderGateway) validateProviderResponse(response *http.Re
 	if err := validateRegionProviderEntrySelection(descriptor.EntrySelection); err != nil {
 		return err
 	}
+	regionIDs, err := validateProviderRegionScope(descriptor.RegionScope)
+	if err != nil {
+		return err
+	}
 	if gateway.worldID != "" && !samePlayerCapsule(descriptor.EntrySelection.PlayerCapsule, gateway.playerCapsule) {
 		return errors.New("provider player capsule changed after worldd startup")
 	}
 	if gateway.previewRegion != nil && (descriptor.EntrySelection.PreviewRegion == nil || *descriptor.EntrySelection.PreviewRegion != *gateway.previewRegion) {
 		return errors.New("provider preview region bounds changed after worldd startup")
+	}
+	if !sameRegionScope(regionIDs, gateway.regionIDs) {
+		return errors.New("provider region scope changed after worldd startup")
 	}
 	response.Body = io.NopCloser(bytes.NewReader(data))
 	response.ContentLength = int64(len(data))
@@ -493,6 +545,9 @@ func (gateway *regionProviderGateway) authorizeRequestedContent(visitor playerPr
 	relativePath := strings.TrimPrefix(request.URL.Path, "/v1/regions/")
 	pathParts := strings.Split(relativePath, "/")
 	if pathParts[0] == "" || len(pathParts) > 2 || len(pathParts) == 2 && pathParts[1] != "cells" && pathParts[1] != "leases" {
+		return false
+	}
+	if _, allowed := gateway.regionIDs[pathParts[0]]; !allowed {
 		return false
 	}
 	query := request.URL.Query()

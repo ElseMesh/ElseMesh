@@ -111,6 +111,7 @@ let cellFetches = 0;
 let rangeFetches = 0;
 let leaseReleases = 0;
 let descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
+let descriptorRegionIDs = [ 'great-hall' ];
 let omitCacheRevision = false;
 const descriptorAvatarOptions = [ { id: 'short-hair', profileId: 'elsemesh.avatar.stock-male/1', label: 'Short hair' } ];
 let descriptorChoices = [ { id: 'gryffindor', label: 'Gryffindor', avatarOptionId: 'short-hair' }, { id: 'hufflepuff', label: 'Hufflepuff' } ];
@@ -173,6 +174,7 @@ globalThis.fetch = async ( input, options = {} ) => {
 	if ( url.pathname === '/v1/descriptor' ) return Response.json( {
 		schema: 'elsemesh.dynamic-region-provider/1', worldId: descriptorWorldId, title: 'Hogwarts Legacy',
 		sourceRevision: 'test-revision', ...( omitCacheRevision ? {} : { cacheRevision: 'test-revision:converter-1' } ), readOnly: true, regions: '/v1/regions',
+		regionScope: { regionIds: descriptorRegionIDs },
 		entrySelection: {
 			schema: 'elsemesh.world-entry-selection/1', entryPointActionLabel: 'Choose your house',
 			avatarOptions: descriptorAvatarOptions,
@@ -317,6 +319,11 @@ try {
 		await assert.rejects( invalidIDConnector.getManifest(), /unsupported descriptor/, `dynamic world providers must reject ${worldId}` );
 	}
 	descriptorWorldId = 'elsemesh:hogwarts-legacy-local';
+	descriptorRegionIDs = [];
+	await assert.rejects( new LocalRegionConnector( link ).getManifest(), /invalid authorized region scope/, 'providers must declare at least one authorized region ID' );
+	descriptorRegionIDs = [ 'another-map' ];
+	await assert.rejects( new LocalRegionConnector( link ).getManifest(), /outside its authorized region scope/, 'selected maps must be covered by the provider authorized region IDs' );
+	descriptorRegionIDs = [ 'great-hall' ];
 	omitCacheRevision = true;
 	await assert.rejects( new LocalRegionConnector( link ).getManifest(), /invalid cache revision/, 'region providers must identify the converter-aware disk-cache revision' );
 	omitCacheRevision = false;

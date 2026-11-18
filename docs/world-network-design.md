@@ -84,6 +84,15 @@ camera/view information; it does not authoritatively set position. World data
 defines permitted movement profiles, while the engine/server validates them;
 unknown speeds or collision do not grant extra movement.
 
+The provider descriptor supplies the stable region IDs currently authorized
+for the hosted world. `worldd` validates and pins that allow-list at startup,
+requires later descriptor responses to retain it, and rejects region-content
+requests whose region ID is outside it before proxying to the provider. The
+browser connector also checks that its selected region and authored layers are
+in the list. This allow-list bounds which regions a client may name; accepted
+pose, collision, and reachable-route checks still determine whether content in
+an allowed region may be requested now.
+
 Collision and support use one canonical engine calculation and one canonical
 collision dataset. The browser may run that shared calculation for responsive
 local prediction, but it must not maintain a separate ground-height, floor

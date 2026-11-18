@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -15,6 +16,35 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
+
+func TestValidateProviderRegionScope(t *testing.T) {
+	for name, scope := range map[string]*regionProviderRegionScope{
+		"missing":        nil,
+		"empty":          {RegionIDs: []string{}},
+		"empty ID":       {RegionIDs: []string{""}},
+		"path separator": {RegionIDs: []string{"../other"}},
+		"duplicate IDs":  {RegionIDs: []string{"GreatHall", "GreatHall"}},
+		"too many IDs":   {RegionIDs: makeRegionIDs(10001)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := validateProviderRegionScope(scope); err == nil {
+				t.Fatal("invalid region scope was accepted")
+			}
+		})
+	}
+	allowed, err := validateProviderRegionScope(&regionProviderRegionScope{RegionIDs: []string{"GreatHall", "SUB_GreatHall_Int"}})
+	if err != nil || !sameRegionScope(allowed, map[string]struct{}{"GreatHall": {}, "SUB_GreatHall_Int": {}}) {
+		t.Fatalf("valid region scope = %v, %v", allowed, err)
+	}
+}
+
+func makeRegionIDs(count int) []string {
+	regionIDs := make([]string, count)
+	for index := range regionIDs {
+		regionIDs[index] = "region-" + strconv.Itoa(index)
+	}
+	return regionIDs
+}
 
 func movementAuthorityFixture(t *testing.T, ready *atomic.Bool) (*httptest.Server, *regionProviderGateway, *atomic.Int32, *atomic.Uint64) {
 	t.Helper()
@@ -117,6 +147,7 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 	gateway.cacheRevision = cacheRevision
 	gateway.previewRegion = &regionProviderPreviewRegion{CellSizeMeters: 16, MaxViewDistanceMeters: 32}
 	gateway.playerCapsule = &playerCapsule{RadiusMeters: 0.3, HeightMeters: 1.75}
+	gateway.regionIDs = map[string]struct{}{"GreatHall": {}}
 	gateway.authorizeContent = func(token string) (playerPresence, bool) {
 		return playerPresence{playerPose: playerPose{Position: []float64{0, 0, 0}, Yaw: 0, Pitch: 0}}, token == "accepted-presence-capability"
 	}
@@ -159,6 +190,14 @@ func TestRegionContentGatewayRequiresPresenceCapability(t *testing.T) {
 	gateway.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || upstreamRequests.Load() != 2 {
 		t.Fatalf("speed-bounded collision prefetch status=%d upstream=%d", response.Code, upstreamRequests.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/v1/regions/OtherMap/cells?cell=0,0,0&size=16&scope=view&sourceInventory=1", nil)
+	request.Header.Set("Authorization", "Bearer accepted-presence-capability")
+	response = httptest.NewRecorder()
+	gateway.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || upstreamRequests.Load() != 2 {
+		t.Fatalf("out-of-scope region request status=%d upstream=%d", response.Code, upstreamRequests.Load())
 	}
 
 	request = httptest.NewRequest(http.MethodGet, "/v1/regions/GreatHall/cells?cell=5,0,0&size=16&scope=collision&sourceInventory=1", nil)
@@ -323,6 +362,7 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 	const worldID = "elsemesh:hogwarts-legacy"
 	const sourceRevision = "container-fingerprint:installed-content"
 	const cacheRevision = sourceRevision + ":converter-1"
+	descriptorRegionIDs := []string{"SUB_GreatHall_Int"}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-ElseMesh-World-ID", worldID)
 		w.Header().Set("X-ElseMesh-Source-Revision", sourceRevision)
@@ -330,7 +370,7 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/descriptor":
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			descriptor := dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, SourceRevision: sourceRevision, CacheRevision: cacheRevision, ReadOnly: true}
+			descriptor := dynamicRegionProviderDescriptor{Schema: "elsemesh.dynamic-region-provider/1", WorldID: worldID, SourceRevision: sourceRevision, CacheRevision: cacheRevision, ReadOnly: true, RegionScope: &regionProviderRegionScope{RegionIDs: descriptorRegionIDs}}
 			descriptor.EntrySelection.PlayerCapsule = &playerCapsule{RadiusMeters: 0.42, HeightMeters: 1.76}
 			yaw, pitch := 3.141592653589793, -0.1
 			descriptor.EntrySelection.PreviewSpawn = &worldSpawn{Position: []float64{0, 8.62, 90}, Yaw: &yaw, Pitch: &pitch}
@@ -485,6 +525,20 @@ func TestRegionProviderGatewayProxiesValidatedStreamingAPI(t *testing.T) {
 		if response.Code != http.StatusBadGateway {
 			t.Fatalf("changed provider source revision status = %d, want %d", response.Code, http.StatusBadGateway)
 		}
+	})
+
+	t.Run("authorized region IDs are pinned", func(t *testing.T) {
+		gateway.worldID = worldID
+		gateway.sourceRevision = sourceRevision
+		gateway.cacheRevision = cacheRevision
+		descriptorRegionIDs = []string{"AnotherMap"}
+		request := httptest.NewRequest(http.MethodGet, "/v1/descriptor", nil)
+		response := httptest.NewRecorder()
+		gateway.ServeHTTP(response, request)
+		if response.Code != http.StatusBadGateway {
+			t.Fatalf("changed provider region scope status = %d, want %d", response.Code, http.StatusBadGateway)
+		}
+		descriptorRegionIDs = []string{"SUB_GreatHall_Int"}
 	})
 
 	t.Run("every provider response carries pinned identity", func(t *testing.T) {
