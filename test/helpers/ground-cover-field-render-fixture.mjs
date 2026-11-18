@@ -1,5 +1,6 @@
 import { encodeGrassDensityAsset } from '../../src/network/GrassDensityAsset.js';
 import { ShaderModule } from '../../src/engine/gpu/Shader.js';
+import { getDetailImage } from '../../src/world/terrain/DetailTextureData.js';
 import { createTidewaterGroundCoverMaterialGraph } from '../../worlds/tidewater/vegetation/GroundCoverMaterialGraph.js';
 import { buildGroundCoverPatch } from '../../worlds/tidewater/vegetation/GroundCoverPatch.js';
 import { groundCoverPatchGLB } from '../../worlds/tidewater/vegetation/GroundCoverPatchGLB.js';
@@ -14,13 +15,6 @@ export async function groundCoverFieldRenderFixture() {
 	const densityData = new Uint8Array( 32 * 32 * 4 );
 	for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
 	const densityBytes = encodeGrassDensityAsset( { data: densityData, res: 32, size: 32, origin: -16 } );
-	const detailData = new Uint8Array( 8 * 8 * 4 );
-	for ( let index = 0; index < 8 * 8; index ++ ) {
-		detailData[ index * 4 ] = ( index % 8 ) * 32;
-		detailData[ index * 4 + 1 ] = Math.floor( index / 8 ) * 32;
-		detailData[ index * 4 + 2 ] = 64;
-		detailData[ index * 4 + 3 ] = 255 - ( index % 8 ) * 24;
-	}
 	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: -16, densitySize: 32 } );
 	const modelBytesByLOD = [ 0, 1, 2 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
 	const densityAssetId = await assetID( densityBytes );
@@ -55,5 +49,6 @@ export async function groundCoverFieldRenderFixture() {
 			return densityBytes;
 		},
 	};
-	return { component, connector, terrain, grassMask: { data: densityData, res: 32, size: 32, origin: -16 }, terrainHeightModule, terrainDetail: { data: detailData, width: 8, height: 8 }, graph, modelAssetIds, modelBytesByLOD };
+	const detailImage = getDetailImage();
+	return { component, connector, terrain, grassMask: { data: densityData, res: 32, size: 32, origin: -16 }, terrainHeightModule, terrainDetail: detailImage, graph, modelAssetIds, modelBytesByLOD };
 }
