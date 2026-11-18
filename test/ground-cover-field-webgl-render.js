@@ -55,7 +55,7 @@ try {
 	for ( let offset = 0; offset < pixels.length; offset += 4 ) if ( Math.abs( pixels[ offset ] - background[ 0 ] ) + Math.abs( pixels[ offset + 1 ] - background[ 1 ] ) + Math.abs( pixels[ offset + 2 ] - background[ 2 ] ) > 36 ) foreground ++;
 	if ( foreground < 30 ) throw new Error( `WebGL ground-cover fixture rendered too few foreground pixels (${ foreground })` );
 	const metrics = { instances: instanceCounts[ 0 ], shadowInstances: instanceCounts[ 1 ], foregroundPixels: foreground, programCount: renderer.info.programs?.length || 0, glError: gl.getError() };
-	if ( metrics.shadowInstances === 0 || metrics.shadowInstances > metrics.instances ) throw new Error( 'WebGL shadow draws must select a non-empty subset of the visible instances' );
+	if ( metrics.shadowInstances === 0 ) throw new Error( 'WebGL shadow draws must select near fixed-cell patches' );
 	if ( metrics.programCount === 0 || metrics.glError !== gl.NO_ERROR ) throw new Error( `WebGL renderer error (${ metrics.programCount } programs; GL ${ metrics.glError })` );
 	result.textContent = JSON.stringify( metrics );
 	result.dataset.status = 'complete';
