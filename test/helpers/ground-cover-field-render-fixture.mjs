@@ -19,7 +19,7 @@ export async function groundCoverFieldRenderFixture( { density: authoredDensity 
 	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: density.origin, densitySize: density.size } );
 	// fixed-cell-patch asset lists are ordered far-to-near; the source patch
 	// exporter emits near-to-far, so reverse the source LOD indices here.
-	const modelBytesByLOD = [ 2, 1, 0 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
+	const modelBytesByLOD = [ 2, 1, 0 ].map( level => groundCoverPatchGLB( `Tidewater ground cover ${[ 'near', 'mid', 'far' ][ level ]}`, buildGroundCoverPatch( level, 7 ), graph ) );
 	const densityAssetId = await assetID( densityBytes );
 	const modelAssetIds = await Promise.all( modelBytesByLOD.map( assetID ) );
 	// Enclose the same 8 m cell box and vertical padding used by the source
@@ -29,7 +29,7 @@ export async function groundCoverFieldRenderFixture( { density: authoredDensity 
 		id: 'elsemesh-component:ground-cover-render-fixture',
 		type: 'elsemesh.ground-cover-field/1',
 		data: {
-			densityAssetId, seed: 314159, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
+			densityAssetId, seed: 7, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
 			distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 			species: [ {
 				id: 'fixture-grass', densityExpression: { op: 'max', left: { op: 'channel', index: 0 }, right: { op: 'max', left: { op: 'max', left: { op: 'channel', index: 1 }, right: { op: 'channel', index: 2 } }, right: { op: 'channel', index: 3 } } }, densityThreshold: 8,

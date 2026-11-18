@@ -14,7 +14,6 @@ import { Vector3 as EngineVector3 } from '../engine/index.js';
 import { updateWorldComponentRuntimes } from '../engine/scene/WorldComponentUpdate.js';
 import { cameraPoseFromSearch } from '../core/DebugViews.js';
 import { portalRouteFromPosition } from '../network/PortalHandoff.js';
-import { decodeGrassDensityAsset } from '../network/GrassDensityAsset.js';
 import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
@@ -63,7 +62,6 @@ import { SHORE_WATER_TURBIDITY, WATER_ABSORPTION, WATER_BACKSCATTER, WATER_IOR, 
 import { G } from '../engine/render/Frame.js';
 import { staticModelCoarseViewProgress } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { advanceWorldWindField, setWorldWindFrame } from '../engine/world/WorldWindField.js';
-import { GroundCoverCellPlanner } from '../engine/render/GroundCoverCellPlanner.js';
 
 const LOCAL_REGION_STREAM_BATCH_SIZE = 1;
 
@@ -732,92 +730,6 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 
 }
 
-function sampleGrassMask( mask, x, z ) {
-	const fx = Math.max( 0, Math.min( mask.res - 1, ( x - mask.origin ) / ( mask.size / mask.res ) - 0.5 ) );
-	const fz = Math.max( 0, Math.min( mask.res - 1, ( z - mask.origin ) / ( mask.size / mask.res ) - 0.5 ) );
-	const x0 = Math.floor( fx ), z0 = Math.floor( fz ), x1 = Math.min( mask.res - 1, x0 + 1 ), z1 = Math.min( mask.res - 1, z0 + 1 );
-	const tx = fx - x0, tz = fz - z0, result = [ 0, 0, 0, 0 ];
-	for ( let channel = 0; channel < 4; channel ++ ) {
-		const a = mask.data[ ( z0 * mask.res + x0 ) * 4 + channel ], b = mask.data[ ( z0 * mask.res + x1 ) * 4 + channel ];
-		const c = mask.data[ ( z1 * mask.res + x0 ) * 4 + channel ], d = mask.data[ ( z1 * mask.res + x1 ) * 4 + channel ];
-		result[ channel ] = ( ( a * ( 1 - tx ) + b * tx ) * ( 1 - tz ) + ( c * ( 1 - tx ) + d * tx ) * tz ) / 255;
-	}
-	return result;
-}
-
-export function webglGrassMesh( T, terrain, camera, previous, grassMask = null, cellPlanner = null ) {
-
-	if ( ! grassMask || ! cellPlanner ) throw new Error( 'WebGL ground cover requires a signed density field and its engine cell planner' );
-	const radius = cellPlanner.levels.at( - 1 ).maxDistance, spacing = 0.46, positions = [], colors = [], windWeights = [], indices = [];
-	const cx = camera.position.x, cz = camera.position.z, firstX = Math.floor( ( cx - radius ) / spacing ), firstZ = Math.floor( ( cz - radius ) / spacing );
-	const visibleCellLevels = new Int8Array( cellPlanner.cellFlags.length ).fill( - 1 );
-	for ( const [ levelIndex, level ] of cellPlanner.update( { x: cx, z: cz } ).entries() ) for ( let index = 0; index < level.count; index ++ ) visibleCellLevels[ level.cells[ index ] ] = levelIndex;
-	const hash = ( x, z ) => { let n = Math.imul( x, 0x1f123bb5 ) ^ Math.imul( z, 0x5f356495 ); n = Math.imul( n ^ n >>> 16, 0x7feb352d ); n = Math.imul( n ^ n >>> 15, 0x846ca68b ); return ( n ^ n >>> 16 ) >>> 0; };
-	const addBlade = ( x, z, y, angle, height, width, color ) => {
-		const dx = Math.cos( angle ), dz = Math.sin( angle ), bend = 0.12 + height * 0.16, sx = - dz * width, sz = dx * width, base = positions.length / 3;
-		positions.push( x - sx, y, z - sz, x + sx, y, z + sz, x + dx * bend - sx * 0.3, y + height * 0.72, z + dz * bend + sz * 0.3, x + dx * bend + sx * 0.3, y + height * 0.72, z + dz * bend - sz * 0.3, x + dx * bend * 1.8, y + height, z + dz * bend * 1.8 );
-		windWeights.push( 0, 0, 0.72, 0.72, 1 );
-		for ( let v = 0; v < 5; v ++ ) { const f = v === 4 ? 1.18 : v < 2 ? 0.76 : 1.08; colors.push( color[ 0 ] * f, color[ 1 ] * f, color[ 2 ] * f ); }
-		indices.push( base, base + 1, base + 2, base + 1, base + 3, base + 2, base + 2, base + 3, base + 4 );
-	};
-	for ( let gz = firstZ; gz <= Math.ceil( ( cz + radius ) / spacing ); gz ++ ) for ( let gx = firstX; gx <= Math.ceil( ( cx + radius ) / spacing ); gx ++ ) {
-		const rand = ( shift ) => ( hash( gx + shift * 31, gz - shift * 17 ) & 0xffff ) / 0xffff;
-		const x = ( gx + 0.15 + rand( 1 ) * 0.7 ) * spacing, z = ( gz + 0.15 + rand( 2 ) * 0.7 ) * spacing, d = Math.hypot( x - cx, z - cz );
-		const i = Math.floor( ( x - terrain.origin ) / cellPlanner.cellSize ), j = Math.floor( ( z - terrain.origin ) / cellPlanner.cellSize );
-		if ( i < 0 || j < 0 || i >= cellPlanner.cellsPerSide || j >= cellPlanner.cellsPerSide ) continue;
-		if ( visibleCellLevels[ j * cellPlanner.cellsPerSide + i ] < 0 ) continue;
-		const detailLevel = cellPlanner.lodIndexAtDistance( d, rand( 40 ) );
-		if ( detailLevel < 0 || d > radius ) continue;
-		const h = terrain.heightAt( x, z );
-		const mask = sampleGrassMask( grassMask, x, z );
-		const duneFraction = mask[ 0 ] / ( mask[ 0 ] + mask[ 1 ] + 1e-3 );
-		const meadowDensity = mask[ 1 ] * ( 1 - duneFraction ) + Math.min( mask[ 0 ] * 1.1, 1 ) * duneFraction;
-		const candidates = [
-			{ density: meadowDensity, salt: 4, height: 0.62 * duneFraction + ( 0.7 + rand( 6 ) * 0.6 ) * ( 1 - duneFraction ), color: [ 0.11, 0.27, 0.09 ] },
-			{ density: mask[ 2 ], salt: 20, height: 0.9 + rand( 21 ) * 0.6, color: [ 0.32, 0.34, 0.13 ] },
-			{ density: mask[ 3 ], salt: 30, height: 0.18 + rand( 31 ) * 0.22, color: [ 0.16, 0.31, 0.12 ] },
-		];
-		for ( const candidate of candidates ) {
-			if ( detailLevel === 2 && candidate.salt !== 4 ) continue;
-			if ( detailLevel === 1 && candidate.salt === 30 ) continue;
-			if ( rand( candidate.salt ) > candidate.density ) continue;
-			const baseAngle = rand( candidate.salt + 1 ) * Math.PI * 2, tone = rand( candidate.salt + 2 );
-			const color = candidate.color.map( ( channel, index ) => channel + tone * [ 0.06, 0.08, 0.035 ][ index ] );
-			const blades = candidate.salt === 20 ? ( detailLevel === 1 ? 1 : 2 ) : detailLevel === 0 ? 5 : detailLevel === 1 ? 3 : 2;
-			const widthScale = detailLevel === 0 ? 1 : detailLevel === 1 ? 1.35 : 1.8;
-			for ( let blade = 0; blade < blades; blade ++ ) addBlade( x, z, h + 0.025, baseAngle + blade * Math.PI * 2 / blades + rand( blade + candidate.salt + 3 ) * 0.18, candidate.height * ( 0.82 + rand( blade + candidate.salt + 4 ) * 0.32 ), ( candidate.salt === 30 ? 0.012 : 0.018 + rand( blade + candidate.salt + 5 ) * 0.009 ) * widthScale, color );
-		}
-	}
-	const geometry = new T.BufferGeometry();
-	geometry.setAttribute( 'position', new T.Float32BufferAttribute( positions, 3 ) );
-	geometry.setAttribute( 'color', new T.Float32BufferAttribute( colors, 3 ) );
-	geometry.setAttribute( 'aGroundCoverWindWeight', new T.Float32BufferAttribute( windWeights, 1 ) );
-	geometry.setIndex( indices ); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
-	const material = new T.MeshLambertMaterial( { vertexColors: true, side: T.DoubleSide } );
-	material.onBeforeCompile = shader => {
-		shader.uniforms.uGroundCoverTime = { value: 0 };
-		shader.uniforms.uGroundCoverWindDirection = { value: new T.Vector2( 1, 0 ) };
-		shader.uniforms.uGroundCoverWindStrength = { value: 0 };
-		shader.vertexShader = shader.vertexShader.replace( '#include <common>', '#include <common>\nattribute float aGroundCoverWindWeight;\nuniform float uGroundCoverTime;\nuniform vec2 uGroundCoverWindDirection;\nuniform float uGroundCoverWindStrength;' );
-		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', '#include <begin_vertex>\nfloat groundCoverWindPhase = uGroundCoverTime * ( 1.1 + uGroundCoverWindStrength * 0.16 ) + dot( position.xz, uGroundCoverWindDirection ) * 0.19;\nfloat groundCoverWindSway = sin( groundCoverWindPhase ) * ( 0.012 + uGroundCoverWindStrength * 0.035 ) * aGroundCoverWindWeight;\ntransformed.xz += uGroundCoverWindDirection * groundCoverWindSway;' );
-		material.userData.groundCoverWindUniforms = shader.uniforms;
-	};
-	const mesh = new T.Mesh( geometry, material );
-	mesh.name = 'WebGL camera-following grass'; mesh.frustumCulled = false; mesh.renderOrder = 1;
-	if ( previous ) { previous.geometry.dispose(); previous.material.dispose(); }
-	return mesh;
-
-}
-
-function updateWebGLGrassWind( grass, time ) {
-	const uniforms = grass?.material?.userData?.groundCoverWindUniforms;
-	if ( ! uniforms ) return;
-	const direction = G.windDir.value, speed = G.windSpeed.value;
-	uniforms.uGroundCoverTime.value = time;
-	uniforms.uGroundCoverWindDirection.value.set( direction.x, direction.y ).normalize();
-	uniforms.uGroundCoverWindStrength.value = Math.max( 0, Math.min( 2.5, speed * 0.1 ) );
-}
-
 export class WebGLFallback {
 
 	constructor( app, engine ) {
@@ -1002,11 +914,6 @@ export class WebGLFallback {
 				this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 				this._createWebGLWake();
 				this.player.boat = this.boat.controller;
-			}
-			if ( this.hostedTerrainData && this.hostedGrassMask ) {
-				this.grass = webglGrassMesh( T, this.hostedTerrainData, this.camera, null, this.hostedGrassMask, this.grassCellPlanner );
-				this.scene.add( this.grass );
-				this.grassCenter = new T.Vector2( this.camera.position.x, this.camera.position.z );
 			}
 		}
 		if ( this.worldLink ) {
@@ -1773,13 +1680,6 @@ export class WebGLFallback {
 		const startZ = start.position.z ?? start.position[ 2 ];
 		if ( ! Number.isFinite( startX ) || ! Number.isFinite( startZ ) ) throw new Error( 'The built-in world layout must provide a finite start position' );
 		this.spawn = { position: [ startX, this.terrain.heightAt( startX, startZ ) + 1.7, startZ ], yaw: start.yaw, pitch: - 0.05 };
-		const hasGroundCover = this.defaultWorldSource?.components.some( component => component.grassMaskAssetId );
-		if ( hasGroundCover ) {
-			if ( ! this.hostedGrassMask || ! this.grassCellPlanner ) throw new Error( 'Built-in world declares ground-cover density but its signed density asset was not installed' );
-			this.grass = webglGrassMesh( T, this.terrain, { position: new T.Vector3( startX, 0, startZ ) }, null, this.hostedGrassMask, this.grassCellPlanner );
-			this.scene.add( this.grass );
-			this.grassCenter = new T.Vector2( startX, startZ );
-		}
 		progress( 0.9, 'Starting the WebGL island…' );
 
 	}
@@ -2375,13 +2275,6 @@ export class WebGLFallback {
 		}
 		if ( this.worldLink ) this._updateHostedWorldStreaming();
 		this.useButton.style.display = this._nearestPortalRoute() ? '' : 'none';
-		const grassDx = this.grassCenter ? this.camera.position.x - this.grassCenter.x : 0, grassDz = this.grassCenter ? this.camera.position.z - this.grassCenter.y : 0;
-		if ( this.grass && ( this.terrain || this.hostedTerrainData ) && grassDx * grassDx + grassDz * grassDz > 64 ) {
-			this.scene.remove( this.grass );
-			this.grass = webglGrassMesh( T, this.terrain || this.hostedTerrainData, this.camera, this.grass, this.hostedGrassMask || null, this.grassCellPlanner || null );
-			this.scene.add( this.grass );
-			this.grassCenter.set( this.camera.position.x, this.camera.position.z );
-		}
 		if ( this.beachDebris && this.beachDebrisTerrain ) {
 			const dx = this.camera.position.x - this.debrisCenter.x, dz = this.camera.position.z - this.debrisCenter.y;
 			if ( dx * dx + dz * dz > 36 ) {
@@ -2389,7 +2282,6 @@ export class WebGLFallback {
 				this.debrisCenter.set( this.camera.position.x, this.camera.position.z );
 			}
 		}
-		updateWebGLGrassWind( this.grass, simulationTime );
 		dispatchWorldBehaviorHooks( experience, 'onWebGLWorldFrame', { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin', dt, simulationTime, extensions: this.activeWorldExtensions } );
 		this.app.dispatchWorldFrameEvent( experience, this.activeWorldExtensions, this.worldLink ? this.connector?.worldId : 'elsemesh:local', dt, simulationTime, this.player, { fallback: this, mode: this.worldLink ? 'hosted' : 'builtin' } );
 		for ( const runtime of this.hostedComponentRuntimes?.values?.() || [] ) runtime.afterPlayerUpdate?.( dt, this.camera, this.player );

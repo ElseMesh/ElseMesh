@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { groundCoverFieldRenderFixture } from './helpers/ground-cover-field-render-fixture.mjs';
+import source from '../worlds/tidewater/world-source.json' with { type: 'json' };
+import { decodeGrassDensityAsset } from '../src/network/GrassDensityAsset.js';
+import { decodeTerrainSurfaceAsset } from '../src/network/TerrainSurfaceAsset.js';
+import { HeightfieldTerrainData } from '../src/world/HeightfieldTerrainData.js';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { installWebGLSceneMaterialLighting } from '../src/fallback/WebGLMaterialLighting.js';
 import { WebGLSunShadows } from '../src/fallback/WebGLSunShadows.js';
@@ -9,7 +12,33 @@ import '../src/fallback/WebGLGroundCoverFieldAdapter.js';
 const result = document.querySelector( '#result' );
 let runtime, renderer, shadows;
 try {
-	const { component, connector, terrain, terrainDetail } = await groundCoverFieldRenderFixture();
+	const groundCover = source.components.find( component => component.type === 'elsemesh.ground-cover-field/1' );
+	if ( ! groundCover ) throw new Error( 'Tidewater package has no signed ground-cover component' );
+	const densityReference = groundCover.assets.find( asset => asset.assetId === groundCover.data.densityAssetId );
+	if ( densityReference?.kind !== 'grass-density/1' ) throw new Error( 'Tidewater ground-cover component has no signed density asset' );
+	const readAsset = async assetId => {
+		const response = await fetch( `/__tidewater_assets/${ assetId.slice( 'sha256:'.length ) }` );
+		if ( ! response.ok ) throw new Error( `Unable to fetch Tidewater asset ${ assetId } (${ response.status}; ${ response.url }; ${ ( await response.text() ).slice( 0, 160 ) })` );
+		const bytes = new Uint8Array( await response.arrayBuffer() );
+		const digest = new Uint8Array( await crypto.subtle.digest( 'SHA-256', bytes ) );
+		const hash = Array.from( digest, value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' );
+		if ( hash !== assetId.slice( 'sha256:'.length ) ) throw new Error( `Tidewater asset ${ assetId } failed its content hash` );
+		return bytes;
+	};
+	const densityBytes = await readAsset( groundCover.data.densityAssetId );
+	const density = decodeGrassDensityAsset( densityBytes );
+	const terrainComponent = source.components.find( component => component.type === 'elsemesh.terrain-surface/1' );
+	const terrainMaps = await decodeTerrainSurfaceAsset( await readAsset( terrainComponent.data.dataAssetId ) );
+	const terrain = new HeightfieldTerrainData( terrainMaps );
+	const connector = {
+		manifest: { assets: groundCover.assets.map( asset => ( { id: asset.assetId, kind: asset.kind } ) ) },
+		assets: new Map( [ [ groundCover.data.densityAssetId, densityBytes ] ] ),
+		getAsset: async assetId => readAsset( assetId ),
+	};
+	const component = {
+		...groundCover,
+		data: { ...groundCover.data, species: groundCover.data.species.map( species => ( { ...species, castsShadow: true, shadowMaxDistance: 12 } ) ) },
+	};
 	const canvas = document.createElement( 'canvas' );
 	canvas.width = 192; canvas.height = 144;
 	renderer = new THREE.WebGLRenderer( { canvas, antialias: false, preserveDrawingBuffer: true } );
@@ -19,15 +48,16 @@ try {
 	const scene = new THREE.Scene();
 	scene.background = new THREE.Color( 0x98b8d0 );
 	const camera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 100 );
-	camera.position.set( 0, 3, 8 ); camera.lookAt( 0, 0.5, 0 ); camera.updateProjectionMatrix();
-	const ground = new THREE.Mesh( new THREE.PlaneGeometry( 32, 32 ), new THREE.MeshStandardMaterial( { color: 0xc3b895, roughness: 1 } ) );
-	ground.rotation.x = - Math.PI / 2; ground.position.y = - 0.02; ground.receiveShadow = true; scene.add( ground );
+	const viewX = - 52, viewZ = - 184, viewY = terrain.heightAt( viewX, viewZ );
+	camera.position.set( viewX, viewY + 3, viewZ + 8 ); camera.lookAt( viewX, viewY + 0.5, viewZ ); camera.updateProjectionMatrix();
+	const ground = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100 ), new THREE.MeshStandardMaterial( { color: 0xc3b895, roughness: 1 } ) );
+	ground.rotation.x = - Math.PI / 2; ground.position.set( viewX, viewY - 0.02, viewZ ); ground.receiveShadow = true; scene.add( ground );
 	const sunDirection = new THREE.Vector3( 0.45, 0.8, 0.38 ).normalize();
 	scene.add( new THREE.HemisphereLight( 0xcfe4ff, 0x50462f, 1.1 ) );
 	shadows = new WebGLSunShadows( { renderer, scene, camera, direction: sunDirection } );
 	for ( const light of shadows.lights ) light.intensity = 1.8;
 	installWebGLSceneMaterialLighting( THREE, scene, null, shadows );
-	const fallback = { THREE, connector, loader: new GLTFLoader(), scene, terrain, hostedTerrainSurface: { detail: terrainDetail.data, detailWidth: terrainDetail.width, detailHeight: terrainDetail.height }, hostedComponentRuntimes: new Map(), app: { renderLoadBias: 0 } };
+	const fallback = { THREE, connector, loader: new GLTFLoader(), scene, terrain, hostedTerrainData: terrain, hostedTerrainSurface: { detail: terrainMaps.detail, detailWidth: terrainMaps.detailWidth, detailHeight: terrainMaps.detailHeight }, hostedComponentRuntimes: new Map(), app: { renderLoadBias: 0 } };
 	const installed = await worldComponentBackendAdapter( 'webgl', component.type )( { fallback, terrain, assets: connector.assets }, component );
 	if ( ! installed?.installed ) throw new Error( 'WebGL ground-cover adapter did not install the signed component' );
 	runtime = installed.runtime;

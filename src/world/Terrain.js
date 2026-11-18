@@ -5,7 +5,7 @@ import { standard } from '../materials/Materials.js';
 import { G } from '../engine/render/Frame.js';
 import { srgb, rot2, terrainShadingModule } from './terrain/TerrainShading.js';
 
-// = GrassField FADE_T0 (vegetation/GrassField.js): tier 0 blades drop out at random distances in
+// = the ground-cover field's authored far fade: tier-0 blades thin out at random distances in
 // this range. Kept as a literal so the terrain doesn't pull in the grass field's shaders.
 const GRASS_FADE = [ 62, 87 ];
 
@@ -470,7 +470,7 @@ export function buildTerrainSurfaceWGSL( profile = null ) {
 		// bare trodden soil in places, sandy soil toward the beach
 		lawn = mix( lawn, ${ S( 0.4, 0.33, 0.23 ) }, smoothstep( 0.72, 0.84, dN.y + ( dM.y - 0.5 ) * 0.5 ) * 0.25 );
 		lawn = mix( lawn, ${ S( 0.60, 0.52, 0.38 ) }, sat( sp.x * 1.6 ) * smoothstep( 0.45, 0.62, dN.z + dM.y * 0.3 ) * 0.7 );
-		// inside the geometric grass field (GrassField) the ground is only seen between the blades:
+		// inside a dense ground-cover field the ground is only seen between the blades:
 		// the shaded base of the sward, dark and brownish with dead leaves; it hands over to the
 		// sward's own look (above) where the blades thin out
 		let grassHere = smoothstep( 2.5, 4.5, h ) * ( 1.0 - smoothstep( 0.45, 0.85, jungleW ) ) * ( 1.0 - sat( sp.x * 1.6 ) );

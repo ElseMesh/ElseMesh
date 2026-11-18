@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { accessSync, constants, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createServer } from 'vite';
 import { join } from 'node:path';
 
 const engineRoot = process.cwd();
+const tidewaterAssetDir = process.env.ELSEMESH_TIDEWATER_ASSET_DIR || join( engineRoot, 'worlds/tidewater/assets' );
 const sleep = ms => new Promise( resolveSleep => setTimeout( resolveSleep, ms ) );
 function chromiumPath() {
 	for ( const candidate of [ process.env.ELSEMESH_TEST_CHROMIUM, '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome' ].filter( Boolean ) ) {
@@ -19,7 +21,29 @@ async function stopBrowser( browser ) {
 }
 
 const profile = mkdtempSync( join( '/var/tmp', 'elsemesh-ground-cover-webgl-' ) );
-const vite = await createServer( { configFile: false, root: engineRoot, optimizeDeps: { entries: [ 'test/ground-cover-field-webgl-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
+const vite = await createServer( {
+	configFile: false, root: engineRoot, publicDir: false,
+	plugins: [ {
+		name: 'tidewater-ground-cover-assets',
+		configureServer( server ) {
+			server.middlewares.use( '/__tidewater_assets', async ( request, response, next ) => {
+				const hash = request.url?.replace( /^\//, '' ).split( '?' )[ 0 ];
+				if ( ! /^[0-9a-f]{64}$/.test( hash || '' ) ) { response.statusCode = 400; response.end( 'invalid asset hash' ); return; }
+				try {
+					const bytes = await readFile( join( tidewaterAssetDir, hash ) );
+					response.setHeader( 'Content-Type', 'application/octet-stream' );
+					response.setHeader( 'Content-Length', bytes.byteLength );
+					response.end( bytes );
+				} catch ( error ) {
+					if ( error.code === 'ENOENT' ) { response.statusCode = 404; response.end( 'asset not found' ); return; }
+					next( error );
+				}
+			} );
+		},
+	} ],
+	optimizeDeps: { entries: [ 'test/ground-cover-field-webgl-render.html' ] },
+	server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa',
+} );
 let browser, socket;
 try {
 	await vite.listen();

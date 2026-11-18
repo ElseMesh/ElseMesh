@@ -2235,3 +2235,22 @@ finding changes them.
   and adapter execution rather than signed-package visual parity. Tidewater's
   production package still has the old grass presenters active; no migration
   gate closes and the overall 93% estimate is unchanged.
+
+- 2026-11-18: activated Tidewater's signed `elsemesh.ground-cover-field/1`
+  component with its content-addressed density asset and near/mid/far patch
+  GLBs. The production WebGL and WebGPU ground-cover paths now use the same
+  renderer-neutral runtime, signed objects, density data, placements, material
+  graph, and shared LOD batches; the old WebGL lattice grass and production
+  Tidewater WebGPU `GrassField` path have been removed (the latter remains only
+  as a source reference in tests). Rechecked deterministic manifest conversion
+  and world-authored vegetation/density parity. With the committed terrain
+  asset staged separately to preserve a concurrent uncommitted terrain edit,
+  the signed-asset WebGPU source comparison reports 3.479/255 RGB MAE and
+  22,087/22,046 foliage pixels. Source and migrated cell selections still
+  differ: 20 source cells versus 42 shared cells (16 near, 26 mid). The WebGL
+  browser fixture renders the signed ground-cover content with 56 visible
+  instances and no GL errors; its shadow option is fixture-configured and the
+  capture is not a matched pre-split comparison. The component is active, but
+  matched production WebGPU/WebGL views, exact source-reference placement/cull
+  alignment, finite-vegetation migration, and supported-hardware FPS remain
+  open. No Tidewater percentage changes.

@@ -189,23 +189,22 @@ and matched visual parity remain open.
 
 ## Vegetation migration gate
 
-Tidewater's current vegetation path is still world-owned presentation code:
+Tidewater's finite vegetation path remains world-owned presentation code:
 `worlds/tidewater/component-installers.js` constructs
 `renderers/WebGPUVegetation.js`, `register-components.js` loads
 `renderers/WebGLVegetationComponentAdapter.js`, and the built-in `App` path calls
-the world's `presentation.createVegetation` factory. These paths implement
-different LOD, wind, and grass behavior. Their location in the Tidewater
+the world's `presentation.createVegetation` factory. These presenters still
+implement different LOD and wind behavior. Their location in the Tidewater
 repository does not satisfy renderer neutrality, and moving either presenter
 alone would repeat the backend-by-backend migration that this document forbids.
 
-There is a third, separate path: `src/fallback/WebGLFallback.js` builds
-camera-following WebGL grass in `webglGrassMesh()`. It is engine-owned code but
-is not yet a world-agnostic translation: it assumes Tidewater's RGBA meanings
-(dune, meadow, oats, creeper) and hard-codes Tidewater blade colors, dimensions,
-and distance thinning. The Tidewater WebGL vegetation component adapter builds
-the other plant categories but does not install this grass mesh itself. Keep
-this fallback path inside the same complete migration; do not treat its engine
-location as evidence that WebGL and WebGPU already share a neutral renderer.
+Dense ground cover now uses the engine-owned `elsemesh.ground-cover-field/1`
+runtime in both built-in and hosted paths. The former Tidewater-specific
+`webglGrassMesh()` approximation has been removed from
+`src/fallback/WebGLFallback.js`; the WebGL and WebGPU component adapters both
+consume the same signed density field, patch GLBs, placement records, material
+graph, cell selection, and LOD batches. This establishes a shared content path,
+but does not yet prove matched appearance against pre-split WebGPU.
 
 Keep Tidewater-owned scatter rules, placement records, density maps, species
 parameters, and authored model assets in Tidewater. Move all production
@@ -223,17 +222,18 @@ contract now has a `fixed-cell-patch/1` placement mode for signed GLBs that
 already contain each cell's complete authored layout. It emits one identity
 instance at each occupied cell origin and uses the shared distance-band choice
 for both adapters; minimum-FPS bias may choose a coarser asset from the same
-signed LOD list. Tidewater now exports its patch GLBs with the world-owned
-ground-cover graph. The paired fixture loads those authored GLBs through both
-adapters and exercises their material graph, geometry, and shadow paths using a
-synthetic density mask, the shared terrain-detail texels, and flat terrain. A
-separate matched WebGPU fixture compares the graph against Tidewater's source
-`GrassField` with the same patches, camera, mask, and fixed frame time; its RGB
-mean absolute error is 4.979/255. The engine path currently submits two
-additional near-field cells because its shared sphere culling is looser than
-the source cell-box culling. Tidewater's WebGPU grass still owns the active
-world path; matched production-world appearance against the pre-split reference
-remains open.
+signed LOD list. Tidewater exports and activates its near/mid/far patch GLBs
+with the authored ground-cover graph. The paired fixture loads those exact GLBs
+through both adapters and exercises their material graph and geometry using a
+synthetic density mask, shared terrain-detail texels, and flat terrain. A
+separate signed-asset WebGPU comparison uses Tidewater's committed density and
+terrain assets: the graph render is 3.479/255 RGB mean absolute error from the
+test-only pre-migration `GrassField` at the overhead meadow view. The source
+selects 20 cells while the shared runtime selects 42 (16 near and 26 mid);
+this remains a placement/culling difference from the old reference, even though
+the captured image passes the current 10/255 diagnostic threshold. A WebGL
+browser fixture also renders the signed patch GLBs, density, and terrain with
+no GL errors. Matched production views against pre-split WebGPU remain open.
 
 The ground-cover material graph can read the installed terrain surface's
 detail texture through the `detailField` slot. This reuses the texture already
@@ -247,9 +247,9 @@ and WebGL maps them into its standard physical-lighting path. Paired generic GLB
 render fixtures exercise those outputs, but do not establish Tidewater material
 or visual parity. Tidewater's generated ground-cover graph now combines these
 outputs with the authored density, detail, wind, terrain-height, color, and
-per-blade LOD behavior. Its signed world package has not selected the inactive
-patch sidecars yet; that switch awaits matched production views against the
-pre-split WebGPU reference.
+category-fade behavior. The active signed package references the patch assets.
+Matched production views against the pre-split WebGPU reference remain a parity
+gate.
 
 The ground-cover field is only the dense-flora contract; it does not cover the
 finite vegetation set. Tidewater's placement asset has ten authored categories
@@ -316,7 +316,7 @@ vegetation as incomplete.
 ### Dense ground-cover migration target
 
 The first vegetation slice is Tidewater's dense ground cover. The signed world
-must describe one cell-patch arrangement for both backends: the source 8 m cells,
+describes one cell-patch arrangement for both backends: the source 8 m cells,
 seeded clump, oat, and creeper slots, all five authored visual forms (meadow and
 dune grass, oat stalks and heads, creeper leaves and flowers), and the source
 near/mid/far geometry levels, including the source-authored distance fades for
@@ -337,19 +337,19 @@ costs. At matched settings both backends must use the same LOD asset and its
 authored category fades; adaptation may not independently remove categories or
 substitute a backend-specific content set.
 
-The shared graph now has the `translucency` and `specularIntensity` outputs
-needed by the source foliage lighting. Tidewater still needs to author their
-expressions alongside density response, terrain alignment, wind, palette, and
-category fades in the exported patch materials.
+The shared graph has the `translucency` and `specularIntensity` outputs needed
+by the source foliage lighting. Tidewater authors their expressions alongside
+density response, terrain alignment, wind, palette, and category fades in the
+exported patch materials.
 
-Before activating the component, a conformance fixture must load the exported
-Tidewater patch set through both engine adapters and assert identical cell
-transforms, species coverage, density inputs, selected LOD asset IDs, and wind
-inputs. Matched WebGPU/WebGL captures must then compare the same beach poses,
-time, viewport, render scale, and quality settings against pre-split WebGPU,
-including the near/mid/far transitions. Only after those gates pass may the
-world package select the shared component and the existing Tidewater vegetation
-presenters and WebGL grass approximation be removed.
+The generic paired-adapter fixture loads the exported patch set and verifies
+both renderers use the same component assets and shared runtime selections.
+Signed-asset source comparison and WebGL browser checks also pass, but source
+and migrated WebGPU cell lists still differ and there is no matched production
+WebGPU/WebGL/pre-split capture across beach poses and near/mid/far transitions.
+The dense-ground-cover component is active. Finite Tidewater vegetation stays
+on its world-owned presenters until its assets, shared data contract, and both
+backend adapters pass the corresponding migration and visual gates.
 
 ## Migration order
 
