@@ -16,16 +16,18 @@ visibility, LOD transitions, shadows, and GPU resources.
 
 ## Coarse-first lazy-loading evolution
 
-The implementation orders `lods` from coarsest to finest, requests the coarse
-model first, and lazily fetches finer levels as projected view demand crosses
-their thresholds. The shared component preload gate loads only the instance-set
-descriptor; both backend adapters use the same runtime and retain the coarse
-model while refinement is pending or unavailable. Refinement requests are
-limited to two concurrent loads per component. Texture bytes must be external
-shared assets so geometry refinement does not resend them. Fine GPU levels are
-currently retained until component eviction; per-level GPU LRU eviction remains
-to be implemented. Collision remains on its independent, higher-priority path.
-This is the engine's generic contract for static model sets.
+`lods` follows the common engine convention: LOD0 is highest detail and each
+larger index is progressively coarser. The runtime requests the last entry first
+for coarse coverage, then lazily fetches finer levels in descending index order
+as view demand requires them. The shared component preload gate loads only the
+instance-set descriptor; both backend adapters use the same runtime and retain
+the coarsest loaded level while refinement is pending or unavailable.
+Refinement requests are limited to two concurrent loads per component. Texture
+bytes must be external shared assets so geometry refinement does not resend
+them. Fine GPU levels are currently retained until component eviction;
+per-level GPU LRU eviction remains to be implemented. Collision remains on its
+independent, higher-priority path. This is the engine's generic contract for
+static model sets.
 
 ## Package shape
 
@@ -55,10 +57,10 @@ not a replacement for content-addressed package assets.
         { "assetId": "sha256:..." },
         { "assetId": "sha256:..." }
       ],
-      "lodThresholds": [0.004, 0.018],
+      "lodThresholds": [0.018, 0.004],
       "lodMetric": "projected-radius",
       "lodFadeFraction": 0.1,
-      "shadowLod": 0,
+      "shadowLodBias": 0,
       "shadowMaxDistance": 22,
       "drawMaxDistance": 90,
       "drawFadeStartDistance": 81
@@ -100,13 +102,15 @@ handedness. The corresponding instance rotations absorb the source scale-sign
 pattern, while every serialized instance scale remains positive. This lets
 mirrored source placements use per-mesh LODs without relying on negative-scale
 instanced matrices, which neither renderer can cull consistently.
-LOD entries are ordered from coarsest to finest detail. With `lodMetric` set to
-`projected-radius`, each `lodThresholds` entry is a normalized projected-radius
-boundary for the next finer level and values ascend. With `scaled-distance`,
-each is a world distance divided by the instance's largest scale and values
-descend. With `world-distance`, each is a camera-to-instance-origin distance
-in metres and values descend, independent of model bounds center and instance
-scale. This is for authored handoff ranges defined in world space.
+LOD0 is the highest-detail asset. Higher indices are progressively lower-detail
+assets intended for smaller projected sizes or greater distances. With
+`lodMetric` set to `projected-radius`, each `lodThresholds` entry is the
+normalized projected-radius boundary for changing from LOD *i* to LOD *i+1*;
+values descend as indices increase. With `scaled-distance`, each is a world
+distance divided by the instance's largest scale and values ascend. With
+`world-distance`, each is a camera-to-instance-origin distance in metres and
+values ascend, independent of model bounds center and instance scale. This is
+for authored handoff ranges defined in world space.
 With `world-distance-offset`, each instance must also provide a finite,
 non-negative `lodDistanceOffset`. The planner subtracts it from camera-to-origin
 distance, clamped at zero, and uses that measure for LOD selection, color draw
@@ -119,24 +123,19 @@ on each threshold and the shared planner applies a smoothstep transition.
 screen-door fade using distance from the transformed bounds center, except that
 `world-distance-offset` uses its adjusted camera-to-origin measure for both.
 Shadows use the independent `shadowMaxDistance`.
-`shadowLod` selects any valid level in the model's LOD list. For distance-based
-LOD, assets are ordered coarse-to-fine; a world can therefore choose its
-near-detail mesh for shadows while keeping coarse color rendering as the first
-startup request. WebGPU requests the selected shadow mesh when an instance
-enters the authored shadow range. WebGL continues to cast from its selected
-visible LOD and does not create a separate shadow batch.
+Shadows use the same authored LOD family and thresholds as color rendering.
+`shadowLodBias` adds an optional coarser-level bias to that shared selection;
+zero keeps shadow geometry aligned with the color LOD, while positive values
+reduce shadow mesh detail. Both renderers apply the same LOD transition fades
+to their shadow batches. `shadowMaxDistance` independently limits which
+instances cast shadows. The coarsest LOD remains the first startup request for
+coarse color coverage, while a required shadow level is requested when a
+caster enters range.
 The renderer-neutral planner selects visible instances and complementary
-incoming/outgoing LOD fades; shadow candidates are selected by distance
-independently of the camera frustum. WebGPU consumes those independent shadow
-selections. The Three.js WebGL fallback instead lets the currently selected
-visible LOD cast through its fade-aware depth material and skips separate
-shadow-instance batches: Three.js also submits scene-visible meshes to the
-color pass when their materials only disable color writes, so duplicate shadow
-meshes substantially increase WebGL draw calls. This WebGL policy is an
-approximation: off-frustum shadow casters and independently selected shadow
-LODs are not represented there yet. Model bounds are in local space and drive
-frustum culling and streaming. Instance transforms use a normalized quaternion
-and positive scale.
+incoming/outgoing LOD fades. Shadow candidates use the same multi-LOD policy
+independently of camera-frustum visibility, and shadow transitions use the same
+fades. Model bounds are in local space and drive frustum culling and streaming.
+Instance transforms use a normalized quaternion and positive scale.
 The package cannot contain shader source,
 renderer names, backend flags, or engine class names.
 

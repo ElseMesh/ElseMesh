@@ -26,11 +26,11 @@ const valid = {
 		id: 'market-table-fish',
 		bounds: { center: [ 0, 0.1, 0 ], radius: 0.6 },
 		geometryMirrorX: false,
-		lods: [ { assetId: lowest }, { assetId: low }, { assetId: hi } ],
-		lodThresholds: [ 0.004, 0.018 ],
+		lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ],
+		lodThresholds: [ 0.018, 0.004 ],
 		lodMetric: 'projected-radius',
 		lodFadeFraction: 0.1,
-		shadowLod: 0,
+		shadowLodBias: 0,
 		shadowMaxDistance: 22,
 		drawMaxDistance: 350,
 		drawFadeStartDistance: 350,
@@ -40,12 +40,22 @@ const valid = {
 
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
 assert.equal( validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 120 ], lodMetric: 'world-distance' } ] } ).models[ 0 ].lodMetric, 'world-distance', 'accepts fixed world-space handoff distances' );
-const coarseToFine = validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 70, 22 ], lodMetric: 'world-distance', shadowLod: 2 } ] } );
-assert.equal( coarseToFine.models[ 0 ].shadowLod, 2, 'distance-ordered LODs can select a finer authored shadow mesh' );
-assert.equal( new StaticModelInstanceSetPlanner( coarseToFine ).shadowGroups[ 0 ].lodIndex, 2, 'shared shadow planner uses the authored LOD index' );
+const nearToFar = validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 22, 70 ], lodMetric: 'world-distance', shadowLodBias: 0 } ] } );
+assert.equal( nearToFar.models[ 0 ].shadowLodBias, 0, 'shadows follow the same LOD thresholds as color by default' );
+assert.equal( new StaticModelInstanceSetPlanner( nearToFar ).shadowGroups[ 0 ].lodIndex, 0, 'shared shadow planner uses the authored LOD index' );
+const multiLODShadowPlanner = new StaticModelInstanceSetPlanner( {
+	...nearToFar,
+	models: [ { ...nearToFar.models[ 0 ], shadowMaxDistance: 50 } ],
+	instances: [ 5, 40 ].map( ( z, index ) => ( { ...nearToFar.instances[ 0 ], placementId: `shadow-${index}`, position: [ 0, 0, - z ] } ) ),
+} ).update( {
+	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
+	frustumPlanes: Array.from( { length: 6 }, () => [ 0, 0, 0, 1 ] ),
+} );
+assert.deepEqual( Array.from( multiLODShadowPlanner.shadowGroups[ 0 ].indices.subarray( 0, multiLODShadowPlanner.shadowGroups[ 0 ].count ) ), [ 0 ], 'near casters select shadow LOD0' );
+assert.deepEqual( Array.from( multiLODShadowPlanner.shadowGroups[ 1 ].indices.subarray( 0, multiLODShadowPlanner.shadowGroups[ 1 ].count ) ), [ 1 ], 'farther casters select the next coarser shadow LOD' );
 const offsetDistanceDocument = validateStaticModelInstanceSet( {
 	...valid,
-	models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 70, 22 ], lodMetric: 'world-distance-offset', shadowLod: 2, shadowMaxDistance: 70, drawMaxDistance: 70, drawFadeStartDistance: 50 } ],
+	models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 22, 70 ], lodMetric: 'world-distance-offset', shadowLodBias: 0, shadowMaxDistance: 70, drawMaxDistance: 70, drawFadeStartDistance: 50 } ],
 	instances: [ { ...valid.instances[ 0 ], position: [ 0, 0, - 80 ], lodDistanceOffset: 20 } ],
 } );
 assert.equal( offsetDistanceDocument.instances[ 0 ].lodDistanceOffset, 20, 'offset distance is explicit authored instance data' );
@@ -56,7 +66,7 @@ assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set(
 const providerLocalID = 'local-mesh-lod:great-hall:component:0';
 const providerLocalDocument = structuredClone( valid );
 providerLocalDocument.models[ 0 ].lods[ 0 ].assetId = providerLocalID;
-assert.equal( validateStaticModelInstanceSet( providerLocalDocument, { availableAssetIDs: new Set( [ providerLocalID, low, hi ] ) } ).models[ 0 ].lods[ 0 ].assetId, providerLocalID, 'provider-scoped model IDs require declaration in the connector inventory' );
+assert.equal( validateStaticModelInstanceSet( providerLocalDocument, { availableAssetIDs: new Set( [ providerLocalID, low, lowest ] ) } ).models[ 0 ].lods[ 0 ].assetId, providerLocalID, 'provider-scoped model IDs require declaration in the connector inventory' );
 assert.throws( () => validateStaticModelInstanceSet( providerLocalDocument, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
 assert.equal( decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes ).models[ 0 ].id, 'market-table-fish', 'the engine asset-codec registry applies the generic validator' );
 assert.throws( () => decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, bytes, { availableAssetIDs: new Set( [ hi ] ) } ), /missing/ );
@@ -67,7 +77,7 @@ assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { 
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], scale: [ 1, 0, 1 ] } ] } ), /transform/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], materialData: [ 1, 2, 3 ] } ] } ), /material data/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, instances: [ { ...valid.instances[ 0 ], materialData: [ 1, 2, 3, 4, 5, 6, 7, Infinity ] } ] } ), /material data/ );
-assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.018, 0.004 ] } ] } ), /overlapping LOD/ );
+assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodThresholds: [ 0.004, 0.018 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawMaxDistance: 0 } ] } ), /draw distance/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lodMetric: 'scaled-distance', lodThresholds: [ 28, 26 ] } ] } ), /overlapping LOD/ );
 assert.throws( () => validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], drawFadeStartDistance: 351 } ] } ), /draw fade distance/ );
@@ -102,10 +112,10 @@ assert.deepEqual( preloadedIDs, [ setAssetID, hi ], 'explicit caller demand may 
 const resolved = await loadStaticModelInstanceSetAssets( assetConnector, { assets: componentAssets } );
 assert.equal( resolved.document.models[ 0 ].id, 'market-table-fish' );
 assert.deepEqual( requestedAssets, [], 'resolving the compact descriptor does not prefetch any model GLBs' );
-await resolved.loadModelLOD( 0, 0 );
+await resolved.loadModelLOD( 0, 2 );
 assert.deepEqual( requestedAssets, [ lowest ], 'the renderer explicitly requests the coarsest signed GLB to start rendering' );
 await resolved.loadModelLOD( 0, 1 );
-await resolved.loadModelLOD( 0, 2 );
+await resolved.loadModelLOD( 0, 0 );
 assert.deepEqual( requestedAssets, [ lowest, low, hi ], 'finer GLBs are fetched only when the runtime requests them' );
 for ( let lodIndex = 0; lodIndex < valid.models[ 0 ].lods.length; lodIndex ++ ) resolved.releaseModelLOD( 0, lodIndex );
 assert.equal( resolved.modelAssets.size, 0, 'the adapter can release its temporary encoded copies after decoding each level' );
@@ -134,7 +144,7 @@ placements.push( { model: 'market-table-fish', position: [ 5, 2, 20 ], rotation:
 placements.push( { model: 'market-table-fish', position: [ 1, 2, 400 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } );
 const planner = new StaticModelInstanceSetPlanner( {
 	...valid,
-	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, geometryMirrorX: false, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 100, drawFadeStartDistance: 100 }, { id: 'short-range-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, geometryMirrorX: false, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 10, drawMaxDistance: 4, drawFadeStartDistance: 4 } ],
+	models: [ ...valid.models, { id: 'single-lod-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, geometryMirrorX: false, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLodBias: 0, shadowMaxDistance: 10, drawMaxDistance: 100, drawFadeStartDistance: 100 }, { id: 'short-range-model', bounds: { center: [ 0, 0, 0 ], radius: 0.3 }, geometryMirrorX: false, lods: [ { assetId: hi } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLodBias: 0, shadowMaxDistance: 10, drawMaxDistance: 4, drawFadeStartDistance: 4 } ],
 	instances: [ ...placements, { model: 'single-lod-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] }, { model: 'short-range-model', position: [ 0, 0, 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 } );
 planner.update( {
@@ -142,7 +152,7 @@ planner.update( {
 	verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 2 ], [ -1, 0, 0, 2 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 500 ], [ 0, 0, -1, 500 ] ],
 }, { renderLoadBias: 1 } );
-const [ coarseLod, middleLod, fineLod ] = planner.groups;
+const [ fineLod, middleLod, coarseLod ] = planner.groups;
 assert.deepEqual( Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ), [ 3 ] );
 assert.deepEqual( Array.from( middleLod.indices.subarray( 0, middleLod.count ) ), [ 1, 2 ] );
 assert.deepEqual( Array.from( fineLod.indices.subarray( 0, fineLod.count ) ), [ 0, 1 ] );
@@ -152,7 +162,7 @@ loadBiasedPlanner.update( {
 	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
 } );
-assert.equal( loadBiasedPlanner.groups[ 2 ].count, 1, 'the nearest LOD is selected without renderer-load bias' );
+assert.equal( loadBiasedPlanner.groups[ 0 ].count, 1, 'LOD0, the highest-detail level, is selected without renderer-load bias' );
 loadBiasedPlanner.update( {
 	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
@@ -163,21 +173,21 @@ const outgoingOffset = Array.from( middleLod.indices.subarray( 0, middleLod.coun
 const incomingOffset = Array.from( fineLod.indices.subarray( 0, fineLod.count ) ).indexOf( 1 );
 assert.ok( fineLod.fade[ incomingOffset ] > 0.4 && fineLod.fade[ incomingOffset ] < 0.6, 'shared LOD transition produces a fractional incoming fade' );
 assert.equal( middleLod.fade[ outgoingOffset ], fineLod.fade[ incomingOffset ], 'both transition LODs use the same complementary screen-door threshold' );
-assert.equal( middleLod.incoming[ outgoingOffset ], 0 );
-assert.equal( fineLod.incoming[ incomingOffset ], 1 );
-assert.equal( planner.shadowGroups[ 0 ].count, 2, 'shadow candidates are distance-limited independently of the camera frustum' );
-assert.equal( planner.shadowGroups[ 0 ].indices[ 0 ], 0 );
-assert.equal( planner.shadowGroups[ 0 ].indices[ 1 ], 5 );
+assert.equal( fineLod.incoming[ incomingOffset ], 0, 'near LOD0 fades out as view distance increases' );
+assert.equal( middleLod.incoming[ outgoingOffset ], 1, 'the next coarser LOD fades in with distance' );
+assert.equal( planner.shadowGroups[ 0 ].count, 0, 'these distant shadow candidates lie below the projected-size threshold for LOD0' );
+assert.equal( planner.shadowGroups[ 1 ].count, 2, 'shadow candidates are distance-limited independently of the camera frustum and assigned to LOD1' );
+assert.deepEqual( Array.from( planner.shadowGroups[ 1 ].indices.subarray( 0, planner.shadowGroups[ 1 ].count ) ), [ 0, 5 ] );
 assert.equal( planner.groups[ 3 ].indices.length, 1, 'per-model output buffers use that model\'s instance count' );
-assert.equal( planner.shadowGroups[ 1 ].indices.length, 1 );
+assert.equal( planner.shadowGroups[ 3 ].count, 1 );
 assert.equal( planner.groups[ 3 ].incoming[ 0 ], 2, 'a steady LOD is distinct from the outgoing transition side' );
 assert.ok( ! Array.from( coarseLod.indices.subarray( 0, coarseLod.count ) ).includes( 6 ), 'instances beyond drawMaxDistance are omitted from color draws' );
 assert.equal( planner.groups[ 4 ].count, 0, 'color draw distance can hide a model independently of its shadow range' );
-assert.equal( planner.shadowGroups[ 2 ].indices[ 0 ], 8, 'shadow selection remains independent of color draw distance' );
+assert.equal( planner.shadowGroups[ 4 ].indices[ 0 ], 8, 'shadow selection remains independent of color draw distance' );
 
 const worldDistanceDocument = {
 	...valid,
-	models: [ { ...valid.models[ 0 ], bounds: { center: [ 0, - 50, 0 ], radius: 1 }, lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 120 ], lodMetric: 'world-distance', shadowLod: 0, drawMaxDistance: 1000, drawFadeStartDistance: 1000 } ],
+	models: [ { ...valid.models[ 0 ], bounds: { center: [ 0, - 50, 0 ], radius: 1 }, lods: [ { assetId: hi }, { assetId: low } ], lodThresholds: [ 120 ], lodMetric: 'world-distance', shadowLodBias: 0, drawMaxDistance: 1000, drawFadeStartDistance: 1000 } ],
 	instances: [ { model: 'market-table-fish', position: [ 0, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 4, 4, 4 ] } ],
 };
 const worldDistancePlanner = new StaticModelInstanceSetPlanner( worldDistanceDocument );
@@ -186,16 +196,16 @@ const worldDistanceCamera = {
 	frustumPlanes: [ [ 1, 0, 0, 1000 ], [ - 1, 0, 0, 1000 ], [ 0, 1, 0, 1000 ], [ 0, - 1, 0, 1000 ], [ 0, 0, 1, 1000 ], [ 0, 0, - 1, 1000 ] ],
 };
 worldDistancePlanner.update( worldDistanceCamera );
-assert.equal( worldDistancePlanner.groups[ 1 ].count, 1, 'world-distance LOD measures from the placement origin and ignores the offset bounds center and instance scale' );
+assert.equal( worldDistancePlanner.groups[ 0 ].count, 1, 'world-distance LOD0 is highest detail and measures from the placement origin, ignoring the offset bounds center and instance scale' );
 worldDistancePlanner.update( worldDistanceCamera, { renderLoadBias: 1 } );
-assert.equal( worldDistancePlanner.groups[ 0 ].count, 1, 'render-load bias still permits an engine-owned coarser world-distance LOD under sustained load' );
+assert.equal( worldDistancePlanner.groups[ 1 ].count, 1, 'render-load bias still permits an engine-owned coarser world-distance LOD under sustained load' );
 const offsetDistancePlanner = new StaticModelInstanceSetPlanner( offsetDistanceDocument ).update( {
 	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 1000 ], [ -1, 0, 0, 1000 ], [ 0, 1, 0, 1000 ], [ 0, -1, 0, 1000 ], [ 0, 0, 1, 1000 ], [ 0, 0, -1, 1000 ] ],
 } );
 assert.equal( offsetDistancePlanner.groups[ 1 ].count, 1, 'authored offset is subtracted from camera-to-origin distance for shared LOD selection' );
 assert.equal( offsetDistancePlanner.groups[ 1 ].drawFade[ 0 ], 0.5, 'the same radius-adjusted distance controls color fade and draw range' );
-assert.equal( offsetDistancePlanner.shadowGroups[ 0 ].count, 1, 'the same adjusted distance controls the authored shadow range' );
+assert.equal( offsetDistancePlanner.shadowGroups[ 1 ].count, 1, 'the same adjusted distance controls both the authored shadow range and shadow LOD' );
 const offsetTransitionPlanner = new StaticModelInstanceSetPlanner( {
 	...offsetDistanceDocument,
 	instances: [ { ...offsetDistanceDocument.instances[ 0 ], position: [ 0, 0, - 90 ] } ],
@@ -203,12 +213,12 @@ const offsetTransitionPlanner = new StaticModelInstanceSetPlanner( {
 	position: [ 0, 0, 0 ], verticalFovRadians: Math.PI / 2,
 	frustumPlanes: [ [ 1, 0, 0, 1000 ], [ -1, 0, 0, 1000 ], [ 0, 1, 0, 1000 ], [ 0, -1, 0, 1000 ], [ 0, 0, 1, 1000 ], [ 0, 0, -1, 1000 ] ],
 } );
-assert.equal( offsetTransitionPlanner.groups[ 0 ].count, 1, 'centered smoothstep LOD band draws the coarse level during transition' );
-assert.equal( offsetTransitionPlanner.groups[ 1 ].count, 1, 'centered smoothstep LOD band draws the fine level during transition' );
-assert.ok( Math.abs( offsetTransitionPlanner.groups[ 0 ].fade[ 0 ] - 0.5 ) < 1e-6 && Math.abs( offsetTransitionPlanner.groups[ 1 ].fade[ 0 ] - 0.5 ) < 1e-6, 'the source handoff threshold produces the same centered half-fade as Tidewater bandFade' );
+assert.equal( offsetTransitionPlanner.groups[ 1 ].count, 1, 'centered smoothstep LOD band draws the near level during transition' );
+assert.equal( offsetTransitionPlanner.groups[ 2 ].count, 1, 'centered smoothstep LOD band draws the far level during transition' );
+assert.ok( Math.abs( offsetTransitionPlanner.groups[ 1 ].fade[ 0 ] - 0.5 ) < 1e-6 && Math.abs( offsetTransitionPlanner.groups[ 2 ].fade[ 0 ] - 0.5 ) < 1e-6, 'the source handoff threshold produces the same centered half-fade as Tidewater bandFade' );
 assert.throws( () => planner.update( { position: [ 0, 0 ], verticalFovRadians: 1, frustumPlanes: [] } ), /camera/ );
 
-const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLod: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };
+const distanceModel = { ...valid.models[ 0 ], id: 'scaled-distance-model', lods: [ { assetId: hi }, { assetId: low } ], lodThresholds: [ 28 ], lodMetric: 'scaled-distance', lodFadeFraction: 0.12, shadowLodBias: 0, drawMaxDistance: 90, drawFadeStartDistance: 81 };
 const distanceDocument = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ distanceModel ],
@@ -220,15 +230,15 @@ const distanceCamera = {
 	frustumPlanes: [ [ 1, 0, 0, 100 ], [ -1, 0, 0, 100 ], [ 0, 1, 0, 100 ], [ 0, -1, 0, 100 ], [ 0, 0, 1, 100 ], [ 0, 0, -1, 100 ] ],
 	};
 const distancePlanner = new StaticModelInstanceSetPlanner( distanceDocument ).update( distanceCamera, { renderLoadBias: 1 } );
-const [ distanceCoarse, distanceFine ] = distancePlanner.groups;
-assert.deepEqual( Array.from( distanceCoarse.indices.subarray( 0, distanceCoarse.count ) ), [ 2, 3 ], 'scaled-distance LOD starts coarse and keeps farther instances at lower detail' );
-assert.deepEqual( Array.from( distanceFine.indices.subarray( 0, distanceFine.count ) ), [ 0, 1, 2 ], 'closer instances refine as distance falls below the authored boundary' );
-assert.ok( distanceFine.fade[ 2 ] > 0.4 && distanceFine.fade[ 2 ] < 0.6, 'distance LOD fade fraction is author-configurable' );
+const [ distanceFine, distanceCoarse ] = distancePlanner.groups;
+assert.deepEqual( Array.from( distanceCoarse.indices.subarray( 0, distanceCoarse.count ) ), [ 2, 3 ], 'higher LOD indices retain lower detail at farther distances' );
+assert.deepEqual( Array.from( distanceFine.indices.subarray( 0, distanceFine.count ) ), [ 0, 1, 2 ], 'LOD0 is highest detail and closer instances refine below the authored boundary' );
+assert.ok( distanceCoarse.fade[ 0 ] > 0.4 && distanceCoarse.fade[ 0 ] < 0.6, 'distance LOD fade fraction is author-configurable' );
 assert.equal( distanceFine.drawFadeEnabled[ 0 ], 1 );
 assert.equal( distanceFine.drawFade[ 0 ], 1 );
 assert.ok( distanceCoarse.drawFade[ 1 ] > 0 && distanceCoarse.drawFade[ 1 ] < 1, 'draw range fades over an authored distance band' );
 const headroomDistancePlanner = new StaticModelInstanceSetPlanner( distanceDocument ).update( distanceCamera );
-assert.deepEqual( Array.from( headroomDistancePlanner.groups[ 0 ].indices.subarray( 0, headroomDistancePlanner.groups[ 0 ].count ) ), [ 3 ], 'neutral-load headroom refines the transition-distance model before its authored threshold requires it' );
+assert.deepEqual( Array.from( headroomDistancePlanner.groups[ 1 ].indices.subarray( 0, headroomDistancePlanner.groups[ 1 ].count ) ), [ 3 ], 'neutral-load headroom refines the transition-distance model before its authored threshold requires it' );
 
 for ( const camera of [ new PerspectiveCamera( 60, 1, 0.1, 100 ), new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) ] ) {
 	camera.position.set( 0, 0, 0 );
@@ -286,17 +296,17 @@ const initialBaseRuntime = new StaticModelInstanceSetRuntime( runtimeDocument, {
 } );
 initialBaseRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( initialBaseRequests, [ [ 0, 0 ] ], 'an unloaded visible model requests only its coarse base level while refinement is gated' );
+assert.deepEqual( initialBaseRequests, [ [ 0, 2 ] ], 'an unloaded visible model requests only its last-index coarse base level while refinement is gated' );
 assert.equal( initialBaseRuntime.isCoarseReadyForView(), false, 'the view coverage gate stays closed until its visible base mesh is installed' );
 finishInitialBase();
 await new Promise( resolve => setImmediate( resolve ) );
 assert.equal( initialBaseRuntime.isCoarseReadyForView(), true, 'the view coverage gate opens as soon as the visible base mesh arrives' );
 initialBaseRuntime.update( 1 / 60, gatedCamera );
-assert.deepEqual( initialBaseRequests, [ [ 0, 0 ] ], 'fine LOD requests remain blocked until the shared view gate opens' );
+assert.deepEqual( initialBaseRequests, [ [ 0, 2 ] ], 'fine LOD requests remain blocked until the shared view gate opens' );
 initialBaseRuntime.dispose();
 
 const shadowLODRequests = [];
-const shadowLODDocument = { ...coarseToFine, instances: [ { ...coarseToFine.instances[ 0 ], position: [ 0, 0, - 5 ] } ] };
+const shadowLODDocument = { ...nearToFar, instances: [ { ...nearToFar.instances[ 0 ], position: [ 0, 0, - 5 ] } ] };
 const shadowLODPlanner = new StaticModelInstanceSetPlanner( shadowLODDocument );
 const shadowLODRuntime = new StaticModelInstanceSetRuntime( shadowLODDocument, {
 	batches: shadowLODPlanner.groups.map( () => [ makeRuntimeBatch() ] ),
@@ -305,7 +315,7 @@ const shadowLODRuntime = new StaticModelInstanceSetRuntime( shadowLODDocument, {
 } );
 shadowLODRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.ok( shadowLODRequests.some( ( [ modelIndex, lodIndex ] ) => modelIndex === 0 && lodIndex === 2 ), 'WebGPU runtime requests the authored near-detail shadow mesh when a placement is within shadow range' );
+assert.ok( shadowLODRequests.some( ( [ modelIndex, lodIndex ] ) => modelIndex === 0 && lodIndex === 0 ), 'runtime requests LOD0, the authored near-detail shadow mesh, within the shadow range' );
 shadowLODRuntime.dispose();
 
 const priorityDocument = {
@@ -330,7 +340,7 @@ const coarsePriorityRuntime = new StaticModelInstanceSetRuntime( priorityDocumen
 } );
 coarsePriorityRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( coarsePriorityRequests, [ [ 'far-furniture', 0 ], [ 'near-bench', 0 ] ], 'visible coarse models request the largest projected coverage first even when it is farther and appears first in the descriptor' );
+assert.deepEqual( coarsePriorityRequests, [ [ 'far-furniture', 2 ], [ 'near-bench', 2 ] ], 'visible coarse models request the largest projected coverage first even when it is farther and appears first in the descriptor' );
 coarsePriorityRuntime.dispose();
 
 const overlappingBoundsDocument = {
@@ -348,7 +358,7 @@ const overlappingBoundsRuntime = new StaticModelInstanceSetRuntime( overlappingB
 } );
 overlappingBoundsRuntime.update( 1 / 60, gatedCamera );
 await new Promise( resolve => setImmediate( resolve ) );
-assert.deepEqual( overlappingBoundsRequests, [ [ 'far-furniture', 0 ], [ 'near-bench', 0 ] ], 'the larger projected coarse footprint wins even when its bound contains the camera' );
+assert.deepEqual( overlappingBoundsRequests, [ [ 'far-furniture', 2 ], [ 'near-bench', 2 ] ], 'the larger projected coarse footprint wins even when its bound contains the camera' );
 overlappingBoundsRuntime.dispose();
 
 const priorityPlanner = new StaticModelInstanceSetPlanner( priorityDocument );
@@ -444,7 +454,7 @@ let retryPlannerNotices = 0;
 retryRuntime.addPlannerRevisionListener( () => retryPlannerNotices ++ );
 retryRuntime.planner.update = () => {
 	for ( const group of retryRuntime.planner.groups ) group.count = 0;
-	retryRuntime.planner._groupsByModel[ 0 ][ 2 ].count = 1;
+		retryRuntime.planner._groupsByModel[ 0 ][ 0 ].count = 1;
 };
 const originalWarn = console.warn;
 console.warn = () => {};
@@ -453,8 +463,8 @@ try {
 	for ( let attempt = 0; attempt < 10 && ( retryRuntime.retryAfter.size === 0 || retryRuntime.pendingLods.size !== 0 ); attempt ++ ) await new Promise( resolve => setImmediate( resolve ) );
 	assert.equal( retryLoads, 1, 'first visible LOD request is attempted' );
 	assert.equal( retryRuntime.retryAfter.size, 1, 'a failed LOD request schedules its retry' );
-	assert.equal( retryRuntime.desiredLods[ 0 ], 2, 'the desired fine LOD is retained while its placement falls back to coarse geometry' );
-	assert.equal( retryRuntime.planner._groupsByModel[ 0 ][ 2 ].count, 0, 'the unavailable fine LOD is removed from the active draw group' );
+		assert.equal( retryRuntime.desiredLods[ 0 ], 0, 'LOD0 remains the desired highest-detail level while its placement falls back to coarse geometry' );
+		assert.equal( retryRuntime.planner._groupsByModel[ 0 ][ 0 ].count, 0, 'the unavailable fine LOD is removed from the active draw group' );
 	retryRuntime.update( 1 / 60, runtimeCamera );
 	assert.equal( retryLoads, 1, 'unchanged view does not retry before its scheduled time' );
 	const retryKey = [ ...retryRuntime.retryAfter.keys() ][ 0 ];

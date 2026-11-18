@@ -24,7 +24,7 @@ async function waitFor( predicate, message ) {
 const glbBytes = staticModelGLB( { nodeScale: [ -1, 1, 1 ] } ), modelAssetID = hash( glbBytes ), fineModelAssetID = `sha256:${'f'.repeat( 64 )}`;
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: modelAssetID }, { assetId: fineModelAssetID } ], lodThresholds: [ 0.001 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: fineModelAssetID }, { assetId: modelAssetID } ], lodThresholds: [ 0.1 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLodBias: 0, shadowMaxDistance: 40, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
 	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] } ],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
@@ -58,19 +58,19 @@ assert.deepEqual( requestedAssets, [ modelAssetID ], 'the current view requests 
 await waitFor( () => webgpuResult.runtime.isCoarseReadyForView(), 'the WebGPU coarse model finishes installing' );
 webgpuResult.runtime.update( 1 / 60, camera );
 assert.ok( webgpuRoot.children.filter( mesh => mesh.isInstancedMesh ).every( mesh => mesh.matrixAutoUpdate === false && mesh.matrixWorldAutoUpdate === false ), 'static WebGPU batches freeze their world transforms' );
-const cachedFineBatchAttributes = webgpuResult.runtime._batchAttributeGroups[ 1 ];
+const cachedFineBatchAttributes = webgpuResult.runtime._batchAttributeGroups[ 0 ];
 await waitFor( () => typeof releaseFineAsset === 'function', 'WebGPU starts the finer request asynchronously' );
 assert.ok( webgpuRoot.children.some( mesh => mesh.isInstancedMesh && ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the coarse WebGPU model stays visible while refinement is pending' );
 releaseFineAsset();
 await new Promise( resolve => setTimeout( resolve, 10 ) );
 assert.deepEqual( requestedAssets, [ modelAssetID, fineModelAssetID ], 'projected-size demand requests the finer model only after installation' );
 webgpuResult.runtime.update( 1 / 60, camera );
-assert.notEqual( webgpuResult.runtime._batchAttributeGroups[ 1 ], cachedFineBatchAttributes, 'streaming a finer LOD rebuilds only its cached batch attributes' );
-assert.equal( webgpuResult.runtime._batchAttributeGroups[ 1 ].batches, webgpuResult.runtime.batches[ 1 ], 'the refreshed cache points at the newly installed LOD batch' );
+assert.notEqual( webgpuResult.runtime._batchAttributeGroups[ 0 ], cachedFineBatchAttributes, 'streaming a finer LOD rebuilds only its cached batch attributes' );
+assert.equal( webgpuResult.runtime._batchAttributeGroups[ 0 ].batches, webgpuResult.runtime.batches[ 0 ], 'the refreshed cache points at the newly installed LOD batch' );
 const webgpuMeshes = [];
 webgpuRoot.traverse( object => { if ( object.isInstancedMesh ) webgpuMeshes.push( object ); } );
 const webgpuMain = webgpuMeshes.find( mesh => ! mesh.userData.shadowOnly );
-const webgpuShadow = webgpuMeshes.find( mesh => mesh.userData.shadowOnly );
+const webgpuShadow = webgpuMeshes.find( mesh => mesh.userData.shadowOnly && mesh.count > 0 );
 assert.ok( webgpuMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the requested fine WebGPU model becomes active after it loads' );
 assert.ok( webgpuMeshes.every( mesh => mesh.matrixAutoUpdate === false && mesh.matrixWorldAutoUpdate === false ), 'newly streamed WebGPU LOD batches also freeze their world transforms' );
 assert.equal( webgpuShadow.count, 1 );
@@ -84,6 +84,11 @@ assert.deepEqual( Array.from( webgpuMain.geometry.getAttribute( 'iStaticMaterial
 assert.equal( webgpuMain.material.attributes.iStaticMaterialData0, 'vec4f', 'WebGPU material profiles can bind opaque per-instance data' );
 assert.match( webgpuMain.material.vertex, /v\.iStaticMaterialData0/ );
 assert.equal( webgpuShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0, 'shadow-only instances remain fully visible with complementary fade enabled' );
+const farWebGPUCamera = new PerspectiveCamera( 60, 1, 0.1, 200 );
+farWebGPUCamera.position.set( 0, 0, 25 );
+farWebGPUCamera.lookAt( 0, 0, - 5 );
+webgpuResult.runtime.update( 1 / 60, farWebGPUCamera );
+assert.equal( webgpuResult.runtime.planner.shadowGroups[ 1 ].count, 1, 'WebGPU casts the same instance through the coarser shadow LOD as the camera recedes' );
 webgpuResult.runtime.dispose();
 disposeWorldPackage( webgpuRoot );
 assert.equal( webgpuRoot.children.length, 0 );
@@ -109,7 +114,7 @@ assert.equal( requestedAssets.filter( id => id === fineModelAssetID ).length, 2,
 webglResult.runtime.update( 1 / 60, new THREE.PerspectiveCamera( 60, 1, 0.1, 100 ) );
 const webglMeshes = webglFallback.scene.children.filter( object => object.isInstancedMesh );
 const webglMain = webglMeshes.find( mesh => ! mesh.userData.shadowOnly );
-const webglShadow = webglMeshes.find( mesh => mesh.userData.shadowOnly );
+const webglShadow = webglMeshes.find( mesh => mesh.userData.shadowOnly && mesh.count > 0 );
 assert.ok( webglMeshes.some( mesh => ! mesh.userData.shadowOnly && mesh.count === 1 ), 'the requested fine WebGL model becomes active after it loads' );
 assert.ok( webglMeshes.every( mesh => mesh.matrixAutoUpdate === false && mesh.matrixWorldAutoUpdate === false ), 'newly streamed WebGL LOD batches also freeze their world transforms' );
 assert.ok( webglShadow, 'WebGL submits a separate batch for the shared authored shadow LOD' );
@@ -122,6 +127,11 @@ assert.equal( webglShadow.material.depthWrite, false, 'the WebGL shadow LOD does
 assert.ok( webglShadow.customDepthMaterial, 'the selected shadow LOD uses its fade-aware depth material' );
 assert.equal( webglResult.runtime.usesShadowBatches, true, 'WebGL uses the shared independent shadow selection' );
 assert.equal( webglResult.runtime.planner.shadowGroups[ 0 ].count, 1, 'WebGL selects the same shadow instance independently of color visibility' );
+const farWebGLCamera = new THREE.PerspectiveCamera( 60, 1, 0.1, 200 );
+farWebGLCamera.position.set( 0, 0, 25 );
+farWebGLCamera.lookAt( 0, 0, - 5 );
+webglResult.runtime.update( 1 / 60, farWebGLCamera );
+assert.equal( webglResult.runtime.planner.shadowGroups[ 1 ].count, 1, 'WebGL casts the same instance through the matching coarser shadow LOD' );
 assert.equal( webglMain.geometry.getAttribute( 'position' ).getX( 0 ), 2.5, 'the WebGL batch retains reflected GLB node geometry positions' );
 assert.deepEqual( [ webglMain.geometry.getIndex().getX( 0 ), webglMain.geometry.getIndex().getX( 1 ), webglMain.geometry.getIndex().getX( 2 ) ], [ 0, 2, 1 ], 'baking a negative-scale GLB node reverses winding for the WebGL rasterizer' );
 assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).array[ 0 ], 1 );
@@ -136,7 +146,7 @@ const transparentModelBytes = staticModelGLB( { materialAlpha: 0 } );
 const transparentModelAssetID = hash( transparentModelBytes );
 const transparentDocumentBytes = new TextEncoder().encode( JSON.stringify( {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
-	models: [ { id: 'transparent-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: transparentModelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLod: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
+	models: [ { id: 'transparent-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: transparentModelAssetID } ], lodThresholds: [], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLodBias: 0, shadowMaxDistance: 20, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
 	instances: [ { model: 'transparent-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ] } ],
 } ) );
 const transparentDocumentAssetID = hash( transparentDocumentBytes );

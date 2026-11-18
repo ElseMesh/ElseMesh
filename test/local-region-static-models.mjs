@@ -46,8 +46,10 @@ assert.equal( materialVariants.length, 2, 'different authored material overrides
 assert.ok( materialVariants.every( set => set.document.models.length === 1 ), 'each streaming component contains one visibility-bounded mesh group' );
 assert.deepEqual( materialVariants.map( set => set.component.streamingBounds.center[ 0 ] ).sort( ( a, b ) => a - b ), [ 0, 4 ], 'each mesh component uses its own source bounds rather than a combined cell-wide bound' );
 assert.equal( new Set( materialVariants.flatMap( set => set.document.models.flatMap( model => model.lods.map( lod => lod.assetId ) ) ) ).size, 6, 'different material overrides never alias the same source mesh LOD assets' );
-assert.deepEqual( sets[ 0 ].document.models[ 0 ].lodThresholds, [ 0.05985, 0.1794 ], 'Unreal authored ScreenSize thresholds are ordered coarse-to-fine' );
-assert.match( sets[ 0 ].document.models[ 0 ].lods[ 0 ].assetId, /:2$/, 'the coarsest usable Unreal LOD loads first' );
+assert.deepEqual( sets[ 0 ].document.models[ 0 ].lodThresholds, [ 0.05985, 0.02498 ], 'Unreal authored ScreenSize thresholds descend from LOD0 to coarser levels' );
+assert.match( sets[ 0 ].document.models[ 0 ].lods[ 0 ].assetId, /:0$/, 'LOD0 uses the highest-detail Unreal source mesh' );
+assert.match( sets[ 0 ].document.models[ 0 ].lods.at( - 1 ).assetId, /:2$/, 'the coarsest usable Unreal LOD is last for coarse-first streaming' );
+assert.match( sets[ 0 ].component.assets[ 1 ].assetId, /:2$/, 'component asset inventory lists the coarse startup mesh first' );
 assert.equal( sets[ 0 ].component.assets.length, 4, 'the component declares its descriptor and each independent mesh LOD' );
 assert.ok( sets[ 0 ].document.models[ 0 ].bounds.radius >= Math.sqrt( 3 ), 'model bounds conservatively enclose the world-space source bounds' );
 assert.equal( sets[ 0 ].document.models[ 0 ].geometryMirrorX, false );
@@ -69,7 +71,7 @@ assert.equal( doubleMirrorSet.document.models[ 0 ].geometryMirrorX, false, 'even
 assert.deepEqual( doubleMirrorSet.document.instances[ 0 ].rotation, [ 0, 0, 1, 0 ] );
 assert.equal( localRegionStaticModelSets( { ...cell, visualInstances: [ { ...source( 0, 0 ), isSplineMesh: true } ] }, options ), null, 'spline-deformed meshes stay on the whole-cell GLB path' );
 assert.equal( localRegionStaticModelSets( { ...cell, meshLods: [] }, options ), null, 'incomplete mesh profiles keep the whole-cell fallback' );
-const invalidProfiles = [ { ...profiles[ 0 ], screenSize: 0.05 }, { ...profiles[ 1 ], screenSize: 0.1 }, { ...profiles[ 2 ], screenSize: 0.02 } ];
+const invalidProfiles = [ { ...profiles[ 0 ], screenSize: 0.05 }, { ...profiles[ 1 ], screenSize: 0.02 }, { ...profiles[ 2 ], screenSize: 0.04 } ];
 assert.equal( localRegionStaticModelSets( { ...cell, meshLods: [ { staticMeshPath: '/Game/GreatHall/SM_Table', lods: invalidProfiles } ] }, options ), null, 'non-monotonic authored thresholds do not produce a guessed LOD policy' );
 
 console.info( 'local-region static model instance-set synthesis checks passed' );

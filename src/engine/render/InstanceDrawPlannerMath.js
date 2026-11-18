@@ -37,8 +37,9 @@ export function writeInstanceLODSelection( target, lodMetric, distance, radius, 
 			if ( lodMeasure >= fadeStart && lodMeasure < fadeEnd ) { transition = thresholdIndex; break; }
 			continue;
 		}
-		const fadeStart = threshold * ( 1 - fadeFraction );
-		if ( lodMetric === 'projected-radius' ? lodMeasure < threshold && lodMeasure >= fadeStart : lodMeasure >= threshold && lodMeasure < threshold / ( 1 - fadeFraction ) ) { transition = thresholdIndex; break; }
+		const fadeStart = lodMetric === 'projected-radius' ? threshold * ( 1 - fadeFraction ) : threshold;
+		const fadeEnd = lodMetric === 'projected-radius' ? threshold : threshold / ( 1 - fadeFraction );
+		if ( lodMeasure >= fadeStart && lodMeasure < fadeEnd ) { transition = thresholdIndex; break; }
 	}
 	if ( transition >= 0 ) {
 		const threshold = thresholds[ transition ];
@@ -48,19 +49,20 @@ export function writeInstanceLODSelection( target, lodMetric, distance, radius, 
 			const t = Math.max( 0, Math.min( 1, ( lodMeasure - fadeStart ) / ( fadeEnd - fadeStart ) ) );
 			target[ 0 ] = transition;
 			target[ 1 ] = transition;
-			target[ 2 ] = 1 - t * t * ( 3 - 2 * t );
+			target[ 2 ] = t * t * ( 3 - 2 * t );
 			target[ 3 ] = lodMeasure;
 			return target;
 		}
-		const fadeStart = lodMetric === 'projected-radius' ? threshold * ( 1 - fadeFraction ) : threshold / ( 1 - fadeFraction );
+		const fadeStart = lodMetric === 'projected-radius' ? threshold * ( 1 - fadeFraction ) : threshold;
+		const fadeEnd = lodMetric === 'projected-radius' ? threshold : threshold / ( 1 - fadeFraction );
 		target[ 0 ] = transition;
 		target[ 1 ] = transition;
 		target[ 2 ] = lodMetric === 'projected-radius'
-			? ( lodMeasure - fadeStart ) / ( threshold - fadeStart )
-			: ( fadeStart - lodMeasure ) / ( fadeStart - threshold );
+			? ( fadeEnd - lodMeasure ) / ( fadeEnd - fadeStart )
+			: ( lodMeasure - fadeStart ) / ( fadeEnd - fadeStart );
 	} else {
 		let lodIndex = 0;
-		while ( lodIndex < thresholds.length && ( lodMetric === 'projected-radius' ? lodMeasure >= thresholds[ lodIndex ] : lodMeasure < thresholds[ lodIndex ] ) ) lodIndex ++;
+		while ( lodIndex < thresholds.length && ( lodMetric === 'projected-radius' ? lodMeasure < thresholds[ lodIndex ] : lodMeasure >= thresholds[ lodIndex ] ) ) lodIndex ++;
 		target[ 0 ] = lodIndex;
 		target[ 1 ] = -1;
 		target[ 2 ] = 1;

@@ -26,10 +26,11 @@ its shared planner and WebGL/WebGPU runtime load the coarse level first and
 fetch finer variants lazily. Keep collision independent from every visual
 detail choice.
 
-An asset instance may declare optional signed `lods`, ordered from medium to
-lowest detail, each referencing a distinct content-addressed GLB and a decreasing
-`maxScreenFraction` threshold. Keep the existing `assetId` as full detail and the
-collision source. Validate bounded level counts, threshold ordering, referenced
+An asset instance may declare optional signed `lods`, with LOD0 as highest
+detail and each increasing index progressively coarser, each referencing a
+distinct content-addressed GLB and a decreasing `maxScreenFraction` threshold.
+Keep the existing `assetId` as the highest-detail model and collision source.
+Validate bounded level counts, threshold ordering, referenced
 GLB types, and compatible bounds/transforms in source import, server manifests,
 client verification and AI/Blender authoring. Geometry alternatives must retain
 materials, UVs and silhouettes; do not drop arbitrary runtime triangles.

@@ -12,7 +12,7 @@ const data = {
 		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [], lodFadeFraction: 0.12,
 		drawMaxDistance: 24, drawFadeStartDistance: 20, scaleRange: [ 0.7, 1.3 ],
-		castsShadow: false, shadowMaxDistance: 0,
+		castsShadow: false, shadowLodBias: 0, shadowMaxDistance: 0,
 	} ],
 };
 const terrain = {
@@ -52,7 +52,7 @@ const fixedData = {
 		densityThreshold: 1, modelAssetIds: fixedModelIDs,
 		bounds: { center: [ 2, 0.5, 2 ], radius: 3 }, geometryMirrorX: false,
 		drawMaxDistance: 24, drawFadeStartDistance: 22,
-		castsShadow: false, shadowMaxDistance: 0,
+		castsShadow: false, shadowLodBias: 0, shadowMaxDistance: 0,
 	} ],
 };
 const fixedAssets = [ { assetId: densityAssetId, kind: 'grass-density/1' }, ...fixedModelIDs.map( assetId => ( { assetId, kind: 'glb' } ) ) ];
@@ -66,9 +66,9 @@ assert.ok( fixedInstances.every( record => record.position[ 0 ] % 4 === 0 && rec
 const fixedView = { position: [ 3, 5, 3 ], verticalFovRadians: Math.PI / 2, frustumPlanes: Array.from( { length: 6 }, () => [ 0, 0, 0, 1 ] ) };
 const fixedPlan = fixedRuntime.planDraws( fixedView );
 const fixedNear = fixedPlan.visibleGroups.get( 'authored-patch' );
-assert.ok( fixedNear[ 2 ].indices.some( index => fixedInstances[ index ].cellLodIndex === 0 ), 'near cells select the authored near patch asset' );
+assert.ok( fixedNear[ 0 ].indices.some( index => fixedInstances[ index ].cellLodIndex === 0 ), 'near cells select LOD0, the authored highest-detail patch asset' );
 const fixedCoarsePlan = fixedRuntime.planDraws( fixedView, 2 );
-assert.ok( fixedCoarsePlan.visibleGroups.get( 'authored-patch' )[ 0 ].indices.length > 0, 'minimum-FPS bias selects a coarser authored LOD while retaining the same patch instances' );
+assert.ok( fixedCoarsePlan.visibleGroups.get( 'authored-patch' )[ 2 ].indices.length > 0, 'minimum-FPS bias selects a higher-index coarser authored LOD while retaining the same patch instances' );
 fixedRuntime.dispose();
 
 console.log( 'ground-cover shared placement runtime: ok' );

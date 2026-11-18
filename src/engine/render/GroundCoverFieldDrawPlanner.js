@@ -51,7 +51,23 @@ export class GroundCoverFieldDrawPlanner {
 			const [ centerX, centerY, centerZ, radius, maxScale ] = sphere;
 			const dx = centerX - camera.position[ 0 ], dy = centerY - camera.position[ 1 ], dz = centerZ - camera.position[ 2 ];
 			const distance = Math.hypot( dx, dy, dz );
-			if ( record.castsShadow && distance <= record.shadowMaxDistance ) append( groupsFor( shadowGroups, record )[ 0 ], index, 1, 2, 1, 0 );
+			const lodDistance = record.lodMetric === 'world-distance'
+				? Math.hypot( record.position[ 0 ] - camera.position[ 0 ], record.position[ 1 ] - camera.position[ 1 ], record.position[ 2 ] - camera.position[ 2 ] )
+				: distance;
+			if ( record.castsShadow && distance <= record.shadowMaxDistance ) {
+				const shadowGroupsForSpecies = groupsFor( shadowGroups, record );
+				if ( record.placementAlgorithm === 'fixed-cell-patch/1' ) {
+					const lodIndex = Math.max( 0, Math.min( record.modelAssetIds.length - 1, record.cellLodIndex + record.shadowLodBias ) );
+					append( shadowGroupsForSpecies[ lodIndex ], index, 1, 2, 1, 0 );
+				} else {
+					const selection = writeInstanceLODSelection( this.lodScratch, record.lodMetric, lodDistance, radius, maxScale, tanHalfFov, record.lodThresholds, record.lodFadeFraction, renderLoadBias + record.shadowLodBias );
+					const [ lodIndex, transition, incomingFade ] = selection;
+					if ( transition >= 0 ) {
+						append( shadowGroupsForSpecies[ transition ], index, incomingFade, 0, 1, 0 );
+						append( shadowGroupsForSpecies[ transition + 1 ], index, incomingFade, 1, 1, 0 );
+					} else append( shadowGroupsForSpecies[ lodIndex ], index, 1, 2, 1, 0 );
+				}
+			}
 			if ( distance > record.drawMaxDistance ) continue;
 			let visible = true;
 			for ( const plane of planes ) if ( plane[ 0 ] * centerX + plane[ 1 ] * centerY + plane[ 2 ] * centerZ + plane[ 3 ] < - radius ) { visible = false; break; }
@@ -59,13 +75,10 @@ export class GroundCoverFieldDrawPlanner {
 
 			const fade = writeInstanceDrawDistanceFade( this.fadeScratch, record.drawFadeStartDistance, record.drawMaxDistance, distance );
 			if ( record.placementAlgorithm === 'fixed-cell-patch/1' ) {
-				const lodIndex = Math.max( 0, Math.min( record.modelAssetIds.length - 1, record.modelAssetIds.length - 1 - record.cellLodIndex - renderLoadBias ) );
+				const lodIndex = Math.max( 0, Math.min( record.modelAssetIds.length - 1, record.cellLodIndex + renderLoadBias ) );
 				append( groupsFor( visibleGroups, record )[ lodIndex ], index, 1, 2, fade[ 0 ], fade[ 1 ] );
 				continue;
 			}
-			const lodDistance = record.lodMetric === 'world-distance'
-				? Math.hypot( record.position[ 0 ] - camera.position[ 0 ], record.position[ 1 ] - camera.position[ 1 ], record.position[ 2 ] - camera.position[ 2 ] )
-				: distance;
 			const selection = writeInstanceLODSelection( this.lodScratch, record.lodMetric, lodDistance, radius, maxScale, tanHalfFov, record.lodThresholds, record.lodFadeFraction, renderLoadBias - ( record.lodMetric === 'world-distance' ? 0 : STREAMING_DETAIL_HEADROOM ) );
 			const groups = groupsFor( visibleGroups, record );
 			const [ lodIndex, transition, incomingFade ] = selection;

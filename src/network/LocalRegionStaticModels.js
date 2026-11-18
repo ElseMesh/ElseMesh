@@ -94,14 +94,14 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		let model = groups.get( groupKey );
 		if ( ! model ) {
 			const usable = lods.filter( lod => lod?.usable === true && Number.isSafeInteger( lod.index ) && lod.index >= 0 && Number.isFinite( lod.screenSize ) && lod.screenSize > 0 && lod.screenSize <= 1 )
-				.sort( ( a, b ) => b.index - a.index );
+				.sort( ( a, b ) => a.index - b.index );
 			if ( usable.length === 0 || usable.length > MAX_STATIC_MODEL_INSTANCE_LODS ) return null;
 			const thresholds = usable.slice( 1 ).map( lod => lod.screenSize );
-			if ( thresholds.some( ( value, index ) => index > 0 && value <= thresholds[ index - 1 ] ) ) return null;
+			if ( thresholds.some( ( value, index ) => index > 0 && value >= thresholds[ index - 1 ] ) ) return null;
 			let lodFadeFraction = 0.1;
 			for ( let index = 1; index < thresholds.length; index ++ ) {
 				// Keep adjacent cross-fades inside the game-authored screen-size gap.
-				lodFadeFraction = Math.min( lodFadeFraction, ( thresholds[ index ] - thresholds[ index - 1 ] ) / thresholds[ index ] * 0.5 );
+				lodFadeFraction = Math.min( lodFadeFraction, ( thresholds[ index - 1 ] - thresholds[ index ] ) / thresholds[ index - 1 ] * 0.5 );
 			}
 			model = { componentPath: source.componentPath, staticMeshPath: source.staticMeshPath, materialOverrideKey: source.materialOverrideKey, geometryMirrorX: mirrored.geometryMirrorX, sourceLods: usable, lodFadeFraction, radius: 0, instances: [], bounds: { min: [ Infinity, Infinity, Infinity ], max: [ - Infinity, - Infinity, - Infinity ] } };
 			groups.set( groupKey, model );
@@ -148,7 +148,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 				lodMetric: 'projected-radius',
 				// Provisional cross-fade width; it is a rendering choice, not game-authored data.
 				lodFadeFraction: model.lodFadeFraction,
-				shadowLod: 0,
+				shadowLodBias: 0,
 				shadowMaxDistance: maxDistanceMeters,
 				drawMaxDistance: maxDistanceMeters,
 				drawFadeStartDistance: maxDistanceMeters,
@@ -164,7 +164,7 @@ export function localRegionStaticModelSets( cell, { regionID, cellSizeMeters, co
 		if ( document.instances.length > MAX_STATIC_MODEL_INSTANCES ) return null;
 		const descriptorAssetID = localStaticModelSetAssetID( regionID, cellSizeMeters, coordinates, chunk );
 		const assetReferences = [ { assetId: descriptorAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND } ];
-		for ( const lod of model.sourceLods ) {
+		for ( const lod of model.sourceLods.slice().reverse() ) {
 			const assetId = localMeshLODAssetID( model.staticMeshPath, model.materialOverrideKey, lod.index );
 			if ( assetId.length > 8192 ) return null;
 			assetReferences.push( { assetId, kind: 'glb' } );

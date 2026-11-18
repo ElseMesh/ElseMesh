@@ -365,7 +365,7 @@ try {
 	const setDescriptorID = staticSet.assets[ 0 ].assetId;
 	const descriptorBytes = await connector.getAsset( setDescriptorID );
 	const descriptor = JSON.parse( new TextDecoder().decode( descriptorBytes ) );
-	assert.deepEqual( descriptor.models[ 0 ].lodThresholds, [ 0.05985, 0.1794 ], 'the provider descriptor retains authored coarse-to-fine thresholds' );
+	assert.deepEqual( descriptor.models[ 0 ].lodThresholds, [ 0.05985, 0.02498 ], 'the provider descriptor retains descending screen-size thresholds after LOD0' );
 	const priorDiskCache = connector.diskCache;
 	let storedDescriptor = new TextEncoder().encode( JSON.stringify( { ...descriptor, instances: descriptor.instances.map( ( { placementId, ...instance } ) => instance ) } ) );
 	let generatedDescriptors = 0;
@@ -388,7 +388,7 @@ try {
 	const meshLodAssetID = staticSet.assets[ 1 ].assetId;
 	const meshLodURL = new URL( connector.regionAssets.get( meshLodAssetID ) );
 	assert.equal( meshLodURL.searchParams.get( 'mesh' ), staticVisualInstance.componentPath );
-	assert.equal( meshLodURL.searchParams.get( 'lod' ), '2', 'the initial asset is the coarsest usable source LOD' );
+	assert.equal( meshLodURL.searchParams.get( 'lod' ), '2', 'the initial requested asset is the coarsest usable source LOD' );
 	createdRegionLeaseQuery = null;
 	assert.deepEqual( await connector.getAsset( meshLodAssetID ), bytes, 'a standalone mesh LOD is fetched as a provider asset' );
 	assert.equal( createdRegionLeaseQuery?.get( 'mesh' ), staticVisualInstance.componentPath, 'the region lease is scoped to the requested static-mesh component' );

@@ -54,7 +54,7 @@ export class StaticModelInstanceSetRuntime {
 		this.loadController = new AbortController();
 		if ( initialLoadedLods !== null && ( ! Array.isArray( initialLoadedLods ) || initialLoadedLods.length !== document.models.length || initialLoadedLods.some( ( levels, modelIndex ) => ! Array.isArray( levels ) || levels.some( level => ! Number.isInteger( level ) || level < 0 || level >= document.models[ modelIndex ].lods.length ) ) ) ) throw new Error( 'Initial static-model LOD residency is invalid' );
 		this.loadedLods = initialLoadedLods === null
-			? document.models.map( () => new Set( [ 0 ] ) )
+			? document.models.map( model => new Set( [ model.lods.length - 1 ] ) )
 			: initialLoadedLods.map( levels => new Set( levels ) );
 		this.desiredLods = new Int8Array( document.models.length ).fill( - 1 );
 		this.desiredLodPriorities = new Float32Array( document.models.length );
@@ -82,7 +82,7 @@ export class StaticModelInstanceSetRuntime {
 			const visible = ! this._cameraStateValid || this.planner._groupsByModel[ modelIndex ].some( group => group.count > 0 );
 			if ( ! visible ) continue;
 			total ++;
-			if ( this.loadedLods[ modelIndex ].has( 0 ) ) done ++;
+			if ( this.loadedLods[ modelIndex ].has( this.document.models[ modelIndex ].lods.length - 1 ) ) done ++;
 		}
 		return { done, total };
 	}
@@ -151,14 +151,30 @@ export class StaticModelInstanceSetRuntime {
 			const groups = this.planner._groupsByModel[ modelIndex ];
 			const loaded = this.loadedLods[ modelIndex ];
 			const model = this.document.models[ modelIndex ];
-			const shadowGroup = this.usesShadowBatches ? this.planner.shadowGroups[ modelIndex ] : null;
-			if ( shadowGroup?.count > 0 && ! loaded.has( model.shadowLod ) ) {
-				const key = `${ modelIndex }:${ model.shadowLod }`;
-				if ( ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
-					candidates.push( { modelIndex, level: model.shadowLod, key, loaded, projectedRadius: 0, distanceMeters: 0, centerDistanceMeters: 0 } );
+			const coarsestLevel = groups.length - 1;
+			const shadowGroups = this.usesShadowBatches ? this.planner._shadowsByModel[ modelIndex ] : null;
+			if ( shadowGroups?.some( group => group.count > 0 ) ) {
+				const coarsestLoaded = loaded.has( coarsestLevel );
+				for ( let level = 0; level < shadowGroups.length; level ++ ) {
+					const group = shadowGroups[ level ];
+					if ( group.count === 0 || loaded.has( level ) || ! coarsestLoaded && level !== coarsestLevel ) continue;
+					const key = `${ modelIndex }:${ level }`;
+					if ( this.pendingLods.has( key ) || candidates.some( candidate => candidate.key === key ) || performance.now() < ( this.retryAfter.get( key ) || 0 ) ) continue;
+					let projectedRadius = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity;
+					for ( let index = 0; index < group.count; index ++ ) {
+						const instanceIndex = group.indices[ index ];
+						projectedRadius = Math.max( projectedRadius, this.planner._projectedRadiusByInstance[ instanceIndex ] );
+						const surfaceDistance = this.planner._viewDistanceByInstance[ instanceIndex ];
+						const centerDistance = this.planner._viewCenterDistanceByInstance[ instanceIndex ];
+						if ( surfaceDistance < distanceMeters || surfaceDistance === distanceMeters && centerDistance < centerDistanceMeters ) {
+							distanceMeters = surfaceDistance;
+							centerDistanceMeters = centerDistance;
+						}
+					}
+					candidates.push( { modelIndex, level, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } );
 				}
 			}
-			if ( ! loaded.has( 0 ) ) {
+			if ( ! loaded.has( coarsestLevel ) ) {
 				let projectedRadius = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity, visible = false;
 				for ( const group of groups ) for ( let index = 0; index < group.count; index ++ ) {
 					visible = true;
@@ -171,17 +187,18 @@ export class StaticModelInstanceSetRuntime {
 						centerDistanceMeters = centerDistance;
 					}
 				}
-				const key = `${ modelIndex }:0`;
-				if ( visible && ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: 0, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } );
+				const key = `${ modelIndex }:${ coarsestLevel }`;
+				if ( visible && ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: coarsestLevel, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } );
 				continue;
 			}
 			if ( refreshDesired ) {
-				let desiredLevel = -1;
-				for ( let level = 1; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.max( desiredLevel, level );
+				let desiredLevel = Infinity;
+				for ( let level = 0; level < groups.length; level ++ ) if ( groups[ level ].count > 0 ) desiredLevel = Math.min( desiredLevel, level );
+				if ( desiredLevel === Infinity ) desiredLevel = - 1;
 				this.desiredLods[ modelIndex ] = desiredLevel;
 				let priority = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity;
-				const loadedMax = Math.max( ...this.loadedLods[ modelIndex ] );
-				for ( let visibleLevel = loadedMax + 1; visibleLevel <= desiredLevel; visibleLevel ++ ) {
+				const loadedMin = Math.min( ...loaded );
+				for ( let visibleLevel = Math.max( 0, desiredLevel ); desiredLevel >= 0 && visibleLevel < loadedMin; visibleLevel ++ ) {
 					const group = groups[ visibleLevel ];
 					for ( let index = 0; index < group.count; index ++ ) {
 						const instanceIndex = group.indices[ index ];
@@ -199,17 +216,17 @@ export class StaticModelInstanceSetRuntime {
 				this.desiredLodCenterDistances[ modelIndex ] = centerDistanceMeters;
 			}
 			const desiredLevel = this.desiredLods[ modelIndex ];
-			const loadedMax = Math.max( ...loaded );
-			const level = loadedMax + 1;
+			const loadedMin = Math.min( ...loaded );
+			const level = loadedMin - 1;
 			const key = `${ modelIndex }:${ level }`;
-			if ( desiredLevel < level ) this.retryAfter.delete( key );
-			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
+			if ( desiredLevel < 0 || desiredLevel >= loadedMin ) this.retryAfter.delete( key );
+			if ( desiredLevel >= 0 && desiredLevel < loadedMin && ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
 				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ], distanceMeters: this.desiredLodDistances[ modelIndex ], centerDistanceMeters: this.desiredLodCenterDistances[ modelIndex ] } );
 			}
-			if ( loadedMax >= 0 ) for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );
+			for ( let level = 0; level < loadedMin; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMin ] );
 		}
 		if ( ! canRefine ) {
-			for ( let index = candidates.length - 1; index >= 0; index -- ) if ( candidates[ index ].level !== 0 ) candidates.splice( index, 1 );
+			for ( let index = candidates.length - 1; index >= 0; index -- ) if ( candidates[ index ].level !== this.document.models[ candidates[ index ].modelIndex ].lods.length - 1 ) candidates.splice( index, 1 );
 			this._nextLODCheckAt = Math.min( this._nextLODCheckAt, performance.now() + 100 );
 		}
 		if ( ! this.loadLOD ) return;
@@ -217,7 +234,7 @@ export class StaticModelInstanceSetRuntime {
 		// structural silhouettes can close visible gaps before detail work. Once
 		// coverage is ready, refinements favor the nearest visible surface.
 		candidates.sort( ( a, b ) => {
-			if ( a.level === 0 && b.level === 0 && a.projectedRadius !== b.projectedRadius ) return b.projectedRadius > a.projectedRadius ? 1 : - 1;
+			if ( a.level === this.document.models[ a.modelIndex ].lods.length - 1 && b.level === this.document.models[ b.modelIndex ].lods.length - 1 && a.projectedRadius !== b.projectedRadius ) return b.projectedRadius > a.projectedRadius ? 1 : - 1;
 			return a.distanceMeters - b.distanceMeters || a.centerDistanceMeters - b.centerDistanceMeters || b.projectedRadius - a.projectedRadius || this.document.models[ a.modelIndex ].id.localeCompare( this.document.models[ b.modelIndex ].id );
 		} );
 		for ( const { modelIndex, level, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } of candidates ) {

@@ -35,6 +35,7 @@ export class StaticModelInstanceSetPlanner {
 		this.shadowGroups = [];
 		this._groupsByModel = [];
 		this._shadowsByModel = [];
+		this._shadowGroupOffsets = [];
 		const modelIndexById = new Map( document.models.map( ( model, index ) => [ model.id, index ] ) );
 		const modelInstanceCounts = new Uint32Array( document.models.length );
 		this._instanceModelIndices = new Uint16Array( document.instances.length );
@@ -52,9 +53,13 @@ export class StaticModelInstanceSetPlanner {
 				return group;
 			} );
 			this._groupsByModel.push( modelGroups );
-			const shadowGroup = createGroup( modelIndex, model.id, model.shadowLod, capacity );
-			this.shadowGroups.push( shadowGroup );
-			this._shadowsByModel.push( shadowGroup );
+			this._shadowGroupOffsets.push( this.shadowGroups.length );
+			const modelShadowGroups = model.lods.map( ( _lod, lodIndex ) => {
+				const group = createGroup( modelIndex, model.id, lodIndex, capacity );
+				this.shadowGroups.push( group );
+				return group;
+			} );
+			this._shadowsByModel.push( modelShadowGroups );
 		}
 		this._normalizedPlanes = new Float64Array( 24 );
 		this._projectedRadiusByInstance = new Float32Array( document.instances.length );
@@ -111,9 +116,16 @@ export class StaticModelInstanceSetPlanner {
 			const renderDistance = model.lodMetric === 'world-distance-offset' ? lodDistance : distance;
 			this._viewCenterDistanceByInstance[ instanceIndex ] = distance;
 			this._viewDistanceByInstance[ instanceIndex ] = Math.max( 0, distance - radius );
+			const projectedRadius = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
+			this._projectedRadiusByInstance[ instanceIndex ] = projectedRadius;
 			if ( includeShadows && renderDistance <= model.shadowMaxDistance ) {
-				const shadowGroup = this._shadowsByModel[ modelIndex ];
-				this._append( shadowGroup, instanceIndex, 1, 2, 1, 0 );
+				const shadowSelection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, lodDistance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias + model.shadowLodBias );
+				const [ shadowLodIndex, shadowTransition, shadowFade ] = shadowSelection;
+				const shadowGroups = this._shadowsByModel[ modelIndex ];
+				if ( shadowTransition >= 0 ) {
+					this._append( shadowGroups[ shadowTransition ], instanceIndex, shadowFade, 0, 1, 0 );
+					this._append( shadowGroups[ shadowTransition + 1 ], instanceIndex, shadowFade, 1, 1, 0 );
+				} else this._append( shadowGroups[ shadowLodIndex ], instanceIndex, 1, 2, 1, 0 );
 			}
 			if ( renderDistance > model.drawMaxDistance ) continue;
 			let visible = true;
@@ -123,7 +135,6 @@ export class StaticModelInstanceSetPlanner {
 			}
 			if ( ! visible ) continue;
 
-			this._projectedRadiusByInstance[ instanceIndex ] = radius / ( Math.max( distance, 1e-6 ) * tanHalfFov );
 			// Sustained render overload shifts demand toward coarser authored LODs.
 			const fade = writeInstanceDrawDistanceFade( this._drawFadeScratch, model.drawFadeStartDistance, model.drawMaxDistance, renderDistance );
 			const selection = writeInstanceLODSelection( this._lodScratch, model.lodMetric, lodDistance, radius, maxScale, tanHalfFov, model.lodThresholds, model.lodFadeFraction, renderLoadBias - ( usesAuthoredDistance ? 0 : STREAMING_DETAIL_HEADROOM ) );

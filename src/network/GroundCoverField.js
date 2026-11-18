@@ -33,7 +33,7 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 	const speciesIDs = new Set(), modelAssetIDs = new Set();
 	for ( const species of data.species ) {
 		const patchMode = data.placementAlgorithm === 'fixed-cell-patch/1';
-		const speciesKeys = [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'drawMaxDistance', 'drawFadeStartDistance', 'castsShadow', 'shadowMaxDistance', ...( patchMode ? [] : [ 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'scaleRange' ] ) ];
+		const speciesKeys = [ 'id', 'densityExpression', 'densityThreshold', 'modelAssetIds', 'bounds', 'geometryMirrorX', 'drawMaxDistance', 'drawFadeStartDistance', 'castsShadow', 'shadowLodBias', 'shadowMaxDistance', ...( patchMode ? [] : [ 'lodMetric', 'lodThresholds', 'lodFadeFraction', 'scaleRange' ] ) ];
 		if ( ! record( species ) || ! allowed( species, speciesKeys ) ) fail( 'species entry has unknown fields' );
 		if ( typeof species.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( species.id ) || speciesIDs.has( species.id ) ) fail( 'species ID is invalid or duplicated' );
 		speciesIDs.add( species.id );
@@ -45,12 +45,12 @@ export function validateGroundCoverField( data, componentAssets = [] ) {
 		if ( patchMode ) {
 			if ( species.modelAssetIds.length !== data.distanceBands.length ) fail( `species ${species.id} patch LOD count must match the distance-band count` );
 		} else {
-			if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance' ].includes( species.lodMetric ) || ! Array.isArray( species.lodThresholds ) || species.lodThresholds.length !== species.modelAssetIds.length - 1 || species.lodThresholds.some( ( value, index, values ) => ! finite( value ) || value <= 0 || index > 0 && ( species.lodMetric === 'projected-radius' ? value <= values[ index - 1 ] : value >= values[ index - 1 ] ) ) ) fail( `species ${species.id} LOD thresholds are invalid` );
+			if ( ! [ 'projected-radius', 'scaled-distance', 'world-distance' ].includes( species.lodMetric ) || ! Array.isArray( species.lodThresholds ) || species.lodThresholds.length !== species.modelAssetIds.length - 1 || species.lodThresholds.some( ( value, index, values ) => ! finite( value ) || value <= 0 || index > 0 && ( species.lodMetric === 'projected-radius' ? value >= values[ index - 1 ] : value <= values[ index - 1 ] ) ) ) fail( `species ${species.id} LOD thresholds are invalid` );
 			if ( ! finite( species.lodFadeFraction ) || species.lodFadeFraction < 0 || species.lodFadeFraction > 0.5 ) fail( `species ${species.id} LOD fade is invalid` );
 			if ( ! Array.isArray( species.scaleRange ) || species.scaleRange.length !== 2 || species.scaleRange.some( value => ! finite( value ) || value <= 0 || value > 100 ) || species.scaleRange[ 0 ] > species.scaleRange[ 1 ] ) fail( `species ${species.id} scale range is invalid` );
 		}
 		if ( ! finite( species.drawMaxDistance ) || species.drawMaxDistance <= 0 || species.drawMaxDistance > data.distanceBands.at( - 1 ).maxDistance || ! finite( species.drawFadeStartDistance ) || species.drawFadeStartDistance < 0 || species.drawFadeStartDistance > species.drawMaxDistance ) fail( `species ${species.id} draw range is invalid` );
-		if ( typeof species.castsShadow !== 'boolean' || ! finite( species.shadowMaxDistance ) || species.shadowMaxDistance < 0 || species.shadowMaxDistance > 10000 ) fail( `species ${species.id} shadow settings are invalid` );
+		if ( typeof species.castsShadow !== 'boolean' || ! Number.isInteger( species.shadowLodBias ) || species.shadowLodBias < 0 || species.shadowLodBias > MAX_MODEL_LODS || ! finite( species.shadowMaxDistance ) || species.shadowMaxDistance < 0 || species.shadowMaxDistance > 10000 ) fail( `species ${species.id} shadow settings are invalid` );
 		if ( ! species.castsShadow && species.shadowMaxDistance !== 0 ) fail( `species ${species.id} cannot have a shadow distance when shadows are disabled` );
 	}
 	const maxCandidates = data.distanceBands.reduce( ( total, band ) => total + band.cellCapacity, 0 ) * data.pointsPerCell * data.species.length;

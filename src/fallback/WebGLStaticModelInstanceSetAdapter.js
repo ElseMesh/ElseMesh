@@ -82,8 +82,8 @@ async function installStaticModelInstanceSet( { fallback, connector: providedCon
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const mainBatches = Array.from( { length: batchOffset }, () => [] );
-	const shadowBatches = Array.from( { length: document.models.length }, () => [] );
-	const initialLoadedLods = modelCapacity.map( capacity => capacity === 0 ? [ 0 ] : [] );
+	const shadowBatches = Array.from( { length: batchOffset }, () => [] );
+	const initialLoadedLods = modelCapacity.map( ( capacity, index ) => capacity === 0 ? [ document.models[ index ].lods.length - 1 ] : [] );
 	const disposeOwned = () => {
 		if ( runtime ) textureLOD.unregister( runtime );
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) {
@@ -129,12 +129,10 @@ async function installStaticModelInstanceSet( { fallback, connector: providedCon
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				const groups = [ draws ];
-				if ( lodIndex === document.models[ modelIndex ].shadowLod ) {
-					const shadows = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, true );
-					shadowBatches[ modelIndex ] = shadows;
-					for ( const draw of shadows ) fallback.scene.add( draw.mesh );
-					groups.push( shadows );
-				}
+				const shadows = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, true );
+				shadowBatches[ modelOffsets[ modelIndex ] + lodIndex ] = shadows;
+				for ( const draw of shadows ) fallback.scene.add( draw.mesh );
+				groups.push( shadows );
 				freezeStaticModelInstanceBatchTransforms( fallback.scene, groups );
 			}, priority ),
 			dispose: disposeOwned,

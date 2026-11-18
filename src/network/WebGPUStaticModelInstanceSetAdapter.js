@@ -28,8 +28,8 @@ async function installStaticModelInstanceSet( { root, connector, installed = [] 
 	let batchOffset = 0;
 	for ( const model of document.models ) { modelOffsets.push( batchOffset ); batchOffset += model.lods.length; }
 	const mainBatches = Array.from( { length: batchOffset }, () => [] );
-	const shadowBatches = Array.from( { length: document.models.length }, () => [] );
-	const initialLoadedLods = modelCapacity.map( capacity => capacity === 0 ? [ 0 ] : [] );
+	const shadowBatches = Array.from( { length: batchOffset }, () => [] );
+	const initialLoadedLods = modelCapacity.map( ( capacity, index ) => capacity === 0 ? [ document.models[ index ].lods.length - 1 ] : [] );
 	const disposeOwned = () => {
 		unregisterTextureDemand?.();
 		unregisterTextureDemand = null;
@@ -55,12 +55,10 @@ async function installStaticModelInstanceSet( { root, connector, installed = [] 
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
 				const groups = [ draws ];
-				if ( lodIndex === document.models[ modelIndex ].shadowLod ) {
-					const shadow = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
-					shadowBatches[ modelIndex ] = shadow;
-					for ( const draw of shadow ) root.add( draw.mesh );
-					groups.push( shadow );
-				}
+				const shadow = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
+				shadowBatches[ modelOffsets[ modelIndex ] + lodIndex ] = shadow;
+				for ( const draw of shadow ) root.add( draw.mesh );
+				groups.push( shadow );
 				freezeStaticModelInstanceBatchTransforms( root, groups );
 			}, priority ),
 			dispose: disposeOwned,

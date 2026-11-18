@@ -22,7 +22,7 @@ const field = {
 		bounds: { center: [ 0, 0.5, 0 ], radius: 0.8 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [ 46 ], lodFadeFraction: 0.12,
 		drawMaxDistance: 88, drawFadeStartDistance: 81, scaleRange: [ 0.7, 1.3 ],
-		castsShadow: false, shadowMaxDistance: 0,
+		castsShadow: false, shadowLodBias: 0, shadowMaxDistance: 0,
 	} ],
 };
 

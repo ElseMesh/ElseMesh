@@ -15,7 +15,7 @@ const data = {
 		modelAssetIds: [ modelAssetId ], bounds: { center: [ 0, 0.5, 0 ], radius: 1 }, geometryMirrorX: false,
 		lodMetric: 'scaled-distance', lodThresholds: [], lodFadeFraction: 0,
 		drawMaxDistance: 20, drawFadeStartDistance: 18, scaleRange: [ 0.8, 1.2 ],
-		castsShadow: false, shadowMaxDistance: 0,
+		castsShadow: false, shadowLodBias: 0, shadowMaxDistance: 0,
 	} ],
 };
 const component = {

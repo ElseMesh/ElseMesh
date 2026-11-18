@@ -44,6 +44,7 @@ component nor its assets select a backend or contain shader source.
         "drawFadeStartDistance": 81,
         "scaleRange": [ 0.7, 1.3 ],
         "castsShadow": false,
+        "shadowLodBias": 0,
         "shadowMaxDistance": 0
       }
     ]
@@ -63,8 +64,9 @@ candidate presence; species-specific appearance is carried by its model assets
 and material data.
 
 Each blue-noise species references one to four signed
-static GLBs, ordered coarsest to finest, and declares the same LOD metric and
-thresholds understood by the static-model contract. The asset references must
+static GLBs, ordered from LOD0 (highest detail) to progressively coarser
+levels, and declares the same LOD metric and thresholds understood by the
+static-model contract. The asset references must
 also appear in the component's signed asset list. Its authored bounds and
 reflection parity use the same semantics as
 `elsemesh.static-model-instance-set/1`, allowing both field adapters to use the
@@ -97,8 +99,8 @@ that share that patch. It requires `pointsPerCell: 1` and exactly one species
 model set. The species density expression identifies the RGBA channels that
 make a cell occupied; it does not scatter or randomly filter instances. The
 engine emits one instance at each occupied cell's exact origin with identity
-rotation and unit scale. Its `modelAssetIds` are ordered coarsest to finest and
-their count matches the distance-band count; those shared distance bands select
+rotation and unit scale. Its `modelAssetIds` are ordered from LOD0 (highest
+detail) to coarsest and their count matches the distance-band count; those shared distance bands select
 the matching authored patch level. This mode does not use per-species scale or
 LOD-transition settings. Minimum-FPS
 render-load bias may select a coarser asset from that same list, without
@@ -109,6 +111,8 @@ The graph may use the shared time, wind direction, and wind speed inputs for
 vertex deformation; authored wind response belongs in that renderer-neutral
 material graph rather than in a renderer-specific field setting. `castsShadow` and
 `shadowMaxDistance` are shared intent consumed by each backend's shadow path.
+Shadows use the same authored LOD family, thresholds, and transition fades as
+color; `shadowLodBias` optionally selects a coarser level to reduce shadow cost.
 
 The registered WebGPU and WebGL adapters consume the same signed-density and
 GLB fixture. Both select 51 visible and 45 near-shadow instances from the same

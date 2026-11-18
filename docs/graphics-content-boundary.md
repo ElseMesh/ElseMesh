@@ -228,6 +228,11 @@ needs one explicit engine component contract rather than separate WGSL and
 GLSL implementations in Tidewater. Both backends must sample the same signed
 atlas assets and select the same LOD at matched quality settings.
 
+Use the common asset-index convention for this contract: LOD0 is the highest-
+detail near model, and increasing indices are progressively coarser. The
+runtime can preserve coarse-first streaming by requesting the last index first;
+streaming order does not change the authored LOD numbering.
+
 Dense ground cover now uses the engine-owned `elsemesh.ground-cover-field/1`
 runtime in both built-in and hosted paths. The former Tidewater-specific
 `webglGrassMesh()` approximation has been removed from
