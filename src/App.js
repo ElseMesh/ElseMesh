@@ -8,6 +8,7 @@ import { advanceWorldWindField, setWorldWindFrame } from './engine/world/WorldWi
 
 import { Engine } from './core/Engine.js';
 import { Input } from './core/Input.js';
+import { autoExposureEnabled } from './core/GraphicsOptions.js';
 import { CDLOD } from './core/CDLOD.js';
 import { G } from './core/Globals.js';
 import { Profiler } from './core/Profiler.js';
@@ -658,7 +659,7 @@ export class App {
 			depthTexture: this.sceneRenderer.sceneRT.depthTexture, underwater: this.underwater, atmosphere: this.atmosphere,
 			sky: this.sky, clouds: this.clouds, terrain: this.terrainGPU, csm: this.csm,
 		} );
-		this.post = new PostFX( renderer, { sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater, clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze } );
+		this.post = new PostFX( renderer, { sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater, clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze, autoExposure: autoExposureEnabled( qs ) } );
 		if ( this.desktopAntiAliasingMode ) this.post.aaMode = this.desktopAntiAliasingMode;
 		G.exposure.value = this.settings.exposure;
 		this.setRenderScale( this.settings.renderScale );
@@ -884,6 +885,7 @@ export class App {
 		this.post = new PostFX( engine, {
 			sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater,
 			clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze,
+			autoExposure: autoExposureEnabled( this.qs ),
 		} );
 		if ( this.desktopAntiAliasingMode ) this.post.aaMode = this.desktopAntiAliasingMode;
 		G.exposure.value = this.settings.exposure;

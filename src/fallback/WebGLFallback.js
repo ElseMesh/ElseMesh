@@ -8,6 +8,7 @@ import { avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
 import { Input } from '../core/Input.js';
 import { FrameWorkMeter } from '../core/FrameWorkMeter.js';
 import { CDLOD } from '../core/CDLOD.js';
+import { autoExposureEnabled } from '../core/GraphicsOptions.js';
 import { Player } from '../player/Player.js';
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerDimensions.js';
 import { Vector3 as EngineVector3 } from '../engine/index.js';
@@ -749,7 +750,7 @@ export class WebGLFallback {
 		this.THREE = engine.THREE;
 		this.renderer = engine.renderer;
 		this.frameWorkMeter = new FrameWorkMeter( { webglRenderer: this.renderer } );
-		this.postFX = new WebGLPostFX( this.THREE, this.renderer, { autoExposure: ! app.qs?.has( 'noAutoExposure' ) } );
+		this.postFX = new WebGLPostFX( this.THREE, this.renderer, { autoExposure: autoExposureEnabled( app.qs ) } );
 		this.scene = new this.THREE.Scene();
 		this.waterScene = new this.THREE.Scene();
 		this.oceanLODs = new Set();

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { buildMovementKernel } from './build-movement-kernel.mjs';
 
 const tests = [
+	'test/graphics-options.mjs',
 	'test/cloud-profile.mjs',
 	'test/world-local-light-set.mjs',
 	'test/webgl-local-light-render.mjs',

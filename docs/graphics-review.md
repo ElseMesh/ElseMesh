@@ -22,8 +22,10 @@ samples, not calibrated colorimetric values or an FPS benchmark. The capture
 record does not establish that auto-exposure was disabled or that reflection
 settings matched. It confirms a visible color difference but cannot isolate
 whether lighting, image-based reflections, exposure, or tone mapping caused it.
-The next matched capture must record and lock those settings, and use the
-current shadow-LOD selection on both backends.
+The shared `?noAutoExposure` review option now disables auto-exposure in both
+WebGPU and WebGL while retaining the normal automatic default otherwise. Use it
+with `?view=beach&quality&scale=1&simtime=1000` for a fixed-exposure recapture,
+and verify shadows/reflections before interpreting ROI color differences.
 
 The WebGPU static-model runtime selected shadow-only batches for the four
 scanned-debris classes (`5, 1, 7, 4`). This capture predates `0c3dabde`, which

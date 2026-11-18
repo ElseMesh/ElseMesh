@@ -59,7 +59,7 @@ fn acesFilmicToneMapping( colorIn: vec3f, exposure: f32 ) -> vec3f {
 
 export class PostFX {
 
-	constructor( renderer, { sceneRenderer, camera, underwater, clouds = null, sunDir = null, haze = null } ) {
+	constructor( renderer, { sceneRenderer, camera, underwater, clouds = null, sunDir = null, haze = null, autoExposure = true } ) {
 
 		this.renderer = renderer;
 		this.camera = camera;
@@ -85,7 +85,7 @@ export class PostFX {
 
 		// ---- auto exposure (eye adaptation), metered on the GPU from the 1/16 bloom level
 		this.aeUniforms = new UniformBlock( 'AutoExposureParams', {
-			enabled: [ 'f32', 1 ],
+			enabled: [ 'f32', autoExposure ? 1 : 0 ],
 			refLum: [ 'f32', 0.25 ], // scene average luminance that needs no correction
 			min: [ 'f32', 0.6 ],
 			max: [ 'f32', 6.0 ],

@@ -3,6 +3,7 @@
 // output resolution, with stubbed modules of the other streams.
 //   node test/post-chain.mjs [mode] [out.png]     mode: air | under | motion | noao | flare | lens | waterline
 import { writePNG } from './headless.mjs';
+import assert from 'node:assert/strict';
 import './smaa-shim.mjs';
 import { GPU } from '../src/engine/gpu/GPU.js';
 import { ShaderModule, UniformBlock } from '../src/engine/gpu/Shader.js';
@@ -148,7 +149,9 @@ const underwater = new Underwater( { depthTexture: sceneRenderer.sceneRT.depthTe
 const haze = new AirHaze( { depthTexture: sceneRenderer.sceneRT.depthTexture, underwater, atmosphere, sky, clouds } );
 const engine = { width: W, height: H };
 const sunDirU = realApp ? atmosphere.sunDir : { value: G.sunDir.value.clone() };
-const post = new PostFX( engine, { sceneRenderer, camera, underwater, clouds, sunDir: sunDirU, haze } );
+const noAutoExposure = process.env.NO_AUTO_EXPOSURE === '1';
+const post = new PostFX( engine, { sceneRenderer, camera, underwater, clouds, sunDir: sunDirU, haze, autoExposure: ! noAutoExposure } );
+assert.equal( post.autoExposure.enabled.value, noAutoExposure ? 0 : 1, 'PostFX applies the selected fixed/automatic exposure mode' );
 // AA=none|taa|smaataa|smaa|fxaa: the anti-aliasing mode (SMAA's lookup textures are read from public/)
 if ( process.env.AA ) post.aaMode = process.env.AA;
 post.outputTexture = new Texture( { label: 'out', width: W, height: H, format: 'rgba8unorm', usage: [ 'render', 'copySrc', 'sample' ] } );
