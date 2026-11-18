@@ -21,7 +21,7 @@ const tests = [
 	'test/world-object-lod.mjs', 'test/world-object-lod-contract.mjs', 'worlds/tidewater/test/lod-package.mjs', 'worlds/tidewater/test/webgl-whale-package.mjs', 'test/webgl-spray.mjs',
 	'test/world-source-manifest.mjs', 'test/world-avatar-options.mjs', 'worlds/tidewater/test/world-source-manifest.mjs', 'worlds/tidewater/test/coconut-preservation.mjs', 'worlds/tidewater/test/village-materials.mjs', 'test/world-proposal.mjs',
 	'test/ai-edit-worker.mjs', 'test/ai-edit-mcp.mjs', 'test/ai-edit-review-html.mjs', 'test/prepare-ai-edit-publication.mjs',
-	'test/ai-edit-worker-runtime.mjs', 'worlds/tidewater/test/world-export.mjs', 'test/world-ocean-frame.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'test/world-audio.mjs',
+	'test/ai-edit-worker-runtime.mjs', 'worlds/tidewater/test/ground-cover-patch-glb.mjs', 'worlds/tidewater/test/world-export.mjs', 'test/world-ocean-frame.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'test/world-audio.mjs',
 	'worlds/tidewater/test/boat-lod-runtime.mjs', 'worlds/tidewater/test/webgl-pier-collision.mjs',
 	'test/world-collision.mjs', 'test/movement-support-kernel.mjs', 'test/world-package-emissive-texture.mjs', 'test/world-hosted-player.mjs', 'test/world-hosted-lifecycle.mjs', 'test/player-presence.mjs', 'test/world-presence-session.mjs',
 	'test/remote-avatar.mjs', 'test/avatar-lod-assets.mjs', 'test/account-client.mjs', 'test/serve-world-profile-options.mjs', 'test/ktx2-browser.mjs',

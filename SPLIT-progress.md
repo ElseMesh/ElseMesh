@@ -2123,3 +2123,14 @@ finding changes them.
   has not yet exported or activated its authored patch GLBs using this slot, so
   its separate vegetation arrangements and matched visual parity remain open;
   Tidewater remains 93%.
+
+- 2026-11-18: Tidewater's deterministic world exporter now emits an inactive
+  near/mid/far ground-cover GLB sidecar from `GroundCoverPatch.js`. The Tidewater
+  tests round-trip the exact position, normal, blade-side, cell-slot,
+  blade/category, and index streams; the exporter test verifies content hashes,
+  all three source triangle counts (17,560 / 4,716 / 768), and byte-stable
+  descriptors across repeated exports. The sidecar is not in the signed world
+  manifest or live component yet: shared renderer-neutral material behavior
+  for terrain placement, density response, wind, and matched visuals remains a
+  gate. WebGPU and WebGL vegetation paths therefore remain different; Tidewater
+  parity remains 93%.
