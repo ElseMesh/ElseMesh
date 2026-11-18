@@ -2317,3 +2317,14 @@ finding changes them.
   comparable. Pre-split image matching,
   full-resolution texture detail, other debris views, and LOD transitions remain
   open. Tidewater remains 93%.
+
+- 2026-11-18: upgraded the signed debris comparison to decode full-resolution
+  JPEG maps, save both backend captures, and calculate a matched-view silhouette
+  overlap. The automated WebGPU/WebGL run selects the same signed trunk LOD 2
+  GLB and placement document, then measures 565 shared foreground pixels out
+  of 581 (IoU 0.972) at 192×144. Foreground RGB MAE is 22.11/255, and the two
+  backends loaded 12/9 image assets in this run. Thus the close-up geometry
+  coverage is closely aligned while material/lighting output and texture
+  residency still differ. This software Dawn/SwiftShader fixture is not the
+  pre-split full-scene visual gate; other views, LOD transitions, and AMD
+  production capture remain open. No percentage change.
