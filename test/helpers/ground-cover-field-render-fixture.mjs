@@ -55,5 +55,5 @@ export async function groundCoverFieldRenderFixture() {
 			return densityBytes;
 		},
 	};
-	return { component, connector, terrain, terrainHeightModule, terrainDetail: { data: detailData, width: 8, height: 8 }, graph, modelAssetIds, modelBytesByLOD };
+	return { component, connector, terrain, grassMask: { data: densityData, res: 32, size: 32, origin: -16 }, terrainHeightModule, terrainDetail: { data: detailData, width: 8, height: 8 }, graph, modelAssetIds, modelBytesByLOD };
 }
