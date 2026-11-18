@@ -24,18 +24,63 @@ different built-in world package.
 ### Invitation-gated launches
 
 The planned short friend URL is `https://elsemesh.org/?invite=<opaque-code>`.
-It resolves to the owner's authorized world and reachable gateway; the
-destination gateway then checks a short-lived launch grant and owner admission.
-This short-code issuance and redemption flow is not implemented yet. Today,
+The Pages app reads the query and redeems the code with a public
+invitation/rendezvous API. That API maps it to an owner-authorized world and
+reachable gateway; the browser connects to the gateway, and the destination
+`worldd` checks a short-lived launch grant and its own admission policy. This
+short-code issuance, API, and redemption flow are not implemented yet. The
+existing `elsemesh-world-resolver` is only a signed provider directory: its
+current routes look up worlds or ZeroTier nodes and do not redeem invitations.
+The invitation API can extend that Worker or be a separate service. Today,
 **Share world invite** creates a full provider-bearing URL, which works only
 when the included gateway is reachable by the visitor.
 
-The owner may eventually choose a high-entropy bearer code or require an
-authenticated Google or Telegram account linked to a verified identity. A
-ZeroTier NodeID may identify a network member but does not prove a person's
-account; IP addresses are route hints. Never put private credentials or
-reusable account tokens in an invite URL. Once implemented, redemption must
-enforce expiry, revocation, replay protection, and destination-owner admission.
+The invitation service is a lookup/rendezvous component, not a world server.
+It stores owner-authorized invite metadata (world ID, signed gateway/provider
+candidates, allowed sign-in methods, expiry and revocation/redemption state),
+not world assets or reusable account credentials. It returns only
+owner-authorized, signed records. The browser verifies the world owner's
+manifest before accepting content, then uses the returned route to contact
+`worldd`. Do not accept an arbitrary gateway URL from invite input. Link
+previewers and crawlers must not consume an invite: use a non-consuming
+preview and an explicit redemption request after the visitor opens the page
+and completes any required sign-in. Make invite codes high-entropy and
+short-lived, remove them from browser history after handoff, and never put
+account tokens, ZeroTier secrets, or raw IPs in the link.
+
+The world gateway still has to be reachable from the visitor's browser over
+HTTPS/WSS (or a later browser-compatible relay). A ZeroTier Host ID or private
+ZeroTier address does not make a private `worldd` reachable from the public
+internet, and the browser does not join the host's ZeroTier network. A host
+behind NAT/firewall needs a public TLS gateway, a configured tunnel/reverse
+proxy, or a relay path that forwards browser traffic to the owner-authorized
+daemon. The invite resolver discovers the route; it does not create it.
+
+On 2026-11-18, `https://elsemesh.org/?invite=codex-test` returned the ElseMesh
+Pages app directly with HTTP 200 and no `Location` redirect. The custom domain
+is currently serving the Pages site, so this URL form reaches the client
+without redirect query-string handling. If deployment later changes to an
+HTTP redirect to another origin, configure it to preserve the complete query
+string and verify the final app receives `invite` unchanged. The client does
+not yet interpret opaque `invite` values; it currently understands explicit
+world/gateway parameters and direct world-resolver lookups.
+
+An invitation's eventual policy can use a high-entropy bearer code or allow one
+or more verified sign-in providers: Facebook, Google, and Telegram. After
+sign-in, the visitor chooses one verified public profile to display to other
+players, or keeps all profile links private; that choice may differ from the
+provider used to authenticate. Profile-link availability and verification vary
+by provider, so a missing link must not be fabricated. When `worldd` is
+configured for ZeroTier, sign-in via ztlib is enabled by default; without
+that configuration the method is unavailable. An invite need not know the
+visitor's NodeID in advance. If the visitor joins through ZeroTier, the
+authenticated NodeID may be associated with their world-local player record
+by the owner.
+This does not link a social account, and IP addresses remain route hints.
+Never put private credentials or reusable account tokens in an invite URL.
+Once implemented, redemption must enforce expiry, revocation,
+replay protection, and destination-owner admission. See [visitor identity and
+world-local state](visitor-identity-and-world-state.md#invite-provider-choices-and-public-identity).
 
 The static client accepts `worldId`, `nodeId`, `gateway` and `directory` query
 arguments. For example (replace the placeholder with an actual world gateway):

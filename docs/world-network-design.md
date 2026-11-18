@@ -11,13 +11,19 @@ details and limits live in [world-network-protocol.md](world-network-protocol.md
 
 Use the stable ElseMesh profile PeerID derived from its persistent `node.key`
 as the world **HostID**. Bind it to `worldId` in an owner-signed provider or
-session advertisement. Keep `worldId`, HostID, ZeroTier NodeID, and ZeroTier
-network ID as distinct values. ZeroTier roots establish overlay paths; they do
+session advertisement. Keep `worldId`, ElseMesh HostID, ZeroTier Host ID
+(called NodeID in its API/config), and ZeroTier network ID distinct. ZeroTier
+roots establish overlay paths; they do
 not register ElseMesh worlds or authorize network membership. ElseMesh's
 signed directory/resolver and configured gateway handle application-level
 world discovery. A browser host can advertise through the gateway with the
-same HostID and without joining ZeroTier. A ZeroTier NodeID is an optional
-route hint, not identity or membership proof.
+same HostID and without joining ZeroTier. A ZeroTier NodeID identifies a
+ZeroTier node, but does not register an ElseMesh world or by itself identify a
+social account. When `worldd` is configured for ZeroTier, ztlib sign-in is
+enabled by default and authenticates that node identity. The world owner can
+then associate it with a world-local player record. A ZeroTier virtual IP
+remains routing information. IRC may be evaluated as a separate discovery
+lookup method; it would not replace authenticated identity.
 
 When one machine hosts multiple worlds that need distinct HostIDs, give each
 world a persistent node profile and `node.key`. Its signed node record binds
@@ -603,17 +609,24 @@ using its own timeout. No atomic inter-owner membership commit is required.
 ### Invitation-gated entry
 
 World owners may opt into invitation admission. The desired share URL is a
-short root URL such as `https://elsemesh.org/?invite=<opaque-code>`; the main
-ElseMesh invitation service resolves it to the owner-authorized world and
-reachable gateway, validates the invitation and any required visitor identity,
-then redirects with a short-lived opaque launch grant. The destination gateway
-exchanges that grant for a signed, world-bound admission assertion before
+short root URL such as `https://elsemesh.org/?invite=<opaque-code>`. The Pages
+client reads the code and redeems it through a public invitation/rendezvous
+service. The service resolves it to the owner-authorized world and signed,
+reachable gateway candidates, then returns a short-lived opaque launch grant.
+The browser connects to the destination gateway; `worldd` validates the grant
+and applies its own admission policy. A path-form URL may be supported as an
+alias. The directory/resolver is not itself a world server or gateway.
 accepting the browser connection. A path-form URL may be supported as an alias.
 
-ZeroTier NodeID is an optional reusable network identity, not proof of a
-person's account. Owners may choose a high-entropy bearer invitation or require
-an authenticated account such as Google or Telegram, linked through a verified
-account key. IP addresses, including ZeroTier addresses, are routing
+When `worldd` is configured for ZeroTier, ztlib sign-in is enabled by default
+and provides the visitor's authenticated NodeID. The owner may associate it
+with a world-local player record after the visitor joins; the owner need not
+know it when creating an invitation. This does not link social accounts. A
+`worldd` instance without ZeroTier configuration cannot offer this method.
+Owners may choose a high-entropy bearer invitation or require
+an authenticated account through any providers allowed by the invite, initially
+Facebook, Google, and Telegram, linked through a verified account key. IP
+addresses, including ZeroTier addresses, are routing
 information, not account identity. An invitation without a provable static
 identity is single-use. Reuse, inactivity expiry, revocation, and replay
 protection are enforced by durable admission state. Existing worlds remain
@@ -621,9 +634,18 @@ guest-readable unless their signed access policy requires invitations. The
 invitation is separate from account roles and does not replace owner-signed
 manifest/provider validation.
 
-See [Google and Facebook visitor authentication](visitor-identity-and-world-state.md#google-and-facebook-visitor-authentication)
-for account-to-node binding and the rule that IP addresses are route hints,
-not identities.
+An invitation can allow Facebook, Google, Telegram, or any selected subset of
+those methods. After sign-in, the visitor chooses one linked public profile to
+show other players, separately from the provider used to authenticate. The
+trusted-neighbor handoff may preserve that choice with the visitor's consent;
+authentication tokens and unselected identities remain private. See
+[visitor identity and world-local state](visitor-identity-and-world-state.md#invite-provider-choices-and-public-identity)
+for provider-link availability and the visibility contract.
+
+See [Facebook, Google, and Telegram visitor authentication](visitor-identity-and-world-state.md#facebook-google-and-telegram-visitor-authentication)
+and [ZeroTier sign-in](visitor-identity-and-world-state.md#zerotier-sign-in-and-player-association)
+for account linking, owner-controlled NodeID association, and the rule that IP
+addresses are route hints, not identities.
 
 For a world entry, the destination owns the preferred spawn. Its version-2
 source and signed runtime manifest must define `rules.maxVisitors` (1–128) and

@@ -16,6 +16,11 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   short-code admission. The short-link resolution/account-bound admission
   sub-gate is tracked at 0% in
   [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
+  The live `elsemesh.org` check returned HTTP 200 directly from the Pages app
+  with no redirect, so the query reaches the client; however, the client does
+  not parse opaque invite codes and the deployed directory API has no invite
+  redemption route. A private `worldd` still needs an independently reachable
+  HTTPS/WSS gateway, tunnel, or browser-compatible relay.
 - Added the cross-world account requirement to the identity design: one
   ElseMesh account can link multiple verified providers, and a destination may
   accept a short-lived broker assertion plus a trusted-neighbor introduction
@@ -23,6 +28,17 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   while keeping its own admission policy authoritative. This is design-only;
   the multi-authenticator and trusted-neighbor sub-gate is tracked at 0% in
   [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#product-requirements).
+- Expanded the identity requirement to make Facebook, Google, and Telegram the
+  initial sign-in choices selectable by an invite creator. After authenticating,
+  the visitor chooses one verified, publicly linkable identity to display, or
+  keeps it private. Provider-specific profile-link availability and the
+  distinction between authenticated identity and public link are documented;
+  implementation remains at 0%.
+- Added ZeroTier sign-in via ztlib as a separate identity method, enabled by
+  default when `worldd` is configured for ZeroTier and unavailable otherwise.
+  Invites do not require a known Host ID; when a player joins through ZeroTier,
+  ztlib supplies the authenticated Host ID for the world owner to associate with
+  that player's world-local database record. Implementation remains at 0%.
 
 ## 2026-11-04
 

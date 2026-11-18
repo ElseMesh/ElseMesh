@@ -199,13 +199,21 @@ in `docs/`.
   [implementation status](docs/elsemesh-status.md).
 - **Optional identity and editing (65%):** keep worlds usable without an account;
   support optional Google login, owner-signed roles/revocations, and the
-  reviewable AI/Blender editing boundary. **Multi-authenticator account linking
-  and trusted-neighbor portal identity introduction: 0%.** One ElseMesh account
-  key may link multiple verified identities (including multiple Google
-  accounts and Telegram), and a destination may accept a signed,
-  destination-bound introduction from a trusted portal neighbor without
-  prompting the visitor to authenticate again. The destination stores a
-  world-local known-player record and retains final admission authority. See
+  reviewable AI/Blender editing boundary. **Multi-provider sign-in, public
+  identity choice, and trusted-neighbor introduction: 0%.** Support Facebook,
+  Google, and Telegram; allow an invite creator to choose which providers the
+  visitor may use. One ElseMesh account key can link multiple verified accounts
+  from those providers. After sign-in, ask which verified, linkable public
+  profile the visitor consents to show; keep this choice separate from the
+  authentication proof, and allow no public link. A destination may accept a
+  signed, destination-bound introduction from a trusted portal neighbor
+  without prompting for sign-in again, then store its own known-player record
+  while retaining final admission authority. **ZeroTier sign-in via ztlib and
+  owner-controlled ZeroTier NodeID-to-player association: 0%.** Enable it by
+  default when `worldd` is configured for ZeroTier; it is unavailable without
+  that configuration. When a player joins through it, the authenticated
+  ZeroTier NodeID is available to that world; the owner may then bind it to
+  the player's world-local record. See
   [account roles](docs/account-roles.md) and [visitor identity and world-local
   state](docs/visitor-identity-and-world-state.md).
 - **Portals and multiple worlds (75%):** support independently configured portal
@@ -259,21 +267,40 @@ details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-h
 
 Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
-**Opaque friend-link resolution and account-bound admission: 0%.** The
-shareable entry URL should be as simple as
-`https://elsemesh.org/?invite=<opaque-code>`: ElseMesh resolves the code to
-the owner-authorized world and its reachable gateway, then hands the browser a
-short-lived launch grant. The code may itself be a high-entropy, expiring,
-single-use capability, or the owner may require the visitor to authenticate
-with a linked provider such as Google or Telegram. Never encode a raw ZeroTier
-IP, private credential, or reusable account token in the URL. A ZeroTier
-NodeID may be bound as a separately verified network identity; neither it nor
-an IP address proves a person's Google/Telegram identity. The destination
-`worldd` remains the final admission authority. Until the short-link,
-redemption, and remote-admission path is implemented and verified, the browser
-can use direct world/gateway URLs or configured resolver lookups; these are not
+**Opaque friend-link resolution, account-bound admission, and reachable-
+gateway routing: 0%.** The shareable entry URL should be as simple as
+`https://elsemesh.org/?invite=<opaque-code>`. The Pages client reads the code
+and redeems it through a public invitation/rendezvous API, which resolves the
+owner-authorized world and signed, reachable gateway candidates, then returns
+a short-lived launch grant. The browser connects to the gateway, and the
+destination `worldd` validates the grant and remains the admission authority.
+The existing provider directory does not redeem invite codes. The code may be
+a high-entropy, expiring, single-use capability, or the owner may require the
+visitor to authenticate with one of the providers enabled for that invite:
+Facebook, Google, and/or
+Telegram. The owner can enable all three, allowing the visitor to choose any
+linked account. When `worldd` is configured for ZeroTier, the visitor may also
+sign in through ztlib, enabled by default. The owner need not know the
+visitor's ZeroTier Host ID when creating an invite; if the visitor joins
+through ZeroTier, ztlib supplies the authenticated Host ID to the world and
+the owner may associate it with that player's world-local record. After
+authentication, the visitor chooses which verified, publicly linkable
+provider identity to show other players; authentication identity and visible
+identity are separate choices, and a private/no-link
+choice remains available. Never encode a raw ZeroTier IP, private credential,
+or reusable account token in the URL. A ZeroTier NodeID identifies the
+authenticated network node; an owner-controlled database association can make
+it a player identifier in that world. This association does not prove a
+Facebook, Google, or Telegram identity, and IP addresses remain route hints.
+The destination `worldd` remains the final admission authority. Until the
+short-link, redemption, and remote-admission path is implemented and verified,
+the browser can use direct world/gateway URLs or configured resolver lookups; these are not
 revocable owner-issued short-code invitations. A remote visitor still needs a
-reachable secure gateway and an owner-authorized admission path.
+reachable secure gateway, tunnel, or browser-compatible relay and an
+owner-authorized admission path. DNS or a redirect only reaches the static
+client; it does not make a private daemon reachable. The current Pages
+deployment serves `https://elsemesh.org` directly (HTTP 200, no redirect in
+the 2026-11-18 check); any future redirect must preserve the `invite` query.
 
 Invitation launches use the destination world's authored spawn as the preferred
 entry point. Move the player only when a player or colliding object occupies

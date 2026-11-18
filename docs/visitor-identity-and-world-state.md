@@ -105,14 +105,14 @@ contract is not yet implemented. Identity recovery, key rotation, revocation
 and cross-world linkability/privacy remain design decisions. Ordinary guest
 visits need not require account sign-in.
 
-## Google and Facebook visitor authentication
+## Facebook, Google, and Telegram visitor authentication
 
 Visitors must be able to authenticate an ElseMesh account by signing in with
-Google or Facebook. The external provider verifies control of its account;
-ElseMesh maps the provider's issuer-scoped stable subject to a user-held
-ElseMesh account key. Email addresses are contact attributes, never account
-identifiers. The browser proves possession of that key, and the account broker
-issues a short-lived, audience- and world-bound signed visitor assertion for
+Facebook, Google, or Telegram. The external provider verifies control of its
+account. ElseMesh maps the provider's issuer-scoped stable subject to the
+user-held ElseMesh account key. Email addresses are contact attributes, never
+account identifiers. The browser proves possession of that key, and the account
+broker issues a short-lived, audience- and world-bound signed visitor assertion for
 `worldd`. Assertions expose only the ElseMesh account identity and the
 authentication status needed by the world's signed access policy; external
 provider tokens and raw provider subject IDs stay between the browser and the
@@ -122,40 +122,59 @@ admission rules.
 
 IP addresses are transport locators, not account identities. This includes
 `localhost` and a ZeroTier virtual IP: addresses can be shared, reassigned,
-proxied or changed, so `worldd` must not infer that an IP belongs to a Google
-or Facebook account or use an IP match to link a person to a world owner. A
-ZeroTier NodeID can authenticate a network node, but it does not establish
-which person or social account is using that node. If a deployment wants to
-associate a visitor account with a ZeroTier node, require independent proof of
-the ElseMesh account key and of the ZeroTier node, then bind both proofs to a
-short-lived world/presence session. The observed source address may help route
-or rate-limit that session; it is not the proof of either identity. A local
-world owner likewise authenticates as an account or owner key, not by being
-`localhost`.
+proxied or changed, so `worldd` must not infer that an IP belongs to a Facebook,
+Google, or Telegram account or use an IP match to link a person to a world
+owner. A ZeroTier Host ID (NodeID) identifies its authenticated ZeroTier node;
+it does not by itself link to a Facebook, Google, Telegram, or ElseMesh
+account. Do not infer it from the source IP. Linking it to another account
+identity is a separate explicit account-linking operation. A local world owner
+likewise authenticates as an account or owner key, not by being `localhost`.
 
 Guest access remains the default unless a world owner requires an authenticated
 account. The current account service implements Google sign-in for role-gated
-authoring actions only. Facebook/Telegram login, account assertions for visitor
-admission, and stable account-to-presence binding are not implemented yet.
+authoring actions only. Facebook/Telegram visitor login, ZeroTier/ztlib visitor
+sign-in, account assertions for visitor admission, and stable account-to-
+presence binding are not implemented yet.
+
+## ZeroTier sign-in and player association
+
+ZeroTier sign-in through ztlib is a distinct authentication method. It is
+enabled by default in a `worldd` instance configured for ZeroTier and is
+unavailable when the daemon has no ZeroTier configuration. The authenticated
+ZeroTier Host ID (NodeID) is supplied by this login flow; there is no separate
+“reveal my ID” prompt. Since the owner generally will not know the visitor's
+Host ID when issuing an invitation, the invite does not bind to one in advance.
+After the visitor joins through ZeroTier, the owner may associate that
+authenticated Host ID with the visitor's world-local player record. The link
+is recorded in the world's database and can be revoked by its owner.
+
+This ZeroTier player association does not automatically link Facebook, Google,
+Telegram, or an ElseMesh account; those identities require their own sign-in
+and explicit account-linking flow. IP addresses are never used as a substitute
+for the authenticated NodeID. Do not expose ZeroTier identity secrets or
+control-plane credentials to the browser. The exact ztlib login assertion and
+verification boundary must be specified before implementation. **Design
+complete: 0%; implementation: 0%.**
 
 ## Multiple sign-in methods for one visitor
 
 The user's ElseMesh account key is the canonical account identity. A user may
-link several independently verified external identities to that account, such
-as more than one Google account and a Telegram account. Linking a new method
-requires proof of control of that provider identity and authorization from the
-existing account key; matching email addresses, display names, IP addresses,
-or ZeroTier addresses never merge accounts. Each provider identity is keyed by
-its issuer and stable provider subject. The target account broker must support
+link several independently verified external identities to that account,
+including multiple Google accounts plus Facebook and Telegram accounts.
+Linking a new method requires proof of control of that provider identity and
+authorization from the existing account key; matching email addresses,
+display names, IP addresses, or ZeroTier addresses never merge accounts. Each
+provider identity is keyed by its issuer and stable provider subject. The target account broker must support
 linking, unlinking, revocation, recovery, and key rotation without treating any
 provider as the owner of the ElseMesh account. A display name such as `loz` is a
 world-local label, not an identity.
 
-The broker must not send Google or Telegram bearer tokens, raw provider subject
-IDs, or account session secrets to `worldd` or neighboring worlds. After
-interactive sign-in, it issues a short-lived signed assertion that proves the
-ElseMesh account key and, with the visitor's consent, identifies the verified
-authentication method or methods and their authentication time/assurance. A
+The broker must not send Facebook, Google, or Telegram bearer tokens, raw
+provider subject IDs, or account session secrets to `worldd` or neighboring
+worlds. After interactive sign-in, it issues a short-lived signed assertion
+that proves possession of the ElseMesh account key and, with the visitor's
+consent, identifies the verified authentication method or methods and their
+authentication time/assurance. A
 world can check which method was used or which linked methods were verified
 without receiving a reusable provider token. The world may request a stronger
 or more recent proof when its access policy requires one.
@@ -164,6 +183,50 @@ or more recent proof when its access policy requires one.
 key for authoring actions. It does not yet support multiple linked provider
 identities per account, Telegram sign-in, account assertions for world entry,
 or stable world-local visitor identifiers.
+
+## Invite provider choices and public identity
+
+An invitation may authorize one or more sign-in providers: Facebook, Google,
+and Telegram are the initial target set. The invitation creator selects the
+allowed methods, and the visitor may authenticate through any enabled method.
+The visitor can link it to an existing ElseMesh account after proving control
+of that account, or create an account if needed. For a friend who uses all
+three, the owner can enable all three choices on one invitation.
+
+After authentication, the visitor must be asked which one of their verified
+Facebook, Google, or Telegram identities they want other players to see. This
+is a public-identity choice, separate from which provider authenticated the
+session: a visitor may authenticate with Google and display a linked Facebook
+or Telegram profile, if that identity was independently verified and linked
+to the same account key. Show only the selected provider identity and its
+chosen display label/link. Offer a
+private/no-link choice, and let the visitor change or withdraw the selection.
+A world may retain its own per-world choice; trusted portal handoff carries the
+selection only with the visitor's consent and the destination's acceptance.
+Authentication methods and linked identities stay private unless separately
+disclosed by the visitor; a public profile choice does not disclose every
+linked account.
+
+Authentication subjects and tokens are never public profile links. Construct a
+hyperlink only from a provider-returned or user-supplied profile URL that has
+been checked against that provider's allowed HTTPS host and explicitly
+confirmed by the visitor; never derive it from an email address or opaque
+provider subject. The visitor's account key signs the disclosure for the
+intended world, proving consent to publish it; it does not by itself prove the
+URL belongs to the provider account. A host check confirms the destination
+domain, not account ownership: mark user-entered links unverified unless provider proof binds them
+to that account. Provider capabilities differ: Google People API can return
+`urls[]`, but does not guarantee a public profile URL for every account;
+Facebook profile links use the permission-gated `user_link` field and may not
+resolve for every viewer; the Telegram login widget may return a username,
+which can form a `t.me` link and may change. Missing or inaccessible profile
+links must be shown as unavailable rather than invented. See the [Google People API](https://developers.google.com/people/api/rest/v1/people),
+[Meta profile-link permission notes](https://developers.facebook.com/docs/facebook-login/changelog/),
+and [Telegram login widget fields](https://core.telegram.org/widgets/login/).
+
+**Implementation gap:** invite-level provider allowlists, the required
+post-authentication identity prompt, validated provider profile links,
+visibility consent, and per-world identity records are not implemented.
 
 ## Reusing authentication through a trusted neighboring world
 
@@ -178,9 +241,13 @@ world and accepts the asserted authentication method and age.
 
 When accepted, the destination creates or updates its own known-player record,
 keyed by a destination-specific pseudonymous account subject. It may record the
-verified method(s), introduction source, first/last visit, and the local
-display name chosen by that visitor. The browser need not prompt for another
-login while the proof is valid and the destination's trust policy accepts it.
+verified method evidence, introduction source, first/last visit, and the local
+display name chosen by that visitor, plus the selected public profile link if
+the visitor consented to share it. The public player view exposes only the
+single profile link the visitor selected; the set of linked accounts and
+authentication methods remains private unless separately disclosed. The
+browser need not prompt for another login while the proof is valid and the
+destination's trust policy accepts it.
 Each destination retains final control over access, bans, visitor limits,
 avatar rules, and saved state; a neighbor's introduction grants no roles or
 privileges. If the source is not trusted, the assertion has expired, the
