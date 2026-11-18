@@ -222,7 +222,7 @@ float emgTerrainHeightAt( vec2 xz ) {
 	return material;
 }
 
-export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHeightField = null } = {} ) {
+export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHeightField = null, graphTextures = {} } = {} ) {
 	const compiled = compileWorldMaterialGraph( graph, 'webgl', { doubleSided: sourceMaterial.side === T.DoubleSide } );
 	const terrainHeightBinding = compiled.requiresTerrainHeight ? acquireTerrainHeightBinding( T, terrainHeightField ) : null;
 	const usesVertexColors = compiled.inputs.some( name => name === 'color' || name === 'colorRGB' );
@@ -233,6 +233,7 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHei
 		normal: sourceMaterial.normalMap,
 		occlusion: sourceMaterial.aoMap,
 		emissive: sourceMaterial.emissiveMap,
+		...graphTextures,
 	};
 	for ( const slot of compiled.textureSlots ) if ( ! textureBindings[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
 	const graphKey = JSON.stringify( graph );

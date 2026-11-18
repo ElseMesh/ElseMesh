@@ -22,4 +22,4 @@ export function hasWorldMaterialProfileCompiler( profile, backend ) {
 
 // Engine-owned built-in compiler pair. World packages provide graph data only.
 registerWorldMaterialProfileCompiler( 'elsemesh.material-graph/1', 'webgpu', ( { source, graph, textures, terrainHeightModule } ) => createWebGPUMaterialGraph( source, graph, { ...textures, terrainHeightModule } ) );
-registerWorldMaterialProfileCompiler( 'elsemesh.material-graph/1', 'webgl', ( { THREE, sourceMaterial, graph, terrainHeightField } ) => createWebGLMaterialGraph( THREE, sourceMaterial, graph, { terrainHeightField } ) );
+registerWorldMaterialProfileCompiler( 'elsemesh.material-graph/1', 'webgl', ( { THREE, sourceMaterial, graph, terrainHeightField, graphTextures } ) => createWebGLMaterialGraph( THREE, sourceMaterial, graph, { terrainHeightField, graphTextures } ) );

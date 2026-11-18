@@ -140,24 +140,24 @@ export async function appendWorldPackageAssets( connector, root, assets, { signa
 // Decode one content-addressed GLB through the same cache and material adapter
 // path used by ordinary world objects. Callers may clone its primitives, but
 // this cached source remains owned by disposeWorldPackage().
-export async function loadWorldPackageModelAsset( connector, root, assetId, { signal, parsedGLTF = null, bytes = null, terrainHeightModule = null } = {} ) {
+export async function loadWorldPackageModelAsset( connector, root, assetId, { signal, parsedGLTF = null, bytes = null, terrainHeightModule = null, graphTextureOverrides = {}, cacheKey = assetId } = {} ) {
 	const state = root?.userData?.worldPackage;
 	if ( ! state || state.disposed ) throw new Error( 'Cannot load a model into a disposed world package' );
-	const cached = state.parsed.get( assetId );
+	const cached = state.parsed.get( cacheKey );
 	if ( cached ) return cached;
 	const modelBytes = parsedGLTF ? null : bytes || await connector.getAsset( assetId, { signal } );
 	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const decoded = await buildGLTF( parsedGLTF || parseGLB( modelBytes ), state, signal, assetId, terrainHeightModule );
+	const decoded = await buildGLTF( parsedGLTF || parseGLB( modelBytes ), state, signal, assetId, terrainHeightModule, graphTextureOverrides );
 	if ( signal?.aborted || state.disposed ) {
 		disposeWorldPackage( decoded );
 		throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
 	}
-	const raced = state.parsed.get( assetId );
+	const raced = state.parsed.get( cacheKey );
 	if ( raced ) {
 		disposeWorldPackage( decoded );
 		return raced;
 	}
-	state.parsed.set( assetId, decoded );
+	state.parsed.set( cacheKey, decoded );
 	return decoded;
 }
 
@@ -1125,7 +1125,7 @@ function unregisterPackageLightNodes( state, root ) {
 	root.traverse( object => state.lightNodes.delete( object ) );
 }
 
-async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null, terrainHeightModule = null ) {
+async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null, terrainHeightModule = null, graphTextureOverrides = {} ) {
 
 	if ( packageState ) packageState.textureAssets ||= new Map();
 	const root = new Group();
@@ -1246,8 +1246,11 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 				const graphTextureFormats = { baseColor: 'rgba8unorm-srgb', metallicRoughness: 'rgba8unorm', normal: 'rgba8unorm', occlusion: 'rgba8unorm', emissive: 'rgba8unorm-srgb' };
 				const graphTextures = {};
 				for ( const slot of graphSlots ) {
-					if ( ! graphTextureInfo[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
-					graphTextures[ slot ] = slot === 'baseColor' ? albedo : slot === 'normal' ? normalMap : slot === 'emissive' ? emissiveMap : await loadTexture( graphTextureInfo[ slot ], `graph-${slot}`, graphTextureFormats[ slot ] );
+					if ( graphTextureOverrides[ slot ] ) graphTextures[ slot ] = graphTextureOverrides[ slot ];
+					else {
+						if ( ! graphTextureInfo[ slot ] ) throw new Error( `World material graph requires a ${slot} texture` );
+						graphTextures[ slot ] = slot === 'baseColor' ? albedo : slot === 'normal' ? normalMap : slot === 'emissive' ? emissiveMap : await loadTexture( graphTextureInfo[ slot ], `graph-${slot}`, graphTextureFormats[ slot ] );
+					}
 				}
 				resolvedMaterials.push( compileWorldMaterialProfile( source.extras.elsemeshMaterial.profile, 'webgpu', {
 					source, graph, textures: { albedo, normalMap, emissiveMap, graphTextures },

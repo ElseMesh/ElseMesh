@@ -2107,3 +2107,18 @@ finding changes them.
   not Tidewater material or visual parity; Tidewater remains 93% and no parity
   gate closes. Exporting its authored patch assets and connecting the signed
   density data to their material graph remain open.
+
+- 2026-11-18: connected a component's signed `grass-density/1` RGBA asset to
+  the renderer-neutral `densityField` material-graph slot in both ground-cover
+  adapters. WebGPU uses the shared linear-clamp sampler; WebGL binds the same
+  bytes as a linear-filtered, clamp-addressed data texture. WebGPU package model
+  material compilation accepts the component binding, with a component-scoped
+  parsed-model cache key; WebGL supplies the matching binding to the same graph
+  compiler. The graph contract test verifies both bindings and sampler choice,
+  and focused graph/ground-cover contract and runtime tests pass. The paired
+  WebGPU/WebGL fixed-cell browser fixtures now render signed synthetic GLBs that
+  sample this component binding; both select the same patch instances, WebGL
+  reports no GL errors, and WebGPU's shadow toggle changes two receiver pixels.
+  Tidewater has not yet exported or activated its authored patch GLBs using this
+  slot, so its separate vegetation arrangements and matched visual parity remain
+  open; Tidewater remains 93%.

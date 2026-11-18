@@ -3,7 +3,9 @@ import { GPU } from '../src/engine/gpu/GPU.js';
 import { composeShader } from '../src/engine/gpu/Shader.js';
 import { buildMeshShader } from '../src/engine/render/MeshShader.js';
 import { parseGLB } from '../src/engine/loaders/GLTF.js';
-import { loadWorldPackage, disposeWorldPackage } from '../src/network/WorldPackage.js';
+import { Texture } from '../src/engine/webgpu.js';
+import { Group } from '../src/engine/scene/Group.js';
+import { loadWorldPackage, loadWorldPackageModelAsset, disposeWorldPackage } from '../src/network/WorldPackage.js';
 
 await import('./headless.mjs');
 
@@ -58,6 +60,7 @@ let root;
 let graphRoot;
 let ktx2Root;
 let referencedKtx2Root;
+let densityGraphRoot;
 const previousAssetImage = globalThis.__assetImage;
 const previousAssetKTX2 = globalThis.__assetKTX2;
 globalThis.__assetImage = async () => ( { width: 1, height: 1, data: new Uint8Array( [ 255, 255, 255, 255 ] ) } );
@@ -153,6 +156,27 @@ try {
 	const graphComposed = composeShader( { modules: graphShader.modules, bindings: graphShader.bindings, code: graphShader.code, defines: graphShader.defines, stage: 'render', label: graphMaterial.name } );
 	const graphCompilation = await GPU.device.createShaderModule( { code: graphComposed.code, label: 'world-material-graph-texture-test' } ).getCompilationInfo();
 	assert.deepEqual( graphCompilation.messages.filter( message => message.type === 'error' ), [], 'WebGPU compiles graph texture samples from package-loaded GLB textures' );
+	const densityGraph = {
+		format: 'elsemesh.material-graph/1',
+		nodes: [ { id: 'uv', op: 'input', name: 'uv' }, { id: 'sample', op: 'textureSample', slot: 'densityField', uv: 'uv' }, { id: 'color', op: 'rgb', args: [ 'sample' ] } ],
+		outputs: { baseColor: 'color' },
+	};
+	const densityGLB = makeGLB( Buffer.from( [ 0 ] ), 'image/png', null, { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph: densityGraph } } );
+	const densityMaterialTexture = new Texture( { width: 1, height: 1, format: 'rgba8unorm', data: new Uint8Array( [ 10, 20, 30, 255 ] ), sampler: 'linearClamp' } );
+	densityGraphRoot = new Group();
+	densityGraphRoot.userData.worldPackage = {
+		parsed: new Map(), textureAssets: new Map( [ [ 'density-fixture', { key: 'density-fixture', texture: densityMaterialTexture } ] ] ),
+		textureEntryByTexture: new Map(), progressiveAssets: new Map(), connector, disposed: false,
+	};
+	const densitySource = await loadWorldPackageModelAsset( connector, densityGraphRoot, 'density-fixture-glb', {
+		bytes: densityGLB,
+		graphTextureOverrides: { densityField: densityMaterialTexture },
+		cacheKey: 'density-fixture-glb\0component-a',
+	} );
+	let densityBoundMaterial;
+	densitySource.traverse( node => { if ( node.isMesh ) densityBoundMaterial = node.material; } );
+	assert.equal( densityBoundMaterial.bindings.emgTexture_densityField.texture, densityMaterialTexture, 'WebGPU package compilation resolves the component density binding' );
+	assert.match( densityBoundMaterial.surface, /textureSample\( emgTexture_densityField, smpLinearClamp,/ );
 	let decodedKTX2Bytes;
 	globalThis.__assetKTX2 = async bytes => {
 		decodedKTX2Bytes = bytes;
@@ -203,6 +227,7 @@ try {
 	if ( graphRoot ) disposeWorldPackage( graphRoot );
 	if ( ktx2Root ) disposeWorldPackage( ktx2Root );
 	if ( referencedKtx2Root ) disposeWorldPackage( referencedKtx2Root );
+	if ( densityGraphRoot ) disposeWorldPackage( densityGraphRoot );
 	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;
 	else globalThis.__assetImage = previousAssetImage;
 	if ( previousAssetKTX2 === undefined ) delete globalThis.__assetKTX2;

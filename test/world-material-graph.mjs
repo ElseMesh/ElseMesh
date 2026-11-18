@@ -194,6 +194,32 @@ webGPUTextureMaterial.dispose();
 webGLTextureMaterial.material.dispose();
 testTexture.dispose();
 
+const densityFieldGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'fieldUv', op: 'input', name: 'uv' },
+		{ id: 'fieldSample', op: 'textureSample', slot: 'densityField', uv: 'fieldUv' },
+		{ id: 'fieldColor', op: 'rgb', args: [ 'fieldSample' ] },
+	],
+	outputs: { baseColor: 'fieldColor' },
+};
+const densityWebGPU = compileWorldMaterialGraph( densityFieldGraph, 'webgpu' );
+const densityWebGL = compileWorldMaterialGraph( densityFieldGraph, 'webgl' );
+assert.deepEqual( densityWebGPU.textureSlots, [ 'densityField' ], 'the signed density field is a renderer-neutral graph texture slot' );
+assert.match( densityWebGPU.surface, /textureSample\( emgTexture_densityField, smpLinearClamp,/ );
+assert.match( densityWebGL.glsl.fragment, /texture2D\( emgTexture_densityField,/ );
+const densityBytes = new Uint8Array( [ 10, 20, 30, 255 ] );
+const densityTexture = new THREE.DataTexture( densityBytes, 1, 1, THREE.RGBAFormat, THREE.UnsignedByteType );
+const densityMaterialWebGPU = createWebGPUMaterialGraph( {}, densityFieldGraph, { graphTextures: { densityField: densityTexture } } );
+assert.equal( densityMaterialWebGPU.bindings.emgTexture_densityField.texture, densityTexture, 'WebGPU binds the component density asset to the graph slot' );
+const densityMaterialWebGL = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial(), densityFieldGraph, { graphTextures: { densityField: densityTexture } } );
+const densityShader = { vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <lights_physical_fragment>', uniforms: {} };
+densityMaterialWebGL.material.onBeforeCompile( densityShader );
+assert.equal( densityShader.uniforms.emgTexture_densityField.value, densityTexture, 'WebGL binds the same component density asset to the graph slot' );
+densityMaterialWebGPU.dispose();
+densityMaterialWebGL.material.dispose();
+densityTexture.dispose();
+
 const worldPositionGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [

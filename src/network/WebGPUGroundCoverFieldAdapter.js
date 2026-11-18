@@ -4,6 +4,7 @@ import { GroundCoverFieldPresentationRuntime } from '../engine/render/GroundCove
 import { GroundCoverFieldRuntime } from '../engine/render/GroundCoverFieldRuntime.js';
 import { freezeStaticModelInstanceBatchTransforms } from '../engine/render/StaticModelInstanceSetRuntime.js';
 import { lodFadeModule } from '../materials/LODFade.js';
+import { Texture } from '../engine/webgpu.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { loadGroundCoverFieldAssets } from './GroundCoverFieldAssets.js';
 import { loadWorldPackageModelAsset } from './WorldPackage.js';
@@ -21,6 +22,18 @@ async function installGroundCoverField( { app, root, connector }, component ) {
 		signal: root.userData.worldPackage?.progressiveController?.signal,
 	} );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
+	root.userData.worldPackage ||= {};
+	root.userData.worldPackage.textureAssets ||= new Map();
+	const densityTexture = new Texture( {
+		label: `ground-cover-density-${component.id}`,
+		width: assets.density.res,
+		height: assets.density.res,
+		format: 'rgba8unorm',
+		data: assets.density.data,
+		sampler: 'linearClamp',
+	} );
+	const textureKey = `component:${component.id}:densityField`;
+	root.userData.worldPackage.textureAssets.set( textureKey, { key: textureKey, texture: densityTexture } );
 	const field = new GroundCoverFieldRuntime( { data: assets.data, componentAssets: component.assets, terrain, density: assets.density } );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const presentation = new GroundCoverFieldPresentationRuntime( field, {
@@ -28,7 +41,12 @@ async function installGroundCoverField( { app, root, connector }, component ) {
 		loadModel: async ( assetId, signal ) => {
 			const bytes = await assets.loadModel( assetId, signal );
 			if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
-			const source = await loadWorldPackageModelAsset( connector, root, assetId, { bytes, terrainHeightModule: installedTerrain.terrainGPU.heightModule } );
+			const source = await loadWorldPackageModelAsset( connector, root, assetId, {
+				bytes,
+				terrainHeightModule: installedTerrain.terrainGPU.heightModule,
+				graphTextureOverrides: { densityField: densityTexture },
+				cacheKey: `${assetId}\0${component.id}`,
+			} );
 			if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 			return source;
 		},

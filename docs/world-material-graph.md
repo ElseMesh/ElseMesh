@@ -87,14 +87,18 @@ Use it for authored material variation when portable source texture data is not
 the appropriate representation; it does not introduce a backend-specific
 texture or shader path.
 
-The `uv` field references an earlier `vec2` node. Supported slots are
-`baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive`; each
-resolves to the matching standard glTF material texture slot. Color slots use
-the texture's linearized sample, while data slots preserve their linear channel
-values. Explicit-LOD vertex reads let signed portable textures drive deformation
-without sending shader code. The graph chooses its coordinates explicitly, so
-authors can scale or offset the `uv` input with ordinary graph nodes before
-sampling. If the `baseColor` output uses a sample
+The `uv` field references an earlier `vec2` node. The standard slots
+`baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive` resolve
+to the matching glTF material texture slots. The `densityField` slot is bound
+by ElseMesh's ground-cover component to that component's signed
+`grass-density/1` RGBA asset; it uses linear filtering and clamp addressing in
+both backends and preserves the raw data channels. Its graph must compute UVs
+for the density asset's world domain and avoid sampling outside that domain.
+Color slots use the texture's linearized sample, while data slots preserve
+their linear channel values. Explicit-LOD vertex reads let signed portable
+textures drive deformation without sending shader code. The graph chooses its
+coordinates explicitly, so authors can scale or offset the `uv` input with
+ordinary graph nodes before sampling. If the `baseColor` output uses a sample
 from the `baseColor` slot, the engine does not multiply that texture into the
 surface a second time; the graph output still multiplies the glTF base-color
 factor. Sampling that slot for another output leaves the ordinary base-color
@@ -153,9 +157,10 @@ this graph.
 
 ## Current limits and migration gate
 
-Format `/1` samples only the five standard glTF material texture slots; it does
-not define material-specific texture bundles. Vertex texture reads require an
-explicit LOD and are shared by color, depth, and shadow deformation paths. The
+Format `/1` supports the five standard glTF material texture slots plus the
+ground-cover-only `densityField` component binding; it does not define general
+material-specific texture bundles. Vertex texture reads require an explicit
+LOD and are shared by color, depth, and shadow deformation paths. The
 graph inputs otherwise include vertex/instance data, and the standard glTF
 base-color, normal, and emissive textures are applied by the engine around the
 graph. The authored
