@@ -27,7 +27,7 @@ try {
 	shadows = new WebGLSunShadows( { renderer, scene, camera, direction: sunDirection } );
 	for ( const light of shadows.lights ) light.intensity = 1.8;
 	installWebGLSceneMaterialLighting( THREE, scene, null, shadows );
-	const fallback = { THREE, connector, loader: new GLTFLoader(), scene, hostedTerrainSurface: { detail: terrainDetail.data, detailWidth: terrainDetail.width, detailHeight: terrainDetail.height }, hostedComponentRuntimes: new Map(), app: { renderLoadBias: 0 } };
+	const fallback = { THREE, connector, loader: new GLTFLoader(), scene, terrain, hostedTerrainSurface: { detail: terrainDetail.data, detailWidth: terrainDetail.width, detailHeight: terrainDetail.height }, hostedComponentRuntimes: new Map(), app: { renderLoadBias: 0 } };
 	const installed = await worldComponentBackendAdapter( 'webgl', component.type )( { fallback, terrain, assets: connector.assets }, component );
 	if ( ! installed?.installed ) throw new Error( 'WebGL ground-cover adapter did not install the signed component' );
 	runtime = installed.runtime;
