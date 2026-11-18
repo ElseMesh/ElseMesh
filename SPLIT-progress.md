@@ -2210,9 +2210,15 @@ finding changes them.
 - 2026-11-18: extended Tidewater's source-versus-graph WebGPU diagnostic to
   hash-check and decode the actual signed grass-density and terrain-surface
   assets, and to use the packaged heightfield, terrain detail texture, and
-  height shader. At the dense-meadow camera, source and graph selected different
-  cell sets and LOD counts (source 9/23/9; graph 9/23/6). Neither produced
-  foliage pixels beyond the empty background, so the zero image difference is
-  not visual-parity evidence. The diagnostic does not close a gate: shared cell
-  and LOD selection, a view that visibly renders Tidewater foliage, and paired
-  WebGL comparison remain open. Tidewater stays 93%.
+  height shader. The first run omitted Tidewater's `uCamPos` update, hiding the
+  source grass; the harness now updates it as Tidewater's live grass test does.
+  With committed signed assets at the overhead meadow view, the source changes
+  22,087 pixels while the graph changes none (MAE 68.423/255), so parity is
+  clearly failing. Forcing graph density and terrain height still leaves the
+  full graph invisible; unscaled graph positions affect 3,793 pixels, and a
+  raw geometry material affects 1,438. This localizes the fault to the graph's
+  authored vertex deformation path, but does not yet identify the bad term.
+  Source and graph also select different cell sets and LODs. A concurrent
+  uncommitted Tidewater terrain-asset edit now fails the signed hash check; it
+  was preserved, and these measurements use committed asset bytes staged under
+  `/var/tmp`. Paired WebGL comparison remains open. Tidewater stays 93%.
