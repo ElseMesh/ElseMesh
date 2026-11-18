@@ -2302,3 +2302,18 @@ finding changes them.
   it is not a matched image comparison against pre-split WebGPU or hosted
   Tidewater parity. Other debris views, LOD transitions, materials, and
   full-world visual parity remain open; Tidewater remains 93%.
+
+- 2026-11-18: added a Tidewater-owned WebGPU render check for the same signed
+  scanned-debris component and beach-trunk camera pose as the WebGL fixture.
+  Both load the 141-placement document and select LOD 2 with the same authored
+  trunk GLB (`sha256:416b79f7e408d37089535dfb65e3ded7239f332534ea65e793be8b2c52386333`).
+  At 192×144, the software WebGPU check renders 578 foreground pixels and the
+  isolated SwiftShader WebGL check renders 568; both report no graphics errors.
+  This is closely matched raster coverage and identical asset/LOD selection,
+  not pixel-image or material parity: WebGPU decodes the signed JPEGs at 32×32
+  in this harness, and backend lighting/rasterization differ. The WebGL fixture
+  also loads a view-dependent number of texture assets (9–10 across runs; the
+  WebGPU fixture loaded 12), so texture residency is not yet aligned or directly
+  comparable. Pre-split image matching,
+  full-resolution texture detail, other debris views, and LOD transitions remain
+  open. Tidewater remains 93%.
