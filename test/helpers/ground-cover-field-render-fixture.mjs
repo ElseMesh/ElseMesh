@@ -32,7 +32,7 @@ export async function groundCoverFieldRenderFixture( { density: authoredDensity 
 			densityAssetId, seed: 314159, cellSize: 8, pointsPerCell: 1, placementAlgorithm: 'fixed-cell-patch/1',
 			distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 			species: [ {
-				id: 'fixture-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,
+				id: 'fixture-grass', densityExpression: { op: 'max', left: { op: 'channel', index: 0 }, right: { op: 'max', left: { op: 'max', left: { op: 'channel', index: 1 }, right: { op: 'channel', index: 2 } }, right: { op: 'channel', index: 3 } } }, densityThreshold: 8,
 				modelAssetIds, bounds, geometryMirrorX: false,
 				drawMaxDistance: 88, drawFadeStartDistance: 88,
 				castsShadow: true, shadowMaxDistance: 12,
