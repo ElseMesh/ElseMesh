@@ -77,6 +77,7 @@ function expression( node, names, backend ) {
 	if ( node.op === 'input' ) return names.get( node.id );
 	if ( node.op === 'constant' ) return literal( node.value, Array.isArray( node.value ) ? `vec${node.value.length}` : 'scalar', backend );
 	if ( node.op === 'terrainHeightAt' ) return backend === 'webgpu' ? `terrainHeightAt( ${names.get( node.args[ 0 ] )} )` : `emgTerrainHeightAt( ${names.get( node.args[ 0 ] )} )`;
+	if ( node.op === 'hash12' ) return `emgValueNoiseHash12( ${names.get( node.args[ 0 ] )} )`;
 	if ( node.op === 'valueNoise2' ) return `emgValueNoise2( ${names.get( node.args[ 0 ] )} )`;
 	if ( node.op === 'textureSample' || node.op === 'textureSampleLevel' ) {
 		const texture = `emgTexture_${node.slot}`;
@@ -147,7 +148,9 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	const nodeTypes = worldMaterialGraphNodeTypes( graph );
 	const valueNoiseUsedInVertex = hasRequiredNode( graph, vertexRequired, 'valueNoise2' );
 	const valueNoiseUsedInFragment = hasRequiredNode( graph, fragmentRequired, 'valueNoise2' );
-	const wgslHelpers = valueNoiseUsedInVertex || valueNoiseUsedInFragment ? VALUE_NOISE_WGSL : '';
+	const hashUsedInVertex = hasRequiredNode( graph, vertexRequired, 'hash12' );
+	const hashUsedInFragment = hasRequiredNode( graph, fragmentRequired, 'hash12' );
+	const wgslHelpers = valueNoiseUsedInVertex || valueNoiseUsedInFragment || hashUsedInVertex || hashUsedInFragment ? VALUE_NOISE_WGSL : '';
 	const emitNodes = ( stage, required, prefix = 'emg_' ) => {
 		const names = new Map(), lines = [];
 		for ( const node of graph.nodes ) {
@@ -190,7 +193,7 @@ export function compileWorldMaterialGraph( graph, backend, { doubleSided = false
 	const glslUniformInputs = usedInputs.filter( name => INPUT_SOURCES[ name ].uniform );
 	const glslUniforms = [ ...glslUniformInputs.filter( name => ! INPUT_SOURCES[ name ].webglBuiltinUniform ).map( name => `uniform ${glslType( inputTypes[ name ] )} ${INPUT_SOURCES[ name ].glsl};` ), ...( usedInputs.includes( 'pixelPosition' ) ? [ 'uniform vec2 emgViewportSize;' ] : [] ) ].join( '\n' );
 	const needsNormalFromSlope = graph.nodes.some( node => node.op === 'normalFromSlope' && fragmentRequired.has( node.id ) );
-	const glslFragmentHelpers = [ valueNoiseUsedInFragment ? VALUE_NOISE_GLSL : '', needsNormalFromSlope ? `
+	const glslFragmentHelpers = [ valueNoiseUsedInFragment || hashUsedInFragment ? VALUE_NOISE_GLSL : '', needsNormalFromSlope ? `
 vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 	vec3 dp1 = dFdx( P ); vec3 dp2 = dFdy( P );
 	vec2 duv1 = dFdx( uv ); vec2 duv2 = dFdy( uv );
@@ -200,7 +203,7 @@ vec3 emgNormalFromSlope( vec3 P, vec3 N, vec2 uv, vec2 slope ) {
 	float invmax = inversesqrt( max( max( dot( T, T ), dot( B, B ) ), 1e-20 ) );
 	return normalize( mat3( T * invmax, B * invmax, N ) * normalize( vec3( slope, 1.0 ) ) );
 }` : '' ].filter( Boolean ).join( '\n' );
-	const glslVertexHelpers = valueNoiseUsedInVertex ? VALUE_NOISE_GLSL : '';
+	const glslVertexHelpers = valueNoiseUsedInVertex || hashUsedInVertex ? VALUE_NOISE_GLSL : '';
 	const commonVertex = [ vertex.code, ...vertexAssignments, ...vertexOutputs ].filter( Boolean ).join( '\n' );
 	const commonFragment = [ fragment.code, ...surfaceLines ].filter( Boolean ).join( '\n' );
 	const transmissionID = graph.outputs.thinTransmission;

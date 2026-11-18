@@ -2134,3 +2134,10 @@ finding changes them.
   for terrain placement, density response, wind, and matched visuals remains a
   gate. WebGPU and WebGL vegetation paths therefore remain different; Tidewater
   parity remains 93%.
+
+- 2026-11-18: extended the shared material graph with `hash12`, compiled to
+  WebGPU and WebGL through the same deterministic helper already used by
+  `valueNoise2`. The graph test checks both shader outputs and rejects invalid
+  input types. This supplies the per-position hash needed to translate
+  Tidewater's authored blade density/yaw calculations into the portable graph;
+  it does not yet activate those GLBs or close a visual-parity gate.

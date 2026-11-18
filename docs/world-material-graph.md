@@ -80,12 +80,13 @@ and return `-90` outside the terrain domain. This is a world-surface input to
 the graph contract; it does not select a renderer or provide backend shader
 code.
 
-`valueNoise2` takes a `vec2` and returns deterministic cubic-smoothed value
-noise in `[0, 1)`. It uses the same hash and interpolation definition in the
-WebGPU and WebGL compilers, and is available in vertex and fragment outputs.
-Use it for authored material variation when portable source texture data is not
-the appropriate representation; it does not introduce a backend-specific
-texture or shader path.
+`hash12` takes a `vec2` and returns the deterministic scalar hash used by
+`valueNoise2`. `valueNoise2` applies cubic-smoothed interpolation to that hash
+and returns noise in `[0, 1)`. Both compile from the same definition in WebGPU
+and WebGL and are available in vertex and fragment outputs. Use them for
+authored material variation when portable source texture data is not the
+appropriate representation; they do not introduce a backend-specific texture
+or shader path.
 
 The `uv` field references an earlier `vec2` node. The standard slots
 `baseColor`, `metallicRoughness`, `normal`, `occlusion`, and `emissive` resolve
@@ -106,7 +107,7 @@ texture path intact.
 
 Supported operations are `input`, `constant`, `add`, `subtract`, `multiply`,
 `divide`, `min`, `max`, `pow`, `abs`, `sin`, `cos`, `floor`, `fract`, `sqrt`,
-`sign`, `exp`, `log2`, `normalize`, `normalFromSlope`, `terrainHeightAt`, `x`,
+`sign`, `exp`, `log2`, `normalize`, `normalFromSlope`, `terrainHeightAt`, `hash12`, `x`,
 `y`, `z`, `w`, `xy`, `xyz`, `rgb`, `vec2`, `vec3`, `vec4`, `length`, `dot`,
 `mix`, `clamp`, `smoothstep`, `lessThan`,
 `lessEqual`, `greaterThan`, `greaterEqual`, `equal`, `not`, `and`, `or`,

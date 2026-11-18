@@ -63,6 +63,18 @@ assert.match( valueNoiseWebGPU.surface, /emgValueNoise2\( in\.vs\.emg_uv \)/, 'W
 assert.match( valueNoiseWebGL.glsl.vertexHelpers, /float emgValueNoise2\( vec2 p \)/, 'WebGL vertex graphs receive the same value-noise implementation' );
 assert.match( valueNoiseWebGL.glsl.fragmentHelpers, /float emgValueNoise2\( vec2 p \)/, 'WebGL fragment graphs receive the same value-noise implementation' );
 assert.throws( () => validateWorldMaterialGraph( { ...valueNoiseGraph, nodes: [ ...valueNoiseGraph.nodes, { id: 'badNoise', op: 'valueNoise2', args: [ 'noise' ] } ] } ), /operation/, 'valueNoise2 accepts only a vec2 input' );
+const hashGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [ { id: 'uv', op: 'input', name: 'uv' }, { id: 'hash', op: 'hash12', args: [ 'uv' ] }, { id: 'color', op: 'vec3', args: [ 'hash', 'hash', 'hash' ] } ],
+	outputs: { baseColor: 'color' },
+};
+const hashWebGPU = compileWorldMaterialGraph( hashGraph, 'webgpu' );
+const hashWebGL = compileWorldMaterialGraph( hashGraph, 'webgl' );
+assert.match( hashWebGPU.wgslHelpers, /fn emgValueNoiseHash12\( p: vec2f \)/, 'hash12 shares the deterministic hash helper with valueNoise2' );
+assert.match( hashWebGPU.surface, /emgValueNoiseHash12\( in\.vs\.emg_uv \)/, 'WebGPU material graphs can reproduce authored per-position hashes' );
+assert.match( hashWebGL.glsl.fragmentHelpers, /float emgValueNoiseHash12\( vec2 p \)/, 'WebGL emits the same hash implementation' );
+assert.match( hashWebGL.glsl.fragment, /emgValueNoiseHash12\( vEmg_uv \)/ );
+assert.throws( () => validateWorldMaterialGraph( { ...hashGraph, nodes: [ hashGraph.nodes[ 0 ], { id: 'scalar', op: 'constant', value: 1 }, { ...hashGraph.nodes[ 1 ], id: 'badHash', args: [ 'scalar' ] }, hashGraph.nodes[ 2 ] ] } ), /operation/, 'hash12 accepts only a vec2 input' );
 
 const vertexDataGraph = {
 	format: 'elsemesh.material-graph/1',
