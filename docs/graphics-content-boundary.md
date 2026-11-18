@@ -203,6 +203,18 @@ the world exporter. They still return engine `BufferGeometry`; this clarifies
 authorship but does not yet provide the portable signed model/LOD inputs needed
 to remove the presenters from Tidewater.
 
+The matched AMD beach captures show a substantial distant-canopy mismatch.
+`WebGLVegetationPresentation.js` draws trees beyond 110 m from an instanced
+5-sided cylinder plus 5-by-3 sphere lobes (`TREE_LOBES`), whereas
+`WebGPUVegetation.js` uses view-dependent octahedral impostors baked from
+`buildTreeNear()`/`buildShrubNear()` geometry and the shared WebGPU leaf atlas.
+These paths consume the same placement records but not the same distant model,
+texture inputs, or presentation behavior. The fix must define a signed,
+renderer-neutral canopy LOD asset/data contract and have both engine backends
+consume the same authored near and far content. Preserve both current paths
+until that contract passes matched pre-split WebGPU and WebGL reviews; do not
+replace the WebGL primitives with another Tidewater-owned presenter.
+
 Dense ground cover now uses the engine-owned `elsemesh.ground-cover-field/1`
 runtime in both built-in and hosted paths. The former Tidewater-specific
 `webglGrassMesh()` approximation has been removed from

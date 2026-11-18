@@ -2329,3 +2329,12 @@ finding changes them.
   `BufferGeometry`, and their WebGPU/WebGL presenters, material inputs, far
   LODs, and wind remain world-owned and divergent. This is source ownership
   cleanup, not a renderer-parity fix; no percentage change.
+
+- 2026-11-18: inspected the matched AMD beach captures against the active
+  vegetation source. The visible WebGL distant canopy is built from an
+  instanced 5-sided cylinder and 5-by-3 sphere lobes beyond 110 m; WebGPU uses
+  octahedral impostors baked from the shared tree/shrub geometry and leaf
+  atlas. Placement records match, but distant models and presentation inputs
+  do not. This narrows the finite-vegetation parity work to a renderer-neutral
+  signed canopy LOD contract consumed by both engine backends. No code or
+  parity gate changed; Tidewater remains 93%.
