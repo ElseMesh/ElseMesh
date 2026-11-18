@@ -40,6 +40,9 @@ const valid = {
 
 assert.equal( validateStaticModelInstanceSet( valid ), valid, 'accepts backend-neutral model assets and transforms' );
 assert.equal( validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: low }, { assetId: hi } ], lodThresholds: [ 120 ], lodMetric: 'world-distance' } ] } ).models[ 0 ].lodMetric, 'world-distance', 'accepts fixed world-space handoff distances' );
+const coarseToFine = validateStaticModelInstanceSet( { ...valid, models: [ { ...valid.models[ 0 ], lods: [ { assetId: hi }, { assetId: low }, { assetId: lowest } ], lodThresholds: [ 70, 22 ], lodMetric: 'world-distance', shadowLod: 2 } ] } );
+assert.equal( coarseToFine.models[ 0 ].shadowLod, 2, 'distance-ordered LODs can select a finer authored shadow mesh' );
+assert.equal( new StaticModelInstanceSetPlanner( coarseToFine ).shadowGroups[ 0 ].lodIndex, 2, 'shared shadow planner uses the authored LOD index' );
 const bytes = new TextEncoder().encode( JSON.stringify( valid ) );
 assert.equal( decodeStaticModelInstanceSet( bytes, { availableAssetIDs: new Set( [ hi, low, lowest ] ) } ).instances.length, 1 );
 const providerLocalID = 'local-mesh-lod:great-hall:component:0';
@@ -251,6 +254,19 @@ assert.equal( initialBaseRuntime.isCoarseReadyForView(), true, 'the view coverag
 initialBaseRuntime.update( 1 / 60, gatedCamera );
 assert.deepEqual( initialBaseRequests, [ [ 0, 0 ] ], 'fine LOD requests remain blocked until the shared view gate opens' );
 initialBaseRuntime.dispose();
+
+const shadowLODRequests = [];
+const shadowLODDocument = { ...coarseToFine, instances: [ { ...coarseToFine.instances[ 0 ], position: [ 0, 0, - 5 ] } ] };
+const shadowLODPlanner = new StaticModelInstanceSetPlanner( shadowLODDocument );
+const shadowLODRuntime = new StaticModelInstanceSetRuntime( shadowLODDocument, {
+	batches: shadowLODPlanner.groups.map( () => [ makeRuntimeBatch() ] ),
+	shadowBatches: shadowLODPlanner.shadowGroups.map( () => [ makeRuntimeBatch() ] ),
+	loadLOD: async ( modelIndex, lodIndex ) => { shadowLODRequests.push( [ modelIndex, lodIndex ] ); },
+} );
+shadowLODRuntime.update( 1 / 60, gatedCamera );
+await new Promise( resolve => setImmediate( resolve ) );
+assert.ok( shadowLODRequests.some( ( [ modelIndex, lodIndex ] ) => modelIndex === 0 && lodIndex === 2 ), 'WebGPU runtime requests the authored near-detail shadow mesh when a placement is within shadow range' );
+shadowLODRuntime.dispose();
 
 const priorityDocument = {
 	...valid,

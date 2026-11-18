@@ -50,7 +50,7 @@ export function validateStaticModelInstanceSet( document, { availableAssetIDs = 
 			if ( ! Number.isFinite( threshold ) || threshold <= 0 || invalidOrder ) throw new Error( `Invalid or overlapping LOD thresholds for static model ${model.id}` );
 			previousThreshold = threshold;
 		}
-		if ( model.shadowLod !== 0 || ! Number.isFinite( model.shadowMaxDistance ) || model.shadowMaxDistance < 0 || model.shadowMaxDistance > 1e6 ) throw new Error( `Invalid shadow policy for static model ${model.id}` );
+		if ( ! Number.isInteger( model.shadowLod ) || model.shadowLod < 0 || model.shadowLod >= model.lods.length || ! Number.isFinite( model.shadowMaxDistance ) || model.shadowMaxDistance < 0 || model.shadowMaxDistance > 1e6 ) throw new Error( `Invalid shadow policy for static model ${model.id}` );
 		if ( ! Number.isFinite( model.drawMaxDistance ) || model.drawMaxDistance <= 0 || model.drawMaxDistance > 1e6 ) throw new Error( `Invalid draw distance for static model ${model.id}` );
 		if ( ! Number.isFinite( model.drawFadeStartDistance ) || model.drawFadeStartDistance < 0 || model.drawFadeStartDistance > model.drawMaxDistance ) throw new Error( `Invalid draw fade distance for static model ${model.id}` );
 	}

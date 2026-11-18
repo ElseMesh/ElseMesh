@@ -54,7 +54,7 @@ async function installStaticModelInstanceSet( { root, connector }, component ) {
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) root.add( draw.mesh );
 				const groups = [ draws ];
-				if ( lodIndex === 0 ) {
+				if ( lodIndex === document.models[ modelIndex ].shadowLod ) {
 					const shadow = createModelDraws( source, modelCapacity[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, true, hasMaterialData, materialCache, ownedGeometry, ownedMaterials );
 					shadowBatches[ modelIndex ] = shadow;
 					for ( const draw of shadow ) root.add( draw.mesh );

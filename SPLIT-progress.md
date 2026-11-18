@@ -1953,3 +1953,13 @@ finding changes them.
   deterministic gameplay-state parity, not matched live browser profiles or
   production-water browser parity. Visual/material review and supported-
   hardware FPS remain open; Tidewater parity remains 93%.
+
+- 2026-11-18: added a Tidewater exporter migration fixture for scanned debris:
+  all 141 source transforms, all four model classes, all three original mesh
+  LODs, and the unchanged albedo/normal/ARM bytes are represented by one
+  renderer-neutral static-model instance set. Generalized the engine contract
+  so distance-ordered LODs can select their near-detail mesh for shadows. The
+  fixture is not installed at runtime because the shared material contract
+  still needs the WebGPU per-instance bleaching, terrain contact, wet shading,
+  and fade behavior in both presenters. Exporter/runtime-contract checks remain
+  required; no Tidewater parity percentage changes.

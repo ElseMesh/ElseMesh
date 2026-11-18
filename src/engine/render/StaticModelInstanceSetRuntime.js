@@ -150,6 +150,14 @@ export class StaticModelInstanceSetRuntime {
 		for ( let modelIndex = 0; modelIndex < this.document.models.length; modelIndex ++ ) {
 			const groups = this.planner._groupsByModel[ modelIndex ];
 			const loaded = this.loadedLods[ modelIndex ];
+			const model = this.document.models[ modelIndex ];
+			const shadowGroup = this.usesShadowBatches ? this.planner.shadowGroups[ modelIndex ] : null;
+			if ( shadowGroup?.count > 0 && ! loaded.has( model.shadowLod ) ) {
+				const key = `${ modelIndex }:${ model.shadowLod }`;
+				if ( ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
+					candidates.push( { modelIndex, level: model.shadowLod, key, loaded, projectedRadius: 0, distanceMeters: 0, centerDistanceMeters: 0 } );
+				}
+			}
 			if ( ! loaded.has( 0 ) ) {
 				let projectedRadius = 0, distanceMeters = Infinity, centerDistanceMeters = Infinity, visible = false;
 				for ( const group of groups ) for ( let index = 0; index < group.count; index ++ ) {
@@ -164,7 +172,7 @@ export class StaticModelInstanceSetRuntime {
 					}
 				}
 				const key = `${ modelIndex }:0`;
-				if ( visible && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: 0, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } );
+				if ( visible && ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) candidates.push( { modelIndex, level: 0, key, loaded, projectedRadius, distanceMeters, centerDistanceMeters } );
 				continue;
 			}
 			if ( refreshDesired ) {
@@ -195,7 +203,7 @@ export class StaticModelInstanceSetRuntime {
 			const level = loadedMax + 1;
 			const key = `${ modelIndex }:${ level }`;
 			if ( desiredLevel < level ) this.retryAfter.delete( key );
-			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
+			if ( desiredLevel > loadedMax && ! this.pendingLods.has( key ) && ! candidates.some( candidate => candidate.key === key ) && performance.now() >= ( this.retryAfter.get( key ) || 0 ) ) {
 				candidates.push( { modelIndex, level, key, loaded, projectedRadius: this.desiredLodPriorities[ modelIndex ], distanceMeters: this.desiredLodDistances[ modelIndex ], centerDistanceMeters: this.desiredLodCenterDistances[ modelIndex ] } );
 			}
 			if ( loadedMax >= 0 ) for ( let level = loadedMax + 1; level < groups.length; level ++ ) this.#moveToLoadedCoarseLevel( groups[ level ], groups[ loadedMax ] );

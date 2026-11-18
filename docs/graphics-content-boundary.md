@@ -126,6 +126,16 @@ and WebGL. This removes the world-owned village shader and profile-resolution
 paths; the built-in procedural village still generates its portable source maps
 through Tidewater's WebGPU texture baker and remains migration debt.
 
+The Tidewater exporter now emits a renderer-neutral scanned-debris migration
+fixture with all 141 authored placements, the three source mesh LODs per model,
+and the original albedo, normal, and ARM maps embedded in portable glTF PBR.
+It remains outside the signed runtime package. The source WebGPU presenter also
+applies per-instance bleaching, terrain-contact dust/AO, wet darkening and
+roughness, plus its own fade bands and distance offset. The static-model
+contract does not yet represent those appearance inputs exactly; do not switch
+either production backend to the fixture until a shared material/effect
+contract and matched WebGPU/WebGL presentation preserve that appearance.
+
 Do not move a world's bespoke shader or material implementation into ElseMesh
 verbatim just to remove renderer APIs from the world. First choose a portable
 representation: bake world-specific appearance into ordinary glTF/PBR assets

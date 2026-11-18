@@ -109,9 +109,12 @@ sets the transition-band width for either metric; overlapping bands are
 rejected. `drawMaxDistance` limits color rendering by world-space distance from
 the transformed bounds center, and `drawFadeStartDistance` sets where its
 screen-door fade begins. Shadows use the independent `shadowMaxDistance`.
-`shadowLod` is fixed at zero so coarse-first startup uses the same already-loaded
-coarse geometry for its shadow proxy; finer visual levels do not create extra
-startup asset requests.
+`shadowLod` selects any valid level in the model's LOD list. For distance-based
+LOD, assets are ordered coarse-to-fine; a world can therefore choose its
+near-detail mesh for shadows while keeping coarse color rendering as the first
+startup request. WebGPU requests the selected shadow mesh when an instance
+enters the authored shadow range. WebGL continues to cast from its selected
+visible LOD and does not create a separate shadow batch.
 The renderer-neutral planner selects visible instances and complementary
 incoming/outgoing LOD fades; shadow candidates are selected by distance
 independently of the camera frustum. WebGPU consumes those independent shadow
