@@ -1958,8 +1958,10 @@ finding changes them.
   all 141 source transforms, all four model classes, all three original mesh
   LODs, and the unchanged albedo/normal/ARM bytes are represented by one
   renderer-neutral static-model instance set. Generalized the engine contract
-  so distance-ordered LODs can select their near-detail mesh for shadows. The
-  fixture is not installed at runtime because the shared material contract
-  still needs the WebGPU per-instance bleaching, terrain contact, wet shading,
-  and fade behavior in both presenters. Exporter/runtime-contract checks remain
-  required; no Tidewater parity percentage changes.
+  so distance-ordered LODs can select and request their near-detail shadow
+  mesh. The static-model contract check, deterministic Tidewater export check,
+  and external production build pass. The fixture is not installed at runtime
+  because the shared material contract still needs the WebGPU per-instance
+  bleaching, terrain contact, wet shading, and fade behavior in both
+  presenters. Built-in package integration and matched backend appearance
+  checks remain open; no Tidewater parity percentage changes.
