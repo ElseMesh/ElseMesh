@@ -61,10 +61,11 @@ function validGateway( value, page ) {
 	}
 }
 
-function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', nodeId = '', gateway = '', providers = [], directory = '' } ) {
+function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNetworkId = 'e3918db4832a3056', nodeId = '', gateway = '', providers = [], directory = '' } ) {
 	const page = appPageURL( pageURL );
 	if ( ! isWorldID( worldId ) && ! ( ! worldId && /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) ) throw new Error( 'Invite does not contain a valid ThruHold ID or ZeroTier node ID' );
 	if ( zeroTierNodeId && ! /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) throw new Error( 'Invite contains an invalid ZeroTier node ID' );
+	if ( zeroTierNodeId && ! /^[0-9a-f]{16}$/i.test( zeroTierNetworkId ) ) throw new Error( 'Invite contains an invalid ZeroTier network ID' );
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	if ( candidates.length > 8 ) throw new Error( 'Invite contains too many gateway candidates' );
 	for ( const candidate of candidates ) {
@@ -77,11 +78,15 @@ function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', nodeId = '
 		const directoryURL = new URL( directory );
 		if ( directoryURL.protocol !== 'https:' || directoryURL.username || directoryURL.password || ! [ '', '/' ].includes( directoryURL.pathname ) || directoryURL.search || directoryURL.hash ) throw new Error( 'Invite contains an invalid directory URL' );
 	}
-	if ( zeroTierNodeId && ! directory ) throw new Error( 'A ZeroTier node ID requires an HTTPS world resolver' );
+	if ( zeroTierNodeId && ! directory && ! candidates.length ) throw new Error( 'A ZeroTier node ID requires a direct provider gateway or HTTPS world resolver' );
 	if ( worldId ) page.searchParams.set( 'worldId', worldId );
 	else page.searchParams.delete( 'worldId' );
 	page.searchParams.delete( 'ztNodeId' );
-	if ( zeroTierNodeId ) page.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
+	page.searchParams.delete( 'ztNetworkId' );
+	if ( zeroTierNodeId ) {
+		page.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
+		page.searchParams.set( 'ztNetworkId', zeroTierNetworkId.toLowerCase() );
+	}
 	page.searchParams.delete( 'nodeId' );
 	page.searchParams.delete( 'gateway' );
 	for ( const candidate of candidates ) {
@@ -125,6 +130,7 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 		pageURL: page.href,
 		worldId: params.get( 'worldId' ),
 		zeroTierNodeId: params.get( 'ztNodeId' ) || '',
+		zeroTierNetworkId: params.get( 'ztNetworkId' ) || 'e3918db4832a3056',
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
 		gateway: nodeIds.length ? '' : gateways[ 0 ] || '',
 		directory: params.get( 'directory' ) || resolver,

@@ -84,9 +84,13 @@ const OldWebSocket = globalThis.WebSocket;
 let staleSecondAssets = new Set();
 let failoverProviderReachable = false;
 let directoryProviders = providers;
+let zeroTierLookups = 0;
 globalThis.fetch = async ( input ) => {
 	const url = new URL( input );
-	if ( url.pathname === '/v1/zerotier/e3918db4832a3056/3af4fd5d50' ) return { ok: true, json: async () => ( { networkId: 'e3918db4832a3056', nodeId: '3af4fd5d50', worldIds: [ 'elsemesh:directory-test' ], providers: [ zeroTierProvider ] } ) };
+	if ( url.pathname === '/v1/zerotier/e3918db4832a3056/3af4fd5d50' ) {
+		zeroTierLookups ++;
+		return { ok: true, json: async () => ( { networkId: 'e3918db4832a3056', nodeId: '3af4fd5d50', worldIds: [ 'elsemesh:directory-test' ], providers: [ zeroTierProvider ] } ) };
+	}
 	return { ok: true, json: async () => ( { worldId: 'elsemesh:directory-test', providers: directoryProviders } ) };
 };
 globalThis.WebSocket = class extends EventTarget {
@@ -158,6 +162,24 @@ try {
 	assert.equal( zeroTierManifest.worldId, 'elsemesh:directory-test', 'a ZeroTier node locator resolves through its signed provider record to the canonical ThruHold ID' );
 	assert.equal( zeroTierConnector.nodeId, second.peerId, 'ZeroTier lookup selects the signed provider gateway and verifies the world manifest' );
 	zeroTierConnector.close();
+	const lookupsBeforeDirect = zeroTierLookups;
+	const tailscaleGateway = new WorldConnector( {
+		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+		nodeId: second.peerId, gateway: 'https://world-host.tailnet-example.ts.net', directory: 'https://thruhold.org',
+	} );
+	await tailscaleGateway.getManifest();
+	assert.equal( tailscaleGateway.gateway, 'https://world-host.tailnet-example.ts.net', 'an invite-supplied secure Tailscale gateway is tried directly before ZeroTier resolver lookup' );
+	assert.equal( zeroTierLookups, lookupsBeforeDirect, 'a working direct gateway avoids the resolver request' );
+	tailscaleGateway.close();
+	const directThenResolver = new WorldConnector( {
+		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+		nodeId: first.peerId, gateway: 'https://offline.example', directory: 'https://thruhold.org',
+	} );
+	await directThenResolver.getManifest();
+	assert.equal( directThenResolver.nodeId, second.peerId, 'an unreachable invite gateway falls back to the signed ZeroTier HostID resolver result' );
+	assert.equal( directThenResolver.gateway, 'https://online.example' );
+	assert.equal( zeroTierLookups, lookupsBeforeDirect + 1, 'the resolver is queried after the direct route fails' );
+	directThenResolver.close();
 	failoverProviderReachable = false;
 	authorityLease = await signedDocument( 'elsemesh.authority/2', {
 		worldId: 'elsemesh:directory-test', authorityPeerId: first.peerId, epoch: 2, grantEpoch: grantEpoch - 1,

@@ -151,6 +151,8 @@ export class AppUI {
 			const url = createWorldInviteURL( {
 				pageURL: location.href,
 				worldId: hostedDocument?.payload.worldId || connector.worldId,
+				zeroTierNodeId: hostedDocument ? '' : connector.zeroTierNodeId,
+				zeroTierNetworkId: connector?.zeroTierNetworkId,
 				nodeId: hostedDocument?.signer || connector.nodeId,
 				gateway: hostedDocument ? browserHostState.gateway : connector.gateway,
 				providers: hostedDocument ? [] : connector.providers,

@@ -186,6 +186,10 @@ assert.equal( directoryLink.directory, 'https://thruhold.org', 'browser link can
 const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';
 const pairedLink = worldLinkFromLocation( { search: `?worldId=elsemesh:coast&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fdesktop.example&nodeId=${backupPeerId}&gateway=wss%3A%2F%2Fflip.example`, origin: 'https://app.example' } );
 assert.deepEqual( pairedLink.providers, [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ], 'browser links preserve each peer identity with its own secure gateway' );
+const zeroTierDirectLink = worldLinkFromLocation( { search: `?worldId=elsemesh:coast&ztNodeId=3af4fd5d50&ztNetworkId=e3918db4832a3056&nodeId=12D3KooWAbcdefghijk1234567890123456&gateway=https%3A%2F%2Fcoast.tailnet-example.ts.net&directory=https%3A%2F%2Fthruhold.org`, origin: 'https://app.example' } );
+assert.equal( zeroTierDirectLink.zeroTierNodeId, '3af4fd5d50', 'browser links retain the ZeroTier HostID for fallback discovery' );
+assert.equal( zeroTierDirectLink.zeroTierNetworkId, 'e3918db4832a3056', 'browser links retain the configured ZeroTier network ID' );
+assert.deepEqual( zeroTierDirectLink.providers, [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://coast.tailnet-example.ts.net' } ], 'browser links retain a secure direct gateway before fallback discovery' );
 assert.throws( () => new WorldConnector( { worldId: 'elsemesh:coast', directory: 'http://thruhold.org' } ), 'directory endpoints must use HTTPS' );
 const invite = createWorldInviteURL( {
 	pageURL: 'https://app.example/tidewater/?noVeg=1',
@@ -201,6 +205,13 @@ assert.equal( inviteURL.searchParams.get( 'nodeId' ), '12D3KooWAbcdefghijk123456
 assert.equal( inviteURL.searchParams.get( 'gateway' ), 'https://coast.example', 'world invitations carry the provider gateway' );
 assert.equal( inviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'world invitations retain optional decentralized discovery' );
 assert.equal( inviteURL.searchParams.get( 'noVeg' ), '1', 'world invitations preserve unrelated client options' );
+const overlayInviteURL = new URL( createWorldInviteURL( {
+	pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+	nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://coast.tailnet-example.ts.net', directory: 'https://thruhold.org',
+} ) );
+assert.equal( overlayInviteURL.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'shared invites retain the ZeroTier HostID for Worker fallback' );
+assert.equal( overlayInviteURL.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056', 'shared invites retain the ZeroTier network ID for Worker fallback' );
+assert.equal( overlayInviteURL.searchParams.get( 'gateway' ), 'https://coast.tailnet-example.ts.net', 'shared invites preserve the direct secure overlay gateway' );
 const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
 assert.deepEqual( redundantInvite.searchParams.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
 assert.throws( () => createWorldInviteURL( { pageURL: 'https://app.example/tidewater/', worldId: 'elsemesh:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );

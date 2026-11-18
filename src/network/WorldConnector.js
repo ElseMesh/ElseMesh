@@ -71,14 +71,15 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	}
 	const worldId = params.get( 'worldId' );
 	const zeroTierNodeId = params.get( 'ztNodeId' ) || '';
+	const zeroTierNetworkId = params.get( 'ztNetworkId' ) || DEFAULT_ZEROTIER_NETWORK_ID;
 	if ( ! worldId && ! zeroTierNodeId ) return null;
 	const nodeIds = params.getAll( 'nodeId' );
 	const gateways = params.getAll( 'gateway' );
 	invariant( nodeIds.length === gateways.length || ( nodeIds.length === 0 && gateways.length === 1 ), 'Invite provider IDs and gateways must be paired' );
 	return {
 		worldId: worldId || '',
-		zeroTierNodeId,
-		zeroTierNetworkId: DEFAULT_ZEROTIER_NETWORK_ID,
+		zeroTierNodeId: zeroTierNodeId.toLowerCase(),
+		zeroTierNetworkId: zeroTierNetworkId.toLowerCase(),
 		nodeId: nodeIds[ 0 ] || '',
 		gateway: gateways[ 0 ] || location.origin,
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
@@ -86,15 +87,24 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	};
 }
 
-export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, nodeId, gateway, providers = [], directory = '' } = {} ) {
+export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, nodeId, gateway, providers = [], directory = '' } = {} ) {
 		invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
 	url.searchParams.set( 'worldId', worldId );
+	if ( zeroTierNodeId ) {
+		invariant( /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ), 'Invalid ZeroTier node or network ID for invite' );
+		url.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
+		url.searchParams.set( 'ztNetworkId', zeroTierNetworkId );
+	} else {
+		url.searchParams.delete( 'ztNodeId' );
+		url.searchParams.delete( 'ztNetworkId' );
+	}
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	invariant( candidates.length <= 8, 'Invite contains too many gateway candidates' );
 	url.searchParams.delete( 'nodeId' );
 	url.searchParams.delete( 'gateway' );
+	invariant( ! zeroTierNodeId || directory || candidates.length > 0, 'A ZeroTier locator requires a direct provider gateway or HTTPS resolver' );
 	for ( const provider of candidates ) {
 		invariant( /^[A-Za-z0-9]{20,256}$/.test( provider.nodeId || '' ), 'Invalid invite node PeerID' );
 		invariant( validSecureGateway( provider.gateway ), 'Invite gateway must be a secure HTTPS/WSS origin' );
@@ -118,7 +128,7 @@ export class WorldConnector {
 		invariant( isWorldID( worldId ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
-		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && directory, 'ZeroTier lookup requires a valid node ID, network ID, and HTTPS resolver' );
+		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && ( directory || providers.length > 0 || nodeId && gateway ), 'ZeroTier lookup requires a valid node ID and network ID, plus either a direct gateway or HTTPS resolver' );
 		this.worldId = worldId;
 		this.localOnly = false;
 		this.presenceEnabled = true;
@@ -153,8 +163,30 @@ export class WorldConnector {
 
 	async getManifest( { signal, excludeProviders = this.unavailableProviders } = {} ) {
 		throwIfAborted( signal );
+		let lastError = null;
+		const attempted = new Set( excludeProviders );
+		for ( const provider of this.providers ) {
+			const key = `${provider.nodeId}\n${provider.gateway}`;
+			if ( attempted.has( key ) ) continue;
+			attempted.add( key );
+			this.nodeId = provider.nodeId;
+			this.gateway = provider.gateway;
+			try {
+				return await this.#fetchManifest( signal );
+			} catch ( error ) {
+				if ( signal?.aborted ) throw signal.reason || error;
+				lastError = error;
+				this.close();
+				this.nodeId = '';
+			}
+		}
 		if ( this.zeroTierNodeId ) {
-			const discovered = await this.#discoverZeroTierProviders( signal );
+			let discovered;
+			try { discovered = await this.#discoverZeroTierProviders( signal ); }
+			catch ( error ) {
+				if ( signal?.aborted ) throw signal.reason || error;
+				throw lastError || error;
+			}
 			if ( ! this.worldId ) {
 				const worldIDs = [ ...new Set( discovered.flatMap( ( provider ) => provider.worldIds ) ) ];
 				invariant( worldIDs.length === 1, worldIDs.length ? 'ZeroTier node advertises multiple ThruHolds; choose one by ThruHold ID' : 'ZeroTier node does not currently advertise a ThruHold' );
@@ -165,8 +197,6 @@ export class WorldConnector {
 			this.providers = candidates.map( ( provider ) => ( { nodeId: provider.nodeId, gateway: provider.gateway } ) );
 		}
 		invariant( isWorldID( this.worldId ), 'A valid worldId is required' );
-		let lastError = null;
-		const attempted = new Set( excludeProviders );
 		for ( const provider of this.providers ) {
 			const key = `${provider.nodeId}\n${provider.gateway}`;
 			if ( ! attempted.has( key ) ) {

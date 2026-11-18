@@ -137,11 +137,20 @@ and be authorized on that network. Where the application socket API requires
 a ZeroTier managed IP, the network must provide a stable managed address or
 the client must obtain the current HostID-to-managed-address mapping from a
 trusted network advertisement/controller. Host ID alone is not an IP route.
-The visitor's browser can use this path only through a native ZeroTier
-interface or a working browser ZeroTier transport. The existing signed
-directory may optionally map Host ID/network ID to an advertised HTTPS/WSS
-gateway, but then that lookup service is a dependency. A private route must
-also satisfy browser HTTPS/WSS certificate requirements.
+The visitor's browser can use a ZeroTier private route only when its host OS
+provides the ZeroTier route (or a working browser ZeroTier transport exists),
+and the endpoint is HTTPS/WSS with a certificate the browser trusts. A secure
+provider gateway supplied in the invite is tried before HostID lookup. If it
+fails, the signed directory can map Host ID/network ID to the provider's
+current HTTPS/WSS gateway; the Worker performs lookup only and never carries
+world traffic. A Tailscale MagicDNS `*.ts.net` gateway can use the same direct
+gateway slot when the visitor's device has been connected to or shared into
+the relevant tailnet. This uses the host OS Tailscale route, not a browser
+Tailscale implementation. Tailscale Funnel is a separate public-exposure mode:
+it can make a `.ts.net` endpoint reachable to ordinary Internet visitors, but
+then ElseMesh must enforce access itself and cannot treat Tailscale identity
+headers as proof of the visitor's identity. A raw overlay IP over plain
+HTTP/WS is not a valid route from the hosted HTTPS client.
 
 ElseMesh already has an optional signed provider locator: `worldd` can publish
 its current gateway advertisement, and the client can look it up by world ID
@@ -199,7 +208,10 @@ limits](https://emscripten.org/docs/porting/networking.html) and the open
 The benchmark is tracked at 0% in
 [project direction](../PROJECT-DIRECTION.md#product-requirements). Until it
 passes, a visitor must use a device-level ZeroTier client for a direct
-ZeroTier-IP route, or use a public gateway/tunnel/relay.
+ZeroTier-IP route, or use a reachable HTTPS/WSS gateway. Tailscale Serve can
+provide a private HTTPS/WSS gateway under a tailnet's `*.ts.net` name; this
+still requires device-level Tailscale connectivity and acceptance of the
+shared host where applicable.
 
 Invitation codes and launch grants are capabilities, not account role grants.
 They must not contain private keys or reusable account session tokens. Enforce

@@ -9,13 +9,26 @@ ElseMesh separates a world's identity from the machines that can serve it. This 
 | `elsemesh:<name>` ThruHold ID | The signed world and its content | No; it needs a provider route |
 | ZeroTier node ID (10 hex characters) | A persistent `worldd` overlay identity | No; a browser is not on the ZeroTier network |
 | libp2p PeerID | One daemon/provider identity | No; it is not a network address |
-| HTTPS/WSS gateway origin | A public endpoint for that provider | Yes, subject to TLS, availability, and world authorization |
+| HTTPS/WSS gateway origin | A browser-reachable endpoint for that provider | Yes, if the browser can route to it and TLS, origin policy, and world authorization pass |
+
+A gateway does not have to be public. For a browser whose host OS is already
+connected to an overlay, an HTTPS/WSS origin routed over that overlay can be
+tried directly. A Tailscale MagicDNS name ending in `.ts.net` is one option:
+`tailscale serve` terminates browser-trusted TLS for tailnet-only access, so
+the visitor needs Tailscale access to the world server. `tailscale funnel`
+instead exposes the service to anyone on the public Internet; visitors do not
+need Tailscale, and ElseMesh must enforce its own admission and authorization
+because Funnel does not provide tailnet identity headers. Either option avoids
+putting Tailscale networking code in the browser. A raw ZeroTier managed IP is
+only a usable browser gateway if the browser's device has a route to it and
+the HTTPS/WSS endpoint presents a certificate the browser trusts; plain
+HTTP/WS from a hosted HTTPS page is blocked.
 
 The ZeroTier ID is useful to identify which persistent daemon the owner means. `worldd` now adds its local ZeroTier node ID and network ID to its signed `elsemesh.node/1` advertisement. `directoryd` accepts those optional signed fields and exposes `GET /v1/zerotier/{networkId}/{nodeId}`; the response includes current provider records and the ThruHold IDs they advertise. The browser verifies each provider signature, resolves a single-world node to its canonical ThruHold ID, then verifies the signed world manifest through HTTPS/WSS. The existing `/v1/worlds/{worldId}` lookup remains unchanged.
 
 The association is signed by the provider's libp2p identity, using the node ID read from that daemon's local libzt runtime. It is a locator assertion, not a ZeroTier cryptographic proof or authorization credential. The directory and browser must never use it to grant access: world signatures and owner grants remain authoritative, and another signed world cannot impersonate the owner's manifest. Do not substitute a discovered physical IP/UDP port for the gateway: libzt path observations are transient and are not browser-routable addresses.
 
-## Current invite failover
+## Invite route order
 
 The client accepts a sequence of matching `nodeId` and `gateway` query arguments. Keep each pair in the same order. For example, use an owner's desktop first, then a Flip7 replica, then a separately administered cache:
 
@@ -26,7 +39,17 @@ https://elsemesh.github.io/?worldId=elsemesh%3Amy-island
   &nodeId=<cache-libp2p-peer-id>&gateway=https%3A%2F%2Fcache-gateway.example
 ```
 
-This is one URL; line breaks above are for readability. The app tries the pairs in order, verifies the same signed ThruHold manifest, then uses its existing signed discovery and provider recovery. Up to eight candidates are accepted. Bare ThruHold and 10-character ZeroTier IDs in the world picker use `worldResolver` from `public/elsemesh-config.js`. A ZeroTier lookup requires a current discoverable advertisement; if that node advertises several worlds, provide a ThruHold ID too. Secure pages reject HTTP/WS gateways. Local loopback HTTP/WS remains available only when testing from a loopback page.
+This is one URL; line breaks above are for readability. The app tries explicit
+invite gateway pairs first, in order. If a ZeroTier HostID/network ID is also
+present and those routes fail, it queries `worldResolver` for the current
+signed provider gateway, then verifies the same signed ThruHold manifest. Up
+to eight explicit candidates are accepted. Thus a `.ts.net` endpoint can be
+the first direct route while the ZeroTier HostID remains the discovery
+fallback. A bare ThruHold ID or 10-character ZeroTier ID in the world picker
+uses `worldResolver` from `public/elsemesh-config.js`. ZeroTier lookup requires
+a current discoverable advertisement; if that node advertises several worlds,
+provide a ThruHold ID too. Secure pages reject HTTP/WS gateways. Local loopback
+HTTP/WS remains available only when testing from a loopback page.
 
 When sharing a URL, include only providers that already serve the same world and have the necessary owner-signed host grant. A PeerID/gateway in a link does not grant content-cache or failover-authority permission. Each daemon must have its own persistent identity directory; do not copy a private node key from desktop to phone or friend. Issue/renew grants through the world's owner-authorized manifest workflow.
 
