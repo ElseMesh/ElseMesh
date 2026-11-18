@@ -1,23 +1,39 @@
 import assert from 'node:assert/strict';
 import { fork, spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { webcrypto } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { goBuildEnvironment } from './go-build-env.mjs';
+import { handleRequest as handleResolverRequest } from '../cloudflare/world-resolver/src/index.js';
 
 const projectRoot = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const daemonDir = path.join( projectRoot, 'server', 'worldd' );
 const tempDirectory = process.env.PREFIX ? path.join( process.env.PREFIX, 'tmp' ) : '/var/tmp';
 const tempRoot = await mkdtemp( path.join( tempDirectory, 'elsemesh-world-gateway-' ) );
 const processes = [];
+globalThis.crypto ||= webcrypto;
+
+class MemoryKV {
+	values = new Map();
+	async put( key, value ) { this.values.set( key, value ); }
+	async get( key ) { return this.values.get( key ) ?? null; }
+	async list( { prefix } ) { return { keys: [ ...this.values.keys() ].filter( name => name.startsWith( prefix ) ).map( name => ( { name } ) ), list_complete: true }; }
+}
 
 try {
-	const binary = path.join( tempRoot, 'worldd' );
-	const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
-	assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
+	const configuredBinary = process.env.ELSEMESH_TEST_WORLDD_BINARY;
+	const binary = configuredBinary ? path.resolve( configuredBinary ) : path.join( tempRoot, 'worldd' );
+	if ( configuredBinary ) {
+		const version = spawnSync( binary, [ '--version' ], { encoding: 'utf8', timeout: 30000 } );
+		assert.equal( version.status, 0, `configured worldd binary is not executable:\n${version.stdout}\n${version.stderr}` );
+	} else {
+		const build = spawnSync( 'go', [ 'build', '-o', binary, '.' ], { cwd: daemonDir, encoding: 'utf8', timeout: 180000, env: goBuildEnvironment() } );
+		assert.equal( build.status, 0, `worldd build failed:\n${build.stdout}\n${build.stderr}` );
+	}
 
 	const ownerData = path.join( tempRoot, 'owner' );
 	const cacheData = path.join( tempRoot, 'cache' );
@@ -95,7 +111,48 @@ try {
 		await new Promise( ( resolve, reject ) => secureGateway.server.close( ( error ) => error ? reject( error ) : resolve() ) );
 	}
 
-	console.log( 'ok   live WSS two-visitor spawn admission and capacity, signed manifest, authorized cache recovery, HTTPS provider lookup, and asset SHA-256 verification' );
+	const workerGateway = await createSecureGatewayProxy( cacheHTTPPort, keyPath, certPath );
+	let resolverServer;
+	try {
+		const cacheKeyPath = path.join( tempRoot, 'cache-node.key' );
+		runCli( binary, [ '--data', cacheData, '--export-node-key', cacheKeyPath ] );
+		const cacheIdentity = await readLibp2pIdentity( cacheKeyPath );
+		assert.equal( cacheIdentity.peerID, cachePeerID, 'the exported test identity matches the running worldd node ID' );
+		const resolverNode = await signNodeRecord( {
+			protocol: 'elsemesh.node/1', nodeId: cachePeerID, gateway: workerGateway.url,
+			worldIds: [ worldID ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+			issuedAt: Math.floor( Date.now() / 1000 ), expiresAt: Math.floor( Date.now() / 1000 ) + 600,
+		}, cacheIdentity );
+		const resolverState = { PROVIDERS: new MemoryKV() };
+		const resolverManifest = JSON.parse( await readFile( manifestPath, 'utf8' ) );
+		const announcement = await handleResolverRequest( new Request( 'https://resolver.example/v1/announce', {
+			method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify( { node: resolverNode, manifest: resolverManifest } ),
+		} ), resolverState );
+		assert.equal( announcement.status, 202, `Worker contract rejected the live cache node advertisement: ${await announcement.text()}` );
+		const lookup = await handleResolverRequest( new Request( 'https://resolver.example/v1/zerotier/e3918db4832a3056/3af4fd5d50' ), resolverState );
+		const lookupResult = await lookup.json();
+		assert.equal( lookup.status, 200 );
+		assert.deepEqual( lookupResult.providers, [ resolverNode ], 'HostID discovery returns the signed live worldd provider record' );
+		resolverServer = await createResolverServer( resolverState, keyPath, certPath );
+
+		const result = await runWorkerDiscoveryClient( {
+			worldID, ownerPeerID, cachePeerID, zeroTierNodeID: '3af4fd5d50',
+			zeroTierNetworkID: 'e3918db4832a3056', directory: resolverServer.url,
+			assetID, assetSource, certPath,
+		} );
+		assert.ok( result.ok, `Worker-discovered WSS connector failed: ${result.error || 'unknown error'}\nworldd cache log:\n${cache.output}` );
+		assert.equal( result.nodeId, cachePeerID, 'HostID lookup connects directly to the advertised worldd peer' );
+		assert.equal( result.gateway, workerGateway.url, 'worldd traffic uses its HTTPS/WSS gateway, not the resolver' );
+		assert.equal( resolverServer.lookups, 1, 'the resolver handles only the HostID lookup' );
+		assert.ok( workerGateway.upgrades >= 1, 'the client opens a direct WSS session to worldd after lookup' );
+	} finally {
+		await Promise.all( [
+			resolverServer && new Promise( ( resolve, reject ) => resolverServer.server.close( ( error ) => error ? reject( error ) : resolve() ) ),
+			new Promise( ( resolve, reject ) => workerGateway.server.close( ( error ) => error ? reject( error ) : resolve() ) ),
+		].filter( Boolean ) );
+	}
+
+	console.log( 'ok   live WSS admission and recovery plus Worker HostID lookup to direct worldd gateway' );
 } finally {
 	for ( const child of processes.reverse() ) await stopDaemon( child );
 	await rm( tempRoot, { recursive: true, force: true } );
@@ -173,6 +230,83 @@ async function createSecureGatewayProxy( upstreamPort, keyPath, certPath ) {
 	await new Promise( ( resolve, reject ) => server.listen( 0, '127.0.0.1', resolve ).once( 'error', reject ) );
 	const { port } = server.address();
 	return { server, url: `https://127.0.0.1:${port}`, get upgrades() { return upgrades; }, get lookups() { return lookups; } };
+}
+
+async function createResolverServer( env, keyPath, certPath ) {
+	let lookups = 0;
+	const server = https.createServer( { key: await readFile( keyPath ), cert: await readFile( certPath ) }, async ( incoming, outgoing ) => {
+		try {
+			const chunks = [];
+			for await ( const chunk of incoming ) chunks.push( chunk );
+			const body = chunks.length ? Buffer.concat( chunks ) : undefined;
+			const headers = new Headers();
+			for ( const [ name, value ] of Object.entries( incoming.headers ) ) if ( value !== undefined ) headers.set( name, Array.isArray( value ) ? value.join( ', ' ) : value );
+			const requestURL = new URL( incoming.url || '/', `https://${incoming.headers.host || 'resolver.local'}` );
+			if ( requestURL.pathname.startsWith( '/v1/zerotier/' ) ) lookups ++;
+			const response = await handleResolverRequest( new Request( requestURL, { method: incoming.method, headers, ...( body ? { body } : {} ) } ), env );
+			outgoing.writeHead( response.status, Object.fromEntries( response.headers.entries() ) );
+			outgoing.end( Buffer.from( await response.arrayBuffer() ) );
+		} catch ( error ) {
+			outgoing.writeHead( 500 );
+			outgoing.end( error instanceof Error ? error.message : 'resolver test failure' );
+		}
+	} );
+	await new Promise( ( resolve, reject ) => server.listen( 0, '127.0.0.1', resolve ).once( 'error', reject ) );
+	return { server, url: `https://127.0.0.1:${server.address().port}`, get lookups() { return lookups; } };
+}
+
+async function readLibp2pIdentity( keyPath ) {
+	const serialized = await readFile( keyPath );
+	assert.equal( serialized[ 0 ], 8, 'libp2p private key protobuf has an algorithm field' );
+	assert.equal( serialized[ 1 ], 1, 'libp2p private key is Ed25519' );
+	assert.equal( serialized[ 2 ], 18, 'libp2p private key protobuf has private data' );
+	assert.equal( serialized[ 3 ], 64, 'Ed25519 private key data is 64 bytes' );
+	const privateBytes = serialized.subarray( 4 );
+	assert.equal( privateBytes.length, 64 );
+	const publicKey = Buffer.concat( [ Buffer.from( [ 8, 1, 18, 32 ] ), privateBytes.subarray( 32 ) ] );
+	const peerID = base58( Buffer.concat( [ Buffer.from( [ 0, publicKey.length ] ), publicKey ] ) );
+	const pkcs8Prefix = Buffer.from( '302e020100300506032b657004220420', 'hex' );
+	const signingKey = await webcrypto.subtle.importKey( 'pkcs8', Buffer.concat( [ pkcs8Prefix, privateBytes.subarray( 0, 32 ) ] ), { name: 'Ed25519' }, false, [ 'sign' ] );
+	return { peerID, publicKey, signingKey };
+}
+
+async function signNodeRecord( payload, identity ) {
+	const unsigned = { protocol: 'elsemesh.node/1', signer: identity.peerID, publicKey: identity.publicKey.toString( 'base64' ).replace( /=+$/g, '' ), payload };
+	const signature = await webcrypto.subtle.sign( 'Ed25519', identity.signingKey, new TextEncoder().encode( canonicalJSON( unsigned ) ) );
+	return { ...unsigned, signature: Buffer.from( signature ).toString( 'base64' ).replace( /=+$/g, '' ) };
+}
+
+function canonicalJSON( value ) {
+	if ( Array.isArray( value ) ) return `[${value.map( canonicalJSON ).join( ',' )}]`;
+	if ( value && typeof value === 'object' ) return `{${Object.keys( value ).sort().map( ( key ) => `${JSON.stringify( key )}:${canonicalJSON( value[ key ] )}` ).join( ',' )}}`;
+	return JSON.stringify( value );
+}
+
+function base58( bytes ) {
+	const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+	let value = 0n;
+	for ( const byte of bytes ) { value = value * 256n + BigInt( byte ); }
+	let encoded = '';
+	while ( value > 0n ) { encoded = alphabet[ Number( value % 58n ) ] + encoded; value /= 58n; }
+	for ( const byte of bytes ) { if ( byte !== 0 ) break; encoded = `1${encoded}`; }
+	return encoded;
+}
+
+async function runWorkerDiscoveryClient( options ) {
+	const child = spawn( process.execPath, [ fileURLToPath( new URL( './world-gateway-worker-client.mjs', import.meta.url ) ), JSON.stringify( options ) ], {
+		env: { ...process.env, NODE_EXTRA_CA_CERTS: options.certPath },
+		stdio: [ 'ignore', 'pipe', 'pipe' ],
+	} );
+	child.output = '';
+	child.stdout.setEncoding( 'utf8' ).on( 'data', value => { child.output += value; } );
+	child.stderr.setEncoding( 'utf8' ).on( 'data', value => { child.output += value; } );
+	const exitCode = await new Promise( ( resolve, reject ) => {
+		const timer = setTimeout( () => { child.kill( 'SIGKILL' ); reject( new Error( `Worker-discovery connector timed out:\n${child.output}` ) ); }, 45000 );
+		child.once( 'exit', code => { clearTimeout( timer ); resolve( code ); } );
+		child.once( 'error', error => { clearTimeout( timer ); reject( error ); } );
+	} );
+	assert.equal( exitCode, 0, `Worker-discovery connector exited ${exitCode}:\n${child.output}` );
+	return JSON.parse( child.output.trim().split( '\n' ).at( -1 ) );
 }
 
 function runCli( binary, args ) {
