@@ -240,6 +240,10 @@ as signed GLB data while keeping their interpretation in world-authored graph
 data.
 `textureSampleLevel` can now also feed vertex outputs, with the same signed
 glTF texture bound in WebGPU, WebGL color, and WebGL depth/shadow materials.
+The material graph also provides `valueNoise2`, compiled from the same authored
+operation to WGSL and GLSL; Tidewater's inactive palm migration sidecar uses it
+for bark mottling. This adds a portable material primitive, not an active
+vegetation migration or a parity result.
 The graph also exposes `worldVertexPosition`, computed after object and instance
 transforms but before graph deformation, so vertex texture coordinates can stay
 anchored across instances. ElseMesh now accumulates world-heading and wind-velocity

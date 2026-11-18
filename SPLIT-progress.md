@@ -2046,3 +2046,15 @@ finding changes them.
   unverified. This closes the matched fresh-wallet state gate; Tidewater remains
   93% because matched visual/material views and controlled hardware FPS remain
   open.
+
+- 2026-11-18: added the renderer-neutral `valueNoise2` material-graph operation
+  and compiled it from the same authored node for WGSL and GLSL. Tidewater's
+  inactive palm sidecar now uses it for bark mottling. Graph validation,
+  Tidewater graph/export checks, generic static-model adapter checks, WebGPU and
+  WebGL render fixtures, and the external production build pass. This is a
+  portable material capability; the signed Tidewater vegetation presenters
+  remain separate and the sidecar remains inactive pending complete asset,
+  wind, LOD, shadow, matched-visual, and hardware-FPS gates. Tidewater remains
+  93%. Engine quality controls may tune cost while both backends retain the
+  same authored object, placement, geometry/LOD, texture, variant, and material
+  inputs.
