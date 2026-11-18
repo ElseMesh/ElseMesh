@@ -218,6 +218,7 @@ export class LocalRegionConnector {
 		this.assetRangeBytes = 0;
 		this.assetRangeCacheBudgetBytes = memoryCacheBudgetBytes - this.assetCacheBudgetBytes;
 		this.regionAssets = new Map();
+		this.regionAssetsByCell = new Map();
 		this.regionRequestQueue = new PriorityRequestQueue( REGION_DATA_REQUEST_LIMIT );
 		this.syntheticAssetLoaders = new Map();
 		this.collisionAssetIDs = new Set();
@@ -526,7 +527,14 @@ export class LocalRegionConnector {
 			const sourceCell = item?.sourceRegionCell;
 			if ( ! sourceCell ) return true;
 			if ( ! sourceRegionIDs.has( sourceCell.regionID ) || ! Array.isArray( sourceCell.coordinates ) || sourceCell.coordinates.length !== 3 || ! sourceCell.coordinates.every( Number.isSafeInteger ) ) return false;
-			return visibleCells.has( sourceCell.coordinates.join( ',' ) );
+			const cellKey = sourceCell.coordinates.join( ',' );
+			if ( ! visibleCells.has( cellKey ) ) return false;
+			const cellAssets = this.regionAssetsByCell.get( `${sourceCell.regionID}\0${cellKey}` );
+			for ( const reference of item.assets || [] ) {
+				const assetURL = cellAssets?.get( reference.assetId );
+				if ( assetURL ) this.regionAssets.set( reference.assetId, assetURL );
+			}
+			return true;
 		} );
 	}
 
@@ -635,14 +643,16 @@ export class LocalRegionConnector {
 						return new TextEncoder().encode( JSON.stringify( refreshed.document ) );
 					} );
 					for ( const modelAsset of set.modelAssets ) {
-						if ( ! this.regionAssets.has( modelAsset.assetId ) ) {
-							const modelURL = new URL( sourceRegion.asset, `${base}/` );
-							modelURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
-							modelURL.searchParams.set( 'payload', 'visual' );
-							modelURL.searchParams.set( 'mesh', modelAsset.componentPath );
-							modelURL.searchParams.set( 'lod', String( modelAsset.lodIndex ) );
-							this.regionAssets.set( modelAsset.assetId, modelURL.href );
-						}
+						const modelURL = new URL( sourceRegion.asset, `${base}/` );
+						modelURL.searchParams.set( 'cell', `${cellKey},${previewRegion.cellSizeMeters}` );
+						modelURL.searchParams.set( 'payload', 'visual' );
+						modelURL.searchParams.set( 'mesh', modelAsset.componentPath );
+						modelURL.searchParams.set( 'lod', String( modelAsset.lodIndex ) );
+						const regionCellKey = `${sourceRegion.id}\0${cellKey}`;
+						let cellAssets = this.regionAssetsByCell.get( regionCellKey );
+						if ( ! cellAssets ) this.regionAssetsByCell.set( regionCellKey, cellAssets = new Map() );
+						cellAssets.set( modelAsset.assetId, modelURL.href );
+						if ( ! this.regionAssets.has( modelAsset.assetId ) ) this.regionAssets.set( modelAsset.assetId, modelURL.href );
 						if ( ! this.manifest.assets.some( asset => asset.id === modelAsset.assetId ) ) this.manifest.assets.push( { id: modelAsset.assetId, bytes: 0, kind: 'glb', priority } );
 					}
 				}

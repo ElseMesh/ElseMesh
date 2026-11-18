@@ -58,14 +58,20 @@ try {
 		],
 	};
 	assert.deepEqual( selectLocalRegionStreamingObjects( connector, visibleManifest, camera ).map( object => object.id ), [ 'visible-wall' ], 'background visual streaming does not load view-frustum collision cells ahead of permitted movement' );
+	const sharedMeshLOD = 'shared-mesh-lod';
+	const rejectedCellURL = 'http://127.0.0.1:4179/v1/regions/hall?cell=1%2C0%2C10%2C8&payload=visual';
+	const visibleCellURL = 'http://127.0.0.1:4179/v1/regions/hall?cell=0%2C0%2C11%2C8&payload=visual';
+	connector.regionAssets.set( sharedMeshLOD, rejectedCellURL );
+	connector.regionAssetsByCell.set( `hall\0${[ 0, 0, 11 ].join( ',' )}`, new Map( [ [ sharedMeshLOD, visibleCellURL ] ] ) );
 	const visibleComponents = selectWorldComponentsForConnectorView( connector, {
 		assets: [],
 		components: [
 			{ id: 'rear-cell-floor-bounds', sourceRegionCell: { regionID: 'hall', coordinates: [ 1, 0, 10 ] }, streamingBounds: { center: [ 0, 11.9, 88 ], radius: 33, maxDistanceMeters: 64 } },
-			{ id: 'forward-cell-floor-bounds', sourceRegionCell: { regionID: 'hall', coordinates: [ 0, 0, 11 ] }, streamingBounds: { center: [ 0, 11.9, 88 ], radius: 33, maxDistanceMeters: 64 } },
+			{ id: 'forward-cell-floor-bounds', sourceRegionCell: { regionID: 'hall', coordinates: [ 0, 0, 11 ] }, assets: [ { assetId: sharedMeshLOD } ], streamingBounds: { center: [ 0, 11.9, 88 ], radius: 33, maxDistanceMeters: 64 } },
 		],
 	}, camera, { nearbyDistance: 0, maxDistance: 64 } );
 	assert.deepEqual( visibleComponents.map( component => component.id ), [ 'forward-cell-floor-bounds' ], 'wide component bounds cannot stream a source cell outside the actual camera frustum' );
+	assert.equal( connector.regionAssets.get( sharedMeshLOD ), visibleCellURL, 'a shared model LOD uses the visible cell as its authorization route instead of the first indexed cell' );
 	connector.close();
 } finally {
 	globalThis.fetch = previousFetch;
