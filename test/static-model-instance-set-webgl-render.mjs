@@ -78,7 +78,13 @@ try {
 	assert( metrics.changedPixels >= 30, `WebGL rendered pixels differ from background (${ metrics.changedPixels })` );
 	assert( metrics.programCount > 0, 'WebGL compiled the static model shader program' );
 	assert.equal( metrics.glError, 0, 'WebGL reports no graphics error' );
-	console.log( `generic WebGL static-model render passed (${ metrics.changedPixels } non-background pixels; ${ metrics.programCount } program(s); no GL errors)` );
+	assert( metrics.scannedDebris?.placements > 0, 'Built-in Tidewater package loaded authored debris placements' );
+	assert( metrics.scannedDebris?.visibleMeshes > 0, 'Built-in Tidewater debris produced visible color meshes' );
+	assert( metrics.scannedDebris?.textureAssets > 0, 'Built-in Tidewater debris fetched signed JPEG texture assets' );
+	assert( metrics.scannedDebris?.changedPixels >= 30, `Built-in Tidewater debris rendered pixels (${ metrics.scannedDebris?.changedPixels })` );
+	assert( metrics.scannedDebris?.programCount > 0, 'Built-in Tidewater debris compiled WebGL programs' );
+	assert.equal( metrics.scannedDebris?.glError, 0, 'Built-in Tidewater debris reports no graphics error' );
+	console.log( `WebGL static-model rendering passed: generic fixture ${metrics.changedPixels} pixels/${metrics.programCount} programs; built-in Tidewater debris ${metrics.scannedDebris.changedPixels} pixels, ${metrics.scannedDebris.placements} placements, ${metrics.scannedDebris.textureAssets} signed textures/${metrics.scannedDebris.programCount} programs; no GL errors` );
 } finally {
 	socket?.close();
 	if ( browser ) await stopBrowser( browser );

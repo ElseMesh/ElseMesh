@@ -248,6 +248,9 @@ try {
 	if ( ! scannedDebris ) throw new Error( 'The default world has no signed scanned-debris component' );
 	const builtInScene = new THREE.Scene();
 	builtInScene.background = new THREE.Color( 0x101820 );
+	const builtInSun = new THREE.DirectionalLight( 0xffffff, 3 );
+	builtInSun.position.set( - 2, 4, 3 );
+	builtInScene.add( builtInSun, new THREE.AmbientLight( 0xffffff, 0.5 ) );
 	const builtInCamera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 1000 );
 	const firstInstance = [ 142.0147, 2.2869, -91.6233 ];
 	builtInCamera.position.set( firstInstance[ 0 ] + 1, firstInstance[ 1 ] + 1.2, firstInstance[ 2 ] + 5 );
@@ -269,12 +272,14 @@ try {
 	await builtInFallback._loadBuiltinComponents();
 	builtInRuntime = builtInFallback.builtinComponentRuntimes.get( scannedDebris.id );
 	if ( ! builtInRuntime ) throw new Error( 'Built-in WebGL did not install the signed scanned-debris component' );
+	const builtInPlacementCount = builtInRuntime.document.instances.length;
+	if ( builtInPlacementCount === 0 ) throw new Error( 'The signed Tidewater debris component has no authored placements' );
 	const builtInDeadline = Date.now() + 20000;
 	let visibleBuiltInMeshes = [];
 	while ( Date.now() < builtInDeadline ) {
 		builtInRuntime.update( 1 / 60, builtInCamera, null, 0 );
 		visibleBuiltInMeshes = [];
-		builtInScene.traverse( object => { if ( object.isInstancedMesh && object.count > 0 ) visibleBuiltInMeshes.push( object ); } );
+		builtInScene.traverse( object => { if ( object.isInstancedMesh && object.count > 0 && object.material.colorWrite && ! object.userData.shadowOnly ) visibleBuiltInMeshes.push( object ); } );
 		if ( visibleBuiltInMeshes.length > 0 ) break;
 		await new Promise( resolve => setTimeout( resolve, 25 ) );
 	}
@@ -286,8 +291,16 @@ try {
 	renderer.getContext().readPixels( 0, 0, canvas.width, canvas.height, renderer.getContext().RGBA, renderer.getContext().UNSIGNED_BYTE, builtInPixels );
 	let builtInChangedPixels = 0;
 	for ( let offset = 0; offset < builtInPixels.length; offset += 4 ) if ( Math.abs( builtInPixels[ offset ] - background[ 0 ] ) + Math.abs( builtInPixels[ offset + 1 ] - background[ 1 ] ) + Math.abs( builtInPixels[ offset + 2 ] - background[ 2 ] ) > 24 ) builtInChangedPixels ++;
-	if ( builtInChangedPixels < 30 ) throw new Error( `The signed Tidewater debris component rendered too few pixels: ${builtInChangedPixels}` );
-	result.textContent = JSON.stringify( { status: 'complete', changedPixels, programCount: programs.length, glError, scannedDebris: { placements: 141, visibleMeshes: visibleBuiltInMeshes.length, textureAssets: loadedTextureAssets.length, changedPixels: builtInChangedPixels } } );
+	const builtInDrawDiagnostics = visibleBuiltInMeshes.map( mesh => {
+		const matrix = new THREE.Matrix4(); mesh.getMatrixAt( 0, matrix );
+		return { count: mesh.count, colorWrite: mesh.material.colorWrite, visible: mesh.visible, type: mesh.material.type, color: mesh.material.color?.getHexString(), position: new THREE.Vector3().setFromMatrixPosition( matrix ).toArray() };
+	} );
+	const builtInPixelSamples = [ 0, canvas.width * Math.floor( canvas.height / 2 ) + Math.floor( canvas.width / 2 ), builtInPixels.length - 4 ].map( offset => Array.from( builtInPixels.slice( offset, offset + 4 ) ) );
+	if ( builtInChangedPixels < 30 ) throw new Error( `The signed Tidewater debris component rendered too few pixels: ${builtInChangedPixels}; ${JSON.stringify( { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, draws: builtInDrawDiagnostics, samples: builtInPixelSamples, camera: builtInCamera.position.toArray() } )}` );
+	const builtInGL = renderer.getContext(), builtInGlError = builtInGL.getError(), builtInPrograms = renderer.info.programs || [];
+	if ( builtInGlError !== builtInGL.NO_ERROR ) throw new Error( `Built-in Tidewater debris render reported WebGL error 0x${builtInGlError.toString( 16 )}` );
+	if ( builtInPrograms.some( program => program.diagnostics?.runnable === false ) ) throw new Error( 'Built-in Tidewater debris compiled an invalid WebGL program' );
+	result.textContent = JSON.stringify( { status: 'complete', changedPixels, programCount: programs.length, glError, scannedDebris: { placements: builtInPlacementCount, visibleMeshes: visibleBuiltInMeshes.length, textureAssets: loadedTextureAssets.length, changedPixels: builtInChangedPixels, programCount: builtInPrograms.length, glError: builtInGlError } } );
 	result.dataset.status = 'complete';
 } catch ( error ) {
 	result.textContent = `FAIL ${ error.stack || error }`;

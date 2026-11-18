@@ -262,7 +262,10 @@ function staticFadeMaterial( T, source, hasMaterialData, shadowOnly ) {
 	const originalCompile = source.onBeforeCompile, originalKey = source.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.call( material, shader, renderer );
-		const materialAttributes = hasMaterialData ? '\nattribute vec4 iStaticMaterialData0;\nattribute vec4 iStaticMaterialData1;' : '';
+		const materialAttributes = hasMaterialData ? [
+			shader.vertexShader.includes( 'attribute vec4 iStaticMaterialData0;' ) ? '' : '\nattribute vec4 iStaticMaterialData0;',
+			shader.vertexShader.includes( 'attribute vec4 iStaticMaterialData1;' ) ? '' : '\nattribute vec4 iStaticMaterialData1;',
+		].join( '' ) : '';
 		const materialVaryings = hasMaterialData ? '\nvarying vec4 vStaticMaterialData0;\nvarying vec4 vStaticMaterialData1;' : '';
 		const materialAssignments = hasMaterialData ? 'vStaticMaterialData0 = iStaticMaterialData0;\nvStaticMaterialData1 = iStaticMaterialData1;\n' : '';
 		shader.vertexShader = shader.vertexShader
@@ -295,7 +298,10 @@ function staticFadeDepthMaterial( T, source, hasMaterialData, profileDepthMateri
 	const originalKey = profileDepthMaterial ? source.customProgramCacheKey : material.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
 		originalCompile?.call( material, shader, renderer );
-		const materialAttributes = hasMaterialData ? '\nattribute vec4 iStaticMaterialData0;\nattribute vec4 iStaticMaterialData1;' : '';
+		const materialAttributes = hasMaterialData ? [
+			shader.vertexShader.includes( 'attribute vec4 iStaticMaterialData0;' ) ? '' : '\nattribute vec4 iStaticMaterialData0;',
+			shader.vertexShader.includes( 'attribute vec4 iStaticMaterialData1;' ) ? '' : '\nattribute vec4 iStaticMaterialData1;',
+		].join( '' ) : '';
 		const materialVaryings = hasMaterialData ? '\nvarying vec4 vStaticMaterialData0;\nvarying vec4 vStaticMaterialData1;' : '';
 		const materialAssignments = hasMaterialData ? 'vStaticMaterialData0 = iStaticMaterialData0;\nvStaticMaterialData1 = iStaticMaterialData1;\n' : '';
 		shader.vertexShader = shader.vertexShader
