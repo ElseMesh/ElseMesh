@@ -1,5 +1,38 @@
 # Reproducible graphics review
 
+## 2026-11-18 matched hosted beach: WebGPU and WebGL
+
+Captured the same hosted `beach` camera on Chromium 156 at 1600×813, with
+`quality=1`, render scale 1, and simulation time 1000. WebGPU ran on AMD RADV
+Renoir; WebGL ran through ANGLE/AMD RadeonSI. Both pages loaded
+`elsemesh:example-island` and the signed `elsemesh-component:scanned-debris`
+with the same 141 placements, four model classes, and three authored mesh LODs.
+At this camera, the shared visibility planner selected zero camera-visible
+groups for each class on both renderers. That confirms equal planner input and
+selection here; it does not yet verify the debris appearance in this view.
+
+The broad beach and pier composition matches, but the rendered color and light
+do not: WebGL is darker and less blue in the sky, open sea, swash, wet sand, and
+pier. Approximate gamma-encoded screen-space ROI mean RGB values (WebGPU versus
+WebGL) were sky `119/156/190` vs `99/136/174`, open sea `114/148/170` vs
+`97/134/157`, swash `158/176/177` vs `139/157/163`, wet sand `167/166/166` vs
+`152/144/140`, and pier `118/133/133` vs `96/116/120`. Dry sand was closer:
+`211/187/137` vs `202/182/149`. These measurements are diagnostic image
+samples, not calibrated colorimetric values or an FPS benchmark.
+
+The WebGPU static-model runtime also selected shadow-only batches for the four
+scanned-debris classes (`5, 1, 7, 4`); WebGL's static-model adapter currently
+does not submit shadow-only batches. Investigate whether this affects matched
+views before closing shadow parity. Users may tune engine-owned quality controls
+to meet a minimum-FPS target, but both backends must keep the same authored
+objects, placements, geometry/LOD assets, texture sources, variants, and
+material inputs. Quality changes may adjust cost or sample a different mip of
+the same texture; they must not switch to a backend-specific content set.
+Tidewater parity remains 93%.
+
+[Hosted WebGPU beach](images/tidewater-hosted-webgpu-beach-amd-radv-2026-11-18.png) ·
+[Hosted WebGL beach](images/tidewater-hosted-webgl-beach-amd-radeonsi-2026-11-18.png).
+
 ## 2026-11-17 hosted WebGL shadow coverage
 
 Hosted WebGL used one 1024² directional shadow map spanning 600 m. In the

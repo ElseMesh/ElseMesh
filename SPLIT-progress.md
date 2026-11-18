@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-17. Percentages are rough completion estimates for the
+Last assessed: 2026-11-18. Percentages are rough completion estimates for the
 active engine/world-separation, Tidewater parity, and AI Portals hosting goals. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -2011,3 +2011,15 @@ finding changes them.
   pixels, color and shadow pipelines compiled). This verifies the engine
   component path, not the hosted Tidewater scene or scanned-debris appearance;
   Tidewater parity remains 93%.
+
+- 2026-11-18: matched hosted AMD beach captures confirm WebGPU and WebGL load
+  the same signed 141-placement scanned-debris component and their shared LOD
+  planner selects the same camera-visible groups at this pose. WebGL is still
+  darker/less blue in the sky, sea, swash, wet sand, and pier; WebGPU also has
+  shadow-only batches absent from the WebGL static-model adapter. The captures
+  are recorded in [graphics review](docs/graphics-review.md#2026-11-18-matched-hosted-beach-webgpu-and-webgl).
+  This adds matched-view evidence, not parity completion or FPS evidence; the
+  Tidewater parity estimate remains 93%. Engine-owned minimum-FPS and quality
+  controls may reduce rendering cost, while both backends must use the same
+  authored objects, placements, geometry/LOD assets, texture sources, variants,
+  and material inputs.
