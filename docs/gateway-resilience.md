@@ -42,20 +42,23 @@ https://elsemesh.github.io/?worldId=elsemesh%3Amy-island
   &nodeId=<cache-libp2p-peer-id>&gateway=https%3A%2F%2Fcache-gateway.example
 ```
 
-This is one URL; line breaks above are for readability. The app tries an
-invite's signed-identity-bound private ZeroTier gateway first, then explicit
-HTTPS/WSS gateway pairs in order. If those routes fail and a ZeroTier
-HostID/network ID is present, it queries `worldResolver` for signed provider
-records, tries each provider's private gateway, then its HTTPS/WSS gateway,
-and verifies the same signed ThruHold manifest. Up
-to eight explicit candidates are accepted. Thus a `.ts.net` endpoint can be
-the first direct route while the ZeroTier HostID remains the discovery
-fallback. A bare ThruHold ID or 10-character ZeroTier ID in the world picker
-uses `worldResolver` from `public/elsemesh-config.js`. ZeroTier lookup requires
-a current discoverable advertisement; if that node advertises several worlds,
-provide a ThruHold ID too. Secure pages reject arbitrary HTTP/WS gateways;
-the separate ZeroTier gateway field accepts only private IP literals and is
-subject to browser Local Network Access rules.
+This is one URL; line breaks above are for readability. For an invite with a
+ZeroTier HostID, the app tries the invite's private ZeroTier gateway first,
+verifying it against the signed node record. If that fails or is absent, it
+queries `worldResolver` by network ID and HostID, verifies the returned signed
+provider records, and tries each matching provider's private gateway followed
+by its HTTPS/WSS gateway. Only after HostID discovery does it try static
+HTTPS/WSS gateway pairs from the invite. Invites without a ZeroTier locator try
+their explicit HTTPS/WSS pairs in order. The client verifies the same signed
+ThruHold manifest whichever route succeeds. Up to eight explicit candidates
+are accepted. A bare ThruHold ID or 10-character ZeroTier ID in the world
+picker uses `worldResolver` from `public/elsemesh-config.js`. ZeroTier lookup
+requires a current discoverable advertisement; if that node advertises several
+worlds, provide a ThruHold ID too. Secure pages reject arbitrary HTTP/WS
+gateways; the separate ZeroTier gateway field accepts only private IP literals
+and is subject to browser Local Network Access rules. The browser does not
+join ZeroTier itself: the visitor's operating-system ZeroTier client supplies
+the private route.
 
 When sharing a URL, include only providers that already serve the same world and have the necessary owner-signed host grant. A PeerID/gateway in a link does not grant content-cache or failover-authority permission. Each daemon must have its own persistent identity directory; do not copy a private node key from desktop to phone or friend. Issue/renew grants through the world's owner-authorized manifest workflow.
 
@@ -80,7 +83,7 @@ or proxy traffic. A stable DNS name updated by dynamic DNS or an outbound
 reverse tunnel can keep the gateway origin usable. GitHub Pages can host the
 client but cannot host this changing registry or gateway path.
 
-The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials; clients retain static invites and portal discovery as fallback when it is unavailable. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. On 2026-10-11, a live read-only lookup for `elsemesh:example-island` returned `providers: []`; no provider was announced. A custom HTTPS hostname remains optional. A Worker can provide a WebSocket endpoint or route to a gateway, but that is a separate traffic path from lookup; deployment should measure and state whether world traffic traverses Cloudflare. Cloudflare Tunnel can expose a private daemon gateway without opening inbound ports, but it still depends on Cloudflare's gateway path being reachable.
+The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials; world traffic remains a direct browser-to-`worldd` connection over the selected private gateway or HTTPS/WSS gateway. Static invites and explicit provider candidates remain fallbacks when the Worker is unavailable. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. A custom HTTPS hostname remains optional. Cloudflare Tunnel can expose a private daemon gateway without opening inbound ports, but that is a separate gateway path and would route world traffic through Cloudflare.
 
 Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tokens in local secret storage and deploy them through Cloudflare's secret mechanism, never in this repository or a browser URL.
 
