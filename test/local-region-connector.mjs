@@ -534,6 +534,7 @@ try {
 	includeSupportedPrimitiveCell = true;
 	const supportedPrimitiveConnector = new LocalRegionConnector( link );
 	await supportedPrimitiveConnector.getManifest();
+	await supportedPrimitiveConnector.ensureCells( [ [ 4, 0, 0 ] ] );
 	const supportedPrimitiveCollisionID = [ ...supportedPrimitiveConnector.collisionObjectIDsByCell.get( '4,0,0' ) ][ 0 ];
 	const supportedPrimitiveCollisionAsset = supportedPrimitiveConnector.manifest.assets.find( asset => asset.id === 'local-region:great-hall:16:4,0,0:collision' );
 	await supportedPrimitiveConnector.getAsset( supportedPrimitiveCollisionAsset.id );
