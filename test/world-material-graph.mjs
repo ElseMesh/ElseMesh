@@ -210,7 +210,7 @@ const terrainHeightWebGL = compileWorldMaterialGraph( terrainHeightGraph, 'webgl
 assert.equal( terrainHeightWebGPU.requiresTerrainHeight, true );
 assert.equal( terrainHeightWebGL.requiresTerrainHeight, true );
 assert.match( terrainHeightWebGPU.surface, /terrainHeightAt\( emg_xz \)/ );
-assert.match( terrainHeightWebGL.glsl.fragment, /emgTerrainHeightAt\( vEmg_xz \)/ );
+assert.match( terrainHeightWebGL.glsl.fragment, /emgTerrainHeightAt\( emg_xz \)/ );
 assert.throws( () => compileWorldMaterialGraph( { ...terrainHeightGraph, outputs: { vertexPosition: 'world' } }, 'webgpu' ), /fragment outputs/ );
 const terrainHeightModule = new ShaderModule( { name: 'fixtureTerrainHeight', code: 'fn terrainHeightAt( xz: vec2f ) -> f32 { return xz.x + xz.y; }' } );
 assert.throws( () => createWebGPUMaterialGraph( {}, terrainHeightGraph ), /installed terrain height module/ );
