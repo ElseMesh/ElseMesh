@@ -1,15 +1,16 @@
 # World content repository layout and file definitions
 
 World repositories contain authored data, immutable package assets, and
-world-specific behavior and presentation modules. They are not standalone
-applications: their code uses ElseMesh engine APIs and package contracts. The
-engine owns shared schemas, networking, renderer selection, and reusable
-backend implementations; world packages may provide content-specific
-procedural construction and renderer adapters. A signed manifest can select a
-locally installed world provider for its registered component types; the
-provider loads only after the manifest signature is verified. Owner-signed
-JavaScript behavior modules run in dedicated browser Workers and do not receive
-renderer objects.
+renderer-neutral behavior and simulation modules. They are not standalone
+applications: their code uses ElseMesh package contracts. ElseMesh owns shared
+schemas, networking, renderer selection, and all production backend
+presenters. World packages may provide content-specific procedural asset
+authoring and export tools, but they do not provide production renderer
+adapters. Existing `renderers/` modules are migration debt, not the target
+layout. A signed manifest can select a locally installed world provider for
+its registered component types; the provider loads only after the manifest
+signature is verified. Owner-signed JavaScript behavior modules run in
+dedicated browser Workers and do not receive renderer objects.
 
 The current content repositories are [Tidewater](../worlds/tidewater/README.md)
 and the private [Hogwarts-World bridge repository](../worlds/Hogwarts/README.md).
@@ -67,10 +68,11 @@ and binary buffer for vendor props; `source/models/whale/humpback.json` and
 textures. `source/audio/` contains source OGG recordings and credits.
 `Village.js`, `Pier.js`, `Props.js`, and `village/` contain Tidewater's
 procedural village construction and geometry batching; `renderers/` contains
-Tidewater-specific WebGPU and WebGL presentation modules. The engine loads the
-default village through a package factory and supplies the generic debris
-renderer with world-owned geometry factories. `lod-source/` contains
-low-detail village and boat GLBs. See the
+existing Tidewater-specific WebGPU and WebGL presentation modules that remain
+to be migrated into ElseMesh's paired backend adapters. The built-in path
+currently calls package presentation factories, which is also migration debt.
+The engine's generic debris renderer receives world-owned geometry factories.
+`lod-source/` contains low-detail village and boat GLBs. See the
 [Tidewater README](../worlds/tidewater/README.md) and its [asset index](../worlds/tidewater/ASSET-INDEX.md).
 
 ### Hogwarts-World
