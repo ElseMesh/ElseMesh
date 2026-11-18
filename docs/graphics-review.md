@@ -23,8 +23,10 @@ samples, not calibrated colorimetric values or an FPS benchmark.
 The WebGPU static-model runtime selected shadow-only batches for the four
 scanned-debris classes (`5, 1, 7, 4`). This capture predates `0c3dabde`, which
 aligns the generic WebGL adapter with that shared authored shadow-LOD selection.
-It also predates the shared engine-owned post-grade values, so the recorded
-color samples are not measurements of the current WebGL final pass.
+The capture used the same numeric post-grade defaults now shared by both
+backends. The remaining color difference therefore persists with those inputs
+and needs a separate lighting, material, or tone-mapping diagnosis; sharing the
+defaults alone does not explain or resolve it.
 The adapter conformance test, WebGL render fixture (343 foreground pixels, eight
 programs, no GL errors), WebGPU render fixture (252 foreground pixels), and
 external production build pass after the change. The WebGL shadow-only batch
