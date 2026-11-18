@@ -5,7 +5,8 @@ import { worldComponentBackendAdapter } from '../src/network/WorldComponentBacke
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
 import { registerWorldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
 import { applyWebGLWorldMaterialGraphs } from '../src/fallback/WebGLWorldMaterialGraphs.js';
-import '../src/fallback/WebGLStaticModelInstanceSetAdapter.js';
+import { WebGLFallback } from '../src/fallback/WebGLFallback.js';
+import '../src/fallback/WebGLComponentSupport.js';
 
 const result = document.querySelector( '#result' );
 const hash = async bytes => {
@@ -13,7 +14,7 @@ const hash = async bytes => {
 	return `sha256:${ Array.from( digest, value => value.toString( 16 ).padStart( 2, '0' ) ).join( '' ) }`;
 };
 
-let runtime, renderer, profileGeometryPrepared = false, hostedGraphMesh, hostedGraphMaterial;
+let runtime, builtInRuntime, renderer, profileGeometryPrepared = false, hostedGraphMesh, hostedGraphMaterial;
 let profileMaterial, profileDepthMaterial;
 try {
 	const profile = 'elsemesh.fixture-static-model-material/1';
@@ -242,13 +243,58 @@ try {
 	if ( changedPixels < 30 ) throw new Error( `Static model rendered too few visible pixels: ${ changedPixels }` );
 	const programs = renderer.info.programs || [];
 	if ( ! programs.length || programs.some( program => program.diagnostics?.runnable === false ) ) throw new Error( `WebGL did not compile every renderer program: ${ programs.map( program => program.diagnostics?.runnable ) }` );
-	result.textContent = JSON.stringify( { status: 'complete', changedPixels, programCount: programs.length, glError } );
+	const { defaultWorldPackage } = await import( '../worlds/default.js' );
+	const scannedDebris = defaultWorldPackage.source.components.find( entry => entry.id === 'elsemesh-component:scanned-debris' );
+	if ( ! scannedDebris ) throw new Error( 'The default world has no signed scanned-debris component' );
+	const builtInScene = new THREE.Scene();
+	builtInScene.background = new THREE.Color( 0x101820 );
+	const builtInCamera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 1000 );
+	const firstInstance = [ 142.0147, 2.2869, -91.6233 ];
+	builtInCamera.position.set( firstInstance[ 0 ] + 1, firstInstance[ 1 ] + 1.2, firstInstance[ 2 ] + 5 );
+	builtInCamera.lookAt( ...firstInstance );
+	builtInCamera.updateProjectionMatrix();
+	const builtInFallback = Object.assign( Object.create( WebGLFallback.prototype ), {
+		defaultWorldSource: { ...defaultWorldPackage.source, components: [ scannedDebris ] },
+		defaultWorldAssets: defaultWorldPackage.assets,
+		worldLink: null,
+		THREE,
+		scene: builtInScene,
+		camera: builtInCamera,
+		renderer,
+		loader: new GLTFLoader(),
+		terrain: { origin: - 1024, size: 2048, res: 2, heights: new Float32Array( 4 ) },
+		app: { renderLoadBias: 0 },
+		builtinComponentRuntimes: new Map(),
+	} );
+	await builtInFallback._loadBuiltinComponents();
+	builtInRuntime = builtInFallback.builtinComponentRuntimes.get( scannedDebris.id );
+	if ( ! builtInRuntime ) throw new Error( 'Built-in WebGL did not install the signed scanned-debris component' );
+	const builtInDeadline = Date.now() + 20000;
+	let visibleBuiltInMeshes = [];
+	while ( Date.now() < builtInDeadline ) {
+		builtInRuntime.update( 1 / 60, builtInCamera, null, 0 );
+		visibleBuiltInMeshes = [];
+		builtInScene.traverse( object => { if ( object.isInstancedMesh && object.count > 0 ) visibleBuiltInMeshes.push( object ); } );
+		if ( visibleBuiltInMeshes.length > 0 ) break;
+		await new Promise( resolve => setTimeout( resolve, 25 ) );
+	}
+	if ( visibleBuiltInMeshes.length === 0 ) throw new Error( 'The authored scanned-debris instances did not enter the built-in WebGL view' );
+	const loadedTextureAssets = [ ...builtInFallback.builtinAssetConnector.assets.keys() ].filter( id => builtInFallback.builtinAssetConnector.manifest.assets.some( asset => asset.id === id && asset.kind === 'image/jpeg' ) );
+	if ( loadedTextureAssets.length === 0 ) throw new Error( 'Built-in WebGL did not fetch any signed scanned-debris texture assets' );
+	renderer.render( builtInScene, builtInCamera );
+	const builtInPixels = new Uint8Array( canvas.width * canvas.height * 4 );
+	renderer.getContext().readPixels( 0, 0, canvas.width, canvas.height, renderer.getContext().RGBA, renderer.getContext().UNSIGNED_BYTE, builtInPixels );
+	let builtInChangedPixels = 0;
+	for ( let offset = 0; offset < builtInPixels.length; offset += 4 ) if ( Math.abs( builtInPixels[ offset ] - background[ 0 ] ) + Math.abs( builtInPixels[ offset + 1 ] - background[ 1 ] ) + Math.abs( builtInPixels[ offset + 2 ] - background[ 2 ] ) > 24 ) builtInChangedPixels ++;
+	if ( builtInChangedPixels < 30 ) throw new Error( `The signed Tidewater debris component rendered too few pixels: ${builtInChangedPixels}` );
+	result.textContent = JSON.stringify( { status: 'complete', changedPixels, programCount: programs.length, glError, scannedDebris: { placements: 141, visibleMeshes: visibleBuiltInMeshes.length, textureAssets: loadedTextureAssets.length, changedPixels: builtInChangedPixels } } );
 	result.dataset.status = 'complete';
 } catch ( error ) {
 	result.textContent = `FAIL ${ error.stack || error }`;
 	result.dataset.status = 'failed';
 } finally {
 	runtime?.dispose();
+	builtInRuntime?.dispose?.();
 	hostedGraphMesh?.material?.dispose?.();
 	hostedGraphMesh?.customDepthMaterial?.dispose?.();
 	hostedGraphMesh?.geometry?.dispose?.();

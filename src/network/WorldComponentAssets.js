@@ -28,7 +28,7 @@ export async function loadWorldComponentAssets( components, assetURLs, fetchAsse
 		if ( typeof url !== 'string' || ! url ) throw new Error( `World component asset ${assetID} has no local package URL` );
 		const bytes = await readBytes( url, fetchAsset );
 		const digest = hex( new Uint8Array( await globalThis.crypto.subtle.digest( 'SHA-256', bytes ) ) );
-		if ( digest !== match[ 1 ].toLowerCase() ) throw new Error( `World component asset ${assetID} failed its SHA-256 check` );
+		if ( digest !== match[ 1 ].toLowerCase() ) throw new Error( `World component asset ${assetID} failed its SHA-256 check (expected ${match[ 1 ].toLowerCase()}, received ${digest} from ${url})` );
 		assets.set( assetID, bytes );
 	}
 	return assets;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { accessSync, constants, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createServer } from 'vite';
 
 const engineRoot = process.cwd();
@@ -21,7 +21,7 @@ async function stopBrowser( browser ) {
 }
 
 const profile = mkdtempSync( join( '/var/tmp', 'elsemesh-static-model-webgl-' ) );
-const vite = await createServer( { configFile: false, root: engineRoot, optimizeDeps: { entries: [ 'test/static-model-instance-set-webgl-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
+const vite = await createServer( { configFile: resolve( engineRoot, 'vite.config.js' ), root: engineRoot, optimizeDeps: { entries: [ 'test/static-model-instance-set-webgl-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
 let browser, socket;
 try {
 	await vite.listen();
