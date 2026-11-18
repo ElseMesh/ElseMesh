@@ -70,6 +70,16 @@ export function selectWorldComponentsForView( manifest, camera, { nearbyDistance
 	return selected.sort( ( a, b ) => ( VIEW_RANK[ worldComponentPriority( a, assets ) ] ?? 1 ) - ( VIEW_RANK[ worldComponentPriority( b, assets ) ] ?? 1 ) );
 }
 
+export function selectWorldObjectsForConnectorView( connector, manifest, camera, options ) {
+	const selected = selectWorldObjectsForView( manifest, camera, options );
+	return connector?.filterRegionCellContentForCamera?.( selected, camera ) ?? selected;
+}
+
+export function selectWorldComponentsForConnectorView( connector, manifest, camera, options ) {
+	const selected = selectWorldComponentsForView( manifest, camera, options );
+	return connector?.filterRegionCellContentForCamera?.( selected, camera ) ?? selected;
+}
+
 function worldComponentPriority( component, assets ) {
 	if ( component.priority ) return component.priority;
 	for ( const reference of component.assets || [] ) {

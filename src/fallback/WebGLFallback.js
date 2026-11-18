@@ -50,7 +50,7 @@ import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSH
 import { mulberry32 } from '../util/Noise.js';
 import { HeightfieldTerrainData } from '../world/HeightfieldTerrainData.js';
 import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from '../network/WorldSource.js';
-import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from '../network/WorldStreaming.js';
+import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, transformBoundsCenter } from '../network/WorldStreaming.js';
 import { collisionLookaheadDistance } from '../network/CollisionFrontier.js';
 import { selectLocalRegionEntryObjects, selectLocalRegionStartupObjects } from '../network/LocalRegionStartup.js';
 import { registerWorldPackageCollisionPayload, replaceWorldSourceCollisions } from '../network/WorldPackage.js';
@@ -1870,7 +1870,7 @@ export class WebGLFallback {
 			await this.connector.ensureCellsForCamera?.( this.camera );
 			const selectedObjects = selectLocalRegionStartupObjects( this.connector, manifest, this.camera, localSpawn );
 			const initialObjects = selectLocalRegionEntryObjects( this.connector, manifest, selectedObjects, this.camera );
-			const initialComponents = selectWorldComponentsForView( manifest, this.camera, {
+			const initialComponents = selectWorldComponentsForConnectorView( this.connector, manifest, this.camera, {
 				nearbyDistance: 0,
 				maxDistance: this.connector.maxViewDistanceMeters,
 				maxPriority: 'background',
@@ -2448,7 +2448,7 @@ export class WebGLFallback {
 		this.hostedWorldStreamingAt = performance.now();
 		const manifest = connector.manifest;
 		const loaded = this.localLoadedObjectIDs || ( this.localLoadedObjectIDs = new Set() );
-		const objects = selectWorldObjectsForView( manifest, this.camera, {
+		const objects = selectWorldObjectsForConnectorView( connector, manifest, this.camera, {
 			nearbyDistance: connector.localOnly ? connector.cellSizeMeters || 8 : 24,
 			maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
 		} )
@@ -2654,7 +2654,7 @@ export class WebGLFallback {
 			this.hostedCoarseCoverageReady = false;
 			return;
 		}
-		const visible = selectWorldComponentsForView( connector.manifest, this.camera, {
+		const visible = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera, {
 			nearbyDistance: 0,
 			maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
 			maxPriority: 'background',
@@ -2678,7 +2678,7 @@ export class WebGLFallback {
 		while ( connector === this.connector && ! connector.closed && ! this.hostedCoarseCoverageReady ) {
 			this._updateHostedCoarseCoverage();
 			updateWorldComponentRuntimes( this.hostedComponentRuntimes?.values?.(), 0, this.camera, this.player, 0 );
-			const visibleStaticComponents = selectWorldComponentsForView( connector.manifest, this.camera, {
+			const visibleStaticComponents = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera, {
 				nearbyDistance: 0,
 				maxDistance: connector.localOnly ? connector.maxViewDistanceMeters : 500,
 				maxPriority: 'background',
@@ -2733,7 +2733,7 @@ export class WebGLFallback {
 				for ( const reference of component?.assets || [] ) if ( reference.assetId && ! retained.has( reference.assetId ) ) connector.releaseAsset?.( reference.assetId );
 			}
 		}
-		const candidates = selectWorldComponentsForView( manifest, this.camera, {
+		const candidates = selectWorldComponentsForConnectorView( connector, manifest, this.camera, {
 			nearbyDistance: connector.cellSizeMeters || 8,
 			maxDistance,
 			maxPriority: 'background',

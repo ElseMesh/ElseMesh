@@ -517,6 +517,19 @@ export class LocalRegionConnector {
 		} );
 	}
 
+	filterRegionCellContentForCamera( content, camera ) {
+		if ( ! Array.isArray( content ) || ! this.cellSizeMeters || ! camera || ! content.some( item => item?.sourceRegionCell ) ) return content;
+		const visibleCells = new Set( worldViewCellCoordinates( camera, this.cellSizeMeters, this.maxViewDistanceMeters ).map( cell => cell.join( ',' ) ) );
+		const sourceRegionIDs = new Set( this.sourceRegions.map( region => region.id ) );
+		return content.filter( item => {
+			if ( item?.collisionPayload ) return true;
+			const sourceCell = item?.sourceRegionCell;
+			if ( ! sourceCell ) return true;
+			if ( ! sourceRegionIDs.has( sourceCell.regionID ) || ! Array.isArray( sourceCell.coordinates ) || sourceCell.coordinates.length !== 3 || ! sourceCell.coordinates.every( Number.isSafeInteger ) ) return false;
+			return visibleCells.has( sourceCell.coordinates.join( ',' ) );
+		} );
+	}
+
 	#installCellIndex( sourceRegion, cellIndex ) {
 		const { baseURL: base, previewRegion } = this;
 		const sourceURL = new URL( sourceRegion.asset, `${base}/` );
@@ -598,6 +611,7 @@ export class LocalRegionConnector {
 				if ( ! this.manifest.rules.requiredFeatures.includes( 'elsemesh.static-model-instance-set/1' ) ) this.manifest.rules.requiredFeatures.push( 'elsemesh.static-model-instance-set/1' );
 				for ( const set of staticModelSets ) {
 					const component = set.component;
+					component.sourceRegionCell = { regionID: sourceRegion.id, coordinates: cellCoordinates };
 					this.manifest.components.push( component );
 					this.manifest.assets.push( { id: set.descriptorAssetID, bytes: 0, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND, priority } );
 					this.syntheticAssetLoaders.set( set.descriptorAssetID, async signal => {
@@ -639,6 +653,7 @@ export class LocalRegionConnector {
 					id: visualObjectId, label: `${sourceRegion.label} visual cell ${cellKey}`, kind: 'asset-instance', assetId: visualAssetId,
 					transform: { position: [ 0, 0, 0 ], yaw: 0 }, scale: [ 1, 1, 1 ], priority,
 					streamingBounds: localRegionVisualStreamingBounds( cell.source.visualInstances, { center, radius: previewRegion.cellSizeMeters * Math.sqrt( 3 ) / 2, maxDistanceMeters: previewRegion.maxViewDistanceMeters } ), regionCell: true,
+					sourceRegionCell: { regionID: sourceRegion.id, coordinates: cellCoordinates },
 				} );
 			}
 		}

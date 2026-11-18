@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { Euler, PerspectiveCamera } from '../src/engine/index.js';
 import { LocalRegionConnector } from '../src/network/LocalRegionConnector.js';
 import { selectLocalRegionStreamingObjects } from '../src/network/LocalRegionStartup.js';
+import { selectWorldComponentsForConnectorView } from '../src/network/WorldStreaming.js';
 
 const requestedCells = [];
 const descriptor = {
 	schema: 'elsemesh.dynamic-region-provider/1', worldId: 'elsemesh:test-camera-view', sourceRevision: 'source-1',
-	cacheRevision: 'source-1:converter-1', readOnly: true, regions: '/v1/regions',
+	cacheRevision: 'source-1:converter-1', readOnly: true, regions: '/v1/regions', regionScope: { regionIds: [ 'hall' ] },
 	entrySelection: {
 		entryPointActionLabel: 'Enter', entryPointPrompt: 'Enter the room?', choices: [ { id: 'start', label: 'Start' } ],
 		previewSpawn: { position: [ 0, 8.62, 90 ], yaw: 180, pitch: - 0.1 },
@@ -40,21 +41,31 @@ globalThis.fetch = async input => {
 try {
 	const connector = new LocalRegionConnector( { localProvider: 'http://127.0.0.1:4179', localMap: 'Hall' } );
 	await connector.getManifest();
-	assert.equal( requestedCells.includes( '0,0,15' ), false, 'the four-cell player bubble does not fetch the far-end cell at startup' );
+	assert.ok( requestedCells.includes( '0,0,15' ), 'startup collision lookahead covers cells reachable within the authored movement horizon' );
+	const collisionLookaheadCellCount = requestedCells.length;
 	const camera = new PerspectiveCamera( 60, 1.8, 0.1, 1000 );
 	camera.position.set( 0, 8.62, 90 );
 	camera.quaternion.setFromEuler( new Euler( - 0.1, Math.PI, 0, 'YXZ' ) );
 	await connector.ensureCellsForCamera( camera );
-	assert.ok( requestedCells.includes( '0,0,15' ), 'camera-frustum discovery queries the visible far-end cell beyond the player-centered bubble' );
+	assert.ok( requestedCells.length > collisionLookaheadCellCount, 'camera-frustum discovery indexes visible cells outside the collision lookahead' );
 
 	const visibleManifest = {
 		assets: [],
 		objects: [
 			{ id: 'visible-wall', priority: 'visible', transform: { position: [ 0, 0, 0 ], yaw: 0 }, streamingBounds: { center: [ 0, 8, 120 ], radius: 12, maxDistanceMeters: 64 } },
 			{ id: 'visible-wall-collision', priority: 'visible', transform: { position: [ 0, 0, 0 ], yaw: 0 }, collisionPayload: true, streamingBounds: { center: [ 0, 8, 120 ], radius: 12, maxDistanceMeters: 64 } },
+			{ id: 'rear-cell-wide-object', priority: 'visible', sourceRegionCell: { regionID: 'hall', coordinates: [ 1, 0, 10 ] }, transform: { position: [ 0, 0, 0 ], yaw: 0 }, streamingBounds: { center: [ 0, 11.9, 88 ], radius: 33, maxDistanceMeters: 64 } },
 		],
 	};
 	assert.deepEqual( selectLocalRegionStreamingObjects( connector, visibleManifest, camera ).map( object => object.id ), [ 'visible-wall' ], 'background visual streaming does not load view-frustum collision cells ahead of permitted movement' );
+	const visibleComponents = selectWorldComponentsForConnectorView( connector, {
+		assets: [],
+		components: [
+			{ id: 'rear-cell-floor-bounds', sourceRegionCell: { regionID: 'hall', coordinates: [ 1, 0, 10 ] }, streamingBounds: { center: [ 0, 11.9, 88 ], radius: 33, maxDistanceMeters: 64 } },
+			{ id: 'forward-cell-floor-bounds', sourceRegionCell: { regionID: 'hall', coordinates: [ 0, 0, 11 ] }, streamingBounds: { center: [ 0, 11.9, 88 ], radius: 33, maxDistanceMeters: 64 } },
+		],
+	}, camera, { nearbyDistance: 0, maxDistance: 64 } );
+	assert.deepEqual( visibleComponents.map( component => component.id ), [ 'forward-cell-floor-bounds' ], 'wide component bounds cannot stream a source cell outside the actual camera frustum' );
 	connector.close();
 } finally {
 	globalThis.fetch = previousFetch;

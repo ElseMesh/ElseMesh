@@ -76,7 +76,7 @@ import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPo
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
-import { isVegetationWorldComponent, selectWorldComponentsForView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
+import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { matchingPortalAgreement } from './network/PortalAgreement.js';
 import { vehiclePolicy } from './network/WorldRules.js';
@@ -717,7 +717,7 @@ export class App {
 			const initialObjects = connector.dynamicRegions
 				? selectLocalRegionEntryObjects( connector, connector.manifest, selectedObjects, this.camera )
 				: selectedObjects;
-			const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
+			const initialComponents = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background' } ).filter( ( component ) => this.vegetationEnabled || ! isVegetationWorldComponent( component ) );
 			const initialObjectIDs = new Set( initialObjects.map( ( object ) => object.id ) );
 			if ( ! connector.dynamicRegions ) for ( const objectID of connector.initialRegionCellObjectIDs || [] ) initialObjectIDs.add( objectID );
 			if ( ! connector.dynamicRegions ) {
@@ -938,7 +938,7 @@ export class App {
 			for ( const objectID of worldSpawnCollisionObjectIDs( connector.manifest, spawn, connector.manifest.rules.spawnRadius, connector.manifest.rules.playerCapsule ) ) initialObjectIDs.add( objectID );
 		}
 		const assetIDs = new Set( connector.manifest.objects.filter( object => initialObjectIDs.has( object.id ) && object.assetId ).map( object => object.assetId ) );
-		const initialComponents = selectWorldComponentsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background' } );
+		const initialComponents = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera, { nearbyDistance: 0, maxPriority: 'background' } );
 		const initialComponentIDs = new Set( initialComponents.map( component => component.id ) );
 		const retainAssetIDs = new Set();
 		for ( const component of initialComponents ) {
@@ -1525,9 +1525,9 @@ export class App {
 		if ( ! worldPackage ) return false;
 		const maxDistance = connector.dynamicRegions ? connector.maxViewDistanceMeters : 500;
 		const loaded = worldPackage.loadedObjects || new Set();
-		const visibleObjects = selectWorldObjectsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
+		const visibleObjects = selectWorldObjectsForConnectorView( connector, connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
 		if ( visibleObjects.some( object => ! object.collisionPayload && object.assetId && ! loaded.has( object.id ) ) ) return false;
-		const visibleComponents = selectWorldComponentsForView( connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
+		const visibleComponents = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera, { nearbyDistance: 0, maxDistance, maxPriority: 'background' } );
 		const installed = root.userData.installedWorldComponentIDs || new Set();
 		const runtimes = root.userData.worldComponentRuntimes || new Map();
 		return ! visibleComponents.some( component => {
@@ -1543,7 +1543,7 @@ export class App {
 			this.updateWorldComponents( root, 0, this.camera );
 			if ( reportProgress ) {
 				const installed = root.userData.installedWorldComponentIDs || new Set();
-				const visibleStaticComponents = selectWorldComponentsForView( connector.manifest, this.camera, {
+				const visibleStaticComponents = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera, {
 					nearbyDistance: 0,
 				maxDistance: connector.dynamicRegions ? connector.maxViewDistanceMeters : 500,
 					maxPriority: 'background',
@@ -1869,7 +1869,7 @@ export class App {
 		}
 		const wantedObjectIDs = new Set( objects.map( ( object ) => object.id ) );
 		const installedComponents = root.userData.installedWorldComponentIDs || new Set();
-		const components = selectWorldComponentsForView( connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ! installedComponents.has( component.id ) );
+		const components = selectWorldComponentsForConnectorView( connector, connector.manifest, this.camera ).filter( ( component ) => ( this.vegetationEnabled || ! isVegetationWorldComponent( component ) ) && ! installedComponents.has( component.id ) );
 		const wantedComponentIDs = new Set( components.map( ( component ) => component.id ) );
 		this.updateWorldCoarseCoverage( connector, root, state );
 		const assetPriorities = new Map( connector.manifest.assets.map( ( asset ) => [ asset.id, asset.priority ] ) );
