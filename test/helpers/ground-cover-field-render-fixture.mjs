@@ -11,11 +11,12 @@ async function assetID( bytes ) {
 }
 
 /** One signed world fixture shared by the browser WebGL and native WebGPU render checks. */
-export async function groundCoverFieldRenderFixture() {
-	const densityData = new Uint8Array( 32 * 32 * 4 );
-	for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
-	const densityBytes = encodeGrassDensityAsset( { data: densityData, res: 32, size: 32, origin: -16 } );
-	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: -16, densitySize: 32 } );
+export async function groundCoverFieldRenderFixture( { density: authoredDensity = null, terrain: authoredTerrain = null, terrainHeightModule: authoredTerrainHeightModule = null, terrainDetail: authoredTerrainDetail = null } = {} ) {
+	const densityData = authoredDensity?.data || new Uint8Array( 32 * 32 * 4 );
+	if ( ! authoredDensity ) for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
+	const density = authoredDensity || { data: densityData, res: 32, size: 32, origin: -16 };
+	const densityBytes = encodeGrassDensityAsset( density );
+	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: density.origin, densitySize: density.size } );
 	// fixed-cell-patch asset lists are ordered far-to-near; the source patch
 	// exporter emits near-to-far, so reverse the source LOD indices here.
 	const modelBytesByLOD = [ 2, 1, 0 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
@@ -39,12 +40,12 @@ export async function groundCoverFieldRenderFixture() {
 		},
 		assets: [ { assetId: densityAssetId, kind: 'grass-density/1' }, ...modelAssetIds.map( assetId => ( { assetId, kind: 'glb' } ) ) ],
 	};
-	const terrain = {
+	const terrain = authoredTerrain || {
 		res: 2, size: 32, origin: -16, texel: 32,
 		heights: new Float32Array( 4 ),
 		heightAt: () => 0,
 	};
-	const terrainHeightModule = new ShaderModule( { name: 'groundCoverFixtureTerrainHeight', code: 'fn terrainHeightAt( xz: vec2f ) -> f32 { return 0.0; }' } );
+	const terrainHeightModule = authoredTerrainHeightModule || new ShaderModule( { name: 'groundCoverFixtureTerrainHeight', code: 'fn terrainHeightAt( xz: vec2f ) -> f32 { return 0.0; }' } );
 	const connector = {
 		manifest: { assets: component.assets.map( asset => ( { id: asset.assetId, kind: asset.kind } ) ) },
 		assets: new Map( [ [ densityAssetId, densityBytes ] ] ),
@@ -54,6 +55,6 @@ export async function groundCoverFieldRenderFixture() {
 			return densityBytes;
 		},
 	};
-	const detailImage = getDetailImage();
-	return { component, connector, terrain, grassMask: { data: densityData, res: 32, size: 32, origin: -16 }, terrainHeightModule, terrainDetail: detailImage, graph, modelAssetIds, modelBytesByLOD };
+	const detailImage = authoredTerrainDetail || getDetailImage();
+	return { component, connector, terrain, density, grassMask: density, terrainHeightModule, terrainDetail: detailImage, graph, modelAssetIds, modelBytesByLOD };
 }
