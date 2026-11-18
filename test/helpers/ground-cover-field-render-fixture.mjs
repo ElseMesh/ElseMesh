@@ -21,6 +21,9 @@ export async function groundCoverFieldRenderFixture() {
 	const modelBytesByLOD = [ 2, 1, 0 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
 	const densityAssetId = await assetID( densityBytes );
 	const modelAssetIds = await Promise.all( modelBytesByLOD.map( assetID ) );
+	// Enclose the same 8 m cell box and vertical padding used by the source
+	// GroundCoverCellPlanner frustum test.
+	const bounds = { center: [ 4, 0.65, 4 ], radius: Math.hypot( 4, 1.15, 4 ) };
 	const component = {
 		id: 'elsemesh-component:ground-cover-render-fixture',
 		type: 'elsemesh.ground-cover-field/1',
@@ -29,7 +32,7 @@ export async function groundCoverFieldRenderFixture() {
 			distanceBands: [ { maxDistance: 18, cellCapacity: 48 }, { maxDistance: 46, cellCapacity: 160 }, { maxDistance: 88, cellCapacity: 420 } ],
 			species: [ {
 				id: 'fixture-grass', densityExpression: { op: 'channel', index: 1 }, densityThreshold: 0,
-				modelAssetIds, bounds: { center: [ 4, 0.5, 4 ], radius: 6 }, geometryMirrorX: false,
+				modelAssetIds, bounds, geometryMirrorX: false,
 				drawMaxDistance: 88, drawFadeStartDistance: 88,
 				castsShadow: true, shadowMaxDistance: 12,
 			} ],
