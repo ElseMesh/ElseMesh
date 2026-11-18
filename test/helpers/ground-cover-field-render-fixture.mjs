@@ -16,7 +16,9 @@ export async function groundCoverFieldRenderFixture() {
 	for ( let index = 0; index < 32 * 32; index ++ ) densityData.set( [ 255, 255, 255, 255 ], index * 4 );
 	const densityBytes = encodeGrassDensityAsset( { data: densityData, res: 32, size: 32, origin: -16 } );
 	const graph = createTidewaterGroundCoverMaterialGraph( { densityOrigin: -16, densitySize: 32 } );
-	const modelBytesByLOD = [ 0, 1, 2 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
+	// fixed-cell-patch asset lists are ordered far-to-near; the source patch
+	// exporter emits near-to-far, so reverse the source LOD indices here.
+	const modelBytesByLOD = [ 2, 1, 0 ].map( level => groundCoverPatchGLB( `Tidewater ground cover fixture ${level}`, buildGroundCoverPatch( level, 7 ), graph ) );
 	const densityAssetId = await assetID( densityBytes );
 	const modelAssetIds = await Promise.all( modelBytesByLOD.map( assetID ) );
 	const component = {
