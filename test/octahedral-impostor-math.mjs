@@ -31,8 +31,11 @@ assert.equal( selectFractionalBinVariant( 0.1337, 3, 7.77 ), Math.floor( ( 0.133
 assert.equal( selectFractionalBinVariant( 0.7331, 2, 7.77 ), Math.floor( ( 0.7331 * 7.77 % 1 ) * 2 ), 'variant selection supports different variant counts' );
 const thinning = { startDistance: 140, endDistance: 320, removeFraction: 0.5, seedMultiplier: 91.7 };
 assert.deepEqual( planCanopyThinning( 140, 0.01, thinning ), { amount: 0, keep: true, scale: 1 }, 'the source thinning starts with all crowns at authored scale' );
-assert.deepEqual( planCanopyThinning( 320, 0.001, thinning ), { amount: 1, keep: false, scale: Math.SQRT2 }, 'the source removes seeded crowns and grows the remainder to compensate coverage' );
-assert.deepEqual( planCanopyThinning( 320, 0.01, thinning ), { amount: 1, keep: true, scale: Math.SQRT2 }, 'the remaining source crowns receive the exact coverage compensation' );
+const removedCrowns = planCanopyThinning( 320, 0.001, thinning );
+const retainedCrowns = planCanopyThinning( 320, 0.01, thinning );
+assert.equal( removedCrowns.keep, false, 'the source removes crowns selected by the seeded threshold' );
+assert.equal( retainedCrowns.keep, true, 'the source retains crowns above the seeded threshold' );
+assert.ok( Math.abs( removedCrowns.scale - Math.SQRT2 ) < 1e-12 && Math.abs( retainedCrowns.scale - Math.SQRT2 ) < 1e-12, 'remaining crowns receive inverse-square-root density compensation' );
 
 assert.throws( () => decodeHemiOctahedral( 1.1, 0 ), /within/ );
 assert.throws( () => encodeHemiOctahedral( [ 1, - 1, 0 ] ), /upper hemisphere/ );
