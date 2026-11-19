@@ -244,6 +244,11 @@ Tidewater does not export the production atlas assets yet.
 `elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
 with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
 values; color-space conversion and alpha premultiplication are not allowed.
+Its signed descriptor also carries an `elsemesh.material-graph/1` graph for
+canopy surface appearance. The graph requires `baseColor` and can describe
+roughness, translucency, and wind-driven vertex position through the bounded
+contract compiled for both backends; it contains no backend shader source.
+Tidewater has not authored or exported its canopy graph yet.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The

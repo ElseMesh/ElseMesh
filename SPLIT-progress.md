@@ -1126,6 +1126,15 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-20: extended the signed `elsemesh.octahedral-canopy/1` descriptor to
+  carry ElseMesh's bounded `elsemesh.material-graph/1` data and require its
+  `baseColor` output. This gives WebGPU and WebGL canopy adapters a shared place
+  for authored color, roughness, translucency, and wind inputs; the descriptor
+  rejects shader-source substitutes. The focused descriptor check covers valid
+  and invalid graphs. Tidewater has not exported a canopy graph or atlas, and
+  neither production adapter consumes the contract, so no parity gate or
+  percentage changes.
+
 - 2026-11-19: registered `elsemesh.octahedral-canopy/1` as an engine
   vegetation component with install rank 2. In the external build,
   `world-component-registry`, `octahedral-canopy-descriptor`,

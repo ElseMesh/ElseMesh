@@ -1,3 +1,5 @@
+import { validateWorldMaterialGraph } from './WorldMaterialGraph.js';
+
 export const OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT = 'elsemesh.octahedral-canopy/1';
 export const OCTAHEDRAL_CANOPY_COMPONENT_TYPE = 'elsemesh.octahedral-canopy/1';
 export const OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND = 'octahedral-canopy/1';
@@ -36,9 +38,12 @@ export function decodeOctahedralCanopyDescriptor( bytes, options = {} ) {
  * choose how to sample the two atlas images for their backend.
  */
 export function validateOctahedralCanopyDescriptor( document, { componentAssets, staticModelInstanceSetAssetId, staticModelInstanceSet } = {} ) {
-	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
+	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'materialGraph', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
 	if ( ! hasExactKeys( document, rootKeys ) || document.format !== OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT ) fail( 'unsupported format or fields' );
 	if ( document.atlasDataFormat !== OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT || ! hasExactKeys( document.atlasChannels, [ 'material', 'normalExposure' ] ) || ! hasExactKeys( document.atlasChannels.material, [ 'r', 'g', 'b', 'a' ] ) || ! hasExactKeys( document.atlasChannels.normalExposure, [ 'r', 'g', 'b', 'a' ] ) || [ 'r', 'g', 'b', 'a' ].some( ( channel, index ) => document.atlasChannels.material[ channel ] !== ATLAS_CHANNELS.material[ index ] || document.atlasChannels.normalExposure[ channel ] !== ATLAS_CHANNELS.normalExposure[ index ] ) ) fail( 'atlas data encoding or channel semantics are invalid' );
+	try { validateWorldMaterialGraph( document.materialGraph ); }
+	catch ( error ) { fail( `materialGraph is invalid (${error.message})` ); }
+	if ( ! Object.hasOwn( document.materialGraph.outputs, 'baseColor' ) ) fail( 'materialGraph must provide a baseColor output' );
 	if ( ! validAssetID( document.instanceSetAssetId ) || ! Array.isArray( document.atlasAssetIds ) || document.atlasAssetIds.length !== 2 || document.atlasAssetIds.some( id => ! validAssetID( id ) ) || new Set( document.atlasAssetIds ).size !== 2 ) fail( 'signed instance-set or atlas asset IDs are invalid' );
 	if ( ! Array.isArray( componentAssets ) || ! componentAssets.length ) fail( 'component asset inventory is required' );
 	const inventory = new Map();

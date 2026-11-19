@@ -36,6 +36,14 @@ const descriptor = {
 		material: { r: 'brightness', g: 'leaf-flag', b: 'card-variation', a: 'coverage' },
 		normalExposure: { r: 'normal-x-encoded', g: 'normal-y-encoded', b: 'normal-z-encoded', a: 'ambient-exposure' },
 	},
+	materialGraph: {
+		format: 'elsemesh.material-graph/1',
+		nodes: [
+			{ id: 'color', op: 'input', name: 'colorRGB' },
+			{ id: 'roughness', op: 'constant', value: 0.85 },
+		],
+		outputs: { baseColor: 'color', roughness: 'roughness' },
+	},
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
@@ -56,6 +64,8 @@ const invalid = [
 	{ ...descriptor, extra: true },
 	{ ...descriptor, atlasDataFormat: 'rgba8-srgb/1' },
 	{ ...descriptor, atlasChannels: { ...descriptor.atlasChannels, material: { ...descriptor.atlasChannels.material, a: 'opacity' } } },
+	{ ...descriptor, materialGraph: { ...descriptor.materialGraph, format: 'shader-source/1' } },
+	{ ...descriptor, materialGraph: { ...descriptor.materialGraph, outputs: { roughness: 'roughness' } } },
 	{ ...descriptor, instanceSetAssetId: id( 'f' ) },
 	{ ...descriptor, atlasAssetIds: [ atlasColorID, atlasColorID ] },
 	{ ...descriptor, atlasAssetIds: [ atlasColorID, nearTreeID ] },
