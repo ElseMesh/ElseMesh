@@ -33,6 +33,14 @@ assert.deepEqual(rendezvousOptions.providers, [ rendezvousProvider ], 'presence 
 assert.equal(rendezvousOptions.directory, rendezvousRegion.directory, 'presence preserves the Worker rendezvous directory');
 assert.doesNotThrow(() => new WorldConnector(rendezvousOptions), 'the owner presence route remains a valid gateway-less Worker rendezvous');
 rendezvousSession.dispose();
+let workerResolvedOptions;
+const workerResolvedSession = new WorldPresenceSession({ connector: { ...rendezvousRegion, providers: [] }, parent: { add() {} },
+ createConnector(value) { workerResolvedOptions = value; return { close() {} }; },
+});
+assert.equal(workerResolvedOptions.gateway, '', 'a ZeroTier resolver invite never substitutes the browser page as the owner gateway');
+assert.deepEqual(workerResolvedOptions.providers, [ rendezvousProvider ], 'presence can reconstruct its owner rendezvous route from the Worker locator');
+assert.doesNotThrow(() => new WorldConnector(workerResolvedOptions), 'a reconstructed owner rendezvous candidate passes connector validation');
+workerResolvedSession.dispose();
 session.update(.016,player); assert.equal(sent.length,1);
 assert.ok(Math.abs(sent[0].pose.yaw)<=Math.PI,'accumulated player yaw is normalized for bounded wire protocol');
 now=500; session.update(.016,player); assert.equal(sent.length,1,'one in-flight request prevents overlapping publishes');
