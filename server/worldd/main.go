@@ -136,6 +136,7 @@ func run() error {
 	listenPort := flag.Int("p2p-port", 0, "libp2p TCP and QUIC listen port (default selects ephemeral ports; embedded ZeroTier uses its shared bridge port)")
 	zeroTierNetwork := flag.String("zerotier-network", defaultZeroTierNetworkID, "ZeroTier network ID to join through embedded libzt (requires a zerotier build)")
 	zeroTierUDPPort := flag.Uint("zerotier-udp-port", 0, "embedded libzt primary physical UDP port (0 uses libzt default; configure before node start)")
+	zeroTierHandoffForWebRTC := flag.Bool("zerotier-handoff-for-webrtc", false, "experimental: stop libzt after identity capture so Pion can bind the same fixed UDP port; libzt stays stopped until worldd exits")
 	zeroTierPathDiagnostics := flag.Bool("zerotier-path-diagnostics", false, "enable a loopback-only endpoint for querying observed embedded ZeroTier peer IP/UDP-port paths")
 	httpAddress := flag.String("http", "127.0.0.1:0", "HTTP/WebSocket gateway listen address (default selects an ephemeral loopback port); place behind TLS for public browser access")
 	webTransportAddress := flag.String("webtransport", "", "optional WebTransport HTTP/3 UDP listen address, for example :5201")
@@ -521,17 +522,25 @@ func run() error {
 	if *zeroTierUDPPort != 0 && *zeroTierNetwork == "" {
 		return errors.New("--zerotier-udp-port requires embedded ZeroTier")
 	}
+	if *zeroTierHandoffForWebRTC && (*rendezvous == false || *zeroTierNetwork == "" || *zeroTierUDPPort == 0 || *webrtcUDPPortMin != *zeroTierUDPPort || *webrtcUDPPortMax != *zeroTierUDPPort) {
+		return errors.New("--zerotier-handoff-for-webrtc requires rendezvous, embedded ZeroTier, and matching nonzero --zerotier-udp-port/--webrtc-udp-port-min/--webrtc-udp-port-max")
+	}
+	if *zeroTierHandoffForWebRTC && *zeroTierPathDiagnostics {
+		return errors.New("--zerotier-path-diagnostics cannot be used after --zerotier-handoff-for-webrtc stops libzt")
+	}
 	if *zeroTierNetwork != "" {
 		zeroTier, err = startZeroTier(*zeroTierNetwork, *zeroTierDataDir, zeroTierBlacklistInterfaces, uint16(*zeroTierUDPPort))
 		if err != nil {
 			return fmt.Errorf("start ZeroTier: %w", err)
 		}
 		addresses := zeroTier.Addresses()
-		ztAddresses, parseErr := zeroTierMultiaddrs(addresses, *listenPort)
-		if parseErr != nil {
-			return fmt.Errorf("ZeroTier address: %w", parseErr)
+		if !*zeroTierHandoffForWebRTC {
+			ztAddresses, parseErr := zeroTierMultiaddrs(addresses, *listenPort)
+			if parseErr != nil {
+				return fmt.Errorf("ZeroTier address: %w", parseErr)
+			}
+			parsedAnnounceAddresses = append(parsedAnnounceAddresses, ztAddresses...)
 		}
-		parsedAnnounceAddresses = append(parsedAnnounceAddresses, ztAddresses...)
 		log.Printf("ZeroTier node %s joined %s at %v (primary UDP port=%d)", zeroTier.NodeID(), *zeroTierNetwork, addresses, zeroTier.PrimaryUDPPort())
 	} else if len(zeroTierBlacklistInterfaces) > 0 {
 		return errors.New("--zerotier-blacklist-interface requires ZeroTier support")
@@ -545,7 +554,7 @@ func run() error {
 	if regionProvider == nil {
 		opts = append(opts, libp2p.EnableAutoNATv2(), libp2p.EnableHolePunching())
 	}
-	if zeroTier != nil {
+	if zeroTier != nil && !*zeroTierHandoffForWebRTC {
 		opts = append(opts, zeroTier.Libp2pOptions()...)
 	}
 	if len(parsedAnnounceAddresses) > 0 {
@@ -560,7 +569,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("start libp2p: %w", err)
 	}
-	if zeroTier != nil {
+	if zeroTier != nil && !*zeroTierHandoffForWebRTC {
 		if err := zeroTier.StartBridge(ctx, *listenPort); err != nil {
 			return fmt.Errorf("start ZeroTier TCP bridge: %w", err)
 		}
@@ -646,6 +655,12 @@ func run() error {
 	}
 	if zeroTier != nil {
 		d.zeroTierNodeID = zeroTier.NodeID()
+		if *zeroTierHandoffForWebRTC {
+			if err := zeroTier.StopForPortHandoff(); err != nil {
+				return fmt.Errorf("stop libzt for WebRTC port handoff: %w", err)
+			}
+			log.Printf("experimental libzt-to-Pion UDP handoff ready on port %d; ZeroTier remains stopped until worldd exits", zeroTier.PrimaryUDPPort())
+		}
 	}
 	if d.rendezvous && d.zeroTierNodeID == "" {
 		return errors.New("--rendezvous requires an active embedded ZeroTier node identity")
@@ -724,7 +739,7 @@ func run() error {
 	}
 	serverErr := make(chan error, 1)
 	go func() { serverErr <- server.Serve(httpListener) }()
-	if zeroTier != nil {
+	if zeroTier != nil && !*zeroTierHandoffForWebRTC {
 		httpPort := httpListener.Addr().(*net.TCPAddr).Port
 		if bridgeErr := zeroTier.StartHTTPBridge(ctx, httpPort); bridgeErr != nil {
 			log.Printf("ZeroTier browser gateway unavailable; clients will use the advertised HTTPS gateway or Worker lookup: %v", bridgeErr)
