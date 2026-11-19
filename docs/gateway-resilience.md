@@ -133,9 +133,15 @@ signaling through the room, and the manifest/assets must travel directly over
 WebRTC. This removes the requirement for inbound router forwarding when direct
 ICE succeeds; it does not solve symmetric/restrictive NATs and does not relay
 world data. If direct connectivity fails and no HTTPS/WSS data gateway is
-configured, the client must report failure. The Durable Object binding has not
-yet been deployed or tested between independent networks. Do not silently use
-the control Tunnel or Worker as a world-data relay.
+configured, the client must report failure. On 2026-11-19, Wrangler reported
+Worker deployment `2025ef10-34c2-41f3-997e-c73e200ece2f` serving 100% of
+production traffic. The deployed `/healthz` returned 200, a HostID lookup for
+an absent test node returned an empty provider list, and an unused signaling
+room accepted an HTTP/1.1 WebSocket upgrade (101). Local tests also pass the
+host proof and transfer a signed manifest over a real Pion WebRTC data channel.
+No real worldd host has yet registered with the deployed room, and direct ICE
+has not yet been verified between an independent browser and that host. Do not
+silently use the control Tunnel or Worker as a world-data relay.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
