@@ -181,10 +181,14 @@ behavior must be measured ([RFC 4787](https://www.rfc-editor.org/rfc/rfc4787/)).
 After the last browser peer leaves, its ICE consent checks stop, so preserving
 ZeroTier traffic while idle does not guarantee reachability from a future
 non-ZeroTier browser: filtering may be specific to the ZeroTier root or peer
-endpoints. `worldd` should keep its Worker signaling session available and let
-each visiting browser and worldd perform ICE connectivity checks for that
-visitor; keep libzt active or re-ignite it while idle only to preserve the
-optional ZeroTier route. Verify that a new browser can establish a fresh
+endpoints. The current `worldd` starts libzt for the daemon lifetime; it does
+not stop or restart it based on player count, so an empty visitor list needs no
+re-ignition today. Do not shut libzt down merely because no players are
+connected. If a future idle policy adds that shutdown, re-ignite it to restore
+the optional ZeroTier route, but do not treat that as keeping Pion's separate
+browser ICE mapping alive. `worldd` should keep its Worker signaling session
+available and let each visiting browser and worldd perform ICE connectivity
+checks for that visitor. Verify that a new browser can establish a fresh
 direct pair after idle. ICE connectivity checks and nomination follow
 [RFC 8445](https://www.rfc-editor.org/rfc/rfc8445.html).
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
