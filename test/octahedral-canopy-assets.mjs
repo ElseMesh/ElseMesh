@@ -57,6 +57,11 @@ const descriptor = {
 		material: { r: 'brightness', g: 'leaf-flag', b: 'card-variation', a: 'coverage' },
 		normalExposure: { r: 'normal-x-encoded', g: 'normal-y-encoded', b: 'normal-z-encoded', a: 'ambient-exposure' },
 	},
+	materialGraph: {
+		format: 'elsemesh.material-graph/1',
+		nodes: [ { id: 'color', op: 'input', name: 'colorRGB' } ],
+		outputs: { baseColor: 'color' },
+	},
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
