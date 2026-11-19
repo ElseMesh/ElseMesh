@@ -146,7 +146,9 @@ packets; it was removed after the test. This proves discovery and signaling
 work for a visitor without the project network, but it does not prove direct
 world-data reachability through these NATs. This host needs a router UDP
 mapping or a separately reachable HTTPS/WSS worldd gateway; the Worker does
-not relay assets. A browser-rendering check also remains open.
+not relay assets. Read-only discovery found no UPnP IGD or NAT-PMP service on
+the host's Wi-Fi gateway, so an inbound mapping cannot be created
+automatically. A browser-rendering check also remains open.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).

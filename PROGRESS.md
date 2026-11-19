@@ -17,8 +17,10 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   works outside that network, but the world itself cannot yet be reached from
   these internet connections. Direct UDP port mapping or a reachable direct
   HTTPS/WSS `worldd` gateway is needed here; the Worker must remain outside the
-  world-content data path. The disposable world had no assets, and no browser
-  render was tested. Public-invite routing is now tracked at 50% (2 of 4
+  world-content data path. Read-only UPnP IGD and NAT-PMP discovery on the host
+  gateway returned no response, so mapping would require manual router
+  configuration. The disposable world had no assets, and no browser render
+  was tested. Public-invite routing is now tracked at 50% (2 of 4
   verification gates) in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
 
 ## 2026-11-18

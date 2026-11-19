@@ -302,7 +302,9 @@ through the resulting public invite. This host needs reachable UDP port
 mapping or a direct HTTPS/WSS gateway for that path. The Worker remains a
 lookup/signaling service and does not relay world content. The host operating
 system does not need to join ZeroTier; visitor ZeroTier is only an optional
-private-gateway shortcut.
+private-gateway shortcut. Read-only discovery found no UPnP IGD or NAT-PMP
+service on the host's Wi-Fi gateway, so router port mapping would need manual
+configuration.
 The normal browser route is Worker lookup followed by direct HTTPS/WSS or
 WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only
