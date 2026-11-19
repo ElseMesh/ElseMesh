@@ -43,7 +43,9 @@ try {
 
 	const ownerData = path.join( tempRoot, 'owner' );
 	const cacheData = path.join( tempRoot, 'cache' );
-	await Promise.all( [ mkdir( ownerData, { recursive: true, mode: 0o700 } ), mkdir( cacheData, { recursive: true, mode: 0o700 } ) ] );
+	const ownerZeroTierData = path.join( tempRoot, 'owner-zerotier' );
+	const cacheZeroTierData = path.join( tempRoot, 'cache-zerotier' );
+	await Promise.all( [ mkdir( ownerData, { recursive: true, mode: 0o700 } ), mkdir( cacheData, { recursive: true, mode: 0o700 } ), mkdir( ownerZeroTierData, { recursive: true, mode: 0o700 } ), mkdir( cacheZeroTierData, { recursive: true, mode: 0o700 } ) ] );
 	const ownerPeerID = runCli( binary, [ '--data', ownerData, '--print-node-id' ] );
 	const cachePeerID = runCli( binary, [ '--data', cacheData, '--print-node-id' ] );
 	const assetSource = path.join( tempRoot, 'fixture.glb' );
@@ -84,7 +86,7 @@ try {
 	assert.equal( certificate.status, 0, `local gateway test certificate generation failed:\n${certificate.stdout}\n${certificate.stderr}` );
 	workerGateway = await createSecureGatewayProxy( cacheHTTPPort, keyPath, certPath );
 	const ownerArgs = [
-		'--data', ownerData, '--manifest', manifestPath, '--p2p-port', String( ownerP2PPort ),
+		'--data', ownerData, '--zerotier-data', ownerZeroTierData, '--manifest', manifestPath, '--p2p-port', String( ownerP2PPort ),
 		'--http', `127.0.0.1:${ownerHTTPPort}`, '--dht-mode', 'server',
 	];
 	if ( liveDirectoryURL ) ownerArgs.push( '--public-gateway', livePublicGateway, '--directory-url', liveDirectoryURL );
@@ -110,7 +112,7 @@ try {
 	}
 	const bootstrap = `/ip4/127.0.0.1/tcp/${ownerP2PPort}/p2p/${ownerPeerID}`;
 	const cache = startDaemon( binary, [
-		'--data', cacheData, '--manifest', manifestPath, '--p2p-port', String( cacheP2PPort ),
+		'--data', cacheData, '--zerotier-data', cacheZeroTierData, '--manifest', manifestPath, '--p2p-port', String( cacheP2PPort ),
 		'--http', `127.0.0.1:${cacheHTTPPort}`, '--public-gateway', workerGateway.url, '--dht-mode', 'server', '--bootstrap', bootstrap,
 		'--cache-from', ownerPeerID, '--cache-sync-interval', '1s',
 	] );
@@ -146,7 +148,8 @@ try {
 		assert.equal( resolverNode.protocol, 'elsemesh.node/1' );
 		assert.equal( resolverNode.payload.nodeId, cachePeerID, 'the signed advertisement belongs to the running worldd provider' );
 		assert.equal( resolverNode.payload.gateway, workerGateway.url, 'worldd advertises its actual HTTPS/WSS gateway' );
-		assert.match( resolverNode.payload.zeroTierNodeId || '', /^[0-9a-f]{10}$/, 'worldd advertises its embedded libzt HostID' );
+		const zeroTierStartup = cache.output.split( '\n' ).filter( line => /ZeroTier/i.test( line ) ).map( line => line.replace( /\b(?:\d{1,3}\.){1,3}\d{1,3}\b/g, '<IPv4>' ) ).join( '\n' );
+		assert.match( resolverNode.payload.zeroTierNodeId || '', /^[0-9a-f]{10}$/, `worldd advertises its embedded libzt HostID (network=${resolverNode.payload.zeroTierNetworkId || '<none>'})\nZeroTier startup diagnostics:\n${zeroTierStartup || '<none>'}\nworldd arguments: ${cache.spawnargs.join( ' ' )}` );
 		assert.equal( resolverNode.payload.zeroTierNetworkId, 'e3918db4832a3056', 'worldd joined the configured network through embedded libzt' );
 		const resolverState = { PROVIDERS: new MemoryKV() };
 		const resolverManifest = JSON.parse( await readFile( manifestPath, 'utf8' ) );
