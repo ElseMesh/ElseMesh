@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,6 +143,9 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	}
 
 	settingEngine := webrtc.SettingEngine{}
+	settingEngine.SetInterfaceFilter(func(name string) bool {
+		return !strings.HasPrefix(strings.ToLower(name), "zt")
+	})
 	if err := settingEngine.SetEphemeralUDPPortRange(45001, 45032); err != nil {
 		t.Fatalf("configure narrow visitor UDP range: %v", err)
 	}
@@ -234,6 +238,27 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 		t.Fatal("direct WebRTC data channel did not open")
 	}
 
+	stats := peer.GetStats()
+	var selectedPair *webrtc.ICECandidatePairStats
+	for _, stat := range stats {
+		pair, ok := stat.(webrtc.ICECandidatePairStats)
+		if ok && pair.Nominated {
+			selectedPair = &pair
+			break
+		}
+	}
+	if selectedPair == nil {
+		t.Fatal("WebRTC opened without a nominated ICE candidate pair")
+	}
+	localCandidate, localOK := stats[selectedPair.LocalCandidateID].(webrtc.ICECandidateStats)
+	remoteCandidate, remoteOK := stats[selectedPair.RemoteCandidateID].(webrtc.ICECandidateStats)
+	if !localOK || !remoteOK {
+		t.Fatal("selected ICE candidate pair omitted candidate details")
+	}
+	t.Logf("visitor excluded all ZeroTier interfaces; selected ICE pair local=%s/%s (%s) remote=%s/%s",
+		localCandidate.CandidateType, localCandidate.NetworkType, localCandidate.Address,
+		remoteCandidate.CandidateType, remoteCandidate.Protocol)
+
 	manifestResponse := make(chan peerResponse, 1)
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
 		var result peerResponse
@@ -262,5 +287,5 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("direct WebRTC manifest response timed out")
 	}
-	t.Logf("verified HostID lookup, Worker signaling, and direct WebRTC manifest for %s", worldID)
+	t.Logf("verified HostID lookup, Worker signaling, and direct WebRTC manifest for %s with ZeroTier excluded on visitor", worldID)
 }
