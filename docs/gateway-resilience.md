@@ -169,7 +169,14 @@ not prove the router disables either protocol. Candidate generation is
 covered by worldd tests, but a real router forward and external data channel
 remain untested. This host also has no global IPv6 address or default IPv6
 route on `wlo1`, and outbound IPv6 HTTPS failed, so IPv6 is not currently an
-alternate public candidate path here.
+alternate public candidate path here. A separate read-only STUN probe bound
+`192.168.111.127:46000` and queried Cloudflare and Google from that same UDP
+socket. Both destinations returned the same public IPv4 but different mapped
+UDP ports; repeating each destination within a run returned its same mapping.
+The absolute mapped ports changed across fresh runs. This supports
+destination-dependent mapping on this path, but does not by itself prove the
+cause of the failed ICE checks. Do not treat one STUN server's mapped port as
+a stable endpoint for arbitrary peers.
 
 The next transport experiment must isolate why simultaneous ICE checks do not
 reach the host's physical interface with the handed-off port. Keep the host
