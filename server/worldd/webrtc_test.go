@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -85,6 +86,57 @@ func TestSharedWebRTCAPIReusesConfiguredUDPPort(t *testing.T) {
 		t.Fatalf("shared WebRTC UDP port was not released on shutdown: %v", err)
 	}
 	_ = packetConn.Close()
+}
+
+func TestSharedWebRTCAPIHonorsInterfaceAllowlist(t *testing.T) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selected net.Interface
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagLoopback == 0 {
+			selected = iface
+			break
+		}
+	}
+	if selected.Name == "" {
+		t.Skip("no active non-loopback interface is available")
+	}
+
+	daemon := &daemon{webrtcInterfaces: []string{selected.Name}}
+	if _, err := daemon.sharedWebRTCAPI(); err != nil {
+		t.Fatal(err)
+	}
+	defer daemon.closeWebRTCTransport()
+	mux, ok := daemon.webrtcUDPMux.(ice.UDPMux)
+	if !ok {
+		t.Fatalf("filtered WebRTC mux has unexpected type %T", daemon.webrtcUDPMux)
+	}
+	addresses := mux.GetListenAddresses()
+	if len(addresses) == 0 {
+		t.Fatal("filtered WebRTC mux has no listen addresses")
+	}
+	want := make(map[string]struct{})
+	interfaceAddresses, err := selected.Addrs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, address := range interfaceAddresses {
+		ip, _, err := net.ParseCIDR(address.String())
+		if err == nil {
+			want[ip.String()] = struct{}{}
+		}
+	}
+	for _, address := range addresses {
+		udpAddress, ok := address.(*net.UDPAddr)
+		if !ok {
+			t.Fatalf("filtered mux returned non-UDP address %T", address)
+		}
+		if _, ok := want[udpAddress.IP.String()]; !ok {
+			t.Errorf("WebRTC mux address %s is outside interface %q", udpAddress, selected.Name)
+		}
+	}
 }
 
 func TestSharedWebRTCAPIUsesOnePortForConcurrentPeers(t *testing.T) {

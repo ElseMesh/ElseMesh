@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -90,37 +91,74 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 		return d.webrtcAPI, nil
 	}
 
-	var packetConn net.PacketConn
-	var err error
-	if d.webrtcUDPPortMin == 0 && d.webrtcUDPPortMax == 0 {
-		packetConn, err = net.ListenPacket("udp", ":0")
-	} else {
-		for port := int(d.webrtcUDPPortMin); port <= int(d.webrtcUDPPortMax); port++ {
-			packetConn, err = net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(port)))
-			if err == nil {
-				break
-			}
-		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("bind shared WebRTC UDP port: %w", err)
-	}
-	udpMux := webrtc.NewICEUDPMux(nil, packetConn)
 	settingEngine := webrtc.SettingEngine{}
-	settingEngine.SetICEUDPMux(udpMux)
+	var udpMux ice.UDPMux
+	var listenAddress string
 	if len(d.webrtcInterfaces) > 0 {
 		allowed := make(map[string]struct{}, len(d.webrtcInterfaces))
 		for _, name := range d.webrtcInterfaces {
 			allowed[name] = struct{}{}
 		}
-		settingEngine.SetInterfaceFilter(func(name string) bool {
+		interfaceFilter := func(name string) bool {
 			_, ok := allowed[name]
 			return ok
-		})
+		}
+		settingEngine.SetInterfaceFilter(interfaceFilter)
+		bind := func(port int) (ice.UDPMux, error) {
+			return ice.NewMultiUDPMuxFromPort(port, ice.UDPMuxFromPortWithInterfaceFilter(interfaceFilter))
+		}
+		minimum, maximum := int(d.webrtcUDPPortMin), int(d.webrtcUDPPortMax)
+		if minimum == 0 && maximum == 0 {
+			var err error
+			udpMux, err = bind(0)
+			if err != nil {
+				return nil, fmt.Errorf("bind shared WebRTC UDP mux on interfaces %s: %w", strings.Join(d.webrtcInterfaces, ","), err)
+			}
+		} else {
+			var err error
+			for port := minimum; port <= maximum; port++ {
+				udpMux, err = bind(port)
+				if err == nil {
+					minimum = port
+					break
+				}
+			}
+			if udpMux == nil {
+				return nil, fmt.Errorf("bind shared WebRTC UDP port on interfaces %s: %w", strings.Join(d.webrtcInterfaces, ","), err)
+			}
+		}
+		if len(udpMux.GetListenAddresses()) == 0 {
+			_ = udpMux.Close()
+			return nil, fmt.Errorf("WebRTC interface allowlist %s has no active addresses", strings.Join(d.webrtcInterfaces, ","))
+		}
+		if minimum == 0 && maximum == 0 {
+			listenAddress = fmt.Sprintf("interfaces=%s port=ephemeral", strings.Join(d.webrtcInterfaces, ","))
+		} else {
+			listenAddress = net.JoinHostPort(strings.Join(d.webrtcInterfaces, ","), strconv.Itoa(minimum))
+		}
 		log.Printf("WebRTC ICE interface allowlist=%s", strings.Join(d.webrtcInterfaces, ","))
+	} else {
+		var packetConn net.PacketConn
+		var err error
+		if d.webrtcUDPPortMin == 0 && d.webrtcUDPPortMax == 0 {
+			packetConn, err = net.ListenPacket("udp", ":0")
+		} else {
+			for port := int(d.webrtcUDPPortMin); port <= int(d.webrtcUDPPortMax); port++ {
+				packetConn, err = net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(port)))
+				if err == nil {
+					break
+				}
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("bind shared WebRTC UDP port: %w", err)
+		}
+		udpMux = webrtc.NewICEUDPMux(nil, packetConn)
+		listenAddress = packetConn.LocalAddr().String()
 	}
+	settingEngine.SetICEUDPMux(udpMux)
 	d.webrtcUDPMux = udpMux
-	d.webrtcUDPAddr = packetConn.LocalAddr().String()
+	d.webrtcUDPAddr = listenAddress
 	d.webrtcAPI = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 	log.Printf("worldd shared WebRTC ICE UDP mux listen=%s", d.webrtcUDPAddr)
 	return d.webrtcAPI, nil
