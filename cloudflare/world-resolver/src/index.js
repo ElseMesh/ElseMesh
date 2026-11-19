@@ -400,11 +400,11 @@ export class SignalRoom {
 			const attachment = socket.deserializeAttachment();
 			return attachment && ( attachment.role === 'pending' || attachment.role === 'host-pending' || attachment.role === 'visitor' && ! attachment.connected ) ? [ attachment.createdAt + 30_000 ] : [];
 		} );
-		const current = await this.state.getAlarm();
+		const current = await this.state.storage.getAlarm();
 		if ( deadlines.length ) {
 			const next = Math.min( ...deadlines );
-			if ( current === null || current > next ) await this.state.setAlarm( Math.max( Date.now() + 1, next ) );
-		} else if ( current !== null ) await this.state.deleteAlarm();
+			if ( current === null || current > next ) await this.state.storage.setAlarm( Math.max( Date.now() + 1, next ) );
+		} else if ( current !== null ) await this.state.storage.deleteAlarm();
 	}
 
 	#send( socket, value ) {

@@ -123,9 +123,15 @@ class FakeSignalSocket {
 	close( code, reason ) { this.closed = true; this.closeReason = { code, reason }; }
 }
 const signalSockets = [];
+let signalAlarm = null;
 const signalState = {
 	acceptWebSocket( socket ) { signalSockets.push( socket ); },
 	getWebSockets() { return signalSockets.filter( ( socket ) => ! socket.closed ); },
+	storage: {
+		async getAlarm() { return signalAlarm; },
+		async setAlarm( at ) { signalAlarm = at; },
+		async deleteAlarm() { signalAlarm = null; },
+	},
 };
 const signalRoom = new SignalRoom( signalState, env );
 const hostSocket = new FakeSignalSocket( { role: 'pending', networkId: 'e3918db4832a3056', nodeId: '0123456789', worldId: rendezvousWorldId } );
@@ -155,6 +161,10 @@ await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.res
 assert.equal( visitorSocket.messages.at( -1 ).type, 'webrtc.answer' );
 await signalRoom.webSocketMessage( visitorSocket, JSON.stringify( { type: 'asset.get', signalSessionId: connected.signalSessionId } ) );
 assert.equal( visitorSocket.closed, true, 'the rendezvous rejects asset requests instead of carrying world data' );
+const stalePending = new FakeSignalSocket( { role: 'pending', createdAt: Date.now() - 31_000, networkId: 'e3918db4832a3056', nodeId: '0123456789', worldId: rendezvousWorldId } );
+signalSockets.push( stalePending );
+await signalRoom.alarm();
+assert.equal( stalePending.closed, true, 'Durable Object alarms close abandoned signaling handshakes' );
 
 const rendezvousWithoutHostID = await signedDocument( 'elsemesh.node/1', {
 	protocol: 'elsemesh.node/1', nodeId: rendezvousHost.peerId, gateway: '', rendezvous: true,
