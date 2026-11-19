@@ -255,53 +255,19 @@ export class WorldConnector {
 				deadline.dispose();
 			}
 		};
-		// A world-ID invite is usable by ordinary browsers without an overlay VPN.
-		// Try its public provider candidates and world-ID directory lookup first;
-		// ZeroTier is only an optional fallback for devices already on that network.
-		for ( const provider of inviteProviders ) {
-			const manifest = await attemptProvider( provider.nodeId, provider.gateway );
-			if ( manifest ) return manifest;
-		}
-		let worldDirectoryTried = false;
-		const attemptWorldDirectory = async () => {
-			invariant( isWorldID( this.worldId ), lastError?.message || 'A valid worldId is required' );
-			this.nodeId = '';
-			let providers;
+		if ( this.zeroTierGateway && this.zeroTierNodeId ) {
 			try {
-				providers = this.directory ? await this.#discoverDirectoryProviders( signal ) : await this.#discoverGatewayProviders( signal );
+				const direct = await this.#discoverDirectZeroTierProvider( signal );
+				const manifest = await attemptPrivateProvider( direct.nodeId, this.zeroTierGateway );
+				if ( manifest ) return manifest;
 			} catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
-				lastError ||= error;
-				worldDirectoryTried = true;
-				return null;
+				lastError = error;
+				this.close();
+				this.nodeId = '';
 			}
-			worldDirectoryTried = true;
-			for ( const provider of providers ) {
-				throwIfAborted( signal );
-				const nodeId = typeof provider === 'string' ? provider : provider.nodeId;
-				const gateway = typeof provider === 'string' ? this.gateway : provider.gateway;
-				const manifest = await attemptProvider( nodeId, gateway );
-				if ( manifest ) return manifest;
-			}
-			return null;
-		};
-		if ( isWorldID( this.worldId ) ) {
-			const manifest = await attemptWorldDirectory();
-			if ( manifest ) return manifest;
 		}
 		if ( this.zeroTierNodeId ) {
-			if ( this.zeroTierGateway && isWorldID( this.worldId ) ) {
-				try {
-					const direct = await this.#discoverDirectZeroTierProvider( signal );
-					const manifest = await attemptPrivateProvider( direct.nodeId, this.zeroTierGateway );
-					if ( manifest ) return manifest;
-				} catch ( error ) {
-					if ( signal?.aborted ) throw signal.reason || error;
-					lastError = error;
-					this.close();
-					this.nodeId = '';
-				}
-			}
 			let discovered = [];
 			try { discovered = await this.#discoverZeroTierProviders( signal ); }
 			catch ( error ) {
@@ -328,8 +294,24 @@ export class WorldConnector {
 			}
 		}
 		if ( this.zeroTierNodeId && ! this.worldId ) throw new Error( lastError?.message || 'ZeroTier node does not currently advertise a ThruHold' );
-		if ( ! worldDirectoryTried ) {
-			const manifest = await attemptWorldDirectory();
+		for ( const provider of inviteProviders ) {
+			const manifest = await attemptProvider( provider.nodeId, provider.gateway );
+			if ( manifest ) return manifest;
+		}
+		invariant( isWorldID( this.worldId ), lastError?.message || 'A valid worldId is required' );
+		this.nodeId = '';
+		let providers;
+		try {
+			providers = this.directory ? await this.#discoverDirectoryProviders( signal ) : await this.#discoverGatewayProviders( signal );
+		} catch ( error ) {
+			if ( signal?.aborted ) throw signal.reason || error;
+			throw lastError || error;
+		}
+		for ( const provider of providers ) {
+			throwIfAborted( signal );
+			const nodeId = typeof provider === 'string' ? provider : provider.nodeId;
+			const gateway = typeof provider === 'string' ? this.gateway : provider.gateway;
+			const manifest = await attemptProvider( nodeId, gateway );
 			if ( manifest ) return manifest;
 		}
 		throw lastError || new Error( 'No available provider could serve this world' );

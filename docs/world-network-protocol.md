@@ -171,17 +171,17 @@ and be authorized on that network. Where the application socket API requires
 a ZeroTier managed IP, the network must provide a stable managed address or
 the client must obtain the current HostID-to-managed-address mapping from a
 trusted network advertisement/controller. Host ID alone is not an IP route.
-An ordinary browser invite resolves its world ID through the Worker and
-connects directly to a provider's signed HTTPS/WSS gateway. A ZeroTier private
-route is optional and only available when the visitor's host OS already
-provides that route (or a future browser ZeroTier transport exists). An invite
-may include a private HTTP gateway as a fallback. `worldd` publishes this
-address inside its signed node record and bridges the ZeroTier TCP port to its
-dynamically selected local HTTP/WebSocket gateway port. The client verifies
-the node signature and checks its ZeroTier network ID, Host ID, world ID and
-gateway before connecting. The Worker performs lookup only and never carries
-world traffic; ordinary browser access does not require ZeroTier or a browser
-ZeroTier implementation.
+An invite may include a signed ZeroTier private gateway. The client tries that
+route first with a strict timeout, then looks up the invited HostID through the
+Worker and connects directly to the provider's signed public HTTPS/WSS
+gateway. `worldd` publishes the private address inside its signed node record
+and bridges the ZeroTier TCP port to its dynamically selected local
+HTTP/WebSocket gateway port. The client verifies the node signature and checks
+its ZeroTier network ID, Host ID, world ID and gateway before connecting. A
+visitor without ZeroTier falls through to the public gateway; ordinary browser
+access does not require ZeroTier or browser-side ztlib. When an invite has no
+ZeroTier locator, the client resolves its world ID and uses the same public
+provider path. The Worker performs lookup only and never carries world traffic.
 
 Hosted HTTPS pages cannot generally connect to private IPs without browser
 permission. Chrome 142 and newer supports local-network requests from secure

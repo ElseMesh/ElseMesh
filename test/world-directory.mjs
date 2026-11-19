@@ -175,21 +175,12 @@ try {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 		zeroTierGateway: 'http://10.147.20.4:43127', zeroTierNodeRecord: zeroTierProvider, directory: 'https://thruhold.org',
 	} );
-	const privateAttemptsBeforePublicRoute = directGatewayAttempts.length;
 	await directZeroTierConnector.getManifest();
 	assert.equal( directZeroTierConnector.nodeId, second.peerId, 'a direct private gateway reveals a signed node identity bound to the invited ZeroTier ID' );
-	assert.equal( directZeroTierConnector.gateway, 'https://online.example', 'a world-ID invite uses its public provider before probing an optional private route' );
-	assert.equal( zeroTierLookups, zeroTierLookupsBeforePrivate, 'a working public route does not need a ZeroTier Worker lookup' );
-	assert.equal( directGatewayAttempts.length, privateAttemptsBeforePublicRoute, 'a successful public route does not contact the private IP' );
+	assert.equal( directZeroTierConnector.gateway, 'http://10.147.20.4:43127' );
+	assert.equal( zeroTierLookups, zeroTierLookupsBeforePrivate, 'a working private gateway is tried before Worker HostID lookup' );
+	assert.equal( directNodeRecordRequests, 0, 'the browser verifies the invite-bound node signature before contacting the private IP' );
 	directZeroTierConnector.close();
-	directoryProviders = [];
-	const privateFallback = new WorldConnector( {
-		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
-		zeroTierGateway: 'http://10.147.20.4:43127', zeroTierNodeRecord: zeroTierProvider, directory: 'https://thruhold.org',
-	} );
-	await privateFallback.getManifest();
-	assert.equal( privateFallback.gateway, 'http://10.147.20.4:43127', 'the signed private gateway remains available when public provider discovery has no working route' );
-	privateFallback.close();
 	assert.throws( () => new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 		zeroTierGateway: 'http://10.147.20.4:43127', directory: 'https://thruhold.org',
@@ -216,24 +207,23 @@ try {
 	assert.equal( zeroTierLookups, lookupsBeforeStaleRecord + 1, 'a stale invite-bound node record triggers fresh Worker discovery' );
 	assert.equal( stalePrivateRoute.gateway, 'http://10.147.20.4:43127', 'fresh Worker data restores the current direct private route' );
 	stalePrivateRoute.close();
-	directoryProviders = providers;
 	const lookupsBeforeWorkerFallback = zeroTierLookups;
 	const tailscaleGateway = new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 		nodeId: second.peerId, gateway: 'https://world-host.tailnet-example.ts.net', directory: 'https://thruhold.org',
 	} );
 	await tailscaleGateway.getManifest();
-	assert.equal( tailscaleGateway.gateway, 'https://world-host.tailnet-example.ts.net', 'a signed explicit HTTPS provider is tried before optional ZeroTier discovery' );
-	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback, 'a working explicit provider avoids ZeroTier lookup' );
+	assert.equal( tailscaleGateway.gateway, 'http://10.147.20.4:43127', 'the Worker HostID lookup and its signed private gateway take priority over a static invite gateway when the invite has no private gateway' );
+	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 1, 'the resolver is queried before trying a static invite gateway when the private route was not included in the invite' );
 	tailscaleGateway.close();
 	const directThenResolver = new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 		nodeId: first.peerId, gateway: 'https://offline.example', directory: 'https://thruhold.org',
 	} );
 	await directThenResolver.getManifest();
-	assert.equal( directThenResolver.nodeId, second.peerId, 'an unreachable invite gateway falls back to the world-ID directory provider' );
-	assert.equal( directThenResolver.gateway, 'https://online.example', 'the public provider route is used before any optional private route' );
-	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback, 'a working world-ID lookup does not query the ZeroTier index' );
+	assert.equal( directThenResolver.nodeId, second.peerId, 'an unreachable invite gateway falls back to the signed ZeroTier HostID resolver result' );
+	assert.equal( directThenResolver.gateway, 'http://10.147.20.4:43127', 'a signed private gateway is attempted before the provider HTTPS gateway after lookup' );
+	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 2, 'the resolver is queried after the direct route fails' );
 	directThenResolver.close();
 	privateGatewayReachable = false;
 	const directThenFallback = new WorldConnector( {
@@ -243,7 +233,7 @@ try {
 	await directThenFallback.getManifest();
 	assert.equal( directThenFallback.nodeId, second.peerId, 'if the private ZeroTier gateway fails, the verified public provider remains available' );
 	assert.equal( directThenFallback.gateway, 'https://online.example' );
-	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback, 'a world-ID invite does not depend on ZeroTier resolution for its public route' );
+	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 3 );
 	directThenFallback.close();
 	privateGatewayHangs = true;
 	const boundedPrivateRoute = new WorldConnector( {

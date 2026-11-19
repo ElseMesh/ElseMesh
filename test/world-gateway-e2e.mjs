@@ -109,7 +109,7 @@ try {
 		assert.ok( liveResult.ok, `deployed Worker lookup to the public worldd gateway failed: ${liveResult.error || 'unknown error'}\nworldd log:\n${owner.output}` );
 		assert.equal( liveResult.nodeId, ownerPeerID, 'deployed Worker lookup selects the live worldd owner' );
 		assert.equal( liveResult.gateway, livePublicGateway, 'the client uses the signed public gateway, not the Worker, for world traffic' );
-		console.log( 'ok   deployed Worker world-ID lookup connects directly to the temporary public worldd gateway' );
+		console.log( 'ok   deployed Worker HostID lookup connects directly to the temporary public worldd gateway' );
 	}
 	const bootstrap = `/ip4/127.0.0.1/tcp/${ownerP2PPort}/p2p/${ownerPeerID}`;
 	const cache = startDaemon( binary, [
@@ -159,10 +159,10 @@ try {
 		} ), resolverState );
 		assert.equal( announcement.status, 202, `Worker contract rejected the live cache node advertisement: ${await announcement.text()}` );
 		const zeroTierNodeID = resolverNode.payload.zeroTierNodeId;
-		const hostLookup = await handleResolverRequest( new Request( `https://resolver.example/v1/zerotier/e3918db4832a3056/${zeroTierNodeID}` ), resolverState );
-		const hostLookupResult = await hostLookup.json();
-		assert.equal( hostLookup.status, 200 );
-		assert.deepEqual( hostLookupResult.providers, [ resolverNode ], 'optional HostID lookup can return the signed live worldd provider record' );
+		const lookup = await handleResolverRequest( new Request( `https://resolver.example/v1/zerotier/e3918db4832a3056/${zeroTierNodeID}` ), resolverState );
+		const lookupResult = await lookup.json();
+		assert.equal( lookup.status, 200 );
+		assert.deepEqual( lookupResult.providers, [ resolverNode ], 'HostID discovery returns the signed live worldd provider record' );
 		resolverServer = await createResolverServer( resolverState, keyPath, certPath );
 
 		const result = await runWorkerDiscoveryClient( {
@@ -173,8 +173,7 @@ try {
 		assert.ok( result.ok, `Worker-discovered WSS connector failed: ${result.error || 'unknown error'}\nworldd cache log:\n${cache.output}` );
 		assert.equal( result.nodeId, cachePeerID, 'HostID lookup connects directly to the advertised worldd peer' );
 		assert.equal( result.gateway, workerGateway.url, 'worldd traffic uses its HTTPS/WSS gateway, not the resolver' );
-		assert.equal( resolverServer.lookups, 0, 'a world-ID invite does not require the ZeroTier HostID index' );
-		assert.equal( resolverServer.worldLookups, 1, 'the invite resolves the world ID through the Worker' );
+		assert.equal( resolverServer.lookups, 1, 'the resolver handles only the HostID lookup' );
 		assert.ok( workerGateway.upgrades >= 1, 'the client opens a direct WSS session to worldd after lookup' );
 	} finally {
 		await Promise.all( [
@@ -183,7 +182,7 @@ try {
 		].filter( Boolean ) );
 	}
 
-	console.log( 'ok   live WSS admission and recovery plus Worker world-ID lookup; optional embedded-libzt HostID verified' );
+	console.log( 'ok   live WSS admission and recovery plus Worker lookup using the actual embedded-libzt HostID' );
 } finally {
 	for ( const child of processes.reverse() ) await stopDaemon( child );
 	if ( workerGateway?.server.listening ) await new Promise( resolve => workerGateway.server.close( resolve ) );
@@ -266,7 +265,6 @@ async function createSecureGatewayProxy( upstreamPort, keyPath, certPath ) {
 
 async function createResolverServer( env, keyPath, certPath ) {
 	let lookups = 0;
-	let worldLookups = 0;
 	const server = https.createServer( { key: await readFile( keyPath ), cert: await readFile( certPath ) }, async ( incoming, outgoing ) => {
 		try {
 			const chunks = [];
@@ -276,7 +274,6 @@ async function createResolverServer( env, keyPath, certPath ) {
 			for ( const [ name, value ] of Object.entries( incoming.headers ) ) if ( value !== undefined ) headers.set( name, Array.isArray( value ) ? value.join( ', ' ) : value );
 			const requestURL = new URL( incoming.url || '/', `https://${incoming.headers.host || 'resolver.local'}` );
 			if ( requestURL.pathname.startsWith( '/v1/zerotier/' ) ) lookups ++;
-			if ( requestURL.pathname.startsWith( '/v1/worlds/' ) ) worldLookups ++;
 			const response = await handleResolverRequest( new Request( requestURL, { method: incoming.method, headers, ...( body ? { body } : {} ) } ), env );
 			outgoing.writeHead( response.status, Object.fromEntries( response.headers.entries() ) );
 			outgoing.end( Buffer.from( await response.arrayBuffer() ) );
@@ -286,7 +283,7 @@ async function createResolverServer( env, keyPath, certPath ) {
 		}
 	} );
 	await new Promise( ( resolve, reject ) => server.listen( 0, '127.0.0.1', resolve ).once( 'error', reject ) );
-	return { server, url: `https://127.0.0.1:${server.address().port}`, get lookups() { return lookups; }, get worldLookups() { return worldLookups; } };
+	return { server, url: `https://127.0.0.1:${server.address().port}`, get lookups() { return lookups; } };
 }
 
 async function runWorkerDiscoveryClient( options ) {

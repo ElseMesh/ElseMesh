@@ -17,7 +17,10 @@ HostID and `worldId` are the normal discovery identities. A browser invite
 resolves `worldId` through the signed directory/Worker to a reachable HTTPS/
 WSS provider, then connects directly to that provider; neither the visitor nor
 the browser needs ZeroTier installed. The Worker carries lookup traffic only,
-not world content.
+not world content. If an invite also carries a signed ZeroTier private gateway,
+the client may try that route first with a strict timeout, then use HostID
+lookup and the provider's public HTTPS/WSS route. This is an optimization for
+devices that already have overlay access, never a visitor requirement.
 
 ZeroTier roots establish optional overlay paths; they do not register ElseMesh
 worlds or authorize network membership. A ZeroTier NodeID identifies a

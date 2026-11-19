@@ -51,20 +51,22 @@ https://elsemesh.github.io/?worldId=elsemesh%3Amy-island
   &nodeId=<cache-libp2p-peer-id>&gateway=https%3A%2F%2Fcache-gateway.example
 ```
 
-This is one URL; line breaks above are for readability. For a world-ID invite,
-the client first tries its explicit HTTPS/WSS provider pairs, then resolves
-`worldId` through `worldResolver` and connects directly to a signed public
-provider gateway. A signed ZeroTier private gateway or HostID lookup is an
-optional fallback for devices that already have a route to that overlay; it
-must not delay or be required for the ordinary public path. A bare
-10-character ZeroTier ID in the world picker is a convenience for known
-overlay users and uses `worldResolver`; if that node advertises several worlds,
-provide a ThruHold ID too. The client verifies the same signed ThruHold
-manifest whichever route succeeds. Up to eight explicit candidates are
-accepted. Secure pages reject arbitrary HTTP/WS gateways; the separate
-ZeroTier gateway field accepts only private IP literals and is subject to
-browser Local Network Access rules. The browser never needs to join ZeroTier
-itself: a normal visitor connects over HTTPS/WSS without installing it.
+This is one URL; line breaks above are for readability. If a world-ID invite
+contains a signed ZeroTier private gateway, the client tries it first with a
+short bounded timeout. If it fails, the client queries `worldResolver` by
+network ID and HostID, verifies the signed provider record, tries its current
+private gateway once, then connects directly to the provider's public
+HTTPS/WSS gateway. A visitor without ZeroTier can use that public fallback;
+ZeroTier is not required. An invite without a ZeroTier locator tries its
+explicit HTTPS/WSS provider pairs, then resolves `worldId` through
+`worldResolver`. A bare 10-character ZeroTier ID in the world picker is a
+convenience for known overlay users and uses `worldResolver`; if that node
+advertises several worlds, provide a ThruHold ID too. The client verifies the
+same signed ThruHold manifest whichever route succeeds. Up to eight explicit
+candidates are accepted. Secure pages reject arbitrary HTTP/WS gateways; the
+separate ZeroTier gateway field accepts only private IP literals and is
+subject to browser Local Network Access rules. The browser never needs to join
+ZeroTier itself.
 
 When sharing a URL, include only providers that already serve the same world and have the necessary owner-signed host grant. A PeerID/gateway in a link does not grant content-cache or failover-authority permission. Each daemon must have its own persistent identity directory; do not copy a private node key from desktop to phone or friend. Issue/renew grants through the world's owner-authorized manifest workflow.
 
@@ -94,27 +96,31 @@ The Worker is an optional lookup/bootstrap service. It does not store world pack
 ### Public gateway setup still required
 
 Live checks on 2026-11-19 confirmed that this host has a private LAN address
-behind a globally reachable, non-CGNAT public address. `elsemesh.org` is
-delegated to Namecheap DNS and currently points its web traffic to GitHub Pages;
-the deployed resolver uses its `workers.dev` origin. The connected Cloudflare
-account has the active `reb.ai` and `esuza.com` zones, but no named Tunnels.
-The deployed Worker needs no additional Cloudflare DNS or route configuration
-for HostID lookup.
+behind a globally reachable, non-CGNAT public address. The deployed resolver
+uses its `workers.dev` origin and needs no custom DNS configuration for
+HostID lookup. Namecheap remains the authoritative DNS provider for both
+`elsemesh.org` and `elsemesh.com`; neither registrar delegation has changed.
 
-The preferred public gateway hostname is under `elsemesh.org`, while the invite
-site remains on GitHub Pages. The connected Cloudflare account does not
-currently contain that zone; its checked `reb.ai` and `esuza.com` zones are on
-the Free plan. Cloudflare's current documentation says partial (CNAME) setup,
-which would keep Namecheap authoritative, requires Business or Enterprise.
-Delegating only `worldd.elsemesh.org` to its own Cloudflare zone requires
-Cloudflare Enterprise. The no-upgrade route is therefore to add `elsemesh.org`
-as a full Cloudflare zone, copy all existing DNS records, verify the GitHub
-Pages records, and then change the registrar nameservers. Namecheap documents
-that its email and URL forwarding do not work with custom nameservers, so
-inventory and preserve any active forwarding before making that change. No
-zone, nameserver, or DNS record has been changed yet. The requested
-`elsemesh.com` to `elsemesh.org` HTTPS redirect is a separate pending change;
-verify its current records and preserve any mail routing before applying it.
+Full Cloudflare zones now exist for both domains, pending nameserver
+delegation. The `.org` zone contains the four existing GitHub Pages A records,
+the `www` CNAME and GitHub Pages challenge TXT record, all DNS-only. The `.com`
+zone contains proxied placeholder A records for the apex and wildcard plus a
+Single Redirect rule to `https://elsemesh.org`, preserving the request path and
+query string. Read-only Namecheap checks found no email-forwarding rules. Its
+existing `.com` URL redirects are not affected until nameserver delegation;
+the Cloudflare rule is intended to replace them after cutover. Cloudflare's
+current documentation says partial (CNAME) setup, which would keep Namecheap
+authoritative, requires Business or Enterprise. Delegating only
+`worldd.elsemesh.org` to its own Cloudflare zone requires Enterprise, so full
+zone delegation is the no-upgrade route.
+
+The Namecheap nameservers still need to be changed to the pair assigned to
+these zones before either Cloudflare zone becomes active. After cutover, verify
+GitHub Pages and `.com` redirects before adding a DNS-only
+`worldd.elsemesh.org` record. That record must point to the current public
+gateway address and be updated dynamically; it is not present yet because no
+durable public `worldd` HTTPS/WSS route exists. The router must expose the
+gateway to the Internet. Do not proxy world-content traffic through Cloudflare.
 See Namecheap's [DNS service limits](https://www.namecheap.com/support/api/methods/domains-dns/)
 and [redirect requirements](https://www.namecheap.com/support/knowledgebase/article.aspx/385/2237/how-to-set-up-a-url-redirect-for-a-domain/), plus Cloudflare's [partial DNS](https://developers.cloudflare.com/dns/zone-setups/partial-setup/)
 and [subdomain-zone availability](https://developers.cloudflare.com/dns/zone-setups/subdomain-setup/).
@@ -141,6 +147,6 @@ Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tok
 
 The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. The daemon and `directoryd` support signed ZeroTier locator advertisements and lookup. The Worker contract tests cover signature and grant validation, both lookup routes, expiry controls, CORS, malformed IDs, oversized bodies, and rate limiting.
 
-`test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s signed node record, announces it to an in-memory Worker KV, resolves the invite by world ID, then verifies that the client opens WSS to worldd directly. It also checks the optional HostID index independently; it does not route world content through the Worker. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by world ID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies route ordering with an in-memory directory and WebSocket shim: public providers are tried before optional ZeroTier routes for a world-ID invite, while a bare ZeroTier locator and public-route failure can still use the signed HostID/private gateway fallback. This is not a live ZeroTier private-IP test; the host has no `zerotier-cli`, and no independent visitor device was used.
+`test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s signed node record, announces it to an in-memory Worker KV, resolves the invite by HostID, then verifies that the client opens WSS to worldd directly. The Worker carries no world content. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by the actual embedded-libzt HostID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies bounded private-route-first behavior, HostID discovery fallback, signature validation before private access, and the public HTTPS/WSS route for visitors without ZeroTier. This is not a live ZeroTier private-IP test; the host has no `zerotier-cli`, and no independent visitor device was used.
 
 The deployed Worker is `https://elsemesh-world-resolver.rebroad.workers.dev`, restricted to network `e3918db4832a3056`; the hosted client config points to it. A live health check, lookups for the configured and unsupported networks, and a temporary live provider announcement by the end-to-end test verified the deployed endpoints. Public GitHub Pages serves the client only; it does not serve the resolver API or world gateway. A durable public world gateway and an independent remote-browser run remain unverified.
