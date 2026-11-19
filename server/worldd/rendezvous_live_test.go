@@ -155,6 +155,9 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 		t.Fatalf("create WebRTC peer: %v", err)
 	}
 	defer peer.Close()
+	peer.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		t.Logf("visitor ICE state: %s", state)
+	})
 	ordered := true
 	channel, err := peer.CreateDataChannel(worldProtocolNamespace, &webrtc.DataChannelInit{Ordered: &ordered})
 	if err != nil {
@@ -209,6 +212,11 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("WebRTC ICE gathering timed out")
 	}
+	for _, stat := range peer.GetStats() {
+		if candidate, ok := stat.(webrtc.ICECandidateStats); ok && candidate.Type == webrtc.StatsTypeLocalCandidate {
+			t.Logf("visitor ICE candidate: %s %s %s:%d", candidate.CandidateType, candidate.NetworkType, candidate.IP, candidate.Port)
+		}
+	}
 	requestID := fmt.Sprintf("live-offer-%d", time.Now().UnixNano())
 	if err := socket.WriteJSON(map[string]string{
 		"type": "webrtc.offer", "worldId": worldID, "requestId": requestID,
@@ -235,6 +243,11 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	case err := <-readFailure:
 		t.Fatalf("open WebRTC data channel: %v", err)
 	case <-ctx.Done():
+		for _, stat := range peer.GetStats() {
+			if pair, ok := stat.(webrtc.ICECandidatePairStats); ok {
+				t.Logf("visitor ICE pair: state=%s nominated=%t local=%s remote=%s", pair.State, pair.Nominated, pair.LocalCandidateID, pair.RemoteCandidateID)
+			}
+		}
 		t.Fatal("direct WebRTC data channel did not open")
 	}
 
