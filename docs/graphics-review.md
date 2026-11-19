@@ -32,6 +32,25 @@ other world views and assets, LOD transitions, and split WebGL parity remain
 open. An exploratory comparison against the separate pre-split ElseMesh
 snapshot is not the authority for this visual gate.
 
+## 2026-11-19 village ground-cover parity: WebGPU
+
+Compared the authoritative `dgreenheck/tidewater` `tidewater/main` ref at
+`4811ba48` with ElseMesh split revision `63f18831`, using Chromium 156 on AMD
+Radeon Graphics (RADV RENOIR), WebGPU, a 2560×1267 output, the same `village`
+pose (`[62, 7, -62]`, yaw `0.34`, pitch `-0.12`, time of day `15.5`), and
+fixed simulation time `1000`. The ElseMesh runtime now installs the signed
+`elsemesh.ground-cover-field/1` component through its normal backend registry;
+the view shows the authored grass coverage and LOD models again.
+
+![Tidewater main and split ElseMesh WebGPU village views](images/tidewater-main-vs-elsemesh-webgpu-village-ground-cover-2026-11-19.jpg)
+
+Full-frame RGB MAE is `5.35/255`; mean RGB is lower in the split image by
+`(4.26, 4.11, 3.40)` levels. This view therefore still has a small color
+difference to investigate. In a separate `dt=0`, `simtime=0` run, toggling
+auto-exposure produced byte-identical frames; that is useful evidence, but it
+was not the same simulation time as this comparison. Other views, spray
+visibility, LOD transitions, shadows, and WebGL parity remain open.
+
 ## 2026-11-18 matched hosted beach: WebGPU and WebGL
 
 Captured the same hosted `beach` camera on Chromium 156 at 1600×813, with

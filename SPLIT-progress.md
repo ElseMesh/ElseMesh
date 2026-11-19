@@ -15,6 +15,16 @@ useful for isolating regressions from the split, but are not the final visual
 target. WebGL must present the same Tidewater-authored content and match that
 appearance through ElseMesh's renderer adapters.
 
+**2026-11-19 evidence update:** Built-in WebGPU now installs the Tidewater-
+authored `elsemesh.ground-cover-field/1` through the standard component
+registry, using the signed density map and three shared model LOD assets
+already consumed by WebGL. Asset, registry, and ground-cover checks pass; an
+AMD RADV WebGPU village capture confirms the grass coverage returns. Its RGB
+MAE is `5.35/255`, with split-minus-main mean RGB `(-4.26, -4.11, -3.40)`;
+the village color shift remains open. Overall Tidewater parity stays **93%**.
+This closes only the missing built-in WebGPU ground-cover path. See
+[`docs/graphics-review.md`](docs/graphics-review.md).
+
 ## Progress by requirement
 
 | Requirement | Estimate | Evidence and remaining acceptance gate |
