@@ -59,6 +59,9 @@ func validateWebRTCPortRange(minimum, maximum uint) error {
 
 func (d *daemon) webrtcICEServers() []webrtc.ICEServer {
 	if len(d.webrtcSTUNServers) == 0 {
+		if d.rendezvous {
+			return []webrtc.ICEServer{{URLs: []string{"stun:stun.cloudflare.com:3478"}}}
+		}
 		return nil
 	}
 	return []webrtc.ICEServer{{URLs: append([]string(nil), d.webrtcSTUNServers...)}}

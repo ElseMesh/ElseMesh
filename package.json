@@ -11,6 +11,7 @@
     "preview": "vite preview --port 0",
     "test:world-gateway": "node test/world-gateway-e2e.mjs",
     "test:world-resolver": "node cloudflare/world-resolver/test.mjs",
+    "test:world-rendezvous": "node test/world-rendezvous.mjs",
     "test:browser-host-client": "node test/browser-host-client.mjs",
     "test:account-client": "node test/account-client.mjs",
     "test:world-extension-browser": "node test/world-javascript-extension-browser.mjs && node test/world-javascript-extension-live-browser.mjs",

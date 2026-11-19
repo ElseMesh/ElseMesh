@@ -23,3 +23,17 @@ func TestWebRTCConfigurationValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestRendezvousUsesDirectSTUNWithoutTURN(t *testing.T) {
+	defaultServers := (&daemon{rendezvous: true}).webrtcICEServers()
+	if len(defaultServers) != 1 || len(defaultServers[0].URLs) != 1 || defaultServers[0].URLs[0] != "stun:stun.cloudflare.com:3478" {
+		t.Fatalf("rendezvous default ICE servers = %#v", defaultServers)
+	}
+	if len(defaultServers[0].Username) != 0 || defaultServers[0].Credential != nil {
+		t.Fatalf("rendezvous unexpectedly configures a TURN relay: %#v", defaultServers[0])
+	}
+	customServers := (&daemon{rendezvous: true, webrtcSTUNServers: []string{"stun:stun.example.org:3478"}}).webrtcICEServers()
+	if len(customServers) != 1 || customServers[0].URLs[0] != "stun:stun.example.org:3478" {
+		t.Fatalf("custom STUN override = %#v", customServers)
+	}
+}

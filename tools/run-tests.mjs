@@ -20,7 +20,7 @@ const tests = [
 	'worlds/tidewater/test/boat-controller-origin.mjs', 'worlds/tidewater/test/boat-water-query-parity.mjs', 'worlds/tidewater/test/boat-design.mjs', 'worlds/tidewater/test/webgl-boat-adapter.mjs', 'worlds/tidewater/test/webgl-boat-idle.mjs', 'worlds/tidewater/test/vendor-lights.mjs', 'test/webgl-lighting-parity.mjs', 'worlds/tidewater/test/webgl-fish-stand.mjs', 'worlds/tidewater/test/webgl-chandlery.mjs',
 	'worlds/tidewater/test/webgl-game-adapter.mjs', 'test/webgl-wildlife-adapter.mjs', 'test/webgl-swash-probe.mjs', 'test/webgl-component-support.mjs', 'worlds/tidewater/test/world-vehicle-policy.mjs', 'worlds/tidewater/test/pier-surface.mjs',
 	'test/world-portals.mjs', 'test/portal-sides.mjs', 'test/portal-back-contract.mjs', 'test/portal-link.mjs',
-	'test/world-launcher.mjs', 'test/world-directory.mjs', 'cloudflare/world-resolver/test.mjs', 'test/world-streaming.mjs',
+	'test/world-launcher.mjs', 'test/world-directory.mjs', 'test/world-rendezvous.mjs', 'cloudflare/world-resolver/test.mjs', 'test/world-streaming.mjs',
 	'test/world-object-lod.mjs', 'test/world-object-lod-contract.mjs', 'worlds/tidewater/test/lod-package.mjs', 'worlds/tidewater/test/webgl-whale-package.mjs', 'test/webgl-spray.mjs',
 	'test/world-source-manifest.mjs', 'test/world-avatar-options.mjs', 'worlds/tidewater/test/world-source-manifest.mjs', 'worlds/tidewater/test/coconut-preservation.mjs', 'worlds/tidewater/test/village-materials.mjs', 'test/world-proposal.mjs',
 	'test/ai-edit-worker.mjs', 'test/ai-edit-mcp.mjs', 'test/ai-edit-review-html.mjs', 'test/prepare-ai-edit-publication.mjs',

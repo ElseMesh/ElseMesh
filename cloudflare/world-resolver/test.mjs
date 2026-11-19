@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
-import { handleRequest } from './src/index.js';
+import { handleRequest, SignalRoom } from './src/index.js';
 
 globalThis.crypto ||= webcrypto;
 
@@ -96,6 +96,86 @@ assert.equal( unsupportedNetwork.status, 400, 'the configured resolver is limite
 const unsupportedAnnouncementNode = await signedDocument( 'elsemesh.node/1', { ...node.payload, zeroTierNetworkId: '0123456789abcdef', issuedAt: now, expiresAt: now + 600 }, owner );
 const unsupportedAnnouncement = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: JSON.stringify( { node: unsupportedAnnouncementNode, manifest } ) } ), env );
 assert.equal( unsupportedAnnouncement.status, 422, 'announcements for other ZeroTier networks are rejected' );
+
+const rendezvousHost = await identity();
+const rendezvousWorldId = 'elsemesh:worker-rendezvous';
+const rendezvousNode = await signedDocument( 'elsemesh.node/1', {
+	protocol: 'elsemesh.node/1', nodeId: rendezvousHost.peerId, gateway: '', rendezvous: true,
+	worldIds: [ rendezvousWorldId ], zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056',
+	issuedAt: now, expiresAt: now + 600,
+}, rendezvousHost );
+const rendezvousManifest = await signedDocument( 'elsemesh.world/3', {
+	protocol: 'elsemesh.world/3', worldId: rendezvousWorldId, ownerPeerId: owner.peerId, authorityEpoch: 1,
+	discoverable: true, hosts: [ { peerId: rendezvousHost.peerId, scopes: [ 'content-cache' ], expiresAt: now + 600, epoch: 1 } ],
+}, owner );
+const rendezvousPublished = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: JSON.stringify( { node: rendezvousNode, manifest: rendezvousManifest } ) } ), env );
+assert.equal( rendezvousPublished.status, 202, 'a signed rendezvous-only provider can publish without a public gateway' );
+const rendezvousLookup = await handleRequest( new Request( 'https://resolver.example/v1/zerotier/e3918db4832a3056/0123456789' ), env );
+const rendezvousResult = await rendezvousLookup.json();
+assert.equal( rendezvousResult.providers[ 0 ].payload.rendezvous, true );
+assert.equal( rendezvousResult.providers[ 0 ].payload.gateway, '' );
+
+class FakeSignalSocket {
+	constructor( attachment ) { this.attachment = attachment; this.messages = []; this.closed = false; }
+	serializeAttachment( attachment ) { this.attachment = structuredClone( attachment ); }
+	deserializeAttachment() { return structuredClone( this.attachment ); }
+	send( value ) { if ( this.closed ) throw new Error( 'socket is closed' ); this.messages.push( JSON.parse( value ) ); }
+	close( code, reason ) { this.closed = true; this.closeReason = { code, reason }; }
+}
+const signalSockets = [];
+const signalState = {
+	acceptWebSocket( socket ) { signalSockets.push( socket ); },
+	getWebSockets() { return signalSockets.filter( ( socket ) => ! socket.closed ); },
+};
+const signalRoom = new SignalRoom( signalState, env );
+const hostSocket = new FakeSignalSocket( { role: 'pending', networkId: 'e3918db4832a3056', nodeId: '0123456789', worldId: rendezvousWorldId } );
+signalSockets.push( hostSocket );
+await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.open', node: rendezvousNode } ) );
+const challenge = hostSocket.messages.at( -1 );
+assert.equal( challenge.type, 'host.challenge' );
+const hostProof = await signedDocument( 'elsemesh.signal-proof/1', {
+	nonce: challenge.nonce, worldId: rendezvousWorldId, networkId: challenge.networkId,
+	zeroTierNodeId: challenge.zeroTierNodeId, iceServers: [],
+}, rendezvousHost );
+await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.proof', document: hostProof } ) );
+assert.equal( hostSocket.deserializeAttachment().role, 'host', `the host must answer the one-use signed challenge (${JSON.stringify( hostSocket.closeReason )})` );
+const visitorSocket = new FakeSignalSocket( { role: 'pending', networkId: 'e3918db4832a3056', nodeId: '0123456789', worldId: rendezvousWorldId } );
+signalSockets.push( visitorSocket );
+await signalRoom.webSocketMessage( visitorSocket, JSON.stringify( { type: 'connect', worldId: rendezvousWorldId, targetPeerId: rendezvousHost.peerId } ) );
+const openRequest = hostSocket.messages.at( -1 );
+assert.equal( openRequest.type, 'visitor.request' );
+await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.response', sessionId: openRequest.sessionId, response: { type: 'connected', worldId: rendezvousWorldId, nodeId: rendezvousHost.peerId, targetPeerId: rendezvousHost.peerId } } ) );
+const connected = visitorSocket.messages.at( -1 );
+assert.equal( connected.type, 'connected' );
+assert.equal( connected.signalSessionId, openRequest.sessionId );
+await signalRoom.webSocketMessage( visitorSocket, JSON.stringify( { type: 'webrtc.offer', signalSessionId: connected.signalSessionId, requestId: 'offer-1', sdp: 'valid bounded offer' } ) );
+const offerRequest = hostSocket.messages.at( -1 );
+assert.equal( offerRequest.request.type, 'webrtc.offer' );
+await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.response', sessionId: openRequest.sessionId, response: { type: 'webrtc.answer', worldId: rendezvousWorldId, requestId: 'offer-1', sdp: 'valid bounded answer' } } ) );
+assert.equal( visitorSocket.messages.at( -1 ).type, 'webrtc.answer' );
+await signalRoom.webSocketMessage( visitorSocket, JSON.stringify( { type: 'asset.get', signalSessionId: connected.signalSessionId } ) );
+assert.equal( visitorSocket.closed, true, 'the rendezvous rejects asset requests instead of carrying world data' );
+
+const rendezvousWithoutHostID = await signedDocument( 'elsemesh.node/1', {
+	protocol: 'elsemesh.node/1', nodeId: rendezvousHost.peerId, gateway: '', rendezvous: true,
+	worldIds: [ rendezvousWorldId ], issuedAt: now, expiresAt: now + 600,
+}, rendezvousHost );
+const invalidRendezvous = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: JSON.stringify( { node: rendezvousWithoutHostID, manifest: rendezvousManifest } ) } ), env );
+assert.equal( invalidRendezvous.status, 422, 'rendezvous-only discovery requires the signed ZeroTier host identity' );
+
+let routedRoom = '';
+const signalEnv = {
+	...env,
+	SIGNAL_ROOMS: {
+		idFromName( name ) { routedRoom = name; return name; },
+		get() { return { fetch: async () => new Response( 'routed' ) }; },
+	},
+};
+const signalRoute = await handleRequest( new Request( `https://resolver.example/v1/signal/e3918db4832a3056/0123456789/${encodeURIComponent( rendezvousWorldId )}`, { headers: { Upgrade: 'websocket', Origin: 'https://elsemesh.org' } } ), signalEnv );
+assert.equal( signalRoute.status, 200 );
+assert.equal( routedRoom, `e3918db4832a3056:0123456789:${rendezvousWorldId}` );
+const deniedSignalOrigin = await handleRequest( new Request( `https://resolver.example/v1/signal/e3918db4832a3056/0123456789/${encodeURIComponent( rendezvousWorldId )}`, { headers: { Upgrade: 'websocket', Origin: 'https://attacker.example' } } ), signalEnv );
+assert.equal( deniedSignalOrigin.status, 403, 'signal room access is limited to the hosted ElseMesh app and local development' );
 
 const oversized = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: ' '.repeat( 2 * 1024 * 1024 + 1 ) } ), env );
 assert.equal( oversized.status, 413, 'body-size limits apply even when a caller does not provide Content-Length' );

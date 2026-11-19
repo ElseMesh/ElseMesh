@@ -183,6 +183,16 @@ access does not require ZeroTier or browser-side ztlib. When an invite has no
 ZeroTier locator, the client resolves its world ID and uses the same public
 provider path. The Worker performs lookup only and never carries world traffic.
 
+When a signed provider record has no public gateway but sets `rendezvous: true`,
+the client uses the Worker's Durable Object room after the private ZeroTier
+attempt. The host maintains an outbound WebSocket to that room and proves
+possession of its libp2p identity with a one-use challenge. The room relays only
+bounded connection and SDP offer/answer messages. The browser and worldd then
+exchange manifests, simulation messages, and assets directly over WebRTC. The
+room is not a world-data gateway or TURN relay. Direct ICE still depends on
+usable STUN candidates and compatible NATs; if it fails, the client reports
+the failure or tries a separately advertised HTTPS/WSS data gateway.
+
 Hosted HTTPS pages cannot generally connect to private IPs without browser
 permission. Chrome 142 and newer supports local-network requests from secure
 contexts, including HTTP fetch and WebSocket URLs using private IP literals,

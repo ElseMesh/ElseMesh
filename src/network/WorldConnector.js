@@ -201,7 +201,7 @@ export class WorldConnector {
 		this.nodeId = nodeId || '';
 		this.gateway = gateway;
 		this.providers = providers.length ? providers.map( ( provider ) => ( { ...provider } ) ) : this.nodeId ? [ { nodeId: this.nodeId, gateway } ] : [];
-		invariant( this.providers.length <= 8 && this.providers.every( ( provider ) => /^[A-Za-z0-9]{20,256}$/.test( provider.nodeId || '' ) && validGatewayForCurrentPage( provider.gateway ) ), 'Invalid world gateway candidates' );
+		invariant( this.providers.length <= 8 && this.providers.every( ( provider ) => /^[A-Za-z0-9]{20,256}$/.test( provider.nodeId || '' ) && ( provider.rendezvous === true ? provider.gateway === '' : validGatewayForCurrentPage( provider.gateway ) ) ), 'Invalid world gateway candidates' );
 		this.directory = directory;
 		this.chunkBytes = chunkBytes;
 		this.loadWorldProviders = loadWorldProviders;
@@ -213,6 +213,8 @@ export class WorldConnector {
 		this.providerRecovery = null;
 		this.transferRateBytesPerSecond = null;
 		this.socket = null;
+		this.rendezvous = false;
+		this.signalSessionId = '';
 		this.webTransport = null;
 		this.webTransportFailed = false;
 		this.socketPromise = null;
@@ -229,12 +231,17 @@ export class WorldConnector {
 		let lastError = null;
 		const attempted = new Set( excludeProviders );
 		const inviteProviders = this.providers.slice();
-		const attemptProvider = async ( nodeId, gateway, providerSignal = signal ) => {
+		const attemptProvider = async ( nodeId, gateway, providerSignal = signal, rendezvous = false, locator = null ) => {
 			const key = `${nodeId}\n${gateway}`;
 			if ( attempted.has( key ) ) return null;
 			attempted.add( key );
 			this.nodeId = nodeId;
 			this.gateway = gateway;
+			this.rendezvous = rendezvous;
+			if ( rendezvous && locator?.zeroTierNodeId && locator?.zeroTierNetworkId ) {
+				this.zeroTierNodeId = locator.zeroTierNodeId;
+				this.zeroTierNetworkId = locator.zeroTierNetworkId;
+			}
 			try { return await this.#fetchManifest( providerSignal ); }
 			catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
@@ -287,15 +294,15 @@ export class WorldConnector {
 				const manifest = await attemptPrivateProvider( provider.nodeId, provider.zeroTierGateway );
 				if ( manifest ) return manifest;
 			}
-			this.providers = candidates.map( ( provider ) => ( { nodeId: provider.nodeId, gateway: provider.gateway } ) );
+			this.providers = candidates.map( ( provider ) => ( { ...provider } ) );
 			for ( const provider of this.providers ) {
-				const manifest = await attemptProvider( provider.nodeId, provider.gateway );
+				const manifest = await attemptProvider( provider.nodeId, provider.gateway, signal, provider.rendezvous, provider );
 				if ( manifest ) return manifest;
 			}
 		}
 		if ( this.zeroTierNodeId && ! this.worldId ) throw new Error( lastError?.message || 'ZeroTier node does not currently advertise a ThruHold' );
 		for ( const provider of inviteProviders ) {
-			const manifest = await attemptProvider( provider.nodeId, provider.gateway );
+			const manifest = await attemptProvider( provider.nodeId, provider.gateway, signal, provider.rendezvous, provider );
 			if ( manifest ) return manifest;
 		}
 		invariant( isWorldID( this.worldId ), lastError?.message || 'A valid worldId is required' );
@@ -311,7 +318,7 @@ export class WorldConnector {
 			throwIfAborted( signal );
 			const nodeId = typeof provider === 'string' ? provider : provider.nodeId;
 			const gateway = typeof provider === 'string' ? this.gateway : provider.gateway;
-			const manifest = await attemptProvider( nodeId, gateway );
+			const manifest = await attemptProvider( nodeId, gateway, signal, provider?.rendezvous === true, provider );
 			if ( manifest ) return manifest;
 		}
 		throw lastError || new Error( 'No available provider could serve this world' );
@@ -390,8 +397,9 @@ export class WorldConnector {
 			catch { continue; }
 			const node = document.payload;
 			const now = Date.now() / 1000;
-			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || ! node.worldIds?.includes( this.worldId ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
-			providers.push( { nodeId: node.nodeId, gateway: node.gateway } );
+			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || ! node.worldIds?.includes( this.worldId ) || !( validSecureGateway( node.gateway ) || node.rendezvous === true && node.gateway === '' && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && node.zeroTierNetworkId === this.zeroTierNetworkId ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
+			if ( validSecureGateway( node.gateway ) ) providers.push( { nodeId: node.nodeId, gateway: node.gateway, rendezvous: false } );
+			if ( node.rendezvous === true && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && node.zeroTierNetworkId === this.zeroTierNetworkId ) providers.push( { nodeId: node.nodeId, gateway: '', rendezvous: true, zeroTierNodeId: node.zeroTierNodeId, zeroTierNetworkId: node.zeroTierNetworkId } );
 		}
 		if ( providers.length === 0 ) throw new Error( 'Directory returned no valid signed provider for this world' );
 		return providers;
@@ -411,8 +419,10 @@ export class WorldConnector {
 			catch { continue; }
 			const node = document.payload;
 			const now = Date.now() / 1000;
-			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || node.zeroTierNodeId !== this.zeroTierNodeId || node.zeroTierNetworkId !== this.zeroTierNetworkId || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! isWorldID( node.worldIds[ 0 ] ) || ! validSecureGateway( node.gateway ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 || node.zeroTierGateway && ! validZeroTierGateway( node.zeroTierGateway ) ) continue;
-			providers.push( { nodeId: node.nodeId, gateway: node.gateway, zeroTierGateway: node.zeroTierGateway || '', worldIds: node.worldIds } );
+			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || node.zeroTierNodeId !== this.zeroTierNodeId || node.zeroTierNetworkId !== this.zeroTierNetworkId || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! isWorldID( node.worldIds[ 0 ] ) || !( validSecureGateway( node.gateway ) || node.rendezvous === true && node.gateway === '' ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 || node.zeroTierGateway && ! validZeroTierGateway( node.zeroTierGateway ) ) continue;
+			const common = { nodeId: node.nodeId, zeroTierGateway: node.zeroTierGateway || '', zeroTierNodeId: node.zeroTierNodeId, zeroTierNetworkId: node.zeroTierNetworkId, worldIds: node.worldIds };
+			if ( validSecureGateway( node.gateway ) ) providers.push( { ...common, gateway: node.gateway, rendezvous: false } );
+			if ( node.rendezvous === true ) providers.push( { ...common, gateway: '', rendezvous: true } );
 		}
 		return providers;
 	}
@@ -599,13 +609,14 @@ export class WorldConnector {
 		if ( this.socket?.readyState === WebSocket.OPEN ) {
 			if ( ! this.rtcAttempted && typeof globalThis.RTCPeerConnection === 'function' ) {
 				try { await this.#openRTC( this.socket, signal ); }
-				catch ( error ) { if ( signal?.aborted ) throw signal.reason || error; }
+				catch ( error ) { if ( signal?.aborted || this.rendezvous ) throw signal?.reason || error; }
 			}
 			if ( this.rtcChannel?.readyState === 'open' ) return { kind: 'webrtc', channel: this.rtcChannel };
+			if ( this.rendezvous ) throw new Error( 'Signaling rendezvous has no world-data fallback; direct WebRTC is required' );
 			return { kind: 'websocket', socket: this.socket };
 		}
 		const promise = ( async () => {
-			const base = this.#httpBaseURL();
+			const base = this.rendezvous ? new URL( this.directory ) : this.#httpBaseURL();
 			let socket = null;
 			if ( typeof globalThis.RTCPeerConnection === 'function' ) {
 				socket = await this.#openWebSocket( base, signal );
@@ -614,9 +625,11 @@ export class WorldConnector {
 					return { kind: 'webrtc', channel: this.rtcChannel };
 				} catch ( error ) {
 					if ( signal?.aborted ) throw signal.reason || error;
+					if ( this.rendezvous ) throw new Error( `Direct WebRTC through the signaling rendezvous failed: ${error.message}` );
 					console.info( 'Direct WebRTC unavailable; trying the world gateway.', error );
 				}
 			}
+			if ( this.rendezvous ) throw new Error( 'This browser does not support WebRTC required by the signaling rendezvous' );
 			if ( ! this.webTransportFailed && base.protocol === 'https:' && typeof globalThis.WebTransport === 'function' ) {
 				try { return await this.#openWebTransport( base, signal ); }
 				catch ( error ) {
@@ -659,7 +672,9 @@ export class WorldConnector {
 			if ( signal?.aborted ) { reject( signal.reason || new DOMException( 'Aborted', 'AbortError' ) ); return; }
 			const url = new URL( base );
 			url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-			url.pathname = '/gateway';
+			url.pathname = this.rendezvous
+				? `/v1/signal/${this.zeroTierNetworkId}/${this.zeroTierNodeId}/${encodeURIComponent( this.worldId )}`
+				: '/gateway';
 			const socket = this.socket = new WebSocket( url );
 			let connected = false;
 			let settled = false;
@@ -689,6 +704,8 @@ export class WorldConnector {
 				if ( ! connected ) {
 					if ( response.type !== 'connected' || response.worldId !== this.worldId ) { failConnect( new Error( response.error || 'World connection failed' ) ); return; }
 					this.iceServers = validateICEServers( response.iceServers );
+					this.signalSessionId = response.signalSessionId || '';
+					if ( this.rendezvous && ! /^[0-9a-f]{32}$/.test( this.signalSessionId ) ) { failConnect( new Error( 'Rendezvous did not assign a valid signaling session' ) ); return; }
 					connected = true;
 					settled = true;
 					cleanup();
@@ -751,6 +768,7 @@ export class WorldConnector {
 			try { return await this.#requestRTC( connection.channel, { ...message, worldId: this.worldId, requestId }, signal ); }
 			catch ( error ) {
 				if ( signal?.aborted || ! [ 'manifest.get', 'role-revocations.get', 'asset.get' ].includes( message.type ) || this.rtcChannel?.readyState === 'open' ) throw error;
+				if ( this.rendezvous ) throw new Error( `Direct WebRTC world request failed without a data-path fallback: ${error.message}` );
 				connection = await this.#connection( signal );
 				if ( connection.kind === 'webrtc' ) throw error;
 				if ( connection.kind === 'webtransport' ) return requestWebTransport( connection.session, { ...message, requestId }, signal );
@@ -806,7 +824,7 @@ export class WorldConnector {
 			await peer.setLocalDescription( offer );
 			await waitForICEGathering( peer, signal );
 			invariant( peer.localDescription?.sdp && peer.localDescription.sdp.length <= 64 * 1024, 'WebRTC offer is invalid or too large' );
-			const response = await this.#requestSocket( socket, { type: 'webrtc.offer', sdp: peer.localDescription.sdp, requestId: `webrtc-${globalThis.crypto?.randomUUID?.() || Date.now()}` }, signal );
+			const response = await this.#requestSocket( socket, { type: 'webrtc.offer', sdp: peer.localDescription.sdp, requestId: `webrtc-${globalThis.crypto?.randomUUID?.() || Date.now()}`, ...( this.rendezvous ? { signalSessionId: this.signalSessionId } : {} ) }, signal );
 			invariant( response.type === 'webrtc.answer' && response.worldId === this.worldId && typeof response.sdp === 'string' && response.sdp.length <= 64 * 1024, 'World gateway returned an invalid WebRTC answer' );
 			await peer.setRemoteDescription( { type: 'answer', sdp: response.sdp } );
 			await waitForDataChannel(channel, signal);

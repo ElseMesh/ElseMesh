@@ -93,7 +93,7 @@ client but cannot host this changing registry or gateway path.
 
 The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. A custom HTTPS hostname remains optional. A named Cloudflare Tunnel is a possible bounded control-plane route for lookup or WebRTC signaling, but world assets must not be transferred through its public hostname. If direct WebRTC or another explicitly approved data path is unavailable, the client must fail clearly instead of silently using the Tunnel for asset delivery. Cloudflare's current Tunnel FAQ says public-hostname routes on Free, Pro, and Business plans are subject to its large-file/video service terms; verify the applicable plan and terms before any future change to this rule.
 
-### Public gateway setup still required
+### Public HTTPS/WSS data gateway
 
 On 2026-11-19, both `elsemesh.org` and `elsemesh.com` became active Cloudflare
 zones using `jeremy.ns.cloudflare.com` and `tori.ns.cloudflare.com`. The
@@ -108,10 +108,11 @@ domain, and Namecheap's DNSSEC controls show disabled.
 
 The deployed resolver continues to use its `workers.dev` origin and needs no
 custom DNS for HostID lookup. A DNS-only `worldd.elsemesh.org` record is not
-configured because no durable public `worldd` HTTPS/WSS route exists yet. When
-one is available, point that record at the current public gateway address and
-update it dynamically. The router must expose the gateway to the Internet. Do
-not proxy world-content traffic through Cloudflare. See Namecheap's [DNS
+configured because no durable public `worldd` HTTPS/WSS route exists yet. A
+public data gateway remains useful for WebSocket/WebTransport fallback and
+visitors whose WebRTC path fails. When one is available, point that record at
+the current public gateway address and update it dynamically. The router must
+expose the gateway to the Internet. Do not proxy world-content traffic through Cloudflare. See Namecheap's [DNS
 service limits](https://www.namecheap.com/support/api/methods/domains-dns/)
 and Cloudflare's [partial DNS](https://developers.cloudflare.com/dns/zone-setups/partial-setup/)
 and [subdomain-zone availability](https://developers.cloudflare.com/dns/zone-setups/subdomain-setup/).
@@ -125,9 +126,16 @@ serve as the advertised gateway. A Cloudflare Tunnel has not been created or
 configured.
 
 Direct WebRTC still needs public ICE reachability and has not been proven
-between independent NATs. If direct connectivity fails, a future non-Cloudflare
-data path or a Cloudflare plan/service explicitly approved for large-file
-delivery is required; do not silently use the control Tunnel as a relay.
+independent NATs. Rendezvous mode defaults to Cloudflare's STUN endpoint
+`stun.cloudflare.com:3478`. The source now includes a signaling-only Durable
+Object room: worldd connects outward, the browser sends only `connect` and SDP
+signaling through the room, and the manifest/assets must travel directly over
+WebRTC. This removes the requirement for inbound router forwarding when direct
+ICE succeeds; it does not solve symmetric/restrictive NATs and does not relay
+world data. If direct connectivity fails and no HTTPS/WSS data gateway is
+configured, the client must report failure. The Durable Object binding has not
+yet been deployed or tested between independent networks. Do not silently use
+the control Tunnel or Worker as a world-data relay.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
@@ -136,7 +144,9 @@ Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tok
 
 ## Current implementation and verification boundary
 
-The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. The daemon and `directoryd` support signed ZeroTier locator advertisements and lookup. The Worker contract tests cover signature and grant validation, both lookup routes, expiry controls, CORS, malformed IDs, oversized bodies, and rate limiting.
+The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. Source now supports rendezvous-only signed advertisements, a host-identity challenge, bounded WebRTC signaling, and a browser that requires the direct WebRTC data channel for all world traffic. The Worker contract tests cover the signaling state machine and reject world-data messages. The deployed Worker still has the prior lookup-only behavior until the Durable Object migration is deployed.
+
+`test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, challenge-bound WebRTC negotiation, and manifest transfer over the mocked direct data channel. It proves the client does not send the manifest request through the Worker. It does not replace a live Cloudflare Durable Object plus real `worldd` and independent-network ICE check.
 
 `test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s signed node record, announces it to an in-memory Worker KV, resolves the invite by HostID, then verifies that the client opens WSS to worldd directly. The Worker carries no world content. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by the actual embedded-libzt HostID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies bounded private-route-first behavior, HostID discovery fallback, signature validation before private access, and the public HTTPS/WSS route for visitors without ZeroTier. This is not a live ZeroTier private-IP test; the host has no `zerotier-cli`, and no independent visitor device was used.
 

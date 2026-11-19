@@ -61,6 +61,7 @@ type daemon struct {
 	assetsDir             string
 	publicGateway         string
 	directoryURL          string
+	rendezvous            bool
 	zeroTierNodeID        string
 	zeroTierNetworkID     string
 	zeroTierGateway       string
@@ -135,6 +136,7 @@ func run() error {
 	webTransportKey := flag.String("webtransport-tls-key", "", "TLS private key for the optional WebTransport listener")
 	publicGateway := flag.String("public-gateway", "", "public HTTPS/WSS gateway origin included in signed node records")
 	directoryURL := flag.String("directory-url", "", "optional HTTPS ElseMesh directory service URL for publishing this discoverable node")
+	rendezvous := flag.Bool("rendezvous", false, "connect to the directory's signaling-only WebRTC rendezvous (requires embedded ZeroTier and --directory-url)")
 	var allowedBrowserOriginsFlags stringFlags
 	var webrtcSTUNServers stringFlags
 	var zeroTierBlacklistInterfaces stringFlags
@@ -276,8 +278,11 @@ func run() error {
 	if *publicGateway != "" && !validPortalGateway(*publicGateway) {
 		return errors.New("public-gateway must be a secure HTTPS/WSS origin without path, query, or credentials")
 	}
-	if *directoryURL != "" && (!validDirectoryURL(*directoryURL) || *publicGateway == "") {
-		return errors.New("directory-url requires an HTTPS service origin and --public-gateway")
+	if *directoryURL != "" && (!validDirectoryURL(*directoryURL) || *publicGateway == "" && !*rendezvous) {
+		return errors.New("directory-url requires an HTTPS service origin and either --public-gateway or --rendezvous")
+	}
+	if *rendezvous && (*directoryURL == "" || *zeroTierNetwork == "") {
+		return errors.New("--rendezvous requires --directory-url and embedded ZeroTier")
 	}
 	if *zeroTierPathDiagnostics {
 		if *zeroTierNetwork == "" {
@@ -614,7 +619,7 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
 	if regionProvider != nil {
 		regionProvider.authorizeContent = d.regionContentVisitor
 		regionProvider.maxMovementSpeed = func(visitor playerPresence) (float64, error) {
@@ -627,6 +632,9 @@ func run() error {
 	}
 	if zeroTier != nil {
 		d.zeroTierNodeID = zeroTier.NodeID()
+	}
+	if d.rendezvous && d.zeroTierNodeID == "" {
+		return errors.New("--rendezvous requires an active embedded ZeroTier node identity")
 	}
 	if err := d.loadRoleRevocations(); err != nil {
 		return fmt.Errorf("load persisted role revocations: %w", err)
@@ -715,6 +723,9 @@ func run() error {
 	}
 	if d.directoryURL != "" {
 		go d.publishDirectory()
+	}
+	if d.rendezvous {
+		go d.runRendezvous()
 	}
 	var webTransportErr chan error
 	if wtServer != nil {
@@ -1156,6 +1167,9 @@ func (d *daemon) handleNodeRecord(w http.ResponseWriter, r *http.Request) {
 
 func (d *daemon) nodeRecordPayload(now time.Time) map[string]any {
 	record := map[string]any{"protocol": "elsemesh.node/1", "nodeId": d.host.ID().String(), "addresses": d.peerAddresses(), "worldIds": []string{d.world.WorldID}, "gateway": d.publicGateway, "issuedAt": now.Unix(), "expiresAt": now.Add(15 * time.Minute).Unix()}
+	if d.rendezvous {
+		record["rendezvous"] = true
+	}
 	if d.zeroTierNodeID != "" && d.zeroTierNetworkID != "" {
 		record["zeroTierNodeId"] = d.zeroTierNodeID
 		record["zeroTierNetworkId"] = d.zeroTierNetworkID
@@ -1540,6 +1554,9 @@ type gatewayMessage struct {
 
 type peerResponse struct {
 	PlayerID          string           `json:"playerId,omitempty"`
+	NodeID            string           `json:"nodeId,omitempty"`
+	TargetPeerID      string           `json:"targetPeerId,omitempty"`
+	ManifestProtocol  string           `json:"manifestProtocol,omitempty"`
 	Players           []playerPresence `json:"players,omitempty"`
 	DoorStates        []worldDoorState `json:"doorStates,omitempty"`
 	Type              string           `json:"type"`

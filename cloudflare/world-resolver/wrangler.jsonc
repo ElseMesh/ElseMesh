@@ -7,6 +7,14 @@
 	"kv_namespaces": [
 		{ "binding": "PROVIDERS", "id": "acdad0a24fff4ef083ca3aeb304f1fdb" }
 	],
+	"durable_objects": {
+		"bindings": [
+			{ "name": "SIGNAL_ROOMS", "class_name": "SignalRoom" }
+		]
+	},
+	"migrations": [
+		{ "tag": "signal-room", "new_sqlite_classes": [ "SignalRoom" ] }
+	],
 	"ratelimits": [
 		{
 			"name": "ANNOUNCEMENT_LIMIT",
