@@ -140,14 +140,20 @@ ZeroTier HostID. A visitor on pi3, outside the project's ZeroTier network,
 resolved the signed provider and completed Worker WebSocket signaling. The
 probe excluded ZeroTier and tunnel interfaces from the visitor's ICE
 candidates. Both sides gathered public STUN-reflexive candidates on different
-public IPs, but ICE failed and no world data channel opened. A temporary host
-firewall rule limited to pi3's public IP and the probe's UDP range received no
-packets; it was removed after the test. This proves discovery and signaling
-work for a visitor without the project network, but it does not identify why
-direct ICE failed or prove that router mapping is required. Read-only
-discovery found no UPnP IGD or NAT-PMP service on the host's Wi-Fi gateway;
-that only rules out those automatic mapping paths. A browser-rendering check
-also remains open.
+public IPs, but ICE failed and no world data channel opened. The test used a
+fixed 32-port worldd ICE range. Packet captures restricted to the two public
+endpoints and those ICE ranges saw repeated outbound connectivity checks from
+each side toward the other's server-reflexive candidate, but no inbound checks
+arrive at either physical interface. A temporary host firewall rule limited
+to pi3's exact public address, the Wi-Fi interface, and worldd's ICE range had
+a zero packet counter and was removed. This localizes the observed loss
+upstream of the host INPUT chain; it is consistent with endpoint-dependent
+NAT filtering/mapping or an upstream firewall, but does not prove which one.
+Separate ZeroTier packets were observed on the ZeroTier ports, demonstrating
+that the working ZeroTier path uses different sockets/endpoints from the Pion
+ICE path. Read-only discovery found no UPnP IGD or NAT-PMP service on the
+host's Wi-Fi gateway; that only rules out those automatic mapping paths. The
+browser-rendering check also remains open.
 
 The next transport experiment is a measured UDP-port handoff: start the
 embedded libzt node on an explicitly selected primary UDP port, record its

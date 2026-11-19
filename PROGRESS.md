@@ -25,6 +25,16 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   was tested. Public-invite routing is now tracked at 50% (2 of 4
   verification gates) in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
 
+- Follow-up probe used a fixed worldd ICE range and packet captures restricted
+  to the host/pi3 public endpoints and their ICE ports. Both endpoints sent
+  checks toward the other's server-reflexive candidate, but neither capture
+  saw inbound checks reach the physical interface. A temporary firewall allow
+  for pi3's exact public IP, `wlo1`, and the fixed host range counted zero and
+  was removed. This points upstream of the host INPUT chain but does not
+  identify NAT mapping/filter behavior. ZeroTier packets were separately
+  visible on their own ports. The Worker lookup/signaling path remains good;
+  direct WebRTC data is still unverified.
+
 ## 2026-11-18
 
 - Audited the browser launch path for short friend-invitation URLs. The client
