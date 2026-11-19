@@ -34,6 +34,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   Public-invite routing remains at 50% (2 of 4
   verification gates) in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
 
+- Verified the preferred ZeroTier private route live from pi3. Pi3 temporarily
+  joined the configured network under an nftables policy allowing only TCP
+  42901 between pi3 and the disposable worldd's managed IP; other input,
+  output, and forwarding on that interface was blocked. Pi3 reached the
+  signed `/.well-known/elsemesh/node` endpoint, opened `/gateway` over
+  WebSocket, and retrieved the signed manifest directly from worldd. The test
+  used Node's WebSocket API rather than a browser. Pi3 left the network, its
+  temporary interface disappeared, and the nftables table was removed.
+
 - Follow-up probe used a fixed worldd ICE range and packet captures restricted
   to the host/pi3 public endpoints and their ICE ports. Both endpoints sent
   checks toward the other's server-reflexive candidate, but neither capture

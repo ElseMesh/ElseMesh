@@ -290,12 +290,16 @@ world/gateway-bound admission assertions, and enforcement on every transport.
 The client accepts world ID plus ZeroTier HostID/network ID, verifies the
 invite-bound signed node record before trying its included private gateway,
 then resolves the HostID through the deployed Worker and verifies signed
-provider records. Focused client tests pass. A live test from pi3 outside the
-project network resolved the signed provider and completed Worker signaling
-with all visitor `zt*` and `tun*` ICE interfaces excluded. The local libzt
-stop/rebind/re-ignite probe passes on one selected port and preserves the same
-identity, but a live pi3 test with that handoff still failed ICE before a data
-channel opened. `--webrtc-interface wlo1` now constrains the host to its
+provider records. Focused client tests pass. A live pi3 test temporarily
+joined the configured ZeroTier network and reached the signed node record and
+manifest over the private HTTP/WebSocket gateway under a narrow interface
+firewall policy; the test membership and policy were removed afterward. This
+used Node's WebSocket client, not a browser. A separate live test from pi3
+outside the project network resolved the signed provider and completed Worker
+signaling with all visitor `zt*` and `tun*` ICE interfaces excluded. The local
+libzt stop/rebind/re-ignite probe passes on one selected port and preserves the
+same identity, but a live pi3 test with that handoff still failed ICE before a
+data channel opened. `--webrtc-interface wlo1` now constrains the host to its
 physical interface, but that filtered test also failed. A capture saw outgoing
 checks from local UDP 46000 to pi3's public candidate and no incoming peer
 datagrams; a temporary firewall rule limited to pi3's exact public IP, `wlo1`,
