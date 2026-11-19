@@ -13,9 +13,12 @@ import (
 	"github.com/gorilla/websocket"
 	libp2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/pion/webrtc/v4"
 )
 
-func TestRendezvousSessionProvesHostAndRoutesOnlyConnect(t *testing.T) {
+func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	key, _, err := crypto.GenerateEd25519Key(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -26,6 +29,15 @@ func TestRendezvousSessionProvesHostAndRoutesOnlyConnect(t *testing.T) {
 	}
 	defer host.Close()
 	worldID := "elsemesh:rendezvous-test"
+	world := newStarterManifest("Rendezvous integration", host.ID().String())
+	world.WorldID = worldID
+	manifest, err := signDocument(manifestProtocol, world, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connectedResponses := make(chan peerResponse, 1)
+	offerRequests := make(chan gatewayMessage, 1)
+	answerResponses := make(chan peerResponse, 1)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/signal/e3918db4832a3056/0123456789/"+worldID {
 			t.Errorf("rendezvous path = %q", r.URL.Path)
@@ -89,7 +101,7 @@ func TestRendezvousSessionProvesHostAndRoutesOnlyConnect(t *testing.T) {
 			t.Errorf("decode host proof: %v", err)
 			return
 		}
-		if proof.Document.Signer != hello.Node.Signer || proofPayload.Nonce != strings.Repeat("ab", 32) || proofPayload.WorldID != worldID || proofPayload.NetworkID != "e3918db4832a3056" || proofPayload.ZeroTierNode != "0123456789" || len(proofPayload.ICEServers) != 1 || len(proofPayload.ICEServers[0].URLs) != 1 || proofPayload.ICEServers[0].URLs[0] != "stun:stun.cloudflare.com:3478" {
+		if proof.Document.Signer != hello.Node.Signer || proofPayload.Nonce != strings.Repeat("ab", 32) || proofPayload.WorldID != worldID || proofPayload.NetworkID != "e3918db4832a3056" || proofPayload.ZeroTierNode != "0123456789" || len(proofPayload.ICEServers) != 1 || len(proofPayload.ICEServers[0].URLs) != 1 || proofPayload.ICEServers[0].URLs[0] != "stun:127.0.0.1:9" {
 			t.Errorf("host proof payload = %#v", proofPayload)
 			return
 		}
@@ -108,19 +120,106 @@ func TestRendezvousSessionProvesHostAndRoutesOnlyConnect(t *testing.T) {
 		}
 		if response.Type != "host.response" || response.SessionID != strings.Repeat("cd", 16) || response.Response == nil || response.Response.Type != "connected" || response.Response.WorldID != worldID || response.Response.NodeID != host.ID().String() || response.Response.TargetPeerID != host.ID().String() || response.Response.ManifestProtocol != manifestProtocol {
 			t.Errorf("rendezvous host response = %#v", response)
+			return
 		}
+		connectedResponses <- *response.Response
+		offer := <-offerRequests
+		if err := conn.WriteJSON(rendezvousMessage{Type: "visitor.request", SessionID: strings.Repeat("cd", 16), Request: &offer}); err != nil {
+			t.Errorf("send visitor WebRTC offer: %v", err)
+			return
+		}
+		var answer rendezvousMessage
+		if err := conn.ReadJSON(&answer); err != nil {
+			t.Errorf("read host WebRTC answer: %v", err)
+			return
+		}
+		if answer.Type != "host.response" || answer.Response == nil || answer.Response.Type != "webrtc.answer" || answer.Response.RequestID != offer.RequestID {
+			t.Errorf("rendezvous answer response = %#v", answer)
+			return
+		}
+		answerResponses <- *answer.Response
 	}))
 	defer server.Close()
 
 	d := &daemon{
-		ctx: context.Background(), host: host, key: key,
-		world:          worldManifest{WorldID: worldID, OwnerPeerID: host.ID().String()},
+		ctx: ctx, host: host, key: key, manifest: manifest,
+		world:          world,
 		zeroTierNodeID: "0123456789", zeroTierNetworkID: "e3918db4832a3056", rendezvous: true,
-		directoryURL:     server.URL,
-		rendezvousDialer: &websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		directoryURL:      server.URL,
+		rendezvousDialer:  &websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		webrtcSTUNServers: []string{"stun:127.0.0.1:9"},
+		webrtcSessions:    make(map[string]*worldRTCSession), authorityChanged: make(chan struct{}, 1),
 	}
 	done := make(chan error, 1)
 	go func() { done <- d.runRendezvousSession() }()
+	var connected peerResponse
+	select {
+	case connected = <-connectedResponses:
+		if connected.Type != "connected" || connected.NodeID != host.ID().String() {
+			t.Fatalf("rendezvous connected response = %+v", connected)
+		}
+	case <-ctx.Done():
+		t.Fatal("rendezvous host did not answer the visitor connect")
+	}
+	client, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ordered := true
+	channel, err := client.CreateDataChannel(worldProtocolNamespace, &webrtc.DataChannelInit{Ordered: &ordered})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened := make(chan struct{}, 1)
+	channel.OnOpen(func() { opened <- struct{}{} })
+	offer, err := client.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gatherComplete := webrtc.GatheringCompletePromise(client)
+	if err := client.SetLocalDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-gatherComplete:
+	case <-ctx.Done():
+		t.Fatal("rendezvous WebRTC ICE gathering timed out")
+	}
+	offerRequests <- gatewayMessage{Type: "webrtc.offer", WorldID: worldID, TargetPeerID: host.ID().String(), RequestID: "rendezvous-offer", SDP: client.LocalDescription().SDP}
+	var answer peerResponse
+	select {
+	case answer = <-answerResponses:
+	case <-ctx.Done():
+		t.Fatal("rendezvous host did not answer the WebRTC offer")
+	}
+	if err := client.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: answer.SDP}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-opened:
+	case <-ctx.Done():
+		t.Fatal("rendezvous WebRTC data channel did not open")
+	}
+	responses := make(chan peerResponse, 1)
+	channel.OnMessage(func(message webrtc.DataChannelMessage) {
+		var response peerResponse
+		if json.Unmarshal(message.Data, &response) == nil {
+			responses <- response
+		}
+	})
+	request, _ := json.Marshal(gatewayMessage{Type: "manifest.get", WorldID: worldID, RequestID: "rendezvous-manifest"})
+	if err := channel.Send(request); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case response := <-responses:
+		if response.Type != "manifest" || response.WorldID != worldID || response.RequestID != "rendezvous-manifest" || response.Document == nil {
+			t.Fatalf("unexpected direct WebRTC manifest response: %+v", response)
+		}
+	case <-ctx.Done():
+		t.Fatal("direct WebRTC manifest request timed out")
+	}
 	select {
 	case err := <-done:
 		if err == nil || !strings.Contains(err.Error(), "close") && !strings.Contains(err.Error(), "EOF") {
