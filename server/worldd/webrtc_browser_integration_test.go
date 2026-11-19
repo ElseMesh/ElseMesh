@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -121,5 +122,97 @@ try {
 	}
 	if !strings.Contains(string(output), "PASS direct WebRTC and gateway fallback") {
 		t.Fatalf("Chromium did not complete direct WebRTC manifest and asset retrieval:\n%s", output)
+	}
+}
+
+func TestLiveChromiumConnectsDirectlyToWorldd(t *testing.T) {
+	gateway := os.Getenv("ELSEMESH_LIVE_WEBRTC_GATEWAY")
+	if gateway == "" {
+		t.Skip("set ELSEMESH_LIVE_WEBRTC_GATEWAY to a reachable test worldd gateway")
+	}
+	parsedGateway, err := url.Parse(gateway)
+	if err != nil || (parsedGateway.Scheme != "http" && parsedGateway.Scheme != "https") || parsedGateway.Host == "" {
+		t.Fatal("ELSEMESH_LIVE_WEBRTC_GATEWAY must be an HTTP(S) origin")
+	}
+	parsedGateway.Path = "/.well-known/elsemesh/node"
+	parsedGateway.RawQuery = ""
+	parsedGateway.Fragment = ""
+	requestCtx, cancelRequest := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancelRequest()
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, parsedGateway.String(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := (&http.Client{Timeout: 8 * time.Second}).Do(request)
+	if err != nil {
+		t.Fatalf("read worldd node record: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("worldd node record returned HTTP %d", response.StatusCode)
+	}
+	var document signedDocument
+	if err := json.NewDecoder(response.Body).Decode(&document); err != nil {
+		t.Fatalf("decode worldd node record: %v", err)
+	}
+	if err := verifyDocument(document, "elsemesh.node/1"); err != nil {
+		t.Fatalf("verify worldd node record: %v", err)
+	}
+	var node struct {
+		WorldIDs []string `json:"worldIds"`
+	}
+	if err := json.Unmarshal(document.Payload, &node); err != nil || len(node.WorldIDs) != 1 || !worldIDPattern.MatchString(node.WorldIDs[0]) {
+		t.Fatalf("worldd node record has invalid world IDs: %v", node.WorldIDs)
+	}
+	chromium, err := exec.LookPath("chromium")
+	if err != nil {
+		chromium, err = exec.LookPath("chromium-browser")
+	}
+	if err != nil {
+		t.Skip("Chromium is not installed")
+	}
+	worldIDJSON, _ := json.Marshal(node.WorldIDs[0])
+	gatewayJSON, _ := json.Marshal(gateway)
+	mux := http.NewServeMux()
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux.Handle("/src/", http.StripPrefix("/src/", http.FileServer(http.Dir(filepath.Join(repoRoot, "src")))))
+	mux.HandleFunc("/live-webrtc", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprintf(w, `<!doctype html><meta charset="utf-8"><body>WAIT<script type="module">
+import { WorldConnector } from '/src/network/WorldConnector.js';
+const connector = new WorldConnector({worldId:%s,gateway:%s});
+try {
+  const manifest = await connector.getManifest();
+  const direct = connector.rtcChannel?.readyState === 'open' && connector.rtcPeerConnection?.connectionState === 'connected';
+  document.body.textContent = direct && manifest.worldId === %s ? 'PASS live worldd WebRTC manifest' : 'FAIL live WebRTC or manifest';
+  connector.close();
+} catch (error) { document.body.textContent = 'FAIL ' + String(error); }
+</script></body>`, worldIDJSON, gatewayJSON, worldIDJSON)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	tempRoot := "/var/tmp"
+	if runtime.GOOS == "android" {
+		if prefix := os.Getenv("PREFIX"); prefix != "" {
+			tempRoot = filepath.Join(prefix, "tmp")
+		}
+	}
+	profileDir, err := os.MkdirTemp(tempRoot, "elsemesh-chromium-live-webrtc-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(profileDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, chromium, "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--no-proxy-server", "--disable-background-networking", "--user-data-dir="+profileDir, "--virtual-time-budget=18000", "--dump-dom", server.URL+"/live-webrtc")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run Chromium live WebRTC page: %v\n%s", err, output)
+	}
+	if !strings.Contains(string(output), "PASS live worldd WebRTC manifest") {
+		t.Fatalf("Chromium did not retrieve the live worldd manifest over direct WebRTC:\n%s", output)
 	}
 }

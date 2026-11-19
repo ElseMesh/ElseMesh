@@ -22,6 +22,11 @@ export function parseArguments( argv ) {
 			options[ key ] = true;
 			continue;
 		}
+		if ( key === '--rendezvous' ) {
+			if ( options[ key ] ) throw new Error( 'Option may only be specified once: --rendezvous' );
+			options[ key ] = true;
+			continue;
+		}
 		const value = argv[ i + 1 ];
 		if ( ! valueOptions.has( key ) || value === undefined || ( value === '' && key !== '--zerotier-network' ) || value.startsWith( '--' ) ) throw new Error( `Invalid or incomplete option: ${key}` );
 		if ( [ '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ].includes( key ) ) ( options[ key.slice( 2 ) ] ||= [] ).push( argv[ ++ i ] );
@@ -36,7 +41,8 @@ export function parseArguments( argv ) {
 	if ( ! /^[a-z0-9][a-z0-9_-]{0,63}$/.test( options[ '--profile' ] ) ) throw new Error( '--profile must be 1 to 64 lowercase letters, digits, hyphens, or underscores and start with a letter or digit' );
 	if ( options[ '--http' ] && ! /^(?:localhost|127\.0\.0\.1|\[[0-9a-f:]+\]|[^\s:]+):\d{1,5}$/.test( options[ '--http' ] ) ) throw new Error( '--http must be a host:port address' );
 	if ( options[ '--p2p-port' ] && ( ! /^\d+$/.test( options[ '--p2p-port' ] ) || Number( options[ '--p2p-port' ] ) > 65535 ) ) throw new Error( '--p2p-port must be 0 (automatic) or between 1 and 65535' );
-	if ( options[ '--directory-url' ] && ! options[ '--public-gateway' ] ) throw new Error( '--directory-url requires --public-gateway' );
+	if ( options[ '--directory-url' ] && ! options[ '--public-gateway' ] && ! options[ '--rendezvous' ] ) throw new Error( '--directory-url requires --public-gateway or --rendezvous' );
+	if ( options[ '--rendezvous' ] && ! options[ '--directory-url' ] ) throw new Error( '--rendezvous requires --directory-url' );
 	if ( options[ '--discoverable' ] && ! [ 'true', 'false' ].includes( options[ '--discoverable' ] ) ) throw new Error( '--discoverable must be true or false' );
 	if ( options[ '--directory-url' ] && options[ '--discoverable' ] === 'false' ) throw new Error( '--directory-url cannot be combined with --discoverable false' );
 	if ( options[ '--dht-mode' ] && ! [ 'auto', 'client', 'server' ].includes( options[ '--dht-mode' ] ) ) throw new Error( '--dht-mode must be auto, client, or server' );
@@ -101,6 +107,7 @@ async function serve( options ) {
 	if ( options[ '--dht-mode' ] ) args.push( '--dht-mode', options[ '--dht-mode' ] );
 	if ( options[ '--public-gateway' ] ) args.push( '--public-gateway', options[ '--public-gateway' ] );
 	if ( options[ '--directory-url' ] ) args.push( '--directory-url', options[ '--directory-url' ] );
+	if ( options[ '--rendezvous' ] ) args.push( '--rendezvous' );
 	for ( const key of [ 'bootstrap', 'relay', 'announce-address', 'allow-browser-origin' ] ) for ( const value of options[ key ] || [] ) args.push( `--${key}`, value );
 	const child = spawn( path.resolve( options[ '--worldd' ] ), args, { stdio: 'inherit' } );
 	const forwardSignal = signal => child.kill( signal );

@@ -15,7 +15,9 @@ assert.equal( parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp
 assert.equal( parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--autoport', '--zerotier-network', '' ] )[ '--zerotier-network' ], '' );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', '../escape' ] ), /profile must be/ );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--source', 'world.json' ] ), /supplied together/ );
-assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--directory-url', 'https://thruhold.org' ] ), /requires --public-gateway/ );
+assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--directory-url', 'https://thruhold.org' ] ), /requires --public-gateway or --rendezvous/ );
+assert.equal( parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--directory-url', 'https://thruhold.org', '--rendezvous' ] )[ '--rendezvous' ], true, 'a signaling-only provider can be announced without a public data gateway' );
+assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--rendezvous' ] ), /requires --directory-url/ );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--discoverable', 'yes' ] ), /discoverable must/ );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--dht-mode', 'peer' ] ), /dht-mode must/ );
 assert.throws( () => parseArguments( [ '--worldd', '/bin/worldd', '--worlds-dir', '/tmp/worlds', '--profile', 'ok', '--directory-url', 'https://thruhold.org', '--public-gateway', 'https://world.example', '--discoverable', 'false' ] ), /cannot be combined/ );
