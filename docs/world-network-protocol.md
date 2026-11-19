@@ -173,14 +173,15 @@ the client must obtain the current HostID-to-managed-address mapping from a
 trusted network advertisement/controller. Host ID alone is not an IP route.
 The visitor's browser can use a ZeroTier private route only when its host OS
 provides the ZeroTier route (or a working browser ZeroTier transport exists).
-An invite may include a private HTTP gateway as a fast first attempt. `worldd`
-publishes this optional address inside its signed node record and bridges the
+An invite may include a private HTTP gateway as an optional fast path.
+`worldd` publishes this address inside its signed node record and bridges the
 ZeroTier TCP port to its dynamically selected local HTTP/WebSocket gateway
-port. The client fetches the signed node record first and checks its ZeroTier
-network ID, Host ID, world ID and gateway before connecting. If that route
-fails, it tries any explicit HTTPS/WSS provider routes, then resolves the
-HostID/network ID through the signed directory and tries the returned private
-gateway before the signed HTTPS/WSS gateway. The Worker performs lookup only
+port. The client verifies the node signature and checks its ZeroTier network
+ID, Host ID, world ID and gateway before connecting. This private probe is
+bounded so a visitor without an OS-level ZeroTier route quickly falls back to
+HostID/network lookup through the Worker, then connects directly to the
+provider's signed HTTPS/WSS gateway. Ordinary browser access does not require
+ZeroTier or a browser ZeroTier implementation. The Worker performs lookup only
 and never carries world traffic.
 
 Hosted HTTPS pages cannot generally connect to private IPs without browser
@@ -222,15 +223,14 @@ existing guest-readable behavior.
 
 Direct browser access to a ZeroTier IP requires the browser's device to be a
 member of that ZeroTier network. A regular web page does not join ZeroTier
-merely by receiving a Host ID. The initial direct route uses the device's
+merely by receiving a Host ID. The optional direct route uses the device's
 existing OS route and a short-lived, signed `zeroTierGateway` address; it does
-not add ZeroTier membership to the browser. Issue #173 is an open question from 2022 about
-compiling libzt to WASM; it contains no implementation recipe or linked
-working branch. The target is to run ztlib as WebAssembly in ElseMesh so it
-can hold a visitor-specific ZeroTier identity, join the configured network,
-discover the target node and prove control of the visitor's Host ID. Do not
-use the server's ztlib identity as the visitor's or trust a client-supplied
-Host ID without proof.
+not add ZeroTier membership to the browser. Ordinary browser access must work
+without this route. Issue #173 is an open question from 2022 about compiling
+libzt to WASM; it contains no implementation recipe or linked working branch.
+Treat a browser ZeroTier implementation as exploratory, not as a dependency.
+Do not use the server's ztlib identity as the visitor's or trust a
+client-supplied Host ID without proof.
 
 Here, a **transport adapter** means the code that connects libzt's expected
 UDP packet send/receive operations to browser networking APIs. WASM does not

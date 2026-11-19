@@ -84,6 +84,7 @@ const OldWebSocket = globalThis.WebSocket;
 let staleSecondAssets = new Set();
 let failoverProviderReachable = false;
 let privateGatewayReachable = true;
+let privateGatewayHangs = false;
 let directoryProviders = providers;
 let zeroTierLookups = 0;
 let directNodeRecordRequests = 0;
@@ -109,6 +110,7 @@ globalThis.WebSocket = class extends EventTarget {
 		this.targetPeerId = '';
 		this.readyState = WebSocket.CONNECTING;
 		queueMicrotask( () => {
+			if ( this.url.includes( '10.147.20.4' ) && privateGatewayHangs ) return;
 			if ( this.url.includes( 'offline.example' ) && ! failoverProviderReachable || this.url.includes( '10.147.20.4' ) && ! privateGatewayReachable ) emit( this, 'error' );
 			else { this.readyState = WebSocket.OPEN; emit( this, 'open' ); }
 		} );
@@ -233,6 +235,16 @@ try {
 	assert.equal( directThenFallback.gateway, 'https://online.example' );
 	assert.equal( zeroTierLookups, lookupsBeforeWorkerFallback + 3 );
 	directThenFallback.close();
+	privateGatewayHangs = true;
+	const boundedPrivateRoute = new WorldConnector( {
+		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org',
+	} );
+	const privateRouteStartedAt = Date.now();
+	await boundedPrivateRoute.getManifest();
+	assert.ok( Date.now() - privateRouteStartedAt < 7000, 'a non-ZeroTier browser falls through from the bounded private-route probe to its ordinary public gateway' );
+	assert.equal( boundedPrivateRoute.gateway, 'https://online.example' );
+	boundedPrivateRoute.close();
+	privateGatewayHangs = false;
 	privateGatewayReachable = true;
 	failoverProviderReachable = false;
 	authorityLease = await signedDocument( 'elsemesh.authority/2', {

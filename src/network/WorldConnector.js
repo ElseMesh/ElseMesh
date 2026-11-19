@@ -16,11 +16,30 @@ const ASSET_CHUNK_BYTES = 128 * 1024;
 const MAX_ASSET_BYTES = 2 * 1024 * 1024 * 1024;
 const PRIORITY_ORDER = Object.freeze( [ 'portal-preview', 'visible', 'nearby', 'background' ] );
 export const DEFAULT_ZEROTIER_NETWORK_ID = 'e3918db4832a3056';
+// Provisional budget: an unavailable optional overlay route must not make
+// ordinary browser visitors wait for the general 20-second gateway timeout.
+// Tune this from observed Local Network Access and private-route timings.
+const ZERO_TIER_PRIVATE_ROUTE_TIMEOUT_MS = 2500;
 
 function invariant( value, message ) { if ( ! value ) throw new Error( message ); }
 
 function throwIfAborted( signal ) {
 	if ( signal?.aborted ) throw signal.reason || new DOMException( 'Aborted', 'AbortError' );
+}
+
+function createTimeoutSignal( parentSignal, timeoutMs, message ) {
+	const controller = new AbortController();
+	const abort = () => controller.abort( parentSignal.reason || new DOMException( 'Aborted', 'AbortError' ) );
+	if ( parentSignal?.aborted ) abort();
+	else parentSignal?.addEventListener( 'abort', abort, { once: true } );
+	const timeout = setTimeout( () => controller.abort( new Error( message ) ), timeoutMs );
+	return {
+		signal: controller.signal,
+		dispose() {
+			clearTimeout( timeout );
+			parentSignal?.removeEventListener( 'abort', abort );
+		},
+	};
 }
 
 export function assetConcurrencyForConnection( connection = globalThis.navigator?.connection, measuredBytesPerSecond = null ) {
@@ -210,13 +229,13 @@ export class WorldConnector {
 		let lastError = null;
 		const attempted = new Set( excludeProviders );
 		const inviteProviders = this.providers.slice();
-		const attemptProvider = async ( nodeId, gateway ) => {
+		const attemptProvider = async ( nodeId, gateway, providerSignal = signal ) => {
 			const key = `${nodeId}\n${gateway}`;
 			if ( attempted.has( key ) ) return null;
 			attempted.add( key );
 			this.nodeId = nodeId;
 			this.gateway = gateway;
-			try { return await this.#fetchManifest( signal ); }
+			try { return await this.#fetchManifest( providerSignal ); }
 			catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
 				lastError = error;
@@ -225,10 +244,21 @@ export class WorldConnector {
 				return null;
 			}
 		};
+		const attemptPrivateProvider = async ( nodeId, gateway ) => {
+			if ( attempted.has( `${nodeId}\n${gateway}` ) ) return null;
+			const deadline = createTimeoutSignal( signal, ZERO_TIER_PRIVATE_ROUTE_TIMEOUT_MS, 'Optional ZeroTier private route timed out' );
+			try {
+				const manifest = await attemptProvider( nodeId, gateway, deadline.signal );
+				if ( ! manifest && ! signal?.aborted ) console.info( 'ZeroTier private route unavailable; continuing with signed HTTPS/WSS provider routes.' );
+				return manifest;
+			} finally {
+				deadline.dispose();
+			}
+		};
 		if ( this.zeroTierGateway && this.zeroTierNodeId ) {
 			try {
 				const direct = await this.#discoverDirectZeroTierProvider( signal );
-				const manifest = await attemptProvider( direct.nodeId, this.zeroTierGateway );
+				const manifest = await attemptPrivateProvider( direct.nodeId, this.zeroTierGateway );
 				if ( manifest ) return manifest;
 			} catch ( error ) {
 				if ( signal?.aborted ) throw signal.reason || error;
@@ -254,7 +284,7 @@ export class WorldConnector {
 			for ( const provider of candidates ) {
 				if ( ! provider.zeroTierGateway ) continue;
 				this.zeroTierGateway = provider.zeroTierGateway;
-				const manifest = await attemptProvider( provider.nodeId, provider.zeroTierGateway );
+				const manifest = await attemptPrivateProvider( provider.nodeId, provider.zeroTierGateway );
 				if ( manifest ) return manifest;
 			}
 			this.providers = candidates.map( ( provider ) => ( { nodeId: provider.nodeId, gateway: provider.gateway } ) );
