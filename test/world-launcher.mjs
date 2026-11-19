@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { builtInWorldURL, clearHomeWorld, defaultHomeWorldURL, discoverLocalWorldURL, getHomeWorld, homeWorldStorageKey, listVisitedWorlds, parseWorldInviteURL, rememberWorldVisit, setHomeWorld, worldLauncherStorageKey } from '../src/network/WorldLauncher.js';
-import { worldLinkFromLocation } from '../src/network/WorldConnector.js';
+import { createWorldInviteURL, worldLinkFromLocation } from '../src/network/WorldConnector.js';
 
 class MemoryStorage {
 	items = new Map();
@@ -17,6 +17,28 @@ globalThis.ELSEMESH_CONFIG = { worldResolver: 'https://resolver.example' };
 
 assert.equal( builtInWorldURL( pageURL ), 'https://app.example/tidewater/' );
 assert.equal( parseWorldInviteURL( invite, pageURL ), invite );
+const compactInvite = createWorldInviteURL( {
+	pageURL,
+	worldId: 'elsemesh:cave',
+	zeroTierNodeId: '3af4fd5d50',
+	zeroTierNetworkId: 'e3918db4832a3056',
+	zeroTierGateway: 'http://10.147.20.4:43127',
+	directory: 'https://resolver.example',
+} );
+const compactInviteURL = new URL( compactInvite );
+assert.ok( compactInviteURL.searchParams.has( 'invite' ), 'Share links use the single compact invite parameter' );
+assert.equal( compactInviteURL.searchParams.has( 'worldId' ), false, 'compact route claims are carried inside the invite code' );
+const expandedCompactInvite = new URL( parseWorldInviteURL( compactInvite, pageURL ) );
+assert.equal( expandedCompactInvite.searchParams.get( 'worldId' ), 'elsemesh:cave' );
+assert.equal( expandedCompactInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50' );
+assert.equal( expandedCompactInvite.searchParams.get( 'ztGateway' ), 'http://10.147.20.4:43127' );
+assert.equal( expandedCompactInvite.searchParams.get( 'directory' ), 'https://resolver.example' );
+const compactBrowserLink = worldLinkFromLocation( { search: compactInviteURL.search, origin: compactInviteURL.origin } );
+assert.equal( compactBrowserLink.worldId, 'elsemesh:cave' );
+assert.equal( compactBrowserLink.zeroTierNodeId, '3af4fd5d50' );
+assert.equal( compactBrowserLink.zeroTierGateway, 'http://10.147.20.4:43127' );
+assert.throws( () => parseWorldInviteURL( 'https://app.example/tidewater/?invite=bad!', pageURL ), /route code is invalid/ );
+assert.throws( () => parseWorldInviteURL( `${pageURL}&worldId=elsemesh:cave&invite=${compactInviteURL.searchParams.get( 'invite' )}`, pageURL ), /cannot be combined/ );
 assert.equal( parseWorldInviteURL( 'elsemesh:cave', pageURL ), 'https://app.example/tidewater/?worldId=elsemesh%3Acave&directory=https%3A%2F%2Fresolver.example', 'a bare canonical ThruHold ID becomes a resolver-backed world link' );
 const zeroTierInvite = new URL( parseWorldInviteURL( '3AF4FD5D50', pageURL ) );
 assert.equal( zeroTierInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'a bare ZeroTier ID becomes a normalized, lower-case locator' );

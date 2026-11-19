@@ -295,7 +295,10 @@ ZeroTier; a visitor's system-level ZeroTier client is optional and only enables
 the private-gateway fast path.
 The default browser path is Worker lookup followed by direct HTTPS/WSS to a
 reachable provider gateway. **Opaque friend-link tickets and account-bound admission:
-0%.** The shareable entry URL for those tickets should be as simple as
+0%.** The client now creates and parses a compact route-only
+`https://elsemesh.org/?invite=<route-code>` URL; that code identifies the
+world/provider route but grants no access. Signed player-bound admission
+tickets remain unimplemented. Their eventual entry URL should remain as simple as
 `https://elsemesh.org/?invite=<signed-ticket>`. `worldd` creates the pending
 world-local player record and signs a self-contained ticket binding that
 record, world, authentication policy, route and expiry. The Pages client

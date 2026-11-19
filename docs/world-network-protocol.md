@@ -97,6 +97,18 @@ Portals and invitation codes are alternative arrival routes: both are
 subject to destination admission. A portal may admit visitors without codes
 where permitted, but cannot bypass a destination's invitation requirement.
 
+The current `?invite=` route code is a compact base64url encoding of route
+query fields: canonical world ID, optional ZeroTier network ID and HostID,
+optional ZeroTier private gateway, ordered PeerID/gateway candidates, and
+resolver origin. The browser decodes and validates it before constructing the
+normal `WorldConnector` route. This code is unsigned, unencrypted, and not a
+secret or admission grant; it is only a set of routing hints. The client still
+verifies the provider's signed node record and the owner's signed world
+manifest, and retrieves world data from the selected provider gateway. A
+future owner-signed admission ticket using `?invite=` must have a distinct
+format and remain unimplemented until `worldd` verifies its player binding,
+allowed identity, expiry, revocation, and replay state.
+
 The desired public entry point is a short ElseMesh invitation URL such as
 `https://elsemesh.org/?invite=<signed-ticket>` (a path-form URL may be
 supported as an alias). Avoid a separate invitation lookup service: `worldd`

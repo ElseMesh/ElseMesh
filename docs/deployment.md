@@ -21,23 +21,19 @@ different built-in world package.
 
 ## Selected ThruHolds
 
-### Invitation-gated launches
+### World route links and invitation-gated launches
 
-The planned short friend URL is `https://elsemesh.org/?invite=<opaque-code>`.
-`worldd` can issue a self-contained owner-signed ticket that the Pages client
-parses locally, without a separate invitation lookup service. The ticket can
-bind the invite to a pending player record, allowed sign-in methods, route and
-expiry; `worldd` verifies it when the browser connects. This client path is not
-implemented yet. The existing `elsemesh-world-resolver` is a signed provider
-directory, not an invitation service; it remains an optional fallback when a
-ticket does not carry a usable route and a gateway advertisement must be found.
-A direct ZeroTier invite should carry the network ID and stable Host ID, not
-the changing public IP. If the socket API needs a managed overlay IP, the
-client must get it from stable network configuration or a signed current
-advertisement. Today,
-**Share world invite**
-creates a full provider-bearing URL, which works only when the included
-gateway is reachable by the visitor.
+**Share world invite** now creates a compact link such as
+`https://elsemesh.org/?invite=<route-code>`. The URL-safe code encodes the
+route data described in the [invitation wire contract](world-network-protocol.md#invitation-admission-and-launch-grants). The client tries an included ZeroTier private gateway first, then uses HostID lookup through the configured Worker when needed. The Worker remains lookup-only; world manifests and assets are fetched from the selected provider gateway. Route codes are unsigned locator hints, not credentials or admission grants. The provider's signed node record and owner-signed world manifest establish the trust boundary.
+
+The separate owner-signed admission ticket is not implemented yet. Its future
+form may use the same `?invite=` entry point but must be distinguishable from a
+route-only code and bind a pending player record, allowed sign-in methods,
+route and expiry. `worldd` must verify it when the browser connects. The
+existing `elsemesh-world-resolver` is a signed provider directory, not an
+invitation service; it resolves HostIDs to current provider advertisements but
+does not redeem admission tickets.
 
 `worldd` owns the pending record and signs the ticket; no invite lookup or
 redemption service is required. The ticket carries a random player-record
@@ -86,9 +82,7 @@ Pages app directly with HTTP 200 and no `Location` redirect. The custom domain
 is currently serving the Pages site, so this URL form reaches the client
 without redirect query-string handling. If deployment later changes to an
 HTTP redirect to another origin, configure it to preserve the complete query
-string and verify the final app receives `invite` unchanged. The client does
-not yet interpret opaque `invite` values; it currently understands explicit
-world/gateway parameters and direct world-resolver lookups.
+string and verify the final app receives `invite` unchanged.
 
 An invitation's eventual policy can use a high-entropy bearer code or allow one
 or more verified sign-in providers: Facebook, Google, and Telegram. After

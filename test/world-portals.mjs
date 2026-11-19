@@ -9,6 +9,7 @@ import { buildMeshShader } from '../src/engine/render/MeshShader.js';
 import { validateWorldSource } from '../src/network/WorldSource.js';
 import { validateWorldComponents, validateWorldHosts, validateWorldObjects, validateWorldPortals } from '../src/network/WorldConnector.js';
 import { createWorldInviteURL, worldLinkFromLocation, WorldConnector } from '../src/network/WorldConnector.js';
+import { decodeWorldInviteRoute } from '../src/network/WorldInvite.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
 import { disposeWorldPackage, loadWorldPackage } from '../src/network/WorldPackage.js';
 import { matchingPortalAgreement } from '../src/network/PortalAgreement.js';
@@ -201,29 +202,38 @@ const invite = createWorldInviteURL( {
 } );
 const inviteURL = new URL( invite );
 assert.equal( inviteURL.pathname, '/tidewater/', 'world invitations preserve the game base path' );
-assert.equal( inviteURL.searchParams.get( 'worldId' ), 'elsemesh:coast', 'world invitations carry the stable world ID' );
-assert.equal( inviteURL.searchParams.get( 'nodeId' ), '12D3KooWAbcdefghijk1234567890123456', 'world invitations pin a signed provider identity' );
-assert.equal( inviteURL.searchParams.get( 'gateway' ), 'https://coast.example', 'world invitations carry the provider gateway' );
-assert.equal( inviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'world invitations retain optional decentralized discovery' );
+assert.ok( inviteURL.searchParams.has( 'invite' ), 'world invitations use one compact route-code parameter' );
+assert.equal( inviteURL.searchParams.has( 'worldId' ), false, 'compact invites do not duplicate route fields in the outer URL' );
+const inviteRoute = decodeWorldInviteRoute( inviteURL.searchParams.get( 'invite' ) );
+assert.equal( inviteRoute.get( 'worldId' ), 'elsemesh:coast', 'world invitations carry the stable world ID inside the route code' );
+assert.equal( inviteRoute.get( 'nodeId' ), '12D3KooWAbcdefghijk1234567890123456', 'world invitations pin a signed provider identity' );
+assert.equal( inviteRoute.get( 'gateway' ), 'https://coast.example', 'world invitations carry the provider gateway' );
+assert.equal( inviteRoute.get( 'directory' ), 'https://thruhold.org', 'world invitations retain optional decentralized discovery' );
+const openedInvite = worldLinkFromLocation( { search: inviteURL.search, origin: inviteURL.origin } );
+assert.equal( openedInvite.worldId, 'elsemesh:coast', 'browser resolves compact invite codes before constructing its world connector' );
+assert.equal( openedInvite.gateway, 'https://coast.example' );
 assert.equal( inviteURL.searchParams.get( 'noVeg' ), '1', 'world invitations preserve unrelated client options' );
 const overlayInviteURL = new URL( createWorldInviteURL( {
 	pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 	zeroTierGateway: 'http://10.147.20.4:43127',
 	nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://coast.tailnet-example.ts.net', directory: 'https://thruhold.org',
 } ) );
-assert.equal( overlayInviteURL.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'shared invites retain the ZeroTier HostID for Worker fallback' );
-assert.equal( overlayInviteURL.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056', 'shared invites retain the ZeroTier network ID for Worker fallback' );
-assert.equal( overlayInviteURL.searchParams.get( 'gateway' ), 'https://coast.tailnet-example.ts.net', 'shared invites preserve the direct secure overlay gateway' );
-assert.equal( overlayInviteURL.searchParams.get( 'ztGateway' ), 'http://10.147.20.4:43127', 'shared invites carry the private ZeroTier gateway for direct first attempt' );
+const overlayRoute = decodeWorldInviteRoute( overlayInviteURL.searchParams.get( 'invite' ) );
+assert.equal( overlayRoute.get( 'ztNodeId' ), '3af4fd5d50', 'shared invites retain the ZeroTier HostID for Worker fallback' );
+assert.equal( overlayRoute.get( 'ztNetworkId' ), 'e3918db4832a3056', 'shared invites retain the ZeroTier network ID for Worker fallback' );
+assert.equal( overlayRoute.get( 'gateway' ), 'https://coast.tailnet-example.ts.net', 'shared invites preserve the direct secure overlay gateway' );
+assert.equal( overlayRoute.get( 'ztGateway' ), 'http://10.147.20.4:43127', 'shared invites carry the private ZeroTier gateway for direct first attempt' );
 const workerOnlyInviteURL = new URL( createWorldInviteURL( {
 	pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org',
 } ) );
-assert.equal( workerOnlyInviteURL.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'HostID-only invites remain usable without a private ZeroTier gateway' );
-assert.equal( workerOnlyInviteURL.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056', 'HostID-only invites retain the configured network for Worker lookup' );
-assert.equal( workerOnlyInviteURL.searchParams.get( 'directory' ), 'https://thruhold.org', 'HostID-only invites preserve Worker discovery when no private route is provided' );
-assert.equal( workerOnlyInviteURL.searchParams.has( 'ztGateway' ), false, 'a private gateway is optional for ZeroTier discovery' );
+const workerOnlyRoute = decodeWorldInviteRoute( workerOnlyInviteURL.searchParams.get( 'invite' ) );
+assert.equal( workerOnlyRoute.get( 'ztNodeId' ), '3af4fd5d50', 'HostID-only invites remain usable without a private ZeroTier gateway' );
+assert.equal( workerOnlyRoute.get( 'ztNetworkId' ), 'e3918db4832a3056', 'HostID-only invites retain the configured network for Worker lookup' );
+assert.equal( workerOnlyRoute.get( 'directory' ), 'https://thruhold.org', 'HostID-only invites preserve Worker discovery when no private route is provided' );
+assert.equal( workerOnlyRoute.has( 'ztGateway' ), false, 'a private gateway is optional for ZeroTier discovery' );
 assert.throws( () => createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierGateway: 'http://8.8.8.8:43127', directory: 'https://thruhold.org' } ), /ZeroTier private gateway/, 'ZeroTier private gateways cannot point at a public IP' );
 const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
-assert.deepEqual( redundantInvite.searchParams.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
+const redundantRoute = decodeWorldInviteRoute( redundantInvite.searchParams.get( 'invite' ) );
+assert.deepEqual( redundantRoute.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
 assert.throws( () => createWorldInviteURL( { pageURL: 'https://app.example/tidewater/', worldId: 'elsemesh:coast', gateway: 'http://coast.example' } ), /secure HTTPS\/WSS/, 'world invitations reject an insecure gateway' );
 console.log( 'ok   portal crossing geometry and orientation handoff' );

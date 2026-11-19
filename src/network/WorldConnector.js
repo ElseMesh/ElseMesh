@@ -8,6 +8,7 @@ import { verifySignedDocument } from './SignedDocument.js';
 import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 import { loadWorldManifestProviders } from './WorldProviderLoader.js';
+import { decodeWorldInviteRoute, encodeWorldInviteRoute, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
 
@@ -38,8 +39,15 @@ export function assetConcurrencyForConnection( connection = globalThis.navigator
 }
 
 export function worldLinkFromLocation( location = globalThis.location ) {
-	const params = new URLSearchParams( location.search );
-	const configuredLocalWorld = globalThis.ELSEMESH_CONFIG?.localWorld;
+	const outerParams = new URLSearchParams( location.search );
+	const inviteCodes = outerParams.getAll( 'invite' );
+	let params = outerParams;
+	if ( inviteCodes.length ) {
+		invariant( inviteCodes.length === 1, 'Browser location contains duplicate invite route codes' );
+		invariant( ! WORLD_INVITE_ROUTE_KEYS.some( key => outerParams.has( key ) ) && ! outerParams.has( 'localProvider' ) && ! outerParams.has( 'localMap' ), 'Compact invites cannot be combined with separate world or local-provider route parameters' );
+		params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
+	}
+	const configuredLocalWorld = inviteCodes.length ? null : globalThis.ELSEMESH_CONFIG?.localWorld;
 	const localProvider = params.get( 'localProvider' ) || configuredLocalWorld?.provider;
 	const localMap = params.get( 'localMap' ) || configuredLocalWorld?.map;
 	if ( localProvider || localMap ) {
@@ -91,9 +99,10 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 }
 
 export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', nodeId, gateway, providers = [], directory = '' } = {} ) {
-		invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
+	invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
+	for ( const key of [ ...WORLD_INVITE_ROUTE_KEYS, 'invite' ] ) url.searchParams.delete( key );
 	url.searchParams.set( 'worldId', worldId );
 	if ( zeroTierNodeId ) {
 		invariant( /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ), 'Invalid ZeroTier node or network ID for invite' );
@@ -128,6 +137,12 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 		invariant( validSecureOrigin( directory ), 'Invite directory must be an HTTPS origin' );
 		url.searchParams.set( 'directory', directory );
 	} else url.searchParams.delete( 'directory' );
+	const route = new URLSearchParams();
+	for ( const key of WORLD_INVITE_ROUTE_KEYS ) for ( const value of url.searchParams.getAll( key ) ) route.append( key, value );
+	const code = encodeWorldInviteRoute( route );
+	for ( const key of WORLD_INVITE_ROUTE_KEYS ) url.searchParams.delete( key );
+	url.searchParams.set( 'invite', code );
+	invariant( url.href.length <= 4096, 'Invite URL is too long' );
 	return url.href;
 }
 

@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { WorldConnector } from '../src/network/WorldConnector.js';
+import { createWorldInviteURL, WorldConnector, worldLinkFromLocation } from '../src/network/WorldConnector.js';
 
 const options = JSON.parse( process.argv[ 2 ] );
-const connector = new WorldConnector( {
+const inviteURL = createWorldInviteURL( {
+	pageURL: 'https://elsemesh.org/',
 	worldId: options.worldID,
 	zeroTierNodeId: options.zeroTierNodeID,
 	zeroTierNetworkId: options.zeroTierNetworkID,
+	zeroTierGateway: options.zeroTierGateway || '',
 	directory: options.directory,
-	chunkBytes: 64 * 1024,
 } );
+const route = worldLinkFromLocation( new URL( inviteURL ) );
+const connector = new WorldConnector( { ...route, chunkBytes: 64 * 1024 } );
 
 try {
 	const manifest = await connector.getManifest();

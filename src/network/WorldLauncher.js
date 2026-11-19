@@ -1,5 +1,6 @@
 import { isWorldID } from './WorldIdentity.js';
 import { validZeroTierGateway } from './WorldConnector.js';
+import { decodeWorldInviteRoute, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
 
 const STORAGE_KEY = 'elsemesh.visited-worlds.v1';
 const HOME_STORAGE_KEY = 'elsemesh.home-world.v1';
@@ -31,7 +32,7 @@ export async function discoverLocalWorldURL( { pageURL = globalThis.location?.hr
 	if ( ! [ 'http:', 'https:' ].includes( page.protocol ) ) return null;
 	if ( globalThis.ELSEMESH_CONFIG?.localWorld && ! globalThis.ELSEMESH_CONFIG?.localWorldGatewayConfigured ) return null;
 	if ( page.searchParams.has( 'localProvider' ) || page.searchParams.has( 'localMap' ) ) return null;
-	if ( ! isLoopback( page.hostname ) || page.searchParams.has( 'worldId' ) || page.searchParams.has( 'ztNodeId' ) || page.searchParams.get( 'example' ) === '1' ) return null;
+	if ( ! isLoopback( page.hostname ) || page.searchParams.has( 'worldId' ) || page.searchParams.has( 'ztNodeId' ) || page.searchParams.has( 'invite' ) || page.searchParams.get( 'example' ) === '1' ) return null;
 	try {
 		const response = await fetchImpl( new URL( '/api/world/manifest', page ), { credentials: 'omit', cache: 'no-store' } );
 		if ( ! response.ok ) return null;
@@ -126,7 +127,13 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 		throw new Error( 'Enter a valid ElseMesh world invite URL' );
 	}
 	if ( ! [ 'http:', 'https:' ].includes( invite.protocol ) || invite.username || invite.password ) throw new Error( 'Enter a valid ElseMesh world invite URL' );
-	const params = invite.searchParams;
+	const outerParams = invite.searchParams;
+	const inviteCodes = outerParams.getAll( 'invite' );
+	let params = outerParams;
+	if ( inviteCodes.length ) {
+		if ( inviteCodes.length !== 1 || WORLD_INVITE_ROUTE_KEYS.some( key => outerParams.has( key ) ) || outerParams.has( 'localProvider' ) || outerParams.has( 'localMap' ) ) throw new Error( 'Compact invites cannot be combined with separate world or local-provider route parameters' );
+		params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
+	}
 	const nodeIds = params.getAll( 'nodeId' );
 	const gateways = params.getAll( 'gateway' );
 	if ( nodeIds.length !== gateways.length && ! ( nodeIds.length === 0 && gateways.length === 1 ) ) throw new Error( 'Invite provider IDs and gateways must be paired' );
@@ -213,7 +220,7 @@ export function clearHomeWorld( { storage } = {} ) {
 export function defaultHomeWorldURL( { pageURL = globalThis.location?.href, storage } = {} ) {
 	const current = new URL( pageURL );
 	if ( current.searchParams.has( 'localProvider' ) || current.searchParams.has( 'localMap' ) ) return null;
-	if ( current.searchParams.has( 'worldId' ) || current.searchParams.has( 'ztNodeId' ) || current.searchParams.get( 'example' ) === '1' ) return null;
+	if ( current.searchParams.has( 'worldId' ) || current.searchParams.has( 'ztNodeId' ) || current.searchParams.has( 'invite' ) || current.searchParams.get( 'example' ) === '1' ) return null;
 	const home = getHomeWorld( { pageURL, storage } );
 	if ( ! home ) return null;
 	const url = new URL( home.url );
