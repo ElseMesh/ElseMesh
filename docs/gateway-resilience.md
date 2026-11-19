@@ -161,6 +161,13 @@ the visitor side alone cannot make the host's ICE socket reachable. The
 automatic-mapping implementation target and its limits are specified in
 [`browser-direct-webrtc.md`](browser-direct-webrtc.md).
 
+After adding the integrated `worldd` mapper, the opt-in ARMv7 live test ran on
+pi3. It created the verified mapping `82.1.79.142:34718/UDP` to
+`192.168.0.11:34718` and exited successfully. The follow-up test verifies that
+the mapping is removed before it exits. This confirms that pi3's gateway
+accepts the mapping request; it does not test inbound peer checks or a complete
+WebRTC data channel.
+
 A follow-up narrowed worldd ICE gathering to `wlo1` using the new
 `--webrtc-interface` option. Its SDP contained only `192.168.111.127:46000`
 and the STUN-reflexive public candidate, but ICE still failed. A capture on
@@ -185,17 +192,14 @@ destination-dependent mapping on this path, but does not by itself prove the
 cause of the failed ICE checks. Do not treat one STUN server's mapped port as
 a stable endpoint for arbitrary peers.
 
-The next transport work should first implement and validate automatic UDP
-mapping on the `worldd` host. `worldd` now has best-effort UPnP IGD
-WANIPConnection:1 mapping for the Pion UDP socket, including lease renewal and
-verified cleanup. NAT-PMP and PCP are still unimplemented, and no live mapping
-or external data channel has verified this code. The next test should run
-`worldd` behind an IGD-capable gateway (pi3's gateway is a candidate), then
-repeat the cross-network ICE/data-channel check. Manual port forwarding is an
-optional diagnostic only, never a setup requirement. Keep any temporary host
-firewall exception source/interface/port-specific and remove it after each
-run. Do not treat a successful local re-ignition as proof that an idle public
-mapping survives.
+The next transport work is to test inbound peer checks and a full cross-network
+data channel with `worldd` behind an IGD-capable gateway. `worldd` now has
+best-effort UPnP IGD WANIPConnection:1 mapping for the Pion UDP socket, with
+lease renewal and verified cleanup. NAT-PMP and PCP remain unimplemented.
+Manual port forwarding is an optional diagnostic only, never a setup
+requirement. Keep any temporary host firewall exception source/interface/port
+specific and remove it after each run. Do not treat a successful local
+re-ignition as proof that an idle public mapping survives.
 
 Do not treat an idle UDP mapping as a permanent public listener. NAT mapping
 timeouts vary, and outbound traffic is what refreshes a mapping; the IETF

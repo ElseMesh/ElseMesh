@@ -112,6 +112,16 @@ func TestLiveWebRTCUPnPMapping(t *testing.T) {
 	if manager == nil || len(candidates) == 0 {
 		t.Fatal("no verified UPnP mapping was created")
 	}
+	leases := append([]webrtcUPnPLease(nil), manager.leases...)
 	defer manager.close()
 	t.Logf("verified temporary WebRTC candidate mapping(s): %v", candidates)
+	manager.close()
+	for _, lease := range leases {
+		ctx, cancel := context.WithTimeout(context.Background(), webrtcUPnPActionTimeout)
+		_, found, err := lease.service.getMapping(ctx, lease.port)
+		cancel()
+		if found || err == nil || !isUPnPMappingMissing(err) {
+			t.Errorf("UPnP mapping %s:%d remained after cleanup: found=%t err=%v", lease.externalIP, lease.port, found, err)
+		}
+	}
 }

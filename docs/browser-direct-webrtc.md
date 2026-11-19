@@ -77,8 +77,8 @@ internal UDP port, verifies that the gateway installed the expected mapping,
 renews the one-hour lease, and removes only a matching mapping on shutdown.
 `--webrtc-upnp=false` disables this behavior. NAT-PMP and PCP discovery are not
 implemented yet; ordinary ICE/STUN remains active when UPnP is absent or fails.
-The mapping has not yet been verified through a live cross-network data
-channel.
+The mapping has been created and removed successfully on pi3's router. A live
+cross-network WebRTC data channel remains unverified.
 
 Automatic mapping is an assist, not a guarantee: gateways may disable it,
 upstream NAT or CGNAT may prevent it, and endpoint-dependent mappings can still
