@@ -214,6 +214,14 @@ The client supports ordered provider fallback, verifies signed ZeroTier node rec
 
 `test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture and serves the signed manifest over a Pion WebRTC data channel. The opt-in `server/worldd/rendezvous_live_test.go` follows an invite through the deployed Worker and verifies the signed provider and Durable Object signaling. Its 2026-11-19 cross-internet run from pi3 completed lookup and signaling with visitor ZeroTier/tunnel ICE interfaces excluded, then failed direct ICE before a data channel opened. No browser rendering check has passed through this invite route.
 
+The headless Chromium integration test passed from the external build tree:
+`go test ./worldd -run '^TestChromiumWorldConnectorUsesDirectWebRTC$' -count=1
+-v`. It opened a browser-to-worldd WebRTC data channel, fetched the signed
+manifest and asset, then closed WebRTC and verified the direct WSS gateway
+fallback. This proves browser transport behavior on localhost, not Worker
+invite discovery or public NAT traversal; the live cross-internet invite still
+has not opened a WebRTC data channel in a browser.
+
 The Worker carries lookup and offer/answer signaling only. World content must
 use a direct provider connection; the cross-internet probe has not yet
 established that connection for the current host/network pair.
