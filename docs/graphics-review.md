@@ -17,8 +17,9 @@ The matched images confirm that split WebGPU is very close to the original:
 full-frame RGB mean absolute error is `0.349/255`. ROI MAE is `0.26` for sky,
 `0.76` for open sea, `0.59` for swash, `0.24` for wet sand, `0.21` for dry
 sand, and `2.32` for the pier. Mean full-frame RGB differs by only
-`(-0.15, -0.19, -0.24)` (split minus Tidewater), so there is no meaningful
-overall darkening to correct in the default path. The earlier `5.01/255`
+`(-0.15, -0.19, -0.24)` (split minus Tidewater) for revision `65d2b30b`.
+That result applies to that captured revision only; a later current-source
+capture has a separate color offset recorded below. The earlier `5.01/255`
 result came from disabling auto-exposure only in the split capture; it was not
 a valid default-render comparison. These are diagnostic pixel measurements,
 not calibrated color values.
@@ -27,10 +28,44 @@ not calibrated color values.
 
 ![Split ElseMesh WebGPU beach capture](images/elsemesh-split-webgpu-beach-2026-11-19.png)
 
-This closes only the matched beach-camera WebGPU comparison. Spray visibility,
-other world views and assets, LOD transitions, and split WebGL parity remain
-open. An exploratory comparison against the separate pre-split ElseMesh
-snapshot is not the authority for this visual gate.
+This closes only the matched beach-camera WebGPU comparison for revision
+`65d2b30b`. Spray visibility, other world views and assets, LOD transitions,
+and split WebGL parity remain open. An exploratory comparison against the
+separate pre-split ElseMesh snapshot is not the authority for this visual gate.
+
+## 2026-11-19 split revision 353bac83 beach check: WebGPU and WebGL
+
+Revision `353bac83` rendered the bundled world
+`elsemesh:example-island` on AMD Radeon Graphics (RADV RENOIR). Both captures
+used a 1600×813 output, the `beach` camera (`[15, 3, -58]`, yaw `3.14`, pitch
+`-0.08`), time of day `16.2`, exposure `0.55`, scale 1, and the same local
+world route. The WebGPU runtime reported auto-exposure enabled with a measured
+multiplier of `1.0`.
+
+The WebGPU image came from `Bench.shots` at fixed simulation time `1000`, with
+64 settling frames at `dt=0`. It was captured after the live app had started,
+not from a fresh benchmark page, so pre-existing temporal history may affect
+this comparison. Against the saved Tidewater main image, full-frame RGB MAE is
+`5.47/255`; mean RGB is lower by `(4.73, 4.96, 5.22)` levels. ROI MAE is `5.36`
+for sky, `8.68` for surf, `6.11` for shore, and `4.53` for sand. Detaching the
+new local ground-cover component for a second capture did not remove the
+offset (MAE `5.53/255`). Treat this as a current-source discrepancy to
+investigate, not a confirmed exposure fix or a clean fresh-process parity
+measurement.
+
+![Current ElseMesh WebGPU beach capture at revision 353bac83](images/elsemesh-split-webgpu-353bac83-beach-2026-11-19.png)
+
+The WebGL page was separately captured at the same camera and time. Chromium
+reported `ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES
+3.2)`. This is a visual inspection capture, not the offscreen `Bench.shots`
+output, so no pixel metric is reported. It shows a different canopy and
+water/shore appearance from WebGPU. The distant tree crowns are currently
+generated as low-segment sphere lobes with hard-coded colors by the
+world-owned `worlds/tidewater/renderers/WebGLVegetationPresentation.js` path;
+that backend-specific world presenter is migration debt under the
+renderer-neutral content boundary.
+
+![Current ElseMesh WebGL beach capture at revision 353bac83](images/elsemesh-split-webgl-353bac83-beach-2026-11-19.png)
 
 ## 2026-11-19 village ground-cover parity: WebGPU
 
