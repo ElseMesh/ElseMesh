@@ -1016,7 +1016,7 @@ export function validZeroTierGateway( value ) {
 	}
 }
 
-function validGatewayForCurrentPage( value ) {
+export function validGatewayForCurrentPage( value ) {
 	if ( validSecureGateway( value ) ) return true;
 	try {
 		const gateway = new URL( value );

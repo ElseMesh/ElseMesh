@@ -1,4 +1,4 @@
-import { WorldConnector } from './WorldConnector.js';
+import { WorldConnector, validGatewayForCurrentPage } from './WorldConnector.js';
 import { PlayerPresence, PLAYER_PRESENCE_PROTOCOL } from './PlayerPresence.js';
 import { appearanceForAllowedProfiles, avatarProfileId, loadAppearance } from '../player/AvatarAppearance.js';
 import { RemoteAvatar } from '../player/RemoteAvatar.js';
@@ -24,6 +24,27 @@ export function makePresencePose(player, sequence, appearance, vehicleType = pla
  };
 }
 
+function ownerConnectionOptions( connector ) {
+ const ownerPeerId = connector.manifest.ownerPeerId;
+ const isOwnerProvider = connector.nodeId === ownerPeerId;
+ const options = {
+  worldId: connector.worldId,
+  nodeId: ownerPeerId,
+  gateway: validGatewayForCurrentPage( connector.gateway ) ? connector.gateway : '',
+  providers: isOwnerProvider ? ( connector.providers || [] ).filter( provider => provider.nodeId === ownerPeerId ) : [],
+  directory: connector.directory || '',
+ };
+ if ( isOwnerProvider && connector.zeroTierNodeId ) {
+  options.zeroTierNodeId = connector.zeroTierNodeId;
+  options.zeroTierNetworkId = connector.zeroTierNetworkId;
+  if ( connector.zeroTierGateway && connector.zeroTierNodeRecord ) {
+   options.zeroTierGateway = connector.zeroTierGateway;
+   options.zeroTierNodeRecord = connector.zeroTierNodeRecord;
+  }
+ }
+ return options;
+}
+
 // Entry admission is the first operation that registers a visitor. Asset loading
 // and portal previews never publish a visitor into a destination.
 export class WorldPresenceSession {
@@ -44,8 +65,7 @@ export class WorldPresenceSession {
   for ( const [ field, color ] of Object.entries( { ...avatarOption?.palette, ...entryPoint?.uniform } ) ) {
    if ( admittedAppearance[ field ] !== color ) throw new Error( 'Selected avatar appearance does not match the world-authored palette' );
   }
-  this.connector = createConnector({worldId: connector.worldId,
-   nodeId: connector.manifest.ownerPeerId, gateway: connector.gateway, directory: connector.directory});
+  this.connector = createConnector(ownerConnectionOptions( connector ));
   this.regionConnector = connector;
   this.manifest = connector.manifest;
   this.parent = parent;

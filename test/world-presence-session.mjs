@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { WorldPresenceSession, makePresencePose } from '../src/network/WorldPresenceSession.js';
+import { WorldConnector } from '../src/network/WorldConnector.js';
 import { DEFAULT_APPEARANCE } from '../src/player/AvatarAppearance.js';
 import { Vector3 } from '../src/engine/math/Vector3.js';
 
@@ -13,6 +14,25 @@ const session = new WorldPresenceSession({connector, parent: {add(group){created
  createAvatar({appearance,maxComplexity}){ assert.equal(maxComplexity,20000); return {group:{},setAppearance(){},setGhost(value){ghostStates.push(value)},update(dt,pose){this.pose=pose},dispose(){disposed++}} },
 });
 assert.equal(options.nodeId,'owner','presence targets signed owner even when content gateway belongs to a replica');
+let rendezvousOptions;
+const routePeerId = '12D3KooWAbcdefghijk1234567890123456';
+const rendezvousProvider = { nodeId: routePeerId, gateway: '', rendezvous: true, zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056' };
+const rendezvousRegion = {
+ ...connector, nodeId: routePeerId, gateway: 'http://172.22.125.89:43127',
+ zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056',
+ zeroTierGateway: 'http://172.22.125.89:43127', zeroTierNodeRecord: { protocol: 'elsemesh.node/1' },
+ providers: [ rendezvousProvider ], directory: 'https://resolver.example',
+ manifest: { ...connector.manifest, ownerPeerId: routePeerId },
+};
+const rendezvousSession = new WorldPresenceSession({ connector: rendezvousRegion, parent: { add() {} },
+ createConnector(value) { rendezvousOptions = value; return { close() {} }; },
+});
+assert.equal(rendezvousOptions.gateway, '', 'a private HTTP ZeroTier address is not passed as a public gateway candidate');
+assert.equal(rendezvousOptions.zeroTierGateway, rendezvousRegion.zeroTierGateway, 'presence preserves the validated private ZeroTier route');
+assert.deepEqual(rendezvousOptions.providers, [ rendezvousProvider ], 'presence preserves its owner rendezvous candidate');
+assert.equal(rendezvousOptions.directory, rendezvousRegion.directory, 'presence preserves the Worker rendezvous directory');
+assert.doesNotThrow(() => new WorldConnector(rendezvousOptions), 'the owner presence route remains a valid gateway-less Worker rendezvous');
+rendezvousSession.dispose();
 session.update(.016,player); assert.equal(sent.length,1);
 assert.ok(Math.abs(sent[0].pose.yaw)<=Math.PI,'accumulated player yaw is normalized for bounded wire protocol');
 now=500; session.update(.016,player); assert.equal(sent.length,1,'one in-flight request prevents overlapping publishes');
