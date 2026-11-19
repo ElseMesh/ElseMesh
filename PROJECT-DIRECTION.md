@@ -246,6 +246,13 @@ in `docs/`.
   [browser hosting](docs/browser-hosting.md),
   [direct WebRTC](docs/browser-direct-webrtc.md), and
   [relay deployment](docs/relay-deployment.md#publish-a-browser-gateway-with-tls).
+  **Connection-path diagnostics TODO:** show and capture whether a session used
+  the private route, direct WebRTC, or a fallback; record why preferred paths
+  failed, connection timing, and transferred byte counts without recording
+  invite secrets or identity tokens. Do not silently send world assets through
+  a Cloudflare Tunnel: it may carry bounded lookup/signaling only. If direct
+  data transfer is unavailable, explain the failure and stop until another
+  approved data path exists.
 - **ZeroTier (60%):** use the dedicated ElseMesh network
   `e3918db4832a3056` with the single `worldd` world server and
   optional embedded libzt membership configured at runtime. The former

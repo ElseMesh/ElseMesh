@@ -42,11 +42,12 @@ deployment.
    `presence.update`, and `presence.leave`) directly over the channel. Replies
    use the existing `peerResponse` shape and must match both `worldId` and
    `requestId`.
-6. The browser falls back to WebTransport or WebSocket if setup fails. Safe
-   read requests (`manifest.get`, `role-revocations.get`, and `asset.get`) are
-   retried through the gateway if the data channel closes before a response.
-   Mutating presence updates are never retried after an ambiguous disconnect;
-   this avoids applying the same sequence twice. Late responses on the closed
+6. The browser may use an explicitly approved direct WebTransport or WebSocket
+   path if WebRTC setup fails. It must not fall back to a Cloudflare Tunnel for
+   world assets. If the only available gateway is a control-only Tunnel, fail
+   asset requests clearly when direct data transport is unavailable. Mutating
+   presence updates are never retried after an ambiguous disconnect; this
+   avoids applying the same sequence twice. Late responses on the closed
    channel have no matching pending request and are ignored.
 
 The initial offer/answer should travel over an existing gateway request rather
@@ -74,10 +75,13 @@ host firewall and forward them at the edge router to the daemon. Replies are
 stateful. Keep the HTTPS/WSS gateway path available when direct UDP cannot be
 opened; direct WebRTC is opportunistic.
 
-The existing HTTPS/WSS gateway remains the relay fallback when ICE fails or
-TURN is unavailable. WebRTC failure must not make a world unreachable when its
-gateway path still works. ZeroTier remains an optional daemon-to-daemon
-transport and does not make a browser join the overlay.
+The existing HTTPS/WSS gateway remains a fallback only when that route is an
+approved data path. A Cloudflare public-hostname Tunnel may carry bounded
+lookup and WebRTC signaling, but must not carry large world-asset transfers.
+When direct ICE fails, the client must report the unavailable data path rather
+than silently moving asset traffic onto that Tunnel. ZeroTier remains an
+optional daemon-to-daemon transport and does not make a browser join the
+overlay.
 
 ## Limits and safety
 
@@ -95,6 +99,12 @@ transport and does not make a browser join the overlay.
   bound to the selected world and PeerConnection. It is not a bearer token.
 - Do not report a direct connection until ICE reaches `connected` or
   `completed` and a request/reply round trip succeeds.
+- **TODO — connection-path diagnostics:** expose the selected data path and
+  capture path attempts, failure reasons, setup time, and transferred bytes in
+  a user-visible diagnostics panel or exportable client log. Redact invite
+  codes, account tokens, and other credentials. Make Tunnel/control-only
+  policy visible, and report a blocked large-asset fallback instead of
+  retrying it through that Tunnel.
 - Treat browser-hosted worlds separately: their owner worker currently
   registers through a reverse WebSocket. Direct access to a browser-hosted
   owner needs an independently verified browser-worker WebRTC path; the daemon

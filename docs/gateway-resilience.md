@@ -93,41 +93,35 @@ or proxy traffic. A stable DNS name updated by dynamic DNS or an outbound
 reverse tunnel can keep the gateway origin usable. GitHub Pages can host the
 client but cannot host this changing registry or gateway path.
 
-The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials; world traffic remains a direct browser-to-`worldd` connection over the selected private gateway or HTTPS/WSS gateway. Static invites and explicit provider candidates remain fallbacks when the Worker is unavailable. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. A custom HTTPS hostname remains optional. Cloudflare Tunnel can expose a private daemon gateway without opening inbound ports, but that is a separate gateway path and would route world traffic through Cloudflare.
+The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. A custom HTTPS hostname remains optional. A named Cloudflare Tunnel is a possible bounded control-plane route for lookup or WebRTC signaling, but world assets must not be transferred through its public hostname. If direct WebRTC or another explicitly approved data path is unavailable, the client must fail clearly instead of silently using the Tunnel for asset delivery. Cloudflare's current Tunnel FAQ says public-hostname routes on Free, Pro, and Business plans are subject to its large-file/video service terms; verify the applicable plan and terms before any future change to this rule.
 
 ### Public gateway setup still required
 
 Live checks on 2026-11-19 confirmed that this host has a private LAN address
 behind a globally reachable, non-CGNAT public address. `elsemesh.org` is
 delegated to Namecheap DNS and currently points its web traffic to GitHub Pages;
-the deployed resolver uses its `workers.dev` origin. No named Cloudflare
-Tunnels exist. The deployed Worker needs no additional Cloudflare DNS or route
-configuration for HostID lookup.
+the deployed resolver uses its `workers.dev` origin. The connected Cloudflare
+account has the active `reb.ai` and `esuza.com` zones, but no named Tunnels.
+The deployed Worker needs no additional Cloudflare DNS or route configuration
+for HostID lookup.
 
-To keep the world-data path direct to the provider, configure the edge router
-to forward TCP 443 to a local TLS reverse proxy for `worldd`, create a
-DNS-only gateway hostname under `elsemesh.org`, keep its A/AAAA records current
-as the public address changes, and provision browser-trusted TLS for that
-hostname. The Worker then resolves HostID to this stable gateway name; it does
-not resolve or proxy changing IP traffic. Direct WebRTC additionally needs the
-configured STUN server and its bounded UDP port range forwarded through the
-router; WSS remains the fallback path. Operational reverse-proxy and firewall
-examples are in [relay deployment](relay-deployment.md).
+The selected Cloudflare direction is a named Tunnel only for bounded control
+traffic such as lookup and WebRTC offer/answer signaling. A hostname can use a
+zone already managed by the connected account (currently `reb.ai` or
+`esuza.com`); the invite URL can remain on `elsemesh.org` and carry the chosen
+gateway origin. Do not create a public route that permits world-asset delivery
+through the Tunnel. The current client retries asset requests over its gateway
+after WebRTC failure, so this policy requires a control-only gateway/data-path
+boundary before a Tunnel can safely serve as the advertised gateway. A Cloudflare
+Tunnel has not been created or configured.
 
-A named Cloudflare Tunnel is an alternative if inbound router rules are not
-available, but it carries WSS and world-asset traffic through Cloudflare's
-tunnel network. It would still keep the Worker lookup-only, but it is not a
-direct browser-to-host path. Because the domain's authoritative DNS is
-Namecheap, this route requires adding the zone to the Cloudflare account with
-Partial (CNAME) setup, publishing the tunnel hostname there, and adding the
-Namecheap CNAME target required by that setup (`<hostname>.cdn.cloudflare.net`).
-The Worker does not need extra DNS or route
-configuration for its existing lookup-only role. Cloudflare describes Quick
-Tunnels as temporary endpoints whose hostnames change; they are not a durable
-invite gateway. Review the service terms for large-file delivery before putting
-streamed world assets through a public Tunnel. Neither route is configured yet.
-See Cloudflare's [Partial DNS Tunnel guidance](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/)
-and [Quick Tunnel limitations](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+Direct WebRTC still needs public ICE reachability and has not been proven
+between independent NATs. If direct connectivity fails, a future non-Cloudflare
+data path or a Cloudflare plan/service explicitly approved for large-file
+delivery is required; do not silently use the control Tunnel as a relay.
+Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
+invite gateways. See Cloudflare's [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/)
+and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
 
 Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tokens in local secret storage and deploy them through Cloudflare's secret mechanism, never in this repository or a browser URL.
 
