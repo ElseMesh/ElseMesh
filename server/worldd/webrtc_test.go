@@ -33,6 +33,21 @@ func TestWebRTCConfigurationValidation(t *testing.T) {
 			t.Errorf("invalid WebRTC UDP range accepted: %v", ports)
 		}
 	}
+	if err := validateWebRTCInterfaces(nil); err != nil {
+		t.Fatalf("empty WebRTC interface allowlist rejected: %v", err)
+	}
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(interfaces) > 0 {
+		if err := validateWebRTCInterfaces([]string{interfaces[0].Name}); err != nil {
+			t.Fatalf("existing WebRTC interface rejected: %v", err)
+		}
+	}
+	if err := validateWebRTCInterfaces([]string{"elsemesh-missing-interface"}); err == nil {
+		t.Fatal("unknown WebRTC interface accepted")
+	}
 }
 
 func TestSharedWebRTCAPIReusesConfiguredUDPPort(t *testing.T) {

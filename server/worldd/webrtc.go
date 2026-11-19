@@ -60,6 +60,29 @@ func validateWebRTCPortRange(minimum, maximum uint) error {
 	return nil
 }
 
+func validateWebRTCInterfaces(names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return fmt.Errorf("list network interfaces for WebRTC: %w", err)
+	}
+	available := make(map[string]struct{}, len(interfaces))
+	for _, iface := range interfaces {
+		available[iface.Name] = struct{}{}
+	}
+	for _, name := range names {
+		if strings.TrimSpace(name) != name || name == "" {
+			return errors.New("WebRTC interface names must be nonempty and contain no surrounding whitespace")
+		}
+		if _, ok := available[name]; !ok {
+			return fmt.Errorf("WebRTC interface %q does not exist", name)
+		}
+	}
+	return nil
+}
+
 func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 	d.webrtcInitMu.Lock()
 	defer d.webrtcInitMu.Unlock()
@@ -85,6 +108,17 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 	udpMux := webrtc.NewICEUDPMux(nil, packetConn)
 	settingEngine := webrtc.SettingEngine{}
 	settingEngine.SetICEUDPMux(udpMux)
+	if len(d.webrtcInterfaces) > 0 {
+		allowed := make(map[string]struct{}, len(d.webrtcInterfaces))
+		for _, name := range d.webrtcInterfaces {
+			allowed[name] = struct{}{}
+		}
+		settingEngine.SetInterfaceFilter(func(name string) bool {
+			_, ok := allowed[name]
+			return ok
+		})
+		log.Printf("WebRTC ICE interface allowlist=%s", strings.Join(d.webrtcInterfaces, ","))
+	}
 	d.webrtcUDPMux = udpMux
 	d.webrtcUDPAddr = packetConn.LocalAddr().String()
 	d.webrtcAPI = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))

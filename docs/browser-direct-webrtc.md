@@ -71,7 +71,10 @@ The daemon shares one Pion ICE UDP mux across peer connections. By default it
 binds an ephemeral UDP port; set both `--webrtc-udp-port-min` and
 `--webrtc-udp-port-max` to select the first available port in a bounded range.
 A one-port range is valid, which supports a fixed firewall rule and enables a
-measured same-port handoff experiment. If direct browser connectivity is
+measured same-port handoff experiment. By default, ICE gathers candidates from
+all available interfaces. On multi-homed hosts, repeat `--webrtc-interface`
+to constrain candidates to specific interfaces and avoid advertising
+unreachable private or overlay addresses. If direct browser connectivity is
 desired, allow the bound UDP port on the host firewall and forward it at the
 edge router to the daemon. Replies are stateful. Keep the HTTPS/WSS gateway
 path available when direct UDP cannot be opened; direct WebRTC is
