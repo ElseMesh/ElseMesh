@@ -105,22 +105,29 @@ account has the active `reb.ai` and `esuza.com` zones, but no named Tunnels.
 The deployed Worker needs no additional Cloudflare DNS or route configuration
 for HostID lookup.
 
-The selected Cloudflare direction is a named Tunnel only for bounded control
-traffic such as lookup and WebRTC offer/answer signaling. A hostname can use a
-zone already managed by the connected account (currently `reb.ai` or
-`esuza.com`); the invite URL can remain on `elsemesh.org` and carry the chosen
-gateway origin. Do not create a public route that permits world-asset delivery
-through the Tunnel. The current client retries asset requests over its gateway
-after WebRTC failure, so this policy requires a control-only gateway/data-path
-boundary before a Tunnel can safely serve as the advertised gateway. A Cloudflare
-Tunnel has not been created or configured.
+The preferred public gateway hostname is under `elsemesh.org`, while the invite
+site remains on GitHub Pages. The connected Cloudflare account does not
+currently contain that zone; its checked `reb.ai` and `esuza.com` zones are on
+the Free plan. Cloudflare's current documentation says partial (CNAME) setup,
+which would keep Namecheap authoritative, requires Business or Enterprise.
+The no-upgrade route is to add `elsemesh.org` as a full Cloudflare zone, copy
+all existing DNS records, verify the GitHub Pages records, and then change the
+registrar nameservers. No zone, nameserver, or DNS record has been changed yet.
+
+If deployed, a named Tunnel must be restricted to bounded control traffic such
+as lookup and WebRTC offer/answer signaling. Do not create a public route that
+permits world-asset delivery through the Tunnel. The current client retries
+asset requests over its gateway after WebRTC failure, so a control-only
+gateway/data-path boundary must be implemented before the Tunnel can safely
+serve as the advertised gateway. A Cloudflare Tunnel has not been created or
+configured.
 
 Direct WebRTC still needs public ICE reachability and has not been proven
 between independent NATs. If direct connectivity fails, a future non-Cloudflare
 data path or a Cloudflare plan/service explicitly approved for large-file
 delivery is required; do not silently use the control Tunnel as a relay.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
-invite gateways. See Cloudflare's [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/)
+invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
 
 Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tokens in local secret storage and deploy them through Cloudflare's secret mechanism, never in this repository or a browser URL.
