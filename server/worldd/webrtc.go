@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,10 +54,63 @@ func validateWebRTCPortRange(minimum, maximum uint) error {
 	if minimum == 0 && maximum == 0 {
 		return nil
 	}
-	if minimum < 1 || maximum > 65535 || maximum < minimum || maximum-minimum+1 < maxWebRTCOffers {
-		return fmt.Errorf("WebRTC UDP port range must contain at least %d ports", maxWebRTCOffers)
+	if minimum < 1 || maximum > 65535 || maximum < minimum {
+		return errors.New("WebRTC UDP port range must be between 1 and 65535")
 	}
 	return nil
+}
+
+func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
+	d.webrtcInitMu.Lock()
+	defer d.webrtcInitMu.Unlock()
+	if d.webrtcAPI != nil {
+		return d.webrtcAPI, nil
+	}
+
+	var packetConn net.PacketConn
+	var err error
+	if d.webrtcUDPPortMin == 0 && d.webrtcUDPPortMax == 0 {
+		packetConn, err = net.ListenPacket("udp", ":0")
+	} else {
+		for port := int(d.webrtcUDPPortMin); port <= int(d.webrtcUDPPortMax); port++ {
+			packetConn, err = net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(port)))
+			if err == nil {
+				break
+			}
+		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("bind shared WebRTC UDP port: %w", err)
+	}
+	udpMux := webrtc.NewICEUDPMux(nil, packetConn)
+	settingEngine := webrtc.SettingEngine{}
+	settingEngine.SetICEUDPMux(udpMux)
+	d.webrtcUDPMux = udpMux
+	d.webrtcUDPAddr = packetConn.LocalAddr().String()
+	d.webrtcAPI = webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
+	log.Printf("worldd shared WebRTC ICE UDP mux listen=%s", d.webrtcUDPAddr)
+	return d.webrtcAPI, nil
+}
+
+func (d *daemon) closeWebRTCTransport() {
+	d.webrtcMu.Lock()
+	sessions := make([]*worldRTCSession, 0, len(d.webrtcSessions))
+	for _, session := range d.webrtcSessions {
+		sessions = append(sessions, session)
+	}
+	d.webrtcMu.Unlock()
+	for _, session := range sessions {
+		d.closeWebRTCSession(session)
+	}
+
+	d.webrtcInitMu.Lock()
+	defer d.webrtcInitMu.Unlock()
+	if d.webrtcUDPMux != nil {
+		_ = d.webrtcUDPMux.Close()
+		d.webrtcUDPMux = nil
+		d.webrtcAPI = nil
+		d.webrtcUDPAddr = ""
+	}
 }
 
 func (d *daemon) webrtcICEServers() []webrtc.ICEServer {
@@ -106,12 +162,11 @@ func (d *daemon) acceptWebRTCOffer(request gatewayMessage) (peerResponse, error)
 	d.webrtcSessions[id] = session
 	d.webrtcMu.Unlock()
 
-	settingEngine := webrtc.SettingEngine{}
-	if err := settingEngine.SetEphemeralUDPPortRange(d.webrtcUDPPortMin, d.webrtcUDPPortMax); err != nil {
+	api, err := d.sharedWebRTCAPI()
+	if err != nil {
 		d.closeWebRTCSession(session)
-		return peerResponse{}, fmt.Errorf("configure WebRTC UDP ports: %w", err)
+		return peerResponse{}, err
 	}
-	api := webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
 	configuration := webrtc.Configuration{ICEServers: d.webrtcICEServers()}
 	peerConnection, err := api.NewPeerConnection(configuration)
 	if err != nil {

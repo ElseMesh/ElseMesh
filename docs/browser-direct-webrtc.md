@@ -67,13 +67,15 @@ firewalls. TURN credentials are not currently configurable; the existing
 HTTPS/WSS gateway is the fallback relay. Never put relay credentials in a world
 package, invite URL, source repository, or long-lived client bundle.
 
-By default, the daemon lets Pion allocate local ICE UDP ports dynamically. To
-use a bounded range for firewall rules, set both `--webrtc-udp-port-min` and
-`--webrtc-udp-port-max`; the range must contain at least 32 ports. If direct
-browser connectivity is desired, allow the gathered UDP candidate ports on the
-host firewall and forward them at the edge router to the daemon. Replies are
-stateful. Keep the HTTPS/WSS gateway path available when direct UDP cannot be
-opened; direct WebRTC is opportunistic.
+The daemon shares one Pion ICE UDP mux across peer connections. By default it
+binds an ephemeral UDP port; set both `--webrtc-udp-port-min` and
+`--webrtc-udp-port-max` to select the first available port in a bounded range.
+A one-port range is valid, which supports a fixed firewall rule and enables a
+measured same-port handoff experiment. If direct browser connectivity is
+desired, allow the bound UDP port on the host firewall and forward it at the
+edge router to the daemon. Replies are stateful. Keep the HTTPS/WSS gateway
+path available when direct UDP cannot be opened; direct WebRTC is
+opportunistic.
 
 The existing HTTPS/WSS gateway remains a fallback only when that route is an
 approved data path. A Cloudflare public-hostname Tunnel may carry bounded
