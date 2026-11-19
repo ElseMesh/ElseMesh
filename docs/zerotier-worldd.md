@@ -39,6 +39,16 @@ prefix reported by libzt for the joined network; other IPv4 traffic uses the
 normal host dialer. Managed IPv4 can overlap a user's local routes, so prefer
 6PLANE where address ambiguity prevents reliable routing.
 
+`--zerotier-udp-port N` selects libzt's primary physical UDP port before the
+node starts; zero preserves libzt's default selection. Startup logs the actual
+primary port. This does not disable ZeroTier's optional secondary-port/NAT
+fallback and does not promise that a router preserves the mapping for another
+protocol. `worldd`'s shared Pion ICE mux can select a matching fixed port with
+`--webrtc-udp-port-min N --webrtc-udp-port-max N`, but a same-port handoff
+still requires stopping libzt, binding Pion, and verifying the resulting
+external ICE path. Merely choosing the same port does not transfer a live
+socket or guarantee NAT traversal.
+
 The Legacy Central API token at `~/.config/zerotier/central-api-token` is an
 administration credential, not a runtime setting. Keep it owner-readable only
 (mode `0600`), do not copy it into a repository or world/client configuration,

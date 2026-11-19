@@ -135,6 +135,7 @@ func run() error {
 	regionProviderURL := flag.String("region-provider", "", "loopback dynamic region provider URL (requires --world-profile; local preview only)")
 	listenPort := flag.Int("p2p-port", 0, "libp2p TCP and QUIC listen port (default selects ephemeral ports; embedded ZeroTier uses its shared bridge port)")
 	zeroTierNetwork := flag.String("zerotier-network", defaultZeroTierNetworkID, "ZeroTier network ID to join through embedded libzt (requires a zerotier build)")
+	zeroTierUDPPort := flag.Uint("zerotier-udp-port", 0, "embedded libzt primary physical UDP port (0 uses libzt default; configure before node start)")
 	zeroTierPathDiagnostics := flag.Bool("zerotier-path-diagnostics", false, "enable a loopback-only endpoint for querying observed embedded ZeroTier peer IP/UDP-port paths")
 	httpAddress := flag.String("http", "127.0.0.1:0", "HTTP/WebSocket gateway listen address (default selects an ephemeral loopback port); place behind TLS for public browser access")
 	webTransportAddress := flag.String("webtransport", "", "optional WebTransport HTTP/3 UDP listen address, for example :5201")
@@ -514,8 +515,14 @@ func run() error {
 			_ = zeroTier.Stop()
 		}
 	}()
+	if *zeroTierUDPPort > 65535 {
+		return errors.New("--zerotier-udp-port must be between 0 and 65535")
+	}
+	if *zeroTierUDPPort != 0 && *zeroTierNetwork == "" {
+		return errors.New("--zerotier-udp-port requires embedded ZeroTier")
+	}
 	if *zeroTierNetwork != "" {
-		zeroTier, err = startZeroTier(*zeroTierNetwork, *zeroTierDataDir, zeroTierBlacklistInterfaces)
+		zeroTier, err = startZeroTier(*zeroTierNetwork, *zeroTierDataDir, zeroTierBlacklistInterfaces, uint16(*zeroTierUDPPort))
 		if err != nil {
 			return fmt.Errorf("start ZeroTier: %w", err)
 		}
@@ -525,7 +532,7 @@ func run() error {
 			return fmt.Errorf("ZeroTier address: %w", parseErr)
 		}
 		parsedAnnounceAddresses = append(parsedAnnounceAddresses, ztAddresses...)
-		log.Printf("ZeroTier node %s joined %s at %v", zeroTier.NodeID(), *zeroTierNetwork, addresses)
+		log.Printf("ZeroTier node %s joined %s at %v (primary UDP port=%d)", zeroTier.NodeID(), *zeroTierNetwork, addresses, zeroTier.PrimaryUDPPort())
 	} else if len(zeroTierBlacklistInterfaces) > 0 {
 		return errors.New("--zerotier-blacklist-interface requires ZeroTier support")
 	}

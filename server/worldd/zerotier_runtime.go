@@ -12,6 +12,7 @@ import (
 type zeroTierRuntime interface {
 	Addresses() []net.IP
 	NodeID() string
+	PrimaryUDPPort() int
 	Libp2pOptions() []libp2p.Option
 	StartBridge(context.Context, int) error
 	StartHTTPBridge(context.Context, int) error

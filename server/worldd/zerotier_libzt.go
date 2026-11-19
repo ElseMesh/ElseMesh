@@ -52,25 +52,26 @@ const daemonName = "worldd"
 const ztSocketCallTimeout = 10 * time.Millisecond
 
 type libztRuntime struct {
-	networkID    uint64
-	nodeID       uint64
-	address      net.IP
-	prefix       net.IPNet
-	ipv4         net.IP
-	ipv4Prefix   net.IPNet
-	port         int
-	closeOnce    sync.Once
-	listener     int
-	ipv4Listener int
-	httpListener int
-	listenerOnce sync.Once
-	bridgeCtx    context.Context
-	bridgeCancel context.CancelFunc
-	acceptWG     sync.WaitGroup
-	proxyWG      sync.WaitGroup
+	networkID      uint64
+	nodeID         uint64
+	address        net.IP
+	prefix         net.IPNet
+	ipv4           net.IP
+	ipv4Prefix     net.IPNet
+	primaryUDPPort int
+	port           int
+	closeOnce      sync.Once
+	listener       int
+	ipv4Listener   int
+	httpListener   int
+	listenerOnce   sync.Once
+	bridgeCtx      context.Context
+	bridgeCancel   context.CancelFunc
+	acceptWG       sync.WaitGroup
+	proxyWG        sync.WaitGroup
 }
 
-func startZeroTier(networkID, storagePath string, blacklistInterfaces []string) (zeroTierRuntime, error) {
+func startZeroTier(networkID, storagePath string, blacklistInterfaces []string, primaryUDPPort uint16) (zeroTierRuntime, error) {
 	if len(networkID) != 16 {
 		return nil, errors.New("network ID must contain exactly 16 hexadecimal digits")
 	}
@@ -100,6 +101,11 @@ func startZeroTier(networkID, storagePath string, blacklistInterfaces []string) 
 	if code := int(C.zts_init_from_storage(path)); code != 0 {
 		return nil, fmt.Errorf("libzt state initialization failed (%d)", code)
 	}
+	if primaryUDPPort != 0 {
+		if code := int(C.zts_init_set_port(C.ushort(primaryUDPPort))); code != 0 {
+			return nil, fmt.Errorf("libzt primary UDP port configuration failed (%d)", code)
+		}
+	}
 	for _, prefix := range blacklistInterfaces {
 		cPrefix := C.CString(prefix)
 		code := int(C.zts_init_blacklist_if(cPrefix, C.uint(len(prefix))))
@@ -123,6 +129,10 @@ func startZeroTier(networkID, storagePath string, blacklistInterfaces []string) 
 	}
 	if int(C.zts_node_is_online()) != 1 {
 		return nil, errors.New("timed out waiting for ZeroTier node to come online")
+	}
+	actualPrimaryUDPPort := int(C.zts_node_get_port())
+	if actualPrimaryUDPPort < 1 || actualPrimaryUDPPort > 65535 {
+		return nil, fmt.Errorf("libzt returned an invalid primary UDP port (%d)", actualPrimaryUDPPort)
 	}
 	nodeID := uint64(C.zts_node_get_id())
 	if nodeID == 0 || nodeID > (1<<40)-1 {
@@ -158,7 +168,7 @@ func startZeroTier(networkID, storagePath string, blacklistInterfaces []string) 
 				return nil, errors.New("assigned ZeroTier IPv6 address does not match this network's 6PLANE address")
 			}
 			mask := net.CIDRMask(40, 128)
-			runtime := &libztRuntime{networkID: netID, nodeID: nodeID, address: address, prefix: net.IPNet{IP: address.Mask(mask), Mask: mask}, listener: -1, ipv4Listener: -1, httpListener: -1}
+			runtime := &libztRuntime{networkID: netID, nodeID: nodeID, address: address, prefix: net.IPNet{IP: address.Mask(mask), Mask: mask}, primaryUDPPort: actualPrimaryUDPPort, listener: -1, ipv4Listener: -1, httpListener: -1}
 			switch assigned := int(C.zts_addr_is_assigned(C.uint64_t(netID), C.ZTS_AF_INET)); assigned {
 			case 0:
 				log.Printf("ZeroTier managed IPv4 address: not assigned")
@@ -201,7 +211,8 @@ func (z *libztRuntime) Addresses() []net.IP {
 	}
 	return addresses
 }
-func (z *libztRuntime) NodeID() string { return fmt.Sprintf("%010x", z.nodeID) }
+func (z *libztRuntime) NodeID() string      { return fmt.Sprintf("%010x", z.nodeID) }
+func (z *libztRuntime) PrimaryUDPPort() int { return z.primaryUDPPort }
 
 func (z *libztRuntime) PhysicalPeerPaths(peerID uint64) ([]string, error) {
 	if peerID == 0 || peerID > (1<<40)-1 {
