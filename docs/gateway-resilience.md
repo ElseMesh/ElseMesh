@@ -95,6 +95,31 @@ client but cannot host this changing registry or gateway path.
 
 The Worker is an optional lookup/bootstrap service. It does not store world packages, private keys, or ZeroTier credentials; world traffic remains a direct browser-to-`worldd` connection over the selected private gateway or HTTPS/WSS gateway. Static invites and explicit provider candidates remain fallbacks when the Worker is unavailable. The deployed `elsemesh-world-resolver` is at `https://elsemesh-world-resolver.rebroad.workers.dev`; `/healthz` is verified and the hosted client sets this origin in `public/elsemesh-config.js`. A custom HTTPS hostname remains optional. Cloudflare Tunnel can expose a private daemon gateway without opening inbound ports, but that is a separate gateway path and would route world traffic through Cloudflare.
 
+### Public gateway setup still required
+
+Live checks on 2026-11-19 confirmed that this host has a private LAN address
+behind a globally reachable, non-CGNAT public address. `elsemesh.org` is
+delegated to Namecheap DNS and currently points its web traffic to GitHub Pages;
+the deployed resolver uses its `workers.dev` origin. No named Cloudflare
+Tunnels exist. The deployed Worker needs no additional Cloudflare DNS or route
+configuration for HostID lookup.
+
+To keep the world-data path direct to the provider, configure the edge router
+to forward TCP 443 to a local TLS reverse proxy for `worldd`, create a
+DNS-only gateway hostname under `elsemesh.org`, keep its A/AAAA records current
+as the public address changes, and provision browser-trusted TLS for that
+hostname. The Worker then resolves HostID to this stable gateway name; it does
+not resolve or proxy changing IP traffic. Direct WebRTC additionally needs the
+configured STUN server and its bounded UDP port range forwarded through the
+router; WSS remains the fallback path. Operational reverse-proxy and firewall
+examples are in [relay deployment](relay-deployment.md).
+
+A named Cloudflare Tunnel is an alternative if inbound router rules are not
+available, but it carries WSS traffic through Cloudflare's tunnel network. It
+would still keep the Worker lookup-only, but it is not a direct browser-to-host
+path. It requires an account-managed tunnel and a Namecheap CNAME for its
+gateway hostname. Neither option is configured yet.
+
 Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tokens in local secret storage and deploy them through Cloudflare's secret mechanism, never in this repository or a browser URL.
 
 ## Current implementation and verification boundary
