@@ -110,9 +110,18 @@ site remains on GitHub Pages. The connected Cloudflare account does not
 currently contain that zone; its checked `reb.ai` and `esuza.com` zones are on
 the Free plan. Cloudflare's current documentation says partial (CNAME) setup,
 which would keep Namecheap authoritative, requires Business or Enterprise.
-The no-upgrade route is to add `elsemesh.org` as a full Cloudflare zone, copy
-all existing DNS records, verify the GitHub Pages records, and then change the
-registrar nameservers. No zone, nameserver, or DNS record has been changed yet.
+Delegating only `worldd.elsemesh.org` to its own Cloudflare zone requires
+Cloudflare Enterprise. The no-upgrade route is therefore to add `elsemesh.org`
+as a full Cloudflare zone, copy all existing DNS records, verify the GitHub
+Pages records, and then change the registrar nameservers. Namecheap documents
+that its email and URL forwarding do not work with custom nameservers, so
+inventory and preserve any active forwarding before making that change. No
+zone, nameserver, or DNS record has been changed yet. The requested
+`elsemesh.com` to `elsemesh.org` HTTPS redirect is a separate pending change;
+verify its current records and preserve any mail routing before applying it.
+See Namecheap's [DNS service limits](https://www.namecheap.com/support/api/methods/domains-dns/)
+and [redirect requirements](https://www.namecheap.com/support/knowledgebase/article.aspx/385/2237/how-to-set-up-a-url-redirect-for-a-domain/), plus Cloudflare's [partial DNS](https://developers.cloudflare.com/dns/zone-setups/partial-setup/)
+and [subdomain-zone availability](https://developers.cloudflare.com/dns/zone-setups/subdomain-setup/).
 
 If deployed, a named Tunnel must be restricted to bounded control traffic such
 as lookup and WebRTC offer/answer signaling. Do not create a public route that

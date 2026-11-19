@@ -262,7 +262,8 @@ in `docs/`.
   Central. See [ZeroTier worldd setup and evidence](docs/zerotier-worldd.md#dedicated-elsemesh-network).
 - **Publishing (90%):** host the current ElseMesh client at `elsemesh.github.io/`, retire
   `/elsemesh`, and show an eight-character source stamp matching the published
-  ref. See
+  ref. Add a permanent `elsemesh.com` redirect to `elsemesh.org` that preserves
+  path and invite query parameters and works over HTTPS. See
   [deployment](docs/deployment.md#github-pages).
 
 ## Personal ThruHold and provider failover (70%)
