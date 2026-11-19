@@ -125,8 +125,7 @@ gateway/data-path boundary must be implemented before the Tunnel can safely
 serve as the advertised gateway. A Cloudflare Tunnel has not been created or
 configured.
 
-Direct WebRTC still needs public ICE reachability and has not been proven
-independent NATs. Rendezvous mode defaults to Cloudflare's STUN endpoint
+Direct WebRTC still needs public ICE reachability. Rendezvous mode defaults to Cloudflare's STUN endpoint
 `stun.cloudflare.com:3478`. The source now includes a signaling-only Durable
 Object room: worldd connects outward, the browser sends only `connect` and SDP
 signaling through the room, and the manifest/assets must travel directly over
@@ -136,18 +135,18 @@ world data. If direct connectivity fails and no HTTPS/WSS data gateway is
 configured, the client must report failure. On 2026-11-19, Wrangler reported
 Worker deployment `7a2c5936-47c4-4250-8a2c-29dce03694e6` serving 100% of
 production traffic. The deployed `/healthz` returned 200. A disposable,
-real-worldd host registered with the deployed Worker, was found by its
-ZeroTier HostID, completed signaling through the Durable Object, and served
-its signed manifest directly to a Pion visitor on pi3 over WebRTC. The
-visitor and host were not verified on the same ZeroTier network: pi3's route
-to the host's libzt private gateway selected Wi-Fi. The probe's temporary UDP
-allowance covered only pi3's address on a separate system ZeroTier interface.
-The data channel succeeded after Worker signaling, but the Pion candidate pair
-was not recorded, so the selected ICE path is unknown. This proves cross-host
-direct WebRTC data delivery, not the libzt private-HTTP shortcut or
-connectivity through arbitrary NATs. The temporary host and firewall
-allowance were stopped and removed after the probe. Do not silently use the
-control Worker as a world-data relay.
+real-worldd host registered with the deployed Worker and was found by its
+ZeroTier HostID. A visitor on pi3, outside the project's ZeroTier network,
+resolved the signed provider and completed Worker WebSocket signaling. The
+probe excluded ZeroTier and tunnel interfaces from the visitor's ICE
+candidates. Both sides gathered public STUN-reflexive candidates on different
+public IPs, but ICE failed and no world data channel opened. A temporary host
+firewall rule limited to pi3's public IP and the probe's UDP range received no
+packets; it was removed after the test. This proves discovery and signaling
+work for a visitor without the project network, but it does not prove direct
+world-data reachability through these NATs. This host needs a router UDP
+mapping or a separately reachable HTTPS/WSS worldd gateway; the Worker does
+not relay assets. A browser-rendering check also remains open.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
@@ -158,12 +157,12 @@ Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tok
 
 The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. Source supports rendezvous-only signed advertisements, a host-identity challenge, bounded WebRTC signaling, and a browser that requires the direct WebRTC data channel for all world traffic. The Worker contract tests cover the signaling state machine and reject world-data messages.
 
-`test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture and serves the signed manifest over a Pion WebRTC data channel. The opt-in `server/worldd/rendezvous_live_test.go` follows an invite through the deployed Worker, verifies the signed provider, completes Durable Object signaling, then verifies the manifest received directly from worldd over WebRTC. It has passed from pi3 against the deployed service and the disposable live worldd. This is a real cross-machine check, but the visitor was not joined to the host's libzt network, the selected ICE candidate pair was not recorded, and it was not a browser rendering check.
+`test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture and serves the signed manifest over a Pion WebRTC data channel. The opt-in `server/worldd/rendezvous_live_test.go` follows an invite through the deployed Worker and verifies the signed provider and Durable Object signaling. Its 2026-11-19 cross-internet run from pi3 completed lookup and signaling with visitor ZeroTier/tunnel ICE interfaces excluded, then failed direct ICE before a data channel opened. No browser rendering check has passed through this invite route.
 
-The Worker carries lookup and offer/answer signaling only. World content in
-the live probe traveled over the peer-to-peer WebRTC data channel; the browser
-client still needs a visual run through this invite path.
+The Worker carries lookup and offer/answer signaling only. World content must
+use a direct provider connection; the cross-internet probe has not yet
+established that connection for the current host/network pair.
 
 `test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s signed node record, announces it to an in-memory Worker KV, resolves the invite by HostID, then verifies that the client opens WSS to worldd directly. The Worker carries no world content. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by the actual embedded-libzt HostID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies bounded private-route-first behavior, HostID discovery fallback, signature validation before private access, and the public HTTPS/WSS route for visitors without ZeroTier. Its private-IP behavior is mocked; it is not a live ZeroTier private-IP test.
 
-The deployed Worker is `https://elsemesh-world-resolver.rebroad.workers.dev`, restricted to network `e3918db4832a3056`; the hosted client config points to it. Public GitHub Pages serves the client only; it does not serve the resolver API or world gateway. A durable public world gateway and a visual browser run remain unverified. The cross-host probe uses a visitor whose operating system already has ZeroTier access; browser-native ZeroTier joining is not part of this design.
+The deployed Worker is `https://elsemesh-world-resolver.rebroad.workers.dev`, restricted to network `e3918db4832a3056`; the hosted client config points to it. Public GitHub Pages serves the client only; it does not serve the resolver API or world gateway. A durable public world gateway and a visual browser run remain unverified. The visitor-side no-ZeroTier test filters all `zt*` and `tun*` interfaces, but the host still advertises candidates from its configured interfaces; the public ICE data path failed before a candidate pair was selected. Browser-native ZeroTier joining is not part of this design.

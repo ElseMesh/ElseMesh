@@ -4,6 +4,23 @@ This is the dated implementation and verification log. Current priorities and
 open product requirements are tracked in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md);
 completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
+## 2026-11-19
+
+- Tested the compact `elsemesh.org/?invite=` route from pi3 without joining the
+  configured ElseMesh ZeroTier network. The deployed Worker returned the
+  signed HostID provider and completed WebSocket offer/answer signaling. The
+  visitor probe excluded all `zt*` and `tun*` interfaces; both peers gathered
+  public STUN-reflexive candidates on different public IPs, but ICE failed
+  before opening the direct world-data channel. A narrowly scoped host UDP
+  firewall rule for pi3's exact public IP and the probe's port range received
+  no packets, and was removed. This confirms the invite discovery/control path
+  works outside that network, but the world itself cannot yet be reached from
+  these internet connections. Direct UDP port mapping or a reachable direct
+  HTTPS/WSS `worldd` gateway is needed here; the Worker must remain outside the
+  world-content data path. The disposable world had no assets, and no browser
+  render was tested. Public-invite routing is now tracked at 50% (2 of 4
+  verification gates) in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
+
 ## 2026-11-18
 
 - Audited the browser launch path for short friend-invitation URLs. The client

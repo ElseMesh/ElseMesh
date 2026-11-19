@@ -286,23 +286,25 @@ details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-h
 
 Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
-**ZeroTier invite discovery and routing: 75% (3 of 4 verification gates).**
+**Invite discovery for visitors without the project ZeroTier network: 50% (2 of 4 verification gates).**
 The client accepts world ID plus ZeroTier HostID/network ID, verifies the
 invite-bound signed node record before trying its included private gateway,
-then resolves the HostID through the deployed Worker, verifies signed provider
-records, and falls back to direct HTTPS/WSS worldd gateways. Focused client
-tests pass, and an end-to-end test announces a signed worldd provider's actual
-signed node record and embedded-libzt HostID to an in-memory Worker, then
-connects to the real local worldd over WSS; the Worker handles lookup only. A
-live check also announced the actual signed node record to the deployed Worker
-and connected through a temporary public tunnel. This verified lookup and
-gateway selection, but not an independent browser/device or a stable public
-gateway. The remaining gate is a separate visitor device using a durable
-reachable gateway. The host operating system does not need to join ZeroTier; a
-visitor's system-level ZeroTier client is optional and only enables the
-private-gateway fast path.
-The default browser path is Worker lookup followed by direct HTTPS/WSS to a
-reachable provider gateway. **Opaque friend-link tickets and account-bound admission:
+then resolves the HostID through the deployed Worker and verifies signed
+provider records. Focused client tests pass. A live test from pi3 outside the
+project network resolved the signed provider and completed Worker signaling
+with all visitor `zt*` and `tun*` ICE interfaces excluded. The peers gathered
+public STUN-reflexive candidates on different public IPs, but ICE failed before
+a data channel opened; the temporary firewall rule for pi3's exact public IP
+and UDP test range received no packets and was removed. This proves lookup and
+signaling, not world-data reachability across the tested NATs. The remaining
+gates are direct data delivery from an independent visitor and a browser load
+through the resulting public invite. This host needs reachable UDP port
+mapping or a direct HTTPS/WSS gateway for that path. The Worker remains a
+lookup/signaling service and does not relay world content. The host operating
+system does not need to join ZeroTier; visitor ZeroTier is only an optional
+private-gateway shortcut.
+The normal browser route is Worker lookup followed by direct HTTPS/WSS or
+WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only
 `https://elsemesh.org/?invite=<route-code>` URL; that code identifies the
 world/provider route but grants no access. Signed player-bound admission
@@ -317,9 +319,11 @@ ZeroTier route uses the stable network ID and Host ID, not the host's changing
 public IP, and works only when the visitor's device has joined the same
 network. If the application needs a managed ZeroTier IP, it must be stable or
 discovered from trusted network state. For browser-only visitors outside
-ZeroTier, dynamic DNS with inbound reachability or a stable online relay is
-required; GitHub Pages cannot resolve a changing IP. A directory or DHT can
-provide lookup, but it adds online infrastructure or bootstrap dependencies.
+ZeroTier, direct WebRTC may fail under restrictive NAT; a direct HTTPS/WSS
+gateway requires inbound reachability. GitHub Pages cannot resolve a changing
+IP. A directory or DHT can provide lookup, but it adds online infrastructure
+or bootstrap dependencies. Do not silently route world content through the
+lookup Worker.
 See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
 **Three-provider friend-invite acceptance: 0%.** Acceptance requires the owner
 to create one world-local player and issue one `elsemesh.org?invite=` URL
