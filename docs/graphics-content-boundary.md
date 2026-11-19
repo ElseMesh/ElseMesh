@@ -238,8 +238,11 @@ the instance-set and PNG references against the component and manifest, checks
 atlas dimensions and data-image encoding, and exposes near GLBs through a lazy
 signed-asset loader. Startup requests only the descriptor; adapters fetch the
 instance set and atlas data as they initialize. The PNG decoder disables color
-conversion and alpha premultiplication. This prepares the shared input path;
-Tidewater does not export the production atlas assets yet.
+conversion and alpha premultiplication. Tidewater's exporter now emits the
+source WebGPU material and normal/exposure atlases as deterministic,
+content-addressed raw-data PNG sidecars. The Tidewater export test reruns the
+bake and checks byte identity, dimensions, and variant ranges. These atlases
+are still an inactive sidecar: no signed canopy descriptor references them.
 
 `elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
 with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
@@ -248,7 +251,8 @@ Its signed descriptor also carries an `elsemesh.material-graph/1` graph for
 canopy surface appearance. The graph requires `baseColor` and can describe
 roughness, translucency, and wind-driven vertex position through the bounded
 contract compiled for both backends; it contains no backend shader source.
-Tidewater has not authored or exported its canopy graph yet.
+Tidewater has not authored or exported its canopy graph or the near-model set
+yet, so the atlas sidecar does not form a signed canopy component.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The
@@ -260,8 +264,8 @@ records the source tree handoff at 65 m, shrub handoff at 45 m, tree fade from
 three-frame blend limit, shared 12% LOD transition band, and 50% thinning from
 140 to 320 m, selected with the source seed multiplier 91.7 and compensated
 with inverse-square-root retained density. The complete canopy palette, wind
-response, exact atlas assets, and production adapters are still missing; those
-remain required before replacing either presenter.
+response, signed atlas references, and production adapters are still missing;
+those remain required before replacing either presenter.
 
 `src/engine/render/OctahedralCanopyRuntime.js` now resolves each instance to its
 authored group, quaternion yaw, seed-selected atlas variant, and shared near/far

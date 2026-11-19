@@ -1126,6 +1126,15 @@ finding changes them.
 
 ## Verification record
 
+- 2026-11-20: Tidewater's own `export-world.mjs` now bakes the current source
+  WebGPU tree/shrub impostor atlases into content-addressed raw-data PNG
+  sidecars in the Tidewater repository. Its `world-export` test runs the
+  headless llvmpipe exporter twice and verifies identical PNG bytes, hashes,
+  3840×768 dimensions, the 6×6 frame grid, and all three tree/two shrub variant
+  ranges. The artifacts remain inactive and unsigned; Tidewater still lacks
+  the near-model material graph, and neither ElseMesh backend consumes the
+  sidecar. No parity gate or percentage changes.
+
 - 2026-11-20: extended the signed `elsemesh.octahedral-canopy/1` descriptor to
   carry ElseMesh's bounded `elsemesh.material-graph/1` data and require its
   `baseColor` output. This gives WebGPU and WebGL canopy adapters a shared place
