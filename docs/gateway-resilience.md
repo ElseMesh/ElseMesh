@@ -154,6 +154,13 @@ incoming datagrams matching that exact tuple; the failure point remains
 unidentified. The Worker remains signaling-only and does not relay assets.
 Browser rendering through this invite route remains unverified.
 
+The pi3 visitor's router was discoverable as a UPnP IGD in a read-only SSDP
+probe, but pi3 has no `upnpc` utility installed. No mapping was requested or
+changed. In this test pi3 is the visitor, not the `worldd` host; a mapping on
+the visitor side alone cannot make the host's ICE socket reachable. The
+automatic-mapping implementation target and its limits are specified in
+[`browser-direct-webrtc.md`](browser-direct-webrtc.md).
+
 A follow-up narrowed worldd ICE gathering to `wlo1` using the new
 `--webrtc-interface` option. Its SDP contained only `192.168.111.127:46000`
 and the STUN-reflexive public candidate, but ICE still failed. A capture on
@@ -178,13 +185,13 @@ destination-dependent mapping on this path, but does not by itself prove the
 cause of the failed ICE checks. Do not treat one STUN server's mapped port as
 a stable endpoint for arbitrary peers.
 
-The next transport experiment must isolate why simultaneous ICE checks do not
-reach the host's physical interface with the handed-off port. Keep the host
+The next transport work should first implement and validate automatic UDP
+mapping on the `worldd` host (UPnP IGD, NAT-PMP, or PCP when available), then
+repeat the cross-network ICE/data-channel test. Manual port forwarding is an
+optional diagnostic only, never a setup requirement. Keep any temporary host
 firewall exception source/interface/port-specific, remove it after each run,
-and capture only the two peer endpoints and ICE ports. If an owner configures
-the same-port router forward, test the public-IP candidate path separately.
-Do not treat a successful local re-ignition as proof that an idle public
-mapping survives.
+and capture only the two peer endpoints and ICE ports. Do not treat a
+successful local re-ignition as proof that an idle public mapping survives.
 
 Do not treat an idle UDP mapping as a permanent public listener. NAT mapping
 timeouts vary, and outbound traffic is what refreshes a mapping; the IETF

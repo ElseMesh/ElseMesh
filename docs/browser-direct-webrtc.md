@@ -59,13 +59,26 @@ trust a browser-selected presence key.
 
 ## ICE and relay behavior
 
-ICE configuration is deployment configuration, not world metadata. Add one or
-more `--webrtc-stun-server stun:<host>:<port>` options to the gateway and target
-`worldd` processes. STUN can improve direct-path discovery, but cannot relay
-traffic or guarantee connectivity through symmetric NATs and restrictive
-firewalls. TURN credentials are not currently configurable; the existing
-HTTPS/WSS gateway is the fallback relay. Never put relay credentials in a world
-package, invite URL, source repository, or long-lived client bundle.
+Direct ICE is the expected data path and must not require visitors or world
+owners to configure router port forwards. Both peers should use ICE/STUN UDP
+hole punching. The native `worldd` host should also attempt automatic UDP
+mapping through supported gateway protocols (UPnP IGD, NAT-PMP, or PCP) for its
+shared ICE socket, when available. Mapping must be implemented inside
+`worldd`, with bounded discovery, a lease, renewal while the socket is active,
+and cleanup on shutdown; it must not depend on a separate executable or ask
+the user to edit router settings. The browser cannot perform router discovery
+or create a mapping from ordinary web content, so visitor-side connectivity
+uses browser ICE. A mapping at the visitor's router does not fix an unreachable
+worldd host.
+
+Automatic mapping is an assist, not a guarantee: gateways may disable it,
+upstream NAT or CGNAT may prevent it, and endpoint-dependent mappings can still
+defeat direct ICE. `worldd` must keep attempting ordinary ICE when automatic
+mapping is unavailable and report the actual connection failure. STUN improves
+direct-path discovery but does not relay traffic. TURN credentials are not
+currently configurable, and a TURN data relay is not part of the current
+signaling-only Worker design. Never put relay credentials in a world package,
+invite URL, source repository, or long-lived client bundle.
 
 The daemon shares one Pion ICE UDP mux across peer connections. By default it
 binds an ephemeral UDP port; set both `--webrtc-udp-port-min` and
@@ -74,12 +87,12 @@ A one-port range is valid, which supports a fixed firewall rule and enables a
 measured same-port handoff experiment. By default, ICE gathers candidates from
 all available interfaces. On multi-homed hosts, repeat `--webrtc-interface`
 to constrain candidates to specific interfaces and avoid advertising
-unreachable private or overlay addresses. If a router forwards the same UDP
-port to worldd, repeat `--webrtc-nat-1to1-ip <public-ip>` to advertise that
-public address for the host candidate; this setting does not create the router
-forward. Allow the bound UDP port on the host firewall as well. Keep the
-HTTPS/WSS gateway path available when direct UDP cannot be opened; direct
-WebRTC is opportunistic.
+unreachable private or overlay addresses. If a gateway automatically maps the
+selected UDP port, `worldd` must advertise the mapped external candidate only
+when its address and port are known and verified. `--webrtc-nat-1to1-ip`
+remains an explicit diagnostic/advanced override; it is not the normal setup
+path and does not create a mapping. Keep the HTTPS/WSS signaling path available
+while attempting direct UDP.
 
 The existing HTTPS/WSS gateway remains a fallback only when that route is an
 approved data path. A Cloudflare public-hostname Tunnel may carry bounded
