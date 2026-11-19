@@ -1730,7 +1730,7 @@ export class App {
 		const session = this.pendingWorldPresenceSession || this.webglFallback?.earlyPresenceSession;
 		session?.dispose();
 		this.pendingWorldPresenceSession = null;
-		if ( this.webglFallback?.earlyPresenceSession === session ) this.webglFallback.earlyPresenceSession = null;
+		if ( session && this.webglFallback?.earlyPresenceSession === session ) this.webglFallback.earlyPresenceSession = null;
 	}
 
 	prepareHostedWorld( connector ) {
