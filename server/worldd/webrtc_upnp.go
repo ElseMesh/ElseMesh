@@ -28,7 +28,7 @@ const (
 type webrtcUPnPService interface {
 	localAddress() net.IP
 	externalAddress(context.Context) (net.IP, error)
-	getMapping(context.Context, uint16) (upnpPortMapping, bool, error)
+	getMapping(context.Context, uint16) (webrtcUPnPPortMapping, bool, error)
 	addMapping(context.Context, net.IP, uint16) error
 	deleteMapping(context.Context, uint16) error
 }
