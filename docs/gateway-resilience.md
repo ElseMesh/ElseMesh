@@ -162,9 +162,12 @@ public candidate and no inbound peer datagrams; the matching firewall rule
 again counted zero. The host's STUN-reflexive candidate used public UDP port
 19683, not local port 46000. `worldd` now supports `--webrtc-nat-1to1-ip` to
 advertise a public IP at the local candidate port when an owner explicitly
-forwards that same UDP port to the host. Candidate generation is covered by
-worldd tests, but a real router forward and external data channel remain
-untested.
+forwards that same UDP port to the host. A read-only SSDP search and NAT-PMP
+external-address query to this host's default gateway (`192.168.111.1`) got no
+responses, so automatic mapping was not available in this check; this does
+not prove the router disables either protocol. Candidate generation is
+covered by worldd tests, but a real router forward and external data channel
+remain untested.
 
 The next transport experiment must isolate why simultaneous ICE checks do not
 reach the host's physical interface with the handed-off port. Keep the host
