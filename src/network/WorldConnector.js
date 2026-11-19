@@ -1116,8 +1116,41 @@ function withTimeout( promise, milliseconds, message, signal ) {
 }
 
 function waitForICEGathering( peer, signal ) {
-	if ( peer.iceGatheringState === 'complete' ) return Promise.resolve();
-	return waitForEvent( peer, 'icegatheringstatechange', () => peer.iceGatheringState === 'complete', 12000, 'WebRTC ICE gathering timed out', signal );
+	if ( peer.iceGatheringState === 'complete' || hasPublicICECandidate( peer.localDescription?.sdp ) ) return Promise.resolve();
+	if ( signal?.aborted ) return Promise.reject( signal.reason || new DOMException( 'Aborted', 'AbortError' ) );
+	return new Promise( ( resolve, reject ) => {
+		const cleanup = () => {
+			clearTimeout( timeout );
+			signal?.removeEventListener( 'abort', abort );
+			peer.removeEventListener( 'icecandidate', onCandidate );
+			peer.removeEventListener( 'icegatheringstatechange', onStateChange );
+		};
+		const finish = ( error = null ) => {
+			cleanup();
+			if ( error ) reject( error );
+			else resolve();
+		};
+		const onCandidate = ( event ) => {
+			if ( event.candidate?.type === 'srflx' || event.candidate?.type === 'relay' ) finish();
+		};
+		const onStateChange = () => {
+			if ( peer.iceGatheringState === 'complete' ) finish();
+		};
+		const abort = () => finish( signal.reason || new DOMException( 'Aborted', 'AbortError' ) );
+		const timeout = setTimeout( () => finish( new Error( 'WebRTC ICE gathering produced no public candidate before timeout' ) ), 12000 );
+		peer.addEventListener( 'icecandidate', onCandidate );
+		peer.addEventListener( 'icegatheringstatechange', onStateChange );
+		signal?.addEventListener( 'abort', abort, { once: true } );
+		// Gathering may remain open after a usable server-reflexive or relay
+		// candidate arrives. The rendezvous path sends one bounded SDP offer,
+		// so use the first public candidate instead of waiting for trickle ICE
+		// that this signaling protocol does not yet carry.
+		onStateChange();
+	} );
+}
+
+function hasPublicICECandidate( sdp = '' ) {
+	return /^a=candidate:.*\btyp\s+(?:srflx|relay)\b/m.test( sdp );
 }
 
 function waitForDataChannel( channel, signal ) {

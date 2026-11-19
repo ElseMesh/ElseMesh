@@ -60,8 +60,10 @@ const OldWebSocket = globalThis.WebSocket;
 const OldRTCPeerConnection = globalThis.RTCPeerConnection;
 const socketURLs = [];
 const socketFrames = [];
+const offerSDPs = [];
 let connector;
 let rejectPublicGateway = false;
+let gatheringStaysOpenAfterPublicCandidate = false;
 
 globalThis.fetch = async ( input ) => {
 	const url = new URL( input );
@@ -91,6 +93,7 @@ globalThis.WebSocket = class extends EventTarget {
 		if ( request.type === 'connect' ) emit( this, 'message', JSON.stringify( { type: 'connected', worldId, nodeId: owner.peerId, targetPeerId: owner.peerId, manifestProtocol: 'elsemesh.world/3', signalSessionId: 'a'.repeat( 32 ), iceServers: [ { urls: [ 'stun:stun.example:3478' ] } ] } ) );
 		else if ( request.type === 'webrtc.offer' ) {
 			assert.equal( request.signalSessionId, 'a'.repeat( 32 ) );
+			offerSDPs.push( request.sdp );
 			emit( this, 'message', JSON.stringify( { type: 'webrtc.answer', worldId, requestId: request.requestId, sdp: 'answer' } ) );
 		}
 		else throw new Error( `world data must not be sent over signaling (${request.type})` );
@@ -108,10 +111,19 @@ class FakeChannel extends EventTarget {
 }
 
 globalThis.RTCPeerConnection = class extends EventTarget {
-	constructor( config ) { super(); this.iceServers = config.iceServers; this.iceGatheringState = 'complete'; this.connectionState = 'new'; }
+	constructor( config ) { super(); this.iceServers = config.iceServers; this.iceGatheringState = gatheringStaysOpenAfterPublicCandidate ? 'gathering' : 'complete'; this.connectionState = 'new'; }
 	createDataChannel() { return this.channel = new FakeChannel(); }
 	async createOffer() { return { type: 'offer', sdp: 'offer' }; }
-	async setLocalDescription( offer ) { this.localDescription = offer; }
+	async setLocalDescription( offer ) {
+		this.localDescription = { ...offer };
+		if ( gatheringStaysOpenAfterPublicCandidate ) setTimeout( () => {
+			const candidate = { candidate: 'candidate:1 1 udp 100 203.0.113.7 50000 typ srflx raddr 192.0.2.4 rport 50000', type: 'srflx' };
+			this.localDescription.sdp += `\r\na=${candidate.candidate}`;
+			const event = new Event( 'icecandidate' );
+			Object.defineProperty( event, 'candidate', { value: candidate } );
+			this.dispatchEvent( event );
+		}, 0 );
+	}
 	async setRemoteDescription() { this.channel.readyState = 'open'; queueMicrotask( () => emit( this.channel, 'open' ) ); }
 	close() { this.connectionState = 'closed'; }
 };
@@ -125,6 +137,15 @@ try {
 	assert.deepEqual( socketURLs, [ `wss://resolver.example/v1/signal/e3918db4832a3056/0123456789/${encodeURIComponent( worldId )}` ] );
 	assert.deepEqual( socketFrames, [ 'connect', 'webrtc.offer' ], 'the Worker receives signaling only; manifest data travels over the WebRTC channel' );
 	connector.close();
+	gatheringStaysOpenAfterPublicCandidate = true;
+	socketFrames.length = 0;
+	offerSDPs.length = 0;
+	const partialGathering = new WorldConnector( { zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://resolver.example' } );
+	assert.equal( ( await partialGathering.getManifest() ).worldId, worldId, 'the rendezvous proceeds once a public candidate exists even if ICE gathering stays open' );
+	assert.match( offerSDPs[ 0 ], /typ srflx/, 'the one-shot offer includes the gathered server-reflexive candidate' );
+	assert.deepEqual( socketFrames, [ 'connect', 'webrtc.offer' ], 'partial gathering still uses signaling for setup only' );
+	partialGathering.close();
+	gatheringStaysOpenAfterPublicCandidate = false;
 	node = await signedDocument( 'elsemesh.node/1', { ...node.payload, gateway: 'https://owner.example' }, owner );
 	rejectPublicGateway = true;
 	socketURLs.length = 0;

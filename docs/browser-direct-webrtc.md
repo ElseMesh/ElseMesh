@@ -25,9 +25,12 @@ deployment.
    STUN URLs. If WebRTC is unavailable or the selected target rejects the offer,
    the client keeps the current transport.
 2. The browser creates an ordered, reliable `elsemesh` data channel
-   and a WebRTC offer. It completes ICE gathering before sending the offer;
-   the first version uses non-trickle ICE so signaling remains one bounded
-   request and response.
+   and a WebRTC offer. It sends the offer when ICE gathering completes or as
+   soon as a server-reflexive/relay candidate is available. This keeps the
+   current one-offer/one-answer signaling exchange from stalling when a browser
+   continues gathering after it already has a public candidate. Candidate
+   trickling is not implemented yet; candidates gathered after the offer are not
+   signaled.
 3. The client sends `webrtc.offer` over its authenticated gateway session. The
    gateway forwards the request to the selected PeerID using the existing
    authenticated libp2p route. A gateway must not answer on behalf of a target
@@ -145,18 +148,23 @@ Before claiming public direct WebRTC reachability, tests must prove:
 1. **Passed locally:** headless Chromium uses a separate signaling gateway to
    negotiate with the target daemon, retrieves a signed manifest and
    hash-verified asset, closes the channel, and recovers over gateway fallback.
-2. **Passed locally:** signaling through a gateway to a distinct intended
+2. **Passed on 2026-11-19:** isolated headless Chromium used the deployed
+   Worker to resolve a live HostID, attempted the signed private ZeroTier
+   gateway, completed rendezvous fallback, and retrieved the live world's
+   signed manifest over a direct WebRTC data channel. Browser and worldd were
+   on the same host, so this does not prove connectivity across networks.
+3. **Passed locally:** signaling through a gateway to a distinct intended
    target PeerID and world. Traversal over independent NATs remains open.
-3. Invalid SDP, mismatched worlds, unauthorized providers, stale connection
+4. Invalid SDP, mismatched worlds, unauthorized providers, stale connection
    IDs, oversized messages, duplicate request IDs, and unauthorized asset
    ranges are rejected.
-4. ICE failure, data-channel closure, and daemon restart recover over the
+5. ICE failure, data-channel closure, and daemon restart recover over the
    existing WebTransport/WebSocket path without hanging a portal load or
    corrupting an asset transfer.
-5. Direct ICE is tested across independent NATs. TURN relay is tested where
+6. Direct ICE is tested across independent NATs. TURN relay is tested where
    configured; gateway fallback is tested with TURN absent. Localhost-only
    Pion tests do not prove internet reachability.
-6. The real-browser local integration test covers browser APIs and the Linux
+7. The real-browser local integration test covers browser APIs and the Linux
    daemon. Android renderer checks remain separate; Flip7 checks must wait until
    the device is available.
 
