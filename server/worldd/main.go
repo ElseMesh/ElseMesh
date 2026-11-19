@@ -84,6 +84,7 @@ type daemon struct {
 	webrtcUDPPortMax      uint16
 	webrtcMu              sync.Mutex
 	webrtcSessions        map[string]*worldRTCSession
+	rendezvousDialer      *websocket.Dialer
 	regionProvider        *regionProviderGateway
 }
 

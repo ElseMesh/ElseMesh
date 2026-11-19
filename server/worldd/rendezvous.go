@@ -61,7 +61,11 @@ func (d *daemon) runRendezvousSession() error {
 	if err != nil {
 		return err
 	}
-	conn, response, err := websocket.DefaultDialer.DialContext(d.ctx, endpoint, nil)
+	dialer := d.rendezvousDialer
+	if dialer == nil {
+		dialer = websocket.DefaultDialer
+	}
+	conn, response, err := dialer.DialContext(d.ctx, endpoint, nil)
 	if err != nil {
 		if response != nil {
 			return fmt.Errorf("open rendezvous WebSocket: HTTP %d", response.StatusCode)
