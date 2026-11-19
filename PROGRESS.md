@@ -53,6 +53,33 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   visible on their own ports. The Worker lookup/signaling path remains good;
   direct WebRTC data is still unverified.
 
+## 2026-11-20
+
+- Fixed two browser-to-worldd startup failures in the invite route. Chromium
+  can obtain a public STUN-reflexive candidate while ICE gathering remains
+  open, so the client now sends its bounded offer when that candidate appears
+  instead of timing out while waiting for `iceGatheringState=complete`. The
+  player-admission connector now completes and verifies the owner manifest
+  route before sending `presence.update`; it can reconstruct the owner route
+  from the invite's ZeroTier HostID and Worker directory.
+- Verified from an isolated headless Chromium browser using the build-tree
+  client and a disposable empty world: the compact invite tried its signed
+  private ZeroTier gateway, resolved the HostID through the deployed Worker,
+  completed Worker signaling, received the world manifest directly over
+  WebRTC, completed owner presence admission, and reached 100% Ready. The
+  Worker carried only lookup and signaling. This was a same-host test using
+  the WebGL fallback and an empty world; it does not prove independent-NAT
+  connectivity or production-world rendering. Invite routing is now 75% (3
+  of 4 gates); the remaining gate is successful data and admission from an
+  independent network without ZeroTier.
+- The source changes through `fb00620f` are pushed to `origin/main`, but the
+  GitHub Pages workflow failed before the frontend build: its Tidewater
+  submodule checkout could not fetch commit
+  `7ada2a55aa71b961292a6cafbf9186f8fb1604e6`. The deployed page therefore
+  still lacks these latest fixes. Do not use the hosted invite as a friend-
+  ready link until that submodule ref is available and the updated Pages
+  build passes.
+
 ## 2026-11-18
 
 - Audited the browser launch path for short friend-invitation URLs. The client

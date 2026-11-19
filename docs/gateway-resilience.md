@@ -152,7 +152,9 @@ temporary firewall allow limited to pi3's public IP, `wlo1`, and UDP 46000
 matched zero packets and was removed. This run therefore did not observe
 incoming datagrams matching that exact tuple; the failure point remains
 unidentified. The Worker remains signaling-only and does not relay assets.
-Browser rendering through this invite route remains unverified.
+The same-host empty-world browser and admission check is recorded in
+[`PROGRESS.md`](../PROGRESS.md); independent-network ICE and production-world
+asset rendering remain unverified.
 
 The pi3 visitor's router was discoverable as a UPnP IGD in a read-only SSDP
 probe, but pi3 has no `upnpc` utility installed. No mapping was requested or

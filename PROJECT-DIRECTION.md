@@ -286,33 +286,32 @@ details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-h
 
 Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
-**Invite discovery for visitors without the project ZeroTier network: 50% (2 of 4 verification gates).**
-The client accepts world ID plus ZeroTier HostID/network ID, verifies the
-invite-bound signed node record before trying its included private gateway,
-then resolves the HostID through the deployed Worker and verifies signed
-provider records. Focused client tests pass. A live pi3 test temporarily
-joined the configured ZeroTier network and reached the signed node record and
-manifest over the private HTTP/WebSocket gateway under a narrow interface
-firewall policy; the test membership and policy were removed afterward. This
-used Node's WebSocket client, not a browser. A separate live test from pi3
-outside the project network resolved the signed provider and completed Worker
-signaling with all visitor `zt*` and `tun*` ICE interfaces excluded. The local
-libzt stop/rebind/re-ignite probe passes on one selected port and preserves the
-same identity, but a live pi3 test with that handoff still failed ICE before a
-data channel opened. `--webrtc-interface wlo1` now constrains the host to its
-physical interface, but that filtered test also failed. A capture saw outgoing
-checks from local UDP 46000 to pi3's public candidate and no incoming peer
-datagrams; a temporary firewall rule limited to pi3's exact public IP, `wlo1`,
-and UDP 46000 matched zero packets and was removed. This places the observed
-loss before the host INPUT rule but does not identify the NAT/firewall
-behavior. `worldd` now has `--webrtc-nat-1to1-ip` for a public address when the
-same UDP port is forwarded to the host; that route remains unconfigured and
-untested. Lookup and signaling work; world-data reachability across these
-NATs does not. The next gate is testing that explicit direct mapping or
-isolating the NAT behavior. The Worker remains a lookup/signaling service and
-does not relay world content. The host operating system does not need to join
-ZeroTier; visitor ZeroTier is only an optional private-gateway shortcut.
-Gateway resilience records packet evidence and re-ignition behavior.
+**Invite discovery and same-host browser admission: 75% (3 of 4 verification gates).**
+
+1. **Passed:** parse the compact route, verify the signed provider record, try
+   its private ZeroTier gateway first, then fall back to HostID lookup.
+2. **Passed:** resolve the signed provider and complete authenticated Worker
+   signaling without sending world data through the Worker.
+3. **Passed on 2026-11-20:** a headless browser loaded an empty test world,
+   received its manifest directly over WebRTC, completed owner presence
+   admission, and reached 100% ready. This was a same-host check; it does not
+   establish independent-network traversal.
+4. **Open:** a browser on an independent network receives world data and is
+   admitted without joining the project's ZeroTier network. Pi3 completed
+   Worker signaling and gathered public ICE candidates, but direct ICE failed
+   before a data channel opened. Packet and NAT evidence is recorded in
+   [gateway resilience](docs/gateway-resilience.md#public-httpswss-data-gateway).
+
+The Worker remains lookup/signaling only. The invite carries stable locators;
+the changing public IP/UDP port is exchanged as an ICE candidate during
+signaling, not stored as a durable route. `worldd --webrtc-nat-1to1-ip` exists
+for a known forwarded UDP port, but that path remains unconfigured and
+untested. A public HTTPS/WSS gateway is also not yet configured. Neither path
+may turn the Worker into a world-data relay. The client currently sends one
+bounded offer/answer; trickled candidates are not implemented.
+
+Signed player-bound admission tickets, social authentication, and owner invite
+management remain separate open requirements below.
 The normal browser route is Worker lookup followed by direct HTTPS/WSS or
 WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only
