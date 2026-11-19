@@ -82,6 +82,7 @@ type daemon struct {
 	browserHosts          map[string]*browserHostSession
 	webrtcSTUNServers     []string
 	webrtcInterfaces      []string
+	webrtcNAT1To1IPs      []string
 	webrtcUDPPortMin      uint16
 	webrtcUDPPortMax      uint16
 	webrtcMu              sync.Mutex
@@ -149,6 +150,7 @@ func run() error {
 	var allowedBrowserOriginsFlags stringFlags
 	var webrtcSTUNServers stringFlags
 	var webrtcInterfaces stringFlags
+	var webrtcNAT1To1IPs stringFlags
 	var zeroTierBlacklistInterfaces stringFlags
 	webrtcUDPPortMin := flag.Uint("webrtc-udp-port-min", 0, "first local UDP port available to the shared WebRTC ICE socket (0 with max 0 selects an ephemeral port)")
 	webrtcUDPPortMax := flag.Uint("webrtc-udp-port-max", 0, "last local UDP port available to the shared WebRTC ICE socket (a one-port range is valid)")
@@ -167,6 +169,7 @@ func run() error {
 	flag.Var(&allowedBrowserOriginsFlags, "allow-browser-origin", "allow this exact HTTP(S) browser origin to connect to the WebSocket gateway (repeatable)")
 	flag.Var(&webrtcSTUNServers, "webrtc-stun-server", "STUN server URL advertised to browsers and used by worldd for direct WebRTC (repeatable)")
 	flag.Var(&webrtcInterfaces, "webrtc-interface", "network interface allowed for WebRTC ICE candidates (repeatable; default allows all interfaces)")
+	flag.Var(&webrtcNAT1To1IPs, "webrtc-nat-1to1-ip", "public IP to advertise for ICE host candidates when the same UDP port is forwarded to this daemon (repeatable)")
 	flag.Var(&zeroTierBlacklistInterfaces, "zerotier-blacklist-interface", "interface name prefix that libzt must not use for physical paths (repeatable)")
 	cacheSyncInterval := flag.Duration("cache-sync-interval", 5*time.Minute, "how often to retry missing owner-authorized cached assets")
 	roleStateSyncInterval := flag.Duration("role-state-sync-interval", time.Minute, "how often to sync owner-signed role revocations")
@@ -644,10 +647,13 @@ func run() error {
 	if err := validateWebRTCInterfaces(webrtcInterfaces); err != nil {
 		return err
 	}
+	if err := validateWebRTCNAT1To1IPs(webrtcNAT1To1IPs); err != nil {
+		return err
+	}
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
 	defer d.closeWebRTCTransport()
 	if regionProvider != nil {
 		regionProvider.authorizeContent = d.regionContentVisitor

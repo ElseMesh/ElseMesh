@@ -84,6 +84,15 @@ func validateWebRTCInterfaces(names []string) error {
 	return nil
 }
 
+func validateWebRTCNAT1To1IPs(values []string) error {
+	for _, value := range values {
+		if strings.TrimSpace(value) != value || net.ParseIP(value) == nil {
+			return fmt.Errorf("invalid WebRTC one-to-one NAT IP %q: expected an IP address", value)
+		}
+	}
+	return nil
+}
+
 func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 	d.webrtcInitMu.Lock()
 	defer d.webrtcInitMu.Unlock()
@@ -92,6 +101,9 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 	}
 
 	settingEngine := webrtc.SettingEngine{}
+	if len(d.webrtcNAT1To1IPs) > 0 {
+		settingEngine.SetNAT1To1IPs(d.webrtcNAT1To1IPs, webrtc.ICECandidateTypeHost)
+	}
 	var udpMux ice.UDPMux
 	var listenAddress string
 	if len(d.webrtcInterfaces) > 0 {

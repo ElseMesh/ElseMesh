@@ -49,6 +49,12 @@ func TestWebRTCConfigurationValidation(t *testing.T) {
 	if err := validateWebRTCInterfaces([]string{"elsemesh-missing-interface"}); err == nil {
 		t.Fatal("unknown WebRTC interface accepted")
 	}
+	if err := validateWebRTCNAT1To1IPs([]string{"203.0.113.4", "2001:db8::4"}); err != nil {
+		t.Fatalf("valid ICE NAT IPs rejected: %v", err)
+	}
+	if err := validateWebRTCNAT1To1IPs([]string{"not-an-ip"}); err == nil {
+		t.Fatal("invalid ICE NAT IP accepted")
+	}
 }
 
 func TestSharedWebRTCAPIReusesConfiguredUDPPort(t *testing.T) {
@@ -137,6 +143,59 @@ func TestSharedWebRTCAPIHonorsInterfaceAllowlist(t *testing.T) {
 			t.Errorf("WebRTC mux address %s is outside interface %q", udpAddress, selected.Name)
 		}
 	}
+}
+
+func TestSharedWebRTCAPIAdvertisesConfiguredPublicHostIP(t *testing.T) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selected net.Interface
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagLoopback == 0 {
+			selected = iface
+			break
+		}
+	}
+	if selected.Name == "" {
+		t.Skip("no active non-loopback interface is available")
+	}
+
+	daemon := &daemon{webrtcInterfaces: []string{selected.Name}, webrtcNAT1To1IPs: []string{"203.0.113.4"}}
+	api, err := daemon.sharedWebRTCAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer daemon.closeWebRTCTransport()
+	peer, err := api.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peer.Close()
+	ordered := true
+	if _, err := peer.CreateDataChannel("elsemesh", &webrtc.DataChannelInit{Ordered: &ordered}); err != nil {
+		t.Fatal(err)
+	}
+	offer, err := peer.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gathered := webrtc.GatheringCompletePromise(peer)
+	if err := peer.SetLocalDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-gathered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("ICE gathering timed out")
+	}
+	for _, line := range strings.Split(peer.LocalDescription().SDP, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 8 && strings.HasPrefix(line, "a=candidate:") && fields[6] == "typ" && fields[7] == "host" && fields[4] == "203.0.113.4" {
+			return
+		}
+	}
+	t.Fatal("ICE did not advertise the configured public IP as a host candidate")
 }
 
 func TestSharedWebRTCAPIUsesOnePortForConcurrentPeers(t *testing.T) {

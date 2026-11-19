@@ -74,11 +74,12 @@ A one-port range is valid, which supports a fixed firewall rule and enables a
 measured same-port handoff experiment. By default, ICE gathers candidates from
 all available interfaces. On multi-homed hosts, repeat `--webrtc-interface`
 to constrain candidates to specific interfaces and avoid advertising
-unreachable private or overlay addresses. If direct browser connectivity is
-desired, allow the bound UDP port on the host firewall and forward it at the
-edge router to the daemon. Replies are stateful. Keep the HTTPS/WSS gateway
-path available when direct UDP cannot be opened; direct WebRTC is
-opportunistic.
+unreachable private or overlay addresses. If a router forwards the same UDP
+port to worldd, repeat `--webrtc-nat-1to1-ip <public-ip>` to advertise that
+public address for the host candidate; this setting does not create the router
+forward. Allow the bound UDP port on the host firewall as well. Keep the
+HTTPS/WSS gateway path available when direct UDP cannot be opened; direct
+WebRTC is opportunistic.
 
 The existing HTTPS/WSS gateway remains a fallback only when that route is an
 approved data path. A Cloudflare public-hostname Tunnel may carry bounded
