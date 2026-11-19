@@ -144,7 +144,8 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 
 	settingEngine := webrtc.SettingEngine{}
 	settingEngine.SetInterfaceFilter(func(name string) bool {
-		return !strings.HasPrefix(strings.ToLower(name), "zt")
+		name = strings.ToLower(name)
+		return !strings.HasPrefix(name, "zt") && !strings.HasPrefix(name, "tun")
 	})
 	if err := settingEngine.SetEphemeralUDPPortRange(45001, 45032); err != nil {
 		t.Fatalf("configure narrow visitor UDP range: %v", err)
@@ -234,6 +235,11 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	}
 	if answer.RequestID != requestID || answer.WorldID != worldID || answer.SDP == "" {
 		t.Fatalf("Worker returned an invalid WebRTC answer")
+	}
+	for _, line := range strings.Split(answer.SDP, "\n") {
+		if strings.HasPrefix(line, "a=candidate:") {
+			t.Logf("worldd ICE candidate: %s", strings.TrimSpace(line))
+		}
 	}
 	if err := peer.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: answer.SDP}); err != nil {
 		t.Fatalf("set WebRTC remote answer: %v", err)
