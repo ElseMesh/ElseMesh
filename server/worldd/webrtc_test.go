@@ -2,7 +2,12 @@ package main
 
 import (
 	"net"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/pion/webrtc/v4"
 )
 
 func TestWebRTCConfigurationValidation(t *testing.T) {
@@ -65,6 +70,64 @@ func TestSharedWebRTCAPIReusesConfiguredUDPPort(t *testing.T) {
 		t.Fatalf("shared WebRTC UDP port was not released on shutdown: %v", err)
 	}
 	_ = packetConn.Close()
+}
+
+func TestSharedWebRTCAPIUsesOnePortForConcurrentPeers(t *testing.T) {
+	daemon := &daemon{}
+	api, err := daemon.sharedWebRTCAPI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, portText, err := net.SplitHostPort(daemon.webrtcUDPAddr)
+	if err != nil {
+		t.Fatalf("shared UDP address %q: %v", daemon.webrtcUDPAddr, err)
+	}
+	sharedPort, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer daemon.closeWebRTCTransport()
+
+	for index := 0; index < 2; index++ {
+		peer, err := api.NewPeerConnection(webrtc.Configuration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer peer.Close()
+		ordered := true
+		if _, err := peer.CreateDataChannel("elsemesh", &webrtc.DataChannelInit{Ordered: &ordered}); err != nil {
+			t.Fatal(err)
+		}
+		offer, err := peer.CreateOffer(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gathered := webrtc.GatheringCompletePromise(peer)
+		if err := peer.SetLocalDescription(offer); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-gathered:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("peer %d ICE gathering timed out", index)
+		}
+		foundSharedPort := false
+		for _, line := range strings.Split(peer.LocalDescription().SDP, "\n") {
+			if !strings.HasPrefix(line, "a=candidate:") {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) >= 6 {
+				candidatePort, parseErr := strconv.Atoi(fields[5])
+				if parseErr == nil && candidatePort == sharedPort {
+					foundSharedPort = true
+				}
+			}
+		}
+		if !foundSharedPort {
+			t.Fatalf("peer %d ICE candidates did not use shared UDP port %d", index, sharedPort)
+		}
+	}
 }
 
 func TestRendezvousUsesDirectSTUNWithoutTURN(t *testing.T) {
