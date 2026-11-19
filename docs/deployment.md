@@ -48,34 +48,33 @@ The client must not accept a route or player number independently of the
 signed ticket. Remove the ticket from browser history after parsing, and
 avoid making link-preview requests that try to join the world.
 
-For direct ZeroTier-IP access, the visitor's device networking stack
-must already be joined and authorized on the same ZeroTier network. A public
-web page cannot reach a private ZeroTier IP just because it has the Host ID.
-The desired browser-side ztlib/WebAssembly path is a research and performance
-benchmark gate; until it is proven, use a device-level ZeroTier client or a
-public HTTPS/WSS gateway, tunnel, reverse proxy, or browser-compatible relay.
-An invite resolver can discover routes but cannot create network membership or
-reachability. Compare WebAssembly with the native OS client and ElseMesh's
-existing WSS/WebRTC gateway path for connection time, latency, throughput, CPU,
-memory, startup cost, browser compatibility, and failure recovery.
+Ordinary visitors use signed world-ID discovery followed by a direct public
+HTTPS/WSS connection to `worldd`; they do not need ZeroTier. Direct
+ZeroTier-IP access is an optional route for a visitor whose device is already
+joined and authorized on that network. A public web page cannot reach a private
+ZeroTier IP just because it has the HostID. The invite resolver can find a
+provider but cannot create network membership or reachability. Browser-side
+ztlib/WebAssembly remains exploratory and should be considered only if a
+measured use case requires browser-managed ZeroTier membership.
 
 GitHub Pages serves static files; it cannot look up a changing world address
 from an invite code. A self-contained signed ticket avoids a separate invite
 lookup only when it contains a stable locator, such as a ZeroTier node/network
 identity or a hostname whose DNS is kept current. The existing optional
 Cloudflare Worker is a dynamic provider locator: `worldd` publishes a signed
-gateway advertisement and the Pages client can look it up by world or
-ZeroTier identity. It is not an invitation service or traffic relay; details
-are in [gateway resilience](gateway-resilience.md#optional-cloudflare-resolver).
+gateway advertisement and the Pages client looks it up by world ID. A
+ZeroTier identity lookup is an optional convenience for overlay users. The
+Worker is not an invitation service or traffic relay; details are in
+[gateway resilience](gateway-resilience.md#optional-cloudflare-resolver).
 If an ordinary browser needs to reach a world whose public address changes,
 use a dynamic DNS update with
 inbound reachability, or a stable public relay/reverse tunnel to which
 `worldd` connects outbound. A relay or resolver adds an online service
-dependency; ZeroTier can avoid putting the changing public IP in the invite,
-but only for visitors whose device is an authorized ZeroTier node. A browser
-WASM client would need a supported ZeroTier packet transport, not just a
-compiled binary. GitHub Pages alone cannot provide that transport, registration
-or relay.
+dependency; ZeroTier can avoid putting the changing public IP in the invite
+only for visitors whose device is an authorized ZeroTier node. A browser WASM
+client would need a supported ZeroTier packet transport, not just a compiled
+binary. GitHub Pages alone cannot provide that transport, registration or
+relay.
 
 On 2026-11-18, `https://elsemesh.org/?invite=codex-test` returned the ElseMesh
 Pages app directly with HTTP 200 and no `Location` redirect. The custom domain
@@ -95,8 +94,9 @@ without that configuration the method is unavailable. An invite need not
 know the visitor's NodeID in advance. The visitor NodeID must come from a
 verified client-side ZeroTier integration; `worldd`'s own ztlib identity
 identifies the server only. The owner may associate a verified visitor NodeID
-with the world-local player record. Browser ztlib/WebAssembly remains an
-unverified performance benchmark, not an implemented sign-in path.
+with the world-local player record. This account association is separate from
+the public route ordinary browsers use. Browser ztlib/WebAssembly is not a
+sign-in or invite-routing dependency.
 This does not link a social account, and IP addresses remain route hints.
 Never put private credentials or reusable account tokens in an invite URL.
 Once implemented, redemption must enforce expiry, revocation,

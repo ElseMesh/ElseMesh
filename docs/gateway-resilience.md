@@ -51,24 +51,20 @@ https://elsemesh.github.io/?worldId=elsemesh%3Amy-island
   &nodeId=<cache-libp2p-peer-id>&gateway=https%3A%2F%2Fcache-gateway.example
 ```
 
-This is one URL; line breaks above are for readability. For an invite with a
-ZeroTier HostID, the client may first try the invite's signed private gateway
-with a short bounded timeout. If it is unavailable, the client queries
-`worldResolver` by network ID and HostID, verifies the signed provider records,
-and connects directly to the provider's reachable HTTPS/WSS gateway. A private
-gateway returned by HostID discovery is another optional shortcut, not a
-prerequisite; an already-failed private route is not retried. An invite without
-a ZeroTier locator uses its explicit HTTPS/WSS gateway pairs or resolves the
-world ID through `worldResolver`. The client verifies the same signed ThruHold
+This is one URL; line breaks above are for readability. For a world-ID invite,
+the client first tries its explicit HTTPS/WSS provider pairs, then resolves
+`worldId` through `worldResolver` and connects directly to a signed public
+provider gateway. A signed ZeroTier private gateway or HostID lookup is an
+optional fallback for devices that already have a route to that overlay; it
+must not delay or be required for the ordinary public path. A bare
+10-character ZeroTier ID in the world picker is a convenience for known
+overlay users and uses `worldResolver`; if that node advertises several worlds,
+provide a ThruHold ID too. The client verifies the same signed ThruHold
 manifest whichever route succeeds. Up to eight explicit candidates are
-accepted. A bare ThruHold ID or 10-character ZeroTier ID in the world picker
-uses `worldResolver` from `public/elsemesh-config.js`. ZeroTier lookup requires
-a current discoverable advertisement; if that node advertises several worlds,
-provide a ThruHold ID too. Secure pages reject arbitrary HTTP/WS gateways; the
-separate ZeroTier gateway field accepts only private IP literals and is
-subject to browser Local Network Access rules. The browser never needs to join
-ZeroTier itself: the visitor's ordinary public HTTPS/WSS route works without
-it.
+accepted. Secure pages reject arbitrary HTTP/WS gateways; the separate
+ZeroTier gateway field accepts only private IP literals and is subject to
+browser Local Network Access rules. The browser never needs to join ZeroTier
+itself: a normal visitor connects over HTTPS/WSS without installing it.
 
 When sharing a URL, include only providers that already serve the same world and have the necessary owner-signed host grant. A PeerID/gateway in a link does not grant content-cache or failover-authority permission. Each daemon must have its own persistent identity directory; do not copy a private node key from desktop to phone or friend. Issue/renew grants through the world's owner-authorized manifest workflow.
 
@@ -145,6 +141,6 @@ Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tok
 
 The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. The daemon and `directoryd` support signed ZeroTier locator advertisements and lookup. The Worker contract tests cover signature and grant validation, both lookup routes, expiry controls, CORS, malformed IDs, oversized bodies, and rate limiting.
 
-`test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s actual signed node record, including its real ZeroTier HostID, announces that record to an in-memory Worker KV, resolves it by HostID, then verifies that the client opens WSS to worldd directly. The test counts the Worker's HostID lookup separately from the worldd gateway's WebSocket upgrade and asset transfer; it does not route world content through the Worker. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by the actual embedded-libzt HostID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies route ordering with an in-memory directory and WebSocket shim: the browser verifies the invite-bound signed node record before a reachable mocked private gateway bypasses lookup, while failed or stale private routes proceed through Worker discovery. This is not a live ZeroTier private-IP test; the host has no `zerotier-cli`, and no independent visitor device was used.
+`test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s signed node record, announces it to an in-memory Worker KV, resolves the invite by world ID, then verifies that the client opens WSS to worldd directly. It also checks the optional HostID index independently; it does not route world content through the Worker. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by world ID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies route ordering with an in-memory directory and WebSocket shim: public providers are tried before optional ZeroTier routes for a world-ID invite, while a bare ZeroTier locator and public-route failure can still use the signed HostID/private gateway fallback. This is not a live ZeroTier private-IP test; the host has no `zerotier-cli`, and no independent visitor device was used.
 
 The deployed Worker is `https://elsemesh-world-resolver.rebroad.workers.dev`, restricted to network `e3918db4832a3056`; the hosted client config points to it. A live health check, lookups for the configured and unsupported networks, and a temporary live provider announcement by the end-to-end test verified the deployed endpoints. Public GitHub Pages serves the client only; it does not serve the resolver API or world gateway. A durable public world gateway and an independent remote-browser run remain unverified.

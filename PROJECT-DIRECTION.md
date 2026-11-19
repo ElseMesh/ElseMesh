@@ -220,11 +220,10 @@ in `docs/`.
   owner-controlled ZeroTier NodeID-to-player association: 0%.** Enable it by
   default when `worldd` is configured for ZeroTier; this authenticates the
   server's network node, not the browser visitor. Visitor sign-in requires the
-  visitor's own ZeroTier client identity and a verified proof path. **Browser
-  ztlib/WebAssembly feasibility and comparative performance benchmark: 0%.**
-  Compare a browser WebAssembly client with an OS ZeroTier client and the
-  existing browser WSS/WebRTC gateway path on startup/join time, throughput,
-  latency, CPU, memory, browser support, and failure recovery. See
+  visitor's own ZeroTier client identity and a verified proof path. **Optional,
+  non-blocking browser-managed ZeroTier feasibility study: 0%.** Only pursue it
+  if a measured user need justifies joining ZeroTier inside the browser; public
+  world-ID discovery and HTTPS/WSS access do not depend on it. See
   [account roles](docs/account-roles.md) and [visitor identity and world-local
   state](docs/visitor-identity-and-world-state.md), plus the [network
   protocol](docs/world-network-protocol.md#zerotier-browser-transport-and-invites).

@@ -171,18 +171,17 @@ and be authorized on that network. Where the application socket API requires
 a ZeroTier managed IP, the network must provide a stable managed address or
 the client must obtain the current HostID-to-managed-address mapping from a
 trusted network advertisement/controller. Host ID alone is not an IP route.
-The visitor's browser can use a ZeroTier private route only when its host OS
-provides the ZeroTier route (or a working browser ZeroTier transport exists).
-An invite may include a private HTTP gateway as an optional fast path.
-`worldd` publishes this address inside its signed node record and bridges the
-ZeroTier TCP port to its dynamically selected local HTTP/WebSocket gateway
-port. The client verifies the node signature and checks its ZeroTier network
-ID, Host ID, world ID and gateway before connecting. This private probe is
-bounded so a visitor without an OS-level ZeroTier route quickly falls back to
-HostID/network lookup through the Worker, then connects directly to the
-provider's signed HTTPS/WSS gateway. Ordinary browser access does not require
-ZeroTier or a browser ZeroTier implementation. The Worker performs lookup only
-and never carries world traffic.
+An ordinary browser invite resolves its world ID through the Worker and
+connects directly to a provider's signed HTTPS/WSS gateway. A ZeroTier private
+route is optional and only available when the visitor's host OS already
+provides that route (or a future browser ZeroTier transport exists). An invite
+may include a private HTTP gateway as a fallback. `worldd` publishes this
+address inside its signed node record and bridges the ZeroTier TCP port to its
+dynamically selected local HTTP/WebSocket gateway port. The client verifies
+the node signature and checks its ZeroTier network ID, Host ID, world ID and
+gateway before connecting. The Worker performs lookup only and never carries
+world traffic; ordinary browser access does not require ZeroTier or a browser
+ZeroTier implementation.
 
 Hosted HTTPS pages cannot generally connect to private IPs without browser
 permission. Chrome 142 and newer supports local-network requests from secure
@@ -244,23 +243,20 @@ forwards the ZeroTier packets. That relay must be discoverable at a stable
 endpoint, so it is an online dependency. This is substantial networking work,
 not merely a compiler flag.
 
-This browser implementation is unproven and must be benchmarked before it is
-selected. Keep ZeroTier as a supported route; ordinary browser access must not
-depend on a browser-specific ZeroTier implementation. Compare it with the
-native OS ZeroTier client and ElseMesh's existing WSS/WebRTC gateway path,
-measuring time to join/connect, latency, throughput,
-CPU, memory, bundle/startup cost, browser compatibility, and failure recovery.
-Standard browser networking does not expose raw UDP sockets; the WASM port may
-need a WebRTC or WebTransport adapter and a compatible peer or relay. See [Emscripten networking
+Browser-managed ZeroTier is unproven and is not part of the supported baseline.
+Only investigate it if a measured user need justifies the networking and
+performance work. Standard browser networking does not expose raw UDP sockets;
+a WASM port would need a WebRTC or WebTransport adapter and a compatible peer
+or relay. See [Emscripten networking
 limits](https://emscripten.org/docs/porting/networking.html) and the open
 [libzt WebAssembly investigation](https://github.com/zerotier/libzt/issues/173).
-The benchmark is tracked at 0% in
-[project direction](../PROJECT-DIRECTION.md#product-requirements). Until it
-passes, a visitor must use a device-level ZeroTier client for a direct
-ZeroTier-IP route, or use a reachable HTTPS/WSS gateway. Tailscale Serve can
-provide a private HTTPS/WSS gateway under a tailnet's `*.ts.net` name; this
-still requires device-level Tailscale connectivity and acceptance of the
-shared host where applicable.
+Its optional, non-blocking status is tracked in
+[project direction](../PROJECT-DIRECTION.md#product-requirements). Ordinary
+visitors use the signed public HTTPS/WSS gateway. An already-connected device
+may use its native ZeroTier route; Tailscale Serve can provide a private
+HTTPS/WSS gateway under a tailnet's `*.ts.net` name, which still requires
+device-level Tailscale connectivity and acceptance of the shared host where
+applicable.
 
 Invitation codes and launch grants are capabilities, not account role grants.
 They must not contain private keys or reusable account session tokens. Enforce

@@ -198,14 +198,13 @@ that Host ID to the pending world-local player record without requiring it in
 the invite. The association is stored in the world's database and can be
 revoked by its owner.
 
-The target browser path is ztlib compiled to WebAssembly, but this is not
-implemented or proven. It must be benchmarked against the device's native
-ZeroTier client and a public HTTPS/WSS gateway. A normal browser does not
-provide raw UDP sockets; a WASM implementation likely needs a WebRTC or
-WebTransport network adapter. Until that work succeeds, direct ZeroTier access
-requires a device-level ZeroTier client, or the world must expose a public
-gateway/tunnel/relay. **Browser WASM feasibility and performance benchmark:
-0%.**
+Browser-side ztlib/WebAssembly is not a delivery requirement. Browsers do not
+provide raw UDP sockets, so such a port would need another network adapter and
+would add implementation and performance risk. Only investigate it if a
+measured use case requires joining ZeroTier from inside the browser. The
+supported baseline is ordinary HTTPS/WSS to a signed public provider route;
+an already-connected device may additionally use its operating-system
+ZeroTier route without embedding the ZeroTier stack in the browser.
 
 This ZeroTier player association does not automatically link Facebook, Google,
 Telegram, or an ElseMesh account; those identities require their own sign-in
