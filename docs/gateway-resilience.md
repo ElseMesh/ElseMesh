@@ -153,14 +153,20 @@ The next transport experiment is a measured UDP-port handoff: start the
 embedded libzt node on an explicitly selected primary UDP port, record its
 observed public mapping, stop libzt cleanly, then bind that same local port to
 a Pion ICE UDP mux and repeat STUN/peer checks from the independent visitor.
-The fork already exposes fixed-primary-port selection and port inspection;
-the worldd adapter can orchestrate shutdown and rebinding. This tests whether
-the NAT mapping survives the handoff and whether the visitor's packets pass
-the NAT filter. Neither behavior is assumed. If handing the port to Pion
-requires a libzt API change, add that only after the baseline handoff proves
-where the gap is. Keep an optional system ZeroTier path separate from this
-test, and do not make router forwarding a requirement unless evidence
-establishes it. The Worker remains signaling-only and does not relay assets.
+The fork already exposes fixed-primary-port selection and inspection, so
+worldd can test a whole-node stop/rebind without a libzt change. That stops
+the embedded ZeroTier node, however. The current API does not transfer one
+active physical UDP socket to Pion while leaving libzt online. libzt binds a
+primary port, an optional secondary port, and a mapping port only when the
+port-mapping build path is available; the public getter reports only the
+primary port. If preserving the ZeroTier node is required, the fork would
+need a dedicated socket handoff API and worldd would need to give that socket
+to Pion's shared ICE UDP mux. First measure the simpler stop/rebind case: it
+tests whether the NAT mapping survives and whether packets from the visitor
+pass the NAT filter. Neither behavior is assumed. Keep any system ZeroTier
+path separate from this test, and do not make router forwarding a requirement
+unless evidence establishes it. The Worker remains signaling-only and does
+not relay assets.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
