@@ -30,7 +30,8 @@ func TestRendezvousSessionProvesHostAndRoutesOnlyConnect(t *testing.T) {
 		if r.URL.Path != "/v1/signal/e3918db4832a3056/0123456789/"+worldID {
 			t.Errorf("rendezvous path = %q", r.URL.Path)
 		}
-		conn, err := (websocket.Upgrader{}).Upgrade(w, r, nil)
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			t.Errorf("upgrade host rendezvous connection: %v", err)
 			return
