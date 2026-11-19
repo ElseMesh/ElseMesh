@@ -167,12 +167,16 @@ behavior must be measured ([RFC 4787](https://www.rfc-editor.org/rfc/rfc4787/)).
 After the last browser peer leaves, its ICE consent checks stop, so preserving
 ZeroTier traffic while idle does not guarantee reachability from a future
 non-ZeroTier browser: filtering may be specific to the ZeroTier root or peer
-endpoints. The current `worldd` starts libzt for the daemon lifetime; it does
-not stop or restart it based on player count, so an empty visitor list needs no
-re-ignition today. Do not shut libzt down merely because no players are
-connected. If a future idle policy adds that shutdown, re-ignite it to restore
-the optional ZeroTier route, but do not treat that as keeping Pion's separate
-browser ICE mapping alive. `worldd` should keep its Worker signaling session
+endpoints. Without experimental port handoff, `worldd` starts libzt for the
+daemon lifetime and does not change it based on player count. The opt-in
+handoff mode instead stops libzt for the daemon lifetime; it does not yet
+re-ignite libzt when visitors leave. The local API probe confirms that, after
+Pion releases the selected port, libzt can re-ignite with the same identity and
+port. A future player-aware lifecycle could re-ignite libzt after the last
+visitor leaves and hand the port back to Pion when a new visitor arrives, but
+that alternation is not implemented or externally validated. Re-igniting
+restores the optional ZeroTier route; it does not preserve Pion's separate
+browser ICE mapping. `worldd` should keep its Worker signaling session
 available and let each visiting browser and worldd perform ICE connectivity
 checks for that visitor. Verify that a new browser can establish a fresh
 direct pair after idle. ICE connectivity checks and nomination follow
