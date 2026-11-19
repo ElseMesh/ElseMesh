@@ -249,9 +249,21 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	case err := <-readFailure:
 		t.Fatalf("open WebRTC data channel: %v", err)
 	case <-ctx.Done():
-		for _, stat := range peer.GetStats() {
+		stats := peer.GetStats()
+		for _, stat := range stats {
 			if pair, ok := stat.(webrtc.ICECandidatePairStats); ok {
-				t.Logf("visitor ICE pair: state=%s nominated=%t local=%s remote=%s", pair.State, pair.Nominated, pair.LocalCandidateID, pair.RemoteCandidateID)
+				local, localOK := stats[pair.LocalCandidateID].(webrtc.ICECandidateStats)
+				remote, remoteOK := stats[pair.RemoteCandidateID].(webrtc.ICECandidateStats)
+				if localOK && remoteOK {
+					t.Logf("visitor ICE pair: state=%s nominated=%t local=%s/%s %s:%d remote=%s %s:%d requests(sent=%d received=%d) responses(sent=%d received=%d)",
+						pair.State, pair.Nominated, local.CandidateType, local.Protocol, local.IP, local.Port,
+						remote.CandidateType, remote.IP, remote.Port,
+						pair.RequestsSent, pair.RequestsReceived, pair.ResponsesSent, pair.ResponsesReceived)
+				} else {
+					t.Logf("visitor ICE pair: state=%s nominated=%t local=%s remote=%s requests(sent=%d received=%d) responses(sent=%d received=%d)",
+						pair.State, pair.Nominated, pair.LocalCandidateID, pair.RemoteCandidateID,
+						pair.RequestsSent, pair.RequestsReceived, pair.ResponsesSent, pair.ResponsesReceived)
+				}
 			}
 		}
 		t.Fatal("direct WebRTC data channel did not open")
