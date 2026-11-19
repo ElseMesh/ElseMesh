@@ -114,7 +114,7 @@ try {
 	defer os.RemoveAll(profileDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, chromium, "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--no-proxy-server", "--disable-background-networking", "--user-data-dir="+profileDir, "--virtual-time-budget=30000", "--dump-dom", server.URL+"/webrtc-test")
+	command := exec.CommandContext(ctx, chromium, "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--no-proxy-server", "--disable-background-networking", "--user-data-dir="+profileDir, "--virtual-time-budget=18000", "--dump-dom", server.URL+"/webrtc-test")
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("run Chromium direct-WebRTC page: %v\n%s", err, output)
