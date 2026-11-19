@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"net"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/huin/goupnp/soap"
+	"github.com/pion/webrtc/v4"
 )
 
 type fakeWebRTCUPnPService struct {
@@ -88,4 +91,27 @@ func TestPublicIPv4RejectsPrivateAndCarrierNATAddresses(t *testing.T) {
 	if ip, err := publicIPv4("8.8.8.8"); err != nil || !ip.Equal(net.ParseIP("8.8.8.8")) {
 		t.Fatalf("publicIPv4(8.8.8.8) = %v, %v", ip, err)
 	}
+}
+
+func TestLiveWebRTCUPnPMapping(t *testing.T) {
+	if os.Getenv("ELSEMESH_LIVE_UPNP") != "1" {
+		t.Skip("set ELSEMESH_LIVE_UPNP=1 to create and remove a temporary router mapping")
+	}
+	packetConn, err := net.ListenPacket("udp4", ":0")
+	if err != nil {
+		t.Fatalf("bind temporary WebRTC UDP socket: %v", err)
+	}
+	mux := webrtc.NewICEUDPMux(nil, packetConn)
+	defer mux.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	manager, candidates, err := mapWebRTCUDPPort(ctx, mux, nil)
+	if err != nil {
+		t.Fatalf("create temporary UPnP mapping: %v", err)
+	}
+	if manager == nil || len(candidates) == 0 {
+		t.Fatal("no verified UPnP mapping was created")
+	}
+	defer manager.close()
+	t.Logf("verified temporary WebRTC candidate mapping(s): %v", candidates)
 }
