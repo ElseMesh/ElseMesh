@@ -143,12 +143,24 @@ candidates. Both sides gathered public STUN-reflexive candidates on different
 public IPs, but ICE failed and no world data channel opened. A temporary host
 firewall rule limited to pi3's public IP and the probe's UDP range received no
 packets; it was removed after the test. This proves discovery and signaling
-work for a visitor without the project network, but it does not prove direct
-world-data reachability through these NATs. This host needs a router UDP
-mapping or a separately reachable HTTPS/WSS worldd gateway; the Worker does
-not relay assets. Read-only discovery found no UPnP IGD or NAT-PMP service on
-the host's Wi-Fi gateway, so an inbound mapping cannot be created
-automatically. A browser-rendering check also remains open.
+work for a visitor without the project network, but it does not identify why
+direct ICE failed or prove that router mapping is required. Read-only
+discovery found no UPnP IGD or NAT-PMP service on the host's Wi-Fi gateway;
+that only rules out those automatic mapping paths. A browser-rendering check
+also remains open.
+
+The next transport experiment is a measured UDP-port handoff: start the
+embedded libzt node on an explicitly selected primary UDP port, record its
+observed public mapping, stop libzt cleanly, then bind that same local port to
+a Pion ICE UDP mux and repeat STUN/peer checks from the independent visitor.
+The fork already exposes fixed-primary-port selection and port inspection;
+the worldd adapter can orchestrate shutdown and rebinding. This tests whether
+the NAT mapping survives the handoff and whether the visitor's packets pass
+the NAT filter. Neither behavior is assumed. If handing the port to Pion
+requires a libzt API change, add that only after the baseline handoff proves
+where the gap is. Keep an optional system ZeroTier path separate from this
+test, and do not make router forwarding a requirement unless evidence
+establishes it. The Worker remains signaling-only and does not relay assets.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).

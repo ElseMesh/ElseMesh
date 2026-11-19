@@ -296,15 +296,16 @@ with all visitor `zt*` and `tun*` ICE interfaces excluded. The peers gathered
 public STUN-reflexive candidates on different public IPs, but ICE failed before
 a data channel opened; the temporary firewall rule for pi3's exact public IP
 and UDP test range received no packets and was removed. This proves lookup and
-signaling, not world-data reachability across the tested NATs. The remaining
-gates are direct data delivery from an independent visitor and a browser load
-through the resulting public invite. This host needs reachable UDP port
-mapping or a direct HTTPS/WSS gateway for that path. The Worker remains a
+signaling, not world-data reachability across the tested NATs; it does not
+establish that router mapping is required. The next gate is a measured handoff
+of a fixed UDP port from the embedded libzt node to a Pion ICE UDP mux, followed
+by independent-visitor packet and data-channel checks. The fork already has
+fixed-primary-port configuration and inspection; only add a libzt handoff API
+if the measured shutdown/rebind path needs one. The Worker remains a
 lookup/signaling service and does not relay world content. The host operating
 system does not need to join ZeroTier; visitor ZeroTier is only an optional
-private-gateway shortcut. Read-only discovery found no UPnP IGD or NAT-PMP
-service on the host's Wi-Fi gateway, so router port mapping would need manual
-configuration.
+private-gateway shortcut. Gateway resilience records the NAT evidence and
+handoff procedure.
 The normal browser route is Worker lookup followed by direct HTTPS/WSS or
 WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only
