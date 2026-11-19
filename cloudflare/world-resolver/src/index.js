@@ -328,7 +328,8 @@ export class SignalRoom {
 				if ( message.node.signer !== node.nodeId || node.protocol !== NODE_PROTOCOL || node.rendezvous !== true || node.zeroTierNodeId !== attachment.nodeId || node.zeroTierNetworkId !== attachment.networkId || ! node.worldIds?.includes( attachment.worldId ) || node.issuedAt > now + 300 || node.issuedAt < now - MAX_ADVERTISEMENT_AGE_SECONDS || node.expiresAt <= now ) throw new Error( 'node record does not match rendezvous route' );
 				const rawRecord = await this.env.PROVIDERS?.get( announcementKey( { worldId: attachment.worldId, nodeId: node.nodeId } ) );
 				const record = rawRecord ? JSON.parse( rawRecord ) : null;
-				if ( ! record || ! record.rendezvous || record.expiresAt <= now || record.node?.signature !== message.node.signature || record.zeroTierNodeId !== attachment.nodeId || record.zeroTierNetworkId !== attachment.networkId ) throw new Error( 'no current authorized rendezvous advertisement' );
+				const announcedNode = record?.node?.payload;
+				if ( ! record || ! record.rendezvous || record.expiresAt <= now || record.node?.signer !== message.node.signer || announcedNode?.nodeId !== node.nodeId || announcedNode?.rendezvous !== true || ! announcedNode.worldIds?.includes( attachment.worldId ) || announcedNode.zeroTierNodeId !== attachment.nodeId || announcedNode.zeroTierNetworkId !== attachment.networkId || record.zeroTierNodeId !== attachment.nodeId || record.zeroTierNetworkId !== attachment.networkId ) throw new Error( 'no current authorized rendezvous advertisement' );
 				const nonce = Array.from( crypto.getRandomValues( new Uint8Array( 32 ) ), ( byte ) => byte.toString( 16 ).padStart( 2, '0' ) ).join( '' );
 				socket.serializeAttachment( { ...attachment, role: 'host-pending', peerId: node.nodeId, nonce } );
 				this.#send( socket, { type: 'host.challenge', nonce, worldId: attachment.worldId, networkId: attachment.networkId, zeroTierNodeId: attachment.nodeId } );

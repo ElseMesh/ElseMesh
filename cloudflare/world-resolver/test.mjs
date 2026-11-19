@@ -156,7 +156,11 @@ const signalState = {
 const signalRoom = new SignalRoom( signalState, env );
 const hostSocket = new FakeSignalSocket( { role: 'pending', networkId: 'e3918db4832a3056', nodeId: '0123456789', worldId: rendezvousWorldId } );
 signalSockets.push( hostSocket );
-await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.open', node: rendezvousNode } ) );
+const refreshedRendezvousNode = await signedDocument( 'elsemesh.node/1', {
+	...rendezvousNode.payload, issuedAt: now + 1, expiresAt: now + 601,
+}, rendezvousHost );
+assert.notEqual( refreshedRendezvousNode.signature, rendezvousNode.signature, 'fresh signed node records rotate their signature as timestamps change' );
+await signalRoom.webSocketMessage( hostSocket, JSON.stringify( { type: 'host.open', node: refreshedRendezvousNode } ) );
 const challenge = hostSocket.messages.at( -1 );
 assert.equal( challenge.type, 'host.challenge' );
 const hostProof = await signedDocument( 'elsemesh.signal-proof/1', {
