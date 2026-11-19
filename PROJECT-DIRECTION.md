@@ -292,10 +292,13 @@ world/gateway-bound admission assertions, and enforcement on every transport.
    its private ZeroTier gateway first, then fall back to HostID lookup.
 2. **Passed:** resolve the signed provider and complete authenticated Worker
    signaling without sending world data through the Worker.
-3. **Passed on 2026-11-20:** a headless browser loaded an empty test world,
-   received its manifest directly over WebRTC, completed owner presence
-   admission, and reached 100% ready. This was a same-host check; it does not
-   establish independent-network traversal.
+3. **Passed on 2026-11-20:** the deployed Pages client loaded an empty test
+   world from a compact invite, tried the signed private ZeroTier gateway,
+   fell back to HostID/Worker rendezvous, received the manifest directly over
+   WebRTC, completed owner presence admission, and reached 100% Ready. Both
+   browser-to-owner rendezvous handshakes returned an SDP answer. This was a
+   same-host check with an empty world; it does not establish independent-
+   network traversal or production-world rendering.
 4. **Open:** a browser on an independent network receives world data and is
    admitted without joining the project's ZeroTier network. Pi3 completed
    Worker signaling and gathered public ICE candidates, but direct ICE failed

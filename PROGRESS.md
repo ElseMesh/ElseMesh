@@ -62,23 +62,21 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   player-admission connector now completes and verifies the owner manifest
   route before sending `presence.update`; it can reconstruct the owner route
   from the invite's ZeroTier HostID and Worker directory.
-- Verified from an isolated headless Chromium browser using the build-tree
-  client and a disposable empty world: the compact invite tried its signed
-  private ZeroTier gateway, resolved the HostID through the deployed Worker,
-  completed Worker signaling, received the world manifest directly over
-  WebRTC, completed owner presence admission, and reached 100% Ready. The
-  Worker carried only lookup and signaling. This was a same-host test using
-  the WebGL fallback and an empty world; it does not prove independent-NAT
-  connectivity or production-world rendering. Invite routing is now 75% (3
-  of 4 gates); the remaining gate is successful data and admission from an
-  independent network without ZeroTier.
-- The source changes through `fb00620f` are pushed to `origin/main`, but the
-  GitHub Pages workflow failed before the frontend build: its Tidewater
-  submodule checkout could not fetch commit
-  `7ada2a55aa71b961292a6cafbf9186f8fb1604e6`. The deployed page therefore
-  still lacks these latest fixes. Do not use the hosted invite as a friend-
-  ready link until that submodule ref is available and the updated Pages
-  build passes.
+- Verified the deployed `elsemesh.org` client in isolated headless Chromium
+  against a disposable empty world. The compact invite tried its signed
+  private ZeroTier gateway, resolved the HostID through the Worker, completed
+  signaling twice (manifest and owner presence), received the manifest and
+  admitted presence directly over WebRTC, then reached 100% Ready. The Worker
+  carried lookup/signaling only. This same-host WebGL-fallback check does not
+  prove independent-NAT connectivity or production-world rendering.
+- Invite routing is 75% (3 of 4 gates). The open gate is successful data and
+  admission from an independent network without ZeroTier; the pi3 ICE failure
+  above remains unresolved.
+- The Pages retry initially failed because its pinned Tidewater submodule
+  commits were not available from `ElseMesh/tidewater`. The existing three
+  committed Tidewater changes were pushed as a fast-forward, then the Pages
+  workflow passed and deployed `51da0377`. Both the root and submodule source
+  trees are clean at their pushed tips.
 
 ## 2026-11-18
 
