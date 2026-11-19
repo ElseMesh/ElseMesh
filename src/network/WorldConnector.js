@@ -390,8 +390,9 @@ export class WorldConnector {
 	async #discoverDirectZeroTierProvider( signal ) {
 		throwIfAborted( signal );
 		// The private gateway comes from a share URL. Verify the embedded short-lived
-		// node record before any request to that private address; never probe an
-		// arbitrary LAN/ZeroTier IP just to learn who answered it.
+		// node record before requesting that address, so edits to the advertised
+		// gateway, HostID, or world fail before socket creation. The provider's
+		// owner grant is still checked against the signed manifest after connection.
 		const document = this.zeroTierNodeRecord;
 		invariant( document, 'Direct ZeroTier route has no signed node record' );
 		await verifySignedDocument( document, 'elsemesh.node/1' );

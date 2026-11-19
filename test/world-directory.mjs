@@ -182,7 +182,7 @@ try {
 	assert.throws( () => new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
 		zeroTierGateway: 'http://10.147.20.4:43127', directory: 'https://thruhold.org',
-	} ), /signed node record/, 'untrusted invite IPs cannot be probed without a signed route record' );
+	} ), /signed node record/, 'direct gateway use requires a signed route record' );
 	const unsignedPrivateIPRecord = { ...zeroTierProvider, payload: { ...zeroTierProvider.payload, zeroTierGateway: 'http://10.147.20.99:43127' } };
 	const attemptsBeforeTamperedRecord = directGatewayAttempts.length;
 	const tamperedPrivateRoute = new WorldConnector( {
@@ -191,7 +191,7 @@ try {
 	} );
 	await tamperedPrivateRoute.getManifest();
 	assert.equal( tamperedPrivateRoute.gateway, 'http://10.147.20.4:43127', 'a tampered direct IP is discarded in favor of the signed Worker route' );
-	assert.equal( directGatewayAttempts.slice( attemptsBeforeTamperedRecord ).some( url => url.includes( '10.147.20.99' ) ), false, 'an untrusted private IP receives no WebSocket request' );
+	assert.equal( directGatewayAttempts.slice( attemptsBeforeTamperedRecord ).some( url => url.includes( '10.147.20.99' ) ), false, 'changing the private IP without updating its provider signature receives no WebSocket request' );
 	tamperedPrivateRoute.close();
 	const staleNodeRecord = await signedDocument( 'elsemesh.node/1', {
 		...zeroTierProvider.payload, issuedAt: now - 901, expiresAt: now + 600,

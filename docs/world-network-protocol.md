@@ -107,8 +107,11 @@ stale, the browser skips that direct attempt and resolves the HostID through
 the configured directory. The browser decodes and validates the route before
 constructing the normal `WorldConnector`. The compact code itself is unsigned,
 unencrypted, and not a secret or admission grant; it is only a set of routing
-hints. The client still verifies provider signatures and the owner's signed
-world manifest, and retrieves world data from the selected provider gateway. A
+hints. The embedded node signature binds its own advertised gateway and
+ZeroTier identity against route edits, but is not an owner authorization: the
+node self-asserts those fields. The browser checks the provider's owner grant
+against the signed manifest after connecting and before accepting content.
+The client retrieves world data from the selected provider gateway. A
 future owner-signed admission ticket using `?invite=` must have a distinct
 format and remain unimplemented until `worldd` verifies its player binding,
 allowed identity, expiry, revocation, and replay state.
