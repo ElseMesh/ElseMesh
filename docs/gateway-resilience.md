@@ -167,6 +167,20 @@ pass the NAT filter. Neither behavior is assumed. Keep any system ZeroTier
 path separate from this test, and do not make router forwarding a requirement
 unless evidence establishes it. The Worker remains signaling-only and does
 not relay assets.
+
+Do not treat an idle UDP mapping as a permanent public listener. NAT mapping
+timeouts vary, and outbound traffic is what refreshes a mapping; the IETF
+baseline recommends a timer of at least two minutes, but the actual gateway
+behavior must be measured ([RFC 4787](https://www.rfc-editor.org/rfc/rfc4787/)).
+After the last browser peer leaves, its ICE consent checks stop, so preserving
+ZeroTier traffic while idle does not guarantee reachability from a future
+non-ZeroTier browser: filtering may be specific to the ZeroTier root or peer
+endpoints. `worldd` should keep its Worker signaling session available and let
+each visiting browser and worldd perform ICE connectivity checks for that
+visitor; keep libzt active or re-ignite it while idle only to preserve the
+optional ZeroTier route. Verify that a new browser can establish a fresh
+direct pair after idle. ICE connectivity checks and nomination follow
+[RFC 8445](https://www.rfc-editor.org/rfc/rfc8445.html).
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
