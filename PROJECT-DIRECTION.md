@@ -292,23 +292,19 @@ invite-bound signed node record before trying its included private gateway,
 then resolves the HostID through the deployed Worker and verifies signed
 provider records. Focused client tests pass. A live test from pi3 outside the
 project network resolved the signed provider and completed Worker signaling
-with all visitor `zt*` and `tun*` ICE interfaces excluded. The peers gathered
-public STUN-reflexive candidates on different public IPs, but ICE failed before
-a data channel opened; the temporary firewall rule for pi3's exact public IP
-and UDP test range received no packets and was removed. Narrow captures then
-showed ICE checks leaving both endpoints but no inbound checks reaching either
-physical interface; the host firewall exception counter stayed at zero. This
-points to the upstream NAT/firewall path, without identifying its exact
-behavior. This proves lookup and signaling, not world-data reachability across
-the tested NATs; it does not establish that router mapping is required. The
-next gate is a measured handoff of a fixed UDP port from the embedded libzt
-node to a Pion ICE UDP mux, followed by independent-visitor packet and
-data-channel checks. The fork already has fixed-primary-port configuration
-and inspection; only add a libzt handoff API if the measured shutdown/rebind
-path needs one. The Worker remains a lookup/signaling service and does not
-relay world content. The host operating system does not need to join ZeroTier;
-visitor ZeroTier is only an optional private-gateway shortcut. Gateway
-resilience records the packet evidence and handoff procedure.
+with all visitor `zt*` and `tun*` ICE interfaces excluded. The local libzt
+stop/rebind/re-ignite probe passes on one selected port and preserves the same
+identity, but a live pi3 test with that handoff still failed ICE before a data
+channel opened. A temporary firewall rule limited to pi3's exact public IP,
+`wlo1`, and UDP 46000 received no packets and was removed. This points to the
+upstream NAT/firewall path without identifying its exact behavior. Lookup and
+signaling work; world-data reachability across these NATs does not. The next
+gate is isolating why ICE checks do not reach the host's physical interface;
+the result does not establish that router mapping is required. The Worker
+remains a lookup/signaling service and does not relay world content. The host
+operating system does not need to join ZeroTier; visitor ZeroTier is only an
+optional private-gateway shortcut. Gateway resilience records packet
+evidence and re-ignition behavior.
 The normal browser route is Worker lookup followed by direct HTTPS/WSS or
 WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only

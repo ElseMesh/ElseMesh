@@ -11,18 +11,19 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   signed HostID provider and completed WebSocket offer/answer signaling. The
   visitor probe excluded all `zt*` and `tun*` interfaces; both peers gathered
   public STUN-reflexive candidates on different public IPs, but ICE failed
-  before opening the direct world-data channel. A narrowly scoped host UDP
-  firewall rule for pi3's exact public IP and the probe's port range received
-  no packets, and was removed. This confirms the invite discovery/control path
-  works outside that network, but the world itself cannot yet be reached from
-  these internet connections. The cause is not yet isolated, and this result
-  does not prove that router port mapping is required. Read-only UPnP IGD and
-  NAT-PMP discovery on the host gateway returned no response, which only means
-  those automatic mapping paths were not found. Next, test a fixed-port handoff
-  from embedded libzt to Pion and verify mapping stability and inbound packets
-  from pi3; the Worker must remain outside the world-content data path. The
-  disposable world had no assets, and no browser render
-  was tested. Public-invite routing is now tracked at 50% (2 of 4
+  before opening the direct world-data channel, including with the fixed-port
+  libzt-to-Pion handoff enabled. A narrowly scoped host UDP firewall rule for
+  pi3's exact public IP, `wlo1`, and port 46000 received no packets and was
+  removed. The local handoff and libzt re-ignition probe passed with the same
+  identity and port; it does not prove that the public NAT mapping survives.
+  This confirms invite discovery/control works outside that network, but the
+  world itself cannot yet be reached from these internet connections. The
+  cause is not isolated and this result does not prove router port mapping is
+  required. Read-only UPnP IGD and NAT-PMP discovery found no automatic mapping
+  path on the host gateway. Next, isolate why the peer's ICE checks do not
+  reach the host's physical interface; keep the Worker outside the world-data
+  path. The disposable world had no assets, and no browser render was tested.
+  Public-invite routing remains at 50% (2 of 4
   verification gates) in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
 
 - Follow-up probe used a fixed worldd ICE range and packet captures restricted

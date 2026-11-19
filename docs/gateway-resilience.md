@@ -132,47 +132,33 @@ signaling through the room, and the manifest/assets must travel directly over
 WebRTC. This removes the requirement for inbound router forwarding when direct
 ICE succeeds; it does not solve symmetric/restrictive NATs and does not relay
 world data. If direct connectivity fails and no HTTPS/WSS data gateway is
-configured, the client must report failure. On 2026-11-19, Wrangler reported
-Worker deployment `7a2c5936-47c4-4250-8a2c-29dce03694e6` serving 100% of
-production traffic. The deployed `/healthz` returned 200. A disposable,
-real-worldd host registered with the deployed Worker and was found by its
-ZeroTier HostID. A visitor on pi3, outside the project's ZeroTier network,
-resolved the signed provider and completed Worker WebSocket signaling. The
-probe excluded ZeroTier and tunnel interfaces from the visitor's ICE
-candidates. Both sides gathered public STUN-reflexive candidates on different
-public IPs, but ICE failed and no world data channel opened. The test used a
-fixed 32-port worldd ICE range. Packet captures restricted to the two public
-endpoints and those ICE ranges saw repeated outbound connectivity checks from
-each side toward the other's server-reflexive candidate, but no inbound checks
-arrive at either physical interface. A temporary host firewall rule limited
-to pi3's exact public address, the Wi-Fi interface, and worldd's ICE range had
-a zero packet counter and was removed. This localizes the observed loss
-upstream of the host INPUT chain; it is consistent with endpoint-dependent
-NAT filtering/mapping or an upstream firewall, but does not prove which one.
-Separate ZeroTier packets were observed on the ZeroTier ports, demonstrating
-that the working ZeroTier path uses different sockets/endpoints from the Pion
-ICE path. Read-only discovery found no UPnP IGD or NAT-PMP service on the
-host's Wi-Fi gateway; that only rules out those automatic mapping paths. The
-browser-rendering check also remains open.
+configured, the client must report failure. On 2026-11-19, the Worker was
+deployed as version `aaa554ef-a8a7-4068-a6ad-63cb41cb916a`. A registration
+bug was fixed: `worldd` refreshes its signed node-record timestamps, so its
+signature legitimately changes after the directory announcement. The Worker
+now checks the fresh record's signer and route against the stored authorized
+announcement, then still requires the host to prove possession of that key
+with a one-use challenge. A live host registered and remained connected.
 
-The next transport experiment is a measured UDP-port handoff: start the
-embedded libzt node on an explicitly selected primary UDP port, record its
-observed public mapping, stop libzt cleanly, then bind that same local port to
-a Pion ICE UDP mux and repeat STUN/peer checks from the independent visitor.
-The fork already exposes fixed-primary-port selection and inspection, so
-worldd can test a whole-node stop/rebind without a libzt change. That stops
-the embedded ZeroTier node, however. The current API does not transfer one
-active physical UDP socket to Pion while leaving libzt online. libzt binds a
-primary port, an optional secondary port, and a mapping port only when the
-port-mapping build path is available; the public getter reports only the
-primary port. If preserving the ZeroTier node is required, the fork would
-need a dedicated socket handoff API and worldd would need to give that socket
-to Pion's shared ICE UDP mux. First measure the simpler stop/rebind case: it
-tests whether the NAT mapping survives and whether packets from the visitor
-pass the NAT filter. Neither behavior is assumed. Keep any system ZeroTier
-path separate from this test, and do not make router forwarding a requirement
-unless evidence establishes it. The Worker remains signaling-only and does
-not relay assets.
+The local libzt port-handoff probe passes: libzt starts on the selected port,
+stops synchronously, Pion binds that port, then after Pion closes libzt
+re-ignites with the same identity and port. This verifies local bind/restart
+behavior only, not preservation of a public NAT mapping. A pi3 visitor outside
+the project's ZeroTier network resolved the signed provider and completed
+Worker signaling with ZeroTier and tunnel interfaces excluded. With handoff
+enabled on UDP 46000, both sides gathered public STUN-reflexive candidates on
+different public IPs, but ICE failed before opening a world-data channel. A
+temporary firewall allow limited to pi3's public IP, `wlo1`, and UDP 46000
+matched zero packets and was removed. This run therefore did not observe
+incoming datagrams matching that exact tuple; the failure point remains
+unidentified. The Worker remains signaling-only and does not relay assets.
+Browser rendering through this invite route remains unverified.
+
+The next transport experiment must isolate why simultaneous ICE checks do not
+reach the host's physical interface with the handed-off port. Keep the host
+firewall exception source/interface/port-specific, remove it after each run,
+and capture only the two peer endpoints and ICE ports. Do not treat a successful
+local re-ignition as proof that an idle public mapping survives.
 
 Do not treat an idle UDP mapping as a permanent public listener. NAT mapping
 timeouts vary, and outbound traffic is what refreshes a mapping; the IETF
