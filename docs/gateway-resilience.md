@@ -186,14 +186,18 @@ daemon lifetime and does not change it based on player count. The opt-in
 handoff mode instead stops libzt for the daemon lifetime; it does not yet
 re-ignite libzt when visitors leave. The local API probe confirms that, after
 Pion releases the selected port, libzt can re-ignite with the same identity and
-port. A future player-aware lifecycle could re-ignite libzt after the last
-visitor leaves and hand the port back to Pion when a new visitor arrives, but
-that alternation is not implemented or externally validated. Re-igniting
+port. The intended player-aware lifecycle is to re-ignite libzt immediately
+after the last visitor leaves, then leave it running continuously while the
+world is idle; when a visitor arrives, hand the selected port to Pion only for
+the active session. Do not periodically stop and restart libzt while waiting:
+continuous operation is what preserves ZeroTier's own active overlay paths.
+This port alternation is not implemented or externally validated. Re-igniting
 restores the optional ZeroTier route; it does not preserve Pion's separate
-browser ICE mapping. `worldd` should keep its Worker signaling session
-available and let each visiting browser and worldd perform ICE connectivity
-checks for that visitor. Verify that a new browser can establish a fresh
-direct pair after idle. ICE connectivity checks and nomination follow
+browser ICE mapping or guarantee a public NAT mapping for non-ZeroTier peers.
+`worldd` should keep its Worker signaling session available and let each
+visiting browser and worldd perform ICE connectivity checks for that visitor.
+Verify that a new browser can establish a fresh direct pair after idle. ICE
+connectivity checks and nomination follow
 [RFC 8445](https://www.rfc-editor.org/rfc/rfc8445.html).
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
