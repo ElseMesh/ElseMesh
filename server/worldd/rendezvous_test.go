@@ -150,6 +150,7 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 		webrtcSTUNServers: []string{"stun:127.0.0.1:9"},
 		webrtcSessions:    make(map[string]*worldRTCSession), authorityChanged: make(chan struct{}, 1),
 	}
+	defer d.closeWebRTCTransport()
 	done := make(chan error, 1)
 	go func() { done <- d.runRendezvousSession() }()
 	var connected peerResponse

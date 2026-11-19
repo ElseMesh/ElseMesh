@@ -34,6 +34,7 @@ func TestBrowserWebRTCDataChannelServesSignedManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := &daemon{ctx: ctx, host: host, manifest: document, world: world, key: key, authorityChanged: make(chan struct{}, 1), webrtcSessions: make(map[string]*worldRTCSession)}
+	defer d.closeWebRTCTransport()
 	server := httptest.NewServer(http.HandlerFunc(d.handleBrowserGateway))
 	defer server.Close()
 	ws, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/gateway", nil)
