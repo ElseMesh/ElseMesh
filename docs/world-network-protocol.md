@@ -99,12 +99,16 @@ where permitted, but cannot bypass a destination's invitation requirement.
 
 The current `?invite=` route code is a compact base64url encoding of route
 query fields: canonical world ID, optional ZeroTier network ID and HostID,
-optional ZeroTier private gateway, ordered PeerID/gateway candidates, and
-resolver origin. The browser decodes and validates it before constructing the
-normal `WorldConnector` route. This code is unsigned, unencrypted, and not a
-secret or admission grant; it is only a set of routing hints. The client still
-verifies the provider's signed node record and the owner's signed world
-manifest, and retrieves world data from the selected provider gateway. A
+optional ZeroTier private gateway plus its short-lived signed node record,
+ordered PeerID/gateway candidates, and resolver origin. The browser verifies
+the embedded node record against the world ID, network ID, HostID and private
+gateway before making any request to that private address. If the record is
+stale, the browser skips that direct attempt and resolves the HostID through
+the configured directory. The browser decodes and validates the route before
+constructing the normal `WorldConnector`. The compact code itself is unsigned,
+unencrypted, and not a secret or admission grant; it is only a set of routing
+hints. The client still verifies provider signatures and the owner's signed
+world manifest, and retrieves world data from the selected provider gateway. A
 future owner-signed admission ticket using `?invite=` must have a distinct
 format and remain unimplemented until `worldd` verifies its player binding,
 allowed identity, expiry, revocation, and replay state.

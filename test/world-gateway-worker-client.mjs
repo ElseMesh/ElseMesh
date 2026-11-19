@@ -9,6 +9,7 @@ const inviteURL = createWorldInviteURL( {
 	zeroTierNodeId: options.zeroTierNodeID,
 	zeroTierNetworkId: options.zeroTierNetworkID,
 	zeroTierGateway: options.zeroTierGateway || '',
+	zeroTierNodeRecord: options.zeroTierNodeRecord || null,
 	directory: options.directory,
 } );
 const route = worldLinkFromLocation( new URL( inviteURL ) );

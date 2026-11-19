@@ -86,9 +86,11 @@ let failoverProviderReachable = false;
 let privateGatewayReachable = true;
 let directoryProviders = providers;
 let zeroTierLookups = 0;
+let directNodeRecordRequests = 0;
+const directGatewayAttempts = [];
 globalThis.fetch = async ( input ) => {
 	const url = new URL( input );
-	if ( url.pathname === '/.well-known/elsemesh/node' ) return { ok: true, json: async () => zeroTierProvider };
+	if ( url.pathname === '/.well-known/elsemesh/node' ) { directNodeRecordRequests ++; return { ok: true, json: async () => zeroTierProvider }; }
 	if ( url.pathname === '/v1/zerotier/e3918db4832a3056/3af4fd5d50' ) {
 		zeroTierLookups ++;
 		return { ok: true, json: async () => ( { networkId: 'e3918db4832a3056', nodeId: '3af4fd5d50', worldIds: [ 'elsemesh:directory-test' ], providers: [ zeroTierProvider ] } ) };
@@ -103,6 +105,7 @@ globalThis.WebSocket = class extends EventTarget {
 	constructor( url ) {
 		super();
 		this.url = String( url );
+		if ( this.url.includes( '10.147.20.' ) ) directGatewayAttempts.push( this.url );
 		this.targetPeerId = '';
 		this.readyState = WebSocket.CONNECTING;
 		queueMicrotask( () => {
@@ -168,13 +171,40 @@ try {
 	const zeroTierLookupsBeforePrivate = zeroTierLookups;
 	const directZeroTierConnector = new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
-		zeroTierGateway: 'http://10.147.20.4:43127', directory: 'https://thruhold.org',
+		zeroTierGateway: 'http://10.147.20.4:43127', zeroTierNodeRecord: zeroTierProvider, directory: 'https://thruhold.org',
 	} );
 	await directZeroTierConnector.getManifest();
 	assert.equal( directZeroTierConnector.nodeId, second.peerId, 'a direct private gateway reveals a signed node identity bound to the invited ZeroTier ID' );
 	assert.equal( directZeroTierConnector.gateway, 'http://10.147.20.4:43127' );
 	assert.equal( zeroTierLookups, zeroTierLookupsBeforePrivate, 'a working private gateway is tried before Worker HostID lookup' );
+	assert.equal( directNodeRecordRequests, 0, 'the browser verifies the invite-bound node signature before contacting the private IP' );
 	directZeroTierConnector.close();
+	assert.throws( () => new WorldConnector( {
+		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+		zeroTierGateway: 'http://10.147.20.4:43127', directory: 'https://thruhold.org',
+	} ), /signed node record/, 'untrusted invite IPs cannot be probed without a signed route record' );
+	const unsignedPrivateIPRecord = { ...zeroTierProvider, payload: { ...zeroTierProvider.payload, zeroTierGateway: 'http://10.147.20.99:43127' } };
+	const attemptsBeforeTamperedRecord = directGatewayAttempts.length;
+	const tamperedPrivateRoute = new WorldConnector( {
+		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+		zeroTierGateway: 'http://10.147.20.99:43127', zeroTierNodeRecord: unsignedPrivateIPRecord, directory: 'https://thruhold.org',
+	} );
+	await tamperedPrivateRoute.getManifest();
+	assert.equal( tamperedPrivateRoute.gateway, 'http://10.147.20.4:43127', 'a tampered direct IP is discarded in favor of the signed Worker route' );
+	assert.equal( directGatewayAttempts.slice( attemptsBeforeTamperedRecord ).some( url => url.includes( '10.147.20.99' ) ), false, 'an untrusted private IP receives no WebSocket request' );
+	tamperedPrivateRoute.close();
+	const staleNodeRecord = await signedDocument( 'elsemesh.node/1', {
+		...zeroTierProvider.payload, issuedAt: now - 901, expiresAt: now + 600,
+	}, second );
+	const lookupsBeforeStaleRecord = zeroTierLookups;
+	const stalePrivateRoute = new WorldConnector( {
+		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+		zeroTierGateway: 'http://10.147.20.4:43127', zeroTierNodeRecord: staleNodeRecord, directory: 'https://thruhold.org',
+	} );
+	await stalePrivateRoute.getManifest();
+	assert.equal( zeroTierLookups, lookupsBeforeStaleRecord + 1, 'a stale invite-bound node record triggers fresh Worker discovery' );
+	assert.equal( stalePrivateRoute.gateway, 'http://10.147.20.4:43127', 'fresh Worker data restores the current direct private route' );
+	stalePrivateRoute.close();
 	const lookupsBeforeWorkerFallback = zeroTierLookups;
 	const tailscaleGateway = new WorldConnector( {
 		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',

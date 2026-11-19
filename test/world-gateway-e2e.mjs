@@ -102,7 +102,7 @@ try {
 		assert.equal( ownerNode.payload.zeroTierNetworkId, 'e3918db4832a3056' );
 		const liveResult = await runWorkerDiscoveryClient( {
 			worldID, ownerPeerID, cachePeerID: ownerPeerID, zeroTierNodeID: ownerNode.payload.zeroTierNodeId,
-			zeroTierGateway: ownerNode.payload.zeroTierGateway || '',
+			zeroTierGateway: ownerNode.payload.zeroTierGateway || '', zeroTierNodeRecord: ownerNode,
 			zeroTierNetworkID: ownerNode.payload.zeroTierNetworkId, directory: liveDirectoryURL,
 			assetID, assetSource, certPath,
 		} );
@@ -166,7 +166,7 @@ try {
 		resolverServer = await createResolverServer( resolverState, keyPath, certPath );
 
 		const result = await runWorkerDiscoveryClient( {
-			worldID, ownerPeerID, cachePeerID, zeroTierNodeID, zeroTierGateway: resolverNode.payload.zeroTierGateway || '',
+			worldID, ownerPeerID, cachePeerID, zeroTierNodeID, zeroTierGateway: resolverNode.payload.zeroTierGateway || '', zeroTierNodeRecord: resolverNode,
 			zeroTierNetworkID: 'e3918db4832a3056', directory: resolverServer.url,
 			assetID, assetSource, certPath,
 		} );

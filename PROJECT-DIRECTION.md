@@ -280,19 +280,20 @@ details in [deployment](docs/deployment.md) and [browser hosting](docs/browser-h
 Support opt-in invitation issuance, redemption, revocation, replay protection,
 world/gateway-bound admission assertions, and enforcement on every transport.
 **ZeroTier invite discovery and routing: 75% (3 of 4 verification gates).**
-The client accepts world ID plus ZeroTier HostID/network ID, tries an included
-private gateway first, then resolves the HostID through the deployed Worker,
-verifies signed provider records, and falls back to direct HTTPS/WSS worldd
-gateways. Focused client tests pass, and an end-to-end test announces a signed
-worldd provider's actual signed node record and embedded-libzt HostID to an
-in-memory Worker, then connects to the real local worldd over WSS; the Worker
-handles lookup only. A live check also announced the actual signed node record
-to the deployed Worker and connected through a temporary public tunnel. This
-verified lookup and gateway selection, but not an independent browser/device or
-a stable public gateway. The remaining gate is a separate visitor device using
-a durable reachable gateway. The host operating system does not need to join
-ZeroTier; a visitor's system-level ZeroTier client is optional and only enables
-the private-gateway fast path.
+The client accepts world ID plus ZeroTier HostID/network ID, verifies the
+invite-bound signed node record before trying its included private gateway,
+then resolves the HostID through the deployed Worker, verifies signed provider
+records, and falls back to direct HTTPS/WSS worldd gateways. Focused client
+tests pass, and an end-to-end test announces a signed worldd provider's actual
+signed node record and embedded-libzt HostID to an in-memory Worker, then
+connects to the real local worldd over WSS; the Worker handles lookup only. A
+live check also announced the actual signed node record to the deployed Worker
+and connected through a temporary public tunnel. This verified lookup and
+gateway selection, but not an independent browser/device or a stable public
+gateway. The remaining gate is a separate visitor device using a durable
+reachable gateway. The host operating system does not need to join ZeroTier; a
+visitor's system-level ZeroTier client is optional and only enables the
+private-gateway fast path.
 The default browser path is Worker lookup followed by direct HTTPS/WSS to a
 reachable provider gateway. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only

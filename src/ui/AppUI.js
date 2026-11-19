@@ -150,12 +150,14 @@ export class AppUI {
 			}
 			let zeroTierNodeId = connector?.zeroTierNodeId || '';
 			let zeroTierNetworkId = connector?.zeroTierNetworkId;
-			let zeroTierGateway = connector?.zeroTierGateway || '';
+			const connectedZeroTierGateway = connector?.zeroTierGateway || '';
+			let zeroTierGateway = '';
+			let zeroTierNodeRecord = null;
 			let inviteNodeId = hostedDocument?.signer || connector?.nodeId || '';
 			let inviteGateway = hostedDocument ? browserHostState.gateway : connector?.gateway || '';
 			let inviteProviders = hostedDocument ? [] : connector?.providers || [];
-			if ( inviteGateway && inviteGateway === zeroTierGateway ) inviteGateway = '';
-			if ( ! hostedDocument && connector?.nodeId && connector?.gateway && ( ! zeroTierGateway || ! inviteGateway ) ) {
+			if ( inviteGateway && inviteGateway === connectedZeroTierGateway ) inviteGateway = '';
+			if ( ! hostedDocument && connector?.nodeId && connector?.gateway ) {
 				try {
 					const nodeBase = new URL( connector.gateway );
 					if ( nodeBase.protocol === 'wss:' ) nodeBase.protocol = 'https:';
@@ -166,6 +168,7 @@ export class AppUI {
 						await verifySignedDocument( nodeDocument, 'elsemesh.node/1' );
 						const node = nodeDocument.payload;
 						if ( node.nodeId === connector.nodeId && node.worldIds?.includes( connector.worldId ) && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && /^[0-9a-f]{16}$/.test( node.zeroTierNetworkId || '' ) ) {
+							zeroTierNodeRecord = nodeDocument;
 							zeroTierNodeId = node.zeroTierNodeId;
 							zeroTierNetworkId = node.zeroTierNetworkId;
 							zeroTierGateway = node.zeroTierGateway || '';
@@ -182,6 +185,7 @@ export class AppUI {
 				zeroTierNodeId: hostedDocument ? '' : zeroTierNodeId,
 				zeroTierNetworkId,
 				zeroTierGateway: hostedDocument ? '' : zeroTierGateway,
+				zeroTierNodeRecord: hostedDocument ? null : zeroTierNodeRecord,
 				nodeId: inviteGateway ? inviteNodeId : '',
 				gateway: inviteGateway,
 				providers: inviteGateway ? inviteProviders : [],

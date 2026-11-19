@@ -11,6 +11,10 @@ class MemoryStorage {
 
 const pageURL = 'https://app.example/tidewater/?worldId=elsemesh:old&nodeId=old';
 const peerId = '12D3KooW9fPds2JtYVx5aY6kWqRg9m9M1P2Q3R4S5T6U7V8W9XYZ';
+const zeroTierNodeRecord = {
+	protocol: 'elsemesh.node/1', signer: peerId, publicKey: 'public-key', signature: 'signature',
+	payload: { protocol: 'elsemesh.node/1', nodeId: peerId, gateway: 'https://world-host.tailnet-example.ts.net', worldIds: [ 'elsemesh:cave' ], zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', zeroTierGateway: 'http://10.147.20.4:43127', issuedAt: 1900000000, expiresAt: 1900000600 },
+};
 const invite = `https://app.example/tidewater/?worldId=elsemesh%3Acave&nodeId=${peerId}&gateway=https%3A%2F%2Fworld.example&directory=https%3A%2F%2Fthruhold.org`;
 const priorConfig = globalThis.ELSEMESH_CONFIG;
 globalThis.ELSEMESH_CONFIG = { worldResolver: 'https://resolver.example' };
@@ -23,6 +27,7 @@ const compactInvite = createWorldInviteURL( {
 	zeroTierNodeId: '3af4fd5d50',
 	zeroTierNetworkId: 'e3918db4832a3056',
 	zeroTierGateway: 'http://10.147.20.4:43127',
+	zeroTierNodeRecord,
 	directory: 'https://resolver.example',
 } );
 const compactInviteURL = new URL( compactInvite );
@@ -32,11 +37,13 @@ const expandedCompactInvite = new URL( parseWorldInviteURL( compactInvite, pageU
 assert.equal( expandedCompactInvite.searchParams.get( 'worldId' ), 'elsemesh:cave' );
 assert.equal( expandedCompactInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50' );
 assert.equal( expandedCompactInvite.searchParams.get( 'ztGateway' ), 'http://10.147.20.4:43127' );
+assert.deepEqual( JSON.parse( expandedCompactInvite.searchParams.get( 'ztNodeRecord' ) ), zeroTierNodeRecord );
 assert.equal( expandedCompactInvite.searchParams.get( 'directory' ), 'https://resolver.example' );
 const compactBrowserLink = worldLinkFromLocation( { search: compactInviteURL.search, origin: compactInviteURL.origin } );
 assert.equal( compactBrowserLink.worldId, 'elsemesh:cave' );
 assert.equal( compactBrowserLink.zeroTierNodeId, '3af4fd5d50' );
 assert.equal( compactBrowserLink.zeroTierGateway, 'http://10.147.20.4:43127' );
+assert.deepEqual( compactBrowserLink.zeroTierNodeRecord, zeroTierNodeRecord );
 assert.throws( () => parseWorldInviteURL( 'https://app.example/tidewater/?invite=bad!', pageURL ), /route code is invalid/ );
 assert.throws( () => parseWorldInviteURL( `${pageURL}&worldId=elsemesh:cave&invite=${compactInviteURL.searchParams.get( 'invite' )}`, pageURL ), /cannot be combined/ );
 assert.equal( parseWorldInviteURL( 'elsemesh:cave', pageURL ), 'https://app.example/tidewater/?worldId=elsemesh%3Acave&directory=https%3A%2F%2Fresolver.example', 'a bare canonical ThruHold ID becomes a resolver-backed world link' );
@@ -44,10 +51,11 @@ const zeroTierInvite = new URL( parseWorldInviteURL( '3AF4FD5D50', pageURL ) );
 assert.equal( zeroTierInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50', 'a bare ZeroTier ID becomes a normalized, lower-case locator' );
 assert.equal( zeroTierInvite.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056', 'a bare ZeroTier ID records the network used for resolver lookup' );
 assert.equal( zeroTierInvite.searchParams.get( 'directory' ), 'https://resolver.example' );
-const directZeroTierInvite = new URL( parseWorldInviteURL( `https://app.example/tidewater/?worldId=elsemesh%3Acave&ztNodeId=3af4fd5d50&ztNetworkId=e3918db4832a3056&ztGateway=http%3A%2F%2F10.147.20.4%3A43127&nodeId=${peerId}&gateway=https%3A%2F%2Fworld-host.tailnet-example.ts.net`, pageURL ) );
+const directZeroTierInvite = new URL( parseWorldInviteURL( `https://app.example/tidewater/?worldId=elsemesh%3Acave&ztNodeId=3af4fd5d50&ztNetworkId=e3918db4832a3056&ztGateway=http%3A%2F%2F10.147.20.4%3A43127&ztNodeRecord=${encodeURIComponent( JSON.stringify( zeroTierNodeRecord ) )}&nodeId=${peerId}&gateway=https%3A%2F%2Fworld-host.tailnet-example.ts.net`, pageURL ) );
 assert.equal( directZeroTierInvite.searchParams.get( 'gateway' ), 'https://world-host.tailnet-example.ts.net', 'a secure direct gateway is retained alongside the ZeroTier fallback locator' );
 assert.equal( directZeroTierInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50' );
 assert.equal( directZeroTierInvite.searchParams.get( 'ztNetworkId' ), 'e3918db4832a3056' );
+assert.deepEqual( JSON.parse( directZeroTierInvite.searchParams.get( 'ztNodeRecord' ) ), zeroTierNodeRecord );
 assert.equal( directZeroTierInvite.searchParams.get( 'ztGateway' ), 'http://10.147.20.4:43127', 'the invite keeps the private gateway as the first route candidate' );
 assert.equal( parseWorldInviteURL( 'https://elsemesh.example/another-app/?worldId=elsemesh:cave&gateway=https%3A%2F%2Fworld.example', pageURL ), 'https://app.example/tidewater/?worldId=elsemesh%3Acave&gateway=https%3A%2F%2Fworld.example&directory=https%3A%2F%2Fresolver.example' );
 const backupPeerId = '12D3KooWBackupPeerIdentifier12345678901234567890';

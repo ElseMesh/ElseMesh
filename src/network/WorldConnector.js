@@ -78,11 +78,20 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 		};
 	}
 	const worldId = params.get( 'worldId' );
+	for ( const key of [ 'worldId', 'ztNodeId', 'ztNetworkId', 'ztGateway', 'ztNodeRecord', 'directory' ] ) invariant( params.getAll( key ).length <= 1, `Invite contains duplicate ${key}` );
 	const zeroTierNodeId = params.get( 'ztNodeId' ) || '';
 	const zeroTierNetworkId = params.get( 'ztNetworkId' ) || DEFAULT_ZEROTIER_NETWORK_ID;
 	const zeroTierGateway = params.get( 'ztGateway' ) || '';
+	let zeroTierNodeRecord = null;
+	const zeroTierNodeRecordText = params.get( 'ztNodeRecord' ) || '';
+	if ( zeroTierNodeRecordText ) {
+		try { zeroTierNodeRecord = JSON.parse( zeroTierNodeRecordText ); }
+		catch { throw new Error( 'Invite contains an invalid signed ZeroTier node record' ); }
+		invariant( zeroTierNodeRecord && typeof zeroTierNodeRecord === 'object' && ! Array.isArray( zeroTierNodeRecord ), 'Invite contains an invalid signed ZeroTier node record' );
+	}
 	if ( ! worldId && ! zeroTierNodeId ) return null;
 	invariant( ! zeroTierGateway || validZeroTierGateway( zeroTierGateway ), 'Invite contains an invalid ZeroTier private gateway' );
+	invariant( ! zeroTierGateway || zeroTierNodeRecord, 'A direct ZeroTier gateway requires its signed node record in the invite' );
 	const nodeIds = params.getAll( 'nodeId' );
 	const gateways = params.getAll( 'gateway' );
 	invariant( nodeIds.length === gateways.length || ( nodeIds.length === 0 && gateways.length === 1 ), 'Invite provider IDs and gateways must be paired' );
@@ -91,6 +100,7 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 		zeroTierNodeId: zeroTierNodeId.toLowerCase(),
 		zeroTierNetworkId: zeroTierNetworkId.toLowerCase(),
 		zeroTierGateway,
+		zeroTierNodeRecord,
 		nodeId: nodeIds[ 0 ] || '',
 		gateway: gateways[ 0 ] || location.origin,
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
@@ -98,7 +108,7 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	};
 }
 
-export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', nodeId, gateway, providers = [], directory = '' } = {} ) {
+export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', zeroTierNodeRecord = null, nodeId, gateway, providers = [], directory = '' } = {} ) {
 	invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
@@ -110,12 +120,20 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 		url.searchParams.set( 'ztNetworkId', zeroTierNetworkId );
 		if ( zeroTierGateway ) {
 			invariant( validZeroTierGateway( zeroTierGateway ), 'Invalid ZeroTier private gateway for invite' );
+			invariant( zeroTierNodeRecord && typeof zeroTierNodeRecord === 'object' && ! Array.isArray( zeroTierNodeRecord ), 'A direct ZeroTier gateway requires its signed node record' );
+			const node = zeroTierNodeRecord.payload || {};
+			invariant( zeroTierNodeRecord.protocol === 'elsemesh.node/1' && zeroTierNodeRecord.signer === node?.nodeId && node.zeroTierNodeId === zeroTierNodeId.toLowerCase() && node.zeroTierNetworkId === zeroTierNetworkId.toLowerCase() && node.worldIds?.includes( worldId ) && validZeroTierGateway( node.zeroTierGateway ) && new URL( node.zeroTierGateway ).origin === new URL( zeroTierGateway ).origin, 'Signed node record does not match the invite ZeroTier route' );
 			url.searchParams.set( 'ztGateway', new URL( zeroTierGateway ).origin );
-		} else url.searchParams.delete( 'ztGateway' );
+			url.searchParams.set( 'ztNodeRecord', JSON.stringify( zeroTierNodeRecord ) );
+		} else {
+			url.searchParams.delete( 'ztGateway' );
+			url.searchParams.delete( 'ztNodeRecord' );
+		}
 	} else {
 		url.searchParams.delete( 'ztNodeId' );
 		url.searchParams.delete( 'ztNetworkId' );
 		url.searchParams.delete( 'ztGateway' );
+		url.searchParams.delete( 'ztNodeRecord' );
 	}
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	invariant( candidates.length <= 8, 'Invite contains too many gateway candidates' );
@@ -147,12 +165,12 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 }
 
 export class WorldConnector {
-	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES, loadWorldProviders = null } = {} ) {
+	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', zeroTierNodeRecord = null, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES, loadWorldProviders = null } = {} ) {
 		invariant( isWorldID( worldId ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
 		invariant( ! zeroTierNodeId || /^[0-9a-f]{10}$/.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ) && ( directory || zeroTierGateway || providers.length > 0 || nodeId && gateway ), 'ZeroTier lookup requires a valid node ID and network ID, plus either a direct gateway or HTTPS resolver' );
-		invariant( ! zeroTierGateway || zeroTierNodeId && validZeroTierGateway( zeroTierGateway ), 'ZeroTier private gateway requires a valid ZeroTier node ID and private-network HTTP(S) origin' );
+		invariant( ! zeroTierGateway || zeroTierNodeId && validZeroTierGateway( zeroTierGateway ) && zeroTierNodeRecord && typeof zeroTierNodeRecord === 'object', 'ZeroTier private gateway requires a valid ZeroTier node ID, private-network HTTP(S) origin, and signed node record' );
 		this.worldId = worldId;
 		this.localOnly = false;
 		this.presenceEnabled = true;
@@ -160,6 +178,7 @@ export class WorldConnector {
 		this.zeroTierNodeId = zeroTierNodeId;
 		this.zeroTierNetworkId = zeroTierNetworkId;
 		this.zeroTierGateway = zeroTierGateway ? new URL( zeroTierGateway ).origin : '';
+		this.zeroTierNodeRecord = zeroTierNodeRecord;
 		this.nodeId = nodeId || '';
 		this.gateway = gateway;
 		this.providers = providers.length ? providers.map( ( provider ) => ( { ...provider } ) ) : this.nodeId ? [ { nodeId: this.nodeId, gateway } ] : [];
@@ -369,11 +388,12 @@ export class WorldConnector {
 	}
 
 	async #discoverDirectZeroTierProvider( signal ) {
-		const base = new URL( this.zeroTierGateway );
-		if ( base.protocol === 'ws:' ) base.protocol = 'http:';
-		const response = await fetch( new URL( '/.well-known/elsemesh/node', base ), { credentials: 'omit', cache: 'no-store', signal } );
-		if ( ! response.ok ) throw new Error( `Direct ZeroTier node lookup failed (${response.status})` );
-		const document = await response.json();
+		throwIfAborted( signal );
+		// The private gateway comes from a share URL. Verify the embedded short-lived
+		// node record before any request to that private address; never probe an
+		// arbitrary LAN/ZeroTier IP just to learn who answered it.
+		const document = this.zeroTierNodeRecord;
+		invariant( document, 'Direct ZeroTier route has no signed node record' );
 		await verifySignedDocument( document, 'elsemesh.node/1' );
 		throwIfAborted( signal );
 		const node = document.payload;
