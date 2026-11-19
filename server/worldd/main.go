@@ -85,12 +85,14 @@ type daemon struct {
 	webrtcNAT1To1IPs      []string
 	webrtcUDPPortMin      uint16
 	webrtcUDPPortMax      uint16
+	webrtcUPnP            bool
 	webrtcMu              sync.Mutex
 	webrtcSessions        map[string]*worldRTCSession
 	webrtcInitMu          sync.Mutex
 	webrtcAPI             *webrtc.API
 	webrtcUDPMux          io.Closer
 	webrtcUDPAddr         string
+	webrtcUPnPLease       *webrtcUPnPLeaseManager
 	rendezvousDialer      *websocket.Dialer
 	regionProvider        *regionProviderGateway
 }
@@ -154,6 +156,7 @@ func run() error {
 	var zeroTierBlacklistInterfaces stringFlags
 	webrtcUDPPortMin := flag.Uint("webrtc-udp-port-min", 0, "first local UDP port available to the shared WebRTC ICE socket (0 with max 0 selects an ephemeral port)")
 	webrtcUDPPortMax := flag.Uint("webrtc-udp-port-max", 0, "last local UDP port available to the shared WebRTC ICE socket (a one-port range is valid)")
+	webrtcUPnP := flag.Bool("webrtc-upnp", true, "best-effort automatic UDP port mapping for direct WebRTC (no manual router setup; disable with --webrtc-upnp=false)")
 	dhtMode := flag.String("dht-mode", "auto", "DHT mode: auto, client, or server")
 	serveRelay := flag.Bool("relay-service", false, "allow this node to provide a bounded libp2p circuit relay")
 	var bootstrap stringFlags
@@ -653,8 +656,13 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
 	defer d.closeWebRTCTransport()
+	if d.rendezvous {
+		if _, err := d.sharedWebRTCAPI(); err != nil {
+			return fmt.Errorf("initialize rendezvous WebRTC transport: %w", err)
+		}
+	}
 	if regionProvider != nil {
 		regionProvider.authorizeContent = d.regionContentVisitor
 		regionProvider.maxMovementSpeed = func(visitor playerPresence) (float64, error) {

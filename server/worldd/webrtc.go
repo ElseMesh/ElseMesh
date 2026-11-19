@@ -101,9 +101,6 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 	}
 
 	settingEngine := webrtc.SettingEngine{}
-	if len(d.webrtcNAT1To1IPs) > 0 {
-		settingEngine.SetNAT1To1IPs(d.webrtcNAT1To1IPs, webrtc.ICECandidateTypeHost)
-	}
 	var udpMux ice.UDPMux
 	var listenAddress string
 	if len(d.webrtcInterfaces) > 0 {
@@ -168,6 +165,24 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 		udpMux = webrtc.NewICEUDPMux(nil, packetConn)
 		listenAddress = packetConn.LocalAddr().String()
 	}
+	nat1To1IPs := append([]string(nil), d.webrtcNAT1To1IPs...)
+	if d.webrtcUPnP && len(d.webrtcNAT1To1IPs) == 0 {
+		mappingCtx, cancel := context.WithTimeout(d.ctx, webrtcUPnPDiscoveryTimeout+4*webrtcUPnPActionTimeout)
+		lease, candidates, mapErr := mapWebRTCUDPPort(mappingCtx, udpMux, d.webrtcInterfaces)
+		cancel()
+		if mapErr != nil {
+			log.Printf("WebRTC automatic UPnP mapping unavailable; continuing with ICE/STUN: %v", mapErr)
+		}
+		if lease != nil {
+			d.webrtcUPnPLease = lease
+			nat1To1IPs = append(nat1To1IPs, candidates...)
+		} else if mapErr == nil {
+			log.Printf("WebRTC UPnP mapping unavailable; continuing with ICE/STUN")
+		}
+	}
+	if len(nat1To1IPs) > 0 {
+		settingEngine.SetNAT1To1IPs(nat1To1IPs, webrtc.ICECandidateTypeHost)
+	}
 	settingEngine.SetICEUDPMux(udpMux)
 	d.webrtcUDPMux = udpMux
 	d.webrtcUDPAddr = listenAddress
@@ -189,6 +204,10 @@ func (d *daemon) closeWebRTCTransport() {
 
 	d.webrtcInitMu.Lock()
 	defer d.webrtcInitMu.Unlock()
+	if d.webrtcUPnPLease != nil {
+		d.webrtcUPnPLease.close()
+		d.webrtcUPnPLease = nil
+	}
 	if d.webrtcUDPMux != nil {
 		_ = d.webrtcUDPMux.Close()
 		d.webrtcUDPMux = nil

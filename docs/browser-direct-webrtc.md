@@ -71,6 +71,15 @@ or create a mapping from ordinary web content, so visitor-side connectivity
 uses browser ICE. A mapping at the visitor's router does not fix an unreachable
 worldd host.
 
+The first runtime implementation enables UPnP IGD WANIPConnection:1 mapping by
+default for `worldd`'s shared ICE socket. It requests the same external and
+internal UDP port, verifies that the gateway installed the expected mapping,
+renews the one-hour lease, and removes only a matching mapping on shutdown.
+`--webrtc-upnp=false` disables this behavior. NAT-PMP and PCP discovery are not
+implemented yet; ordinary ICE/STUN remains active when UPnP is absent or fails.
+The mapping has not yet been verified through a live cross-network data
+channel.
+
 Automatic mapping is an assist, not a guarantee: gateways may disable it,
 upstream NAT or CGNAT may prevent it, and endpoint-dependent mappings can still
 defeat direct ICE. `worldd` must keep attempting ordinary ICE when automatic
