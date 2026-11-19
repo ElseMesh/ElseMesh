@@ -18,6 +18,7 @@ type zeroTierRuntime interface {
 	StartHTTPBridge(context.Context, int) error
 	StopAccepting() error
 	CloseListeners() error
+	StopForPortHandoff() error
 	Stop() error
 }
 

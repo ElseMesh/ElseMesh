@@ -43,19 +43,14 @@ func TestLiveLibztPrimaryUDPPortRebindsToPion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start libzt on UDP port %d: %v", port, err)
 	}
-	stopped := false
-	t.Cleanup(func() {
-		if !stopped {
-			_ = zt.Stop()
-		}
-	})
+	activeRuntime := zt
+	t.Cleanup(func() { _ = activeRuntime.Stop() })
 	if zt.PrimaryUDPPort() != port {
 		t.Fatalf("libzt primary UDP port = %d, want %d", zt.PrimaryUDPPort(), port)
 	}
-	if err := zt.Stop(); err != nil {
+	if err := zt.StopForPortHandoff(); err != nil {
 		t.Fatalf("stop libzt before handoff: %v", err)
 	}
-	stopped = true
 
 	pion := &daemon{webrtcUDPPortMin: uint16(port), webrtcUDPPortMax: uint16(port)}
 	if _, err := pion.sharedWebRTCAPI(); err != nil {
@@ -68,6 +63,14 @@ func TestLiveLibztPrimaryUDPPortRebindsToPion(t *testing.T) {
 	if reboundPort != fmt.Sprint(port) {
 		t.Fatalf("Pion rebound UDP port %s, want %d", reboundPort, port)
 	}
-	defer pion.closeWebRTCTransport()
-	t.Logf("libzt primary UDP port %d was released and rebound by Pion; external NAT reachability is not established by this probe", port)
+	pion.closeWebRTCTransport()
+	restarted, err := startZeroTier(networkID, dataDir, nil, uint16(port))
+	if err != nil {
+		t.Fatalf("re-ignite libzt after Pion released UDP port %d: %v", port, err)
+	}
+	if restarted.NodeID() != zt.NodeID() || restarted.PrimaryUDPPort() != port {
+		t.Fatalf("re-ignited libzt identity/port changed: node=%s port=%d", restarted.NodeID(), restarted.PrimaryUDPPort())
+	}
+	activeRuntime = restarted
+	t.Logf("libzt released primary UDP port %d for Pion, then re-ignited on the same identity and port; external NAT reachability is not established by this probe", port)
 }

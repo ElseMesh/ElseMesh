@@ -398,6 +398,16 @@ func (z *libztRuntime) StopAccepting() error {
 	return nil
 }
 
+func (z *libztRuntime) StopForPortHandoff() error {
+	if err := z.CloseListeners(); err != nil {
+		return err
+	}
+	if code := int(C.zts_node_stop_and_wait()); code != 0 {
+		return fmt.Errorf("libzt handoff stop failed (%d)", code)
+	}
+	return nil
+}
+
 func (z *libztRuntime) CloseListeners() error {
 	if err := z.StopAccepting(); err != nil {
 		return err
