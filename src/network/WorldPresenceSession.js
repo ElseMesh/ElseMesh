@@ -26,12 +26,13 @@ export function makePresencePose(player, sequence, appearance, vehicleType = pla
 
 function ownerConnectionOptions( connector ) {
  const ownerPeerId = connector.manifest.ownerPeerId;
- const isOwnerProvider = connector.nodeId === ownerPeerId;
+ const providers = ( connector.providers || [] ).filter( provider => provider.nodeId === ownerPeerId );
+ const isOwnerProvider = connector.nodeId === ownerPeerId || providers.length > 0;
  const options = {
   worldId: connector.worldId,
   nodeId: ownerPeerId,
-  gateway: validGatewayForCurrentPage( connector.gateway ) ? connector.gateway : '',
-  providers: isOwnerProvider ? ( connector.providers || [] ).filter( provider => provider.nodeId === ownerPeerId ) : [],
+  gateway: providers.length ? '' : validGatewayForCurrentPage( connector.gateway ) ? connector.gateway : '',
+  providers,
   directory: connector.directory || '',
  };
  if ( isOwnerProvider && connector.zeroTierNodeId ) {

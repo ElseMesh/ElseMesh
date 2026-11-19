@@ -18,7 +18,7 @@ let rendezvousOptions;
 const routePeerId = '12D3KooWAbcdefghijk1234567890123456';
 const rendezvousProvider = { nodeId: routePeerId, gateway: '', rendezvous: true, zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056' };
 const rendezvousRegion = {
- ...connector, nodeId: routePeerId, gateway: 'http://172.22.125.89:43127',
+ ...connector, nodeId: '', gateway: 'https://elsemesh.org',
  zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056',
  zeroTierGateway: 'http://172.22.125.89:43127', zeroTierNodeRecord: { protocol: 'elsemesh.node/1' },
  providers: [ rendezvousProvider ], directory: 'https://resolver.example',
