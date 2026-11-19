@@ -20,9 +20,17 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   world itself cannot yet be reached from these internet connections. The
   cause is not isolated and this result does not prove router port mapping is
   required. Read-only UPnP IGD and NAT-PMP discovery found no automatic mapping
-  path on the host gateway. Next, isolate why the peer's ICE checks do not
-  reach the host's physical interface; keep the Worker outside the world-data
-  path. The disposable world had no assets, and no browser render was tested.
+  path on the host gateway. A follow-up using `--webrtc-interface wlo1`
+  confirmed the host now advertises only that interface's private and
+  server-reflexive candidates, but ICE still failed. The host capture showed
+  eight outgoing checks from UDP 46000 to pi3's server-reflexive endpoint and
+  no incoming peer datagrams; the exact firewall allow remained at zero and
+  was removed. `worldd` now supports `--webrtc-nat-1to1-ip` for advertising a
+  public IP when the same UDP port is explicitly forwarded to it. That
+  forwarding path has not been configured or tested. Next, test that explicit
+  direct mapping or isolate the NAT behavior; keep the Worker outside the
+  world-data path. The disposable world had no assets, and no browser render
+  was tested.
   Public-invite routing remains at 50% (2 of 4
   verification gates) in [PROJECT-DIRECTION.md](PROJECT-DIRECTION.md#invitation-gated-launch-and-staged-portal-loading-55).
 

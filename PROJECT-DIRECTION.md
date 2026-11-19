@@ -295,16 +295,20 @@ project network resolved the signed provider and completed Worker signaling
 with all visitor `zt*` and `tun*` ICE interfaces excluded. The local libzt
 stop/rebind/re-ignite probe passes on one selected port and preserves the same
 identity, but a live pi3 test with that handoff still failed ICE before a data
-channel opened. A temporary firewall rule limited to pi3's exact public IP,
-`wlo1`, and UDP 46000 received no packets and was removed. This points to the
-upstream NAT/firewall path without identifying its exact behavior. Lookup and
-signaling work; world-data reachability across these NATs does not. The next
-gate is isolating why ICE checks do not reach the host's physical interface;
-the result does not establish that router mapping is required. The Worker
-remains a lookup/signaling service and does not relay world content. The host
-operating system does not need to join ZeroTier; visitor ZeroTier is only an
-optional private-gateway shortcut. Gateway resilience records packet
-evidence and re-ignition behavior.
+channel opened. `--webrtc-interface wlo1` now constrains the host to its
+physical interface, but that filtered test also failed. A capture saw outgoing
+checks from local UDP 46000 to pi3's public candidate and no incoming peer
+datagrams; a temporary firewall rule limited to pi3's exact public IP, `wlo1`,
+and UDP 46000 matched zero packets and was removed. This places the observed
+loss before the host INPUT rule but does not identify the NAT/firewall
+behavior. `worldd` now has `--webrtc-nat-1to1-ip` for a public address when the
+same UDP port is forwarded to the host; that route remains unconfigured and
+untested. Lookup and signaling work; world-data reachability across these
+NATs does not. The next gate is testing that explicit direct mapping or
+isolating the NAT behavior. The Worker remains a lookup/signaling service and
+does not relay world content. The host operating system does not need to join
+ZeroTier; visitor ZeroTier is only an optional private-gateway shortcut.
+Gateway resilience records packet evidence and re-ignition behavior.
 The normal browser route is Worker lookup followed by direct HTTPS/WSS or
 WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only

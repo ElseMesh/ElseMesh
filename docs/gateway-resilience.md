@@ -154,11 +154,25 @@ incoming datagrams matching that exact tuple; the failure point remains
 unidentified. The Worker remains signaling-only and does not relay assets.
 Browser rendering through this invite route remains unverified.
 
+A follow-up narrowed worldd ICE gathering to `wlo1` using the new
+`--webrtc-interface` option. Its SDP contained only `192.168.111.127:46000`
+and the STUN-reflexive public candidate, but ICE still failed. A capture on
+`wlo1` recorded eight outbound checks from `192.168.111.127:46000` to pi3's
+public candidate and no inbound peer datagrams; the matching firewall rule
+again counted zero. The host's STUN-reflexive candidate used public UDP port
+19683, not local port 46000. `worldd` now supports `--webrtc-nat-1to1-ip` to
+advertise a public IP at the local candidate port when an owner explicitly
+forwards that same UDP port to the host. Candidate generation is covered by
+worldd tests, but a real router forward and external data channel remain
+untested.
+
 The next transport experiment must isolate why simultaneous ICE checks do not
 reach the host's physical interface with the handed-off port. Keep the host
 firewall exception source/interface/port-specific, remove it after each run,
-and capture only the two peer endpoints and ICE ports. Do not treat a successful
-local re-ignition as proof that an idle public mapping survives.
+and capture only the two peer endpoints and ICE ports. If an owner configures
+the same-port router forward, test the public-IP candidate path separately.
+Do not treat a successful local re-ignition as proof that an idle public
+mapping survives.
 
 Do not treat an idle UDP mapping as a permanent public listener. NAT mapping
 timeouts vary, and outbound traffic is what refreshes a mapping; the IETF
