@@ -167,7 +167,9 @@ external-address query to this host's default gateway (`192.168.111.1`) got no
 responses, so automatic mapping was not available in this check; this does
 not prove the router disables either protocol. Candidate generation is
 covered by worldd tests, but a real router forward and external data channel
-remain untested.
+remain untested. This host also has no global IPv6 address or default IPv6
+route on `wlo1`, and outbound IPv6 HTTPS failed, so IPv6 is not currently an
+alternate public candidate path here.
 
 The next transport experiment must isolate why simultaneous ICE checks do not
 reach the host's physical interface with the handed-off port. Keep the host
