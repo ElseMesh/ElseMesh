@@ -75,7 +75,8 @@ import { appearanceForAllowedProfiles, avatarProfileId, AVATAR_STYLES, loadAppea
 import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
-import { updateWorldPackageLOD, appendWorldPackageAssets, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { updateWorldPackageLOD, appendWorldPackageAssets, createWorldPackageRoot, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
+import { createBundledWorldAssetConnector, loadWorldComponentAssets } from './network/WorldComponentAssets.js';
 import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -465,6 +466,7 @@ export class App {
 		this.terrainGPU = new TerrainGPU( this.terrainData, this.shoreField );
 		// terrain and rocks apply the heightfield sun shadow (long hill shadows) in their own lighting
 		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, surfaceProfile: terrainSurfaceProfile, renderer } );
+		if ( this.vegetationEnabled ) await this.installLocalGroundCoverComponent( scene );
 		const createRocks = this.worldPackage?.presentation?.createRocks;
 		if ( typeof createRocks !== 'function' ) throw new Error( 'The default world package must provide its rock presentation' );
 		this.rocks = await createRocks( { scene, terrain: this.terrain, worldLayout: this.worldLayout, village: this.village, colliders: this.colliders } );
@@ -1563,6 +1565,22 @@ export class App {
 		throw new DOMException( 'World changed before visible coarse coverage was ready', 'AbortError' );
 	}
 
+	async installLocalGroundCoverComponent( scene ) {
+		const source = this.worldPackage?.source;
+		const component = source?.components?.find( entry => entry.type === 'elsemesh.ground-cover-field/1' );
+		if ( ! component ) return;
+		const assetURLs = this.worldPackage.assets?.assetURLs;
+		const connector = createBundledWorldAssetConnector( source, assetURLs );
+		const assets = await loadWorldComponentAssets( [ component ], assetURLs );
+		for ( const [ assetID, bytes ] of assets ) connector.assets.set( assetID, bytes );
+		const root = createWorldPackageRoot( connector );
+		root.userData.terrainData = this.terrainData;
+		root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: this.terrainGPU } ];
+		scene.add( root );
+		this.localWorldComponentRoot = root;
+		await this.installWorldComponents( root, connector, new Set( [ component.id ] ) );
+	}
+
 	async installWorldComponents( root, connector, componentIDs = null ) {
 		const installed = [];
 		const installedIDs = root.userData.installedWorldComponentIDs ||= new Set();
@@ -2399,6 +2417,7 @@ export class App {
 		this.reef.update( dt, this.camera.position );
 		this.village.update( dt );
 		if ( this.vegetation && ! this.remoteWorldActive ) this.vegetation.update( dt, this.camera );
+		if ( this.localWorldComponentRoot && ! this.remoteWorldActive ) this.updateWorldComponents( this.localWorldComponentRoot, dt, this.camera );
 		if ( this.whale ) {
 			this.whale.group.visible = ! this.remoteWorldActive;
 			if ( ! this.remoteWorldActive ) this.whale.update( dt, this.camera );

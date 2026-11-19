@@ -46,13 +46,20 @@ const PORTAL_FRAME_STYLES = Object.freeze( {
 } );
 const TEXTURE_LOD_RETRY_MS = 5000;
 
+export function createWorldPackageRoot( connector, { materialContext = null, progressiveAssets = null } = {} ) {
+	if ( ! connector?.manifest ) throw new Error( 'A world package root requires a verified world manifest' );
+	const root = new Group();
+	root.name = `world:${connector.worldId || connector.manifest.worldId || 'local'}`;
+	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), lightNodes: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map(), textureEntryByTexture: new Map(), progressiveAssets: new Map( progressiveAssets || [] ), progressiveTextureTargets: new Map(), progressiveTextureTargetsByAsset: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
+	return root;
+
+}
+
 export async function loadWorldPackage( connector, { signal, assets: preloadedAssets, objectIDs, materialContext, progressiveAssets } = {} ) {
 
 	if ( ! connector.manifest ) throw new Error( 'Load and verify a world manifest first' );
 	const assets = preloadedAssets || await connector.preload();
-	const root = new Group();
-	root.name = `world:${connector.worldId}`;
-	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), replacedByComponents: new Set(), lightNodes: new Set(), connector, materialContext, materialAdapterContexts: new Map(), textureAssets: new Map(), textureEntryByTexture: new Map(), progressiveAssets: new Map( progressiveAssets || [] ), progressiveTextureTargets: new Map(), progressiveTextureTargetsByAsset: new Map(), progressiveTextureJobs: new Map(), objectsByAsset: new Map(), progressiveController: new AbortController() };
+	const root = createWorldPackageRoot( connector, { materialContext, progressiveAssets } );
 	try {
 		await appendWorldPackageAssets( connector, root, assets, { signal, objectIDs } );
 		return root;
