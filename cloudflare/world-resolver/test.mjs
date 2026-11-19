@@ -115,6 +115,26 @@ const rendezvousResult = await rendezvousLookup.json();
 assert.equal( rendezvousResult.providers[ 0 ].payload.rendezvous, true );
 assert.equal( rendezvousResult.providers[ 0 ].payload.gateway, '' );
 
+const ownerRendezvousWorldId = 'elsemesh:worker-owner-rendezvous';
+const ownerRendezvousNode = await signedDocument( 'elsemesh.node/1', {
+	protocol: 'elsemesh.node/1', nodeId: owner.peerId, gateway: '', rendezvous: true,
+	worldIds: [ ownerRendezvousWorldId ], zeroTierNodeId: 'abcdef1234', zeroTierNetworkId: 'e3918db4832a3056',
+	issuedAt: now, expiresAt: now + 600,
+}, owner );
+const ownerRendezvousManifest = await signedDocument( 'elsemesh.world/3', {
+	protocol: 'elsemesh.world/3', worldId: ownerRendezvousWorldId, ownerPeerId: owner.peerId, authorityEpoch: 1,
+	discoverable: true,
+}, owner );
+const ownerRendezvousPublished = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: JSON.stringify( { node: ownerRendezvousNode, manifest: ownerRendezvousManifest } ) } ), env );
+assert.equal( ownerRendezvousPublished.status, 202, 'an owner-hosted rendezvous world may omit its empty host-grant list' );
+const ownerRendezvousLookup = await handleRequest( new Request( 'https://resolver.example/v1/zerotier/e3918db4832a3056/abcdef1234' ), env );
+assert.deepEqual( ( await ownerRendezvousLookup.json() ).providers, [ ownerRendezvousNode ], 'HostID lookup returns an owner-hosted rendezvous world without delegated hosts' );
+const invalidOwnerManifest = await signedDocument( 'elsemesh.world/3', {
+	...ownerRendezvousManifest.payload, hosts: null,
+}, owner );
+const invalidOwnerRendezvous = await handleRequest( new Request( 'https://resolver.example/v1/announce', { method: 'POST', body: JSON.stringify( { node: ownerRendezvousNode, manifest: invalidOwnerManifest } ) } ), env );
+assert.equal( invalidOwnerRendezvous.status, 422, 'a present but malformed host-grant list remains invalid' );
+
 class FakeSignalSocket {
 	constructor( attachment ) { this.attachment = attachment; this.messages = []; this.closed = false; }
 	serializeAttachment( attachment ) { this.attachment = structuredClone( attachment ); }

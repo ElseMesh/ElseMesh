@@ -113,6 +113,7 @@ async function validateAnnouncement( announcement, nowSeconds ) {
 	if ( announcement.authorityLease ) await verifySignedDocument( announcement.authorityLease, AUTHORITY_PROTOCOL );
 	const node = announcement.node.payload;
 	const manifest = announcement.manifest.payload;
+	const hosts = manifest.hosts === undefined ? [] : manifest.hosts;
 	if ( JSON.stringify( node ).length > MAX_RECORD_BYTES || JSON.stringify( manifest ).length > MAX_RECORD_BYTES ) throw new Error( 'signed document payload exceeds the size limit' );
 	const rendezvous = node.rendezvous === true;
 	if ( node.protocol !== NODE_PROTOCOL || node.nodeId !== announcement.node.signer || ! PEER_ID.test( node.nodeId ) || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! WORLD_ID.test( node.worldIds[ 0 ] ) || !( validGateway( node.gateway ) || rendezvous && node.gateway === '' ) ) throw new Error( 'invalid node advertisement' );
@@ -121,10 +122,10 @@ async function validateAnnouncement( announcement, nowSeconds ) {
 	if ( rendezvous && ( ! node.zeroTierNodeId || ! node.zeroTierNetworkId ) ) throw new Error( 'signaling rendezvous requires a ZeroTier node identity' );
 	if ( node.zeroTierGateway && ( ! node.zeroTierNodeId || ! validZeroTierGateway( node.zeroTierGateway ) ) ) throw new Error( 'invalid ZeroTier private gateway' );
 	const worldId = node.worldIds[ 0 ];
-	if ( manifest.protocol !== WORLD_PROTOCOL || manifest.worldId !== worldId || manifest.ownerPeerId !== announcement.manifest.signer || ! PEER_ID.test( manifest.ownerPeerId ) || manifest.discoverable !== true || ! safeInteger( manifest.authorityEpoch ) || ! Array.isArray( manifest.hosts ) ) throw new Error( 'manifest does not authorize public discovery' );
-	validateFailoverWindows( manifest.hosts );
+	if ( manifest.protocol !== WORLD_PROTOCOL || manifest.worldId !== worldId || manifest.ownerPeerId !== announcement.manifest.signer || ! PEER_ID.test( manifest.ownerPeerId ) || manifest.discoverable !== true || ! safeInteger( manifest.authorityEpoch ) || ! Array.isArray( hosts ) ) throw new Error( 'manifest does not authorize public discovery' );
+	validateFailoverWindows( hosts );
 	let authorizedUntil = manifest.ownerPeerId === node.nodeId ? node.expiresAt : 0;
-	for ( const grant of manifest.hosts ) {
+	for ( const grant of hosts ) {
 		if ( grant?.peerId !== node.nodeId || ! Number.isSafeInteger( grant.expiresAt ) || grant.expiresAt <= nowSeconds || grant.expiresAt <= authorizedUntil ) continue;
 		if ( grant.scopes?.includes( 'content-cache' ) ) authorizedUntil = grant.expiresAt;
 	}
