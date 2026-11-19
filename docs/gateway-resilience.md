@@ -95,34 +95,25 @@ The Worker is an optional lookup/bootstrap service. It does not store world pack
 
 ### Public gateway setup still required
 
-Live checks on 2026-11-19 confirmed that this host has a private LAN address
-behind a globally reachable, non-CGNAT public address. The deployed resolver
-uses its `workers.dev` origin and needs no custom DNS configuration for
-HostID lookup. Namecheap remains the authoritative DNS provider for both
-`elsemesh.org` and `elsemesh.com`; neither registrar delegation has changed.
+On 2026-11-19, both `elsemesh.org` and `elsemesh.com` became active Cloudflare
+zones using `jeremy.ns.cloudflare.com` and `tori.ns.cloudflare.com`. The
+`.org` zone keeps the GitHub Pages apex A records, `www` CNAME, and Pages
+challenge TXT record DNS-only. HTTPS to `elsemesh.org` returns HTTP 200 from
+GitHub Pages. The `.com` zone has proxied apex and wildcard placeholder A
+records and a Cloudflare Single Redirect to `https://elsemesh.org` that
+preserves path and query; HTTPS was verified to return 301 with both intact.
+The previous Namecheap forwarding MX and SPF records are also present in the
+Cloudflare `.com` zone. No child-zone DNSSEC DS record is published for either
+domain, and Namecheap's DNSSEC controls show disabled.
 
-Full Cloudflare zones now exist for both domains, pending nameserver
-delegation. The `.org` zone contains the four existing GitHub Pages A records,
-the `www` CNAME and GitHub Pages challenge TXT record, all DNS-only. The `.com`
-zone contains proxied placeholder A records for the apex and wildcard plus a
-Single Redirect rule to `https://elsemesh.org`, preserving the request path and
-query string. Read-only Namecheap checks found no email-forwarding rules. Its
-existing `.com` URL redirects are not affected until nameserver delegation;
-the Cloudflare rule is intended to replace them after cutover. Cloudflare's
-current documentation says partial (CNAME) setup, which would keep Namecheap
-authoritative, requires Business or Enterprise. Delegating only
-`worldd.elsemesh.org` to its own Cloudflare zone requires Enterprise, so full
-zone delegation is the no-upgrade route.
-
-The Namecheap nameservers still need to be changed to the pair assigned to
-these zones before either Cloudflare zone becomes active. After cutover, verify
-GitHub Pages and `.com` redirects before adding a DNS-only
-`worldd.elsemesh.org` record. That record must point to the current public
-gateway address and be updated dynamically; it is not present yet because no
-durable public `worldd` HTTPS/WSS route exists. The router must expose the
-gateway to the Internet. Do not proxy world-content traffic through Cloudflare.
-See Namecheap's [DNS service limits](https://www.namecheap.com/support/api/methods/domains-dns/)
-and [redirect requirements](https://www.namecheap.com/support/knowledgebase/article.aspx/385/2237/how-to-set-up-a-url-redirect-for-a-domain/), plus Cloudflare's [partial DNS](https://developers.cloudflare.com/dns/zone-setups/partial-setup/)
+The deployed resolver continues to use its `workers.dev` origin and needs no
+custom DNS for HostID lookup. A DNS-only `worldd.elsemesh.org` record is not
+configured because no durable public `worldd` HTTPS/WSS route exists yet. When
+one is available, point that record at the current public gateway address and
+update it dynamically. The router must expose the gateway to the Internet. Do
+not proxy world-content traffic through Cloudflare. See Namecheap's [DNS
+service limits](https://www.namecheap.com/support/api/methods/domains-dns/)
+and Cloudflare's [partial DNS](https://developers.cloudflare.com/dns/zone-setups/partial-setup/)
 and [subdomain-zone availability](https://developers.cloudflare.com/dns/zone-setups/subdomain-setup/).
 
 If deployed, a named Tunnel must be restricted to bounded control traffic such

@@ -153,49 +153,19 @@ persistent substitute for the owner's `worldd`; visitors lose access when
 the host tab disconnects. Once a reachable invite exists, setting it as the
 browser's home makes it the default for that browser.
 
-## elsemesh.org
+## Custom domains
 
-An earlier 2026-10-11 check found Namecheap parking records and an incomplete
-GitHub Pages setup. That observation is superseded by the live recheck below.
-
-The custom domain and Pages source stamp were verified in the deployment checks recorded at the time. The static client is live; this does not make Pages a world gateway.
-
-`http://elsemesh.com/` currently redirects to `https://elsemesh.org/`, but a
-direct HTTPS request to `https://elsemesh.com/` timed out in this check. The
-`.com` redirect is therefore only partially verified; provide HTTPS redirect
-service for that hostname and verify it from an independent connection.
-
-A public DNS recheck on 2026-10-11 found the `.com` nameservers still at
-Namecheap (`dns1.registrar-servers.com` and `dns2.registrar-servers.com`), with
-apex A `192.64.119.161` and `www` A `192.64.119.254`. The five Namecheap email
-forwarding MX records and apex SPF record are present. The ElseMesh GitHub
-Pages verification TXT record also now returns a value; its value is omitted
-from this repository. Namecheap's URL-redirect guidance says an HTTPS source
-domain needs an SSL certificate to perform a secure redirect to another
-domain. Choose a TLS-capable redirect endpoint before changing DNS; a Cloudflare
-redirect would require that domain's DNS to be served through Cloudflare, while
-retaining the current Namecheap forwarding keeps the existing HTTP-only
-behavior. Preserve the MX and SPF records in either configuration. See
-[Namecheap URL redirect guidance](https://www.namecheap.com/support/knowledgebase/article.aspx/385/2237/how-to-set-up-a-url-redirect-for-a-domain/).
+`elsemesh.org` is served by GitHub Pages. `elsemesh.com` redirects over HTTPS
+to `elsemesh.org`, preserving the request path and query string. Both zones
+are active on Cloudflare; the `.com` zone retains its previous Namecheap
+forwarding MX and SPF records. Current DNS configuration and verification
+evidence are maintained in [gateway resilience](gateway-resilience.md#public-gateway-setup-still-required).
 
 The resolver is live, but its read-only lookup for
 `elsemesh:example-island` returned an empty provider list. Do not infer that a
 world is discoverable merely because the client and resolver are deployed.
 The private direct gateway invite used for the current test is intentionally
 not written here or published through the resolver.
-
-Preserve the existing email records: MX priorities 10 (`eforward1`,
-`eforward2`, `eforward3`), 15 (`eforward4`), and 20 (`eforward5`) under
-`registrar-servers.com`, plus the apex SPF record
-`v=spf1 include:spf.efwd.registrar-servers.com ~all`. The zone previously had
-no apex AAAA or CAA records. Nameservers are `dns1.registrar-servers.com` and
-`dns2.registrar-servers.com`.
-
-The earlier verification challenge and Namecheap record observations above
-were made before the custom-domain setup completed. Recheck the organization
-verification TXT record and current Namecheap records in their dashboards
-before changing the zone; preserve the email records listed above. The
-challenge value must remain out of this public repository.
 
 GitHub Pages serves the static client only. It does not serve `/api/lookup` or
 `/gateway`; world access requires a separate gateway/daemon. See the live
