@@ -138,6 +138,10 @@ export class WorldPresenceSession {
  }
  async admitPose(pose, spawnCandidates) {
   if (this.disposed || this.admitted) throw new Error('Invalid world presence admission');
+  if ( typeof this.connector.getManifest === 'function' ) {
+   const ownerManifest = await this.connector.getManifest( { signal: this.controller.signal } );
+   if ( ownerManifest.worldId !== this.manifest.worldId || ownerManifest.ownerPeerId !== this.manifest.ownerPeerId ) throw new Error( 'Presence route resolved to a different world owner' );
+  }
   const snapshot = await this.connector.updatePresence(pose, {signal:this.controller.signal, spawnCandidates});
   if (this.disposed) throw new DOMException('Left ThruHold', 'AbortError');
   if (this.regionConnector?.presenceEnabled && !snapshot.contentCapability) throw new Error('Owner admission did not issue a local region content capability');

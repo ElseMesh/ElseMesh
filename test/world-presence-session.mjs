@@ -59,10 +59,12 @@ pending.resolve({type:'presence',worldId:connector.worldId,requestId:'late',play
 session.update(.016,player); assert.equal(created.length,1,'late source-world response cannot resurrect an avatar after handoff');
 session.dispose(); assert.equal(closed,1,'disposal is idempotent');
 let admissionOptions, admittedPose;
+const admissionRouteCalls = [];
 const admissionSession = new WorldPresenceSession({connector,parent:{add(){}},clock:()=>700,
- createConnector(){return {updatePresence(pose,options){admittedPose=pose;admissionOptions=options;return Promise.resolve({type:'presence',worldId:connector.worldId,requestId:'admit',playerId:own,contentCapability:'b'.repeat(64),players:[{...pose,position:options.spawnCandidates[0],id:own,updatedAt:700}]})},close(){}}},
+ createConnector(){return {getManifest(){admissionRouteCalls.push('manifest');return Promise.resolve(connector.manifest)},updatePresence(pose,options){admissionRouteCalls.push('presence');admittedPose=pose;admissionOptions=options;return Promise.resolve({type:'presence',worldId:connector.worldId,requestId:'admit',playerId:own,contentCapability:'b'.repeat(64),players:[{...pose,position:options.spawnCandidates[0],id:own,updatedAt:700}]})},close(){}}},
 });
 const accepted = await admissionSession.admit(player, [[1,1,3],[1.6,1,3]]);
+assert.deepEqual(admissionRouteCalls, ['manifest', 'presence'], 'the owner route completes its rendezvous handshake before presence admission');
 assert.equal(receivedCapability, 'b'.repeat(64), 'admission forwards the owner capability to the region connector');
 assert.equal(admittedPose.sequence,0,'admission creates the session before its regular update sequence');
 assert.deepEqual(admissionOptions.spawnCandidates,[[1,1,3],[1.6,1,3]],'invitation candidates reach the owner for atomic player occupancy checks');
