@@ -134,14 +134,15 @@ WebRTC. This removes the requirement for inbound router forwarding when direct
 ICE succeeds; it does not solve symmetric/restrictive NATs and does not relay
 world data. If direct connectivity fails and no HTTPS/WSS data gateway is
 configured, the client must report failure. On 2026-11-19, Wrangler reported
-Worker deployment `2025ef10-34c2-41f3-997e-c73e200ece2f` serving 100% of
-production traffic. The deployed `/healthz` returned 200, a HostID lookup for
-an absent test node returned an empty provider list, and an unused signaling
-room accepted an HTTP/1.1 WebSocket upgrade (101). Local tests also pass the
-host proof and transfer a signed manifest over a real Pion WebRTC data channel.
-No real worldd host has yet registered with the deployed room, and direct ICE
-has not yet been verified between an independent browser and that host. Do not
-silently use the control Tunnel or Worker as a world-data relay.
+Worker deployment `7a2c5936-47c4-4250-8a2c-29dce03694e6` serving 100% of
+production traffic. The deployed `/healthz` returned 200. A disposable,
+real-worldd host registered with the deployed Worker, was found by its
+ZeroTier HostID, completed signaling through the Durable Object, and served
+its signed manifest directly to a Pion visitor on pi3 over WebRTC. The
+visitor and host were on the same ZeroTier network; this does not establish
+connectivity through arbitrary public NATs. The temporary host and narrowly
+scoped firewall allowance were stopped and removed after the probe. Do not
+silently use the control Worker as a world-data relay.
 Cloudflare describes Quick Tunnels as temporary testing endpoints, not durable
 invite gateways. See Cloudflare's [partial DNS setup](https://developers.cloudflare.com/dns/zone-setups/partial-setup/), [Tunnel FAQ](https://developers.cloudflare.com/cloudflare-one/faq/cloudflare-tunnels-faq/),
 and [Quick Tunnel guidance](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
@@ -152,14 +153,12 @@ Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tok
 
 The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. Source supports rendezvous-only signed advertisements, a host-identity challenge, bounded WebRTC signaling, and a browser that requires the direct WebRTC data channel for all world traffic. The Worker contract tests cover the signaling state machine and reject world-data messages.
 
-`test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture, creates a real Pion WebRTC data channel, and serves the signed manifest over it. These checks do not replace a live Cloudflare Durable Object plus real `worldd` and independent-network ICE check.
+`test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture and serves the signed manifest over a Pion WebRTC data channel. The opt-in `server/worldd/rendezvous_live_test.go` follows an invite through the deployed Worker, verifies the signed provider, completes Durable Object signaling, then verifies the manifest received directly from worldd over WebRTC. It has passed from pi3 against the deployed service and the disposable live worldd. This is a real cross-machine check on one ZeroTier network, not an independent public-network/NAT check or a browser rendering check.
 
-The Durable Object migration is deployed in Worker version
-`2025ef10-34c2-41f3-997e-c73e200ece2f`. Its `/healthz` returned 200 and a live
-HTTP/1.1 WebSocket upgrade to an unused room returned 101. That empty-room
-probe confirms the production route reaches a Durable Object, but it does not
-register a host or verify cross-network WebRTC.
+The Worker carries lookup and offer/answer signaling only. World content in
+the live probe traveled over the peer-to-peer WebRTC data channel; the browser
+client still needs a visual run through this invite path.
 
 `test/world-gateway-e2e.mjs` exercises both the real worldd WSS gateway and the Worker handler. Its normal mode reads the running libzt-backed `worldd`'s signed node record, announces it to an in-memory Worker KV, resolves the invite by HostID, then verifies that the client opens WSS to worldd directly. The Worker carries no world content. Each temporary daemon receives a separate temporary `--zerotier-data` directory so tests cannot reuse or alter the host's persistent libzt identity. An opt-in live mode uses `ELSEMESH_TEST_DIRECTORY_URL`, `ELSEMESH_TEST_PUBLIC_GATEWAY`, and `ELSEMESH_TEST_HTTP_PORT` to publish a disposable provider record to the deployed Worker, resolve it by the actual embedded-libzt HostID, then fetch the signed manifest and verify asset bytes through the selected worldd gateway. That mode creates an expiring external directory record and requires an operator-managed public route to the local gateway; stop and remove the route after the run. The live run used a same-host Node client and temporary Cloudflare Quick Tunnel; it verified Worker lookup and worldd content delivery without proving an independent browser/device or stable public gateway. The same test also covers two-visitor admission, capacity enforcement, owner shutdown, and authorized cache recovery. `test/world-directory.mjs` separately verifies bounded private-route-first behavior, HostID discovery fallback, signature validation before private access, and the public HTTPS/WSS route for visitors without ZeroTier. This is not a live ZeroTier private-IP test; the host has no `zerotier-cli`, and no independent visitor device was used.
 
-The deployed Worker is `https://elsemesh-world-resolver.rebroad.workers.dev`, restricted to network `e3918db4832a3056`; the hosted client config points to it. A live health check, lookups for the configured and unsupported networks, and a temporary live provider announcement by the end-to-end test verified the deployed endpoints. Public GitHub Pages serves the client only; it does not serve the resolver API or world gateway. A durable public world gateway and an independent remote-browser run remain unverified.
+The deployed Worker is `https://elsemesh-world-resolver.rebroad.workers.dev`, restricted to network `e3918db4832a3056`; the hosted client config points to it. Public GitHub Pages serves the client only; it does not serve the resolver API or world gateway. A durable public world gateway and a visual browser run remain unverified. The cross-host probe uses a visitor whose operating system already has ZeroTier access; browser-native ZeroTier joining is not part of this design.
