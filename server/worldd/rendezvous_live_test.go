@@ -255,9 +255,9 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	if !localOK || !remoteOK {
 		t.Fatal("selected ICE candidate pair omitted candidate details")
 	}
-	t.Logf("visitor excluded all ZeroTier interfaces; selected ICE pair local=%s/%s (%s) remote=%s/%s",
-		localCandidate.CandidateType, localCandidate.NetworkType, localCandidate.IP,
-		remoteCandidate.CandidateType, remoteCandidate.Protocol)
+	t.Logf("visitor excluded all ZeroTier interfaces; selected ICE pair local=%s/%s %s:%d remote=%s %s:%d",
+		localCandidate.CandidateType, localCandidate.NetworkType, localCandidate.IP, localCandidate.Port,
+		remoteCandidate.CandidateType, remoteCandidate.IP, remoteCandidate.Port)
 
 	manifestResponse := make(chan peerResponse, 1)
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
