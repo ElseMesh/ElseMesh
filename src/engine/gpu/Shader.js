@@ -238,6 +238,7 @@ function describe( name, spec, stage ) {
 	if ( spec.texture ) {
 
 		const t = resolve( spec.texture );
+		if ( ! t ) throw new Error( `binding ${ name }: texture resource resolved to null` );
 		const dim = spec.viewDimension || spec.view?.dimension || t.defaultViewDimension;
 		let sampleType = spec.sampleType || t.sampleType;
 		let wgsl = spec.wgslType || t.wgslType( dim );
