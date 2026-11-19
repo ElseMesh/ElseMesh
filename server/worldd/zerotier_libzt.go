@@ -292,6 +292,7 @@ func (z *libztRuntime) StartHTTPBridge(ctx context.Context, port int) error {
 }
 
 func (z *libztRuntime) startForwardListener(ctx context.Context, addressText string, family C.int, listenPort, targetPort int, httpGateway bool) error {
+	traceBridge := os.Getenv("ELSEMESH_TRACE_ZEROTIER_BRIDGE") == "1"
 	address := C.CString(addressText)
 	defer C.free(unsafe.Pointer(address))
 	fd := int(C.zts_socket(family, C.ZTS_SOCK_STREAM, C.ZTS_IPPROTO_TCP))
@@ -319,6 +320,9 @@ func (z *libztRuntime) startForwardListener(ctx context.Context, addressText str
 	} else {
 		z.listener = fd
 	}
+	if traceBridge {
+		log.Printf("libzt TCP listener active address=%s port=%d target=127.0.0.1:%d", addressText, listenPort, targetPort)
+	}
 	z.acceptWG.Add(1)
 	go func() {
 		defer z.acceptWG.Done()
@@ -336,6 +340,9 @@ func (z *libztRuntime) startForwardListener(ctx context.Context, addressText str
 			if code := int(C.zts_set_blocking(C.int(accepted), 1)); code != 0 {
 				C.zts_close(C.int(accepted))
 				continue
+			}
+			if traceBridge {
+				log.Printf("libzt TCP connection accepted address=%s remote=%s:%d target=127.0.0.1:%d", addressText, C.GoString(&remote[0]), int(remotePort), targetPort)
 			}
 			ztConn, err := newZTConn(accepted, nil, nil)
 			if err != nil {
@@ -356,6 +363,9 @@ func (z *libztRuntime) proxy(ztConn *ztConn, targetPort int) {
 	defer ztConn.Close()
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(targetPort)), 5*time.Second)
 	if err != nil {
+		if os.Getenv("ELSEMESH_TRACE_ZEROTIER_BRIDGE") == "1" {
+			log.Printf("libzt TCP target connection failed target=127.0.0.1:%d: %v", targetPort, err)
+		}
 		return
 	}
 	defer conn.Close()
