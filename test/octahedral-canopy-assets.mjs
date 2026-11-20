@@ -69,6 +69,13 @@ const descriptor = {
 		color: { instanceTintScale: 0.36, instanceTintBias: 0.74, leafDesaturation: 0.85, impostorBrightnessScale: 1.4, barkDark: 0x1c1a13, barkLight: 0x2e2b20, leafBlendStart: 0.05, leafBlendEnd: 0.55, impostorSaturation: 1.25 },
 		lighting: { bakedOcclusionFloor: 0.26, bakedOcclusionExponent: 2, brightnessScale: 0.6, brightnessBias: 0.7, roughness: 0.85, specularIntensity: 0.12, translucency: 0.35 },
 		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
+		palette: {
+			trees: [ { low: 0x283a1b, high: 0x364a23, dry: 0x5e4a2e, dryStart: 0.96, dryEnd: 0.995, dryMix: 0.5 }, { low: 0x34491f, high: 0x485c27 } ],
+			shrubs: [ { low: 0x3f5522, high: 0x52662a } ],
+			bark: { dark: 0x302a22, mid: 0x5c5549, pale: 0x7b7b6a, paleStart: 0.64, paleEnd: 0.8, paleMix: 0.3 },
+			dryTree: { low: 0x5c5234, high: 0x6e5a3a, mix: 0.5 }, floweringTree: 0x8a4a2c,
+		},
+		species: { treeSeedMultiplier: 5.31, shrubSeedMultiplier: 3.17, shrubSeaGrapeThreshold: 0.45, shrubCrotonThreshold: 0.6, dryTreeChance: 0.035, floweringTreeThreshold: 0.988 },
 	},
 	materialGraph: {
 		format: 'elsemesh.material-graph/1',

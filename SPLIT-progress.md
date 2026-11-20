@@ -116,6 +116,15 @@ bytes, identities, and image dimensions. The candidate remains outside
 `world-source.json`; its near-model PBR graph is provisional, and neither engine
 backend consumes the component. No parity percentage changes.
 
+**2026-11-20 canopy appearance contract:** The signed descriptor now includes
+the authored tree/shrub palette entries and species seed thresholds, which
+were missing from its previous color/lighting/wind payload. ElseMesh rejects
+missing, malformed, or out-of-range palette and selection data. Tidewater's
+export integration checks the descriptor appearance against its source
+profile. This closes a contract-data gap only: the near PBR graph is still
+provisional, the runtime package remains inactive, and paired engine adapters
+and matched visual review are still outstanding. No percentage changes.
+
 **2026-11-20 AMD pre-split gameplay-query update:** The hardware harness
 verified its pinned `23c30bf` wake, water-query, boat, dock, and pier sources,
 then generated the WebGPU reference on AMD RADV RENOIR and ran WebGL through

@@ -233,6 +233,13 @@ needs one explicit engine component contract rather than separate WGSL and
 GLSL implementations in Tidewater. Both backends must sample the same signed
 atlas assets and select the same LOD at matched quality settings.
 
+The inactive runtime descriptor now includes the authored tree/shrub palette
+and seed thresholds alongside its color, lighting, and wind values. The engine
+validates those fields, and Tidewater's export test checks the descriptor
+against its source profile. This closes a missing-data gap only: the near GLB
+material graph is still provisional, and neither backend consumes the
+descriptor or atlases yet.
+
 `src/network/OctahedralCanopyAssets.js` loads the signed descriptor, validates
 the instance-set and PNG references against the component and manifest, checks
 atlas dimensions and data-image encoding, and exposes near GLBs through a lazy
