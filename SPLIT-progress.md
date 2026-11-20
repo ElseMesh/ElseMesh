@@ -49,12 +49,23 @@ and shoreline-driven lip mesh, but those are separate from WebGPU's `Breakers`
 simulation; the full-frame metric does not establish feature-specific spray
 parity. These frames close no visual gate and change no percentage. A shared
 renderer-neutral breaker contract and feature-specific conformance fixture are
-still needed. The current station inputs also differ: WebGPU samples the
-hard-coded `x=-175..195` beach interval every `0.6 m`; WebGL extracts terrain
-contours at `max(2 m, terrain.size/256)` spacing and caps them at 768 stations.
-This should become one Tidewater-authored, renderer-neutral station asset
-consumed by both engine presenters. See the dynamic captures and source details in
+still needed. See the dynamic captures and source details in
 [`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-dynamic-tidewater-beach-phases-webgpu-and-webgl).
+
+**2026-11-20 shared-breaker implementation:** Tidewater now exports a single
+renderer-neutral `wave-breaker-stations/1` asset with 577 ordered shoreline
+stations at 0.6 m spacing. The WebGPU `Breakers` simulation and WebGL spray/lip
+presenters all consume this packaged input; the shoreline selection and station
+generation now live in the Tidewater world repository. The deterministic world
+export, asset codec, WebGL component/lip render checks, WebGL water render check,
+and external production build pass. AMD Weston startup captures loaded the same
+`view=beach` world in both backends. The WebGPU capture was on RADV RENOIR and
+WebGL on RadeonSI; these were start-screen captures, not a matched feature-level
+spray comparison. The controlled DevTools click into active WebGPU play exited
+the review browser before an active-scene capture, so that path remains
+unverified. No visual parity percentage changes: feature-specific breaker
+conformance against Tidewater `main` and the remaining cloud, canopy, water,
+swash, sand, pier, and FPS gaps remain open.
 
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas
