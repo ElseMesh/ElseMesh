@@ -149,32 +149,37 @@ try {
 		assert.equal( resolverNode.protocol, 'elsemesh.node/1' );
 		assert.equal( resolverNode.payload.nodeId, cachePeerID, 'the signed advertisement belongs to the running worldd provider' );
 		assert.equal( resolverNode.payload.gateway, workerGateway.url, 'worldd advertises its actual HTTPS/WSS gateway' );
-		const zeroTierStartup = cache.output.split( '\n' ).filter( line => /ZeroTier/i.test( line ) ).map( line => line.replace( /\b(?:\d{1,3}\.){1,3}\d{1,3}\b/g, '<IPv4>' ) ).join( '\n' );
-		assert.match( resolverNode.payload.zeroTierNodeId || '', /^[0-9a-f]{10}$/, `worldd advertises its embedded libzt HostID (network=${resolverNode.payload.zeroTierNetworkId || '<none>'})\nZeroTier startup diagnostics:\n${zeroTierStartup || '<none>'}\nworldd arguments: ${cache.spawnargs.join( ' ' )}` );
-		assert.equal( resolverNode.payload.zeroTierNetworkId, 'e3918db4832a3056', 'worldd joined the configured network through embedded libzt' );
 		const resolverState = { PROVIDERS: new MemoryKV() };
 		const resolverManifest = JSON.parse( await readFile( manifestPath, 'utf8' ) );
 		const announcement = await handleResolverRequest( new Request( 'https://resolver.example/v1/announce', {
 			method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify( { node: resolverNode, manifest: resolverManifest } ),
 		} ), resolverState );
 		assert.equal( announcement.status, 202, `Worker contract rejected the live cache node advertisement: ${await announcement.text()}` );
-		const zeroTierNodeID = resolverNode.payload.zeroTierNodeId;
-		const lookup = await handleResolverRequest( new Request( `https://resolver.example/v1/zerotier/e3918db4832a3056/${zeroTierNodeID}` ), resolverState );
+		const zeroTierNodeID = resolverNode.payload.zeroTierNodeId || '';
+		const lookupPath = zeroTierNodeID
+			? `/v1/zerotier/${resolverNode.payload.zeroTierNetworkId}/${zeroTierNodeID}`
+			: `/v1/worlds/${encodeURIComponent( worldID )}`;
+		if ( zeroTierNodeID ) {
+			assert.match( zeroTierNodeID, /^[0-9a-f]{10}$/, 'libzt-enabled worldd advertises a valid HostID' );
+			assert.equal( resolverNode.payload.zeroTierNetworkId, 'e3918db4832a3056', 'libzt-enabled worldd advertises its joined network' );
+		} else assert.equal( resolverNode.payload.zeroTierNetworkId || '', '', 'the plain worldd build advertises no ZeroTier network' );
+		const lookup = await handleResolverRequest( new Request( `https://resolver.example${lookupPath}` ), resolverState );
 		const lookupResult = await lookup.json();
 		assert.equal( lookup.status, 200 );
-		assert.deepEqual( lookupResult.providers, [ resolverNode ], 'HostID discovery returns the signed live worldd provider record' );
+		assert.deepEqual( lookupResult.providers, [ resolverNode ], 'resolver discovery returns the signed live worldd provider record' );
 		resolverServer = await createResolverServer( resolverState, keyPath, certPath );
-
-		const result = await runWorkerDiscoveryClient( {
-			worldID, ownerPeerID, cachePeerID, zeroTierNodeID, zeroTierGateway: resolverNode.payload.zeroTierGateway || '', zeroTierNodeRecord: resolverNode,
-			zeroTierNetworkID: 'e3918db4832a3056', directory: resolverServer.url,
-			assetID, assetSource, certPath,
-		} );
+		const workerOptions = zeroTierNodeID
+			? {
+				worldID, ownerPeerID, cachePeerID, zeroTierNodeID, zeroTierGateway: resolverNode.payload.zeroTierGateway || '', zeroTierNodeRecord: resolverNode,
+				zeroTierNetworkID: resolverNode.payload.zeroTierNetworkId, directory: resolverServer.url, assetID, assetSource, certPath,
+			}
+			: { worldID, ownerPeerID, cachePeerID, directory: resolverServer.url, assetID, assetSource, certPath };
+		const result = await runWorkerDiscoveryClient( workerOptions );
 		assert.ok( result.ok, `Worker-discovered WSS connector failed: ${result.error || 'unknown error'}\nworldd cache log:\n${cache.output}` );
-		assert.equal( result.nodeId, cachePeerID, 'HostID lookup connects directly to the advertised worldd peer' );
+		assert.equal( result.nodeId, cachePeerID, 'resolver lookup connects directly to the advertised worldd peer' );
 		assert.equal( result.gateway, workerGateway.url, 'worldd traffic uses its HTTPS/WSS gateway, not the resolver' );
-		assert.equal( resolverServer.lookups, 1, 'the resolver handles only the HostID lookup' );
-		assert.ok( workerGateway.upgrades >= 1, 'the client opens a direct WSS session to worldd after lookup' );
+		assert.equal( resolverServer.lookups, 1, 'the resolver handles exactly one provider lookup' );
+		assert.ok( workerGateway.upgrades >= 1, 'the client opens a direct WSS session to worldd after provider lookup' );
 	} finally {
 		await Promise.all( [
 			resolverServer && new Promise( ( resolve, reject ) => resolverServer.server.close( ( error ) => error ? reject( error ) : resolve() ) ),
@@ -182,7 +187,7 @@ try {
 		].filter( Boolean ) );
 	}
 
-	console.log( 'ok   live WSS admission and recovery plus Worker lookup using the actual embedded-libzt HostID' );
+	console.log( 'ok   live WSS admission and recovery plus Worker provider lookup' );
 } finally {
 	for ( const child of processes.reverse() ) await stopDaemon( child );
 	if ( workerGateway?.server.listening ) await new Promise( resolve => workerGateway.server.close( resolve ) );
@@ -273,7 +278,7 @@ async function createResolverServer( env, keyPath, certPath ) {
 			const headers = new Headers();
 			for ( const [ name, value ] of Object.entries( incoming.headers ) ) if ( value !== undefined ) headers.set( name, Array.isArray( value ) ? value.join( ', ' ) : value );
 			const requestURL = new URL( incoming.url || '/', `https://${incoming.headers.host || 'resolver.local'}` );
-			if ( requestURL.pathname.startsWith( '/v1/zerotier/' ) ) lookups ++;
+			if ( requestURL.pathname.startsWith( '/v1/zerotier/' ) || requestURL.pathname.startsWith( '/v1/worlds/' ) ) lookups ++;
 			const response = await handleResolverRequest( new Request( requestURL, { method: incoming.method, headers, ...( body ? { body } : {} ) } ), env );
 			outgoing.writeHead( response.status, Object.fromEntries( response.headers.entries() ) );
 			outgoing.end( Buffer.from( await response.arrayBuffer() ) );
