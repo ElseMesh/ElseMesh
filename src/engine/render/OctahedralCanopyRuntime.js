@@ -35,6 +35,43 @@ function dominantFrameIndex( selection ) {
 	return selection.indices[ frame ];
 }
 
+function canopyBillboardTransform( instance, group, cameraPosition, yaw, farScale ) {
+	const scale = instance.scale;
+	const bounds = group.bounds;
+	const localCenter = bounds.center;
+	const scaledCenter = [ localCenter[ 0 ] * scale[ 0 ] * farScale, localCenter[ 1 ] * scale[ 1 ] * farScale, localCenter[ 2 ] * scale[ 2 ] * farScale ];
+	const cosYaw = Math.cos( yaw ), sinYaw = Math.sin( yaw );
+	const center = [
+		instance.position[ 0 ] + scaledCenter[ 0 ] * cosYaw + scaledCenter[ 2 ] * sinYaw,
+		instance.position[ 1 ] + scaledCenter[ 1 ],
+		instance.position[ 2 ] - scaledCenter[ 0 ] * sinYaw + scaledCenter[ 2 ] * cosYaw,
+	];
+	const toCamera = [ cameraPosition[ 0 ] - center[ 0 ], cameraPosition[ 1 ] - center[ 1 ], cameraPosition[ 2 ] - center[ 2 ] ];
+	const length = Math.hypot( ...toCamera );
+	if ( length > 1e-8 ) for ( let axis = 0; axis < 3; axis ++ ) toCamera[ axis ] /= length;
+	else toCamera.splice( 0, 3, 0, 0, 1 );
+	const right = [ toCamera[ 2 ] + 1e-4, 0, - toCamera[ 0 ] ];
+	const rightLength = Math.hypot( ...right );
+	for ( let axis = 0; axis < 3; axis ++ ) right[ axis ] /= rightLength;
+	const up = [
+		toCamera[ 1 ] * right[ 2 ] - toCamera[ 2 ] * right[ 1 ],
+		toCamera[ 2 ] * right[ 0 ] - toCamera[ 0 ] * right[ 2 ],
+		toCamera[ 0 ] * right[ 1 ] - toCamera[ 1 ] * right[ 0 ],
+	];
+	const horizontalScale = Math.max( scale[ 0 ], scale[ 2 ] ) * farScale;
+	const verticalScale = scale[ 1 ] * farScale;
+	const cameraElevation = Math.abs( toCamera[ 1 ] );
+	const halfWidth = bounds.horizontalRadius * horizontalScale;
+	const halfHeight = ( bounds.halfHeight * verticalScale * Math.sqrt( Math.max( 1 - cameraElevation * cameraElevation, 0 ) ) + bounds.horizontalRadius * horizontalScale * cameraElevation );
+	const matrix = new Float32Array( [
+		right[ 0 ] * halfWidth, right[ 1 ] * halfWidth, right[ 2 ] * halfWidth, 0,
+		up[ 0 ] * halfHeight, up[ 1 ] * halfHeight, up[ 2 ] * halfHeight, 0,
+		toCamera[ 0 ], toCamera[ 1 ], toCamera[ 2 ], 0,
+		center[ 0 ], center[ 1 ], center[ 2 ], 1,
+	] );
+	return { center, toCamera, halfWidth, halfHeight, matrix };
+}
+
 function canopyGroupMap( descriptor ) {
 	const map = new Map();
 	for ( const group of descriptor.variantGroups ) for ( const modelId of group.modelIds ) map.set( modelId, group );
@@ -76,6 +113,7 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 		const yaw = Math.atan2( 2 * ( qw * qy + qx * qz ), 1 - 2 * ( qy * qy + qz * qz ) );
 		const localViewDirection = canopyLocalViewDirection( instance, group, cameraPosition, yaw );
 		const frameSelection = selectHemiOctahedralFrames( localViewDirection, framesPerSide );
+		const billboard = farWeight > 0 ? canopyBillboardTransform( instance, group, cameraPosition, yaw, thinning.scale ) : null;
 		plan.push( {
 			instanceIndex,
 			placementId: instance.placementId ?? `${instance.model}:${instanceIndex}`,
@@ -92,6 +130,7 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 			frameWeights: frameSelection.weights,
 			dominantFrameIndex: dominantFrameIndex( frameSelection ),
 			blendFrames: distance < descriptor.frameBlendDistance,
+			billboard,
 			nearWeight,
 			farWeight,
 			nearShadowWeight: nearWeight,
