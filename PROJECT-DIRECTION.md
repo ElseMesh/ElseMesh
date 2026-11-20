@@ -312,8 +312,9 @@ browser tries the current private route and public HTTPS/WSS or WebRTC paths.
 The changing public IP/UDP port is exchanged as an ICE candidate during
 signaling, not stored as a durable route. `worldd --webrtc-nat-1to1-ip` exists
 for a known forwarded UDP port, but that path remains unconfigured and
-untested. A public HTTPS/WSS gateway is also not yet configured. Neither path
-may turn the Worker into a world-data relay. Bounded late ICE candidates now
+untested. A public HTTPS/WSS gateway is also not yet configured; a pi3 check on
+2026-11-20 found TCP 80 and 443 closed. Neither path may turn the Worker into a
+world-data relay. Bounded late ICE candidates now
 trickle through the signaling Worker to the authenticated `worldd` session;
 cross-network ICE still fails and remains the open gate.
 

@@ -138,6 +138,9 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   server's Pion ICE socket still has an unverified external mapping, and its
   automatic UPnP discovery did not complete. No router configuration was
   changed.
+- Checked for a direct public HTTPS/WSS path from pi3: this host had no local
+  listener on TCP 80 or 443, and both ports were closed from pi3. There is no
+  currently reachable direct HTTPS/WSS gateway for this worldd.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages
