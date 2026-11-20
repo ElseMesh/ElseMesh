@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -43,18 +42,18 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	if len(codes) != 1 {
 		t.Fatalf("invite URL must contain exactly one invite code")
 	}
-	routeBytes, err := base64.RawURLEncoding.DecodeString(codes[0])
+	ticket, err := decodeWorldInviteTicket(codes[0])
 	if err != nil {
-		t.Fatalf("decode invite route: %v", err)
+		t.Fatalf("decode compact invite ticket: %v", err)
 	}
-	route, err := url.ParseQuery(string(routeBytes))
-	if err != nil {
-		t.Fatalf("parse invite route: %v", err)
+	zeroTierNodeID := ticket.ZeroTierNodeID
+	networkID := defaultZeroTierNetworkID
+	if !liveZeroTierNetworkID.MatchString(networkID) || !liveZeroTierNodeID.MatchString(zeroTierNodeID) {
+		t.Fatalf("invite must contain a valid ZeroTier HostID for the configured network")
 	}
-	worldID, networkID, zeroTierNodeID := route.Get("worldId"), route.Get("ztNetworkId"), route.Get("ztNodeId")
-	directory, zeroTierGateway := route.Get("directory"), route.Get("ztGateway")
-	if !worldIDPattern.MatchString(worldID) || !liveZeroTierNetworkID.MatchString(networkID) || !liveZeroTierNodeID.MatchString(zeroTierNodeID) || directory == "" || zeroTierGateway != "" {
-		t.Fatalf("invite must identify a world and ZeroTier HostID, use a resolver, and omit a direct gateway for this fallback probe")
+	directory := os.Getenv("ELSEMESH_LIVE_RENDEZVOUS_DIRECTORY")
+	if directory == "" {
+		directory = "https://elsemesh-world-resolver.rebroad.workers.dev"
 	}
 	resolver, err := url.Parse(directory)
 	if err != nil || resolver.Scheme != "https" || resolver.Host == "" {
@@ -87,6 +86,10 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	if discovery.NetworkID != networkID || discovery.NodeID != zeroTierNodeID {
 		t.Fatalf("Worker lookup returned a different ZeroTier locator")
 	}
+	if len(discovery.WorldIDs) != 1 || !worldIDPattern.MatchString(discovery.WorldIDs[0]) {
+		t.Fatalf("HostID lookup did not resolve to exactly one valid world ID")
+	}
+	worldID := discovery.WorldIDs[0]
 	var provider *signedDocument
 	for index := range discovery.Providers {
 		document := &discovery.Providers[index]
