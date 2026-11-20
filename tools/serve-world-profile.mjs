@@ -14,7 +14,7 @@ function temporaryRoot() {
 
 export function parseArguments( argv ) {
 	const options = {};
-	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--http', '--p2p-port', '--zerotier-network', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
+	const valueOptions = new Set( [ '--worldd', '--profile', '--worlds-dir', '--source', '--assets', '--asset-source', '--http', '--p2p-port', '--zerotier-network', '--public-gateway', '--directory-url', '--discoverable', '--dht-mode', '--bootstrap', '--relay', '--announce-address', '--allow-browser-origin' ] );
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
 		if ( key === '--autoport' ) {
@@ -90,7 +90,7 @@ async function serve( options ) {
 			if ( discoverable ) converterArgs.push( '--discoverable', discoverable );
 			run( process.execPath, converterArgs );
 			run( worldd, worlddArgs( options, [ '--sign-manifest', unsignedPath, '--manifest-out', signedPath ] ) );
-			run( worldd, worlddArgs( options, [ '--manifest', signedPath, '--import-package', assetsPath, '--world-name', source.title ] ) );
+			run( worldd, worlddArgs( options, [ '--manifest', signedPath, '--verify-package', assetsPath, '--world-name', source.title ] ) );
 			await copyFile( signedPath, worldManifestPath, constants.COPYFILE_EXCL );
 			await chmod( worldManifestPath, 0o600 );
 			console.log( `Prepared ${source.title} (${source.worldId}) in profile ${options[ '--profile' ]} using owner ${peerId}` );
@@ -100,6 +100,8 @@ async function serve( options ) {
 	}
 
 	const args = worlddArgs( options, [] );
+	const assetSourcePath = options[ '--asset-source' ] || options[ '--assets' ];
+	if ( assetSourcePath ) args.push( '--asset-source', path.resolve( assetSourcePath ) );
 	if ( options[ '--autoport' ] ) args.push( '--http', '127.0.0.1:0' );
 	else if ( options[ '--http' ] ) args.push( '--http', options[ '--http' ] );
 	if ( options[ '--p2p-port' ] ) args.push( '--p2p-port', options[ '--p2p-port' ] );

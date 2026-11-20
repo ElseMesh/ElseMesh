@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,5 +32,34 @@ func TestCachedAssetVerificationDetectsChangedFiles(t *testing.T) {
 	}
 	if d.hasVerifiedAsset(asset) {
 		t.Fatal("changed content-addressed asset treated as verified")
+	}
+}
+
+func TestSourceAssetServedWithoutProfileCopy(t *testing.T) {
+	sourceDir := t.TempDir()
+	cacheDir := filepath.Join(t.TempDir(), "assets")
+	data := []byte("asset served from the checked-in source directory")
+	digest := sha256.Sum256(data)
+	asset := assetRef{ID: fmt.Sprintf("sha256:%x", digest), Bytes: int64(len(data))}
+	if err := os.WriteFile(filepath.Join(sourceDir, asset.ID[len("sha256:"):]), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	d := &daemon{
+		world:          worldManifest{WorldID: "elsemesh:test", Assets: []assetRef{asset}},
+		assetSourceDir: sourceDir,
+		assetsDir:      cacheDir,
+		verifiedAssets: make(map[string]assetFileStamp),
+	}
+
+	response, err := d.assetChunk(gatewayMessage{AssetID: asset.ID, Offset: 0, Length: int64(len(data))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := base64.RawStdEncoding.DecodeString(response.Chunk)
+	if err != nil || string(got) != string(data) {
+		t.Fatalf("served asset = %q, err=%v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(cacheDir, asset.ID[len("sha256:"):])); !os.IsNotExist(err) {
+		t.Fatalf("source asset was copied into profile cache: %v", err)
 	}
 }

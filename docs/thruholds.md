@@ -26,10 +26,13 @@ worldd /path/to/world-content
 ```
 
 The directory must contain the exported `world-source.json` and hash-named
-`assets/` directory. On first start, `worldd` validates and imports the
-package, signs its manifest with a persistent local identity, and stores that
-identity and package under the standard ElseMesh config directory, keyed by
-the source's `worldId`. If a matching saved profile already exists, its owner
+`assets/` directory. On first start, `worldd` validates the referenced assets
+in place, signs its manifest with a persistent local identity, and stores that
+identity plus the signed manifest under the standard ElseMesh config
+directory, keyed by the source's `worldId`. It does not copy the repository's
+assets into the profile. A private `asset-source.path` file records which
+repository asset directory to serve; `--asset-source` can override it for a
+manifest-based launch. If a matching saved profile already exists, its owner
 identity is reused. Later starts serve that saved signed version; changed
 content is refused until the owner publishes a reviewed source update. This
 keeps ordinary startup to one path argument without silently replacing signed
@@ -55,7 +58,7 @@ available gateway port. Use `--worlds-dir` to choose the config root or
 The longer profile helper below remains available for provisioning and
 specialized setups.
 
-`tools/serve-world-profile.mjs` provisions an immutable world package into one named owner profile, signs its runtime manifest with that profile's persistent node key, verifies and installs all package assets, then starts the supplied daemon binary. Give every simultaneously running profile its own P2P and HTTP ports. The helper refuses to overwrite an existing profile manifest; once provisioned, the same command can restart it without `--source` or `--assets`.
+`tools/serve-world-profile.mjs` provisions one named owner profile, signs its runtime manifest with that profile's persistent node key, verifies the package in place, then starts the supplied daemon binary serving from the specified source asset directory. It does not make a second package copy. Give every simultaneously running profile its own P2P and HTTP ports. The helper refuses to overwrite an existing profile manifest; once provisioned, the same command can restart it without `--source` or `--assets` because the asset-source path is saved in the profile.
 
 For temporary local hosting, use `--autoport`. The daemon binds OS-assigned
 loopback HTTP and libp2p TCP/QUIC ports, then prints the selected gateway

@@ -134,7 +134,7 @@ func TestAuthorizedNeighborFetchesSignedManifestAndAssetOverLibp2p(t *testing.T)
 	if observer.roleStateSerial != 1 || observer.roleState.Signer != ownerID.String() {
 		t.Fatalf("failover-only observer did not install owner role state: serial=%d signer=%q", observer.roleStateSerial, observer.roleState.Signer)
 	}
-	got, err := os.ReadFile(cache.assetPath(assetID))
+	got, err := os.ReadFile(cache.cacheAssetPath(assetID))
 	if err != nil {
 		t.Fatal(err)
 	}

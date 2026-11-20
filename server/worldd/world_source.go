@@ -183,6 +183,13 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	if err := validateManifest(manifest, localPeerID, now); err != nil {
 		return signedDocument{}, fmt.Errorf("world source validation: %w", err)
 	}
+	packageAssetsDir := filepath.Join(directory, "assets")
+	if _, _, err := verifyWorldPackageAssets(packageAssetsDir, manifest); err != nil {
+		return signedDocument{}, fmt.Errorf("world source assets: %w", err)
+	}
+	if err := writeAssetSourceConfig(dataDir, packageAssetsDir); err != nil {
+		return signedDocument{}, fmt.Errorf("save world asset source: %w", err)
+	}
 
 	manifestPath := filepath.Join(dataDir, "world.json")
 	if existing, readErr := os.ReadFile(manifestPath); readErr == nil {
@@ -205,12 +212,6 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 		return signedDocument{}, readErr
 	}
 
-	if err := os.MkdirAll(filepath.Join(dataDir, "assets"), 0700); err != nil {
-		return signedDocument{}, err
-	}
-	if _, _, err := importWorldPackage(filepath.Join(directory, "assets"), filepath.Join(dataDir, "assets"), manifest); err != nil {
-		return signedDocument{}, fmt.Errorf("import world assets: %w", err)
-	}
 	document, err := signDocument(manifestProtocol, manifest, key)
 	if err != nil {
 		return signedDocument{}, err

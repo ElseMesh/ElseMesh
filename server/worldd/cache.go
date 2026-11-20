@@ -146,7 +146,7 @@ func (d *daemon) syncAssetFrom(ctx context.Context, source peer.ID, asset assetR
 	if err := temp.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tempPath, d.assetPath(asset.ID)); err != nil {
+	if err := os.Rename(tempPath, d.cacheAssetPath(asset.ID)); err != nil {
 		return err
 	}
 	d.rememberVerifiedAsset(asset)
@@ -154,23 +154,48 @@ func (d *daemon) syncAssetFrom(ctx context.Context, source peer.ID, asset assetR
 }
 
 func (d *daemon) hasVerifiedAsset(asset assetRef) bool {
-	file, err := os.Open(d.assetPath(asset.ID))
+	file, err := d.openVerifiedAsset(asset)
 	if err != nil {
 		return false
 	}
-	defer file.Close()
-	return d.verifyAssetFile(asset, file)
+	_ = file.Close()
+	return true
 }
 
-func (d *daemon) verifyAssetFile(asset assetRef, file *os.File) bool {
+func (d *daemon) openVerifiedAsset(asset assetRef) (*os.File, error) {
+	paths := []string{}
+	if d.assetSourceDir != "" {
+		paths = append(paths, filepath.Join(d.assetSourceDir, strings.TrimPrefix(asset.ID, "sha256:")))
+	}
+	paths = append(paths, d.cacheAssetPath(asset.ID))
+	for _, path := range paths {
+		pathInfo, pathErr := os.Lstat(path)
+		if pathErr != nil || !pathInfo.Mode().IsRegular() {
+			continue
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		info, statErr := file.Stat()
+		if statErr == nil && info.Mode().IsRegular() && os.SameFile(pathInfo, info) && d.verifyAssetFile(asset, path, file) {
+			return file, nil
+		}
+		_ = file.Close()
+	}
+	return nil, os.ErrNotExist
+}
+
+func (d *daemon) verifyAssetFile(asset assetRef, path string, file *os.File) bool {
 	d.assetCheckMu.Lock()
 	if d.assetVerificationLocks == nil {
 		d.assetVerificationLocks = make(map[string]*sync.Mutex)
 	}
-	verificationLock := d.assetVerificationLocks[asset.ID]
+	verificationKey := path + "\x00" + asset.ID
+	verificationLock := d.assetVerificationLocks[verificationKey]
 	if verificationLock == nil {
 		verificationLock = &sync.Mutex{}
-		d.assetVerificationLocks[asset.ID] = verificationLock
+		d.assetVerificationLocks[verificationKey] = verificationLock
 	}
 	d.assetCheckMu.Unlock()
 	verificationLock.Lock()
@@ -182,7 +207,7 @@ func (d *daemon) verifyAssetFile(asset assetRef, file *os.File) bool {
 	}
 	stamp := assetFileStamp{size: info.Size(), modTime: info.ModTime().UnixNano()}
 	d.assetCheckMu.Lock()
-	verified, ok := d.verifiedAssets[asset.ID]
+	verified, ok := d.verifiedAssets[verificationKey]
 	d.assetCheckMu.Unlock()
 	if ok && verified == stamp {
 		return true
@@ -201,13 +226,14 @@ func (d *daemon) verifyAssetFile(asset assetRef, file *os.File) bool {
 	if d.verifiedAssets == nil {
 		d.verifiedAssets = make(map[string]assetFileStamp)
 	}
-	d.verifiedAssets[asset.ID] = stamp
+	d.verifiedAssets[verificationKey] = stamp
 	d.assetCheckMu.Unlock()
 	return true
 }
 
 func (d *daemon) rememberVerifiedAsset(asset assetRef) {
-	info, err := os.Stat(d.assetPath(asset.ID))
+	path := d.cacheAssetPath(asset.ID)
+	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Size() != asset.Bytes {
 		return
 	}
@@ -215,10 +241,10 @@ func (d *daemon) rememberVerifiedAsset(asset assetRef) {
 	if d.verifiedAssets == nil {
 		d.verifiedAssets = make(map[string]assetFileStamp)
 	}
-	d.verifiedAssets[asset.ID] = assetFileStamp{size: info.Size(), modTime: info.ModTime().UnixNano()}
+	d.verifiedAssets[path+"\x00"+asset.ID] = assetFileStamp{size: info.Size(), modTime: info.ModTime().UnixNano()}
 	d.assetCheckMu.Unlock()
 }
 
-func (d *daemon) assetPath(id string) string {
+func (d *daemon) cacheAssetPath(id string) string {
 	return filepath.Join(d.assetsDir, strings.TrimPrefix(id, "sha256:"))
 }

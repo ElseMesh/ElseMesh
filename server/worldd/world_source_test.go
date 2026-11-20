@@ -1,11 +1,34 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestVerifyWorldPackageAssetsAllowsUnreferencedRepositoryFiles(t *testing.T) {
+	assetsDir := t.TempDir()
+	data := []byte("referenced")
+	digest := sha256.Sum256(data)
+	id := "sha256:" + hex.EncodeToString(digest[:])
+	if err := os.WriteFile(filepath.Join(assetsDir, hex.EncodeToString(digest[:])), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(assetsDir, "README.md"), []byte("other repository data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	count, total, err := verifyWorldPackageAssets(assetsDir, worldManifest{Assets: []assetRef{{ID: id, Bytes: int64(len(data))}}})
+	if err != nil || count != 1 || total != int64(len(data)) {
+		t.Fatalf("verification = %d assets / %d bytes, err=%v", count, total, err)
+	}
+	if _, err := os.Lstat(filepath.Join(assetsDir, "README.md")); err != nil {
+		t.Fatal(fmt.Errorf("unreferenced source file was removed: %w", err))
+	}
+}
 
 func TestWorldSourceRuleFieldsIncludeMovementProfiles(t *testing.T) {
 	fields := map[string]json.RawMessage{

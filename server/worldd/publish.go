@@ -149,9 +149,9 @@ func publishOwnerWorldManifest(activePath, candidatePath, packageAssetsDir, base
 	if err != nil {
 		return 0, 0, err
 	}
-	count, totalBytes, err := importAuthorizedPackage(document, localPeerID, packageAssetsDir, filepath.Join(dataDir, "assets"), now)
+	count, totalBytes, err := verifyWorldPackageAssets(packageAssetsDir, next)
 	if err != nil {
-		return 0, 0, fmt.Errorf("package import failed; active manifest unchanged: %w", err)
+		return 0, 0, fmt.Errorf("package verification failed; active manifest unchanged: %w", err)
 	}
 	encoded, err := json.MarshalIndent(document, "", "  ")
 	if err != nil {
@@ -203,6 +203,9 @@ func publishOwnerWorldManifest(activePath, candidatePath, packageAssetsDir, base
 	}
 	if err := os.Rename(stagedPath, activePath); err != nil {
 		return 0, 0, err
+	}
+	if err := writeAssetSourceConfig(dataDir, packageAssetsDir); err != nil {
+		return 0, 0, fmt.Errorf("manifest published but asset source path could not be saved: %w", err)
 	}
 	dir, err := os.Open(dataDir)
 	if err != nil {

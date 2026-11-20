@@ -10,7 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func TestPublishOwnerWorldManifestImportsArchivesAndActivates(t *testing.T) {
+func TestPublishOwnerWorldManifestUsesSourceAssetsArchivesAndActivates(t *testing.T) {
 	root := t.TempDir()
 	dataDir := filepath.Join(root, "profile")
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
@@ -81,9 +81,12 @@ func TestPublishOwnerWorldManifestImportsArchivesAndActivates(t *testing.T) {
 	if err != nil || active.Version != 8 || active.Title != "Published" || !active.Discoverable || active.SourceHash != next.SourceHash {
 		t.Fatalf("active manifest was not correctly activated: world=%+v err=%v", active, err)
 	}
-	installed, err := os.ReadFile(filepath.Join(dataDir, "assets", assetID[len("sha256:"):]))
-	if err != nil || string(installed) != string(assetBytes) {
-		t.Fatalf("package asset missing or changed: err=%v", err)
+	if _, err := os.Lstat(filepath.Join(dataDir, "assets", assetID[len("sha256:"):])); !os.IsNotExist(err) {
+		t.Fatalf("publication duplicated package assets into profile storage: %v", err)
+	}
+	sourcePath, err := readAssetSourceConfig(dataDir)
+	if err != nil || sourcePath != packageDir {
+		t.Fatalf("asset source config = %q, err=%v", sourcePath, err)
 	}
 	if _, err := os.Lstat(filepath.Join(dataDir, ".publish.lock")); !os.IsNotExist(err) {
 		t.Fatalf("publication lock was not removed: %v", err)

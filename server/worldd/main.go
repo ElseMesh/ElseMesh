@@ -60,6 +60,7 @@ type daemon struct {
 	world                  worldManifest
 	key                    crypto.PrivKey
 	assetsDir              string
+	assetSourceDir         string
 	inviteDataDir          string
 	publicGateway          string
 	directoryURL           string
@@ -134,6 +135,8 @@ func run() error {
 	roleDocumentOut := flag.String("role-document-out", "", "new private output path for --sign-role-grant or --sign-role-revocations")
 	importAssetPath := flag.String("import-asset", "", "import one asset into the content-addressed store, print its sha256 ID, then exit")
 	importPackagePath := flag.String("import-package", "", "verify and import all assets referenced by --manifest from this hash-named assets directory, then exit")
+	verifyPackagePath := flag.String("verify-package", "", "verify referenced assets in a hash-named directory without copying them, then exit")
+	assetSourcePath := flag.String("asset-source", "", "read world assets from this content-addressed directory without copying them into worldd data")
 	printNodeID := flag.Bool("print-node-id", false, "print this data directory's persistent node PeerID, then exit")
 	createInviteNumber := flag.Int("create-invite", -1, "create a short-lived invite for a 16-bit player number, print its ElseMesh URL, then exit")
 	inviteExpiresIn := flag.Duration("invite-expires-in", 24*time.Hour, "invite lifetime when used with --create-invite")
@@ -212,7 +215,7 @@ func run() error {
 		worldDirectory = positional[0]
 	}
 	operationCount := 0
-	for _, requested := range []bool{*printNodeID, *createInviteNumber >= 0, *exportNodeKey != "", *importNodeKey != "", *importAssetPath != "", *importPackagePath != "", *signManifestPath != "", *signRoleGrantPath != "", *signRoleRevocationsPath != "", *listWorldProfiles, *listProposals, *inspectManifest, *publishManifestPath != "", *exportProposalID != "", *removeProposalID != ""} {
+	for _, requested := range []bool{*printNodeID, *createInviteNumber >= 0, *exportNodeKey != "", *importNodeKey != "", *importAssetPath != "", *importPackagePath != "", *verifyPackagePath != "", *signManifestPath != "", *signRoleGrantPath != "", *signRoleRevocationsPath != "", *listWorldProfiles, *listProposals, *inspectManifest, *publishManifestPath != "", *exportProposalID != "", *removeProposalID != ""} {
 		if requested {
 			operationCount++
 		}
@@ -478,7 +481,7 @@ func run() error {
 		if publishErr != nil {
 			return publishErr
 		}
-		fmt.Printf("Published world version after importing %d verified package assets (%d bytes); restart worldd to load the new manifest.\n", count, totalBytes)
+		fmt.Printf("Published world version with %d verified source assets (%d bytes); restart worldd to load the new manifest.\n", count, totalBytes)
 		return nil
 	}
 	if *importAssetPath != "" {
@@ -502,6 +505,28 @@ func run() error {
 			return importErr
 		}
 		fmt.Printf("Imported %d verified package assets (%d bytes)\n", count, totalBytes)
+		return nil
+	}
+	if *verifyPackagePath != "" {
+		if *manifestPath == "" {
+			return errors.New("--verify-package requires an owner-signed --manifest")
+		}
+		document, loadErr := loadWorldManifest(*manifestPath, *dataDir, *worldName, localID.String(), key, "", nil)
+		if loadErr != nil {
+			return loadErr
+		}
+		world, decodeErr := decodeManifest(document, localID.String(), time.Now())
+		if decodeErr != nil {
+			return decodeErr
+		}
+		if !canServeWorldAssets(world, localID.String(), time.Now()) {
+			return errors.New("this node lacks an owner or content-cache grant for package assets")
+		}
+		count, totalBytes, verifyErr := verifyWorldPackageAssets(*verifyPackagePath, world)
+		if verifyErr != nil {
+			return verifyErr
+		}
+		fmt.Printf("Verified %d package assets (%d bytes) without copying them\n", count, totalBytes)
 		return nil
 	}
 	if *signManifestPath != "" {
@@ -666,6 +691,30 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("world manifest: %w", err)
 	}
+	assetSourceDir := *assetSourcePath
+	if assetSourceDir == "" && worldDirectory != "" {
+		assetSourceDir = filepath.Join(worldDirectory, "assets")
+	}
+	if assetSourceDir == "" {
+		assetSourceDir, err = readAssetSourceConfig(*dataDir)
+		if err != nil {
+			return fmt.Errorf("asset source config: %w", err)
+		}
+	}
+	if assetSourceDir != "" {
+		assetSourceDir, err = filepath.Abs(assetSourceDir)
+		if err != nil {
+			return fmt.Errorf("asset source path: %w", err)
+		}
+		if worldDirectory == "" {
+			if _, _, err := verifyWorldPackageAssets(assetSourceDir, world); err != nil {
+				return fmt.Errorf("asset source: %w", err)
+			}
+		}
+		if err := writeAssetSourceConfig(*dataDir, assetSourceDir); err != nil {
+			return fmt.Errorf("persist asset source path: %w", err)
+		}
+	}
 	if regionProvider != nil && world.WorldID != regionProviderWorldID {
 		return fmt.Errorf("region provider world ID %q does not match ThruHold profile world ID %q", regionProviderWorldID, world.WorldID)
 	}
@@ -688,7 +737,7 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), inviteDataDir: *dataDir, proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), assetSourceDir: assetSourceDir, inviteDataDir: *dataDir, proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
 	defer d.closeWebRTCTransport()
 	if d.rendezvous {
 		if _, err := d.sharedWebRTCAPI(); err != nil {
@@ -1943,8 +1992,7 @@ func (d *daemon) assetChunk(request gatewayMessage) (peerResponse, error) {
 	if request.Offset < 0 || request.Length < 1 || request.Length > 192<<10 {
 		return peerResponse{}, errors.New("invalid_asset_range")
 	}
-	path := filepath.Join(d.assetsDir, strings.TrimPrefix(request.AssetID, "sha256:"))
-	f, err := os.Open(path)
+	f, err := d.openVerifiedAsset(asset)
 	if err != nil {
 		return peerResponse{}, errors.New("asset_unavailable")
 	}
