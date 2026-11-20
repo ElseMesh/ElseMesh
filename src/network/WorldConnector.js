@@ -395,7 +395,10 @@ export class WorldConnector {
 		for ( const document of result.providers ) {
 			throwIfAborted( signal );
 			try { await verifySignedDocument( document, 'elsemesh.node/1' ); }
-			catch { continue; }
+			catch ( error ) {
+				if ( error?.code === 'ELSEMESH_ED25519_UNSUPPORTED' ) throw error;
+				continue;
+			}
 			const node = document.payload;
 			const now = Date.now() / 1000;
 			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || ! node.worldIds?.includes( this.worldId ) || !( validSecureGateway( node.gateway ) || node.rendezvous === true && node.gateway === '' && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && node.zeroTierNetworkId === this.zeroTierNetworkId ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 ) continue;
@@ -417,7 +420,10 @@ export class WorldConnector {
 		for ( const document of result.providers ) {
 			throwIfAborted( signal );
 			try { await verifySignedDocument( document, 'elsemesh.node/1' ); }
-			catch { continue; }
+			catch ( error ) {
+				if ( error?.code === 'ELSEMESH_ED25519_UNSUPPORTED' ) throw error;
+				continue;
+			}
 			const node = document.payload;
 			const now = Date.now() / 1000;
 			if ( node.protocol !== 'elsemesh.node/1' || node.nodeId !== document.signer || node.zeroTierNodeId !== this.zeroTierNodeId || node.zeroTierNetworkId !== this.zeroTierNetworkId || ! Array.isArray( node.worldIds ) || node.worldIds.length !== 1 || ! isWorldID( node.worldIds[ 0 ] ) || !( validSecureGateway( node.gateway ) || node.rendezvous === true && node.gateway === '' ) || node.issuedAt > now + 300 || node.issuedAt < now - 86400 || node.expiresAt <= now || node.expiresAt > node.issuedAt + 172800 || node.zeroTierGateway && ! validZeroTierGateway( node.zeroTierGateway ) ) continue;

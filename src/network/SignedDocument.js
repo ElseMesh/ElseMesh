@@ -6,8 +6,19 @@ export async function verifySignedDocument( document, protocol ) {
 	invariant( protobufKey.length === 36 && protobufKey[ 0 ] === 8 && protobufKey[ 1 ] === 1 && protobufKey[ 2 ] === 18 && protobufKey[ 3 ] === 32, 'Unsupported world signing key' );
 	invariant( peerIdFromEd25519( protobufKey ) === document.signer, 'World signer does not match its public key' );
 	const unsigned = { protocol: document.protocol, signer: document.signer, publicKey: document.publicKey, payload: document.payload };
-	const key = await crypto.subtle.importKey( 'raw', protobufKey.subarray( 4 ), { name: 'Ed25519' }, false, [ 'verify' ] );
-	const valid = await crypto.subtle.verify( 'Ed25519', key, decodeBase64( document.signature ), new TextEncoder().encode( canonicalJSON( unsigned ) ) );
+	let key;
+	let valid;
+	try {
+		key = await crypto.subtle.importKey( 'raw', protobufKey.subarray( 4 ), { name: 'Ed25519' }, false, [ 'verify' ] );
+		valid = await crypto.subtle.verify( 'Ed25519', key, decodeBase64( document.signature ), new TextEncoder().encode( canonicalJSON( unsigned ) ) );
+	} catch ( error ) {
+		if ( error?.name === 'NotSupportedError' ) {
+			const unsupported = new Error( 'This browser cannot verify Ed25519-signed ElseMesh records. Update to a current browser.', { cause: error } );
+			unsupported.code = 'ELSEMESH_ED25519_UNSUPPORTED';
+			throw unsupported;
+		}
+		throw error;
+	}
 	invariant( valid, 'World signature verification failed' );
 }
 

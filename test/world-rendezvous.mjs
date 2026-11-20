@@ -56,6 +56,7 @@ const manifest = await signedDocument( 'elsemesh.world/1', {
 }, owner );
 
 const oldFetch = globalThis.fetch;
+const OldCrypto = globalThis.crypto;
 const OldWebSocket = globalThis.WebSocket;
 const OldRTCPeerConnection = globalThis.RTCPeerConnection;
 const socketURLs = [];
@@ -175,6 +176,11 @@ try {
 	assert.deepEqual( socketFrames, [ 'connect', 'webrtc.offer' ], 'fallback still keeps manifest traffic off the Worker' );
 	rendezvousFallback.close();
 	rejectPublicGateway = false;
+	globalThis.crypto = { subtle: { importKey: async () => { throw new DOMException( 'Ed25519 is not available', 'NotSupportedError' ); } } };
+	const unsupportedSigning = new WorldConnector( { zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://resolver.example' } );
+	await assert.rejects( unsupportedSigning.getManifest(), error => error.code === 'ELSEMESH_ED25519_UNSUPPORTED' && /Update to a current browser/.test( error.message ) );
+	unsupportedSigning.close();
+	globalThis.crypto = OldCrypto;
 	globalThis.RTCPeerConnection = undefined;
 	const unsupported = new WorldConnector( { zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://resolver.example' } );
 	await assert.rejects( unsupported.getManifest(), /does not support WebRTC required by the signaling rendezvous/ );
@@ -183,6 +189,7 @@ try {
 } finally {
 	connector?.close();
 	globalThis.fetch = oldFetch;
+	globalThis.crypto = OldCrypto;
 	if ( OldWebSocket === undefined ) delete globalThis.WebSocket;
 	else globalThis.WebSocket = OldWebSocket;
 	if ( OldRTCPeerConnection === undefined ) delete globalThis.RTCPeerConnection;
