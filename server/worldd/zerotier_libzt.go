@@ -111,6 +111,7 @@ const libztUDPPollInterval = 25 * time.Millisecond
 type libztPacketConn struct {
 	fd            int
 	localAddr     *net.UDPAddr
+	trace         bool
 	mu            sync.Mutex
 	readDeadline  time.Time
 	writeDeadline time.Time
@@ -149,7 +150,15 @@ func (z *libztRuntime) OpenUDPPacketConn(port uint16) (net.PacketConn, error) {
 		C.zts_close(C.int(fd))
 		return nil, fmt.Errorf("libzt returned an invalid UDP socket address %s:%d", C.GoString(&raw[0]), int(assignedPort))
 	}
-	return &libztPacketConn{fd: fd, localAddr: &net.UDPAddr{IP: assignedIP, Port: int(assignedPort)}}, nil
+	packetConn := &libztPacketConn{
+		fd:        fd,
+		localAddr: &net.UDPAddr{IP: assignedIP, Port: int(assignedPort)},
+		trace:     os.Getenv("ELSEMESH_TRACE_WEBRTC_ZEROTIER_UDP") == "1",
+	}
+	if packetConn.trace {
+		log.Printf("WebRTC libzt UDP tracing enabled at %s", packetConn.localAddr)
+	}
+	return packetConn, nil
 }
 
 func (c *libztPacketConn) begin() (int, error) {
@@ -219,7 +228,11 @@ func (c *libztPacketConn) ReadFrom(buffer []byte) (int, net.Addr, error) {
 			}
 			return 0, nil, fmt.Errorf("libzt UDP receive failed (%d)", int(socketErr))
 		}
-		return n, &net.UDPAddr{IP: net.ParseIP(C.GoString(&ip[0])).To4(), Port: int(port)}, nil
+		remote := &net.UDPAddr{IP: net.ParseIP(C.GoString(&ip[0])).To4(), Port: int(port)}
+		if c.trace {
+			log.Printf("WebRTC libzt UDP received %d bytes from %s", n, remote)
+		}
+		return n, remote, nil
 	}
 }
 
@@ -250,6 +263,9 @@ func (c *libztPacketConn) WriteTo(buffer []byte, address net.Addr) (int, error) 
 		var socketErr C.int
 		n := int(C.zt_udp_sendto(C.int(fd), data, C.size_t(len(buffer)), ipText, C.ushort(remote.Port), &socketErr))
 		if n >= 0 {
+			if c.trace {
+				log.Printf("WebRTC libzt UDP sent %d bytes to %s", n, remote)
+			}
 			return n, nil
 		}
 		if socketErr != C.ZTS_EAGAIN && socketErr != C.ZTS_EINTR {
