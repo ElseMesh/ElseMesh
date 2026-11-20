@@ -37,6 +37,20 @@ func TestZeroTierIdentityMarkerPersistsAndRejectsReplacement(t *testing.T) {
 	}
 }
 
+func TestDefaultZeroTierDataDirIsWorldScoped(t *testing.T) {
+	first := defaultZeroTierDataDir(filepath.Join(t.TempDir(), "world-a"))
+	second := defaultZeroTierDataDir(filepath.Join(t.TempDir(), "world-b"))
+	if first == second || filepath.Base(first) != "zerotier" || filepath.Base(second) != "zerotier" {
+		t.Fatalf("world-scoped ZeroTier paths = %q, %q", first, second)
+	}
+	if got := worldZeroTierDataDir("/world/a", "/custom/identity", true); got != "/custom/identity" {
+		t.Fatalf("explicit ZeroTier data path = %q", got)
+	}
+	if got := worldZeroTierDataDir("/world/a", "", false); got != filepath.Join("/world/a", "zerotier") {
+		t.Fatalf("default ZeroTier data path = %q", got)
+	}
+}
+
 func TestZeroTierIdentityStorageRefusesRegenerationAfterKeyLoss(t *testing.T) {
 	path := t.TempDir()
 	if err := prepareZeroTierIdentityStorage(path); err != nil {

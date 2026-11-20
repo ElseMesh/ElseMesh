@@ -37,11 +37,11 @@ with a world-local player record remains distinct from social-account linking.
 IRC may be evaluated as an alternative lookup method, but lookup does not
 replace authenticated identity.
 
-When one machine hosts multiple worlds that need distinct HostIDs, give each
-world a persistent node profile and `node.key`. Its signed node record binds
-that profile's PeerID to one `worldId`, and restarting the profile preserves
-the HostID. `worldd --world-profile` provides separate identities and data
-directories for this model.
+Each hosted world uses its own persistent `worldd` data directory and embedded
+ZeroTier identity. The default libzt state path is `<world data>/zerotier`, so
+separate `--world-profile` or world-source profiles get distinct HostIDs while
+restarts preserve each HostID. Set `--zerotier-data` only when intentionally
+choosing a different persistent identity path.
 
 The ordinary package provider serves declared, hash-verified assets. A dynamic
 region provider needs signed region discovery, bounded on-demand decoding and

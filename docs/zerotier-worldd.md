@@ -250,33 +250,32 @@ connectivity or direct-transport viability.
 Temporary daemons, profiles, and ADB forwards were removed after the check;
 existing Flip7 daemons and display state were left alone.
 
-The embedded node identity is persisted in
-`$XDG_CONFIG_HOME/elsemesh/zerotier/identity.public` and
-`identity.secret` (normally `~/.config/elsemesh/zerotier/` on Linux). This
-device-wide path is independent of a ThruHold profile or `--data`, so changing
-world profiles does not create another ZeroTier node. The private secret file
-and its directory are owner-only. `elsemesh-node-id` records the first
-successful node ID; if the identity files are lost, incomplete, or produce a
-different ID, `worldd` now stops instead of silently accepting a new node.
-At first startup, existing state at the former default
-`~/.config/tidewater/worldd/zerotier/` path is moved into this location so its
-node identity is preserved.
-The default world data directory is `~/.config/elsemesh/worldd/`. At startup,
-when neither `--data` nor `--world-profile` is selected, an existing
-`~/.config/tidewater/worldd/` data directory is migrated there. Its legacy
-ZeroTier identity is moved to the device-wide directory first. If both old and
-new world data directories contain files, the daemon stops and leaves both
-untouched; choose a data directory explicitly or merge the contents manually.
-A 2026-10-10 isolated CLI check ran `--print-node-id` with a temporary
-`XDG_CONFIG_HOME`: it moved the legacy world key and data directory, moved the
-legacy ZeroTier state directory, and returned the same world PeerID before
-and after migration. This one-shot check did not start libzt or join the
-network; ZeroTier key reuse is separately covered by the identity tests.
-Back up the complete `zerotier` directory and restore it with the daemon on a
-new installation. Run one libzt-enabled `worldd` process per OS user at a
-time because they share this device identity and libzt state. A separate
-`--zerotier-data` path is available for an explicit second node or isolated
-test; using it intentionally creates a different ZeroTier identity.
+The embedded node identity is persisted under each world's data directory at
+`<world data>/zerotier/identity.public` and `identity.secret`. The default
+world data directory is `~/.config/elsemesh/worldd/`; named profiles and
+world-source profiles use their own directories. The private secret file and
+its directory are owner-only. `elsemesh-node-id` records the first successful
+node ID; if the identity files are lost, incomplete, or produce a different
+ID, `worldd` stops instead of silently accepting a replacement identity.
+
+The former device-wide `$XDG_CONFIG_HOME/elsemesh/zerotier/` path is not
+selected automatically by the per-world default. Existing identities remain
+on disk; pass `--zerotier-data <path>` to keep using one for a chosen world.
+Never run two libzt-enabled processes against the same identity directory.
+Older `$XDG_CONFIG_HOME/tidewater/worldd/` data and identity layouts also
+require explicit paths when using the current daemon; the historical
+migration recorded below describes an earlier build, not current startup
+behavior.
+Back up each world's complete `zerotier` directory and restore it with that
+world on a new installation. By default, each `worldd` profile stores its
+embedded ZeroTier identity under `<world data>/zerotier`, giving each world a
+stable, distinct HostID across restarts. Separate worlds can run concurrently
+when they use separate world data directories. The former device-wide
+`~/.config/elsemesh/zerotier/` identity is not selected automatically; pass it
+with `--zerotier-data` to preserve that identity for one world. Never run two
+libzt-enabled processes against the same identity directory. An explicit
+`--zerotier-data` path otherwise selects the identity directory for that
+process.
 `worldd` waits up to 60 seconds for network membership/configuration, computes its
 network-scoped 6PLANE address from its stable ZeroTier node ID, and announces
 that address on TCP port 42901. TCP dials to that network's 6PLANE `/40` prefix

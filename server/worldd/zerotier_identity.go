@@ -44,6 +44,17 @@ func prepareZeroTierIdentityStorage(path string) error {
 	return nil
 }
 
+func defaultZeroTierDataDir(worldDataDir string) string {
+	return filepath.Join(worldDataDir, "zerotier")
+}
+
+func worldZeroTierDataDir(worldDataDir, configuredDir string, explicitlySet bool) string {
+	if explicitlySet {
+		return configuredDir
+	}
+	return defaultZeroTierDataDir(worldDataDir)
+}
+
 func verifyZeroTierNodeID(path string, nodeID uint64) error {
 	markerPath := filepath.Join(path, "elsemesh-node-id")
 	marker := fmt.Sprintf("%010x\n", nodeID)

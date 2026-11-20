@@ -124,7 +124,7 @@ func run() error {
 	removeProposalID := flag.String("remove-proposal", "", "remove one verified queued proposal by sha256 ID after owner review (requires --manifest)")
 	proposalOut := flag.String("proposal-out", "", "new private output file for --export-proposal")
 	dataDir := flag.String("data", defaultData, "private daemon data directory")
-	zeroTierDataDir := flag.String("zerotier-data", filepath.Join(elsemeshConfigDir, "zerotier"), "private persistent libzt identity/state directory for embedded ZeroTier builds")
+	zeroTierDataDir := flag.String("zerotier-data", "", "private persistent libzt identity/state directory (defaults to <world data>/zerotier)")
 	manifestPath := flag.String("manifest", "", "owner-signed world manifest JSON")
 	signManifestPath := flag.String("sign-manifest", "", "validate and owner-sign an unsigned runtime world manifest, then exit")
 	manifestOut := flag.String("manifest-out", "", "output path for --sign-manifest (must not already exist)")
@@ -243,9 +243,13 @@ func run() error {
 		return nil
 	}
 	dataWasSet := false
+	zeroTierDataWasSet := false
 	flag.Visit(func(current *flag.Flag) {
 		if current.Name == "data" {
 			dataWasSet = true
+		}
+		if current.Name == "zerotier-data" {
+			zeroTierDataWasSet = true
 		}
 	})
 	if *worldProfile != "" {
@@ -270,6 +274,7 @@ func run() error {
 		}
 		*dataDir = profileData
 	}
+	*zeroTierDataDir = worldZeroTierDataDir(*dataDir, *zeroTierDataDir, zeroTierDataWasSet)
 	if *listenPort < 0 || *listenPort > 65535 {
 		return errors.New("p2p-port must be 0 (automatic) or between 1 and 65535")
 	}
