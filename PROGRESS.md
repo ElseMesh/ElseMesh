@@ -116,6 +116,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   shoreline cast matched landing frame/state with `0.00034 m` maximum
   bobber/landing-water delta. These are query/physics results, not rendered
   pixel parity or FPS evidence.
+- Compared avatar walking in an isolated AMD browser against pre-split ElseMesh
+  `23c30bf`, split WebGPU, and split WebGL from the same pose and yaw. Each run
+  loaded 489 box and 601 cylinder colliders and advanced the real
+  `Player.updateWalk` path for 180 fixed W+sprint steps. Split WebGPU and WebGL
+  matched at all seven sampled positions, ended grounded on the authored wood,
+  and finished 0.06138 m from the pre-split WebGPU endpoint. This controlled
+  movement-step comparison does not run the full app frame, live input timing,
+  production water, rendered pixels, or FPS, so it closes no full gameplay or
+  visual parity gate.
 
 ## 2026-11-18
 
