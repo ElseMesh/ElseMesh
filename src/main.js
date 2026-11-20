@@ -2,7 +2,7 @@ import './core/BenchSeed.js';
 import { App } from './App.js';
 import { UI } from './ui/UI.js';
 import { AppUI } from './ui/AppUI.js';
-import { defaultHomeWorldURL, discoverLocalWorldURL } from './network/WorldLauncher.js';
+import { defaultHomeWorldURL, discoverLocalWorldURL, inviteZeroTierNetworkId } from './network/WorldLauncher.js';
 // Public deployments can opt into account sign-in without exposing secrets or
 // requiring a build change. A missing file leaves the guest experience intact.
 try {
@@ -32,6 +32,10 @@ if ( /[?&]bench\b/.test( location.search ) ) {
 }
 
 const ui = new UI();
+let inviteNetworkId = null;
+try { inviteNetworkId = inviteZeroTierNetworkId(); }
+catch ( error ) { console.error( 'Invalid invited network route:', error.message ); }
+if ( inviteNetworkId ) await ui.showInviteNetworkOnboarding( inviteNetworkId );
 const app = new App( {
 	loadDefaultWorldPackage: async () => ( await import( 'virtual:elsemesh-default-world' ) ).defaultWorldPackage,
 	loadWorldProviders: async ( manifest ) => ( await import( 'virtual:elsemesh-world-providers' ) ).loadWorldProviders( manifest ),

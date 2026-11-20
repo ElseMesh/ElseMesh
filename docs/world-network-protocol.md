@@ -178,10 +178,12 @@ gateway. `worldd` publishes the private address inside its signed node record
 and bridges the ZeroTier TCP port to its dynamically selected local
 HTTP/WebSocket gateway port. The client verifies the node signature and checks
 its ZeroTier network ID, Host ID, world ID and gateway before connecting. A
-visitor without ZeroTier falls through to the public gateway; ordinary browser
-access does not require ZeroTier or browser-side ztlib. When an invite has no
-ZeroTier locator, the client resolves its world ID and uses the same public
-provider path. The Worker performs lookup only and never carries world traffic.
+visitor who continues without joining can still try direct WebRTC and the
+advertised public gateway; the invite onboarding prompts them to join first.
+Browser-side ztlib is not required. When an invite has no host ZeroTier
+locator, the client resolves its world ID and uses the signed provider path;
+the invite still identifies the shared network for onboarding and signaling.
+The Worker performs lookup and signaling only and never carries world traffic.
 
 When a signed provider record has no public gateway but sets `rendezvous: true`,
 the client uses the Worker's Durable Object room after the private ZeroTier
@@ -245,14 +247,25 @@ existing guest-readable behavior.
 
 Direct browser access to a ZeroTier IP requires the browser's device to be a
 member of that ZeroTier network. A regular web page does not join ZeroTier
-merely by receiving a Host ID. The optional direct route uses the device's
-existing OS route and a short-lived, signed `zeroTierGateway` address; it does
-not add ZeroTier membership to the browser. Ordinary browser access must work
-without this route. Issue #173 is an open question from 2022 about compiling
-libzt to WASM; it contains no implementation recipe or linked working branch.
-Treat a browser ZeroTier implementation as exploratory, not as a dependency.
-Do not use the server's ztlib identity as the visitor's or trust a
-client-supplied Host ID without proof.
+merely by receiving a Host ID; it uses the device's existing OS route. The
+plain `elsemesh.org` root entry remains a single-user experience and does not
+ask the visitor to join. A `?invite=` route carries the shared `ztNetworkId`
+even when it has no host `ztNodeId`; before `App.init()` starts loading the
+world, the client displays that network ID, platform join instructions, and
+the option to continue with browser WebRTC without joining. The visitor's
+acknowledgment is remembered per network on that browser, but is not treated
+as proof of membership. Participating `worldd` hosts and player devices use
+the same network so its route is present before portal travel. Per-world
+admission and player authorization remain separate from overlay membership.
+The optional private gateway uses a short-lived signed `zeroTierGateway`
+address and the device's OS route. Ordinary WebRTC still uses the browser's
+own ICE implementation and can use UDP without ZeroTier. Do not use the
+server's ztlib identity as the visitor's or trust a client-supplied Host ID
+without proof.
+
+Issue #173 is an open question from 2022 about compiling libzt to WASM; it
+contains no implementation recipe or linked working branch. Browser-side
+ZeroTier remains exploratory, not a dependency.
 
 Here, a **transport adapter** means the code that connects libzt's expected
 UDP packet send/receive operations to browser networking APIs. WASM does not
@@ -396,8 +409,9 @@ the existing presence messages.
    world, target, request ID, and transport session. WebRTC is opportunistic;
    local integration has passed, but cross-NAT reachability and TURN remain
    unverified.
-4. Optional libp2p/ZeroTier connects daemons, including authorized content
-   caches. It does not make an ordinary browser a ZeroTier participant.
+4. Participating worldd hosts and invited player devices use the shared
+   ZeroTier overlay at the OS level. It does not make the browser itself a
+   ZeroTier participant; the browser uses its device's network route.
 
 Gameplay and physics run in each visitor's browser wherever practical. Presence
 updates must reach the owner so other visitors can see the resulting avatar

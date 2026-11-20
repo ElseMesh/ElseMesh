@@ -3503,6 +3503,47 @@ export class UI {
 	// scripts run. setLoadingDetail( done, total ): sub-progress of the current stage (e.g. pipelines
 	// compiled / total), mapped between p and `until`. setLoadingError( message ).
 
+	showInviteNetworkOnboarding( networkId ) {
+
+		if ( ! /^[0-9a-f]{16}$/.test( networkId || '' ) ) return Promise.resolve();
+		const acknowledgedKey = `elsemesh.zerotier-onboarding.v1.${ networkId }`;
+		try { if ( globalThis.localStorage?.getItem( acknowledgedKey ) === 'joined' ) return Promise.resolve(); } catch {}
+		const gate = document.getElementById( 'invite-network-onboarding' );
+		if ( ! gate ) return Promise.resolve();
+		for ( const element of gate.querySelectorAll( '[data-invite-network-id]' ) ) element.textContent = networkId;
+		const copyButton = gate.querySelector( '[data-copy-invite-network]' );
+		const joinButton = gate.querySelector( '[data-invite-network-joined]' );
+		const skipButton = gate.querySelector( '[data-invite-network-skip]' );
+		if ( ! copyButton || ! joinButton || ! skipButton ) return Promise.resolve();
+		gate.hidden = false;
+		joinButton.focus();
+		return new Promise( ( resolve ) => {
+
+			const controller = new AbortController();
+			const finish = ( joined ) => {
+				controller.abort();
+				gate.hidden = true;
+				if ( joined ) try { globalThis.localStorage?.setItem( acknowledgedKey, 'joined' ); } catch {}
+				resolve();
+			};
+			joinButton.addEventListener( 'click', () => finish( true ), { signal: controller.signal } );
+			skipButton.addEventListener( 'click', () => finish( false ), { signal: controller.signal } );
+			gate.addEventListener( 'keydown', ( event ) => {
+				if ( event.key === 'Escape' ) { event.preventDefault(); finish( false ); }
+			}, { signal: controller.signal } );
+			copyButton.addEventListener( 'click', async () => {
+				try {
+					await navigator.clipboard.writeText( networkId );
+					copyButton.textContent = 'Copied';
+				} catch {
+					copyButton.textContent = 'Select the ID to copy';
+				}
+			}, { signal: controller.signal } );
+
+		} );
+
+	}
+
 	setLoadingPresentation( title, experience ) {
 
 		const L = document.getElementById( 'loader' );
@@ -3609,7 +3650,7 @@ export class UI {
 				const explanation = document.createElement( 'p' );
 				explanation.textContent = connectionHelp.reason === 'WEBRTC_UNSUPPORTED'
 					? 'This connection requires WebRTC, which this browser does not provide. Try a current version of Chrome, Firefox, or Edge.'
-					: 'The direct WebRTC connection could not be established. If the world owner enabled this ZeroTier network route, join it on your device and retry. This can help when the networks’ NAT or firewall rules prevent a direct peer connection.';
+					: 'The direct WebRTC connection could not be established. Join this invite’s shared ZeroTier network on your device and retry. It provides a route to participating worlds and players.';
 				const idRow = document.createElement( 'div' );
 				idRow.className = 'loader-connection-id';
 				const idLabel = document.createElement( 'span' );
@@ -3657,14 +3698,12 @@ export class UI {
 				androidLink.textContent = 'Android app';
 				links.append( desktopLink, document.createTextNode( ' · ' ), androidLink );
 
-				const tailscale = document.createElement( 'p' );
-				tailscale.textContent = 'Tailscale also works if the world owner has shared a Tailscale route with you. This invite does not advertise one, so installing Tailscale alone will not connect it.';
 				const retry = document.createElement( 'button' );
 				retry.type = 'button';
 				retry.className = 'loader-connection-retry';
 				retry.textContent = 'Retry connection';
 				retry.addEventListener( 'click', () => globalThis.location?.reload() );
-				panel.append( heading, explanation, idRow, steps, approval, links, tailscale, retry );
+				panel.append( heading, explanation, idRow, steps, approval, links, retry );
 				panel.hidden = false;
 			}
 		}

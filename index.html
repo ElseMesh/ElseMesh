@@ -53,6 +53,28 @@
 			<div class="loader-connection-help" hidden role="region" aria-label="Connection help"></div>
 		</div>
 	</div>
+	<div id="invite-network-onboarding" class="invite-network-onboarding" hidden role="dialog" aria-modal="true" aria-labelledby="invite-network-title" aria-describedby="invite-network-description">
+		<section class="invite-network-card">
+			<p class="invite-network-kicker">Invited to ElseMesh</p>
+			<h1 id="invite-network-title">Join the ElseMesh network</h1>
+			<p id="invite-network-description">Joining once on this device gives participating worlds and players a shared route before you approach a portal. Each world still controls who may enter.</p>
+			<div class="invite-network-id-row"><span>ZeroTier network ID</span><code data-invite-network-id></code><button type="button" data-copy-invite-network>Copy ID</button></div>
+			<details class="invite-network-steps">
+				<summary>How to join</summary>
+				<ol>
+					<li>Linux: install ZeroTier One, then join with <code>sudo zerotier-cli join <span data-invite-network-id></span></code>.</li>
+					<li>Windows: use the ZeroTier tray menu and choose “Join New Network”.</li>
+					<li>Android: add the network in the ZeroTier app and approve its VPN prompt.</li>
+				</ol>
+				<p>The network owner may need to authorize your device. <a href="https://docs.zerotier.com/start/" target="_blank" rel="noopener noreferrer">Install and setup help</a> · <a href="https://docs.zerotier.com/faq/android-install/" target="_blank" rel="noopener noreferrer">Android setup</a></p>
+			</details>
+			<div class="invite-network-actions">
+				<button type="button" class="invite-network-join" data-invite-network-joined>I've joined — continue</button>
+				<button type="button" class="invite-network-skip" data-invite-network-skip>Try direct WebRTC without joining</button>
+			</div>
+			<p class="invite-network-note">If you continue without joining, ElseMesh will still try a direct browser connection. Some networks may not allow it, which can interrupt access to a world or portal.</p>
+		</section>
+	</div>
 	<script type="module" src="/src/main.js"></script>
 </body>
 </html>

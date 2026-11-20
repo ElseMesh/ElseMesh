@@ -139,12 +139,13 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 	invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
+	invariant( /^[0-9a-f]{16}$/i.test( zeroTierNetworkId ), 'Invalid ZeroTier network ID for invite' );
 	for ( const key of [ ...WORLD_INVITE_ROUTE_KEYS, 'invite' ] ) url.searchParams.delete( key );
 	url.searchParams.set( 'worldId', worldId );
+	url.searchParams.set( 'ztNetworkId', zeroTierNetworkId.toLowerCase() );
 	if ( zeroTierNodeId ) {
-		invariant( /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) && /^[0-9a-f]{16}$/.test( zeroTierNetworkId ), 'Invalid ZeroTier node or network ID for invite' );
+		invariant( /^[0-9a-f]{10}$/i.test( zeroTierNodeId ), 'Invalid ZeroTier node ID for invite' );
 		url.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
-		url.searchParams.set( 'ztNetworkId', zeroTierNetworkId );
 		if ( zeroTierGateway ) {
 			invariant( validZeroTierGateway( zeroTierGateway ), 'Invalid ZeroTier private gateway for invite' );
 			invariant( zeroTierNodeRecord && typeof zeroTierNodeRecord === 'object' && ! Array.isArray( zeroTierNodeRecord ), 'A direct ZeroTier gateway requires its signed node record' );
@@ -158,7 +159,6 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 		}
 	} else {
 		url.searchParams.delete( 'ztNodeId' );
-		url.searchParams.delete( 'ztNetworkId' );
 		url.searchParams.delete( 'ztGateway' );
 		url.searchParams.delete( 'ztNodeRecord' );
 	}

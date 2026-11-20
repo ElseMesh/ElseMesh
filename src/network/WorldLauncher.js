@@ -1,5 +1,5 @@
 import { isWorldID } from './WorldIdentity.js';
-import { validZeroTierGateway } from './WorldConnector.js';
+import { DEFAULT_ZEROTIER_NETWORK_ID, validZeroTierGateway } from './WorldConnector.js';
 import { decodeWorldInviteRoute, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
 
 const STORAGE_KEY = 'elsemesh.visited-worlds.v1';
@@ -63,11 +63,11 @@ function validGateway( value, page ) {
 	}
 }
 
-function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNetworkId = 'e3918db4832a3056', zeroTierGateway = '', zeroTierNodeRecord = '', nodeId = '', gateway = '', providers = [], directory = '' } ) {
+function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, includeZeroTierNetwork = false, zeroTierGateway = '', zeroTierNodeRecord = '', nodeId = '', gateway = '', providers = [], directory = '' } ) {
 	const page = appPageURL( pageURL );
 	if ( ! isWorldID( worldId ) && ! ( ! worldId && /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) ) throw new Error( 'Invite does not contain a valid ThruHold ID or ZeroTier node ID' );
 	if ( zeroTierNodeId && ! /^[0-9a-f]{10}$/i.test( zeroTierNodeId ) ) throw new Error( 'Invite contains an invalid ZeroTier node ID' );
-	if ( zeroTierNodeId && ! /^[0-9a-f]{16}$/i.test( zeroTierNetworkId ) ) throw new Error( 'Invite contains an invalid ZeroTier network ID' );
+	if ( ( zeroTierNodeId || includeZeroTierNetwork ) && ! /^[0-9a-f]{16}$/i.test( zeroTierNetworkId ) ) throw new Error( 'Invite contains an invalid ZeroTier network ID' );
 	if ( zeroTierGateway && ( ! zeroTierNodeId || ! validZeroTierGateway( zeroTierGateway ) || ! zeroTierNodeRecord ) ) throw new Error( 'Direct ZeroTier gateway requires a signed node record' );
 	const candidates = providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	if ( candidates.length > 8 ) throw new Error( 'Invite contains too many gateway candidates' );
@@ -88,9 +88,9 @@ function normalizedWorldURL( { pageURL, worldId, zeroTierNodeId = '', zeroTierNe
 	page.searchParams.delete( 'ztNetworkId' );
 	page.searchParams.delete( 'ztGateway' );
 	page.searchParams.delete( 'ztNodeRecord' );
+	if ( zeroTierNodeId || includeZeroTierNetwork ) page.searchParams.set( 'ztNetworkId', zeroTierNetworkId.toLowerCase() );
 	if ( zeroTierNodeId ) {
 		page.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
-		page.searchParams.set( 'ztNetworkId', zeroTierNetworkId.toLowerCase() );
 		if ( zeroTierGateway ) {
 			page.searchParams.set( 'ztGateway', new URL( zeroTierGateway ).origin );
 			page.searchParams.set( 'ztNodeRecord', zeroTierNodeRecord );
@@ -145,13 +145,31 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 		pageURL: page.href,
 		worldId: params.get( 'worldId' ),
 		zeroTierNodeId: params.get( 'ztNodeId' ) || '',
-		zeroTierNetworkId: params.get( 'ztNetworkId' ) || 'e3918db4832a3056',
+		zeroTierNetworkId: params.get( 'ztNetworkId' ) || DEFAULT_ZEROTIER_NETWORK_ID,
+		includeZeroTierNetwork: inviteCodes.length === 1,
 		zeroTierGateway: params.get( 'ztGateway' ) || '',
 		zeroTierNodeRecord: params.get( 'ztNodeRecord' ) || '',
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
 		gateway: nodeIds.length ? '' : gateways[ 0 ] || '',
 		directory: params.get( 'directory' ) || resolver,
 	} ).href;
+}
+
+export function inviteZeroTierNetworkId( pageURL = globalThis.location?.href ) {
+	const page = new URL( pageURL );
+	const inviteCodes = page.searchParams.getAll( 'invite' );
+	let networkId;
+	if ( inviteCodes.length ) {
+		if ( inviteCodes.length !== 1 || WORLD_INVITE_ROUTE_KEYS.some( key => page.searchParams.has( key ) ) || page.searchParams.has( 'localProvider' ) || page.searchParams.has( 'localMap' ) ) throw new Error( 'Compact invites cannot be combined with separate world or local-provider route parameters' );
+		const params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
+		networkId = params.get( 'ztNetworkId' ) || DEFAULT_ZEROTIER_NETWORK_ID;
+	} else {
+		if ( ! page.searchParams.has( 'ztNetworkId' ) && ! page.searchParams.has( 'ztNodeId' ) ) return null;
+		if ( page.searchParams.getAll( 'ztNetworkId' ).length > 1 ) throw new Error( 'Invite contains duplicate ZeroTier network IDs' );
+		networkId = page.searchParams.get( 'ztNetworkId' ) || DEFAULT_ZEROTIER_NETWORK_ID;
+	}
+	if ( ! /^[0-9a-f]{16}$/i.test( networkId ) ) throw new Error( 'Invite contains an invalid ZeroTier network ID' );
+	return networkId.toLowerCase();
 }
 
 function getStorage( storage ) {

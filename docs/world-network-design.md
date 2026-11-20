@@ -13,28 +13,29 @@ Use the stable ElseMesh profile PeerID derived from its persistent `node.key`
 as the world **HostID**. Bind it to `worldId` in an owner-signed provider or
 session advertisement. Keep `worldId`, ElseMesh HostID, ZeroTier Host ID
 (called NodeID in its API/config), and ZeroTier network ID distinct. ElseMesh
-HostID and `worldId` are the normal discovery identities. A browser invite
-resolves `worldId` through the signed directory/Worker to a reachable HTTPS/
-WSS provider, then connects directly to that provider; neither the visitor nor
-the browser needs ZeroTier installed. The Worker carries lookup traffic only,
-not world content. If an invite also carries a signed ZeroTier private gateway,
-the client may try that route first with a strict timeout, then use HostID
-lookup and the provider's public HTTPS/WSS route. This is an optimization for
-devices that already have overlay access, never a visitor requirement.
+HostID and `worldId` are the normal discovery identities. The plain
+`elsemesh.org` entry remains a single-user experience and does not ask the
+visitor to join ZeroTier. Opening `elsemesh.org?invite=...` shows the shared
+ElseMesh ZeroTier network ID and join instructions before loading the invited
+world. A visitor joins once on the device; participating worlds use that same
+network so the route is already available before portal travel. The visitor
+may continue with browser WebRTC without joining, but that path can fail on
+restrictive NATs. World-level admission and player authorization remain
+separate from ZeroTier membership. The Worker carries lookup and signaling
+traffic only, not world content.
 
-ZeroTier roots establish optional overlay paths; they do not register ElseMesh
-worlds or authorize network membership. A ZeroTier NodeID identifies a
-ZeroTier node, but does not register an ElseMesh world or by itself identify a
-social account. A ZeroTier-configured `worldd` can publish its ZeroTier
-locator alongside its normal public gateway. A visitor whose operating system
-already has a route to that overlay may use the private gateway as an
-optimization or fallback, subject to browser Local Network Access rules.
-ElseMesh must not require browser-side ztlib/WebAssembly or ask ordinary
-visitors to install ZeroTier. Bare ZeroTier NodeID lookup is a convenience for
-known overlay users, not the default invite route. The owner's association of
-an authenticated ZeroTier Host ID with a world-local player record remains
-distinct from social-account linking. IRC may be evaluated as an alternative
-lookup method, but lookup does not replace authenticated identity.
+ZeroTier roots establish overlay paths; they do not register ElseMesh worlds
+or authorize world membership. A ZeroTier NodeID identifies a ZeroTier node,
+but does not register an ElseMesh world or by itself identify a social
+account. Participating world hosts and invited player devices join the shared
+ElseMesh network. A browser uses its device's OS route; it does not run ztlib
+or join the network itself. ZeroTier can establish direct peer paths and relay
+when direct connectivity fails. Treat overlay reachability as transport only:
+every `worldd` still checks that world's signed admission policy and player
+permissions. The owner's association of an authenticated ZeroTier Host ID
+with a world-local player record remains distinct from social-account linking.
+IRC may be evaluated as an alternative lookup method, but lookup does not
+replace authenticated identity.
 
 When one machine hosts multiple worlds that need distinct HostIDs, give each
 world a persistent node profile and `node.key`. Its signed node record binds
@@ -627,28 +628,30 @@ auth policy, expiry and a pending world-local player record created by
 `worldd`. The client must not accept a player number outside the signed ticket;
 `worldd` validates the ticket and applies its own admission policy. A path-form
 URL may be supported as an alias. See the protocol design and
-[gateway resilience](gateway-resilience.md) for route selection. The normal
-world-ID route uses signed HTTPS/WSS provider discovery; ZeroTier is optional.
+[gateway resilience](gateway-resilience.md) for route selection. Every invite
+also carries the shared ElseMesh ZeroTier network ID, independently of the
+world host's ZeroTier NodeID or private gateway. The invite page shows the
+join instructions before loading the world. Participating worldd hosts join
+that same network.
 
 The ticket can be resolved without a separate service only when its locator is
 stable. For ZeroTier clients, use the network ID and stable Host ID; ZeroTier
 peer discovery handles the node's changing public endpoint after the client
 joins the network. The application's ZeroTier managed address must also be
-stable or discoverable from trusted network configuration. For a browser that
-does not join ZeroTier, a changing public address needs dynamic DNS plus
-inbound reachability, or an online relay/rendezvous endpoint to which `worldd`
-connects outbound. GitHub Pages is static hosting and cannot map an invite code
-to a changing address by itself. DHT-based lookup can distribute that mapping,
-but still depends on bootstrap peers and online nodes; it is not infrastructure
-free.
+stable or discoverable from trusted network configuration. The visitor's
+operating system must join the shared network for that private route. GitHub
+Pages is static hosting and cannot map an invite code to a changing address by
+itself; the online Worker still resolves the host's current signed locator.
+DHT-based lookup can distribute that mapping, but still depends on bootstrap
+peers and online nodes; it is not infrastructure free.
 When `worldd` is configured for ZeroTier, ztlib identifies the server node by
 default; it does not authenticate the visitor. A verified client-side
 ZeroTier integration must prove the visitor's own NodeID before the owner can
 associate it with the world-local player record. The owner need not know it
 when creating an invitation. This does not link social accounts. A `worldd`
-instance without ZeroTier configuration cannot offer this method. The browser
-ztlib/WebAssembly route remains a feasibility and performance benchmark, as
-specified in the protocol.
+instance without ZeroTier configuration cannot participate in the shared
+overlay. Browser-side ztlib/WebAssembly remains out of scope; the browser uses
+the device's OS network route.
 Owners may choose a high-entropy bearer invitation or require
 an authenticated account through any providers allowed by the invite, initially
 Facebook, Google, and Telegram, linked through a verified account key. IP

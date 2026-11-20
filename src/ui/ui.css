@@ -344,6 +344,144 @@ body {
 	background: rgba(95, 227, 212, 0.18);
 }
 
+.invite-network-onboarding[hidden] {
+	display: none;
+}
+
+.invite-network-onboarding:not([hidden]) {
+	position: fixed;
+	inset: 0;
+	z-index: 1100;
+	display: grid;
+	place-items: center;
+	box-sizing: border-box;
+	padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+	overflow: auto;
+	background: rgba(3, 7, 12, 0.94);
+	color: var(--em-ink);
+	font-family: var(--em-font);
+}
+
+.invite-network-card {
+	width: min(100%, 680px);
+	box-sizing: border-box;
+	padding: clamp(20px, 4vw, 36px);
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-lg);
+	background: var(--em-glass);
+	box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.invite-network-card h1,
+.invite-network-card p,
+.invite-network-card ol {
+	margin: 0;
+}
+
+.invite-network-kicker {
+	margin-bottom: 8px !important;
+	color: var(--em-aqua);
+	font-size: var(--em-fs-xs);
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+}
+
+.invite-network-card h1 {
+	margin-bottom: 10px;
+	font-size: clamp(24px, 4vw, 34px);
+}
+
+.invite-network-card > p:not(.invite-network-kicker) {
+	margin-top: 12px;
+	color: var(--em-ink-2);
+	line-height: 1.55;
+}
+
+.invite-network-id-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 18px;
+}
+
+.invite-network-id-row code,
+.invite-network-steps code {
+	padding: 4px 8px;
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-sm);
+	color: var(--em-ink);
+	font-family: var(--em-mono);
+	font-size: 0.92em;
+	user-select: text;
+}
+
+.invite-network-steps {
+	margin-top: 18px;
+	padding: 12px 14px;
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-md);
+	color: var(--em-ink-2);
+}
+
+.invite-network-steps summary {
+	color: var(--em-ink);
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.invite-network-steps ol {
+	margin-top: 12px;
+	padding-left: 1.5em;
+	line-height: 1.7;
+}
+
+.invite-network-steps p {
+	margin-top: 10px;
+	line-height: 1.5;
+}
+
+.invite-network-steps a {
+	color: var(--em-aqua);
+	text-underline-offset: 0.18em;
+}
+
+.invite-network-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 18px;
+}
+
+.invite-network-actions button,
+.invite-network-id-row button {
+	min-height: 40px;
+	padding: 0 14px;
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-sm);
+	background: var(--em-fill-2);
+	color: var(--em-ink);
+	font: inherit;
+	cursor: pointer;
+}
+
+.invite-network-actions .invite-network-join {
+	border-color: transparent;
+	background: var(--em-aqua);
+	color: #03201c;
+	font-weight: 700;
+}
+
+.invite-network-actions button:hover,
+.invite-network-id-row button:hover {
+	filter: brightness(1.12);
+}
+
+.invite-network-card .invite-network-note {
+	font-size: var(--em-fs-xs);
+}
+
 /* rotating tips: stacked in one grid cell (no layout shift), cross-faded by a CSS cycle so they keep
    turning while scripts are blocked. 8 tips x 6 s. */
 .loader-tips {
