@@ -13,9 +13,9 @@ import { registerWorldComponentBackendAdapter } from './WorldComponentBackendReg
 const COMPONENT_TYPE = 'elsemesh.ground-cover-field/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installGroundCoverField );
 
-async function installGroundCoverField( { app, root, connector }, component ) {
+async function installGroundCoverField( { app, root, connector, installed = [] }, component ) {
 	const terrain = root.userData.terrainData;
-	const installedTerrain = [ ...( root.userData.worldComponents || [] ) ].find( candidate => candidate.terrainSurface && candidate.terrainGPU );
+	const installedTerrain = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU );
 	if ( ! terrain || ! installedTerrain ) throw new Error( `Ground-cover field ${ component.id } requires an installed terrain surface` );
 	const assets = await loadGroundCoverFieldAssets( connector, component, {
 		terrain,

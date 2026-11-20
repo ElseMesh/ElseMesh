@@ -23,11 +23,12 @@ try {
 	const root = new Group();
 	root.userData.terrainData = terrain;
 	terrainDetailTexture = new Texture( { label: 'fixture-signed-terrain-detail', width: terrainDetail.width, height: terrainDetail.height, format: 'rgba8unorm', data: terrainDetail.data, sampler: 'aniso4Repeat' } );
-	root.userData.worldComponents = [ { terrainSurface: true, terrainGPU: { detailTexture: terrainDetailTexture, heightModule: terrainHeightModule } } ];
+	root.userData.worldComponents = [];
 	root.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, progressiveController: new AbortController() };
 	const install = worldComponentBackendAdapter( 'webgpu', component.type );
-	const installed = await install( { app: {}, root, connector }, component );
-	assert.equal( installed.installed, true, 'the signed ground-cover component installs through the WebGPU registry' );
+	const pendingTerrain = { terrainSurface: true, terrainGPU: { detailTexture: terrainDetailTexture, heightModule: terrainHeightModule } };
+	const installed = await install( { app: {}, root, connector, installed: [ pendingTerrain ] }, component );
+	assert.equal( installed.installed, true, 'the signed ground-cover component resolves terrain installed earlier in the same component pass' );
 	runtime = installed.runtime;
 	L.scene.add( root );
 	L.camera.position.set( 0, 3, 8 );
