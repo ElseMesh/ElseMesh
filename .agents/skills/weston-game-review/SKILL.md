@@ -42,11 +42,16 @@ Use the checked-in display setup and browser helper; do not launch Weston with
    Weston window a concise title that names
    the task, build/revision, and renderer (for example, `Tidewater original —
    WebGPU` and `ElseMesh split — WebGPU`). Target the exact outer-window ID with
-   `wmctrl -ir WINDOW_ID -T TITLE`. Prefer matching its PID from `wmctrl -lp`;
+   `wmctrl -ir WINDOW_ID -T TITLE`. Then minimize the outer Weston window by
+   default with `wmctrl -ir WINDOW_ID -b add,hidden`; this hides it without
+   stopping the compositor or its private socket. Do not close Weston as a way
+   to minimize it. If human visual inspection requires showing the window,
+   remove the `hidden` state during that inspection and minimize it again
+   afterward, without focusing it. Prefer matching its PID from `wmctrl -lp`;
    Weston may publish PID 0, so in that case record the existing window IDs
    before launch and select the newly created Weston window afterward. Never
-   rename the active window by assumption. Keep the windowed Weston display
-   visible; do not mute the host audio or fullscreen the outer Weston window.
+   rename or minimize a window by assumption. Do not mute host audio or
+   fullscreen the outer Weston window.
 3. Start Chromium with `tools/review-browser.mjs`, a dedicated profile, and a
    maximized window. Use the Weston Wayland socket directly (`WAYLAND_DISPLAY`
    set to that display's socket and `CHROMIUM_OZONE_PLATFORM=wayland`). Do not
