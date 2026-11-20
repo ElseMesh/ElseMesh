@@ -261,8 +261,9 @@ async function createResolverServer( providerRecord, worldID, keyPath, certPath 
 			outgoing.writeHead( 200, { 'content-type': 'application/json', 'cache-control': 'no-store' } );
 			outgoing.end( JSON.stringify( zeroTierMatch
 				? { networkId: providerRecord.payload.zeroTierNetworkId, nodeId: providerRecord.payload.zeroTierNodeId, worldIds: providerRecord.payload.worldIds, providers: [ providerRecord ] }
-				: { worldId, providers: [ providerRecord ] } ) );
+				: { worldId: worldID, providers: [ providerRecord ] } ) );
 		} catch ( error ) {
+			if ( outgoing.headersSent ) { console.error( 'resolver fixture failed after sending headers:', error ); outgoing.destroy(); return; }
 			outgoing.writeHead( 500 );
 			outgoing.end( error instanceof Error ? error.message : 'resolver test failure' );
 		}
