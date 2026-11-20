@@ -139,6 +139,15 @@ raw RGBA8/linear-clamp pixel payload ready for either backend; no canopy adapter
 consumes it yet. The package stays inactive and unsigned. No parity percentage
 changes.
 
+**2026-11-20 canopy near-wind graph:** The same Tidewater-authored graph now
+deforms near tree and shrub geometry from shared world wind/time inputs in both
+material compilers. The export carries the per-instance yaw and scale values
+needed to express the displacement in local model space. This supersedes the
+earlier note that near wind was absent; the graph's procedural traveling gust
+still needs matched rendered review against the source detail-texture gust.
+The far octahedral presenter, paired component adapters, active package wiring,
+and appearance review remain open. No parity percentage changes.
+
 **2026-11-20 AMD pre-split gameplay-query update:** The hardware harness
 verified its pinned `23c30bf` wake, water-query, boat, dock, and pier sources,
 then generated the WebGPU reference on AMD RADV RENOIR and ran WebGL through
