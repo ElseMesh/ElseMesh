@@ -106,6 +106,16 @@ material and lack the renderer-neutral canopy graph; they are not signed into
 the world package and no adapter consumes them. This prepares portable canopy
 inputs but closes no parity gate and changes no percentage.
 
+**2026-11-20 canopy package assembly:** The Tidewater exporter now joins the
+near instance set and GLBs, both impostor atlases, the leaf mask, authored
+appearance inputs, and LOD settings in an inactive
+`vegetation-canopy-runtime-package.json`. It validates the candidate descriptor
+with the engine codec. The exporter integration test loads those actual
+content-addressed files through `OctahedralCanopyAssets` and checks deterministic
+bytes, identities, and image dimensions. The candidate remains outside
+`world-source.json`; its near-model PBR graph is provisional, and neither engine
+backend consumes the component. No parity percentage changes.
+
 **2026-11-20 AMD pre-split gameplay-query update:** The hardware harness
 verified its pinned `23c30bf` wake, water-query, boat, dock, and pier sources,
 then generated the WebGPU reference on AMD RADV RENOIR and ran WebGL through
