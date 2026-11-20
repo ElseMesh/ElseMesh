@@ -21,6 +21,39 @@ static ssize_t zt_write_with_errno(int fd, const void *buf, size_t len, int *err
 	*err = (n < 0) ? zts_errno : 0;
 	return n;
 }
+static int zt_udp_poll(int fd, int events, int timeout_ms, int *err) {
+	struct zts_pollfd descriptor = { .fd = fd, .events = (short)events, .revents = 0 };
+	int n = zts_bsd_poll(&descriptor, 1, timeout_ms);
+	*err = n < 0 ? zts_errno : 0;
+	return n;
+}
+static ssize_t zt_udp_recvfrom(int fd, void *buf, size_t len, char *ip, size_t ip_len, unsigned short *port, int *err) {
+	struct zts_sockaddr_in address = {0};
+	zts_socklen_t address_len = sizeof(address);
+	ssize_t n = zts_bsd_recvfrom(fd, buf, len, 0, (struct zts_sockaddr *)&address, &address_len);
+	*err = n < 0 ? zts_errno : 0;
+	if (n >= 0) {
+		if (address.sin_family != ZTS_AF_INET || !inet_ntop(AF_INET, &address.sin_addr.s_addr, ip, (socklen_t)ip_len)) {
+			*err = ZTS_EAFNOSUPPORT;
+			return -1;
+		}
+		*port = ntohs(address.sin_port);
+	}
+	return n;
+}
+static ssize_t zt_udp_sendto(int fd, const void *buf, size_t len, const char *ip, unsigned short port, int *err) {
+	struct zts_sockaddr_in address = {0};
+	address.sin_len = sizeof(address);
+	address.sin_family = ZTS_AF_INET;
+	address.sin_port = htons(port);
+	if (inet_pton(AF_INET, ip, &address.sin_addr.s_addr) != 1) {
+		*err = ZTS_EINVAL;
+		return -1;
+	}
+	ssize_t n = zts_bsd_sendto(fd, buf, len, 0, (struct zts_sockaddr *)&address, sizeof(address));
+	*err = n < 0 ? zts_errno : 0;
+	return n;
+}
 */
 import "C"
 
@@ -72,6 +105,220 @@ type libztRuntime struct {
 	acceptWG       sync.WaitGroup
 	proxyWG        sync.WaitGroup
 }
+
+const libztUDPPollInterval = 25 * time.Millisecond
+
+type libztPacketConn struct {
+	fd            int
+	localAddr     *net.UDPAddr
+	mu            sync.Mutex
+	readDeadline  time.Time
+	writeDeadline time.Time
+	closed        bool
+	active        sync.WaitGroup
+	closeOnce     sync.Once
+	closeErr      error
+}
+
+func (z *libztRuntime) OpenUDPPacketConn(port uint16) (net.PacketConn, error) {
+	if z.ipv4 == nil {
+		return nil, errors.New("libzt UDP packet transport requires an assigned ZeroTier IPv4 address")
+	}
+	fd := int(C.zts_socket(C.ZTS_AF_INET, C.ZTS_SOCK_DGRAM, C.ZTS_IPPROTO_UDP))
+	if fd < 0 {
+		return nil, fmt.Errorf("libzt UDP socket creation failed (%d)", int(C.zts_errno))
+	}
+	ipText := C.CString(z.ipv4.String())
+	defer C.free(unsafe.Pointer(ipText))
+	if code := int(C.zts_bind(C.int(fd), ipText, C.ushort(port))); code != 0 {
+		C.zts_close(C.int(fd))
+		return nil, fmt.Errorf("libzt UDP bind failed (%d)", code)
+	}
+	if code := int(C.zts_set_blocking(C.int(fd), 0)); code != 0 {
+		C.zts_close(C.int(fd))
+		return nil, fmt.Errorf("libzt UDP nonblocking setup failed (%d)", code)
+	}
+	var raw [C.ZTS_IP_MAX_STR_LEN]C.char
+	var assignedPort C.ushort
+	if code := int(C.zts_getsockname(C.int(fd), &raw[0], C.int(len(raw)), &assignedPort)); code != 0 {
+		C.zts_close(C.int(fd))
+		return nil, fmt.Errorf("read libzt UDP socket address failed (%d)", code)
+	}
+	assignedIP := net.ParseIP(C.GoString(&raw[0])).To4()
+	if assignedIP == nil || !assignedIP.Equal(z.ipv4) || assignedPort == 0 {
+		C.zts_close(C.int(fd))
+		return nil, fmt.Errorf("libzt returned an invalid UDP socket address %s:%d", C.GoString(&raw[0]), int(assignedPort))
+	}
+	return &libztPacketConn{fd: fd, localAddr: &net.UDPAddr{IP: assignedIP, Port: int(assignedPort)}}, nil
+}
+
+func (c *libztPacketConn) begin() (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return -1, net.ErrClosed
+	}
+	c.active.Add(1)
+	return c.fd, nil
+}
+
+func (c *libztPacketConn) end() { c.active.Done() }
+
+func (c *libztPacketConn) ReadFrom(buffer []byte) (int, net.Addr, error) {
+	fd, err := c.begin()
+	if err != nil {
+		return 0, nil, err
+	}
+	defer c.end()
+	var ip [C.INET_ADDRSTRLEN]C.char
+	var port C.ushort
+	for {
+		deadline, closed := c.readState()
+		if closed {
+			return 0, nil, net.ErrClosed
+		}
+		wait := libztUDPPollInterval
+		if !deadline.IsZero() {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				return 0, nil, os.ErrDeadlineExceeded
+			}
+			if remaining < wait {
+				wait = remaining
+			}
+		}
+		milliseconds := int(wait / time.Millisecond)
+		if milliseconds < 1 {
+			milliseconds = 1
+		}
+		var socketErr C.int
+		ready := int(C.zt_udp_poll(C.int(fd), C.ZTS_POLLIN, C.int(milliseconds), &socketErr))
+		if ready < 0 {
+			if socketErr == C.ZTS_EINTR || socketErr == C.ZTS_EAGAIN {
+				continue
+			}
+			if _, closed := c.readState(); closed {
+				return 0, nil, net.ErrClosed
+			}
+			return 0, nil, fmt.Errorf("libzt UDP poll failed (%d)", int(socketErr))
+		}
+		if ready == 0 {
+			continue
+		}
+		var data unsafe.Pointer
+		if len(buffer) > 0 {
+			data = unsafe.Pointer(&buffer[0])
+		}
+		n := int(C.zt_udp_recvfrom(C.int(fd), data, C.size_t(len(buffer)), &ip[0], C.size_t(len(ip)), &port, &socketErr))
+		if n < 0 {
+			if socketErr == C.ZTS_EINTR || socketErr == C.ZTS_EAGAIN {
+				continue
+			}
+			if _, closed := c.readState(); closed {
+				return 0, nil, net.ErrClosed
+			}
+			return 0, nil, fmt.Errorf("libzt UDP receive failed (%d)", int(socketErr))
+		}
+		return n, &net.UDPAddr{IP: net.ParseIP(C.GoString(&ip[0])).To4(), Port: int(port)}, nil
+	}
+}
+
+func (c *libztPacketConn) WriteTo(buffer []byte, address net.Addr) (int, error) {
+	remote, ok := address.(*net.UDPAddr)
+	if !ok || remote == nil || remote.IP.To4() == nil || remote.Port < 1 || remote.Port > 65535 {
+		return 0, errors.New("libzt UDP transport requires an IPv4 UDP destination")
+	}
+	fd, err := c.begin()
+	if err != nil {
+		return 0, err
+	}
+	defer c.end()
+	ipText := C.CString(remote.IP.To4().String())
+	defer C.free(unsafe.Pointer(ipText))
+	var data unsafe.Pointer
+	if len(buffer) > 0 {
+		data = unsafe.Pointer(&buffer[0])
+	}
+	for {
+		deadline, closed := c.writeState()
+		if closed {
+			return 0, net.ErrClosed
+		}
+		if !deadline.IsZero() && !time.Now().Before(deadline) {
+			return 0, os.ErrDeadlineExceeded
+		}
+		var socketErr C.int
+		n := int(C.zt_udp_sendto(C.int(fd), data, C.size_t(len(buffer)), ipText, C.ushort(remote.Port), &socketErr))
+		if n >= 0 {
+			return n, nil
+		}
+		if socketErr != C.ZTS_EAGAIN && socketErr != C.ZTS_EINTR {
+			return 0, fmt.Errorf("libzt UDP send failed (%d)", int(socketErr))
+		}
+		wait := libztUDPPollInterval
+		if !deadline.IsZero() && time.Until(deadline) < wait {
+			wait = time.Until(deadline)
+		}
+		milliseconds := int(wait / time.Millisecond)
+		if milliseconds < 1 {
+			milliseconds = 1
+		}
+		ready := int(C.zt_udp_poll(C.int(fd), C.ZTS_POLLOUT, C.int(milliseconds), &socketErr))
+		if ready < 0 && socketErr != C.ZTS_EINTR && socketErr != C.ZTS_EAGAIN {
+			return 0, fmt.Errorf("libzt UDP write poll failed (%d)", int(socketErr))
+		}
+	}
+}
+
+func (c *libztPacketConn) Close() error {
+	c.closeOnce.Do(func() {
+		c.mu.Lock()
+		c.closed = true
+		c.mu.Unlock()
+		c.active.Wait()
+		if code := int(C.zts_close(C.int(c.fd))); code != 0 {
+			c.closeErr = fmt.Errorf("libzt UDP socket close failed (%d)", code)
+		}
+	})
+	return c.closeErr
+}
+
+func (c *libztPacketConn) LocalAddr() net.Addr { return c.localAddr }
+
+func (c *libztPacketConn) SetDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	c.readDeadline, c.writeDeadline = deadline, deadline
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *libztPacketConn) SetReadDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	c.readDeadline = deadline
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *libztPacketConn) SetWriteDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	c.writeDeadline = deadline
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *libztPacketConn) readState() (time.Time, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.readDeadline, c.closed
+}
+
+func (c *libztPacketConn) writeState() (time.Time, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.writeDeadline, c.closed
+}
+
+var _ net.PacketConn = (*libztPacketConn)(nil)
 
 func startZeroTier(networkID, storagePath string, blacklistInterfaces []string, primaryUDPPort uint16) (zeroTierRuntime, error) {
 	if len(networkID) != 16 {
@@ -423,16 +670,6 @@ func (z *libztRuntime) StopAccepting() error {
 		z.bridgeCancel()
 	}
 	z.acceptWG.Wait()
-	return nil
-}
-
-func (z *libztRuntime) StopForPortHandoff() error {
-	if err := z.CloseListeners(); err != nil {
-		return err
-	}
-	if code := int(C.zts_node_stop_and_wait()); code != 0 {
-		return fmt.Errorf("libzt handoff stop failed (%d)", code)
-	}
 	return nil
 }
 

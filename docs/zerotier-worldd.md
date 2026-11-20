@@ -44,10 +44,15 @@ node starts; zero preserves libzt's default selection. Startup logs the actual
 primary port. This does not disable ZeroTier's optional secondary-port/NAT
 fallback and does not promise that a router preserves the mapping for another
 protocol. `worldd`'s shared Pion ICE mux can select a matching fixed port with
-`--webrtc-udp-port-min N --webrtc-udp-port-max N`, but a same-port handoff
-still requires stopping libzt, binding Pion, and verifying the resulting
-external ICE path. Merely choosing the same port does not transfer a live
-socket or guarantee NAT traversal.
+`--webrtc-udp-port-min N --webrtc-udp-port-max N`. When embedded ZeroTier is
+active, `worldd` keeps libzt running and binds a second Pion packet socket to
+the same numeric UDP port inside libzt's virtual IPv4 network. Pion also keeps
+its normal host UDP socket for public ICE. The two sockets use separate network
+stacks; neither takes over nor stops libzt's physical UDP socket. Visitors use
+ordinary system ZeroTier clients and do not need a modified ZeroTier install.
+This provides an overlay ICE candidate, but it does not guarantee that a peer
+is a member of the overlay or that a public ICE path succeeds. Rendezvous,
+STUN, and the HTTPS/WSS gateway remain separate connectivity mechanisms.
 
 The Legacy Central API token at `~/.config/zerotier/central-api-token` is an
 administration credential, not a runtime setting. Keep it owner-readable only

@@ -13,12 +13,12 @@ type zeroTierRuntime interface {
 	Addresses() []net.IP
 	NodeID() string
 	PrimaryUDPPort() int
+	OpenUDPPacketConn(port uint16) (net.PacketConn, error)
 	Libp2pOptions() []libp2p.Option
 	StartBridge(context.Context, int) error
 	StartHTTPBridge(context.Context, int) error
 	StopAccepting() error
 	CloseListeners() error
-	StopForPortHandoff() error
 	Stop() error
 }
 
