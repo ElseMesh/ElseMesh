@@ -149,9 +149,16 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 
 	settingEngine := webrtc.SettingEngine{}
 	includeZeroTier := os.Getenv("ELSEMESH_LIVE_INCLUDE_ZEROTIER") == "1"
+	zeroTierInterface := strings.ToLower(strings.TrimSpace(os.Getenv("ELSEMESH_LIVE_ZEROTIER_INTERFACE")))
 	settingEngine.SetInterfaceFilter(func(name string) bool {
 		name = strings.ToLower(name)
-		return !strings.HasPrefix(name, "tun") && (includeZeroTier || !strings.HasPrefix(name, "zt"))
+		if strings.HasPrefix(name, "tun") {
+			return false
+		}
+		if strings.HasPrefix(name, "zt") {
+			return includeZeroTier && (zeroTierInterface == "" || name == zeroTierInterface)
+		}
+		return true
 	})
 	if err := settingEngine.SetEphemeralUDPPortRange(45001, 45032); err != nil {
 		t.Fatalf("configure narrow visitor UDP range: %v", err)
@@ -368,6 +375,9 @@ candidatesDrained:
 	visitorPath := "visitor excluded ZeroTier interfaces"
 	if includeZeroTier {
 		visitorPath = "visitor included ZeroTier interfaces"
+		if zeroTierInterface != "" {
+			visitorPath = fmt.Sprintf("visitor included ZeroTier interface %s", zeroTierInterface)
+		}
 	}
 	t.Logf("%s; selected ICE pair local=%s/%s %s:%d remote=%s %s:%d",
 		visitorPath,
