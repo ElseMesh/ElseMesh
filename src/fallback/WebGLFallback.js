@@ -19,7 +19,6 @@ import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { createBundledWorldAssetConnector, loadWorldComponentAssets } from '../network/WorldComponentAssets.js';
-import { decodeBreakerStationsComponentAsset } from '../network/BreakerStationsAsset.js';
 import { WebGLLocalLights } from './WebGLLocalLights.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
@@ -46,7 +45,7 @@ import { WebGLPostFX } from './WebGLPostFX.js';
 import { WebGLRefractionPass } from './WebGLRefractionPass.js';
 import { WebGLRemoteAvatar } from './WebGLRemoteAvatar.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
-import { worldComponentAssetIDs, worldVehicleObjectId } from '../network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldComponentDescriptor, worldVehicleObjectId } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
 import { mulberry32 } from '../util/Noise.js';
@@ -1669,13 +1668,7 @@ export class WebGLFallback {
 		const water = this._makeWater( oceanLOD.geometry, this.worldSeaLevel, waterTerrain, oceanLOD.lod );
 		water.position.y = this.worldSeaLevel;
 		this.waterScene.add( water );
-		const oceanComponent = this.defaultWorldSource?.components?.find( component => component.type === 'elsemesh.island-ocean/1' );
-		let breakerStations = null;
-		if ( oceanComponent ) {
-			const assets = await loadWorldComponentAssets( [ oceanComponent ], this.defaultWorldAssets?.assetURLs );
-			breakerStations = decodeBreakerStationsComponentAsset( oceanComponent, assets );
-		}
-		if ( breakerStations ) this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel, breakerStations ) );
+		this.builtinWorldTerrainWater = waterTerrain;
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( this.defaultWorldAssets.villageLOD );
@@ -1718,7 +1711,6 @@ export class WebGLFallback {
 		const connector = this.builtinAssetConnector ||= createBundledWorldAssetConnector( this.defaultWorldSource, this.defaultWorldAssets?.assetURLs );
 		const manuallyPresented = new Set( [
 			this.defaultWorldSource.components.find( component => component.type === 'elsemesh.terrain-surface/1' )?.id,
-			this.defaultWorldSource.components.find( component => component.type === 'elsemesh.island-ocean/1' )?.id,
 		].filter( Boolean ) );
 		const isCurrent = () => ! this.worldLink && connector === this.builtinAssetConnector;
 		for ( const { adapter, component } of singles ) {
@@ -1726,7 +1718,7 @@ export class WebGLFallback {
 			try {
 				const assets = await loadWorldComponentAssets( [ component ], this.defaultWorldAssets?.assetURLs );
 				for ( const [ assetID, bytes ] of assets ) connector.assets.set( assetID, bytes );
-				const result = await adapter( { fallback: this, connector, isCurrent, manifest: connector.manifest, assets, rules: this.defaultWorldSource.rules, terrain: this.terrain }, component );
+				const result = await adapter( { fallback: this, connector, isCurrent, manifest: connector.manifest, assets, rules: this.defaultWorldSource.rules, terrain: this.terrain, terrainWater: this.builtinWorldTerrainWater, terrainSurface: { shoreField: this.shoreField }, builtin: true }, component );
 				if ( result?.runtime ) this.builtinComponentRuntimes.set( component.id, result.runtime );
 			} catch ( error ) {
 				console.warn( `WebGL fallback component ${component.type} unavailable:`, error );

@@ -70,14 +70,14 @@ function installWaterBody( { app, root, connector, installed }, component ) {
 
 }
 
-function installIslandOcean( { app, root, connector }, component ) {
+function installIslandOcean( { app, root, connector, builtin = false }, component ) {
 
-	const lod = new CDLOD( { gridSize: Number( app.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
-	const mesh = new Mesh( lod.geometry, app.waterMaterial );
+	const lod = builtin ? app.oceanLOD : new CDLOD( { gridSize: Number( app.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
+	const mesh = builtin ? app.ocean : new Mesh( lod.geometry, app.waterMaterial );
 	mesh.frustumCulled = false;
 	mesh.receiveShadow = true;
 	mesh.layers.set( LAYERS.WATER );
-	root.add( mesh );
+	if ( ! builtin ) root.add( mesh );
 	const breakerStations = decodeBreakerStationsComponentAsset( component, connector?.assets );
 	return {
 		installed: true,
@@ -86,7 +86,7 @@ function installIslandOcean( { app, root, connector }, component ) {
 			surface: app.surface,
 			breakerStations,
 			update: ( _dt, camera ) => lod.update( camera ),
-			dispose: () => { root.remove( mesh ); lod.geometry.dispose(); },
+			dispose: () => { if ( ! builtin ) { root.remove( mesh ); lod.geometry.dispose(); } },
 		},
 	};
 

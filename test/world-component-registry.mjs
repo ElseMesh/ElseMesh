@@ -9,6 +9,8 @@ assert.equal( worldVehicleObjectId( [ { type: 'elsemesh.downeast-boat/1', data: 
 assert.equal( worldVehicleObjectId( [ { type: 'elsemesh.downeast-boat/1', objectId: 'elsemesh-object:hosted-boat' } ] ), 'elsemesh-object:hosted-boat', 'the generic vehicle resolver finds an object ID in a signed manifest component' );
 
 assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, true );
+assert.equal( worldComponentDescriptor( 'elsemesh.island-ocean/1' ).waterSurface, true, 'the reference-island ocean is an engine-registered water capability' );
+assert.equal( worldComponentDescriptor( 'elsemesh.island-ocean/1' ).worldOcean, true, 'the engine registry exposes a generic world-ocean runtime capability' );
 assert.equal( worldComponentDescriptor( 'elsemesh.ambient-audio/1' ).waterSurface, false );
 assert.equal( worldComponentDescriptor( 'elsemesh.terrain-surface/1' ).installRank, 0, 'terrain surface installation precedes components which depend on terrain' );
 assert.equal( worldComponentDescriptor( 'elsemesh.local-light-set/1' ).installRank, 0, 'renderer-neutral local light data is available before visual components install' );
@@ -18,8 +20,10 @@ assert.deepEqual( worldComponentAssetIDs( { type: 'elsemesh.octahedral-canopy/1'
 assert.equal( worldComponentDescriptor( 'elsemesh.unregistered/1' ), null );
 
 const type = 'elsemesh.registry-fixture/1';
-registerWorldComponent( type, { waterSurface: true } );
+registerWorldComponent( type, { waterSurface: true, worldOcean: true } );
 assert.equal( worldComponentDescriptor( type ).waterSurface, true );
+assert.equal( worldComponentDescriptor( type ).worldOcean, true );
+assert.throws( () => registerWorldComponent( 'elsemesh.ocean-without-water/1', { worldOcean: true } ), /Invalid/ );
 assert.ok( registeredWorldComponents().includes( type ) );
 assert.throws( () => registerWorldComponent( type ), /duplicate/ );
 const installer = () => true;

@@ -67,6 +67,21 @@ const lips = fallback.waterScene.children.find( child => child.name === 'HostedB
 assert( lips?.isMesh && lips.geometry.getAttribute( 'aProfile' ), 'hosted island ocean installs the generic shoreline-driven lip mesh' );
 assert.equal( installResult.runtime.stations, 2, 'the WebGL lip mesh consumes the exact world-authored station count' );
 
+const installedWaterCount = fallback.waterScene.children.filter( child => child.material?.uniforms?.uOceanEnabled ).length;
+fallback.builtinWorldWater = fallback.waterScene.children.find( child => child.material?.uniforms?.uOceanEnabled );
+const builtinResult = adapter( {
+	fallback,
+	rules: { seaLevel: 0 },
+	terrain,
+	terrainWater: { texture: shoreTexture, minHeight: - 512, maxHeight: 1536, origin: 0, size: resolution, shore: { texture: shoreTexture, origin: 0, size: resolution, timeRange: new THREE.Vector2( 0, 1 ) } },
+	terrainSurface: { shoreField },
+	assets: new Map( [ [ stationAssetId, stationBytes ] ] ),
+	builtin: true,
+}, oceanComponent );
+assert.equal( builtinResult?.installed, true, 'the built-in WebGL route uses the same registered island-ocean adapter' );
+assert.equal( fallback.waterScene.children.filter( child => child.material?.uniforms?.uOceanEnabled ).length, installedWaterCount, 'built-in adapter reuses its preinstalled ocean mesh' );
+builtinResult.runtime?.dispose?.();
+
 installResult.runtime.dispose();
 shoreTexture.dispose();
 for ( const child of fallback.waterScene.children ) {

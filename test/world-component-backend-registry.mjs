@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerWorldComponentBackendAdapter, registerWorldComponentBackendBatchAdapter, worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { worldComponentAssetIDs, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
+import { BREAKER_STATIONS_ASSET_KIND, encodeBreakerStationsAsset } from '../src/network/BreakerStationsAsset.js';
 
 const webgpu = ( context, component ) => ( { backend: 'webgpu', context, component } );
 const webgl = ( context, component ) => ( { backend: 'webgl', context, component } );
@@ -26,8 +27,10 @@ assert.throws( () => registerWorldComponentBackendAdapter( 'canvas', 'elsemesh.i
 await import( '../src/App.js' );
 await import( '../src/fallback/WebGLFallback.js' );
 const appSource = await readFile( new URL( '../src/App.js', import.meta.url ), 'utf8' );
-assert.match( appSource, /this\.activeHostedOcean = components\.some\( \( component \) => component\.isWorldOcean \)/, 'App detects the generic world-ocean runtime capability' );
+assert.match( appSource, /const worldOcean = components\.find\( component => component\.isWorldOcean \)/, 'App detects the generic world-ocean runtime capability' );
+assert.match( appSource, /this\.activeHostedOcean = Boolean\( worldOcean \)/, 'App activates hosted ocean effects from the generic runtime capability' );
 assert.doesNotMatch( appSource, /component\.islandOcean/, 'App does not depend on a Tidewater-specific ocean runtime flag' );
+assert.doesNotMatch( appSource, /elsemesh\.island-ocean\/1/, 'App resolves the registered world-ocean capability without naming a component version' );
 const fallbackSource = await readFile( new URL( '../src/fallback/WebGLFallback.js', import.meta.url ), 'utf8' );
 const playerSource = await readFile( new URL( '../src/player/Player.js', import.meta.url ), 'utf8' );
 const soundScapeSource = await readFile( new URL( '../src/audio/SoundScape.js', import.meta.url ), 'utf8' );
@@ -70,9 +73,19 @@ assert.equal( oceanRoot.children.length, 1, 'the adapter adds one water mesh to 
 assert.equal( oceanRoot.children[ 0 ].receiveShadow, true, 'the water mesh retains its receive-shadow setting' );
 oceanInstallation.runtime.dispose();
 assert.equal( oceanRoot.children.length, 0, 'the engine adapter removes the water mesh on disposal' );
+const stationBytes = encodeBreakerStationsAsset( { data: new Float32Array( [ 1, 2, 0, 1, 2, 2, 0, 1 ] ), count: 2, spacing: 1 } );
+const builtinMesh = { layers: { set() {} } }, builtinLOD = { geometry: {}, update() {} }, builtinRoot = { added: 0, add() { this.added ++; } };
+const builtinInstallation = await worldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1' )( {
+	app: { qs: { get: () => null }, waterMaterial: {}, surface: oceanSurface, ocean: builtinMesh, oceanLOD: builtinLOD },
+	root: builtinRoot, builtin: true,
+	connector: { assets: new Map( [ [ 'sha256:stations', stationBytes ] ] ) },
+}, { id: 'elsemesh-component:ocean', type: 'elsemesh.island-ocean/1', assets: [ { assetId: 'sha256:stations', kind: BREAKER_STATIONS_ASSET_KIND } ] } );
+assert.equal( builtinInstallation.runtime.breakerStations.count, 2, 'the built-in route gets shared station data from the engine adapter' );
+assert.equal( builtinRoot.added, 0, 'the built-in adapter reuses App’s existing water mesh instead of duplicating presentation' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.terrain-surface/1' ), 'function', 'ElseMesh registers the WebGPU terrain-surface adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1' ), 'function', 'WebGLFallback registers the WebGL water-body adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' ), 'function', 'WebGLFallback registers the ocean adapter' );
+assert.doesNotMatch( fallbackSource, /component\.type === 'elsemesh\.island-ocean\/1'/, 'the WebGL fallback selects the ocean through its registered adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGPU static-model adapter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgl', 'elsemesh.static-model-instance-set/1' ), 'function', 'ElseMesh registers a generic WebGL static-model adapter' );
 const groundCoverType = 'elsemesh.ground-cover-field/1';
@@ -85,7 +98,7 @@ assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'ElseMesh registers t
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGPU fish-props presenter' );
 assert.equal( typeof worldComponentBackendBatchAdapter( 'webgl', tidewaterFishProps ), 'function', 'ElseMesh owns the WebGL fish-props presenter' );
 await import( '../worlds/tidewater/register-components.js' );
-assert.equal( worldComponentDescriptor( 'elsemesh.island-ocean/1' )?.install, null, 'Tidewater declares the ocean capability without installing a renderer presenter' );
+assert.equal( worldComponentDescriptor( 'elsemesh.island-ocean/1' )?.install, null, 'the engine ocean capability does not install a world-owned renderer presenter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1' ), 'function', 'loading Tidewater does not replace the engine WebGPU ocean presenter' );
 assert.ok( worldComponentDescriptor( tidewaterFishProps ), 'Tidewater uses the engine component contract without registering a presenter' );
 assert.equal( typeof worldComponentBackendAdapter( 'webgpu', tidewaterFishProps ), 'function', 'loading Tidewater does not replace the engine WebGPU presenter' );
