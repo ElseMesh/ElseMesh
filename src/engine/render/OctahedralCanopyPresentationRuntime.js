@@ -2,14 +2,15 @@ import { planOctahedralCanopyInstances, writeOctahedralCanopyDrawPlan } from './
 
 /** Shared camera-driven canopy presentation state consumed by both backend adapters. */
 export class OctahedralCanopyPresentationRuntime {
-	constructor( descriptor, instanceSet, { applyDrawPlan = null, dispose = null } = {} ) {
+	constructor( descriptor, instanceSet, { applyDrawPlan = null, drawBuffers = {}, dispose = null } = {} ) {
 		if ( typeof applyDrawPlan !== 'function' ) throw new Error( 'Octahedral canopy presentation requires a backend draw-plan consumer' );
+		if ( ! drawBuffers || typeof drawBuffers !== 'object' ) throw new Error( 'Octahedral canopy presentation requires reusable draw buffers' );
 		this.descriptor = descriptor;
 		this.instanceSet = instanceSet;
 		this.applyDrawPlan = applyDrawPlan;
 		this.disposeBackend = dispose;
 		this.cameraPosition = [ NaN, NaN, NaN ];
-		this.drawBuffers = {};
+		this.drawBuffers = drawBuffers;
 		this.disposed = false;
 	}
 

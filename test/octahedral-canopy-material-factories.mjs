@@ -56,6 +56,7 @@ assert.match( shader.vertexShader, /canopyWindDisplacement\( iCanopy0\.x, iCanop
 assert.match( shader.vertexShader, /worldPosition\.xyz \+= vCanopyWindOffset/ );
 assert.match( shader.fragmentShader, /uWindVelocityIntegral \* 0\.700000000/ );
 assert.match( shader.fragmentShader, /max\( vCanopy1\.x, 1e-6 \) \/ max\( vCanopy1\.y, 1e-6 \)/ );
+assert.match( shader.fragmentShader, /canopyWorldNormal \+ canopyViewDirectionWorld \* 0\.12/, 'WebGL applies the same authored view-facing normal bias as WebGPU' );
 assert.match( shader.fragmentShader, /directionalLights\[ 0 \]\.direction/ );
 assert.match( shader.fragmentShader, /directionalShadowMap\[ i \].*canopyShadowData/s, 'transmission uses the same cascaded shadow maps as direct PBR lighting' );
 assert.match( shader.fragmentShader, /directionalLights\[ 0 \]\.color \* canopySunShadow/ );

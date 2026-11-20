@@ -155,6 +155,16 @@ function ensureFloatBuffer( target, key, required ) {
 	return target[ key ] = new Float32Array( capacity );
 }
 
+/** Reserve shared draw buffers up front so renderer adapters keep stable GPU attributes. */
+export function createOctahedralCanopyDrawBuffers( maxInstances ) {
+	if ( ! Number.isSafeInteger( maxInstances ) || maxInstances < 0 ) throw new Error( 'Canopy draw-buffer capacity must be a non-negative integer' );
+	return {
+		matrices: new Float32Array( maxInstances * 16 ),
+		attributes: new Float32Array( maxInstances * OCTAHEDRAL_CANOPY_ATTRIBUTE_STRIDE ),
+		count: 0,
+	};
+}
+
 /** Pack the shared far-card plan into reusable, backend-neutral instanced buffers. */
 export function writeOctahedralCanopyDrawPlan( plan, target = {} ) {
 	if ( ! Array.isArray( plan ) ) throw new Error( 'Octahedral canopy draw plan must be an array' );

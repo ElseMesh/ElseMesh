@@ -13,6 +13,7 @@ import { decodeBreakerStationsComponentAsset } from './BreakerStationsAsset.js';
 import { GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js';
 import { PebbleField } from '../world/debris/PebbleField.js';
 
+import './WebGPUOctahedralCanopyAdapter.js';
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.water-body/1', installWaterBody );
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.island-ocean/1', installIslandOcean );
 registerWorldComponentBackendAdapter( 'webgpu', 'elsemesh.ground-detail-field/1', installGroundDetailField );

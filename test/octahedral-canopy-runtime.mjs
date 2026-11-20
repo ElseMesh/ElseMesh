@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { planOctahedralCanopyInstances, writeOctahedralCanopyDrawPlan } from '../src/engine/render/OctahedralCanopyRuntime.js';
+import { createOctahedralCanopyDrawBuffers, planOctahedralCanopyInstances, writeOctahedralCanopyDrawPlan } from '../src/engine/render/OctahedralCanopyRuntime.js';
 
 const tree = {
 	id: 'trees', modelIds: [ 'oak' ], atlasVariantRange: { start: 0, end: 3 },
@@ -63,8 +63,10 @@ assert.equal( plan[ 3 ].blendFrames, false, 'far crowns use the dominant atlas f
 assert.ok( Math.abs( plan[ 3 ].farScale - Math.SQRT2 ) < 1e-12, 'far crowns are density-compensated at the thinning endpoint' );
 assert.equal( plan[ 4 ].farWeight, 1, 'the retained tree remains visible at the thinning endpoint' );
 assert.ok( Math.abs( plan[ 4 ].billboard.halfWidth - 4 * Math.SQRT2 ) < 1e-12, 'far-card bounds account for the larger horizontal instance scale' );
-const packed = writeOctahedralCanopyDrawPlan( plan );
+const reserved = createOctahedralCanopyDrawBuffers( set.instances.length );
+const packed = writeOctahedralCanopyDrawPlan( plan, reserved );
 const f32 = values => values.map( Math.fround );
+assert.equal( packed, reserved, 'backend adapters can reserve one stable interleaved buffer for all signed instances' );
 assert.equal( packed.count, 4, 'only visible far cards enter the shared instanced draw' );
 assert.deepEqual( Array.from( packed.matrices.slice( 0, 16 ) ), Array.from( treeHandoff.billboard.matrix ), 'the backend draw matrix is copied without renderer-specific conversion' );
 assert.deepEqual( Array.from( packed.attributes.slice( 0, 4 ) ), f32( [ 0.01, 0, 5, 0 ] ), 'the shared attributes carry seed, atlas variant, bounds, and authored group index' );

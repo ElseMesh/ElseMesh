@@ -32,6 +32,7 @@ const tests = [
 	'test/priority-request-queue.mjs', 'test/local-region-request-budget.mjs', 'test/world-streaming-incremental-components.mjs', 'test/static-model-texture-demand.mjs', 'test/webgl-static-texture-lod.mjs', 'test/world-texture-priority.mjs',
 ];
 tests.push( 'test/octahedral-canopy-presentation-runtime.mjs' );
+tests.push( 'test/octahedral-canopy-adapters.mjs' );
 tests.push( 'test/octahedral-canopy-material-factories.mjs' );
 tests.push( 'test/octahedral-canopy-webgl-render.mjs' );
 const dawnTests = new Set( [

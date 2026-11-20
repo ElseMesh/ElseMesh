@@ -351,7 +351,8 @@ export function createWebGLOctahedralCanopyMaterial( THREE, descriptor, options 
 			diffuseColor.rgb = canopyAlbedo;
 		` );
 		shader.fragmentShader = insertAfter( shader.fragmentShader, '#include <normal_fragment_maps>', /* glsl */`
-			normal = normalize( mat3( viewMatrix ) * canopyWorldNormal );
+			vec3 canopyViewDirectionWorld = normalize( uCameraPosition - vCanopyWorldPosition );
+			normal = normalize( mat3( viewMatrix ) * normalize( canopyWorldNormal + canopyViewDirectionWorld * 0.12 ) );
 		` );
 		shader.fragmentShader = insertAfter( shader.fragmentShader, '#include <lights_fragment_end>', /* glsl */`
 			#if NUM_DIR_LIGHTS > 0

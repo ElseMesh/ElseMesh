@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createOctahedralCanopyDrawBuffers } from '../src/engine/render/OctahedralCanopyRuntime.js';
 import { OctahedralCanopyPresentationRuntime } from '../src/engine/render/OctahedralCanopyPresentationRuntime.js';
 
 const descriptor = {
@@ -14,7 +15,9 @@ const descriptor = {
 };
 const instanceSet = { instances: [ { model: 'oak', position: [ 15, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.2, 4 ] } ] };
 const updates = [], disposed = [];
+const reserved = createOctahedralCanopyDrawBuffers( instanceSet.instances.length );
 const runtime = new OctahedralCanopyPresentationRuntime( descriptor, instanceSet, {
+	drawBuffers: reserved,
 	applyDrawPlan: ( plan, buffers ) => updates.push( { plan, buffers } ),
 	dispose: () => disposed.push( true ),
 } );
@@ -22,6 +25,7 @@ const runtime = new OctahedralCanopyPresentationRuntime( descriptor, instanceSet
 assert.equal( runtime.update( 0, { position: { x: 0, y: 0, z: 0 } } ), true );
 assert.equal( updates.length, 1 );
 assert.equal( updates[ 0 ].buffers.count, 1 );
+assert.equal( updates[ 0 ].buffers, reserved, 'the backend reserved capacity is used directly by the shared presentation runtime' );
 assert.equal( updates[ 0 ].buffers.attributes[ 8 ], 4, 'authored wind height is passed through the shared interleaved draw buffer' );
 const matrices = updates[ 0 ].buffers.matrices;
 assert.equal( runtime.update( 0, { position: { x: 0, y: 0, z: 0 } } ), false, 'stationary cameras do not rebuild shared instance buffers' );
