@@ -33,6 +33,7 @@ const tests = [
 ];
 tests.push( 'test/octahedral-canopy-presentation-runtime.mjs' );
 tests.push( 'test/octahedral-canopy-adapters.mjs' );
+tests.push( 'test/octahedral-canopy-webgpu-adapter.mjs' );
 tests.push( 'test/octahedral-canopy-material-factories.mjs' );
 tests.push( 'test/octahedral-canopy-webgl-render.mjs' );
 const dawnTests = new Set( [

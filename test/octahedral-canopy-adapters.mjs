@@ -86,6 +86,7 @@ const references = [
 const component = { type: OCTAHEDRAL_CANOPY_COMPONENT_TYPE, data: { descriptorAssetId: descriptorID }, assets: references };
 const assets = new Map( [ [ descriptorID, descriptorBytes ], [ setID, setBytes ], [ modelAID, modelA ], [ modelBID, modelB ], [ atlasAID, atlasA ], [ atlasBID, atlasB ], [ leafMaskID, leafMask ] ] );
 const connector = { manifest: { assets: references.map( ( { assetId, kind } ) => ( { id: assetId, kind } ) ) }, assets, async getAsset( assetId ) { return assets.get( assetId ); } };
+export const signedCanopyFixture = { component, connector };
 const scene = new THREE.Scene();
 const fallback = { THREE, scene, connector, beachDetailTexture: null };
 const result = await webglAdapter( { fallback, connector, isCurrent: () => true }, component );
