@@ -11,6 +11,26 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+type fakeZeroTierUDPPacketProvider struct {
+	packetConn    net.PacketConn
+	requestedPort uint16
+	address       net.Addr
+}
+
+type packetConnWithAdvertisedAddr struct {
+	net.PacketConn
+	address net.Addr
+}
+
+func (c packetConnWithAdvertisedAddr) LocalAddr() net.Addr { return c.address }
+
+func (p *fakeZeroTierUDPPacketProvider) OpenUDPPacketConn(port uint16) (net.PacketConn, error) {
+	p.requestedPort = port
+	addr := &net.UDPAddr{IP: net.ParseIP("172.22.80.141").To4(), Port: int(port)}
+	p.address = addr
+	return packetConnWithAdvertisedAddr{PacketConn: p.packetConn, address: addr}, nil
+}
+
 func TestWebRTCConfigurationValidation(t *testing.T) {
 	if err := validateSTUNServerURLs([]string{"stun:stun.example.org:3478", "stuns:stun.example.org:5349"}); err != nil {
 		t.Fatalf("valid STUN servers rejected: %v", err)
@@ -254,6 +274,68 @@ func TestSharedWebRTCAPIUsesOnePortForConcurrentPeers(t *testing.T) {
 			t.Fatalf("peer %d ICE candidates did not use shared UDP port %d", index, sharedPort)
 		}
 	}
+}
+
+func TestSharedWebRTCAPIAddsLibztCandidateWithoutStoppingProvider(t *testing.T) {
+	packetConn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &fakeZeroTierUDPPacketProvider{packetConn: packetConn}
+	daemon := &daemon{zeroTierUDP: provider}
+	api, err := daemon.sharedWebRTCAPI()
+	if err != nil {
+		_ = packetConn.Close()
+		t.Fatal(err)
+	}
+	defer daemon.closeWebRTCTransport()
+	if provider.requestedPort == 0 {
+		t.Fatal("libzt UDP provider was not given the selected shared ICE port")
+	}
+	mux, ok := daemon.webrtcUDPMux.(ice.UDPMux)
+	if !ok {
+		t.Fatalf("combined WebRTC mux has unexpected type %T", daemon.webrtcUDPMux)
+	}
+	foundOverlayAddress := false
+	for _, address := range mux.GetListenAddresses() {
+		udpAddress, ok := address.(*net.UDPAddr)
+		if ok && udpAddress.IP.Equal(net.ParseIP("172.22.80.141").To4()) && udpAddress.Port == int(provider.requestedPort) {
+			foundOverlayAddress = true
+		}
+	}
+	if !foundOverlayAddress {
+		t.Fatalf("combined ICE mux did not include the libzt address %s", provider.address)
+	}
+
+	peer, err := api.NewPeerConnection(webrtc.Configuration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peer.Close()
+	ordered := true
+	if _, err := peer.CreateDataChannel("elsemesh", &webrtc.DataChannelInit{Ordered: &ordered}); err != nil {
+		t.Fatal(err)
+	}
+	offer, err := peer.CreateOffer(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gathered := webrtc.GatheringCompletePromise(peer)
+	if err := peer.SetLocalDescription(offer); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-gathered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("ICE gathering timed out")
+	}
+	for _, line := range strings.Split(peer.LocalDescription().SDP, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 8 && strings.HasPrefix(line, "a=candidate:") && fields[4] == "172.22.80.141" && fields[5] == strconv.Itoa(int(provider.requestedPort)) && fields[7] == "host" {
+			return
+		}
+	}
+	t.Fatal("ICE did not advertise the libzt UDP socket as a host candidate")
 }
 
 func TestRendezvousUsesDirectSTUNWithoutTURN(t *testing.T) {

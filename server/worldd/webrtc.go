@@ -169,7 +169,7 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 		listenAddress = packetConn.LocalAddr().String()
 	}
 	nat1To1IPs := append([]string(nil), d.webrtcNAT1To1IPs...)
-	if d.webrtcUPnP && len(d.webrtcNAT1To1IPs) == 0 && d.zeroTierRuntime == nil {
+	if d.webrtcUPnP && len(d.webrtcNAT1To1IPs) == 0 && d.zeroTierUDP == nil {
 		mappingCtx, cancel := context.WithTimeout(d.ctx, webrtcUPnPDiscoveryTimeout+4*webrtcUPnPActionTimeout)
 		lease, candidates, mapErr := mapWebRTCUDPPort(mappingCtx, udpMux, d.webrtcInterfaces)
 		cancel()
@@ -182,17 +182,17 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 		} else if mapErr == nil {
 			log.Printf("WebRTC UPnP mapping unavailable; continuing with ICE/STUN")
 		}
-	} else if d.webrtcUPnP && d.zeroTierRuntime != nil {
+	} else if d.webrtcUPnP && d.zeroTierUDP != nil {
 		log.Printf("WebRTC UPnP mapping skipped while embedded ZeroTier is active; public ICE uses STUN and the ZeroTier candidate uses libzt")
 	}
-	if len(d.webrtcNAT1To1IPs) > 0 && d.zeroTierRuntime != nil {
+	if len(d.webrtcNAT1To1IPs) > 0 && d.zeroTierUDP != nil {
 		_ = udpMux.Close()
 		return nil, errors.New("--webrtc-nat-1to1-ip cannot be combined with embedded ZeroTier; use STUN for public ICE and libzt for the ZeroTier route")
 	}
 	if len(nat1To1IPs) > 0 {
 		settingEngine.SetNAT1To1IPs(nat1To1IPs, webrtc.ICECandidateTypeHost)
 	}
-	if d.zeroTierRuntime != nil {
+	if d.zeroTierUDP != nil {
 		var port uint16
 		for _, address := range udpMux.GetListenAddresses() {
 			udpAddress, ok := address.(*net.UDPAddr)
@@ -205,7 +205,7 @@ func (d *daemon) sharedWebRTCAPI() (*webrtc.API, error) {
 			_ = udpMux.Close()
 			return nil, errors.New("native WebRTC UDP mux did not expose a bound port for the libzt transport")
 		}
-		zeroTierPacketConn, err := d.zeroTierRuntime.OpenUDPPacketConn(port)
+		zeroTierPacketConn, err := d.zeroTierUDP.OpenUDPPacketConn(port)
 		if err != nil {
 			_ = udpMux.Close()
 			return nil, fmt.Errorf("bind WebRTC UDP socket inside embedded ZeroTier: %w", err)

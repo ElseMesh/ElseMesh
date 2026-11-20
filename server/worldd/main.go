@@ -68,7 +68,7 @@ type daemon struct {
 	zeroTierNodeID         string
 	zeroTierNetworkID      string
 	zeroTierGateway        string
-	zeroTierRuntime        zeroTierRuntime
+	zeroTierUDP            zeroTierUDPPacketProvider
 	allowedBrowserOrigins  map[string]struct{}
 	assetCheckMu           sync.Mutex
 	verifiedAssets         map[string]assetFileStamp
@@ -729,7 +729,7 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), assetSourceDir: assetSourceDir, inviteDataDir: *dataDir, proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, zeroTierRuntime: zeroTier, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), assetSourceDir: assetSourceDir, inviteDataDir: *dataDir, proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, zeroTierUDP: zeroTier, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
 	defer d.closeWebRTCTransport()
 	if d.rendezvous {
 		if _, err := d.sharedWebRTCAPI(); err != nil {

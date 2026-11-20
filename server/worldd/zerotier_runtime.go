@@ -22,6 +22,10 @@ type zeroTierRuntime interface {
 	Stop() error
 }
 
+type zeroTierUDPPacketProvider interface {
+	OpenUDPPacketConn(port uint16) (net.PacketConn, error)
+}
+
 func zeroTierMultiaddrs(addresses []net.IP, port int) ([]ma.Multiaddr, error) {
 	result := make([]ma.Multiaddr, 0, len(addresses))
 	for _, address := range addresses {
