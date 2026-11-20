@@ -96,10 +96,13 @@ by ElseMesh's ground-cover component to that component's signed
 `grass-density/1` RGBA asset; it uses linear filtering and clamp addressing in
 both backends and preserves the raw data channels. Its graph must compute UVs
 for the density asset's world domain and avoid sampling outside that domain.
-The `detailField` slot is bound by a ground-cover component to the installed
-terrain surface's detail texture from its signed terrain-surface asset. It uses
-linear filtering and repeat addressing in both backends and preserves raw RGBA
-channels. It is separate from the domain-bounded density field.
+The `detailField` slot is bound by static-model and ground-cover adapters to
+the installed terrain surface's detail texture from its signed
+terrain-surface asset. It uses linear filtering and repeat addressing in both
+backends and preserves raw RGBA channels. It is separate from the
+domain-bounded density field. Static-model materials receive the same texture
+through both renderer adapters, including when `textureSampleLevel` is used in
+the vertex graph.
 The `leafMask` slot is a component-provided foliage data texture. The
 octahedral-canopy component binds its signed raw `rgba8unorm-data/1` image here;
 adapters must preserve the RGBA byte values and use linear clamp sampling in

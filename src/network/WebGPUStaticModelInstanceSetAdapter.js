@@ -15,13 +15,15 @@ async function installStaticModelInstanceSet( { root, connector, installed = [] 
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
 	const materialCache = new Map(), sceneCache = new Map(), lodQueue = worldPackageMeshLODQueue( root );
-	const terrainHeightModule = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU )?.terrainGPU.heightModule || null;
+	const terrainComponent = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU );
+	const terrainHeightModule = terrainComponent?.terrainGPU.heightModule || null;
+	const detailFieldTexture = terrainComponent?.terrainGPU.detailTexture || null;
 	let unregisterTextureDemand = null;
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const getScene = async ( assetId, bytes, progressive ) => {
 		if ( progressive?.textures ) setWorldPackageProgressiveAsset( root, assetId, { textures: progressive.textures } );
-		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { bytes, terrainHeightModule } ) );
+		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { bytes, terrainHeightModule, graphTextureOverrides: detailFieldTexture ? { detailField: detailFieldTexture } : {} } ) );
 		return sceneCache.get( assetId );
 	};
 	const modelOffsets = [];

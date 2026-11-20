@@ -74,6 +74,7 @@ async function installStaticModelInstanceSet( { fallback, connector: providedCon
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
+	const graphTextureOverrides = fallback.beachDetailTexture ? { detailField: fallback.beachDetailTexture } : {};
 	if ( fallback.hostedStaticTextureLOD?.connector !== connector ) fallback.hostedStaticTextureLOD = new WebGLProgressiveStaticTextures( fallback, connector );
 	const textureLOD = fallback.hostedStaticTextureLOD;
 	let runtime = null;
@@ -124,12 +125,12 @@ async function installStaticModelInstanceSet( { fallback, connector: providedCon
 				if ( signal.aborted || ! isCurrent() ) throw signal.reason || new DOMException( 'World unloaded', 'AbortError' );
 				textureLOD.register( runtime, modelIndex, lodIndex, assetId, source, progressive );
 				releaseModelLOD( modelIndex, lodIndex );
-				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, false );
+				const draws = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, graphTextureOverrides, false );
 				runtime.sharedMaterials = [ ...sharedProfileMaterials ];
 				mainBatches[ modelOffsets[ modelIndex ] + lodIndex ] = draws;
 				for ( const draw of draws ) fallback.scene.add( draw.mesh );
 				const groups = [ draws ];
-				const shadows = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, true );
+				const shadows = createModelDraws( T, fallback, source.scene, modelCapacity[ modelIndex ], materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, modelBoundsSpheres[ modelIndex ], document.models[ modelIndex ].geometryMirrorX, hasMaterialData, graphTextureOverrides, true );
 				shadowBatches[ modelOffsets[ modelIndex ] + lodIndex ] = shadows;
 				for ( const draw of shadows ) fallback.scene.add( draw.mesh );
 				groups.push( shadows );
@@ -181,7 +182,7 @@ function staticModelInstanceBoundsSphere( T, document, modelIndex ) {
 	return new T.Sphere( new T.Vector3( ...sphereCenter ), sphereRadius );
 }
 
-function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX, hasMaterialData, shadowOnly ) {
+function createModelDraws( T, fallback, source, capacity, materialCache, ownedGeometry, ownedMaterials, sharedProfileMaterials, instanceBoundsSphere, geometryMirrorX, hasMaterialData, graphTextureOverrides, shadowOnly ) {
 	const matrixAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
 	const fadeAttribute = new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
 	const materialData0Attribute = hasMaterialData ? new T.InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
@@ -194,7 +195,7 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 		meshCount ++;
 		if ( object.isSkinnedMesh || object.morphTargetInfluences ) throw new Error( 'Static model instance GLBs cannot contain skinned or morph-target meshes' );
 		if ( Array.isArray( object.material ) || ! object.geometry || ! object.material ) throw new Error( 'Static model instance GLBs require triangle meshes with one material per primitive' );
-		const materialResolution = resolveStaticModelMaterial( fallback, object.material );
+		const materialResolution = resolveStaticModelMaterial( fallback, object.material, graphTextureOverrides );
 		const sourceMaterial = materialResolution?.material || materialResolution || object.material;
 		if ( sourceMaterial.transparent && Number.isFinite( sourceMaterial.opacity ) && sourceMaterial.opacity <= 0 ) {
 			fullyTransparentMeshCount ++;
@@ -239,12 +240,12 @@ function createModelDraws( T, fallback, source, capacity, materialCache, ownedGe
 	return draws;
 }
 
-function resolveStaticModelMaterial( fallback, sourceMaterial ) {
+function resolveStaticModelMaterial( fallback, sourceMaterial, graphTextureOverrides ) {
 	const profile = sourceMaterial.userData?.elsemeshMaterial;
 	const material = { extras: { elsemeshMaterial: profile } };
 	const role = worldMaterialRole( material );
 	if ( ! role ) return sourceMaterial;
-	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ), terrainHeightField: fallback.hostedTerrainData || fallback.terrain || null } );
+	const compiled = compileWorldMaterialProfile( profile.profile, 'webgl', { THREE: fallback.THREE, sourceMaterial, graph: worldMaterialGraph( material ), terrainHeightField: fallback.hostedTerrainData || fallback.terrain || null, graphTextures: graphTextureOverrides } );
 	if ( compiled ) return compiled;
 	for ( const runtime of fallback.hostedComponentRuntimes?.values?.() || [] ) {
 		const resolution = runtime.resolveWorldMaterialProfile?.( { profile: profile.profile, role, sourceMaterial } );

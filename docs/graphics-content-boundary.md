@@ -351,9 +351,11 @@ open.
 The ground-cover material graph can read the installed terrain surface's
 detail texture through the `detailField` slot. This reuses the texture already
 included in the signed terrain-surface asset: both presenters bind its RGBA
-texels with linear filtering and repeat addressing. The paired generic fixture
-verifies the binding using the shared terrain-detail bytes, but does not
-establish production-world visual parity. The graph also exposes
+texels with linear filtering and repeat addressing. Generic static-model
+instance adapters now pass that same installed terrain texture to graph
+materials on both backends, including explicit-LOD vertex sampling. The paired
+generic fixture verifies the ground-cover binding using shared terrain-detail
+bytes, but does not establish production-world visual parity. The graph also exposes
 `translucency` and `specularIntensity`
 through the shared material contract; WebGPU writes its existing surface fields,
 and WebGL maps them into its standard physical-lighting path. Paired generic GLB

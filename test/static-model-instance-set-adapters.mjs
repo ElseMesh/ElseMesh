@@ -6,6 +6,7 @@ import { Group } from '../src/engine/scene/Group.js';
 import { PerspectiveCamera } from '../src/engine/scene/Camera.js';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { disposeWorldPackage } from '../src/network/WorldPackage.js';
+import { Texture } from '../src/engine/gpu/Texture.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
 import { staticModelGLB } from './helpers/static-model-glb.mjs';
 
@@ -21,7 +22,25 @@ async function waitFor( predicate, message ) {
 	}
 	assert.ok( predicate(), message );
 }
-const glbBytes = staticModelGLB( { nodeScale: [ -1, 1, 1 ] } ), modelAssetID = hash( glbBytes ), fineModelAssetID = `sha256:${'f'.repeat( 64 )}`;
+const detailFieldGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'position', op: 'input', name: 'position' },
+		{ id: 'x', op: 'x', args: [ 'position' ] }, { id: 'y', op: 'y', args: [ 'position' ] },
+		{ id: 'uv', op: 'vec2', args: [ 'x', 'y' ] }, { id: 'lod', op: 'constant', value: 0 },
+		{ id: 'detail', op: 'textureSampleLevel', slot: 'detailField', uv: 'uv', lod: 'lod' },
+		{ id: 'red', op: 'x', args: [ 'detail' ] }, { id: 'scale', op: 'constant', value: 0.05 },
+		{ id: 'offsetX', op: 'multiply', args: [ 'red', 'scale' ] }, { id: 'zero', op: 'constant', value: 0 },
+		{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'zero' ] },
+		{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
+		{ id: 'albedo', op: 'rgb', args: [ 'detail' ] },
+	],
+	outputs: { baseColor: 'albedo', vertexPosition: 'moved' },
+};
+const glbBytes = staticModelGLB( {
+	nodeScale: [ -1, 1, 1 ],
+	materialExtras: { elsemeshMaterial: { profile: 'elsemesh.material-graph/1', role: 'graph', graph: detailFieldGraph } },
+} ), modelAssetID = hash( glbBytes ), fineModelAssetID = `sha256:${'f'.repeat( 64 )}`;
 const document = {
 	format: STATIC_MODEL_INSTANCE_SET_FORMAT,
 	models: [ { id: 'fixture-triangle', bounds: { center: [ 0, 0.5, 0 ], radius: 0.75 }, geometryMirrorX: false, lods: [ { assetId: fineModelAssetID }, { assetId: modelAssetID } ], lodThresholds: [ 0.1 ], lodMetric: 'projected-radius', lodFadeFraction: 0.1, shadowLodBias: 0, shadowMaxDistance: 40, drawMaxDistance: 90, drawFadeStartDistance: 90 } ],
@@ -46,9 +65,10 @@ camera.lookAt( 0, 0, - 1 );
 
 const webgpuRoot = new Group();
 webgpuRoot.userData.worldPackage = { parsed: new Map(), loadedObjects: new Set(), connector, materialAdapterContexts: new Map() };
+const webgpuDetailField = new Texture( { label: 'static-model-detail-field-fixture', width: 1, height: 1, format: 'rgba8unorm', data: Uint8Array.from( [ 64, 128, 192, 255 ] ), sampler: 'linearRepeat' } );
 const webgpuInstall = worldComponentBackendAdapter( 'webgpu', component.type );
 assert.equal( typeof webgpuInstall, 'function' );
-const webgpuResult = await webgpuInstall( { root: webgpuRoot, connector }, component );
+const webgpuResult = await webgpuInstall( { root: webgpuRoot, connector, installed: [ { terrainSurface: true, terrainGPU: { detailTexture: webgpuDetailField } } ] }, component );
 assert.equal( webgpuResult.installed, true );
 assert.deepEqual( requestedAssets, [], 'installing the placement descriptor does not fetch offscreen model assets' );
 assert.equal( webgpuResult.runtime.isCoarseReadyForView(), false, 'the visible model waits for its coarse mesh' );
@@ -83,6 +103,8 @@ assert.deepEqual( Array.from( webgpuMain.geometry.getAttribute( 'iStaticMaterial
 assert.deepEqual( Array.from( webgpuMain.geometry.getAttribute( 'iStaticMaterialData1' ).array ), [ 2, 3, 4, 5 ], 'WebGPU exposes opaque material-profile data in the second instanced vec4' );
 assert.equal( webgpuMain.material.attributes.iStaticMaterialData0, 'vec4f', 'WebGPU material profiles can bind opaque per-instance data' );
 assert.match( webgpuMain.material.vertex, /v\.iStaticMaterialData0/ );
+assert.equal( webgpuMain.material.bindings.emgTexture_detailField.texture, webgpuDetailField, 'the WebGPU static-model adapter binds the installed terrain detail texture to material graphs' );
+assert.match( webgpuMain.material.vertex, /textureSampleLevel\( emgTexture_detailField, smpLinearRepeat,/ );
 assert.equal( webgpuShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0, 'shadow-only instances remain fully visible with complementary fade enabled' );
 const farWebGPUCamera = new PerspectiveCamera( 60, 1, 0.1, 200 );
 farWebGPUCamera.position.set( 0, 0, 25 );
@@ -91,9 +113,15 @@ webgpuResult.runtime.update( 1 / 60, farWebGPUCamera );
 assert.equal( webgpuResult.runtime.planner.shadowGroups[ 1 ].count, 1, 'WebGPU casts the same instance through the coarser shadow LOD as the camera recedes' );
 webgpuResult.runtime.dispose();
 disposeWorldPackage( webgpuRoot );
+webgpuDetailField.destroy();
 assert.equal( webgpuRoot.children.length, 0 );
 
 const webglFallback = { THREE, connector, loader: new GLTFLoader(), scene: new THREE.Scene(), app: { renderLoadBias: 1 } };
+const webglDetailField = new THREE.DataTexture( Uint8Array.from( [ 64, 128, 192, 255 ] ), 1, 1, THREE.RGBAFormat, THREE.UnsignedByteType );
+webglDetailField.wrapS = webglDetailField.wrapT = THREE.RepeatWrapping;
+webglDetailField.colorSpace = THREE.NoColorSpace;
+webglDetailField.needsUpdate = true;
+webglFallback.beachDetailTexture = webglDetailField;
 const webglInstall = worldComponentBackendAdapter( 'webgl', component.type );
 assert.equal( typeof webglInstall, 'function' );
 const webglResult = await webglInstall( { fallback: webglFallback }, component );
@@ -139,7 +167,12 @@ assert.equal( webglMain.geometry.getAttribute( 'iStaticFade' ).itemSize, 4, 'Web
 assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialData0' ).array ), [ 0.25, 0.5, 0.75, 1 ], 'WebGL exposes the same opaque material-profile data as WebGPU' );
 assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialData1' ).array ), [ 2, 3, 4, 5 ], 'WebGL exposes the second material-profile vec4' );
 assert.match( webglMain.material.customProgramCacheKey(), /static-instance-fade-v1\+material-data-v1/ );
+const webglShader = { vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
+webglMain.material.onBeforeCompile( webglShader, {} );
+assert.match( webglShader.vertexShader, /textureLod\( emgTexture_detailField,/ );
+assert.equal( webglShader.uniforms.emgTexture_detailField.value, webglDetailField, 'the WebGL static-model adapter binds the installed terrain detail texture to material graphs' );
 webglResult.runtime.dispose();
+webglDetailField.dispose();
 assert.equal( webglFallback.scene.children.length, 0 );
 
 const transparentModelBytes = staticModelGLB( { materialAlpha: 0 } );
