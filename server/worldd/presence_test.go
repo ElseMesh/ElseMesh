@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -97,7 +96,7 @@ func TestPresenceBindsValidInviteToAdmittedSession(t *testing.T) {
 	d := presenceTestDaemon(t)
 	now := time.Now()
 	dataDir := t.TempDir()
-	d.inviteStorePath = filepath.Join(dataDir, "invites.json")
+	d.inviteDataDir = dataDir
 	d.zeroTierNodeID = "8e23729743"
 	code, err := createWorldInvite(dataDir, d.zeroTierNodeID, 321, now.Add(time.Hour), now)
 	if err != nil {
@@ -120,7 +119,7 @@ func TestPresenceBindsValidInviteToAdmittedSession(t *testing.T) {
 	}
 
 	other := presenceTestDaemon(t)
-	other.inviteStorePath = filepath.Join(t.TempDir(), "invites.json")
+	other.inviteDataDir = t.TempDir()
 	other.zeroTierNodeID = d.zeroTierNodeID
 	bad := gatewayMessage{Type: "presence.update", Pose: pose, SpawnCandidates: presenceTestSpawnCandidates(), InviteTicket: "invalid-ticket"}
 	bindPresenceRequest(&bad, other.host.ID().String(), session)

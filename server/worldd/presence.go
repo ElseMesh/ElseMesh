@@ -416,10 +416,10 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 	}
 	var invitePlayerNumber *uint16
 	if request.Type == "presence.update" && request.InviteTicket != "" {
-		if d.inviteStorePath == "" || d.zeroTierNodeID == "" {
+		if d.inviteDataDir == "" || d.zeroTierNodeID == "" {
 			return peerResponse{}, errors.New("invite_invalid")
 		}
-		playerNumber, err := validateWorldInvite(d.inviteStorePath, d.zeroTierNodeID, request.InviteTicket, now)
+		playerNumber, err := validateWorldInvite(d.inviteDataDir, d.zeroTierNodeID, request.InviteTicket, now)
 		if err != nil {
 			return peerResponse{}, err
 		}
