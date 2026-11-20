@@ -17,12 +17,12 @@ HostID and `worldId` are the normal discovery identities. The plain
 `elsemesh.org` entry remains a single-user experience and does not ask the
 visitor to join ZeroTier. Opening `elsemesh.org?invite=...` shows the shared
 ElseMesh ZeroTier network ID and join instructions before loading the invited
-world. A visitor joins once on the device; participating worlds use that same
-network so the route is already available before portal travel. The visitor
-may continue with browser WebRTC without joining, but that path can fail on
-restrictive NATs. World-level admission and player authorization remain
-separate from ZeroTier membership. The Worker carries lookup and signaling
-traffic only, not world content.
+world; the network ID comes from client configuration and is not copied into
+the invite. A visitor joins once on the device; participating worlds use that
+same network so the route is already available before portal travel.
+World-level admission and player authorization remain separate from ZeroTier
+membership. The Worker carries lookup and signaling traffic only, not world
+content.
 
 ZeroTier roots establish overlay paths; they do not register ElseMesh worlds
 or authorize world membership. A ZeroTier NodeID identifies a ZeroTier node,
@@ -621,29 +621,30 @@ using its own timeout. No atomic inter-owner membership commit is required.
 ### Invitation-gated entry
 
 World owners may opt into invitation admission. The desired share URL is a
-short root URL such as `https://elsemesh.org/?invite=<signed-ticket>`. The
-ticket is self-contained and owner-signed, so the Pages client can parse it
-locally without a separate invite lookup service. It binds the world, route,
-auth policy, expiry and a pending world-local player record created by
-`worldd`. The client must not accept a player number outside the signed ticket;
-`worldd` validates the ticket and applies its own admission policy. A path-form
-URL may be supported as an alias. See the protocol design and
-[gateway resilience](gateway-resilience.md) for route selection. Every invite
-also carries the shared ElseMesh ZeroTier network ID, independently of the
-world host's ZeroTier NodeID or private gateway. The invite page shows the
-join instructions before loading the world. Participating worldd hosts join
-that same network.
+short root URL such as `https://elsemesh.org/?invite=<ticket>`. The target
+ticket carries only the destination ZeroTier HostID, the worldd
+browser-facing TCP port, and an 80-bit cryptographically random invite value
+bound by `worldd` to the pending player record. The shared network ID is
+hardcoded in the client and Worker and never appears in the ticket. Host
+registration supplies the destination world and current managed address.
+`worldd` validates the invite value and its player/admission record; a
+player number or route claim supplied separately by the browser is not
+authority. A path-form URL may be supported as an alias. See the protocol
+design and [gateway resilience](gateway-resilience.md) for route selection.
 
-The ticket can be resolved without a separate service only when its locator is
-stable. For ZeroTier clients, use the network ID and stable Host ID; ZeroTier
-peer discovery handles the node's changing public endpoint after the client
-joins the network. The application's ZeroTier managed address must also be
-stable or discoverable from trusted network configuration. The visitor's
-operating system must join the shared network for that private route. GitHub
-Pages is static hosting and cannot map an invite code to a changing address by
-itself; the online Worker still resolves the host's current signed locator.
-DHT-based lookup can distribute that mapping, but still depends on bootstrap
-peers and online nodes; it is not infrastructure free.
+Use the stable ZeroTier HostID in the ticket rather than managed IPv4/IPv6
+addresses. Managed addresses are short and could remove lookup, but may be
+reassigned; the HostID is the more durable locator. The Worker resolves it
+against the latest signed `worldd` registration and returns current private
+address data. This requires no ZeroTier Central API token because worldd
+already observes its libzt-assigned addresses and publishes its private
+gateway. The browser connects directly to the resolved private IP and ticket
+port after the visitor joins the shared network. The Worker remains outside
+the world-data path. Include both address families in the registration when
+available so the client can try IPv4 or IPv6; the current signed record
+publishes one selected private gateway and needs extension for full dual-stack
+lookup. Invite onboarding shows the hardcoded network ID before loading the
+world. Browser-side ztlib remains unnecessary.
 When `worldd` is configured for ZeroTier, ztlib identifies the server node by
 default; it does not authenticate the visitor. A verified client-side
 ZeroTier integration must prove the visitor's own NodeID before the owner can

@@ -97,7 +97,8 @@ Portals and invitation codes are alternative arrival routes: both are
 subject to destination admission. A portal may admit visitors without codes
 where permitted, but cannot bypass a destination's invitation requirement.
 
-The current `?invite=` route code is a compact base64url encoding of route
+The current `?invite=` route code is transitional and is not a player-bound
+admission ticket. It is a compact base64url encoding of route
 query fields: canonical world ID, optional ZeroTier network ID and HostID,
 optional ZeroTier private gateway plus its short-lived signed node record,
 ordered PeerID/gateway candidates, and resolver origin. The browser verifies
@@ -111,30 +112,40 @@ hints. The embedded node signature binds its own advertised gateway and
 ZeroTier identity against route edits, but is not an owner authorization: the
 node self-asserts those fields. The browser checks the provider's owner grant
 against the signed manifest after connecting and before accepting content.
-The client retrieves world data from the selected provider gateway. A
-future owner-signed admission ticket using `?invite=` must have a distinct
-format and remain unimplemented until `worldd` verifies its player binding,
-allowed identity, expiry, revocation, and replay state.
+The client retrieves world data from the selected provider gateway. Replace
+this route-code payload with the minimal HostID/port/80-bit invite
+ticket described below when `worldd` issues and validates player-bound
+invitations. Until then, the current route code grants no admission and must
+not be described as a working friend invitation.
 
 The desired public entry point is a short ElseMesh invitation URL such as
-`https://elsemesh.org/?invite=<signed-ticket>` (a path-form URL may be
-supported as an alias). Avoid a separate invitation lookup service: `worldd`
-creates the pending world-local player record and issues a self-contained,
-URL-safe ticket signed by the world owner key. The ticket binds the world ID,
-owner identity, network route, a random opaque player-record reference, the
-allowed sign-in methods or identities, issue/expiry times, a unique ticket ID,
-and redemption policy. A 24-hour expiry should be available as a preset; the
-owner may choose a shorter or longer lifetime. Signatures prevent editing the
-player reference, route, or expiry. Use random record references rather than
-guessable sequential player numbers, and never treat client-supplied player
-numbers as authority. The ticket is signed, not secret: don't include provider
-tokens, ZeroTier private keys, or other reusable credentials. The client can
-parse and verify its structure locally, but `worldd` is the final validator.
+`https://elsemesh.org/?invite=<ticket>` (a path-form URL may be supported as
+an alias). Encode exactly 17 bytes as unpadded base64url (23 characters): the
+five-byte destination ZeroTier HostID, a two-byte network-order `worldd`
+browser-facing TCP port, and a ten-byte (80-bit) opaque invite value bound
+server-side to the pending player/invite record. The single ElseMesh ZeroTier
+network ID is application configuration and must not be duplicated in the
+ticket. The destination world is derived from the registered worldd HostID;
+each HostID used for an invite must resolve unambiguously to one world. Do not
+include a world ID, resolver URL, gateway URL, signed node document, or
+provider allowlist when the same information is available from host
+registration or the server-side invite record.
+
+Generate the 80-bit invite value with a cryptographic random source and store
+only its one-way digest bound to the pending world-local player record. Do not
+derive it from a player number or other predictable/public fields. It is a
+bearer capability, not a signature or social-identity proof; `worldd` checks
+the digest, expiry, revocation/replay state, and any required account
+authentication. Rate-limit failed redemption attempts. A 24-hour expiry
+should be available as a preset; the owner may choose a shorter or longer
+lifetime. Keep provider tokens, ZeroTier credentials, and contact details out
+of the URL. Remove the ticket from browser history after parsing and avoid
+consuming it on a link-preview GET.
 
 For a single friend invitation that allows Facebook, Google, and Telegram,
 all three verified provider identities must resolve to the same pending
-world-local player. The ticket may bind the provider allowlist and opaque
-identity references, but must not expose contact details. On redemption, the
+world-local player. Keep provider allowlists and opaque identity references
+in the server-side invite record, not in the ticket. On redemption, the
 selected provider must prove control of an identity explicitly authorized for
 that player; merely signing in with an arbitrary account at an allowed
 provider is insufficient. Treat owner-entered email addresses, phone numbers,
@@ -142,48 +153,37 @@ and profile URLs as unverified matching hints until the provider's supported
 login or verification flow proves the association. In particular, do not
 assume a Telegram login claim proves control of a phone number unless that
 flow returns a verified phone claim. The acceptance test is one URL of the
-form `https://elsemesh.org/?invite=<signed-ticket>` that opens the target
-world after successful authentication with any one of the invite's verified,
-allowed identities.
+form `https://elsemesh.org/?invite=<ticket>` that opens the target world after
+successful authentication with any one of the invite's verified, allowed
+identities.
 
-The owner signature binds the invite to the existing pending player record.
-On connection, `worldd` verifies the signature, target world, expiry,
-revocation/replay state, allowed authentication, and the record binding before
-admission. It can maintain revoked ticket IDs and redeemed-ticket state in its
-own database; no separate online invite service is needed. Provider login, if
-required, still occurs before the world binds the player record. A self-issued
-ticket is a bearer capability unless it also requires an allowed provider
-identity or authenticated ZeroTier Host ID. Remove the ticket from browser
-history after parsing and avoid consuming it on a link-preview GET.
+`worldd` creates the pending player record and invite, stores a digest of the
+random 80-bit value with expiry/revocation/redemption state, and validates it
+before admission. The compact value is a bearer capability, not an owner
+signature; it is not derived from a player number and cannot be used to
+enumerate player records. Provider login, if required, happens before the
+world binds the player record. Remove the ticket from browser history after
+parsing and avoid consuming it on a link-preview GET.
 
-The ticket must identify a route the visitor can actually reach. Prefer a
-stable HTTPS/WSS gateway hostname for ordinary browsers. If its address is
-dynamic, DNS must be updated or a relay must keep a stable public endpoint;
-GitHub Pages cannot perform that lookup. These approaches require DNS control
-or an online relay/locator service. A self-contained invite ticket is
-service-free only when it contains a stable locator, not an address that may
-change after issuance.
+The ticket identifies a route by HostID and port. The Worker resolves the
+HostID to current ZeroTier managed IP address data from worldd's signed,
+short-lived registration; the browser then connects directly to the private
+address. This is a locator lookup, not an invite-redemption service, and the
+Worker never relays world traffic. It does require the Worker to be online for
+initial address resolution. Embedding managed IPv4 and IPv6 directly would
+remove that lookup, but can make a ticket stale after reassignment. The stable
+HostID is preferred; dual-stack managed addresses belong in the refreshed
+registration response, with fallback between families.
 
-A ZeroTier ticket should carry the network ID and stable ZeroTier Host ID, not
-the host's changing public/WAN IP. The Host ID lets ZeroTier's peer discovery
-find the node's current underlying endpoint, but a client still needs to join
-and be authorized on that network. Where the application socket API requires
-a ZeroTier managed IP, the network must provide a stable managed address or
-the client must obtain the current HostID-to-managed-address mapping from a
-trusted network advertisement/controller. Host ID alone is not an IP route.
-An invite may include a signed ZeroTier private gateway. The client tries that
-route first with a strict timeout, then looks up the invited HostID through the
-Worker and connects directly to the provider's signed public HTTPS/WSS
-gateway. `worldd` publishes the private address inside its signed node record
-and bridges the ZeroTier TCP port to its dynamically selected local
-HTTP/WebSocket gateway port. The client verifies the node signature and checks
-its ZeroTier network ID, Host ID, world ID and gateway before connecting. A
-visitor who continues without joining can still try direct WebRTC and the
-advertised public gateway; the invite onboarding prompts them to join first.
-Browser-side ztlib is not required. When an invite has no host ZeroTier
-locator, the client resolves its world ID and uses the signed provider path;
-the invite still identifies the shared network for onboarding and signaling.
-The Worker performs lookup and signaling only and never carries world traffic.
+The shared network ID is hardcoded in client and Worker configuration. It is
+shown by invite onboarding but never serialized into the ticket. The visitor's
+operating system must join the shared network to use this private route; a
+browser page does not run ztlib or join ZeroTier itself. The Worker may still
+provide lookup and WebRTC signaling for discovery or fallback, but the
+preferred world-data path is directly to the private address. `worldd`
+validates the invite value and admission policy after connection. A ZeroTier
+HostID identifies a route, not a visitor's identity. The Worker carries no
+world data.
 
 When a signed provider record has no public gateway but sets `rendezvous: true`,
 the client uses the Worker's Durable Object room after the private ZeroTier
@@ -249,18 +249,16 @@ Direct browser access to a ZeroTier IP requires the browser's device to be a
 member of that ZeroTier network. A regular web page does not join ZeroTier
 merely by receiving a Host ID; it uses the device's existing OS route. The
 plain `elsemesh.org` root entry remains a single-user experience and does not
-ask the visitor to join. A `?invite=` route carries the shared `ztNetworkId`
-even when it has no host `ztNodeId`; before `App.init()` starts loading the
-world, the client displays that network ID, platform join instructions, and
-the option to continue with browser WebRTC without joining. The visitor's
-acknowledgment is remembered per network on that browser, but is not treated
-as proof of membership. Participating `worldd` hosts and player devices use
-the same network so its route is present before portal travel. Per-world
-admission and player authorization remain separate from overlay membership.
-The optional private gateway uses a short-lived signed `zeroTierGateway`
-address and the device's OS route. Ordinary WebRTC still uses the browser's
+ask the visitor to join. On `?invite=`, the client reads the hardcoded shared
+network ID from application configuration and shows it with platform join
+instructions before trying the invited world. The network ID is not part of
+the invite code. The visitor's acknowledgment is remembered per network on
+that browser, but is not treated as proof of membership. Participating
+`worldd` hosts and player devices use the same network so its route is present
+before portal travel. Per-world admission and player authorization remain
+separate from overlay membership. Ordinary WebRTC still uses the browser's
 own ICE implementation and can use UDP without ZeroTier. Do not use the
-server's ztlib identity as the visitor's or trust a client-supplied Host ID
+server's ztlib identity as the visitor's or trust a client-supplied HostID
 without proof.
 
 Issue #173 is an open question from 2022 about compiling libzt to WASM; it

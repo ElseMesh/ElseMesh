@@ -58,6 +58,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-11-20
 
+- Specified the compact friend-invite ticket: 17 bytes (23 base64url
+  characters) for the ZeroTier HostID, worldd TCP port, and an 80-bit random
+  player-bound capability. The shared network ID stays hardcoded in client and
+  Worker configuration. HostID is preferred over embedding managed IPv4/IPv6
+  because addresses can be reassigned; the Worker resolves current private
+  address data from worldd's signed registration and never carries world data.
+  The browser still must join the shared ZeroTier network. This is a design
+  decision only: issuing/redeeming the player-bound token and dual-stack
+  registration are unimplemented, so the tracker remains at 0%.
 - Fixed two browser-to-worldd startup failures in the invite route. Chromium
   can obtain a public STUN-reflexive candidate while ICE gathering remains
   open, so the client now sends its bounded offer when that candidate appears

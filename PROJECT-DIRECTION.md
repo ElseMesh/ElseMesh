@@ -320,23 +320,30 @@ The normal browser route is Worker lookup followed by direct HTTPS/WSS or
 WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound admission:
 0%.** The client now creates and parses a compact route-only
 `https://elsemesh.org/?invite=<route-code>` URL; that code identifies the
-world/provider route but grants no access. Signed player-bound admission
-tickets remain unimplemented. Their eventual entry URL should remain as simple as
-`https://elsemesh.org/?invite=<signed-ticket>`. `worldd` creates the pending
-world-local player record and signs a self-contained ticket binding that
-record, world, authentication policy, route and expiry. The Pages client
-parses the ticket locally; no separate invitation lookup service is required.
-The destination `worldd` verifies the signature and admission policy. The
-ticket may contain a direct HTTPS/WSS gateway route, or a ZeroTier route. A
-ZeroTier route uses the stable network ID and Host ID, not the host's changing
-public IP, and works only when the visitor's device has joined the same
-network. If the application needs a managed ZeroTier IP, it must be stable or
-discovered from trusted network state. For browser-only visitors outside
-ZeroTier, direct WebRTC may fail under restrictive NAT; a direct HTTPS/WSS
-gateway requires inbound reachability. GitHub Pages cannot resolve a changing
-IP. A directory or DHT can provide lookup, but it adds online infrastructure
-or bootstrap dependencies. Do not silently route world content through the
-lookup Worker.
+world/provider route but grants no access. Player-bound admission tickets
+remain unimplemented. **Compact, player-bound ZeroTier ticket: 0%.** The
+target `https://elsemesh.org/?invite=<ticket>` encodes 17 bytes (23 unpadded
+base64url characters): destination ZeroTier HostID, worldd-facing TCP port,
+and an 80-bit cryptographically random invite value bound server-side to the
+pending player record. The network ID is hardcoded in client and Worker
+configuration and is never included in the ticket. Do not derive the 80-bit
+value from a player ID; store its digest with the invite and enforce expiry,
+revocation/replay checks, and rate limits at worldd. This tracker remains at
+0% until worldd issues the bound token and the browser redeems it end-to-end.
+
+HostID is more durable than managed IPv4/IPv6 addresses, which can be
+reassigned. The Worker resolves the HostID through the current signed worldd
+registration and returns the managed address; it does not relay world data.
+ZeroTier registration already gives worldd its current managed address, so
+this lookup does not need a ZeroTier Central API key. The visitor's device
+must join the shared network and the browser then connects directly to the
+resolved private address and ticket port. The Worker remains useful for
+address resolution and optional signaling, while the worldd validates the
+player-bound invite. A direct-IP ticket could remove address lookup but would
+become stale when the managed address changes. For browser-only visitors
+outside ZeroTier, direct WebRTC may fail under restrictive NAT; a direct
+HTTPS/WSS gateway requires inbound reachability. Do not silently route world
+content through the lookup Worker.
 See [invitation protocol](docs/world-network-protocol.md#invitation-admission-and-launch-grants).
 **Three-provider friend-invite acceptance: 0%.** Acceptance requires the owner
 to create one world-local player and issue one `elsemesh.org?invite=` URL
