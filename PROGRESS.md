@@ -97,6 +97,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 - Invite routing is 75% (3 of 4 gates). The open gate is successful data and
   admission from an independent network without ZeroTier; the pi3 ICE failure
   above remains unresolved.
+- Rebuilt the libzt-enabled worldd from canonical source and repeated the
+  cross-host private-route check while system ZeroTier remained active. A
+  remote ZeroTier peer fetched the signed manifest directly from worldd over
+  the managed private address and shared TCP listener; the WSS and local
+  HostID-resolver fixture checks also passed. This confirms the two ZeroTier
+  clients can coexist on this host/public IP. The earlier port timeout came
+  from a stale build: Go's source overlay used a non-canonical alias for the
+  external build path. This run did not exercise the deployed Cloudflare Worker;
+  independent-network WebRTC remains the open invite-routing gate.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages
