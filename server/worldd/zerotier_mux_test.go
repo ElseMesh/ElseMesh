@@ -1,3 +1,5 @@
+//go:build zerotier && cgo
+
 package main
 
 import (
