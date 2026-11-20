@@ -102,10 +102,20 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   remote ZeroTier peer fetched the signed manifest directly from worldd over
   the managed private address and shared TCP listener; the WSS and local
   HostID-resolver fixture checks also passed. This confirms the two ZeroTier
-  clients can coexist on this host/public IP. The earlier port timeout came
+  clients can coexist behind one public IP. The earlier port timeout came
   from a stale build: Go's source overlay used a non-canonical alias for the
-  external build path. This run did not exercise the deployed Cloudflare Worker;
-  independent-network WebRTC remains the open invite-routing gate.
+  external build path. The test harness's HostID lookup used a local resolver;
+  the production Worker was verified separately below. Independent-network
+  WebRTC remains the open invite-routing gate.
+- Deployed the current private resolver source as Worker version
+  `2eb9aa79-5c1a-4ba7-9e9b-aa36bf71de13` after the older deployment rejected
+  worldd's v1 announcement. A remote ZeroTier peer resolved a disposable
+  world's HostID through the production Worker; its signed provider record
+  verified, and the peer fetched the signed manifest directly from the private
+  gateway. The Worker handled lookup only; the test announcement expires
+  automatically. This verifies the production resolver-to-worldd private route,
+  not browser mixed-content/Local Network Access behavior or independent-NAT
+  WebRTC.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages
