@@ -2722,3 +2722,15 @@ finding changes them.
   plan to either backend consumer. Focused update, reuse, invalid-camera, and
   disposal checks pass. The WebGPU and WebGL consumers are not registered yet;
   this closes no rendered parity gate or percentage.
+
+- 2026-11-20: implemented paired engine-owned canopy atlas presenters and
+  carried Tidewater's authored per-instance sway height and gust travel inputs
+  through the signed descriptor and shared draw plan. A headless Dawn render
+  compiled and rendered one synthetic WebGPU far card; an isolated Chromium
+  SwiftShader render compiled and drew the same fixture through the WebGL
+  presenter. The first WebGPU compile exposed a device limit with five separate
+  per-instance buffers, so the shared plan now packs them into one interleaved
+  buffer; the GPU render then passed. These are shader/buffer smoke checks, not
+  an AMD capture or a comparison with Tidewater's authored scene. Neither canopy
+  adapter is registered, the package remains inactive, and no rendered parity
+  percentage changes.

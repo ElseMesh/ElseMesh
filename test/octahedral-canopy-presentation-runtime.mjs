@@ -22,7 +22,7 @@ const runtime = new OctahedralCanopyPresentationRuntime( descriptor, instanceSet
 assert.equal( runtime.update( 0, { position: { x: 0, y: 0, z: 0 } } ), true );
 assert.equal( updates.length, 1 );
 assert.equal( updates[ 0 ].buffers.count, 1 );
-assert.equal( updates[ 0 ].buffers.instance2[ 0 ], 4, 'authored wind height is passed through the shared draw buffer' );
+assert.equal( updates[ 0 ].buffers.attributes[ 8 ], 4, 'authored wind height is passed through the shared interleaved draw buffer' );
 const matrices = updates[ 0 ].buffers.matrices;
 assert.equal( runtime.update( 0, { position: { x: 0, y: 0, z: 0 } } ), false, 'stationary cameras do not rebuild shared instance buffers' );
 assert.equal( updates.length, 1 );

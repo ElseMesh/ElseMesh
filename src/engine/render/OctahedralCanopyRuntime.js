@@ -1,5 +1,8 @@
 import { planCanopyThinning, selectFractionalBinVariant, selectHemiOctahedralFrames } from './OctahedralImpostorMath.js';
 
+export const OCTAHEDRAL_CANOPY_ATTRIBUTE_STRIDE = 20;
+export const OCTAHEDRAL_CANOPY_ATTRIBUTE_OFFSETS = Object.freeze( { iCanopy0: 0, iCanopy1: 4, iCanopy2: 8, iCanopyFrames: 12, iCanopyWeights: 16 } );
+
 const smoothstep = ( start, end, value ) => {
 	const t = Math.max( 0, Math.min( 1, ( value - start ) / ( end - start ) ) );
 	return t * t * ( 3 - 2 * t );
@@ -161,36 +164,37 @@ export function writeOctahedralCanopyDrawPlan( plan, target = {} ) {
 		count ++;
 	}
 	const matrices = ensureFloatBuffer( target, 'matrices', count * 16 );
-	const instance0 = ensureFloatBuffer( target, 'instance0', count * 4 );
-	const instance1 = ensureFloatBuffer( target, 'instance1', count * 4 );
-	const frames = ensureFloatBuffer( target, 'frames', count * 4 );
-	const weights = ensureFloatBuffer( target, 'weights', count * 4 );
-	const instance2 = ensureFloatBuffer( target, 'instance2', count * 4 );
+	const attributes = ensureFloatBuffer( target, 'attributes', count * OCTAHEDRAL_CANOPY_ATTRIBUTE_STRIDE );
 	let drawIndex = 0;
 	for ( const item of plan ) {
 		if ( item.farWeight <= 0 ) continue;
-		const matrixOffset = drawIndex * 16, attributeOffset = drawIndex * 4;
+		const matrixOffset = drawIndex * 16, attributeOffset = drawIndex * OCTAHEDRAL_CANOPY_ATTRIBUTE_STRIDE;
+		const canopy0 = attributeOffset + OCTAHEDRAL_CANOPY_ATTRIBUTE_OFFSETS.iCanopy0;
+		const canopy1 = attributeOffset + OCTAHEDRAL_CANOPY_ATTRIBUTE_OFFSETS.iCanopy1;
+		const canopy2 = attributeOffset + OCTAHEDRAL_CANOPY_ATTRIBUTE_OFFSETS.iCanopy2;
+		const frames = attributeOffset + OCTAHEDRAL_CANOPY_ATTRIBUTE_OFFSETS.iCanopyFrames;
+		const weights = attributeOffset + OCTAHEDRAL_CANOPY_ATTRIBUTE_OFFSETS.iCanopyWeights;
 		matrices.set( item.billboard.matrix, matrixOffset );
-		instance0[ attributeOffset ] = item.seed;
-		instance0[ attributeOffset + 1 ] = item.variantIndex;
-		instance0[ attributeOffset + 2 ] = item.impostorRadius;
-		instance0[ attributeOffset + 3 ] = item.groupIndex;
-		instance1[ attributeOffset ] = item.scale[ 0 ] * item.farScale;
-		instance1[ attributeOffset + 1 ] = item.scale[ 1 ] * item.farScale;
-		instance1[ attributeOffset + 2 ] = item.scale[ 2 ] * item.farScale;
-		instance1[ attributeOffset + 3 ] = item.yaw;
-		frames[ attributeOffset ] = item.frameIndices[ 0 ];
-		frames[ attributeOffset + 1 ] = item.frameIndices[ 1 ];
-		frames[ attributeOffset + 2 ] = item.frameIndices[ 2 ];
-		frames[ attributeOffset + 3 ] = item.blendFrames ? 1 : 0;
-		weights[ attributeOffset ] = item.frameWeights[ 0 ];
-		weights[ attributeOffset + 1 ] = item.frameWeights[ 1 ];
-		weights[ attributeOffset + 2 ] = item.frameWeights[ 2 ];
-		weights[ attributeOffset + 3 ] = item.farWeight;
-		instance2[ attributeOffset ] = item.windHeight;
-		instance2[ attributeOffset + 1 ] = 0;
-		instance2[ attributeOffset + 2 ] = 0;
-		instance2[ attributeOffset + 3 ] = 0;
+		attributes[ canopy0 ] = item.seed;
+		attributes[ canopy0 + 1 ] = item.variantIndex;
+		attributes[ canopy0 + 2 ] = item.impostorRadius;
+		attributes[ canopy0 + 3 ] = item.groupIndex;
+		attributes[ canopy1 ] = item.scale[ 0 ] * item.farScale;
+		attributes[ canopy1 + 1 ] = item.scale[ 1 ] * item.farScale;
+		attributes[ canopy1 + 2 ] = item.scale[ 2 ] * item.farScale;
+		attributes[ canopy1 + 3 ] = item.yaw;
+		attributes[ canopy2 ] = item.windHeight;
+		attributes[ canopy2 + 1 ] = 0;
+		attributes[ canopy2 + 2 ] = 0;
+		attributes[ canopy2 + 3 ] = 0;
+		attributes[ frames ] = item.frameIndices[ 0 ];
+		attributes[ frames + 1 ] = item.frameIndices[ 1 ];
+		attributes[ frames + 2 ] = item.frameIndices[ 2 ];
+		attributes[ frames + 3 ] = item.blendFrames ? 1 : 0;
+		attributes[ weights ] = item.frameWeights[ 0 ];
+		attributes[ weights + 1 ] = item.frameWeights[ 1 ];
+		attributes[ weights + 2 ] = item.frameWeights[ 2 ];
+		attributes[ weights + 3 ] = item.farWeight;
 		drawIndex ++;
 	}
 	target.count = count;
