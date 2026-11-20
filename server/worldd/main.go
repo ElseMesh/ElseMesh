@@ -1545,21 +1545,20 @@ func (d *daemon) handleAsset(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	path := d.assetPath(id)
-	f, err := os.Open(path)
+	asset, ok := d.assetRef(id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	f, err := d.openVerifiedAsset(asset)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 	defer f.Close()
 	info, err := f.Stat()
-	asset, ok := d.assetRef(id)
-	if err != nil || !ok || !info.Mode().IsRegular() || info.Size() != asset.Bytes {
+	if err != nil || !info.Mode().IsRegular() || info.Size() != asset.Bytes {
 		http.Error(w, "asset unavailable", http.StatusBadRequest)
-		return
-	}
-	if !d.verifyAssetFile(asset, f) {
-		http.Error(w, "asset hash does not match its address", http.StatusUnprocessableEntity)
 		return
 	}
 	w.Header().Set("ETag", `"`+strings.TrimPrefix(id, "sha256:")+`"`)
