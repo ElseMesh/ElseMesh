@@ -226,6 +226,13 @@ Do not edit `mame-proxy`; it is an unrelated MAME browser emulator. Keep API tok
 
 ## Current implementation and verification boundary
 
+A 2026-11-20 repeat of the live pi3 probe after late-candidate support again
+completed Worker lookup and SDP signaling but did not establish the direct
+WebRTC data channel. The fresh libzt identity joined while system ZeroTier was
+active, using a separate UDP socket; this does not support a local bind
+collision as the cause. Independent-network NAT reachability remains
+unresolved. See the dated probe details in [`PROGRESS.md`](../PROGRESS.md).
+
 The client supports ordered provider fallback, verifies signed ZeroTier node records, and validates the owner-signed world manifest after connecting. Source supports rendezvous-only signed advertisements, a host-identity challenge, bounded WebRTC signaling, and a browser that requires the direct WebRTC data channel for all world traffic. The Worker contract tests cover the signaling state machine and reject world-data messages.
 
 `test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture and serves the signed manifest over a Pion WebRTC data channel. The opt-in `server/worldd/rendezvous_live_test.go` follows an invite through the deployed Worker and verifies the signed provider and Durable Object signaling. Its 2026-11-19 cross-internet run from pi3 completed lookup and signaling with visitor ZeroTier/tunnel ICE interfaces excluded, then failed direct ICE before a data channel opened. No browser rendering check has passed through this invite route.

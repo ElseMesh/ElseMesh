@@ -125,6 +125,19 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   routing. The rendezvous WebRTC path worked without an origin flag. This
   verifies the production browser-to-worldd data path on the joined network,
   not independent-NAT WebRTC.
+- Repeated the opt-in ARMv7 invite probe from pi3 after adding bounded late ICE
+  candidate trickling. Production Worker HostID lookup and SDP signaling both
+  succeeded, and both peers reported public STUN-reflexive candidates, but no
+  direct WebRTC data channel opened within 75 seconds. The visitor had no late
+  candidates to trickle because its candidates were already in the initial
+  offer SDP, so this run does not show late-candidate recovery. In the same
+  run, a fresh libzt identity joined the configured ZeroTier network while
+  system `zerotier-one` remained active; libzt used a separate UDP socket and
+  announced successfully. This rules out a local UDP bind collision in this
+  setup, but does not rule out NAT behavior between the separate sockets. The
+  server's Pion ICE socket still has an unverified external mapping, and its
+  automatic UPnP discovery did not complete. No router configuration was
+  changed.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages
