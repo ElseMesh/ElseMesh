@@ -159,6 +159,28 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	peer.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		t.Logf("visitor ICE state: %s", state)
 	})
+	lateCandidates := make(chan webrtc.ICECandidateInit, 64)
+	candidateOverflow := make(chan struct{}, 1)
+	publicCandidate := make(chan struct{}, 1)
+	peer.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+		if candidate == nil {
+			return
+		}
+		select {
+		case lateCandidates <- candidate.ToJSON():
+		default:
+			select {
+			case candidateOverflow <- struct{}{}:
+			default:
+			}
+		}
+		if candidate.Typ == webrtc.ICECandidateTypeSrflx || candidate.Typ == webrtc.ICECandidateTypeRelay {
+			select {
+			case publicCandidate <- struct{}{}:
+			default:
+			}
+		}
+	})
 	ordered := true
 	channel, err := peer.CreateDataChannel(worldProtocolNamespace, &webrtc.DataChannelInit{Ordered: &ordered})
 	if err != nil {
@@ -209,7 +231,10 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 		t.Fatalf("set WebRTC local offer: %v", err)
 	}
 	select {
+	case <-publicCandidate:
+		t.Log("visitor starts signaling after obtaining a public ICE candidate")
 	case <-gathered:
+		t.Log("visitor ICE gathering completed before signaling")
 	case <-ctx.Done():
 		t.Fatal("WebRTC ICE gathering timed out")
 	}
@@ -243,6 +268,54 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	}
 	if err := peer.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: answer.SDP}); err != nil {
 		t.Fatalf("set WebRTC remote answer: %v", err)
+	}
+	offerCandidates := make(map[string]struct{})
+	for _, line := range strings.Split(peer.LocalDescription().SDP, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "a=candidate:") {
+			offerCandidates[strings.TrimPrefix(line, "a=")] = struct{}{}
+		}
+	}
+	trickledCandidates := 0
+	forwardCandidate := func(candidate webrtc.ICECandidateInit) {
+		if candidate.Candidate == "" || len(candidate.Candidate) > 8*1024 {
+			return
+		}
+		if _, included := offerCandidates[candidate.Candidate]; included {
+			return
+		}
+		offerCandidates[candidate.Candidate] = struct{}{}
+		if err := socket.WriteJSON(map[string]any{"type": "webrtc.candidate", "signalSessionId": connected.SignalSessionID, "candidate": candidate}); err != nil {
+			t.Errorf("trickle ICE candidate through Worker: %v", err)
+			return
+		}
+		trickledCandidates++
+	}
+	gatheringComplete := false
+	for !gatheringComplete {
+		select {
+		case candidate := <-lateCandidates:
+			forwardCandidate(candidate)
+		case <-gathered:
+			gatheringComplete = true
+		case <-ctx.Done():
+			t.Fatal("visitor ICE gathering timed out while trickling candidates")
+		}
+	}
+	for {
+		select {
+		case candidate := <-lateCandidates:
+			forwardCandidate(candidate)
+		default:
+			goto candidatesDrained
+		}
+	}
+candidatesDrained:
+	t.Logf("visitor trickled %d late ICE candidate(s) through the Worker", trickledCandidates)
+	select {
+	case <-candidateOverflow:
+		t.Fatal("visitor ICE candidate test queue overflowed")
+	default:
 	}
 	select {
 	case <-opened:
