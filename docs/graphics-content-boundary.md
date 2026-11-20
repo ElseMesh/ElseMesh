@@ -214,40 +214,33 @@ The matched AMD beach captures show a substantial distant-canopy mismatch.
 `WebGPUVegetation.js` uses view-dependent octahedral impostors baked from
 `buildTreeNear()`/`buildShrubNear()` geometry and the shared WebGPU leaf atlas.
 These paths consume the same placement records but not the same distant model,
-texture inputs, or presentation behavior. The fix must define a signed,
-renderer-neutral canopy LOD asset/data contract and have both engine backends
-consume the same authored near and far content. Preserve both current paths
-until that contract passes matched pre-split WebGPU and WebGL reviews; do not
-replace the WebGL primitives with another Tidewater-owned presenter.
+texture inputs, or presentation behavior. Tidewater now exports a
+renderer-neutral canopy candidate, and ElseMesh registers both its generic
+static-model near component and octahedral far component for WebGPU and WebGL.
+Preserve both current paths until the candidate passes matched pre-split
+WebGPU/WebGL review; do not replace the WebGL primitives with another
+Tidewater-owned presenter.
 
 The current source bake provides a concrete portable target: 3 tree and 2 shrub
 variants, each rendered from a 6-by-6 upper-hemisphere direction grid with
 128-pixel frames. Its two RGBA atlases carry coverage/leaf brightness/class
-data and local normal/exposure data. The new contract should package those
-shared atlas bytes once, with authored bounds, variant mapping, near/far
-handoff, palette inputs, and per-instance seed/yaw/scale. ElseMesh should own
-the billboard orientation, octahedral frame lookup/reprojection, wind offset,
-LOD fade, and WebGPU/WebGL texture binding through registered adapters. This
-view-dependent lookup is beyond the current static GLB material graph, so it
-needs one explicit engine component contract rather than separate WGSL and
-GLSL implementations in Tidewater. Both backends must sample the same signed
-atlas assets and select the same LOD at matched quality settings.
+data and local normal/exposure data. The candidate packages the shared atlas
+bytes once, with authored bounds, variant mapping, near/far handoff, palette
+inputs, and per-instance seed/yaw/scale. ElseMesh owns billboard orientation,
+octahedral frame lookup/reprojection, wind offset, LOD fade, and texture
+binding through registered adapters. This view-dependent lookup has one engine
+component contract; WGSL and GLSL translation stay in ElseMesh rather than
+Tidewater. Both backends consume the same atlas assets and shared CPU draw plan.
 
 The current ElseMesh renderers cannot share one Three.js TSL/NodeMaterial
 presenter: WebGPU uses ElseMesh's custom WGSL renderer, while WebGL uses the
 classic Three.js `WebGLRenderer`, which does not build NodeMaterials. Sharing
 TSL would require moving both paths onto Three's `WebGPURenderer` and its
 WebGL backend, an engine renderer migration with separate parity risks. The
-canopy migration therefore keeps WGSL and GLSL translation in paired
-ElseMesh-owned adapters while sharing the signed content, CPU draw plan, LOD
-decisions, and conformance fixture. No backend adapter may be activated alone.
+canopy migration keeps WGSL and GLSL translation in paired ElseMesh-owned
+adapters while sharing content, the CPU draw plan, and LOD decisions. Do not
+activate one backend separately.
 
-The inactive runtime descriptor now includes the authored tree/shrub palette
-and seed thresholds alongside its color, lighting, and wind values. The engine
-validates those fields, and Tidewater's export test checks the descriptor
-against its source profile. This closes a missing-data gap only: the near GLB
-material graph is still provisional, and the octahedral descriptor and far
-atlases have no registered presenter yet.
 
 `src/network/OctahedralCanopyAssets.js` loads the signed descriptor, validates
 the instance-set and PNG references against the component and manifest, checks
@@ -256,19 +249,17 @@ signed-asset loader. Startup requests only the descriptor; adapters fetch the
 instance set and atlas data as they initialize. The PNG decoder disables color
 conversion and alpha premultiplication. Tidewater's exporter now emits the
 source WebGPU material and normal/exposure atlases as deterministic,
-content-addressed raw-data PNG sidecars. It now also emits an inactive near-
-model sidecar containing all tree/shrub lobe variants, the authored placement
-transforms, and the same seed-based variant selection. The GLBs preserve all
-three source VEC4 streams but still use a provisional PBR material. The
-exporter also writes the source leaf-mask atlas as a content-addressed, linear
-RGBA8 data PNG and records its 2×2 tile layout and channel meanings. The signed
-material graph and runtime references are present in the inactive package and
-near GLBs. The candidate remains outside the signed world source; the near
-component can use the generic static-model adapters, but no app path activates
-it. The Tidewater export test reruns the bakes and checks byte identity,
+content-addressed raw-data PNG sidecars. It also emits an inactive near-model
+sidecar containing all tree/shrub lobe variants, authored placement transforms,
+and the same seed-based variant selection. The GLBs preserve all three source
+VEC4 streams and carry the authored renderer-neutral material graph. The
+exporter writes the source leaf-mask atlas as a content-addressed linear RGBA8
+data PNG with its 2×2 tile layout and channel meanings. The candidate remains
+outside the signed active world. The Tidewater export test checks byte identity,
 dimensions, asset hashes, source streams, placement counts, and variant
-selection. Do not activate the geometry until the complete authored appearance
-and the far presenter pass matched review.
+selection. Actual candidate package checks run both far adapters, but do not
+install the near component or compare appearance against the pre-split scene;
+keep Tidewater's current presenters active until that review passes.
 
 `elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
 with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
@@ -285,33 +276,40 @@ inventory and verifies the decoded image dimensions against that layout.
 Tidewater's exporter now assembles the near instance set, near GLBs, both frame
 atlases, leaf mask, appearance inputs, and LOD rules into an inactive
 `vegetation-canopy-runtime-package.json`. The engine descriptor and asset loader
-validate against the actual content-addressed source files. This candidate is
-still outside `world-source.json`; its near-model graph remains provisional.
-The package now includes a generic static-model near-component record. ElseMesh
-validates its signed `graphTextureBindings` and content-role metadata, and both
-generic static-model adapters bind the raw RGBA8 leaf-mask input. Paired adapter
-and WebGPU/WebGL synthetic render checks cover this generic contract; Tidewater's
-candidate is not active and those fixtures do not prove authored-scene parity.
-The octahedral far-canopy component still has no registered presenter.
-The candidate GLSL material now uses the billboard's geometric normal for leaf
-translucency, matching Tidewater's source `in.N` and the paired WebGPU material,
-and no longer flips its atlas normal on back faces. Its WebGL shader fixture
-passes. The GLSL material still computes its own direct, ambient, translucency,
-and specular lighting instead of using ElseMesh's standard shadowed lighting
-path, so scene lighting and shadow parity remain open.
+validate against the actual content-addressed source files. The near-model graph
+now carries the authored species palette, leaf mask, bark/weathering values,
+roughness, occlusion, translucency, normal bias, and near wind for both material
+compilers. Its near deformation still needs matched rendered review. The
+candidate remains outside `world-source.json`.
+
+ElseMesh registers the generic static-model near component and the
+`elsemesh.octahedral-canopy/1` far component with both renderers. The far
+presenters use the same camera-driven plan for placement, atlas variant and
+frame blending, wind, distance LOD, and thinning. The WebGL presenter starts
+from `MeshPhysicalMaterial`, uses the engine scene lighting and cascaded shadow
+maps, and adds the canopy's authored view-normal bias and transmission response.
+A deterministic Tidewater export was loaded through both candidate adapters;
+both planned 7,945 far instances, and WebGPU rendered the atlas batch without
+validation errors. These package-level checks do not install the near component
+or establish a matched Tidewater scene comparison. The candidate remains
+inactive until both representations pass that visual review.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The
-engine must generate sampling mips from these data values without an sRGB
-transform. This corrects the earlier KTX2-only assumption: no KTX2 encoder is
-currently available in the Tidewater export pipeline. The descriptor now
+Both adapters generate mip chains from the raw linear RGBA8 data without an
+sRGB transform. Matched review must still check distant filtering and
+normal/exposure appearance. This corrects the earlier KTX2-only assumption:
+no KTX2 encoder is currently available in the Tidewater export pipeline. The
+descriptor now
 records the source tree handoff at 65 m, shrub handoff at 45 m, tree fade from
 2,600 to 2,800 m, and shrub hard cutoff at 180 m. It also specifies the 100 m
 three-frame blend limit, shared 12% LOD transition band, and 50% thinning from
 140 to 320 m, selected with the source seed multiplier 91.7 and compensated
-with inverse-square-root retained density. The complete canopy palette, wind
-response, signed atlas references, and production adapters are still missing;
-those remain required before replacing either presenter.
+with inverse-square-root retained density. The remaining gates are the matched
+near/far handoff, near-mesh wind, shadow, lighting, and overall appearance
+comparison against Tidewater's pre-split WebGPU view. Until those pass, the
+candidate stays out of the signed active world and both existing presenters
+remain in use.
 
 `src/engine/render/OctahedralCanopyRuntime.js` now resolves each instance to its
 authored group, quaternion yaw, seed-selected atlas variant, and shared near/far
@@ -322,10 +320,10 @@ shading inputs, and impostor wind coefficients now live in the plain-data
 `vegetation/CanopyProfile.js`; the current WebGPU shader and atlas exporter
 consume that same profile. Its color, lighting, and wind subset is projected
 as `elsemesh.canopy-appearance/1`, validated by the engine descriptor codec,
-and checked in the deterministic export and descriptor tests. The exported
-descriptor sidecar still is not signed world content, neither engine backend
-consumes the component contract, and both world-owned presenters remain active.
-No appearance-parity gate has closed.
+and checked in the deterministic export and descriptor tests. The
+content-addressed descriptor sidecar is not yet part of the signed active world
+package, so the production app still uses both world-owned presenters. No
+appearance-parity gate has closed.
 
 Use the common asset-index convention for this contract: LOD0 is the highest-
 detail near model, and increasing indices are progressively coarser. The

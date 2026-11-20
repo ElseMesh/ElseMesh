@@ -2780,11 +2780,21 @@ finding changes them.
 
 - 2026-11-20: registered the renderer-neutral canopy component with both engine
   backends and connected their presenters to the same reserved draw-plan
-  buffers. A signed-fixture WebGL adapter check loads raw atlas PNGs, installs
-  one interleaved instanced batch from the shared camera plan, and verifies
-  disposal removes it. The WebGPU adapter now also loads the signed fixture,
+  buffers. A content-addressed-fixture WebGL adapter check loads raw atlas
+  PNGs, installs one interleaved instanced batch from the shared camera plan,
+  and verifies disposal removes it. The WebGPU adapter loads the same fixture,
   uploads both raw atlases, renders a planned far-card batch, and disposes its
   draw and texture resources without validation errors. WebGL also applies the
   source's 0.12 view-facing normal bias in the physical material path. These
   checks do not activate the candidate package or compare a Tidewater scene, so
   Tidewater stays at 93% and renderer-neutral packages stay at 71%.
+
+- 2026-11-20 production canopy adapter check: ran Tidewater's exporter into a
+  disposable `/var/tmp` output tree and loaded its actual content-addressed
+  candidate package through the WebGL and WebGPU canopy adapters. Both planned
+  7,945 source far-card instances from the exported placements; WebGPU uploaded
+  the real atlas PNGs and rendered the batch without validation errors, and
+  both adapters disposed their resources. This did not install the separate
+  near-model component, activate the candidate in the signed world, or compare
+  rendered Tidewater output with the pre-split reference. The package remains
+  inactive, so Tidewater stays at 93% and renderer-neutral packages at 71%.

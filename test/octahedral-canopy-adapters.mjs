@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT, OCTAHEDRAL_CANOPY_COMPONENT_TYPE } from '../src/network/OctahedralCanopyDescriptor.js';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
 import { worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
+import { loadCanopyProductionPackage } from './octahedral-canopy-production-package.mjs';
 import '../src/network/WebGPUOctahedralCanopyAdapter.js';
 import '../src/fallback/WebGLOctahedralCanopyAdapter.js';
 
@@ -102,3 +103,17 @@ result.runtime.dispose();
 assert.equal( scene.children.filter( object => object.isInstancedMesh ).length, 0, 'disposing the component removes its draw batch' );
 
 console.log( 'WebGPU and WebGL canopy adapters register the shared contract; WebGL installs and disposes a planned far-card batch' );
+
+if ( process.env.ELSEMESH_CANOPY_EXPORT ) {
+	const candidate = await loadCanopyProductionPackage( process.env.ELSEMESH_CANOPY_EXPORT );
+	const productionScene = new THREE.Scene();
+	const productionFallback = { THREE, scene: productionScene, connector: candidate.connector, beachDetailTexture: null };
+	const productionResult = await webglAdapter( { fallback: productionFallback, connector: candidate.connector, isCurrent: () => true }, candidate.component );
+	const productionMesh = productionScene.children.find( object => object.isInstancedMesh );
+	const camera = new THREE.Vector3( ...candidate.cameraPosition );
+	productionResult.runtime.update( 1 / 60, { position: camera }, null, 1 / 60 );
+	assert.ok( productionMesh.count > 0, 'the content-addressed Tidewater canopy package selects far cards in its WebGL presenter' );
+	const drawnCount = productionMesh.count;
+	productionResult.runtime.dispose();
+	console.log( `WebGL Tidewater canopy package installed and planned ${drawnCount} source far-card instances` );
+}
