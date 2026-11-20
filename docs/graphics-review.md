@@ -26,14 +26,16 @@ and `0.133/255` across the three phases. Split WebGPU/WebGL is `18.748`,
 for sky, `24.09/255` for open sea, `26.27/255` for swash, `14.11/255` for
 sand, and `22.93/255` for the pier. WebGL remains visibly darker, its cloud
 shapes and canopy differ, and the ocean/swash appearance is not aligned with
-WebGPU. The earlier apparent spray mismatch came from screenshots taken at
-different simulation phases. Source inspection still shows the wave-breaker
-spray path is only installed through the WebGPU `Breakers` implementation;
-WebGL's generic `WebGLSpray` is updated but has no equivalent breaker emitter.
-This is a measured backend gap, not a Tidewater-main WebGL comparison. No
-renderer-neutral breaker contract exists yet, so this review records the gap
-without adding a second world-owned renderer path. Tidewater parity remains
-93%.
+WebGPU. The earlier apparent spray mismatch between Tidewater `main` and split
+WebGPU came from screenshots taken at different simulation phases. WebGL does
+install a separate breaker presentation: its island-ocean adapter adds
+terrain-sampled spray points and a shoreline-driven breaker-lip mesh. That is
+not the WebGPU `Breakers` simulation; the two backends use distinct particle,
+crest, and lip paths. The full-frame comparison does not isolate breaker-spray
+parity, so the WebGL spray match remains unverified. A shared, renderer-neutral
+breaker input/output contract and a feature-specific conformance fixture are
+still needed. This is a measured backend gap, not a Tidewater-main WebGL
+comparison. Tidewater parity remains 93%.
 
 ## 2026-11-20 matched split beach view: WebGPU and WebGL
 
