@@ -1,6 +1,6 @@
 # ElseMesh world-split progress
 
-Last assessed: 2026-11-19. Percentages are rough completion estimates for the
+Last assessed: 2026-11-20. Percentages are rough completion estimates for the
 active engine/world-separation, Tidewater parity, and AI Portals hosting goals. They measure the
 acceptance gates met, not code volume or test coverage. Reassess a percentage
 only when implementation or verification evidence changes; update this file
@@ -24,6 +24,18 @@ MAE is `5.35/255`, with split-minus-main mean RGB `(-4.26, -4.11, -3.40)`;
 the village color shift remains open. Overall Tidewater parity stays **93%**.
 This closes only the missing built-in WebGPU ground-cover path. See
 [`docs/graphics-review.md`](docs/graphics-review.md).
+
+**2026-11-20 evidence update:** A matched current-source beach capture on AMD
+RADV WebGPU and RadeonSI WebGL used the same `[15, 3, -58]` camera, 16.2 time
+of day, fixed simulation time 1000, 1600×813 canvas, scale 1, high quality,
+and fixed exposure. The WebGL frame has a canvas RGB MAE of `18.54/255` against
+WebGPU; the largest regional difference is the swash (`26.11/255`), followed by
+open sea (`21.68/255`), sky (`19.08/255`), pier (`25.61/255`), and sand
+(`12.44/255`). The cloud shapes and distant canopy also visibly differ. This
+confirms a backend parity gap at this view but is not a direct current-source
+comparison against Tidewater `main`. No completion gate or percentage changed:
+Tidewater remains **93%**, and renderer-neutral world packages remain **71%**.
+See [`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-matched-split-beach-view-webgpu-and-webgl).
 
 ## Progress by requirement
 

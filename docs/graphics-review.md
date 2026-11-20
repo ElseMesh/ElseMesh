@@ -1,5 +1,38 @@
 # Reproducible graphics review
 
+## 2026-11-20 matched split beach view: WebGPU and WebGL
+
+Captured ElseMesh source revision `4b4e0f1f` in isolated Chromium on AMD
+Radeon Graphics. The WebGPU capture used RADV through Vulkan; WebGL used
+RadeonSI through ANGLE. Both used the `beach` pose (`[15, 3, -58]`, yaw
+`3.14`, pitch `-0.08`, time of day `16.2`), fixed simulation time `1000`, a
+1600×813 canvas at scale 1, high quality, and auto-exposure disabled. Each
+renderer ran separately in the same no-input Weston display. The screenshot
+capture path and viewport matched; non-canvas UI was hidden through that
+browser's DevTools session. The page's normal host input seat remained disabled.
+
+![ElseMesh split WebGPU beach at 4b4e0f1f](images/elsemesh-split-webgpu-beach-4b4e0f1f-2026-11-20.png)
+
+![ElseMesh split WebGL beach at 4b4e0f1f](images/elsemesh-split-webgl-beach-4b4e0f1f-2026-11-20.png)
+
+The WebGL image is visibly darker and less blue across the scene, has chunkier
+clouds, and uses low-poly sphere-lobe crowns where WebGPU uses its octahedral
+canopy impostors. The fixed-exposure RGB MAE is `18.54/255` over the canvas.
+For sky `(100,100)-(1500,330)`, mean RGB is `(125.1,159.6,189.6)` in WebGPU
+and `(112.0,145.4,176.2)` in WebGL; open sea `(500,340)-(1100,410)` is
+`(111.0,146.8,164.2)` vs `(95.2,130.2,148.3)`; swash `(200,410)-(1400,500)`
+is `(173.8,180.0,180.1)` vs `(154.6,153.9,150.7)`; sand
+`(200,540)-(1400,813)` is `(213.1,194.9,160.2)` vs `(201.1,181.5,148.8)`.
+These are diagnostic screen-space values, not calibrated color measurements.
+They confirm current backend divergence at this pose; they do not compare the
+current WebGPU capture directly with Tidewater `main`, whose matched source
+comparison is documented above. No global grade adjustment is justified from
+this measurement alone. The canopy migration must define one signed,
+renderer-neutral content contract and have both ElseMesh adapters consume the
+same canopy assets before removing the current world-owned presenters. Clouds
+and shoreline materials need the same matched review after their shared inputs
+are defined.
+
 ## 2026-11-19 authoritative Tidewater beach: WebGPU
 
 Compared the split ElseMesh build at `65d2b30b` with the authoritative
