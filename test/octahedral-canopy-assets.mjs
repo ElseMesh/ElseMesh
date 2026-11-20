@@ -130,7 +130,7 @@ const previousCreateImageBitmap = globalThis.createImageBitmap;
 globalThis.createImageBitmap = async ( blob, options ) => {
 	assert.equal( blob.type, 'image/png' );
 	assert.deepEqual( options, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }, 'data atlas decoding disables color conversion and alpha premultiplication' );
-	return { width: 3840, height: 768 };
+	return blob.size === leafMaskBytes.byteLength ? { width: 1024, height: 1024 } : { width: 3840, height: 768 };
 };
 try {
 	assert.deepEqual( await decodeOctahedralCanopyAtlas( atlasA ), { width: 3840, height: 768 } );
