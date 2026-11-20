@@ -372,7 +372,7 @@ func (z *libztRuntime) startForwardListener(ctx context.Context, addressText str
 	return nil
 }
 
-func (z *libztRuntime) proxyZeroTierTCP(ztConn *ztConn, peerPort int) {
+func (z *libztRuntime) proxyZeroTierTCP(ztConn net.Conn, peerPort int) {
 	targetPort := peerPort
 	var conn net.Conn = ztConn
 	z.httpTargetMu.RLock()
