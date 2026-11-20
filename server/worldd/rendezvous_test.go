@@ -135,7 +135,7 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 			return
 		}
 		if answer.Type != "host.response" || answer.Response == nil || answer.Response.Type != "webrtc.answer" || answer.Response.RequestID != offer.RequestID {
-			t.Errorf("rendezvous answer response = %#v", answer)
+			t.Errorf("rendezvous answer response type=%s payload=%+v", answer.Type, answer.Response)
 			return
 		}
 		answerResponses <- *answer.Response
