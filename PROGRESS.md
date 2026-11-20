@@ -19,9 +19,12 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   This confirms invite discovery/control works outside that network, but the
   world itself cannot yet be reached from these internet connections. The
   cause is not isolated and this result does not prove router port mapping is
-  required. Read-only UPnP IGD and NAT-PMP discovery found no automatic mapping
-  path on the host gateway. A follow-up using `--webrtc-interface wlo1`
-  confirmed the host now advertises only that interface's private and
+  required. NAT-PMP and PCP probes to the host gateway timed out. UPnP
+  availability remains unknown: its SSDP discovery failed locally with
+  `EPERM`, before a gateway response could be observed. The host has no
+  public IPv6 address or default IPv6 route (only its ZeroTier ULA). A follow-up
+  using `--webrtc-interface wlo1` confirmed the host now advertises only that
+  interface's private and
   server-reflexive candidates, but ICE still failed. The host capture showed
   eight outgoing checks from UDP 46000 to pi3's server-reflexive endpoint and
   no incoming peer datagrams; the exact firewall allow remained at zero and

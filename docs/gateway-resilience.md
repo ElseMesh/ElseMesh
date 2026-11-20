@@ -248,8 +248,12 @@ server-reflexive candidate `91.90.103.109:20817`. The probe trickled zero
 candidates because gathering completed before the answer arrived, so this run
 does not demonstrate late-candidate recovery. Host-side UPnP discovery failed
 with `EPERM` while sending SSDP multicast; no mapping or firewall rule was
-changed. This confirms lookup and signaling on the deployed Worker, not
-independent-network world-data reachability.
+changed. Read-only NAT-PMP and PCP probes to the default gateway
+`192.168.111.1:5351` timed out. The host has no public IPv6 address or default
+IPv6 route; its only global-scope IPv6 address is the ZeroTier ULA. Thus UPnP
+support is still unknown, and this host has no verified automatic mapping or
+public IPv6 path. This confirms lookup and signaling on the deployed Worker,
+not independent-network world-data reachability.
 
 The headless Chromium integration test passed from the external build tree:
 `go test ./worldd -run '^TestChromiumWorldConnectorUsesDirectWebRTC$' -count=1
