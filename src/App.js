@@ -1026,7 +1026,7 @@ export class App {
 			admissionSession.stopBootstrapHeartbeat();
 			this.player.setHostedWorldPose( new Vector3( admittedPosition[ 0 ], admittedPosition[ 1 ] + PLAYER_EYE_HEIGHT, admittedPosition[ 2 ] ), this.player.yaw, this.player.pitch );
 			this.camera.position.copy( this.player.camera.position );
-			if ( ! this.player.hostedCollisionGuard?.( this.player.position, this.player.position ) ) throw new Error( 'Collision coverage for the world-authored spawn is incomplete; entry is blocked' );
+			if ( connector.localOnly && ! this.player.hostedCollisionGuard?.( this.player.position, this.player.position ) ) throw new Error( 'Collision coverage for the world-authored spawn is incomplete; entry is blocked' );
 		}
 		this.activateHostedWorld( this.linkedWorldRoot, connector, admissionSession );
 		this.streamWorldRemainder( connector, this.linkedWorldRoot );
