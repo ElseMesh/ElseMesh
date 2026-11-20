@@ -265,9 +265,12 @@ lighting, and wind coefficients. Its required `leafMask` record references a
 third signed raw-data PNG and defines the row-major tile layout and channel
 meanings. `OctahedralCanopyAssets` loads it through the signed component asset
 inventory and verifies the decoded image dimensions against that layout.
-Tidewater still exports the leaf-mask bytes and metadata only in its inactive
-source sidecar; the runtime descriptor reference and complete material graph
-are absent, so these assets do not yet form a signed canopy component.
+Tidewater's exporter now assembles the near instance set, near GLBs, both frame
+atlases, leaf mask, appearance inputs, and LOD rules into an inactive
+`vegetation-canopy-runtime-package.json`. The engine descriptor and asset loader
+validate against the actual content-addressed source files. This candidate is
+still outside `world-source.json`; its near-model graph remains provisional and
+neither backend adapter consumes the component.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The
