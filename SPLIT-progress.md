@@ -2715,3 +2715,10 @@ finding changes them.
   focused fixture verifies both constructors retain the same bytes and channel
   semantics. GPU upload/mip rendering and adapter consumption remain
   unverified; the package is inactive and no parity percentage changes.
+
+- 2026-11-20: added a shared camera-driven canopy presentation runtime. It
+  recomputes the authored instance/LOD plan only when the camera position
+  changes, reuses the packed typed-array buffers, and delegates one identical
+  plan to either backend consumer. Focused update, reuse, invalid-camera, and
+  disposal checks pass. The WebGPU and WebGL consumers are not registered yet;
+  this closes no rendered parity gate or percentage.
