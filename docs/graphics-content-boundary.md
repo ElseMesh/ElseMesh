@@ -261,10 +261,13 @@ canopy surface appearance. The graph requires `baseColor` and can describe
 roughness, translucency, and wind-driven vertex position through the bounded
 contract compiled for both backends; it contains no backend shader source.
 The descriptor now validates a renderer-neutral appearance block for color,
-lighting, and wind coefficients. Tidewater exports the leaf-mask bytes and
-channel/tile metadata only in its inactive source sidecar; the complete
-material graph and signed descriptor reference are still absent, so these
-assets do not form a signed canopy component.
+lighting, and wind coefficients. Its required `leafMask` record references a
+third signed raw-data PNG and defines the row-major tile layout and channel
+meanings. `OctahedralCanopyAssets` loads it through the signed component asset
+inventory and verifies the decoded image dimensions against that layout.
+Tidewater still exports the leaf-mask bytes and metadata only in its inactive
+source sidecar; the runtime descriptor reference and complete material graph
+are absent, so these assets do not yet form a signed canopy component.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The

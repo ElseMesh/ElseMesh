@@ -9,13 +9,14 @@ import {
 } from '../src/network/OctahedralCanopyDescriptor.js';
 
 const id = letter => `sha256:${letter.repeat( 64 )}`;
-const setID = id( 'a' ), nearTreeID = id( 'b' ), nearShrubID = id( 'c' ), atlasColorID = id( 'd' ), atlasAuxID = id( 'e' );
+const setID = id( 'a' ), nearTreeID = id( 'b' ), nearShrubID = id( 'c' ), atlasColorID = id( 'd' ), atlasAuxID = id( 'e' ), leafMaskID = id( '6' );
 const inventory = [
 	{ assetId: setID, kind: 'static-model-instance-set/1' },
 	{ assetId: nearTreeID, kind: 'glb' },
 	{ assetId: nearShrubID, kind: 'glb' },
 	{ assetId: atlasColorID, kind: 'image/png' },
 	{ assetId: atlasAuxID, kind: 'image/png' },
+	{ assetId: leafMaskID, kind: 'image/png' },
 ];
 const instanceSet = {
 	format: 'elsemesh.static-model-instance-set/1',
@@ -36,6 +37,12 @@ const descriptor = {
 	atlasChannels: {
 		material: { r: 'brightness', g: 'leaf-flag', b: 'card-variation', a: 'coverage' },
 		normalExposure: { r: 'normal-x-encoded', g: 'normal-y-encoded', b: 'normal-z-encoded', a: 'ambient-exposure' },
+	},
+	leafMask: {
+		assetId: leafMaskID,
+		dataFormat: 'rgba8unorm-data/1',
+		layout: { type: 'row-major-atlas-uv/1', columns: 2, rows: 2, tileWidth: 512, tileHeight: 512 },
+		channels: { r: 'leaf-coverage', g: 'leaf-brightness-over-1.4', b: 'leaf-cell-random', a: 'opaque' },
 	},
 	materialGraph: {
 		format: 'elsemesh.material-graph/1',
@@ -71,6 +78,9 @@ const invalid = [
 	{ ...descriptor, extra: true },
 	{ ...descriptor, atlasDataFormat: 'rgba8-srgb/1' },
 	{ ...descriptor, atlasChannels: { ...descriptor.atlasChannels, material: { ...descriptor.atlasChannels.material, a: 'opacity' } } },
+	{ ...descriptor, leafMask: { ...descriptor.leafMask, dataFormat: 'rgba8-srgb/1' } },
+	{ ...descriptor, leafMask: { ...descriptor.leafMask, layout: { ...descriptor.leafMask.layout, type: 'atlas-uv/1' } } },
+	{ ...descriptor, leafMask: { ...descriptor.leafMask, channels: { ...descriptor.leafMask.channels, r: 'alpha' } } },
 	{ ...descriptor, materialGraph: { ...descriptor.materialGraph, format: 'shader-source/1' } },
 	{ ...descriptor, materialGraph: { ...descriptor.materialGraph, outputs: { roughness: 'roughness' } } },
 	{ ...descriptor, appearance: { ...descriptor.appearance, color: { ...descriptor.appearance.color, barkDark: -1 } } },
@@ -98,6 +108,7 @@ for ( const value of invalid ) assert.throws( () => decodeOctahedralCanopyDescri
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, componentAssets: inventory.filter( asset => asset.assetId !== nearTreeID ) } ), /near GLB referenced by static model tree-oak is not a signed component asset/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, staticModelInstanceSetAssetId: id( 'f' ) } ), /does not match the signed descriptor reference/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, componentAssets: inventory.map( asset => asset.assetId === atlasAuxID ? { ...asset, kind: 'image/ktx2' } : asset ) } ), /atlas reference is not a declared image\/png data asset/ );
+assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, componentAssets: inventory.filter( asset => asset.assetId !== leafMaskID ) } ), /leaf-mask reference is not a declared image\/png data asset/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( bytes( descriptor ), { ...options, staticModelInstanceSet: { ...instanceSet, instances: [ { model: 'tree-oak' }, instanceSet.instances[ 1 ] ] } } ), /requires normalized per-instance variant data/ );
 assert.throws( () => decodeOctahedralCanopyDescriptor( new Uint8Array(), options ), /non-empty binary data/ );
 

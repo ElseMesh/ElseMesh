@@ -50,12 +50,19 @@ const setBytes = Buffer.from( JSON.stringify( set ) );
 const setID = sha( setBytes );
 const atlasA = dataPNG( 3840, 768, 0 ), atlasB = dataPNG( 3840, 768, 128 );
 const atlasAID = sha( atlasA ), atlasBID = sha( atlasB );
+const leafMaskBytes = dataPNG( 1024, 1024, 192 );
+const leafMaskID = sha( leafMaskBytes );
 const descriptor = {
 	format: 'elsemesh.octahedral-canopy/1', instanceSetAssetId: setID, atlasAssetIds: [ atlasAID, atlasBID ],
 	atlasDataFormat: OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT,
 	atlasChannels: {
 		material: { r: 'brightness', g: 'leaf-flag', b: 'card-variation', a: 'coverage' },
 		normalExposure: { r: 'normal-x-encoded', g: 'normal-y-encoded', b: 'normal-z-encoded', a: 'ambient-exposure' },
+	},
+	leafMask: {
+		assetId: leafMaskID, dataFormat: OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT,
+		layout: { type: 'row-major-atlas-uv/1', columns: 2, rows: 2, tileWidth: 512, tileHeight: 512 },
+		channels: { r: 'leaf-coverage', g: 'leaf-brightness-over-1.4', b: 'leaf-cell-random', a: 'opaque' },
 	},
 	materialGraph: {
 		format: 'elsemesh.material-graph/1',
@@ -81,9 +88,10 @@ const component = {
 		{ assetId: setID, kind: 'static-model-instance-set/1' },
 		{ assetId: treeGLBID, kind: 'glb' }, { assetId: shrubGLBID, kind: 'glb' },
 		{ assetId: atlasAID, kind: 'image/png' }, { assetId: atlasBID, kind: 'image/png' },
+		{ assetId: leafMaskID, kind: 'image/png' },
 	],
 };
-const assetBytes = new Map( [ [ descriptorID, descriptorBytes ], [ setID, setBytes ], [ treeGLBID, treeGLB ], [ shrubGLBID, shrubGLB ], [ atlasAID, atlasA ], [ atlasBID, atlasB ] ] );
+const assetBytes = new Map( [ [ descriptorID, descriptorBytes ], [ setID, setBytes ], [ treeGLBID, treeGLB ], [ shrubGLBID, shrubGLB ], [ atlasAID, atlasA ], [ atlasBID, atlasB ], [ leafMaskID, leafMaskBytes ] ] );
 const connector = {
 	manifest: { assets: component.assets.map( ( { assetId, kind } ) => ( { id: assetId, kind } ) ) },
 	assets: new Map(),
@@ -94,9 +102,24 @@ const assets = await loadOctahedralCanopyAssets( connector, component );
 assert.equal( assets.descriptor.instanceSetAssetId, setID );
 assert.equal( assets.instanceSet.instances.length, 2 );
 assert.deepEqual( [ ...assets.atlases.values() ].map( atlas => [ atlas.width, atlas.height ] ), [ [ 3840, 768 ], [ 3840, 768 ] ] );
+assert.deepEqual( [ assets.leafMask.width, assets.leafMask.height ], [ 1024, 1024 ], 'the source leaf mask is loaded as a signed raw-data PNG with its four-tile layout' );
+assert.deepEqual( assets.leafMask.channels, descriptor.leafMask.channels, 'leaf-mask channel semantics survive signed descriptor loading' );
 assert.deepEqual( await assets.loadModel( treeGLBID ), treeGLB, 'near model assets are loaded only through signed component references' );
 await assert.rejects( assets.loadModel( sha( Buffer.from( 'unreferenced' ) ) ), /not referenced by the signed instance set/ );
 assert.deepEqual( worldComponentAssetIDs( component ), [ descriptorID ], 'startup requests only the canopy descriptor; the set, atlases, and models are loaded by the adapter' );
+const mismatchedDescriptorBytes = Buffer.from( JSON.stringify( { ...descriptor, leafMask: { ...descriptor.leafMask, layout: { ...descriptor.leafMask.layout, tileWidth: 256 } } } ) );
+const mismatchedDescriptorID = sha( mismatchedDescriptorBytes );
+const mismatchedComponent = {
+	...component,
+	data: { descriptorAssetId: mismatchedDescriptorID },
+	assets: component.assets.map( asset => asset.assetId === descriptorID ? { ...asset, assetId: mismatchedDescriptorID } : asset ),
+};
+const mismatchedConnector = {
+	...connector,
+	manifest: { assets: mismatchedComponent.assets.map( ( { assetId, kind } ) => ( { id: assetId, kind } ) ) },
+	async getAsset( assetId ) { return assetId === mismatchedDescriptorID ? mismatchedDescriptorBytes : assetBytes.get( assetId ); },
+};
+await assert.rejects( loadOctahedralCanopyAssets( mismatchedConnector, mismatchedComponent ), /leaf-mask dimensions 1024x1024 do not match 512x1024/ );
 const previousCreateImageBitmap = globalThis.createImageBitmap;
 globalThis.createImageBitmap = async ( blob, options ) => {
 	assert.equal( blob.type, 'image/png' );
@@ -105,6 +128,7 @@ globalThis.createImageBitmap = async ( blob, options ) => {
 };
 try {
 	assert.deepEqual( await decodeOctahedralCanopyAtlas( atlasA ), { width: 3840, height: 768 } );
+	assert.deepEqual( await decodeOctahedralCanopyAtlas( leafMaskBytes ), { width: 1024, height: 1024 } );
 } finally {
 	if ( previousCreateImageBitmap === undefined ) delete globalThis.createImageBitmap;
 	else globalThis.createImageBitmap = previousCreateImageBitmap;

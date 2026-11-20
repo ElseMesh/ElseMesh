@@ -89,11 +89,18 @@ export async function loadOctahedralCanopyAssets( connector, component, { signal
 		if ( dimensions.width !== expectedWidth || dimensions.height !== expectedHeight ) fail( `atlas ${assetId} dimensions ${dimensions.width}x${dimensions.height} do not match ${expectedWidth}x${expectedHeight}` );
 		atlases.set( assetId, { bytes, ...dimensions } );
 	}
+	const leafMaskBytes = await getSignedComponentAsset( connector, componentAssets, manifestAssets, descriptor.leafMask.assetId, 'image/png', signal );
+	const leafMaskDimensions = inspectDataPNG( leafMaskBytes );
+	const leafMaskWidth = descriptor.leafMask.layout.columns * descriptor.leafMask.layout.tileWidth;
+	const leafMaskHeight = descriptor.leafMask.layout.rows * descriptor.leafMask.layout.tileHeight;
+	if ( leafMaskDimensions.width !== leafMaskWidth || leafMaskDimensions.height !== leafMaskHeight ) fail( `leaf-mask dimensions ${leafMaskDimensions.width}x${leafMaskDimensions.height} do not match ${leafMaskWidth}x${leafMaskHeight}` );
+	const leafMask = { bytes: leafMaskBytes, ...leafMaskDimensions, ...descriptor.leafMask };
 	const modelAssetIds = new Set( instanceSet.models.flatMap( model => model.lods.map( lod => lod.assetId ) ) );
 	return {
 		descriptor,
 		instanceSet,
 		atlases,
+		leafMask,
 		async loadModel( assetId, requestSignal = signal ) {
 			if ( ! modelAssetIds.has( assetId ) ) fail( `model asset ${assetId} is not referenced by the signed instance set` );
 			return getSignedComponentAsset( connector, componentAssets, manifestAssets, assetId, 'glb', requestSignal );

@@ -8,6 +8,8 @@ export const OCTAHEDRAL_CANOPY_PROJECTION = 'hemi-octahedral/1';
 export const OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT = 'rgba8unorm-data/1';
 export const OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT = 'elsemesh.canopy-appearance/1';
 
+const LEAF_MASK_CHANNELS = { r: 'leaf-coverage', g: 'leaf-brightness-over-1.4', b: 'leaf-cell-random', a: 'opaque' };
+
 const ATLAS_CHANNELS = {
 	material: [ 'brightness', 'leaf-flag', 'card-variation', 'coverage' ],
 	normalExposure: [ 'normal-x-encoded', 'normal-y-encoded', 'normal-z-encoded', 'ambient-exposure' ],
@@ -32,6 +34,13 @@ function validateAppearance( appearance ) {
 	if ( ! hasExactKeys( appearance.color, [ ...colorKeys, 'barkDark', 'barkLight' ] ) || ! colorKeys.every( key => finiteIn( appearance.color[ key ], 0, 4 ) ) || [ appearance.color.barkDark, appearance.color.barkLight ].some( value => ! Number.isInteger( value ) || value < 0 || value > 0xffffff ) || ! validValues( appearance.lighting, lightingKeys, 0, 4 ) || ! validValues( appearance.wind, windKeys, 0, 100 ) ) fail( 'canopy color, lighting or wind values are invalid' );
 }
 
+function validateLeafMask( leafMask ) {
+	if ( ! hasExactKeys( leafMask, [ 'assetId', 'dataFormat', 'layout', 'channels' ] ) || ! validAssetID( leafMask.assetId ) || leafMask.dataFormat !== OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT ) fail( 'leaf-mask data encoding or asset identity is invalid' );
+	const { layout, channels } = leafMask;
+	if ( ! hasExactKeys( layout, [ 'type', 'columns', 'rows', 'tileWidth', 'tileHeight' ] ) || layout.type !== 'row-major-atlas-uv/1' || ! Number.isInteger( layout.columns ) || layout.columns < 1 || layout.columns > 16 || ! Number.isInteger( layout.rows ) || layout.rows < 1 || layout.rows > 16 || ! Number.isInteger( layout.tileWidth ) || layout.tileWidth < 16 || layout.tileWidth > 2048 || ! Number.isInteger( layout.tileHeight ) || layout.tileHeight < 16 || layout.tileHeight > 2048 ) fail( 'leaf-mask tile layout is invalid' );
+	if ( ! hasExactKeys( channels, [ 'r', 'g', 'b', 'a' ] ) || [ 'r', 'g', 'b', 'a' ].some( channel => channels[ channel ] !== LEAF_MASK_CHANNELS[ channel ] ) ) fail( 'leaf-mask channel semantics are invalid' );
+}
+
 /** Decode the renderer-neutral, signed canopy descriptor and validate its component inventory. */
 export function decodeOctahedralCanopyDescriptor( bytes, options = {} ) {
 	const data = bytes instanceof Uint8Array ? bytes : bytes instanceof ArrayBuffer ? new Uint8Array( bytes ) : null;
@@ -48,10 +57,11 @@ export function decodeOctahedralCanopyDescriptor( bytes, options = {} ) {
  * choose how to sample the two atlas images for their backend.
  */
 export function validateOctahedralCanopyDescriptor( document, { componentAssets, staticModelInstanceSetAssetId, staticModelInstanceSet } = {} ) {
-	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'materialGraph', 'appearance', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
+	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'leafMask', 'materialGraph', 'appearance', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
 	if ( ! hasExactKeys( document, rootKeys ) || document.format !== OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT ) fail( 'unsupported format or fields' );
 	validateAppearance( document.appearance );
 	if ( document.atlasDataFormat !== OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT || ! hasExactKeys( document.atlasChannels, [ 'material', 'normalExposure' ] ) || ! hasExactKeys( document.atlasChannels.material, [ 'r', 'g', 'b', 'a' ] ) || ! hasExactKeys( document.atlasChannels.normalExposure, [ 'r', 'g', 'b', 'a' ] ) || [ 'r', 'g', 'b', 'a' ].some( ( channel, index ) => document.atlasChannels.material[ channel ] !== ATLAS_CHANNELS.material[ index ] || document.atlasChannels.normalExposure[ channel ] !== ATLAS_CHANNELS.normalExposure[ index ] ) ) fail( 'atlas data encoding or channel semantics are invalid' );
+	validateLeafMask( document.leafMask );
 	try { validateWorldMaterialGraph( document.materialGraph ); }
 	catch ( error ) { fail( `materialGraph is invalid (${error.message})` ); }
 	if ( ! Object.hasOwn( document.materialGraph.outputs, 'baseColor' ) ) fail( 'materialGraph must provide a baseColor output' );
@@ -68,6 +78,7 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 	if ( inventory.get( document.instanceSetAssetId ) !== 'static-model-instance-set/1' ) fail( 'instance-set reference is not a declared static-model-instance-set/1 asset' );
 	if ( staticModelInstanceSetAssetId !== document.instanceSetAssetId ) fail( 'decoded static-model instance set does not match the signed descriptor reference' );
 	for ( const id of document.atlasAssetIds ) if ( inventory.get( id ) !== 'image/png' ) fail( `atlas reference is not a declared image/png data asset: ${id}` );
+	if ( inventory.get( document.leafMask.assetId ) !== 'image/png' ) fail( 'leaf-mask reference is not a declared image/png data asset' );
 	if ( ! hasExactKeys( document.projection, [ 'type', 'framesPerSide' ] ) || document.projection.type !== OCTAHEDRAL_CANOPY_PROJECTION || ! Number.isInteger( document.projection.framesPerSide ) || document.projection.framesPerSide < 2 || document.projection.framesPerSide > 16 ) fail( 'projection or frame count is invalid' );
 	const frames = document.projection.framesPerSide;
 	if ( ! hasExactKeys( document.frameGrid, [ 'columns', 'rows', 'frameWidth', 'frameHeight' ] ) || ! Number.isInteger( document.frameGrid.columns ) || ! Number.isInteger( document.frameGrid.rows ) || ! Number.isInteger( document.frameGrid.frameWidth ) || ! Number.isInteger( document.frameGrid.frameHeight ) || document.frameGrid.rows !== frames || document.frameGrid.columns < frames || document.frameGrid.columns % frames !== 0 || document.frameGrid.frameWidth < 16 || document.frameGrid.frameWidth > 2048 || document.frameGrid.frameHeight < 16 || document.frameGrid.frameHeight > 2048 ) fail( 'atlas frame grid is invalid' );
