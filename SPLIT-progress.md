@@ -47,9 +47,9 @@ mismatch between Tidewater `main` and split WebGPU came from non-matching
 capture phases. Split WebGL does install its own terrain-sampled breaker spray
 and shoreline-driven lip mesh, but those are separate from WebGPU's `Breakers`
 simulation; the full-frame metric does not establish feature-specific spray
-parity. These frames close no visual gate and change no percentage. A shared
-renderer-neutral breaker contract and feature-specific conformance fixture are
-still needed. See the dynamic captures and source details in
+parity. These frames close no visual gate and change no percentage. The shared
+renderer-neutral station contract is implemented below; feature-specific
+breaker conformance is still needed. See the dynamic captures and source details in
 [`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-dynamic-tidewater-beach-phases-webgpu-and-webgl).
 
 **2026-11-20 shared-breaker implementation:** Tidewater now exports a single
@@ -66,6 +66,17 @@ the review browser before an active-scene capture, so that path remains
 unverified. No visual parity percentage changes: feature-specific breaker
 conformance against Tidewater `main` and the remaining cloud, canopy, water,
 swash, sand, pier, and FPS gaps remain open.
+
+**2026-11-20 ocean registry follow-up:** `elsemesh.island-ocean/1` is now an
+engine-registered water capability rather than a Tidewater provider
+registration. Built-in WebGPU and WebGL startup send its packaged station data
+through the same engine backend adapters used by hosted components, reusing the
+built-in water meshes. Focused registry/provider and adapter tests, the
+production build, and AMD Weston startup captures pass. The fresh Tidewater
+renderer suite also passes shared fishing transitions, WebGPU/WebGL cast-to-sale
+traces, pre-split fishing traces, and pre-split boat traces. Startup captures
+are not feature-level visual parity evidence. No percentage changes; the
+remaining acceptance gates listed above stay open.
 
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas
