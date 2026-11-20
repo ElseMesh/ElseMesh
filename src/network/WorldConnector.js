@@ -15,6 +15,7 @@ export { verifySignedDocument } from './SignedDocument.js';
 const ASSET_CHUNK_BYTES = 128 * 1024;
 const MAX_ASSET_BYTES = 2 * 1024 * 1024 * 1024;
 const PRIORITY_ORDER = Object.freeze( [ 'portal-preview', 'visible', 'nearby', 'background' ] );
+const DIRECT_WORLD_PATH_ERROR_CODE = 'DIRECT_WORLD_PATH_UNAVAILABLE';
 export const DEFAULT_ZEROTIER_NETWORK_ID = 'e3918db4832a3056';
 // Provisional budget: an unavailable optional overlay route must not make
 // ordinary browser visitors wait for the general 20-second gateway timeout.
@@ -22,6 +23,13 @@ export const DEFAULT_ZEROTIER_NETWORK_ID = 'e3918db4832a3056';
 const ZERO_TIER_PRIVATE_ROUTE_TIMEOUT_MS = 2500;
 
 function invariant( value, message ) { if ( ! value ) throw new Error( message ); }
+
+function directWorldPathError( message, reason, cause = undefined ) {
+	const error = new Error( message, cause === undefined ? undefined : { cause } );
+	error.code = DIRECT_WORLD_PATH_ERROR_CODE;
+	error.reason = reason;
+	return error;
+}
 
 function throwIfAborted( signal ) {
 	if ( signal?.aborted ) throw signal.reason || new DOMException( 'Aborted', 'AbortError' );
@@ -609,10 +617,18 @@ export class WorldConnector {
 		if ( this.socket?.readyState === WebSocket.OPEN ) {
 			if ( ! this.rtcAttempted && typeof globalThis.RTCPeerConnection === 'function' ) {
 				try { await this.#openRTC( this.socket, signal ); }
-				catch ( error ) { if ( signal?.aborted || this.rendezvous ) throw signal?.reason || error; }
+				catch ( error ) {
+					if ( signal?.aborted ) throw signal.reason || error;
+					if ( this.rendezvous ) throw directWorldPathError( `Direct WebRTC through the signaling rendezvous failed: ${error.message}`, 'ICE_FAILED', error );
+				}
 			}
 			if ( this.rtcChannel?.readyState === 'open' ) return { kind: 'webrtc', channel: this.rtcChannel };
-			if ( this.rendezvous ) throw new Error( 'Signaling rendezvous has no world-data fallback; direct WebRTC is required' );
+			if ( this.rendezvous ) throw directWorldPathError(
+				typeof globalThis.RTCPeerConnection === 'function'
+					? 'Signaling rendezvous has no world-data fallback; direct WebRTC is required'
+					: 'This browser does not support WebRTC required by the signaling rendezvous',
+				typeof globalThis.RTCPeerConnection === 'function' ? 'ICE_FAILED' : 'WEBRTC_UNSUPPORTED',
+			);
 			return { kind: 'websocket', socket: this.socket };
 		}
 		const promise = ( async () => {
@@ -625,11 +641,11 @@ export class WorldConnector {
 					return { kind: 'webrtc', channel: this.rtcChannel };
 				} catch ( error ) {
 					if ( signal?.aborted ) throw signal.reason || error;
-					if ( this.rendezvous ) throw new Error( `Direct WebRTC through the signaling rendezvous failed: ${error.message}` );
+					if ( this.rendezvous ) throw directWorldPathError( `Direct WebRTC through the signaling rendezvous failed: ${error.message}`, 'ICE_FAILED', error );
 					console.info( 'Direct WebRTC unavailable; trying the world gateway.', error );
 				}
 			}
-			if ( this.rendezvous ) throw new Error( 'This browser does not support WebRTC required by the signaling rendezvous' );
+			if ( this.rendezvous ) throw directWorldPathError( 'This browser does not support WebRTC required by the signaling rendezvous', 'WEBRTC_UNSUPPORTED' );
 			if ( ! this.webTransportFailed && base.protocol === 'https:' && typeof globalThis.WebTransport === 'function' ) {
 				try { return await this.#openWebTransport( base, signal ); }
 				catch ( error ) {

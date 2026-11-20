@@ -270,6 +270,80 @@ body {
 	display: none;
 }
 
+.loader-connection-help[hidden] {
+	display: none;
+}
+
+.loader-connection-help:not([hidden]) {
+	display: grid;
+	gap: calc(10 * var(--em-u));
+	width: 100%;
+	max-width: 680px;
+	box-sizing: border-box;
+	padding: calc(16 * var(--em-u));
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-md);
+	background: var(--em-glass);
+	color: var(--em-ink-2);
+	text-align: left;
+	font-size: var(--em-fs-sm);
+	line-height: 1.55;
+}
+
+.loader-connection-help h2,
+.loader-connection-help p,
+.loader-connection-help ol {
+	margin: 0;
+}
+
+.loader-connection-help h2 {
+	color: var(--em-ink);
+	font-size: var(--em-fs-lg);
+}
+
+.loader-connection-help ol {
+	padding-left: 1.5em;
+}
+
+.loader-connection-help li + li {
+	margin-top: calc(4 * var(--em-u));
+}
+
+.loader-connection-id {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: calc(8 * var(--em-u));
+}
+
+.loader-connection-id code {
+	padding: calc(4 * var(--em-u)) calc(8 * var(--em-u));
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-sm);
+	color: var(--em-ink);
+	font-family: var(--em-mono);
+}
+
+.loader-connection-help a {
+	color: var(--em-aqua);
+	text-underline-offset: 0.18em;
+}
+
+.loader-connection-help button {
+	min-height: 36px;
+	padding: 0 calc(12 * var(--em-u));
+	border: 1px solid var(--em-line-2);
+	border-radius: var(--em-r-sm);
+	background: var(--em-fill-2);
+	color: var(--em-ink);
+	font: inherit;
+	cursor: pointer;
+}
+
+.loader-connection-help button:hover {
+	background: rgba(95, 227, 212, 0.18);
+}
+
 /* rotating tips: stacked in one grid cell (no layout shift), cross-faded by a CSS cycle so they keep
    turning while scripts are blocked. 8 tips x 6 s. */
 .loader-tips {

@@ -3588,7 +3588,7 @@ export class UI {
 
 	}
 
-	setLoadingError( message ) {
+	setLoadingError( message, connectionHelp = null ) {
 
 		const L = document.getElementById( 'loader' );
 		if ( ! L ) return;
@@ -3598,6 +3598,76 @@ export class UI {
 		ld.status = String( message );
 		if ( ld.statusEl ) ld.statusEl.textContent = ld.status;
 		ld.stopped = true;
+		const panel = L.querySelector( '.loader-connection-help' );
+		if ( panel ) {
+			panel.replaceChildren();
+			panel.hidden = true;
+			const networkId = connectionHelp?.zeroTierNetworkId;
+			if ( /^[0-9a-f]{16}$/.test( networkId || '' ) ) {
+				const heading = document.createElement( 'h2' );
+				heading.textContent = connectionHelp.reason === 'WEBRTC_UNSUPPORTED' ? 'This browser cannot connect to the world' : 'Try the invite’s ZeroTier network';
+				const explanation = document.createElement( 'p' );
+				explanation.textContent = connectionHelp.reason === 'WEBRTC_UNSUPPORTED'
+					? 'This connection requires WebRTC, which this browser does not provide. Try a current version of Chrome, Firefox, or Edge.'
+					: 'The direct WebRTC connection could not be established. If the world owner enabled this ZeroTier network route, join it on your device and retry. This can help when the networks’ NAT or firewall rules prevent a direct peer connection.';
+				const idRow = document.createElement( 'div' );
+				idRow.className = 'loader-connection-id';
+				const idLabel = document.createElement( 'span' );
+				idLabel.textContent = 'Network ID';
+				const idCode = document.createElement( 'code' );
+				idCode.textContent = networkId;
+				const copyButton = document.createElement( 'button' );
+				copyButton.type = 'button';
+				copyButton.textContent = 'Copy ID';
+				copyButton.addEventListener( 'click', async () => {
+					try {
+						await navigator.clipboard.writeText( networkId );
+						copyButton.textContent = 'Copied';
+					} catch {
+						copyButton.textContent = 'Select ID to copy';
+					}
+				} );
+				idRow.append( idLabel, idCode, copyButton );
+
+				const steps = document.createElement( 'ol' );
+				const linux = document.createElement( 'li' );
+				linux.textContent = 'Linux: install ZeroTier One, then run sudo zerotier-cli join ';
+				const linuxCode = document.createElement( 'code' );
+				linuxCode.textContent = networkId;
+				linux.append( linuxCode );
+				const windows = document.createElement( 'li' );
+				windows.textContent = 'Windows: install ZeroTier One, open its tray menu, choose “Join New Network”, and paste the ID.';
+				const android = document.createElement( 'li' );
+				android.textContent = 'Android: install the ZeroTier app, add a network using this ID, and approve its VPN prompt.';
+				steps.append( linux, windows, android );
+
+				const approval = document.createElement( 'p' );
+				approval.textContent = 'The world owner may need to authorize your new device. If the browser asks to access the local network, allow it. Then return here and retry.';
+				const links = document.createElement( 'p' );
+				links.className = 'loader-connection-links';
+				const desktopLink = document.createElement( 'a' );
+				desktopLink.href = 'https://docs.zerotier.com/start/';
+				desktopLink.target = '_blank';
+				desktopLink.rel = 'noopener noreferrer';
+				desktopLink.textContent = 'Linux and Windows setup';
+				const androidLink = document.createElement( 'a' );
+				androidLink.href = 'https://docs.zerotier.com/faq/android-install/';
+				androidLink.target = '_blank';
+				androidLink.rel = 'noopener noreferrer';
+				androidLink.textContent = 'Android app';
+				links.append( desktopLink, document.createTextNode( ' · ' ), androidLink );
+
+				const tailscale = document.createElement( 'p' );
+				tailscale.textContent = 'Tailscale also works if the world owner has shared a Tailscale route with you. This invite does not advertise one, so installing Tailscale alone will not connect it.';
+				const retry = document.createElement( 'button' );
+				retry.type = 'button';
+				retry.className = 'loader-connection-retry';
+				retry.textContent = 'Retry connection';
+				retry.addEventListener( 'click', () => globalThis.location?.reload() );
+				panel.append( heading, explanation, idRow, steps, approval, links, tailscale, retry );
+				panel.hidden = false;
+			}
+		}
 
 	}
 

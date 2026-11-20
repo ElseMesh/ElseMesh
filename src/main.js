@@ -92,7 +92,14 @@ app.init( ( p, text, until ) => ui.setLoading( p, text, until ) ).then( async ()
 
 	app.disposePendingWorldPresence?.();
 	console.error( e );
-	ui.setLoadingError( 'Something went wrong: ' + e.message );
+	const zeroTierNetworkId = app.worldConnector?.zeroTierNetworkId;
+	const connectionHelp = e?.code === 'DIRECT_WORLD_PATH_UNAVAILABLE' && /^[0-9a-f]{16}$/.test( zeroTierNetworkId || '' )
+		? { zeroTierNetworkId, reason: e.reason }
+		: null;
+	ui.setLoadingError(
+		connectionHelp ? 'A direct connection to this world could not be established.' : 'Something went wrong: ' + e.message,
+		connectionHelp,
+	);
 
 } );
 
