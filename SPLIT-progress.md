@@ -1124,11 +1124,16 @@ geometry groups. A fresh decode of the checked-in asset found 71 distinct
 kind/species/curl/sag/jaw combinations, 60 lengths, and 24 distinct material
 flag tuples. Each record also carries pattern seed and wet/dried/blood/cloudy-eye
 values that affect the existing mesh or material. The generic static-model
-instance-set currently accepts only a model reference and transform per
-instance. A valid migration therefore needs a generic, renderer-neutral way to
-represent those per-instance model/material inputs (or authored model variants)
-while retaining instancing, per-item culling, LOD, and shadows. The existing
-asset cannot be converted by mapping only its positions and rotations.
+instance-set now carries eight per-instance material scalars, exposes them to
+the material graph as two `vec4` inputs, and binds them in both backend
+adapters. Tidewater's inactive fish sidecar preserves those values and the
+per-vertex `_ELSEMESH_VDATA` input, but its GLBs still use white PBR and contain
+no fish material graph or baked appearance textures. The placement transport
+gap is closed; the appearance contract is not. A valid migration still needs
+to preserve pattern, body deformation, and wet/dried/blood/cloudy-eye shading
+through portable material data or baked assets while retaining instancing,
+per-item culling, LOD, and shadows. The sidecar must remain inactive until its
+rendered output matches the current WebGPU fish props.
 
 Village material profile names, roles, and map metadata now register in the
 generic `WorldMaterialProfileRegistry`. Tidewater owns the packaged map schema
