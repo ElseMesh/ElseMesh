@@ -113,9 +113,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   world's HostID through the production Worker; its signed provider record
   verified, and the peer fetched the signed manifest directly from the private
   gateway. The Worker handled lookup only; the test announcement expires
-  automatically. This verifies the production resolver-to-worldd private route,
-  not browser mixed-content/Local Network Access behavior or independent-NAT
-  WebRTC.
+  automatically. A separate isolated Weston Chromium run opened a HostID-only
+  invite on `elsemesh.org`, resolved the same Worker record, and loaded the
+  signed manifest through the rendezvous-only WebRTC path without
+  `--allow-browser-origin`. Its initial `ws://` private-gateway attempt failed
+  with an insecure-WebSocket warning; the exact browser-policy versus server
+  origin cause is not isolated. This verifies the production browser-to-worldd
+  data path on the joined network, not independent-NAT WebRTC.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages

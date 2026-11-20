@@ -643,6 +643,17 @@ available so the client can try IPv4 or IPv6; the current signed record
 publishes one selected private gateway and needs extension for full dual-stack
 lookup. Invite onboarding shows the hardcoded network ID before loading the
 world. Browser-side ztlib remains unnecessary.
+
+Treat the private HTTP/WebSocket route as best-effort from an HTTPS browser.
+A live hosted-browser check reached the production HostID lookup, but its
+`ws://` attempt to the private gateway failed with an insecure-WebSocket
+warning; that probe did not isolate browser network policy from the provider's
+origin handling. The same browser then used the Worker WebSocket only for
+signaling and loaded the signed manifest over direct WebRTC from worldd. Keep
+that rendezvous fallback when a private gateway cannot be used, and never send
+manifest, player, or asset data through the Worker. See the dated result in
+[`PROGRESS.md`](../PROGRESS.md).
+
 When `worldd` is configured for ZeroTier, ztlib identifies the server node by
 default; it does not authenticate the visitor. A verified client-side
 ZeroTier integration must prove the visitor's own NodeID before the owner can
