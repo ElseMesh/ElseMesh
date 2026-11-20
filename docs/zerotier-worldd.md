@@ -130,35 +130,26 @@ authorization must continue to work without a Central API request.
 
 ## Embedded libzt transport
 
-### Host firewall for embedded libzt
-
-`worldd`'s libzt node runs ZeroTier in userspace; it does not create a native
-`zt...` network interface. The host firewall therefore sees the encrypted
-outer UDP packets, not the inner ElseMesh TCP connection. For ordinary hosts,
-allow UDP egress to ZeroTier roots on port 9993 and stateful reply traffic.
-Direct peer paths also use dynamically negotiated UDP endpoints, so a strict
-egress policy may need to permit outbound UDP to peer endpoints; blocking this
-can force relay paths or prevent connectivity. Do not open the world's TCP or
-UDP peer port on the physical WAN just for libzt. The TCP peer stream is carried
-inside ZeroTier. The same `42901` TCP allowance still belongs in ZeroTier
-Central's *inner network flow rules* when other overlay members need to reach a
-worldd listener. See ZeroTier's [corporate firewall guidance](https://docs.zerotier.com/corporate-firewalls/)
+Embedded libzt uses runtime-selected UDP sockets for its encrypted outer
+transport. Systems with packet filtering should track the active sockets
+dynamically; a fixed physical UDP port is not part of the worldd contract.
+Do not expose worldd's inner TCP or HTTP listener on the public interface for
+libzt. The HTTP gateway shares the libzt TCP peer listener: HTTP methods are
+forwarded to worldd's loopback HTTP server, while libp2p traffic continues to
+the peer listener. This keeps overlay gateway traffic on the configured
+`--p2p-port` and its corresponding ZeroTier Central flow rule even when the
+loopback HTTP port is ephemeral. See ZeroTier's
+[corporate firewall guidance](https://docs.zerotier.com/corporate-firewalls/)
 and [root server whitelist](https://docs.zerotier.com/whitelist/) for the
-outer-path requirements. Native ZeroTier One deployments are different: their
-host firewall may need rules on the kernel `zt...` interface for inner peer
-traffic.
+outer-path requirements.
 
-The development host has an additional local `spod` isolation interface. Its
-output chain deliberately drops general UDP from that interface. That is a
-property of this host's command-execution environment, not an ElseMesh or
-ZeroTier network requirement; do not add a `spod` exception to deployment
-firewalls. The host's `/etc/nftables.conf` contains the catch-all `spod`
-output drop, and `/var/log/fw.log` records UDP packets from `137.205.192.1` to
-ZeroTier root port 9993 as `SDROP` on 2026-10-10/11. Those log entries do not
-identify the originating process, so they cannot be attributed specifically to
-`worldd`. The system's ordinary physical route to ZeroTier roots uses
-`wlo1`; a route lookup alone does not prove which interface libzt's socket
-used.
+The ElseMesh ZeroTier network is public membership. It encrypts and
+authenticates overlay traffic, but membership alone is not player authorization.
+The current compact `?invite=` URL encodes routing data only; it is not a
+bearer credential. World manifests and authorized-host assets are currently
+readable to a peer that can reach the gateway. Do not treat this setup as
+private-world access control until worldd validates an expiring player invite
+before serving private content and admitting presence.
 
 `worldd` includes libzt and joins the dedicated network by default, without
 installing the separate ZeroTier One service or passing `--zerotier-network`.
@@ -403,13 +394,9 @@ endpoint briefly reported one DHT peer; a later sample returned zero. This is
 evidence of an inter-device peer connection, but not a stable/sustained path
 or a world/portal asset exchange. The two devices produced the same hash when
 their public IPv4 egress responses were compared, so the run does not prove
-separate-NAT traversal. The restricted shell timed out joining. Its UDP/9993
-packets were logged as `SDROP` on `OUT=spod` at 12:09:23 and 12:09:28 local
-time. The same Linux test identity joined when run with host-network access
-at 12:09:34; no later matching `spod` UDP/9993 drops appeared in the inspected
-log tail. This isolates that failed attempt to the restricted shell's `spod`
-policy; it is not a deployment firewall rule and must not be copied into the
-host ruleset.
+separate-NAT traversal. The restricted-shell attempt timed out; the same Linux
+test identity joined when run with host-network access. This distinguishes the
+execution environments but does not identify the network-layer cause.
 
 Host `adb devices -l` lists no attached phone, but the Termux ADB client can
 connect to the phone's local debug endpoint at `127.0.0.1:5555`. At the latest
@@ -476,14 +463,6 @@ before the custom connection adapter was fixed. The later Flip7 test above
 confirms that the adapter can establish a peer connection. The managed IPv4
 address was not queried through libzt; current `worldd` code only uses and
 announces the 6PLANE IPv6 address.
-
-During that attempt, `/var/log/fw.log` recorded outbound UDP drops on
-`OUT=spod`, including packets to ZeroTier root `103.195.103.66`. The local
-nftables output chain intentionally drops traffic on `spod`. A later process
-inspection showed that libzt had opened sockets for `worldd` on several
-interfaces, including both `spod` and the active `wlo1`; the log entries
-therefore prove that the `spod`-bound attempts were dropped, but do not prove
-that this caused the peer dial to fail. No exception was added to `spod`.
 
 ### Latest clean two-device retry (2026-10-10)
 
@@ -566,8 +545,7 @@ listener startup, and address advertisement, but not IPv4 peer connectivity.
 The test ended when the Flip7 went offline. Its disposable test files remain
 under Termux's private temporary directory and did not replace the normal
 installation or persistent ZeroTier identity. No phone retry is possible
-while it is offline. The host could not read `/var/log/fw.log` because sudo
-required an unavailable password, so the cause of the timeout is unresolved.
+while it is offline, so the cause of the timeout is unresolved.
 
 ### Managed IPv4 Linux peer check (2026-10-10)
 
@@ -671,22 +649,6 @@ confirm the application adapter handles the tested connection lifecycle.
 Cross-NAT traversal, relay fallback, and full world-content exchange remain
 separate validation gates.
 
-### Flip7 active-peer retry and host firewall evidence (2026-10-11)
-
-USB ADB reached the Flip7, and its existing Termux daemon processes were
-inspected but left untouched. The matching Android test binary and `libzt.so`
-were copied with resumable `rsync` into a new private `$PREFIX/tmp` directory;
-their SHA-256 values matched the external build artifacts. Before starting a
-new phone process, the disposable Linux peer timed out waiting for network
-configuration. During the same minute, `/var/log/fw.log` recorded UDP/9993
-packets from the host's `spod` address to a ZeroTier root as `SDROP`. The log
-does not identify the originating process, and this does not prove those drops
-caused the libzt timeout. An unmarked route query for that root selected
-`wlo1`; the traceable relationship between libzt's physical sockets and the
-`spod` drops remains to be established. This attempt therefore did not reach
-the peer test or exercise Android shutdown. No firewall rules were changed,
-and the existing `spod` drop policy remains intact.
-
 ### Linux–Flip7 managed-IPv4 peer and shutdown verification (2026-10-11)
 
 The Linux test daemon was kept alive in a tracked terminal session. It used a
@@ -702,45 +664,9 @@ and `libzt.so` hashes were checked against the build artifacts before
 deployment, and the user's other Termux daemons and persistent identities were
 left untouched.
 
-An unfiltered fresh Linux test identity immediately before this run timed out
-waiting for network configuration after 60 seconds. With `spod` excluded, a
-fresh Linux identity joined and became healthy in about 13 seconds. This
-controlled result supports the interface option as a useful host-specific
-setting, but does not prove that the unfiltered timeout was caused by the
-logged `spod` drops.
-
 The test establishes a live peer between separate devices, but not separate
 NATs: both may have shared the same network egress. It also does not yet verify
 portal handoff, content transfer, sustained peer stability, or relay fallback.
-
-### Current Linux host route and firewall snapshot (2026-10-11)
-
-A later read-only check on the Linux host queried the previously observed
-Flip7 address `172.22.216.247`. The current route is via the normal Wi-Fi
-gateway (`192.168.20.1`, interface `wlo1`, source `192.168.22.247`), not a
-ZeroTier interface. The host currently exposes ZeroTier interfaces for
-`10.205.192.0/24`, `192.168.192.0/24`, and `192.168.193.0/24`; no route for the
-dedicated network's `172.22.0.0/16` was present. No `worldd` process was
-running during this snapshot, so it was not an active libzt peer test. This
-means the earlier Flip7 address is stale for the current host state and cannot
-be used as evidence of present reachability.
-
-The firewall log's latest relevant entries were `nPOd` UDP translation records
-on `lo` involving `10.205.192.*` and inbound UDP drops to host port `14237`;
-there were no matching current UDP/9993 or daemon TCP/42901 drops in the
-inspected window. The records do not identify a libzt process or establish a
-causal relationship. The `zerotier-cli` binary is installed at `/usr/sbin`, but
-the unprivileged execution environment cannot read `/var/lib/zerotier-one`'s
-auth token. Attempts to use `sudo` from this execution environment are blocked
-by its `no_new_privs` setting, despite the host-side report that sudo now
-works. No firewall, route, ZeroTier membership, or daemon state was changed.
-
-Before the next live peer attempt, join the Linux libzt test daemon and Flip7
-to the same dedicated network and re-check the assigned addresses and route
-from a shell with the host's required privileges. Capture `/var/log/fw.log`
-over that exact test interval and correlate it with the daemon's selected
-interface and libzt path-query output. Do not infer process ownership from the
-firewall rule label alone.
 
 ### Local persistent identity checks (2026-10-11)
 
@@ -774,36 +700,13 @@ remained the same. The secret key and ID-marker files were mode `0600`. The
 test daemon exited cleanly and the disposable state was removed. No user's
 persistent identity, route, or firewall rule was changed.
 
-The firewall log during this interval contained outgoing `SDROP` records on
-`spod` from `137.205.192.1` to ZeroTier root IPs, including UDP destination
-ports 9993 and 21045. A process-level check then matched the logged source
-ports to UDP sockets owned by this exact `worldd` PID. `ss` showed libzt had
-opened same-port sockets bound to `wlo1`, `spod`, `docker0`, and
-`br-winproxy`; so the `spod` packets were libzt's own multi-interface
-ZeroTier discovery/path traffic, not traffic routed through ElseMesh's
-managed ZeroTier interface and not the standalone `zerotier-one` service.
-The host's `spod` interface is a separate bridge for other host networking.
-
-The daemon was restarted with the existing
-`--zerotier-blacklist-interface spod` option. It joined the same network and
-reported healthy, while its libzt UDP sockets remained on `wlo1`, `docker0`,
-and `br-winproxy` and none were bound to `spod`. No new `SDROP` records for
-that daemon appeared during the inspected post-restart window. This confirms
-that the interface was involved because libzt's default physical-interface
-selection included it; it was not a requirement of ElseMesh or the ZeroTier
-overlay. The host firewall remains unchanged. Keep the option for this host's
-test invocation; whether to blacklist interfaces by default is a separate
-deployment choice because other hosts may legitimately use multiple
-interfaces.
-
 ### Automatic interface selection and ECHO rate-gate check (2026-10-11)
 
 Two disposable Linux daemons with separate ZeroTier state directories joined
-`e3918db4832a3056` using the automatic interface policy. Both selected only
-`wlo1`; the policy excluded `spod`, Docker, `br-winproxy`, and existing
-ZeroTier interfaces. An initial test using custom ports `43041` and `43042`
-timed out. That result was invalid: the configured flow rules allow TCP peer
-traffic on `42901`, not those custom ports.
+`e3918db4832a3056` using the automatic interface policy. An initial test using
+custom ports `43041` and `43042` timed out. That result was invalid: the
+configured flow rules allow TCP peer traffic on `42901`, not those custom
+ports.
 
 The corrected test ran the first daemon on TCP `42901` at managed IPv4
 `172.22.13.62` and the second daemon on local TCP `42902` at `172.22.207.68`.

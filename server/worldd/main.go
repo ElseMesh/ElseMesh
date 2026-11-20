@@ -49,52 +49,53 @@ func (s *stringFlags) String() string         { return strings.Join(*s, ",") }
 func (s *stringFlags) Set(value string) error { *s = append(*s, value); return nil }
 
 type daemon struct {
-	ctx                   context.Context
-	host                  host.Host
-	dht                   *dht.IpfsDHT
-	discovery             *routing.RoutingDiscovery
-	manifest              signedDocument
-	authorityMu           sync.RWMutex
-	authority             *signedDocument
-	authorityChanged      chan struct{}
-	world                 worldManifest
-	key                   crypto.PrivKey
-	assetsDir             string
-	publicGateway         string
-	directoryURL          string
-	rendezvous            bool
-	zeroTierNodeID        string
-	zeroTierNetworkID     string
-	zeroTierGateway       string
-	allowedBrowserOrigins map[string]struct{}
-	assetCheckMu          sync.Mutex
-	verifiedAssets        map[string]assetFileStamp
-	roleStateMu           sync.RWMutex
-	roleState             signedDocument
-	roleStateSerial       uint64
-	roleStatePath         string
-	proposalDir           string
-	proposalMu            sync.Mutex
-	presenceMu            sync.Mutex
-	players               map[string]playerPresence
-	doorStates            map[string]worldDoorState
-	browserHostsMu        sync.RWMutex
-	browserHosts          map[string]*browserHostSession
-	webrtcSTUNServers     []string
-	webrtcInterfaces      []string
-	webrtcNAT1To1IPs      []string
-	webrtcUDPPortMin      uint16
-	webrtcUDPPortMax      uint16
-	webrtcUPnP            bool
-	webrtcMu              sync.Mutex
-	webrtcSessions        map[string]*worldRTCSession
-	webrtcInitMu          sync.Mutex
-	webrtcAPI             *webrtc.API
-	webrtcUDPMux          io.Closer
-	webrtcUDPAddr         string
-	webrtcUPnPLease       *webrtcUPnPLeaseManager
-	rendezvousDialer      *websocket.Dialer
-	regionProvider        *regionProviderGateway
+	ctx                    context.Context
+	host                   host.Host
+	dht                    *dht.IpfsDHT
+	discovery              *routing.RoutingDiscovery
+	manifest               signedDocument
+	authorityMu            sync.RWMutex
+	authority              *signedDocument
+	authorityChanged       chan struct{}
+	world                  worldManifest
+	key                    crypto.PrivKey
+	assetsDir              string
+	publicGateway          string
+	directoryURL           string
+	rendezvous             bool
+	zeroTierNodeID         string
+	zeroTierNetworkID      string
+	zeroTierGateway        string
+	allowedBrowserOrigins  map[string]struct{}
+	assetCheckMu           sync.Mutex
+	verifiedAssets         map[string]assetFileStamp
+	assetVerificationLocks map[string]*sync.Mutex
+	roleStateMu            sync.RWMutex
+	roleState              signedDocument
+	roleStateSerial        uint64
+	roleStatePath          string
+	proposalDir            string
+	proposalMu             sync.Mutex
+	presenceMu             sync.Mutex
+	players                map[string]playerPresence
+	doorStates             map[string]worldDoorState
+	browserHostsMu         sync.RWMutex
+	browserHosts           map[string]*browserHostSession
+	webrtcSTUNServers      []string
+	webrtcInterfaces       []string
+	webrtcNAT1To1IPs       []string
+	webrtcUDPPortMin       uint16
+	webrtcUDPPortMax       uint16
+	webrtcUPnP             bool
+	webrtcMu               sync.Mutex
+	webrtcSessions         map[string]*worldRTCSession
+	webrtcInitMu           sync.Mutex
+	webrtcAPI              *webrtc.API
+	webrtcUDPMux           io.Closer
+	webrtcUDPAddr          string
+	webrtcUPnPLease        *webrtcUPnPLeaseManager
+	rendezvousDialer       *websocket.Dialer
+	regionProvider         *regionProviderGateway
 }
 
 func main() {
@@ -764,7 +765,7 @@ func run() error {
 		if bridgeErr := zeroTier.StartHTTPBridge(ctx, httpPort); bridgeErr != nil {
 			log.Printf("ZeroTier browser gateway unavailable; clients will use the advertised HTTPS gateway or Worker lookup: %v", bridgeErr)
 		} else {
-			d.zeroTierGateway = zeroTierGatewayURL(zeroTier.Addresses(), httpPort)
+			d.zeroTierGateway = zeroTierGatewayURL(zeroTier.Addresses(), *listenPort)
 			if d.zeroTierGateway != "" {
 				log.Printf("ZeroTier browser gateway=%s", d.zeroTierGateway)
 			}
@@ -1464,7 +1465,7 @@ func (d *daemon) handleAsset(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	path := filepath.Join(d.assetsDir, strings.TrimPrefix(id, "sha256:"))
+	path := d.assetPath(id)
 	f, err := os.Open(path)
 	if err != nil {
 		http.NotFound(w, r)
@@ -1477,13 +1478,8 @@ func (d *daemon) handleAsset(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "asset unavailable", http.StatusBadRequest)
 		return
 	}
-	hash, err := hashFile(f)
-	if err != nil || hash != id {
+	if !d.verifyAssetFile(asset, f) {
 		http.Error(w, "asset hash does not match its address", http.StatusUnprocessableEntity)
-		return
-	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		http.Error(w, "asset unavailable", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("ETag", `"`+strings.TrimPrefix(id, "sha256:")+`"`)

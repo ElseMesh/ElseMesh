@@ -25,6 +25,7 @@ static ssize_t zt_write_with_errno(int fd, const void *buf, size_t len, int *err
 import "C"
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -63,10 +64,11 @@ type libztRuntime struct {
 	closeOnce      sync.Once
 	listener       int
 	ipv4Listener   int
-	httpListener   int
 	listenerOnce   sync.Once
 	bridgeCtx      context.Context
 	bridgeCancel   context.CancelFunc
+	httpTargetMu   sync.RWMutex
+	httpTargetPort int
 	acceptWG       sync.WaitGroup
 	proxyWG        sync.WaitGroup
 }
@@ -168,7 +170,7 @@ func startZeroTier(networkID, storagePath string, blacklistInterfaces []string, 
 				return nil, errors.New("assigned ZeroTier IPv6 address does not match this network's 6PLANE address")
 			}
 			mask := net.CIDRMask(40, 128)
-			runtime := &libztRuntime{networkID: netID, nodeID: nodeID, address: address, prefix: net.IPNet{IP: address.Mask(mask), Mask: mask}, primaryUDPPort: actualPrimaryUDPPort, listener: -1, ipv4Listener: -1, httpListener: -1}
+			runtime := &libztRuntime{networkID: netID, nodeID: nodeID, address: address, prefix: net.IPNet{IP: address.Mask(mask), Mask: mask}, primaryUDPPort: actualPrimaryUDPPort, listener: -1, ipv4Listener: -1}
 			switch assigned := int(C.zts_addr_is_assigned(C.uint64_t(netID), C.ZTS_AF_INET)); assigned {
 			case 0:
 				log.Printf("ZeroTier managed IPv4 address: not assigned")
@@ -285,24 +287,26 @@ func (z *libztRuntime) StartBridge(ctx context.Context, port int) error {
 }
 
 func (z *libztRuntime) startBridgeListener(ctx context.Context, addressText string, family C.int) error {
-	return z.startForwardListener(ctx, addressText, family, z.port, z.port, false)
+	return z.startForwardListener(ctx, addressText, family, z.port, z.port)
 }
 
-func (z *libztRuntime) StartHTTPBridge(ctx context.Context, port int) error {
+func (z *libztRuntime) StartHTTPBridge(_ context.Context, port int) error {
 	if port < 1 || port > 65535 {
 		return errors.New("HTTP gateway bridge requires an assigned TCP port")
 	}
-	bridgeCtx := z.bridgeCtx
-	if bridgeCtx == nil {
-		bridgeCtx = ctx
+	if z.port < 1 {
+		return errors.New("ZeroTier TCP peer bridge must start before the HTTP gateway is attached")
 	}
-	if z.ipv4 != nil {
-		return z.startForwardListener(bridgeCtx, z.ipv4.String(), C.ZTS_AF_INET, port, port, true)
+	z.httpTargetMu.Lock()
+	defer z.httpTargetMu.Unlock()
+	if z.httpTargetPort != 0 && z.httpTargetPort != port {
+		return errors.New("ZeroTier HTTP gateway is already attached to a different local port")
 	}
-	return z.startForwardListener(bridgeCtx, z.address.String(), C.ZTS_AF_INET6, port, port, true)
+	z.httpTargetPort = port
+	return nil
 }
 
-func (z *libztRuntime) startForwardListener(ctx context.Context, addressText string, family C.int, listenPort, targetPort int, httpGateway bool) error {
+func (z *libztRuntime) startForwardListener(ctx context.Context, addressText string, family C.int, listenPort, targetPort int) error {
 	traceBridge := os.Getenv("ELSEMESH_TRACE_ZEROTIER_BRIDGE") == "1"
 	address := C.CString(addressText)
 	defer C.free(unsafe.Pointer(address))
@@ -324,9 +328,7 @@ func (z *libztRuntime) startForwardListener(ctx context.Context, addressText str
 		C.zts_close(C.int(fd))
 		return fmt.Errorf("libzt nonblocking TCP listener setup failed (%d)", code)
 	}
-	if httpGateway {
-		z.httpListener = fd
-	} else if family == C.ZTS_AF_INET {
+	if family == C.ZTS_AF_INET {
 		z.ipv4Listener = fd
 	} else {
 		z.listener = fd
@@ -363,14 +365,40 @@ func (z *libztRuntime) startForwardListener(ctx context.Context, addressText str
 			z.proxyWG.Add(1)
 			go func() {
 				defer z.proxyWG.Done()
-				z.proxy(ztConn, targetPort)
+				z.proxyZeroTierTCP(ztConn, targetPort)
 			}()
 		}
 	}()
 	return nil
 }
 
-func (z *libztRuntime) proxy(ztConn *ztConn, targetPort int) {
+func (z *libztRuntime) proxyZeroTierTCP(ztConn *ztConn, peerPort int) {
+	targetPort := peerPort
+	var conn net.Conn = ztConn
+	z.httpTargetMu.RLock()
+	httpPort := z.httpTargetPort
+	z.httpTargetMu.RUnlock()
+	if httpPort > 0 {
+		_ = ztConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		reader := bufio.NewReaderSize(ztConn, 4096)
+		isHTTP, err := isWorlddHTTPGatewayRequest(reader)
+		_ = ztConn.SetReadDeadline(time.Time{})
+		if err != nil {
+			if os.Getenv("ELSEMESH_TRACE_ZEROTIER_BRIDGE") == "1" {
+				log.Printf("libzt TCP protocol detection failed remote=%s: %v", ztConn.RemoteAddr(), err)
+			}
+			_ = ztConn.Close()
+			return
+		}
+		if isHTTP {
+			targetPort = httpPort
+			conn = bufferedReadConn{Conn: ztConn, reader: reader}
+		}
+	}
+	z.proxy(conn, targetPort)
+}
+
+func (z *libztRuntime) proxy(ztConn net.Conn, targetPort int) {
 	defer ztConn.Close()
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(targetPort)), 5*time.Second)
 	if err != nil {
@@ -436,9 +464,6 @@ func (z *libztRuntime) closeListener() {
 		}
 		if z.ipv4Listener >= 0 {
 			C.zts_close(C.int(z.ipv4Listener))
-		}
-		if z.httpListener >= 0 {
-			C.zts_close(C.int(z.httpListener))
 		}
 	})
 }

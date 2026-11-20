@@ -20,7 +20,9 @@ let workerGateway;
 const liveDirectoryURL = process.env.ELSEMESH_TEST_DIRECTORY_URL || '';
 const livePublicGateway = process.env.ELSEMESH_TEST_PUBLIC_GATEWAY || '';
 const liveHTTPPort = Number( process.env.ELSEMESH_TEST_HTTP_PORT || 0 );
+const configuredCacheP2PPort = Number( process.env.ELSEMESH_TEST_CACHE_P2P_PORT || 0 );
 const zeroTierRemoteHost = process.env.ELSEMESH_TEST_ZEROTIER_REMOTE_HOST || '';
+const zeroTierUDPPort = Number( process.env.ELSEMESH_TEST_ZEROTIER_UDP_PORT || 0 );
 assert.equal( Boolean( liveDirectoryURL ), Boolean( livePublicGateway ), 'live Worker checks require both a directory URL and public gateway' );
 assert.equal( Boolean( liveDirectoryURL ), liveHTTPPort > 0 && liveHTTPPort <= 65535, 'live Worker checks require a valid fixed local HTTP port for the gateway tunnel' );
 
@@ -70,10 +72,15 @@ try {
 	} ), { mode: 0o600 } );
 	runCli( binary, [ '--data', ownerData, '--sign-manifest', manifestInput, '--manifest-out', manifestPath ] );
 
-	const ownerP2PPort = await unusedPort();
-	const cacheP2PPort = await unusedPort();
-	const ownerHTTPPort = liveHTTPPort || await unusedPort();
-	const cacheHTTPPort = await unusedPort();
+	if ( configuredCacheP2PPort ) assert.ok( Number.isInteger( configuredCacheP2PPort ) && configuredCacheP2PPort > 0 && configuredCacheP2PPort <= 65535, 'test cache peer port must be an integer from 1 to 65535' );
+	const reservedPorts = new Set( [ liveHTTPPort, configuredCacheP2PPort ].filter( Boolean ) );
+	const ownerP2PPort = await unusedPort( reservedPorts );
+	reservedPorts.add( ownerP2PPort );
+	const cacheP2PPort = configuredCacheP2PPort || await unusedPort( reservedPorts );
+	reservedPorts.add( cacheP2PPort );
+	const ownerHTTPPort = liveHTTPPort || await unusedPort( reservedPorts );
+	reservedPorts.add( ownerHTTPPort );
+	const cacheHTTPPort = await unusedPort( reservedPorts );
 	const certPath = path.join( tempRoot, 'gateway-cert.pem' );
 	const keyPath = path.join( tempRoot, 'gateway-key.pem' );
 	const certificate = spawnSync( 'openssl', [ 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-keyout', keyPath, '-out', certPath, '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-addext', 'basicConstraints=critical,CA:TRUE' ], { encoding: 'utf8', timeout: 30000 } );
@@ -112,6 +119,10 @@ try {
 		'--http', `127.0.0.1:${cacheHTTPPort}`, '--public-gateway', workerGateway.url, '--dht-mode', 'server', '--bootstrap', bootstrap,
 		'--cache-from', ownerPeerID, '--cache-sync-interval', '1s',
 	];
+	if ( zeroTierUDPPort ) {
+		assert.ok( Number.isInteger( zeroTierUDPPort ) && zeroTierUDPPort > 0 && zeroTierUDPPort <= 65535, 'test ZeroTier UDP port must be an integer from 1 to 65535' );
+		cacheArgs.push( '--zerotier-udp-port', String( zeroTierUDPPort ) );
+	}
 	if ( zeroTierRemoteHost ) cacheArgs.push( '--zerotier-path-diagnostics' );
 	const cache = startDaemon( binary, cacheArgs );
 	await waitForHTTP( `http://127.0.0.1:${cacheHTTPPort}/healthz`, cache, daemonReadinessTimeout );
@@ -350,12 +361,15 @@ async function waitFor( condition, label, children = [], timeoutMs = 30000 ) {
 	assert.fail( `timed out waiting for ${label}${children.length ? `:\n${children.map( ( child ) => child.output ).join( '\n' )}` : ''}` );
 }
 
-async function unusedPort() {
-	const server = net.createServer();
-	await new Promise( ( resolve, reject ) => server.listen( 0, '127.0.0.1', resolve ).once( 'error', reject ) );
-	const { port } = server.address();
-	await new Promise( ( resolve, reject ) => server.close( ( error ) => error ? reject( error ) : resolve() ) );
-	return port;
+async function unusedPort( excluded = new Set() ) {
+	for ( let attempt = 0; attempt < 10; attempt++ ) {
+		const server = net.createServer();
+		await new Promise( ( resolve, reject ) => server.listen( 0, '127.0.0.1', resolve ).once( 'error', reject ) );
+		const { port } = server.address();
+		await new Promise( ( resolve, reject ) => server.close( ( error ) => error ? reject( error ) : resolve() ) );
+		if ( ! excluded.has( port ) ) return port;
+	}
+	throw new Error( 'could not allocate a unique test port' );
 }
 
 async function stopDaemon( child ) {

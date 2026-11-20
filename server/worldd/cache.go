@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -158,6 +159,23 @@ func (d *daemon) hasVerifiedAsset(asset assetRef) bool {
 		return false
 	}
 	defer file.Close()
+	return d.verifyAssetFile(asset, file)
+}
+
+func (d *daemon) verifyAssetFile(asset assetRef, file *os.File) bool {
+	d.assetCheckMu.Lock()
+	if d.assetVerificationLocks == nil {
+		d.assetVerificationLocks = make(map[string]*sync.Mutex)
+	}
+	verificationLock := d.assetVerificationLocks[asset.ID]
+	if verificationLock == nil {
+		verificationLock = &sync.Mutex{}
+		d.assetVerificationLocks[asset.ID] = verificationLock
+	}
+	d.assetCheckMu.Unlock()
+	verificationLock.Lock()
+	defer verificationLock.Unlock()
+
 	info, err := file.Stat()
 	if err != nil || !info.Mode().IsRegular() || info.Size() != asset.Bytes {
 		return false
@@ -169,8 +187,14 @@ func (d *daemon) hasVerifiedAsset(asset assetRef) bool {
 	if ok && verified == stamp {
 		return true
 	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return false
+	}
 	actual, err := hashFile(file)
 	if err != nil || actual != asset.ID {
+		return false
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return false
 	}
 	d.assetCheckMu.Lock()

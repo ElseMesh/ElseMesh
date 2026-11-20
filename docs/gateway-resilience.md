@@ -146,12 +146,11 @@ re-ignites with the same identity and port. This verifies local bind/restart
 behavior only, not preservation of a public NAT mapping. A pi3 visitor outside
 the project's ZeroTier network resolved the signed provider and completed
 Worker signaling with ZeroTier and tunnel interfaces excluded. With handoff
-enabled on UDP 46000, both sides gathered public STUN-reflexive candidates on
-different public IPs, but ICE failed before opening a world-data channel. A
-temporary firewall allow limited to pi3's public IP, `wlo1`, and UDP 46000
-matched zero packets and was removed. This run therefore did not observe
-incoming datagrams matching that exact tuple; the failure point remains
-unidentified. The Worker remains signaling-only and does not relay assets.
+enabled on its selected UDP socket, both sides gathered public STUN-reflexive
+candidates on different public IPs, but ICE failed before opening a
+world-data channel. The capture did not observe inbound peer datagrams, so the
+failure point remains unidentified. The Worker remains signaling-only and
+does not relay assets.
 The same-host empty-world browser and admission check is recorded in
 [`PROGRESS.md`](../PROGRESS.md); independent-network ICE and production-world
 asset rendering remain unverified.
@@ -170,26 +169,17 @@ the mapping is removed before it exits. This confirms that pi3's gateway
 accepts the mapping request; it does not test inbound peer checks or a complete
 WebRTC data channel.
 
-A follow-up narrowed worldd ICE gathering to `wlo1` using the new
-`--webrtc-interface` option. Its SDP contained only `192.168.111.127:46000`
-and the STUN-reflexive public candidate, but ICE still failed. A capture on
-`wlo1` recorded eight outbound checks from `192.168.111.127:46000` to pi3's
-public candidate and no inbound peer datagrams; the matching firewall rule
-again counted zero. The host's STUN-reflexive candidate used public UDP port
-19683, not local port 46000. `worldd` now supports `--webrtc-nat-1to1-ip` to
+Constrained ICE gathering to one selected interface still failed. A capture
+recorded outbound checks to pi3's public candidate and no inbound peer
+datagrams. The STUN-reflexive candidate used a different public UDP port than
+the bound local socket. `worldd` now supports `--webrtc-nat-1to1-ip` to
 advertise a public IP at the local candidate port when an owner explicitly
-forwards that same UDP port to the host. A read-only SSDP search and NAT-PMP
-external-address query to this host's default gateway (`192.168.111.1`) got no
-responses, so automatic mapping was not available in this check; this does
-not prove the router disables either protocol. Candidate generation is
-covered by worldd tests, but a real router forward and external data channel
-remain untested. This host also has no global IPv6 address or default IPv6
-route on `wlo1`, and outbound IPv6 HTTPS failed, so IPv6 is not currently an
-alternate public candidate path here. A separate read-only STUN probe bound
-`192.168.111.127:46000` and queried Cloudflare and Google from that same UDP
-socket. Both destinations returned the same public IPv4 but different mapped
-UDP ports; repeating each destination within a run returned its same mapping.
-The absolute mapped ports changed across fresh runs. This supports
+forwards that same UDP port to the host. Candidate generation is covered by
+worldd tests, but a real router forward and external data channel remain
+untested. A separate STUN probe queried two servers from the same UDP socket.
+Both destinations returned the same public IPv4 but different mapped UDP
+ports; repeating each destination within a run returned its same mapping. The
+absolute mapped ports changed across fresh runs. This supports
 destination-dependent mapping on this path, but does not by itself prove the
 cause of the failed ICE checks. Do not treat one STUN server's mapped port as
 a stable endpoint for arbitrary peers.
