@@ -23,6 +23,8 @@ var (
 	liveSignalSessionID   = regexp.MustCompile(`^[0-9a-f]{32}$`)
 )
 
+const liveZeroTierNetworkIDValue = "e3918db4832a3056"
+
 // TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC is an opt-in cross-host
 // probe. It follows a real invite through the deployed Worker and retrieves
 // the signed world manifest over a direct WebRTC data channel.
@@ -47,7 +49,7 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 		t.Fatalf("decode compact invite ticket: %v", err)
 	}
 	zeroTierNodeID := ticket.ZeroTierNodeID
-	networkID := defaultZeroTierNetworkID
+	networkID := liveZeroTierNetworkIDValue
 	if !liveZeroTierNetworkID.MatchString(networkID) || !liveZeroTierNodeID.MatchString(zeroTierNodeID) {
 		t.Fatalf("invite must contain a valid ZeroTier HostID for the configured network")
 	}
