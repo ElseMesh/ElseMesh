@@ -50,6 +50,53 @@ not pretend that transiently converted game data is the same as an authored
 static package. Game-specific implementation details belong with the private
 world repository.
 
+### Static asset delivery and CDN caching
+
+World discovery and world content have different routes. The invited
+worldd remains authoritative for the signed manifest, invite and player
+authorization, presence, collision, movement, and dynamic region requests.
+Immutable render assets may be fetched directly by the browser from a
+world-selected CDN, so a visitor does not have to download every mesh and
+texture through the worldd data channel. The Cloudflare Worker remains outside
+the content data plane. A CDN response is only a byte source: the browser
+checks the declared size and content hash before decoding it, and falls back to
+an authorized worldd or cache provider if the CDN request fails.
+
+CDN publication is explicit per world and per asset. Signed manifests may
+advertise an HTTPS URL for a public immutable asset; assets without one remain
+available only through authorized providers. Use content-addressed object keys
+and immutable cache headers, and publish a new object when the bytes change.
+Do not upload bridge output or other restricted content merely because it is
+present in worldd's local store. A world owner must opt the relevant assets in
+to the selected distribution target. Worlds with bridge-derived assets may use
+Cloudflare's asset cache, but those meshes and textures must not be published
+to GitHub Pages.
+
+Cloudflare R2 behind a custom domain is the preferred first CDN target: the
+worldd publisher uploads opted-in objects directly to R2, while browsers fetch
+them directly through Cloudflare's cache. Do not put the Cloudflare Worker in
+this path. If a world requires invite-only asset access, enforce that at the
+CDN edge before cache lookup; the cache key may omit the authorization token
+only after the edge has validated it for the requested immutable object. R2's
+public development URL is for testing and is not the production cache path.
+GitHub Pages remains suitable for assets intentionally included in a public
+repository build, not for private or bridge-derived world content.
+
+CDN delivery reduces asset transfer time after the manifest is available; it
+does not make ZeroTier route attempts, Worker lookup, signaling, or worldd
+authorization faster. Measure those startup stages separately from first
+collision-ready view and later visual refinement. Keep collision and
+traversal-safety assets on their existing highest-priority authorized path;
+CDN availability must not delay or bypass the movement gate. Progressive
+texture/model tiers remain independently addressable and cacheable by their
+own content identity.
+
+The current browser connector fetches hosted-world assets only through its
+provider protocol, and the current Pages build does not publish the world
+package asset tree. CDN URL validation, hash-checked direct fetch with
+provider fallback, worldd upload support, and end-to-end startup timing are
+implementation gaps; this section is the single design reference for them.
+
 Treat `WorldContentProvider` as an additive engine boundary, not a new
 world-specific code path. The existing signed-package provider remains the
 default implementation and must retain its manifest signature, per-asset hash,
