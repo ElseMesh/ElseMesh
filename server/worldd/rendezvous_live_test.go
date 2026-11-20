@@ -148,9 +148,10 @@ func TestLiveRendezvousInviteUsesWorkerAndDirectWebRTC(t *testing.T) {
 	}
 
 	settingEngine := webrtc.SettingEngine{}
+	includeZeroTier := os.Getenv("ELSEMESH_LIVE_INCLUDE_ZEROTIER") == "1"
 	settingEngine.SetInterfaceFilter(func(name string) bool {
 		name = strings.ToLower(name)
-		return !strings.HasPrefix(name, "zt") && !strings.HasPrefix(name, "tun")
+		return !strings.HasPrefix(name, "tun") && (includeZeroTier || !strings.HasPrefix(name, "zt"))
 	})
 	if err := settingEngine.SetEphemeralUDPPortRange(45001, 45032); err != nil {
 		t.Fatalf("configure narrow visitor UDP range: %v", err)
@@ -364,7 +365,12 @@ candidatesDrained:
 	if !localOK || !remoteOK {
 		t.Fatal("selected ICE candidate pair omitted candidate details")
 	}
-	t.Logf("visitor excluded all ZeroTier interfaces; selected ICE pair local=%s/%s %s:%d remote=%s %s:%d",
+	visitorPath := "visitor excluded ZeroTier interfaces"
+	if includeZeroTier {
+		visitorPath = "visitor included ZeroTier interfaces"
+	}
+	t.Logf("%s; selected ICE pair local=%s/%s %s:%d remote=%s %s:%d",
+		visitorPath,
 		localCandidate.CandidateType, localCandidate.NetworkType, localCandidate.IP, localCandidate.Port,
 		remoteCandidate.CandidateType, remoteCandidate.IP, remoteCandidate.Port)
 
@@ -396,5 +402,5 @@ candidatesDrained:
 	case <-ctx.Done():
 		t.Fatal("direct WebRTC manifest response timed out")
 	}
-	t.Logf("verified HostID lookup, Worker signaling, and direct WebRTC manifest for %s with ZeroTier excluded on visitor", worldID)
+	t.Logf("verified HostID lookup, Worker signaling, and direct WebRTC manifest for %s (%s)", worldID, visitorPath)
 }
