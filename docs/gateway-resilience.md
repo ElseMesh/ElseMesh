@@ -240,6 +240,17 @@ The client supports ordered provider fallback, verifies signed ZeroTier node rec
 
 `test/world-rendezvous.mjs` exercises gateway-less HostID discovery, public-gateway failure followed by rendezvous, and confirms the browser client does not send manifest requests over the Worker. `server/worldd/rendezvous_test.go` runs the host handshake against a local signaling fixture and serves the signed manifest over a Pion WebRTC data channel. The opt-in `server/worldd/rendezvous_live_test.go` follows an invite through the deployed Worker and verifies the signed provider and Durable Object signaling. Its 2026-11-19 cross-internet run from pi3 completed lookup and signaling with visitor ZeroTier/tunnel ICE interfaces excluded, then failed direct ICE before a data channel opened. No browser rendering check has passed through this invite route.
 
+On 2026-11-20, Worker version `907c1894-c6a8-4eae-b9a4-2c44ca5464e8`
+resolved a temporary invite for a live `worldd` host; the pi3 ARMv7 probe
+received the SDP answer over signaling but failed to open the direct data
+channel. The visitor gathered `82.1.79.142:45020`; the host gathered the
+server-reflexive candidate `91.90.103.109:20817`. The probe trickled zero
+candidates because gathering completed before the answer arrived, so this run
+does not demonstrate late-candidate recovery. Host-side UPnP discovery failed
+with `EPERM` while sending SSDP multicast; no mapping or firewall rule was
+changed. This confirms lookup and signaling on the deployed Worker, not
+independent-network world-data reachability.
+
 The headless Chromium integration test passed from the external build tree:
 `go test ./worldd -run '^TestChromiumWorldConnectorUsesDirectWebRTC$' -count=1
 -v`. It opened a browser-to-worldd WebRTC data channel, fetched the signed

@@ -73,6 +73,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   and `worldd` session handler. Focused browser and Worker tests pass; the Worker
   remains control-plane only. This improves ICE candidate exchange but does not
   yet resolve the recorded pi3 independent-network failure.
+- Deployed Worker version `907c1894-c6a8-4eae-b9a4-2c44ca5464e8`; its health
+  endpoint returned `{"status":"ok"}`. The opt-in ARMv7 live probe on pi3
+  resolved the temporary invite by HostID and received the world's SDP answer
+  through the Worker, but direct ICE still failed before a data channel opened.
+  It trickled zero candidates because pi3 completed gathering before the answer
+  arrived. The host's best-effort UPnP discovery failed with `EPERM` while
+  sending SSDP multicast; no router or firewall settings were changed.
 - Invite routing is 75% (3 of 4 gates). The open gate is successful data and
   admission from an independent network without ZeroTier; the pi3 ICE failure
   above remains unresolved.
