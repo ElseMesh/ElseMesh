@@ -101,10 +101,11 @@ all authored tree/shrub placements, the shared seed-bin variant rule, and the
 source geometry's VEC4 streams. Deterministic export checks cover model hashes,
 placement transforms/counts, and variant assignments. The exporter now also
 writes the source leaf-mask atlas as content-addressed linear RGBA8 data with
-its channel meanings and tile layout. These GLBs still use a provisional PBR
-material and lack the renderer-neutral canopy graph; they are not signed into
-the world package and no adapter consumes them. This prepares portable canopy
-inputs but closes no parity gate and changes no percentage.
+its channel meanings and tile layout. The near GLBs still use a provisional
+constant base color, but now carry a renderer-neutral leaf-mask graph for both
+engine compilers. They are not signed into the active world source and no
+adapter consumes them. This prepares portable canopy inputs but closes no
+parity gate and changes no percentage.
 
 **2026-11-20 canopy package assembly:** The Tidewater exporter now joins the
 near instance set and GLBs, both impostor atlases, the leaf mask, authored
@@ -113,8 +114,9 @@ appearance inputs, and LOD settings in an inactive
 with the engine codec. The exporter integration test loads those actual
 content-addressed files through `OctahedralCanopyAssets` and checks deterministic
 bytes, identities, and image dimensions. The candidate remains outside
-`world-source.json`; its near-model PBR graph is provisional, and neither engine
-backend consumes the component. No parity percentage changes.
+`world-source.json`; its graph currently handles leaf cutouts but uses
+provisional color and omits near wind, and neither engine backend consumes the
+component. No parity percentage changes.
 
 **2026-11-20 canopy appearance contract:** The signed descriptor now includes
 the authored tree/shrub palette entries and species seed thresholds, which
@@ -124,6 +126,16 @@ export integration checks the descriptor appearance against its source
 profile. This closes a contract-data gap only: the near PBR graph is still
 provisional, the runtime package remains inactive, and paired engine adapters
 and matched visual review are still outstanding. No percentage changes.
+
+**2026-11-20 canopy leaf-mask graph:** Tidewater now authors the same bounded
+material graph in the canopy descriptor and all five near-model GLBs. It selects
+the authored tree/shrub mask tile from each instance seed, samples linear leaf
+coverage, and enables alpha masking with a 0.5 cutoff for both engine compilers.
+The exporter test verifies the content-addressed package and compilation for
+WebGPU and WebGL. Base color remains a provisional constant; authored palette
+shading, near wind, the far-atlas presenter, both runtime adapters, and matched
+appearance review remain open. The package stays inactive and unsigned. No
+parity percentage changes.
 
 **2026-11-20 AMD pre-split gameplay-query update:** The hardware harness
 verified its pinned `23c30bf` wake, water-query, boat, dock, and pier sources,
@@ -1261,9 +1273,10 @@ finding changes them.
   sidecars in the Tidewater repository. Its `world-export` test runs the
   headless llvmpipe exporter twice and verifies identical PNG bytes, hashes,
   3840×768 dimensions, the 6×6 frame grid, and all three tree/two shrub variant
-  ranges. The artifacts remain inactive and unsigned; Tidewater still lacks
-  the near-model material graph, and neither ElseMesh backend consumes the
-  sidecar. No parity gate or percentage changes.
+  ranges. The artifacts remain inactive and unsigned; at that point Tidewater
+  still lacked the near-model material graph. The 2026-11-20 leaf-mask graph
+  update below adds card cutouts but not the missing palette/wind shading or
+  runtime adapters. No parity gate or percentage changes.
 
 - 2026-11-20: extended the signed `elsemesh.octahedral-canopy/1` descriptor to
   carry ElseMesh's bounded `elsemesh.material-graph/1` data and require its
