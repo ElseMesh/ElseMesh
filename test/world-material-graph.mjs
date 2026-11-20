@@ -79,6 +79,23 @@ leafMaskMaterials.depthMaterial.dispose();
 leafMaskSource.dispose();
 leafMaskTexture.dispose();
 
+const worldPositionOpacityGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'worldPosition', op: 'input', name: 'worldPosition' },
+		{ id: 'opacity', op: 'x', args: [ 'worldPosition' ] },
+		{ id: 'worldNormal', op: 'input', name: 'worldNormal' },
+	],
+	outputs: { baseColor: 'worldNormal', opacity: 'opacity' },
+};
+const worldPositionOpacityMaterial = createWebGLMaterialGraph( THREE, new THREE.MeshStandardMaterial( { alphaTest: 0.5 } ), worldPositionOpacityGraph );
+const worldPositionDepthShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>', fragmentShader: '#include <common>\n#include <alphatest_fragment>', uniforms: {} };
+worldPositionOpacityMaterial.depthMaterial.onBeforeCompile( worldPositionDepthShader );
+assert.match( worldPositionDepthShader.vertexShader, /vEmg_worldPosition = emgWorldPosition\.xyz/, 'opacity shadow shaders without worldpos_vertex compute world position after graph deformation' );
+assert.match( worldPositionDepthShader.fragmentShader, /diffuseColor\.a \*= emgAlpha_opacity/ );
+worldPositionOpacityMaterial.material.dispose();
+worldPositionOpacityMaterial.depthMaterial.dispose();
+
 const valueNoiseGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [

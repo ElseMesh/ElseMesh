@@ -145,11 +145,22 @@ emgWorldVertexPosition = batchingMatrix * emgWorldVertexPosition;
 emgWorldVertexPosition = instanceMatrix * emgWorldVertexPosition;
 #endif
 emgWorldVertexPosition = modelMatrix * emgWorldVertexPosition;` : '';
+		const worldPositionMarker = '#include <worldpos_vertex>';
+		const needsWorldPositionOutput = fragmentGraph && compiled.glsl.worldPosition;
+		const worldPositionFallback = needsWorldPositionOutput && ! shader.vertexShader.includes( worldPositionMarker ) && ! fragment && opacity ? `
+vec4 emgWorldPosition = vec4( transformed, 1.0 );
+#ifdef USE_BATCHING
+emgWorldPosition = batchingMatrix * emgWorldPosition;
+#endif
+#ifdef USE_INSTANCING
+emgWorldPosition = instanceMatrix * emgWorldPosition;
+#endif
+emgWorldPosition = modelMatrix * emgWorldPosition;
+vEmg_worldPosition = emgWorldPosition.xyz;` : '';
+		if ( needsWorldPositionOutput && ! shader.vertexShader.includes( worldPositionMarker ) && ! worldPositionFallback ) throw new Error( `WebGL material graph hook is missing ${worldPositionMarker}` );
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${worldVertexPosition}\n${graphVertex}` );
 		if ( fragmentGraph && compiled.glsl.worldPosition ) {
-			const marker = '#include <worldpos_vertex>';
-			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
-			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}
+			if ( shader.vertexShader.includes( worldPositionMarker ) ) shader.vertexShader = shader.vertexShader.replace( worldPositionMarker, `${worldPositionMarker}
 vec4 emgWorldPosition = vec4( transformed, 1.0 );
 #ifdef USE_BATCHING
 emgWorldPosition = batchingMatrix * emgWorldPosition;
@@ -159,6 +170,11 @@ emgWorldPosition = instanceMatrix * emgWorldPosition;
 #endif
 emgWorldPosition = modelMatrix * emgWorldPosition;
 vEmg_worldPosition = emgWorldPosition.xyz;` );
+		}
+		if ( worldPositionFallback ) {
+			const projectMarker = '#include <project_vertex>';
+			if ( ! shader.vertexShader.includes( projectMarker ) ) throw new Error( `WebGL opacity depth graph hook is missing ${projectMarker}` );
+			shader.vertexShader = shader.vertexShader.replace( projectMarker, `${worldPositionFallback}\n${projectMarker}` );
 		}
 		if ( fragmentGraph && compiled.glsl.worldNormal ) {
 			const marker = '#include <defaultnormal_vertex>';
@@ -250,8 +266,14 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHei
 		material.addEventListener( 'dispose', terrainHeightBinding.release );
 		material.userData.releaseTerrainHeightBinding = terrainHeightBinding.release;
 	}
-	const depthMaterial = compiled.hasVertexOutput || Boolean( graph.outputs.opacity )
-		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors, alphaTest: sourceMaterial.alphaTest } ), compiled, graphKey, { fragment: false, opacity: Boolean( graph.outputs.opacity ), textureBindings, terrainHeightBinding } )
+	const depthGraphOutputs = {
+		...( graph.outputs.vertexPosition ? { vertexPosition: graph.outputs.vertexPosition } : {} ),
+		...( graph.outputs.opacity ? { opacity: graph.outputs.opacity } : {} ),
+	};
+	const depthCompiled = Object.keys( depthGraphOutputs ).length ? compileWorldMaterialGraph( { ...graph, outputs: depthGraphOutputs }, 'webgl', { doubleSided: sourceMaterial.side === T.DoubleSide } ) : null;
+	const depthGraphKey = depthCompiled ? JSON.stringify( { format: graph.format, nodes: graph.nodes, outputs: depthGraphOutputs } ) : graphKey;
+	const depthMaterial = depthCompiled
+		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors, alphaTest: sourceMaterial.alphaTest } ), depthCompiled, depthGraphKey, { fragment: false, opacity: Boolean( graph.outputs.opacity ), textureBindings, terrainHeightBinding } )
 		: null;
 	return {
 		material,
