@@ -37,6 +37,19 @@ comparison against Tidewater `main`. No completion gate or percentage changed:
 Tidewater remains **93%**, and renderer-neutral world packages remain **71%**.
 See [`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-matched-split-beach-view-webgpu-and-webgl).
 
+**2026-11-20 dynamic-frame follow-up:** Repeated the beach capture with the
+exact camera height restored to `3 m`, the overlay hidden, and matching
+simulation phases. Across three phases, Tidewater `main` versus split WebGPU
+measured `0.159`, `0.140`, and `0.133/255` MAE. Split WebGPU versus split
+WebGL measured `18.748`, `18.851`, and `18.827/255`; clouds, canopy, sea,
+swash, sand, and pier still visibly differ. The earlier apparent wave-spray
+mismatch came from non-matching capture phases. Source inspection confirms
+split WebGL does not install the WebGPU `Breakers` wave-spray emitter, while
+its generic `WebGLSpray` service only supports world-component effects. These
+frames close no visual gate and change no percentage; a shared renderer-neutral
+breaker contract is still needed. See the dynamic captures in
+[`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-dynamic-tidewater-beach-phases-webgpu-and-webgl).
+
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas
 dimensions, and impostor shading/wind parameters in the plain-data

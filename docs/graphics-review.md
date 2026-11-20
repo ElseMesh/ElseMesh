@@ -1,5 +1,40 @@
 # Reproducible graphics review
 
+## 2026-11-20 dynamic Tidewater beach phases: WebGPU and WebGL
+
+Captured the authoritative Tidewater `main` WebGPU build (`4811ba48`), split
+ElseMesh WebGPU, and split ElseMesh WebGL (`aa8c7925`) in isolated Chromium on
+the same AMD Radeon Graphics host. WebGPU used RADV; WebGL used ANGLE RadeonSI.
+All three screenshots use the exact `[15, 3, -58]` camera, yaw `pi`, pitch
+`-0.08`, time of day `16.2`, a 1600×813 canvas, scale 1, high quality, and
+disabled auto-exposure. The review DOM was hidden, and the browser input seat
+was disabled. Each app started at simulation time `1000` and advanced 64
+frames, then two groups of 30 frames at approximately `1/60` second per frame.
+The three sampled simulation phases were approximately `1001.067`, `1001.567`,
+and `1002.067` seconds; the WebGL samples were within 0.004 seconds of the
+WebGPU samples.
+
+![Authoritative Tidewater main WebGPU beach, dynamic phase 0](images/tidewater-main-beach-dynamic-2026-11-20.png)
+
+![Split ElseMesh WebGPU beach, dynamic phase 0](images/elsemesh-split-webgpu-beach-dynamic-2026-11-20.png)
+
+![Split ElseMesh WebGL beach, dynamic phase 0](images/elsemesh-split-webgl-beach-dynamic-2026-11-20.png)
+
+The matched Tidewater-main/split WebGPU full-frame MAE is `0.159`, `0.140`,
+and `0.133/255` across the three phases. Split WebGPU/WebGL is `18.748`,
+`18.851`, and `18.827/255`; the regional mean across phases is `19.82/255`
+for sky, `24.09/255` for open sea, `26.27/255` for swash, `14.11/255` for
+sand, and `22.93/255` for the pier. WebGL remains visibly darker, its cloud
+shapes and canopy differ, and the ocean/swash appearance is not aligned with
+WebGPU. The earlier apparent spray mismatch came from screenshots taken at
+different simulation phases. Source inspection still shows the wave-breaker
+spray path is only installed through the WebGPU `Breakers` implementation;
+WebGL's generic `WebGLSpray` is updated but has no equivalent breaker emitter.
+This is a measured backend gap, not a Tidewater-main WebGL comparison. No
+renderer-neutral breaker contract exists yet, so this review records the gap
+without adding a second world-owned renderer path. Tidewater parity remains
+93%.
+
 ## 2026-11-20 matched split beach view: WebGPU and WebGL
 
 Captured ElseMesh source revision `4b4e0f1f` in isolated Chromium on AMD
