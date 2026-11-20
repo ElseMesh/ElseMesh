@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
-import { decodeOctahedralCanopyAtlas, loadOctahedralCanopyAssets } from '../src/network/OctahedralCanopyAssets.js';
+import { decodeOctahedralCanopyAtlas, decodeOctahedralCanopyLeafMask, loadOctahedralCanopyAssets } from '../src/network/OctahedralCanopyAssets.js';
 import { OCTAHEDRAL_CANOPY_COMPONENT_TYPE, OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND, OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT } from '../src/network/OctahedralCanopyDescriptor.js';
 import { worldComponentAssetIDs } from '../src/network/WorldComponentRegistry.js';
 
@@ -145,6 +145,22 @@ try {
 } finally {
 	if ( previousCreateImageBitmap === undefined ) delete globalThis.createImageBitmap;
 	else globalThis.createImageBitmap = previousCreateImageBitmap;
+}
+
+const previousAssetImage = globalThis.__assetImage;
+const rawLeafPixels = new Uint8Array( 1024 * 1024 * 4 ).fill( 192 );
+globalThis.__assetImage = ( bytes, mimeType ) => {
+	assert.equal( bytes, assets.leafMask.bytes, 'raw mask decoding uses the signed asset bytes' );
+	assert.equal( mimeType, 'image/png' );
+	return { data: rawLeafPixels, width: 1024, height: 1024 };
+};
+try {
+	const decodedLeafMask = await decodeOctahedralCanopyLeafMask( assets.leafMask );
+	assert.equal( decodedLeafMask.data, rawLeafPixels, 'both backend textures receive the same decoded linear RGBA8 pixels' );
+	assert.deepEqual( [ decodedLeafMask.width, decodedLeafMask.height, decodedLeafMask.format, decodedLeafMask.sampler ], [ 1024, 1024, 'rgba8unorm', 'linearClamp' ] );
+} finally {
+	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;
+	else globalThis.__assetImage = previousAssetImage;
 }
 
 console.log( 'signed canopy descriptor, instance set, raw PNG atlases, and lazy model loading pass' );

@@ -4,6 +4,7 @@ import {
 	OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND,
 	decodeOctahedralCanopyDescriptor,
 } from './OctahedralCanopyDescriptor.js';
+import { decodeImage } from '../engine/loaders/GLTF.js';
 
 const PNG_SIGNATURE = [ 137, 80, 78, 71, 13, 10, 26, 10 ];
 const COLOR_PROFILE_CHUNKS = new Set( [ 'cHRM', 'gAMA', 'iCCP', 'sRGB' ] );
@@ -113,4 +114,12 @@ export async function decodeOctahedralCanopyAtlas( bytes ) {
 	if ( typeof createImageBitmap !== 'function' || typeof Blob !== 'function' ) throw new Error( 'PNG canopy decoding requires browser ImageBitmap support' );
 	const image = await createImageBitmap( new Blob( [ bytes ], { type: 'image/png' } ), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' } );
 	return image;
+}
+
+/** Decode the signed RGBA8 mask as shared byte data for both renderer adapters. */
+export async function decodeOctahedralCanopyLeafMask( leafMask ) {
+	if ( ! leafMask || ! ( leafMask.bytes instanceof Uint8Array ) || ! Number.isInteger( leafMask.width ) || ! Number.isInteger( leafMask.height ) ) fail( 'a validated leaf-mask PNG is required' );
+	const decoded = await decodeImage( leafMask.bytes, 'image/png', { forceRGBA: true } );
+	if ( decoded.width !== leafMask.width || decoded.height !== leafMask.height || !( decoded.data instanceof Uint8Array ) || decoded.data.byteLength !== decoded.width * decoded.height * 4 ) fail( 'decoded leaf-mask pixels do not match its signed RGBA8 dimensions' );
+	return { data: decoded.data, width: decoded.width, height: decoded.height, format: 'rgba8unorm', sampler: 'linearClamp' };
 }

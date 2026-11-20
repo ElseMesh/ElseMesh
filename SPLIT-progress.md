@@ -134,8 +134,10 @@ coverage, and enables alpha masking with a 0.5 cutoff for both engine compilers.
 The exporter test verifies the content-addressed package and compilation for
 WebGPU and WebGL. Base color remains a provisional constant; authored palette
 shading, near wind, the far-atlas presenter, both runtime adapters, and matched
-appearance review remain open. The package stays inactive and unsigned. No
-parity percentage changes.
+appearance review remain open. ElseMesh also decodes the signed mask into one
+raw RGBA8/linear-clamp pixel payload ready for either backend; no canopy adapter
+consumes it yet. The package stays inactive and unsigned. No parity percentage
+changes.
 
 **2026-11-20 AMD pre-split gameplay-query update:** The hardware harness
 verified its pinned `23c30bf` wake, water-query, boat, dock, and pier sources,
