@@ -74,7 +74,7 @@ function canopyBillboardTransform( instance, group, cameraPosition, yaw, farScal
 
 function canopyGroupMap( descriptor ) {
 	const map = new Map();
-	for ( const group of descriptor.variantGroups ) for ( const modelId of group.modelIds ) map.set( modelId, group );
+	for ( const [ groupIndex, group ] of descriptor.variantGroups.entries() ) for ( const modelId of group.modelIds ) map.set( modelId, { group, groupIndex } );
 	return map;
 }
 
@@ -92,8 +92,9 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 	const plan = [];
 	for ( let instanceIndex = 0; instanceIndex < instanceSet.instances.length; instanceIndex ++ ) {
 		const instance = instanceSet.instances[ instanceIndex ];
-		const group = groupByModel.get( instance.model );
-		if ( ! group ) continue;
+		const mapping = groupByModel.get( instance.model );
+		if ( ! mapping ) continue;
+		const { group, groupIndex } = mapping;
 		const selection = group.variantSelection;
 		const seed = instance.materialData?.[ selection.index ];
 		if ( ! Number.isFinite( seed ) || seed < 0 || seed > 1 ) throw new Error( `Canopy instance ${instanceIndex} has invalid variant-selection seed` );
@@ -119,6 +120,8 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 			placementId: instance.placementId ?? `${instance.model}:${instanceIndex}`,
 			modelId: instance.model,
 			groupId: group.id,
+			groupIndex,
+			impostorRadius: group.bounds.radius,
 			position: instance.position,
 			yaw,
 			scale: instance.scale,
@@ -138,4 +141,50 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 		} );
 	}
 	return plan;
+}
+
+function ensureFloatBuffer( target, key, required ) {
+	if ( target[ key ]?.length >= required ) return target[ key ];
+	const capacity = Math.max( 16, 2 ** Math.ceil( Math.log2( required ) ) );
+	return target[ key ] = new Float32Array( capacity );
+}
+
+/** Pack the shared far-card plan into reusable, backend-neutral instanced buffers. */
+export function writeOctahedralCanopyDrawPlan( plan, target = {} ) {
+	if ( ! Array.isArray( plan ) ) throw new Error( 'Octahedral canopy draw plan must be an array' );
+	let count = 0;
+	for ( const item of plan ) if ( item.farWeight > 0 ) {
+		if ( ! item.billboard?.matrix || item.billboard.matrix.length !== 16 || ! Array.isArray( item.scale ) || item.scale.length !== 3 || ! Array.isArray( item.frameIndices ) || item.frameIndices.length !== 3 || ! Array.isArray( item.frameWeights ) || item.frameWeights.length !== 3 ) throw new Error( 'Visible far canopy plan item is missing draw attributes' );
+		count ++;
+	}
+	const matrices = ensureFloatBuffer( target, 'matrices', count * 16 );
+	const instance0 = ensureFloatBuffer( target, 'instance0', count * 4 );
+	const instance1 = ensureFloatBuffer( target, 'instance1', count * 4 );
+	const frames = ensureFloatBuffer( target, 'frames', count * 4 );
+	const weights = ensureFloatBuffer( target, 'weights', count * 4 );
+	let drawIndex = 0;
+	for ( const item of plan ) {
+		if ( item.farWeight <= 0 ) continue;
+		const matrixOffset = drawIndex * 16, attributeOffset = drawIndex * 4;
+		matrices.set( item.billboard.matrix, matrixOffset );
+		instance0[ attributeOffset ] = item.seed;
+		instance0[ attributeOffset + 1 ] = item.variantIndex;
+		instance0[ attributeOffset + 2 ] = item.impostorRadius;
+		instance0[ attributeOffset + 3 ] = item.groupIndex;
+		instance1[ attributeOffset ] = item.scale[ 0 ] * item.farScale;
+		instance1[ attributeOffset + 1 ] = item.scale[ 1 ] * item.farScale;
+		instance1[ attributeOffset + 2 ] = item.scale[ 2 ] * item.farScale;
+		instance1[ attributeOffset + 3 ] = item.yaw;
+		frames[ attributeOffset ] = item.frameIndices[ 0 ];
+		frames[ attributeOffset + 1 ] = item.frameIndices[ 1 ];
+		frames[ attributeOffset + 2 ] = item.frameIndices[ 2 ];
+		frames[ attributeOffset + 3 ] = item.blendFrames ? 1 : 0;
+		weights[ attributeOffset ] = item.frameWeights[ 0 ];
+		weights[ attributeOffset + 1 ] = item.frameWeights[ 1 ];
+		weights[ attributeOffset + 2 ] = item.frameWeights[ 2 ];
+		weights[ attributeOffset + 3 ] = item.farWeight;
+		drawIndex ++;
+	}
+	target.count = count;
+	return target;
 }

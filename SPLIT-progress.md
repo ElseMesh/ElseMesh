@@ -2701,6 +2701,9 @@ finding changes them.
   far-card transform derived from signed group bounds, placement, and camera
   direction. Near-only placements skip far-card transform allocation, and
   nonuniform horizontal instance scale is included in the conservative width.
-  The focused planner test covers these cases and passes. No renderer adapter
-  consumes the transform yet, the signed package remains inactive, and this
-  closes no appearance-parity gate; Tidewater remains at 93%.
+  The plan now packs matrices, profile/group indices, instance scales, selected
+  frames, blend flags, and weights into reusable typed arrays for the paired
+  adapters. The focused planner test covers transform math, packed attributes,
+  and buffer reuse. No renderer adapter consumes the plan yet, the signed
+  package remains inactive, and this closes no appearance-parity gate;
+  Tidewater remains at 93%.
