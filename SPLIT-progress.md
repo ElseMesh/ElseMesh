@@ -42,7 +42,10 @@ species/variant selection, near/far handoff, fade and thinning distances, atlas
 dimensions, and impostor shading/wind parameters in the plain-data
 `vegetation/CanopyProfile.js`. The current WebGPU canopy shader and atlas export
 consume this profile, and the world-export check verifies the profile recorded
-beside the deterministic atlas images. This centralizes world-authored inputs;
+beside the deterministic atlas images. The exporter test, WebGPU vegetation
+render smoke, and Tidewater's pre-split WebGPU/WebGL gameplay parity suite pass
+in the external build; the render smoke is not a new visual parity comparison.
+This centralizes world-authored inputs;
 the profile is not yet signed into the runtime package and the engine WebGPU
 and WebGL canopy adapters are not implemented. This closes no parity gate and
 changes no percentage.
