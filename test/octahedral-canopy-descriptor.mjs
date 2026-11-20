@@ -4,6 +4,7 @@ import {
 	OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND,
 	OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT,
 	OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT,
+	OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT,
 	decodeOctahedralCanopyDescriptor,
 } from '../src/network/OctahedralCanopyDescriptor.js';
 
@@ -44,6 +45,12 @@ const descriptor = {
 		],
 		outputs: { baseColor: 'color', roughness: 'roughness' },
 	},
+	appearance: {
+		format: OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT,
+		color: { instanceTintScale: 0.36, instanceTintBias: 0.74, leafDesaturation: 0.85, impostorBrightnessScale: 1.4, barkDark: 0x1c1a13, barkLight: 0x2e2b20, leafBlendStart: 0.05, leafBlendEnd: 0.55, impostorSaturation: 1.25 },
+		lighting: { bakedOcclusionFloor: 0.26, bakedOcclusionExponent: 2, brightnessScale: 0.6, brightnessBias: 0.7, roughness: 0.85, specularIntensity: 0.12, translucency: 0.35 },
+		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
+	},
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
@@ -66,6 +73,8 @@ const invalid = [
 	{ ...descriptor, atlasChannels: { ...descriptor.atlasChannels, material: { ...descriptor.atlasChannels.material, a: 'opacity' } } },
 	{ ...descriptor, materialGraph: { ...descriptor.materialGraph, format: 'shader-source/1' } },
 	{ ...descriptor, materialGraph: { ...descriptor.materialGraph, outputs: { roughness: 'roughness' } } },
+	{ ...descriptor, appearance: { ...descriptor.appearance, color: { ...descriptor.appearance.color, barkDark: -1 } } },
+	{ ...descriptor, appearance: { ...descriptor.appearance, wind: { ...descriptor.appearance.wind, gustAmplitude: -1 } } },
 	{ ...descriptor, instanceSetAssetId: id( 'f' ) },
 	{ ...descriptor, atlasAssetIds: [ atlasColorID, atlasColorID ] },
 	{ ...descriptor, atlasAssetIds: [ atlasColorID, nearTreeID ] },

@@ -251,8 +251,10 @@ Its signed descriptor also carries an `elsemesh.material-graph/1` graph for
 canopy surface appearance. The graph requires `baseColor` and can describe
 roughness, translucency, and wind-driven vertex position through the bounded
 contract compiled for both backends; it contains no backend shader source.
-Tidewater has not authored or exported its canopy graph or the near-model set
-yet, so the atlas sidecar does not form a signed canopy component.
+The descriptor now validates a renderer-neutral appearance block for color,
+lighting, and wind coefficients. Tidewater has not exported that block into a
+signed descriptor or published the near-model set yet, so the atlas sidecar
+does not form a signed canopy component.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The
@@ -274,10 +276,10 @@ thinning, and crown-growth compensation. Tidewater's palette, species
 selection, variant selection, handoff distances, thinning, atlas dimensions,
 shading inputs, and impostor wind coefficients now live in the plain-data
 `vegetation/CanopyProfile.js`; the current WebGPU shader and atlas exporter
-consume that same profile, and the deterministic export test checks the
-profile copied into the atlas sidecar. This moves the authored values into one
-world-owned data source but does not yet move presentation ownership. The
-profile is not yet part of a signed canopy descriptor, neither engine backend
+consume that same profile. Its color, lighting, and wind subset is projected
+as `elsemesh.canopy-appearance/1`, validated by the engine descriptor codec,
+and checked in the deterministic export and descriptor tests. The exported
+descriptor sidecar still is not signed world content, neither engine backend
 consumes the component contract, and both world-owned presenters remain active.
 No appearance-parity gate has closed.
 

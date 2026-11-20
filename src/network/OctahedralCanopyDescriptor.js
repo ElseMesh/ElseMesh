@@ -6,6 +6,7 @@ export const OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND = 'octahedral-canopy/1';
 export const MAX_OCTAHEDRAL_CANOPY_DESCRIPTOR_BYTES = 64 * 1024;
 export const OCTAHEDRAL_CANOPY_PROJECTION = 'hemi-octahedral/1';
 export const OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT = 'rgba8unorm-data/1';
+export const OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT = 'elsemesh.canopy-appearance/1';
 
 const ATLAS_CHANNELS = {
 	material: [ 'brightness', 'leaf-flag', 'card-variation', 'coverage' ],
@@ -20,6 +21,15 @@ const validModelID = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0
 
 function fail( message ) {
 	throw new Error( `Invalid octahedral canopy descriptor: ${message}` );
+}
+
+function validateAppearance( appearance ) {
+	const colorKeys = [ 'instanceTintScale', 'instanceTintBias', 'leafDesaturation', 'impostorBrightnessScale', 'leafBlendStart', 'leafBlendEnd', 'impostorSaturation' ];
+	const lightingKeys = [ 'bakedOcclusionFloor', 'bakedOcclusionExponent', 'brightnessScale', 'brightnessBias', 'roughness', 'specularIntensity', 'translucency' ];
+	const windKeys = [ 'gustAmplitude', 'gustBias', 'gustScale', 'waveAmplitude', 'waveFrequency', 'waveGustBias', 'seedPhaseScale', 'heightScale' ];
+	const validValues = ( value, keys, min, max ) => hasExactKeys( value, keys ) && keys.every( key => finiteIn( value[ key ], min, max ) );
+	if ( ! hasExactKeys( appearance, [ 'format', 'color', 'lighting', 'wind' ] ) || appearance.format !== OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT ) fail( 'renderer-neutral canopy appearance format is invalid' );
+	if ( ! hasExactKeys( appearance.color, [ ...colorKeys, 'barkDark', 'barkLight' ] ) || ! colorKeys.every( key => finiteIn( appearance.color[ key ], 0, 4 ) ) || [ appearance.color.barkDark, appearance.color.barkLight ].some( value => ! Number.isInteger( value ) || value < 0 || value > 0xffffff ) || ! validValues( appearance.lighting, lightingKeys, 0, 4 ) || ! validValues( appearance.wind, windKeys, 0, 100 ) ) fail( 'canopy color, lighting or wind values are invalid' );
 }
 
 /** Decode the renderer-neutral, signed canopy descriptor and validate its component inventory. */
@@ -38,8 +48,9 @@ export function decodeOctahedralCanopyDescriptor( bytes, options = {} ) {
  * choose how to sample the two atlas images for their backend.
  */
 export function validateOctahedralCanopyDescriptor( document, { componentAssets, staticModelInstanceSetAssetId, staticModelInstanceSet } = {} ) {
-	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'materialGraph', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
+	const rootKeys = [ 'format', 'instanceSetAssetId', 'atlasAssetIds', 'atlasDataFormat', 'atlasChannels', 'materialGraph', 'appearance', 'projection', 'frameGrid', 'variantGroups', 'frameBlendDistance', 'lodBandFraction', 'thinning' ];
 	if ( ! hasExactKeys( document, rootKeys ) || document.format !== OCTAHEDRAL_CANOPY_DESCRIPTOR_FORMAT ) fail( 'unsupported format or fields' );
+	validateAppearance( document.appearance );
 	if ( document.atlasDataFormat !== OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT || ! hasExactKeys( document.atlasChannels, [ 'material', 'normalExposure' ] ) || ! hasExactKeys( document.atlasChannels.material, [ 'r', 'g', 'b', 'a' ] ) || ! hasExactKeys( document.atlasChannels.normalExposure, [ 'r', 'g', 'b', 'a' ] ) || [ 'r', 'g', 'b', 'a' ].some( ( channel, index ) => document.atlasChannels.material[ channel ] !== ATLAS_CHANNELS.material[ index ] || document.atlasChannels.normalExposure[ channel ] !== ATLAS_CHANNELS.normalExposure[ index ] ) ) fail( 'atlas data encoding or channel semantics are invalid' );
 	try { validateWorldMaterialGraph( document.materialGraph ); }
 	catch ( error ) { fail( `materialGraph is invalid (${error.message})` ); }
