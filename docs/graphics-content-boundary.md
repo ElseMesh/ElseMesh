@@ -233,6 +233,15 @@ needs one explicit engine component contract rather than separate WGSL and
 GLSL implementations in Tidewater. Both backends must sample the same signed
 atlas assets and select the same LOD at matched quality settings.
 
+The current ElseMesh renderers cannot share one Three.js TSL/NodeMaterial
+presenter: WebGPU uses ElseMesh's custom WGSL renderer, while WebGL uses the
+classic Three.js `WebGLRenderer`, which does not build NodeMaterials. Sharing
+TSL would require moving both paths onto Three's `WebGPURenderer` and its
+WebGL backend, an engine renderer migration with separate parity risks. The
+canopy migration therefore keeps WGSL and GLSL translation in paired
+ElseMesh-owned adapters while sharing the signed content, CPU draw plan, LOD
+decisions, and conformance fixture. No backend adapter may be activated alone.
+
 The inactive runtime descriptor now includes the authored tree/shrub palette
 and seed thresholds alongside its color, lighting, and wind values. The engine
 validates those fields, and Tidewater's export test checks the descriptor
