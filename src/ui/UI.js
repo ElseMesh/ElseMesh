@@ -1898,7 +1898,7 @@ export class UI {
 		this.onPanelInteract = null; // ( event ) pointerdown on the settings panel or rail
 		this.onPanelToggle = null; // ( open )
 		this.onHelpToggle = null; // ( open )
-		this.onReplayGuide = null; // (): the fishing game's first-play guide
+		this.worldExperience = null;
 		// Opening the panel exits pointer lock so the cursor can reach it.
 		this.releasePointerOnPanel = true;
 
@@ -2244,7 +2244,7 @@ export class UI {
 						<h2 id="em-help-title">Controls</h2>
 						<p>Click the view to capture the mouse. Esc releases it.</p>
 						<p class="em-help-touch-hint">On a touch screen, use the left stick to move and the right stick to look. Tap an action prompt to interact.</p>
-						<p class="em-help-controller-hint">Xbox controller: left stick moves, right stick looks, A jumps, X interacts, Y opens inventory, and LB sprints.</p>
+						<p class="em-help-controller-hint">Xbox controller: left stick moves, right stick looks, A jumps, X interacts, and LB sprints.</p>
 					</div>
 					<button type="button" class="em-icon-btn em-help-close" aria-label="Close" data-tip="Close (F1)">${ icon( 'close' ) }</button>
 				</header>
@@ -2254,18 +2254,13 @@ export class UI {
 						${ row( wasd, 'Move' ) }
 						${ row( ARROW_KEY_LAYOUT, 'Look around' ) }
 						${ row( mouse, 'Look around<small>Click to capture</small>' ) }
-						${ row( k( 'Shift' ), 'Sprint, boat boost' ) }
-						${ row( k( 'Space' ), 'Jump, swim up' ) }
-						${ row( k( 'C' ), 'Crouch, dive' ) }
+						${ row( k( 'Shift' ), 'Sprint' ) }
+						${ row( k( 'Space' ), 'Jump' ) }
+						${ row( k( 'C' ), 'Crouch' ) }
 					</section>
 					<section>
 						<h3>Interact</h3>
-						${ row( k( 'E' ), 'Interact<small>Board, helm, step ashore, trade</small>' ) }
-						${ row( k( 'V' ), 'Boat camera<small>1st / 3rd person</small>' ) }
-						${ row( k( 'R' ), 'Fishing rod<small>Take out / put away</small>' ) }
-						${ row( k( 'LMB' ), 'Cast, strike, reel<small>Hold to wind up / reel</small>' ) }
-						${ row( k( 'RMB' ), 'Reel in an empty line' ) }
-						${ row( k( 'I' ), 'Cooler and fish log' ) }
+						${ row( k( 'E' ), 'Interact' ) }
 						${ row( k( 'F' ), 'Free camera' ) }
 						${ row( k( 'T' ), 'Pause time' ) }
 						${ row( k( 'L' ), 'Flashlight' ) }
@@ -2280,18 +2275,25 @@ export class UI {
 					</section>
 				</div>
 				<div class="em-help-guide">
-					<span><b>How to play:</b> catch fish, sell them to Joe at the fish stand by the pier, and buy upgrades from Marta at the chandlery by the boathouse. Both are on the map (lower right).</span>
-					<button type="button" class="gm-btn is-ghost em-help-replay">Replay the guide</button>
+					<span><b>This ThruHold:</b> <span class="em-help-world-guide"></span></span>
 				</div>
 			</div>`;
 		el.querySelector( '.em-help-close' ).addEventListener( 'click', () => this.toggleHelp( false ) );
-		el.querySelector( '.em-help-replay' ).addEventListener( 'click', () => callHook( this.onReplayGuide ) );
 		el.addEventListener( 'click', ( e ) => {
 
 			if ( e.target === el ) this.toggleHelp( false );
 
 		} );
 		this.root.append( el );
+		this._updateWorldGuide();
+
+	}
+
+	_updateWorldGuide() {
+
+		const guide = this.helpEl?.querySelector( '.em-help-world-guide' );
+		if ( ! guide ) return;
+		guide.textContent = this.worldExperience?.tagline || this.worldExperience?.tips?.[ 0 ] || 'Activities and controls are provided by this ThruHold.';
 
 	}
 
@@ -3545,6 +3547,8 @@ export class UI {
 	}
 
 	setLoadingPresentation( title, experience ) {
+		this.worldExperience = experience || null;
+		this._updateWorldGuide();
 
 		const L = document.getElementById( 'loader' );
 		if ( ! L ) return;

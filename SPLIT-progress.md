@@ -150,6 +150,20 @@ deformation still needs matched rendered review; the far octahedral presenter,
 active canopy component wiring, and full appearance review remain open. No
 parity percentage changes.
 
+**2026-11-20 raw canopy atlas data:** The canopy asset loader can now decode
+the signed atlas PNGs directly into one byte-identical RGBA8 payload suitable
+for WebGPU textures and WebGL data textures, with browser color conversion
+removed from the path. A fixture verifies exact channel bytes and sampler
+metadata. The canopy presenter and paired renderer adapters remain open; no
+parity percentage changes.
+
+**2026-11-20 world-authored help guide:** The engine controls sheet no longer
+names Tidewater vendors, fishing actions, boat camera, or cooler controls. It
+lists shared avatar/UI controls and displays the current world's authored
+experience tagline; detailed activities remain in the world's tips. This
+removes an engine-owned content leak but does not change behavior registries
+or their estimate. No percentages changed.
+
 **2026-11-20 AMD pre-split gameplay-query update:** The hardware harness
 verified its pinned `23c30bf` wake, water-query, boat, dock, and pier sources,
 then generated the WebGPU reference on AMD RADV RENOIR and ran WebGL through

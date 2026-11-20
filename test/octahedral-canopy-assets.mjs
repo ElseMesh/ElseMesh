@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
-import { decodeOctahedralCanopyAtlas, decodeOctahedralCanopyLeafMask, loadOctahedralCanopyAssets } from '../src/network/OctahedralCanopyAssets.js';
+import { decodeOctahedralCanopyAtlas, decodeOctahedralCanopyAtlasData, decodeOctahedralCanopyLeafMask, loadOctahedralCanopyAssets } from '../src/network/OctahedralCanopyAssets.js';
 import { OCTAHEDRAL_CANOPY_COMPONENT_TYPE, OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND, OCTAHEDRAL_CANOPY_ATLAS_DATA_FORMAT } from '../src/network/OctahedralCanopyDescriptor.js';
 import { worldComponentAssetIDs } from '../src/network/WorldComponentRegistry.js';
 
@@ -158,6 +158,9 @@ try {
 
 const expectedMaskPixels = [ 0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255 ];
 const rawMaskFixture = pixelPNG( 2, 2, expectedMaskPixels );
+const decodedAtlas = await decodeOctahedralCanopyAtlasData( { bytes: rawMaskFixture, width: 2, height: 2 } );
+assert.deepEqual( Array.from( decodedAtlas.data ), expectedMaskPixels, 'both renderers receive identical raw octahedral-atlas RGBA8 bytes' );
+assert.deepEqual( [ decodedAtlas.width, decodedAtlas.height, decodedAtlas.format, decodedAtlas.sampler ], [ 2, 2, 'rgba8unorm', 'linearClamp' ] );
 const decodedLeafMask = await decodeOctahedralCanopyLeafMask( { bytes: rawMaskFixture, width: 2, height: 2 } );
 assert.deepEqual( Array.from( decodedLeafMask.data ), expectedMaskPixels, 'raw-data PNG decoding preserves every authored RGBA8 channel byte' );
 assert.deepEqual( [ decodedLeafMask.width, decodedLeafMask.height, decodedLeafMask.format, decodedLeafMask.sampler ], [ 2, 2, 'rgba8unorm', 'linearClamp' ] );

@@ -148,14 +148,14 @@ async function decodeRawRGBA8PNG( bytes, width, height ) {
 	}
 	const rowBytes = width * 4;
 	const filteredLength = ( rowBytes + 1 ) * height;
-	if ( ! Number.isSafeInteger( filteredLength ) || filteredLength > 0x7fffffff ) fail( 'leaf-mask PNG dimensions exceed the decoder limit' );
+	if ( ! Number.isSafeInteger( filteredLength ) || filteredLength > 0x7fffffff ) fail( 'RGBA8 PNG dimensions exceed the decoder limit' );
 	const filtered = new Uint8Array( await new Response( new Blob( [ compressed ] ).stream().pipeThrough( new DecompressionStream( 'deflate' ) ) ).arrayBuffer() );
-	if ( filtered.length !== filteredLength ) fail( 'decompressed leaf-mask PNG data has an invalid length' );
+	if ( filtered.length !== filteredLength ) fail( 'decompressed RGBA8 PNG data has an invalid length' );
 	const pixels = new Uint8Array( rowBytes * height );
 	for ( let y = 0; y < height; y ++ ) {
 		const sourceRow = y * ( rowBytes + 1 );
 		const filter = filtered[ sourceRow ];
-		if ( filter > 4 ) fail( `leaf-mask PNG uses unsupported row filter ${filter}` );
+		if ( filter > 4 ) fail( `RGBA8 PNG uses unsupported row filter ${filter}` );
 		const targetRow = y * rowBytes;
 		for ( let x = 0; x < rowBytes; x ++ ) {
 			const left = x >= 4 ? pixels[ targetRow + x - 4 ] : 0;
@@ -170,6 +170,16 @@ async function decodeRawRGBA8PNG( bytes, width, height ) {
 		}
 	}
 	return pixels;
+}
+
+/** Decode a validated data atlas as shared raw bytes for the WebGPU and WebGL presenters. */
+export async function decodeOctahedralCanopyAtlasData( atlas ) {
+	if ( ! atlas || ! ( atlas.bytes instanceof Uint8Array ) || ! Number.isInteger( atlas.width ) || ! Number.isInteger( atlas.height ) ) fail( 'a validated octahedral atlas PNG is required' );
+	const dimensions = inspectDataPNG( atlas.bytes );
+	if ( dimensions.width !== atlas.width || dimensions.height !== atlas.height ) fail( 'atlas dimensions do not match its validated PNG header' );
+	const data = await decodeRawRGBA8PNG( atlas.bytes, atlas.width, atlas.height );
+	if ( data.byteLength !== atlas.width * atlas.height * 4 ) fail( 'decoded atlas pixels do not match its signed RGBA8 dimensions' );
+	return { data, width: atlas.width, height: atlas.height, format: 'rgba8unorm', sampler: 'linearClamp' };
 }
 
 /** Decode the signed RGBA8 mask as shared byte data for both renderer adapters. */
