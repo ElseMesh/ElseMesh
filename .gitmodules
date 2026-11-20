@@ -10,3 +10,6 @@
 [submodule "worlds/ai-portals"]
 	path = worlds/ai-portals
 	url = https://github.com/rebroad/ai-portals.git
+[submodule "cloudflare/world-resolver"]
+	path = cloudflare/world-resolver
+	url = git@github.com:ElseMesh/world-resolver.git

@@ -321,18 +321,11 @@ WebRTC to a reachable provider. **Opaque friend-link tickets and account-bound a
 0%.** The client now creates and parses a compact route-only
 `https://elsemesh.org/?invite=<route-code>` URL; that code identifies the
 world/provider route but grants no access. Player-bound admission tickets
-remain unimplemented. **Compact, player-bound ZeroTier ticket: 0%.** The
-target `https://elsemesh.org/?invite=<ticket>` initially encodes 12 bytes
-(16 unpadded base64url characters): destination ZeroTier HostID, worldd-facing
-TCP port, a two-byte player/invite index, and a three-byte random value. Widen
-the index field if the world exceeds 65,536 records. The network ID is
-hardcoded in client and Worker configuration and is never included in the
-ticket. A global five-second cooldown per invite allows up to 17,280 guesses
-in 24 hours, a 0.103% success chance for one targeted invite; this is a
-deliberate size/security tradeoff and creates a repeated-guess denial-of-
-service risk. `worldd` must enforce cooldown, expiry, revocation/replay checks,
-and account authentication where required. This tracker remains at 0% until
-worldd issues the bound token and the browser redeems it end-to-end.
+remain unimplemented. Ticket encoding and security parameters are documented
+in the private resolver implementation notes. `worldd` must enforce per-invite
+guess throttling, expiry, revocation/replay checks, and account authentication
+where required. This tracker remains at 0% until worldd issues the bound token
+and the browser redeems it end-to-end.
 
 HostID is more durable than managed IPv4/IPv6 addresses, which can be
 reassigned. The Worker resolves the HostID through the current signed worldd

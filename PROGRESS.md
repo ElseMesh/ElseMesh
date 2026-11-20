@@ -58,28 +58,17 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 
 ## 2026-11-20
 
-- Specified the compact friend-invite ticket: 17 bytes (23 base64url
-  characters) for the ZeroTier HostID, worldd TCP port, and an 80-bit random
-  player-bound capability. The shared network ID stays hardcoded in client and
-  Worker configuration. HostID is preferred over embedding managed IPv4/IPv6
-  because addresses can be reassigned; the Worker resolves current private
-  address data from worldd's signed registration and never carries world data.
-  The browser still must join the shared ZeroTier network. This is a design
-  decision only: issuing/redeeming the player-bound token and dual-stack
-  registration are unimplemented, so the tracker remains at 0%. This initial
-  80-bit format was later superseded by the compact index-plus-random format
-  below.
+- Recorded the outstanding opaque friend-invite requirement. Ticket encoding
+  and security parameters are maintained in private implementation notes;
+  issuing and redeeming player-bound tickets remain unimplemented (0%).
 - Updated generated route-only ZeroTier invites to omit the hardcoded network
   ID, world ID (derived from the uniquely registered HostID), direct private
   gateway, and signed node-record copy. The configured Worker resolves those
   details. This trims route links but does not add the target port or player
   token; player-bound ticket implementation remains at 0%.
-- Revised the target ticket to a 16-bit player/invite index plus a 24-bit
-  random value, widening the index if more than 65,536 records are needed. A
-  global five-second per-invite cooldown permits at most 17,280 guesses in
-  24 hours: about 0.103% success probability per targeted invite. Documented
-  the remaining guess and denial-of-service risks; ticket implementation is
-  still 0%.
+- Ticket implementation remains 0%. The private resolver implementation
+  notes define the opaque ticket format and per-invite abuse controls; public
+  protocol documents intentionally omit security-sensitive encoding details.
 - Fixed two browser-to-worldd startup failures in the invite route. Chromium
   can obtain a public STUN-reflexive candidate while ICE gathering remains
   open, so the client now sends its bounded offer when that candidate appears

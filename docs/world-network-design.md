@@ -621,23 +621,14 @@ using its own timeout. No atomic inter-owner membership commit is required.
 ### Invitation-gated entry
 
 World owners may opt into invitation admission. The desired share URL is a
-short root URL such as `https://elsemesh.org/?invite=<ticket>`. The target
-ticket carries only the destination ZeroTier HostID, the worldd
-browser-facing TCP port, a player/invite index, and a short random value
-bound by `worldd` to the pending player record. Initially the index is two
-bytes and the random value three bytes; widen the index if the world exceeds
-65,536 player/invite records. Apply a global five-second cooldown per
-player/invite after failed checks. The 24-bit random value allows at most
-17,280 guesses during the default 24-hour expiry, about a 0.103% success
-chance per targeted invite. This is a compact-ticket tradeoff with measurable
-residual risk, not high-entropy 80-bit protection; continual failed guesses
-can also delay a legitimate visitor. The shared network ID is
-hardcoded in the client and Worker and never appears in the ticket. Host
-registration supplies the destination world and current managed address.
-`worldd` validates the invite value and its player/admission record; a
-player number or route claim supplied separately by the browser is not
-authority. A path-form URL may be supported as an alias. See the protocol
-design and [gateway resilience](gateway-resilience.md) for route selection.
+short root URL such as `https://elsemesh.org/?invite=<opaque-ticket>`. Keep
+ticket encoding and its security parameters in the private resolver design;
+do not publish those details in this repository. `worldd` validates each
+ticket against persistent player/invite state, including expiry, revocation,
+replay, and account requirements. A player number or route claim supplied
+separately by the browser is not authority. A path-form URL may be supported
+as an alias. See the protocol design and [gateway resilience](gateway-resilience.md)
+for route selection.
 
 Use the stable ZeroTier HostID in the ticket rather than managed IPv4/IPv6
 addresses. Managed addresses are short and could remove lookup, but may be

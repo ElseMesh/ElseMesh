@@ -114,43 +114,16 @@ ticket described below when `worldd` issues and validates player-bound
 invitations. Until then, the current route code grants no admission and must
 not be described as a working friend invitation.
 
-The desired public entry point is a short ElseMesh invitation URL such as
-`https://elsemesh.org/?invite=<ticket>` (a path-form URL may be supported as
-an alias). Initially encode 12 bytes as unpadded base64url (16 characters):
-the five-byte destination ZeroTier HostID, a two-byte network-order `worldd`
-browser-facing TCP port, a two-byte player/invite index, and a three-byte
-(24-bit) cryptographically random value. The index identifies a server-side
-player/invite record; values 0 through 65535 address 65,536 records. If more
-indices are needed, widen the index field by a byte. Its width is inferred
-from the decoded ticket length because the HostID, port and random value
-occupy fixed lengths. The single ElseMesh ZeroTier network ID is application
-configuration and must not be duplicated in the ticket. The destination
-world is derived from the registered worldd HostID; each HostID used for an
-invite must resolve unambiguously to one world. Do not include a world ID,
-resolver URL, gateway URL, signed node document, or provider allowlist when
-the same information is available from host registration or the server-side
-invite record.
-
-Generate the three-byte value with a cryptographic random source and bind it
-to the player/invite index in worldd's persistent invite state. Do not derive
-it from the index or other predictable/public fields. Store a keyed digest of
-HostID, index, and random value; an unkeyed digest of a 24-bit value could be
-brute-forced offline if the invite database were exposed. A failed check puts
-that player/invite into a global five-second cooldown enforced by worldd,
-shared across connections and restarts; a per-IP-only limit is insufficient
-because an attacker can distribute guesses. With a 24-hour expiry, this
-allows at most 17,280 guesses per invite. Exhaustive search takes about 971
-days, but the chance of guessing one ticket in its 24-hour lifetime is still
-about 0.103% (17,280 / 2^24). Across 20 independently targeted active invites,
-the combined chance is about 2.04%. Treat this as a deliberate compact-ticket
-tradeoff, not 80-bit strength. A shorter expiry lowers the window; a longer
-expiry raises it. The cooldown also creates a denial-of-service risk if an
-attacker continually guesses the same invite, so keep failures and cooldowns
-observable and avoid permanent lockout. `worldd` still checks expiry,
-revocation/replay state, and any required account authentication. Keep
-provider tokens, ZeroTier credentials, and contact details out of the URL.
-Remove the ticket from browser history after parsing and avoid consuming it on
-a link-preview GET.
+The public entry point is a short ElseMesh invitation URL such as
+`https://elsemesh.org/?invite=<opaque-ticket>` (a path-form URL may be
+supported as an alias). Ticket encoding, entropy, rate limits, expiry,
+redemption, and recovery policy are maintained in the private resolver
+implementation notes and must not be specified in this public protocol.
+`worldd` must validate the ticket against persistent player/invite state,
+including expiry, revocation, replay, and required account authentication.
+Keep provider tokens, ZeroTier credentials, and contact details out of the
+URL. Remove the ticket from browser history after parsing and avoid consuming
+it on a link-preview GET.
 
 For a single friend invitation that allows Facebook, Google, and Telegram,
 all three verified provider identities must resolve to the same pending
@@ -167,13 +140,12 @@ form `https://elsemesh.org/?invite=<ticket>` that opens the target world after
 successful authentication with any one of the invite's verified, allowed
 identities.
 
-`worldd` creates the pending player record and invite, stores the random value
-bound to the player/invite index with expiry/revocation/redemption state, and
-validates it before admission. The compact value is a bearer capability, not
-an owner signature. The index may be enumerable, so the random value and
-cooldown provide the guess resistance. Provider login, if required, happens
-before the world binds the player record. Remove the ticket from browser
-history after parsing and avoid consuming it on a link-preview GET.
+`worldd` creates the pending player record and invite, stores the ticket
+verifier with expiry/revocation/redemption state, and validates it before
+admission. The ticket is a bearer capability, not an owner signature.
+Provider login, if required, happens before the world binds the player record.
+Remove the ticket from browser history after parsing and avoid consuming it
+on a link-preview GET.
 
 The ticket identifies a route by HostID and port. The Worker resolves the
 HostID to current ZeroTier managed IP address data from worldd's signed,
