@@ -17,16 +17,16 @@ export function updateHostedShoreWetness( root ) {
 	root?.userData?.hostedWaterEffects?.shoreSim?.update();
 }
 
-export function createWebGPUHostedOceanEffects( { renderer, root, terrainGPU, terrainData, surface, sky, spray, clouds, includeBreakers = false } ) {
+export function createWebGPUHostedOceanEffects( { renderer, root, terrainGPU, surface, sky, spray, clouds, breakerStations = null, includeBreakers = false } ) {
 
-	if ( ! surface?.shore || ! terrainGPU || ! terrainData ) throw new Error( 'Hosted shoreline effects require a water surface, terrain GPU, and terrain data' );
+	if ( ! surface?.shore || ! terrainGPU ) throw new Error( 'Hosted shoreline effects require a water surface and terrain GPU' );
 	const shoreSim = new ShoreSim( renderer, { terrainGPU, shore: surface.shore } );
 	const surfFoam = new SurfFoam( { shoreSim } );
 	let breakers = null;
 	try {
 		if ( includeBreakers ) {
-			if ( ! terrainData ) throw new Error( 'Hosted breakers require terrain data' );
-			breakers = new Breakers( renderer, { surface, shore: surface.shore, terrainData, sky, spray, clouds } );
+			if ( ! breakerStations ) throw new Error( 'Hosted breakers require a world-authored station asset' );
+			breakers = new Breakers( renderer, { surface, shore: surface.shore, stations: breakerStations, sky, spray, clouds } );
 			root.add( breakers.mesh );
 		}
 	} catch ( error ) {

@@ -28,7 +28,7 @@ const detail = new SeaDetail();
 const spray = makeSpray();
 const surface = { fft: makeFFT(), terrain, shoreSim: sim, amplitude: { value: 1 } };
 const t1 = performance.now();
-const breakers = new Breakers( null, { surface, shore, terrainData: { heightAt }, sky: makeSky(), spray, clouds: makeClouds() } );
+const breakers = new Breakers( null, { surface, shore, stations: { data: new Float32Array( [ -1, 0, 0, 1, 1, 0, 0, 1 ] ), count: 2, spacing: 2 }, sky: makeSky(), spray, clouds: makeClouds() } );
 console.log( 'Breakers stations', breakers.NS, 'setup', ( performance.now() - t1 ).toFixed( 0 ), 'ms' );
 
 G.windSpeed.value = 9;

@@ -60,7 +60,10 @@ fn breakersFresnel( cosI: f32, eta: f32 ) -> f32 {
 
 export class Breakers {
 
-	constructor( renderer, { surface, shore, terrainData, sky, spray = null, clouds = null } ) {
+	constructor( renderer, { surface, shore, stations, sky, spray = null, clouds = null } ) {
+		if ( ! stations || ! Number.isInteger( stations.count ) || stations.count < 2 || stations.data?.length !== stations.count * 4 || ! Number.isFinite( stations.spacing ) || stations.spacing <= 0 ) {
+			throw new TypeError( 'Breakers require a decoded world-authored station asset' );
+		}
 
 		this.renderer = renderer;
 		this.surface = surface;
@@ -82,11 +85,10 @@ export class Breakers {
 		this.cameraPos = F.cameraPos;
 
 		const t0 = performance.now();
-		const st = buildStations( terrainData );
-		this.NS = st.count;
-		this.spacing = st.spacing;
-		this.stationData = st.data;
-		this.stations = new StorageBuffer( { label: 'brkStations', count: Math.max( 1, this.NS ), type: 'vec4f', data: st.data.length ? st.data : new Float32Array( 4 ) } );
+		this.NS = stations.count;
+		this.spacing = stations.spacing;
+		this.stationData = stations.data;
+		this.stations = new StorageBuffer( { label: 'brkStations', count: this.NS, type: 'vec4f', data: stations.data } );
 		// per station and slot (wave parity): 3 x vec4
 		//   (root.xyz, b) (back.xyz, H) (dir.xz, trough y, wave id 1..1024 or 0 = none)
 		this.crest = new StorageBuffer( { label: 'brkCrest', count: Math.max( 1, this.NS * 6 ), type: 'vec4f' } );
@@ -256,7 +258,6 @@ fn breakersFftDisp( p: vec2f, depth: f32 ) -> vec3f {
 	var d = vec3f( 0.0 );
 ${ fftCode }	return d * breakersP.amplitude;
 }
-
 ${ emitCode }
 
 // One crest of wave m at Lagrangian point pc (station i): store the lip frame and emit spray.
@@ -809,95 +810,5 @@ const BRK_NV: f32 = ${ f( NV ) };
 		mesh.staticVelocity = true;
 
 	}
-
-}
-
-// Shoreline stations along the main beach: evenly spaced along the (smoothed) shoreline, each with
-// the unit direction toward the sea. Returns { data: Float32Array(n * 4) (x, z, nx, nz), count, spacing }.
-export function buildStations( terrain, { x0 = - 175, x1 = 195, spacing = 0.6 } = {} ) {
-
-	// shoreline z(x): first land found marching north from the water
-	const pts = [];
-	for ( let x = x0; x <= x1; x += 0.5 ) {
-
-		if ( terrain.heightAt( x, 12 ) > - 0.3 ) continue; // not open water in front
-		let z = 12, zs = null;
-		for ( ; z > - 110; z -= 0.5 ) {
-
-			if ( terrain.heightAt( x, z ) > 0 ) {
-
-				let lo = z, hi = z + 0.5; // land at lo, water at hi
-				for ( let k = 0; k < 16; k ++ ) {
-
-					const mid = ( lo + hi ) * 0.5;
-					if ( terrain.heightAt( x, mid ) > 0 ) lo = mid; else hi = mid;
-
-				}
-
-				zs = ( lo + hi ) * 0.5;
-				break;
-
-			}
-
-		}
-
-		if ( zs !== null ) pts.push( [ x, zs ] );
-
-	}
-
-	// break into continuous runs, keep the longest (the main beach)
-	let best = [], run = [];
-	for ( let k = 0; k < pts.length; k ++ ) {
-
-		if ( run.length && ( Math.abs( pts[ k ][ 1 ] - run[ run.length - 1 ][ 1 ] ) > 3 || pts[ k ][ 0 ] - run[ run.length - 1 ][ 0 ] > 1.01 ) ) {
-
-			if ( run.length > best.length ) best = run;
-			run = [];
-
-		}
-
-		run.push( pts[ k ] );
-
-	}
-
-	if ( run.length > best.length ) best = run;
-
-	// smooth the polyline (the transects should not follow every wiggle of the waterline)
-	let sm = best.map( ( p ) => [ p[ 0 ], p[ 1 ] ] );
-	for ( let it = 0; it < 30; it ++ ) {
-
-		const nx = sm.map( ( p, k ) => {
-
-			if ( k === 0 || k === sm.length - 1 ) return p;
-			return [ p[ 0 ], ( sm[ k - 1 ][ 1 ] + 2 * p[ 1 ] + sm[ k + 1 ][ 1 ] ) * 0.25 ];
-
-		} );
-		sm = nx;
-
-	}
-
-	// resample by arc length
-	const out = [];
-	let acc = 0, next = 0;
-	for ( let k = 1; k < sm.length; k ++ ) {
-
-		const [ ax, az ] = sm[ k - 1 ], [ bx, bz ] = sm[ k ];
-		const seg = Math.hypot( bx - ax, bz - az );
-		while ( next <= acc + seg ) {
-
-			const t = ( next - acc ) / seg;
-			const x = ax + ( bx - ax ) * t, z = az + ( bz - az ) * t;
-			// normal toward the sea (+z side of a west->east polyline)
-			const tx = ( bx - ax ) / seg, tz = ( bz - az ) / seg;
-			out.push( x, z, - tz, tx );
-			next += spacing;
-
-		}
-
-		acc += seg;
-
-	}
-
-	return { data: new Float32Array( out ), count: out.length / 4, spacing };
 
 }

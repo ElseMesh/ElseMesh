@@ -2,6 +2,7 @@ import { decodeStaticModelInstanceSet, STATIC_MODEL_INSTANCE_SET_ASSET_KIND } fr
 import { decodeGroundDetailDensityAsset, GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js';
 import { decodeGrassDensityAsset, GRASS_DENSITY_ASSET_KIND } from './GrassDensityAsset.js';
 import { decodeOctahedralCanopyDescriptor, OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND } from './OctahedralCanopyDescriptor.js';
+import { decodeBreakerStationsAsset, BREAKER_STATIONS_ASSET_KIND } from './BreakerStationsAsset.js';
 
 const decoders = new Map();
 
@@ -11,6 +12,7 @@ decoders.set( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, decodeStaticModelInstanceSet
 decoders.set( GROUND_DETAIL_DENSITY_ASSET_KIND, decodeGroundDetailDensityAsset );
 decoders.set( GRASS_DENSITY_ASSET_KIND, decodeGrassDensityAsset );
 decoders.set( OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND, decodeOctahedralCanopyDescriptor );
+decoders.set( BREAKER_STATIONS_ASSET_KIND, decodeBreakerStationsAsset );
 
 export function registerWorldComponentAssetDecoder( kind, decode ) {
 	if ( typeof kind !== 'string' || ! /^[a-z0-9][a-z0-9.-]{0,63}\/\d+$/.test( kind ) || typeof decode !== 'function' || decoders.has( kind ) ) {

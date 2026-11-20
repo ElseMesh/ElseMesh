@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { createWebGLBreakerLips, prepareWebGLBreakerTransects, updateWebGLBreakerCrestState } from '../src/fallback/WebGLBreakerLips.js';
-import { extractWebGLShorelineStations } from '../src/fallback/WebGLShorelineStations.js';
 
 const result = document.querySelector( '#result' );
 try {
@@ -14,15 +13,18 @@ try {
 	camera.position.set( 10, 3.2, 8 ); camera.lookAt( 10, 0.15, - 2 );
 	const sea = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100 ), new THREE.MeshBasicMaterial( { color: 0x153b46 } ) );
 	sea.rotation.x = - Math.PI / 2; sea.position.set( 0, - 0.04, - 25 ); scene.add( sea );
-	const resolution = 64, origin = - 32, size = 64, fieldData = new Float32Array( resolution * resolution * 4 );
+	const resolution = 128, origin = - 64, size = 128, fieldData = new Float32Array( resolution * resolution * 4 );
 	for ( let j = 0; j < resolution; j ++ ) for ( let i = 0; i < resolution; i ++ ) {
 		const offset = ( j * resolution + i ) * 4;
-		fieldData[ offset ] = origin + ( j + 0.5 ) * size / resolution;
+		const z = origin + ( j + 0.5 ) * size / resolution;
+		fieldData[ offset ] = - z;
 		fieldData[ offset + 2 ] = 1;
 	}
 	const shoreField = { data: fieldData, res: resolution, origin, size };
-	const terrain = { origin, size, res: resolution, heightAt: ( _x, z ) => z };
-	const stations = extractWebGLShorelineStations( { terrain, shoreField, seaLevel: 0, targetSpacing: 2, maxStations: 256 } );
+	const terrain = { origin, size, res: resolution, heightAt: ( _x, z ) => z < 0 ? 1 : - 1 };
+	const breakerStations = { count: 50, spacing: 2, data: new Float32Array( 50 * 4 ) };
+	for ( let index = 0; index < breakerStations.count; index ++ ) breakerStations.data.set( [ - 49 + index * 2, - 10, 0, 1 ], index * 4 );
+	const stations = Array.from( { length: breakerStations.count }, ( _, index ) => ( { center: [ breakerStations.data[ index * 4 ], breakerStations.data[ index * 4 + 1 ] ], direction: [ 0, 1 ], contour: 0 } ) );
 	const transects = prepareWebGLBreakerTransects( stations, terrain, shoreField, 0 );
 	const debugState = new Float32Array( stations.length * 2 * 12 );
 	updateWebGLBreakerCrestState( stations, transects, 0, 97.6, debugState );
@@ -39,7 +41,7 @@ try {
 	const gl = renderer.getContext(), baseline = new Uint8Array( 640 * 480 * 4 );
 	renderer.render( scene, camera );
 	gl.readPixels( 0, 0, 640, 480, gl.RGBA, gl.UNSIGNED_BYTE, baseline );
-	const runtime = createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel: 0, scene } );
+	const runtime = createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel: 0, scene, breakerStations } );
 	if ( ! runtime || runtime.stations < 8 ) throw new Error( `shoreline mesh not created (${runtime?.stations || 0} stations)` );
 	runtime.update( 1 / 60, camera, null, 97.6 );
 	renderer.render( scene, camera );

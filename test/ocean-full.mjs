@@ -51,7 +51,7 @@ const s = await makeOceanScene( { terrain, sky, clouds, extra: ( ctx ) => {
 	ctx.onMaterial = ( mat, sr ) => {
 
 		const spray = sys.spray = new Spray( null, { query, terrain, sceneCopy: sr.opaqueCopy, clouds } );
-		const breakers = new Breakers( null, { surface, shore, terrainData: { heightAt }, sky, spray, clouds } );
+		const breakers = new Breakers( null, { surface, shore, stations: { data: new Float32Array( [ -1, 0, 0, 1, 1, 0, 0, 1 ] ), count: 2, spacing: 2 }, sky, spray, clouds } );
 		sys.breakers = breakers;
 		ctx.scene.add( breakers.mesh );
 		ctx.scene.add( spray.mesh );

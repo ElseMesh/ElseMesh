@@ -77,6 +77,7 @@ import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPo
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, createWorldPackageRoot, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createBundledWorldAssetConnector, loadWorldComponentAssets } from './network/WorldComponentAssets.js';
+import { decodeBreakerStationsComponentAsset } from './network/BreakerStationsAsset.js';
 import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
@@ -597,11 +598,17 @@ export class App {
 		// spray.emit() / emitAlongPoints() for boat bow spray and splashes)
 		this.spray = new Spray( renderer, { query: this.query, terrain: this.terrainGPU, sceneCopy: this.sceneRenderer.opaqueCopy, clouds: this.clouds } );
 		scene.add( this.spray.mesh );
-		this.breakers = new Breakers( renderer, {
-			surface: this.surface, shore: this.shore, terrainData: this.terrainData, sky: this.sky,
+		const oceanComponent = this.worldPackage.source.components.find( component => component.type === 'elsemesh.island-ocean/1' );
+		let breakerStations = null;
+		if ( oceanComponent ) {
+			const oceanAssets = await loadWorldComponentAssets( [ oceanComponent ], this.worldPackage.assets?.assetURLs );
+			breakerStations = decodeBreakerStationsComponentAsset( oceanComponent, oceanAssets );
+		}
+		this.breakers = breakerStations ? new Breakers( renderer, {
+			surface: this.surface, shore: this.shore, stations: breakerStations, sky: this.sky,
 			spray: this.spray, clouds: this.clouds,
-		} );
-		scene.add( this.breakers.mesh );
+		} ) : null;
+		if ( this.breakers ) scene.add( this.breakers.mesh );
 		// dust, pollen, salt aerosol, seed fluff and gnats drifting around the camera
 		this.airMotes = new AirMotes( { terrain: this.terrainGPU, clouds: this.clouds, csm: this.csm, reversedDepth: true } );
 		scene.add( this.airMotes.mesh );
@@ -1627,7 +1634,8 @@ export class App {
 		const components = root.userData.worldComponents || [];
 		const terrain = components.find( ( component ) => component.terrainSurface && component.terrainGPU );
 		const runtime = components.find( ( component ) => component.hostedBoat );
-		this.activeHostedOcean = components.some( ( component ) => component.isWorldOcean );
+		const worldOcean = components.find( component => component.isWorldOcean );
+		this.activeHostedOcean = Boolean( worldOcean );
 		this.activeHostedBoat = runtime || null;
 		const hostedVehicleObjectId = worldVehicleObjectId( connector.manifest.components );
 		if ( hostedVehicleObjectId && runtime?.boat?.model?.group ) this.localLights.setWorldObjectRoot( hostedVehicleObjectId, runtime.boat.model.group );
@@ -1652,8 +1660,9 @@ export class App {
 			waterSurface.shore = terrain.shore;
 			const effects = ensureWebGPUHostedOceanEffects( {
 				enabled: ! this.qs.has( 'noSim' ) && components.some( component => component.surface ),
-				renderer: this.renderer, root, terrainGPU: terrain.terrainGPU, terrainData: root.userData.terrainData,
-				surface: waterSurface, sky: this.sky, spray: this.spray, clouds: this.clouds, includeBreakers: this.activeHostedOcean,
+				renderer: this.renderer, root, terrainGPU: terrain.terrainGPU,
+				surface: waterSurface, sky: this.sky, spray: this.spray, clouds: this.clouds,
+				breakerStations: worldOcean?.breakerStations, includeBreakers: Boolean( worldOcean?.breakerStations ),
 			} );
 			if ( effects ) {
 				waterSurface.shoreSim = effects.shoreSim;

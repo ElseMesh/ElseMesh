@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import '../src/fallback/WebGLComponentSupport.js';
 import { worldComponentBackendAdapter } from '../src/network/WorldComponentBackendRegistry.js';
+import { encodeBreakerStationsAsset, BREAKER_STATIONS_ASSET_KIND } from '../src/network/BreakerStationsAsset.js';
 import { WebGLFallback } from '../src/fallback/WebGLFallback.js';
 
 const resolution = 8;
@@ -42,24 +43,29 @@ fallback._makeWater = geometry => {
 
 const adapter = worldComponentBackendAdapter( 'webgl', 'elsemesh.island-ocean/1' );
 assert.equal( typeof adapter, 'function', 'the generic WebGL island-ocean adapter is registered' );
+	const stationBytes = encodeBreakerStationsAsset( { data: new Float32Array( [ 4, 5, 0, 1, 5, 5, 0, 1 ] ), count: 2, spacing: 1 } );
+	const stationAssetId = `sha256:${'1'.repeat( 64 )}`;
+	const oceanComponent = { id: 'ocean', type: 'elsemesh.island-ocean/1', assets: [ { assetId: stationAssetId, kind: BREAKER_STATIONS_ASSET_KIND } ] };
 	const installResult = adapter( {
 	fallback,
 	rules: { seaLevel: 0 },
 	terrain,
 	terrainWater: { texture: shoreTexture, minHeight: - 512, maxHeight: 1536, origin: 0, size: resolution, shore: { texture: shoreTexture, origin: 0, size: resolution, timeRange: new THREE.Vector2( 0, 1 ) } },
 	terrainSurface: { shoreField },
-	}, { id: 'ocean' } );
+		assets: new Map( [ [ stationAssetId, stationBytes ] ] ),
+	}, oceanComponent );
 assert.equal( installResult?.installed, true, 'the hosted island ocean installs' );
 assert.equal( typeof installResult?.runtime?.update, 'function', 'the hosted island ocean returns a live breaker-lip runtime' );
 installResult.runtime.update( 1 / 60, null, null, 1 );
 
 const breakerSpray = fallback.waterScene.children.find( child => child.isPoints );
-assert( breakerSpray, 'hosted WebGL island ocean installs the same breaker spray presentation used by the built-in ocean' );
+assert( breakerSpray, 'hosted WebGL island ocean installs spray at the world-authored breaker stations' );
 assert( breakerSpray.material.vertexShader.includes( 'webglShoreWobble( along )' ), 'breaker spray uses the water surface shore phase' );
 assert( breakerSpray.geometry.getAttribute( 'position' ).count > 0, 'breaker spray samples shallow-water points from packaged terrain' );
 assert( fallback.waterScene.children.some( child => child.material?.uniforms?.uOceanEnabled ), 'the hosted water mesh is installed for FFT binding' );
 const lips = fallback.waterScene.children.find( child => child.name === 'HostedBreakerLips' );
 assert( lips?.isMesh && lips.geometry.getAttribute( 'aProfile' ), 'hosted island ocean installs the generic shoreline-driven lip mesh' );
+assert.equal( installResult.runtime.stations, 2, 'the WebGL lip mesh consumes the exact world-authored station count' );
 
 installResult.runtime.dispose();
 shoreTexture.dispose();

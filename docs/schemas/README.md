@@ -13,4 +13,5 @@ repository, alongside the source and package assets that use them.
 - [`ai-edit-decision.schema.json`](ai-edit-decision.schema.json): local review
   decisions for AI-generated candidates.
 - [`ambient-audio.md`](ambient-audio.md): signed ambience data.
+- [`island-ocean.md`](island-ocean.md): terrain-backed ocean and shared breaker inputs.
 - [`water-body.md`](water-body.md): bounded terrain-independent water.

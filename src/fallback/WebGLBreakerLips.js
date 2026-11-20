@@ -1,10 +1,8 @@
-import { extractWebGLShorelineStations } from './WebGLShorelineStations.js';
 import { SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_VARIATION, shoreWaveAmplitude, shoreWobble, sampleShoreField } from '../ocean/ShoreSwash.js';
 
 const SEGMENT_LENGTH = 2;
 const TRANSECT_STEPS = 64;
 const PROFILE_VERTICES = 20;
-const MAX_STATIONS = 768;
 const LIP_UPDATE_RANGE = 240;
 const TRANSECT_VALUES = 6;
 const GRAVITY = 9.81;
@@ -60,7 +58,7 @@ export function prepareWebGLBreakerTransects( stations, terrain, shoreField, sea
 		const station = stations[ stationIndex ], [ x0, z0 ] = station.center;
 		for ( let step = 0; step <= TRANSECT_STEPS; step ++ ) {
 			const distance = step * SEGMENT_LENGTH;
-			const x = x0 - station.direction[ 0 ] * distance, z = z0 - station.direction[ 1 ] * distance;
+			const x = x0 + station.direction[ 0 ] * distance, z = z0 + station.direction[ 1 ] * distance;
 			const sh = sampleShoreField( shoreField, x, z, sample );
 			const magnitude = Math.hypot( sh[ 1 ], sh[ 2 ] );
 			const directionX = sh[ 1 ] / Math.max( magnitude, 1e-4 ), directionZ = sh[ 2 ] / Math.max( magnitude, 1e-4 );
@@ -113,8 +111,8 @@ export function updateWebGLBreakerCrestState( stations, transects, seaLevel, tim
 			directionX /= Math.max( directionLength, 1e-4 ); directionZ /= Math.max( directionLength, 1e-4 );
 			const exposure = mix( values[ a + 4 ], values[ b + 4 ], t );
 			const depth = mix( values[ a + 5 ], values[ b + 5 ], t );
-			const rootX = x0 - station.direction[ 0 ] * rootDistance;
-			const rootZ = z0 - station.direction[ 1 ] * rootDistance;
+			const rootX = x0 + station.direction[ 0 ] * rootDistance;
+			const rootZ = z0 + station.direction[ 1 ] * rootDistance;
 			const amplitude = shoreWaveAmplitude( wave, along, { amplitude: SHORE_DEFAULT_AMPLITUDE, variation: SHORE_DEFAULT_VARIATION } );
 				const params = breakParams( amplitude, depth );
 				const env = smoothstep( 26, 13, depth ) * sat( exposure * 1.4 );
@@ -235,9 +233,19 @@ function makeMaterial( THREE, texture, width ) {
 	} );
 }
 
-export function createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel, scene } = {} ) {
+function stationRecords( asset ) {
+	if ( ! asset || ! Number.isInteger( asset.count ) || asset.count < 2 || asset.data?.length !== asset.count * 4 || ! Number.isFinite( asset.spacing ) ) return [];
+	const stations = [];
+	for ( let index = 0; index < asset.count; index ++ ) {
+		const offset = index * 4, center = [ asset.data[ offset ], asset.data[ offset + 1 ] ];
+		stations.push( { center, direction: [ asset.data[ offset + 2 ], asset.data[ offset + 3 ] ], contour: 0 } );
+	}
+	return stations;
+}
+
+export function createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel, scene, breakerStations } = {} ) {
 	if ( ! terrain || ! shoreField || ! scene || ! Number.isFinite( seaLevel ) ) return null;
-	const stations = extractWebGLShorelineStations( { terrain, shoreField, seaLevel, targetSpacing: Math.max( 2, terrain.size / 256 ), maxStations: MAX_STATIONS } );
+	const stations = stationRecords( breakerStations );
 	if ( stations.length < 2 ) return null;
 	const transects = prepareWebGLBreakerTransects( stations, terrain, shoreField, seaLevel );
 	const state = new Float32Array( stations.length * 2 * 12 );
@@ -245,7 +253,7 @@ export function createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel, 
 	texture.magFilter = texture.minFilter = THREE.NearestFilter;
 	texture.generateMipmaps = false;
 	texture.needsUpdate = true;
-	const geometry = makeGeometry( THREE, stations, Math.max( 8, terrain.size / 128 ) );
+	const geometry = makeGeometry( THREE, stations, breakerStations.spacing * 1.75 );
 	const material = makeMaterial( THREE, texture, stations.length * 2 );
 	const mesh = new THREE.Mesh( geometry, material );
 	mesh.name = 'HostedBreakerLips'; mesh.frustumCulled = false; mesh.renderOrder = 10;
@@ -253,6 +261,7 @@ export function createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel, 
 	scene.add( mesh );
 	return {
 		stations: stations.length,
+		stationData: breakerStations.data,
 		update( _dt, camera, _player, time = 0 ) {
 			updateWebGLBreakerCrestState( stations, transects, seaLevel, time, state, camera?.position || null );
 			texture.needsUpdate = true;

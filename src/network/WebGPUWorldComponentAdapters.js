@@ -9,6 +9,7 @@ import { registerWorldComponentBackendAdapter } from './WorldComponentBackendReg
 import './WebGPUStaticModelInstanceSetAdapter.js';
 import './WebGPUGroundCoverFieldAdapter.js';
 import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js';
+import { decodeBreakerStationsComponentAsset } from './BreakerStationsAsset.js';
 import { GROUND_DETAIL_DENSITY_ASSET_KIND } from './GroundDetailDensityAsset.js';
 import { PebbleField } from '../world/debris/PebbleField.js';
 
@@ -69,7 +70,7 @@ function installWaterBody( { app, root, connector, installed }, component ) {
 
 }
 
-function installIslandOcean( { app, root }, _component ) {
+function installIslandOcean( { app, root, connector }, component ) {
 
 	const lod = new CDLOD( { gridSize: Number( app.qs.get( 'G' ) || 32 ), leafSize: 8, levels: 12, minY: -25, maxY: 25 } );
 	const mesh = new Mesh( lod.geometry, app.waterMaterial );
@@ -77,11 +78,13 @@ function installIslandOcean( { app, root }, _component ) {
 	mesh.receiveShadow = true;
 	mesh.layers.set( LAYERS.WATER );
 	root.add( mesh );
+	const breakerStations = decodeBreakerStationsComponentAsset( component, connector?.assets );
 	return {
 		installed: true,
 		runtime: {
 			isWorldOcean: true,
 			surface: app.surface,
+			breakerStations,
 			update: ( _dt, camera ) => lod.update( camera ),
 			dispose: () => { root.remove( mesh ); lod.geometry.dispose(); },
 		},

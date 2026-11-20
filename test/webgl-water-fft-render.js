@@ -96,10 +96,11 @@ try {
 	const shoreTexture = new THREE.DataTexture( new Uint8Array( [ 128, 255, 255, 128 ] ), 1, 1, THREE.RGBAFormat );
 	shoreTexture.needsUpdate = true;
 	const sprayTerrain = { res: 2, size: 2, origin: 0, heights: new Float32Array( 4 ).fill( -1 ), heightAt: () => -1 };
+	const sprayStations = { count: 2, spacing: 1, data: new Float32Array( [ 0.5, 0.5, 0, 1, 1.5, 0.5, 0, 1 ] ) };
 	const spray = fallback._makeBreakerSpray( sprayTerrain, {
 		texture: shoreTexture, origin: 0, size: 2, minHeight: -10, maxHeight: 10,
 		shore: { texture: shoreTexture, origin: 0, size: 2, timeRange: new THREE.Vector2( 0, 1 ) },
-	}, 0 );
+	}, 0, sprayStations );
 	const sprayScene = new THREE.Scene();
 	sprayScene.add( spray );
 	renderer.setRenderTarget( null );

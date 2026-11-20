@@ -19,6 +19,7 @@ import { decodeTerrainSurfaceAsset } from '../network/TerrainSurfaceAsset.js';
 import { decodeWorldComponentAsset } from '../network/WorldComponentAssetCodecRegistry.js';
 import { LODLoadQueue, WorldObjectLOD } from '../network/WorldObjectLOD.js';
 import { createBundledWorldAssetConnector, loadWorldComponentAssets } from '../network/WorldComponentAssets.js';
+import { decodeBreakerStationsComponentAsset } from '../network/BreakerStationsAsset.js';
 import { WebGLLocalLights } from './WebGLLocalLights.js';
 import { getDetailImage } from '../world/terrain/DetailTextures.js';
 import { makeFoamLaceData } from '../ocean/FoamLaceData.js';
@@ -576,7 +577,7 @@ function webglShoreFieldTexture( T, terrain, seaLevel, worldDefinition ) {
 
 }
 
-function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
+function webglBreakerSpray( T, terrain, terrainWater, seaLevel, stations ) {
 
 	const positions = [], seeds = [], depths = [];
 	const add = ( x, z, depth ) => {
@@ -584,24 +585,20 @@ function webglBreakerSpray( T, terrain, terrainWater, seaLevel ) {
 		const seed = ( ( Math.sin( x * 12.9898 + z * 78.233 ) * 43758.5453 ) % 1 + 1 ) % 1;
 		positions.push( x, 0, z ); seeds.push( seed ); depths.push( depth );
 	};
-	if ( terrain?.heights && terrain.res > 1 ) {
-		// Use the same terrain-derived shore sampling for built-in and hosted worlds.
-		// A fixed world-space spacing bounds the particle count independently of
-		// the source heightfield resolution.
-		const cell = terrain.size / terrain.res, stride = Math.max( 1, Math.ceil( 0.75 / cell ) );
-		const spacing = cell * stride;
-		const hash = ( i, j, salt ) => {
-			const value = Math.sin( i * 127.1 + j * 311.7 + salt * 74.7 ) * 43758.5453;
-			return value - Math.floor( value );
-		};
-		for ( let j = 0; j < terrain.res; j += stride ) for ( let i = 0; i < terrain.res; i += stride ) {
-			const depth = seaLevel - terrain.heights[ j * terrain.res + i ];
-			if ( depth <= - 2 || depth >= 8 ) continue;
-			const x = terrain.origin + ( i + stride * 0.5 + 0.5 ) * cell + ( hash( i, j, 1 ) - 0.5 ) * Math.min( 0.7, spacing * 0.7 );
-			const z = terrain.origin + ( j + stride * 0.5 + 0.5 ) * cell + ( hash( i, j, 2 ) - 0.5 ) * Math.min( 0.7, spacing * 0.7 );
-			const px = T.MathUtils.clamp( x, terrain.origin + cell * 0.5, terrain.origin + terrain.size - cell * 0.5 );
-			const pz = T.MathUtils.clamp( z, terrain.origin + cell * 0.5, terrain.origin + terrain.size - cell * 0.5 );
-			add( px, pz, seaLevel - terrain.heightAt( px, pz ) );
+	if ( terrain && stations?.data && stations.count > 1 ) {
+		const boundsMin = terrain.origin, boundsMax = terrain.origin + terrain.size;
+		const distanceStep = 1.5;
+		for ( let station = 0; station < stations.count; station ++ ) {
+			const offset = station * 4, x0 = stations.data[ offset ], z0 = stations.data[ offset + 1 ];
+			const nx = stations.data[ offset + 2 ], nz = stations.data[ offset + 3 ];
+			const tx = nz, tz = - nx;
+			for ( let sample = 0, distance = 0.5; distance <= 84; sample ++, distance += distanceStep ) {
+				const seed = ( ( Math.sin( station * 127.1 + sample * 311.7 ) * 43758.5453 ) % 1 + 1 ) % 1;
+				const lateral = ( seed - 0.5 ) * Math.min( 0.7, stations.spacing * 0.8 );
+				const x = x0 + nx * distance + tx * lateral, z = z0 + nz * distance + tz * lateral;
+				if ( x < boundsMin || x > boundsMax || z < boundsMin || z > boundsMax ) continue;
+				add( x, z, seaLevel - terrain.heightAt( x, z ) );
+			}
 		}
 	}
 	const geometry = new T.BufferGeometry();
@@ -1441,9 +1438,9 @@ export class WebGLFallback {
 
 	}
 
-	_makeBreakerSpray( terrain, terrainWater, seaLevel ) {
+	_makeBreakerSpray( terrain, terrainWater, seaLevel, stations ) {
 
-		return webglBreakerSpray( this.THREE, terrain, terrainWater, seaLevel );
+		return webglBreakerSpray( this.THREE, terrain, terrainWater, seaLevel, stations );
 
 	}
 
@@ -1672,7 +1669,13 @@ export class WebGLFallback {
 		const water = this._makeWater( oceanLOD.geometry, this.worldSeaLevel, waterTerrain, oceanLOD.lod );
 		water.position.y = this.worldSeaLevel;
 		this.waterScene.add( water );
-		this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel ) );
+		const oceanComponent = this.defaultWorldSource?.components?.find( component => component.type === 'elsemesh.island-ocean/1' );
+		let breakerStations = null;
+		if ( oceanComponent ) {
+			const assets = await loadWorldComponentAssets( [ oceanComponent ], this.defaultWorldAssets?.assetURLs );
+			breakerStations = decodeBreakerStationsComponentAsset( oceanComponent, assets );
+		}
+		if ( breakerStations ) this.waterScene.add( webglBreakerSpray( T, this.terrain, waterTerrain, this.worldSeaLevel, breakerStations ) );
 		progress( 0.55, 'Loading the island village…' );
 		try {
 			const model = await this.loader.loadAsync( this.defaultWorldAssets.villageLOD );

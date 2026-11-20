@@ -77,7 +77,7 @@ Portal records may optionally select a client-rendered frame using `visual: "tim
 
 Tidewater's tropical vegetation placement asset is a world-owned binary format. Its fixed field order, bounds, and compatibility rules are documented in [`../worlds/tidewater/docs/schemas/vegetation-placement.md`](../worlds/tidewater/docs/schemas/vegetation-placement.md). The bounded deep-water component and its current simulation limits are documented in [`schemas/water-body.md`](schemas/water-body.md). The hosted Downeast boat berth and gameplay contract is documented in [`../worlds/tidewater/docs/schemas/downeast-boat.md`](../worlds/tidewater/docs/schemas/downeast-boat.md).
 
-The example-island water component is documented in [`../worlds/tidewater/docs/schemas/island-ocean.md`](../worlds/tidewater/docs/schemas/island-ocean.md). It is deliberately scoped to the reference island's water profile.
+The reference-island ocean component and its optional shared breaker-station asset are documented in [`schemas/island-ocean.md`](schemas/island-ocean.md).
 
 Runtime component records are closed, versioned contracts. Authoring validation, owner signing, Go node decoding, and browser validation reject fields that are not declared for that component version; introduce new data under a new protocol version rather than relying on unknown fields being ignored.
 

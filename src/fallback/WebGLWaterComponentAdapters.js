@@ -1,4 +1,5 @@
 import { registerWorldComponentBackendAdapter } from '../network/WorldComponentBackendRegistry.js';
+import { decodeBreakerStationsComponentAsset } from '../network/BreakerStationsAsset.js';
 import { createWebGLBreakerLips } from './WebGLBreakerLips.js';
 
 registerWorldComponentBackendAdapter( 'webgl', 'elsemesh.water-body/1', installWaterBody );
@@ -13,14 +14,15 @@ function installWaterBody( { fallback, rules, terrainWater }, component ) {
 	return true;
 }
 
-function installIslandOcean( { fallback, rules, terrain, terrainWater, terrainSurface } ) {
+function installIslandOcean( { fallback, rules, terrain, terrainWater, terrainSurface, assets }, component ) {
 	const T = fallback.THREE;
 	const seaLevel = rules.seaLevel ?? - 4.5;
+	const breakerStations = decodeBreakerStationsComponentAsset( component, assets );
 	const oceanLOD = fallback._createOceanLOD();
 	const water = fallback._makeWater( oceanLOD.geometry, seaLevel, terrainWater, oceanLOD.lod );
 	water.position.y = seaLevel;
 	fallback.waterScene.add( water );
-	if ( terrain && terrainWater?.shore ) fallback.waterScene.add( fallback._makeBreakerSpray( terrain, terrainWater, seaLevel ) );
-	const breakerLips = terrainSurface?.shoreField ? createWebGLBreakerLips( T, { terrain, shoreField: terrainSurface.shoreField, seaLevel, scene: fallback.waterScene } ) : null;
+	if ( breakerStations && terrain && terrainWater?.shore ) fallback.waterScene.add( fallback._makeBreakerSpray( terrain, terrainWater, seaLevel, breakerStations ) );
+	const breakerLips = breakerStations && terrainSurface?.shoreField ? createWebGLBreakerLips( T, { terrain, shoreField: terrainSurface.shoreField, seaLevel, scene: fallback.waterScene, breakerStations } ) : null;
 	return breakerLips ? { installed: true, runtime: breakerLips } : true;
 }
