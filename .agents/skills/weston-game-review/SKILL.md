@@ -43,9 +43,11 @@ Use the checked-in display setup and browser helper; do not launch Weston with
    the task, build/revision, and renderer (for example, `Tidewater original —
    WebGPU` and `ElseMesh split — WebGPU`). Target the exact outer-window ID with
    `wmctrl -ir WINDOW_ID -T TITLE`. Start it minimized by passing
-   `--start-minimized` to Weston when the selected binary supports that option;
-   it requests the iconic state before the first map. For an older installed
-   Weston, minimize the identified outer window with
+   `--start-minimized` to Weston; `start-weston-review.sh` does this by default
+   when the selected binary supports the option. It requests the iconic state
+   before the first map. Set `WESTON_START_MINIMIZED=0` only when a visible
+   Weston window is needed for inspection. For an older installed Weston,
+   minimize the identified outer window with
    `wmctrl -ir WINDOW_ID -b add,hidden`; this hides it without stopping the
    compositor or its private socket. Do not close Weston as a way to minimize
    it. If human visual inspection requires showing the window, remove the
