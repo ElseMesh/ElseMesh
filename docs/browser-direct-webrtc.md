@@ -139,6 +139,15 @@ overlay.
   codes, account tokens, and other credentials. Make Tunnel/control-only
   policy visible, and report a blocked large-asset fallback instead of
   retrying it through that Tunnel.
+- **TODO — actionable overlay fallback:** when a rendezvous-only invite cannot
+  establish a direct ICE data channel and no public world gateway is available,
+  explain that the direct path failed for this connection and offer the invited
+  ZeroTier network ID with copy support plus concise join steps for Linux,
+  Windows, and Android. Say that the network owner may need to authorize the
+  new device. Offer Tailscale only when the world owner has advertised/shared a
+  usable Tailscale route; otherwise explain that installing Tailscale alone
+  cannot reach this world. Include retry after the visitor joins. Do not imply
+  that browser WebRTC lacks UDP or that an extension alone can provide raw UDP.
 - Treat browser-hosted worlds separately: their owner worker currently
   registers through a reverse WebSocket. Direct access to a browser-hosted
   owner needs an independently verified browser-worker WebRTC path; the daemon

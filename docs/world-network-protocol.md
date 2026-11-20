@@ -266,6 +266,15 @@ forwards the ZeroTier packets. That relay must be discoverable at a stable
 endpoint, so it is an online dependency. This is substantial networking work,
 not merely a compiler flag.
 
+A normal browser extension does not provide a raw UDP socket API. A Chromium
+extension can communicate with a separately installed native messaging host;
+that host could run libzt, but every visitor would need to install and maintain
+both pieces. The historical `chrome.sockets.udp` API belongs to Chrome Apps,
+not ordinary extensions. Treat a native companion as an optional client
+distribution, not as a browser-only fix for ICE reachability. See [Chrome
+Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging)
+and the [Chrome Apps UDP API](https://developer.chrome.com/docs/apps/reference/sockets/udp).
+
 Browser-managed ZeroTier is unproven and is not part of the supported baseline.
 Only investigate it if a measured user need justifies the networking and
 performance work. Standard browser networking does not expose raw UDP sockets;
