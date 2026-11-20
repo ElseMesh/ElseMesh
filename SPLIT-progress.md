@@ -2696,3 +2696,11 @@ finding changes them.
   default-path darkening; no exposure change is needed. Spray, other
   views/assets, LOD transitions, and WebGL comparison remain open. Tidewater
   parity stays at 93%; no percentage change.
+
+- 2026-11-20: extended the engine-owned canopy camera plan with the shared
+  far-card transform derived from signed group bounds, placement, and camera
+  direction. Near-only placements skip far-card transform allocation, and
+  nonuniform horizontal instance scale is included in the conservative width.
+  The focused planner test covers these cases and passes. No renderer adapter
+  consumes the transform yet, the signed package remains inactive, and this
+  closes no appearance-parity gate; Tidewater remains at 93%.
