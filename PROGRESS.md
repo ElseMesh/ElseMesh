@@ -107,6 +107,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   linear RGBA8 data PNG, with channel meanings and tile layout recorded. The
   provisional PBR material and absent canopy graph/runtime reference keep this
   artifact out of the signed package; no parity percentage changed.
+- Reran Tidewater's AMD WebGPU/WebGL shoreline and boat parity harness in an
+  isolated no-input Weston display. Its pre-split `23c30bf` source checks passed;
+  RADV generated the reference and RadeonSI ran WebGL. The 13 shoreline/dock
+  samples had `0.00781 m` height MAE (`0.04941 m` max). The no-wake 18-second
+  boat trace diverged by at most `0.05368 m`; the trace with WakeSim and pier
+  colliders diverged by at most `0.07417 m`. The 176-frame production
+  shoreline cast matched landing frame/state with `0.00034 m` maximum
+  bobber/landing-water delta. These are query/physics results, not rendered
+  pixel parity or FPS evidence.
 
 ## 2026-11-18
 
