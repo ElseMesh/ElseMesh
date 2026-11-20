@@ -42,12 +42,15 @@ Use the checked-in display setup and browser helper; do not launch Weston with
    Weston window a concise title that names
    the task, build/revision, and renderer (for example, `Tidewater original —
    WebGPU` and `ElseMesh split — WebGPU`). Target the exact outer-window ID with
-   `wmctrl -ir WINDOW_ID -T TITLE`. Then minimize the outer Weston window by
-   default with `wmctrl -ir WINDOW_ID -b add,hidden`; this hides it without
-   stopping the compositor or its private socket. Do not close Weston as a way
-   to minimize it. If human visual inspection requires showing the window,
-   remove the `hidden` state during that inspection and minimize it again
-   afterward, without focusing it. Prefer matching its PID from `wmctrl -lp`;
+   `wmctrl -ir WINDOW_ID -T TITLE`. Start it minimized by passing
+   `--start-minimized` to Weston when the selected binary supports that option;
+   it requests the iconic state before the first map. For an older installed
+   Weston, minimize the identified outer window with
+   `wmctrl -ir WINDOW_ID -b add,hidden`; this hides it without stopping the
+   compositor or its private socket. Do not close Weston as a way to minimize
+   it. If human visual inspection requires showing the window, remove the
+   `hidden` state during that inspection and minimize it again afterward,
+   without focusing it. Prefer matching its PID from `wmctrl -lp`;
    Weston may publish PID 0, so in that case record the existing window IDs
    before launch and select the newly created Weston window afterward. Never
    rename or minimize a window by assumption. Do not mute host audio or
