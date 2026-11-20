@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -95,6 +96,24 @@ func verifyZeroTierNodeID(path string, nodeID uint64) error {
 		return fmt.Errorf("close ZeroTier node ID marker: %w", err)
 	}
 	return nil
+}
+
+func readZeroTierNodeID(path string) (string, error) {
+	contents, err := os.ReadFile(filepath.Join(path, "elsemesh-node-id"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", errors.New("start this worldd with ZeroTier once before creating an invite")
+		}
+		return "", fmt.Errorf("read ZeroTier node ID marker: %w", err)
+	}
+	value := strings.ToLower(strings.TrimSpace(string(contents)))
+	if len(value) != 10 {
+		return "", errors.New("stored ZeroTier node ID marker is invalid")
+	}
+	if _, err := strconv.ParseUint(value, 16, 40); err != nil {
+		return "", errors.New("stored ZeroTier node ID marker is invalid")
+	}
+	return value, nil
 }
 
 func fileExists(path string) (bool, error) {

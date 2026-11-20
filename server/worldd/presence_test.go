@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -89,6 +90,42 @@ func TestRegionContentCapabilityFollowsAcceptedPresenceLifetime(t *testing.T) {
 	}
 	if _, ok := d.regionContentVisitor(token); ok {
 		t.Fatal("content capability remained valid after explicit leave")
+	}
+}
+
+func TestPresenceBindsValidInviteToAdmittedSession(t *testing.T) {
+	d := presenceTestDaemon(t)
+	now := time.Now()
+	dataDir := t.TempDir()
+	d.inviteStorePath = filepath.Join(dataDir, "invites.json")
+	d.zeroTierNodeID = "8e23729743"
+	code, err := createWorldInvite(dataDir, d.zeroTierNodeID, 321, now.Add(time.Hour), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pose := presenceTestPose()
+	pose.Position = []float64{0, 1.38, 8}
+	session, err := newPresenceSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	join := gatewayMessage{Type: "presence.update", Pose: pose, SpawnCandidates: presenceTestSpawnCandidates(), InviteTicket: code}
+	bindPresenceRequest(&join, d.host.ID().String(), session)
+	if _, err := d.presenceRequest(join, now); err != nil {
+		t.Fatalf("valid invite did not admit player: %v", err)
+	}
+	joined := d.players[join.presenceKey]
+	if joined.invitePlayerNumber == nil || *joined.invitePlayerNumber != 321 {
+		t.Fatalf("invite player number was not bound to the session: %+v", joined.invitePlayerNumber)
+	}
+
+	other := presenceTestDaemon(t)
+	other.inviteStorePath = filepath.Join(t.TempDir(), "invites.json")
+	other.zeroTierNodeID = d.zeroTierNodeID
+	bad := gatewayMessage{Type: "presence.update", Pose: pose, SpawnCandidates: presenceTestSpawnCandidates(), InviteTicket: "invalid-ticket"}
+	bindPresenceRequest(&bad, other.host.ID().String(), session)
+	if _, err := other.presenceRequest(bad, now); err == nil || err.Error() != "invite_invalid" {
+		t.Fatalf("invalid ticket error = %v, want invite_invalid", err)
 	}
 }
 

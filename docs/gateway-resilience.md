@@ -2,13 +2,15 @@
 
 ElseMesh separates a world's identity from the machines that can serve it. This lets an owner keep one ThruHold while their desktop, Flip7, or a trusted friend's daemon is online independently.
 
-`worldd` uses embedded libzt for its own ZeroTier identity and overlay
-connection. The host operating system does not need to join the ZeroTier
-network. Visitors do not need ZeroTier installed: the baseline browser path
-uses Worker lookup by world ID or HostID, verifies the signed provider record,
-and connects directly to the provider's reachable HTTPS/WSS gateway. The
-Worker resolves records but carries no world traffic. A visitor whose device
-already has the ZeroTier route may also use the signed private gateway as an
+`worldd` uses a distinct persistent embedded libzt identity for each hosted
+world and its overlay connection. The host operating system does not need to
+join the ZeroTier network. Visitors do not need ZeroTier installed: the
+baseline browser path uses Worker lookup by world ID or HostID, verifies the
+signed provider record, and connects directly to the provider's reachable
+HTTPS/WSS gateway. An invite uses only its world's unique HostID as the Worker
+lookup key; its compact ticket does not carry a world ID, ZeroTier network ID,
+or port. The Worker resolves records but carries no world traffic. A visitor
+whose device already has the ZeroTier route may also use the signed private gateway as an
 optional shortcut; it must fail over promptly when that route is unavailable.
 
 ## Identifiers and routes

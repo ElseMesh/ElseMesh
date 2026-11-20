@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { builtInWorldURL, clearHomeWorld, defaultHomeWorldURL, discoverLocalWorldURL, getHomeWorld, homeWorldStorageKey, listVisitedWorlds, parseWorldInviteURL, rememberWorldVisit, setHomeWorld, worldLauncherStorageKey } from '../src/network/WorldLauncher.js';
+import { builtInWorldURL, clearHomeWorld, defaultHomeWorldURL, discoverLocalWorldURL, getHomeWorld, homeWorldStorageKey, inviteZeroTierNetworkId, listVisitedWorlds, parseWorldInviteURL, rememberWorldVisit, setHomeWorld, worldLauncherStorageKey } from '../src/network/WorldLauncher.js';
 import { createWorldInviteURL, worldLinkFromLocation } from '../src/network/WorldConnector.js';
+import { decodeWorldInviteTicket, encodeWorldInviteTicket, WORLD_INVITE_TICKET_BYTES, WORLD_INVITE_TICKET_CODE_CHARS } from '../src/network/WorldInvite.js';
 
 class MemoryStorage {
 	items = new Map();
@@ -21,6 +22,14 @@ globalThis.ELSEMESH_CONFIG = { worldResolver: 'https://resolver.example' };
 
 assert.equal( builtInWorldURL( pageURL ), 'https://app.example/tidewater/' );
 assert.equal( parseWorldInviteURL( invite, pageURL ), invite );
+const ticketFields = { zeroTierNodeId: '8e23729743', playerNumber: 65535, hash: 'abcdef' };
+const ticketCode = encodeWorldInviteTicket( ticketFields );
+assert.equal( WORLD_INVITE_TICKET_BYTES, 10, 'the ticket contains only HostID, invite number and 24-bit tag' );
+assert.equal( WORLD_INVITE_TICKET_CODE_CHARS, 14, 'ten binary bytes encode to fourteen unpadded base64url characters' );
+assert.equal( ticketCode.length, WORLD_INVITE_TICKET_CODE_CHARS );
+assert.deepEqual( decodeWorldInviteTicket( ticketCode ), ticketFields, 'compact tickets round-trip their fixed-width binary fields' );
+assert.throws( () => encodeWorldInviteTicket( { ...ticketFields, playerNumber: 65536 } ), /fields are invalid/ );
+assert.throws( () => decodeWorldInviteTicket( `${ticketCode}=` ), /invalid length/ );
 const compactInvite = createWorldInviteURL( {
 	pageURL,
 	worldId: 'elsemesh:cave',
@@ -37,15 +46,24 @@ const expandedCompactInvite = new URL( parseWorldInviteURL( compactInvite, pageU
 assert.equal( expandedCompactInvite.searchParams.has( 'worldId' ), false, 'HostID uniquely identifies the invited world through registration' );
 assert.equal( expandedCompactInvite.searchParams.get( 'ztNodeId' ), '3af4fd5d50' );
 assert.equal( expandedCompactInvite.searchParams.has( 'ztNetworkId' ), false );
-assert.equal( expandedCompactInvite.searchParams.has( 'ztGateway' ), false );
-assert.equal( expandedCompactInvite.searchParams.has( 'ztNodeRecord' ), false );
+assert.equal( expandedCompactInvite.searchParams.has( 'ztGateway' ), true, 'legacy route links retain their signed direct-private-route hint' );
+assert.equal( expandedCompactInvite.searchParams.has( 'ztNodeRecord' ), true, 'legacy route links retain the signed node record for that direct route' );
 assert.equal( expandedCompactInvite.searchParams.get( 'directory' ), 'https://resolver.example' );
 const compactBrowserLink = worldLinkFromLocation( { search: compactInviteURL.search, origin: compactInviteURL.origin } );
 assert.equal( compactBrowserLink.worldId, '' );
 assert.equal( compactBrowserLink.zeroTierNodeId, '3af4fd5d50' );
 assert.equal( compactBrowserLink.zeroTierNetworkId, 'e3918db4832a3056', 'compact invites use the application-configured ZeroTier network' );
-assert.equal( compactBrowserLink.zeroTierGateway, '' );
-assert.equal( compactBrowserLink.zeroTierNodeRecord, null );
+assert.equal( compactBrowserLink.zeroTierGateway, 'http://10.147.20.4:43127' );
+assert.deepEqual( compactBrowserLink.zeroTierNodeRecord, zeroTierNodeRecord );
+const binaryTicketURL = new URL( createWorldInviteURL( { pageURL, inviteTicket: ticketFields, directory: 'https://resolver.example' } ) );
+assert.equal( binaryTicketURL.searchParams.get( 'invite' ), ticketCode, 'ticket shares use the ten-byte binary code without route text' );
+assert.equal( binaryTicketURL.searchParams.has( 'worldId' ), false );
+assert.equal( binaryTicketURL.searchParams.has( 'ztNodeId' ), false );
+assert.equal( binaryTicketURL.searchParams.has( 'directory' ), false );
+assert.equal( parseWorldInviteURL( binaryTicketURL.href, pageURL ), binaryTicketURL.href, 'ticket paste preserves the opaque invite code on the current app path' );
+assert.deepEqual( worldLinkFromLocation( { search: binaryTicketURL.search, origin: binaryTicketURL.origin } ).inviteTicket, ticketFields );
+assert.equal( worldLinkFromLocation( { search: binaryTicketURL.search, origin: binaryTicketURL.origin } ).zeroTierNodeId, ticketFields.zeroTierNodeId );
+assert.equal( inviteZeroTierNetworkId( binaryTicketURL.href ), 'e3918db4832a3056', 'compact tickets use the configured ZeroTier network' );
 assert.throws( () => parseWorldInviteURL( 'https://app.example/tidewater/?invite=bad!', pageURL ), /route code is invalid/ );
 assert.throws( () => parseWorldInviteURL( `${pageURL}&worldId=elsemesh:cave&invite=${compactInviteURL.searchParams.get( 'invite' )}`, pageURL ), /cannot be combined/ );
 assert.equal( parseWorldInviteURL( 'elsemesh:cave', pageURL ), 'https://app.example/tidewater/?worldId=elsemesh%3Acave&directory=https%3A%2F%2Fresolver.example', 'a bare canonical ThruHold ID becomes a resolver-backed world link' );

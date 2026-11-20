@@ -1,6 +1,6 @@
 import { isWorldID } from './WorldIdentity.js';
 import { DEFAULT_ZEROTIER_NETWORK_ID, validZeroTierGateway } from './WorldConnector.js';
-import { decodeWorldInviteRoute, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
+import { decodeWorldInviteRoute, decodeWorldInviteTicket, isWorldInviteTicketCode, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
 
 const STORAGE_KEY = 'elsemesh.visited-worlds.v1';
 const HOME_STORAGE_KEY = 'elsemesh.home-world.v1';
@@ -135,6 +135,13 @@ export function parseWorldInviteURL( value, pageURL = globalThis.location?.href 
 	let params = outerParams;
 	if ( inviteCodes.length ) {
 		if ( inviteCodes.length !== 1 || [ ...WORLD_INVITE_ROUTE_KEYS, 'ztNetworkId', 'ztGateway', 'ztNodeRecord' ].some( key => outerParams.has( key ) ) || outerParams.has( 'localProvider' ) || outerParams.has( 'localMap' ) ) throw new Error( 'Compact invites cannot be combined with separate world or local-provider route parameters' );
+		if ( isWorldInviteTicketCode( inviteCodes[ 0 ] ) ) {
+			decodeWorldInviteTicket( inviteCodes[ 0 ] );
+			if ( ! resolver ) throw new Error( 'Compact invite tickets require the configured HTTPS Worker resolver' );
+			const ticketURL = appPageURL( page.href );
+			ticketURL.searchParams.set( 'invite', inviteCodes[ 0 ] );
+			return ticketURL.href;
+		}
 		params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
 	}
 	const nodeIds = params.getAll( 'nodeId' );
@@ -158,6 +165,10 @@ export function inviteZeroTierNetworkId( pageURL = globalThis.location?.href ) {
 	const inviteCodes = page.searchParams.getAll( 'invite' );
 	if ( inviteCodes.length ) {
 		if ( inviteCodes.length !== 1 || [ ...WORLD_INVITE_ROUTE_KEYS, 'ztNetworkId', 'ztGateway', 'ztNodeRecord' ].some( key => page.searchParams.has( key ) ) || page.searchParams.has( 'localProvider' ) || page.searchParams.has( 'localMap' ) ) throw new Error( 'Compact invites cannot be combined with separate world or local-provider route parameters' );
+		if ( isWorldInviteTicketCode( inviteCodes[ 0 ] ) ) {
+			decodeWorldInviteTicket( inviteCodes[ 0 ] );
+			return DEFAULT_ZEROTIER_NETWORK_ID;
+		}
 		const params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
 		return params.has( 'ztNodeId' ) ? DEFAULT_ZEROTIER_NETWORK_ID : null;
 	} else {

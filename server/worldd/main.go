@@ -60,6 +60,7 @@ type daemon struct {
 	world                  worldManifest
 	key                    crypto.PrivKey
 	assetsDir              string
+	inviteStorePath        string
 	publicGateway          string
 	directoryURL           string
 	rendezvous             bool
@@ -134,6 +135,9 @@ func run() error {
 	importAssetPath := flag.String("import-asset", "", "import one asset into the content-addressed store, print its sha256 ID, then exit")
 	importPackagePath := flag.String("import-package", "", "verify and import all assets referenced by --manifest from this hash-named assets directory, then exit")
 	printNodeID := flag.Bool("print-node-id", false, "print this data directory's persistent node PeerID, then exit")
+	createInviteNumber := flag.Int("create-invite", -1, "create a short-lived invite for a 16-bit player number, print its ElseMesh URL, then exit")
+	inviteExpiresIn := flag.Duration("invite-expires-in", 24*time.Hour, "invite lifetime when used with --create-invite")
+	inviteBaseURL := flag.String("invite-base-url", "https://elsemesh.org/", "ElseMesh app root used by --create-invite")
 	exportNodeKey := flag.String("export-node-key", "", "write this data directory's private identity key to a new 0600 file, then exit")
 	importNodeKey := flag.String("import-node-key", "", "install a 0600 private identity key if node.key does not exist, then exit")
 	worldName := flag.String("world-name", "My ThruHold", "create a local starter world when none is supplied")
@@ -208,7 +212,7 @@ func run() error {
 		worldDirectory = positional[0]
 	}
 	operationCount := 0
-	for _, requested := range []bool{*printNodeID, *exportNodeKey != "", *importNodeKey != "", *importAssetPath != "", *importPackagePath != "", *signManifestPath != "", *signRoleGrantPath != "", *signRoleRevocationsPath != "", *listWorldProfiles, *listProposals, *inspectManifest, *publishManifestPath != "", *exportProposalID != "", *removeProposalID != ""} {
+	for _, requested := range []bool{*printNodeID, *createInviteNumber >= 0, *exportNodeKey != "", *importNodeKey != "", *importAssetPath != "", *importPackagePath != "", *signManifestPath != "", *signRoleGrantPath != "", *signRoleRevocationsPath != "", *listWorldProfiles, *listProposals, *inspectManifest, *publishManifestPath != "", *exportProposalID != "", *removeProposalID != ""} {
 		if requested {
 			operationCount++
 		}
@@ -220,8 +224,17 @@ func run() error {
 	if operationCount > 1 || (*publishManifestPath != "" && !publishOperation) || ((*baseSourcePath != "" || *candidateSourcePath != "") && *publishManifestPath == "") || (*inspectManifest && *manifestPath == "") || (*manifestOut != "" && *signManifestPath == "") || (*roleDocumentOut != "" && *signRoleGrantPath == "" && *signRoleRevocationsPath == "") || ((*signRoleGrantPath != "" || *signRoleRevocationsPath != "") && *roleDocumentOut == "") || (*signRoleGrantPath != "" && *signRoleRevocationsPath != "") || (*proposalOut != "" && *exportProposalID == "") || (*exportProposalID != "" && (*proposalOut == "" || *manifestPath == "")) || ((*listProposals || *removeProposalID != "") && *manifestPath == "") {
 		return errors.New("choose one one-shot operation; publish, signing, and proposal export flags require their matching inputs")
 	}
-	if worldDirectory != "" && (operationCount > 0 || *worldProfile != "" || *manifestPath != "") {
+	if worldDirectory != "" && (operationCount > 0 && *createInviteNumber < 0 || *worldProfile != "" || *manifestPath != "") {
 		return errors.New("a world directory cannot be combined with one-shot operations, --world-profile, or --manifest")
+	}
+	if *createInviteNumber >= 0 {
+		if *createInviteNumber > 0xffff || *inviteExpiresIn <= 0 {
+			return errors.New("--create-invite requires a player number from 0 to 65535 and a positive --invite-expires-in duration")
+		}
+		base, parseErr := url.Parse(*inviteBaseURL)
+		if parseErr != nil || base.Scheme != "https" || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" || base.Path != "" && base.Path != "/" {
+			return errors.New("--invite-base-url must be a root HTTPS URL without credentials, path, query, or fragment")
+		}
 	}
 	if *regionProviderURL != "" && (worldDirectory != "" || *worldProfile == "" || *publicGateway != "" || *directoryURL != "" || !isLoopbackListenAddress(*httpAddress) || *zeroTierNetwork != "" || *listenPort != 0 || *webTransportAddress != "" || *zeroTierPathDiagnostics || *serveRelay || len(bootstrap) > 0 || len(relays) > 0 || len(cacheFrom) > 0 || len(roleStateFrom) > 0 || len(announceAddresses) > 0 || len(webrtcSTUNServers) > 0) {
 		return errors.New("--region-provider requires --world-profile, loopback HTTP, --p2p-port 0, disabled ZeroTier, and no public gateway, directory, bootstrap, relay, cache sync, announced addresses, STUN, or WebTransport")
@@ -368,6 +381,19 @@ func run() error {
 	localID, err := peer.IDFromPublicKey(key.GetPublic())
 	if err != nil {
 		return err
+	}
+	if *createInviteNumber >= 0 {
+		zeroTierNodeID, readErr := readZeroTierNodeID(*zeroTierDataDir)
+		if readErr != nil {
+			return readErr
+		}
+		now := time.Now()
+		code, inviteErr := createWorldInvite(*dataDir, zeroTierNodeID, uint16(*createInviteNumber), now.Add(*inviteExpiresIn), now)
+		if inviteErr != nil {
+			return inviteErr
+		}
+		fmt.Printf("%s?invite=%s\n", strings.TrimRight(*inviteBaseURL, "/"), code)
+		return nil
 	}
 	if *printNodeID {
 		fmt.Println(localID.String())
@@ -662,7 +688,7 @@ func run() error {
 	if err := validateWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax); err != nil {
 		return err
 	}
-	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
+	d := &daemon{ctx: ctx, host: p2pHost, dht: router, discovery: routing.NewRoutingDiscovery(router), manifest: manifest, world: world, key: key, assetsDir: filepath.Join(*dataDir, "assets"), inviteStorePath: filepath.Join(*dataDir, "invites.json"), proposalDir: filepath.Join(*dataDir, "proposals"), publicGateway: *publicGateway, directoryURL: *directoryURL, rendezvous: *rendezvous, zeroTierNetworkID: *zeroTierNetwork, allowedBrowserOrigins: allowedBrowserOrigins, regionProvider: regionProvider, authorityChanged: make(chan struct{}, 1), verifiedAssets: make(map[string]assetFileStamp), roleStatePath: roleRevocationStatePath(*dataDir, world.WorldID), webrtcSTUNServers: append([]string(nil), webrtcSTUNServers...), webrtcInterfaces: append([]string(nil), webrtcInterfaces...), webrtcNAT1To1IPs: append([]string(nil), webrtcNAT1To1IPs...), webrtcUDPPortMin: uint16(*webrtcUDPPortMin), webrtcUDPPortMax: uint16(*webrtcUDPPortMax), webrtcUPnP: *webrtcUPnP, webrtcSessions: make(map[string]*worldRTCSession)}
 	defer d.closeWebRTCTransport()
 	if d.rendezvous {
 		if _, err := d.sharedWebRTCAPI(); err != nil {
@@ -1587,6 +1613,7 @@ func browserGatewayOriginAllowed(origin, requestHost string, secure bool, allowe
 type gatewayMessage struct {
 	PresenceSession string      `json:"presenceSession,omitempty"`
 	Pose            *playerPose `json:"pose,omitempty"`
+	InviteTicket    string      `json:"inviteTicket,omitempty"`
 	SpawnCandidates [][]float64 `json:"spawnCandidates,omitempty"`
 	DoorID          string      `json:"doorId,omitempty"`
 	DoorOpen        *bool       `json:"open,omitempty"`

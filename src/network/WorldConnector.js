@@ -8,7 +8,7 @@ import { verifySignedDocument } from './SignedDocument.js';
 import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 import { loadWorldManifestProviders } from './WorldProviderLoader.js';
-import { decodeWorldInviteRoute, encodeWorldInviteRoute, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
+import { decodeWorldInviteRoute, decodeWorldInviteTicket, encodeWorldInviteRoute, encodeWorldInviteTicket, isWorldInviteTicketCode, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
 
@@ -69,10 +69,14 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	const outerParams = new URLSearchParams( location.search );
 	const inviteCodes = outerParams.getAll( 'invite' );
 	let params = outerParams;
+	let inviteTicket = null;
 	if ( inviteCodes.length ) {
 		invariant( inviteCodes.length === 1, 'Browser location contains duplicate invite route codes' );
 		invariant( ! WORLD_INVITE_ROUTE_KEYS.some( key => outerParams.has( key ) ) && ! outerParams.has( 'localProvider' ) && ! outerParams.has( 'localMap' ), 'Compact invites cannot be combined with separate world or local-provider route parameters' );
-		params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
+		if ( isWorldInviteTicketCode( inviteCodes[ 0 ] ) ) {
+			inviteTicket = decodeWorldInviteTicket( inviteCodes[ 0 ] );
+			params = new URLSearchParams( [ [ 'ztNodeId', inviteTicket.zeroTierNodeId ] ] );
+		} else params = decodeWorldInviteRoute( inviteCodes[ 0 ] );
 	}
 	const configuredLocalWorld = inviteCodes.length ? null : globalThis.ELSEMESH_CONFIG?.localWorld;
 	const localProvider = params.get( 'localProvider' ) || configuredLocalWorld?.provider;
@@ -128,6 +132,7 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 		zeroTierNetworkId: zeroTierNetworkId.toLowerCase(),
 		zeroTierGateway,
 		zeroTierNodeRecord,
+		inviteTicket,
 		nodeId: nodeIds[ 0 ] || '',
 		gateway: gateways[ 0 ] || location.origin,
 		providers: nodeIds.map( ( nodeId, index ) => ( { nodeId, gateway: gateways[ index ] } ) ),
@@ -135,12 +140,21 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	};
 }
 
-export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierGateway = '', zeroTierNodeRecord = null, nodeId, gateway, providers = [], directory = '' } = {} ) {
-	invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
+export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierGateway = '', zeroTierNodeRecord = null, nodeId, gateway, providers = [], directory = '', inviteTicket = null } = {} ) {
 	invariant( zeroTierNodeId || ! zeroTierGateway && ! zeroTierNodeRecord, 'Direct ZeroTier route data requires a ZeroTier HostID' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
 	for ( const key of [ ...WORLD_INVITE_ROUTE_KEYS, 'invite', 'ztNetworkId', 'ztGateway', 'ztNodeRecord' ] ) url.searchParams.delete( key );
+	if ( inviteTicket ) {
+		const ticket = decodeWorldInviteTicket( encodeWorldInviteTicket( inviteTicket ) );
+		invariant( ! zeroTierNodeId || zeroTierNodeId.toLowerCase() === ticket.zeroTierNodeId, 'Invite ticket HostID does not match the requested route' );
+		const configuredDirectory = globalThis.ELSEMESH_CONFIG?.worldResolver || '';
+		invariant( configuredDirectory && validSecureOrigin( configuredDirectory ) && ( ! directory || directory === configuredDirectory ), 'Compact invite tickets require the configured HTTPS Worker resolver' );
+		url.searchParams.set( 'invite', encodeWorldInviteTicket( ticket ) );
+		invariant( url.href.length <= 4096, 'Invite URL is too long' );
+		return url.href;
+	}
+	invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
 	if ( ! zeroTierNodeId ) url.searchParams.set( 'worldId', worldId );
 	if ( zeroTierNodeId ) {
 		invariant( /^[0-9a-f]{10}$/i.test( zeroTierNodeId ), 'Invalid ZeroTier node ID for invite' );
@@ -185,7 +199,7 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 }
 
 export class WorldConnector {
-	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', zeroTierNodeRecord = null, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES, loadWorldProviders = null } = {} ) {
+	constructor( { worldId, zeroTierNodeId = '', zeroTierNetworkId = DEFAULT_ZEROTIER_NETWORK_ID, zeroTierGateway = '', zeroTierNodeRecord = null, inviteTicket = null, nodeId, gateway = globalThis.location?.origin, providers = [], directory = '', chunkBytes = ASSET_CHUNK_BYTES, loadWorldProviders = null } = {} ) {
 		invariant( isWorldID( worldId ) || ! worldId && /^[0-9a-f]{10}$/.test( zeroTierNodeId ), 'A valid worldId or ZeroTier node locator is required' );
 		invariant( Number.isInteger( chunkBytes ) && chunkBytes > 0 && chunkBytes <= 192 * 1024, 'Invalid asset chunk size' );
 		invariant( ! directory || validSecureOrigin( directory ), 'Directory must be an HTTPS origin' );
@@ -197,6 +211,10 @@ export class WorldConnector {
 		this.dynamicRegions = false;
 		this.zeroTierNodeId = zeroTierNodeId;
 		this.zeroTierNetworkId = zeroTierNetworkId;
+		if ( inviteTicket ) {
+			invariant( inviteTicket.zeroTierNodeId === zeroTierNodeId && /^[0-9a-f]{6}$/.test( inviteTicket.hash || '' ) && Number.isInteger( inviteTicket.playerNumber ) && inviteTicket.playerNumber >= 0 && inviteTicket.playerNumber <= 0xffff, 'Invite ticket does not match the configured ZeroTier HostID' );
+		}
+		this.pendingInviteTicket = inviteTicket ? encodeWorldInviteTicket( inviteTicket ) : '';
 		this.zeroTierGateway = zeroTierGateway ? new URL( zeroTierGateway ).origin : '';
 		this.zeroTierNodeRecord = zeroTierNodeRecord;
 		this.nodeId = nodeId || '';
@@ -331,8 +349,10 @@ export class WorldConnector {
 	async updatePresence( pose, { signal, spawnCandidates } = {} ) {
 		validatePresencePose( pose );
 		if ( spawnCandidates !== undefined && ( ! Array.isArray( spawnCandidates ) || spawnCandidates.length < 1 || spawnCandidates.length > 1024 || spawnCandidates.some( ( position ) => ! Array.isArray( position ) || position.length !== 3 || ! position.every( ( value ) => Number.isFinite( value ) && Math.abs( value ) <= 100000 ) ) ) ) throw new Error( 'Invalid world spawn candidates' );
-		const reply = await this.#request( { type: 'presence.update', pose, ...( spawnCandidates ? { spawnCandidates } : {} ) }, { signal } );
+		const inviteTicket = this.pendingInviteTicket;
+		const reply = await this.#request( { type: 'presence.update', pose, ...( spawnCandidates ? { spawnCandidates } : {} ), ...( inviteTicket ? { inviteTicket } : {} ) }, { signal } );
 		invariant( reply.type === 'presence' && reply.worldId === this.worldId && typeof reply.playerId === 'string' && Array.isArray( reply.players ), 'Invalid player presence response' );
+		this.pendingInviteTicket = '';
 		if ( reply.contentCapability !== undefined ) {
 			invariant( typeof reply.contentCapability === 'string' && /^[a-f0-9]{64}$/.test( reply.contentCapability ), 'Invalid world content capability' );
 			this.contentCapability = reply.contentCapability;

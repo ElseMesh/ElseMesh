@@ -145,11 +145,25 @@ outer-path requirements.
 
 The ElseMesh ZeroTier network is public membership. It encrypts and
 authenticates overlay traffic, but membership alone is not player authorization.
-The current compact `?invite=` URL encodes routing data only; it is not a
-bearer credential. World manifests and authorized-host assets are currently
-readable to a peer that can reach the gateway. Do not treat this setup as
-private-world access control until worldd validates an expiring player invite
-before serving private content and admitting presence.
+Each hosted world must use its own persistent embedded ZeroTier identity, so
+the world's `worldd` HostID is its invite routing key. Do not share one
+`--zerotier-data` directory between worldd instances. The invite ticket omits
+the separate world ID, network ID, and port: it is ten binary bytes containing
+the 5-byte HostID, a 2-byte player number, and a 3-byte random tag (14
+unpadded base64url characters). The configured Worker resolves that HostID to
+the currently registered private address and gateway port; it carries no game
+traffic. The invite record, tag digest, expiry (24 hours by default), and
+exponential failed-attempt cooldown are held by the destination worldd.
+Create a ticket from that world's persistent data directory with
+`worldd --create-invite PLAYER_NUMBER`; this prints the `elsemesh.org?invite=`
+URL. The worldd must already have joined ZeroTier once so its stable HostID is
+available.
+
+This ticket currently validates and binds the invite to the admitted presence.
+It does not yet make all manifest and asset routes private, or replace the
+world's separate uninvited-visitor capacity policy. Do not treat it as complete
+private-world access control until those remaining authorization rules are
+enforced on every content-serving path.
 
 `worldd` includes libzt and joins the dedicated network by default, without
 installing the separate ZeroTier One service or passing `--zerotier-network`.

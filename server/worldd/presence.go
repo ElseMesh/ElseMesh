@@ -65,6 +65,7 @@ type playerPresence struct {
 	updated               time.Time
 	movementCredit        float64
 	contentCapabilityHash string
+	invitePlayerNumber    *uint16
 }
 
 func newContentCapability() (string, string, error) {
@@ -413,6 +414,17 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 			return peerResponse{}, err
 		}
 	}
+	var invitePlayerNumber *uint16
+	if request.Type == "presence.update" && request.InviteTicket != "" {
+		if d.inviteStorePath == "" || d.zeroTierNodeID == "" {
+			return peerResponse{}, errors.New("invite_invalid")
+		}
+		playerNumber, err := validateWorldInvite(d.inviteStorePath, d.zeroTierNodeID, request.InviteTicket, now)
+		if err != nil {
+			return peerResponse{}, err
+		}
+		invitePlayerNumber = &playerNumber
+	}
 	var checkedPrior playerPresence
 	checkedPriorExists := false
 	if request.Type == "presence.update" && d.regionProvider != nil {
@@ -452,6 +464,9 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 		delete(d.players, request.presenceKey)
 	} else {
 		old, exists := d.players[request.presenceKey]
+		if exists && invitePlayerNumber != nil && (old.invitePlayerNumber == nil || *old.invitePlayerNumber != *invitePlayerNumber) {
+			return peerResponse{}, errors.New("presence_invite_changed")
+		}
 		if d.regionProvider != nil && (exists != checkedPriorExists || exists && old.Sequence != checkedPrior.Sequence) {
 			return peerResponse{}, errors.New("presence_retry_required")
 		}
@@ -545,7 +560,10 @@ func (d *daemon) presenceRequest(request gatewayMessage, now time.Time) (peerRes
 				return peerResponse{}, errors.New("content_capability_unavailable")
 			}
 		}
-		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now, movementCredit: movementCredit, contentCapabilityHash: contentCapabilityHash}
+		if exists && invitePlayerNumber == nil {
+			invitePlayerNumber = old.invitePlayerNumber
+		}
+		d.players[request.presenceKey] = playerPresence{ID: request.presenceKey, playerPose: *request.Pose, UpdatedAt: now.UnixMilli(), updated: now, movementCredit: movementCredit, contentCapabilityHash: contentCapabilityHash, invitePlayerNumber: invitePlayerNumber}
 	}
 	players := make([]playerPresence, 0, len(d.players))
 	for _, p := range d.players {
