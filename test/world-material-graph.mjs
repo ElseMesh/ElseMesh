@@ -58,8 +58,26 @@ const leafMaskWebGL = compileWorldMaterialGraph( leafMaskGraph, 'webgl' );
 assert.deepEqual( leafMaskWebGPU.textureSlots, [ 'leafMask' ], 'the canopy mask is an explicit shared data-texture input' );
 assert.deepEqual( leafMaskWebGL.textureSlots, leafMaskWebGPU.textureSlots, 'WebGL and WebGPU bind the same authored graph texture' );
 assert.match( leafMaskWebGPU.surface, /textureSample\( emgTexture_leafMask, smpLinearClamp,/ );
-assert.match( leafMaskWebGL.glsl.declarations, /uniform sampler2D emgTexture_leafMask/ );
 assert.match( leafMaskWebGL.glsl.fragment, /texture2D\( emgTexture_leafMask,/ );
+const leafMaskTexture = new THREE.Texture();
+const leafMaskSource = new THREE.MeshStandardMaterial( { alphaTest: 0.5 } );
+const leafMaskMaterials = createWebGLMaterialGraph( THREE, leafMaskSource, leafMaskGraph, { graphTextures: { leafMask: leafMaskTexture } } );
+const leafMaskColorShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <alphatest_fragment>\n#include <lights_physical_fragment>', uniforms: {} };
+leafMaskMaterials.material.onBeforeCompile( leafMaskColorShader );
+assert.match( leafMaskColorShader.fragmentShader, /uniform sampler2D emgTexture_leafMask/ );
+assert.match( leafMaskColorShader.fragmentShader, /texture2D\( emgTexture_leafMask,/ );
+assert.equal( leafMaskColorShader.uniforms.emgTexture_leafMask.value, leafMaskTexture, 'WebGL binds the signed leaf mask in the color pass' );
+assert.ok( leafMaskMaterials.depthMaterial, 'opacity graphs provide a matching shadow-depth material' );
+assert.equal( leafMaskMaterials.depthMaterial.alphaTest, leafMaskSource.alphaTest, 'shadow depth keeps the authored alpha cutoff' );
+const leafMaskDepthShader = { vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <alphatest_fragment>', uniforms: {} };
+leafMaskMaterials.depthMaterial.onBeforeCompile( leafMaskDepthShader );
+assert.match( leafMaskDepthShader.fragmentShader, /uniform sampler2D emgTexture_leafMask/ );
+assert.match( leafMaskDepthShader.fragmentShader, /texture2D\( emgTexture_leafMask,/ );
+assert.equal( leafMaskDepthShader.uniforms.emgTexture_leafMask.value, leafMaskTexture, 'WebGL shadow depth uses the same signed leaf mask' );
+leafMaskMaterials.material.dispose();
+leafMaskMaterials.depthMaterial.dispose();
+leafMaskSource.dispose();
+leafMaskTexture.dispose();
 
 const valueNoiseGraph = {
 	format: 'elsemesh.material-graph/1',

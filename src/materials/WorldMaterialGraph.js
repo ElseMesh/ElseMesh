@@ -101,7 +101,8 @@ export function createWebGPUMaterialGraph( gltfMaterial, graph, { albedo = null,
 	} );
 }
 
-function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, textureBindings = {}, graphUsesVertexColorForAlbedo = false, terrainHeightBinding = null } = {} ) {
+function installWebGLGraph( T, material, compiled, graphKey, { fragment = true, opacity = false, textureBindings = {}, graphUsesVertexColorForAlbedo = false, terrainHeightBinding = null } = {} ) {
+	const fragmentGraph = fragment || opacity;
 	const originalCompile = material.onBeforeCompile;
 	const originalKey = material.customProgramCacheKey;
 	material.onBeforeCompile = ( shader, renderer ) => {
@@ -134,7 +135,7 @@ float emgTerrainHeightAt( vec2 xz ) {
 	return mix( mix( a, b, t.x ), mix( c, d, t.x ), t.y );
 }` : '';
 		shader.vertexShader = insert( shader.vertexShader, '#include <common>', [ vertexDecl, terrainHeightVertex ].filter( Boolean ).join( '\n' ) );
-		const graphVertex = fragment ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
+		const graphVertex = fragmentGraph ? compiled.glsl.vertex : compiled.glsl.vertex.split( '\n' ).filter( line => ! line.startsWith( 'objectNormal = ' ) ).join( '\n' );
 		const worldVertexPosition = compiled.inputs.includes( 'worldVertexPosition' ) ? `
 vec4 emgWorldVertexPosition = vec4( transformed, 1.0 );
 #ifdef USE_BATCHING
@@ -145,7 +146,7 @@ emgWorldVertexPosition = instanceMatrix * emgWorldVertexPosition;
 #endif
 emgWorldVertexPosition = modelMatrix * emgWorldVertexPosition;` : '';
 		shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', `#include <begin_vertex>\n${worldVertexPosition}\n${graphVertex}` );
-		if ( fragment && compiled.glsl.worldPosition ) {
+		if ( fragmentGraph && compiled.glsl.worldPosition ) {
 			const marker = '#include <worldpos_vertex>';
 			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}
@@ -159,14 +160,14 @@ emgWorldPosition = instanceMatrix * emgWorldPosition;
 emgWorldPosition = modelMatrix * emgWorldPosition;
 vEmg_worldPosition = emgWorldPosition.xyz;` );
 		}
-		if ( fragment && compiled.glsl.worldNormal ) {
+		if ( fragmentGraph && compiled.glsl.worldNormal ) {
 			const marker = '#include <defaultnormal_vertex>';
 			if ( ! shader.vertexShader.includes( marker ) ) throw new Error( `WebGL material graph hook is missing ${marker}` );
 			shader.vertexShader = shader.vertexShader.replace( marker, `${marker}\nvEmg_worldNormal = inverseTransformDirection( normalize( transformedNormal ), viewMatrix );` );
 		}
 		const textureUniforms = compiled.textureSlots.map( slot => `uniform sampler2D emgTexture_${slot};` ).join( '\n' );
 		if ( textureUniforms ) shader.vertexShader = insert( shader.vertexShader, '#include <common>', textureUniforms );
-		if ( fragment ) {
+		if ( fragmentGraph ) {
 			const terrainHeightHelpers = compiled.glsl.terrainHeight ? /* glsl */`
 uniform sampler2D emgTerrainHeightTexture;
 uniform vec3 emgTerrainHeightParams;
@@ -187,8 +188,8 @@ float emgTerrainHeightAt( vec2 xz ) {
 			if ( textureUniforms ) shader.fragmentShader = insert( shader.fragmentShader, '#include <common>', textureUniforms );
 			if ( compiled.glsl.alphaFragment ) shader.fragmentShader = insert( shader.fragmentShader, '#include <alphatest_fragment>', compiled.glsl.alphaFragment );
 			const graphFragment = compiled.glsl.fragment.replace( /^normal = normalize\( (.+) \);$/gm, 'normal = normalize( mat3( viewMatrix ) * $1 );' );
-			shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
-			if ( compiled.glsl.translucency || compiled.glsl.thinTransmission ) {
+			if ( fragment ) shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', graphFragment );
+			if ( fragment && ( compiled.glsl.translucency || compiled.glsl.thinTransmission ) ) {
 				const marker = '#include <lights_physical_pars_fragment>';
 				const source = T.ShaderChunk?.lights_physical_pars_fragment;
 				const directDiffuse = 'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );';
@@ -200,15 +201,15 @@ float emgTerrainHeightAt( vec2 xz ) {
 				if ( compiled.glsl.thinTransmission && ! compiled.glsl.uniformInputs.includes( 'emgNight' ) ) shader.uniforms.emgNight = { get value() { return FRAME_UNIFORM_VALUES.emgNight(); } };
 				shader.fragmentShader = insert( shader.fragmentShader, '#include <lights_physical_fragment>', [ compiled.glsl.translucency, compiled.glsl.thinTransmission ].filter( Boolean ).join( '\n' ) );
 			}
-			if ( compiled.glsl.specularIntensity ) shader.fragmentShader = shader.fragmentShader.replace( '#include <lights_physical_fragment>', `#include <lights_physical_fragment>\n${compiled.glsl.specularIntensity}` );
-			if ( compiled.glsl.occlusion ) shader.fragmentShader = insert( shader.fragmentShader, '#include <aomap_fragment>', compiled.glsl.occlusion );
+			if ( fragment && compiled.glsl.specularIntensity ) shader.fragmentShader = shader.fragmentShader.replace( '#include <lights_physical_fragment>', `#include <lights_physical_fragment>\n${compiled.glsl.specularIntensity}` );
+			if ( fragment && compiled.glsl.occlusion ) shader.fragmentShader = insert( shader.fragmentShader, '#include <aomap_fragment>', compiled.glsl.occlusion );
 		}
 		for ( const name of compiled.glsl.uniformInputs ) {
 			const read = FRAME_UNIFORM_VALUES[ name ];
 			if ( ! read ) throw new Error( `WebGL material graph uses unsupported frame input ${name}` );
 			shader.uniforms[ name ] = { get value() { return read(); } };
 		}
-		if ( fragment && compiled.glsl.viewportSize ) {
+		if ( fragmentGraph && compiled.glsl.viewportSize ) {
 			if ( typeof renderer?.getDrawingBufferSize !== 'function' ) throw new Error( 'WebGL material graph pixelPosition requires drawing-buffer size access' );
 			const size = new T.Vector2();
 			shader.uniforms.emgViewportSize = { get value() { return renderer.getDrawingBufferSize( size ); } };
@@ -249,8 +250,8 @@ export function createWebGLMaterialGraph( T, sourceMaterial, graph, { terrainHei
 		material.addEventListener( 'dispose', terrainHeightBinding.release );
 		material.userData.releaseTerrainHeightBinding = terrainHeightBinding.release;
 	}
-	const depthMaterial = compiled.hasVertexOutput
-		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors } ), compiled, graphKey, { fragment: false, textureBindings, terrainHeightBinding } )
+	const depthMaterial = compiled.hasVertexOutput || Boolean( graph.outputs.opacity )
+		? installWebGLGraph( T, new T.MeshDepthMaterial( { depthPacking: T.RGBADepthPacking, side: sourceMaterial.side, vertexColors: usesVertexColors, alphaTest: sourceMaterial.alphaTest } ), compiled, graphKey, { fragment: false, opacity: Boolean( graph.outputs.opacity ), textureBindings, terrainHeightBinding } )
 		: null;
 	return {
 		material,
