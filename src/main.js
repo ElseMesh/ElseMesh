@@ -3,6 +3,26 @@ import { App } from './App.js';
 import { UI } from './ui/UI.js';
 import { AppUI } from './ui/AppUI.js';
 import { defaultHomeWorldURL, discoverLocalWorldURL, inviteZeroTierNetworkId } from './network/WorldLauncher.js';
+import { loadWorldProviders } from 'virtual:elsemesh-world-providers';
+
+const ASSET_RETRY_PARAM = '__elsemesh_asset_retry';
+
+function retryStaleDynamicImport( error ) {
+	if ( ! /failed to fetch dynamically imported module|importing a module script failed/i.test( error?.message || '' ) ) return false;
+	const url = new URL( location.href );
+	if ( url.searchParams.has( ASSET_RETRY_PARAM ) ) return false;
+	url.searchParams.set( ASSET_RETRY_PARAM, Date.now().toString( 36 ) );
+	location.replace( url.href );
+	return true;
+}
+
+function clearAssetRetryParam() {
+	const url = new URL( location.href );
+	if ( ! url.searchParams.has( ASSET_RETRY_PARAM ) ) return;
+	url.searchParams.delete( ASSET_RETRY_PARAM );
+	history.replaceState( history.state, '', url.href );
+}
+
 // Public deployments can opt into account sign-in without exposing secrets or
 // requiring a build change. A missing file leaves the guest experience intact.
 try {
@@ -38,7 +58,7 @@ catch ( error ) { console.error( 'Invalid invited network route:', error.message
 if ( inviteNetworkId ) await ui.showInviteNetworkOnboarding( inviteNetworkId );
 const app = new App( {
 	loadDefaultWorldPackage: async () => ( await import( 'virtual:elsemesh-default-world' ) ).defaultWorldPackage,
-	loadWorldProviders: async ( manifest ) => ( await import( 'virtual:elsemesh-world-providers' ) ).loadWorldProviders( manifest ),
+	loadWorldProviders,
 } );
 app.hud = ui;
 window.__ui = ui;
@@ -69,6 +89,7 @@ function reportConnection() {
 
 app.init( ( p, text, until ) => ui.setLoading( p, text, until ) ).then( async () => {
 
+	clearAssetRetryParam();
 	reportConnection();
 	if ( app.backend !== 'webgl' && ! app.hostedPackageWorld ) app.ui = new AppUI( app, ui );
 	ui.setLoading( 1, 'Ready' );
@@ -96,6 +117,7 @@ app.init( ( p, text, until ) => ui.setLoading( p, text, until ) ).then( async ()
 
 	app.disposePendingWorldPresence?.();
 	console.error( e );
+	if ( retryStaleDynamicImport( e ) ) return;
 	const zeroTierNetworkId = app.worldConnector?.zeroTierNetworkId;
 	const connectionHelp = e?.code === 'DIRECT_WORLD_PATH_UNAVAILABLE' && /^[0-9a-f]{16}$/.test( zeroTierNetworkId || '' )
 		? { zeroTierNetworkId, reason: e.reason }

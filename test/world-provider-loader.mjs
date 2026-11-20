@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { loadWorldManifestProviders, loadWorldPackageProviders } from '../src/network/WorldProviderLoader.js';
+import { loadMatchingWorldProviders, loadWorldManifestProviders, loadWorldPackageProviders } from '../src/network/WorldProviderLoader.js';
 
 const calls = [];
 const loader = async descriptor => calls.push( descriptor );
@@ -16,4 +16,14 @@ await loadWorldManifestProviders( null, loader );
 await loadWorldPackageProviders( worldPackage, null );
 
 assert.deepEqual( calls, [ packageSource, manifest ], 'providers receive the full world-owned declaration without field loss' );
+
+const selected = [];
+const providerIndexes = [
+	{ componentTypes: [ 'elsemesh.fixture/1' ], behaviorIds: [], load: async () => ( { loadWorldProvider: async () => selected.push( 'fixture' ) } ) },
+	{ componentTypes: [ 'elsemesh.other/1' ], behaviorIds: [ 'elsemesh.other-behavior/1' ], load: async () => ( { loadWorldProvider: async () => selected.push( 'other' ) } ) },
+];
+await loadMatchingWorldProviders( { components: [ { type: 'elsemesh.fixture/1' } ] }, providerIndexes );
+assert.deepEqual( selected, [ 'fixture' ], 'only provider code matching the invited world manifest is imported' );
+await loadMatchingWorldProviders( { components: [], experience: { behaviors: { 'elsemesh.other-behavior/1': {} } } }, providerIndexes );
+assert.deepEqual( selected, [ 'fixture', 'other' ], 'behavior-only manifests load their matching provider' );
 console.log( 'World provider loading preserves package and manifest declarations' );

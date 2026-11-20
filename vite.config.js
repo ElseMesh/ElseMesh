@@ -107,12 +107,19 @@ const connectionLogPath = resolve( 'logs/browser-connections.jsonl' );
 const defaultWorldModule = resolve( process.env.ELSEMESH_DEFAULT_WORLD_MODULE || 'worlds/default.js' );
 const worldsPath = resolve( 'worlds' );
 const configuredWorldProviderModules = process.env.ELSEMESH_WORLD_PROVIDER_MODULES;
-const worldProviderModules = configuredWorldProviderModules === undefined
+const worldProviderModulePaths = configuredWorldProviderModules === undefined
 	? readdirSync( worldsPath, { withFileTypes: true } )
 		.filter( entry => entry.isDirectory() && existsSync( resolve( worldsPath, entry.name, 'world-provider.js' ) ) )
 		.map( entry => resolve( worldsPath, entry.name, 'world-provider.js' ) )
 		.sort()
 	: configuredWorldProviderModules.split( ',' ).map( module => resolve( module.trim() ) ).filter( Boolean );
+const worldProviderModules = worldProviderModulePaths.map( module => {
+	const indexPath = resolve( dirname( module ), 'world-provider.json' );
+	if ( ! existsSync( indexPath ) ) throw new Error( `World provider is missing its lightweight world-provider.json index: ${module}` );
+	const index = JSON.parse( readFileSync( indexPath, 'utf8' ) );
+	if ( ! Array.isArray( index.components ) || index.components.some( component => ! Array.isArray( component ) || typeof component[ 0 ] !== 'string' ) || ! Array.isArray( index.behaviors ) || index.behaviors.some( behavior => typeof behavior !== 'string' ) ) throw new Error( `World provider index is invalid: ${indexPath}` );
+	return { module, index };
+} );
 const localWorldProvider = process.env.ELSEMESH_LOCAL_WORLD_PROVIDER || '';
 const localWorldMap = process.env.ELSEMESH_LOCAL_WORLD_MAP || '';
 const localWorldGatewayValue = process.env.ELSEMESH_LOCAL_WORLD_GATEWAY || '';
@@ -161,9 +168,8 @@ function worldProviderBinding() {
 		resolveId( source ) { return source === 'virtual:elsemesh-world-providers' ? id : null; },
 		load( source ) {
 			if ( source !== id ) return null;
-			const imports = worldProviderModules.map( ( module, index ) => `import * as provider${index} from ${JSON.stringify( module )};` ).join( '\n' );
-			const providers = worldProviderModules.map( ( _module, index ) => `provider${index}` ).join( ', ' );
-			return `${imports}\nconst providers = [ ${providers} ];\nexport async function loadWorldProviders( manifest ) { for ( const provider of providers ) if ( await provider.supportsWorldManifest( manifest ) ) await provider.loadWorldProvider(); }`;
+			const providers = worldProviderModules.map( ( { module, index } ) => `{ componentTypes: ${JSON.stringify( index.components.map( ( [ type ] ) => type ))}, behaviorIds: ${JSON.stringify( index.behaviors )}, load: () => import( ${JSON.stringify( module )} ) }` ).join( ',\n' );
+			return `import { loadMatchingWorldProviders } from ${JSON.stringify( resolve( 'src/network/WorldProviderLoader.js' ))};\nconst providers = [ ${providers} ];\nexport function loadWorldProviders( manifest ) { return loadMatchingWorldProviders( manifest, providers ); }`;
 		},
 	};
 }
