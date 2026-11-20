@@ -49,7 +49,11 @@ and shoreline-driven lip mesh, but those are separate from WebGPU's `Breakers`
 simulation; the full-frame metric does not establish feature-specific spray
 parity. These frames close no visual gate and change no percentage. A shared
 renderer-neutral breaker contract and feature-specific conformance fixture are
-still needed. See the dynamic captures in
+still needed. The current station inputs also differ: WebGPU samples the
+hard-coded `x=-175..195` beach interval every `0.6 m`; WebGL extracts terrain
+contours at `max(2 m, terrain.size/256)` spacing and caps them at 768 stations.
+This should become one Tidewater-authored, renderer-neutral station asset
+consumed by both engine presenters. See the dynamic captures and source details in
 [`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-dynamic-tidewater-beach-phases-webgpu-and-webgl).
 
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,

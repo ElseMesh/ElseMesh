@@ -34,8 +34,14 @@ not the WebGPU `Breakers` simulation; the two backends use distinct particle,
 crest, and lip paths. The full-frame comparison does not isolate breaker-spray
 parity, so the WebGL spray match remains unverified. A shared, renderer-neutral
 breaker input/output contract and a feature-specific conformance fixture are
-still needed. This is a measured backend gap, not a Tidewater-main WebGL
-comparison. Tidewater parity remains 93%.
+still needed. Their authored inputs currently diverge as well: WebGPU's
+`buildStations()` samples a hard-coded beach interval (`x=-175..195`) at
+`0.6 m`, while WebGL extracts terrain contours using a spacing of at least
+`max(2 m, terrain.size/256)` and caps the result at 768 stations. A world-owned
+shoreline station asset can supply one backend-neutral station set to both
+engine presenters and remove the beach bounds from engine code. This is a
+measured backend gap, not a Tidewater-main WebGL comparison. Tidewater parity
+remains 93%.
 
 ## 2026-11-20 matched split beach view: WebGPU and WebGL
 
