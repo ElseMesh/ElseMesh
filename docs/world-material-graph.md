@@ -103,12 +103,24 @@ backends and preserves raw RGBA channels. It is separate from the
 domain-bounded density field. Static-model materials receive the same texture
 through both renderer adapters, including when `textureSampleLevel` is used in
 the vertex graph.
-The `leafMask` slot is a component-provided foliage data texture. The
-octahedral-canopy component binds its signed raw `rgba8unorm-data/1` image here;
-adapters must preserve the RGBA byte values and use linear clamp sampling in
-both backends. R is coverage, G is leaf brightness, B is the per-card random
-value, and A is opaque. A world graph can use R as opacity and G/B for authored
-foliage color variation without embedding a renderer-specific shader.
+The `leafMask` slot is a component-provided foliage data texture. A component
+declares it with `data.graphTextureBindings`, for example:
+
+```json
+{
+  "graphTextureBindings": [
+    { "slot": "leafMask", "assetId": "sha256:<64 lowercase hex digits>", "dataFormat": "rgba8unorm-data-png/1" }
+  ]
+}
+```
+
+The referenced PNG must be declared as `image/png` by both the component and
+signed manifest. ElseMesh validates and decodes it as raw RGBA8 bytes, without
+color conversion, and both backends use the same slot-derived linear clamp
+policy. Tidewater's leaf mask uses R for coverage, G for leaf brightness, B for
+per-card random value, and A for opaque. A world graph can use R as opacity and
+G/B for authored foliage color variation without embedding a renderer-specific
+shader.
 Color slots use the texture's linearized sample, while data slots preserve
 their linear channel values. Explicit-LOD vertex reads let signed portable
 textures drive deformation without sending shader code. The graph chooses its
@@ -179,9 +191,13 @@ this graph.
 
 ## Current limits and migration gate
 
-Format `/1` supports the five standard glTF material texture slots plus the
-ground-cover component `densityField` and terrain-provided `detailField` bindings; it
-does not define arbitrary material-specific texture bundles. Vertex texture reads require an explicit
+Format `/1` supports the five standard glTF material texture slots plus
+component-provided `densityField` and `leafMask` data and terrain-provided
+`detailField` bindings. `data.graphTextureBindings` currently accepts signed
+raw RGBA8 PNG assets for those three data slots; standard color and surface
+maps remain glTF texture references so the engine can apply their color-space
+and mip policies. The engine validates the slot, encoding, and signed asset
+inventory before creating backend textures. Vertex texture reads require an explicit
 LOD and are shared by color, depth, and shadow deformation paths. The
 graph inputs otherwise include vertex/instance data, and the standard glTF
 base-color, normal, and emissive textures are applied by the engine around the

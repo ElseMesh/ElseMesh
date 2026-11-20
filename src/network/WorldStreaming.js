@@ -90,7 +90,7 @@ function worldComponentPriority( component, assets ) {
 }
 
 export function isVegetationWorldComponent( component ) {
-	return worldComponentDescriptor( component?.type )?.vegetation === true;
+	return worldComponentDescriptor( component?.type )?.vegetation === true || component?.data?.contentRole === 'vegetation';
 }
 
 export function transformBoundsCenter( object, center, target ) {

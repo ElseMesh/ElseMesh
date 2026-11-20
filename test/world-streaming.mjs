@@ -111,6 +111,8 @@ const components = [
 const componentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5 } ).map( ( component ) => component.id );
 assert.deepEqual( componentIDs, [ 'elsemesh-component:legacy', 'elsemesh-component:ambience', 'elsemesh-component:front', 'elsemesh-component:near', 'elsemesh-component:whale' ], 'component selection uses world-space bounds and uses the whale manifest asset priority when the component has none' );
 assert.equal( isVegetationWorldComponent( components[ 0 ] ), true, 'vegetation filtering reads the package registered capability instead of component type names' );
+const genericVegetationComponent = { id: 'elsemesh-component:generic-vegetation', type: 'elsemesh.static-model-instance-set/1', data: { contentRole: 'vegetation' } };
+assert.equal( isVegetationWorldComponent( genericVegetationComponent ), true, 'a generic static-model component can opt into the engine vegetation visibility policy through authored content role' );
 const startupComponentIDs = selectWorldComponentsForView( { assets: [ { id: 'ambient-loop', priority: 'portal-preview' }, { id: 'whale-model', priority: 'nearby' } ], components }, camera, { nearbyDistance: 5, maxPriority: 'nearby' } ).map( ( component ) => component.id );
 assert.deepEqual( startupComponentIDs, [ 'elsemesh-component:legacy', 'elsemesh-component:ambience', 'elsemesh-component:front', 'elsemesh-component:near', 'elsemesh-component:whale' ], 'startup component selection excludes records above the entry priority while retaining required visible and nearby systems' );
 

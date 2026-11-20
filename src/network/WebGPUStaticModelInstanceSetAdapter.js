@@ -2,19 +2,23 @@ import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js'
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
-import { loadWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset, worldPackageMeshLODQueue } from './WorldPackage.js';
+import { loadWorldPackageModelAsset, releaseWorldPackageModelAsset, registerStaticModelTextureDemand, setWorldPackageProgressiveAsset, worldPackageMeshLODQueue } from './WorldPackage.js';
 import { correctStaticModelGeometryReflection, mirrorStaticModelGeometryX } from './StaticModelGeometry.js';
 import { registerWorldComponentBackendAdapter } from './WorldComponentBackendRegistry.js';
 import { freezeStaticModelInstanceBatchTransforms, StaticModelInstanceSetRuntime } from '../engine/render/StaticModelInstanceSetRuntime.js';
+import { GPU } from '../engine/gpu/GPU.js';
+import { Texture } from '../engine/gpu/Texture.js';
 
 const COMPONENT_TYPE = 'elsemesh.static-model-instance-set/1';
 registerWorldComponentBackendAdapter( 'webgpu', COMPONENT_TYPE, installStaticModelInstanceSet );
 
 async function installStaticModelInstanceSet( { root, connector, installed = [] }, component ) {
-	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
+	const { document, loadModelLOD, releaseModelLOD, graphTextureBindings } = await loadStaticModelInstanceSetAssets( connector, component, { signal: root.userData.worldPackage?.progressiveController?.signal } );
 	if ( root.userData.worldPackage?.disposed ) throw new DOMException( 'World unloaded', 'AbortError' );
 	const ownedGeometry = new Set(), ownedMaterials = new Set();
-	const materialCache = new Map(), sceneCache = new Map(), lodQueue = worldPackageMeshLODQueue( root );
+	const ownedGraphTextures = new Map( [ ...graphTextureBindings ].map( ( [ slot, image ] ) => [ slot, new Texture( { label: `${component.id || 'static-model'}.${slot}`, width: image.width, height: image.height, format: image.format, data: image.data, sampler: image.sampler } ) ] ) );
+	const graphTextureOverrides = Object.fromEntries( ownedGraphTextures );
+	const materialCache = new Map(), sceneCache = new Map(), sceneCacheKeys = new Map(), lodQueue = worldPackageMeshLODQueue( root );
 	const terrainComponent = [ ...( root.userData.worldComponents || [] ), ...installed ].find( candidate => candidate.terrainSurface && candidate.terrainGPU );
 	const terrainHeightModule = terrainComponent?.terrainGPU.heightModule || null;
 	const detailFieldTexture = terrainComponent?.terrainGPU.detailTexture || null;
@@ -23,7 +27,15 @@ async function installStaticModelInstanceSet( { root, connector, installed = [] 
 	const modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const getScene = async ( assetId, bytes, progressive ) => {
 		if ( progressive?.textures ) setWorldPackageProgressiveAsset( root, assetId, { textures: progressive.textures } );
-		if ( ! sceneCache.has( assetId ) ) sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, { bytes, terrainHeightModule, graphTextureOverrides: detailFieldTexture ? { detailField: detailFieldTexture } : {} } ) );
+		if ( ! sceneCache.has( assetId ) ) {
+			const cacheKey = graphTextureBindings.size ? `${assetId}:${component.id}` : assetId;
+			sceneCacheKeys.set( assetId, cacheKey );
+			sceneCache.set( assetId, await loadWorldPackageModelAsset( connector, root, assetId, {
+				bytes, terrainHeightModule,
+				graphTextureOverrides: { ...( detailFieldTexture ? { detailField: detailFieldTexture } : {} ), ...graphTextureOverrides },
+				cacheKey,
+			} ) );
+		}
 		return sceneCache.get( assetId );
 	};
 	const modelOffsets = [];
@@ -38,6 +50,10 @@ async function installStaticModelInstanceSet( { root, connector, installed = [] 
 		for ( const mesh of [ ...mainBatches, ...shadowBatches ].flatMap( group => group.map( batch => batch.mesh ) ) ) mesh.parent?.remove( mesh );
 		for ( const geometry of ownedGeometry ) geometry.dispose();
 		for ( const material of ownedMaterials ) material.dispose();
+		for ( const [ assetId, cacheKey ] of sceneCacheKeys ) releaseWorldPackageModelAsset( root, assetId, cacheKey );
+		const disposeGraphTextures = () => { for ( const texture of ownedGraphTextures.values() ) texture.destroy(); };
+		if ( GPU.encoder ) GPU.onSubmit( null, disposeGraphTextures );
+		else disposeGraphTextures();
 	};
 	try {
 		const runtime = new StaticModelInstanceSetRuntime( document, {

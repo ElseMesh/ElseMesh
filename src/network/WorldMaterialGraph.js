@@ -31,6 +31,12 @@ const INPUT_TYPES = Object.freeze( {
 } );
 export const WORLD_MATERIAL_GRAPH_INPUT_TYPES = INPUT_TYPES;
 export const WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS = Object.freeze( [ 'baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive', 'densityField', 'detailField', 'leafMask' ] );
+export const WORLD_MATERIAL_GRAPH_DATA_TEXTURE_SLOTS = Object.freeze( [ 'densityField', 'detailField', 'leafMask' ] );
+
+export function worldMaterialGraphSampler( slot ) {
+	if ( ! WORLD_MATERIAL_GRAPH_TEXTURE_SLOTS.includes( slot ) ) throw new Error( `Unsupported world material graph texture slot: ${slot}` );
+	return slot === 'densityField' || slot === 'leafMask' ? 'linearClamp' : slot === 'detailField' ? 'linearRepeat' : 'anisoRepeat';
+}
 
 const OUTPUT_TYPES = Object.freeze( {
 	baseColor: 'vec3',

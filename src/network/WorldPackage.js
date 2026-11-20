@@ -154,7 +154,7 @@ export async function loadWorldPackageModelAsset( connector, root, assetId, { si
 	if ( cached ) return cached;
 	const modelBytes = parsedGLTF ? null : bytes || await connector.getAsset( assetId, { signal } );
 	if ( signal?.aborted || state.disposed ) throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
-	const decoded = await buildGLTF( parsedGLTF || parseGLB( modelBytes ), state, signal, assetId, terrainHeightModule, graphTextureOverrides );
+	const decoded = await buildGLTF( parsedGLTF || parseGLB( modelBytes ), state, signal, assetId, terrainHeightModule, graphTextureOverrides, cacheKey );
 	if ( signal?.aborted || state.disposed ) {
 		disposeWorldPackage( decoded );
 		throw signal?.reason || new DOMException( 'World unloaded', 'AbortError' );
@@ -166,6 +166,13 @@ export async function loadWorldPackageModelAsset( connector, root, assetId, { si
 	}
 	state.parsed.set( cacheKey, decoded );
 	return decoded;
+}
+
+export function releaseWorldPackageModelAsset( root, assetId, cacheKey = assetId ) {
+	const state = root?.userData?.worldPackage;
+	if ( ! state?.parsed?.has( cacheKey ) ) return false;
+	disposeParsedWorldAsset( state, assetId, cacheKey, cacheKey === assetId );
+	return true;
 }
 
 async function prepareWorldPackageMaterialAdapters( connector, root, signal, objectIDs ) {
@@ -890,8 +897,8 @@ function worldObjectAssetIDs( object ) {
 	return [ object.assetId, ...( object.lods || [] ).map( lod => lod.assetId ) ].filter( Boolean );
 }
 
-function disposeParsedWorldAsset( state, assetID ) {
-	const parsed = state?.parsed?.get( assetID );
+function disposeParsedWorldAsset( state, assetID, cacheKey = assetID, releaseProgressive = true ) {
+	const parsed = state?.parsed?.get( cacheKey );
 	const geometries = new Set(), materials = new Set(), textures = new Set();
 	parsed?.traverse( object => {
 		if ( object.geometry?.dispose ) geometries.add( object.geometry );
@@ -907,7 +914,7 @@ function disposeParsedWorldAsset( state, assetID ) {
 	for ( const texture of textures ) {
 		const entry = state?.textureEntryByTexture?.get( texture );
 		if ( ! entry ) continue;
-		entry.sourceAssetIDs?.delete( assetID );
+		entry.sourceAssetIDs?.delete( cacheKey );
 		if ( entry.sourceAssetIDs?.size ) {
 			textures.delete( texture );
 			continue;
@@ -922,16 +929,18 @@ function disposeParsedWorldAsset( state, assetID ) {
 	};
 	if ( GPU.encoder ) GPU.onSubmit( null, release );
 	else release();
-	state?.parsed?.delete( assetID );
-	state?.progressiveAssets?.delete( assetID );
-	const targets = state?.progressiveTextureTargetsByAsset?.get( assetID );
-	for ( const targetID of targets?.keys() || [] ) {
-		const target = state?.progressiveTextureTargets?.get( targetID );
-		target?.sourceAssets?.delete( assetID );
-		if ( ! target?.sourceAssets?.size ) state?.progressiveTextureTargets?.delete( targetID );
+	state?.parsed?.delete( cacheKey );
+	if ( releaseProgressive ) {
+		state?.progressiveAssets?.delete( assetID );
+		const targets = state?.progressiveTextureTargetsByAsset?.get( assetID );
+		for ( const targetID of targets?.keys() || [] ) {
+			const target = state?.progressiveTextureTargets?.get( targetID );
+			target?.sourceAssets?.delete( assetID );
+			if ( ! target?.sourceAssets?.size ) state?.progressiveTextureTargets?.delete( targetID );
+		}
+		if ( targets?.size ) state.textureLODScheduleDirty = true;
+		state?.progressiveTextureTargetsByAsset?.delete( assetID );
 	}
-	if ( targets?.size ) state.textureLODScheduleDirty = true;
-	state?.progressiveTextureTargetsByAsset?.delete( assetID );
 }
 
 const MAX_EMBEDDED_SHAPES_PER_OBJECT = 4096;
@@ -1132,7 +1141,7 @@ function unregisterPackageLightNodes( state, root ) {
 	root.traverse( object => state.lightNodes.delete( object ) );
 }
 
-async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null, terrainHeightModule = null, graphTextureOverrides = {} ) {
+async function buildGLTF( gltf, packageState = null, signal = undefined, sourceAssetId = null, terrainHeightModule = null, graphTextureOverrides = {}, resourceOwnerId = sourceAssetId ) {
 
 	if ( packageState ) packageState.textureAssets ||= new Map();
 	const root = new Group();
@@ -1195,7 +1204,7 @@ async function buildGLTF( gltf, packageState = null, signal = undefined, sourceA
 		}
 		if ( shareAssetTexture && sourceAssetId ) {
 			entry.sourceAssetIDs ||= new Set();
-			entry.sourceAssetIDs.add( sourceAssetId );
+			entry.sourceAssetIDs.add( resourceOwnerId );
 		}
 
 		const decodedTexture = entry.texture || await entry.promise;

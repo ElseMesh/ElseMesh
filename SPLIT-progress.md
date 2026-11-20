@@ -2734,3 +2734,16 @@ finding changes them.
   an AMD capture or a comparison with Tidewater's authored scene. Neither canopy
   adapter is registered, the package remains inactive, and no rendered parity
   percentage changes.
+
+- 2026-11-20: added a renderer-neutral `graphTextureBindings` contract for
+  generic static-model components. ElseMesh verifies each PNG against both the
+  component and signed manifest, decodes one shared raw RGBA8 payload, derives
+  sampler policy from the material-graph slot, and binds the same data in both
+  static-model adapters. Generic authored `contentRole: "vegetation"` keeps
+  this near-model component under the engine's vegetation visibility control.
+  Tidewater's inactive canopy package now records a generic static-model
+  near-component candidate. Signed asset, adapter, WebGPU render, WebGL render,
+  and deterministic world-export checks pass. The candidate remains outside
+  `world-source.json`; no app path activates it, and the far-canopy presenter,
+  matched Tidewater appearance review, and other parity gates remain open. No
+  percentage changes: Tidewater remains 93% and renderer-neutral packages 71%.

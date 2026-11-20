@@ -67,14 +67,27 @@ function releaseParsedModelSource( fallback, assetId ) {
 async function installStaticModelInstanceSet( { fallback, connector: providedConnector, isCurrent: providedIsCurrent }, component ) {
 	const connector = providedConnector || fallback.connector;
 	const isCurrent = providedIsCurrent || ( () => fallback.connector === connector );
-	const { document, loadModelLOD, releaseModelLOD } = await loadStaticModelInstanceSetAssets( connector, component );
+	const { document, loadModelLOD, releaseModelLOD, graphTextureBindings } = await loadStaticModelInstanceSetAssets( connector, component );
 	const T = fallback.THREE, sources = new Map(), sourceFlights = new Map(), ownedGeometry = new Set(), ownedMaterials = new Set(), sharedProfileMaterials = new Set();
+	const ownedGraphTextures = new Map();
+	for ( const [ slot, image ] of graphTextureBindings ) {
+		const texture = new T.DataTexture( image.data, image.width, image.height, T.RGBAFormat, T.UnsignedByteType );
+		texture.magFilter = T.LinearFilter;
+		texture.minFilter = T.LinearFilter;
+		texture.wrapS = texture.wrapT = image.sampler.endsWith( 'Repeat' ) ? T.RepeatWrapping : T.ClampToEdgeWrapping;
+		texture.generateMipmaps = false;
+		texture.flipY = false;
+		texture.unpackAlignment = 1;
+		texture.colorSpace = T.NoColorSpace;
+		texture.needsUpdate = true;
+		ownedGraphTextures.set( slot, texture );
+	}
 	const root = fallback.app?.linkedWorldRoot;
 	const lodQueue = root?.userData?.worldPackage ? worldPackageMeshLODQueue( root ) : ( fallback.hostedStaticModelLODQueue ||= new LODLoadQueue( 1, { deferStart: true } ) );
 	const retainedSourceIDs = new Set();
 	const materialCache = new Map(), modelCapacity = document.models.map( model => document.instances.reduce( ( count, instance ) => count + ( instance.model === model.id ? 1 : 0 ), 0 ) );
 	const hasMaterialData = document.instances.some( instance => instance.materialData );
-	const graphTextureOverrides = fallback.beachDetailTexture ? { detailField: fallback.beachDetailTexture } : {};
+	const graphTextureOverrides = { ...( fallback.beachDetailTexture ? { detailField: fallback.beachDetailTexture } : {} ), ...Object.fromEntries( ownedGraphTextures ) };
 	if ( fallback.hostedStaticTextureLOD?.connector !== connector ) fallback.hostedStaticTextureLOD = new WebGLProgressiveStaticTextures( fallback, connector );
 	const textureLOD = fallback.hostedStaticTextureLOD;
 	let runtime = null;
@@ -93,6 +106,7 @@ async function installStaticModelInstanceSet( { fallback, connector: providedCon
 		}
 		for ( const geometry of ownedGeometry ) geometry.dispose();
 		for ( const material of ownedMaterials ) material.dispose();
+		for ( const texture of ownedGraphTextures.values() ) texture.dispose();
 		for ( const material of sharedProfileMaterials ) material.userData?.releaseTerrainHeightBinding?.();
 		for ( const assetId of retainedSourceIDs ) releaseParsedModelSource( fallback, assetId );
 	};

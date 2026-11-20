@@ -17,6 +17,7 @@ assert.equal( worldComponentDescriptor( 'elsemesh.local-light-set/1' ).installRa
 assert.equal( worldComponentDescriptor( 'elsemesh.octahedral-canopy/1' ).vegetation, true, 'the shared canopy contract is registered as a vegetation component' );
 assert.equal( worldComponentDescriptor( 'elsemesh.octahedral-canopy/1' ).installRank, 2, 'the canopy component installs after foundational world data' );
 assert.deepEqual( worldComponentAssetIDs( { type: 'elsemesh.octahedral-canopy/1', assets: [ { assetId: 'sha256:descriptor', kind: 'octahedral-canopy/1' }, { assetId: 'sha256:instance-set', kind: 'static-model-instance-set/1' }, { assetId: 'sha256:atlas', kind: 'image/png' } ] } ), [ 'sha256:descriptor' ], 'canopy startup requests only its descriptor; dependent signed assets load lazily' );
+assert.deepEqual( worldComponentAssetIDs( { type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: 'sha256:models', kind: 'static-model-instance-set/1' } ], data: { graphTextureBindings: [ { slot: 'leafMask', assetId: 'sha256:mask', dataFormat: 'rgba8unorm-data-png/1' } ] } } ), [ 'sha256:models', 'sha256:mask' ], 'static-model startup preloads every signed graph texture needed by its material graphs' );
 assert.equal( worldComponentDescriptor( 'elsemesh.unregistered/1' ), null );
 
 const type = 'elsemesh.registry-fixture/1';

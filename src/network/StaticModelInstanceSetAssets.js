@@ -2,6 +2,7 @@ import { decodeWorldComponentAsset } from './WorldComponentAssetCodecRegistry.js
 import { parseGLBJSON } from '../engine/loaders/GLTF.js';
 import { fetchGLBWithCoarseKTX2 } from '../engine/loaders/GLBRange.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND } from './StaticModelInstanceSet.js';
+import { loadWorldGraphTextureBindings } from './WorldGraphTextureBindings.js';
 
 // Resolve an instance set only against assets declared by its connector. Signed
 // package IDs are content hashes; the local dynamic provider uses source-scoped
@@ -19,6 +20,7 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 	const availableAssetIDs = new Set( records.filter( asset => asset.kind === 'glb' ).map( asset => asset.id ) );
 	const setBytes = connector.assets.get( setReference.assetId ) || await connector.getAsset( setReference.assetId, { signal } );
 	const document = decodeWorldComponentAsset( STATIC_MODEL_INSTANCE_SET_ASSET_KIND, setBytes, { availableAssetIDs } );
+	const graphTextureBindings = await loadWorldGraphTextureBindings( connector, component, { signal } );
 	for ( const assetId of new Set( document.models.flatMap( model => model.lods.map( lod => lod.assetId ) ) ) ) {
 		const asset = assetsByID.get( assetId );
 		if ( ! asset || asset.kind !== 'glb' || componentAssetsByID.get( assetId ) !== 'glb' ) throw new Error( `Static model LOD asset is not declared as a component GLB: ${assetId}` );
@@ -63,5 +65,5 @@ export async function loadStaticModelInstanceSetAssets( connector, component, { 
 		const assetId = document.models[ modelIndex ]?.lods?.[ lodIndex ]?.assetId;
 		if ( assetId ) { modelAssets.delete( assetId ); modelWebGLAssets.delete( assetId ); modelProgressiveAssets.delete( assetId ); parsedModels.delete( assetId ); }
 	};
-	return { document, modelAssets, parsedModels, loadModelLOD, releaseModelLOD };
+	return { document, modelAssets, parsedModels, graphTextureBindings, loadModelLOD, releaseModelLOD };
 }

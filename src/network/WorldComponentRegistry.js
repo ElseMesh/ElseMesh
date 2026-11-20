@@ -30,7 +30,10 @@ export function worldVehicleObjectId( worldComponents ) {
 // GLBs on demand after decoding the descriptor.
 export function worldComponentAssetIDs( component ) {
 	const references = component?.assets || [];
-	if ( component?.type === 'elsemesh.static-model-instance-set/1' ) return references.filter( reference => reference.kind === STATIC_MODEL_INSTANCE_SET_ASSET_KIND ).map( reference => reference.assetId );
+	if ( component?.type === 'elsemesh.static-model-instance-set/1' ) return [
+		...references.filter( reference => reference.kind === STATIC_MODEL_INSTANCE_SET_ASSET_KIND ).map( reference => reference.assetId ),
+		...( Array.isArray( component.data?.graphTextureBindings ) ? component.data.graphTextureBindings : [] ).map( binding => binding?.assetId ).filter( assetId => typeof assetId === 'string' ),
+	];
 	if ( component?.type === GROUND_COVER_FIELD_COMPONENT_TYPE ) return references.filter( reference => reference.kind === GROUND_COVER_FIELD_DENSITY_ASSET_KIND ).map( reference => reference.assetId );
 	if ( component?.type === OCTAHEDRAL_CANOPY_COMPONENT_TYPE ) return references.filter( reference => reference.kind === OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND ).map( reference => reference.assetId );
 	return references.map( reference => reference.assetId );

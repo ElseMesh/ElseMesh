@@ -246,8 +246,8 @@ The inactive runtime descriptor now includes the authored tree/shrub palette
 and seed thresholds alongside its color, lighting, and wind values. The engine
 validates those fields, and Tidewater's export test checks the descriptor
 against its source profile. This closes a missing-data gap only: the near GLB
-material graph is still provisional, and neither backend consumes the
-descriptor or atlases yet.
+material graph is still provisional, and the octahedral descriptor and far
+atlases have no registered presenter yet.
 
 `src/network/OctahedralCanopyAssets.js` loads the signed descriptor, validates
 the instance-set and PNG references against the component and manifest, checks
@@ -260,14 +260,15 @@ content-addressed raw-data PNG sidecars. It now also emits an inactive near-
 model sidecar containing all tree/shrub lobe variants, the authored placement
 transforms, and the same seed-based variant selection. The GLBs preserve all
 three source VEC4 streams but still use a provisional PBR material. The
-exporter now also writes the source leaf-mask atlas as a content-addressed,
-linear RGBA8 data PNG and records its 2×2 tile layout and channel meanings.
-The signed material graph and runtime references are still missing. Neither
-sidecar is referenced by the signed world package, and no backend adapter
-consumes them. The Tidewater export test reruns the bakes and checks byte
-identity, dimensions, asset hashes, source streams, placement counts, and
-variant selection. Do not activate the geometry until the complete signed
-appearance contract and both engine adapters pass matched review.
+exporter also writes the source leaf-mask atlas as a content-addressed, linear
+RGBA8 data PNG and records its 2×2 tile layout and channel meanings. The signed
+material graph and runtime references are present in the inactive package and
+near GLBs. The candidate remains outside the signed world source; the near
+component can use the generic static-model adapters, but no app path activates
+it. The Tidewater export test reruns the bakes and checks byte identity,
+dimensions, asset hashes, source streams, placement counts, and variant
+selection. Do not activate the geometry until the complete authored appearance
+and the far presenter pass matched review.
 
 `elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
 with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
@@ -285,8 +286,13 @@ Tidewater's exporter now assembles the near instance set, near GLBs, both frame
 atlases, leaf mask, appearance inputs, and LOD rules into an inactive
 `vegetation-canopy-runtime-package.json`. The engine descriptor and asset loader
 validate against the actual content-addressed source files. This candidate is
-still outside `world-source.json`; its near-model graph remains provisional and
-neither backend adapter consumes the component.
+still outside `world-source.json`; its near-model graph remains provisional.
+The package now includes a generic static-model near-component record. ElseMesh
+validates its signed `graphTextureBindings` and content-role metadata, and both
+generic static-model adapters bind the raw RGBA8 leaf-mask input. Paired adapter
+and WebGPU/WebGL synthetic render checks cover this generic contract; Tidewater's
+candidate is not active and those fixtures do not prove authored-scene parity.
+The octahedral far-canopy component still has no registered presenter.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The

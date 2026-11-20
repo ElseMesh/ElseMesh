@@ -8,7 +8,7 @@ import { worldComponentBackendAdapter } from '../src/network/WorldComponentBacke
 import { disposeWorldPackage } from '../src/network/WorldPackage.js';
 import { Texture } from '../src/engine/gpu/Texture.js';
 import { STATIC_MODEL_INSTANCE_SET_ASSET_KIND, STATIC_MODEL_INSTANCE_SET_FORMAT } from '../src/network/StaticModelInstanceSet.js';
-import { staticModelGLB } from './helpers/static-model-glb.mjs';
+import { staticModelGLB, staticModelTexturePNG } from './helpers/static-model-glb.mjs';
 
 await import( '../src/network/WebGPUWorldComponentAdapters.js' );
 await import( '../src/fallback/WebGLComponentSupport.js' );
@@ -34,8 +34,10 @@ const detailFieldGraph = {
 		{ id: 'offset', op: 'vec3', args: [ 'offsetX', 'zero', 'zero' ] },
 		{ id: 'moved', op: 'add', args: [ 'position', 'offset' ] },
 		{ id: 'albedo', op: 'rgb', args: [ 'detail' ] },
+		{ id: 'mask', op: 'textureSample', slot: 'leafMask', uv: 'uv' },
+		{ id: 'maskCoverage', op: 'x', args: [ 'mask' ] },
 	],
-	outputs: { baseColor: 'albedo', vertexPosition: 'moved' },
+	outputs: { baseColor: 'albedo', opacity: 'maskCoverage', vertexPosition: 'moved' },
 };
 const glbBytes = staticModelGLB( {
 	nodeScale: [ -1, 1, 1 ],
@@ -47,12 +49,17 @@ const document = {
 	instances: [ { model: 'fixture-triangle', position: [ 0, 0, - 5 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0.25, 0.5, 0.75, 1, 2, 3, 4, 5 ] } ],
 };
 const setBytes = new TextEncoder().encode( JSON.stringify( document ) ), setAssetID = hash( setBytes );
-const component = { id: 'fixture-static-models', type: 'elsemesh.static-model-instance-set/1', assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: fineModelAssetID, kind: 'glb' } ] };
+const leafMaskAssetID = hash( staticModelTexturePNG );
+const component = {
+	id: 'fixture-static-models', type: 'elsemesh.static-model-instance-set/1',
+	assets: [ { assetId: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { assetId: modelAssetID, kind: 'glb' }, { assetId: fineModelAssetID, kind: 'glb' }, { assetId: leafMaskAssetID, kind: 'image/png' } ],
+	data: { graphTextureBindings: [ { slot: 'leafMask', assetId: leafMaskAssetID, dataFormat: 'rgba8unorm-data-png/1' } ] },
+};
 const requestedAssets = [];
 let releaseFineAsset;
 const connector = {
-	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: fineModelAssetID, kind: 'glb' } ] },
-	assets: new Map( [ [ setAssetID, setBytes ] ] ),
+	manifest: { assets: [ { id: setAssetID, kind: STATIC_MODEL_INSTANCE_SET_ASSET_KIND }, { id: modelAssetID, kind: 'glb' }, { id: fineModelAssetID, kind: 'glb' }, { id: leafMaskAssetID, kind: 'image/png' } ] },
+	assets: new Map( [ [ setAssetID, setBytes ], [ leafMaskAssetID, staticModelTexturePNG ] ] ),
 	getAsset: async assetId => {
 		requestedAssets.push( assetId );
 		assert.ok( [ modelAssetID, fineModelAssetID ].includes( assetId ) );
@@ -104,7 +111,9 @@ assert.deepEqual( Array.from( webgpuMain.geometry.getAttribute( 'iStaticMaterial
 assert.equal( webgpuMain.material.attributes.iStaticMaterialData0, 'vec4f', 'WebGPU material profiles can bind opaque per-instance data' );
 assert.match( webgpuMain.material.vertex, /v\.iStaticMaterialData0/ );
 assert.equal( webgpuMain.material.bindings.emgTexture_detailField.texture, webgpuDetailField, 'the WebGPU static-model adapter binds the installed terrain detail texture to material graphs' );
+assert.equal( webgpuMain.material.bindings.emgTexture_leafMask.texture.width, 1, 'the WebGPU static-model adapter binds a signed data PNG to its authored graph slot' );
 assert.match( webgpuMain.material.vertex, /textureSampleLevel\( emgTexture_detailField, smpLinearRepeat,/ );
+assert.match( webgpuMain.material.surface, /textureSample\( emgTexture_leafMask, smpLinearClamp,/ );
 assert.equal( webgpuShadow.geometry.getAttribute( 'iStaticFade' ).array[ 1 ], 0, 'shadow-only instances remain fully visible with complementary fade enabled' );
 const farWebGPUCamera = new PerspectiveCamera( 60, 1, 0.1, 200 );
 farWebGPUCamera.position.set( 0, 0, 25 );
@@ -112,6 +121,7 @@ farWebGPUCamera.lookAt( 0, 0, - 5 );
 webgpuResult.runtime.update( 1 / 60, farWebGPUCamera );
 assert.equal( webgpuResult.runtime.planner.shadowGroups[ 1 ].count, 1, 'WebGPU casts the same instance through the coarser shadow LOD as the camera recedes' );
 webgpuResult.runtime.dispose();
+assert.equal( webgpuRoot.userData.worldPackage.parsed.has( `${modelAssetID}:fixture-static-models` ), false, 'disposing a graph-bound static component releases its component-specific compiled GLB cache entry' );
 disposeWorldPackage( webgpuRoot );
 webgpuDetailField.destroy();
 assert.equal( webgpuRoot.children.length, 0 );
@@ -169,6 +179,7 @@ assert.deepEqual( Array.from( webglMain.geometry.getAttribute( 'iStaticMaterialD
 assert.match( webglMain.material.customProgramCacheKey(), /static-instance-fade-v1\+material-data-v1/ );
 const webglShader = { vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
 webglMain.material.onBeforeCompile( webglShader, {} );
+assert.equal( webglShader.uniforms.emgTexture_leafMask.value.image.width, 1, 'the WebGL static-model adapter binds the same signed data PNG to its authored graph slot' );
 assert.match( webglShader.vertexShader, /textureLod\( emgTexture_detailField,/ );
 assert.equal( webglShader.uniforms.emgTexture_detailField.value, webglDetailField, 'the WebGL static-model adapter binds the installed terrain detail texture to material graphs' );
 webglResult.runtime.dispose();

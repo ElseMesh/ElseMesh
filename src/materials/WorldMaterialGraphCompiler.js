@@ -1,4 +1,4 @@
-import { WORLD_MATERIAL_GRAPH_INPUT_TYPES, validateWorldMaterialGraph, worldMaterialGraphNodeTypes } from '../network/WorldMaterialGraph.js';
+import { WORLD_MATERIAL_GRAPH_INPUT_TYPES, validateWorldMaterialGraph, worldMaterialGraphNodeTypes, worldMaterialGraphSampler } from '../network/WorldMaterialGraph.js';
 
 const INPUT_SOURCES = Object.freeze( {
 	position: { builtin: true, wgsl: 'v.position', glsl: 'position' },
@@ -84,7 +84,8 @@ function expression( node, names, backend ) {
 		const texture = `emgTexture_${node.slot}`;
 		const uv = names.get( node.uv );
 		const lod = node.op === 'textureSampleLevel' ? names.get( node.lod ) : null;
-		const sampler = node.slot === 'densityField' || node.slot === 'leafMask' ? 'smpLinearClamp' : node.slot === 'detailField' ? 'smpLinearRepeat' : 'smpAnisoRepeat';
+		const samplerName = worldMaterialGraphSampler( node.slot );
+		const sampler = `smp${samplerName[ 0 ].toUpperCase()}${samplerName.slice( 1 )}`;
 		if ( backend === 'webgpu' ) return node.op === 'textureSampleLevel' ? `textureSampleLevel( ${texture}, ${sampler}, ${uv}, ${lod} )` : `textureSample( ${texture}, ${sampler}, ${uv} )`;
 		return node.op === 'textureSampleLevel' ? `textureLod( ${texture}, ${uv}, ${lod} )` : `texture2D( ${texture}, ${uv} )`;
 	}
