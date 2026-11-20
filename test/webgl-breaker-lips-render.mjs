@@ -21,7 +21,7 @@ async function stop( child ) {
 }
 
 const profile = mkdtempSync( join( '/var/tmp', 'elsemesh-webgl-breaker-lips-' ) );
-const vite = await createServer( { configFile: false, root, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
+const vite = await createServer( { configFile: false, root, optimizeDeps: { entries: [ 'test/webgl-breaker-lips-render.html' ] }, server: { host: '127.0.0.1', port: 0, strictPort: true }, appType: 'mpa' } );
 let browser, socket;
 try {
 	await vite.listen();

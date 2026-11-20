@@ -10,9 +10,9 @@ try {
 	const scene = new THREE.Scene();
 	scene.background = new THREE.Color( 0x111820 );
 	const camera = new THREE.PerspectiveCamera( 38, 640 / 480, 0.1, 400 );
-	camera.position.set( 10, 3.2, 8 ); camera.lookAt( 10, 0.15, - 2 );
+	camera.position.set( - 35, 3.2, - 8 ); camera.lookAt( - 35, 0.15, 35 );
 	const sea = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100 ), new THREE.MeshBasicMaterial( { color: 0x153b46 } ) );
-	sea.rotation.x = - Math.PI / 2; sea.position.set( 0, - 0.04, - 25 ); scene.add( sea );
+	sea.rotation.x = - Math.PI / 2; sea.position.set( 0, - 0.04, 45 ); scene.add( sea );
 	const resolution = 128, origin = - 64, size = 128, fieldData = new Float32Array( resolution * resolution * 4 );
 	for ( let j = 0; j < resolution; j ++ ) for ( let i = 0; i < resolution; i ++ ) {
 		const offset = ( j * resolution + i ) * 4;
