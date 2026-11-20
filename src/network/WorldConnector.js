@@ -301,7 +301,10 @@ export class WorldConnector {
 				if ( manifest ) return manifest;
 			}
 		}
-		if ( this.zeroTierNodeId && ! this.worldId ) throw new Error( lastError?.message || 'ZeroTier node does not currently advertise a ThruHold' );
+		if ( this.zeroTierNodeId && ! this.worldId ) {
+			if ( lastError ) throw lastError;
+			throw new Error( 'ZeroTier node does not currently advertise a ThruHold' );
+		}
 		for ( const provider of inviteProviders ) {
 			const manifest = await attemptProvider( provider.nodeId, provider.gateway, signal, provider.rendezvous, provider );
 			if ( manifest ) return manifest;

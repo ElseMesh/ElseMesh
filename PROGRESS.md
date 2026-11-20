@@ -141,6 +141,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
 - Checked for a direct public HTTPS/WSS path from pi3: this host had no local
   listener on TCP 80 or 443, and both ports were closed from pi3. There is no
   currently reachable direct HTTPS/WSS gateway for this worldd.
+- Tried the compact HostID invite in a separate ARMv7 browser with ZeroTier
+  joined. The onboarding page loaded, but Chromium 92 cannot import Ed25519
+  keys through WebCrypto, so it discarded the valid signed Worker provider
+  and misleadingly reported that no provider existed. ElseMesh now preserves
+  this `NotSupportedError` as an actionable “update to a current browser”
+  failure; a focused rendezvous test covers it. This old browser run does not
+  verify the invite data path.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages
