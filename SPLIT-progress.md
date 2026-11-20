@@ -2764,3 +2764,16 @@ finding changes them.
   fading disabled. This fixes an authored-data mismatch in the candidate only:
   its adapters remain unregistered and the package remains inactive, so no
   rendered parity gate closes and Tidewater remains 93% complete.
+
+- 2026-11-20: moved the WebGL far-canopy surface from hand-written ambient,
+  Lambert, and Blinn lighting onto ElseMesh's `MeshPhysicalMaterial` lighting
+  path. The shared atlas inputs now provide albedo, normal, coverage, and leaf
+  transmission while the engine scene hooks supply atmosphere irradiance and
+  all three CSM shadow cascades. Transmission samples the matching CSM cascade
+  and fade policy. An isolated WebGL render asserts both engine lighting
+  adapters are attached, draws 2,500 canopy pixels without shader or GL errors,
+  and verifies positive backlighting against a zero-transmission material; the
+  paired synthetic WebGPU render also passes. This is still not a matched
+  Tidewater scene comparison or a test with a shadow-casting blocker: no canopy
+  adapter is registered, the package remains inactive, and visual parity stays
+  open at 93% (renderer-neutral packages remain 71%).

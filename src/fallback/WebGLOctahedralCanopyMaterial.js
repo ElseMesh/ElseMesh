@@ -102,8 +102,7 @@ float canopyWindDisplacement(float seed, float height, vec2 worldXZ, float gust)
 `;
 }
 
-const VERTEX_SHADER = /* glsl */`
-#include <common>
+const VERTEX_PREAMBLE = /* glsl */`
 attribute vec4 iCanopy0;
 attribute vec4 iCanopy1;
 attribute vec4 iCanopy2;
@@ -120,48 +119,19 @@ uniform sampler2D uGustTexture;
 uniform float uHasGustTexture;
 varying vec3 vCanopyWorldPosition;
 varying vec3 vCanopyCenter;
+varying vec3 vCanopyWindOffset;
 varying vec4 vCanopy0;
 varying vec4 vCanopy1;
 varying vec4 vCanopyFrames;
 varying vec4 vCanopyWeights;
 ${'/*GROUP_FUNCTIONS*/'}
 ${'/*APPEARANCE_FUNCTIONS*/'}
-void main() {
-	int group = int(clamp(floor(iCanopy0.w + 0.5), 0.0, 31.0));
-	vec3 groupCenter = canopyGroupCenter(float(group));
-	vec3 centerOffset = vec3(groupCenter.x * iCanopy1.x, groupCenter.y * iCanopy1.y, groupCenter.z * iCanopy1.z);
-	float cs = cos(iCanopy1.w), sn = sin(iCanopy1.w);
-	vec3 rotatedOffset = vec3(centerOffset.x*cs + centerOffset.z*sn, centerOffset.y, -centerOffset.x*sn + centerOffset.z*cs);
-	vec3 billboardCenter = (modelMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0)).xyz;
-	vec3 base = billboardCenter - rotatedOffset;
-	float gust = 0.5;
-	if (uHasGustTexture > 0.5) {
-		vec2 p = base.xz - canopyGustOffset();
-		gust = texture2D(uGustTexture, p / 140.0).a * 0.62 + texture2D(uGustTexture, p / 61.0 + 0.37).a * 0.38;
-		gust = smoothstep(0.46,0.6,gust);
-	}
-	float wind = canopyWindDisplacement(iCanopy0.x, iCanopy2.x, base.xz, gust);
-	vec3 windOffset = vec3(uWindDirection.x,0.0,uWindDirection.y) * wind;
-	vec4 world = modelMatrix * instanceMatrix * vec4(position,1.0);
-	world.xyz += windOffset;
-	vCanopyWorldPosition = world.xyz;
-	vCanopyCenter = billboardCenter + windOffset;
-	vCanopy0 = iCanopy0;
-	vCanopy1 = iCanopy1;
-	vCanopyFrames = iCanopyFrames;
-	vCanopyWeights = iCanopyWeights;
-	gl_Position = projectionMatrix * viewMatrix * world;
-}
 `;
 
-const FRAGMENT_SHADER = /* glsl */`
-#include <common>
+const FRAGMENT_PREAMBLE = /* glsl */`
 uniform sampler2D uMaterialAtlas;
 uniform sampler2D uNormalExposureAtlas;
 uniform vec3 uCameraPosition;
-uniform vec3 uSunDirection;
-uniform vec3 uSunColor;
-uniform vec3 uAmbientColor;
 uniform float uNight;
 uniform float uTime;
 uniform float uFrameIndex;
@@ -237,50 +207,6 @@ float canopyBayer4(vec2 pixel) {
 	float value=xor0*8.0+y0*4.0+xor1*2.0+y1;
 	return (value+0.5)/16.0;
 }
-void main() {
-	int groupIndex = int(clamp(floor(vCanopy0.w+0.5),0.0,31.0));
-	float shrub = groupIndex == ${'/*SHRUB_GROUP*/'} ? 1.0 : 0.0;
-	vec3 groupCenter = canopyGroupCenter(float(groupIndex));
-	vec3 baseOffset = vec3(groupCenter.x*vCanopy1.x,groupCenter.y*vCanopy1.y,groupCenter.z*vCanopy1.z);
-	float cs=cos(vCanopy1.w), sn=sin(vCanopy1.w);
-	vec3 rotatedOffset=vec3(baseOffset.x*cs+baseOffset.z*sn,baseOffset.y,-baseOffset.x*sn+baseOffset.z*cs);
-	vec3 base=vCanopyCenter-rotatedOffset;
-	vec3 Ow=uCameraPosition-vCanopyCenter;
-	vec3 Dw=vCanopyWorldPosition-uCameraPosition;
-	vec3 O=vec3(Ow.x*cs-Ow.z*sn,Ow.y,Ow.x*sn+Ow.z*cs)/max(vCanopy1.xyz,vec3(1e-6));
-	vec3 D=vec3(Dw.x*cs-Dw.z*sn,Dw.y,Dw.x*sn+Dw.z*cs)/max(vCanopy1.xyz,vec3(1e-6));
-	float radius=max(vCanopy0.z,1e-6);
-	vec4 material=canopyBlendedSample(0.0,O,D,vCanopy0.y,radius);
-	vec4 normalExposure=canopyBlendedSample(1.0,O,D,vCanopy0.y,radius);
-	float coverage=material.a;
-	if (coverage <= 0.42 || canopyBayer4(gl_FragCoord.xy) >= vCanopyWeights.w) discard;
-	float safeCoverage=max(coverage,1e-3);
-	float brightness=material.r/safeCoverage;
-	float leaf=material.g/safeCoverage;
-	float cardRandom=material.b/safeCoverage;
-	float exposure=normalExposure.a/safeCoverage;
-	vec3 albedo=canopyImpostorColor(vCanopy0.x,cardRandom,leaf,brightness,shrub)
-		*canopyBakedOcclusion(exposure)
-		*(brightness*${'/*BRIGHTNESS_SCALE*/'}+${'/*BRIGHTNESS_BIAS*/'});
-	vec3 localNormal=normalExposure.rgb/safeCoverage*2.0-1.0;
-	vec3 stretched=vec3(localNormal.x,localNormal.y*max(vCanopy1.x,1e-6)/max(vCanopy1.y,1e-6),localNormal.z);
-	vec3 worldNormal=normalize(vec3(stretched.x*cs+stretched.z*sn,stretched.y,stretched.z*cs-stretched.x*sn));
-	vec3 billboardNormal=normalize(uCameraPosition-vCanopyCenter);
-	vec3 viewDir=normalize(uCameraPosition-vCanopyWorldPosition);
-	vec3 sunDir=normalize(uSunDirection);
-	float diffuse=max(dot(worldNormal,sunDir),0.0);
-	float back=max(dot(-billboardNormal,sunDir),0.0);
-	float forward=pow(max(dot(-viewDir,sunDir),0.0),3.0)*0.7+0.3;
-	vec3 translucency=(albedo*vec3(1.25,1.45,0.55)+vec3(0.012,0.018,0.0))*back*forward*${'/*TRANSLUCENCY*/'}*(1.0-uNight);
-	vec3 lit=albedo*(uAmbientColor+uSunColor*diffuse)+translucency*uSunColor;
-	float roughness=${'/*ROUGHNESS*/'};
-	float specularPower=mix(128.0,4.0,roughness);
-	float specular=pow(max(dot(worldNormal,normalize(sunDir+viewDir)),0.0),specularPower)*${'/*SPECULAR*/'}*diffuse;
-	lit+=uSunColor*specular;
-	gl_FragColor=vec4(lit,1.0);
-	#include <tonemapping_fragment>
-	#include <colorspace_fragment>
-}
 `;
 
 function makeGroupGLSL( descriptor ) {
@@ -295,24 +221,18 @@ function requiredDescriptorValues( descriptor ) {
 	return descriptor;
 }
 
-/** Create the engine-owned WebGL shader for shared octahedral canopy draw buffers. */
-export function createOctahedralCanopyShaderMaterial( THREE, descriptor, options = {} ) {
+/** Create the engine-owned WebGL physical material for shared canopy draw buffers. */
+export function createWebGLOctahedralCanopyMaterial( THREE, descriptor, options = {} ) {
 	descriptor = requiredDescriptorValues( descriptor );
 	const { appearance } = descriptor;
 	const { functions, shrubGroup } = makeGroupGLSL( descriptor );
 	const appearanceFunctions = canopyAppearanceGLSL( appearance );
-	const vertexShader = VERTEX_SHADER
+	const vertexPreamble = VERTEX_PREAMBLE
 		.replace( '/*GROUP_FUNCTIONS*/', functions )
 		.replace( '/*APPEARANCE_FUNCTIONS*/', appearanceFunctions );
-	const fragmentShader = FRAGMENT_SHADER
+	const fragmentPreamble = FRAGMENT_PREAMBLE
 		.replace( '/*GROUP_FUNCTIONS*/', functions )
-		.replace( '/*APPEARANCE_FUNCTIONS*/', appearanceFunctions )
-		.replace( '/*SHRUB_GROUP*/', String( shrubGroup ) )
-		.replace( '/*BRIGHTNESS_SCALE*/', number( appearance.lighting.brightnessScale ) )
-		.replace( '/*BRIGHTNESS_BIAS*/', number( appearance.lighting.brightnessBias ) )
-		.replace( '/*TRANSLUCENCY*/', number( appearance.lighting.translucency ) )
-		.replace( '/*ROUGHNESS*/', number( appearance.lighting.roughness ) )
-		.replace( '/*SPECULAR*/', number( appearance.lighting.specularIntensity ) );
+		.replace( '/*APPEARANCE_FUNCTIONS*/', appearanceFunctions );
 	const defaultVector3 = ( value, fallback ) => new THREE.Vector3( ...( value || fallback ) );
 	const defaultVector2 = ( value, fallback ) => new THREE.Vector2( ...( value || fallback ) );
 	const expectedWidth = descriptor.frameGrid.columns * descriptor.frameGrid.frameWidth;
@@ -324,14 +244,11 @@ export function createOctahedralCanopyShaderMaterial( THREE, descriptor, options
 	if ( ! options.materialAtlas || ! options.normalExposureAtlas ) throw new Error( 'Raw canopy material and normal/exposure atlas textures are required' );
 	if ( atlasWidth !== expectedWidth || atlasHeight !== expectedHeight || normalWidth !== expectedWidth || normalHeight !== expectedHeight ) throw new Error( 'Canopy atlas texture dimensions do not match the signed descriptor frame grid' );
 	const uniforms = {
-		uMaterialAtlas: { value: options.materialAtlas || null },
-		uNormalExposureAtlas: { value: options.normalExposureAtlas || null },
+		uMaterialAtlas: { value: options.materialAtlas },
+		uNormalExposureAtlas: { value: options.normalExposureAtlas },
 		uGustTexture: { value: options.gustTexture || null },
 		uHasGustTexture: { value: options.gustTexture ? 1 : 0 },
 		uCameraPosition: { value: defaultVector3( options.cameraPosition, [ 0, 0, 0 ] ) },
-		uSunDirection: { value: defaultVector3( options.sunDirection, [ 0.35, 0.9, 0.25 ] ) },
-		uSunColor: { value: defaultVector3( options.sunColor, [ 1, 1, 1 ] ) },
-		uAmbientColor: { value: defaultVector3( options.ambientColor, [ 0.28, 0.32, 0.28 ] ) },
 		uNight: { value: Number.isFinite( options.night ) ? options.night : 0 },
 		uTime: { value: Number.isFinite( options.time ) ? options.time : 0 },
 		uFrameIndex: { value: Number.isFinite( options.frameIndex ) ? options.frameIndex : 0 },
@@ -345,35 +262,166 @@ export function createOctahedralCanopyShaderMaterial( THREE, descriptor, options
 		uAtlasColumns: { value: descriptor.frameGrid.columns },
 		uAtlasRows: { value: descriptor.frameGrid.rows },
 	};
-	const material = new THREE.ShaderMaterial( {
+	const material = new THREE.MeshPhysicalMaterial( {
 		name: 'ElseMesh octahedral canopy',
-		vertexShader,
-		fragmentShader,
-		uniforms,
+		color: 0xffffff,
+		metalness: 0,
+		roughness: appearance.lighting.roughness,
+		specularIntensity: appearance.lighting.specularIntensity,
 		side: THREE.DoubleSide,
 		depthTest: true,
 		depthWrite: true,
 		transparent: false,
 		toneMapped: true,
-		defines: { CANOPY_SHRUB_GROUP: shrubGroup },
 	} );
+	const sourceCompile = material.onBeforeCompile;
+	material.onBeforeCompile = ( shader, renderer ) => {
+		sourceCompile?.call( material, shader, renderer );
+		const insertAfter = ( source, marker, code ) => {
+			if ( ! source.includes( marker ) ) throw new Error( `Three.js canopy material hook is missing ${ marker }` );
+			return source.replace( marker, `${ marker }\n${ code }` );
+		};
+		shader.vertexShader = insertAfter( shader.vertexShader, '#include <common>', vertexPreamble );
+		shader.vertexShader = insertAfter( shader.vertexShader, '#include <project_vertex>', /* glsl */`
+			int canopyGroup = int( clamp( floor( iCanopy0.w + 0.5 ), 0.0, 31.0 ) );
+			vec4 canopyWorld = vec4( transformed, 1.0 );
+			vec4 canopyCenterWorld = vec4( 0.0, 0.0, 0.0, 1.0 );
+			#ifdef USE_INSTANCING
+				canopyWorld = modelMatrix * instanceMatrix * canopyWorld;
+				canopyCenterWorld = modelMatrix * instanceMatrix * canopyCenterWorld;
+			#else
+				canopyWorld = modelMatrix * canopyWorld;
+				canopyCenterWorld = modelMatrix * canopyCenterWorld;
+			#endif
+			vec3 canopyOffsetLocal = vec3( canopyGroupCenter( float( canopyGroup ) ).x * iCanopy1.x, canopyGroupCenter( float( canopyGroup ) ).y * iCanopy1.y, canopyGroupCenter( float( canopyGroup ) ).z * iCanopy1.z );
+			float canopyYawCos = cos( iCanopy1.w ), canopyYawSin = sin( iCanopy1.w );
+			vec3 canopyOffsetWorld = vec3( canopyOffsetLocal.x * canopyYawCos + canopyOffsetLocal.z * canopyYawSin, canopyOffsetLocal.y, -canopyOffsetLocal.x * canopyYawSin + canopyOffsetLocal.z * canopyYawCos );
+			vec3 canopyBase = canopyCenterWorld.xyz - canopyOffsetWorld;
+			float canopyGust = 0.5;
+			if ( uHasGustTexture > 0.5 ) {
+				vec2 canopyGustPosition = canopyBase.xz - canopyGustOffset();
+				canopyGust = texture2D( uGustTexture, canopyGustPosition / 140.0 ).a * 0.62 + texture2D( uGustTexture, canopyGustPosition / 61.0 + 0.37 ).a * 0.38;
+				canopyGust = smoothstep( 0.46, 0.6, canopyGust );
+			}
+			float canopySway = canopyWindDisplacement( iCanopy0.x, iCanopy2.x, canopyBase.xz, canopyGust );
+			vCanopyWindOffset = vec3( uWindDirection.x, 0.0, uWindDirection.y ) * canopySway;
+			mvPosition.xyz += mat3( viewMatrix ) * vCanopyWindOffset;
+			gl_Position = projectionMatrix * mvPosition;
+			vCanopyWorldPosition = canopyWorld.xyz + vCanopyWindOffset;
+			vCanopyCenter = canopyCenterWorld.xyz + vCanopyWindOffset;
+			vCanopy0 = iCanopy0;
+			vCanopy1 = iCanopy1;
+			vCanopyFrames = iCanopyFrames;
+			vCanopyWeights = iCanopyWeights;
+		` );
+		shader.vertexShader = insertAfter( shader.vertexShader, '#include <worldpos_vertex>', /* glsl */`
+			#if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined( USE_SHADOWMAP ) || defined( USE_TRANSMISSION ) || NUM_SPOT_LIGHT_COORDS > 0
+				worldPosition.xyz += vCanopyWindOffset;
+			#endif
+		` );
+		shader.fragmentShader = insertAfter( shader.fragmentShader, '#include <common>', fragmentPreamble );
+		shader.fragmentShader = insertAfter( shader.fragmentShader, '#include <color_fragment>', /* glsl */`
+			int groupIndex = int( clamp( floor( vCanopy0.w + 0.5 ), 0.0, 31.0 ) );
+			float shrub = groupIndex == ${shrubGroup} ? 1.0 : 0.0;
+			vec3 groupCenter = canopyGroupCenter( float( groupIndex ) );
+			vec3 baseOffset = vec3( groupCenter.x * vCanopy1.x, groupCenter.y * vCanopy1.y, groupCenter.z * vCanopy1.z );
+			float cs = cos( vCanopy1.w ), sn = sin( vCanopy1.w );
+			vec3 rotatedOffset = vec3( baseOffset.x * cs + baseOffset.z * sn, baseOffset.y, -baseOffset.x * sn + baseOffset.z * cs );
+			vec3 base = vCanopyCenter - rotatedOffset;
+			vec3 Ow = uCameraPosition - vCanopyCenter;
+			vec3 Dw = vCanopyWorldPosition - uCameraPosition;
+			vec3 O = vec3( Ow.x * cs - Ow.z * sn, Ow.y, Ow.x * sn + Ow.z * cs ) / max( vCanopy1.xyz, vec3( 1e-6 ) );
+			vec3 D = vec3( Dw.x * cs - Dw.z * sn, Dw.y, Dw.x * sn + Dw.z * cs ) / max( vCanopy1.xyz, vec3( 1e-6 ) );
+			vec4 canopyMaterial = canopyBlendedSample( 0.0, O, D, vCanopy0.y, max( vCanopy0.z, 1e-6 ) );
+			vec4 canopyNormalExposure = canopyBlendedSample( 1.0, O, D, vCanopy0.y, max( vCanopy0.z, 1e-6 ) );
+			float canopyCoverage = canopyMaterial.a;
+			if ( canopyCoverage <= 0.42 || canopyBayer4( gl_FragCoord.xy ) >= vCanopyWeights.w ) discard;
+			float canopySafeCoverage = max( canopyCoverage, 1e-3 );
+			float canopyBrightness = canopyMaterial.r / canopySafeCoverage;
+			float canopyLeaf = canopyMaterial.g / canopySafeCoverage;
+			float canopyCardRandom = canopyMaterial.b / canopySafeCoverage;
+			float canopyExposure = canopyNormalExposure.a / canopySafeCoverage;
+			vec3 canopyAlbedo = canopyImpostorColor( vCanopy0.x, canopyCardRandom, canopyLeaf, canopyBrightness, shrub )
+				* canopyBakedOcclusion( canopyExposure )
+				* ( canopyBrightness * ${number( appearance.lighting.brightnessScale )} + ${number( appearance.lighting.brightnessBias )} );
+			vec3 localNormal = canopyNormalExposure.rgb / canopySafeCoverage * 2.0 - 1.0;
+			vec3 stretchedNormal = vec3( localNormal.x, localNormal.y * max( vCanopy1.x, 1e-6 ) / max( vCanopy1.y, 1e-6 ), localNormal.z );
+			vec3 canopyWorldNormal = normalize( vec3( stretchedNormal.x * cs + stretchedNormal.z * sn, stretchedNormal.y, stretchedNormal.z * cs - stretchedNormal.x * sn ) );
+			vec3 canopyBillboardNormal = normalize( uCameraPosition - vCanopyCenter );
+			diffuseColor.rgb = canopyAlbedo;
+		` );
+		shader.fragmentShader = insertAfter( shader.fragmentShader, '#include <normal_fragment_maps>', /* glsl */`
+			normal = normalize( mat3( viewMatrix ) * canopyWorldNormal );
+		` );
+		shader.fragmentShader = insertAfter( shader.fragmentShader, '#include <lights_fragment_end>', /* glsl */`
+			#if NUM_DIR_LIGHTS > 0
+				vec3 canopySunDirection = normalize( directionalLights[ 0 ].direction );
+				float canopySunShadow = 1.0;
+				#if defined( USE_CSM ) && defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+					float canopyLinearDepth = vViewPosition.z / ( shadowFar - cameraNear );
+					vec2 canopyCascade;
+					DirectionalLightShadow canopyShadowData;
+					float canopySampledShadow;
+					#if defined( CSM_FADE )
+						float canopyCascadeCenter;
+						float canopyClosestEdge;
+						float canopyMargin;
+						float canopyFadeNear;
+						float canopyFadeFar;
+						float canopyFadeRatio;
+						bool canopyFadeLast;
+					#endif
+					if ( receiveShadow ) {
+						#pragma unroll_loop_start
+						for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
+							canopyCascade = CSM_cascades[ i ];
+							if ( canopyLinearDepth >= canopyCascade.x && ( canopyLinearDepth < canopyCascade.y || UNROLLED_LOOP_INDEX == CSM_CASCADES - 1 ) ) {
+								canopyShadowData = directionalLightShadows[ i ];
+								canopySampledShadow = getShadow( directionalShadowMap[ i ], canopyShadowData.shadowMapSize, canopyShadowData.shadowIntensity, canopyShadowData.shadowBias, canopyShadowData.shadowRadius, vDirectionalShadowCoord[ i ] );
+								#if defined( CSM_FADE )
+									canopyCascadeCenter = ( canopyCascade.x + canopyCascade.y ) * 0.5;
+									canopyClosestEdge = canopyLinearDepth < canopyCascadeCenter ? canopyCascade.x : canopyCascade.y;
+									canopyMargin = 0.25 * pow( canopyClosestEdge, 2.0 );
+									canopyFadeNear = canopyCascade.x - canopyMargin * 0.5;
+									canopyFadeFar = canopyCascade.y + canopyMargin * 0.5;
+									canopyFadeRatio = clamp( min( canopyLinearDepth - canopyFadeNear, canopyFadeFar - canopyLinearDepth ) / canopyMargin, 0.0, 1.0 );
+									canopyFadeLast = UNROLLED_LOOP_INDEX == CSM_CASCADES - 1 && canopyLinearDepth > canopyCascadeCenter;
+									canopySunShadow = mix( 1.0, canopySampledShadow, canopyFadeLast ? canopyFadeRatio : 1.0 );
+								#else
+									canopySunShadow = canopySampledShadow;
+								#endif
+							}
+						}
+						#pragma unroll_loop_end
+					}
+				#endif
+				vec3 canopyDirectRadiance = directionalLights[ 0 ].color * canopySunShadow;
+				vec3 canopyBillboardNormalView = normalize( mat3( viewMatrix ) * canopyBillboardNormal );
+				vec3 canopyViewDirection = normalize( vViewPosition );
+				float canopyBack = max( dot( -canopyBillboardNormalView, canopySunDirection ), 0.0 );
+				float canopyForward = pow( max( dot( -canopyViewDirection, canopySunDirection ), 0.0 ), 3.0 ) * 0.7 + 0.3;
+				vec3 canopyTranslucency = ( canopyAlbedo * vec3( 1.25, 1.45, 0.55 ) + vec3( 0.012, 0.018, 0.0 ) ) * canopyBack * canopyForward * ${number( appearance.lighting.translucency )} * ( 1.0 - uNight );
+				reflectedLight.directDiffuse += canopyTranslucency * canopyDirectRadiance;
+			#endif
+		` );
+		for ( const [ name, uniform ] of Object.entries( uniforms ) ) shader.uniforms[ name ] = uniform;
+	};
+	material.customProgramCacheKey = () => `elsemesh-octahedral-canopy/1:${JSON.stringify( descriptor )}`;
+	material.userData.octahedralCanopyUniforms = uniforms;
 	material.userData.octahedralCanopyDescriptor = descriptor;
-	material.userData.updateOctahedralCanopy = values => updateOctahedralCanopyShaderMaterial( material, values );
+	material.userData.updateOctahedralCanopy = values => updateWebGLOctahedralCanopyMaterial( material, values );
 	return material;
 }
 
-/** Update world camera, lighting and wind inputs without rebuilding the shader. */
-export function updateOctahedralCanopyShaderMaterial( material, values = {} ) {
-	if ( ! material?.isShaderMaterial || ! material.userData?.octahedralCanopyDescriptor ) throw new Error( 'An octahedral canopy ShaderMaterial is required' );
-	const uniforms = material.uniforms;
+/** Update world camera, lighting and wind inputs without rebuilding the material program. */
+export function updateWebGLOctahedralCanopyMaterial( material, values = {} ) {
+	if ( ! material?.isMeshPhysicalMaterial || ! material.userData?.octahedralCanopyDescriptor ) throw new Error( 'An octahedral canopy physical material is required' );
+	const uniforms = material.userData.octahedralCanopyUniforms;
 	const copyVector = ( name, value ) => {
 		if ( value && uniforms[ name ]?.value?.copy ) uniforms[ name ].value.copy( value );
 		else if ( value && uniforms[ name ]?.value?.set ) uniforms[ name ].value.set( ...value );
 	};
 	copyVector( 'uCameraPosition', values.cameraPosition );
-	copyVector( 'uSunDirection', values.sunDirection );
-	copyVector( 'uSunColor', values.sunColor );
-	copyVector( 'uAmbientColor', values.ambientColor );
 	copyVector( 'uWindDirection', values.windDirection );
 	copyVector( 'uWindDirectionIntegral', values.windDirectionIntegral );
 	copyVector( 'uWindVelocityIntegral', values.windVelocityIntegral );

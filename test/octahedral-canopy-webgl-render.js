@@ -1,6 +1,8 @@
 import * as THREE from 'three';
-import { createOctahedralCanopyShaderMaterial } from '../src/fallback/OctahedralCanopyShaderMaterial.js';
+import { createWebGLOctahedralCanopyMaterial } from '../src/fallback/WebGLOctahedralCanopyMaterial.js';
 import { createWebGLOctahedralCanopyTexture } from '../src/fallback/WebGLOctahedralCanopyTexture.js';
+import { installWebGLSceneMaterialLighting } from '../src/fallback/WebGLMaterialLighting.js';
+import { WebGLSunShadows } from '../src/fallback/WebGLSunShadows.js';
 
 const result = document.querySelector( '#result' );
 const canvas = document.querySelector( '#canvas' );
@@ -30,7 +32,7 @@ const descriptor = {
 	},
 };
 
-let renderer, geometry, material;
+let renderer, geometry, material, materialWithoutTranslucency, shadows;
 const textures = [];
 try {
 	const atlasA = createWebGLOctahedralCanopyTexture( THREE, atlasData( [ 200, 255, 128, 255 ] ), 'canopy-test-material' );
@@ -39,6 +41,7 @@ try {
 	textures.push( atlasA, atlasB, gust );
 	renderer = new THREE.WebGLRenderer( { canvas, antialias: false, preserveDrawingBuffer: true } );
 	renderer.setSize( canvas.width, canvas.height, false );
+	renderer.shadowMap.enabled = true;
 	renderer.debug.checkShaderErrors = true;
 	const shaderErrors = [];
 	renderer.debug.onShaderError = ( gl, program, vertexShader, fragmentShader ) => shaderErrors.push( {
@@ -46,9 +49,15 @@ try {
 		vertex: gl.getShaderInfoLog( vertexShader ),
 		fragment: gl.getShaderInfoLog( fragmentShader ),
 	} );
-	material = createOctahedralCanopyShaderMaterial( THREE, descriptor, {
+	material = createWebGLOctahedralCanopyMaterial( THREE, descriptor, {
 		materialAtlas: atlasA, normalExposureAtlas: atlasB, gustTexture: gust,
-		cameraPosition: [ 0, 0, 5 ], sunDirection: [ 0.35, 0.9, 0.25 ], sunColor: [ 1, 1, 1 ], ambientColor: [ 0.3, 0.35, 0.3 ],
+		cameraPosition: [ 0, 0, 5 ],
+		windDirection: [ 0.35, 0.94 ], windSpeed: 7, time: 1, frameIndex: 0,
+	} );
+	const noTranslucency = { ...descriptor, appearance: { ...descriptor.appearance, lighting: { ...descriptor.appearance.lighting, translucency: 0 } } };
+	materialWithoutTranslucency = createWebGLOctahedralCanopyMaterial( THREE, noTranslucency, {
+		materialAtlas: atlasA, normalExposureAtlas: atlasB, gustTexture: gust,
+		cameraPosition: [ 0, 0, 5 ],
 		windDirection: [ 0.35, 0.94 ], windSpeed: 7, time: 1, frameIndex: 0,
 	} );
 	geometry = new THREE.PlaneGeometry( 2, 2 );
@@ -59,21 +68,46 @@ try {
 	geometry.setAttribute( 'iCanopyFrames', new THREE.InterleavedBufferAttribute( packed, 4, 12 ) );
 	geometry.setAttribute( 'iCanopyWeights', new THREE.InterleavedBufferAttribute( packed, 4, 16 ) );
 	const mesh = new THREE.InstancedMesh( geometry, material, 1 );
+	const meshWithoutTranslucency = new THREE.InstancedMesh( geometry, materialWithoutTranslucency, 1 );
 	mesh.frustumCulled = false;
+	meshWithoutTranslucency.frustumCulled = false;
+	meshWithoutTranslucency.visible = false;
 	const scene = new THREE.Scene();
 	scene.background = new THREE.Color( 0x17202a );
-	scene.add( mesh );
+	scene.add( new THREE.HemisphereLight( 0x91a8c0, 0x393222, 0.8 ) );
+	const irradianceTexture = new THREE.DataTexture( new Uint8Array( [ 142, 157, 177, 255 ] ), 1, 1, THREE.RGBAFormat );
+	const horizonTexture = new THREE.DataTexture( new Uint8Array( [ 110, 98, 77, 255 ] ), 1, 1, THREE.RGBAFormat );
+	irradianceTexture.needsUpdate = true;
+	horizonTexture.needsUpdate = true;
+	textures.push( irradianceTexture, horizonTexture );
 	const camera = new THREE.PerspectiveCamera( 55, canvas.width / canvas.height, 0.1, 100 );
 	camera.position.set( 0, 0, 5 ); camera.lookAt( 0, 0, 0 );
+	const sunDirection = new THREE.Vector3( 0.1, 0.8, 0.6 ).normalize();
+	shadows = new WebGLSunShadows( { renderer, scene, camera, direction: sunDirection } );
+	for ( const light of shadows.lights ) light.intensity = 1.8;
+	installWebGLSceneMaterialLighting( THREE, scene, { skyIrradianceTexture: irradianceTexture, horizonTexture }, shadows );
+	mesh.receiveShadow = true;
+	meshWithoutTranslucency.receiveShadow = true;
+	scene.add( mesh, meshWithoutTranslucency );
+	if ( material.defines?.USE_CSM !== 1 || material.defines?.CSM_CASCADES !== 3 ) throw new Error( 'WebGL canopy material did not receive the engine sun-shadow adapter' );
+	if ( ! material.userData.elsemeshAtmosphereLighting ) throw new Error( 'WebGL canopy material did not receive the engine atmosphere-lighting adapter' );
+	shadows.update( camera, sunDirection );
 	renderer.render( scene, camera );
 	const gl = renderer.getContext();
 	const pixels = new Uint8Array( canvas.width * canvas.height * 4 );
 	gl.readPixels( 0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels );
+	mesh.visible = false;
+	meshWithoutTranslucency.visible = true;
+	renderer.render( scene, camera );
+	const pixelsWithoutTranslucency = new Uint8Array( canvas.width * canvas.height * 4 );
+	gl.readPixels( 0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixelsWithoutTranslucency );
+	let backlightGain = 0;
+	for ( let offset = 0; offset < pixels.length; offset += 4 ) for ( let channel = 0; channel < 3; channel ++ ) backlightGain += pixels[ offset + channel ] - pixelsWithoutTranslucency[ offset + channel ];
 	const background = [ 0x17, 0x20, 0x2a ];
 	let changedPixels = 0;
 	for ( let offset = 0; offset < pixels.length; offset += 4 ) if ( Math.abs( pixels[ offset ] - background[ 0 ] ) + Math.abs( pixels[ offset + 1 ] - background[ 1 ] ) + Math.abs( pixels[ offset + 2 ] - background[ 2 ] ) > 18 ) changedPixels ++;
-	const metrics = { changedPixels, programCount: renderer.info.programs?.length || 0, glError: gl.getError(), shaderErrors };
-	if ( metrics.programCount < 1 || metrics.changedPixels < 20 || metrics.glError !== gl.NO_ERROR || shaderErrors.length ) throw new Error( `WebGL canopy shader failed: ${JSON.stringify( metrics )}` );
+	const metrics = { changedPixels, backlightGain, programCount: renderer.info.programs?.length || 0, glError: gl.getError(), shaderErrors };
+	if ( metrics.programCount < 1 || metrics.changedPixels < 20 || metrics.backlightGain <= 0 || metrics.glError !== gl.NO_ERROR || shaderErrors.length ) throw new Error( `WebGL canopy shader failed: ${JSON.stringify( metrics )}` );
 	result.dataset.status = 'complete';
 	result.textContent = JSON.stringify( metrics );
 } catch ( error ) {
@@ -82,6 +116,8 @@ try {
 } finally {
 	geometry?.dispose();
 	material?.dispose();
+	materialWithoutTranslucency?.dispose();
+	shadows?.dispose();
 	for ( const texture of textures ) texture.dispose();
 	if ( renderer ) renderer.dispose();
 }
