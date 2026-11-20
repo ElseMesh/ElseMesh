@@ -46,6 +46,8 @@ assert.match( webgl.vertexShader, /attribute vec4 iCanopy2/ );
 assert.match( webgl.vertexShader, /iCanopy2\.x, base\.xz, gust/ );
 assert.match( webgl.fragmentShader, /uWindVelocityIntegral \* 0\.700000000/ );
 assert.match( webgl.fragmentShader, /max\(vCanopy1\.x,1e-6\)\/max\(vCanopy1\.y,1e-6\)/ );
+assert.match( webgl.fragmentShader, /dot\(-billboardNormal,sunDir\)/, 'WebGL translucency uses the same billboard normal as Tidewater and the WebGPU presenter' );
+assert.doesNotMatch( webgl.fragmentShader, /if\s*\(!gl_FrontFacing\)\s*worldNormal/, 'the WebGL atlas normal is not inverted on back faces without a corresponding source rule' );
 assert.doesNotMatch( webgl.fragmentShader, /cellMin|cellMax/, 'both backends address the atlas with the source global clamp sampler policy' );
 updateOctahedralCanopyShaderMaterial( webgl, { windDirectionIntegral: new Vector( 2, 3 ), windVelocityIntegral: new Vector( 4, 5 ) } );
 assert.deepEqual( webgl.uniforms.uWindDirectionIntegral.value.values, [ 2, 3 ] );

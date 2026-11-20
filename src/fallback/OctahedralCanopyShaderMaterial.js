@@ -265,11 +265,11 @@ void main() {
 	vec3 localNormal=normalExposure.rgb/safeCoverage*2.0-1.0;
 	vec3 stretched=vec3(localNormal.x,localNormal.y*max(vCanopy1.x,1e-6)/max(vCanopy1.y,1e-6),localNormal.z);
 	vec3 worldNormal=normalize(vec3(stretched.x*cs+stretched.z*sn,stretched.y,stretched.z*cs-stretched.x*sn));
-	if (!gl_FrontFacing) worldNormal=-worldNormal;
+	vec3 billboardNormal=normalize(uCameraPosition-vCanopyCenter);
 	vec3 viewDir=normalize(uCameraPosition-vCanopyWorldPosition);
 	vec3 sunDir=normalize(uSunDirection);
 	float diffuse=max(dot(worldNormal,sunDir),0.0);
-	float back=max(dot(-worldNormal,sunDir),0.0);
+	float back=max(dot(-billboardNormal,sunDir),0.0);
 	float forward=pow(max(dot(-viewDir,sunDir),0.0),3.0)*0.7+0.3;
 	vec3 translucency=(albedo*vec3(1.25,1.45,0.55)+vec3(0.012,0.018,0.0))*back*forward*${'/*TRANSLUCENCY*/'}*(1.0-uNight);
 	vec3 lit=albedo*(uAmbientColor+uSunColor*diffuse)+translucency*uSunColor;

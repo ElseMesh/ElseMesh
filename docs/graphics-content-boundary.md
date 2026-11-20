@@ -293,6 +293,12 @@ generic static-model adapters bind the raw RGBA8 leaf-mask input. Paired adapter
 and WebGPU/WebGL synthetic render checks cover this generic contract; Tidewater's
 candidate is not active and those fixtures do not prove authored-scene parity.
 The octahedral far-canopy component still has no registered presenter.
+The candidate GLSL material now uses the billboard's geometric normal for leaf
+translucency, matching Tidewater's source `in.N` and the paired WebGPU material,
+and no longer flips its atlas normal on back faces. Its WebGL shader fixture
+passes. The GLSL material still computes its own direct, ambient, translucency,
+and specular lighting instead of using ElseMesh's standard shadowed lighting
+path, so scene lighting and shadow parity remain open.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The

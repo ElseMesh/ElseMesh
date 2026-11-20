@@ -2747,3 +2747,12 @@ finding changes them.
   `world-source.json`; no app path activates it, and the far-canopy presenter,
   matched Tidewater appearance review, and other parity gates remain open. No
   percentage changes: Tidewater remains 93% and renderer-neutral packages 71%.
+
+- 2026-11-20: aligned one verified part of the WebGL far-canopy material with
+  the authoritative Tidewater/WebGPU rule: translucency backlighting now uses
+  the billboard's geometric normal, and GLSL no longer flips the baked atlas
+  normal on back faces. The material-factory test and WebGPU/WebGL synthetic
+  render fixtures pass. This is not a Tidewater scene comparison; the far
+  component still has no registered adapters, and WebGL's manually implemented
+  lighting still lacks the engine's shared shadowed direct-light path. No
+  percentage changes.
