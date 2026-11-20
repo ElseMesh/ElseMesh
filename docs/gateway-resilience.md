@@ -256,14 +256,12 @@ public IPv6 path. This confirms lookup and signaling on the deployed Worker,
 not independent-network world-data reachability.
 
 On the same host/Pi3 pair, the system `zerotier-one` daemons currently report
-each other as `DIRECT`: host node `7772616bc8` sees Pi3 at
-`82.1.79.142:35162`, and Pi3 sees the host at `91.90.103.109:17729`. This is
-not a relay path, but it is a different node identity and UDP socket from the
-embedded-libzt `worldd` and Pion ICE sockets used in the failed probe. The
-WebRTC test did attempt ICE connectivity checks using its gathered public
-candidates; the host capture showed outgoing checks and no incoming peer
-datagrams. The available evidence points to a socket-specific NAT mapping or
-filtering difference, but does not identify which endpoint or router rule
+each other as `DIRECT`, not `RELAY`. This is a different node identity and UDP
+socket from the embedded-libzt `worldd` and Pion ICE sockets used in the failed
+probe. The WebRTC test did attempt ICE connectivity checks using its gathered
+public candidates; the host capture showed outgoing checks and no incoming
+peer datagrams. The available evidence points to a socket-specific NAT mapping
+or filtering difference, but does not identify which endpoint or router rule
 prevented the Pion candidate pair from connecting. ZeroTier's working direct
 path therefore does not prove that the separate WebRTC UDP mapping is
 reachable.
