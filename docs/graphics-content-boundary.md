@@ -240,9 +240,16 @@ signed-asset loader. Startup requests only the descriptor; adapters fetch the
 instance set and atlas data as they initialize. The PNG decoder disables color
 conversion and alpha premultiplication. Tidewater's exporter now emits the
 source WebGPU material and normal/exposure atlases as deterministic,
-content-addressed raw-data PNG sidecars. The Tidewater export test reruns the
-bake and checks byte identity, dimensions, and variant ranges. These atlases
-are still an inactive sidecar: no signed canopy descriptor references them.
+content-addressed raw-data PNG sidecars. It now also emits an inactive near-
+model sidecar containing all tree/shrub lobe variants, the authored placement
+transforms, and the same seed-based variant selection. The GLBs preserve all
+three source VEC4 streams but still use a provisional PBR material; they lack
+the leaf texture and signed material graph required for runtime use. Neither
+sidecar is referenced by the signed world package, and no backend adapter
+consumes them. The Tidewater export test reruns both bakes and checks byte
+identity, dimensions, asset hashes, source streams, placement counts, and
+variant selection. Do not activate the geometry until the complete signed
+appearance contract and both engine adapters pass matched review.
 
 `elsemesh.octahedral-canopy/1` now declares those two atlas assets as PNG data
 with `rgba8unorm-data/1` semantics. PNG decoding must preserve raw linear byte
@@ -253,8 +260,9 @@ roughness, translucency, and wind-driven vertex position through the bounded
 contract compiled for both backends; it contains no backend shader source.
 The descriptor now validates a renderer-neutral appearance block for color,
 lighting, and wind coefficients. Tidewater has not exported that block into a
-signed descriptor or published the near-model set yet, so the atlas sidecar
-does not form a signed canopy component.
+signed descriptor, and the near-model sidecar does not yet carry its leaf
+texture or material graph, so these assets do not form a signed canopy
+component.
 The material atlas channels are R brightness, G leaf flag, B per-card color
 variation, and A coverage. The normal/exposure atlas stores the three
 0.5-encoded local normal components in RGB and ambient exposure in A. The

@@ -98,6 +98,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   sale/shop flow on both renderer paths. The live browser test is headless and
   GPU-disabled; its generated-terrain route does not prove production-water
   boat physics or rendered visual parity.
+- Tidewater's exporter now writes an inactive near-canopy model set alongside
+  the deterministic impostor atlas source. Its five variant GLBs preserve
+  their source VEC4 streams, and the instance-set sidecar carries every
+  authored tree/shrub placement with the shared seed-bin variant rule. Export
+  checks verify stable hashes, transforms, and variant assignments. The
+  provisional PBR material and absent leaf atlas/material graph keep this
+  artifact out of the signed runtime package; no parity percentage changed.
 
 ## 2026-11-18
 

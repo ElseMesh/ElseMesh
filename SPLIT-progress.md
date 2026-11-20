@@ -54,6 +54,15 @@ the profile is not yet signed into the runtime package and the engine WebGPU
 and WebGL canopy adapters are not implemented. This closes no parity gate and
 changes no percentage.
 
+**2026-11-20 canopy asset update:** Tidewater's exporter now emits a second,
+inactive near-canopy sidecar with the three tree and two shrub lobe variants,
+all authored tree/shrub placements, the shared seed-bin variant rule, and the
+source geometry's VEC4 streams. Deterministic export checks cover model hashes,
+placement transforms/counts, and variant assignments. These GLBs use a
+provisional PBR material and omit the leaf atlas/material graph; they are not
+signed into the world package and no adapter consumes them. This prepares
+portable near geometry but closes no parity gate and changes no percentage.
+
 ## Progress by requirement
 
 | Requirement | Estimate | Evidence and remaining acceptance gate |
