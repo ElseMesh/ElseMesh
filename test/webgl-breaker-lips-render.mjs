@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { accessSync, constants, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { createServer } from 'vite';
@@ -53,6 +53,10 @@ try {
 		await wait( 50 );
 	}
 	assert.equal( result?.status, 'complete', `WebGL breaker render completed: ${result?.text || 'no page result'}` );
+	if ( process.env.ELSEMESH_TEST_SCREENSHOT ) {
+		const screenshot = await command( 'Page.captureScreenshot', { format: 'png', fromSurface: true } );
+		writeFileSync( process.env.ELSEMESH_TEST_SCREENSHOT, Buffer.from( screenshot.data, 'base64' ) );
+	}
 	console.log( `WebGL breaker render passed (${result.text})` );
 } finally {
 	socket?.close(); if ( browser ) await stop( browser ); await vite.close(); rmSync( profile, { recursive: true, force: true } );

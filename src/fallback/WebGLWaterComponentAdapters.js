@@ -24,7 +24,6 @@ function installIslandOcean( { fallback, rules, terrain, terrainWater = fallback
 		water.position.y = seaLevel;
 		fallback.waterScene.add( water );
 	}
-	if ( breakerStations && terrain && terrainWater?.shore ) fallback.waterScene.add( fallback._makeBreakerSpray( terrain, terrainWater, seaLevel, breakerStations ) );
 	const breakerLips = breakerStations && terrainSurface?.shoreField ? createWebGLBreakerLips( T, { terrain, shoreField: terrainSurface.shoreField, seaLevel, scene: fallback.waterScene, breakerStations } ) : null;
 	return breakerLips ? { installed: true, runtime: breakerLips } : true;
 }

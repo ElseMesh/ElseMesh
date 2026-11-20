@@ -43,6 +43,7 @@ try {
 	gl.readPixels( 0, 0, 640, 480, gl.RGBA, gl.UNSIGNED_BYTE, baseline );
 	const runtime = createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel: 0, scene, breakerStations } );
 	if ( ! runtime || runtime.stations < 8 ) throw new Error( `shoreline mesh not created (${runtime?.stations || 0} stations)` );
+	if ( runtime.sprayParticles !== runtime.stations * 2 * 32 ) throw new Error( `breaker spray batch has unexpected capacity (${runtime.sprayParticles})` );
 	runtime.update( 1 / 60, camera, null, 97.6 );
 	renderer.render( scene, camera );
 	const pixels = new Uint8Array( 640 * 480 * 4 );
@@ -53,7 +54,8 @@ try {
 	let error = gl.getError();
 	while ( error !== gl.NO_ERROR ) { errors.push( error ); error = gl.getError(); }
 	if ( errors.length ) throw new Error( `WebGL errors: ${errors.join( ', ' )}` );
-	if ( renderer.info.programs.length < 1 ) throw new Error( 'breaker vertex/fragment shader did not compile' );
+	if ( renderer.info.programs.length < 2 ) throw new Error( 'breaker lip and shared-state spray shaders did not both compile' );
+	if ( renderer.info.render.points < runtime.sprayParticles ) throw new Error( `shared-state spray points were not drawn (${renderer.info.render.points})` );
 	if ( changedPixels < 20 ) throw new Error( `breaker lip changed too few rendered pixels (${changedPixels}); stations=${stations.length}, validSegments=${validSegments}, active=${JSON.stringify( active.slice( 12, 18 ) )}` );
 	const programCount = renderer.info.programs.length, stationCount = runtime.stations;
 	runtime.dispose(); renderer.dispose();

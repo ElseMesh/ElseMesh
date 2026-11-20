@@ -233,6 +233,114 @@ function makeMaterial( THREE, texture, width ) {
 	} );
 }
 
+function makeSprayGeometry( THREE, stationCount ) {
+	const particlesPerCrest = 32;
+	const count = stationCount * 2 * particlesPerCrest;
+	const positions = new Float32Array( count * 3 );
+	const station = new Float32Array( count );
+	const slot = new Float32Array( count );
+	const seed = new Float32Array( count );
+	const stage = new Float32Array( count );
+	let vertex = 0;
+	for ( let index = 0; index < stationCount; index ++ ) for ( let parity = 0; parity < 2; parity ++ ) {
+		for ( let particle = 0; particle < particlesPerCrest; particle ++ ) {
+			station[ vertex ] = index;
+			slot[ vertex ] = parity;
+			seed[ vertex ] = ( ( Math.sin( index * 127.1 + parity * 311.7 + particle * 74.7 ) * 43758.5453 ) % 1 + 1 ) % 1;
+			stage[ vertex ] = particle % 4;
+			vertex ++;
+		}
+	}
+	const geometry = new THREE.BufferGeometry();
+	geometry.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+	geometry.setAttribute( 'aStation', new THREE.BufferAttribute( station, 1 ) );
+	geometry.setAttribute( 'aSlot', new THREE.BufferAttribute( slot, 1 ) );
+	geometry.setAttribute( 'aSeed', new THREE.BufferAttribute( seed, 1 ) );
+	geometry.setAttribute( 'aStage', new THREE.BufferAttribute( stage, 1 ) );
+	geometry.boundingSphere = new THREE.Sphere( new THREE.Vector3(), 1e7 );
+	return geometry;
+}
+
+function makeSprayMaterial( THREE, texture ) {
+	return new THREE.ShaderMaterial( {
+		glslVersion: THREE.GLSL3,
+		transparent: true,
+		depthTest: true,
+		depthWrite: false,
+		premultipliedAlpha: true,
+		toneMapped: false,
+		uniforms: {
+			uCrests: { value: texture },
+			uTime: { value: 0 },
+			uCameraPosition: { value: new THREE.Vector3() },
+		},
+		vertexShader: `
+			in float aStation; in float aSlot; in float aSeed; in float aStage;
+			uniform sampler2D uCrests; uniform float uTime; uniform vec3 uCameraPosition;
+			out float vOpacity; out float vStage;
+			vec4 crestAt(float station, float parity, int row) {
+				return texelFetch(uCrests, ivec2(int(station * 2.0 + parity), row), 0);
+			}
+		float randomAt(float seed, float wave) {
+			return fract(sin(seed * 91.7 + wave * 17.13) * 43758.5453);
+		}
+		void main() {
+			vec4 crest = crestAt(aStation, aSlot, 0);
+			vec4 frame = crestAt(aStation, aSlot, 2);
+			float b = crest.w;
+			float wave = frame.w;
+			float random = randomAt(aSeed, wave);
+			float eventB = 0.0; float life = 0.0; float liftSpeed = 0.0;
+			float forwardSpeed = 0.0; float spread = 0.0; float size = 0.0; float opacity = 0.0;
+			if (aStage < 0.5) {
+				eventB = 0.48 + random * 0.34; life = 0.62 + random * 0.38;
+				liftSpeed = 1.8 + random * 3.2; forwardSpeed = 1.0 + random * 2.0;
+				spread = 0.55; size = 7.0 + random * 7.0; opacity = 0.76;
+			} else if (aStage < 1.5) {
+				eventB = 0.86 + random * 0.14; life = 0.72 + random * 0.46;
+				liftSpeed = 3.0 + random * 5.0; forwardSpeed = 0.7 + random * 2.6;
+				spread = 0.9; size = 9.0 + random * 10.0; opacity = 0.62;
+			} else if (aStage < 2.5) {
+				eventB = 0.9 + random * 0.34; life = 1.35 + random * 1.2;
+				liftSpeed = 0.35 + random * 1.1; forwardSpeed = 0.2 + random * 0.7;
+				spread = 2.2; size = 14.0 + random * 20.0; opacity = 0.2;
+			} else {
+				eventB = 1.02 + random * 0.24; life = 0.62 + random * 0.56;
+				liftSpeed = 1.1 + random * 3.0; forwardSpeed = 0.9 + random * 1.9;
+				spread = 0.7; size = 8.0 + random * 9.0; opacity = 0.48;
+			}
+			float age = max(0.0, b - eventB) * 2.1;
+			float alive = smoothstep(0.02, 0.14, age) * (1.0 - smoothstep(life * 0.72, life, age));
+			float event = smoothstep(eventB - 0.08, eventB + 0.04, b);
+			vOpacity = frame.w > 0.5 ? alive * event * opacity : 0.0;
+			vStage = aStage;
+			vec2 direction = frame.w > 0.5 ? normalize(frame.xy) : vec2(0.0, 1.0);
+			vec2 tangent = vec2(-direction.y, direction.x);
+			float lateral = (random - 0.5) * spread;
+			float flutter = sin(uTime * (1.3 + random) + aSeed * 31.0) * 0.06;
+			vec3 p = crest.xyz;
+			p.xz += direction * (0.12 + age * forwardSpeed) + tangent * (lateral + flutter);
+			float gravity = aStage > 1.5 && aStage < 2.5 ? 0.35 : 4.905;
+			p.y += 0.04 + liftSpeed * age - gravity * age * age;
+			float pointSize = size * 120.0 / max(distance(uCameraPosition, p), 28.0);
+			gl_PointSize = vOpacity > 0.008 ? clamp(pointSize, 1.25, 12.0) : 0.0;
+			gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+		}
+		`,
+		fragmentShader: `
+			in float vOpacity; in float vStage; out vec4 fragColor;
+			void main() {
+				float d = length(gl_PointCoord - 0.5);
+				float soft = exp(-d * d * mix(9.0, 5.0, step(1.5, vStage)));
+				float alpha = min(vOpacity * soft, 0.72);
+				if (alpha < 0.012) discard;
+				vec3 color = mix(vec3(0.76, 0.9, 0.96), vec3(0.96, 0.99, 1.0), smoothstep(0.4, 2.2, vStage));
+				fragColor = vec4(color * alpha, alpha);
+			}
+		`,
+	} );
+}
+
 function stationRecords( asset ) {
 	if ( ! asset || ! Number.isInteger( asset.count ) || asset.count < 2 || asset.data?.length !== asset.count * 4 || ! Number.isFinite( asset.spacing ) ) return [];
 	const stations = [];
@@ -256,17 +364,29 @@ export function createWebGLBreakerLips( THREE, { terrain, shoreField, seaLevel, 
 	const geometry = makeGeometry( THREE, stations, breakerStations.spacing * 1.75 );
 	const material = makeMaterial( THREE, texture, stations.length * 2 );
 	const mesh = new THREE.Mesh( geometry, material );
-	mesh.name = 'HostedBreakerLips'; mesh.frustumCulled = false; mesh.renderOrder = 10;
+	mesh.name = 'WorldBreakerLips'; mesh.frustumCulled = false; mesh.renderOrder = 10;
 	mesh.castShadow = false; mesh.receiveShadow = false;
 	scene.add( mesh );
+	const sprayGeometry = makeSprayGeometry( THREE, stations.length );
+	const sprayMaterial = makeSprayMaterial( THREE, texture );
+	const spray = new THREE.Points( sprayGeometry, sprayMaterial );
+	spray.name = 'WorldBreakerSpray'; spray.frustumCulled = false; spray.renderOrder = 1;
+	scene.add( spray );
 	return {
 		stations: stations.length,
 		stationData: breakerStations.data,
+		sprayParticles: stations.length * 2 * 32,
 		update( _dt, camera, _player, time = 0 ) {
 			updateWebGLBreakerCrestState( stations, transects, seaLevel, time, state, camera?.position || null );
 			texture.needsUpdate = true;
 			material.uniforms.uTime.value = time;
+			sprayMaterial.uniforms.uTime.value = time;
+			if ( camera?.position ) sprayMaterial.uniforms.uCameraPosition.value.copy( camera.position );
 		},
-		dispose() { scene.remove( mesh ); geometry.dispose(); material.dispose(); texture.dispose(); },
+		dispose() {
+			scene.remove( mesh, spray );
+			geometry.dispose(); material.dispose();
+			sprayGeometry.dispose(); sprayMaterial.dispose(); texture.dispose();
+		},
 	};
 }

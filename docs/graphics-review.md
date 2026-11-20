@@ -59,10 +59,22 @@ terrain and station assets at phases 1001.067, 1001.567, and 1002.067 seconds;
 0.03 m. One slot at 1002.067 falls on the `b = -0.6` visibility threshold
 (WebGPU `b = -0.5947`) and differs within the documented 0.01 precision band.
 This verifies shared station inputs and crest/lip state on the packaged terrain.
-The WebGL point spray still evaluates a separate procedural field over fixed
-station samples, while WebGPU emits dynamic particle classes. The test does
-not establish visible spray parity or a matched rendered-scene result; no
-Tidewater parity percentage changes.
+At the capture revision, WebGL still evaluated a separate procedural point
+field over fixed station samples; the follow-up below replaces that path. These
+state tests do not establish visible spray parity or a matched rendered-scene
+result; no Tidewater parity percentage changes.
+
+### WebGL spray uses the live crest state, 2026-11-20
+
+The WebGL breaker adapter now builds its lip and spray presenters over one
+three-row crest texture. Its 36,928-point Tidewater batch reads the same active
+station/wave slots and crest positions as the WebGL lip mesh; the independent
+terrain-sampled spray field and its duplicate shoreline-phase formula have
+been removed. The isolated SwiftShader render fixture compiled both programs
+and changed 5,299 pixels across its 50-station scene. That proves the shared
+state path renders, not that its spray shape, density, timing, or appearance
+matches Tidewater `main` WebGPU. An AMD production-scene comparison remains
+required; no Tidewater parity percentage changes.
 
 ## 2026-11-20 matched split beach view: WebGPU and WebGL
 

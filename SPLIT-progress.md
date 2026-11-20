@@ -267,6 +267,14 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-20: WebGL breaker lips and spray now consume the same live crest
+  texture. This removes the second terrain-sampled spray-wave formula; the
+  WebGL adapter presents droplets and mist from the shared signed station and
+  wave slots. The isolated 50-station SwiftShader fixture compiled both
+  presenters and changed 5,299 pixels. This is an implementation/render smoke,
+  not a Tidewater-main or AMD appearance comparison. Feature-level spray
+  parity, other visual regions, and supported-hardware FPS remain open; no
+  percentage changes.
 - 2026-11-20: moved Tidewater's 577 breaker shoreline records into its signed
   `wave-breaker-stations/1` asset and made both engine backends consume those
   same records. WebGL now re-samples the shore field during crest-root
