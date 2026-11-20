@@ -13,6 +13,8 @@ const shrub = {
 };
 const descriptor = {
 	variantGroups: [ tree, shrub ],
+	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
+	frameBlendDistance: 100,
 	lodBandFraction: 0.12,
 	thinning: { startDistance: 140, endDistance: 320, removeFraction: 0.5, seedMultiplier: 91.7, scaleCompensation: 'inverse-square-root-retained-density/1' },
 };
@@ -38,8 +40,15 @@ assert.equal( treeHandoff.groupId, 'trees' );
 assert.equal( treeHandoff.variantIndex, 0 );
 assert.ok( Math.abs( treeHandoff.nearWeight - 0.5 ) < 1e-12 && Math.abs( treeHandoff.farWeight - 0.5 ) < 1e-12, 'tree near/far weights split at the authored handoff center' );
 assert.ok( Math.abs( treeHandoff.yaw - Math.PI / 2 ) < 1e-12, 'the signed quaternion resolves to the same canopy yaw' );
+assert.ok( treeHandoff.localViewDirection.every( ( value, axis ) => Math.abs( value - [ 0, 0, - 1 ][ axis ] ) < 1e-12 ), 'frame lookup uses the camera direction in instance-local, unstretched space' );
+assert.deepEqual( treeHandoff.frameIndices, [ 0, 1, 6 ], 'the shared plan selects the same three frames around the upper-hemisphere view direction' );
+assert.ok( treeHandoff.frameWeights.every( ( value, index ) => Math.abs( value - [ 0.9019607843137255, 0.049019607843137254, 0.049019607843137254 ][ index ] ) < 1e-12 ), 'frame weights include the source shader’s upper-hemisphere y clamp' );
+assert.equal( treeHandoff.dominantFrameIndex, 0 );
+assert.equal( treeHandoff.blendFrames, true, 'the source blends three frames only inside its authored distance' );
 assert.equal( plan[ 1 ].variantIndex, 4, 'shrub variants use their own contiguous atlas range' );
+assert.equal( plan[ 1 ].dominantFrameIndex, 30, 'shrub sampling uses the same projection grid and local view transform' );
 assert.equal( plan[ 2 ].farWeight, 0.5, 'tree fade is halfway through its authored 2,600–2,800 m fade' );
+assert.equal( plan[ 2 ].blendFrames, false, 'far crowns use the dominant atlas frame outside the blend distance' );
 assert.ok( Math.abs( plan[ 2 ].farScale - Math.SQRT2 ) < 1e-12, 'far crowns are density-compensated at the thinning endpoint' );
 assert.equal( plan[ 3 ].farWeight, 1, 'the retained tree remains visible at the thinning endpoint' );
 assert.throws( () => planOctahedralCanopyInstances( descriptor, set, [ 0, NaN, 0 ] ), /three finite values/ );

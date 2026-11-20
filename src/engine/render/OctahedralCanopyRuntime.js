@@ -1,4 +1,4 @@
-import { planCanopyThinning, selectFractionalBinVariant } from './OctahedralImpostorMath.js';
+import { planCanopyThinning, selectFractionalBinVariant, selectHemiOctahedralFrames } from './OctahedralImpostorMath.js';
 
 const smoothstep = ( start, end, value ) => {
 	const t = Math.max( 0, Math.min( 1, ( value - start ) / ( end - start ) ) );
@@ -7,6 +7,34 @@ const smoothstep = ( start, end, value ) => {
 
 const distance3 = ( a, b ) => Math.hypot( a[ 0 ] - b[ 0 ], a[ 1 ] - b[ 1 ], a[ 2 ] - b[ 2 ] );
 
+function canopyLocalViewDirection( instance, group, cameraPosition, yaw ) {
+	const scale = instance.scale;
+	if ( ! Array.isArray( scale ) || scale.length !== 3 || scale.some( value => ! Number.isFinite( value ) || value <= 0 ) ) throw new Error( 'Canopy instance scale must contain three positive finite values' );
+	const center = group.bounds?.center || [ 0, 0, 0 ];
+	const localX = center[ 0 ] * scale[ 0 ], localY = center[ 1 ] * scale[ 1 ], localZ = center[ 2 ] * scale[ 2 ];
+	const cosYaw = Math.cos( yaw ), sinYaw = Math.sin( yaw );
+	const worldCenter = [
+		instance.position[ 0 ] + localX * cosYaw + localZ * sinYaw,
+		instance.position[ 1 ] + localY,
+		instance.position[ 2 ] - localX * sinYaw + localZ * cosYaw,
+	];
+	const viewX = cameraPosition[ 0 ] - worldCenter[ 0 ], viewY = cameraPosition[ 1 ] - worldCenter[ 1 ], viewZ = cameraPosition[ 2 ] - worldCenter[ 2 ];
+	const local = [
+		( viewX * cosYaw - viewZ * sinYaw ) / scale[ 0 ],
+		viewY / scale[ 1 ],
+		( viewX * sinYaw + viewZ * cosYaw ) / scale[ 2 ],
+	];
+	const length = Math.hypot( ...local );
+	if ( ! Number.isFinite( length ) || length < 1e-8 ) return [ 0, 1, 0 ];
+	return local.map( value => value / length );
+}
+
+function dominantFrameIndex( selection ) {
+	const [ a, b, c ] = selection.weights;
+	const frame = a >= Math.max( b, c ) ? 0 : b >= c ? 1 : 2;
+	return selection.indices[ frame ];
+}
+
 function canopyGroupMap( descriptor ) {
 	const map = new Map();
 	for ( const group of descriptor.variantGroups ) for ( const modelId of group.modelIds ) map.set( modelId, group );
@@ -14,12 +42,15 @@ function canopyGroupMap( descriptor ) {
 }
 
 /**
- * Resolve signed instance records and the authored camera-dependent LOD decision
- * shared by the WebGPU and WebGL octahedral-canopy presenters.
+ * Resolve signed instance records and the authored camera-dependent LOD and
+ * center-ray frame decisions shared by the WebGPU and WebGL canopy presenters.
+ * Per-pixel ray reprojection remains the backend material's responsibility.
  */
 export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPosition ) {
 	if ( ! Array.isArray( cameraPosition ) || cameraPosition.length !== 3 || cameraPosition.some( value => ! Number.isFinite( value ) ) ) throw new Error( 'Canopy camera position must contain three finite values' );
 	if ( ! Array.isArray( descriptor?.variantGroups ) || ! Array.isArray( instanceSet?.instances ) ) throw new Error( 'Decoded canopy descriptor and instance set are required' );
+	const framesPerSide = descriptor.projection?.framesPerSide;
+	if ( ! Number.isInteger( framesPerSide ) || framesPerSide < 2 || framesPerSide > 32 || ! Number.isFinite( descriptor.frameBlendDistance ) || descriptor.frameBlendDistance < 0 ) throw new Error( 'Canopy descriptor requires a valid hemi-octahedral frame grid and blend distance' );
 	const groupByModel = canopyGroupMap( descriptor );
 	const plan = [];
 	for ( let instanceIndex = 0; instanceIndex < instanceSet.instances.length; instanceIndex ++ ) {
@@ -43,6 +74,8 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 		const rotation = instance.rotation;
 		const [ qx, qy, qz, qw ] = rotation;
 		const yaw = Math.atan2( 2 * ( qw * qy + qx * qz ), 1 - 2 * ( qy * qy + qz * qz ) );
+		const localViewDirection = canopyLocalViewDirection( instance, group, cameraPosition, yaw );
+		const frameSelection = selectHemiOctahedralFrames( localViewDirection, framesPerSide );
 		plan.push( {
 			instanceIndex,
 			placementId: instance.placementId ?? `${instance.model}:${instanceIndex}`,
@@ -54,6 +87,11 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 			seed,
 			variantIndex,
 			distance,
+			localViewDirection,
+			frameIndices: frameSelection.indices,
+			frameWeights: frameSelection.weights,
+			dominantFrameIndex: dominantFrameIndex( frameSelection ),
+			blendFrames: distance < descriptor.frameBlendDistance,
 			nearWeight,
 			farWeight,
 			nearShadowWeight: nearWeight,
