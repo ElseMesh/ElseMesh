@@ -100,6 +100,12 @@ The `detailField` slot is bound by a ground-cover component to the installed
 terrain surface's detail texture from its signed terrain-surface asset. It uses
 linear filtering and repeat addressing in both backends and preserves raw RGBA
 channels. It is separate from the domain-bounded density field.
+The `leafMask` slot is a component-provided foliage data texture. The
+octahedral-canopy component binds its signed raw `rgba8unorm-data/1` image here;
+adapters must preserve the RGBA byte values and use linear clamp sampling in
+both backends. R is coverage, G is leaf brightness, B is the per-card random
+value, and A is opaque. A world graph can use R as opacity and G/B for authored
+foliage color variation without embedding a renderer-specific shader.
 Color slots use the texture's linearized sample, while data slots preserve
 their linear channel values. Explicit-LOD vertex reads let signed portable
 textures drive deformation without sending shader code. The graph chooses its

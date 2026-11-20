@@ -41,6 +41,26 @@ assert.match( webgl.glsl.declarations, /varying vec4 vEmg_color/ );
 assert.match( webgl.glsl.fragment, /diffuseColor\.rgb \*= emg_result/ );
 assert.match( compileWorldMaterialGraph( { ...graph, nodes: [ ...graph.nodes, { id: 'data', op: 'input', name: 'vdata' } ] }, 'webgl' ).glsl.attributes, /attribute vec4 vdata/ );
 
+const leafMaskGraph = {
+	format: 'elsemesh.material-graph/1',
+	nodes: [
+		{ id: 'uv', op: 'input', name: 'uv' },
+		{ id: 'mask', op: 'textureSample', slot: 'leafMask', uv: 'uv' },
+		{ id: 'coverage', op: 'x', args: [ 'mask' ] },
+		{ id: 'brightness', op: 'y', args: [ 'mask' ] },
+		{ id: 'leafTint', op: 'constant', value: [ 0.2, 0.3, 0.1 ] },
+		{ id: 'albedo', op: 'multiply', args: [ 'leafTint', 'brightness' ] },
+	],
+	outputs: { baseColor: 'albedo', opacity: 'coverage' },
+};
+const leafMaskWebGPU = compileWorldMaterialGraph( leafMaskGraph, 'webgpu' );
+const leafMaskWebGL = compileWorldMaterialGraph( leafMaskGraph, 'webgl' );
+assert.deepEqual( leafMaskWebGPU.textureSlots, [ 'leafMask' ], 'the canopy mask is an explicit shared data-texture input' );
+assert.deepEqual( leafMaskWebGL.textureSlots, leafMaskWebGPU.textureSlots, 'WebGL and WebGPU bind the same authored graph texture' );
+assert.match( leafMaskWebGPU.surface, /textureSample\( emgTexture_leafMask, smpLinearClamp,/ );
+assert.match( leafMaskWebGL.glsl.declarations, /uniform sampler2D emgTexture_leafMask/ );
+assert.match( leafMaskWebGL.glsl.fragment, /texture2D\( emgTexture_leafMask,/ );
+
 const valueNoiseGraph = {
 	format: 'elsemesh.material-graph/1',
 	nodes: [
