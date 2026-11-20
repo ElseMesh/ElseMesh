@@ -267,6 +267,14 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-20: the inactive near-canopy sidecar now carries a renderer-neutral
+  material graph for Tidewater's authored species palette, seed/card variation,
+  leaf detail, bark weathering, roughness, AO, normal bias, and translucency.
+  The GLB base factor is neutral white so both engine compilers apply the graph
+  once. Tidewater's material-graph and deterministic world-export checks pass.
+  The package remains unsigned/inactive, and neither engine backend consumes
+  it; near wind, far-atlas presentation, matched appearance, and the existing
+  renderer-boundary migration remain open. No percentage changes.
 - 2026-11-20: WebGL breaker lips and spray now consume the same live crest
   texture. This removes the second terrain-sampled spray-wave formula; the
   WebGL adapter presents droplets and mist from the shared signed station and
