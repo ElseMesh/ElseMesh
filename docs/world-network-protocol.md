@@ -99,20 +99,16 @@ where permitted, but cannot bypass a destination's invitation requirement.
 
 The current `?invite=` route code is transitional and is not a player-bound
 admission ticket. It is a compact base64url encoding of route
-query fields: canonical world ID, optional ZeroTier network ID and HostID,
-optional ZeroTier private gateway plus its short-lived signed node record,
-ordered PeerID/gateway candidates, and resolver origin. The browser verifies
-the embedded node record against the world ID, network ID, HostID and private
-gateway before making any request to that private address. If the record is
-stale, the browser skips that direct attempt and resolves the HostID through
-the configured directory. The browser decodes and validates the route before
-constructing the normal `WorldConnector`. The compact code itself is unsigned,
-unencrypted, and not a secret or admission grant; it is only a set of routing
-hints. The embedded node signature binds its own advertised gateway and
-ZeroTier identity against route edits, but is not an owner authorization: the
-node self-asserts those fields. The browser checks the provider's owner grant
-against the signed manifest after connecting and before accepting content.
-The client retrieves world data from the selected provider gateway. Replace
+query fields: canonical world ID, optional ZeroTier HostID, ordered
+PeerID/gateway candidates, and resolver origin. It no longer serializes the
+shared network ID or embeds the private gateway and signed node document; the
+browser uses the configured network and Worker lookup for those values. The
+browser decodes and validates the route before constructing the normal
+`WorldConnector`. The compact code itself is unsigned, unencrypted, and not a
+secret or admission grant; it is only a set of routing hints. The browser
+checks the provider's owner grant against the signed manifest after connecting
+and before accepting content. The client retrieves world data from the
+selected provider gateway. Replace
 this route-code payload with the minimal HostID/port/80-bit invite
 ticket described below when `worldd` issues and validates player-bound
 invitations. Until then, the current route code grants no admission and must

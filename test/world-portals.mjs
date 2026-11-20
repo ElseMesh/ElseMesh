@@ -226,19 +226,18 @@ const overlayInviteURL = new URL( createWorldInviteURL( {
 } ) );
 const overlayRoute = decodeWorldInviteRoute( overlayInviteURL.searchParams.get( 'invite' ) );
 assert.equal( overlayRoute.get( 'ztNodeId' ), '3af4fd5d50', 'shared invites retain the ZeroTier HostID for Worker fallback' );
-assert.equal( overlayRoute.get( 'ztNetworkId' ), 'e3918db4832a3056', 'shared invites retain the ZeroTier network ID for Worker fallback' );
-assert.equal( overlayRoute.get( 'gateway' ), 'https://coast.tailnet-example.ts.net', 'shared invites preserve the direct secure overlay gateway' );
-assert.equal( overlayRoute.get( 'ztGateway' ), 'http://10.147.20.4:43127', 'shared invites carry the private ZeroTier gateway for direct first attempt' );
-assert.deepEqual( JSON.parse( overlayRoute.get( 'ztNodeRecord' ) ), zeroTierNodeRecord, 'shared invites bind their private IP to the signed provider record' );
+assert.equal( overlayRoute.has( 'ztNetworkId' ), false, 'shared invites use the application network ID instead of serializing it' );
+assert.equal( overlayRoute.has( 'gateway' ), false, 'HostID invites resolve current gateway data through the Worker' );
+assert.equal( overlayRoute.has( 'ztGateway' ), false, 'HostID invites do not duplicate the private IP in the route code' );
+assert.equal( overlayRoute.has( 'ztNodeRecord' ), false, 'HostID invites do not embed a signed node document' );
 const workerOnlyInviteURL = new URL( createWorldInviteURL( {
 	pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org',
 } ) );
 const workerOnlyRoute = decodeWorldInviteRoute( workerOnlyInviteURL.searchParams.get( 'invite' ) );
 assert.equal( workerOnlyRoute.get( 'ztNodeId' ), '3af4fd5d50', 'HostID-only invites remain usable without a private ZeroTier gateway' );
-assert.equal( workerOnlyRoute.get( 'ztNetworkId' ), 'e3918db4832a3056', 'HostID-only invites retain the configured network for Worker lookup' );
+assert.equal( workerOnlyRoute.has( 'ztNetworkId' ), false, 'HostID-only invites use the configured network for Worker lookup' );
 assert.equal( workerOnlyRoute.get( 'directory' ), 'https://thruhold.org', 'HostID-only invites preserve Worker discovery when no private route is provided' );
 assert.equal( workerOnlyRoute.has( 'ztGateway' ), false, 'a private gateway is optional for ZeroTier discovery' );
-assert.throws( () => createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierGateway: 'http://8.8.8.8:43127', directory: 'https://thruhold.org' } ), /ZeroTier private gateway/, 'ZeroTier private gateways cannot point at a public IP' );
 const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
 const redundantRoute = decodeWorldInviteRoute( redundantInvite.searchParams.get( 'invite' ) );
 assert.deepEqual( redundantRoute.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );

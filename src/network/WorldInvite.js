@@ -1,4 +1,4 @@
-const ROUTE_KEYS = Object.freeze( [ 'worldId', 'ztNodeId', 'ztNetworkId', 'ztGateway', 'ztNodeRecord', 'nodeId', 'gateway', 'directory' ] );
+const ROUTE_KEYS = Object.freeze( [ 'worldId', 'ztNodeId', 'nodeId', 'gateway', 'directory' ] );
 const ROUTE_KEY_SET = new Set( ROUTE_KEYS );
 const MAX_ROUTE_PAYLOAD_CHARS = 3072;
 const MAX_ROUTE_CODE_CHARS = 4096;
@@ -30,7 +30,7 @@ export function encodeWorldInviteRoute( params ) {
 export function decodeWorldInviteRoute( code ) {
 	const route = new URLSearchParams( decodeBase64URL( code ) );
 	for ( const key of route.keys() ) if ( ! ROUTE_KEY_SET.has( key ) ) throw new Error( `Invite route contains unsupported field: ${key}` );
-	for ( const key of [ 'worldId', 'ztNodeId', 'ztNetworkId', 'ztGateway', 'ztNodeRecord', 'directory' ] ) {
+	for ( const key of [ 'worldId', 'ztNodeId', 'directory' ] ) {
 		if ( route.getAll( key ).length > 1 ) throw new Error( `Invite route contains duplicate ${key}` );
 	}
 	const nodeIds = route.getAll( 'nodeId' );

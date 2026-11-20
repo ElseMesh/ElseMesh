@@ -67,6 +67,11 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   The browser still must join the shared ZeroTier network. This is a design
   decision only: issuing/redeeming the player-bound token and dual-stack
   registration are unimplemented, so the tracker remains at 0%.
+- Updated generated route-only ZeroTier invites to omit the hardcoded network
+  ID, world ID (derived from the uniquely registered HostID), direct private
+  gateway, and signed node-record copy. The configured Worker resolves those
+  details. This trims route links but does not add the target port or player
+  token; player-bound ticket implementation remains at 0%.
 - Fixed two browser-to-worldd startup failures in the invite route. Chromium
   can obtain a public STUN-reflexive candidate while ICE gathering remains
   open, so the client now sends its bounded offer when that candidate appears
