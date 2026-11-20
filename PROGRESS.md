@@ -116,10 +116,15 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   automatically. A separate isolated Weston Chromium run opened a HostID-only
   invite on `elsemesh.org`, resolved the same Worker record, and loaded the
   signed manifest through the rendezvous-only WebRTC path without
-  `--allow-browser-origin`. Its initial `ws://` private-gateway attempt failed
-  with an insecure-WebSocket warning; the exact browser-policy versus server
-  origin cause is not isolated. This verifies the production browser-to-worldd
-  data path on the joined network, not independent-NAT WebRTC.
+  WebRTC; its world presence session was admitted. The browser's `ws://`
+  private-gateway attempt still failed with an insecure-WebSocket warning even
+  when the test worldd allowed `https://elsemesh.org`. A separate peer's
+  WebSocket upgrade with that Origin returned HTTP 101, confirming the server
+  allowlist works for that route. The browser's same-host private route failure
+  remains unexplained; it may involve Chromium policy or same-host ZeroTier
+  routing. The rendezvous WebRTC path worked without an origin flag. This
+  verifies the production browser-to-worldd data path on the joined network,
+  not independent-NAT WebRTC.
 - The Pages retry initially failed because its pinned Tidewater submodule
   commits were not available from `ElseMesh/tidewater`. The existing three
   committed Tidewater changes were pushed as a fast-forward, then the Pages

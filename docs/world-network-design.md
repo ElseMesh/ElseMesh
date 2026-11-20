@@ -645,14 +645,16 @@ lookup. Invite onboarding shows the hardcoded network ID before loading the
 world. Browser-side ztlib remains unnecessary.
 
 Treat the private HTTP/WebSocket route as best-effort from an HTTPS browser.
-A live hosted-browser check reached the production HostID lookup, but its
-`ws://` attempt to the private gateway failed with an insecure-WebSocket
-warning; that probe did not isolate browser network policy from the provider's
-origin handling. The same browser then used the Worker WebSocket only for
-signaling and loaded the signed manifest over direct WebRTC from worldd. Keep
-that rendezvous fallback when a private gateway cannot be used, and never send
-manifest, player, or asset data through the Worker. See the dated result in
-[`PROGRESS.md`](../PROGRESS.md).
+A live hosted-browser check reached the production HostID lookup and loaded
+the signed manifest with an admitted presence session through rendezvous WebRTC.
+Its `ws://` private-gateway attempt still failed with an insecure-WebSocket
+warning after the test worldd allowed `https://elsemesh.org`. A separate
+ZeroTier peer's WebSocket upgrade with that Origin returned HTTP 101, proving
+the server-side allowlist works; the browser's same-host failure may involve
+Chromium policy or same-host ZeroTier routing. The rendezvous fallback uses the
+Worker WebSocket only for signaling and does not require `--allow-browser-origin`.
+Never send manifest, player, or asset data through the Worker. See the dated
+result in [`PROGRESS.md`](../PROGRESS.md).
 
 When `worldd` is configured for ZeroTier, ztlib identifies the server node by
 default; it does not authenticate the visitor. A verified client-side
