@@ -103,8 +103,10 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   their source VEC4 streams, and the instance-set sidecar carries every
   authored tree/shrub placement with the shared seed-bin variant rule. Export
   checks verify stable hashes, transforms, and variant assignments. The
-  provisional PBR material and absent leaf atlas/material graph keep this
-  artifact out of the signed runtime package; no parity percentage changed.
+  exporter now includes the source leaf-mask atlas as a content-addressed
+  linear RGBA8 data PNG, with channel meanings and tile layout recorded. The
+  provisional PBR material and absent canopy graph/runtime reference keep this
+  artifact out of the signed package; no parity percentage changed.
 
 ## 2026-11-18
 
