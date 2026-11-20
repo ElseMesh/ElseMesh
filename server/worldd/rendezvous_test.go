@@ -168,6 +168,7 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 		directoryURL:      server.URL,
 		rendezvousDialer:  &websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
 		webrtcSTUNServers: []string{"stun:127.0.0.1:9"},
+		webrtcInterfaces:  []string{"lo"},
 		webrtcSessions:    make(map[string]*worldRTCSession), authorityChanged: make(chan struct{}, 1),
 	}
 	defer d.closeWebRTCTransport()
@@ -182,7 +183,10 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("rendezvous host did not answer the visitor connect")
 	}
-	client, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	settingEngine := webrtc.SettingEngine{}
+	settingEngine.SetInterfaceFilter(func(name string) bool { return name == "lo" })
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))
+	client, err := api.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		t.Fatal(err)
 	}
