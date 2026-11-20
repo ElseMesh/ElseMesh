@@ -43,6 +43,27 @@ engine presenters and remove the beach bounds from engine code. This is a
 measured backend gap, not a Tidewater-main WebGL comparison. Tidewater parity
 remains 93%.
 
+### Breaker-state follow-up, 2026-11-20
+
+After the captures above, Tidewater moved its 577 shoreline records into the
+signed `wave-breaker-stations/1` asset (`tidewater` commit `a137b46`). The
+WebGPU and WebGL world-component adapters now load that same station data.
+The WebGL crest solver also re-samples the shore field during its two secant
+refinements and applies the crest direction with the same sign as WebGPU.
+
+Two conformance checks now compare the actual state layouts. A synthetic linear
+shore field matches across five phases, with every station/wave slot agreeing
+and maximum state error under 0.013 m. A second check uses Tidewater's signed
+terrain and station assets at phases 1001.067, 1001.567, and 1002.067 seconds;
+612, 604, and 614 active slots match, and every matched state value is within
+0.03 m. One slot at 1002.067 falls on the `b = -0.6` visibility threshold
+(WebGPU `b = -0.5947`) and differs within the documented 0.01 precision band.
+This verifies shared station inputs and crest/lip state on the packaged terrain.
+The WebGL point spray still evaluates a separate procedural field over fixed
+station samples, while WebGPU emits dynamic particle classes. The test does
+not establish visible spray parity or a matched rendered-scene result; no
+Tidewater parity percentage changes.
+
 ## 2026-11-20 matched split beach view: WebGPU and WebGL
 
 Captured ElseMesh source revision `4b4e0f1f` in isolated Chromium on AMD

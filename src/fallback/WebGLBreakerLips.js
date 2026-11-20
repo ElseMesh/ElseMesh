@@ -53,31 +53,34 @@ function shoreProfile( u, lam, params ) {
 export function prepareWebGLBreakerTransects( stations, terrain, shoreField, seaLevel ) {
 	const sampleCount = TRANSECT_STEPS + 1;
 	const values = new Float32Array( stations.length * sampleCount * TRANSECT_VALUES );
-	const sample = new Float32Array( 4 );
-	for ( let stationIndex = 0; stationIndex < stations.length; stationIndex ++ ) {
+	const shoreSample = new Float32Array( 4 );
+	const sampleAt = ( stationIndex, distance, out, offset = 0 ) => {
 		const station = stations[ stationIndex ], [ x0, z0 ] = station.center;
+		const x = x0 + station.direction[ 0 ] * distance, z = z0 + station.direction[ 1 ] * distance;
+		const sh = sampleShoreField( shoreField, x, z, shoreSample );
+		const magnitude = Math.hypot( sh[ 1 ], sh[ 2 ] );
+		const directionX = sh[ 1 ] / Math.max( magnitude, 1e-4 ), directionZ = sh[ 2 ] / Math.max( magnitude, 1e-4 );
+		out[ offset ] = -sh[ 0 ] / SHORE_DEFAULT_PERIOD + shoreWobble( x * -directionZ + z * directionX );
+		out[ offset + 1 ] = x * -directionZ + z * directionX;
+		out[ offset + 2 ] = directionX;
+		out[ offset + 3 ] = directionZ;
+		out[ offset + 4 ] = magnitude;
+		out[ offset + 5 ] = seaLevel - terrain.heightAt( x, z );
+	};
+	for ( let stationIndex = 0; stationIndex < stations.length; stationIndex ++ ) {
 		for ( let step = 0; step <= TRANSECT_STEPS; step ++ ) {
 			const distance = step * SEGMENT_LENGTH;
-			const x = x0 + station.direction[ 0 ] * distance, z = z0 + station.direction[ 1 ] * distance;
-			const sh = sampleShoreField( shoreField, x, z, sample );
-			const magnitude = Math.hypot( sh[ 1 ], sh[ 2 ] );
-			const directionX = sh[ 1 ] / Math.max( magnitude, 1e-4 ), directionZ = sh[ 2 ] / Math.max( magnitude, 1e-4 );
-			const along = x * -directionZ + z * directionX;
 			const offset = ( stationIndex * sampleCount + step ) * TRANSECT_VALUES;
-			values[ offset ] = -sh[ 0 ] / SHORE_DEFAULT_PERIOD + shoreWobble( along );
-			values[ offset + 1 ] = along;
-			values[ offset + 2 ] = directionX;
-			values[ offset + 3 ] = directionZ;
-			values[ offset + 4 ] = magnitude;
-			values[ offset + 5 ] = seaLevel - terrain.heightAt( x, z );
+			sampleAt( stationIndex, distance, values, offset );
 		}
 	}
-	return { values, sampleCount };
+	return { values, sampleCount, sampleAt };
 }
 
 export function updateWebGLBreakerCrestState( stations, transects, seaLevel, time, state, cameraPosition = null ) {
 	state.fill( 0 );
-	const { values, sampleCount } = transects;
+	const { values, sampleCount, sampleAt } = transects;
+	const refinedSample = new Float32Array( TRANSECT_VALUES );
 	const timePhase = time / SHORE_DEFAULT_PERIOD;
 	const maxRangeSq = LIP_UPDATE_RANGE * LIP_UPDATE_RANGE;
 	for ( let stationIndex = 0; stationIndex < stations.length; stationIndex ++ ) {
@@ -97,23 +100,20 @@ export function updateWebGLBreakerCrestState( stations, transects, seaLevel, tim
 				let lowOffset = previousOffset, highOffset = currentOffset;
 				let rootDistance = lo + ( target - timePhase - lowOffset ) / Math.max( highOffset - lowOffset, 1e-5 ) * SEGMENT_LENGTH;
 				for ( let refine = 0; refine < 2; refine ++ ) {
-					const t = ( rootDistance - ( step - 1 ) * SEGMENT_LENGTH ) / SEGMENT_LENGTH;
-					const offset = mix( previousOffset, currentOffset, t );
+					sampleAt( stationIndex, rootDistance, refinedSample );
+					const offset = refinedSample[ 0 ];
 					if ( timePhase + offset < target ) { lo = rootDistance; lowOffset = offset; }
 					else { hi = rootDistance; highOffset = offset; }
 					rootDistance = lo + ( target - timePhase - lowOffset ) / Math.max( highOffset - lowOffset, 1e-5 ) * ( hi - lo );
 				}
-				const t = ( rootDistance - ( step - 1 ) * SEGMENT_LENGTH ) / SEGMENT_LENGTH;
-				const a = stationOffset + ( step - 1 ) * TRANSECT_VALUES, b = stationOffset + step * TRANSECT_VALUES;
-				const along = mix( values[ a + 1 ], values[ b + 1 ], t );
-				let directionX = mix( values[ a + 2 ], values[ b + 2 ], t ), directionZ = mix( values[ a + 3 ], values[ b + 3 ], t );
-			const directionLength = Math.hypot( directionX, directionZ );
-			directionX /= Math.max( directionLength, 1e-4 ); directionZ /= Math.max( directionLength, 1e-4 );
-			const exposure = mix( values[ a + 4 ], values[ b + 4 ], t );
-			const depth = mix( values[ a + 5 ], values[ b + 5 ], t );
-			const rootX = x0 + station.direction[ 0 ] * rootDistance;
-			const rootZ = z0 + station.direction[ 1 ] * rootDistance;
-			const amplitude = shoreWaveAmplitude( wave, along, { amplitude: SHORE_DEFAULT_AMPLITUDE, variation: SHORE_DEFAULT_VARIATION } );
+				sampleAt( stationIndex, rootDistance, refinedSample );
+				const along = refinedSample[ 1 ];
+				const directionX = refinedSample[ 2 ], directionZ = refinedSample[ 3 ];
+				const exposure = refinedSample[ 4 ];
+				const depth = refinedSample[ 5 ];
+				const rootX = x0 + station.direction[ 0 ] * rootDistance;
+				const rootZ = z0 + station.direction[ 1 ] * rootDistance;
+				const amplitude = shoreWaveAmplitude( wave, along, { amplitude: SHORE_DEFAULT_AMPLITUDE, variation: SHORE_DEFAULT_VARIATION } );
 				const params = breakParams( amplitude, depth );
 				const env = smoothstep( 26, 13, depth ) * sat( exposure * 1.4 );
 				if ( params.b > -0.6 && env > 0.3 && depth > 0.12 ) {
@@ -123,16 +123,16 @@ export function updateWebGLBreakerCrestState( stations, transects, seaLevel, tim
 					const slot = ( ( wave % 2 ) + 2 ) % 2;
 					const texel = stationIndex * 2 + slot;
 					const row0 = texel * 4, row1 = ( stations.length * 2 + texel ) * 4, row2 = ( stations.length * 4 + texel ) * 4;
-					state[ row0 ] = rootX - directionX * crest.x * env;
+					state[ row0 ] = rootX + directionX * crest.x * env;
 					state[ row0 + 1 ] = seaLevel + crest.y * env;
-					state[ row0 + 2 ] = rootZ - directionZ * crest.x * env;
+					state[ row0 + 2 ] = rootZ + directionZ * crest.x * env;
 					state[ row0 + 3 ] = params.b;
-					state[ row1 ] = rootX - directionX * ( back.x * env - 0.4 );
+					state[ row1 ] = rootX + directionX * ( back.x * env - 0.4 );
 					state[ row1 + 1 ] = seaLevel + back.y * env;
-					state[ row1 + 2 ] = rootZ - directionZ * ( back.x * env - 0.4 );
+					state[ row1 + 2 ] = rootZ + directionZ * ( back.x * env - 0.4 );
 					state[ row1 + 3 ] = params.height * env;
-					state[ row2 ] = -directionX;
-					state[ row2 + 1 ] = -directionZ;
+					state[ row2 ] = directionX;
+					state[ row2 + 1 ] = directionZ;
 					state[ row2 + 2 ] = seaLevel + params.trough * env;
 					state[ row2 + 3 ] = ( ( wave % 1024 ) + 1024 ) % 1024 + 1;
 				}

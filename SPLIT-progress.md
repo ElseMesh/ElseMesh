@@ -267,6 +267,17 @@ WebGPU visual parity remain incomplete.
 
 ## Current work and next gates
 
+- 2026-11-20: moved Tidewater's 577 breaker shoreline records into its signed
+  `wave-breaker-stations/1` asset and made both engine backends consume those
+  same records. WebGL now re-samples the shore field during crest-root
+  refinement and applies crest positions/direction with the WebGPU convention.
+  A shared synthetic-field fixture matches all station/wave slots across five
+  phases with maximum error under 0.013 m. A Tidewater-owned fixture reads the
+  signed terrain and station assets and matches 612/604/614 active slots at
+  three phases; one threshold-edge slot differs only within 0.01 of `b=-0.6`.
+  This closes the station-input and crest/lip state comparison for these
+  fixtures, not particle-spray or full-scene visual parity. Tidewater remains
+  93%; spray, materials, other views, and supported-hardware FPS remain open.
 - 2026-11-18: standardized static-model and ground-cover LOD numbering on the common convention: LOD0 is highest detail and larger indices are coarser. Coarse-first streaming remains intact by requesting the last index first. The same shared selector now drives multi-LOD shadow batches in WebGPU and WebGL, with matching transition fades and an optional coarser shadow bias. Tidewater's signed scanned-debris descriptor and ground-cover component were regenerated in this order. The static-model, ground-cover, local-region, both renderer adapter/render checks, Tidewater package export, and default-package asset checks pass. The initial scanned-debris render comparison stopped at temporary LOD2 startup coverage and reported 0.843 foreground silhouette IoU; the corrected result is recorded below. The authored vegetation presenters and their distant-canopy mismatch remain, so no separation or visual-parity percentage changes.
 - 2026-11-18: the native WebGPU bootstrap's legacy scanned-debris presenter also enables shadows on each authored LOD batch. A distant-view render test confirms LOD2 is selected and its batch is shadow-enabled. This closes the near-only shadow-batch gap in that bootstrap, but the procedural presenter remains renderer-specific migration debt; no separation or visual-parity percentage changes.
 - 2026-11-18: corrected the signed scanned-debris parity fixture to wait for the camera-selected near LOD0 rather than comparing the coarsest LOD2 startup placeholder. The fixtures use the same 141 placements and signed LOD0 GLB, camera pose/projection, background, direct-light values, and exposure; WebGL now installs ElseMesh's atmosphere material adapter using the WebGPU harness's sky/horizon constants. Shadows are disabled for this geometry-focused comparison. Raw foreground IoU is 0.951 and symmetric one-pixel coverage is 0.980, clearing the 0.90 silhouette gate. Applying the engine's WebGL atmosphere adapter reduces overlapping foreground RGB MAE from 35.85 to 22.20/255. Diagnostic runs measure 9.32/255 with direct light only, 13.42 with direct plus diffuse and WebGPU specular disabled, and 11.78 with diffuse only. The default full-mode color value is not a valid full-environment comparison: the WebGPU harness uses its fallback specular gradient while the WebGL fixture has no PMREM. Production WebGL creates a sky PMREM and production WebGPU uses its environment probe; a matched production-environment capture remains open. No Tidewater parity estimate change.
