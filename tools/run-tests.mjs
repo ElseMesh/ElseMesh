@@ -32,6 +32,7 @@ const tests = [
 	'test/priority-request-queue.mjs', 'test/local-region-request-budget.mjs', 'test/world-streaming-incremental-components.mjs', 'test/static-model-texture-demand.mjs', 'test/webgl-static-texture-lod.mjs', 'test/world-texture-priority.mjs',
 ];
 tests.push( 'test/octahedral-canopy-presentation-runtime.mjs' );
+tests.push( 'test/octahedral-canopy-material-factories.mjs' );
 const dawnTests = new Set( [
 	'worlds/tidewater/test/reef-placement-render.mjs', 'test/static-model-instance-set-webgpu-render.mjs', 'test/ground-cover-field-webgpu-render.mjs', 'test/webgpu-webgl-breaker-state.mjs', 'worlds/tidewater/test/breaker-state-parity.mjs', 'worlds/tidewater/test/ground-cover-graph-parity-webgpu.mjs', 'worlds/tidewater/test/village-materials.mjs', 'worlds/tidewater/test/world-export.mjs', 'worlds/tidewater/test/whale-world-package.mjs', 'worlds/tidewater/test/webgpu-fish-props-adapter-build.mjs', 'worlds/tidewater/test/fish-props-webgpu-render.mjs', 'worlds/tidewater/test/scanned-debris-render-parity.mjs', 'test/engine-smoke.mjs', 'test/mesh-renderer-resource-preparation.mjs', 'test/ocean-spectrum-parity.mjs',
 ] );

@@ -28,7 +28,7 @@ function fail( message ) {
 function validateAppearance( appearance ) {
 	const colorKeys = [ 'instanceTintScale', 'instanceTintBias', 'leafDesaturation', 'impostorBrightnessScale', 'leafBlendStart', 'leafBlendEnd', 'impostorSaturation' ];
 	const lightingKeys = [ 'bakedOcclusionFloor', 'bakedOcclusionExponent', 'brightnessScale', 'brightnessBias', 'roughness', 'specularIntensity', 'translucency' ];
-	const windKeys = [ 'gustAmplitude', 'gustBias', 'gustScale', 'waveAmplitude', 'waveFrequency', 'waveGustBias', 'seedPhaseScale', 'heightScale' ];
+	const windKeys = [ 'gustAmplitude', 'gustBias', 'gustScale', 'gustTravelSpeedScale', 'gustTravelSpeedBias', 'waveAmplitude', 'waveFrequency', 'waveGustBias', 'seedPhaseScale', 'heightScale' ];
 	const validValues = ( value, keys, min, max ) => hasExactKeys( value, keys ) && keys.every( key => finiteIn( value[ key ], min, max ) );
 	if ( ! hasExactKeys( appearance, [ 'format', 'color', 'lighting', 'wind', 'palette', 'species' ] ) || appearance.format !== OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT ) fail( 'renderer-neutral canopy appearance format is invalid' );
 	if ( ! hasExactKeys( appearance.color, [ ...colorKeys, 'barkDark', 'barkLight' ] ) || ! colorKeys.every( key => finiteIn( appearance.color[ key ], 0, 4 ) ) || [ appearance.color.barkDark, appearance.color.barkLight ].some( value => ! Number.isInteger( value ) || value < 0 || value > 0xffffff ) || ! validValues( appearance.lighting, lightingKeys, 0, 4 ) || ! validValues( appearance.wind, windKeys, 0, 100 ) ) fail( 'canopy color, lighting or wind values are invalid' );
@@ -103,7 +103,7 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 	let nextVariant = 0;
 	const groupIDs = new Set(), referencedModels = new Set();
 	for ( const group of document.variantGroups ) {
-		if ( ! hasExactKeys( group, [ 'id', 'modelIds', 'atlasVariantRange', 'variantSelection', 'bounds', 'lod' ] ) || typeof group.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( group.id ) || groupIDs.has( group.id ) ) fail( 'variant group ID or fields are invalid' );
+		if ( ! hasExactKeys( group, [ 'id', 'modelIds', 'atlasVariantRange', 'variantSelection', 'windHeightDataIndex', 'bounds', 'lod' ] ) || typeof group.id !== 'string' || ! /^[a-z0-9][a-z0-9._-]{0,63}$/.test( group.id ) || groupIDs.has( group.id ) ) fail( 'variant group ID or fields are invalid' );
 		groupIDs.add( group.id );
 		if ( ! Array.isArray( group.modelIds ) || group.modelIds.length < 1 || group.modelIds.length > 64 || group.modelIds.some( id => ! validModelID( id ) || ! modelByID.has( id ) || referencedModels.has( id ) ) ) fail( `variant group ${group.id} has invalid or duplicate static-model IDs` );
 		for ( const id of group.modelIds ) referencedModels.add( id );
@@ -111,9 +111,10 @@ export function validateOctahedralCanopyDescriptor( document, { componentAssets,
 		if ( ! hasExactKeys( range, [ 'start', 'end' ] ) || ! Number.isInteger( range.start ) || ! Number.isInteger( range.end ) || range.start !== nextVariant || range.end <= range.start || range.end - range.start > 64 ) fail( `variant group ${group.id} atlas range must be contiguous and contain 1–64 variants` );
 		const selection = group.variantSelection;
 		if ( ! hasExactKeys( selection, [ 'source', 'index', 'method', 'multiplier' ] ) || selection.source !== 'instance-material-data' || ! Number.isInteger( selection.index ) || selection.index < 0 || selection.index > 7 || selection.method !== 'fractional-bin/1' || ! finiteIn( selection.multiplier, 0.001, 1e4 ) ) fail( `variant group ${group.id} selection rule is invalid` );
+		if ( ! Number.isInteger( group.windHeightDataIndex ) || group.windHeightDataIndex < 0 || group.windHeightDataIndex > 7 ) fail( `variant group ${group.id} wind-height material-data index is invalid` );
 		for ( const id of group.modelIds ) {
 			const instances = set.instances.filter( instance => instance?.model === id );
-			if ( ! instances.length || instances.some( instance => ! Array.isArray( instance.materialData ) || ! finiteIn( instance.materialData[ selection.index ], 0, 1 ) ) ) fail( `variant group ${group.id} requires normalized per-instance variant data for model ${id}` );
+			if ( ! instances.length || instances.some( instance => ! Array.isArray( instance.materialData ) || ! finiteIn( instance.materialData[ selection.index ], 0, 1 ) || ! finiteIn( instance.materialData[ group.windHeightDataIndex ], 0.001, 1e6 ) ) ) fail( `variant group ${group.id} requires normalized per-instance variant data and positive wind-height data for model ${id}` );
 		}
 		nextVariant = range.end;
 		const bounds = group.bounds;

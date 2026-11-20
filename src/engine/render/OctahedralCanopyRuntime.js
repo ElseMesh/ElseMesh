@@ -98,6 +98,8 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 		const selection = group.variantSelection;
 		const seed = instance.materialData?.[ selection.index ];
 		if ( ! Number.isFinite( seed ) || seed < 0 || seed > 1 ) throw new Error( `Canopy instance ${instanceIndex} has invalid variant-selection seed` );
+		const windHeight = instance.materialData?.[ group.windHeightDataIndex ];
+		if ( ! Number.isFinite( windHeight ) || windHeight <= 0 ) throw new Error( `Canopy instance ${instanceIndex} has invalid authored wind height` );
 		const variantIndex = group.atlasVariantRange.start + selectFractionalBinVariant( seed, group.atlasVariantRange.end - group.atlasVariantRange.start, selection.multiplier );
 		const distance = distance3( instance.position, cameraPosition );
 		const nearDistance = group.lod.nearDistance;
@@ -126,6 +128,7 @@ export function planOctahedralCanopyInstances( descriptor, instanceSet, cameraPo
 			yaw,
 			scale: instance.scale,
 			seed,
+			windHeight,
 			variantIndex,
 			distance,
 			localViewDirection,
@@ -154,7 +157,7 @@ export function writeOctahedralCanopyDrawPlan( plan, target = {} ) {
 	if ( ! Array.isArray( plan ) ) throw new Error( 'Octahedral canopy draw plan must be an array' );
 	let count = 0;
 	for ( const item of plan ) if ( item.farWeight > 0 ) {
-		if ( ! item.billboard?.matrix || item.billboard.matrix.length !== 16 || ! Array.isArray( item.scale ) || item.scale.length !== 3 || ! Array.isArray( item.frameIndices ) || item.frameIndices.length !== 3 || ! Array.isArray( item.frameWeights ) || item.frameWeights.length !== 3 ) throw new Error( 'Visible far canopy plan item is missing draw attributes' );
+		if ( ! item.billboard?.matrix || item.billboard.matrix.length !== 16 || ! Array.isArray( item.scale ) || item.scale.length !== 3 || ! Array.isArray( item.frameIndices ) || item.frameIndices.length !== 3 || ! Array.isArray( item.frameWeights ) || item.frameWeights.length !== 3 || ! Number.isFinite( item.windHeight ) || item.windHeight <= 0 ) throw new Error( 'Visible far canopy plan item is missing draw attributes' );
 		count ++;
 	}
 	const matrices = ensureFloatBuffer( target, 'matrices', count * 16 );
@@ -162,6 +165,7 @@ export function writeOctahedralCanopyDrawPlan( plan, target = {} ) {
 	const instance1 = ensureFloatBuffer( target, 'instance1', count * 4 );
 	const frames = ensureFloatBuffer( target, 'frames', count * 4 );
 	const weights = ensureFloatBuffer( target, 'weights', count * 4 );
+	const instance2 = ensureFloatBuffer( target, 'instance2', count * 4 );
 	let drawIndex = 0;
 	for ( const item of plan ) {
 		if ( item.farWeight <= 0 ) continue;
@@ -183,6 +187,10 @@ export function writeOctahedralCanopyDrawPlan( plan, target = {} ) {
 		weights[ attributeOffset + 1 ] = item.frameWeights[ 1 ];
 		weights[ attributeOffset + 2 ] = item.frameWeights[ 2 ];
 		weights[ attributeOffset + 3 ] = item.farWeight;
+		instance2[ attributeOffset ] = item.windHeight;
+		instance2[ attributeOffset + 1 ] = 0;
+		instance2[ attributeOffset + 2 ] = 0;
+		instance2[ attributeOffset + 3 ] = 0;
 		drawIndex ++;
 	}
 	target.count = count;

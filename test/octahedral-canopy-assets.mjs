@@ -51,8 +51,8 @@ const set = {
 		{ id: 'shrub', bounds: { center: [ 0, 1, 0 ], radius: 2 }, geometryMirrorX: false, lods: [ { assetId: shrubGLBID } ], lodThresholds: [], lodMetric: 'world-distance', lodFadeFraction: 0.1, shadowLodBias: 0, shadowMaxDistance: 0, drawMaxDistance: 180, drawFadeStartDistance: 180 },
 	],
 	instances: [
-		{ model: 'tree', position: [ 0, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0, 0, 0, 0, 0, 0, 0, 0.1337 ] },
-		{ model: 'shrub', position: [ 1, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0, 0, 0, 0, 0, 0, 0, 0.7331 ] },
+		{ model: 'tree', position: [ 0, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0, 0, 12.5, 0, 0, 0, 0, 0.1337 ] },
+		{ model: 'shrub', position: [ 1, 0, 0 ], rotation: [ 0, 0, 0, 1 ], scale: [ 1, 1, 1 ], materialData: [ 0, 0, 1.6, 0, 0, 0, 0, 0.7331 ] },
 	],
 };
 const setBytes = Buffer.from( JSON.stringify( set ) );
@@ -77,7 +77,7 @@ const descriptor = {
 		format: 'elsemesh.canopy-appearance/1',
 		color: { instanceTintScale: 0.36, instanceTintBias: 0.74, leafDesaturation: 0.85, impostorBrightnessScale: 1.4, barkDark: 0x1c1a13, barkLight: 0x2e2b20, leafBlendStart: 0.05, leafBlendEnd: 0.55, impostorSaturation: 1.25 },
 		lighting: { bakedOcclusionFloor: 0.26, bakedOcclusionExponent: 2, brightnessScale: 0.6, brightnessBias: 0.7, roughness: 0.85, specularIntensity: 0.12, translucency: 0.35 },
-		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
+		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, gustTravelSpeedScale: 0.7, gustTravelSpeedBias: 1.5, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
 		palette: {
 			trees: [ { low: 0x283a1b, high: 0x364a23, dry: 0x5e4a2e, dryStart: 0.96, dryEnd: 0.995, dryMix: 0.5 }, { low: 0x34491f, high: 0x485c27 } ],
 			shrubs: [ { low: 0x3f5522, high: 0x52662a }, { low: 0x2c421e, high: 0x44561f }, { low: 0x34521c, high: 0x466624 } ],
@@ -94,8 +94,8 @@ const descriptor = {
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
-		{ id: 'trees', modelIds: [ 'tree' ], atlasVariantRange: { start: 0, end: 3 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 4, 0 ], radius: 8, horizontalRadius: 6, halfHeight: 8 }, lod: { nearDistance: 65, maxDistance: 2800, farFade: { startDistance: 2600, endDistance: 2800 } } },
-		{ id: 'shrubs', modelIds: [ 'shrub' ], atlasVariantRange: { start: 3, end: 5 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 1, 0 ], radius: 2, horizontalRadius: 1.5, halfHeight: 2 }, lod: { nearDistance: 45, maxDistance: 180, farFade: null } },
+		{ id: 'trees', modelIds: [ 'tree' ], atlasVariantRange: { start: 0, end: 3 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, windHeightDataIndex: 2, bounds: { center: [ 0, 4, 0 ], radius: 8, horizontalRadius: 6, halfHeight: 8 }, lod: { nearDistance: 65, maxDistance: 2800, farFade: { startDistance: 2600, endDistance: 2800 } } },
+		{ id: 'shrubs', modelIds: [ 'shrub' ], atlasVariantRange: { start: 3, end: 5 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, windHeightDataIndex: 2, bounds: { center: [ 0, 1, 0 ], radius: 2, horizontalRadius: 1.5, halfHeight: 2 }, lod: { nearDistance: 45, maxDistance: 180, farFade: null } },
 	],
 	frameBlendDistance: 100, lodBandFraction: 0.12,
 	thinning: { startDistance: 140, endDistance: 320, removeFraction: 0.5, seedMultiplier: 91.7, scaleCompensation: 'inverse-square-root-retained-density/1' },

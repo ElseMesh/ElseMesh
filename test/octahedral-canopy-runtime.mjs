@@ -4,12 +4,14 @@ import { planOctahedralCanopyInstances, writeOctahedralCanopyDrawPlan } from '..
 const tree = {
 	id: 'trees', modelIds: [ 'oak' ], atlasVariantRange: { start: 0, end: 3 },
 	variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 },
+	windHeightDataIndex: 2,
 	bounds: { center: [ 0, 0, 0 ], radius: 5, horizontalRadius: 2, halfHeight: 5 },
 	lod: { nearDistance: 65, maxDistance: 2800, farFade: { startDistance: 2600, endDistance: 2800 } },
 };
 const shrub = {
 	id: 'shrubs', modelIds: [ 'sea-grape' ], atlasVariantRange: { start: 3, end: 5 },
 	variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 },
+	windHeightDataIndex: 2,
 	bounds: { center: [ 0, 0, 0 ], radius: 5, horizontalRadius: 2, halfHeight: 5 },
 	lod: { nearDistance: 45, maxDistance: 180, farFade: null },
 };
@@ -21,7 +23,7 @@ const descriptor = {
 	thinning: { startDistance: 140, endDistance: 320, removeFraction: 0.5, seedMultiplier: 91.7, scaleCompensation: 'inverse-square-root-retained-density/1' },
 };
 const instance = ( model, x, seed, rotation = [ 0, 0, 0, 1 ], scale = [ 1, 1, 1 ] ) => ( {
-	model, position: [ x, 0, 0 ], rotation, scale, materialData: [ 0, 0, 0, 0, 0, 0, 0, seed ],
+	model, position: [ x, 0, 0 ], rotation, scale, materialData: [ 0, 0, 12.5, 0, 0, 0, 0, seed ],
 } );
 const set = { instances: [
 	instance( 'oak', 65, 0.01, [ 0, Math.SQRT1_2, 0, Math.SQRT1_2 ] ),
@@ -69,6 +71,7 @@ assert.deepEqual( Array.from( packed.instance0.slice( 0, 4 ) ), f32( [ 0.01, 0, 
 assert.deepEqual( Array.from( packed.instance1.slice( 0, 4 ) ), f32( [ 1, 1, 1, Math.PI / 2 ] ), 'the shared attributes carry instance scale and yaw' );
 assert.deepEqual( Array.from( packed.frames.slice( 0, 4 ) ), [ 0, 1, 6, 1 ], 'the shared attributes carry the selected frames and blend flag' );
 assert.deepEqual( Array.from( packed.weights.slice( 0, 4 ) ), f32( [ ...treeHandoff.frameWeights, 0.5 ] ), 'the shared attributes carry frame and LOD weights' );
+assert.deepEqual( Array.from( packed.instance2.slice( 0, 4 ) ), [ 12.5, 0, 0, 0 ], 'the shared attributes carry authored per-instance wind height' );
 const reusableMatrices = packed.matrices;
 assert.equal( writeOctahedralCanopyDrawPlan( plan, packed ), packed, 'the caller-owned draw buffers can be reused each update' );
 assert.equal( packed.matrices, reusableMatrices, 'draw planning retains sufficient matrix storage' );

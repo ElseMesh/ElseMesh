@@ -25,8 +25,8 @@ const instanceSet = {
 		{ id: 'shrub-low', lods: [ { assetId: nearShrubID } ] },
 	],
 	instances: [
-		{ model: 'tree-oak', materialData: [ 0, 0, 0, 0, 0, 0, 0, 0.1337 ] },
-		{ model: 'shrub-low', materialData: [ 0, 0, 0, 0, 0, 0, 0, 0.7331 ] },
+		{ model: 'tree-oak', materialData: [ 0, 0, 12.5, 0, 0, 0, 0, 0.1337 ] },
+		{ model: 'shrub-low', materialData: [ 0, 0, 1.6, 0, 0, 0, 0, 0.7331 ] },
 	],
 };
 const descriptor = {
@@ -56,7 +56,7 @@ const descriptor = {
 		format: OCTAHEDRAL_CANOPY_APPEARANCE_FORMAT,
 		color: { instanceTintScale: 0.36, instanceTintBias: 0.74, leafDesaturation: 0.85, impostorBrightnessScale: 1.4, barkDark: 0x1c1a13, barkLight: 0x2e2b20, leafBlendStart: 0.05, leafBlendEnd: 0.55, impostorSaturation: 1.25 },
 		lighting: { bakedOcclusionFloor: 0.26, bakedOcclusionExponent: 2, brightnessScale: 0.6, brightnessBias: 0.7, roughness: 0.85, specularIntensity: 0.12, translucency: 0.35 },
-		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
+		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, gustTravelSpeedScale: 0.7, gustTravelSpeedBias: 1.5, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
 		palette: {
 			trees: [ { low: 0x283a1b, high: 0x364a23, dry: 0x5e4a2e, dryStart: 0.96, dryEnd: 0.995, dryMix: 0.5 }, { low: 0x34491f, high: 0x485c27 } ],
 			shrubs: [ { low: 0x3f5522, high: 0x52662a }, { low: 0x2c421e, high: 0x44561f }, { low: 0x34521c, high: 0x466624 } ],
@@ -68,8 +68,8 @@ const descriptor = {
 	projection: { type: 'hemi-octahedral/1', framesPerSide: 6 },
 	frameGrid: { columns: 30, rows: 6, frameWidth: 128, frameHeight: 128 },
 	variantGroups: [
-		{ id: 'trees', modelIds: [ 'tree-oak' ], atlasVariantRange: { start: 0, end: 3 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 4, 0 ], radius: 8, horizontalRadius: 6, halfHeight: 8 }, lod: { nearDistance: 65, maxDistance: 2800, farFade: { startDistance: 2600, endDistance: 2800 } } },
-		{ id: 'shrubs', modelIds: [ 'shrub-low' ], atlasVariantRange: { start: 3, end: 5 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, bounds: { center: [ 0, 1, 0 ], radius: 2, horizontalRadius: 1.5, halfHeight: 2 }, lod: { nearDistance: 45, maxDistance: 180, farFade: null } },
+		{ id: 'trees', modelIds: [ 'tree-oak' ], atlasVariantRange: { start: 0, end: 3 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, windHeightDataIndex: 2, bounds: { center: [ 0, 4, 0 ], radius: 8, horizontalRadius: 6, halfHeight: 8 }, lod: { nearDistance: 65, maxDistance: 2800, farFade: { startDistance: 2600, endDistance: 2800 } } },
+		{ id: 'shrubs', modelIds: [ 'shrub-low' ], atlasVariantRange: { start: 3, end: 5 }, variantSelection: { source: 'instance-material-data', index: 7, method: 'fractional-bin/1', multiplier: 7.77 }, windHeightDataIndex: 2, bounds: { center: [ 0, 1, 0 ], radius: 2, horizontalRadius: 1.5, halfHeight: 2 }, lod: { nearDistance: 45, maxDistance: 180, farFade: null } },
 	],
 	frameBlendDistance: 100,
 	lodBandFraction: 0.12,
@@ -105,6 +105,8 @@ const invalid = [
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], modelIds: [ 'missing-model' ] }, descriptor.variantGroups[ 1 ] ] },
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], variantSelection: { ...descriptor.variantGroups[ 0 ].variantSelection, index: 9 } }, descriptor.variantGroups[ 1 ] ] },
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], variantSelection: { ...descriptor.variantGroups[ 0 ].variantSelection, multiplier: 0 } }, descriptor.variantGroups[ 1 ] ] },
+	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], windHeightDataIndex: 8 }, descriptor.variantGroups[ 1 ] ] },
+	{ ...descriptor, variantGroups: [ descriptor.variantGroups[ 0 ], { ...descriptor.variantGroups[ 1 ], windHeightDataIndex: 3 } ] },
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], bounds: { ...descriptor.variantGroups[ 0 ].bounds, horizontalRadius: 9 } }, descriptor.variantGroups[ 1 ] ] },
 	{ ...descriptor, variantGroups: [ { ...descriptor.variantGroups[ 0 ], lod: { ...descriptor.variantGroups[ 0 ].lod, maxDistance: 2000 } }, descriptor.variantGroups[ 1 ] ] },
 	{ ...descriptor, variantGroups: [ descriptor.variantGroups[ 0 ], { ...descriptor.variantGroups[ 1 ], lod: { ...descriptor.variantGroups[ 1 ].lod, farFade: { startDistance: 150, endDistance: 170 } } } ] },
