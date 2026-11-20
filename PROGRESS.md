@@ -91,6 +91,13 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   committed Tidewater changes were pushed as a fast-forward, then the Pages
   workflow passed and deployed `51da0377`. Both the root and submodule source
   trees are clean at their pushed tips.
+- Reran Tidewater's renderer parity suite and live signed-worker Chromium
+  scenario from the synced external build. The pre-split WebGPU and paired
+  WebGPU/WebGL fishing and boat gameplay traces passed. The live test completed
+  the authored-start walk to Joe's vendor in 50 frames (2.43 m) and passed the
+  sale/shop flow on both renderer paths. The live browser test is headless and
+  GPU-disabled; its generated-terrain route does not prove production-water
+  boat physics or rendered visual parity.
 
 ## 2026-11-18
 

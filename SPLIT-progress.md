@@ -44,8 +44,12 @@ dimensions, and impostor shading/wind parameters in the plain-data
 consume this profile, and the world-export check verifies the profile recorded
 beside the deterministic atlas images. The exporter test, WebGPU vegetation
 render smoke, and Tidewater's pre-split WebGPU/WebGL gameplay parity suite pass
-in the external build; the render smoke is not a new visual parity comparison.
-This centralizes world-authored inputs;
+in the external build. On 2026-11-20, the parity suite passed again, and the
+headless signed-worker browser test completed both renderer game paths and the
+authored-start vendor walk. Its GPU-disabled generated-terrain setup does not
+prove production-water boat physics or rendered visual parity. The render
+smoke is not a new visual parity comparison. This centralizes world-authored
+inputs;
 the profile is not yet signed into the runtime package and the engine WebGPU
 and WebGL canopy adapters are not implemented. This closes no parity gate and
 changes no percentage.
