@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
-import { WorldConnector } from '../src/network/WorldConnector.js';
+import { createWorldInviteURL, WorldConnector, worldLinkFromLocation } from '../src/network/WorldConnector.js';
 
 globalThis.crypto ||= webcrypto;
 
@@ -171,14 +171,16 @@ try {
 	assert.equal( zeroTierConnector.gateway, 'http://10.147.20.4:43127', 'after Worker lookup, the browser tries the signed private gateway before the public gateway' );
 	zeroTierConnector.close();
 	const zeroTierLookupsBeforePrivate = zeroTierLookups;
-	const directZeroTierConnector = new WorldConnector( {
-		worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056',
+	const directInviteURL = createWorldInviteURL( {
+		pageURL: 'https://elsemesh.org/', worldId: 'elsemesh:directory-test', zeroTierNodeId: '3af4fd5d50',
 		zeroTierGateway: 'http://10.147.20.4:43127', zeroTierNodeRecord: zeroTierProvider, directory: 'https://thruhold.org',
 	} );
+	const directInvite = worldLinkFromLocation( { search: new URL( directInviteURL ).search, origin: 'https://elsemesh.org' } );
+	const directZeroTierConnector = new WorldConnector( directInvite );
 	await directZeroTierConnector.getManifest();
 	assert.equal( directZeroTierConnector.nodeId, second.peerId, 'a direct private gateway reveals a signed node identity bound to the invited ZeroTier ID' );
 	assert.equal( directZeroTierConnector.gateway, 'http://10.147.20.4:43127' );
-	assert.equal( zeroTierLookups, zeroTierLookupsBeforePrivate, 'a working private gateway is tried before Worker HostID lookup' );
+	assert.equal( zeroTierLookups, zeroTierLookupsBeforePrivate, 'the generated invite uses its direct private route before Worker HostID lookup' );
 	assert.equal( directNodeRecordRequests, 0, 'the browser verifies the invite-bound node signature before contacting the private IP' );
 	directZeroTierConnector.close();
 	assert.throws( () => new WorldConnector( {

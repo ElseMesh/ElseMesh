@@ -98,21 +98,20 @@ subject to destination admission. A portal may admit visitors without codes
 where permitted, but cannot bypass a destination's invitation requirement.
 
 The current `?invite=` route code is transitional and is not a player-bound
-admission ticket. It is a compact base64url encoding of route
-query fields: canonical world ID, optional ZeroTier HostID, ordered
-PeerID/gateway candidates, and resolver origin. It no longer serializes the
-shared network ID or embeds the private gateway and signed node document; the
-browser uses the configured network and Worker lookup for those values. The
-browser decodes and validates the route before constructing the normal
-`WorldConnector`. The compact code itself is unsigned, unencrypted, and not a
-secret or admission grant; it is only a set of routing hints. The browser
-checks the provider's owner grant against the signed manifest after connecting
-and before accepting content. The client retrieves world data from the
-selected provider gateway. Replace
-this route-code payload with the minimal HostID/port/player-index/random-value
-ticket described below when `worldd` issues and validates player-bound
-invitations. Until then, the current route code grants no admission and must
-not be described as a working friend invitation.
+admission ticket. It is a compact base64url encoding of route query fields:
+canonical world ID, optional ZeroTier HostID, an optional signed short-lived
+ZeroTier private-gateway hint, ordered PeerID/gateway candidates, and resolver
+origin. When a fresh private hint is present, the browser verifies the signed
+node record and tries that private gateway first with a bounded timeout. If
+the hint is absent, stale, or unreachable, the browser resolves the HostID
+through the configured Worker, verifies the current signed provider record,
+then tries its private gateway and public HTTPS/WSS gateway as available. The
+shared network ID remains application configuration. The Worker handles only
+lookup and signaling; world data flows directly between the browser and
+worldd. The compact code is unsigned, unencrypted, and not an admission grant;
+it carries routing hints only. The browser checks the provider's owner grant
+against the signed manifest after connecting and before accepting content.
+Player-bound admission remains a separate, unimplemented feature.
 
 The public entry point is a short ElseMesh invitation URL such as
 `https://elsemesh.org/?invite=<opaque-ticket>` (a path-form URL may be

@@ -135,8 +135,9 @@ export function worldLinkFromLocation( location = globalThis.location ) {
 	};
 }
 
-export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', nodeId, gateway, providers = [], directory = '' } = {} ) {
+export function createWorldInviteURL( { pageURL = globalThis.location?.href, worldId, zeroTierNodeId = '', zeroTierGateway = '', zeroTierNodeRecord = null, nodeId, gateway, providers = [], directory = '' } = {} ) {
 	invariant( isWorldID( worldId ), 'A valid worldId is required for an invite' );
+	invariant( zeroTierNodeId || ! zeroTierGateway && ! zeroTierNodeRecord, 'Direct ZeroTier route data requires a ZeroTier HostID' );
 	const url = new URL( pageURL );
 	invariant( url.protocol === 'https:' || url.protocol === 'http:', 'Invite page URL must use HTTP(S)' );
 	for ( const key of [ ...WORLD_INVITE_ROUTE_KEYS, 'invite', 'ztNetworkId', 'ztGateway', 'ztNodeRecord' ] ) url.searchParams.delete( key );
@@ -144,6 +145,13 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 	if ( zeroTierNodeId ) {
 		invariant( /^[0-9a-f]{10}$/i.test( zeroTierNodeId ), 'Invalid ZeroTier node ID for invite' );
 		url.searchParams.set( 'ztNodeId', zeroTierNodeId.toLowerCase() );
+		if ( zeroTierGateway || zeroTierNodeRecord ) {
+			invariant( zeroTierGateway && validZeroTierGateway( zeroTierGateway ) && zeroTierNodeRecord && typeof zeroTierNodeRecord === 'object' && ! Array.isArray( zeroTierNodeRecord ), 'Direct ZeroTier invites require a private gateway and signed node record' );
+			const node = zeroTierNodeRecord.payload;
+			invariant( zeroTierNodeRecord.protocol === 'elsemesh.node/1' && typeof zeroTierNodeRecord.signature === 'string' && typeof zeroTierNodeRecord.publicKey === 'string' && node?.nodeId === zeroTierNodeRecord.signer && node.zeroTierNodeId === zeroTierNodeId.toLowerCase() && node.zeroTierNetworkId === DEFAULT_ZEROTIER_NETWORK_ID && validZeroTierGateway( node.zeroTierGateway ) && new URL( node.zeroTierGateway ).origin === new URL( zeroTierGateway ).origin && Array.isArray( node.worldIds ) && node.worldIds.includes( worldId ), 'Signed node record does not match the direct ZeroTier invite route' );
+			url.searchParams.set( 'ztGateway', new URL( zeroTierGateway ).origin );
+			url.searchParams.set( 'ztNodeRecord', JSON.stringify( zeroTierNodeRecord ) );
+		}
 	}
 	const candidates = zeroTierNodeId ? [] : providers.length ? providers : nodeId && gateway ? [ { nodeId, gateway } ] : [];
 	invariant( candidates.length <= 8, 'Invite contains too many gateway candidates' );
@@ -157,8 +165,8 @@ export function createWorldInviteURL( { pageURL = globalThis.location?.href, wor
 		url.searchParams.append( 'nodeId', provider.nodeId );
 		url.searchParams.append( 'gateway', provider.gateway );
 	}
-	invariant( candidates.length || ! nodeId, 'Invite provider ID and gateway must be supplied together' );
-	if ( ! candidates.length && gateway ) {
+	invariant( candidates.length || ! nodeId || zeroTierNodeId, 'Invite provider ID and gateway must be supplied together' );
+	if ( ! zeroTierNodeId && ! candidates.length && gateway ) {
 		invariant( validSecureGateway( gateway ), 'Invite gateway must be a secure HTTPS/WSS origin' );
 		url.searchParams.set( 'gateway', gateway );
 	}
@@ -432,7 +440,8 @@ export class WorldConnector {
 		throwIfAborted( signal );
 		const node = document.payload;
 		const now = Date.now() / 1000;
-		invariant( node.protocol === 'elsemesh.node/1' && node.nodeId === document.signer && node.zeroTierNodeId === this.zeroTierNodeId && node.zeroTierNetworkId === this.zeroTierNetworkId && node.zeroTierGateway && new URL( node.zeroTierGateway ).origin === this.zeroTierGateway && Array.isArray( node.worldIds ) && node.worldIds.includes( this.worldId ) && node.issuedAt <= now + 300 && node.issuedAt >= now - 900 && node.expiresAt > now && node.expiresAt <= now + 900, 'Direct ZeroTier node record does not match the invited world and host identity' );
+	invariant( node.protocol === 'elsemesh.node/1' && node.nodeId === document.signer && node.zeroTierNodeId === this.zeroTierNodeId && node.zeroTierNetworkId === this.zeroTierNetworkId && node.zeroTierGateway && validZeroTierGateway( node.zeroTierGateway ) && new URL( node.zeroTierGateway ).origin === this.zeroTierGateway && Array.isArray( node.worldIds ) && node.worldIds.length === 1 && isWorldID( node.worldIds[ 0 ] ) && ( ! this.worldId || node.worldIds[ 0 ] === this.worldId ) && node.issuedAt <= now + 300 && node.issuedAt >= now - 900 && node.expiresAt > now && node.expiresAt <= now + 900, 'Direct ZeroTier node record does not match the invited world and host identity' );
+	this.worldId = node.worldIds[ 0 ];
 		return { nodeId: node.nodeId };
 	}
 

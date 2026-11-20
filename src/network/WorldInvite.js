@@ -1,4 +1,4 @@
-const ROUTE_KEYS = Object.freeze( [ 'worldId', 'ztNodeId', 'nodeId', 'gateway', 'directory' ] );
+const ROUTE_KEYS = Object.freeze( [ 'worldId', 'ztNodeId', 'ztGateway', 'ztNodeRecord', 'nodeId', 'gateway', 'directory' ] );
 const ROUTE_KEY_SET = new Set( ROUTE_KEYS );
 const MAX_ROUTE_PAYLOAD_CHARS = 3072;
 const MAX_ROUTE_CODE_CHARS = 4096;
@@ -30,13 +30,14 @@ export function encodeWorldInviteRoute( params ) {
 export function decodeWorldInviteRoute( code ) {
 	const route = new URLSearchParams( decodeBase64URL( code ) );
 	for ( const key of route.keys() ) if ( ! ROUTE_KEY_SET.has( key ) ) throw new Error( `Invite route contains unsupported field: ${key}` );
-	for ( const key of [ 'worldId', 'ztNodeId', 'directory' ] ) {
+	for ( const key of [ 'worldId', 'ztNodeId', 'ztGateway', 'ztNodeRecord', 'directory' ] ) {
 		if ( route.getAll( key ).length > 1 ) throw new Error( `Invite route contains duplicate ${key}` );
 	}
 	const nodeIds = route.getAll( 'nodeId' );
 	const gateways = route.getAll( 'gateway' );
 	if ( nodeIds.length !== gateways.length && ! ( nodeIds.length === 0 && gateways.length === 1 ) ) throw new Error( 'Invite provider IDs and gateways must be paired' );
 	if ( ! route.has( 'worldId' ) && ! route.has( 'ztNodeId' ) ) throw new Error( 'Invite route does not identify a world or ZeroTier node' );
+	if ( route.has( 'ztGateway' ) !== route.has( 'ztNodeRecord' ) || route.has( 'ztGateway' ) && ! route.has( 'ztNodeId' ) ) throw new Error( 'A direct ZeroTier gateway requires its HostID and signed node record' );
 	return route;
 }
 

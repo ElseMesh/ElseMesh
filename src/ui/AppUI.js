@@ -150,6 +150,8 @@ export class AppUI {
 			}
 			let zeroTierNodeId = connector?.zeroTierNodeId || '';
 			const connectedZeroTierGateway = connector?.zeroTierGateway || '';
+			let inviteZeroTierGateway = connector?.zeroTierGateway || '';
+			let inviteZeroTierNodeRecord = inviteZeroTierGateway ? connector?.zeroTierNodeRecord || null : null;
 			let inviteNodeId = hostedDocument?.signer || connector?.nodeId || '';
 			let inviteGateway = hostedDocument ? browserHostState.gateway : connector?.gateway || '';
 			let inviteProviders = hostedDocument ? [] : connector?.providers || [];
@@ -166,6 +168,8 @@ export class AppUI {
 						const node = nodeDocument.payload;
 						if ( node.nodeId === connector.nodeId && node.worldIds?.includes( connector.worldId ) && /^[0-9a-f]{10}$/.test( node.zeroTierNodeId || '' ) && node.zeroTierNetworkId === connector.zeroTierNetworkId ) {
 							zeroTierNodeId = node.zeroTierNodeId;
+							inviteZeroTierGateway = node.zeroTierGateway || '';
+							inviteZeroTierNodeRecord = inviteZeroTierGateway ? nodeDocument : null;
 							inviteNodeId = node.nodeId;
 							inviteGateway = node.gateway || '';
 							if ( ! inviteGateway ) inviteProviders = [];
@@ -177,6 +181,8 @@ export class AppUI {
 				pageURL: location.href,
 				worldId: hostedDocument?.payload.worldId || connector.worldId,
 				zeroTierNodeId: hostedDocument ? '' : zeroTierNodeId,
+				zeroTierGateway: hostedDocument ? '' : inviteZeroTierGateway,
+				zeroTierNodeRecord: hostedDocument ? null : inviteZeroTierNodeRecord,
 				nodeId: inviteGateway ? inviteNodeId : '',
 				gateway: inviteGateway,
 				providers: inviteGateway ? inviteProviders : [],

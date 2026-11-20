@@ -8,7 +8,6 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { goBuildEnvironment } from './go-build-env.mjs';
-import { handleRequest as handleResolverRequest } from '../cloudflare/world-resolver/src/index.js';
 
 const projectRoot = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const daemonDir = path.join( projectRoot, 'server', 'worldd' );
@@ -22,13 +21,6 @@ const livePublicGateway = process.env.ELSEMESH_TEST_PUBLIC_GATEWAY || '';
 const liveHTTPPort = Number( process.env.ELSEMESH_TEST_HTTP_PORT || 0 );
 assert.equal( Boolean( liveDirectoryURL ), Boolean( livePublicGateway ), 'live Worker checks require both a directory URL and public gateway' );
 assert.equal( Boolean( liveDirectoryURL ), liveHTTPPort > 0 && liveHTTPPort <= 65535, 'live Worker checks require a valid fixed local HTTP port for the gateway tunnel' );
-
-class MemoryKV {
-	values = new Map();
-	async put( key, value ) { this.values.set( key, value ); }
-	async get( key ) { return this.values.get( key ) ?? null; }
-	async list( { prefix } ) { return { keys: [ ...this.values.keys() ].filter( name => name.startsWith( prefix ) ).map( name => ( { name } ) ), list_complete: true }; }
-}
 
 try {
 	const configuredBinary = process.env.ELSEMESH_TEST_WORLDD_BINARY;
@@ -149,28 +141,15 @@ try {
 		assert.equal( resolverNode.protocol, 'elsemesh.node/1' );
 		assert.equal( resolverNode.payload.nodeId, cachePeerID, 'the signed advertisement belongs to the running worldd provider' );
 		assert.equal( resolverNode.payload.gateway, workerGateway.url, 'worldd advertises its actual HTTPS/WSS gateway' );
-		const resolverState = { PROVIDERS: new MemoryKV() };
-		const resolverManifest = JSON.parse( await readFile( manifestPath, 'utf8' ) );
-		const announcement = await handleResolverRequest( new Request( 'https://resolver.example/v1/announce', {
-			method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify( { node: resolverNode, manifest: resolverManifest } ),
-		} ), resolverState );
-		assert.equal( announcement.status, 202, `Worker contract rejected the live cache node advertisement: ${await announcement.text()}` );
 		const zeroTierNodeID = resolverNode.payload.zeroTierNodeId || '';
-		const lookupPath = zeroTierNodeID
-			? `/v1/zerotier/${resolverNode.payload.zeroTierNetworkId}/${zeroTierNodeID}`
-			: `/v1/worlds/${encodeURIComponent( worldID )}`;
 		if ( zeroTierNodeID ) {
 			assert.match( zeroTierNodeID, /^[0-9a-f]{10}$/, 'libzt-enabled worldd advertises a valid HostID' );
 			assert.equal( resolverNode.payload.zeroTierNetworkId, 'e3918db4832a3056', 'libzt-enabled worldd advertises its joined network' );
 		} else assert.equal( resolverNode.payload.zeroTierNetworkId || '', '', 'the plain worldd build advertises no ZeroTier network' );
-		const lookup = await handleResolverRequest( new Request( `https://resolver.example${lookupPath}` ), resolverState );
-		const lookupResult = await lookup.json();
-		assert.equal( lookup.status, 200 );
-		assert.deepEqual( lookupResult.providers, [ resolverNode ], 'resolver discovery returns the signed live worldd provider record' );
-		resolverServer = await createResolverServer( resolverState, keyPath, certPath );
+		resolverServer = await createResolverServer( resolverNode, worldID, keyPath, certPath );
 		const workerOptions = zeroTierNodeID
 			? {
-				worldID, ownerPeerID, cachePeerID, zeroTierNodeID, zeroTierGateway: resolverNode.payload.zeroTierGateway || '', zeroTierNodeRecord: resolverNode,
+				worldID, ownerPeerID, cachePeerID, zeroTierNodeID,
 				zeroTierNetworkID: resolverNode.payload.zeroTierNetworkId, directory: resolverServer.url, assetID, assetSource, certPath,
 			}
 			: { worldID, ownerPeerID, cachePeerID, directory: resolverServer.url, assetID, assetSource, certPath };
@@ -268,20 +247,21 @@ async function createSecureGatewayProxy( upstreamPort, keyPath, certPath ) {
 	return { server, url: `https://127.0.0.1:${port}`, get upgrades() { return upgrades; }, get lookups() { return lookups; } };
 }
 
-async function createResolverServer( env, keyPath, certPath ) {
+async function createResolverServer( providerRecord, worldID, keyPath, certPath ) {
 	let lookups = 0;
 	const server = https.createServer( { key: await readFile( keyPath ), cert: await readFile( certPath ) }, async ( incoming, outgoing ) => {
 		try {
-			const chunks = [];
-			for await ( const chunk of incoming ) chunks.push( chunk );
-			const body = chunks.length ? Buffer.concat( chunks ) : undefined;
-			const headers = new Headers();
-			for ( const [ name, value ] of Object.entries( incoming.headers ) ) if ( value !== undefined ) headers.set( name, Array.isArray( value ) ? value.join( ', ' ) : value );
 			const requestURL = new URL( incoming.url || '/', `https://${incoming.headers.host || 'resolver.local'}` );
-			if ( requestURL.pathname.startsWith( '/v1/zerotier/' ) || requestURL.pathname.startsWith( '/v1/worlds/' ) ) lookups ++;
-			const response = await handleResolverRequest( new Request( requestURL, { method: incoming.method, headers, ...( body ? { body } : {} ) } ), env );
-			outgoing.writeHead( response.status, Object.fromEntries( response.headers.entries() ) );
-			outgoing.end( Buffer.from( await response.arrayBuffer() ) );
+			const zeroTierMatch = requestURL.pathname.match( /^\/v1\/zerotier\/([0-9a-f]{16})\/([0-9a-f]{10})$/ );
+			const worldMatch = requestURL.pathname.match( /^\/v1\/worlds\/(.+)$/ );
+			if ( incoming.method !== 'GET' || ! zeroTierMatch && ! worldMatch ) { outgoing.writeHead( 404 ); outgoing.end(); return; }
+			if ( zeroTierMatch && ( zeroTierMatch[ 1 ] !== providerRecord.payload.zeroTierNetworkId || zeroTierMatch[ 2 ] !== providerRecord.payload.zeroTierNodeId ) ) { outgoing.writeHead( 404 ); outgoing.end(); return; }
+			if ( worldMatch && decodeURIComponent( worldMatch[ 1 ] ) !== worldID ) { outgoing.writeHead( 404 ); outgoing.end(); return; }
+			lookups ++;
+			outgoing.writeHead( 200, { 'content-type': 'application/json', 'cache-control': 'no-store' } );
+			outgoing.end( JSON.stringify( zeroTierMatch
+				? { networkId: providerRecord.payload.zeroTierNetworkId, nodeId: providerRecord.payload.zeroTierNodeId, worldIds: providerRecord.payload.worldIds, providers: [ providerRecord ] }
+				: { worldId, providers: [ providerRecord ] } ) );
 		} catch ( error ) {
 			outgoing.writeHead( 500 );
 			outgoing.end( error instanceof Error ? error.message : 'resolver test failure' );

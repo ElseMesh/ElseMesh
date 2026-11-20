@@ -305,8 +305,11 @@ world/gateway-bound admission assertions, and enforcement on every transport.
    before a data channel opened. Packet and NAT evidence is recorded in
    [gateway resilience](docs/gateway-resilience.md#public-httpswss-data-gateway).
 
-The Worker remains lookup/signaling only. The invite carries stable locators;
-the changing public IP/UDP port is exchanged as an ICE candidate during
+The Worker remains lookup/signaling only. When available, an invite carries a
+short-lived signed private ZeroTier route hint and tries it before contacting
+the Worker. Missing or stale hints fall back to HostID lookup; after that the
+browser tries the current private route and public HTTPS/WSS or WebRTC paths.
+The changing public IP/UDP port is exchanged as an ICE candidate during
 signaling, not stored as a durable route. `worldd --webrtc-nat-1to1-ip` exists
 for a known forwarded UDP port, but that path remains unconfigured and
 untested. A public HTTPS/WSS gateway is also not yet configured. Neither path

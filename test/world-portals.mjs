@@ -228,8 +228,9 @@ const overlayRoute = decodeWorldInviteRoute( overlayInviteURL.searchParams.get( 
 assert.equal( overlayRoute.get( 'ztNodeId' ), '3af4fd5d50', 'shared invites retain the ZeroTier HostID for Worker fallback' );
 assert.equal( overlayRoute.has( 'ztNetworkId' ), false, 'shared invites use the application network ID instead of serializing it' );
 assert.equal( overlayRoute.has( 'gateway' ), false, 'HostID invites resolve current gateway data through the Worker' );
-assert.equal( overlayRoute.has( 'ztGateway' ), false, 'HostID invites do not duplicate the private IP in the route code' );
-assert.equal( overlayRoute.has( 'ztNodeRecord' ), false, 'HostID invites do not embed a signed node document' );
+assert.equal( overlayRoute.get( 'ztGateway' ), 'http://10.147.20.4:43127', 'invites include the available private route as a direct-first hint' );
+assert.deepEqual( JSON.parse( overlayRoute.get( 'ztNodeRecord' ) ), zeroTierNodeRecord, 'the signed node record authenticates the private address before the client contacts it' );
+assert.deepEqual( worldLinkFromLocation( { search: overlayInviteURL.search, origin: overlayInviteURL.origin } ).zeroTierNodeRecord, zeroTierNodeRecord, 'compact invites restore the signed record for direct-route verification' );
 const workerOnlyInviteURL = new URL( createWorldInviteURL( {
 	pageURL: 'https://app.example/', worldId: 'elsemesh:coast', zeroTierNodeId: '3af4fd5d50', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://thruhold.org',
 } ) );
@@ -238,6 +239,7 @@ assert.equal( workerOnlyRoute.get( 'ztNodeId' ), '3af4fd5d50', 'HostID-only invi
 assert.equal( workerOnlyRoute.has( 'ztNetworkId' ), false, 'HostID-only invites use the configured network for Worker lookup' );
 assert.equal( workerOnlyRoute.get( 'directory' ), 'https://thruhold.org', 'HostID-only invites preserve Worker discovery when no private route is provided' );
 assert.equal( workerOnlyRoute.has( 'ztGateway' ), false, 'a private gateway is optional for ZeroTier discovery' );
+assert.equal( workerOnlyRoute.has( 'ztNodeRecord' ), false, 'Worker-only invites do not need a signed record embedded in the route' );
 const redundantInvite = new URL( createWorldInviteURL( { pageURL: 'https://app.example/', worldId: 'elsemesh:coast', providers: [ { nodeId: '12D3KooWAbcdefghijk1234567890123456', gateway: 'https://desktop.example' }, { nodeId: backupPeerId, gateway: 'wss://flip.example' } ] } ) );
 const redundantRoute = decodeWorldInviteRoute( redundantInvite.searchParams.get( 'invite' ) );
 assert.deepEqual( redundantRoute.getAll( 'gateway' ), [ 'https://desktop.example', 'wss://flip.example' ], 'shareable invites carry multiple explicit gateways in candidate order' );
