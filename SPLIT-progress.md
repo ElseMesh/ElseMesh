@@ -2756,3 +2756,11 @@ finding changes them.
   component still has no registered adapters, and WebGL's manually implemented
   lighting still lacks the engine's shared shadowed direct-light path. No
   percentage changes.
+
+- 2026-11-20: corrected the inactive Tidewater canopy candidate's far-card LOD
+  descriptor. The source impostor shader keeps its cards visible until the hard
+  maximum-distance cutoff; the separate 2,600–2,800 m fade belongs to near
+  vegetation draws. The deterministic world-export check passes with far-card
+  fading disabled. This fixes an authored-data mismatch in the candidate only:
+  its adapters remain unregistered and the package remains inactive, so no
+  rendered parity gate closes and Tidewater remains 93% complete.
