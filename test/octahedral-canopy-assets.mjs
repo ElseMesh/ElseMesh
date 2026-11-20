@@ -64,6 +64,12 @@ const descriptor = {
 		layout: { type: 'row-major-atlas-uv/1', columns: 2, rows: 2, tileWidth: 512, tileHeight: 512 },
 		channels: { r: 'leaf-coverage', g: 'leaf-brightness-over-1.4', b: 'leaf-cell-random', a: 'opaque' },
 	},
+	appearance: {
+		format: 'elsemesh.canopy-appearance/1',
+		color: { instanceTintScale: 0.36, instanceTintBias: 0.74, leafDesaturation: 0.85, impostorBrightnessScale: 1.4, barkDark: 0x1c1a13, barkLight: 0x2e2b20, leafBlendStart: 0.05, leafBlendEnd: 0.55, impostorSaturation: 1.25 },
+		lighting: { bakedOcclusionFloor: 0.26, bakedOcclusionExponent: 2, brightnessScale: 0.6, brightnessBias: 0.7, roughness: 0.85, specularIntensity: 0.12, translucency: 0.35 },
+		wind: { gustAmplitude: 0.009, gustBias: 0.3, gustScale: 0.8, waveAmplitude: 0.0045, waveFrequency: 0.9, waveGustBias: 0.4, seedPhaseScale: 6.2832, heightScale: 0.45 },
+	},
 	materialGraph: {
 		format: 'elsemesh.material-graph/1',
 		nodes: [ { id: 'color', op: 'input', name: 'colorRGB' } ],
