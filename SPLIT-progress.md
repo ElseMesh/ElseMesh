@@ -2707,3 +2707,11 @@ finding changes them.
   and buffer reuse. No renderer adapter consumes the plan yet, the signed
   package remains inactive, and this closes no appearance-parity gate;
   Tidewater remains at 93%.
+
+- 2026-11-20: added paired engine texture constructors for the canopy's raw
+  RGBA8 atlas and leaf-mask payloads. WebGPU uses linear `rgba8unorm` with the
+  source mip policy; WebGL uses `DataTexture`, no color-space conversion, no
+  premultiplication, matching row orientation, clamp sampling, and mipmaps. The
+  focused fixture verifies both constructors retain the same bytes and channel
+  semantics. GPU upload/mip rendering and adapter consumption remain
+  unverified; the package is inactive and no parity percentage changes.
