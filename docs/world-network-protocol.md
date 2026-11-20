@@ -216,7 +216,11 @@ tailnet. This uses the host OS Tailscale route, not a browser Tailscale
 implementation. Tailscale Funnel is a separate public-exposure mode: it can
 make a `.ts.net` endpoint reachable to ordinary Internet visitors, but then
 ElseMesh must enforce access itself and cannot treat Tailscale identity
-headers as proof of the visitor's identity.
+headers as proof of the visitor's identity. Funnel is a TCP proxy through
+Tailscale relay servers, not a direct route to `worldd`, and it has
+non-configurable bandwidth limits. It could provide public HTTPS/WSS ingress,
+but world traffic would traverse that relay; do not treat it as the direct
+world-data path. See [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel).
 
 ElseMesh already has an optional signed provider locator: `worldd` can publish
 its current gateway advertisement, and the client can look it up by world ID
