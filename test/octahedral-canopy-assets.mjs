@@ -75,7 +75,7 @@ const descriptor = {
 			bark: { dark: 0x302a22, mid: 0x5c5549, pale: 0x7b7b6a, paleStart: 0.64, paleEnd: 0.8, paleMix: 0.3 },
 			dryTree: { low: 0x5c5234, high: 0x6e5a3a, mix: 0.5 }, floweringTree: 0x8a4a2c,
 		},
-		species: { treeSeedMultiplier: 5.31, shrubSeedMultiplier: 3.17, shrubSeaGrapeThreshold: 0.45, shrubCrotonThreshold: 0.6, dryTreeChance: 0.035, floweringTreeThreshold: 0.988 },
+		species: { treeSeedMultiplier: 5.31, shrubSeedMultiplier: 3.17, shrubVariantThresholds: [ 0.45, 0.6 ], dryTreeChance: 0.035, floweringTreeThreshold: 0.988 },
 	},
 	materialGraph: {
 		format: 'elsemesh.material-graph/1',
