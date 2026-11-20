@@ -8,6 +8,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { goBuildEnvironment } from './go-build-env.mjs';
+import { validZeroTierGateway } from '../src/network/WorldConnector.js';
 
 const projectRoot = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const daemonDir = path.join( projectRoot, 'server', 'worldd' );
@@ -19,6 +20,7 @@ let workerGateway;
 const liveDirectoryURL = process.env.ELSEMESH_TEST_DIRECTORY_URL || '';
 const livePublicGateway = process.env.ELSEMESH_TEST_PUBLIC_GATEWAY || '';
 const liveHTTPPort = Number( process.env.ELSEMESH_TEST_HTTP_PORT || 0 );
+const zeroTierRemoteHost = process.env.ELSEMESH_TEST_ZEROTIER_REMOTE_HOST || '';
 assert.equal( Boolean( liveDirectoryURL ), Boolean( livePublicGateway ), 'live Worker checks require both a directory URL and public gateway' );
 assert.equal( Boolean( liveDirectoryURL ), liveHTTPPort > 0 && liveHTTPPort <= 65535, 'live Worker checks require a valid fixed local HTTP port for the gateway tunnel' );
 
@@ -83,7 +85,8 @@ try {
 	];
 	if ( liveDirectoryURL ) ownerArgs.push( '--public-gateway', livePublicGateway, '--directory-url', liveDirectoryURL );
 	const owner = startDaemon( binary, ownerArgs );
-	await waitForHTTP( `http://127.0.0.1:${ownerHTTPPort}/healthz`, owner );
+	const daemonReadinessTimeout = zeroTierRemoteHost ? 90000 : 30000;
+	await waitForHTTP( `http://127.0.0.1:${ownerHTTPPort}/healthz`, owner, daemonReadinessTimeout );
 	if ( liveDirectoryURL ) {
 		const nodeResponse = await fetch( `http://127.0.0.1:${ownerHTTPPort}/.well-known/elsemesh/node` );
 		assert.equal( nodeResponse.status, 200, 'live owner worldd exposes its signed provider record' );
@@ -104,12 +107,14 @@ try {
 		console.log( 'ok   deployed Worker HostID lookup connects directly to the temporary public worldd gateway' );
 	}
 	const bootstrap = `/ip4/127.0.0.1/tcp/${ownerP2PPort}/p2p/${ownerPeerID}`;
-	const cache = startDaemon( binary, [
+	const cacheArgs = [
 		'--data', cacheData, '--zerotier-data', cacheZeroTierData, '--manifest', manifestPath, '--p2p-port', String( cacheP2PPort ),
 		'--http', `127.0.0.1:${cacheHTTPPort}`, '--public-gateway', workerGateway.url, '--dht-mode', 'server', '--bootstrap', bootstrap,
 		'--cache-from', ownerPeerID, '--cache-sync-interval', '1s',
-	] );
-	await waitForHTTP( `http://127.0.0.1:${cacheHTTPPort}/healthz`, cache );
+	];
+	if ( zeroTierRemoteHost ) cacheArgs.push( '--zerotier-path-diagnostics' );
+	const cache = startDaemon( binary, cacheArgs );
+	await waitForHTTP( `http://127.0.0.1:${cacheHTTPPort}/healthz`, cache, daemonReadinessTimeout );
 	await waitFor( async () => {
 		const pathOnCache = path.join( cacheData, 'assets', assetHex );
 		try {
@@ -146,6 +151,28 @@ try {
 			assert.match( zeroTierNodeID, /^[0-9a-f]{10}$/, 'libzt-enabled worldd advertises a valid HostID' );
 			assert.equal( resolverNode.payload.zeroTierNetworkId, 'e3918db4832a3056', 'libzt-enabled worldd advertises its joined network' );
 		} else assert.equal( resolverNode.payload.zeroTierNetworkId || '', '', 'the plain worldd build advertises no ZeroTier network' );
+		if ( zeroTierRemoteHost ) {
+			assert.match( zeroTierRemoteHost, /^[A-Za-z0-9._@-]+$/, 'remote ZeroTier probe host must be a simple SSH host alias' );
+			const privateGateway = resolverNode.payload.zeroTierGateway || '';
+			assert.ok( validZeroTierGateway( privateGateway ), 'remote ZeroTier probe requires a signed private gateway' );
+			const privateURL = new URL( privateGateway );
+			assert.equal( net.isIP( privateURL.hostname ), 4, 'remote ZeroTier probe currently expects the advertised managed IPv4 route' );
+			const remote = ( command, timeout = 15000 ) => spawnSync( 'ssh', [ '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', zeroTierRemoteHost, command ], { encoding: 'utf8', timeout } );
+			const peerInfo = remote( 'sudo -n /usr/sbin/zerotier-cli info' );
+			assert.equal( peerInfo.status, 0, `could not read ZeroTier identity on ${zeroTierRemoteHost}:\n${peerInfo.stderr}` );
+			const remotePeerID = peerInfo.stdout.match(/^200 info ([0-9a-f]{10}) /)?.[ 1 ];
+			assert.ok( remotePeerID, `could not parse the ZeroTier identity on ${zeroTierRemoteHost}: ${peerInfo.stdout}` );
+			const pathResponse = await fetch( `http://127.0.0.1:${cacheHTTPPort}/debug/zerotier/paths?peerId=${remotePeerID}` );
+			const pathDiagnostics = await pathResponse.text();
+			const manifestURL = new URL( '/api/world/manifest', privateGateway ).href;
+			const remoteProbe = remote( `curl --noproxy '*' --fail --silent --show-error --max-time 8 ${manifestURL}` );
+			const overlayPeers = remoteProbe.status === 0 ? '' : remote( 'sudo -n /usr/sbin/zerotier-cli listpeers' ).stdout;
+			const remoteRoute = remoteProbe.status === 0 ? '' : remote( `ip route get ${privateURL.hostname}` ).stdout;
+			assert.equal( remoteProbe.status, 0, `remote ZeroTier browser gateway request failed from ${zeroTierRemoteHost} at ${privateGateway}:\n${remoteProbe.stdout}\n${remoteProbe.stderr}\npi3 route:\n${remoteRoute}\npi3 ZeroTier peers:\n${overlayPeers}\nworldd libzt path diagnostics for ${remotePeerID} (HTTP ${pathResponse.status}):\n${pathDiagnostics}\nworldd log:\n${cache.output}` );
+			const remoteManifest = JSON.parse( remoteProbe.stdout );
+			assert.equal( remoteManifest.document?.payload?.worldId, worldID, 'remote ZeroTier route returns the signed worldd manifest directly' );
+			console.log( `ok   remote ZeroTier host ${zeroTierRemoteHost} fetched the manifest directly from ${privateGateway}` );
+		}
 		resolverServer = await createResolverServer( resolverNode, worldID, keyPath, certPath );
 		const workerOptions = zeroTierNodeID
 			? {
@@ -156,9 +183,11 @@ try {
 		const result = await runWorkerDiscoveryClient( workerOptions );
 		assert.ok( result.ok, `Worker-discovered WSS connector failed: ${result.error || 'unknown error'}\nworldd cache log:\n${cache.output}` );
 		assert.equal( result.nodeId, cachePeerID, 'resolver lookup connects directly to the advertised worldd peer' );
-		assert.equal( result.gateway, workerGateway.url, 'worldd traffic uses its HTTPS/WSS gateway, not the resolver' );
+		const privateGateway = resolverNode.payload.zeroTierGateway || '';
+		assert.ok( result.gateway === workerGateway.url || privateGateway && result.gateway === privateGateway, 'after Worker HostID lookup, the client connects directly to a signed worldd gateway' );
 		assert.equal( resolverServer.lookups, 1, 'the resolver handles exactly one provider lookup' );
-		assert.ok( workerGateway.upgrades >= 1, 'the client opens a direct WSS session to worldd after provider lookup' );
+		if ( result.gateway === workerGateway.url ) assert.ok( workerGateway.upgrades >= 1, 'the client opens a direct WSS session to worldd after provider lookup' );
+		console.log( `ok   live HostID lookup selected worldd gateway ${result.gateway}` );
 	} finally {
 		await Promise.all( [
 			resolverServer && new Promise( ( resolve, reject ) => resolverServer.server.close( ( error ) => error ? reject( error ) : resolve() ) ),
@@ -304,15 +333,15 @@ function startDaemon( binary, args ) {
 	return child;
 }
 
-async function waitForHTTP( url, child ) {
+async function waitForHTTP( url, child, timeoutMs = 30000 ) {
 	await waitFor( async () => {
 		try { return ( await fetch( url, { signal: AbortSignal.timeout( 1000 ) } ) ).ok; }
 		catch { return false; }
-	}, `${url} readiness`, [ child ] );
+	}, `${url} readiness`, [ child ], timeoutMs );
 }
 
-async function waitFor( condition, label, children = [] ) {
-	const deadline = Date.now() + 30000;
+async function waitFor( condition, label, children = [], timeoutMs = 30000 ) {
+	const deadline = Date.now() + timeoutMs;
 	while ( Date.now() < deadline ) {
 		for ( const child of children ) assert.equal( child.exitCode, null, `worldd exited while waiting for ${label}:\n${child.output}` );
 		if ( await condition() ) return;
