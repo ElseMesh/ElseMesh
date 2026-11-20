@@ -28,18 +28,20 @@ const (
 )
 
 type worldRTCSession struct {
-	id              string
-	worldID         string
-	gatewayPeerID   string
-	presenceSession string
-	peer            *webrtc.PeerConnection
-	requests        chan struct{}
-	requestMu       sync.Mutex
-	requestIDs      map[string]struct{}
-	writeMu         sync.Mutex
-	idleMu          sync.Mutex
-	idleTimer       *time.Timer
-	closeOnce       sync.Once
+	id                   string
+	worldID              string
+	signalSessionID      string
+	gatewayPeerID        string
+	presenceSession      string
+	peer                 *webrtc.PeerConnection
+	requests             chan struct{}
+	requestMu            sync.Mutex
+	requestIDs           map[string]struct{}
+	remoteCandidateCount int
+	writeMu              sync.Mutex
+	idleMu               sync.Mutex
+	idleTimer            *time.Timer
+	closeOnce            sync.Once
 }
 
 func validateSTUNServerURLs(values []string) error {
@@ -259,7 +261,7 @@ func (d *daemon) acceptWebRTCOffer(request gatewayMessage) (peerResponse, error)
 	}
 	id := fmt.Sprintf("%x", idBytes[:])
 	session := &worldRTCSession{
-		id: id, worldID: request.WorldID, gatewayPeerID: request.gatewayPeerID,
+		id: id, worldID: request.WorldID, signalSessionID: request.SignalSessionID, gatewayPeerID: request.gatewayPeerID,
 		presenceSession: request.PresenceSession, requests: make(chan struct{}, maxWebRTCRequests), requestIDs: make(map[string]struct{}),
 	}
 	session.idleTimer = time.AfterFunc(2*time.Minute, func() { d.closeWebRTCSession(session) })
@@ -331,6 +333,39 @@ func (d *daemon) acceptWebRTCOffer(request gatewayMessage) (peerResponse, error)
 		return peerResponse{}, errors.New("WebRTC answer size invalid")
 	}
 	return peerResponse{Type: "webrtc.answer", WorldID: request.WorldID, RequestID: request.RequestID, SDP: local.SDP}, nil
+}
+
+func (d *daemon) addWebRTCRemoteCandidate(request gatewayMessage) error {
+	if request.TargetPeerID != d.host.ID().String() || request.gatewayPeerID != d.host.ID().String() || request.SignalSessionID == "" || request.Candidate == nil {
+		return errors.New("webrtc_signaling_session_invalid")
+	}
+	candidate := *request.Candidate
+	if !strings.HasPrefix(candidate.Candidate, "candidate:") || len(candidate.Candidate) > 8*1024 || candidate.UsernameFragment != nil && len(*candidate.UsernameFragment) > 256 {
+		return errors.New("webrtc_candidate_invalid")
+	}
+	d.webrtcMu.Lock()
+	var session *worldRTCSession
+	for _, active := range d.webrtcSessions {
+		if active.worldID == request.WorldID && active.signalSessionID == request.SignalSessionID && active.presenceSession == request.PresenceSession && active.gatewayPeerID == request.gatewayPeerID {
+			session = active
+			break
+		}
+	}
+	d.webrtcMu.Unlock()
+	if session == nil || session.peer == nil {
+		return errors.New("webrtc_signaling_session_invalid")
+	}
+	session.requestMu.Lock()
+	if session.remoteCandidateCount >= 64 {
+		session.requestMu.Unlock()
+		return errors.New("webrtc_candidate_limit_reached")
+	}
+	session.remoteCandidateCount++
+	session.requestMu.Unlock()
+	if err := session.peer.AddICECandidate(candidate); err != nil {
+		return fmt.Errorf("add WebRTC candidate: %w", err)
+	}
+	return nil
 }
 
 func (d *daemon) handleWebRTCRequest(session *worldRTCSession, channel *webrtc.DataChannel, data []byte) {

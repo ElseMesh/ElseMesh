@@ -28,18 +28,21 @@ deployment.
    and a WebRTC offer. It sends the offer when ICE gathering completes or as
    soon as a server-reflexive/relay candidate is available. This keeps the
    current one-offer/one-answer signaling exchange from stalling when a browser
-   continues gathering after it already has a public candidate. Candidate
-   trickling is not implemented yet; candidates gathered after the offer are not
-   signaled.
+   continues gathering after it already has a public candidate. Later browser
+   candidates are sent as bounded `webrtc.candidate` signaling messages after
+   the answer is applied; candidates already embedded in the offer are not
+   repeated. The rendezvous accepts at most 64 candidates of up to 8 KiB each.
 3. The client sends `webrtc.offer` over its authenticated gateway session. The
    gateway forwards the request to the selected PeerID using the existing
    authenticated libp2p route. A gateway must not answer on behalf of a target
    that it cannot reach or that does not own/host the requested world.
 4. The target daemon validates the world and peer route, creates a bounded
    PeerConnection, applies the offer, waits for ICE gathering, and returns the
-   SDP answer. The gateway carries that answer back to the browser without
-   modifying the SDP. A random server-side session identifier is used only for
-   cleanup; it is not exposed as a bearer credential.
+   SDP answer. It applies later candidates only to the PeerConnection bound to
+   that authenticated rendezvous session. The gateway carries setup messages
+   without modifying the SDP or handling world data. A random server-side
+   session identifier is used only for cleanup; it is not exposed as a bearer
+   credential.
 5. The browser applies the answer and waits for the data channel to open. It
    then sends the existing JSON request shapes (`manifest.get`, `asset.get`,
    `presence.update`, and `presence.leave`) directly over the channel. Replies

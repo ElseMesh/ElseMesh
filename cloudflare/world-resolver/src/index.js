@@ -15,6 +15,8 @@ const ZT_NETWORK_ID = /^[0-9a-f]{16}$/;
 const SIGNAL_PROOF_PROTOCOL = 'elsemesh.signal-proof/1';
 const MAX_SIGNAL_FRAME_BYTES = 128 * 1024;
 const MAX_SIGNAL_SDP_BYTES = 64 * 1024;
+const MAX_SIGNAL_CANDIDATE_BYTES = 8 * 1024;
+const MAX_SIGNAL_CANDIDATES = 64;
 const MAX_SIGNAL_VISITORS = 32;
 
 function jsonResponse( body, status = 200, headers = {} ) {
@@ -361,6 +363,10 @@ export class SignalRoom {
 	}
 
 	#hostMessage( socket, attachment, message ) {
+		if ( message?.type === 'host.response' && message.response?.type === 'webrtc.candidate.applied' ) {
+			if ( message.response.worldId !== attachment.worldId || typeof message.sessionId !== 'string' || ! /^[0-9a-f]{32}$/.test( message.sessionId ) ) return this.#close( socket, 1008, 'invalid candidate acknowledgement' );
+			return;
+		}
 		if ( message?.type !== 'host.response' || typeof message.sessionId !== 'string' || ! /^[0-9a-f]{32}$/.test( message.sessionId ) || ! message.response || typeof message.response !== 'object' ) return this.#close( socket, 1008, 'unsupported host signaling message' );
 		const response = message.response;
 		if ( response.worldId !== attachment.worldId || ! [ 'connected', 'webrtc.answer', 'error' ].includes( response.type ) || response.type === 'webrtc.answer' && ( typeof response.sdp !== 'string' || response.sdp.length > MAX_SIGNAL_SDP_BYTES ) ) return this.#close( socket, 1008, 'invalid host signaling response' );
@@ -376,6 +382,15 @@ export class SignalRoom {
 	}
 
 	#visitorMessage( socket, attachment, message ) {
+		if ( attachment.connected && message?.type === 'webrtc.candidate' && message.signalSessionId === attachment.sessionId && validSignalCandidate( message.candidate ) ) {
+			const count = ( attachment.iceCandidateCount || 0 ) + 1;
+			if ( count > MAX_SIGNAL_CANDIDATES ) return this.#close( socket, 1008, 'too many ICE candidates' );
+			socket.serializeAttachment( { ...attachment, iceCandidateCount: count } );
+			const host = this.#sockets( 'host' ).find( ( candidate ) => candidate.deserializeAttachment()?.nodeId === attachment.nodeId );
+			if ( ! host ) return this.#send( socket, { type: 'error', error: 'world host is offline' } );
+			this.#send( host, { type: 'visitor.request', sessionId: attachment.sessionId, request: { type: 'webrtc.candidate', worldId: attachment.worldId, candidate: message.candidate } } );
+			return;
+		}
 		if ( ! attachment.connected || message?.type !== 'webrtc.offer' || message.signalSessionId !== attachment.sessionId || typeof message.sdp !== 'string' || message.sdp.length === 0 || message.sdp.length > MAX_SIGNAL_SDP_BYTES || typeof message.requestId !== 'string' || message.requestId.length > 128 ) return this.#close( socket, 1008, 'unsupported visitor signaling message' );
 		const host = this.#sockets( 'host' ).find( ( candidate ) => candidate.deserializeAttachment()?.nodeId === attachment.nodeId );
 		if ( ! host ) return this.#send( socket, { type: 'error', error: 'world host is offline' } );
@@ -417,6 +432,15 @@ export class SignalRoom {
 	#close( socket, code, reason ) {
 		try { socket.close( code, reason.slice( 0, 120 ) ); } catch {}
 	}
+}
+
+function validSignalCandidate( candidate ) {
+	return candidate && typeof candidate === 'object' && ! Array.isArray( candidate )
+		&& Object.keys( candidate ).every( ( key ) => [ 'candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment' ].includes( key ) )
+		&& typeof candidate.candidate === 'string' && candidate.candidate.startsWith( 'candidate:' ) && candidate.candidate.length <= MAX_SIGNAL_CANDIDATE_BYTES
+		&& ( candidate.sdpMid === undefined || candidate.sdpMid === null || typeof candidate.sdpMid === 'string' && candidate.sdpMid.length <= 256 )
+		&& ( candidate.sdpMLineIndex === undefined || candidate.sdpMLineIndex === null || Number.isInteger( candidate.sdpMLineIndex ) && candidate.sdpMLineIndex >= 0 && candidate.sdpMLineIndex <= 255 )
+		&& ( candidate.usernameFragment === undefined || candidate.usernameFragment === null || typeof candidate.usernameFragment === 'string' && candidate.usernameFragment.length <= 256 );
 }
 
 function validIceServers( servers ) {

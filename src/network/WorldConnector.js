@@ -800,6 +800,28 @@ export class WorldConnector {
 		const channel = peer.createDataChannel( WORLD_PROTOCOL_NAMESPACE, { ordered: true } );
 		this.rtcPeerConnection = peer;
 		this.rtcChannel = channel;
+		const trickledCandidates = [];
+		const sentCandidates = new Set();
+		let initialOfferCandidates = new Set();
+		let remoteDescriptionReady = false;
+		const sendCandidate = ( candidate ) => {
+			if ( ! this.rendezvous || ! candidate?.candidate || sentCandidates.has( candidate.candidate ) ) return;
+			if ( initialOfferCandidates.has( candidate.candidate ) ) return;
+			if ( candidate.candidate.length > 8 * 1024 || sentCandidates.size >= 64 || socket.readyState !== WebSocket.OPEN ) return;
+			sentCandidates.add( candidate.candidate );
+			try {
+				socket.send( JSON.stringify( { type: 'webrtc.candidate', signalSessionId: this.signalSessionId, candidate: candidate.toJSON?.() || candidate } ) );
+			} catch ( error ) { console.warn( 'Could not trickle a WebRTC ICE candidate', error ); }
+		};
+		peer.addEventListener( 'icecandidate', ( event ) => {
+			if ( ! event.candidate ) return;
+			const candidate = event.candidate.toJSON?.() || event.candidate;
+			if ( candidate.candidate?.length > 8 * 1024 ) return;
+			if ( ! remoteDescriptionReady ) {
+				if ( trickledCandidates.length < 64 ) trickledCandidates.push( candidate );
+			}
+			else sendCandidate( candidate );
+		} );
 		channel.addEventListener( 'message', async ( event ) => {
 			let response;
 			try {
@@ -824,9 +846,13 @@ export class WorldConnector {
 			await peer.setLocalDescription( offer );
 			await waitForICEGathering( peer, signal );
 			invariant( peer.localDescription?.sdp && peer.localDescription.sdp.length <= 64 * 1024, 'WebRTC offer is invalid or too large' );
+			initialOfferCandidates = new Set( [ ...peer.localDescription.sdp.matchAll( /^a=(candidate:[^\r\n]*)/gm ) ].map( ( match ) => match[ 1 ] ) );
 			const response = await this.#requestSocket( socket, { type: 'webrtc.offer', sdp: peer.localDescription.sdp, requestId: `webrtc-${globalThis.crypto?.randomUUID?.() || Date.now()}`, ...( this.rendezvous ? { signalSessionId: this.signalSessionId } : {} ) }, signal );
 			invariant( response.type === 'webrtc.answer' && response.worldId === this.worldId && typeof response.sdp === 'string' && response.sdp.length <= 64 * 1024, 'World gateway returned an invalid WebRTC answer' );
 			await peer.setRemoteDescription( { type: 'answer', sdp: response.sdp } );
+			remoteDescriptionReady = true;
+			for ( const candidate of trickledCandidates ) sendCandidate( candidate );
+			trickledCandidates.length = 0;
 			await waitForDataChannel(channel, signal);
 			return channel;
 		} catch ( error ) {

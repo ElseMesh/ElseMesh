@@ -1591,14 +1591,16 @@ type gatewayMessage struct {
 	DoorOpen        *bool       `json:"open,omitempty"`
 	presenceKey     string
 	gatewayPeerID   string
-	Type            string `json:"type"`
-	WorldID         string `json:"worldId,omitempty"`
-	AssetID         string `json:"assetId,omitempty"`
-	TargetPeerID    string `json:"targetPeerId,omitempty"`
-	RequestID       string `json:"requestId,omitempty"`
-	SDP             string `json:"sdp,omitempty"`
-	Offset          int64  `json:"offset,omitempty"`
-	Length          int64  `json:"length,omitempty"`
+	Type            string                   `json:"type"`
+	WorldID         string                   `json:"worldId,omitempty"`
+	AssetID         string                   `json:"assetId,omitempty"`
+	TargetPeerID    string                   `json:"targetPeerId,omitempty"`
+	RequestID       string                   `json:"requestId,omitempty"`
+	SDP             string                   `json:"sdp,omitempty"`
+	SignalSessionID string                   `json:"signalSessionId,omitempty"`
+	Candidate       *webrtc.ICECandidateInit `json:"candidate,omitempty"`
+	Offset          int64                    `json:"offset,omitempty"`
+	Length          int64                    `json:"length,omitempty"`
 }
 
 type peerResponse struct {
@@ -1829,6 +1831,8 @@ func (d *daemon) localRequest(request gatewayMessage) (peerResponse, error) {
 			return peerResponse{}, errors.New("webrtc_signaling_session_invalid")
 		}
 		return d.acceptWebRTCOffer(request)
+	case "webrtc.candidate":
+		return peerResponse{Type: "webrtc.candidate.applied", WorldID: d.world.WorldID, RequestID: request.RequestID}, d.addWebRTCRemoteCandidate(request)
 	default:
 		return peerResponse{}, errors.New("unsupported_request")
 	}

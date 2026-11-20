@@ -310,8 +310,9 @@ the changing public IP/UDP port is exchanged as an ICE candidate during
 signaling, not stored as a durable route. `worldd --webrtc-nat-1to1-ip` exists
 for a known forwarded UDP port, but that path remains unconfigured and
 untested. A public HTTPS/WSS gateway is also not yet configured. Neither path
-may turn the Worker into a world-data relay. The client currently sends one
-bounded offer/answer; trickled candidates are not implemented.
+may turn the Worker into a world-data relay. Bounded late ICE candidates now
+trickle through the signaling Worker to the authenticated `worldd` session;
+cross-network ICE still fails and remains the open gate.
 
 Signed player-bound admission tickets, social authentication, and owner invite
 management remain separate open requirements below.

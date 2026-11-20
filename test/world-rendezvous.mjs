@@ -60,10 +60,12 @@ const OldWebSocket = globalThis.WebSocket;
 const OldRTCPeerConnection = globalThis.RTCPeerConnection;
 const socketURLs = [];
 const socketFrames = [];
+const candidateFrames = [];
 const offerSDPs = [];
 let connector;
 let rejectPublicGateway = false;
 let gatheringStaysOpenAfterPublicCandidate = false;
+let emitLateCandidate = false;
 
 globalThis.fetch = async ( input ) => {
 	const url = new URL( input );
@@ -95,7 +97,7 @@ globalThis.WebSocket = class extends EventTarget {
 			assert.equal( request.signalSessionId, 'a'.repeat( 32 ) );
 			offerSDPs.push( request.sdp );
 			emit( this, 'message', JSON.stringify( { type: 'webrtc.answer', worldId, requestId: request.requestId, sdp: 'answer' } ) );
-		}
+		} else if ( request.type === 'webrtc.candidate' ) candidateFrames.push( request.candidate );
 		else throw new Error( `world data must not be sent over signaling (${request.type})` );
 	}
 	close() { this.readyState = WebSocket.CLOSED; emit( this, 'close' ); }
@@ -124,7 +126,14 @@ globalThis.RTCPeerConnection = class extends EventTarget {
 			this.dispatchEvent( event );
 		}, 0 );
 	}
-	async setRemoteDescription() { this.channel.readyState = 'open'; queueMicrotask( () => emit( this.channel, 'open' ) ); }
+	async setRemoteDescription() {
+		if ( emitLateCandidate ) {
+			const event = new Event( 'icecandidate' );
+			Object.defineProperty( event, 'candidate', { value: { candidate: 'candidate:2 1 udp 90 198.51.100.8 50001 typ host', sdpMid: '0', sdpMLineIndex: 0, usernameFragment: 'test' } } );
+			this.dispatchEvent( event );
+		}
+		this.channel.readyState = 'open'; queueMicrotask( () => emit( this.channel, 'open' ) );
+	}
 	close() { this.connectionState = 'closed'; }
 };
 
@@ -145,6 +154,15 @@ try {
 	assert.match( offerSDPs[ 0 ], /typ srflx/, 'the one-shot offer includes the gathered server-reflexive candidate' );
 	assert.deepEqual( socketFrames, [ 'connect', 'webrtc.offer' ], 'partial gathering still uses signaling for setup only' );
 	partialGathering.close();
+	emitLateCandidate = true;
+	socketFrames.length = 0;
+	candidateFrames.length = 0;
+	const trickle = new WorldConnector( { zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056', directory: 'https://resolver.example' } );
+	assert.equal( ( await trickle.getManifest() ).worldId, worldId );
+	assert.deepEqual( socketFrames, [ 'connect', 'webrtc.offer', 'webrtc.candidate' ], 'late ICE candidates use a signaling-only frame after the offer/answer exchange' );
+	assert.deepEqual( candidateFrames, [ { candidate: 'candidate:2 1 udp 90 198.51.100.8 50001 typ host', sdpMid: '0', sdpMLineIndex: 0, usernameFragment: 'test' } ] );
+	trickle.close();
+	emitLateCandidate = false;
 	gatheringStaysOpenAfterPublicCandidate = false;
 	node = await signedDocument( 'elsemesh.node/1', { ...node.payload, gateway: 'https://owner.example' }, owner );
 	rejectPublicGateway = true;

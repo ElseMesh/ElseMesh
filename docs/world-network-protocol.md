@@ -187,16 +187,17 @@ When a signed provider record has no public gateway but sets `rendezvous: true`,
 the client uses the Worker's Durable Object room after the private ZeroTier
 attempt. The host maintains an outbound WebSocket to that room and proves
 possession of its libp2p identity with a one-use challenge. The room relays only
-bounded connection and SDP offer/answer messages. The browser and worldd then
-exchange manifests, simulation messages, and assets directly over WebRTC. The
-room is not a world-data gateway or TURN relay. Direct ICE still depends on
-usable STUN candidates and compatible NATs; if it fails, the client reports
-the failure or tries a separately advertised HTTPS/WSS data gateway.
+bounded connection, SDP offer/answer, and ICE-candidate messages. The browser
+and worldd then exchange manifests, simulation messages, and assets directly
+over WebRTC. The room is not a world-data gateway or TURN relay. Direct ICE
+still depends on usable STUN candidates and compatible NATs; if it fails, the
+client reports the failure or tries a separately advertised HTTPS/WSS data
+gateway.
 
 The signed directory record carries stable locators such as the ZeroTier
 managed gateway. It must not treat a public IP and UDP port as a durable host
 address: NAT mappings can change or depend on the remote peer. The browser and
-worldd exchange their current public ICE candidates in the SDP offer/answer
+worldd exchange gathered ICE candidates in SDP and bounded trickle messages
 through the signaling room; world traffic then uses the nominated direct ICE
 path. The Worker returns and forwards connection setup only, not the resulting
 game data.

@@ -38,6 +38,7 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 	connectedResponses := make(chan peerResponse, 1)
 	offerRequests := make(chan gatewayMessage, 1)
 	answerResponses := make(chan peerResponse, 1)
+	candidateResponses := make(chan peerResponse, 1)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/signal/e3918db4832a3056/0123456789/"+worldID {
 			t.Errorf("rendezvous path = %q", r.URL.Path)
@@ -138,6 +139,25 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 			return
 		}
 		answerResponses <- *answer.Response
+		candidate := <-offerRequests
+		if candidate.Type != "webrtc.candidate" || candidate.Candidate == nil {
+			t.Errorf("rendezvous candidate request = %#v", candidate)
+			return
+		}
+		if err := conn.WriteJSON(rendezvousMessage{Type: "visitor.request", SessionID: strings.Repeat("cd", 16), Request: &candidate}); err != nil {
+			t.Errorf("send visitor ICE candidate: %v", err)
+			return
+		}
+		var candidateAck rendezvousMessage
+		if err := conn.ReadJSON(&candidateAck); err != nil {
+			t.Errorf("read host ICE candidate response: %v", err)
+			return
+		}
+		if candidateAck.Type != "host.response" || candidateAck.Response == nil || candidateAck.Response.Type != "webrtc.candidate.applied" || candidateAck.Response.WorldID != worldID {
+			t.Errorf("rendezvous candidate response = %#v", candidateAck)
+			return
+		}
+		candidateResponses <- *candidateAck.Response
 	}))
 	defer server.Close()
 
@@ -201,6 +221,25 @@ func TestRendezvousSessionProvesHostAndServesDirectWebRTCData(t *testing.T) {
 	case <-opened:
 	case <-ctx.Done():
 		t.Fatal("rendezvous WebRTC data channel did not open")
+	}
+	var candidateLine string
+	for _, line := range strings.Split(client.LocalDescription().SDP, "\r\n") {
+		if strings.HasPrefix(line, "a=candidate:") {
+			candidateLine = strings.TrimPrefix(line, "a=")
+			break
+		}
+	}
+	if candidateLine == "" {
+		t.Fatal("visitor SDP has no ICE candidate for trickle forwarding")
+	}
+	offerRequests <- gatewayMessage{Type: "webrtc.candidate", WorldID: worldID, TargetPeerID: host.ID().String(), Candidate: &webrtc.ICECandidateInit{Candidate: candidateLine}}
+	select {
+	case response := <-candidateResponses:
+		if response.Type != "webrtc.candidate.applied" {
+			t.Fatalf("unexpected candidate response: %+v", response)
+		}
+	case <-ctx.Done():
+		t.Fatal("worldd did not apply the trickled visitor candidate")
 	}
 	responses := make(chan peerResponse, 1)
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {

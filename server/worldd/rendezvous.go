@@ -194,6 +194,25 @@ func (d *daemon) handleRendezvousRequest(conn *websocket.Conn, writeMu, sessions
 		}
 		request.TargetPeerID = d.host.ID().String()
 		request.PresenceSession = presenceSession
+		request.SignalSessionID = frame.SessionID
+		request.gatewayPeerID = d.host.ID().String()
+		var err error
+		response, err = d.localRequest(request)
+		if err != nil {
+			response = peerResponse{Type: "error", WorldID: d.world.WorldID, RequestID: request.RequestID, Error: err.Error()}
+		}
+	case "webrtc.candidate":
+		sessionsMu.Lock()
+		presenceSession := sessions[frame.SessionID]
+		sessionsMu.Unlock()
+		if request.WorldID != d.world.WorldID || request.TargetPeerID != "" && request.TargetPeerID != d.host.ID().String() || presenceSession == "" {
+			response.Type = "error"
+			response.Error = "webrtc_signaling_session_invalid"
+			break
+		}
+		request.TargetPeerID = d.host.ID().String()
+		request.PresenceSession = presenceSession
+		request.SignalSessionID = frame.SessionID
 		request.gatewayPeerID = d.host.ID().String()
 		var err error
 		response, err = d.localRequest(request)

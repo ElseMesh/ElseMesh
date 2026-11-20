@@ -69,6 +69,10 @@ completed milestones are summarized in [GOAL-done.md](GOAL-done.md).
   admitted presence directly over WebRTC, then reached 100% Ready. The Worker
   carried lookup/signaling only. This same-host WebGL-fallback check does not
   prove independent-NAT connectivity or production-world rendering.
+- Added bounded late-candidate trickling to the browser, Worker signaling room,
+  and `worldd` session handler. Focused browser and Worker tests pass; the Worker
+  remains control-plane only. This improves ICE candidate exchange but does not
+  yet resolve the recorded pi3 independent-network failure.
 - Invite routing is 75% (3 of 4 gates). The open gate is successful data and
   admission from an independent network without ZeroTier; the pi3 ICE failure
   above remains unresolved.
