@@ -4,7 +4,7 @@ import { commonModule } from '../engine/render/wgsl/common.js';
 import { surfaceModule } from '../engine/render/wgsl/lighting.js';
 import { G } from '../engine/render/Frame.js';
 import { SceneLighting } from './SceneLighting.js';
-import { worldLocalLightSources } from '../network/WorldLocalLightSet.js';
+import { transformWorldLocalLightInto, worldLocalLightSources } from '../network/WorldLocalLightSet.js';
 
 // Local lights (lanterns, lamp posts, path lights, lit windows, the boat's cabin and navigation
 // lights, the handheld flashlight) without a light object per lamp: unrolling every light into every
@@ -127,6 +127,7 @@ export class LocalLights {
 		this.worldPackage = null;
 		this.worldSourceCache = new Map();
 		this.worldSources = [];
+		this.worldObjectRoots = new Map();
 		this.enabled = true;
 		this.strength = 1; // UI multiplier for the lamps (not the flashlight)
 		this.flashlight = {
@@ -152,23 +153,35 @@ export class LocalLights {
 	setWorldPackage( worldPackage ) {
 		this.worldPackage = worldPackage || null;
 		this.worldSourceCache.clear();
+		this.worldObjectRoots.clear();
 		this.setWorldComponents( worldPackage?.connector?.manifest?.components || [] );
 	}
 
 	setWorldComponents( components ) {
 		this.worldSources = worldLocalLightSources( components ).map( ( light, index ) => ( {
 			position: new THREE.Vector3( ...light.position ),
+			objectId: light.objectId || null,
+			localPosition: light.objectId ? [ ...light.position ] : null,
 			color: new THREE.Color( ...light.color ),
 			intensity: light.intensity,
 			range: light.range,
 			kind: `world-${light.type}`,
 			dir: light.direction ? new THREE.Vector3( ...light.direction ) : null,
+			localDirection: light.objectId && light.direction ? [ ...light.direction ] : null,
+			worldPosition: [ 0, 0, 0 ],
+			worldDirection: light.objectId && light.direction ? [ 0, 0, 0 ] : null,
 			cosInner: light.innerCone === undefined ? undefined : Math.cos( light.innerCone ),
 			cosOuter: light.outerCone === undefined ? undefined : Math.cos( light.outerCone ),
 			flicker: light.flicker || 0,
 			alwaysOn: light.alwaysOn === true,
 			phase: index * 17.13,
 		} ) );
+	}
+
+	setWorldObjectRoot( objectId, root ) {
+		if ( typeof objectId !== 'string' ) return;
+		if ( root ) this.worldObjectRoots.set( objectId, root );
+		else this.worldObjectRoots.delete( objectId );
 	}
 
 	toggleFlashlight( on = ! this.flashlight.on ) {
@@ -257,6 +270,14 @@ export class LocalLights {
 			}
 			for ( const s of this.worldSources ) {
 
+				if ( s.objectId ) {
+					const root = this.worldObjectRoots.get( s.objectId );
+					if ( ! root ) continue;
+					root.updateWorldMatrix( true, false );
+					transformWorldLocalLightInto( { position: s.localPosition, direction: s.localDirection }, root.matrixWorld.elements, s.worldPosition, s.worldDirection );
+					s.position.fromArray( s.worldPosition );
+					if ( s.dir ) s.dir.fromArray( s.worldDirection );
+				}
 				if ( on <= 0.002 && ! s.alwaysOn ) continue;
 				s.d2 = s.position.distanceToSquared( cp );
 				list.push( s );
@@ -299,45 +320,5 @@ export class LocalLights {
 		this.active = n;
 
 	}
-
-}
-
-// Boat lights in the hull frame: warm cabin dome, instrument glow, navigation lights (red port,
-// green starboard, white masthead and stern). Positions follow the boat's world matrix.
-export function addBoatLights( lights, boat ) {
-
-	const L = boat.lines;
-	const obj = boat.group;
-	const sternY = L.sheerY( 0 ) + 0.1;
-	const defs = [
-		{ p: [ 0, 2.24, 0.42 ], color: [ 1.0, 0.84, 0.62 ], intensity: 0.9, range: 5.5, kind: 'boatDome' },
-		{ p: [ - 0.45, 1.5, 1.12 ], color: [ 0.45, 0.75, 1.0 ], intensity: 0.12, range: 2.2, kind: 'boatInstruments' },
-		{ p: [ 0.47, 3.45, - 0.47 ], color: [ 1.0, 0.06, 0.03 ], intensity: 1.4, range: 8, kind: 'boatNav', side: [ 1, 0, 0 ] },
-		{ p: [ - 0.47, 3.45, - 0.47 ], color: [ 0.05, 1.0, 0.3 ], intensity: 1.4, range: 8, kind: 'boatNav', side: [ - 1, 0, 0 ] },
-		{ p: [ 0, 3.97, - 0.5 ], color: [ 1.0, 0.95, 0.85 ], intensity: 1.2, range: 8, kind: 'boatNav' },
-		{ p: [ 0, sternY, L.zAft - 0.05 ], color: [ 1.0, 0.95, 0.85 ], intensity: 0.8, range: 7, kind: 'boatNav' },
-	];
-	const out = [];
-	for ( const d of defs ) {
-
-		const local = new THREE.Vector3( ...d.p );
-		const localDir = d.side ? new THREE.Vector3( ...d.side ) : null;
-		const src = {
-			position: new THREE.Vector3(), color: new THREE.Color( ...d.color ), intensity: d.intensity, range: d.range, kind: d.kind,
-			dir: localDir ? new THREE.Vector3() : null, cosInner: localDir ? 0.25 : undefined, cosOuter: localDir ? - 0.2 : undefined,
-			update() {
-
-				obj.updateWorldMatrix( true, false );
-				this.position.copy( local ).applyMatrix4( obj.matrixWorld );
-				if ( localDir ) this.dir.copy( localDir ).transformDirection( obj.matrixWorld );
-
-			},
-		};
-		src.update();
-		out.push( lights.add( src ) );
-
-	}
-
-	return out;
 
 }

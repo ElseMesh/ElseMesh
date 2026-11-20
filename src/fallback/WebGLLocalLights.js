@@ -1,4 +1,4 @@
-import { worldLocalLightSources } from '../network/WorldLocalLightSet.js';
+import { transformWorldLocalLightInto, worldLocalLightSources } from '../network/WorldLocalLightSet.js';
 
 const MAX_LIGHTS = 8;
 
@@ -12,7 +12,18 @@ export class WebGLLocalLights {
 	constructor( THREE, scene, components ) {
 		this.THREE = THREE;
 		this.scene = scene;
-		this.sources = worldLocalLightSources( components ).map( ( light, index ) => ( { ...light, phase: index * 17.13, d2: Infinity } ) );
+		this.sources = worldLocalLightSources( components ).map( ( light, index ) => ( {
+			...light,
+			position: [ ...light.position ],
+			direction: light.direction ? [ ...light.direction ] : undefined,
+			localPosition: light.objectId ? [ ...light.position ] : null,
+			localDirection: light.objectId && light.direction ? [ ...light.direction ] : null,
+			worldPosition: [ 0, 0, 0 ],
+			worldDirection: light.objectId && light.direction ? [ 0, 0, 0 ] : null,
+			phase: index * 17.13,
+			d2: Infinity,
+		} ) );
+		this.objectRoots = new Map();
 		this.group = new THREE.Group();
 		this.group.name = 'World local lights';
 		this.pool = { point: [], spot: [] };
@@ -39,6 +50,12 @@ export class WebGLLocalLights {
 		scene.add( this.group );
 		this.time = 0;
 		this.active = 0;
+	}
+
+	setWorldObjectRoot( objectId, root ) {
+		if ( typeof objectId !== 'string' ) return;
+		if ( root ) this.objectRoots.set( objectId, root );
+		else this.objectRoots.delete( objectId );
 	}
 
 	toggleFlashlight( on = ! this.flashlightOn ) {
@@ -70,7 +87,16 @@ export class WebGLLocalLights {
 			this.flashlight.intensity = 55 * ( 0.08 + 0.92 * smooth( night, 0, 0.6 ) ) * strength;
 		}
 		this.flashlight.visible = hasFlashlight;
-		const candidates = this.sources.map( source => {
+		const candidates = this.sources.filter( source => {
+			if ( ! source.objectId ) return true;
+			const root = this.objectRoots.get( source.objectId );
+			if ( ! root ) return false;
+			root.updateWorldMatrix( true, false );
+			transformWorldLocalLightInto( { position: source.localPosition, direction: source.localDirection }, root.matrixWorld.elements, source.worldPosition, source.worldDirection );
+			source.position = source.worldPosition;
+			if ( source.direction ) source.direction = source.worldDirection;
+			return true;
+		} ).map( source => {
 			const dx = source.position[ 0 ] - position.x, dy = source.position[ 1 ] - position.y, dz = source.position[ 2 ] - position.z;
 			source.d2 = dx * dx + dy * dy + dz * dz;
 			return source;
@@ -100,6 +126,7 @@ export class WebGLLocalLights {
 
 	dispose() {
 		this.scene.remove( this.group );
+		this.objectRoots.clear();
 		for ( const pool of Object.values( this.pool ) ) for ( const light of pool ) light.dispose?.();
 	}
 

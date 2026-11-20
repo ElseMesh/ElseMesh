@@ -16,6 +16,15 @@ export function worldComponentDescriptor( type ) {
 	return components.get( type ) || null;
 }
 
+export function worldVehicleObjectId( worldComponents ) {
+	for ( const component of worldComponents || [] ) {
+		if ( ! worldComponentDescriptor( component.type )?.vehicle ) continue;
+		const objectId = component.data?.objectId || component.objectId;
+		if ( typeof objectId === 'string' ) return objectId;
+	}
+	return null;
+}
+
 // Large static model sets declare every possible LOD, but only their compact
 // descriptor is a startup dependency. Backend adapters fetch coarse and finer
 // GLBs on demand after decoding the descriptor.

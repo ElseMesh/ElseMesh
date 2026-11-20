@@ -45,7 +45,7 @@ import { WebGLPostFX } from './WebGLPostFX.js';
 import { WebGLRefractionPass } from './WebGLRefractionPass.js';
 import { WebGLRemoteAvatar } from './WebGLRemoteAvatar.js';
 import { hostedCollisionBoxes, initialHostedWebGLSupport, resolveHostedWebGLVehicleSpec, unsupportedHostedWebGLComponents } from './WebGLComponentSupport.js';
-import { worldComponentAssetIDs } from '../network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldVehicleObjectId } from '../network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter, worldComponentBackendBatchAdapter } from '../network/WorldComponentBackendRegistry.js';
 import { SHORE_BEACH_SLOPE, SHORE_SWASH_UP, SHORE_SWASH_DOWN, SHORE_SWASH_OVERSHOOT, SHORE_DEFAULT_PERIOD, SHORE_DEFAULT_AMPLITUDE, SHORE_DEFAULT_VARIATION, SHORE_DEFAULT_RUNUP } from '../ocean/ShoreSwash.js';
 import { mulberry32 } from '../util/Noise.js';
@@ -869,6 +869,8 @@ export class WebGLFallback {
 			const worldLayout = this.worldLayout;
 			this.boat = new WebGLBoatAdapter( T, this.scene, { query: this.waterQuery, terrain: this.terrain, colliders: this.app.worldState.colliders, initialPosition: new EngineVector3( ...worldLayout.boatDock.position ), initialHeading: worldLayout.boatDock.heading } );
 			this.boat.controller.model = this.boat.model;
+			const vehicleObjectId = worldVehicleObjectId( this.defaultWorldSource?.components );
+			if ( vehicleObjectId ) this.webglLocalLights.setWorldObjectRoot( vehicleObjectId, this.boat.model.group );
 			this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 			this._createWebGLWake();
 			replaceWorldSourceCollisions( this.defaultWorldPackage.source, this.app.worldState.colliders );
@@ -913,6 +915,8 @@ export class WebGLFallback {
 					initialPosition: new EngineVector3( ...berth.transform.position ), initialHeading: berth.transform.yaw || 0,
 				} );
 				this.boat.controller.model = this.boat.model;
+				const vehicleObjectId = worldVehicleObjectId( this.connector?.manifest?.components );
+				if ( vehicleObjectId ) this.webglLocalLights.setWorldObjectRoot( vehicleObjectId, this.boat.model.group );
 				this.boatSpray = new BoatSpray( { boat: this.boat.controller, spray: this.spray } );
 				this._createWebGLWake();
 				this.player.boat = this.boat.controller;

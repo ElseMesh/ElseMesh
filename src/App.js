@@ -37,7 +37,7 @@ import { Caustics } from './ocean/Caustics.js';
 import { installUnderwaterLighting } from './ocean/UnderwaterLighting.js';
 import { RefractionPass } from './ocean/RefractionPass.js';
 import { installGroundBounce } from './materials/GroundBounce.js';
-import { LocalLights, addBoatLights } from './materials/LocalLights.js';
+import { LocalLights } from './materials/LocalLights.js';
 import { WaterQuery } from './ocean/WaterQuery.js';
 import { Breakers } from './ocean/Breakers.js';
 import { SurfFoam } from './ocean/SurfFoam.js';
@@ -58,7 +58,7 @@ import { loadMovementSupportKernel } from './world/MovementSupportKernel.js';
 import { BoatController } from './player/BoatController.js';
 import { BoatSpray } from './player/BoatSpray.js';
 import { WakeSim } from './ocean/WakeSim.js';
-import { worldComponentAssetIDs, worldComponentDescriptor } from './network/WorldComponentRegistry.js';
+import { worldComponentAssetIDs, worldComponentDescriptor, worldVehicleObjectId } from './network/WorldComponentRegistry.js';
 import { worldComponentBackendAdapter } from './network/WorldComponentBackendRegistry.js';
 import { worldWaterSurfaceFor } from './network/WorldWaterSurface.js';
 import { SoundScape } from './audio/SoundScape.js';
@@ -542,8 +542,10 @@ export class App {
 		// lanterns, lamp posts, path lights, lit windows, the boat's cabin / navigation lights and the
 		// flashlight (L): nearest few packed into one small uniform array each frame
 		this.localLights = new LocalLights();
-		this.localLights.setWorldComponents( this.worldPackage?.source?.components || [] );
-		addBoatLights( this.localLights, this.boat );
+		const worldComponents = this.worldPackage?.source?.components || [];
+		this.localLights.setWorldComponents( worldComponents );
+		const vehicleObjectId = worldVehicleObjectId( worldComponents );
+		if ( vehicleObjectId ) this.localLights.setWorldObjectRoot( vehicleObjectId, this.boat.group );
 		// rough, large or heavily overdrawn surfaces (ground, rocks, debris, foliage) take the local
 		// lights as Lambert only; the village, pier and boat get the full BRDF (glints on wet wood, metal)
 		for ( const root of [ this.terrain.mesh, this.rocks.group, this.debris && this.debris.group, this.vegetation && this.vegetation.group ] ) if ( root ) root.traverse( ( o ) => {
@@ -1627,6 +1629,8 @@ export class App {
 		const runtime = components.find( ( component ) => component.hostedBoat );
 		this.activeHostedOcean = components.some( ( component ) => component.isWorldOcean );
 		this.activeHostedBoat = runtime || null;
+		const hostedVehicleObjectId = worldVehicleObjectId( connector.manifest.components );
+		if ( hostedVehicleObjectId && runtime?.boat?.model?.group ) this.localLights.setWorldObjectRoot( hostedVehicleObjectId, runtime.boat.model.group );
 		if ( this.activeHostedOcean && ! this.spray ) {
 			this.spray = new Spray( this.renderer, {
 				query: this.hostedQuery, terrain: terrain?.terrainGPU,
@@ -1750,6 +1754,12 @@ export class App {
 
 		this.worldExtensionGeneration ++;
 		this.localLights?.setWorldPackage( null );
+		if ( this.localLights && this.worldPackage?.source?.components ) {
+			const components = this.worldPackage.source.components;
+			this.localLights.setWorldComponents( components );
+			const objectId = worldVehicleObjectId( components );
+			if ( objectId && this.boat?.group ) this.localLights.setWorldObjectRoot( objectId, this.boat.group );
+		}
 		if ( this.ocean ) this.ocean.visible = true;
 		this.worldPresence?.dispose();
 		this.worldPresence = null;

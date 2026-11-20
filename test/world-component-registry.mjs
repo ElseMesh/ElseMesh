@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import { registerWorldComponent, registeredWorldComponents, worldComponentAssetIDs, worldComponentDescriptor } from '../src/network/WorldComponentRegistry.js';
+import { registerWorldComponent, registeredWorldComponents, worldComponentAssetIDs, worldComponentDescriptor, worldVehicleObjectId } from '../src/network/WorldComponentRegistry.js';
 import { decodeWorldComponentAsset, registerWorldComponentAssetDecoder } from '../src/network/WorldComponentAssetCodecRegistry.js';
 import { validateWorldRequirements } from '../src/network/WorldRules.js';
 import { worldMaterialProfile } from '../src/network/WorldMaterialProfileRegistry.js';
 await import( '../worlds/tidewater/register-components.js' );
+
+assert.equal( worldVehicleObjectId( [ { type: 'elsemesh.downeast-boat/1', data: { objectId: 'elsemesh-object:boat' } } ] ), 'elsemesh-object:boat', 'the generic vehicle resolver finds an object ID in world-source data' );
+assert.equal( worldVehicleObjectId( [ { type: 'elsemesh.downeast-boat/1', objectId: 'elsemesh-object:hosted-boat' } ] ), 'elsemesh-object:hosted-boat', 'the generic vehicle resolver finds an object ID in a signed manifest component' );
 
 assert.equal( worldComponentDescriptor( 'elsemesh.water-body/1' ).waterSurface, true );
 assert.equal( worldComponentDescriptor( 'elsemesh.ambient-audio/1' ).waterSurface, false );
