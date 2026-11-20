@@ -32,6 +32,15 @@ function dataPNG( width, height, byte ) {
 	for ( let y = 0; y < height; y ++ ) rows.fill( byte, y * ( width * 4 + 1 ) + 1, ( y + 1 ) * ( width * 4 + 1 ) );
 	return Buffer.concat( [ Buffer.from( [ 137, 80, 78, 71, 13, 10, 26, 10 ] ), chunk( 'IHDR', header ), chunk( 'IDAT', deflateSync( rows, { level: 1 } ) ), chunk( 'IEND', Buffer.alloc( 0 ) ) ] );
 }
+function pixelPNG( width, height, pixels ) {
+	const header = Buffer.alloc( 13 );
+	header.writeUInt32BE( width, 0 ); header.writeUInt32BE( height, 4 );
+	header[ 8 ] = 8; header[ 9 ] = 6;
+	const rows = Buffer.alloc( height * ( width * 4 + 1 ) );
+	const pixelBytes = Buffer.from( pixels );
+	for ( let y = 0; y < height; y ++ ) pixelBytes.copy( rows, y * ( width * 4 + 1 ) + 1, y * width * 4, ( y + 1 ) * width * 4 );
+	return Buffer.concat( [ Buffer.from( [ 137, 80, 78, 71, 13, 10, 26, 10 ] ), chunk( 'IHDR', header ), chunk( 'IDAT', deflateSync( rows, { level: 1 } ) ), chunk( 'IEND', Buffer.alloc( 0 ) ) ] );
+}
 
 const treeGLB = Buffer.from( 'tree model bytes' ), shrubGLB = Buffer.from( 'shrub model bytes' );
 const treeGLBID = sha( treeGLB ), shrubGLBID = sha( shrubGLB );
@@ -147,20 +156,10 @@ try {
 	else globalThis.createImageBitmap = previousCreateImageBitmap;
 }
 
-const previousAssetImage = globalThis.__assetImage;
-const rawLeafPixels = new Uint8Array( 1024 * 1024 * 4 ).fill( 192 );
-globalThis.__assetImage = ( bytes, mimeType ) => {
-	assert.equal( bytes, assets.leafMask.bytes, 'raw mask decoding uses the signed asset bytes' );
-	assert.equal( mimeType, 'image/png' );
-	return { data: rawLeafPixels, width: 1024, height: 1024 };
-};
-try {
-	const decodedLeafMask = await decodeOctahedralCanopyLeafMask( assets.leafMask );
-	assert.equal( decodedLeafMask.data, rawLeafPixels, 'both backend textures receive the same decoded linear RGBA8 pixels' );
-	assert.deepEqual( [ decodedLeafMask.width, decodedLeafMask.height, decodedLeafMask.format, decodedLeafMask.sampler ], [ 1024, 1024, 'rgba8unorm', 'linearClamp' ] );
-} finally {
-	if ( previousAssetImage === undefined ) delete globalThis.__assetImage;
-	else globalThis.__assetImage = previousAssetImage;
-}
+const expectedMaskPixels = [ 0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255 ];
+const rawMaskFixture = pixelPNG( 2, 2, expectedMaskPixels );
+const decodedLeafMask = await decodeOctahedralCanopyLeafMask( { bytes: rawMaskFixture, width: 2, height: 2 } );
+assert.deepEqual( Array.from( decodedLeafMask.data ), expectedMaskPixels, 'raw-data PNG decoding preserves every authored RGBA8 channel byte' );
+assert.deepEqual( [ decodedLeafMask.width, decodedLeafMask.height, decodedLeafMask.format, decodedLeafMask.sampler ], [ 2, 2, 'rgba8unorm', 'linearClamp' ] );
 
 console.log( 'signed canopy descriptor, instance set, raw PNG atlases, and lazy model loading pass' );

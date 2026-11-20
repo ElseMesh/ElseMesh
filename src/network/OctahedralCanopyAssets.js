@@ -4,7 +4,6 @@ import {
 	OCTAHEDRAL_CANOPY_DESCRIPTOR_ASSET_KIND,
 	decodeOctahedralCanopyDescriptor,
 } from './OctahedralCanopyDescriptor.js';
-import { decodeImage } from '../engine/loaders/GLTF.js';
 
 const PNG_SIGNATURE = [ 137, 80, 78, 71, 13, 10, 26, 10 ];
 const COLOR_PROFILE_CHUNKS = new Set( [ 'cHRM', 'gAMA', 'iCCP', 'sRGB' ] );
@@ -116,10 +115,69 @@ export async function decodeOctahedralCanopyAtlas( bytes ) {
 	return image;
 }
 
+function paethPredictor( left, up, upperLeft ) {
+	const prediction = left + up - upperLeft;
+	const leftDistance = Math.abs( prediction - left );
+	const upDistance = Math.abs( prediction - up );
+	const upperLeftDistance = Math.abs( prediction - upperLeft );
+	if ( leftDistance <= upDistance && leftDistance <= upperLeftDistance ) return left;
+	return upDistance <= upperLeftDistance ? up : upperLeft;
+}
+
+async function decodeRawRGBA8PNG( bytes, width, height ) {
+	if ( typeof DecompressionStream !== 'function' || typeof Blob !== 'function' || typeof Response !== 'function' ) throw new Error( 'Raw PNG canopy decoding requires browser decompression streams' );
+	const view = new DataView( bytes.buffer, bytes.byteOffset, bytes.byteLength );
+	const compressedChunks = [];
+	let compressedLength = 0;
+	for ( let offset = 8; offset + 12 <= bytes.length; ) {
+		const length = view.getUint32( offset );
+		const type = String.fromCharCode( ...bytes.subarray( offset + 4, offset + 8 ) );
+		const start = offset + 8, end = start + length;
+		if ( type === 'IDAT' ) {
+			compressedChunks.push( bytes.subarray( start, end ) );
+			compressedLength += length;
+		}
+		if ( type === 'IEND' ) break;
+		offset = end + 4;
+	}
+	const compressed = new Uint8Array( compressedLength );
+	let compressedOffset = 0;
+	for ( const chunk of compressedChunks ) {
+		compressed.set( chunk, compressedOffset );
+		compressedOffset += chunk.length;
+	}
+	const rowBytes = width * 4;
+	const filteredLength = ( rowBytes + 1 ) * height;
+	if ( ! Number.isSafeInteger( filteredLength ) || filteredLength > 0x7fffffff ) fail( 'leaf-mask PNG dimensions exceed the decoder limit' );
+	const filtered = new Uint8Array( await new Response( new Blob( [ compressed ] ).stream().pipeThrough( new DecompressionStream( 'deflate' ) ) ).arrayBuffer() );
+	if ( filtered.length !== filteredLength ) fail( 'decompressed leaf-mask PNG data has an invalid length' );
+	const pixels = new Uint8Array( rowBytes * height );
+	for ( let y = 0; y < height; y ++ ) {
+		const sourceRow = y * ( rowBytes + 1 );
+		const filter = filtered[ sourceRow ];
+		if ( filter > 4 ) fail( `leaf-mask PNG uses unsupported row filter ${filter}` );
+		const targetRow = y * rowBytes;
+		for ( let x = 0; x < rowBytes; x ++ ) {
+			const left = x >= 4 ? pixels[ targetRow + x - 4 ] : 0;
+			const up = y > 0 ? pixels[ targetRow + x - rowBytes ] : 0;
+			const upperLeft = y > 0 && x >= 4 ? pixels[ targetRow + x - rowBytes - 4 ] : 0;
+			let predictor = 0;
+			if ( filter === 1 ) predictor = left;
+			else if ( filter === 2 ) predictor = up;
+			else if ( filter === 3 ) predictor = Math.floor( ( left + up ) / 2 );
+			else if ( filter === 4 ) predictor = paethPredictor( left, up, upperLeft );
+			pixels[ targetRow + x ] = ( filtered[ sourceRow + 1 + x ] + predictor ) & 255;
+		}
+	}
+	return pixels;
+}
+
 /** Decode the signed RGBA8 mask as shared byte data for both renderer adapters. */
 export async function decodeOctahedralCanopyLeafMask( leafMask ) {
 	if ( ! leafMask || ! ( leafMask.bytes instanceof Uint8Array ) || ! Number.isInteger( leafMask.width ) || ! Number.isInteger( leafMask.height ) ) fail( 'a validated leaf-mask PNG is required' );
-	const decoded = await decodeImage( leafMask.bytes, 'image/png', { forceRGBA: true } );
-	if ( decoded.width !== leafMask.width || decoded.height !== leafMask.height || !( decoded.data instanceof Uint8Array ) || decoded.data.byteLength !== decoded.width * decoded.height * 4 ) fail( 'decoded leaf-mask pixels do not match its signed RGBA8 dimensions' );
-	return { data: decoded.data, width: decoded.width, height: decoded.height, format: 'rgba8unorm', sampler: 'linearClamp' };
+	const dimensions = inspectDataPNG( leafMask.bytes );
+	if ( dimensions.width !== leafMask.width || dimensions.height !== leafMask.height ) fail( 'leaf-mask dimensions do not match its validated PNG header' );
+	const data = await decodeRawRGBA8PNG( leafMask.bytes, leafMask.width, leafMask.height );
+	if ( data.byteLength !== leafMask.width * leafMask.height * 4 ) fail( 'decoded leaf-mask pixels do not match its signed RGBA8 dimensions' );
+	return { data, width: leafMask.width, height: leafMask.height, format: 'rgba8unorm', sampler: 'linearClamp' };
 }
