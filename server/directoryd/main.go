@@ -29,7 +29,7 @@ import (
 
 const (
 	nodeProtocol      = "elsemesh.node/1"
-	manifestProtocol  = "elsemesh.world/3"
+	manifestProtocol  = "elsemesh.world/1"
 	authorityProtocol = "elsemesh.authority/2"
 	maxRecordBytes    = 1 << 20
 	maxDirectorySize  = 1024

@@ -93,7 +93,7 @@ async function main() {
 		if ( packageBytes > source.rules.maxPackageBytes ) throw new Error( `World package uses ${packageBytes} bytes, over its declared ${source.rules.maxPackageBytes}-byte budget` );
 	}
 	const manifest = {
-		protocol: 'elsemesh.world/3',
+		protocol: 'elsemesh.world/1',
 		worldId: source.worldId,
 		sourceHash: `sha256:${createHash( 'sha256' ).update( sourceBytes ).digest( 'hex' )}`,
 		ownerPeerId: args.owner,

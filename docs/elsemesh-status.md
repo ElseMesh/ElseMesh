@@ -29,7 +29,7 @@ atomically by owner presence; the daemon enforces the visitor cap and chooses
 the first unoccupied candidate. Entry fails closed if the bounded area is full
 or owner admission fails. Portal handoffs keep their mapped arrival pose and
 still require destination visitor capacity. The source and runtime document
-protocols are now `elsemesh.world-source/3` and `elsemesh.world/3`; these
+protocols are now `elsemesh.world-source/1` and `elsemesh.world/1`; these
 versions describe structure, not authored world-content revisions.
 
 Focused spawn, presence-session, source-manifest, portal, proposal, and

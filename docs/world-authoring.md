@@ -4,7 +4,7 @@ For doorway placement, independent front/back routes and friend-to-friend connec
 
 ## Product direction
 
-ThruHolds use the versioned `elsemesh.world-source/3` structure and formatting contract. That version identifies how the engine reads world source; it does not version a world's authored content. Terrain, vegetation placements, objects, assets, and world-specific settings live in each world-content repository, imported at `worlds/<world>`. These repositories contain world data and assets, not standalone applications. After Tidewater package import and authoritative multiplayer behavior pass acceptance, ElseMesh will provide the graphical world editor for Tidewater content. Blender interchange and the separate AI editor service remain supported authoring paths.
+ThruHolds use the versioned `elsemesh.world-source/1` structure and formatting contract. That version identifies how the engine reads world source; it does not version a world's authored content. Terrain, vegetation placements, objects, assets, and world-specific settings live in each world-content repository, imported at `worlds/<world>`. These repositories contain world data and assets, not standalone applications. After Tidewater package import and authoritative multiplayer behavior pass acceptance, ElseMesh will provide the graphical world editor for Tidewater content. Blender interchange and the separate AI editor service remain supported authoring paths.
 
 For open portal views, an object may declare `replacesObjectId` pointing to a non-colliding `portal-preview` object. The preview can render while visible-tier assets stream; the runtime hides it once the higher-detail object arrives, regardless of arrival order. Preview objects are visual only and must not carry gameplay collision.
 
@@ -16,7 +16,7 @@ The game runtime should select a world provider by world ID. The procedural isla
 
 World content has three related forms, with distinct jobs:
 
-1. **Editable source in Git:** world layout, object and interaction descriptions, source assets, Blender `.blend` files, and `elsemesh.world-source/3` documents live in the relevant world-content repository. This is the human-readable, reviewable source of truth.
+1. **Editable source in Git:** world layout, object and interaction descriptions, source assets, Blender `.blend` files, and `elsemesh.world-source/1` documents live in the relevant world-content repository. This is the human-readable, reviewable source of truth.
 2. **Built runtime package in Git:** deterministic export output, including runtime source and content-addressed assets, is committed beside the authored source so a node can seed its content store without rebuilding the world.
 3. **Served content in a node store:** the same immutable package assets copied or imported into `worldd` storage and referenced by an owner-signed runtime manifest. Nodes serve those bytes to clients and permitted neighbor caches. The repository is not itself the live content server.
 

@@ -135,7 +135,7 @@ try {
 	const unsignedPath = join( temporaryRoot, 'world-unsigned.json' );
 	const signedPath = join( temporaryRoot, 'world-signed.json' );
 	writeFileSync( unsignedPath, JSON.stringify( {
-		protocol: 'elsemesh.world/3', worldId, ownerPeerId, authorityPeerId: ownerPeerId, authorityEpoch: 1,
+		protocol: 'elsemesh.world/1', worldId, ownerPeerId, authorityPeerId: ownerPeerId, authorityEpoch: 1,
 		version: 1, discoverable: false, title: 'Live JavaScript Worker fixture',
 		rules: { gravity: 1, maxVisitors: 2, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 		assets: [ { id: assetId, bytes: Buffer.byteLength( moduleSource ), kind: 'javascript/1', priority: 'visible' } ],

@@ -360,7 +360,7 @@ export class LocalRegionConnector {
 		const spawn = selection.previewSpawn;
 		this.manifest = {
 			...( ownerManifest || {} ),
-			protocol: ownerManifest?.protocol || 'elsemesh.world/3', worldId: this.worldId, title: ownerManifest?.title || ( descriptor.title ? `${descriptor.title} · ${region.label}` : region.label ),
+			protocol: ownerManifest?.protocol || 'elsemesh.world/1', worldId: this.worldId, title: ownerManifest?.title || ( descriptor.title ? `${descriptor.title} · ${region.label}` : region.label ),
 			experience, ownerPeerId: ownerManifest?.ownerPeerId || '', authorityEpoch: ownerManifest?.authorityEpoch || 1,
 			assets: [], objects: [], components: [], portals: ownerManifest?.portals || [],
 			// Shared ElseMesh movement defaults are provisional and are not game-derived or parity evidence.

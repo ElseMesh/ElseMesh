@@ -49,7 +49,7 @@ func readWorldSourceID(path string) (string, error) {
 	if err := json.Unmarshal(raw, &header); err != nil {
 		return "", fmt.Errorf("read world-source.json: %w", err)
 	}
-	if header.Protocol != "elsemesh.world-source/3" || !worldIDPattern.MatchString(header.WorldID) {
+	if header.Protocol != "elsemesh.world-source/1" || !worldIDPattern.MatchString(header.WorldID) {
 		return "", errors.New("world-source.json has an unsupported protocol or invalid worldId")
 	}
 	return header.WorldID, nil
@@ -142,7 +142,7 @@ func prepareWorldDirectory(directory, dataDir, localPeerID string, key crypto.Pr
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return signedDocument{}, errors.New("world-source.json must contain exactly one JSON document")
 	}
-	if source.Protocol != "elsemesh.world-source/3" || source.CoordinateSystem != "right-handed-y-up-meters" || !worldIDPattern.MatchString(source.WorldID) {
+	if source.Protocol != "elsemesh.world-source/1" || source.CoordinateSystem != "right-handed-y-up-meters" || !worldIDPattern.MatchString(source.WorldID) {
 		return signedDocument{}, errors.New("world-source.json has an unsupported protocol, coordinate system, or worldId")
 	}
 	updatedAt, err := time.Parse(time.RFC3339Nano, source.UpdatedAt)

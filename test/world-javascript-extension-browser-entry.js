@@ -64,13 +64,13 @@ try {
 		behaviors: { [ behaviorId ]: { marker: 'signed-world-data' } }, extensions: [ { behaviorId, assetId, events: [ WORLD_EXTENSION_EVENT_ACTIVATED ] } ],
 	};
 	const payload = {
-		protocol: 'elsemesh.world/3', worldId: 'elsemesh:browser-worker-test', ownerPeerId: signer,
+		protocol: 'elsemesh.world/1', worldId: 'elsemesh:browser-worker-test', ownerPeerId: signer,
 		authorityPeerId: signer, authorityEpoch: 1, version: 1, discoverable: false, title: 'Signed Worker fixture',
 		rules: { gravity: 1, maxVisitors: 2, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 		assets: [ { id: assetId, bytes: moduleBytes.byteLength, kind: 'javascript/1', priority: 'visible' } ],
 		objects: [], components: [], portals: [], hosts: [], experience, updatedAt: Math.floor( Date.now() / 1000 ),
 	};
-	const unsigned = { protocol: 'elsemesh.world/3', signer, publicKey: base64( publicKey ), payload };
+	const unsigned = { protocol: 'elsemesh.world/1', signer, publicKey: base64( publicKey ), payload };
 	const signature = new Uint8Array( await crypto.subtle.sign( 'Ed25519', keyPair.privateKey, new TextEncoder().encode( canonicalJSON( unsigned ) ) ) );
 	const manifest = await verifySignedWorldManifest( { ...unsigned, signature: base64( signature ) } );
 	const connector = { worldId: manifest.worldId, manifest, assets: new Map( [ [ assetId, moduleBytes ] ] ) };

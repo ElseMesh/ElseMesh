@@ -126,7 +126,7 @@ const clippedShader = buildMeshShader( new Material( { lit: false } ), [ { name:
 assert.match( clippedShader.code, /frame\.portalClipPlane/, 'portal render pipelines discard fragments using the per-view exit plane' );
 
 const source = {
-	protocol: 'elsemesh.world-source/3', worldId: 'elsemesh:source', title: 'Source',
+	protocol: 'elsemesh.world-source/1', worldId: 'elsemesh:source', title: 'Source',
 	coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
 	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 	objects: [], updatedAt: '2026-09-30T12:00:00Z',

@@ -15,7 +15,7 @@ if TOOL_DIR not in sys.path:
     sys.path.insert(0, TOOL_DIR)
 from world_identity import is_world_id
 
-PROTOCOL = "elsemesh.world-source/3"
+PROTOCOL = "elsemesh.world-source/1"
 TEXT_NAME = "ElseMeshThruHoldSource"
 
 

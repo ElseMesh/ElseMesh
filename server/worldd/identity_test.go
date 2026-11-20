@@ -98,7 +98,7 @@ func TestSignedDocumentVerifiesAndRejectsTampering(t *testing.T) {
 }
 
 func TestLibp2pProtocolsUseElseMeshNamespace(t *testing.T) {
-	if got := string(worldProtocol); got != "/elsemesh/world/3.0.0" {
+	if got := string(worldProtocol); got != "/elsemesh/world/1.0.0" {
 		t.Fatalf("world stream protocol = %q, want ElseMesh namespace", got)
 	}
 	if worldDHTProtocolPrefix != "/elsemesh/kad/1.0.0" {

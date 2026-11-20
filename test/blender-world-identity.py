@@ -18,7 +18,7 @@ from world_identity import is_world_id
 class BlenderWorldIdentityTests(unittest.TestCase):
     def setUp(self):
         self.source = {
-            "protocol": "elsemesh.world-source/3",
+            "protocol": "elsemesh.world-source/1",
             "worldId": "elsemesh:source",
             "rules": {
                 "maxVisitors": 16,

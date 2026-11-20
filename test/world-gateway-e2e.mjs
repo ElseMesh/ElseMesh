@@ -58,7 +58,7 @@ try {
 	const manifestPath = path.join( tempRoot, 'world-signed.json' );
 	const expiresAt = Math.floor( Date.now() / 1000 ) + 3600;
 	await writeFile( manifestInput, JSON.stringify( {
-		protocol: 'elsemesh.world/3',
+		protocol: 'elsemesh.world/1',
 		worldId: worldID,
 		ownerPeerId: ownerPeerID,
 		authorityPeerId: ownerPeerID,

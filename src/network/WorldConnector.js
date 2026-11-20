@@ -1228,9 +1228,9 @@ function waitWithAbort( promise, signal ) {
 }
 
 export async function verifySignedWorldManifest( document, { loadWorldProviders = null } = {} ) {
-	await verifySignedDocument( document, 'elsemesh.world/3' );
+	await verifySignedDocument( document, 'elsemesh.world/1' );
 	const manifest = document.payload;
-	invariant( manifest.protocol === 'elsemesh.world/3' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
+	invariant( manifest.protocol === 'elsemesh.world/1' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
 	await loadWorldManifestProviders( manifest, loadWorldProviders );
 	validateWorldRequirements( manifest );
 	validateWorldExperience( manifest.experience, manifest.assets ?? null );

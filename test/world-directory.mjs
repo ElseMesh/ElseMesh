@@ -63,8 +63,8 @@ const zeroTierProvider = await signedDocument( 'elsemesh.node/1', {
 const assetBytes = new Map( [ [ 'mesh', new Uint8Array( [ 17, 29, 43, 61 ] ) ], [ 'texture', new Uint8Array( [ 5, 11, 23, 47, 89 ] ) ] ] );
 const assetIDs = new Map();
 for ( const [ name, bytes ] of assetBytes ) assetIDs.set( name, `sha256:${Buffer.from( await crypto.subtle.digest( 'SHA-256', bytes ) ).toString( 'hex' )}` );
-let manifest = await signedDocument( 'elsemesh.world/3', {
-	protocol: 'elsemesh.world/3', worldId: 'elsemesh:directory-test', ownerPeerId: second.peerId,
+let manifest = await signedDocument( 'elsemesh.world/1', {
+	protocol: 'elsemesh.world/1', worldId: 'elsemesh:directory-test', ownerPeerId: second.peerId,
 	authorityPeerId: second.peerId, authorityEpoch: 1, version: 1, discoverable: true,
 	title: 'Directory test', rules: { gravity: 1, maxVisitors: 12, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 	assets: [ ...assetBytes ].map( ( [ name, bytes ] ) => ( { id: assetIDs.get( name ), bytes: bytes.length, priority: 'visible' } ) ), objects: [], portals: [], hosts: [
@@ -269,8 +269,8 @@ try {
 	await assert.rejects( unsafeEpoch.getManifest(), /Authority lease is not valid/, 'browser rejects authority epochs outside JavaScript safe integer range' );
 	unsafeEpoch.close();
 	authorityLease = validAuthorityLease;
-	manifest = await signedDocument( 'elsemesh.world/3', {
-		protocol: 'elsemesh.world/3', worldId: 'elsemesh:directory-test', ownerPeerId: second.peerId,
+	manifest = await signedDocument( 'elsemesh.world/1', {
+		protocol: 'elsemesh.world/1', worldId: 'elsemesh:directory-test', ownerPeerId: second.peerId,
 		authorityPeerId: second.peerId, authorityEpoch: Number.MAX_SAFE_INTEGER + 1, version: 1, discoverable: true,
 		title: 'Directory test', rules: { gravity: 1, maxVisitors: 12, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 		assets: [], objects: [], portals: [], hosts: [], updatedAt: now,

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	manifestProtocol       = "elsemesh.world/3"
+	manifestProtocol       = "elsemesh.world/1"
 	worldProtocolNamespace = "elsemesh"
 	authorityProtocol      = "elsemesh.authority/2"
 	maxManifestBytes       = 1 << 20

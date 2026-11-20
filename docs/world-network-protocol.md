@@ -27,7 +27,7 @@ ElseMesh rendering remains browser-side WebGL/WebGPU.
   evaluated as a separate discovery lookup method, not an identity proof.
 - `ownerPeerId` identifies the owner node. Optional portal peer/gateway fields
   are routing hints. Browser routes use HTTPS/WSS.
-- Daemon-to-daemon world RPC streams negotiate `/elsemesh/world/3.0.0`. This
+- Daemon-to-daemon world RPC streams negotiate `/elsemesh/world/1.0.0`. This
   protocol ID follows the current ElseMesh world-manifest generation; v1 stream
   peers are not negotiated as a compatibility fallback.
 - Content is addressed by SHA-256; clients verify signed declarations and

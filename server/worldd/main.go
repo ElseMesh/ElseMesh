@@ -38,7 +38,7 @@ import (
 	"github.com/quic-go/webtransport-go"
 )
 
-const worldProtocol protocol.ID = "/elsemesh/world/3.0.0"
+const worldProtocol protocol.ID = "/elsemesh/world/1.0.0"
 const worldDHTProtocolPrefix = "/elsemesh/kad/1.0.0"
 
 var buildRevision = "development"

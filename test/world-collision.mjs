@@ -13,7 +13,7 @@ const object = {
 	transform: { position: [ 10, 20, 30 ], yaw: Math.PI / 2 }, scale: [ 2, 3, 4 ], collision,
 };
 const source = {
-	protocol: 'elsemesh.world-source/3', worldId: 'elsemesh:test', title: 'Collision', coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
+	protocol: 'elsemesh.world-source/1', worldId: 'elsemesh:test', title: 'Collision', coordinateSystem: 'right-handed-y-up-meters', styleGuide: '',
 	rules: { gravity: 1, maxVisitors: 128, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' }, objects: [ object ], portals: [], updatedAt: '2026-10-01T00:00:00Z',
 };
 assert.doesNotThrow( () => validateWorldSource( source ), 'enabled box collision with bounded dimensions is valid' );

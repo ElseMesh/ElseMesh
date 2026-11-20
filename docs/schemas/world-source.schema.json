@@ -17,7 +17,7 @@
   ],
   "properties": {
     "protocol": {
-      "const": "elsemesh.world-source/3"
+      "const": "elsemesh.world-source/1"
     },
     "worldId": {
       "type": "string",

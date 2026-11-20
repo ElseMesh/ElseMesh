@@ -48,8 +48,8 @@ let node = await signedDocument( 'elsemesh.node/1', {
 	worldIds: [ worldId ], zeroTierNodeId: '0123456789', zeroTierNetworkId: 'e3918db4832a3056',
 	issuedAt: now, expiresAt: now + 600,
 }, owner );
-const manifest = await signedDocument( 'elsemesh.world/3', {
-	protocol: 'elsemesh.world/3', worldId, ownerPeerId: owner.peerId, authorityPeerId: owner.peerId,
+const manifest = await signedDocument( 'elsemesh.world/1', {
+	protocol: 'elsemesh.world/1', worldId, ownerPeerId: owner.peerId, authorityPeerId: owner.peerId,
 	authorityEpoch: 1, version: 1, discoverable: true, title: 'Rendezvous test',
 	rules: { gravity: 1, maxVisitors: 8, spawnRadius: 8, avatarComplexity: 1000, physicsProfile: 'elsemesh-default' },
 	assets: [], objects: [], components: [], portals: [], hosts: [], updatedAt: now,
@@ -92,7 +92,7 @@ globalThis.WebSocket = class extends EventTarget {
 	send( raw ) {
 		const request = JSON.parse( raw );
 		socketFrames.push( request.type );
-		if ( request.type === 'connect' ) emit( this, 'message', JSON.stringify( { type: 'connected', worldId, nodeId: owner.peerId, targetPeerId: owner.peerId, manifestProtocol: 'elsemesh.world/3', signalSessionId: 'a'.repeat( 32 ), iceServers: [ { urls: [ 'stun:stun.example:3478' ] } ] } ) );
+		if ( request.type === 'connect' ) emit( this, 'message', JSON.stringify( { type: 'connected', worldId, nodeId: owner.peerId, targetPeerId: owner.peerId, manifestProtocol: 'elsemesh.world/1', signalSessionId: 'a'.repeat( 32 ), iceServers: [ { urls: [ 'stun:stun.example:3478' ] } ] } ) );
 		else if ( request.type === 'webrtc.offer' ) {
 			assert.equal( request.signalSessionId, 'a'.repeat( 32 ) );
 			offerSDPs.push( request.sdp );
@@ -104,7 +104,7 @@ globalThis.WebSocket = class extends EventTarget {
 };
 
 class FakeChannel extends EventTarget {
-	constructor() { super(); this.readyState = 'connecting'; this.label = 'elsemesh.world/3'; this.ordered = true; }
+	constructor() { super(); this.readyState = 'connecting'; this.label = 'elsemesh.world/1'; this.ordered = true; }
 	send( raw ) {
 		const request = JSON.parse( raw );
 		assert.equal( request.type, 'manifest.get' );

@@ -27,10 +27,10 @@ checkout, and build ElseMesh with the package available. The checks above establ
 The remaining parity and runtime acceptance belongs to the active project
 direction. This completed record replaces the former repository split roadmap.
 
-## ElseMesh v3 wire and world-ID namespace — complete
+## ElseMesh wire and world-ID namespace — complete
 
-- Browser source validation accepts only `elsemesh.world-source/3`; signed
-  runtime manifests and browser-host profiles accept only `elsemesh.world/3`.
+- Browser source validation accepts only `elsemesh.world-source/1`; signed
+  runtime manifests and browser-host profiles accept only `elsemesh.world/1`.
 - Client and daemon world identity validation accepts `elsemesh:<id>` and
   rejects `world:<id>`, the nested `elsemesh:world:<id>` form, `elsemesh-world`,
   and `em-world`. No old-protocol or old-ID compatibility path remains.

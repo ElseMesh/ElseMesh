@@ -42,7 +42,8 @@ try {
 		assets: [ { assetId, kind: 'example-binary/1' } ],
 		data: { ownerDefined: { nested: [ 1, true, 'opaque' ] } },
 	} ];
-	assert.equal( WORLD_SOURCE_PROTOCOL, 'elsemesh.world-source/3' );
+	assert.equal( WORLD_SOURCE_PROTOCOL, 'elsemesh.world-source/1' );
+	for ( const protocol of [ 'elsemesh.world-source/2', 'elsemesh.world-source/3' ] ) assert.throws( () => validateWorldSource( { ...source, protocol } ), /Unsupported world source format/, `pre-release protocol ${protocol} is not accepted` );
 	assert.throws( () => validateWorldSource( source ), /does not support required world behavior/, 'runtime source validation requires an installed behavior provider' );
 	assert.doesNotThrow( () => validateWorldSource( source, { allowUnregisteredBehaviors: true } ), 'source packaging can preserve a syntactically valid external behavior without executing or importing it' );
 	assert.throws( () => validateWorldSource( { ...source, components: [ { ...source.components[ 0 ], data: [] } ] }, { allowUnregisteredBehaviors: true } ), /component envelope/ );

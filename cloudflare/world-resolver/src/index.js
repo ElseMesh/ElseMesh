@@ -1,7 +1,7 @@
 import { verifySignedDocument } from '../../../src/network/SignedDocument.js';
 
 const NODE_PROTOCOL = 'elsemesh.node/1';
-const WORLD_PROTOCOL = 'elsemesh.world/3';
+const WORLD_PROTOCOL = 'elsemesh.world/1';
 const AUTHORITY_PROTOCOL = 'elsemesh.authority/2';
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_RECORD_BYTES = 1024 * 1024;

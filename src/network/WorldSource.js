@@ -5,7 +5,7 @@ import { WORLD_ID_PREFIX, isWorldID } from './WorldIdentity.js';
 import { AVATAR_STYLES } from '../player/AvatarAppearance.js';
 import { validatePortalRouteContract } from './PortalAgreement.js';
 
-export const WORLD_SOURCE_PROTOCOL = 'elsemesh.world-source/3';
+export const WORLD_SOURCE_PROTOCOL = 'elsemesh.world-source/1';
 const WORLD_COLLISION_TAG_PATTERN = /^[A-Za-z][A-Za-z0-9._:-]{0,63}$/;
 
 export function isValidWorldCollisionTag( tag ) {

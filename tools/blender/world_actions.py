@@ -66,7 +66,7 @@ def require_keys(record, required, allowed, name):
 
 
 def validate_source(source):
-    if not isinstance(source, dict) or source.get("protocol") != "elsemesh.world-source/3":
+    if not isinstance(source, dict) or source.get("protocol") != "elsemesh.world-source/1":
         raise ValueError("unsupported world source protocol")
     rules = source.get("rules")
     if (not isinstance(rules, dict) or not isinstance(rules.get("maxVisitors"), int)

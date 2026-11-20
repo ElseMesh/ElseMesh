@@ -132,12 +132,14 @@ func TestWorldV3RejectsLegacyProtocolAndWorldID(t *testing.T) {
 	}
 
 	manifest.WorldID = "elsemesh:current"
-	document, err := signDocument("elsemesh.world/2", manifest, owner)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decodeManifest(document, ownerID.String(), time.Now()); err == nil {
-		t.Fatal("legacy signed manifest protocol was accepted")
+	for _, protocol := range []string{"elsemesh.world/2", "elsemesh.world/3"} {
+		document, err := signDocument(protocol, manifest, owner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := decodeManifest(document, ownerID.String(), time.Now()); err == nil {
+			t.Fatalf("pre-release signed manifest protocol %s was accepted", protocol)
+		}
 	}
 }
 
