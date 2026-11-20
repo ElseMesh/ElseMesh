@@ -37,6 +37,16 @@ comparison against Tidewater `main`. No completion gate or percentage changed:
 Tidewater remains **93%**, and renderer-neutral world packages remain **71%**.
 See [`docs/graphics-review.md`](docs/graphics-review.md#2026-11-20-matched-split-beach-view-webgpu-and-webgl).
 
+**2026-11-20 implementation update:** Tidewater now stores its canopy palette,
+species/variant selection, near/far handoff, fade and thinning distances, atlas
+dimensions, and impostor shading/wind parameters in the plain-data
+`vegetation/CanopyProfile.js`. The current WebGPU canopy shader and atlas export
+consume this profile, and the world-export check verifies the profile recorded
+beside the deterministic atlas images. This centralizes world-authored inputs;
+the profile is not yet signed into the runtime package and the engine WebGPU
+and WebGL canopy adapters are not implemented. This closes no parity gate and
+changes no percentage.
+
 ## Progress by requirement
 
 | Requirement | Estimate | Evidence and remaining acceptance gate |

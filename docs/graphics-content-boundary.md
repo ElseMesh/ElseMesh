@@ -270,10 +270,16 @@ those remain required before replacing either presenter.
 `src/engine/render/OctahedralCanopyRuntime.js` now resolves each instance to its
 authored group, quaternion yaw, seed-selected atlas variant, and shared near/far
 weights. Its camera plan also applies group cutoffs, tree fade, deterministic
-thinning, and crown-growth compensation. The `elsemesh.octahedral-canopy/1`
-component is registered as a vegetation feature and requests only its signed
-descriptor at startup. Neither backend presenter consumes the contract yet;
-the old presenters remain active and no appearance-parity gate has closed.
+thinning, and crown-growth compensation. Tidewater's palette, species
+selection, variant selection, handoff distances, thinning, atlas dimensions,
+shading inputs, and impostor wind coefficients now live in the plain-data
+`vegetation/CanopyProfile.js`; the current WebGPU shader and atlas exporter
+consume that same profile, and the deterministic export test checks the
+profile copied into the atlas sidecar. This moves the authored values into one
+world-owned data source but does not yet move presentation ownership. The
+profile is not yet part of a signed canopy descriptor, neither engine backend
+consumes the component contract, and both world-owned presenters remain active.
+No appearance-parity gate has closed.
 
 Use the common asset-index convention for this contract: LOD0 is the highest-
 detail near model, and increasing indices are progressively coarser. The
