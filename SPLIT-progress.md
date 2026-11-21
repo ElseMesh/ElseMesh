@@ -292,6 +292,18 @@ collision path, but not the full app frame, live input timing, production water,
 or rendered-pixel/FPS comparison. It is not full route/gameplay parity evidence;
 no parity percentage changed.
 
+**2026-11-21 hosted movement authority gate:** Added a Tidewater-owned e2e test
+that converts and signs the actual Tidewater world source, starts a temporary
+`worldd`, admits a local `Player` through the production `WorldConnector` and
+`WorldPresenceSession`, then walks the six-second authored harbor route while
+publishing presence at the production cadence. The owner accepted the final
+pose on the wooden deck at `[55.000, 2.300, -59.490]`; local prediction ended at
+`[55.000, 2.300, -59.190]`, with no authority rollback. A first update can be
+rate-limited during the first 50 ms after admission; this is transient and does
+not block or roll back movement. This closes the local live-`worldd` presence
+and snapback regression gate, but does not compare rendered movement in WebGPU
+and WebGL or against pre-split Tidewater. No parity percentage changed.
+
 ## Progress by requirement
 
 | Requirement | Estimate | Evidence and remaining acceptance gate |
