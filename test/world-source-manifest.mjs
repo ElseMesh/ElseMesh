@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { validateWorldComponents } from '../src/network/WorldConnector.js';
+import { validateWorldAssets, validateWorldComponents } from '../src/network/WorldConnector.js';
+import { worldAssetCDNURL } from '../src/network/WorldAssetCDN.js';
 import { createWorldSource, isValidWorldCollisionCompound, validateWorldSource, WORLD_SOURCE_PROTOCOL } from '../src/network/WorldSource.js';
 import { GENERIC_WORLD_EXPERIENCE } from '../src/network/WorldExperience.js';
 import { movementProfileSelection, validateWorldRequirements } from '../src/network/WorldRules.js';
@@ -64,6 +65,15 @@ try {
 	assert.equal( manifest.entryPointPrompt, source.entryPointPrompt );
 	assert.equal( manifest.entryPointActionLabel, source.entryPointActionLabel );
 	assert.deepEqual( manifest.assets, [ { id: assetId, bytes: bytes.length, kind: 'example-binary/1', priority: 'visible' } ], 'asset inventory derives only from generic references' );
+	const cdnOutput = path.join( root, 'cdn.json' );
+	execFileSync( process.execPath, [
+		'tools/world-source-to-manifest.mjs', '--source', path.join( root, 'world-source.json' ),
+		'--owner', 'owner-peer', '--assets', assetsPath, '--out', cdnOutput, '--cdn-base-url', 'https://assets.example.net/shared-content',
+	], { stdio: 'pipe' } );
+	const cdnManifest = JSON.parse( await readFile( cdnOutput, 'utf8' ) );
+	assert.equal( cdnManifest.assets[ 0 ].cdnURL, worldAssetCDNURL( 'https://assets.example.net/shared-content', assetId ), 'opted-in worlds emit the same digest URL for shared bytes' );
+	assert.doesNotThrow( () => validateWorldAssets( cdnManifest.assets ) );
+	assert.throws( () => validateWorldAssets( [ { ...cdnManifest.assets[ 0 ], cdnURL: `https://assets.example.net/shared-content/sha256/${'f'.repeat( 64 )}` } ] ), /invalid asset/, 'manifest validation binds the CDN URL to the signed content ID' );
 	assert.doesNotThrow( () => validateWorldRequirements( manifest ) );
 	assert.deepEqual( movementProfileSelection( { components: [ { type: 'elsemesh.fixture-vehicle/1' } ] }, 'elsemesh.avatar.stock-male/1' ), { avatarProfileId: 'elsemesh.avatar.stock-male/1', vehicleType: 'elsemesh.fixture-vehicle/1' }, 'renderer clients select the same authored profile for a single world vehicle type' );
 	assert.equal( movementProfileSelection( { components: [ { type: 'elsemesh.fixture-vehicle/1' } ] }, 'elsemesh.avatar.stock-male/1', 'elsemesh.other-vehicle/1' ).vehicleType, null, 'an undeclared vehicle never receives a movement profile' );

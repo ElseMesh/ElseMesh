@@ -62,6 +62,7 @@ type assetRef struct {
 	Kind     string `json:"kind"`
 	Priority string `json:"priority"`
 	Path     string `json:"path,omitempty"`
+	CDNURL   string `json:"cdnURL,omitempty"`
 }
 
 type objectLOD struct {
@@ -950,6 +951,9 @@ func validateManifest(manifest worldManifest, localPeerID string, now time.Time)
 		if asset.Priority != "portal-preview" && asset.Priority != "visible" && asset.Priority != "nearby" && asset.Priority != "background" {
 			return fmt.Errorf("invalid priority for asset %s", asset.ID)
 		}
+		if asset.CDNURL != "" && !validWorldAssetCDNURL(asset.CDNURL, asset.ID) {
+			return fmt.Errorf("invalid content-addressed CDN URL for asset %s", asset.ID)
+		}
 		seenAssets[asset.ID] = true
 	}
 	if err := validateWorldJavaScriptExtensionAssets(manifest.Experience, manifest.Assets); err != nil {
@@ -1237,6 +1241,18 @@ func validPortalGateway(value string) bool {
 func validDirectoryURL(value string) bool {
 	parsed, err := url.Parse(value)
 	return err == nil && parsed.IsAbs() && parsed.Scheme == "https" && parsed.Hostname() != "" && parsed.User == nil && (parsed.Path == "" || parsed.Path == "/") && parsed.RawQuery == "" && parsed.Fragment == ""
+}
+
+func validWorldAssetCDNURL(value, assetID string) bool {
+	if !assetIDPattern.MatchString(assetID) {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || !parsed.IsAbs() || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return false
+	}
+	digest := strings.TrimPrefix(assetID, "sha256:")
+	return strings.HasSuffix(parsed.Path, "/sha256/"+digest)
 }
 
 type authorityLease struct {

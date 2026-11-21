@@ -62,10 +62,13 @@ the content data plane. A CDN response is only a byte source: the browser
 checks the declared size and content hash before decoding it, and falls back to
 an authorized worldd or cache provider if the CDN request fails.
 
-CDN publication is explicit per world and per asset. Signed manifests may
-advertise an HTTPS URL for a public immutable asset; assets without one remain
-available only through authorized providers. Use content-addressed object keys
-and immutable cache headers, and publish a new object when the bytes change.
+CDN publication is explicit per world and per asset. The signed manifest's
+optional `cdnURL` must end in `/sha256/<digest>` matching the asset ID. The
+source-to-manifest tool accepts `--cdn-base-url` and builds that URL; use the
+same base URL across worlds to give byte-identical assets the exact same URL
+and CDN/browser cache entry. Assets without `cdnURL` remain available only
+through authorized providers. CDN objects must use immutable cache headers,
+and a new object is published when the bytes change.
 Do not upload bridge output or other restricted content merely because it is
 present in worldd's local store. A world owner must opt the relevant assets in
 to the selected distribution target. Worlds with bridge-derived assets may use
@@ -91,11 +94,14 @@ CDN availability must not delay or bypass the movement gate. Progressive
 texture/model tiers remain independently addressable and cacheable by their
 own content identity.
 
-The current browser connector fetches hosted-world assets only through its
-provider protocol, and the current Pages build does not publish the world
-package asset tree. CDN URL validation, hash-checked direct fetch with
-provider fallback, worldd upload support, and end-to-end startup timing are
-implementation gaps; this section is the single design reference for them.
+The browser validates signed digest URLs, attempts hash-checked CDN delivery
+before the provider protocol, and falls back to the authorized provider when
+the CDN fails. Browser HTTP caching is enabled for these immutable URLs. The
+current Pages build does not publish the world package asset tree, and there
+is not yet a publisher that uploads explicitly opted-in assets to R2 or another
+CDN. End-to-end startup timing and a world-package reference path that avoids
+copying shared bytes into each repository remain implementation gaps; this
+section is the single design reference for them.
 
 Treat `WorldContentProvider` as an additive engine boundary, not a new
 world-specific code path. The existing signed-package provider remains the

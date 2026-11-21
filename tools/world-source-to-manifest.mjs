@@ -5,12 +5,13 @@ import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import { validateWorldSource } from '../src/network/WorldSource.js';
 import { decodeWorldJavaScriptExtension } from '../src/network/WorldJavaScriptExtension.js';
+import { normalizeWorldAssetCDNBase, worldAssetCDNURL } from '../src/network/WorldAssetCDN.js';
 
 function options(argv) {
 	const result = {};
 	for ( let i = 0; i < argv.length; i ++ ) {
 		const key = argv[ i ];
-		if ( ! [ '--source', '--owner', '--assets', '--out', '--version', '--discoverable', '--authority-epoch' ].includes( key ) || ! argv[ i + 1 ] ) throw new Error( `Invalid or incomplete option: ${key}` );
+		if ( ! [ '--source', '--owner', '--assets', '--out', '--version', '--discoverable', '--authority-epoch', '--cdn-base-url' ].includes( key ) || ! argv[ i + 1 ] ) throw new Error( `Invalid or incomplete option: ${key}` );
 		result[ key.slice( 2 ) ] = argv[ ++ i ];
 	}
 	for ( const key of [ 'source', 'owner', 'assets', 'out' ] ) if ( ! result[ key ] ) throw new Error( `Missing --${key}` );
@@ -29,6 +30,7 @@ async function main() {
 	const authorityEpoch = args[ 'authority-epoch' ] === undefined ? 1 : Number( args[ 'authority-epoch' ] );
 	if ( ! Number.isSafeInteger( authorityEpoch ) || authorityEpoch < 1 ) throw new Error( '--authority-epoch must be a positive integer' );
 	if ( args.discoverable !== undefined && ! [ 'true', 'false' ].includes( args.discoverable ) ) throw new Error( '--discoverable must be true or false' );
+	if ( args[ 'cdn-base-url' ] !== undefined ) args[ 'cdn-base-url' ] = normalizeWorldAssetCDNBase( args[ 'cdn-base-url' ] );
 	if ( source.styleGuide.length > 512 ) throw new Error( 'styleGuide exceeds the runtime manifest limit of 512 characters' );
 	const updatedAt = Date.parse( source.updatedAt );
 	const validTimestamp = typeof source.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test( source.updatedAt ) && Number.isFinite( updatedAt );
@@ -109,7 +111,7 @@ async function main() {
 		...( source.entryPointPrompt === undefined || source.entryPointPrompt === '' ? {} : { entryPointPrompt: source.entryPointPrompt } ),
 		...( source.entryPointActionLabel === undefined || source.entryPointActionLabel === '' ? {} : { entryPointActionLabel: source.entryPointActionLabel } ),
 		rules: { ...source.rules, styleGuide: source.styleGuide },
-		assets: [ ...assets.values() ],
+		assets: [ ...assets.values() ].map( asset => args[ 'cdn-base-url' ] ? { ...asset, cdnURL: worldAssetCDNURL( args[ 'cdn-base-url' ], asset.id ) } : asset ),
 		objects: source.objects.map( ( { id, kind, label, assetId, priority, streamingBounds, transform, scale, collision, replacesObjectId, lods } ) => ( { id, kind, label, assetId, priority, streamingBounds, transform, scale, collision, replacesObjectId, lods } ) ),
 		components: source.components || [],
 		portals: source.portals,

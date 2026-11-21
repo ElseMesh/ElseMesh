@@ -14,6 +14,37 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+func TestWorldAssetCDNURLUsesContentIdentity(t *testing.T) {
+	assetID := "sha256:" + strings.Repeat("a", 64)
+	valid := "https://assets.example.net/shared/sha256/" + strings.TrimPrefix(assetID, "sha256:")
+	if !validWorldAssetCDNURL(valid, assetID) {
+		t.Fatal("canonical HTTPS digest URL rejected")
+	}
+	for _, invalid := range []string{
+		"http://assets.example.net/shared/sha256/" + strings.TrimPrefix(assetID, "sha256:"),
+		"https://assets.example.net/shared/sha256/" + strings.Repeat("b", 64),
+		"https://assets.example.net/shared/sha256/" + strings.TrimPrefix(assetID, "sha256:") + "?world=elsemesh:test",
+		"https://user:pass@assets.example.net/shared/sha256/" + strings.TrimPrefix(assetID, "sha256:"),
+	} {
+		if validWorldAssetCDNURL(invalid, assetID) {
+			t.Fatalf("non-canonical CDN URL accepted: %s", invalid)
+		}
+	}
+}
+
+func TestWorldManifestValidatesSignedAssetCDNURL(t *testing.T) {
+	d := presenceTestDaemon(t)
+	assetID := "sha256:" + strings.Repeat("a", 64)
+	d.world.Assets = []assetRef{{ID: assetID, Bytes: 1, Kind: "glb", Priority: "visible", CDNURL: "https://assets.example.net/shared/sha256/" + strings.TrimPrefix(assetID, "sha256:")}}
+	if err := validateManifest(d.world, d.host.ID().String(), time.Now()); err != nil {
+		t.Fatalf("valid content-addressed CDN reference rejected: %v", err)
+	}
+	d.world.Assets[0].CDNURL = "https://assets.example.net/shared/sha256/" + strings.Repeat("b", 64)
+	if err := validateManifest(d.world, d.host.ID().String(), time.Now()); err == nil {
+		t.Fatal("CDN reference for a different content digest accepted")
+	}
+}
+
 func TestWorldManifestOwnerAndScopedHostGrant(t *testing.T) {
 	owner, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	if err != nil {

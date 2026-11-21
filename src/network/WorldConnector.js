@@ -9,6 +9,7 @@ import { isWorldID, WORLD_PROTOCOL_NAMESPACE } from './WorldIdentity.js';
 import { worldComponentAssetIDs } from './WorldComponentRegistry.js';
 import { loadWorldManifestProviders } from './WorldProviderLoader.js';
 import { decodeWorldInviteRoute, decodeWorldInviteTicket, encodeWorldInviteRoute, encodeWorldInviteTicket, isWorldInviteTicketCode, WORLD_INVITE_ROUTE_KEYS } from './WorldInvite.js';
+import { fetchWorldAssetFromCDN, isValidWorldAssetCDNURL } from './WorldAssetCDN.js';
 
 export { verifySignedDocument } from './SignedDocument.js';
 
@@ -497,6 +498,17 @@ export class WorldConnector {
 	}
 
 	async #downloadAsset( assetId, asset, signal ) {
+		if ( asset.cdnURL ) {
+			const startedAt = performance.now();
+			try {
+				const bytes = await fetchWorldAssetFromCDN( asset, { signal } );
+				const rate = bytes.byteLength * 1000 / Math.max( 1, performance.now() - startedAt );
+				this.transferRateBytesPerSecond = this.transferRateBytesPerSecond === null ? rate : this.transferRateBytesPerSecond * 0.65 + rate * 0.35;
+				return bytes;
+			} catch ( error ) {
+				if ( signal?.aborted ) throw signal.reason || error;
+			}
+		}
 		let lastError;
 		for ( ;; ) {
 			throwIfAborted( signal );
@@ -1277,6 +1289,7 @@ export async function verifySignedWorldManifest( document, { loadWorldProviders 
 	invariant( manifest.protocol === 'elsemesh.world/1' && isWorldID( manifest.worldId ) && manifest.ownerPeerId === document.signer, 'Signed world manifest identity is invalid' );
 	await loadWorldManifestProviders( manifest, loadWorldProviders );
 	validateWorldRequirements( manifest );
+	validateWorldAssets( manifest.assets );
 	validateWorldExperience( manifest.experience, manifest.assets ?? null );
 	validateWorldSpawn( manifest.spawn );
 	validateWorldEntryPoints( manifest.entryPoints, manifest.entryPointPrompt, manifest.entryPointActionLabel, manifest.avatarOptions );
@@ -1289,6 +1302,22 @@ export async function verifySignedWorldManifest( document, { loadWorldProviders 
 		...manifest,
 		components: ( manifest.components || [] ).map( worldComponentRuntimeRecord ),
 	};
+}
+
+export function validateWorldAssets( assets ) {
+	invariant( Array.isArray( assets ) && assets.length <= 10000, 'World manifest has an invalid asset list' );
+	const seen = new Set();
+	for ( const asset of assets ) {
+		invariant( asset && typeof asset === 'object' && ! Array.isArray( asset )
+			&& Object.keys( asset ).every( key => [ 'id', 'bytes', 'kind', 'priority', 'path', 'cdnURL' ].includes( key ) )
+			&& /^sha256:[0-9a-f]{64}$/.test( asset.id || '' ) && ! seen.has( asset.id )
+			&& Number.isSafeInteger( asset.bytes ) && asset.bytes >= 0 && asset.bytes <= MAX_ASSET_BYTES
+			&& typeof asset.kind === 'string' && /^[a-z0-9][a-z0-9./-]{0,63}$/.test( asset.kind )
+			&& [ 'portal-preview', 'visible', 'nearby', 'background' ].includes( asset.priority )
+			&& ( asset.cdnURL === undefined || isValidWorldAssetCDNURL( asset.cdnURL, asset.id ) ), 'World manifest contains an invalid asset reference' );
+		seen.add( asset.id );
+	}
+	return assets;
 }
 
 function decodeBase64( value ) {
