@@ -29,8 +29,8 @@
 //   submerge / emerge → near (unfiltered) ────────────────────────────────┤
 //   master (volume, mute) → safety limiter → destination ←────────────────┘
 //
-// Levels: every sound has a target loudness (LUFS, momentary) for its reference situation in MIX below;
-// the gain is target minus the file's measured loudness (soundBank.js).
+// Levels: built-in sounds use MIX below; registered world banks supply their
+// own sample metadata and the world behavior supplies its cue levels.
 
 import { BANK } from './soundBank.js';
 
@@ -126,6 +126,8 @@ export class SoundScape {
 		this._volume = 0.8;
 		this._buffers = new Map(); // name -> AudioBuffer
 		this._loading = new Map(); // name -> Promise
+		this._sampleInfo = new Map( Object.entries( BANK ).map( ( [ id, info ] ) => [ id, { info, baseUrl: this.baseUrl } ] ) );
+		this._sampleBankSignatures = new Map();
 		this._worldAudioBuffers = new Map(); // content ID -> AudioBuffer / in-flight decode
 		this._worldAudioFailures = new Set();
 		this._worldAudioComponents = new Map(); // component ID -> signed data and verified bytes
@@ -263,6 +265,30 @@ export class SoundScape {
 
 	}
 
+	registerSampleBank( namespace, entries ) {
+
+		if ( typeof namespace !== 'string' || ! /^[a-z][a-z0-9.-]{0,63}$/.test( namespace ) || ! entries || typeof entries !== 'object' || Array.isArray( entries ) ) throw new Error( 'Invalid world audio sample bank' );
+		const signature = JSON.stringify( entries );
+		const previousSignature = this._sampleBankSignatures.get( namespace );
+		if ( previousSignature !== undefined && previousSignature !== signature ) throw new Error( `World audio sample bank changed after registration: ${namespace}` );
+		const ids = {};
+		for ( const [ name, info ] of Object.entries( entries ) ) {
+			if ( ! /^[a-z][a-z0-9_]{0,63}$/.test( name ) || ! info || typeof info.file !== 'string' || ! /^[\w.-]+\.ogg$/.test( info.file ) ) throw new Error( `Invalid sample in world audio bank: ${namespace}:${name}` );
+			const id = `${namespace}:${name}`;
+			if ( previousSignature === undefined && this._sampleInfo.has( id ) ) throw new Error( `Duplicate world audio sample: ${id}` );
+			if ( info.loop === true ) {
+				if ( ! Number.isFinite( info.lufs ) ) throw new Error( `Invalid loop loudness in world audio bank: ${id}` );
+			} else if ( ! Array.isArray( info.slices ) || ! Array.isArray( info.lufs ) || info.slices.length < 1 || info.slices.length !== info.lufs.length || info.slices.length > 256
+				|| info.slices.some( slice => ! Array.isArray( slice ) || slice.length !== 2 || ! slice.every( Number.isFinite ) || slice[ 0 ] < 0 || slice[ 1 ] <= 0 )
+				|| info.lufs.some( value => ! Number.isFinite( value ) ) ) throw new Error( `Invalid sprite metadata in world audio bank: ${id}` );
+			if ( previousSignature === undefined ) this._sampleInfo.set( id, { info, baseUrl: this.baseUrl } );
+			ids[ name ] = id;
+		}
+		this._sampleBankSignatures.set( namespace, signature );
+		return Object.freeze( ids );
+
+	}
+
 	playSample( name, { category = 'world', channel = 'near', targetLufs, rate = 1, position = null, refDistance = 1, rolloff = 1, maxVoices = 3 } = {} ) {
 
 		if ( ! this.enabled || typeof name !== 'string' || ! Number.isFinite( targetLufs ) || ! Number.isFinite( rate ) || rate <= 0
@@ -277,7 +303,7 @@ export class SoundScape {
 
 	setSampleLoop( name, { targetLufs, weight = 0, rate = 1, channel = 'above', timeConstant = 0.25 } = {} ) {
 
-		const info = BANK[ name ];
+		const info = this._sampleInfo.get( name )?.info;
 		if ( ! this.enabled || ! info?.loop || ! Number.isFinite( targetLufs ) || ! Number.isFinite( weight ) || weight < 0
 			|| ! Number.isFinite( rate ) || rate <= 0 || ! Number.isFinite( timeConstant ) || timeConstant < 0 ) return false;
 		const destination = channel === 'foreground' ? this.foreground : channel === 'above' ? this.above : channel === 'near' ? this.near : null;
@@ -745,9 +771,10 @@ export class SoundScape {
 
 		const b = this._buffers.get( name );
 		if ( b ) return b;
-		if ( ! this._loading.has( name ) && BANK[ name ] && this.ctx ) {
+		const sample = this._sampleInfo.get( name );
+		if ( ! this._loading.has( name ) && sample && this.ctx ) {
 
-			const p = fetch( this.baseUrl + BANK[ name ].file )
+			const p = fetch( sample.baseUrl + sample.info.file )
 				.then( ( r ) => {
 
 					if ( ! r.ok ) throw new Error( `audio ${ name }: HTTP ${ r.status }` );
@@ -808,7 +835,7 @@ export class SoundScape {
 	_shot( bank, cat, dest, targetLufs, rate = 1, at = 0, pick = - 1, maxVoices = LIMITS[ cat ] || 3 ) {
 
 		if ( ! this.enabled || ! dest ) return null;
-		const info = BANK[ bank ];
+		const info = this._sampleInfo.get( bank )?.info;
 		const buf = this._want( bank );
 		if ( ! buf || ! info ) return null;
 		const n = info.slices.length;

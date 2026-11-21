@@ -311,9 +311,11 @@ WebGL adapter use that world-owned profile. `SoundScape` now exposes generic
 sample preloading, one-shot, positional, and loop controls, and no longer
 contains fishing cue methods or fishing mix levels. Engine tests exercise those
 generic controls; Tidewater tests check the profile and its outputs. The shared
-engine `soundBank.js` still contains Tidewater sample metadata, and Tidewater's
-exporter still imports it; the broader built-in soundscape also remains in the
-engine. The Tidewater profile fixture, generic engine audio fixture, full
+Tidewater now owns its fishing sample bank and the audio build tools. The
+engine's `soundBank.js` still holds the built-in environment and footstep
+catalog, which Tidewater's package exporter reads for signed ambience; the
+broader built-in soundscape remains in the engine. The Tidewater profile
+fixture, generic engine audio fixture, full
 WebGPU/WebGL renderer-parity suite (including pre-split WebGPU traces), and
 production build pass. This is a focused ownership move, not completion of
 audio or overall separation. No percentage changed.

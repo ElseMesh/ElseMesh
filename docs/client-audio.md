@@ -18,6 +18,8 @@ World-owned behavior may use `SoundScape.preloadSamples`, `playSample`, and
 levels, voice groups, and cue timing; ElseMesh supplies decoding, spatial
 placement, looping, and voice cleanup. Tidewater's fishing cue profile now
 lives in `worlds/tidewater/game/FishingAudio.js` and is shared by its WebGPU and
-WebGL game paths. The engine's shared `soundBank.js` still contains Tidewater
-sample metadata, and Tidewater's exporter still reads it; both are remaining
+WebGL game paths. Its slice and loudness table is in Tidewater's
+`tools/audio/fishing-bank.json`. ElseMesh's `soundBank.js` still holds the
+built-in environment and footstep catalog, which Tidewater's package exporter
+uses for its signed ambience; that broader built-in soundscape remains
 separation work.
