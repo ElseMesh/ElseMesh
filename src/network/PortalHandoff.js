@@ -65,7 +65,8 @@ export function rotatePortalVelocity( velocity, entryYaw, exitYaw ) {
 export function mapPortalPosition( position, entry, exit, scaleRatio = 1 ) {
 	scaleRatio = portalScaleRatio( scaleRatio );
 	const yaw = exit.yaw - entry.yaw;
-	return new Vector3().copy( position )
+	const point = Array.isArray( position ) ? new Vector3().fromArray( position ) : new Vector3().copy( position );
+	return point
 		.sub( new Vector3().fromArray( entry.position ) )
 		.multiplyScalar( scaleRatio )
 		.applyAxisAngle( _up, yaw )
@@ -75,7 +76,8 @@ export function mapPortalPosition( position, entry, exit, scaleRatio = 1 ) {
 export function unmapPortalPosition( position, entry, exit, scaleRatio = 1 ) {
 	scaleRatio = portalScaleRatio( scaleRatio );
 	const yaw = entry.yaw - exit.yaw;
-	return new Vector3().copy( position )
+	const point = Array.isArray( position ) ? new Vector3().fromArray( position ) : new Vector3().copy( position );
+	return point
 		.sub( new Vector3().fromArray( exit.position ) )
 		.multiplyScalar( 1 / scaleRatio )
 		.applyAxisAngle( _up, yaw )
