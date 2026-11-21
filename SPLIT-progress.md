@@ -25,6 +25,22 @@ the village color shift remains open. Overall Tidewater parity stays **93%**.
 This closes only the missing built-in WebGPU ground-cover path. See
 [`docs/graphics-review.md`](docs/graphics-review.md).
 
+**2026-11-21 AMD canopy candidate review:** In the live ElseMesh WebGPU scene
+on AMD RADV Renoir, I compared the current Tidewater canopy with the exported
+but inactive near-model/far-atlas candidate at four camera distances around the
+authored tree LOD transition. The review used the same tree placement, fixed
+simulation time (`1000 s`), 16.2 time of day, and settled camera frames. Both
+presentations retained the scene lighting and color; the candidate's tree
+silhouettes and density visibly differ at near and transition-out distances,
+while the far view is closer. Full-frame RGB MAE was `10.36`, `4.85`, `10.21`,
+and `3.98/255` at near, transition-in, transition-out, and far. These values
+include the whole scene and are not a canopy-only score. This confirms the
+candidate adapters render with the actual AMD WebGPU scene, but does not show
+appearance parity with either the current canopy or authoritative
+`tidewater/main`; the candidate stays inactive and the parity estimate is
+unchanged. The captures are retained temporarily under
+`/var/tmp/elsemesh-canopy-amd-webgpu-review-20261121` and are not committed.
+
 **2026-11-20 evidence update:** A matched current-source beach capture on AMD
 RADV WebGPU and RadeonSI WebGL used the same `[15, 3, -58]` camera, 16.2 time
 of day, fixed simulation time 1000, 1600×813 canvas, scale 1, high quality,
