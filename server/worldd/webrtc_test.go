@@ -77,6 +77,30 @@ func TestWebRTCConfigurationValidation(t *testing.T) {
 	}
 }
 
+func TestDefaultWebRTCPortRange(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		minimum  uint
+		maximum  uint
+		zeroTier bool
+		explicit bool
+		wantMin  uint
+		wantMax  uint
+	}{
+		{name: "embedded ZeroTier default", zeroTier: true, wantMin: defaultZeroTierWebRTCUDPPort, wantMax: defaultZeroTierWebRTCUDPPort},
+		{name: "without embedded ZeroTier remains ephemeral"},
+		{name: "explicit ephemeral override", zeroTier: true, explicit: true},
+		{name: "explicit configured range", minimum: 43000, maximum: 43010, zeroTier: true, explicit: true, wantMin: 43000, wantMax: 43010},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			gotMin, gotMax := defaultWebRTCPortRange(test.minimum, test.maximum, test.zeroTier, test.explicit)
+			if gotMin != test.wantMin || gotMax != test.wantMax {
+				t.Fatalf("defaultWebRTCPortRange() = %d-%d, want %d-%d", gotMin, gotMax, test.wantMin, test.wantMax)
+			}
+		})
+	}
+}
+
 func TestSharedWebRTCAPIReusesConfiguredUDPPort(t *testing.T) {
 	probe, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {

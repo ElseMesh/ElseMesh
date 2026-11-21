@@ -95,19 +95,21 @@ currently configurable, and a TURN data relay is not part of the current
 signaling-only Worker design. Never put relay credentials in a world package,
 invite URL, source repository, or long-lived client bundle.
 
-The daemon shares one Pion ICE UDP mux across peer connections. By default it
-binds an ephemeral UDP port; set both `--webrtc-udp-port-min` and
-`--webrtc-udp-port-max` to select the first available port in a bounded range.
-A one-port range is valid, which supports a fixed firewall rule and enables a
-measured same-port handoff experiment. By default, ICE gathers candidates from
-all available interfaces. On multi-homed hosts, repeat `--webrtc-interface`
-to constrain candidates to specific interfaces and avoid advertising
-unreachable private or overlay addresses. If a gateway automatically maps the
-selected UDP port, `worldd` must advertise the mapped external candidate only
-when its address and port are known and verified. `--webrtc-nat-1to1-ip`
-remains an explicit diagnostic/advanced override; it is not the normal setup
-path and does not create a mapping. Keep the HTTPS/WSS signaling path available
-while attempting direct UDP.
+The daemon shares one Pion ICE UDP mux across peer connections. Without
+embedded ZeroTier, it binds an ephemeral UDP port by default; set both
+`--webrtc-udp-port-min` and `--webrtc-udp-port-max` to select the first
+available port in a bounded range. With embedded ZeroTier, it defaults to UDP
+`42902` so the overlay can allow one stable WebRTC port separately from
+libp2p's `42901`; passing both bounds as `0` restores ephemeral selection. A
+one-port range is valid. By default, ICE gathers candidates from all available
+interfaces. On multi-homed hosts, repeat `--webrtc-interface` to constrain
+candidates to specific interfaces and avoid advertising unreachable private
+or overlay addresses. If a gateway automatically maps the selected UDP port,
+`worldd` must advertise the mapped external candidate only when its address
+and port are known and verified. `--webrtc-nat-1to1-ip` remains an explicit
+diagnostic/advanced override; it is not the normal setup path and does not
+create a mapping. Keep the HTTPS/WSS signaling path available while attempting
+direct UDP.
 
 The existing HTTPS/WSS gateway remains a fallback only when that route is an
 approved data path. A Cloudflare public-hostname Tunnel may carry bounded

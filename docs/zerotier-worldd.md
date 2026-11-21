@@ -44,15 +44,17 @@ node starts; zero preserves libzt's default selection. Startup logs the actual
 primary port. This does not disable ZeroTier's optional secondary-port/NAT
 fallback and does not promise that a router preserves the mapping for another
 protocol. `worldd`'s shared Pion ICE mux can select a matching fixed port with
-`--webrtc-udp-port-min N --webrtc-udp-port-max N`. When embedded ZeroTier is
-active, `worldd` keeps libzt running and binds a second Pion packet socket to
-the same numeric UDP port inside libzt's virtual IPv4 network. Pion also keeps
-its normal host UDP socket for public ICE. The two sockets use separate network
-stacks; neither takes over nor stops libzt's physical UDP socket. Visitors use
-ordinary system ZeroTier clients and do not need a modified ZeroTier install.
-This provides an overlay ICE candidate, but it does not guarantee that a peer
-is a member of the overlay or that a public ICE path succeeds. Rendezvous,
-STUN, and the HTTPS/WSS gateway remain separate connectivity mechanisms.
+`--webrtc-udp-port-min N --webrtc-udp-port-max N`. With embedded ZeroTier,
+worldd defaults that socket to UDP `42902`, separate from the libp2p TCP/QUIC
+port `42901`; pass both bounds as `0` to request an ephemeral port. `worldd`
+keeps libzt running and binds a second Pion packet socket to the same numeric
+UDP port inside libzt's virtual IPv4 network. Pion also keeps its normal host
+UDP socket for public ICE. The two sockets use separate network stacks; neither
+takes over nor stops libzt's physical UDP socket. Visitors use ordinary system
+ZeroTier clients and do not need a modified ZeroTier install. This provides an
+overlay ICE candidate, but it does not guarantee that a peer is a member of the
+overlay or that a public ICE path succeeds. Rendezvous, STUN, and the HTTPS/WSS
+gateway remain separate connectivity mechanisms.
 
 The Legacy Central API token at `~/.config/zerotier/central-api-token` is an
 administration credential, not a runtime setting. Keep it owner-readable only
@@ -64,7 +66,7 @@ settings have been checked through the authenticated Central UI. Replacing the
 local API credential is not required for world runtime or peer connectivity.
 Never share the token in chat or source control.
 
-The 2026-10-10 Central UI inspection confirmed this custom, stateless policy.
+The 2026-11-21 Central UI inspection confirmed this custom, stateless policy.
 It explicitly drops frame types other than IPv4, ARP, and IPv6; its default
 action also drops unmatched packets, so only the listed traffic is allowed:
 
@@ -75,22 +77,25 @@ accept ipprotocol tcp and dport 42901;
 accept ipprotocol tcp and sport 42901;
 accept ipprotocol udp and dport 42901;
 accept ipprotocol udp and sport 42901;
+accept ipprotocol udp and dport 42902;
+accept ipprotocol udp and sport 42902;
 accept ipprotocol 1;
 accept ipprotocol 58;
 ```
 
 Both source and destination port rules are required because custom ZeroTier
-rules are stateless. This permits the TCP/UDP replies for peer traffic on
-`42901`; it is not a public-host firewall rule. The rules were saved and
-persisted in Central. If the daemon port changes, update the policy as well.
+rules are stateless. This permits peer traffic on TCP/UDP `42901` and WebRTC
+ICE on UDP `42902`; it is not a public-host firewall rule. The rules were
+saved and persisted in Central. If either daemon port changes, update the
+policy as well.
 These rules govern traffic inside the overlay; the host firewall separately
 needs to permit libzt's outbound UDP bootstrap/peer traffic over the physical
 network. The browser HTTPS/WSS gateway does not need an overlay rule unless
 clients intentionally connect to it over ZeroTier.
 
-The configured custom rules are a narrow starting policy for TCP and QUIC on
-the default port. Keep any future ports similarly explicit and update both
-directions where the rules engine is stateless. See the
+The configured custom rules are a narrow policy for TCP and QUIC on `42901`
+and WebRTC on `42902`. Keep any future ports similarly explicit and update
+both directions where the rules engine is stateless. See the
 [ZeroTier Rules Engine guide](https://docs.zerotier.com/rules/) before changing
 the policy. These rules apply only to overlay traffic; they do not open the
 machine's public firewall.

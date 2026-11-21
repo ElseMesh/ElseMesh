@@ -162,8 +162,8 @@ func run() error {
 	var webrtcInterfaces stringFlags
 	var webrtcNAT1To1IPs stringFlags
 	var zeroTierBlacklistInterfaces stringFlags
-	webrtcUDPPortMin := flag.Uint("webrtc-udp-port-min", 0, "first local UDP port available to the shared WebRTC ICE socket (0 with max 0 selects an ephemeral port)")
-	webrtcUDPPortMax := flag.Uint("webrtc-udp-port-max", 0, "last local UDP port available to the shared WebRTC ICE socket (a one-port range is valid)")
+	webrtcUDPPortMin := flag.Uint("webrtc-udp-port-min", 0, "first local UDP port available to the shared WebRTC ICE socket (defaults to 42902 with embedded ZeroTier; set both bounds to 0 for an ephemeral port)")
+	webrtcUDPPortMax := flag.Uint("webrtc-udp-port-max", 0, "last local UDP port available to the shared WebRTC ICE socket (defaults to 42902 with embedded ZeroTier; a one-port range is valid)")
 	webrtcUPnP := flag.Bool("webrtc-upnp", true, "best-effort automatic UDP port mapping for direct WebRTC (no manual router setup; disable with --webrtc-upnp=false)")
 	dhtMode := flag.String("dht-mode", "auto", "DHT mode: auto, client, or server")
 	serveRelay := flag.Bool("relay-service", false, "allow this node to provide a bounded libp2p circuit relay")
@@ -194,14 +194,19 @@ func run() error {
 	}
 	flag.Parse()
 	p2pPortExplicit := false
+	webrtcUDPPortExplicit := false
 	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "p2p-port" {
+		switch f.Name {
+		case "p2p-port":
 			p2pPortExplicit = true
+		case "webrtc-udp-port-min", "webrtc-udp-port-max":
+			webrtcUDPPortExplicit = true
 		}
 	})
 	if !p2pPortExplicit && *zeroTierNetwork != "" {
 		*listenPort = 42901
 	}
+	*webrtcUDPPortMin, *webrtcUDPPortMax = defaultWebRTCPortRange(*webrtcUDPPortMin, *webrtcUDPPortMax, *zeroTierNetwork != "", webrtcUDPPortExplicit)
 	if *version {
 		fmt.Printf("%s %s\n", daemonName, buildRevision)
 		return nil

@@ -64,6 +64,17 @@ func validateWebRTCPortRange(minimum, maximum uint) error {
 	return nil
 }
 
+// Keep embedded ZeroTier ICE on a stable port separate from libp2p's
+// TCP/QUIC port, so overlay rules can allow WebRTC without opening a range.
+const defaultZeroTierWebRTCUDPPort uint = 42902
+
+func defaultWebRTCPortRange(minimum, maximum uint, embeddedZeroTier, explicitlyConfigured bool) (uint, uint) {
+	if embeddedZeroTier && !explicitlyConfigured {
+		return defaultZeroTierWebRTCUDPPort, defaultZeroTierWebRTCUDPPort
+	}
+	return minimum, maximum
+}
+
 func validateWebRTCInterfaces(names []string) error {
 	if len(names) == 0 {
 		return nil
