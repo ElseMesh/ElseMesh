@@ -99,9 +99,9 @@ before the provider protocol, and falls back to the authorized provider when
 the CDN fails. Browser HTTP caching is enabled for these immutable URLs. The
 current Pages build does not publish the world package asset tree, and there
 is not yet a publisher that uploads explicitly opted-in assets to R2 or another
-CDN. End-to-end startup timing and a world-package reference path that avoids
-copying shared bytes into each repository remain implementation gaps; this
-section is the single design reference for them.
+CDN. End-to-end startup timing, CDN upload automation, and a real cross-world
+browser cache-hit verification remain implementation gaps; this section is the
+single design reference for them.
 
 Treat `WorldContentProvider` as an additive engine boundary, not a new
 world-specific code path. The existing signed-package provider remains the
