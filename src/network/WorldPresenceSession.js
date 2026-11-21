@@ -201,8 +201,12 @@ export class WorldPresenceSession {
    }).catch(error => {
     if (this.disposed) return;
     this.lastRejectedPose = { position: [...pose.position], yaw: pose.yaw, pitch: pose.pitch, mode: pose.mode, error: String(error) };
-    const rateLimited = String( error?.message || error ) === 'presence_rate_limited';
-    this.#restoreLastAcceptedPose(player, { blockMovement: ! rateLimited });
+    const ownerRejected = error?.gatewayResponse === true;
+    const rateLimited = ownerRejected && String( error?.message || error ) === 'presence_rate_limited';
+    // A missed response does not tell us whether the owner accepted the pose.
+    // Preserve local prediction across transport failures instead of visibly
+    // snapping the player back to an older confirmed position.
+    if ( ownerRejected && ! rateLimited ) this.#restoreLastAcceptedPose(player);
     this.nextSend = this.clock() + ( rateLimited ? 100 : 2000 );
     if (!rateLimited && !this.reportedError) { this.reportedError = true; this.onError(error); }
    }).finally(() => { this.pending = null; });

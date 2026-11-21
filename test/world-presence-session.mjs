@@ -98,7 +98,11 @@ const authoritySession = new WorldPresenceSession({ connector, parent: { add() {
  onError() {}, createConnector() { return {
   updatePresence(pose) {
    authoritativeRequests++;
-   if (authoritativeRequests === 2) return Promise.reject(new Error('movement_blocked:collision_bounds_block_path:test-wall'));
+   if (authoritativeRequests === 2) {
+    const error = new Error('movement_blocked:collision_bounds_block_path:test-wall');
+    error.gatewayResponse = true;
+    return Promise.reject(error);
+   }
    return Promise.resolve({ type: 'presence', worldId: connector.worldId, requestId: `authority-${authoritativeRequests}`, playerId: own,
     players: [{ ...pose, id: own, updatedAt: authoritativeNow }] });
   }, close() {},
@@ -144,7 +148,11 @@ const transientSession = new WorldPresenceSession( { connector, parent: { add() 
 	onError() { transientErrors ++; }, createConnector() { return {
 		updatePresence( pose ) {
 			transientRequests ++;
-			if ( transientRequests === 2 ) return Promise.reject( new Error( 'presence_rate_limited' ) );
+			if ( transientRequests === 2 ) {
+				const error = new Error( 'presence_rate_limited' );
+				error.gatewayResponse = true;
+				return Promise.reject( error );
+			}
 			return Promise.resolve( { type: 'presence', worldId: connector.worldId, requestId: `transient-${transientRequests}`, playerId: own,
 				players: [ { ...pose, id: own, updatedAt: transientNow } ] } );
 		}, close() {},
@@ -156,7 +164,7 @@ transientPlayer.velocity.z = -3;
 transientNow += 200;
 transientSession.update( 1 / 60, transientPlayer, transientNow );
 await transientSession.pending;
-assert.deepEqual( transientPlayer.position.toArray(), [ 0, 1, 0 ], 'a transient rate limit rolls back to the owner-approved pose' );
+assert.deepEqual( transientPlayer.position.toArray(), [ 0, 1, -0.5 ], 'a transient rate limit preserves the locally predicted position' );
 assert.equal( transientPlayer.worldMovementAuthorityBlocked, false, 'a transient rate limit does not latch the movement block' );
 assert.equal( transientErrors, 0, 'a transient rate limit does not report an authority failure to the user' );
 transientNow += 99;
@@ -169,6 +177,32 @@ await transientSession.pending;
 assert.equal( transientRequests, 3, 'presence publication retries after the rate-limit interval' );
 assert.deepEqual( transientSession.lastAcceptedPose.position, [ 0, 1, -0.1 ], 'the next owner-approved movement pose is accepted without a release-and-repress cycle' );
 transientSession.dispose();
+
+let unavailableNow = 8000, unavailableRequests = 0;
+const unavailablePlayer = {
+	position: new Vector3( 0, 1, 0 ), velocity: new Vector3( 0, 0, 0 ), mode: 'walk', yaw: 0, pitch: 0,
+	setHostedWorldAuthoritativePose( position, yaw, pitch, mode ) {
+		this.position.set( ...position ); this.velocity.set( 0, 0, 0 ); this.yaw = yaw; this.pitch = pitch; this.mode = mode;
+	},
+};
+const unavailableSession = new WorldPresenceSession( { connector, parent: { add() {} }, clock: () => unavailableNow,
+	onError() {}, createConnector() { return {
+		updatePresence( pose ) {
+			unavailableRequests ++;
+			if ( unavailableRequests === 2 ) return Promise.reject( new Error( 'World gateway connection failed' ) );
+			return Promise.resolve( { type: 'presence', worldId: connector.worldId, requestId: `unavailable-${unavailableRequests}`, playerId: own,
+				players: [ { ...pose, id: own, updatedAt: unavailableNow } ] } );
+		}, close() {},
+	}; },
+} );
+await unavailableSession.admit( unavailablePlayer );
+unavailablePlayer.position.z = -0.5;
+unavailableNow += 200;
+unavailableSession.update( 1 / 60, unavailablePlayer, unavailableNow );
+await unavailableSession.pending;
+assert.deepEqual( unavailablePlayer.position.toArray(), [ 0, 1, -0.5 ], 'a transport failure preserves local movement instead of snapping back to the last confirmed position' );
+assert.equal( unavailablePlayer.worldMovementAuthorityBlocked, false, 'a transport failure does not latch an owner movement block' );
+unavailableSession.dispose();
 const houseUniform = {...DEFAULT_APPEARANCE, shirt:'#8b1c2b', trousers:'#3e2434'};
 const restrictedWorld = {...connector, manifest:{...connector.manifest, rules:{...connector.manifest.rules,
  avatarPolicy:{allowedProfiles:['elsemesh.avatar.stock-female/1']}}}};

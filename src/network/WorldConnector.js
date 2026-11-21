@@ -755,7 +755,7 @@ export class WorldConnector {
 				if ( ! pending ) return;
 				this.pending.delete( response.requestId );
 				clearTimeout( pending.timeout );
-				if ( response.type === 'error' ) pending.reject( new Error( response.error || response.code || 'World request failed' ) );
+				if ( response.type === 'error' ) pending.reject( worldResponseError( response ) );
 				else pending.resolve( response );
 			} );
 			socket.addEventListener( 'error', () => {
@@ -873,7 +873,7 @@ export class WorldConnector {
 			this.rtcPending.delete( response.requestId );
 			clearTimeout( pending.timeout );
 			if ( response.worldId !== this.worldId ) { pending.reject( new Error( 'World data channel response mismatch' ) ); return; }
-			if ( response.type === 'error' ) pending.reject( new Error( response.error || 'World request failed' ) );
+			if ( response.type === 'error' ) pending.reject( worldResponseError( response ) );
 			else pending.resolve( response );
 		} );
 		channel.addEventListener( 'close', () => this.#closeRTC( new Error( 'Direct WebRTC data channel closed' ) ), { once: true } );
@@ -1119,12 +1119,17 @@ async function requestWebTransport( session, message, signal ) {
 	const response = await withTimeout( readJSONStream( stream.readable, signal ), 30000, 'World request timed out', signal );
 	if ( signal?.aborted ) throw signal.reason || new DOMException( 'Aborted', 'AbortError' );
 	if ( response.type === 'error' ) {
-		const error = new Error( response.error || response.code || 'World request failed' );
-		error.gatewayResponse = true;
-		throw error;
+		throw worldResponseError( response );
 	}
 	invariant( response.requestId === message.requestId, 'World response does not match its request' );
 	return response;
+}
+
+function worldResponseError( response ) {
+	const error = new Error( response.error || response.code || 'World request failed' );
+	error.gatewayResponse = true;
+	if ( typeof response.code === 'string' ) error.code = response.code;
+	return error;
 }
 
 async function writeJSONStream( writable, value, signal ) {

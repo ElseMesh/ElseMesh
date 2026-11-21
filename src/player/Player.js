@@ -1,6 +1,6 @@
 import * as THREE from '../engine/math/index.js';
 import { gravityAcceleration, movementParameters, movementProfileParameters, playerCapsuleParameters } from '../network/WorldRules.js';
-import { DEFAULT_WALKABLE_SLOPE_DEGREES } from '../world/Colliders.js';
+import { DEFAULT_WALKABLE_SLOPE_DEGREES, GROUND_CONTACT_TOLERANCE_METERS } from '../world/Colliders.js';
 import { PLAYER_EYE_HEIGHT } from './PlayerDimensions.js';
 
 const DEFAULT_HELM = { x: 0, z: 0 };
@@ -214,7 +214,8 @@ export class Player {
 			this.position.copy( _hostedTarget );
 		}
 		if ( wasGrounded && this.velocity.y <= 0 && this.colliders?.stepCapsuleToSurface ) {
-			const stepY = this.colliders.stepCapsuleToSurface( this.position, this._previousPosition, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarStepHeightMeters ?? 0 );
+			const fromGround = this.groundAt( this._previousPosition.x, this._previousPosition.z, this._previousPosition.y + GROUND_CONTACT_TOLERANCE_METERS );
+			const stepY = this.colliders.stepCapsuleToSurface( this.position, this._previousPosition, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarStepHeightMeters ?? 0, fromGround );
 			if ( Number.isFinite( stepY ) ) {
 				_hostedStepStart.copy( this._previousPosition );
 				_hostedStepStart.y = stepY;
@@ -387,7 +388,8 @@ export class Player {
 		const wasGrounded = this.grounded;
 		p.addScaledVector( this.velocity, dt );
 		if ( wasGrounded && this.velocity.y <= 0 && this.colliders?.stepCapsuleToSurface ) {
-			const stepY = this.colliders.stepCapsuleToSurface( p, old, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarStepHeightMeters ?? 0 );
+			const fromGround = this.groundAt( old.x, old.z, old.y + GROUND_CONTACT_TOLERANCE_METERS );
+			const stepY = this.colliders.stepCapsuleToSurface( p, old, this.playerCapsule.radiusMeters, this.playerCapsule.heightMeters, this.avatarStepHeightMeters ?? 0, fromGround );
 			if ( Number.isFinite( stepY ) ) {
 				p.y = stepY;
 				this.velocity.y = 0;

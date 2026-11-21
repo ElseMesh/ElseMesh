@@ -31,6 +31,9 @@ function closestPointOnTriangleXZ( x, z, a, b, c ) {
 // This preserves the prior normal.y > 0.95 walkable-face cutoff when a world
 // does not supply a more specific avatar/vehicle slope capability.
 export const DEFAULT_WALKABLE_SLOPE_DEGREES = Math.acos( 0.95 ) * 180 / Math.PI;
+// Engine contact tolerance for a grounded capsule. World-authored step height
+// remains a separate avatar movement capability.
+export const GROUND_CONTACT_TOLERANCE_METERS = 0.08;
 
 let movementSupportKernel = null;
 
@@ -227,14 +230,14 @@ export class Colliders {
 	// Find a nearby raised walkable surface that a grounded capsule can step onto.
 	// The returned height is only a candidate; callers that stream collision data
 	// must validate the raised path before applying it.
-	stepCapsuleToSurface( pos, from, radius, height, maxStepHeight ) {
+	stepCapsuleToSurface( pos, from, radius, height, maxStepHeight, fromGround = undefined ) {
 
 		if ( ! Number.isFinite( maxStepHeight ) || maxStepHeight <= 0 ) return null;
 		const moveX = pos.x - from.x, moveZ = pos.z - from.z;
 		const moveLength = Math.hypot( moveX, moveZ );
 		if ( moveLength <= 1e-8 ) return null;
-		const fromGround = this.groundHeightAt( from.x, from.z, from.y + 0.08, radius * 0.25 );
-		if ( ! Number.isFinite( fromGround ) || from.y - fromGround > 0.08 ) return null;
+		if ( ! Number.isFinite( fromGround ) ) fromGround = this.groundHeightAt( from.x, from.z, from.y + GROUND_CONTACT_TOLERANCE_METERS, radius * 0.25 );
+		if ( ! Number.isFinite( fromGround ) || from.y - fromGround > GROUND_CONTACT_TOLERANCE_METERS ) return null;
 
 		// A convex stair hull has a vertical riser and a separate horizontal tread.
 		// The capsule center can still be in front of that tread when its leading
