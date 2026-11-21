@@ -128,6 +128,13 @@ fetched, so cross-world CDN reuse at the edge still needs live verification.
 Shared-content progress moves from 80% to 85%; live CDN deployment and edge
 reuse proof remain open.
 
+**2026-11-21 CDN deployment check:** The configured Wrangler account is
+reachable, but its read-only `wrangler r2 bucket list` request returned
+Cloudflare error 10042, directing the account owner to enable R2 in the
+dashboard. This repository also has no selected bucket or CDN hostname. No
+object was uploaded; live CDN reuse remains unverified and the estimate stays
+85% until an opted-in asset is published and fetched through a configured CDN.
+
 **2026-11-21 renderer-neutral input gate:** Tidewater's vendor and inventory
 panels now use one `onWorldBlocksPlayerInput` behavior hook in both ElseMesh
 render paths. WebGPU's app player-update path now honors the same gate already
