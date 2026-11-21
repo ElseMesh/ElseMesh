@@ -94,14 +94,18 @@ CDN availability must not delay or bypass the movement gate. Progressive
 texture/model tiers remain independently addressable and cacheable by their
 own content identity.
 
-The browser validates signed digest URLs, attempts hash-checked CDN delivery
-before the provider protocol, and falls back to the authorized provider when
-the CDN fails. Browser HTTP caching is enabled for these immutable URLs. The
-current Pages build does not publish the world package asset tree, and there
-is not yet a publisher that uploads explicitly opted-in assets to R2 or another
-CDN. End-to-end startup timing, CDN upload automation, and a real cross-world
-browser cache-hit verification remain implementation gaps; this section is the
-single design reference for them.
+The browser validates signed digest URLs, checks an origin-wide CacheStorage
+entry keyed by the canonical digest URL, and verifies the cached size and
+SHA-256 before use. On a miss it fetches with credentials omitted, verifies the
+response, stores the bytes for later world loads, and falls back to the
+authorized provider if CDN delivery fails. An isolated Chromium test confirms
+two world loads use one network transfer. CacheStorage is partitioned by the
+ElseMesh site origin and browser profile; worlds using the same ElseMesh client
+share entries when they name the same URL. The current Pages build does not
+publish the world package asset tree, and there is not yet a publisher that
+uploads explicitly opted-in assets to R2 or another CDN. End-to-end startup
+timing and CDN upload automation remain open; this section is the single
+design reference for them.
 
 Treat `WorldContentProvider` as an additive engine boundary, not a new
 world-specific code path. The existing signed-package provider remains the
