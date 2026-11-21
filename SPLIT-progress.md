@@ -305,20 +305,17 @@ and snapback regression gate, but does not compare rendered movement in WebGPU
 and WebGL or against pre-split Tidewater. No parity percentage changed.
 
 **2026-11-21 Tidewater audio ownership update:** Moved the fishing cue table,
-target levels, pitch variation, positional placement, voice limits, and reel
-loop response into Tidewater's `game/FishingAudio.js`. Both the WebGPU game and
-WebGL adapter use that world-owned profile. `SoundScape` now exposes generic
-sample preloading, one-shot, positional, and loop controls, and no longer
-contains fishing cue methods or fishing mix levels. Engine tests exercise those
-generic controls; Tidewater tests check the profile and its outputs. The shared
-Tidewater now owns its fishing sample bank and the audio build tools. The
-engine's `soundBank.js` still holds the built-in environment and footstep
-catalog, which Tidewater's package exporter reads for signed ambience; the
-broader built-in soundscape remains in the engine. The Tidewater profile
-fixture, generic engine audio fixture, full
+target levels, pitch variation, positional placement, voice limits, reel-loop
+response, sample bank, and audio build tools into Tidewater. Both renderer game
+paths use Tidewater's `game/FishingAudio.js` profile; ElseMesh exposes generic
+sample-bank registration, preloading, one-shot, positional, and loop controls.
+The engine no longer contains fishing cue methods, mix levels, or sample
+metadata. The Tidewater profile and world-export tests, engine audio test, full
 WebGPU/WebGL renderer-parity suite (including pre-split WebGPU traces), and
-production build pass. This is a focused ownership move, not completion of
-audio or overall separation. No percentage changed.
+production build pass. ElseMesh still owns the built-in environment and
+footstep catalog, which Tidewater's exporter reads for signed ambience, and its
+built-in soundscape simulation. Audio and overall separation remain incomplete;
+no percentage changed.
 
 ## Progress by requirement
 
