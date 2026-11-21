@@ -304,6 +304,18 @@ not block or roll back movement. This closes the local live-`worldd` presence
 and snapback regression gate, but does not compare rendered movement in WebGPU
 and WebGL or against pre-split Tidewater. No parity percentage changed.
 
+**2026-11-21 Tidewater audio ownership update:** Moved the fishing cue table,
+target levels, pitch variation, positional placement, voice limits, and reel
+loop response into Tidewater's `game/FishingAudio.js`. Both the WebGPU game and
+WebGL adapter use that world-owned profile. `SoundScape` now exposes generic
+sample preloading, one-shot, positional, and loop controls, and no longer
+contains fishing cue methods or fishing mix levels. Engine tests exercise those
+generic controls; Tidewater tests check the profile and its outputs. The shared
+engine `soundBank.js` still contains Tidewater sample metadata, and Tidewater's
+exporter still imports it; the broader built-in soundscape also remains in the
+engine. This is a focused ownership move, not completion of audio or overall
+separation. No percentage changed.
+
 ## Progress by requirement
 
 | Requirement | Estimate | Evidence and remaining acceptance gate |

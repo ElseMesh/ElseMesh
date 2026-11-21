@@ -11,4 +11,13 @@ If a local tab is silent while the hosted tab plays:
 
 The game currently has no separate local-only audio switch. If those checks pass but ambience is still absent, capture the console and Network errors before changing the mixer; the production and development paths share the same audio initialization code.
 
-Hosted worlds can additionally provide signed, content-addressed ambience through `elsemesh.ambient-audio/1`. The browser plays those OGG loops through the same `SoundScape` AudioContext after the normal start gesture. See [the component contract](schemas/ambient-audio.md). This currently covers loops only; interactive sound events still use the built-in island simulation.
+Hosted worlds can provide signed, content-addressed ambience through `elsemesh.ambient-audio/1`. The browser plays those OGG loops through the same `SoundScape` AudioContext after the normal start gesture. See [the component contract](schemas/ambient-audio.md).
+
+World-owned behavior may use `SoundScape.preloadSamples`, `playSample`, and
+`setSampleLoop` for local interactive cues. The world chooses its samples,
+levels, voice groups, and cue timing; ElseMesh supplies decoding, spatial
+placement, looping, and voice cleanup. Tidewater's fishing cue profile now
+lives in `worlds/tidewater/game/FishingAudio.js` and is shared by its WebGPU and
+WebGL game paths. The engine's shared `soundBank.js` still contains Tidewater
+sample metadata, and Tidewater's exporter still reads it; both are remaining
+separation work.
