@@ -126,8 +126,10 @@ export class SoundScape {
 		this._volume = 0.8;
 		this._buffers = new Map(); // name -> AudioBuffer
 		this._loading = new Map(); // name -> Promise
-		this._sampleInfo = new Map( Object.entries( BANK ).map( ( [ id, info ] ) => [ id, { info, baseUrl: this.baseUrl } ] ) );
+		this._sampleInfo = new Map( Object.entries( BANK ).map( ( [ id, info ] ) => [ id, { info, baseUrl: this.baseUrl, namespace: '' } ] ) );
 		this._sampleBankSignatures = new Map();
+		this._sampleBankEntries = new Map();
+		this._activeSampleBank = '';
 		this._worldAudioBuffers = new Map(); // content ID -> AudioBuffer / in-flight decode
 		this._worldAudioFailures = new Set();
 		this._worldAudioComponents = new Map(); // component ID -> signed data and verified bytes
@@ -281,11 +283,60 @@ export class SoundScape {
 			} else if ( ! Array.isArray( info.slices ) || ! Array.isArray( info.lufs ) || info.slices.length < 1 || info.slices.length !== info.lufs.length || info.slices.length > 256
 				|| info.slices.some( slice => ! Array.isArray( slice ) || slice.length !== 2 || ! slice.every( Number.isFinite ) || slice[ 0 ] < 0 || slice[ 1 ] <= 0 )
 				|| info.lufs.some( value => ! Number.isFinite( value ) ) ) throw new Error( `Invalid sprite metadata in world audio bank: ${id}` );
-			if ( previousSignature === undefined ) this._sampleInfo.set( id, { info, baseUrl: this.baseUrl } );
+			if ( previousSignature === undefined ) this._sampleInfo.set( id, { info, baseUrl: this.baseUrl, namespace } );
 			ids[ name ] = id;
 		}
 		this._sampleBankSignatures.set( namespace, signature );
-		return Object.freeze( ids );
+		const resolved = Object.freeze( ids );
+		this._sampleBankEntries.set( namespace, resolved );
+		return resolved;
+
+	}
+
+	setActiveSampleBank( namespace = '' ) {
+
+		if ( namespace !== '' && ! this._sampleBankEntries.has( namespace ) ) throw new Error( `World audio sample bank is not registered: ${namespace}` );
+		if ( namespace === this._activeSampleBank ) return;
+		const previous = this._activeSampleBank;
+		this._activeSampleBank = namespace;
+		if ( ! previous ) return;
+		for ( const [ id, bed ] of this._beds ) if ( bed.namespace === previous ) {
+			this._ramp( bed.gain.gain, 0, 0.05 );
+			try { bed.src.stop( this.ctx.currentTime + 0.2 ); } catch { /* already stopped */ }
+			this._beds.delete( id );
+		}
+		for ( const voices of Object.values( this._voices ) ) for ( const voice of voices ) if ( voice.sampleNamespace === previous ) {
+			voice.gain.gain.setTargetAtTime( 0, this.ctx.currentTime, 0.03 );
+			try { voice.src.stop( this.ctx.currentTime + 0.1 ); } catch { /* already stopped */ }
+		}
+
+	}
+
+	_sampleID( name ) {
+
+		if ( this._sampleInfo.has( name ) ) return name;
+		return this._sampleBankEntries.get( this._activeSampleBank )?.[ name ] || '';
+
+	}
+
+	_sample( name ) {
+
+		const id = this._sampleID( name );
+		return id ? this._sampleInfo.get( id )?.info || null : null;
+
+	}
+
+	_sampleLufs( name ) {
+
+		const value = this._sample( name )?.lufs;
+		return Number.isFinite( value ) ? value : 0;
+
+	}
+
+	_hasBed( name ) {
+
+		const id = this._sampleID( name );
+		return !! id && this._beds.has( id );
 
 	}
 
@@ -303,14 +354,15 @@ export class SoundScape {
 
 	setSampleLoop( name, { targetLufs, weight = 0, rate = 1, channel = 'above', timeConstant = 0.25 } = {} ) {
 
-		const info = this._sampleInfo.get( name )?.info;
+		const id = this._sampleID( name );
+		const info = id ? this._sampleInfo.get( id )?.info : null;
 		if ( ! this.enabled || ! info?.loop || ! Number.isFinite( targetLufs ) || ! Number.isFinite( weight ) || weight < 0
 			|| ! Number.isFinite( rate ) || rate <= 0 || ! Number.isFinite( timeConstant ) || timeConstant < 0 ) return false;
 		const destination = channel === 'foreground' ? this.foreground : channel === 'above' ? this.above : channel === 'near' ? this.near : null;
 		if ( ! destination ) return false;
 		const level = weight > 0 ? targetLufs + 20 * Math.log10( weight ) : - Infinity;
 		const gain = Number.isFinite( level ) ? dB( clamp( level - info.lufs, - 80, 24 ) ) : 0;
-		this._bed( name, gain, this.ctx.currentTime, timeConstant, rate, destination );
+		this._bed( id, gain, this.ctx.currentTime, timeConstant, rate, destination );
 		return true;
 
 	}
@@ -769,27 +821,29 @@ export class SoundScape {
 	// the buffer if decoded; otherwise starts loading it (once) and returns null
 	_want( name ) {
 
-		const b = this._buffers.get( name );
+		const id = this._sampleID( name );
+		if ( ! id ) return null;
+		const b = this._buffers.get( id );
 		if ( b ) return b;
-		const sample = this._sampleInfo.get( name );
-		if ( ! this._loading.has( name ) && sample && this.ctx ) {
+		const sample = this._sampleInfo.get( id );
+		if ( ! this._loading.has( id ) && sample && this.ctx ) {
 
 			const p = fetch( sample.baseUrl + sample.info.file )
 				.then( ( r ) => {
 
-					if ( ! r.ok ) throw new Error( `audio ${ name }: HTTP ${ r.status }` );
+					if ( ! r.ok ) throw new Error( `audio ${ id }: HTTP ${ r.status }` );
 					return r.arrayBuffer();
 
 				} )
 				.then( ( a ) => this.ctx.decodeAudioData( a ) )
 				.then( ( buf ) => {
 
-					this._buffers.set( name, buf );
+					this._buffers.set( id, buf );
 					return buf;
 
 				} )
 				.catch( ( e ) => this._warn( e ) );
-			this._loading.set( name, p );
+			this._loading.set( id, p );
 
 		}
 
@@ -802,11 +856,13 @@ export class SoundScape {
 	// sets a looping bed's gain (linear) and playback rate; starts it (random offset) when first audible
 	_bed( name, g, now, tau = 0.25, rate = 1, destination = this._dest[ name ] ) {
 
-		let bed = this._beds.get( name );
+		const sampleID = this._sampleID( name );
+		if ( ! sampleID ) return;
+		let bed = this._beds.get( sampleID );
 		if ( ! bed ) {
 
 			if ( g < 1e-4 ) return;
-			const buf = this._want( name );
+			const buf = this._want( sampleID );
 			if ( ! buf ) return;
 			const c = this.ctx;
 			const src = c.createBufferSource();
@@ -816,9 +872,10 @@ export class SoundScape {
 			const gn = c.createGain();
 			gn.gain.value = 0;
 			src.connect( gn ).connect( destination );
+			src.onended = () => { src.disconnect(); gn.disconnect(); };
 			src.start( now + 0.02, Math.random() * buf.duration );
-			bed = { src, gain: gn, trim: buf.numberOfChannels === 1 ? MONO : 1 };
-			this._beds.set( name, bed );
+			bed = { src, gain: gn, trim: buf.numberOfChannels === 1 ? MONO : 1, namespace: this._sampleInfo.get( sampleID )?.namespace || '' };
+			this._beds.set( sampleID, bed );
 			if ( destination !== this.foreground ) tau = Math.max( tau, 0.8 );
 
 		}
@@ -835,13 +892,14 @@ export class SoundScape {
 	_shot( bank, cat, dest, targetLufs, rate = 1, at = 0, pick = - 1, maxVoices = LIMITS[ cat ] || 3 ) {
 
 		if ( ! this.enabled || ! dest ) return null;
-		const info = this._sampleInfo.get( bank )?.info;
-		const buf = this._want( bank );
+		const sampleID = this._sampleID( bank );
+		const info = sampleID ? this._sampleInfo.get( sampleID )?.info : null;
+		const buf = sampleID ? this._want( sampleID ) : null;
 		if ( ! buf || ! info ) return null;
 		const n = info.slices.length;
 		let i = pick >= 0 && pick < n ? pick : Math.floor( Math.random() * n );
-		if ( pick < 0 && n > 1 && i === this._last[ bank ] ) i = ( i + 1 + Math.floor( Math.random() * ( n - 1 ) ) ) % n;
-		this._last[ bank ] = i;
+		if ( pick < 0 && n > 1 && i === this._last[ sampleID ] ) i = ( i + 1 + Math.floor( Math.random() * ( n - 1 ) ) ) % n;
+		this._last[ sampleID ] = i;
 		const [ start, dur ] = info.slices[ i ];
 		const c = this.ctx, t = Math.max( c.currentTime + 0.005, at );
 		const src = c.createBufferSource();
@@ -853,7 +911,7 @@ export class SoundScape {
 		src.start( t, start, dur );
 
 		const list = this._voices[ cat ] || ( this._voices[ cat ] = [] );
-		const v = { src, gain: g, end: t + dur / rate, extra: null };
+		const v = { src, gain: g, end: t + dur / rate, extra: null, sampleNamespace: this._sampleInfo.get( sampleID )?.namespace || '' };
 		list.push( v );
 		src.onended = () => {
 
@@ -1242,7 +1300,7 @@ export class SoundScape {
 		this._ramp( this.aboveOut.gain, lerp( 1, 0.4 / ( 1 + e.depth / 5 ), u ), 0.05 );
 		this._ramp( this.under.gain, u, 0.06 );
 		const wantUnder = u > 0 || ( ! e.onLand && e.ly < 2.5 );
-		this._bed( 'under_reef', wantUnder ? dB( MIX.reef ) * ( 0.8 + 0.3 * deep ) / dB( BANK.under_reef.lufs ) : 0, now, 0.5 );
+		this._bed( 'under_reef', wantUnder ? dB( MIX.reef ) * ( 0.8 + 0.3 * deep ) / dB( this._sampleLufs( 'under_reef' ) ) : 0, now, 0.5 );
 		if ( wantUnder ) {
 
 			this._want( 'uw_swim' );
@@ -1253,7 +1311,7 @@ export class SoundScape {
 
 		// distant surf (the waves themselves are events, see _surf)
 		const lvl = 0.6 + 0.7 * e.surf;
-		this._bed( 'surf_far', dB( MIX.surfFar ) * 1.25 / ( 1 + d / 200 ) * lvl / dB( BANK.surf_far.lufs ), now, 0.5 );
+		this._bed( 'surf_far', dB( MIX.surfFar ) * 1.25 / ( 1 + d / 200 ) * lvl / dB( this._sampleLufs( 'surf_far' ) ), now, 0.5 );
 
 		// wind in gusts: a random target every 2-8 s (lulls near silent), eased towards
 		const g = this._gust;
@@ -1268,17 +1326,17 @@ export class SoundScape {
 		g.v += ( g.target - g.v ) * ( 1 - Math.exp( - dt / 1.4 ) );
 		const w = Math.hypot( e.wind, eb.active ? eb.speed * 0.9 : 0 );
 		const gw = eb.active && eb.speed > 3 ? Math.max( g.v, 0.5 ) : g.v; // apparent wind on a running boat is steady
-		this._bed( 'wind', dB( MIX.wind ) * clamp( w / 7, 0, 2.5 ) * gw / dB( BANK.wind.lufs ), now, 0.3 );
+		this._bed( 'wind', dB( MIX.wind ) * clamp( w / 7, 0, 2.5 ) * gw / dB( this._sampleLufs( 'wind' ) ), now, 0.3 );
 		this._ramp( this.windLP.frequency, 400 + ( 80 + 60 * gw ) * w, 0.4 );
 
 		// trees inland rustle in the gusts; crickets inland at night (daylight < 0.3)
 		const veg = e.onLand ? smooth( 6, 30, d ) : 0;
-		this._bed( 'palms', dB( MIX.palms ) * veg * clamp( e.wind / 7, 0.2, 1.8 ) * g.v * ( 0.3 + 0.7 * e.day ) / dB( BANK.palms.lufs ), now, 0.5 );
+		this._bed( 'palms', dB( MIX.palms ) * veg * clamp( e.wind / 7, 0.2, 1.8 ) * g.v * ( 0.3 + 0.7 * e.day ) / dB( this._sampleLufs( 'palms' ) ), now, 0.5 );
 		const night = smooth( 0.3, 0.12, e.day );
-		this._bed( 'crickets', dB( MIX.crickets ) * night * ( e.onLand ? 0.35 + 0.65 * smooth( 5, 40, d ) : 0.1 ) / dB( BANK.crickets.lufs ), now, 1 );
+		this._bed( 'crickets', dB( MIX.crickets ) * night * ( e.onLand ? 0.35 + 0.65 * smooth( 5, 40, d ) : 0.1 ) / dB( this._sampleLufs( 'crickets' ) ), now, 1 );
 
 		// water lapping the pier piles
-		this._bed( 'pier_lap', ( e.nearPier ? dB( MIX.pierLap ) : 0 ) / dB( BANK.pier_lap.lufs ), now, 0.6 );
+		this._bed( 'pier_lap', ( e.nearPier ? dB( MIX.pierLap ) : 0 ) / dB( this._sampleLufs( 'pier_lap' ) ), now, 0.6 );
 
 		this._boat( now, dt );
 
@@ -1293,12 +1351,12 @@ export class SoundScape {
 		const bd = Math.hypot( eb.x - e.lx, eb.z - e.lz );
 		const nearBoat = eb.active || bd < 60;
 		const eng = this._engine, rpm = eb.rpm;
-		this._bed( 'boat_engine', dB( lerp( MIX.engineIdle, MIX.engineRun, Math.pow( rpm, 0.8 ) ) ) * eng / dB( BANK.boat_engine.lufs ), now, 0.12,
+		this._bed( 'boat_engine', dB( lerp( MIX.engineIdle, MIX.engineRun, Math.pow( rpm, 0.8 ) ) ) * eng / dB( this._sampleLufs( 'boat_engine' ) ), now, 0.12,
 			( 0.8 + 0.85 * rpm ) * lerp( 0.75, 1, eng ) );
 		this._ramp( this.engineLP.frequency, 900 + 6500 * Math.pow( rpm, 1.3 ), 0.12 );
 		const sp = eb.speed;
-		this._bed( 'boat_rush', nearBoat ? dB( MIX.boatRush ) * smooth( 0.4, 9, sp ) / dB( BANK.boat_rush.lufs ) : 0, now, 0.3, 0.85 + 0.02 * Math.min( sp, 12 ) );
-		this._bed( 'boat_lap', nearBoat ? dB( MIX.boatLap ) * ( 1 - smooth( 1.5, 5, sp ) ) / dB( BANK.boat_lap.lufs ) : 0, now, 0.5 );
+		this._bed( 'boat_rush', nearBoat ? dB( MIX.boatRush ) * smooth( 0.4, 9, sp ) / dB( this._sampleLufs( 'boat_rush' ) ) : 0, now, 0.3, 0.85 + 0.02 * Math.min( sp, 12 ) );
+		this._bed( 'boat_lap', nearBoat ? dB( MIX.boatLap ) * ( 1 - smooth( 1.5, 5, sp ) ) / dB( this._sampleLufs( 'boat_lap' ) ) : 0, now, 0.5 );
 		if ( nearBoat && sp > 1.2 && e.u < 0.5 ) {
 
 			this._slapT -= dt;
@@ -1467,7 +1525,7 @@ export class SoundScape {
 
 		// the dawn chorus: many birds at once, diffuse; inland at full, from the beach distant, gone at sea
 		const cg = chorus * ( e.onLand ? 0.3 + 0.7 * inland : 0.3 * ( 1 - smooth( 20, 150, e.shoreDist ) ) ) * ( 1 - e.u );
-		this._bed( 'birds_dawn', dB( MIX.birdChorus ) * cg / dB( BANK.birds_dawn.lufs ), now, 2 );
+		this._bed( 'birds_dawn', dB( MIX.birdChorus ) * cg / dB( this._sampleLufs( 'birds_dawn' ) ), now, 2 );
 
 		this._birdT -= dt;
 		const rate = act * hab;
@@ -1509,7 +1567,7 @@ export class SoundScape {
 
 			}
 
-			const info = BANK[ s.bank ];
+			const info = this._sample( s.bank );
 			if ( ! this._want( s.bank ) ) {
 
 				s.t = 1; // still loading
@@ -1542,7 +1600,7 @@ export class SoundScape {
 		const w = app && ( app.activeHostedWhale || app.whale ), b = w && w.ready && w.brain;
 		if ( ! b || ! b.position ) {
 
-			if ( this._beds.has( 'whale_song' ) ) this._bed( 'whale_song', 0, now, 1 );
+			if ( this._hasBed( 'whale_song' ) ) this._bed( 'whale_song', 0, now, 1 );
 			return;
 
 		}
@@ -1554,12 +1612,12 @@ export class SoundScape {
 		// dull. Only heard near the whale.
 		s.sing += ( ( b.state === 'cruise' ? 1 : 0.1 ) - s.sing ) * ( 1 - Math.exp( - dt / 4 ) );
 		const audible = d < WHALE_RANGE;
-		if ( audible || this._beds.has( 'whale_song' ) ) {
+		if ( audible || this._hasBed( 'whale_song' ) ) {
 
 			this._pos( this.songPan, p.x, p.y, p.z );
 			this._ramp( this.songLP.frequency, Math.exp( lerp( Math.log( 420 ), Math.log( 16000 ), u ) ), 0.08 );
 			this._ramp( this.songOut.gain, lerp( dB( - 20 ), 1, u ), 0.08 );
-			this._bed( 'whale_song', audible ? dB( MIX.whaleSong ) * s.sing * ( 1 - smooth( WHALE_RANGE - 30, WHALE_RANGE, d ) ) / dB( BANK.whale_song.lufs ) : 0, now, 1.5 );
+				this._bed( 'whale_song', audible ? dB( MIX.whaleSong ) * s.sing * ( 1 - smooth( WHALE_RANGE - 30, WHALE_RANGE, d ) ) / dB( this._sampleLufs( 'whale_song' ) ) : 0, now, 1.5 );
 
 		}
 

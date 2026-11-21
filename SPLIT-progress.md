@@ -312,10 +312,10 @@ sample-bank registration, preloading, one-shot, positional, and loop controls.
 The engine no longer contains fishing cue methods, mix levels, or sample
 metadata. The Tidewater profile and world-export tests, engine audio test, full
 WebGPU/WebGL renderer-parity suite (including pre-split WebGPU traces), and
-production build pass. ElseMesh still owns the built-in environment and
-footstep catalog, which Tidewater's exporter reads for signed ambience, and its
-built-in soundscape simulation. Audio and overall separation remain incomplete;
-no percentage changed.
+production build pass. Tidewater's exporter reads its own ambient bank.
+ElseMesh retains generic player samples and the built-in soundscape simulation;
+the shoreline, bird, boat, and whale mix behavior still needs a world-owned
+profile. Audio and overall separation remain incomplete; no percentage changed.
 
 ## Progress by requirement
 
