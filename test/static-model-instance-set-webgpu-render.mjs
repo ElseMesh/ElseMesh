@@ -143,6 +143,7 @@ try {
 	assert.ok( graphMesh.length > 0 && graphMesh.every( mesh => mesh.geometry.getAttribute( 'vdata1' ) && mesh.geometry.getAttribute( 'vdata2' ) ), 'WebGPU static GLB preparation maps both signed auxiliary vertex-data streams' );
 	assert.ok( renderedMaterials.some( material => material.name === profileMaterial.name ), 'WebGPU static models resolve the registered world material profile' );
 	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= emg_albedo' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
+	runtime.update( 1 / 60, L.camera );
 	const instancedMeshes = [];
 	root.traverse( node => { if ( node.isInstancedMesh && node.count > 0 ) instancedMeshes.push( node ); } );
 	assert.ok( instancedMeshes.length > 0, 'the WebGPU fixture installs visible static-model instance batches' );
