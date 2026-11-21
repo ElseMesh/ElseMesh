@@ -627,6 +627,7 @@ export class WebGLFallback {
 		this.worldSeaLevel = this.defaultWorldSource?.rules.seaLevel ?? 0;
 		this.hostedComponentRuntimes = new Map();
 		this.builtinComponentRuntimes = new Map();
+		this.builtinAudioComponents = [];
 		this.hostedInstalledComponentIDs = new Set();
 		this.hostedCollisionPayloads = new Map();
 		this.blockedHostedCollisionIDs = new Set();
@@ -1548,6 +1549,7 @@ export class WebGLFallback {
 	async _loadBuiltinComponents() {
 
 		const singles = [], groups = new Map();
+		const ambience = ( this.defaultWorldSource?.components || [] ).filter( component => component.type === 'elsemesh.ambient-audio/1' );
 		for ( const component of this.defaultWorldSource?.components || [] ) {
 			const batchAdapter = worldComponentBackendBatchAdapter( 'webgl', component.type );
 			if ( batchAdapter ) {
@@ -1559,8 +1561,13 @@ export class WebGLFallback {
 				if ( adapter ) singles.push( { adapter, component } );
 			}
 		}
-		if ( singles.length === 0 && groups.size === 0 ) return;
+		if ( singles.length === 0 && groups.size === 0 && ambience.length === 0 ) return;
 		const connector = this.builtinAssetConnector ||= createBundledWorldAssetConnector( this.defaultWorldSource, this.defaultWorldAssets?.assetURLs );
+		if ( ambience.length ) {
+			const assets = await loadWorldComponentAssets( ambience, this.defaultWorldAssets?.assetURLs );
+			for ( const [ assetID, bytes ] of assets ) connector.assets.set( assetID, bytes );
+			this.builtinAudioComponents = ambience;
+		}
 		const manuallyPresented = new Set( [
 			this.defaultWorldSource.components.find( component => component.type === 'elsemesh.terrain-surface/1' )?.id,
 		].filter( Boolean ) );
@@ -2579,17 +2586,35 @@ export class WebGLFallback {
 			} );
 			return;
 		}
-		if ( ! audio.enabled ) return;
 		const coast = this.terrain?.coastDistance?.( p.x, p.z )?.d ?? 60;
 		const boat = this.boat?.controller;
+		const timeOfDay = this._worldTimeOfDay();
+		const sunHeight = this._sunDirection( timeOfDay ).y;
+		const daylight = 1 - this.THREE.MathUtils.smoothstep( - sunHeight, 0.02, 0.18 );
+		const localAudio = this.builtinAudioComponents.length && this.builtinAssetConnector ? this.builtinAudioComponents : null;
+		let worldAudioBeds = false;
+		if ( localAudio ) {
+			const seaLevel = this.worldSeaLevel;
+			const gains = resolveWorldAmbientAudioGains( this.defaultWorldSource?.experience, {
+				components: localAudio, timeOfDay, daylight, underwater: p.y < seaLevel,
+				listenerPosition: p, seaLevel,
+			} );
+			audio.setWorldAmbience( 'elsemesh:local', localAudio, this.builtinAssetConnector.assets, { gains } );
+			worldAudioBeds = true;
+		} else audio.setWorldAmbience( null, [] );
+		if ( ! audio.enabled ) return;
 		audio.update( dt, {
 			listener: { position: p, forward: fwd, up: new this.THREE.Vector3( 0, 1, 0 ) },
 			underwater: p.y < this.worldSeaLevel ? 1 : 0,
 			depthBelowSurface: Math.max( 0, this.worldSeaLevel - p.y ),
 			distanceToShore: Math.abs( coast ), coastDistance: coast,
 			nearPier: !! this.worldLayout && Math.abs( p.x - this.worldLayout.pier.x ) < 12 && p.z > this.worldLayout.pier.zStart - 5 && p.z < this.worldLayout.pier.zEnd + 8,
+			daylight,
+			timeOfDay,
+			windSpeed: this.app.windSpeed?.value,
+			surfIntensity: this.app.shore?.amplitude?.value ? Math.min( 1, this.app.shore.amplitude.value / 0.6 ) : 0.5,
 			boat: { active: !! boat?.driven, rpm: boat?.rpm || 0, speed: boat?.velocity?.length?.() || 0, position: this.boat?.model?.group?.position, listenerInside: false },
-		} );
+		}, { worldAudioBeds } );
 
 	}
 

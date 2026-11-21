@@ -72,7 +72,7 @@ import { collisionLookaheadDistance } from './network/CollisionFrontier.js';
 import { rememberWorldVisit } from './network/WorldLauncher.js';
 import { avatarPolicy, movementProfileSelection, worldHasWater, worldSeaLevel } from './network/WorldRules.js';
 import { appearanceForAllowedProfiles, avatarProfileId, AVATAR_STYLES, loadAppearance } from './player/AvatarAppearance.js';
-import { worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
+import { worldComponentRuntimeRecord, worldEntryPointPose, worldSpawnPose } from './network/WorldSource.js';
 import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPointPicker.js';
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, createWorldPackageRoot, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
@@ -202,6 +202,9 @@ export class App {
 		this.worldBackgroundLoads = new Map();
 		this.worldStreamState = new Map();
 		this.worldTimeOfDayValues = new Map();
+		this.localAmbientAudioPromise = null;
+		this.localAmbientAudio = null;
+		this.localAmbientAudioFailed = false;
 		this.portalPreviousPosition = null;
 		this.settings = {
 			timeOfDay: 16.2,
@@ -2587,6 +2590,28 @@ export class App {
 
 	}
 
+	async ensureLocalAmbientAudio() {
+
+		if ( this.localAmbientAudio || this.localAmbientAudioFailed || this.localAmbientAudioPromise ) return this.localAmbientAudioPromise;
+		const worldPackage = this.worldPackage;
+		const source = worldPackage?.source;
+		const rawComponents = ( source?.components || [] ).filter( component => component.type === 'elsemesh.ambient-audio/1' );
+		if ( ! rawComponents.length ) { this.localAmbientAudioFailed = true; return null; }
+		const connector = createBundledWorldAssetConnector( source, worldPackage.assets?.assetURLs );
+		this.localAmbientAudioPromise = loadWorldComponentAssets( rawComponents, worldPackage.assets?.assetURLs ).then( assets => {
+			if ( this.worldPackage !== worldPackage ) return null;
+			for ( const [ assetID, bytes ] of assets ) connector.assets.set( assetID, bytes );
+			this.localAmbientAudio = { connector, components: rawComponents.map( worldComponentRuntimeRecord ) };
+			return this.localAmbientAudio;
+		} ).catch( error => {
+			this.localAmbientAudioFailed = true;
+			console.warn( 'Built-in world ambience could not be loaded:', error );
+			return null;
+		} );
+		return this.localAmbientAudioPromise;
+
+	}
+
 	updateAudio( dt ) {
 
 		if ( ! this.audio ) return;
@@ -2626,10 +2651,22 @@ export class App {
 			}
 			return;
 		}
-		this.audio.setWorldAmbience( null, [] );
+		const localAudio = this.localAmbientAudio;
+		if ( ! localAudio ) this.ensureLocalAmbientAudio();
 		if ( ! this.audio.enabled ) return;
 		const h = this.cameraWaterHeight ?? 0;
 		const coast = this.terrainData.coastDistance( p.x, p.z ).d;
+		const timeOfDay = this.getWorldTimeOfDay( 'elsemesh:local', this.localWorldExperience );
+		let worldAudioBeds = false;
+		if ( localAudio ) {
+			const components = localAudio.components;
+			const gains = resolveWorldAmbientAudioGains( this.localWorldExperience, {
+				components, timeOfDay, daylight: 1 - G.night.value,
+				underwater: p.y < h, listenerPosition: p, seaLevel: h,
+			} );
+			this.audio.setWorldAmbience( 'elsemesh:local', components, localAudio.connector.assets, { gains } );
+			worldAudioBeds = true;
+		} else this.audio.setWorldAmbience( null, [] );
 		this.audio.update( dt, {
 			listener,
 			underwater: p.y < h ? 1 : 0,
@@ -2646,7 +2683,7 @@ export class App {
 				active: this.boatCtl.driven, rpm: this.boatCtl.rpm, throttle: this.boatCtl.throttle, speed: this.boatCtl.velocity.length(),
 				position: this.boat.group.position, listenerInside: this.player.mode === 'boat' && this.player.camMode === 'first',
 			},
-		} );
+		}, { worldAudioBeds } );
 
 	}
 

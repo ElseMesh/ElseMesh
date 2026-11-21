@@ -377,7 +377,7 @@ export class SoundScape {
 	}
 
 	// Per frame: listener pose, mixer ramps and surf / life events at ~30 Hz. Cheap.
-	update( dt, state ) {
+	update( dt, state, { worldAudioBeds = false } = {} ) {
 
 		if ( ! this.ctx || this._failed ) return;
 		try {
@@ -390,11 +390,14 @@ export class SoundScape {
 			this._acc = 0;
 			const now = this.ctx.currentTime;
 			this._placeListener();
-			this._mix( now, step );
+			this._mix( now, step, { worldAudioBeds } );
 			this._surf( step );
 			this._life( step );
 			this._birds( now, step );
 			this._whale( now, step );
+			this._syncWorldAudio();
+			this._syncPortalAudio();
+			this._updateWorldAudioGains();
 
 		} catch ( e ) {
 
@@ -604,27 +607,31 @@ export class SoundScape {
 			this._ramp( this.under.gain, this.env.u, 0.06 );
 			this._syncWorldAudio();
 			this._syncPortalAudio();
-			for ( const [ key, bed ] of this._worldAudioSources ) {
-
-				const factor = this._worldAudioGains.get( key ) ?? 1;
-				this._ramp( bed.gain.gain, bed.definition.gain * factor * ( bed.mono ? MONO : 1 ), 0.35 );
-
-			}
-			for ( const [ key, bed ] of this._portalAudioSources ) {
-				if ( bed.fading ) continue;
-				const factor = this._portalAudioGains.get( key ) ?? 1;
-				if ( bed.panner && this._portalAudioPortal ) {
-					const mapped = unmapPortalPosition( bed.definition.position, this._portalAudioPortal.entry, this._portalAudioPortal.exit, this._portalAudioPortal.scaleRatio );
-					const now = this.ctx.currentTime, tau = 0.08;
-					for ( const [ param, value ] of [ [ bed.panner.positionX, mapped.x ], [ bed.panner.positionY, mapped.y ], [ bed.panner.positionZ, mapped.z ] ] ) {
-						if ( typeof param.setTargetAtTime === 'function' ) param.setTargetAtTime( value, now, tau ); else param.value = value;
-					}
-				}
-				this._ramp( bed.gain.gain, bed.definition.gain * factor * this._portalAudioGain * ( bed.mono ? MONO : 1 ), 0.3 );
-			}
+			this._updateWorldAudioGains();
 			if ( state?.boat ) this._boat( this.ctx.currentTime, clamp( num( dt, 1 / 60 ), 0, 0.1 ) );
 
 		} catch ( e ) { this._warn( e ); }
+
+	}
+
+	_updateWorldAudioGains() {
+
+		for ( const [ key, bed ] of this._worldAudioSources ) {
+			const factor = this._worldAudioGains.get( key ) ?? 1;
+			this._ramp( bed.gain.gain, bed.definition.gain * factor * ( bed.mono ? MONO : 1 ), 0.35 );
+		}
+		for ( const [ key, bed ] of this._portalAudioSources ) {
+			if ( bed.fading ) continue;
+			const factor = this._portalAudioGains.get( key ) ?? 1;
+			if ( bed.panner && this._portalAudioPortal ) {
+				const mapped = unmapPortalPosition( bed.definition.position, this._portalAudioPortal.entry, this._portalAudioPortal.exit, this._portalAudioPortal.scaleRatio );
+				const now = this.ctx.currentTime, tau = 0.08;
+				for ( const [ param, value ] of [ [ bed.panner.positionX, mapped.x ], [ bed.panner.positionY, mapped.y ], [ bed.panner.positionZ, mapped.z ] ] ) {
+					if ( typeof param.setTargetAtTime === 'function' ) param.setTargetAtTime( value, now, tau ); else param.value = value;
+				}
+			}
+			this._ramp( bed.gain.gain, bed.definition.gain * factor * this._portalAudioGain * ( bed.mono ? MONO : 1 ), 0.3 );
+		}
 
 	}
 
@@ -1434,7 +1441,7 @@ export class SoundScape {
 		}
 	}
 
-	_mix( now, dt ) {
+	_mix( now, dt, { worldAudioBeds = false } = {} ) {
 
 		const e = this.env, u = e.u, d = e.shoreDist, eb = e.boat;
 		const deep = clamp( e.depth / 12, 0, 1 );
@@ -1446,7 +1453,7 @@ export class SoundScape {
 		this._ramp( this.aboveOut.gain, lerp( 1, 0.4 / ( 1 + e.depth / 5 ), u ), 0.05 );
 		this._ramp( this.under.gain, u, 0.06 );
 		const wantUnder = u > 0 || ( ! e.onLand && e.ly < 2.5 );
-		this._bed( 'under_reef', wantUnder ? dB( MIX.reef ) * ( 0.8 + 0.3 * deep ) / dB( this._sampleLufs( 'under_reef' ) ) : 0, now, 0.5 );
+		if ( ! worldAudioBeds ) this._bed( 'under_reef', wantUnder ? dB( MIX.reef ) * ( 0.8 + 0.3 * deep ) / dB( this._sampleLufs( 'under_reef' ) ) : 0, now, 0.5 );
 		if ( wantUnder ) {
 
 			this._want( 'uw_swim' );
@@ -1457,7 +1464,7 @@ export class SoundScape {
 
 		// distant surf (the waves themselves are events, see _surf)
 		const lvl = 0.6 + 0.7 * e.surf;
-		this._bed( 'surf_far', dB( MIX.surfFar ) * 1.25 / ( 1 + d / 200 ) * lvl / dB( this._sampleLufs( 'surf_far' ) ), now, 0.5 );
+		if ( ! worldAudioBeds ) this._bed( 'surf_far', dB( MIX.surfFar ) * 1.25 / ( 1 + d / 200 ) * lvl / dB( this._sampleLufs( 'surf_far' ) ), now, 0.5 );
 
 		// wind in gusts: a random target every 2-8 s (lulls near silent), eased towards
 		const g = this._gust;
@@ -1472,17 +1479,17 @@ export class SoundScape {
 		g.v += ( g.target - g.v ) * ( 1 - Math.exp( - dt / 1.4 ) );
 		const w = Math.hypot( e.wind, eb.active ? eb.speed * 0.9 : 0 );
 		const gw = eb.active && eb.speed > 3 ? Math.max( g.v, 0.5 ) : g.v; // apparent wind on a running boat is steady
-		this._bed( 'wind', dB( MIX.wind ) * clamp( w / 7, 0, 2.5 ) * gw / dB( this._sampleLufs( 'wind' ) ), now, 0.3 );
+		if ( ! worldAudioBeds ) this._bed( 'wind', dB( MIX.wind ) * clamp( w / 7, 0, 2.5 ) * gw / dB( this._sampleLufs( 'wind' ) ), now, 0.3 );
 		this._ramp( this.windLP.frequency, 400 + ( 80 + 60 * gw ) * w, 0.4 );
 
 		// trees inland rustle in the gusts; crickets inland at night (daylight < 0.3)
 		const veg = e.onLand ? smooth( 6, 30, d ) : 0;
-		this._bed( 'palms', dB( MIX.palms ) * veg * clamp( e.wind / 7, 0.2, 1.8 ) * g.v * ( 0.3 + 0.7 * e.day ) / dB( this._sampleLufs( 'palms' ) ), now, 0.5 );
+		if ( ! worldAudioBeds ) this._bed( 'palms', dB( MIX.palms ) * veg * clamp( e.wind / 7, 0.2, 1.8 ) * g.v * ( 0.3 + 0.7 * e.day ) / dB( this._sampleLufs( 'palms' ) ), now, 0.5 );
 		const night = smooth( 0.3, 0.12, e.day );
-		this._bed( 'crickets', dB( MIX.crickets ) * night * ( e.onLand ? 0.35 + 0.65 * smooth( 5, 40, d ) : 0.1 ) / dB( this._sampleLufs( 'crickets' ) ), now, 1 );
+		if ( ! worldAudioBeds ) this._bed( 'crickets', dB( MIX.crickets ) * night * ( e.onLand ? 0.35 + 0.65 * smooth( 5, 40, d ) : 0.1 ) / dB( this._sampleLufs( 'crickets' ) ), now, 1 );
 
 		// water lapping the pier piles
-		this._bed( 'pier_lap', ( e.nearPier ? dB( MIX.pierLap ) : 0 ) / dB( this._sampleLufs( 'pier_lap' ) ), now, 0.6 );
+		if ( ! worldAudioBeds ) this._bed( 'pier_lap', ( e.nearPier ? dB( MIX.pierLap ) : 0 ) / dB( this._sampleLufs( 'pier_lap' ) ), now, 0.6 );
 
 		this._boat( now, dt );
 
