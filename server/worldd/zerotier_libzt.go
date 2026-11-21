@@ -680,6 +680,7 @@ func (z *libztRuntime) proxy(ztConn net.Conn, targetPort int) {
 		done <- copyErr
 	}
 	go copyStream(conn, ztConn)
+	go copyStream(ztConn, conn)
 	firstErr := <-done
 	if firstErr != nil {
 		_ = ztConn.Close()
