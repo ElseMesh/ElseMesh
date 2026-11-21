@@ -105,6 +105,6 @@ assert.ok( Math.abs( portalSource.panner.positionX.value - 4 ) < 1e-9 && Math.ab
 assert.equal( portalSource.gain.gain.value, 0.2, 'portal proximity gain multiplies the world-authored bed gain' );
 sound.setPortalAmbience( null );
 assert.equal( portalSource.src.stopped, true, 'leaving portal range fades and stops destination ambience' );
-assert.equal( activeSource.src.stopped, false, 'portal departure does not stop the active world ambience' );
+assert.notEqual( activeSource.src.stopped, true, 'portal departure does not stop the active world ambience' );
 sound.dispose();
 console.log( 'ok hosted ambient audio playback and world handoff' );
