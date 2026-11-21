@@ -2871,3 +2871,12 @@ finding changes them.
   near-model component, activate the candidate in the signed world, or compare
   rendered Tidewater output with the pre-split reference. The package remains
   inactive, so Tidewater stays at 93% and renderer-neutral packages at 71%.
+
+- 2026-11-21: reran Tidewater's `test:renderer-parity` from the external build
+  after confirming its renderer-gameplay, pre-split fishing, and pre-split boat
+  test sources match the canonical source tree. Shared gameplay transitions,
+  the WebGPU/WebGL 171-step cast and 519-bite/1,199-fight sale traces, the
+  987-frame pre-split fight, the 2,400-frame pre-split bite, and frame-by-frame
+  pre-split boat gameplay all pass. These deterministic tests reconfirm
+  gameplay-rule parity; they do not prove live input timing, full-route
+  movement, rendered appearance, or FPS. Tidewater remains at 93%.
