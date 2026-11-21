@@ -16,10 +16,11 @@ export function keyboardLookDelta( keys, dt, rate = KEYBOARD_LOOK_PIXELS_PER_SEC
 
 export class Input {
 
-	constructor( dom, { onKeyDown = null, onKeyUp = null } = {} ) {
+	constructor( dom, { onKeyDown = null, onUnhandledKeyDown = null, onKeyUp = null } = {} ) {
 
 		this.dom = dom;
 		this.onKeyDown = onKeyDown;
+		this.onUnhandledKeyDown = onUnhandledKeyDown;
 		this.onKeyUp = onKeyUp;
 		this.keys = new Set();
 		this.consumedKeys = new Set();
@@ -53,19 +54,23 @@ export class Input {
 			if ( freshKeyDown ) this.pressed.add( e.code );
 			this.keys.add( e.code );
 			if ( [ 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab' ].includes( e.code ) ) e.preventDefault();
-			if ( freshKeyDown && this.onKeyDown?.( e ) === true ) {
-				this.consumedKeys.add( e.code );
-				this.pressed.delete( e.code );
-				e.preventDefault();
-				e.stopImmediatePropagation();
+			if ( freshKeyDown ) {
+				const worldHandled = this.onKeyDown?.( e ) === true;
+				const engineHandled = ! worldHandled && this.onUnhandledKeyDown?.( e ) === true;
+				if ( worldHandled || engineHandled ) {
+					this.consumedKeys.add( e.code );
+					this.pressed.delete( e.code );
+					e.preventDefault();
+					e.stopImmediatePropagation();
+				}
 			}
 
-		} );
+		}, true );
 		window.addEventListener( 'keyup', ( e ) => {
 			this.keys.delete( e.code );
 			this.consumedKeys.delete( e.code );
 			if ( ! isEditableTarget( e.target ) ) this.onKeyUp?.( e );
-		} );
+		}, true );
 		window.addEventListener( 'blur', () => this._clearTransientInput() );
 		document.addEventListener( 'visibilitychange', () => {
 

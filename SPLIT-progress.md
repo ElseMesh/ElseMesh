@@ -139,12 +139,16 @@ parity percentage changes.
 owner-signed `events` list subscribes receive normalized down/up events; the
 payload contains a bounded physical key code, phase, repeat flag, modifiers,
 and world ID, not DOM objects or typed text. The engine consumes subscribed
-physical key presses so they do not also invoke its key polling/portal shortcut.
-Registry tests verify the sanitized payload and Worker delivery; input and
-Tidewater parity checks pass. The network protocol and authoring docs describe
-the contract and its client-only authority. This completes an opt-in input
-channel, not general world interaction authority or all behavior extraction;
-no broad separation/parity percentage changes.
+physical key presses from both one-shot and held movement/look polling so they
+do not also invoke engine behavior. WebGL portal/flashlight shortcuts now run
+through the same engine input route after the world gets first claim; WebGL no
+longer has a capture listener that races world delivery during portal
+transitions. Registry tests verify sanitized payload, Worker delivery, held-key
+consumption, and world-before-engine routing; input and Tidewater parity checks
+pass. The network protocol and authoring docs describe the contract and its
+client-only authority. This completes an opt-in input channel, not general
+world interaction authority or all behavior extraction; no broad
+separation/parity percentage changes.
 
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas

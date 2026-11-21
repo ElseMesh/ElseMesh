@@ -707,6 +707,7 @@ export class WebGLFallback {
 		this.camera.position.set( ...this.spawn.position );
 		this.input = new Input( this.engine.canvas, {
 			onKeyDown: event => this._handleWorldKeyDown( event, 'down' ),
+			onUnhandledKeyDown: event => this._handleUnhandledKeyDown( event ),
 			onKeyUp: event => this._handleWorldKeyDown( event, 'up' ),
 		} );
 		if ( ! this.worldLink ) {
@@ -2020,16 +2021,6 @@ export class WebGLFallback {
 
 	_bindInput() {
 
-		this._keyDown = event => {
-			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
-			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
-			if ( event.code === 'KeyL' ) {
-				this.webglLocalLights?.toggleFlashlight();
-				event.preventDefault();
-				return;
-			}
-			if ( this.worldLink && event.code === 'KeyE' ) this._useNearestPortal();
-		};
 		this._resize = () => {
 			const w = window.innerWidth, h = window.innerHeight;
 			this.camera.aspect = w / Math.max( 1, h );
@@ -2052,8 +2043,6 @@ export class WebGLFallback {
 			this.renderScale = Math.max( 0.35, Math.min( 1, Number( scale ) || 1 ) );
 			this._resize();
 		};
-		// Capture key events before UI descendants can stop them from reaching the fallback.
-		window.addEventListener( 'keydown', this._keyDown, true );
 		this.engine.canvas.addEventListener( 'click', () => this.requestLock() );
 
 	}
@@ -2067,6 +2056,17 @@ export class WebGLFallback {
 		if ( phase !== 'down' ) return false;
 		const claimedByBehavior = dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { fallback: this, app: this.app, event, extensions } );
 		return claimedByBehavior || extensions?.subscribes?.( 'elsemesh.world.input/1' ) === true;
+
+	}
+
+	_handleUnhandledKeyDown( event ) {
+
+		if ( event.code === 'KeyL' ) {
+			this.webglLocalLights?.toggleFlashlight();
+			return true;
+		}
+		if ( this.worldLink && event.code === 'KeyE' ) return this._useNearestPortal();
+		return false;
 
 	}
 
@@ -2582,15 +2582,16 @@ export class WebGLFallback {
 
 	_useNearestPortal() {
 
-		if ( ! this.portals.length || ! this.worldLink ) return;
+		if ( ! this.portals.length || ! this.worldLink ) return false;
 		const route = this._nearestPortalRoute();
-		if ( ! route ) return;
+		if ( ! route ) return false;
 		const url = new URL( location.href );
 		url.searchParams.set( 'worldId', route.destinationWorldId );
 		if ( route.destinationPeerId ) url.searchParams.set( 'nodeId', route.destinationPeerId ); else url.searchParams.delete( 'nodeId' );
 		if ( route.destinationGateway ) url.searchParams.set( 'gateway', route.destinationGateway ); else url.searchParams.delete( 'gateway' );
 		url.searchParams.set( 'webglSpawn', [ route.exit.position[ 0 ], route.exit.position[ 1 ] + 1.7, route.exit.position[ 2 ], route.exit.yaw, 0 ].join( ',' ) );
 		location.assign( url.href );
+		return true;
 
 	}
 

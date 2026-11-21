@@ -30,7 +30,11 @@ globalThis.document = documentTarget;
 
 try {
 	const received = [];
-	const input = new Input( dom, { onKeyDown: event => { received.push( event.code ); return [ 'KeyE', 'KeyW' ].includes( event.code ); } } );
+	const route = [];
+	const input = new Input( dom, {
+		onKeyDown: event => { received.push( event.code ); route.push( `world:${event.code}` ); return [ 'KeyE', 'KeyW' ].includes( event.code ); },
+		onUnhandledKeyDown: event => { route.push( `engine:${event.code}` ); return event.code === 'KeyP'; },
+	} );
 	const event = {
 		type: 'keydown', code: 'KeyE', target: null, defaultPrevented: false, immediatePropagationStopped: false,
 		preventDefault() { this.defaultPrevented = true; },
@@ -41,6 +45,7 @@ try {
 	assert.equal( input.hit( 'KeyE' ), false, 'a handled world key is removed from the frame-polled queue' );
 	assert.equal( event.defaultPrevented, true, 'handled world keys do not trigger browser defaults' );
 	assert.equal( event.immediatePropagationStopped, true, 'handled world keys do not also trigger renderer or portal DOM handlers' );
+	assert.deepEqual( route, [ 'world:KeyE' ], 'world actions receive keydown before engine shortcuts and can claim it' );
 	const repeat = {
 		type: 'keydown', code: 'KeyE', target: null, defaultPrevented: false, immediatePropagationStopped: false,
 		preventDefault() { this.defaultPrevented = true; },
@@ -57,14 +62,24 @@ try {
 	windowTarget.dispatch( unhandled );
 	assert.equal( input.hit( 'KeyL' ), true, 'unhandled keys remain available to engine polling' );
 	assert.equal( unhandled.immediatePropagationStopped, false, 'unhandled keys continue to engine handlers' );
+	assert.deepEqual( route.slice( -2 ), [ 'world:KeyL', 'engine:KeyL' ], 'engine shortcuts run only after world behavior declines the key' );
+	const engineHandled = {
+		type: 'keydown', code: 'KeyP', target: null, defaultPrevented: false, immediatePropagationStopped: false,
+		preventDefault() { this.defaultPrevented = true; },
+		stopImmediatePropagation() { this.immediatePropagationStopped = true; },
+	};
+	windowTarget.dispatch( engineHandled );
+	assert.equal( input.hit( 'KeyP' ), false, 'engine-handled shortcuts are excluded from frame polling too' );
+	assert.equal( engineHandled.immediatePropagationStopped, true );
+	assert.deepEqual( route.slice( -2 ), [ 'world:KeyP', 'engine:KeyP' ] );
 	windowTarget.dispatch( {
 		type: 'keydown', code: 'KeyA', target: { tagName: 'DIV', isContentEditable: true }, preventDefault() {}, stopImmediatePropagation() {},
 	} );
-	assert.deepEqual( received, [ 'KeyE', 'KeyL' ], 'contenteditable keystrokes are not forwarded to world behaviors' );
+	assert.deepEqual( received, [ 'KeyE', 'KeyL', 'KeyP' ], 'contenteditable keystrokes are not forwarded to world behaviors' );
 	windowTarget.dispatch( {
 		type: 'keyup', code: 'KeyA', target: { tagName: 'DIV', isContentEditable: true },
 	} );
-	assert.deepEqual( received, [ 'KeyE', 'KeyL' ], 'contenteditable key releases are not forwarded to world behaviors' );
+	assert.deepEqual( received, [ 'KeyE', 'KeyL', 'KeyP' ], 'contenteditable key releases are not forwarded to world behaviors' );
 	const subscribedMovementKey = {
 		type: 'keydown', code: 'KeyW', target: null, defaultPrevented: false, immediatePropagationStopped: false,
 		preventDefault() { this.defaultPrevented = true; },
