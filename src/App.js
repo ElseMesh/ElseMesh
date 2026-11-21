@@ -411,7 +411,7 @@ export class App {
 		this.scene = scene;
 		this.camera = camera;
 
-		this.input = new Input( engine.domElement );
+		this.input = new Input( engine.domElement, { onKeyDown: event => this.handleWorldKeyDown( event ) } );
 		this.fly = new FlyCamera( camera, engine.domElement, this.input );
 		this.fly.setPose( new Vector3( 20, 6, - 20 ), Math.PI * 0.9, - 0.12 );
 
@@ -841,7 +841,7 @@ export class App {
 		this.renderer = engine;
 		this.scene = scene;
 		this.camera = camera;
-		this.input = new Input( engine.domElement );
+		this.input = new Input( engine.domElement, { onKeyDown: event => this.handleWorldKeyDown( event ) } );
 		this.fly = new FlyCamera( camera, engine.domElement, this.input );
 		this.hostedColliders = new Colliders();
 		this.vegetationEnabled = ! this.qs.has( 'noVeg' );
@@ -2495,6 +2495,15 @@ export class App {
 		else if ( mode === 'hosted' ) this.player.updateHostedWorld( dt );
 		else this.player.update( dt );
 		return true;
+
+	}
+
+	handleWorldKeyDown( event ) {
+
+		const hosted = this.remoteWorldActive;
+		const experience = hosted ? this.activeHostedExperience : this.localWorldExperience;
+		const extensions = hosted ? this.activeHostedExtensions : this.localWorldExtensions;
+		return dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { app: this, event, extensions } );
 
 	}
 

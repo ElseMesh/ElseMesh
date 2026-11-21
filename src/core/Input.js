@@ -12,9 +12,10 @@ export function keyboardLookDelta( keys, dt, rate = KEYBOARD_LOOK_PIXELS_PER_SEC
 
 export class Input {
 
-	constructor( dom ) {
+	constructor( dom, { onKeyDown = null } = {} ) {
 
 		this.dom = dom;
+		this.onKeyDown = onKeyDown;
 		this.keys = new Set();
 		this.pressed = new Set();
 		this.look = { x: 0, y: 0 };
@@ -42,9 +43,15 @@ export class Input {
 			// Browsers can release pointer lock after tab focus changes. A gameplay key press is
 			// another user gesture, so use it to restore mouse-look without requiring a separate click.
 			if ( ! this.locked && ! this.lockSuppressed && this.enabled && [ 'KeyW', 'KeyA', 'KeyS', 'KeyD' ].includes( e.code ) && ! window.__ui?.isPointerOverUI ) this.requestLock( { userGesture: false } );
-			if ( ! this.keys.has( e.code ) ) this.pressed.add( e.code );
+			const freshKeyDown = ! this.keys.has( e.code );
+			if ( freshKeyDown ) this.pressed.add( e.code );
 			this.keys.add( e.code );
 			if ( [ 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab' ].includes( e.code ) ) e.preventDefault();
+			if ( freshKeyDown && this.onKeyDown?.( e ) === true ) {
+				this.pressed.delete( e.code );
+				e.preventDefault();
+				e.stopImmediatePropagation();
+			}
 
 		} );
 		window.addEventListener( 'keyup', ( e ) => this.keys.delete( e.code ) );

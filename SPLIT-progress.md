@@ -122,6 +122,18 @@ registry and parity tests pass. This closes the known panel-movement mismatch;
 other live input, gameplay, appearance, and FPS gates remain, so no overall
 parity percentage changes.
 
+**2026-11-21 shared game-key routing:** Removed Tidewater's WebGL-only keydown
+behavior hook. Engine `Input` now offers a generic `onWorldKeyDown` registry
+event to both App and WebGL, consumes a handled physical key before frame
+polling, and leaves unhandled keys available to engine shortcuts such as portal
+use. Tidewater's WebGPU `Game` and WebGL adapter now call the same world-owned
+vendor/inventory/catch-card key handler; keyboard and gamepad frame polling use
+that same handler. Tests cover route consumption, renderer action parity,
+vendor/fight/catch gating, and the prior pre-split fishing/boat traces. The
+remaining renderer-specific lifecycle/presentation adapters, full live-input
+walkthroughs, and broader gameplay/visual/FPS parity are still open. No overall
+parity percentage changes.
+
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas
 dimensions, and impostor shading/wind parameters in the plain-data

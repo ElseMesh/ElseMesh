@@ -33,12 +33,12 @@ export function worldBehaviorData( experience, id ) {
 export function registerWorldBehaviorImplementation( id, implementation ) {
 	const existing = implementations.get( id ) || {};
 	const entries = implementation && typeof implementation === 'object' && ! Array.isArray( implementation ) ? Object.entries( implementation ) : [];
-	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWorldBlocksPlayerInput', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
+	if ( ! behaviors.has( id ) || ! entries.length || entries.some( ( [ hook, handler ] ) => ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWorldBlocksPlayerInput', 'onWorldKeyDown', 'onWebGLWorldActivated', 'onWebGLWorldFrame' ].includes( hook ) || typeof handler !== 'function' || existing[ hook ] ) ) throw new Error( `Invalid or duplicate world behavior implementation: ${id}` );
 	implementations.set( id, Object.freeze( { ...existing, ...implementation } ) );
 }
 
 export function dispatchWorldBehaviorHooks( experience, hook, context ) {
-	if ( ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWorldBlocksPlayerInput', 'onWebGLWorldActivated', 'onWebGLWorldFrame', 'onWebGLKeyDown' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
+	if ( ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWorldBlocksPlayerInput', 'onWorldKeyDown', 'onWebGLWorldActivated', 'onWebGLWorldFrame' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
 	let resolved = resolvedExperiences.get( experience );
 	if ( ! resolved ) {
 		resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );

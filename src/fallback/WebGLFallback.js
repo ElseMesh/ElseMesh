@@ -705,7 +705,10 @@ export class WebGLFallback {
 		// admission pose would violate the owner's spawn-radius rule.
 		if ( this.reviewPose && ! this.worldLink ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
-		this.input = new Input( this.engine.canvas );
+		this.input = new Input( this.engine.canvas, { onKeyDown: event => {
+			const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
+			return dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { fallback: this, app: this.app, event, extensions: this.activeWorldExtensions } );
+		} } );
 		if ( ! this.worldLink ) {
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
 			this._bindOceanFFTToWater();
@@ -2020,8 +2023,6 @@ export class WebGLFallback {
 		this._keyDown = event => {
 			if ( event.target instanceof Element && event.target.closest( 'input, select, textarea, [contenteditable="true"]' ) ) return;
 			if ( event.code.startsWith( 'Arrow' ) ) event.preventDefault();
-			const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
-			if ( dispatchWorldBehaviorHooks( experience, 'onWebGLKeyDown', { fallback: this, event, extensions: this.activeWorldExtensions } ) ) { event.preventDefault(); event.stopImmediatePropagation(); return; }
 			if ( event.code === 'KeyL' ) {
 				this.webglLocalLights?.toggleFlashlight();
 				event.preventDefault();
