@@ -135,6 +135,14 @@ dashboard. This repository also has no selected bucket or CDN hostname. No
 object was uploaded; live CDN reuse remains unverified and the estimate stays
 85% until an opted-in asset is published and fetched through a configured CDN.
 
+**2026-11-21 dead Tidewater gull presenter removal:** `src/world/Gulls.js` was
+only imported by two manual review fixtures and had no production callers. Its
+Tidewater-specific mesh and WGSL implementation duplicated the active
+world-owned wildlife bird runtime, so the unused engine module was removed. The
+whale LOD review now lives in Tidewater's test directory, and its wildlife
+fixture no longer installs the duplicate gull mesh. This removes one stale
+engine-side content path; the registry estimate remains unchanged.
+
 **2026-11-21 renderer-neutral input gate:** Tidewater's vendor and inventory
 panels now use one `onWorldBlocksPlayerInput` behavior hook in both ElseMesh
 render paths. WebGPU's app player-update path now honors the same gate already
