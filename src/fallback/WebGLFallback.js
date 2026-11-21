@@ -2106,8 +2106,8 @@ export class WebGLFallback {
 		const now = performance.now(), rawFrameGapMs = Math.max( 0, now - ( this.lastFrame || now ) ), elapsed = Math.min( 0.1, rawFrameGapMs / 1000 );
 		const fixedSimulationTime = this.app.fixedSimulationTime;
 		const dt = fixedSimulationTime === null || fixedSimulationTime === undefined ? elapsed : 0;
-		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource?.experience;
-		if ( experience?.environment?.timeOfDay?.engineOverride === true && this.app.settings.timeSpeed !== 0 ) this.app.settings.timeOfDay = ( this.app.settings.timeOfDay + dt * this.app.settings.timeSpeed + 24 ) % 24;
+		const clockExperience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource?.experience;
+		if ( clockExperience?.environment?.timeOfDay?.engineOverride === true && this.app.settings.timeSpeed !== 0 ) this.app.settings.timeOfDay = ( this.app.settings.timeOfDay + dt * this.app.settings.timeSpeed + 24 ) % 24;
 		this.app.updateFPS();
 		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, cpuMs: this.app.cpuMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
 		G.dt.value = dt;
