@@ -2872,6 +2872,18 @@ finding changes them.
   rendered Tidewater output with the pre-split reference. The package remains
   inactive, so Tidewater stays at 93% and renderer-neutral packages at 71%.
 
+- 2026-11-21: added a Tidewater-owned capture fixture that compares the actual
+  exported near-model GLBs and far atlases with the current WebGPU canopy on
+  identical placements, camera poses, and fixed simulation time. It captures
+  35.75 m near, 61.10/68.90 m around the LOD transition, and 94.25 m far. The
+  headless llvmpipe full-frame RGB MAE is 35.95, 30.01, 32.05, and 25.24/255;
+  those frames include surrounding world vegetation, and the metric does not
+  isolate canopy pixels. The captures show the candidate executing in the
+  Tidewater vegetation scene, but do not compare AMD hardware, WebGL, or the
+  authoritative Tidewater `main` build. The candidate remains inactive until
+  those matched appearance and shadow gates pass; Tidewater remains 93% and
+  renderer-neutral packages remain 71%.
+
 - 2026-11-21: reran Tidewater's `test:renderer-parity` from the external build
   after confirming its renderer-gameplay, pre-split fishing, and pre-split boat
   test sources match the canonical source tree. Shared gameplay transitions,
