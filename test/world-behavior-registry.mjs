@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { App } from '../src/App.js';
-import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from '../src/network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, createWorldBehaviorRuntime, dispatchWorldBehaviorExtensionEvent, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks, hasWorldBehavior, registerWorldBehavior, registerWorldBehaviorImplementation, worldBehaviorData, worldBehaviorsFor, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME, WORLD_EXTENSION_EVENT_INPUT, worldInputExtensionEvent } from '../src/network/WorldBehaviorRegistry.js';
 import { WORLD_JAVASCRIPT_EXTENSION_PROTOCOL } from '../src/network/WorldJavaScriptExtension.js';
 
 registerWorldBehavior( 'elsemesh.registry-test/1', {
@@ -62,6 +62,11 @@ assert.equal( inputGate.active, false );
 assert.equal( dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWorldKeyDown', { event: { code: 'KeyE' } } ), true, 'world key actions use a backend-neutral behavior hook' );
 assert.equal( worldKeyDown.active, true );
 assert.equal( dispatchWorldBehaviorHooks( { behaviors: {} }, 'onWorldKeyDown', { event: { code: 'KeyE' } } ), false, 'inactive behaviors cannot claim keyboard input' );
+assert.deepEqual( worldInputExtensionEvent( 'down', { code: 'KeyE', repeat: false, shiftKey: true, target: { value: 'private text must not be copied' } }, 'elsemesh:registry-test' ), {
+	type: WORLD_EXTENSION_EVENT_INPUT, phase: 'down', code: 'KeyE', repeat: false,
+	modifiers: { alt: false, control: false, meta: false, shift: true }, worldId: 'elsemesh:registry-test',
+}, 'input bridge exposes only the key code, modifiers, phase, and world route' );
+assert.throws( () => worldInputExtensionEvent( 'down', { code: 'a'.repeat( 33 ) } ), /Invalid world keyboard input/, 'input bridge rejects unbounded key strings' );
 const inputUpdates = [];
 const testApp = Object.assign( Object.create( App.prototype ), {
 	freeCam: false,
@@ -120,6 +125,29 @@ assert.deepEqual( await worldOwnedExtensions.dispatch( { type: 'elsemesh.world.e
 assert.deepEqual( await worldOwnedExtensions.dispatch( { type: 'elsemesh.world-owned-test/1', value: 3 } ), [ { behaviorId: worldOwnedBehaviorID, result: { echo: { type: 'elsemesh.world-owned-test/1', value: 3 } } } ], 'the Engine can broadcast subscribed events to owner-defined extensions without a built-in behavior registration' );
 worldOwnedExtensions.dispose();
 assert.equal( worldOwnedWorker.terminated, true, 'owner-defined behavior worker is terminated with its world' );
+
+const inputExtensionExperience = {
+	behaviors: { [ worldOwnedBehaviorID ]: { privateRule: 'module-owned' } },
+	extensions: [ { behaviorId: worldOwnedBehaviorID, assetId: extensionAssetID, events: [ WORLD_EXTENSION_EVENT_INPUT ] } ],
+};
+const inputWorker = new FakeWorker();
+const inputExtensions = createWorldBehaviorExtensions( inputExtensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { accepted: event }; }' ) ] ] ), { workerFactory: () => inputWorker } );
+const inputKey = { code: 'KeyR', shiftKey: true, target: { value: 'not forwarded' } };
+assert.equal( App.prototype.handleWorldKeyDown.call( {
+	remoteWorldActive: false,
+	localWorldExperience: inputExtensionExperience,
+	localWorldExtensions: inputExtensions,
+	isCurrentWorldExtensions: () => true,
+}, inputKey ), true, 'App routes and consumes a subscribed key through the signed world Worker' );
+assert.deepEqual( await dispatchWorldInputExtensionEvent( inputExtensionExperience, inputExtensions, 'down', inputKey, { worldId: 'elsemesh:input-test' } ), [ {
+	behaviorId: worldOwnedBehaviorID,
+	result: { echo: { type: WORLD_EXTENSION_EVENT_INPUT, phase: 'down', code: 'KeyR', repeat: false, modifiers: { alt: false, control: false, meta: false, shift: true }, worldId: 'elsemesh:input-test' } },
+} ], 'signed Worker input subscriptions receive the normalized renderer-neutral event' );
+assert.deepEqual( inputWorker.messages.filter( message => message.type === 'run' ).at( -1 ).event, {
+	type: WORLD_EXTENSION_EVENT_INPUT, phase: 'down', code: 'KeyR', repeat: false,
+	modifiers: { alt: false, control: false, meta: false, shift: true }, worldId: 'elsemesh:input-test',
+}, 'Worker message excludes DOM event objects and text-entry fields' );
+inputExtensions.dispose();
 
 const frameBehaviorID = 'elsemesh.frame-bridge-test/1';
 let latestFrameResult = null;

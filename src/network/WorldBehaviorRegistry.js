@@ -1,10 +1,12 @@
 import { createWorldJavaScriptExtensionRuntime } from './WorldJavaScriptExtension.js';
+import { isWorldID } from './WorldIdentity.js';
 
 const behaviors = new Map();
 const implementations = new Map();
 const resolvedExperiences = new WeakMap();
 export const WORLD_EXTENSION_EVENT_ACTIVATED = 'elsemesh.world.activated/1';
 export const WORLD_EXTENSION_EVENT_FRAME = 'elsemesh.world.frame/1';
+export const WORLD_EXTENSION_EVENT_INPUT = 'elsemesh.world.input/1';
 const WORLD_EXTENSION_LATEST_EVENT_INTERVAL_MS = 100;
 
 export function registerWorldBehavior( id, descriptor ) {
@@ -54,6 +56,24 @@ export async function dispatchWorldBehaviorExtensionEvent( experience, extension
 	const responses = await extensions.dispatch( event );
 	applyWorldBehaviorExtensionResults( experience, event, responses, context );
 	return responses;
+}
+
+export function worldInputExtensionEvent( phase, event, worldId ) {
+	if ( ! [ 'down', 'up' ].includes( phase ) || typeof event?.code !== 'string' || ! /^[A-Za-z0-9]{1,32}$/.test( event.code ) || ( worldId !== undefined && ! isWorldID( worldId ) ) ) throw new Error( 'Invalid world keyboard input event' );
+	return {
+		type: WORLD_EXTENSION_EVENT_INPUT,
+		phase,
+		code: event.code,
+		repeat: phase === 'down' && event.repeat === true,
+		modifiers: { alt: event.altKey === true, control: event.ctrlKey === true, meta: event.metaKey === true, shift: event.shiftKey === true },
+		...( typeof worldId === 'string' ? { worldId } : {} ),
+	};
+}
+
+export function dispatchWorldInputExtensionEvent( experience, extensions, phase, event, context = {} ) {
+	if ( ! extensions?.subscribes?.( WORLD_EXTENSION_EVENT_INPUT ) ) return Promise.resolve( [] );
+	const inputEvent = worldInputExtensionEvent( phase, event, context.worldId );
+	return dispatchWorldBehaviorExtensionEvent( experience, extensions, inputEvent, context );
 }
 
 export function dispatchLatestWorldBehaviorExtensionEvent( experience, extensions, event, context = {} ) {

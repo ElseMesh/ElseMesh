@@ -57,6 +57,14 @@ try {
 	windowTarget.dispatch( unhandled );
 	assert.equal( input.hit( 'KeyL' ), true, 'unhandled keys remain available to engine polling' );
 	assert.equal( unhandled.immediatePropagationStopped, false, 'unhandled keys continue to engine handlers' );
+	windowTarget.dispatch( {
+		type: 'keydown', code: 'KeyA', target: { tagName: 'DIV', isContentEditable: true }, preventDefault() {}, stopImmediatePropagation() {},
+	} );
+	assert.deepEqual( received, [ 'KeyE', 'KeyL' ], 'contenteditable keystrokes are not forwarded to world behaviors' );
+	windowTarget.dispatch( {
+		type: 'keyup', code: 'KeyA', target: { tagName: 'DIV', isContentEditable: true },
+	} );
+	assert.deepEqual( received, [ 'KeyE', 'KeyL' ], 'contenteditable key releases are not forwarded to world behaviors' );
 } finally {
 	if ( oldWindow === undefined ) delete globalThis.window;
 	else globalThis.window = oldWindow;

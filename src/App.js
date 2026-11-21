@@ -77,7 +77,7 @@ import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPo
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, createWorldPackageRoot, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createBundledWorldAssetConnector, loadWorldComponentAssets } from './network/WorldComponentAssets.js';
-import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
 import { matchingPortalAgreement } from './network/PortalAgreement.js';
@@ -411,7 +411,7 @@ export class App {
 		this.scene = scene;
 		this.camera = camera;
 
-		this.input = new Input( engine.domElement, { onKeyDown: event => this.handleWorldKeyDown( event ) } );
+		this.input = new Input( engine.domElement, { onKeyDown: event => this.handleWorldKeyDown( event ), onKeyUp: event => this.handleWorldKeyUp( event ) } );
 		this.fly = new FlyCamera( camera, engine.domElement, this.input );
 		this.fly.setPose( new Vector3( 20, 6, - 20 ), Math.PI * 0.9, - 0.12 );
 
@@ -841,7 +841,7 @@ export class App {
 		this.renderer = engine;
 		this.scene = scene;
 		this.camera = camera;
-		this.input = new Input( engine.domElement, { onKeyDown: event => this.handleWorldKeyDown( event ) } );
+		this.input = new Input( engine.domElement, { onKeyDown: event => this.handleWorldKeyDown( event ), onKeyUp: event => this.handleWorldKeyUp( event ) } );
 		this.fly = new FlyCamera( camera, engine.domElement, this.input );
 		this.hostedColliders = new Colliders();
 		this.vegetationEnabled = ! this.qs.has( 'noVeg' );
@@ -2503,7 +2503,20 @@ export class App {
 		const hosted = this.remoteWorldActive;
 		const experience = hosted ? this.activeHostedExperience : this.localWorldExperience;
 		const extensions = hosted ? this.activeHostedExtensions : this.localWorldExtensions;
-		return dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { app: this, event, extensions } );
+		const worldId = hosted ? this.activeHostedWorldId : 'elsemesh:local';
+		void dispatchWorldInputExtensionEvent( experience, extensions, 'down', event, { app: this, worldId, isCurrent: () => this.isCurrentWorldExtensions( extensions ) } ).catch( error => console.error( 'World input extension event failed:', error ) );
+		const claimedByBehavior = dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { app: this, event, extensions } );
+		return claimedByBehavior || extensions?.subscribes?.( 'elsemesh.world.input/1' ) === true;
+
+	}
+
+	handleWorldKeyUp( event ) {
+
+		const hosted = this.remoteWorldActive;
+		const experience = hosted ? this.activeHostedExperience : this.localWorldExperience;
+		const extensions = hosted ? this.activeHostedExtensions : this.localWorldExtensions;
+		const worldId = hosted ? this.activeHostedWorldId : 'elsemesh:local';
+		void dispatchWorldInputExtensionEvent( experience, extensions, 'up', event, { app: this, worldId, isCurrent: () => this.isCurrentWorldExtensions( extensions ) } ).catch( error => console.error( 'World input extension event failed:', error ) );
 
 	}
 

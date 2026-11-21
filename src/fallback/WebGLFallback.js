@@ -29,7 +29,7 @@ import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { applyWebGLWorldMaterialGraphs } from './WebGLWorldMaterialGraphs.js';
-import { createWorldBehaviorExtensions, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { WebGLShoreState } from './WebGLShoreState.js';
@@ -705,10 +705,10 @@ export class WebGLFallback {
 		// admission pose would violate the owner's spawn-radius rule.
 		if ( this.reviewPose && ! this.worldLink ) this.spawn = { position: this.reviewPose.p, yaw: this.reviewPose.yaw, pitch: this.reviewPose.pitch };
 		this.camera.position.set( ...this.spawn.position );
-		this.input = new Input( this.engine.canvas, { onKeyDown: event => {
-			const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
-			return dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { fallback: this, app: this.app, event, extensions: this.activeWorldExtensions } );
-		} } );
+		this.input = new Input( this.engine.canvas, {
+			onKeyDown: event => this._handleWorldKeyDown( event, 'down' ),
+			onKeyUp: event => this._handleWorldKeyDown( event, 'up' ),
+		} );
 		if ( ! this.worldLink ) {
 			this.waterQuery = new WebGLWaterQuery( T, this.renderer, this.terrain, this.worldSeaLevel );
 			this._bindOceanFFTToWater();
@@ -2055,6 +2055,18 @@ export class WebGLFallback {
 		// Capture key events before UI descendants can stop them from reaching the fallback.
 		window.addEventListener( 'keydown', this._keyDown, true );
 		this.engine.canvas.addEventListener( 'click', () => this.requestLock() );
+
+	}
+
+	_handleWorldKeyDown( event, phase ) {
+
+		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
+		const extensions = this.activeWorldExtensions;
+		const worldId = this.worldLink ? this.connector?.worldId : 'elsemesh:local';
+		void dispatchWorldInputExtensionEvent( experience, extensions, phase, event, { fallback: this, app: this.app, worldId, isCurrent: () => extensions === this.activeWorldExtensions } ).catch( error => console.error( 'World input extension event failed:', error ) );
+		if ( phase !== 'down' ) return false;
+		const claimedByBehavior = dispatchWorldBehaviorHooks( experience, 'onWorldKeyDown', { fallback: this, app: this.app, event, extensions } );
+		return claimedByBehavior || extensions?.subscribes?.( 'elsemesh.world.input/1' ) === true;
 
 	}
 

@@ -83,6 +83,17 @@ bounded JSON result to the registered behavior adapter. App and renderer
 objects never cross the Worker boundary. WebGPU and WebGL share this event
 contract.
 
+Worlds may also subscribe to `elsemesh.world.input/1` to receive keyboard
+input. The normalized payload contains `phase` (`down` or `up`), a bounded
+physical `code`, the `repeat` flag, four modifier booleans, and the active
+`worldId`. It never includes DOM targets, typed text, or browser event objects.
+The engine keeps renderer-neutral key polling available for normal gameplay;
+when a signed Worker subscribes to this event, the engine routes the physical
+key event to that Worker and does not also expose that press to engine key
+polling. A Worker may return state through its registered behavior result
+handler. Keyboard input is client-local and grants no server authority; worldd
+still validates authoritative interactions and presence separately.
+
 ## Invitation admission and launch grants
 
 World access may be invitation-gated independently of signed content and

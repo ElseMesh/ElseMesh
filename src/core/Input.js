@@ -2,6 +2,10 @@
 const LOOK_VERTICAL_DEAD_ZONE = 0.04;
 const KEYBOARD_LOOK_PIXELS_PER_SECOND = 260;
 
+function isEditableTarget( target ) {
+	return !! target && ( [ 'INPUT', 'SELECT', 'TEXTAREA' ].includes( target.tagName ) || target.isContentEditable === true || target.closest?.( '[contenteditable="true"]' ) != null );
+}
+
 export function keyboardLookDelta( keys, dt, rate = KEYBOARD_LOOK_PIXELS_PER_SECOND ) {
 	const step = rate * dt;
 	return {
@@ -12,10 +16,11 @@ export function keyboardLookDelta( keys, dt, rate = KEYBOARD_LOOK_PIXELS_PER_SEC
 
 export class Input {
 
-	constructor( dom, { onKeyDown = null } = {} ) {
+	constructor( dom, { onKeyDown = null, onKeyUp = null } = {} ) {
 
 		this.dom = dom;
 		this.onKeyDown = onKeyDown;
+		this.onKeyUp = onKeyUp;
 		this.keys = new Set();
 		this.pressed = new Set();
 		this.look = { x: 0, y: 0 };
@@ -35,7 +40,7 @@ export class Input {
 
 		window.addEventListener( 'keydown', ( e ) => {
 
-			if ( e.target && ( e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' ) ) return;
+			if ( isEditableTarget( e.target ) ) return;
 			if ( e.code === 'Escape' ) {
 				this.lockSuppressed = true;
 				if ( document.pointerLockElement === this.dom ) document.exitPointerLock?.();
@@ -54,7 +59,10 @@ export class Input {
 			}
 
 		} );
-		window.addEventListener( 'keyup', ( e ) => this.keys.delete( e.code ) );
+		window.addEventListener( 'keyup', ( e ) => {
+			this.keys.delete( e.code );
+			if ( ! isEditableTarget( e.target ) ) this.onKeyUp?.( e );
+		} );
 		window.addEventListener( 'blur', () => this._clearTransientInput() );
 		document.addEventListener( 'visibilitychange', () => {
 

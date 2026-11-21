@@ -134,6 +134,18 @@ remaining renderer-specific lifecycle/presentation adapters, full live-input
 walkthroughs, and broader gameplay/visual/FPS parity are still open. No overall
 parity percentage changes.
 
+**2026-11-21 signed Worker keyboard input:** Added opt-in
+`elsemesh.world.input/1` delivery on both renderer paths. Only extensions whose
+owner-signed `events` list subscribes receive normalized down/up events; the
+payload contains a bounded physical key code, phase, repeat flag, modifiers,
+and world ID, not DOM objects or typed text. The engine consumes subscribed
+physical key presses so they do not also invoke its key polling/portal shortcut.
+Registry tests verify the sanitized payload and Worker delivery; input and
+Tidewater parity checks pass. The network protocol and authoring docs describe
+the contract and its client-only authority. This completes an opt-in input
+channel, not general world interaction authority or all behavior extraction;
+no broad separation/parity percentage changes.
+
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas
 dimensions, and impostor shading/wind parameters in the plain-data
