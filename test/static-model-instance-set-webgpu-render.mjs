@@ -143,6 +143,13 @@ try {
 	assert.ok( graphMesh.length > 0 && graphMesh.every( mesh => mesh.geometry.getAttribute( 'vdata1' ) && mesh.geometry.getAttribute( 'vdata2' ) ), 'WebGPU static GLB preparation maps both signed auxiliary vertex-data streams' );
 	assert.ok( renderedMaterials.some( material => material.name === profileMaterial.name ), 'WebGPU static models resolve the registered world material profile' );
 	assert.ok( renderedMaterials.some( material => material.name === 'world-material-graph' && material.surface.includes( 's.albedo *= emg_albedo' ) ), 'WebGPU compiles renderer-neutral GLB material graph data' );
+	const instancedMeshes = [];
+	root.traverse( node => { if ( node.isInstancedMesh && node.count > 0 ) instancedMeshes.push( node ); } );
+	assert.ok( instancedMeshes.length > 0, 'the WebGPU fixture installs visible static-model instance batches' );
+	for ( const mesh of instancedMeshes ) {
+		const vertexBufferCount = L.mr._layout( mesh, mesh.geometry, mesh.material ).buffers.length;
+		assert.ok( vertexBufferCount <= GPU.device.limits.maxVertexBuffers, `static-model draw uses ${vertexBufferCount} WebGPU vertex buffers within the device limit of ${GPU.device.limits.maxVertexBuffers}` );
+	}
 	await L.run( 3, dt => runtime.update( dt, L.camera ) );
 	assert.equal( runtime.planner.groups[ 0 ].count, 1, 'the shared planner retains the fixture in view' );
 	const rendered = await readTexture( L.ldr.texture );

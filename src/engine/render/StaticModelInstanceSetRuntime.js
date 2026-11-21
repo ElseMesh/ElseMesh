@@ -32,6 +32,32 @@ export function writeStaticModelInstanceMaterialData( document, group, target0, 
 	return writeInstanceMaterialData( document.instances, group, target0, target1 );
 }
 
+const packedAttributeScratch = new WeakMap();
+
+function attributeWriteTarget( attribute, count ) {
+	if ( ! attribute.isInterleavedBufferAttribute ) return attribute.array;
+	let scratch = packedAttributeScratch.get( attribute );
+	const size = count * attribute.itemSize;
+	if ( ! scratch || scratch.length < size ) {
+		scratch = new Float32Array( size );
+		packedAttributeScratch.set( attribute, scratch );
+	}
+	return scratch;
+}
+
+function commitAttributeWrite( attribute, group, source ) {
+	if ( attribute.isInterleavedBufferAttribute ) {
+		const target = attribute.data.array;
+		const stride = attribute.data.stride;
+		for ( let index = 0; index < group.count; index ++ ) {
+			const sourceOffset = index * attribute.itemSize;
+			const targetOffset = index * stride + attribute.offset;
+			for ( let component = 0; component < attribute.itemSize; component ++ ) target[ targetOffset + component ] = source[ sourceOffset + component ];
+		}
+	}
+	attribute.needsUpdate = true;
+}
+
 /** Shared visibility/LOD update for backend-owned static model draw batches. */
 export class StaticModelInstanceSetRuntime {
 	constructor( document, { batches, shadowBatches = [], loadLOD = null, dispose = null, placementOwners = null, canRefine = null, initialLoadedLods = null } = {} ) {
@@ -295,17 +321,21 @@ export class StaticModelInstanceSetRuntime {
 				attributes = attributeGroups[ groupIndex ] = { batches: groupBatches, matrices, fades, materialData };
 			}
 			for ( const attribute of attributes.matrices ) {
-				writeStaticModelInstanceMatrices( this.document, group, attribute.array );
-				attribute.needsUpdate = true;
+				const target = attributeWriteTarget( attribute, group.count );
+				writeStaticModelInstanceMatrices( this.document, group, target );
+				commitAttributeWrite( attribute, group, target );
 			}
 			for ( const attribute of attributes.fades ) {
-				writeStaticModelInstanceFades( group, attribute.array );
-				attribute.needsUpdate = true;
+				const target = attributeWriteTarget( attribute, group.count );
+				writeStaticModelInstanceFades( group, target );
+				commitAttributeWrite( attribute, group, target );
 			}
 			for ( const [ attribute0, attribute1 ] of attributes.materialData ) {
-				writeStaticModelInstanceMaterialData( this.document, group, attribute0.array, attribute1.array );
-				attribute0.needsUpdate = true;
-				attribute1.needsUpdate = true;
+				const target0 = attributeWriteTarget( attribute0, group.count );
+				const target1 = attributeWriteTarget( attribute1, group.count );
+				writeStaticModelInstanceMaterialData( this.document, group, target0, target1 );
+				commitAttributeWrite( attribute0, group, target0 );
+				commitAttributeWrite( attribute1, group, target1 );
 			}
 			for ( const batch of groupBatches ) {
 				batch.mesh.count = group.count;

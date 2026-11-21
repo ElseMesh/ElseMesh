@@ -1,4 +1,4 @@
-import { InstancedBufferAttribute } from '../engine/geometry/BufferAttribute.js';
+import { InstancedBufferAttribute, InstancedInterleavedBuffer, InterleavedBufferAttribute } from '../engine/geometry/BufferAttribute.js';
 import { InstancedMesh } from '../engine/scene/Mesh.js';
 import { lodFadeModule } from '../materials/LODFade.js';
 import { loadStaticModelInstanceSetAssets } from './StaticModelInstanceSetAssets.js';
@@ -93,9 +93,11 @@ async function installStaticModelInstanceSet( { root, connector, installed = [] 
 
 function createModelDraws( source, capacity, geometryMirrorX, shadowOnly, hasMaterialData, materialCache, ownedGeometry, ownedMaterials ) {
 	const matrixAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 16 ), 16 );
-	const fadeAttribute = new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 );
-	const materialData0Attribute = hasMaterialData ? new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
-	const materialData1Attribute = hasMaterialData ? new InstancedBufferAttribute( new Float32Array( capacity * 4 ), 4 ) : null;
+	const instanceDataStride = 4 + ( hasMaterialData ? 8 : 0 );
+	const instanceData = new InstancedInterleavedBuffer( new Float32Array( capacity * instanceDataStride ), instanceDataStride );
+	const fadeAttribute = new InterleavedBufferAttribute( instanceData, 4, 0 );
+	const materialData0Attribute = hasMaterialData ? new InterleavedBufferAttribute( instanceData, 4, 4 ) : null;
+	const materialData1Attribute = hasMaterialData ? new InterleavedBufferAttribute( instanceData, 4, 8 ) : null;
 	const draws = [];
 	let meshCount = 0, fullyTransparentMeshCount = 0;
 	source.updateMatrixWorld( true );
