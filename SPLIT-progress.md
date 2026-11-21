@@ -112,6 +112,16 @@ fetched, so cross-world CDN reuse at the edge still needs live verification.
 Shared-content progress moves from 80% to 85%; live CDN deployment and edge
 reuse proof remain open.
 
+**2026-11-21 renderer-neutral input gate:** Tidewater's vendor and inventory
+panels now use one `onWorldBlocksPlayerInput` behavior hook in both ElseMesh
+render paths. WebGPU's app player-update path now honors the same gate already
+used by WebGL, preventing movement behind an open panel. The engine registry
+test verifies blocked and allowed hosted updates, and a Tidewater-owned test
+checks the handler with both app and WebGL contexts plus inactive worlds. The
+registry and parity tests pass. This closes the known panel-movement mismatch;
+other live input, gameplay, appearance, and FPS gates remain, so no overall
+parity percentage changes.
+
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas
 dimensions, and impostor shading/wind parameters in the plain-data

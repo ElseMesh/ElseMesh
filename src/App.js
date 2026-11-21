@@ -2374,8 +2374,7 @@ export class App {
 					underwaterLighting: this.underwaterLighting, breakers: this.hostedBreakers || this.breakers, spray: this.spray,
 				} );
 			}
-			if ( this.freeCam ) this.updateFreeCamera( dt );
-			else this.player.updateHostedWorld( dt );
+			this.updatePlayerInput( dt, 'hosted', this.activeHostedExperience, this.activeHostedExtensions );
 			dispatchWorldBehaviorHooks( this.activeHostedExperience, 'onWorldFrame', { app: this, mode: 'hosted', dt, extensions: this.activeHostedExtensions } );
 			this.dispatchWorldFrameEvent( this.activeHostedExperience, this.activeHostedExtensions, this.activeHostedWorldId, dt, G.time.value, this.player, { mode: 'hosted' } );
 			this.updateWorldPortals();
@@ -2387,8 +2386,7 @@ export class App {
 
 			this.boatCtl.update( dt );
 			this.boatSpray.update( dt );
-			if ( this.freeCam ) this.updateFreeCamera( dt );
-			else this.player.update( dt );
+			this.updatePlayerInput( dt, 'builtin', this.localWorldExperience, this.localWorldExtensions );
 			dispatchWorldBehaviorHooks( this.localWorldExperience, 'onWorldFrame', { app: this, mode: 'builtin', dt, extensions: this.localWorldExtensions } );
 			this.dispatchWorldFrameEvent( this.localWorldExperience, this.localWorldExtensions, 'elsemesh:local', dt, G.time.value, this.player, { mode: 'builtin' } );
 
@@ -2487,6 +2485,16 @@ export class App {
 		this.updateNavigationHUD( this.camera, this.player, this.activeHostedExperience || this.worldConnector?.manifest?.experience || this.localWorldExperience );
 		if ( this.ui ) this.ui.update( dt );
 		this.input.endFrame();
+
+	}
+
+	updatePlayerInput( dt, mode, experience, extensions ) {
+
+		if ( dispatchWorldBehaviorHooks( experience, 'onWorldBlocksPlayerInput', { app: this, mode, extensions } ) ) return false;
+		if ( this.freeCam ) this.updateFreeCamera( dt );
+		else if ( mode === 'hosted' ) this.player.updateHostedWorld( dt );
+		else this.player.update( dt );
+		return true;
 
 	}
 

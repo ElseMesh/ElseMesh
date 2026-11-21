@@ -2140,7 +2140,7 @@ export class WebGLFallback {
 			object.material.uniforms.uCameraPosition?.value.copy( this.camera.position );
 		}
 		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource.experience;
-		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWebGLBlocksPlayerInput', { fallback: this, extensions: this.activeWorldExtensions } );
+		const gamePanelOpen = dispatchWorldBehaviorHooks( experience, 'onWorldBlocksPlayerInput', { fallback: this, app: this.app, extensions: this.activeWorldExtensions } );
 		if ( ! this.reviewCameraOnly && this.player && ! gamePanelOpen ) {
 			if ( this.worldLink ) this.player.updateHostedWorld( dt );
 			else this.player.update( dt );

@@ -32,6 +32,7 @@ let worldFrame = null;
 let worldDeactivation = null;
 let webglFrame = null;
 let webglKey = null;
+let inputGate = null;
 let extensionResult = null;
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: state => { worldActivation = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldActivated: state => { webglActivation = state; } } );
@@ -41,6 +42,7 @@ registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldDeacti
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldExtensionResult: state => { extensionResult = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLWorldFrame: state => { webglFrame = state; } } );
 registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWebGLKeyDown: state => { webglKey = state; return state.active && state.code === 'KeyE'; } } );
+registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onWorldBlocksPlayerInput: state => { inputGate = state; return state.active && state.app?.testBlocksInput === true; } } );
 dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onHostedWorldActivated', { marker: 7 } );
 assert.deepEqual( { active: worldActivation.active, data: worldActivation.data, behaviorId: worldActivation.behaviorId, marker: worldActivation.marker }, { active: true, data: {}, behaviorId: 'elsemesh.registry-test/1', marker: 7 }, 'registered handlers receive their active behavior data through generic dispatch' );
 dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWebGLWorldActivated', { marker: 8 } );
@@ -56,6 +58,22 @@ assert.equal( webglFrame.dt, 1 / 30, 'WebGL behavior frame work is registry-disp
 assert.equal( dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWebGLKeyDown', { code: 'KeyE' } ), true, 'input hooks can claim a behavior-specific key' );
 assert.equal( dispatchWorldBehaviorHooks( { behaviors: {} }, 'onWebGLKeyDown', { code: 'KeyE' } ), false, 'inactive behaviors cannot claim input' );
 assert.equal( webglKey.active, false );
+assert.equal( dispatchWorldBehaviorHooks( { behaviors: { 'elsemesh.registry-test/1': {} } }, 'onWorldBlocksPlayerInput', { app: { testBlocksInput: true } } ), true, 'player input gating uses a renderer-neutral behavior hook' );
+assert.equal( inputGate.active, true );
+assert.equal( dispatchWorldBehaviorHooks( { behaviors: {} }, 'onWorldBlocksPlayerInput', { app: { testBlocksInput: true } } ), false, 'inactive behaviors cannot block player input' );
+assert.equal( inputGate.active, false );
+const inputUpdates = [];
+const testApp = Object.assign( Object.create( App.prototype ), {
+	freeCam: false,
+	player: { update: dt => inputUpdates.push( [ 'walk', dt ] ), updateHostedWorld: dt => inputUpdates.push( [ 'hosted', dt ] ) },
+	updateFreeCamera: dt => inputUpdates.push( [ 'free-camera', dt ] ),
+	testBlocksInput: true,
+} );
+assert.equal( testApp.updatePlayerInput( 1 / 60, 'builtin', { behaviors: { [ behaviorID ]: {} } }, null ), false, 'App skips player movement when the active world blocks input' );
+assert.deepEqual( inputUpdates, [], 'blocked input does not advance the player or free camera' );
+testApp.testBlocksInput = false;
+assert.equal( testApp.updatePlayerInput( 1 / 60, 'hosted', { behaviors: { [ behaviorID ]: {} } }, null ), true, 'App advances hosted player input when the world permits it' );
+assert.deepEqual( inputUpdates, [ [ 'hosted', 1 / 60 ] ], 'hosted player update follows the world input gate' );
 dispatchWorldBehaviorHooks( { behaviors: {} }, 'onHostedWorldActivated', {} );
 assert.equal( worldActivation.active, false, 'registered handlers receive inactive lifecycle notifications for worlds without their behavior' );
 assert.throws( () => registerWorldBehaviorImplementation( 'elsemesh.registry-test/1', { onHostedWorldActivated: () => {} } ), /Invalid or duplicate/ );
