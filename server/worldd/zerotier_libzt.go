@@ -653,9 +653,9 @@ func (z *libztRuntime) proxyZeroTierTCP(ztConn net.Conn, peerPort int) {
 			_ = ztConn.Close()
 			return
 		}
+		conn = bufferedReadConn{Conn: ztConn, reader: reader}
 		if isHTTP {
 			targetPort = httpPort
-			conn = bufferedReadConn{Conn: ztConn, reader: reader}
 		}
 	}
 	z.proxy(conn, targetPort)
