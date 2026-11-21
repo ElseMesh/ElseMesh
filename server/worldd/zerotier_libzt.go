@@ -671,14 +671,32 @@ func (z *libztRuntime) proxy(ztConn net.Conn, targetPort int) {
 		return
 	}
 	defer conn.Close()
-	done := make(chan struct{}, 1)
-	go func() {
-		_, _ = io.Copy(conn, ztConn)
-		done <- struct{}{}
-	}()
-	_, _ = io.Copy(ztConn, conn)
-	_ = ztConn.Close()
-	<-done
+	done := make(chan error, 2)
+	copyStream := func(destination, source net.Conn) {
+		_, copyErr := io.Copy(destination, source)
+		if copyErr == nil {
+			copyErr = shutdownWrite(destination)
+		}
+		done <- copyErr
+	}
+	go copyStream(conn, ztConn)
+	firstErr := <-done
+	if firstErr != nil {
+		_ = ztConn.Close()
+		_ = conn.Close()
+	}
+	secondErr := <-done
+	if secondErr != nil {
+		_ = ztConn.Close()
+		_ = conn.Close()
+	}
+}
+
+func shutdownWrite(conn net.Conn) error {
+	if halfCloser, ok := conn.(interface{ CloseWrite() error }); ok {
+		return halfCloser.CloseWrite()
+	}
+	return conn.Close()
 }
 
 func (z *libztRuntime) StopAccepting() error {
@@ -783,6 +801,7 @@ type ztConn struct {
 	localAddr     net.Addr
 	remoteAddr    net.Addr
 	ioMu          sync.Mutex
+	writeClosed   bool
 	deadlineMu    sync.RWMutex
 	readDeadline  time.Time
 	writeDeadline time.Time
@@ -857,6 +876,10 @@ func (c *ztConn) Write(p []byte) (int, error) {
 			c.ioMu.Unlock()
 			return written, net.ErrClosed
 		}
+		if c.writeClosed {
+			c.ioMu.Unlock()
+			return written, net.ErrClosed
+		}
 		var socketErr C.int
 		remaining := p[written:]
 		n := int(C.zt_write_with_errno(C.int(c.fd), unsafe.Pointer(&remaining[0]), C.size_t(len(remaining)), &socketErr))
@@ -880,6 +903,25 @@ func (c *ztConn) Write(p []byte) (int, error) {
 		return written, fmt.Errorf("libzt write failed (%d)", int(socketErr))
 	}
 	return written, nil
+}
+
+func (c *ztConn) CloseWrite() error {
+	if c.isClosed() {
+		return net.ErrClosed
+	}
+	c.ioMu.Lock()
+	defer c.ioMu.Unlock()
+	if c.isClosed() {
+		return net.ErrClosed
+	}
+	if c.writeClosed {
+		return nil
+	}
+	if code := int(C.zts_shutdown_wr(C.int(c.fd))); code != 0 {
+		return fmt.Errorf("libzt socket write shutdown failed (%d)", code)
+	}
+	c.writeClosed = true
+	return nil
 }
 
 func (c *ztConn) Close() error {
