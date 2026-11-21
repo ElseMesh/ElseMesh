@@ -66,9 +66,12 @@ CDN publication is explicit per world and per asset. The signed manifest's
 optional `cdnURL` must end in `/sha256/<digest>` matching the asset ID. The
 source-to-manifest tool accepts `--cdn-base-url` and builds that URL; use the
 same base URL across worlds to give byte-identical assets the exact same URL
-and CDN/browser cache entry. Assets without `cdnURL` remain available only
-through authorized providers. CDN objects must use immutable cache headers,
-and a new object is published when the bytes change.
+and cache key. World ID, manifest ID, and world-specific path prefixes must not
+be part of the key for shared immutable bytes. Each world's signed manifest
+still declares the asset, but publishers upload the digest object once and all
+world manifests reference that same CDN object. Assets without `cdnURL` remain
+available only through authorized providers. CDN objects must use immutable
+cache headers, and a new object is published when the bytes change.
 Do not upload bridge output or other restricted content merely because it is
 present in worldd's local store. A world owner must opt the relevant assets in
 to the selected distribution target. Worlds with bridge-derived assets may use
@@ -96,16 +99,19 @@ own content identity.
 
 The browser validates signed digest URLs, checks an origin-wide CacheStorage
 entry keyed by the canonical digest URL, and verifies the cached size and
-SHA-256 before use. On a miss it fetches with credentials omitted, verifies the
-response, stores the bytes for later world loads, and falls back to the
-authorized provider if CDN delivery fails. An isolated Chromium test confirms
-two world loads use one network transfer. CacheStorage is partitioned by the
-ElseMesh site origin and browser profile; worlds using the same ElseMesh client
-share entries when they name the same URL. The current Pages build does not
-publish the world package asset tree, and there is not yet a publisher that
-uploads explicitly opted-in assets to R2 or another CDN. End-to-end startup
-timing and CDN upload automation remain open; this section is the single
-design reference for them.
+SHA-256 before use. In-flight downloads for the same URL are coalesced. On a
+miss it fetches with credentials omitted, verifies the response, stores the
+bytes for later world loads, and falls back to the authorized provider if CDN
+delivery fails. An isolated Chromium test confirms two world loads use one
+network transfer. CacheStorage is partitioned by the ElseMesh site origin and
+browser profile; worlds using the same ElseMesh client share entries when they
+name the same URL. A shared digest URL also gives the CDN one immutable object
+and edge-cache key regardless of how many world manifests reference it. The
+publisher at `tools/publish-world-cdn-assets.mjs` validates opted-in signed
+assets and publishes them to R2 with immutable cache metadata. A real upload and
+fetch through a deployed CDN, including reuse by two world manifests, remain
+unverified. The current Pages build does not publish the world package asset
+tree. This section is the single design reference for the distribution path.
 
 Treat `WorldContentProvider` as an additive engine boundary, not a new
 world-specific code path. The existing signed-package provider remains the
