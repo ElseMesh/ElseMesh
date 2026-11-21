@@ -30,7 +30,7 @@ globalThis.document = documentTarget;
 
 try {
 	const received = [];
-	const input = new Input( dom, { onKeyDown: event => { received.push( event.code ); return event.code === 'KeyE'; } } );
+	const input = new Input( dom, { onKeyDown: event => { received.push( event.code ); return [ 'KeyE', 'KeyW' ].includes( event.code ); } } );
 	const event = {
 		type: 'keydown', code: 'KeyE', target: null, defaultPrevented: false, immediatePropagationStopped: false,
 		preventDefault() { this.defaultPrevented = true; },
@@ -65,6 +65,16 @@ try {
 		type: 'keyup', code: 'KeyA', target: { tagName: 'DIV', isContentEditable: true },
 	} );
 	assert.deepEqual( received, [ 'KeyE', 'KeyL' ], 'contenteditable key releases are not forwarded to world behaviors' );
+	const subscribedMovementKey = {
+		type: 'keydown', code: 'KeyW', target: null, defaultPrevented: false, immediatePropagationStopped: false,
+		preventDefault() { this.defaultPrevented = true; },
+		stopImmediatePropagation() { this.immediatePropagationStopped = true; },
+	};
+	windowTarget.dispatch( subscribedMovementKey );
+	assert.equal( input.down( 'KeyW' ), false, 'a signed Worker subscribed to W consumes held-key gameplay polling' );
+	assert.equal( input.moveAxes().y, 0, 'a consumed W press does not move the avatar through engine axes' );
+	windowTarget.dispatch( { type: 'keyup', code: 'KeyW', target: null } );
+	assert.equal( input.down( 'KeyW' ), false, 'key release clears the consumed state' );
 } finally {
 	if ( oldWindow === undefined ) delete globalThis.window;
 	else globalThis.window = oldWindow;

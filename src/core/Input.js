@@ -22,6 +22,7 @@ export class Input {
 		this.onKeyDown = onKeyDown;
 		this.onKeyUp = onKeyUp;
 		this.keys = new Set();
+		this.consumedKeys = new Set();
 		this.pressed = new Set();
 		this.look = { x: 0, y: 0 };
 		this.moveStick = { x: 0, y: 0 };
@@ -53,6 +54,7 @@ export class Input {
 			this.keys.add( e.code );
 			if ( [ 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab' ].includes( e.code ) ) e.preventDefault();
 			if ( freshKeyDown && this.onKeyDown?.( e ) === true ) {
+				this.consumedKeys.add( e.code );
 				this.pressed.delete( e.code );
 				e.preventDefault();
 				e.stopImmediatePropagation();
@@ -61,6 +63,7 @@ export class Input {
 		} );
 		window.addEventListener( 'keyup', ( e ) => {
 			this.keys.delete( e.code );
+			this.consumedKeys.delete( e.code );
 			if ( ! isEditableTarget( e.target ) ) this.onKeyUp?.( e );
 		} );
 		window.addEventListener( 'blur', () => this._clearTransientInput() );
@@ -233,6 +236,7 @@ export class Input {
 	_clearTransientInput() {
 
 		this.keys.clear();
+		this.consumedKeys.clear();
 		this.pressed.clear();
 		this.mouseDown = false;
 		this.rightDown = false;
@@ -250,8 +254,10 @@ export class Input {
 	_moveAxis( negative, positive, value ) {
 
 		if ( ! this.enabled ) return 0;
-		if ( this.keys.has( negative ) || this.keys.has( positive ) ) {
-			return Number( this.keys.has( positive ) ) - Number( this.keys.has( negative ) );
+		const negativeDown = this.keys.has( negative ) && ! this.consumedKeys?.has( negative );
+		const positiveDown = this.keys.has( positive ) && ! this.consumedKeys?.has( positive );
+		if ( negativeDown || positiveDown ) {
+			return Number( positiveDown ) - Number( negativeDown );
 		}
 		return value;
 
@@ -301,6 +307,7 @@ export class Input {
 	down( code ) {
 
 		if ( ! this.enabled ) return false;
+		if ( this.consumedKeys?.has( code ) ) return false;
 		if ( this.keys.has( code ) ) return true;
 		if ( this.gamepadButtons.has( code ) ) return true;
 		const { x, y } = this.gamepadConnected ? this.gamepadMove : this.moveStick;
@@ -340,7 +347,8 @@ export class Input {
 			sy = this._shapeAxis( Math.max( - 1, Math.min( y, 1 ) ), LOOK_VERTICAL_DEAD_ZONE ) * outsideScale;
 
 		}
-		const keyboardLook = keyboardLookDelta( this.keys, dt );
+		const lookKeys = this.consumedKeys?.size ? new Set( [ ...this.keys ].filter( code => ! this.consumedKeys.has( code ) ) ) : this.keys;
+		const keyboardLook = keyboardLookDelta( lookKeys, dt );
 		const l = { x: this.look.x + sx * 420 * dt + keyboardLook.x, y: this.look.y - sy * 420 * dt + keyboardLook.y };
 		this.look.x = 0;
 		this.look.y = 0;

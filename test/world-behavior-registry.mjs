@@ -133,12 +133,13 @@ const inputExtensionExperience = {
 const inputWorker = new FakeWorker();
 const inputExtensions = createWorldBehaviorExtensions( inputExtensionExperience, new Map( [ [ extensionAssetID, new TextEncoder().encode( 'export function run(event) { return { accepted: event }; }' ) ] ] ), { workerFactory: () => inputWorker } );
 const inputKey = { code: 'KeyR', shiftKey: true, target: { value: 'not forwarded' } };
-assert.equal( App.prototype.handleWorldKeyDown.call( {
+const inputApp = {
 	remoteWorldActive: false,
 	localWorldExperience: inputExtensionExperience,
 	localWorldExtensions: inputExtensions,
 	isCurrentWorldExtensions: () => true,
-}, inputKey ), true, 'App routes and consumes a subscribed key through the signed world Worker' );
+};
+assert.equal( App.prototype.handleWorldKeyDown.call( inputApp, inputKey ), true, 'App routes and consumes a subscribed key through the signed world Worker' );
 assert.deepEqual( await dispatchWorldInputExtensionEvent( inputExtensionExperience, inputExtensions, 'down', inputKey, { worldId: 'elsemesh:input-test' } ), [ {
 	behaviorId: worldOwnedBehaviorID,
 	result: { echo: { type: WORLD_EXTENSION_EVENT_INPUT, phase: 'down', code: 'KeyR', repeat: false, modifiers: { alt: false, control: false, meta: false, shift: true }, worldId: 'elsemesh:input-test' } },
@@ -147,6 +148,12 @@ assert.deepEqual( inputWorker.messages.filter( message => message.type === 'run'
 	type: WORLD_EXTENSION_EVENT_INPUT, phase: 'down', code: 'KeyR', repeat: false,
 	modifiers: { alt: false, control: false, meta: false, shift: true }, worldId: 'elsemesh:input-test',
 }, 'Worker message excludes DOM event objects and text-entry fields' );
+App.prototype.handleWorldKeyUp.call( inputApp, inputKey );
+await new Promise( resolve => setTimeout( resolve, 0 ) );
+assert.deepEqual( inputWorker.messages.filter( message => message.type === 'run' ).at( -1 ).event, {
+	type: WORLD_EXTENSION_EVENT_INPUT, phase: 'up', code: 'KeyR', repeat: false,
+	modifiers: { alt: false, control: false, meta: false, shift: true }, worldId: 'elsemesh:local',
+}, 'App sends the matching physical key release through the same signed Worker' );
 inputExtensions.dispose();
 
 const frameBehaviorID = 'elsemesh.frame-bridge-test/1';
