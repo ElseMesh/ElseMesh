@@ -33,6 +33,7 @@
 // own sample metadata and the world behavior supplies its cue levels.
 
 import { BANK } from './soundBank.js';
+import { unmapPortalPosition } from '../network/PortalHandoff.js';
 
 const clamp = ( v, a, b ) => ( v < a ? a : v > b ? b : v );
 const lerp = ( a, b, t ) => a + ( b - a ) * t;
@@ -135,6 +136,13 @@ export class SoundScape {
 		this._worldAudioComponents = new Map(); // component ID -> signed data and verified bytes
 		this._worldAudioSources = new Map(); // component ID + bed index -> running loop
 		this._worldAudioPendingBeds = new Set();
+		this._portalAudioWorldID = null;
+		this._portalAudioComponents = new Map(); // world + component ID -> signed data and verified bytes
+		this._portalAudioSources = new Map();
+		this._portalAudioPendingBeds = new Set();
+		this._portalAudioPortal = null;
+		this._portalAudioEnvironment = EMPTY;
+		this._portalAudioGain = 0;
 		this._worldOneShotEvents = new Set(); // world + event ID -> played transition sound
 		this._worldOneShotPending = new Set();
 		this._worldOneShotSources = new Map(); // world + event ID -> one-shot Web Audio nodes
@@ -425,6 +433,74 @@ export class SoundScape {
 
 	}
 
+	// Destination ambience is mixed through the active doorway. The world owns
+	// signed sample references and source positions; ElseMesh maps those positions
+	// through the portal and applies the proximity gain.
+	setPortalAmbience( worldID, components = [], assets = new Map(), { portal = null, gain = 0, environment = EMPTY } = {} ) {
+
+		if ( typeof worldID !== 'string' || ! portal || ! Number.isFinite( gain ) ) {
+			this._fadePortalAudio();
+			return;
+		}
+		if ( this._portalAudioWorldID !== worldID ) {
+			this._fadePortalAudio();
+			this._portalAudioWorldID = worldID;
+		}
+		this._portalAudioPortal = {
+			entry: { position: [ ...portal.entry.position ], yaw: portal.entry.yaw },
+			exit: { position: [ ...portal.exit.position ], yaw: portal.exit.yaw },
+			scaleRatio: portal.scaleRatio ?? 1,
+		};
+		this._portalAudioEnvironment = environment && typeof environment === 'object' ? environment : EMPTY;
+		this._portalAudioGain = clamp( gain, 0, 1 );
+		const next = new Map( components.map( component => [ `${worldID}\0${component.id}`, component ] ) );
+		for ( const key of this._portalAudioComponents.keys() ) if ( ! next.has( key ) ) {
+			this._removePortalAudioComponent( key, true );
+			this._portalAudioComponents.delete( key );
+		}
+		for ( const [ key, component ] of next ) {
+			const signature = JSON.stringify( component.beds );
+			const current = this._portalAudioComponents.get( key );
+			if ( current?.signature !== signature ) {
+				this._removePortalAudioComponent( key, true );
+				this._portalAudioComponents.set( key, { worldID, signature, beds: component.beds, assets } );
+			} else current.assets = assets;
+		}
+		if ( this.enabled ) this._syncPortalAudio();
+
+	}
+
+	_fadePortalAudio() {
+
+		this._portalAudioGain = 0;
+		this._portalAudioPortal = null;
+		this._portalAudioEnvironment = EMPTY;
+		this._portalAudioWorldID = null;
+		for ( const key of this._portalAudioComponents.keys() ) this._removePortalAudioComponent( key, true );
+		this._portalAudioComponents.clear();
+		this._portalAudioPendingBeds.clear();
+
+	}
+
+	_removePortalAudioComponent( componentID, fade = false ) {
+
+		const prefix = `${componentID}\0`;
+		for ( const [ key, bed ] of this._portalAudioSources ) {
+			if ( ! key.startsWith( prefix ) || bed.fading ) continue;
+			if ( fade && this.ctx && this.ctx.state !== 'closed' ) {
+				bed.fading = true;
+				this._ramp( bed.gain.gain, 0, 0.12 );
+				try { bed.src.stop( this.ctx.currentTime + 0.45 ); } catch { /* already stopped */ }
+			} else {
+				this._portalAudioSources.delete( key );
+				try { bed.src.stop(); } catch { /* already stopped */ }
+				bed.src.disconnect(); bed.gain.disconnect(); bed.panner?.disconnect();
+			}
+		}
+		for ( const key of this._portalAudioPendingBeds ) if ( key.startsWith( prefix ) ) this._portalAudioPendingBeds.delete( key );
+
+	}
+
 	// Play one signed, host-authored world event once. Bytes must already come from
 	// the connector's hash-verified asset cache; world URLs are never fetched here.
 	async playWorldOneShot( worldID, eventID, assetID, bytes, position = null ) {
@@ -525,6 +601,7 @@ export class SoundScape {
 			this._ramp( this.aboveOut.gain, lerp( 1, 0.4 / ( 1 + this.env.depth / 5 ), this.env.u ), 0.05 );
 			this._ramp( this.under.gain, this.env.u, 0.06 );
 			this._syncWorldAudio();
+			this._syncPortalAudio();
 			for ( const bed of this._worldAudioSources.values() ) {
 
 				const condition = bed.definition.condition || 'always';
@@ -536,9 +613,92 @@ export class SoundScape {
 				this._ramp( bed.gain.gain, bed.definition.gain * factor * ( bed.mono ? MONO : 1 ), 0.35 );
 
 			}
+			for ( const bed of this._portalAudioSources.values() ) {
+				if ( bed.fading ) continue;
+				const condition = bed.definition.condition || 'always';
+				const env = this._portalAudioEnvironment;
+				const daylight = Number.isFinite( env.daylight ) ? clamp( env.daylight, 0, 1 ) : null;
+				let factor = 1;
+				if ( condition === 'day' ) factor = daylight ?? 0;
+				else if ( condition === 'night' ) factor = daylight === null ? 0 : 1 - daylight;
+				else if ( condition === 'underwater' ) factor = env.underwater === true ? 1 : 0;
+				else if ( condition === 'dawn' ) factor = Number.isFinite( env.timeOfDay ) ? this._dawnFactorAt( env.timeOfDay ) : 0;
+				if ( bed.panner && this._portalAudioPortal ) {
+					const mapped = unmapPortalPosition( bed.definition.position, this._portalAudioPortal.entry, this._portalAudioPortal.exit, this._portalAudioPortal.scaleRatio );
+					const now = this.ctx.currentTime, tau = 0.08;
+					for ( const [ param, value ] of [ [ bed.panner.positionX, mapped.x ], [ bed.panner.positionY, mapped.y ], [ bed.panner.positionZ, mapped.z ] ] ) {
+						if ( typeof param.setTargetAtTime === 'function' ) param.setTargetAtTime( value, now, tau ); else param.value = value;
+					}
+				}
+				this._ramp( bed.gain.gain, bed.definition.gain * factor * this._portalAudioGain * ( bed.mono ? MONO : 1 ), 0.3 );
+			}
 			if ( state?.boat ) this._boat( this.ctx.currentTime, clamp( num( dt, 1 / 60 ), 0, 0.1 ) );
 
 		} catch ( e ) { this._warn( e ); }
+
+	}
+
+	_syncPortalAudio() {
+
+		if ( ! this.ctx || this.ctx.state === 'closed' || ! this._portalAudioWorldID ) return;
+		for ( const [ componentID, component ] of this._portalAudioComponents ) for ( const [ index, definition ] of component.beds.entries() ) {
+			const key = `${componentID}\0${index}`;
+			if ( this._portalAudioSources.has( key ) || this._portalAudioPendingBeds.has( key ) || this._worldAudioFailures.has( definition.assetId ) ) continue;
+			const bytes = component.assets?.get( definition.assetId );
+			if ( ! bytes ) continue;
+			let decoded = this._worldAudioBuffers.get( definition.assetId );
+			if ( ! decoded ) {
+				const audioBytes = bytes instanceof ArrayBuffer ? bytes.slice( 0 ) : bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength );
+				decoded = this.ctx.decodeAudioData( audioBytes ).then( buffer => {
+					this._worldAudioBuffers.set( definition.assetId, buffer );
+					return buffer;
+				} ).catch( error => {
+					this._worldAudioBuffers.delete( definition.assetId );
+					this._worldAudioFailures.add( definition.assetId );
+					this._warn( error );
+					return null;
+				} );
+				this._worldAudioBuffers.set( definition.assetId, decoded );
+			}
+			if ( decoded instanceof Promise ) {
+				this._portalAudioPendingBeds.add( key );
+				decoded.then( buffer => this._startPortalAudioBed( key, componentID, index, definition, buffer ) ).finally( () => this._portalAudioPendingBeds.delete( key ) );
+			} else this._startPortalAudioBed( key, componentID, index, definition, decoded );
+		}
+
+	}
+
+	_startPortalAudioBed( key, componentID, index, definition, buffer ) {
+
+		if ( ! buffer || ! this.ctx || this.ctx.state === 'closed' || this._portalAudioSources.has( key ) || this._portalAudioComponents.get( componentID )?.beds[ index ] !== definition || ! this._portalAudioPortal ) return;
+		const c = this.ctx, src = c.createBufferSource(), gain = c.createGain();
+		src.buffer = buffer;
+		src.loop = true;
+		gain.gain.value = 0;
+		let panner = null;
+		if ( definition.position ) {
+			panner = c.createPanner();
+			panner.panningModel = 'HRTF';
+			panner.distanceModel = 'inverse';
+			panner.refDistance = definition.refDistance ?? 1;
+			panner.rolloffFactor = definition.rolloff ?? 1;
+			panner.maxDistance = 10000;
+			const mapped = unmapPortalPosition( definition.position, this._portalAudioPortal.entry, this._portalAudioPortal.exit, this._portalAudioPortal.scaleRatio );
+			panner.positionX.value = mapped.x;
+			panner.positionY.value = mapped.y;
+			panner.positionZ.value = mapped.z;
+		}
+		src.connect( gain );
+		if ( panner ) gain.connect( panner ).connect( this.above );
+		else gain.connect( this.above );
+		const record = { src, gain, panner, definition, mono: buffer.numberOfChannels === 1, fading: false };
+		this._portalAudioSources.set( key, record );
+		src.onended = () => {
+			if ( this._portalAudioSources.get( key ) !== record ) return;
+			this._portalAudioSources.delete( key );
+			src.disconnect(); gain.disconnect(); panner?.disconnect();
+		};
+		src.start( c.currentTime + 0.02, Math.random() * buffer.duration );
 
 	}
 
@@ -623,8 +783,13 @@ export class SoundScape {
 
 	_dawnFactor() {
 
-		const h = this.env.hour;
-		if ( h === null ) return 0;
+		return this._dawnFactorAt( this.env.hour );
+
+	}
+
+	_dawnFactorAt( h ) {
+
+		if ( ! Number.isFinite( h ) ) return 0;
 		return smooth( 5.0, 5.8, h ) * ( 1 - smooth( 6.6, 7.9, h ) );
 
 	}
@@ -698,6 +863,9 @@ export class SoundScape {
 		for ( const id of this._worldAudioComponents.keys() ) this._removeWorldAudioComponent( id );
 		this._worldAudioComponents.clear();
 		this._worldAudioPendingBeds.clear();
+		for ( const id of this._portalAudioComponents.keys() ) this._removePortalAudioComponent( id );
+		this._portalAudioComponents.clear();
+		this._portalAudioPendingBeds.clear();
 		this._worldOneShotPending.clear();
 		if ( ! this.ctx ) return;
 		try {

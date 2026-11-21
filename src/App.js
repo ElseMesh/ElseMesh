@@ -79,7 +79,8 @@ import { updateWorldPackageLOD, appendWorldPackageAssets, createWorldPackageRoot
 import { createBundledWorldAssetConnector, loadWorldComponentAssets } from './network/WorldComponentAssets.js';
 import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
-import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState } from './network/PortalHandoff.js';
+import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState, mapPortalPosition } from './network/PortalHandoff.js';
+import { portalAudioProximityGain } from './network/PortalAudio.js';
 import { matchingPortalAgreement } from './network/PortalAgreement.js';
 import { vehiclePolicy } from './network/WorldRules.js';
 import { WorldPresenceSession } from './network/WorldPresenceSession.js';
@@ -92,7 +93,8 @@ import { WorldPortalView } from './network/WorldPortalView.js';
 import { RenderLoadLOD } from './network/RenderLoadLOD.js';
 import { FrameWorkMeter } from './core/FrameWorkMeter.js';
 import { staticModelCoarseViewProgress } from './engine/render/StaticModelInstanceSetRuntime.js';
-import { GENERIC_WORLD_EXPERIENCE, worldEnvironmentSettings } from './network/WorldExperience.js';
+import { GENERIC_WORLD_EXPERIENCE, worldEnvironmentSettings, worldTimeOfDay } from './network/WorldExperience.js';
+import { isWorldID } from './network/WorldIdentity.js';
 
 const _up = new Vector3( 0, 1, 0 );
 const _navigationForward = new Vector3();
@@ -199,6 +201,7 @@ export class App {
 		this.worldExtensionFrameSequence = 0;
 		this.worldBackgroundLoads = new Map();
 		this.worldStreamState = new Map();
+		this.worldTimeOfDayValues = new Map();
 		this.portalPreviousPosition = null;
 		this.settings = {
 			timeOfDay: 16.2,
@@ -1200,7 +1203,10 @@ export class App {
 	updateSun() {
 
 		const s = this.settings;
-		const dir = sunDirectionFromTime( s.timeOfDay ).applyAxisAngle( _up, MathUtils.degToRad( s.sunAzimuth || 0 ) );
+		const activeExperience = this.remoteWorldActive ? this.activeHostedExperience : this.localWorldExperience;
+		const activeWorldId = this.remoteWorldActive ? this.activeHostedWorldId : 'elsemesh:local';
+		const hour = this.getWorldTimeOfDay( activeWorldId, activeExperience ) ?? 12;
+		const dir = sunDirectionFromTime( hour ).applyAxisAngle( _up, MathUtils.degToRad( s.sunAzimuth || 0 ) );
 		// the sky is always scattered sunlight, even with the sun below the horizon (twilight)
 		this.atmosphere.sunDir.value.copy( dir );
 		// below the horizon the moon takes over as the key light
@@ -1214,6 +1220,21 @@ export class App {
 		// twilight anyway), then the moon
 		const light = dir.y > - 0.07 ? dir : moon;
 		G.sunDir.value.copy( light );
+
+	}
+
+	setWorldTimeOfDay( worldId, hour ) {
+
+		if ( ! isWorldID( worldId ) || ! Number.isFinite( hour ) || hour < 0 || hour >= 24 ) throw new Error( 'Invalid world time-of-day update' );
+		this.worldTimeOfDayValues.delete( worldId );
+		this.worldTimeOfDayValues.set( worldId, hour );
+		while ( this.worldTimeOfDayValues.size > 128 ) this.worldTimeOfDayValues.delete( this.worldTimeOfDayValues.keys().next().value );
+
+	}
+
+	getWorldTimeOfDay( worldId, experience ) {
+
+		return worldTimeOfDay( experience, this.settings.timeOfDay, this.worldTimeOfDayValues.get( worldId ) );
 
 	}
 
@@ -1261,6 +1282,8 @@ export class App {
 	toggleTime() {
 
 		const s = this.settings;
+		const experience = this.remoteWorldActive ? this.activeHostedExperience : this.localWorldExperience;
+		if ( experience?.environment?.timeOfDay?.engineOverride !== true ) return;
 		if ( s.timeSpeed !== 0 ) {
 
 			this._timeSpeed = s.timeSpeed;
@@ -2045,7 +2068,7 @@ export class App {
 		}
 		if ( ! preparation && this.remoteWorlds.has( portal.destinationWorldId ) ) {
 			const cached = this.remoteWorlds.get( portal.destinationWorldId );
-			preparation = { status: 'ready', connector: cached.connector, root: cached.root };
+			preparation = { status: 'ready', connector: cached.connector, root: cached.root, portalAssets: cached.connector.assets };
 			this.portalPreparations.set( portalKey, preparation );
 		}
 		if ( ! preparation ) {
@@ -2055,6 +2078,8 @@ export class App {
 			connector.preparePortal( portal, { signal, onPortalView: async ( { connector: destination, assets } ) => {
 				if ( signal.aborted ) return null;
 				if ( ! portal.openView ) return null;
+				preparation.connector = destination;
+				preparation.portalAssets = assets;
 				const root = await loadWorldPackage( destination, { assets, signal, materialContext: this.worldVillageMaterialContext } );
 				if ( signal.aborted ) { disposeWorldPackage( root ); return null; }
 				await this.installWorldComponents( root, destination, componentsThroughPriority( destination, 'portal-preview', this.vegetationEnabled ) );
@@ -2065,6 +2090,7 @@ export class App {
 			if ( signal.aborted ) { prepared.connector.close(); return; }
 			const root = prepared.portalView?.root || await loadWorldPackage( prepared.connector, { assets: prepared.assets, signal, materialContext: this.worldVillageMaterialContext } );
 			preparation.root = root;
+			preparation.portalAssets = prepared.assets;
 			if ( signal.aborted ) { this.disposeUncommittedWorldComponents( root ); prepared.connector.close(); return; }
 			await this.installWorldComponents( root, prepared.connector, componentsThroughPriority( prepared.connector, 'visible', this.vegetationEnabled ) );
 			await appendWorldPackageAssets( prepared.connector, root, prepared.assets, { signal } );
@@ -2098,6 +2124,23 @@ export class App {
 		} else {
 			this.clearPortalView();
 		}
+		if ( portal.openView && portalTransfer?.allowed && preparation.connector && preparation.portalAssets ) {
+			const destination = preparation.connector;
+			const ambience = ( destination.manifest.components || [] ).filter( component => component.type === 'elsemesh.ambient-audio/1' );
+			const mappedListener = mapPortalPosition( current, portal.entry, portal.exit, portal.scaleRatio );
+			const seaLevel = destination.manifest.rules?.seaLevel;
+			const destinationHour = this.getWorldTimeOfDay( destination.worldId, destination.manifest.experience );
+			const destinationDaylight = Number.isFinite( destinationHour ) ? 1 - MathUtils.smoothstep( - sunDirectionFromTime( destinationHour ).y, 0.02, 0.18 ) : null;
+			this.audio?.setPortalAmbience?.( destination.worldId, ambience, preparation.portalAssets, {
+				portal,
+				gain: portalAudioProximityGain( Math.sqrt( target.distanceSq ) ),
+				environment: {
+					daylight: destinationDaylight,
+					timeOfDay: destinationHour,
+					underwater: Number.isFinite( seaLevel ) && mappedListener.y < seaLevel,
+				},
+			} );
+		} else this.audio?.setPortalAmbience?.( null );
 
 		if ( ! crossed ) return;
 		if ( preparation.status === 'ready' ) {
@@ -2199,6 +2242,7 @@ export class App {
 
 	clearPortalView() {
 
+		this.audio?.setPortalAmbience?.( null );
 		this.portalView?.setTarget( null, null );
 		this.portalViewId = null;
 
@@ -2324,7 +2368,8 @@ export class App {
 		this.updateFPS();
 		this.hud?.setStats( { fps: this.fps, frameMs: this.frameMs, cpuMs: this.cpuMs, gpuMs: this.frameWorkMeter?.gpuMilliseconds() } );
 		G.dt.value = dt;
-		if ( s.timeSpeed !== 0 ) s.timeOfDay = ( s.timeOfDay + dt * s.timeSpeed + 24 ) % 24;
+		const activeExperience = this.remoteWorldActive ? this.activeHostedExperience : this.localWorldExperience;
+		if ( activeExperience?.environment?.timeOfDay?.engineOverride === true && s.timeSpeed !== 0 ) s.timeOfDay = ( s.timeOfDay + dt * s.timeSpeed + 24 ) % 24;
 
 		// ---- player / boat (boat physics first so the cameras follow this frame's pose)
 		if ( this.input.hit( 'KeyF' ) ) this.setFreeCam( ! this.freeCam );
@@ -2566,7 +2611,7 @@ export class App {
 					underwater: p.y < h ? 1 : 0,
 					depthBelowSurface: Math.max( 0, h - p.y ),
 					daylight: 1 - G.night.value,
-					timeOfDay: this.settings.timeOfDay,
+					timeOfDay: this.getWorldTimeOfDay( connector.worldId, connector.manifest.experience ),
 					boat: boat ? {
 						active: boat.driven, rpm: boat.rpm, speed: boat.velocity.length(), position: boat.model.group.position,
 						listenerInside: this.player.mode === 'boat' && this.player.camMode === 'first',

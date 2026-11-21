@@ -672,7 +672,7 @@ export class WebGLFallback {
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = T.PCFSoftShadowMap;
 		this.spray = new WebGLSpray( T, this.scene );
-		const sunDirection = this._sunDirection( this.app.settings.timeOfDay );
+		const sunDirection = this._sunDirection( this._worldTimeOfDay() );
 		this.scene.background = this.worldEnvironment.sky ? null : new T.Color( 0x080b10 );
 		this.webglAtmosphere = this.worldEnvironment.sky ? new WebGLAtmosphere( T, this.renderer, sunDirection ) : null;
 		this.cloudLayer = this._makeCloudLayer( sunDirection, this.cloudsEnabled );
@@ -680,7 +680,7 @@ export class WebGLFallback {
 		this.scene.add( this.cloudLayer );
 		this.hemisphereLight = new T.HemisphereLight( 0xd9f1ff, 0x42513f, 1.5 );
 		this.scene.add( this.hemisphereLight );
-		const initialLighting = webglLightingForTime( T, this.app.settings.timeOfDay );
+		const initialLighting = webglLightingForTime( T, this._worldTimeOfDay() );
 		this.shadowDirection = initialLighting.keyDirection.clone().negate();
 		this.sunShadows = new WebGLSunShadows( {
 			renderer: this.renderer,
@@ -1444,9 +1444,15 @@ export class WebGLFallback {
 
 	}
 
+	_worldTimeOfDay() {
+		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource?.experience;
+		const worldId = this.worldLink ? this.connector?.worldId : 'elsemesh:local';
+		return this.app.getWorldTimeOfDay( worldId, experience ) ?? 12;
+	}
+
 	_updateLighting() {
 
-		const T = this.THREE, lighting = webglLightingForTime( T, this.app.settings.timeOfDay );
+		const T = this.THREE, lighting = webglLightingForTime( T, this._worldTimeOfDay() );
 		this.lighting = lighting;
 		G.night.value = lighting.night;
 		this.sunDirection.copy( lighting.sunDirection );
@@ -2100,6 +2106,8 @@ export class WebGLFallback {
 		const now = performance.now(), rawFrameGapMs = Math.max( 0, now - ( this.lastFrame || now ) ), elapsed = Math.min( 0.1, rawFrameGapMs / 1000 );
 		const fixedSimulationTime = this.app.fixedSimulationTime;
 		const dt = fixedSimulationTime === null || fixedSimulationTime === undefined ? elapsed : 0;
+		const experience = this.worldLink ? this.connector?.manifest?.experience : this.defaultWorldSource?.experience;
+		if ( experience?.environment?.timeOfDay?.engineOverride === true && this.app.settings.timeSpeed !== 0 ) this.app.settings.timeOfDay = ( this.app.settings.timeOfDay + dt * this.app.settings.timeSpeed + 24 ) % 24;
 		this.app.updateFPS();
 		this.app.hud?.setStats( { fps: this.app.fps, frameMs: this.app.frameMs, cpuMs: this.app.cpuMs, gpuMs: this.frameWorkMeter.gpuMilliseconds() } );
 		G.dt.value = dt;
@@ -2556,13 +2564,13 @@ export class WebGLFallback {
 			audio.setWorldAmbience( this.connector.worldId, components, this.connector.assets );
 			if ( ! audio.enabled ) return;
 			const seaLevel = this.hostedSeaLevel ?? 0;
-			const sunHeight = this._sunDirection( this.app.settings.timeOfDay ).y;
+			const sunHeight = this._sunDirection( this._worldTimeOfDay() ).y;
 			audio.updateWorldAudio( dt, {
 				listener: { position: p, forward: fwd, up: new this.THREE.Vector3( 0, 1, 0 ).applyQuaternion( this.camera.quaternion ) },
 				underwater: p.y < seaLevel ? 1 : 0,
 				depthBelowSurface: Math.max( 0, seaLevel - p.y ),
 				daylight: 1 - this.THREE.MathUtils.smoothstep( - sunHeight, 0.02, 0.18 ),
-				timeOfDay: this.app.settings.timeOfDay,
+				timeOfDay: this._worldTimeOfDay(),
 			} );
 			return;
 		}

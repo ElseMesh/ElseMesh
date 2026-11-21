@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { SoundScape } from '../src/audio/SoundScape.js';
+import { mapPortalPosition, unmapPortalPosition } from '../src/network/PortalHandoff.js';
+import { portalAudioProximityGain } from '../src/network/PortalAudio.js';
 
 class Param {
 	constructor( value = 0 ) { this.value = value; }
@@ -83,5 +85,22 @@ sound.setWorldAmbience( 'elsemesh:second', [], new Map() );
 assert.equal( source.stopped, true, 'world handoff stops the previous world ambience' );
 assert.equal( sound.ctx.sources[ 1 ].stopped, true, 'world handoff stops a playing door event' );
 assert.equal( sound._worldAudioSources.size, 0, 'world handoff releases loop sources' );
+const portal = { entry: { position: [ 0, 0, 0 ], yaw: 0 }, exit: { position: [ 100, 0, 0 ], yaw: Math.PI / 2 }, scaleRatio: 2 };
+const remotePoint = mapPortalPosition( { x: 4, y: 3, z: -2 }, portal.entry, portal.exit, portal.scaleRatio );
+const localPoint = unmapPortalPosition( remotePoint, portal.entry, portal.exit, portal.scaleRatio );
+assert.ok( localPoint.distanceTo( { x: 4, y: 3, z: -2 } ) < 1e-9, 'portal audio source coordinates use the inverse doorway transform' );
+assert.equal( portalAudioProximityGain( 24 ), 0, 'remote ambience is silent outside its approach radius' );
+assert.equal( portalAudioProximityGain( 2 ), 1, 'remote ambience reaches full gain at the doorway' );
+const portalBed = { assetId: assetID, gain: 0.4, condition: 'always', position: [ remotePoint.x, remotePoint.y, remotePoint.z ], refDistance: 2, rolloff: 1 };
+sound.setPortalAmbience( 'elsemesh:next', [ { id: 'elsemesh-component:other-world', beds: [ portalBed ] } ], new Map( [ [ assetID, bytes ] ] ), { portal, gain: 0.5 } );
+await new Promise( resolve => setImmediate( resolve ) );
+sound.updateWorldAudio( 1 / 60, { listener: { position: { x: 1, y: 2, z: 3 }, forward: { z: -1 }, up: { y: 1 } } } );
+const portalSource = [ ...sound._portalAudioSources.values() ][ 0 ];
+assert.ok( portalSource, 'portal ambience starts from verified preview assets' );
+assert.ok( Math.abs( portalSource.panner.positionX.value - 4 ) < 1e-9 && Math.abs( portalSource.panner.positionZ.value + 2 ) < 1e-9, 'portal ambience is spatialized at its mapped source position' );
+assert.equal( portalSource.gain.gain.value, 0.2, 'portal proximity gain multiplies the world-authored bed gain' );
+sound.setPortalAmbience( null );
+assert.equal( portalSource.src.stopped, true, 'leaving portal range fades and stops destination ambience' );
+assert.equal( source.stopped, false, 'portal departure does not stop the active world ambience' );
 sound.dispose();
 console.log( 'ok hosted ambient audio playback and world handoff' );

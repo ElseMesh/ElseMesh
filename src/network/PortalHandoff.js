@@ -59,6 +59,29 @@ export function rotatePortalVelocity( velocity, entryYaw, exitYaw ) {
 	return { x: velocity.x * cos + velocity.z * sin, y: velocity.y ?? 0, z: - velocity.x * sin + velocity.z * cos };
 }
 
+// Map a point through an open portal using the same transform as the camera
+// and player. Audio uses the inverse to place a destination source in the
+// listener's world so the engine's ordinary panner preserves its direction.
+export function mapPortalPosition( position, entry, exit, scaleRatio = 1 ) {
+	scaleRatio = portalScaleRatio( scaleRatio );
+	const yaw = exit.yaw - entry.yaw;
+	return new Vector3().copy( position )
+		.sub( new Vector3().fromArray( entry.position ) )
+		.multiplyScalar( scaleRatio )
+		.applyAxisAngle( _up, yaw )
+		.add( new Vector3().fromArray( exit.position ) );
+}
+
+export function unmapPortalPosition( position, entry, exit, scaleRatio = 1 ) {
+	scaleRatio = portalScaleRatio( scaleRatio );
+	const yaw = entry.yaw - exit.yaw;
+	return new Vector3().copy( position )
+		.sub( new Vector3().fromArray( exit.position ) )
+		.multiplyScalar( 1 / scaleRatio )
+		.applyAxisAngle( _up, yaw )
+		.add( new Vector3().fromArray( entry.position ) );
+}
+
 // Carry the built-in vehicle's rigid-body state through the same yaw-only
 // transform as the player. Vehicle portability is a destination opt-in.
 export function mapPortalVehicleState( state, entry, exit, scaleRatio = 1 ) {
@@ -80,11 +103,7 @@ export function mapPortalVehicleState( state, entry, exit, scaleRatio = 1 ) {
 export function mapPortalPlayerState( state, entry, exit, scaleRatio = 1 ) {
 	scaleRatio = portalScaleRatio( scaleRatio );
 	const yawDelta = exit.yaw - entry.yaw;
-	const position = new Vector3().copy( state.position )
-		.sub( new Vector3().fromArray( entry.position ) )
-		.multiplyScalar( scaleRatio )
-		.applyAxisAngle( _up, yawDelta )
-		.add( new Vector3().fromArray( exit.position ) );
+	const position = mapPortalPosition( state.position, entry, exit, scaleRatio );
 	portalPositionInBounds( position );
 	const velocity = rotatePortalVelocity( state.velocity, entry.yaw, exit.yaw );
 	return {

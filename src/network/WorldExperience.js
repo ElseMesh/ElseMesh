@@ -7,6 +7,7 @@ const LOADING_STAGE_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
 const THEME_COLORS = [ 'background', 'surface', 'accent', 'text', 'muted', 'button', 'buttonText', 'border' ];
 const SKY_MODES = new Set( [ 'none', 'atmosphere' ] );
 const CLOUD_MODES = new Set( [ 'none', 'procedural' ] );
+const WORLD_TIME_FIELDS = [ 'hour', 'engineOverride' ];
 
 function validWorldAssetURL( source ) {
 	if ( typeof source !== 'string' || source.length > 500 ) return false;
@@ -45,6 +46,16 @@ export function worldEnvironmentSettings( experience ) {
 		sky: environment?.sky === 'atmosphere',
 		clouds: environment?.clouds === 'procedural',
 	};
+}
+
+// A ThruHold owns its clock. The engine setting is only a replacement when
+// that world explicitly opts in; otherwise its own authored hour is used.
+export function worldTimeOfDay( experience, engineOverride = null, worldTime = null ) {
+	const clock = experience?.environment?.timeOfDay;
+	if ( ! clock ) return null;
+	if ( clock.engineOverride === true && Number.isFinite( engineOverride ) ) return ( ( engineOverride % 24 ) + 24 ) % 24;
+	const hour = Number.isFinite( worldTime ) ? worldTime : clock.hour;
+	return ( ( hour % 24 ) + 24 ) % 24;
 }
 
 export const GENERIC_WORLD_EXPERIENCE = Object.freeze( validateWorldExperience( {
@@ -95,10 +106,14 @@ export function validateWorldExperience( experience, assets, options = {} ) {
 	}
 	if ( experience.environment !== undefined ) {
 		const environment = experience.environment;
-		if ( ! environment || typeof environment !== 'object' || Array.isArray( environment ) || Object.keys( environment ).some( key => ! [ 'sky', 'clouds' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold environment profile' );
+		if ( ! environment || typeof environment !== 'object' || Array.isArray( environment ) || Object.keys( environment ).some( key => ! [ 'sky', 'clouds', 'timeOfDay' ].includes( key ) ) ) throw new Error( 'Invalid ThruHold environment profile' );
 		if ( environment.sky !== undefined && ! SKY_MODES.has( environment.sky ) ) throw new Error( 'Invalid ThruHold sky mode' );
 		if ( environment.clouds !== undefined && ! CLOUD_MODES.has( environment.clouds ) ) throw new Error( 'Invalid ThruHold cloud mode' );
 		if ( environment.clouds === 'procedural' && environment.sky !== 'atmosphere' ) throw new Error( 'Procedural clouds require the atmospheric sky' );
+		if ( environment.timeOfDay !== undefined ) {
+			const clock = environment.timeOfDay;
+			if ( ! clock || typeof clock !== 'object' || Array.isArray( clock ) || Object.keys( clock ).some( key => ! WORLD_TIME_FIELDS.includes( key ) ) || ! Number.isFinite( clock.hour ) || clock.hour < 0 || clock.hour >= 24 || ( clock.engineOverride !== undefined && typeof clock.engineOverride !== 'boolean' ) ) throw new Error( 'Invalid ThruHold time-of-day profile' );
+		}
 	}
 	if ( experience.navigation !== undefined ) {
 		const navigation = experience.navigation;

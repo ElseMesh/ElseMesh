@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { registerWorldBehavior } from '../src/network/WorldBehaviorRegistry.js';
-import { GENERIC_WORLD_EXPERIENCE, validateWorldExperience } from '../src/network/WorldExperience.js';
+import { GENERIC_WORLD_EXPERIENCE, validateWorldExperience, worldTimeOfDay } from '../src/network/WorldExperience.js';
 
 const behaviorID = 'elsemesh.fixture-world-experience/1';
 registerWorldBehavior( behaviorID, {
@@ -10,6 +10,12 @@ registerWorldBehavior( behaviorID, {
 assert.match( GENERIC_WORLD_EXPERIENCE.tagline, /place shaped by its owner/i, 'remote worlds without copy use neutral loader text' );
 assert.equal( Object.values( GENERIC_WORLD_EXPERIENCE.stages ).every( ( text ) => text.includes( 'ThruHold' ) ), true, 'generic stage labels do not impose game-specific copy' );
 assert.equal( GENERIC_WORLD_EXPERIENCE.behaviors, undefined, 'the generic loading presentation does not select world behavior' );
+const worldClock = { environment: { timeOfDay: { hour: 22.5 } } };
+assert.equal( worldTimeOfDay( worldClock, 9 ), 22.5, 'world time stays authoritative without explicit engine override opt-in' );
+assert.equal( worldTimeOfDay( { environment: { timeOfDay: { hour: 22.5, engineOverride: true } } }, 9 ), 9, 'worlds may opt in to the engine time override' );
+assert.equal( worldTimeOfDay( worldClock, 9, 26 ), 2, 'the world runtime supplies its current time when available' );
+assert.equal( worldTimeOfDay( GENERIC_WORLD_EXPERIENCE, 9 ), null, 'worlds without a clock do not inherit an engine time' );
+assert.throws( () => validateWorldExperience( { ...GENERIC_WORLD_EXPERIENCE, environment: { timeOfDay: { hour: 24, engineOverride: true } } } ), /time-of-day profile/ );
 const javascriptAssetID = `sha256:${'a'.repeat( 64 )}`;
 const behaviorData = { seed: 3 };
 const javascriptExtension = { behaviorId: behaviorID, assetId: javascriptAssetID };
