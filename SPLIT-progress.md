@@ -100,8 +100,17 @@ world repositories. Its focused test passes, including two worlds contributing
 identical bytes. An isolated headless Chromium test then loaded the same
 digest URL for two different world asset records, verified size and SHA-256,
 and observed one origin transfer; the browser's origin-wide CacheStorage is keyed
-by that canonical URL. CDN publishing to R2 or another host remains open.
-Shared-content progress moves from 70% to 80%.
+by that canonical URL. Live CDN publication and edge reuse were not yet
+verified.
+**2026-11-21 CDN publisher follow-up:** Added a dry-run-first publisher for
+explicitly public assets listed in an owner-signed manifest. Before upload it
+checks the signature, canonical shared CDN URL, regular-file status, byte size,
+and SHA-256, then targets the matching digest key with immutable cache metadata.
+Its focused test passes against the repository-pinned Wrangler CLI. This makes
+the upload workflow reproducible, but no real CDN object has been published or
+fetched, so cross-world CDN reuse at the edge still needs live verification.
+Shared-content progress moves from 80% to 85%; live CDN deployment and edge
+reuse proof remain open.
 
 **2026-11-20 implementation update:** Tidewater now stores its canopy palette,
 species/variant selection, near/far handoff, fade and thinning distances, atlas

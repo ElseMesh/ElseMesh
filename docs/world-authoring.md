@@ -107,6 +107,18 @@ worldd --data ./node --manifest ./world.signed.json \
 
 For assets that are explicitly public, pass `--cdn-base-url https://<shared-asset-host>/<optional-prefix>` to the converter. It writes each signed asset's `cdnURL` as `<base>/sha256/<digest>`. Use the same base for every world that reuses those bytes, and publish each object at that digest path with CORS enabled and `Cache-Control: public, max-age=31536000, immutable`. The browser verifies the declared size and SHA-256 before use, stores verified bytes in ElseMesh-origin CacheStorage under that same URL for later worlds, and falls back to the authorized world provider if CDN delivery fails. The browser storage is shared only within the same ElseMesh site origin and browser profile. The converter does not upload assets; do not add this option for private or bridge-derived content.
 
+After signing the manifest and configuring the CDN hostname to serve the matching R2 bucket/prefix, inspect the upload plan:
+
+```sh
+node tools/publish-world-cdn-assets.mjs \
+  --manifest ./world.signed.json \
+  --assets /srv/elsemesh/assets \
+  --bucket elsemesh-world-content \
+  --cdn-base-url https://assets.example.net/public
+```
+
+The default is a dry run. Add `--upload` to publish only the owner-signed manifest assets with an explicit `cdnURL`; it verifies the signature and each local SHA-256 before calling Wrangler `r2 object put` with immutable cache headers. Install the repository's pinned Wrangler with `npm --prefix cloudflare/world-resolver ci` and authenticate the appropriate Cloudflare account first. The bucket and CDN path must match the manifest URL; configure bucket CORS for the ElseMesh site origin separately. This Wrangler path supports objects up to 300 MiB; larger assets need a multipart-capable S3/R2 client.
+
 World source can reference a shared asset by its existing `sha256:<digest>` ID without copying the file into the world's Git repository. Seed a shared hash-named asset store from one or more checked-in world packages with `node tools/sync-world-asset-store.mjs --store /srv/elsemesh/assets --assets worlds/tidewater/assets --assets worlds/other-world/assets`. The importer verifies every source hash, installs each digest only once, keeps existing valid entries, and rejects corrupt or conflicting bytes; it never deletes from the store or edits a world repository. Point `world-source-to-manifest.mjs --assets` at the shared store, then run `worldd` with `--asset-source` set to that store so the world host can verify and serve the asset. The signed manifest still lists the asset for that world. Keep this store outside source repositories and back it up as world content. CDN publication is a separate opt-in for public assets.
 
 ### Apply a reviewable proposal
