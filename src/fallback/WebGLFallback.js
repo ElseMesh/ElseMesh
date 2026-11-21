@@ -29,7 +29,7 @@ import { BoatSpray } from '../player/BoatSpray.js';
 import { hideReplacedWorldObjects } from './WebGLWorldObjectVisibility.js';
 import { webglLightingForTime } from './WebGLLighting.js';
 import { applyWebGLWorldMaterialGraphs } from './WebGLWorldMaterialGraphs.js';
-import { createWorldBehaviorExtensions, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks } from '../network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks, resolveWorldAmbientAudioGains } from '../network/WorldBehaviorRegistry.js';
 import { webglSandShoreBounds, webglShoreFieldTexture as encodeWebGLShoreField } from './WebGLShoreField.js';
 import { WebGLSpray } from './WebGLSpray.js';
 import { WebGLShoreState } from './WebGLShoreState.js';
@@ -2561,16 +2561,21 @@ export class WebGLFallback {
 		this.camera.getWorldDirection( fwd );
 		if ( this.worldLink && this.connector?.manifest ) {
 			const components = ( this.connector.manifest.components || [] ).filter( component => component.type === 'elsemesh.ambient-audio/1' );
-			audio.setWorldAmbience( this.connector.worldId, components, this.connector.assets );
-			if ( ! audio.enabled ) return;
 			const seaLevel = this.hostedSeaLevel ?? 0;
-			const sunHeight = this._sunDirection( this._worldTimeOfDay() ).y;
+			const timeOfDay = this._worldTimeOfDay();
+			const sunHeight = this._sunDirection( timeOfDay ).y;
+			const daylight = 1 - this.THREE.MathUtils.smoothstep( - sunHeight, 0.02, 0.18 );
+			const gains = resolveWorldAmbientAudioGains( this.connector.manifest.experience, {
+				components, timeOfDay, daylight, underwater: p.y < seaLevel, listenerPosition: p, seaLevel,
+			} );
+			audio.setWorldAmbience( this.connector.worldId, components, this.connector.assets, { gains } );
+			if ( ! audio.enabled ) return;
 			audio.updateWorldAudio( dt, {
 				listener: { position: p, forward: fwd, up: new this.THREE.Vector3( 0, 1, 0 ).applyQuaternion( this.camera.quaternion ) },
 				underwater: p.y < seaLevel ? 1 : 0,
 				depthBelowSurface: Math.max( 0, seaLevel - p.y ),
-				daylight: 1 - this.THREE.MathUtils.smoothstep( - sunHeight, 0.02, 0.18 ),
-				timeOfDay: this._worldTimeOfDay(),
+				daylight,
+				timeOfDay,
 			} );
 			return;
 		}

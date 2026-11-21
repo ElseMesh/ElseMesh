@@ -77,7 +77,7 @@ import { chooseWorldAdmission, selectedWorldAppearance } from './ui/WorldEntryPo
 import { worldSpawnCandidates, worldSpawnCollisionObjectIDs } from './network/WorldSpawn.js';
 import { updateWorldPackageLOD, appendWorldPackageAssets, createWorldPackageRoot, disposeWorldPackage, loadWorldPackage, projectedBoundsScreenFraction, registerWorldPackageCollisions, replaceWorldSourceCollisions, setWorldPackageProgressiveAsset, unloadWorldPackageComponents, unloadWorldPackageObjects, unregisterWorldPackageCollisions } from './network/WorldPackage.js';
 import { createBundledWorldAssetConnector, loadWorldComponentAssets } from './network/WorldComponentAssets.js';
-import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
+import { createWorldBehaviorExtensions, dispatchLatestWorldBehaviorExtensionEvent, dispatchWorldBehaviorExtensionEvent, dispatchWorldInputExtensionEvent, dispatchWorldBehaviorHooks, resolveWorldAmbientAudioGains, WORLD_EXTENSION_EVENT_ACTIVATED, WORLD_EXTENSION_EVENT_FRAME } from './network/WorldBehaviorRegistry.js';
 import { isVegetationWorldComponent, selectWorldComponentsForConnectorView, selectWorldObjectsForConnectorView, selectWorldObjectsForView, transformBoundsCenter } from './network/WorldStreaming.js';
 import { portalRouteFromPosition, crossedPortalPlane, mapPortalPlayerState, mapPortalVehicleState, mapPortalPosition } from './network/PortalHandoff.js';
 import { portalAudioProximityGain } from './network/PortalAudio.js';
@@ -2131,14 +2131,15 @@ export class App {
 			const seaLevel = destination.manifest.rules?.seaLevel;
 			const destinationHour = this.getWorldTimeOfDay( destination.worldId, destination.manifest.experience );
 			const destinationDaylight = Number.isFinite( destinationHour ) ? 1 - MathUtils.smoothstep( - sunDirectionFromTime( destinationHour ).y, 0.02, 0.18 ) : null;
+			const destinationUnderwater = Number.isFinite( seaLevel ) && mappedListener.y < seaLevel;
+			const gains = resolveWorldAmbientAudioGains( destination.manifest.experience, {
+				components: ambience, timeOfDay: destinationHour, daylight: destinationDaylight,
+				underwater: destinationUnderwater, listenerPosition: mappedListener, seaLevel,
+			} );
 			this.audio?.setPortalAmbience?.( destination.worldId, ambience, preparation.portalAssets, {
 				portal,
 				gain: portalAudioProximityGain( Math.sqrt( target.distanceSq ) ),
-				environment: {
-					daylight: destinationDaylight,
-					timeOfDay: destinationHour,
-					underwater: Number.isFinite( seaLevel ) && mappedListener.y < seaLevel,
-				},
+				gains,
 			} );
 		} else this.audio?.setPortalAmbience?.( null );
 
@@ -2602,16 +2603,21 @@ export class App {
 		if ( this.remoteWorldActive && this.worldConnector ) {
 			const connector = this.worldConnector;
 			const components = ( connector.manifest.components || [] ).filter( ( component ) => component.type === 'elsemesh.ambient-audio/1' );
-			this.audio.setWorldAmbience( connector.worldId, components, connector.assets );
+			const timeOfDay = this.getWorldTimeOfDay( connector.worldId, connector.manifest.experience );
+			const h = this.cameraWaterHeight ?? G.seaLevel.value;
+			const gains = resolveWorldAmbientAudioGains( connector.manifest.experience, {
+				components, timeOfDay, daylight: 1 - G.night.value,
+				underwater: p.y < h, listenerPosition: p, seaLevel: h,
+			} );
+			this.audio.setWorldAmbience( connector.worldId, components, connector.assets, { gains } );
 			if ( this.audio.enabled ) {
-				const h = this.cameraWaterHeight ?? G.seaLevel.value;
 				const boat = this.activeHostedBoat?.boat.controller;
 				this.audio.updateWorldAudio( dt, {
 					listener,
 					underwater: p.y < h ? 1 : 0,
 					depthBelowSurface: Math.max( 0, h - p.y ),
 					daylight: 1 - G.night.value,
-					timeOfDay: this.getWorldTimeOfDay( connector.worldId, connector.manifest.experience ),
+					timeOfDay,
 					boat: boat ? {
 						active: boat.driven, rpm: boat.rpm, speed: boat.velocity.length(), position: boat.model.group.position,
 						listenerInside: this.player.mode === 'boat' && this.player.camMode === 'first',

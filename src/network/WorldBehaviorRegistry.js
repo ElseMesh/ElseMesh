@@ -11,7 +11,7 @@ const WORLD_EXTENSION_LATEST_EVENT_INTERVAL_MS = 100;
 
 export function registerWorldBehavior( id, descriptor ) {
 	if ( typeof id !== 'string' || ! /^elsemesh\.[a-z0-9.-]+\/\d+$/.test( id ) || ! descriptor || typeof descriptor !== 'object' || Array.isArray( descriptor ) || behaviors.has( id ) ) throw new Error( 'Invalid or duplicate world behavior registration' );
-	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].includes( key ) ) || [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime' ].some( key => descriptor[ key ] !== undefined && typeof descriptor[ key ] !== 'function' ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
+	if ( Object.keys( descriptor ).some( key => ! [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime', 'resolveAmbientAudioGains' ].includes( key ) ) || [ 'validateExperienceData', 'validateExtensionEvent', 'validateExtensionResult', 'createRuntime', 'resolveAmbientAudioGains' ].some( key => descriptor[ key ] !== undefined && typeof descriptor[ key ] !== 'function' ) || ! Object.keys( descriptor ).length ) throw new Error( 'Invalid world behavior registration' );
 	behaviors.set( id, Object.freeze( { id, ...descriptor } ) );
 }
 export function worldBehaviorsFor( experience, { allowUnregisteredBehaviors = false } = {} ) {
@@ -32,6 +32,29 @@ export function worldBehaviorData( experience, id ) {
 	return worldBehaviorsFor( experience ).find( behavior => behavior.id === id )?.data;
 }
 
+// World behaviors interpret their own environmental labels and return gain
+// multipliers for generic ambient-audio beds. The engine only validates and
+// combines the numeric output; it does not assign meaning to world conditions.
+export function resolveWorldAmbientAudioGains( experience, { components = [], ...state } = {} ) {
+	const componentByID = new Map( components.filter( component => component?.type === 'elsemesh.ambient-audio/1' && Array.isArray( component.beds ) ).map( component => [ component.id, component ] ) );
+	const gains = new Map();
+	for ( const behavior of resolvedWorldBehaviors( experience ).values() ) {
+		if ( ! behavior.resolveAmbientAudioGains ) continue;
+		const resolved = behavior.resolveAmbientAudioGains( { ...state, data: behavior.data, components: [ ...componentByID.values() ] } );
+		if ( resolved === undefined ) continue;
+		if ( ! resolved || typeof resolved !== 'object' || Array.isArray( resolved ) ) throw new Error( `World behavior ${behavior.id} returned invalid ambient audio gains` );
+		for ( const [ componentID, values ] of Object.entries( resolved ) ) {
+			const component = componentByID.get( componentID );
+			if ( ! component || ! Array.isArray( values ) || values.length !== component.beds.length || values.some( value => ! Number.isFinite( value ) || value < 0 || value > 1 ) ) throw new Error( `World behavior ${behavior.id} returned invalid ambient audio gains for ${componentID}` );
+			for ( let index = 0; index < values.length; index ++ ) {
+				const key = `${componentID}\0${index}`;
+				gains.set( key, ( gains.get( key ) ?? 1 ) * values[ index ] );
+			}
+		}
+	}
+	return gains;
+}
+
 export function registerWorldBehaviorImplementation( id, implementation ) {
 	const existing = implementations.get( id ) || {};
 	const entries = implementation && typeof implementation === 'object' && ! Array.isArray( implementation ) ? Object.entries( implementation ) : [];
@@ -41,14 +64,19 @@ export function registerWorldBehaviorImplementation( id, implementation ) {
 
 export function dispatchWorldBehaviorHooks( experience, hook, context ) {
 	if ( ! [ 'onBuiltinWorldActivated', 'onHostedWorldActivated', 'onWorldDeactivated', 'onWorldFrame', 'onWorldExtensionResult', 'onWorldBlocksPlayerInput', 'onWorldKeyDown', 'onWebGLWorldActivated', 'onWebGLWorldFrame' ].includes( hook ) ) throw new Error( `Invalid world behavior hook: ${hook}` );
-	let resolved = resolvedExperiences.get( experience );
+	const resolved = resolvedWorldBehaviors( experience );
+	let handled = false;
+	for ( const [ id, implementation ] of implementations ) if ( implementation[ hook ]?.( { ...context, experience, active: resolved.has( id ), data: resolved.get( id )?.data, behaviorId: id } ) === true ) handled = true;
+	return handled;
+}
+
+function resolvedWorldBehaviors( experience ) {
+	let resolved = experience && typeof experience === 'object' ? resolvedExperiences.get( experience ) : null;
 	if ( ! resolved ) {
 		resolved = new Map( worldBehaviorsFor( experience ).map( behavior => [ behavior.id, behavior ] ) );
 		if ( experience && typeof experience === 'object' ) resolvedExperiences.set( experience, resolved );
 	}
-	let handled = false;
-	for ( const [ id, implementation ] of implementations ) if ( implementation[ hook ]?.( { ...context, experience, active: resolved.has( id ), data: resolved.get( id )?.data, behaviorId: id } ) === true ) handled = true;
-	return handled;
+	return resolved;
 }
 
 export async function dispatchWorldBehaviorExtensionEvent( experience, extensions, event, context = {} ) {

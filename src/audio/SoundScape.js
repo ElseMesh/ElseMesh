@@ -136,12 +136,13 @@ export class SoundScape {
 		this._worldAudioComponents = new Map(); // component ID -> signed data and verified bytes
 		this._worldAudioSources = new Map(); // component ID + bed index -> running loop
 		this._worldAudioPendingBeds = new Set();
+		this._worldAudioGains = new Map();
 		this._portalAudioWorldID = null;
 		this._portalAudioComponents = new Map(); // world + component ID -> signed data and verified bytes
 		this._portalAudioSources = new Map();
 		this._portalAudioPendingBeds = new Set();
 		this._portalAudioPortal = null;
-		this._portalAudioEnvironment = EMPTY;
+		this._portalAudioGains = new Map();
 		this._portalAudioGain = 0;
 		this._worldOneShotEvents = new Set(); // world + event ID -> played transition sound
 		this._worldOneShotPending = new Set();
@@ -405,7 +406,7 @@ export class SoundScape {
 
 	// Signed, data-only ambient loops for the active hosted world. Audio bytes come
 	// only from the connector's hash-verified asset cache, never a URL in the manifest.
-	setWorldAmbience( worldID, components = [], assets = new Map() ) {
+	setWorldAmbience( worldID, components = [], assets = new Map(), { gains = new Map() } = {} ) {
 
 		if ( worldID !== this._worldAudioWorldID ) {
 
@@ -417,6 +418,7 @@ export class SoundScape {
 		}
 
 		const next = new Map( components.map( ( component ) => [ component.id, component ] ) );
+		this._worldAudioGains = gains instanceof Map ? gains : new Map();
 		for ( const id of this._worldAudioComponents.keys() ) if ( ! next.has( id ) ) {
 			this._removeWorldAudioComponent( id );
 			this._worldAudioComponents.delete( id );
@@ -436,7 +438,7 @@ export class SoundScape {
 	// Destination ambience is mixed through the active doorway. The world owns
 	// signed sample references and source positions; ElseMesh maps those positions
 	// through the portal and applies the proximity gain.
-	setPortalAmbience( worldID, components = [], assets = new Map(), { portal = null, gain = 0, environment = EMPTY } = {} ) {
+	setPortalAmbience( worldID, components = [], assets = new Map(), { portal = null, gain = 0, gains = new Map() } = {} ) {
 
 		if ( typeof worldID !== 'string' || ! portal || ! Number.isFinite( gain ) ) {
 			this._fadePortalAudio();
@@ -451,7 +453,7 @@ export class SoundScape {
 			exit: { position: [ ...portal.exit.position ], yaw: portal.exit.yaw },
 			scaleRatio: portal.scaleRatio ?? 1,
 		};
-		this._portalAudioEnvironment = environment && typeof environment === 'object' ? environment : EMPTY;
+		this._portalAudioGains = gains instanceof Map ? new Map( [ ...gains ].map( ( [ key, value ] ) => [ `${worldID}\0${key}`, value ] ) ) : new Map();
 		this._portalAudioGain = clamp( gain, 0, 1 );
 		const next = new Map( components.map( component => [ `${worldID}\0${component.id}`, component ] ) );
 		for ( const key of this._portalAudioComponents.keys() ) if ( ! next.has( key ) ) {
@@ -474,7 +476,7 @@ export class SoundScape {
 
 		this._portalAudioGain = 0;
 		this._portalAudioPortal = null;
-		this._portalAudioEnvironment = EMPTY;
+		this._portalAudioGains = new Map();
 		this._portalAudioWorldID = null;
 		for ( const key of this._portalAudioComponents.keys() ) this._removePortalAudioComponent( key, true );
 		this._portalAudioComponents.clear();
@@ -602,27 +604,15 @@ export class SoundScape {
 			this._ramp( this.under.gain, this.env.u, 0.06 );
 			this._syncWorldAudio();
 			this._syncPortalAudio();
-			for ( const bed of this._worldAudioSources.values() ) {
+			for ( const [ key, bed ] of this._worldAudioSources ) {
 
-				const condition = bed.definition.condition || 'always';
-				let factor = 1;
-				if ( condition === 'day' ) factor = this.env.day;
-				else if ( condition === 'night' ) factor = 1 - this.env.day;
-				else if ( condition === 'underwater' ) factor = this.env.u;
-				else if ( condition === 'dawn' ) factor = this._dawnFactor();
+				const factor = this._worldAudioGains.get( key ) ?? 1;
 				this._ramp( bed.gain.gain, bed.definition.gain * factor * ( bed.mono ? MONO : 1 ), 0.35 );
 
 			}
-			for ( const bed of this._portalAudioSources.values() ) {
+			for ( const [ key, bed ] of this._portalAudioSources ) {
 				if ( bed.fading ) continue;
-				const condition = bed.definition.condition || 'always';
-				const env = this._portalAudioEnvironment;
-				const daylight = Number.isFinite( env.daylight ) ? clamp( env.daylight, 0, 1 ) : null;
-				let factor = 1;
-				if ( condition === 'day' ) factor = daylight ?? 0;
-				else if ( condition === 'night' ) factor = daylight === null ? 0 : 1 - daylight;
-				else if ( condition === 'underwater' ) factor = env.underwater === true ? 1 : 0;
-				else if ( condition === 'dawn' ) factor = Number.isFinite( env.timeOfDay ) ? this._dawnFactorAt( env.timeOfDay ) : 0;
+				const factor = this._portalAudioGains.get( key ) ?? 1;
 				if ( bed.panner && this._portalAudioPortal ) {
 					const mapped = unmapPortalPosition( bed.definition.position, this._portalAudioPortal.entry, this._portalAudioPortal.exit, this._portalAudioPortal.scaleRatio );
 					const now = this.ctx.currentTime, tau = 0.08;
@@ -774,23 +764,11 @@ export class SoundScape {
 			panner.positionZ.value = definition.position[ 2 ];
 		}
 		src.connect( gain );
-		if ( panner ) gain.connect( panner ).connect( definition.condition === 'underwater' ? this.under : this.above );
-		else gain.connect( definition.condition === 'underwater' ? this.under : this.above );
+		const output = definition.acousticLayer === 'underwater' ? this.under : this.above;
+		if ( panner ) gain.connect( panner ).connect( output );
+		else gain.connect( output );
 		src.start( c.currentTime + 0.02, Math.random() * buffer.duration );
 		this._worldAudioSources.set( key, { src, gain, panner, definition, mono: buffer.numberOfChannels === 1 } );
-
-	}
-
-	_dawnFactor() {
-
-		return this._dawnFactorAt( this.env.hour );
-
-	}
-
-	_dawnFactorAt( h ) {
-
-		if ( ! Number.isFinite( h ) ) return 0;
-		return smooth( 5.0, 5.8, h ) * ( 1 - smooth( 6.6, 7.9, h ) );
 
 	}
 

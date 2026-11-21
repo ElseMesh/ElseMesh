@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { SoundScape } from '../src/audio/SoundScape.js';
 import { mapPortalPosition, unmapPortalPosition } from '../src/network/PortalHandoff.js';
 import { portalAudioProximityGain } from '../src/network/PortalAudio.js';
+import { registerWorldBehavior, resolveWorldAmbientAudioGains } from '../src/network/WorldBehaviorRegistry.js';
 
 class Param {
 	constructor( value = 0 ) { this.value = value; }
@@ -53,8 +54,16 @@ const sampleIDs = sound.registerSampleBank( 'fixture.world-audio', {
 sound.setActiveSampleBank( 'fixture.world-audio' );
 const assetID = `sha256:${'a'.repeat( 64 )}`;
 const bytes = new Uint8Array( [ 1, 2, 3, 4 ] );
-const bed = { assetId: assetID, gain: 0.35, condition: 'always', position: [ 4, 2, -3 ] };
-sound.setWorldAmbience( 'elsemesh:first', [ { id: 'elsemesh-component:ambience', beds: [ bed ] } ], new Map( [ [ assetID, bytes ] ] ) );
+const bed = { assetId: assetID, gain: 0.35, position: [ 4, 2, -3 ] };
+const componentID = 'elsemesh-component:ambience';
+const audioBehaviorID = 'elsemesh.fixture-audio-gains/1';
+registerWorldBehavior( audioBehaviorID, {
+	resolveAmbientAudioGains: ( { data, components } ) => Object.fromEntries( components.map( component => [ component.id, component.beds.map( () => data.factor ) ] ) ),
+} );
+const audioComponents = [ { id: componentID, type: 'elsemesh.ambient-audio/1', beds: [ bed ] } ];
+const gains = resolveWorldAmbientAudioGains( { behaviors: { [ audioBehaviorID ]: { factor: 0.5 } } }, { components: audioComponents, timeOfDay: 22 } );
+assert.equal( gains.get( `${componentID}\0${0}` ), 0.5, 'registered world behavior supplies semantic ambient gains to the engine' );
+sound.setWorldAmbience( 'elsemesh:first', audioComponents, new Map( [ [ assetID, bytes ] ] ), { gains } );
 sound.updateWorldAudio( 1 / 60, { listener: { position: { x: 1, y: 2, z: 3 }, forward: { z: -1 }, up: { y: 1 } } } );
 await new Promise( ( resolve ) => setImmediate( resolve ) );
 sound.updateWorldAudio( 1 / 60, { listener: { position: { x: 1, y: 2, z: 3 }, forward: { z: -1 }, up: { y: 1 } } } );
@@ -62,7 +71,7 @@ assert.equal( sound._worldAudioSources.size, 1, 'a hash-verified hosted bed is d
 const source = sound.ctx.sources[ 0 ];
 assert.equal( source.started, true, 'the ambience buffer source starts looping' );
 assert.equal( source.loop, true, 'ambient audio loops continuously' );
-assert.equal( sound._worldAudioSources.values().next().value.gain.gain.value, 0.35, 'ambient gain is applied through the shared audio context' );
+assert.equal( sound._worldAudioSources.values().next().value.gain.gain.value, 0.175, 'world-authored gain multipliers are applied through the shared audio context' );
 assert.equal( await sound.playWorldOneShot( 'elsemesh:first', 'elsemesh-component:door:1', assetID, bytes, [ 4, 2, -3 ] ), true, 'a signed world transition sound starts as a positional one-shot' );
 assert.equal( await sound.playWorldOneShot( 'elsemesh:first', 'elsemesh-component:door:1', assetID, bytes, [ 4, 2, -3 ] ), false, 'the same host event cannot play twice' );
 assert.equal( sound.ctx.sources[ 1 ].started, true, 'the door event uses a non-looping buffer source' );
@@ -95,14 +104,15 @@ const localPoint = unmapPortalPosition( remotePoint, portal.entry, portal.exit, 
 assert.ok( localPoint.distanceTo( { x: 4, y: 3, z: -2 } ) < 1e-9, 'portal audio source coordinates use the inverse doorway transform' );
 assert.equal( portalAudioProximityGain( 24 ), 0, 'remote ambience is silent outside its approach radius' );
 assert.equal( portalAudioProximityGain( 2 ), 1, 'remote ambience reaches full gain at the doorway' );
-const portalBed = { assetId: assetID, gain: 0.4, condition: 'always', position: [ remotePoint.x, remotePoint.y, remotePoint.z ], refDistance: 2, rolloff: 1 };
-sound.setPortalAmbience( 'elsemesh:next', [ { id: 'elsemesh-component:other-world', beds: [ portalBed ] } ], new Map( [ [ assetID, bytes ] ] ), { portal, gain: 0.5 } );
+const portalBed = { assetId: assetID, gain: 0.4, position: [ remotePoint.x, remotePoint.y, remotePoint.z ], refDistance: 2, rolloff: 1 };
+const portalComponentID = 'elsemesh-component:other-world';
+sound.setPortalAmbience( 'elsemesh:next', [ { id: portalComponentID, beds: [ portalBed ] } ], new Map( [ [ assetID, bytes ] ] ), { portal, gain: 0.5, gains: new Map( [ [ `${portalComponentID}\0${0}`, 0.5 ] ] ) } );
 await new Promise( resolve => setImmediate( resolve ) );
 sound.updateWorldAudio( 1 / 60, { listener: { position: { x: 1, y: 2, z: 3 }, forward: { z: -1 }, up: { y: 1 } } } );
 const portalSource = [ ...sound._portalAudioSources.values() ][ 0 ];
 assert.ok( portalSource, 'portal ambience starts from verified preview assets' );
 assert.ok( Math.abs( portalSource.panner.positionX.value - 4 ) < 1e-9 && Math.abs( portalSource.panner.positionZ.value + 2 ) < 1e-9, 'portal ambience is spatialized at its mapped source position' );
-assert.equal( portalSource.gain.gain.value, 0.2, 'portal proximity gain multiplies the world-authored bed gain' );
+assert.equal( portalSource.gain.gain.value, 0.1, 'world-authored bed gains multiply with portal proximity gain' );
 sound.setPortalAmbience( null );
 assert.equal( portalSource.src.stopped, true, 'leaving portal range fades and stops destination ambience' );
 assert.notEqual( activeSource.src.stopped, true, 'portal departure does not stop the active world ambience' );

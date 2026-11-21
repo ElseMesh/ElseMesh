@@ -115,6 +115,7 @@ export function validateWorldSource( source, { allowUnregisteredBehaviors = fals
 		const assetIDs = new Set();
 		for ( const asset of component.assets ) if ( ! asset || typeof asset !== 'object' || Array.isArray( asset ) || Object.keys( asset ).length !== 2 || Object.keys( asset ).some( key => ! [ 'assetId', 'kind' ].includes( key ) ) || ! /^sha256:[0-9a-f]{64}$/.test( asset.assetId || '' ) || typeof asset.kind !== 'string' || ! /^[a-z0-9][a-z0-9./-]{0,63}$/.test( asset.kind ) || assetIDs.has( asset.assetId ) ) throw new Error( `Invalid component asset reference on ${component.id}` ); else assetIDs.add( asset.assetId );
 		if ( ! source.rules.requiredFeatures?.includes( component.type ) ) throw new Error( `World component ${component.type} must be listed in requiredFeatures` );
+		if ( component.type === 'elsemesh.ambient-audio/1' ) validateAmbientAudioComponent( component );
 		ids.add( component.id );
 	}
 	return source;
@@ -130,6 +131,15 @@ function validVector( value ) {
 
 function validQuaternion( value ) {
 	return Array.isArray( value ) && value.length === 4 && value.every( Number.isFinite ) && Math.abs( Math.hypot( ...value ) - 1 ) <= 1e-4;
+}
+
+function validateAmbientAudioComponent( component ) {
+	const beds = component.data.beds;
+	if ( Object.keys( component.data ).some( key => key !== 'beds' ) || ! Array.isArray( beds ) || beds.length < 1 || beds.length > 16 ) throw new Error( `Invalid ambient audio beds on ${component.id}` );
+	const assets = new Set( component.assets.filter( asset => asset.kind === 'audio/ogg' ).map( asset => asset.assetId ) );
+	for ( const bed of beds ) {
+		if ( ! bed || typeof bed !== 'object' || Array.isArray( bed ) || Object.keys( bed ).some( key => ! [ 'assetId', 'gain', 'acousticLayer', 'position', 'refDistance', 'rolloff' ].includes( key ) ) || ! /^sha256:[0-9a-f]{64}$/.test( bed.assetId || '' ) || ! assets.has( bed.assetId ) || ! Number.isFinite( bed.gain ) || bed.gain < 0 || bed.gain > 1 || bed.acousticLayer !== undefined && ! [ 'above', 'underwater' ].includes( bed.acousticLayer ) || bed.position !== undefined && ( ! validVector( bed.position ) || bed.position.some( value => Math.abs( value ) > 1e6 ) ) || bed.refDistance !== undefined && ( ! Number.isFinite( bed.refDistance ) || bed.refDistance < 0.5 || bed.refDistance > 1000 ) || bed.rolloff !== undefined && ( ! Number.isFinite( bed.rolloff ) || bed.rolloff < 0 || bed.rolloff > 10 ) ) throw new Error( `Invalid ambient audio bed on ${component.id}` );
+	}
 }
 
 function validGateway( value ) {

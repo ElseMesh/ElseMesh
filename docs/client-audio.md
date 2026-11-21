@@ -11,7 +11,7 @@ If a local tab is silent while the hosted tab plays:
 
 The game currently has no separate local-only audio switch. If those checks pass but ambience is still absent, capture the console and Network errors before changing the mixer; the production and development paths share the same audio initialization code.
 
-Hosted worlds can provide signed, content-addressed ambience through `elsemesh.ambient-audio/1`. The browser plays those OGG loops through the same `SoundScape` AudioContext after the normal start gesture. See [the component contract](schemas/ambient-audio.md).
+Hosted worlds can provide signed, content-addressed ambience through `elsemesh.ambient-audio/1`. Registered world behaviors supply state-driven bed gains; ElseMesh plays and spatializes the OGG loops through the shared `SoundScape` AudioContext after the normal start gesture. See [the component contract](schemas/ambient-audio.md).
 
 World-owned behavior may use `SoundScape.preloadSamples`, `playSample`, and
 `setSampleLoop` for local interactive cues. The world chooses its samples,

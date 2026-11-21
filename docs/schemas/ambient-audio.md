@@ -11,7 +11,7 @@
     {
       "assetId": "sha256:<64 lowercase hex characters>",
       "gain": 0.25,
-      "condition": "night",
+      "acousticLayer": "underwater",
       "position": [12, 4, -8],
       "refDistance": 3,
       "rolloff": 1
@@ -20,6 +20,6 @@
 }
 ```
 
-`beds` must contain 1–16 records; a world may contain at most 16 such components. Each referenced OGG is limited to 16 MiB, and its asset streaming priority must equal the component priority (default `portal-preview`). Gain is a linear scalar in `[0,1]`. Conditions are `always` (default), `day`, `night`, `dawn`, and `underwater`. `position` is an optional world-space point in meters; when present it enables HRTF/inverse-distance spatialization. `refDistance` defaults to 1 m and is bounded to 0.5–1000 m; `rolloff` defaults to 1 and is bounded to 0–10. Without a position, the bed is non-spatial.
+`beds` must contain 1–16 records; a world may contain at most 16 such components. Each referenced OGG is limited to 16 MiB, and its asset streaming priority must equal the component priority (default `portal-preview`). Gain is a linear scalar in `[0,1]`. `acousticLayer` is optional and may be `above` (default) or `underwater`; it selects the engine's corresponding spatial audio bus. `position` is an optional world-space point in meters; when present it enables HRTF/inverse-distance spatialization. `refDistance` defaults to 1 m and is bounded to 0.5–1000 m; `rolloff` defaults to 1 and is bounded to 0–10. Without a position, the bed is non-spatial.
 
-The browser uses its existing `SoundScape` AudioContext and therefore follows normal browser user-gesture audio startup. Bed gain transitions are smoothed; underwater beds route through the underwater bus and other beds through the above-water bus. ElseMesh keeps active-world beds playing and also loads the destination's `portal-preview` ambience for an open portal. It maps each destination source position back through the doorway transform and fades that layer from silence at 24 m to full gain at 2 m from the aperture. The world supplies sample references, loop levels, conditions, and positions; ElseMesh owns decoding, spatial playback, proximity fading, and cleanup. Portal ambience is available only when the bed assets are included in the destination's portal-preview package. The component describes looping ambience only: one-shot events, dynamic occlusion, world-state-driven variations, and server-authoritative audio are outside this version.
+The browser uses its existing `SoundScape` AudioContext and therefore follows normal browser user-gesture audio startup. Bed gain transitions are smoothed; `acousticLayer` selects the underwater or above-water bus. A registered world behavior can resolve per-bed gain multipliers from that world's clock and environment for both the active world and an open portal destination. ElseMesh validates those numeric gains, decodes and spatializes the signed assets, applies the doorway-distance fade, and cleans up departed sources. Portal ambience is available only when the bed assets are included in the destination's `portal-preview` package. The component describes looping ambience only: one-shot events, dynamic occlusion, and server-authoritative audio are outside this version.
