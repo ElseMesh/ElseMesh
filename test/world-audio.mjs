@@ -84,7 +84,7 @@ assert.ok( sound._beds.has( sampleIDs.boat_engine ), 'world audio profiles selec
 sound.setWorldAmbience( 'elsemesh:second', [ { id: 'elsemesh-component:ambience', beds: [ bed ] } ], new Map( [ [ assetID, bytes ] ] ) );
 assert.equal( source.stopped, true, 'world handoff stops the previous world ambience' );
 assert.equal( sound.ctx.sources[ 1 ].stopped, true, 'world handoff stops a playing door event' );
-assert.equal( sound._worldAudioSources.size, 0, 'world handoff releases loop sources' );
+assert.equal( sound._worldAudioSources.size, 1, 'world handoff replaces the old loop with the newly active world bed' );
 await new Promise( resolve => setImmediate( resolve ) );
 sound.updateWorldAudio( 1 / 60, { listener: { position: { x: 1, y: 2, z: 3 }, forward: { z: -1 }, up: { y: 1 } } } );
 const activeSource = [ ...sound._worldAudioSources.values() ][ 0 ];
